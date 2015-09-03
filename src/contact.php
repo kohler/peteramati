@@ -1212,17 +1212,18 @@ class Contact {
             return $error && $Conf->errorMsg("That $code_seas username is already in use.");
 
         // is it valid?
-        $htreq = new http\Client\Request("GET", self::seascode_user($username));
-        $htreq->setOptions(array("timeout" => 5));
-        $htclient = new http\Client;
+        $htopt = array("timeout" => 5, "ignore_errors" => true);
+        $context = stream_context_create(array("http" => $htopt));
         $response_code = 509;
-        try {
-            $htclient->enqueue($htreq)->send();
-            $htresponse = $htclient->getResponse();
-            $response_code = $htresponse->getResponseCode();
-        } catch (http\Exception $ex) {
-            error_log(var_export($ex, true));
+        if (($stream = fopen(self::seascode_user($username), "r", false, $context))) {
+            if (($metadata = stream_get_meta_data($stream))
+                && ($w = @$metadata["wrapper_data"])
+                && is_array($w)
+                && preg_match(',\AHTTP/[\d.]+\s+(\d+)\s+(.+)\z,', $w[0], $m))
+                $response_code = (int) $m[1];
+            fclose($stream);
         }
+
         if ($response_code == 200)
             return true;
         else if ($response_code == 404)
