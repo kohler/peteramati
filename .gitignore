@@ -1,0 +1,10 @@
+*~
+*.dSYM
+conf/gitssh_config
+conf/id_rsa_*
+conf/options.php
+jail/execjail
+jail/stderrtostdout
+log/
+repo/
+.vagrant/

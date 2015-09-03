@@ -1,0 +1,14 @@
+[
+    {
+        "type": "repo_unreadable",
+        "html": "We can’t access the repository at %REPOGITURL%. Check the repository name and make sure that you have listed the %SYSTEAM% team as a collaborator (use <a href=\"https://code.seas.harvard.edu/\">code.seas</a>’s <a href=\"https://code.seas.harvard.edu/%REPOBASE%/memberships\">“Manage read access”</a> link)."
+    },
+    {
+        "type": "repo_nomain",
+        "html": "The %REPOBASE% repository does not appear to have a “master” branch. That branch is required for grading."
+    },
+    {
+        "type": "repo_toopublic",
+        "html": "The %REPOBASE% repository is too public. Use <a href=\"https://code.seas.harvard.edu/%REPOBASE%/memberships\">“Manage read access”</a> to grant the %SYSTEAM% team read access; this should shut down public access."
+    }
+]

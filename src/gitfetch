@@ -1,0 +1,159 @@
+#! /bin/sh
+if ! expr "$0" : '.*[/]' >/dev/null; then PROGDIR=./
+else PROGDIR=`echo "$0" | sed 's,^\(.*/\)[^/]*$,\1,'`; fi
+expr "$PROGDIR" : '[/]' >/dev/null || PROGDIR="`pwd`/$PROGDIR"
+PROGDIR=`echo "$PROGDIR" | sed 's,/$,,'`
+LIBDIR="$PROGDIR/../lib/"
+. ${LIBDIR}dbhelper.sh
+
+usage () {
+    echo "Usage: gitfetch [-f] REPOID CACHEID URL" 1>&2
+    echo "       gitfetch [-f] SEASCODE_USERNAME [PSET]" 1>&2
+    echo "       gitfetch [-f] --refresh" 1>&2
+    exit $1
+}
+
+test -z "$GITSSH_CONFIG" && export GITSSH_CONFIG="${CONFDIR}gitssh_config"
+test -z "$GITSSH_REPOCACHE" && GITSSH_REPOCACHE="${MAINDIR}repo"
+test -z "$GIT_SSH" && export GIT_SSH="${SRCDIR}gitssh"
+if [ ! -r "$GITSSH_CONFIG" -o ! -d "$GITSSH_REPOCACHE" ]; then
+    echo "Bad GITSSH_CONFIG and/or GITSSH_REPOCACHE" 1>&2
+    usage 1
+fi
+
+force=
+if [ "$1" = -f -o "$1" = --force ]; then
+    force=y; shift
+fi
+
+if [ "$#" = 1 -a "$1" = --refresh ]; then
+    now=`date +%s`
+    result=`echo "select r.repoid, r.cacheid, r.url from Repository r
+	where r.snapcheckat<$now - 900
+	order by r.lastpset desc, r.snapcheckat asc limit 1" |
+        ${LIBDIR}runsql.sh -N`
+    repoid="`echo "$result" | awk '{ print $1 }'`"
+    cacheid="`echo "$result" | awk '{ print $2 }'`"
+    url="`echo "$result" | awk '{ print $3 }'`"
+    test -z "$url" && exit 0
+elif [ "$#" = 1 -o "$#" = 2 ]; then
+    quoted="`echo "$1" | sql_quote`"
+    psetquoted="`echo "$2" | sql_quote`"
+    if [ -n "$psetquoted" ]; then psetquoted="and l.pset='$psetquoted'"; fi
+    result=`echo "select r.repoid, r.cacheid, r.url from Repository r
+        join ContactInfo c
+	join ContactLink l on (c.contactId=l.cid and l.type=3 and l.link=r.repoid)
+        where c.seascode_username='$quoted'$psetquoted
+	order by l.pset desc, r.snapcheckat asc limit 1" |
+        ${LIBDIR}runsql.sh -N`
+    repoid="`echo "$result" | awk '{ print $1 }'`"
+    cacheid="`echo "$result" | awk '{ print $2 }'`"
+    url="`echo "$result" | awk '{ print $3 }'`"
+    test -z "$url" && exit 0
+elif [ -z "$1" -o -z "$2" -o -z "$3" ]; then
+    usage 1
+else
+    repoid="$1"; cacheid="$2"; url="$3"
+fi
+
+repo_dir="$GITSSH_REPOCACHE/repo$cacheid"
+if test ! -d "$repo_dir"; then
+    mkdir -m 02770 "$repo_dir" || exit 1
+    chmod g+s "$repo_dir"
+    chgrp `find "$GITSSH_REPOCACHE" -maxdepth 0 -printf %g` "$repo_dir"
+fi
+
+old_dir="`pwd`"
+cd "$repo_dir"
+if test ! -d .git; then
+    git init --shared=group || exit 1
+fi
+
+if test ! -d .git/refs/remotes/repo$repoid && \
+    ! grep '^\[remote "repo'$repoid'"\]' .git/config >/dev/null; then
+    if ! git remote add repo$repoid "$url"; then
+        snaplong=`date '+%d/%b/%Y:%H:%M:%S %z'`
+        echo "[$snaplong] gitfetch $repoid $cacheid $url: cannot add repo"
+        exit 1
+    fi
+fi
+
+if test "`git config remote.repo$repoid.url`" != "$url" && \
+    ! git remote set-url repo$repoid "$url"; then
+    snaplong=`date '+%d/%b/%Y:%H:%M:%S %z'`
+    echo "[$snaplong] gitfetch $repoid $cacheid $url: cannot change repo url"
+    exit 1
+fi
+
+# fuckin git leaves a bad FETCH_HEAD around
+if test -f .git/FETCH_HEAD -a ! -w .git/FETCH_HEAD; then
+    rm -f .git/FETCH_HEAD
+fi
+
+git fetch repo$repoid
+gitfetch_status=$?
+
+now=`date '+%Y%m%d.%H%M%S<%s>%d/%b/%Y:%H:%M:%S %z'`
+snapnow=`echo $now | sed 's/<.*//'`
+snaptime=`echo $now | sed 's/.*<\(.*\)>.*/\1/'`
+snaplong=`echo $now | sed 's/.*>//'`
+
+find_distinct_heads () {
+    distinct_heads=
+    xtags="`git rev-parse $tags`"
+    first_head=`echo $xtags | tr ' ' '\n' | head -n 1`
+    while [ -n "$xtags" ]; do
+        next_head=`echo $xtags | tr ' ' '\n' | head -n 1`
+        distinct_heads="`echo $next_head $distinct_heads`"
+        xtags="`git log --format=%H $next_head |
+            ( echo $xtags | tr ' ' '\n' ; cat ) | sort | uniq -d |
+            ( echo $xtags | tr ' ' '\n' ; cat ) | sort | uniq -u`"
+    done
+    if expr "$distinct_heads" : ".* " >/dev/null 2>&1; then
+        # sort by reverse timestamp
+        distinct_heads="`for h in $distinct_heads; do
+            git log -n1 --format='%ct %H' $h; done | sort -r |
+            awk '{print $2}'`"
+        # nl -> space, no leading/trailing space
+        distinct_heads="`echo $distinct_heads`"
+    fi
+}
+
+update=
+if [ $gitfetch_status = 0 ]; then
+    cur_head=`cat .git/refs/remotes/repo$repoid/master`
+    tags="`git tag -l "repo$repoid.snap*" | sort -r`"
+    last_tag=`echo $tags | tr ' ' '\n' | head -n 1`
+    last_tag_head=`test -n "$last_tag" && cat .git/refs/tags/$last_tag`
+    new_head=
+    update="snaphash='$cur_head', working=$snaptime, $update"
+    if [ -n "$cur_head" -a "$last_tag_head" != "$cur_head" ]; then
+        git tag "repo$repoid.snap$snapnow" $cur_head
+        update="snapat='$snaptime', $update"
+        new_head=y
+    fi
+    if [ -n "$new_head" -o -n "$force" ]; then
+        log="`git log -n1 --format='%ct %s' $cur_head`"
+        log_time=`echo "$log" | sed 's/^\([^ ]*\).*/\1/'`
+        log_line="`echo "$log" | sed 's/^[^ ]* //'`"
+        if [ -n "$log_time" ]; then
+            update="snapcommitat=$log_time, snapcommitline='`echo "$log_line" | head -c 100 | sql_quote`', $update"
+        fi
+        find_distinct_heads
+        update="heads='$distinct_heads', $update"
+    fi
+else
+    update="working=0, "
+fi
+
+cd "$old_dir"
+echo "update Repository set $update snapcheckat='$snaptime' where repoid=$repoid" | ${LIBDIR}runsql.sh
+cd "$repo_dir"
+
+if [ $gitfetch_status != 0 ]; then
+    echo "[$snaplong] gitfetch $repoid $cacheid $url: broken"
+elif [ -n "$new_head" ]; then
+    echo "[$snaplong] gitfetch $repoid $cacheid $url: to $cur_head"
+else
+    echo "[$snaplong] gitfetch $repoid $cacheid $url: unchanged"
+fi

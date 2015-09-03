@@ -1,0 +1,22 @@
+#! /bin/sh
+if ! expr "$0" : '.*[/]' >/dev/null; then PROGDIR=./
+else PROGDIR=`echo "$0" | sed 's,^\(.*/\)[^/]*$,\1,'`; fi
+expr "$PROGDIR" : '[/]' >/dev/null || PROGDIR="`pwd`/$PROGDIR"
+
+# check that GITSSH_CONFIG exists
+test -z "$GITSSH_CONFIG" && export GITSSH_CONFIG="${PROGDIR}../conf/gitssh_config"
+test -n "$GITSSH_CONFIG" || { echo "gitssh: GITSSH_CONFIG not set" 1>&2; exit 1; }
+test -r "$GITSSH_CONFIG" || { echo "gitssh: GITSSH_CONFIG cannot be read" 1>&2; exit 1; }
+
+# check that IdentityFile is set
+identity="`grep ^IdentityFile $GITSSH_CONFIG | awk '{print $2}'`"
+test -n "$identity" || { echo "gitssh: no IdentityFile in $GITSSH_CONFIG" 1>&2; exit 1; }
+
+# make a version of IdentityFile for this user
+uid=`id -u`
+if ! cmp "$identity" "$identity.$uid" >/dev/null 2>&1; then
+    cat "$identity" >"$identity.$uid"
+    chmod go-rwx "$identity.$uid"
+fi
+
+exec ssh -i $identity.$uid -F $GITSSH_CONFIG "$@"

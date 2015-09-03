@@ -1,0 +1,18 @@
+#! /bin/bash
+
+verbose=false
+if [ "$1" = "-v" ]; then verbose=true; shift; fi
+lockfile="$1"; shift
+if [ "$1" != "--" ]; then logfile="$1"; shift; fi
+if [ -z "$lockfile" -o "$lockfile" = "--" -o "$1" != "--" ]; then
+     echo "Usage: loglock LOCKFILE [LOGFILE] -- COMMAND..." 1>&2
+     exit 1
+fi
+shift
+
+if [ -n "$logfile" ]; then
+   ( flock -s 200; echo $$ 1>&200; $verbose && echo "$@"; exec "$@" ) >>"$logfile" 2>&1 200>>"$lockfile"
+else
+   ( flock -s 200; echo $$ 1>&200; $verbose && echo "$@"; exec "$@" ) 200>>"$lockfile"
+fi
+rm -f "$lockfile"
