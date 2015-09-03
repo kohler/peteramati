@@ -486,6 +486,8 @@ function show_pset($pset, $user) {
     echo "</a></h2>";
     ContactView::echo_partner_group($info);
     ContactView::echo_repo_group($info);
+    if ($info->repo)
+        Contact::check_repo($info->repo, 30);
     if ($info->has_grading()) {
         ContactView::echo_repo_grade_commit_group($info);
         if ($can_grade && ($gi = $info->grading_info())) {

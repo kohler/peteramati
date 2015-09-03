@@ -1385,6 +1385,7 @@ class Contact {
         assert(isset($repo->repoid) && isset($repo->cacheid) && isset($repo->url) && property_exists($repo, "snapcheckat"));
         if ($repo->repoid && (!$repo->snapcheckat || $repo->snapcheckat + $delta <= $Now)) {
             Dbl::qe("update Repository set snapcheckat=$Now where repoid=$repo->repoid");
+            $repo->snapcheckat = $Now;
             if ($foreground)
                 set_time_limit(30);
             // see also handout_repo
