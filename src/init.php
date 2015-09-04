@@ -331,7 +331,8 @@ function load_pset_info() {
                       "grades_visible" => "show_grades_to_students",
                       "grades_visible_college" => "show_grades_to_college",
                       "grades_visible_extension" => "show_grades_to_extension",
-                      "grade_cdf_visible" => "show_grade_cdf_to_students"]
+                      "grade_cdf_visible" => "show_grade_cdf_to_students",
+                      "frozen" => "freeze"]
                       as $k => $oldk)
                 if (@$p->$k === null && @$p->$oldk !== null)
                     $p->$k = $p->$oldk;
@@ -344,7 +345,7 @@ function load_pset_info() {
 
             // deadlines
             foreach (array("deadline", "deadline_college", "deadline_extension",
-                           "visible", "grades_visible",
+                           "visible", "grades_visible", "repo_edit_deadline",
                            "grades_visible_college", "grades_visible_extension",
                            "grade_cdf_visible") as $dl)
                 if (is_string(@$p->$dl) && ($p->$dl = parse_time($p->$dl)) <= 0)

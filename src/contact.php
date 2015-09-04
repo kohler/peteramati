@@ -1313,7 +1313,7 @@ class Contact {
                 || (is_int($pset->repo_edit_deadline)
                     && $pset->repo_edit_deadline >= $Now))
             && (!$user || $user == $this || $is_pc)
-            && ($is_pc || !isset($pset->freeze) || !$pset->freeze);
+            && ($is_pc || !@$pset->frozen);
     }
 
     static function add_repo($url, $now, $open) {
