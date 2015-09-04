@@ -122,8 +122,12 @@ class RunnerState {
 
         // create jail
         $this->remove_old_jails();
-        if ($this->run_and_log("jail/pa-jail init " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username)))
-            throw new RunnerException("can't initialize jail");
+        if ($this->run_and_log("jail/pa-jail init " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username))) {
+            if (is_executable("jail/pa-jail"))
+                throw new RunnerException("can't initialize jail");
+            else
+                throw new RunnerException("the pa-jail program has not been compiled");
+        }
 
         // check out code
         $this->checkout_code();
