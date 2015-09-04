@@ -61,6 +61,7 @@ function __autoload($class_name) {
                                "Mimetype" => "lib/mimetype.php",
                                "Multiconference" => "src/multiconference.php",
                                "PsetView" => "src/psetview.php",
+                               "RunnerState" => "src/runner.php",
                                "Qobject" => "lib/qobject.php",
                                "Text" => "lib/text.php",
                                "UnicodeHelper" => "lib/unicodehelper.php",

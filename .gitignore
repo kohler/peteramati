@@ -3,7 +3,7 @@
 conf/gitssh_config
 conf/id_rsa_*
 conf/options.php
-jail/execjail
+jail/pa-jail
 jail/stderrtostdout
 log/
 repo/

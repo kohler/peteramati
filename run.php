@@ -10,7 +10,7 @@ global $User, $Pset, $Psetid, $Info, $RecentCommits;
 
 function quit($err = null) {
     global $Conf;
-    $Conf->ajaxExit(array("error" => true, "message" => $err));
+    $Conf->ajaxExit(array("ok" => false, "error" => $err));
 }
 
 function user_pset_info() {
@@ -105,17 +105,6 @@ else if (!isset($_REQUEST["run"]) || !check_post())
     quit("Permission error");
 else if (!$Info->can_view_repo_contents && !$Me->isPC)
     quit("Unconfirmed repository");
-
-// log directory
-global $Logdir;
-$Logdir = "$ConfSitePATH/log/run" . $Info->repo->cacheid
-    . ".pset" . $Info->pset->id;
-if (!is_dir($Logdir)) {
-    $old_umask = umask(0);
-    if (!mkdir($Logdir, 02770, true))
-        quit("Error logging results");
-    umask($old_umask);
-}
 
 
 // extract request info
@@ -239,114 +228,31 @@ if (!@$Runner->command && @$Runner->eval) {
 }
 
 
-// look for existing lock
-$logfs = glob("$Logdir/repo" . $Info->repo->repoid
-              . ".pset" . $Info->pset->id
-              . ".*.log*");
-rsort($logfs);
+// otherwise run
+try {
+    $rs = new RunnerState($Info, $Runner, $Queue);
 
-// recent
-if (defval($_REQUEST, "check") == "recent") {
-    for ($i = 0; $i != count($logfs) && str_ends_with($logfs[$i], ".lock"); )
-        ++$i;
-    if ($i != count($logfs))
-        $Conf->ajaxExit(ContactView::runner_json($Info, $logfs[$i], $Offset));
-    else
-        quit("No logs yet");
+    // recent
+    if (@$_REQUEST["check"] == "recent" && count($rs->logged_checkts))
+        $Conf->ajaxExit(ContactView::runner_json($Info, $rs->logged_checkts[0], $Offset));
+    else if (@$_REQUEST["check"] == "recent")
+        quit("no logs yet");
+
+    if ($rs->is_recent_job_running())
+        quit("recent job still running");
+
+    // run
+    $rs->start();
+
+    // save information about execution
+    $Info->update_commit_info(array("run" => array($Runner->name => $rs->checkt)));
+
+    $Conf->ajaxExit(array("ok" => true,
+                          "done" => false,
+                          "status" => "working",
+                          "repoid" => $Info->repo->repoid,
+                          "pset" => $Info->pset->id,
+                          "timestamp" => $rs->checkt));
+} catch (Exception $e) {
+    quit($e->getMessage());
 }
-
-// otherwise, start a new request
-function expand($x) {
-    global $Opt, $Info, $ConfSitePATH;
-    if (strpos($x, '${') !== false) {
-        $x = str_replace('${REPOID}', $Info->repo->repoid, $x);
-        $x = str_replace('${PSET}', $Info->pset->id, $x);
-        $x = str_replace('${CONFDIR}', "conf/", $x);
-        $x = str_replace('${SRCDIR}', "src/", $x);
-        $x = str_replace('${HOSTTYPE}', defval($Opt, "hostType", ""), $x);
-        $x = str_replace('${COMMIT}', $Info->commit_hash(), $x);
-        $x = str_replace('${HASH}', $Info->commit_hash(), $x);
-    }
-    return $x;
-}
-
-foreach ($logfs as $lf)
-    if (preg_match(',.*\.(\d+)\.log\.lock\z,', $lf, $m)
-        && ($lstatus = ContactView::runner_status_json($Info, $m[1]))
-        && $lstatus->status == "working")
-        quit("Recent job still running");
-
-$logfn = ContactView::runner_logfile($Info, $checkt);
-$lockfn = $logfn . ".lock";
-file_put_contents($lockfn, "");
-if ($Queue)
-    $Conf->qe("update ExecutionQueue set runat=$Now, status=1, lockfile='" . sqlq($lockfn) . "' where queueid=$Queue->queueid");
-
-// check out the files
-if (!chdir($ConfSitePATH))
-    $Conf->ajaxExit(array("ok" => false));
-
-$subdirarg = "";
-if (isset($Info->repo->truncated_psetdir)
-    && defval($Info->repo->truncated_psetdir, $Pset->id)
-    && $Pset->directory_noslash !== "")
-    $subdirarg = " -s$Pset->directory_noslash";
-
-$skeletonarg = "";
-if ($Pset->run_skeletondir)
-    $skeletonarg .= " -l " . escapeshellarg($Pset->run_skeletondir);
-else if (isset($Opt["run_jailskeleton"]))
-    $skeletonarg .= " -l " . escapeshellarg($Opt["run_jailskeleton"]);
-
-$username = "jail61user";
-if (@$Runner->run_username)
-    $username = $Runner->run_username;
-else if (@$Pset->run_username)
-    $username = $Pset->run_username;
-if (!preg_match('/\A\w+\z/', $username))
-    $Conf->ajaxExit(array("ok" => false, "error" => "bad run_username"));
-
-$command = "jail/gitexecjail -u $username -p $Pset->id"
-    . " -c $Repo->cacheid -H " . $Info->commit_hash()
-    . $subdirarg . $skeletonarg
-    . " $Repo->repoid $Pset->run_dirpattern";
-if (isset($Pset->run_overlay) && $Pset->run_overlay != "")
-    $command .= " $Pset->run_overlay";
-else
-    $command .= " -";
-
-$command = expand("($command) </dev/null >>" . escapeshellarg($logfn) . " 2>&1");
-//file_put_contents($logfn, $command . "\n", FILE_APPEND);
-system($command);
-
-
-// maybe store extra information
-if (($runsettings = $Info->commit_info("runsettings"))) {
-    $x = "";
-    foreach ((array) $runsettings as $k => $v)
-        $x .= "$k = $v\n";
-    $info = posix_getpwnam($username);
-    $jail61home = $info ? $info["dir"] : "/home/jail61";
-    file_put_contents(expand("$Pset->run_dirpattern$jail61home/config.mk"), $x);
-}
-
-
-// run the command (see also jail/gitexecjail)
-$command = expand("(echo; jail/loglock " . escapeshellarg($lockfn)
-    . " -- jail/execjail -t$skeletonarg"
-    . " $Pset->run_dirpattern $username "
-    . escapeshellarg($Runner->command)
-    . ") <$Pset->run_jailfiles >>" . escapeshellarg($logfn) . " 2>&1 &");
-//file_put_contents($logfn, $command . "\n", FILE_APPEND);
-system(expand($command));
-
-
-// save information about execution
-$Info->update_commit_info(array("run" => array($Runner->name => $checkt)));
-
-$Conf->ajaxExit(array("ok" => true,
-                      "done" => false,
-                      "status" => "working",
-                      "repoid" => $Info->repo->repoid,
-                      "pset" => $Info->pset->id,
-                      "timestamp" => $checkt));

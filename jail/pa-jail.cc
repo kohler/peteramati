@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <utime.h>
 #include <assert.h>
+#include <getopt.h>
 #include <string>
 #include <map>
 #include <iostream>
@@ -48,6 +49,11 @@ static std::string linkdir;
 static std::map<std::string, int> linkdir_dirtable;
 static std::string dstroot;
 static std::map<std::string, int> umount_table;
+
+enum jailaction {
+    do_start, do_init, do_run, do_rm, do_mv
+};
+
 
 static int perror_fail(const char* format, const char* arg1) {
     fprintf(stderr, format, arg1, strerror(errno));
@@ -86,6 +92,18 @@ static int x_mkdir(const char* pathname, mode_t mode) {
     if (verbose)
         fprintf(verbosefile, "mkdir -m 0%o %s\n", mode, pathname);
     return dryrun ? 0 : mkdir(pathname, mode);
+}
+
+static int x_mkdirat(int dirfd, const char* component, mode_t mode, const std::string& pathname) {
+    if (verbose)
+        fprintf(verbosefile, "mkdir -m 0%o %s\n", mode, pathname.c_str());
+    return dryrun ? 0 : mkdirat(dirfd, component, mode);
+}
+
+static int x_fchmod(int fd, mode_t mode, const std::string& pathname) {
+    if (verbose)
+        fprintf(verbosefile, "chmod 0%o %s\n", mode, pathname.c_str());
+    return dryrun ? 0 : fchmod(fd, mode);
 }
 
 static int x_ensuredir(const char* pathname, mode_t mode) {
@@ -148,13 +166,6 @@ static int x_lchown(const char* path, uid_t owner, gid_t group) {
     return 0;
 }
 
-
-static __attribute__((noreturn)) void usage(void) {
-    fprintf(stderr, "Usage: execjail [-n | -V] [-l SKELETONDIR] [-t] [-d] JAILDIR USER COMMAND < JAILFILES\n");
-    fprintf(stderr, "       execjail -m JAILDIR NEWNAME\n");
-    fprintf(stderr, "       execjail -d JAILDIR\n");
-    exit(1);
-}
 
 static __attribute__((noreturn)) void perror_exit(const char* message) {
     fprintf(stderr, "%s: %s\n", message, strerror(errno));
@@ -585,7 +596,7 @@ static int handle_copy(const std::string& src, const std::string& dst,
     return 0;
 }
 
-static int construct_jail(std::string jaildir, dev_t jaildev) {
+static int construct_jail(std::string jaildir, dev_t jaildev, FILE* f) {
     dstroot = jaildir;
     while (dstroot.length() > 1 && dstroot[dstroot.length() - 1] == '/')
         dstroot = dstroot.substr(0, dstroot.length() - 1);
@@ -615,7 +626,7 @@ static int construct_jail(std::string jaildir, dev_t jaildev) {
     std::string cursrcdir("/"), curdstdir(dstroot);
 
     char buf[BUFSIZ];
-    while (fgets(buf, BUFSIZ, stdin)) {
+    while (fgets(buf, BUFSIZ, f)) {
         int l = strlen(buf);
         while (l > 0 && isspace((unsigned char) buf[l-1]))
             buf[--l] = 0;
@@ -740,15 +751,16 @@ static std::string absolute(const std::string& dir) {
     }
 }
 
-static void x_rm_rf_under(int dirfd, std::string dirname) {
-    if (dirname.length() == 0 || dirname[dirname.length() - 1] != '/')
+static void x_rm_rf_under(int parentdirfd, std::string component,
+                          std::string dirname) {
+    if (dirname.empty() || dirname[dirname.length() - 1] != '/')
         dirname += "/";
-    int defd = openat(dirfd, ".", O_RDONLY);
-    if (defd == -1) {
+    int dirfd = openat(parentdirfd, component.c_str(), O_RDONLY);
+    if (dirfd == -1) {
         fprintf(stderr, "%s: %s\n", dirname.c_str(), strerror(errno));
         exit(1);
     }
-    DIR* dir = fdopendir(defd);
+    DIR* dir = fdopendir(dirfd);
     if (!dir) {
         fprintf(stderr, "%s: %s\n", dirname.c_str(), strerror(errno));
         exit(1);
@@ -758,16 +770,11 @@ static void x_rm_rf_under(int dirfd, std::string dirname) {
         if (de->d_type == DT_DIR) {
             if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
                 continue;
-            std::string next_dirname = dirname + std::string(de->d_name);
+            std::string next_component = de->d_name;
+            std::string next_dirname = dirname + next_component;
             if (umount_table.find(next_dirname) != umount_table.end())
                 continue;
-            int next_dirfd = openat(dirfd, de->d_name, O_PATH);
-            if (dirfd == -1) {
-                fprintf(stderr, "%s: %s\n", next_dirname.c_str(), strerror(errno));
-                exit(1);
-            }
-            x_rm_rf_under(next_dirfd, next_dirname);
-            close(next_dirfd);
+            x_rm_rf_under(dirfd, next_component, next_dirname);
         }
         const char* op = de->d_type == DT_DIR ? "rmdir" : "rm";
         if (verbose)
@@ -778,6 +785,7 @@ static void x_rm_rf_under(int dirfd, std::string dirname) {
         }
     }
     closedir(dir);
+    close(dirfd);
 }
 
 static void handle_child(pid_t child, int ptymaster) {
@@ -838,209 +846,300 @@ static bool check_shell(const char* shell) {
     return found;
 }
 
-int main(int argc, char** argv) {
-    // parse arguments
-    bool dokill = false, dolive = false, domove = false;
-    std::string jaildir;
+struct jaildirinfo {
+    std::string dir;
+    std::string parent;
+    int parentfd;
+    std::string component;
+    std::string permdir;
 
- parse_argument:
-    if (argc >= 2 && strcmp(argv[1], "-d") == 0) {
-        dokill = true;
-        argv += 1, argc -= 1;
-        goto parse_argument;
-    } else if (argc >= 2 && strcmp(argv[1], "-f") == 0) {
-        // XXX force = true;
-        argv += 1, argc -= 1;
-        goto parse_argument;
-    } else if (argc >= 2 && strcmp(argv[1], "-V") == 0) {
-        verbose = true;
-        argv += 1, argc -= 1;
-        goto parse_argument;
-    } else if (argc >= 3 && strcmp(argv[1], "-l") == 0) {
-        linkdir = argv[2];
-        while (!linkdir.empty() && linkdir[linkdir.length() - 1] == '/')
-            linkdir = linkdir.substr(0, linkdir.length() - 1);
-        argv += 2, argc -= 2;
-        goto parse_argument;
-    } else if (argc >= 2 && strcmp(argv[1], "-n") == 0) {
-        verbose = dryrun = true;
-        argv += 1, argc -= 1;
-        goto parse_argument;
-    } else if (argc >= 2 && strcmp(argv[1], "-t") == 0) {
-        makepty = true;
-        argv += 1, argc -= 1;
-        goto parse_argument;
-    } else if (argc >= 2 && strcmp(argv[1], "-s") == 0) {
-        dolive = true;
-        argv += 1, argc -= 1;
-        goto parse_argument;
-    } else if (argc >= 2 && strcmp(argv[1], "-m") == 0) {
-        domove = true;
-        argv += 1, argc -= 1;
-        goto parse_argument;
-    } else if (argc >= 2 && argv[1][0] == '-')
-        usage();
+    jaildirinfo(const char* str, jailaction action, bool doforce);
+    void check();
 
-    if (verbose && !dryrun)
-        verbosefile = stderr;
-    bool doexec = (!dokill || argc == 4) && !domove;
-    if ((doexec && argc != 4)
-        || (dokill && !doexec && argc != 2)
-        || (domove && argc != 3)
-        || (domove && (makepty || dolive || dokill))
-        || !argv[1][0])
-        usage();
+private:
+    void check_permfile(int fd, std::string dir);
+};
 
-    // open tty
-    int caller_tty = -1;
-    if (dolive)
-        caller_tty = open("/dev/tty", O_RDWR);
-
-    // track whether real UID/GID was root
-    bool was_root = getuid() == ROOT && getgid() == ROOT;
-    (void) was_root; /* don't need this right now */
-
-    // escalate so that the real (not just effective) UID/GID is root. this is
-    // so that the system processes will execute as root
-    if (!dryrun && setgid(ROOT) < 0)
-        perror_exit("setgid");
-    if (!dryrun && setuid(ROOT) < 0)
-        perror_exit("setuid");
-
-    // check the jail directory:
-    // - no special characters
-    // - path has no symlinks
-    // - at least one superdir has a file `JAIL61` owned by root
-    //   containing `allowjail`
-    // - no superdir has a file `JAIL61` not owned by root,
-    //   or containing `nojail`
-    // - everything above that dir is owned by by root
-    // - stuff below the dir containing `JAIL61` dynamically created
-    //   if necessary
-    // - try to eliminate TOCTTOU
-    jaildir = absolute(argv[1]);
-    const char* jailstr = jaildir.c_str();
-    if (!check_filename(jailstr, 1, 1) || jailstr[0] != '/') {
-        fprintf(stderr, "%s: Bad characters in filename\n", jailstr);
+jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
+    : dir(absolute(str)), parentfd(-1) {
+    if (!check_filename(dir.c_str(), 1, 1) || dir.empty() || dir[0] != '/') {
+        fprintf(stderr, "%s: Bad characters in filename\n", str);
         exit(1);
     }
 
-    int jailrootfd = -1, jailparentfd = -1;
-    std::string jailparent, jailcomponent, jailsuperdir;
-    {
-        size_t last_pos = 0;
-        bool found_superdir = false;
-        while (last_pos != jaildir.length()) {
-            // extract component
-            size_t next_pos = last_pos;
-            while (next_pos && next_pos < jaildir.length() && jaildir[next_pos] != '/')
-                ++next_pos;
-            if (!next_pos)
-                ++next_pos;
-            jailparent = jaildir.substr(0, last_pos);
-            jailcomponent = jaildir.substr(last_pos, next_pos - last_pos);
-            std::string superdir = jaildir.substr(0, next_pos);
-            last_pos = next_pos;
-            while (last_pos != jaildir.length() && jaildir[last_pos] == '/')
-                ++last_pos;
+    size_t last_pos = 0;
+    int fd = -1;
+    bool dryrunning = false;
+    while (last_pos != dir.length()) {
+        // extract component
+        size_t next_pos = last_pos;
+        while (next_pos && next_pos < dir.length() && dir[next_pos] != '/')
+            ++next_pos;
+        if (!next_pos)
+            ++next_pos;
+        parent = dir.substr(0, last_pos);
+        component = dir.substr(last_pos, next_pos - last_pos);
+        std::string thisdir = dir.substr(0, next_pos);
+        last_pos = next_pos;
+        while (last_pos != dir.length() && dir[last_pos] == '/')
+            ++last_pos;
 
-            // open it and swap it in
-            int next_jailrootfd = openat(jailrootfd, jailcomponent.c_str(), O_PATH | O_CLOEXEC | O_NOFOLLOW);
-            if (next_jailrootfd == -1 && found_superdir && doexec && errno == ENOENT) {
-                if (mkdirat(jailrootfd, jailcomponent.c_str(), 0755) != 0) {
-                    fprintf(stderr, "mkdir %s: %s\n", superdir.c_str(), strerror(errno));
-                    exit(1);
-                }
-                next_jailrootfd = openat(jailrootfd, jailcomponent.c_str(), O_PATH | O_CLOEXEC | O_NOFOLLOW);
-            }
-            if (next_jailrootfd == -1) {
-                fprintf(stderr, "%s: %s\n", superdir.c_str(), strerror(errno));
+        // open it and swap it in
+        if (parentfd >= 0)
+            close(parentfd);
+        parentfd = fd;
+        fd = openat(parentfd, component.c_str(), O_PATH | O_CLOEXEC | O_NOFOLLOW);
+        if ((fd == -1 && dryrunning)
+            || (fd == -1 && !permdir.empty() && errno == ENOENT
+                && (action == do_init || action == do_run))) {
+            if (x_mkdirat(parentfd, component.c_str(), 0755, thisdir) != 0) {
+                fprintf(stderr, "mkdir %s: %s\n", thisdir.c_str(), strerror(errno));
                 exit(1);
             }
-            close(jailparentfd);
-            jailparentfd = jailrootfd;
-            jailrootfd = next_jailrootfd;
-
-            // stat it
-            struct stat s;
-            if (fstat(jailrootfd, &s) != 0) {
-                fprintf(stderr, "%s: %s\n", superdir.c_str(), strerror(errno));
+            fd = openat(parentfd, component.c_str(), O_CLOEXEC | O_NOFOLLOW);
+            // turn off suid+sgid on created root directory
+            if (last_pos == dir.length() && (fd >= 0 || dryrun)
+                && x_fchmod(fd, 0755, thisdir) != 0) {
+                fprintf(stderr, "chmod %s: %s\n", thisdir.c_str(), strerror(errno));
                 exit(1);
             }
-            if (!S_ISDIR(s.st_mode)) {
-                fprintf(stderr, "%s: Not a directory\n", superdir.c_str());
-                exit(1);
-            } else if (s.st_uid != ROOT && !found_superdir) {
-                fprintf(stderr, "%s: Not owned by root\n", superdir.c_str());
-                exit(1);
-            }
-
-            // check for "JAIL61" allowance
-            if (!found_superdir && jailparent.length()) {
-                int jail61f = openat(jailrootfd, "JAIL61", O_RDONLY | O_NOFOLLOW);
-                if (jail61f == -1 && errno != ENOENT && errno != ELOOP) {
-                    fprintf(stderr, "%s/JAIL61: %s\n", superdir.c_str(), strerror(errno));
-                    exit(1);
-                }
-                if (jail61f != -1) {
-                    struct stat s;
-                    if (fstat(jail61f, &s) != 0) {
-                        fprintf(stderr, "%s/JAIL61: %s\n", superdir.c_str(), strerror(errno));
-                        exit(1);
-                    } else if (s.st_uid != ROOT
-                               || (s.st_gid != ROOT && (s.st_mode & S_IWGRP))
-                               || (s.st_mode & S_IWOTH)) {
-                        fprintf(stderr, "%s/JAIL61: Ignoring, writable by non-root\n", superdir.c_str());
-                        close(jail61f);
-                        jail61f = -1;
-                    }
-                }
-                if (jail61f != -1) {
-                    char buf[8192];
-                    ssize_t nr = read(jail61f, buf, sizeof(buf));
-
-                    std::string str(buf, nr < 0 ? 0 : nr);
-                    size_t pos = 0;
-                    while (pos < str.length()) {
-                        std::string word1 = take_word(str, pos);
-                        std::string word2 = take_word(str, pos);
-                        while (take_word(str, pos).length())
-                            /* do nothing */;
-                        while (pos < str.length() && str[pos] == '\n')
-                            ++pos;
-
-                        if (word2.length() && word2[word2.length() - 1] != '/')
-                            word2 += '/';
-                        bool dirmatch = word2.length() && jaildir.substr(0, word2.length()) == word2;
-                        if (word1 == "nojail" && !word2.length()) {
-                            fprintf(stderr, "%s/JAIL61: Jails are not allowed under here\n", superdir.c_str());
-                            exit(1);
-                        } else if (word1 == "nojail" && dirmatch) {
-                            fprintf(stderr, "%s/JAIL61: Jails are not allowed under %s\n", superdir.c_str(), word2.c_str());
-                            exit(1);
-                        } else if (word1 == "allowjail" && dirmatch) {
-                            found_superdir = true;
-                            jailsuperdir = word2;
-                        }
-                    }
-
-                    close(jail61f);
-                }
+            if (dryrun) {
+                dryrunning = true;
+                continue;
             }
         }
-        if (!found_superdir) {
-            fprintf(stderr, "%s: No `JAIL61` above here contains `allowjail %s`\n", jailstr, jaildir.c_str());
+        if (fd == -1 && errno == ENOENT && action == do_rm && doforce)
+            exit(0);
+        else if (fd == -1) {
+            fprintf(stderr, "%s: %s\n", thisdir.c_str(), strerror(errno));
             exit(1);
         }
+
+        // stat it
+        struct stat s;
+        if (fstat(fd, &s) != 0) {
+            fprintf(stderr, "%s: %s\n", thisdir.c_str(), strerror(errno));
+            exit(1);
+        }
+        if (!S_ISDIR(s.st_mode)) {
+            fprintf(stderr, "%s: Not a directory\n", thisdir.c_str());
+            exit(1);
+        } else if (s.st_uid != ROOT && permdir.empty() && last_pos != dir.length()) {
+            fprintf(stderr, "%s: Not owned by root\n", thisdir.c_str());
+            exit(1);
+        }
+
+        // check for "JAIL61" allowance
+        if (permdir.empty() && parent.length())
+            check_permfile(fd, thisdir);
     }
+    if (permdir.empty()) {
+        fprintf(stderr, "%s: No ancestor directory contains a `JAIL61` with `allowjail`\n", dir.c_str());
+        exit(1);
+    }
+    if (fd >= 0)
+        close(fd);
+}
+
+void jaildirinfo::check_permfile(int fd, std::string thisdir) {
+    int jail61f = openat(fd, "JAIL61", O_RDONLY | O_NOFOLLOW);
+    if (jail61f == -1) {
+        if (errno != ENOENT && errno != ELOOP) {
+            fprintf(stderr, "%s/JAIL61: %s\n", thisdir.c_str(), strerror(errno));
+            exit(1);
+        }
+        return;
+    }
+
+    struct stat s;
+    if (fstat(jail61f, &s) != 0) {
+        fprintf(stderr, "%s/JAIL61: %s\n", thisdir.c_str(), strerror(errno));
+        exit(1);
+    } else if (s.st_uid != ROOT
+               || (s.st_gid != ROOT && (s.st_mode & S_IWGRP))
+               || (s.st_mode & S_IWOTH)) {
+        fprintf(stderr, "%s/JAIL61: Ignoring, writable by non-root\n", thisdir.c_str());
+        close(jail61f);
+        return;
+    }
+
+    char buf[8192];
+    ssize_t nr = read(jail61f, buf, sizeof(buf));
+    if (thisdir[thisdir.length() - 1] != '/')
+        thisdir += '/';
+
+    std::string str(buf, nr < 0 ? 0 : nr);
+    size_t pos = 0;
+    while (pos < str.length()) {
+        std::string word1 = take_word(str, pos);
+        std::string word2 = take_word(str, pos);
+        while (take_word(str, pos).length())
+            /* do nothing */;
+        while (pos < str.length() && str[pos] == '\n')
+            ++pos;
+
+        while (word2.length() > 2 && word2[0] == '.' && word2[1] == '/')
+            word2 = word2.substr(2, word2.length());
+        if (word2 == ".")
+            word2 = thisdir;
+        if (!word2.empty() && word2[word2.length() - 1] != '/')
+            word2 += '/';
+        if (!word2.empty() && word2[0] != '/')
+            word2 = thisdir + word2;
+
+        bool dirmatch = word2.length() && dir.substr(0, word2.length()) == word2;
+        if (word1 == "nojail" && word2.empty()) {
+            fprintf(stderr, "%sJAIL61: Jails are not allowed under here\n", thisdir.c_str());
+            exit(1);
+        } else if (word1 == "nojail" && dirmatch) {
+            fprintf(stderr, "%sJAIL61: Jails are not allowed under %s\n", thisdir.c_str(), word2.c_str());
+            exit(1);
+        } else if (word1 == "allowjail" && word2.empty())
+            permdir = thisdir;
+        else if (word1 == "allowjail" && dirmatch)
+            permdir = word2;
+        else if (word1 == "allowjail" && thisdir.substr(0, word2.length()) != word2)
+            fprintf(stderr, "%sJAIL61: Warning: `allowjail` for wrong directory\n", thisdir.c_str());
+    }
+
+    close(jail61f);
+}
+
+void jaildirinfo::check() {
+    assert(!permdir.empty() && permdir[permdir.length() - 1] == '/');
+    assert(dir.substr(0, permdir.length()) == permdir);
+}
+
+static __attribute__((noreturn)) void usage() {
+    fprintf(stderr, "Usage: pa-jail init [-n] [-f FILES] [-S SKELETON] JAILDIR [USER]\n");
+    fprintf(stderr, "       pa-jail run [-ntL] [-f FILES] [-S SKELETON] JAILDIR USER COMMAND\n");
+    fprintf(stderr, "       pa-jail mv OLDDIR NEWDIR\n");
+    fprintf(stderr, "       pa-jail rm [-nf] JAILDIR\n");
+    exit(1);
+}
+
+static __attribute__((noreturn)) void help() {
+    printf("pa-jail sets up a jail and optionally runs a command in it.\n\
+\n\
+Arguments:\n\
+  -d          Delete jail.\n\
+  -l DIR      Use DIR as skeleton.\n\
+  -V          Be more verbose.\n\
+  -n          Dry run.\n\
+  -t          Create a pty.\n");
+    exit(0);
+}
+
+static struct option longoptions_before[] = {
+    { "verbose", no_argument, NULL, 'V' },
+    { "dry-run", no_argument, NULL, 'n' },
+    { "help", no_argument, NULL, 'H' },
+    { NULL, 0, NULL, 0 }
+};
+
+static struct option longoptions_run[] = {
+    { "verbose", no_argument, NULL, 'V' },
+    { "dry-run", no_argument, NULL, 'n' },
+    { "help", no_argument, NULL, 'H' },
+    { "skeleton", required_argument, NULL, 'S' },
+    { "pty", no_argument, NULL, 't' },
+    { "live", no_argument, NULL, 'L' },
+    { "files", required_argument, NULL, 'f' },
+    { "replace", no_argument, NULL, 'r' },
+    { NULL, 0, NULL, 0 }
+};
+
+static struct option longoptions_rm[] = {
+    { "verbose", no_argument, NULL, 'V' },
+    { "dry-run", no_argument, NULL, 'n' },
+    { "help", no_argument, NULL, 'H' },
+    { "force", no_argument, NULL, 'f' },
+    { NULL, 0, NULL, 0 }
+};
+
+static struct option* longoptions_action[] = {
+    longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
+};
+static const char* shortoptions_action[] = {
+    "+Vn", "VnS:tLf:r", "VnS:tLf:r", "Vnf", "Vn"
+};
+
+int main(int argc, char** argv) {
+    // parse arguments
+    jailaction action = do_start;
+    bool dolive = false, dokill = false, doforce = false;
+    std::string filesarg;
+
+    int ch;
+    while (1) {
+        while ((ch = getopt_long(argc, argv, shortoptions_action[(int) action],
+                                 longoptions_action[(int) action], NULL)) != -1) {
+            if (ch == 'V')
+                verbose = true;
+            else if (ch == 'S') {
+                linkdir = optarg;
+                while (!linkdir.empty() && linkdir[linkdir.length() - 1] == '/')
+                    linkdir = linkdir.substr(0, linkdir.length() - 1);
+            } else if (ch == 'n')
+                verbose = dryrun = true;
+            else if (ch == 't')
+                makepty = true;
+            else if (ch == 'L')
+                dolive = true;
+            else if (ch == 'f' && action == do_rm)
+                doforce = true;
+            else if (ch == 'f')
+                filesarg = optarg;
+            else if (ch == 'r')
+                dokill = true;
+            else if (ch == 'H')
+                help();
+            else
+                usage();
+        }
+        if (action != do_start)
+            break;
+        if (optind == argc)
+            usage();
+        else if (strcmp(argv[optind], "rm") == 0)
+            action = do_rm;
+        else if (strcmp(argv[optind], "mv") == 0)
+            action = do_mv;
+        else if (strcmp(argv[optind], "init") == 0)
+            action = do_init;
+        else if (strcmp(argv[optind], "run") == 0)
+            action = do_run;
+        else
+            usage();
+        argc -= optind;
+        argv += optind;
+        optind = 1;
+    }
+
+    // check arguments
+    if (action == do_run && optind + 2 >= argc)
+        action = do_init;
+    if ((action == do_rm && optind != argc - 1)
+        || (action == do_mv && optind != argc - 2)
+        || (action == do_init && optind != argc - 1 && optind != argc - 2)
+        || (action == do_run && optind != argc - 3)
+        || (action == do_rm && (!linkdir.empty() || !filesarg.empty() || makepty || dolive))
+        || (action == do_mv && (!linkdir.empty() || !filesarg.empty() || makepty || dolive || dokill))
+        || !argv[optind][0]
+        || (action == do_mv && !argv[optind+1][0]))
+        usage();
+    if (verbose && !dryrun)
+        verbosefile = stderr;
+    if (action != do_run)
+        makepty = dolive = false;
 
     // parse user
     uid_t owner = ROOT;
     gid_t group = ROOT;
     std::string owner_home;
     std::string owner_sh = "/bin/sh";
-    if (doexec) {
-        const char* owner_name = argv[2];
+    if ((action == do_init || action == do_run) && optind + 1 < argc) {
+        const char* owner_name = argv[optind + 1];
         if (strlen(owner_name) >= 1024) {
             fprintf(stderr, "%s: Username too long\n", owner_name);
             exit(1);
@@ -1078,16 +1177,59 @@ int main(int argc, char** argv) {
         }
     }
 
-    // move the sandbox if asked
-    if (domove) {
-        if (!check_filename(argv[2], 1, 1)) {
-            fprintf(stderr, "%s: Bad characters in move destination\n", argv[2]);
+    // open tty as current user
+    int caller_tty = -1;
+    if (dolive)
+        caller_tty = open("/dev/tty", O_RDWR);
+
+    // open file list as current user
+    FILE* filesf = NULL;
+    if (filesarg == "-") {
+        filesf = stdin;
+        if (isatty(STDIN_FILENO)) {
+            fprintf(stderr, "stdin: Is a tty\n");
             exit(1);
         }
-        std::string newpath = absolute(argv[2]);
-        if (newpath.length() <= jailsuperdir.length()
-            || newpath.substr(0, jailsuperdir.length()) != jailsuperdir) {
-            fprintf(stderr, "%s: Not a subdirectory of %s\n", newpath.c_str(), jailsuperdir.c_str());
+    } else if (!filesarg.empty()) {
+        filesf = fopen(filesarg.c_str(), "r");
+        if (!filesf) {
+            fprintf(stderr, "%s: %s\n", filesarg.c_str(), strerror(errno));
+            exit(1);
+        }
+    }
+
+    // escalate so that the real (not just effective) UID/GID is root. this is
+    // so that the system processes will execute as root
+    uid_t caller_owner = getuid();
+    gid_t caller_group = getgid();
+    if (!dryrun && setgid(ROOT) < 0)
+        perror_exit("setgid");
+    if (!dryrun && setuid(ROOT) < 0)
+        perror_exit("setuid");
+
+    // check the jail directory
+    // - no special characters
+    // - path has no symlinks
+    // - at least one permdir has a file `JAIL61` owned by root
+    //   containing `allowjail`
+    // - no permdir has a file `JAIL61` not owned by root,
+    //   or containing `nojail`
+    // - everything above that dir is owned by by root
+    // - stuff below the dir containing `JAIL61` dynamically created
+    //   if necessary
+    // - try to eliminate TOCTTOU
+    jaildirinfo jaildir(argv[optind], action, doforce);
+
+    // move the sandbox if asked
+    if (action == do_mv) {
+        if (!check_filename(argv[optind + 1], 1, 1)) {
+            fprintf(stderr, "%s: Bad characters in move destination\n", argv[optind + 1]);
+            exit(1);
+        }
+        std::string newpath = absolute(argv[optind + 1]);
+        if (newpath.length() <= jaildir.permdir.length()
+            || newpath.substr(0, jaildir.permdir.length()) != jaildir.permdir) {
+            fprintf(stderr, "%s: Not a subdirectory of %s\n", newpath.c_str(), jaildir.permdir.c_str());
             exit(1);
         }
 
@@ -1096,43 +1238,44 @@ int main(int argc, char** argv) {
         if (stat(newpath.c_str(), &s) == 0 && S_ISDIR(s.st_mode)) {
             if (newpath[newpath.length() - 1] != '/')
                 newpath += "/";
-            newpath += jailcomponent;
+            newpath += jaildir.component;
         }
 
         if (verbose)
-            fprintf(verbosefile, "mv %s%s %s\n", jailparent.c_str(), jailcomponent.c_str(), newpath.c_str());
-        if (!dryrun && renameat(jailparentfd, jailcomponent.c_str(), jailparentfd, newpath.c_str()) != 0) {
-            fprintf(stderr, "mv %s%s %s: %s\n", jailparent.c_str(), jailcomponent.c_str(), newpath.c_str(), strerror(errno));
+            fprintf(verbosefile, "mv %s%s %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str());
+        if (!dryrun && renameat(jaildir.parentfd, jaildir.component.c_str(), jaildir.parentfd, newpath.c_str()) != 0) {
+            fprintf(stderr, "mv %s%s %s: %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str(), strerror(errno));
             exit(1);
         }
         exit(0);
     }
 
     // kill the sandbox if asked
-    if (dokill) {
+    if (action == do_rm || dokill) {
         // unmount EVERYTHING mounted in the jail!
         // INCLUDING MY HOME DIRECTORY
-        if (jaildir[jaildir.length() - 1] != '/')
-            jaildir += "/";
+        if (jaildir.dir[jaildir.dir.length() - 1] != '/')
+            jaildir.dir += "/";
         populate_mount_table();
         for (auto it = mount_table.begin(); it != mount_table.end(); ++it)
-            if (it->first.length() >= jaildir.length()
-                && memcmp(it->first.data(), jaildir.data(),
-                          jaildir.length()) == 0)
+            if (it->first.length() >= jaildir.dir.length()
+                && memcmp(it->first.data(), jaildir.dir.data(),
+                          jaildir.dir.length()) == 0)
                 handle_umount(it);
         // remove the jail
-        x_rm_rf_under(jailrootfd, jaildir);
-        if (!doexec) {
-            jaildir = jaildir.substr(0, jaildir.length() - 1);
+        x_rm_rf_under(jaildir.parentfd, jaildir.component, jaildir.dir);
+        if (action == do_rm) {
+            jaildir.dir = jaildir.dir.substr(0, jaildir.dir.length() - 1);
             if (verbose)
-                fprintf(verbosefile, "rmdir %s\n", jaildir.c_str());
-            if (!dryrun && unlinkat(jailparentfd, jailcomponent.c_str(), AT_REMOVEDIR) != 0) {
-                fprintf(stderr, "rmdir %s: %s\n", jaildir.c_str(), strerror(errno));
+                fprintf(verbosefile, "rmdir %s\n", jaildir.dir.c_str());
+            if (!dryrun
+                && unlinkat(jaildir.parentfd, jaildir.component.c_str(), AT_REMOVEDIR) != 0
+                && !(errno == ENOENT && doforce)) {
+                fprintf(stderr, "rmdir %s: %s\n", jaildir.dir.c_str(), strerror(errno));
                 exit(1);
             }
-        }
-        if (!doexec)
             exit(0);
+        }
     }
 
     // check link directory
@@ -1143,42 +1286,46 @@ int main(int argc, char** argv) {
     else
         copy_samedev = false;
 
-    // stdin should be a file list
-    if (isatty(0)) {
-        fprintf(stderr, "stdin: Is a tty\n");
-        exit(1);
-    }
-
-    // set ownership
-    dev_t jaildev = closest_ancestor_dev(jaildir);
-    char buf[8192];
-    strcpy(buf, jaildir.c_str());
-    chown_recursive(buf, 0, ROOT, ROOT);
-
-    // construct the jail
-    mode_t old_umask = umask(0);
-    if (construct_jail(jaildir, jaildev) != 0)
-        exit(1);
-    umask(old_umask);
-
     // create the home directory
-    if (argc >= 2) {
-        if (x_ensuredir((jaildir + "/home").c_str(), 0755) < 0)
-            perror_exit((jaildir + "/home").c_str());
-        std::string jailhome = jaildir + owner_home;
+    if (!owner_home.empty()) {
+        if (x_ensuredir((jaildir.dir + "/home").c_str(), 0755) < 0)
+            perror_exit((jaildir.dir + "/home").c_str());
+        std::string jailhome = jaildir.dir + owner_home;
         int r = x_ensuredir(jailhome.c_str(), 0700);
+        uid_t want_owner = action == do_init ? caller_owner : owner;
+        gid_t want_group = action == do_init ? caller_group : group;
         if (r < 0
-            || (r > 0 && x_lchown(jailhome.c_str(), owner, group)))
+            || (r > 0 && x_lchown(jailhome.c_str(), want_owner, want_group)))
             perror_exit(jailhome.c_str());
     }
 
+    // set ownership
+    char buf[8192];
+    if (action == do_run) {
+        strcpy(buf, jaildir.dir.c_str());
+        chown_recursive(buf, 0, ROOT, ROOT);
+    }
+
+    // construct the jail
+    if (filesf) {
+        dev_t jaildev = closest_ancestor_dev(jaildir.dir);
+        mode_t old_umask = umask(0);
+        if (construct_jail(jaildir.dir, jaildev, filesf) != 0)
+            exit(1);
+        umask(old_umask);
+    }
+
+    // close `parentfd`
+    close(jaildir.parentfd);
+    jaildir.parentfd = -1;
+
     // maybe execute a command in the jail
-    if (argc == 4) {
+    if (optind + 2 < argc) {
         // enter the jail
         if (verbose)
-            fprintf(verbosefile, "cd %s\n", jaildir.c_str());
-        if (!dryrun && chdir(jaildir.c_str()) != 0)
-            perror_exit(jaildir.c_str());
+            fprintf(verbosefile, "cd %s\n", jaildir.dir.c_str());
+        if (!dryrun && chdir(jaildir.dir.c_str()) != 0)
+            perror_exit(jaildir.dir.c_str());
         if (verbose)
             fprintf(verbosefile, "chroot .\n");
         if (!dryrun && chroot(".") != 0)
@@ -1239,7 +1386,7 @@ int main(int argc, char** argv) {
         if (makepty)
             newargv[newargvpos++] = "-l";
         newargv[newargvpos++] = "-c";
-        newargv[newargvpos++] = argv[3];
+        newargv[newargvpos++] = argv[optind + 2];
         newargv[newargvpos++] = NULL;
 
         if (!dryrun) {
