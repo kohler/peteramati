@@ -1505,10 +1505,10 @@ function run61(button, opt) {
         }
 
         if (!data || !data.ok) {
-            if (data && data.message)
-                x = data.message;
-            else if (data && data.loggedout)
+            if (data && data.loggedout)
                 x = "You have been logged out (perhaps due to inactivity). Please reload this page.";
+            else if (data && (data.message || typeof(data.error) === "string"))
+                x = data.message || data.error;
             else
                 x = "Unknown";
             append_html("<i><strong>Error: " + x + "</strong></i>");
