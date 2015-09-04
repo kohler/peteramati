@@ -347,7 +347,7 @@ function load_pset_info() {
             foreach (array("deadline", "deadline_college", "deadline_extension",
                            "visible", "grades_visible", "repo_edit_deadline",
                            "grades_visible_college", "grades_visible_extension",
-                           "grade_cdf_visible") as $dl)
+                           "grade_cdf_visible", "frozen") as $dl)
                 if (is_string(@$p->$dl) && ($p->$dl = parse_time($p->$dl)) <= 0)
                     Multiconference::fail_message("`{$pk}->$dl` error: bad date format");
 
