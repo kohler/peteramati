@@ -19,7 +19,6 @@ class ContactView {
     }
 
     static function set_path_request($paths) {
-        global $PsetKeys;
         $path = Navigation::path();
         if ($path === "")
             return;

@@ -301,11 +301,6 @@ function load_pset_info() {
                 $PsetKeys->$x = $p->id;
             else if ($PsetKeys->$x !== $p->id)
                 Multiconference::fail_message("`psets.json` error: reusing URL key “{$p->urlkey}”");
-            $x = $p->psetkey;
-            if (!property_exists($PsetKeys, $x))
-                $PsetKeys->$x = $p->id;
-            else if ($PsetKeys->$x !== $p->id)
-                Multiconference::fail_message("`psets.json` error: reusing pset key for URL “{$p->psetkey}”");
 
             // defaults
             foreach ($PsetInfo->_defaults as $k => $v)
@@ -377,6 +372,13 @@ function load_pset_info() {
             if (!is_string(@$p->handout_repo_url))
                 Multiconference::fail_message("`psets.json` error: {$pk}->handout_repo_url must exist and be a string");
         }
+
+    // make psetkeys available for URLs when they don't conflict
+    foreach ($Psets as $p) {
+        $x = $p->psetkey;
+        if (!property_exists($PsetKeys, $x))
+            $PsetKeys->$x = $p->id;
+    }
 
     // read message data
     if (!@$PsetInfo->_messagedefs)
