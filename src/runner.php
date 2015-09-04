@@ -207,7 +207,7 @@ class RunnerState {
 
         $checkout_instructions = @file_get_contents($checkoutdir . "/.gitcheckout");
         if ($checkout_instructions)
-            foreach (explode("\n", $checkoutinstructions) as $text)
+            foreach (explode("\n", $checkout_instructions) as $text)
                 if (substr($text, 0, 3) === "rm:")
                     $this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && rm -rf " . escapeshellarg(substr($text, 3)));
     }
