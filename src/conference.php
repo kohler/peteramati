@@ -1480,9 +1480,9 @@ class Conference {
         if (isset($Opt["jqueryUrl"]))
             $jquery = $Opt["jqueryUrl"];
         else if (@$Opt["jqueryCdn"])
-            $jquery = "//code.jquery.com/jquery-1.11.2.min.js";
+            $jquery = "//code.jquery.com/jquery-1.11.3.min.js";
         else
-            $jquery = "scripts/jquery-1.11.2.min.js";
+            $jquery = "scripts/jquery-1.11.3.min.js";
         $this->scriptStuff = $this->make_script_file($jquery, true) . "\n";
 
         $this->scriptStuff .= $this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n";
