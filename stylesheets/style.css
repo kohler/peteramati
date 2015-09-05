@@ -17,7 +17,7 @@ body {
 #header {
 }
 #header_right {
-	padding: 8px 12px 0 12px;
+	padding: 8px 24px 0;
 	font-size: smaller;
 	text-align: right;
 	float: right;
@@ -31,7 +31,7 @@ body {
 }
 #header_left_conf {
 	float: left;
-	padding: 0.2em 0.8em 0.3em 0.8em;
+	padding: 0.2em 0.8em 0.3em 24px;
 	border-bottom: 2px solid #dfa5b2;
 	border-right: 1px solid #dfa5b2;
         color: white;
@@ -49,13 +49,13 @@ h1 {
 
 /* Tab bar */
 div.vbar {
-	padding: 0 12px;
+	padding: 0 24px;
 	position: relative;
 	clear: left;
 	border-bottom: 2px solid #9999cc;
 }
 div.nvbar {
-	padding: 0 12px;
+	padding: 0 24px;
 	position: relative;
 	clear: left;
 }
@@ -196,7 +196,7 @@ div.inline {
 
 /* body */
 div.body {
-	margin: 0 12px;
+	margin: 0 24px;
 	position: relative;
 	z-index: 3;
 }
@@ -2819,14 +2819,14 @@ span.foldarrow {
         text-decoration: underline;
 }
 .run61, .run61 a {
-	color: #a4ffa4;
+	color: #e5f8e5;
 }
 .run61 a:hover {
 	color: #228822;
 }
 .run61 {
 	background-color: #000022;
-        color: #80f299;
+        color: #d5e8d5;
 	font-size: 85%;
         overflow: auto;
         max-height: 32em;
