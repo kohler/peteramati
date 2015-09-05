@@ -1373,10 +1373,13 @@ function run61(button, opt) {
             if (!filematch.length && (dir = therun.attr("run61directory")))
                 filematch = jQuery(".filediff61[run61file='" + dir + "/" + m[1] + "']");
             if (filematch.length) {
-                a = jQuery("<a href=\"#Lb" + m[2] + "_" + filematch.attr("run61fileid") + "\" onclick=\"return gotoline61(this)\"></a>");
-                a.text(m[1] + ":" + m[2]);
-                addlinepart(node, a);
-                line = line.substr(1 + m[1].length + m[2].length);
+                x = "Lb" + m[2] + "_" + filematch.attr("run61fileid");
+                if (document.getElementById(x)) {
+                    a = jQuery("<a href=\"#" + x + "\" onclick=\"return gotoline61(this)\"></a>");
+                    a.text(m[1] + ":" + m[2]);
+                    addlinepart(node, a);
+                    line = line.substr(1 + m[1].length + m[2].length);
+                }
             }
         }
 
