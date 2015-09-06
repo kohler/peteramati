@@ -1,5 +1,5 @@
 <?php
-// initweb.php -- HotCRP initialization (test or site)
+// init.php -- HotCRP initialization (test or site)
 // HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
 // Distributed under an MIT-like license; see LICENSE
 
@@ -35,7 +35,6 @@ function set_path_variables() {
             $ConfSitePATH = "/var/www/html";
     }
     require_once("$ConfSitePATH/lib/navigation.php");
-    Navigation::analyze();
     if (@$ConfSiteBase === null)
         $ConfSiteBase = Navigation::siteurl();
     if (@$ConfSiteSuffix === null)
