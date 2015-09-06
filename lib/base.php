@@ -166,6 +166,14 @@ function object_replace_recursive($a, $b) {
             object_replace_recursive($a->$k, $v);
 }
 
+function object_merge_recursive($a, $b) {
+    foreach (get_object_vars($b) as $k => $v)
+        if (!property_exists($a, $k))
+            $a->$k = $v;
+        else if (is_object($a->$k) && is_object($v))
+            object_merge_recursive($a->$k, $v);
+}
+
 
 // debug helpers
 

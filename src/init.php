@@ -54,6 +54,7 @@ function __autoload($class_name) {
                                "DiffInfo" => "src/diffinfo.php",
                                "DocumentHelper" => "lib/documenthelper.php",
                                "Ht" => "lib/ht.php",
+                               "Json" => "lib/json.php",
                                "LoginHelper" => "lib/login.php",
                                "Mailer" => "lib/mailer.php",
                                "Messages" => "lib/messages.php",
@@ -202,43 +203,57 @@ function load_pset_info() {
         Messages::$main->add($j);
 
     // read psets
+    $PsetInfo = (object) array();
     $psets = expand_includes($ConfSitePATH, $Opt["psetsConfig"],
                              array("CONFID" => @$Opt["confid"] ? : @$Opt["dbName"],
                                    "HOSTTYPE" => @$Opt["hostType"] ? : ""));
     if (!count($psets))
         Multiconference::fail_message("\$Opt[\"psetsConfig\"] is not set correctly.");
-    $PsetInfo = (object) array();
-    foreach ($psets as $f) {
-        $x = json_decode(file_get_contents($f));
-        if (!$x)
-            Multiconference::fail_message("`$f` is not present or contains errors. Decoding error: " . json_last_error_msg());
-        if (@$x->_messages && is_array($x->_messages)) {
-            foreach ($x->_messages as $j)
-                Messages::add($j);
-        } else if (@$x->_messages && is_object($x->_messages)) {
-            foreach (get_object_vars($x->_messages) as $type => $j) {
-                $jj = is_array($j) ? $j : array($j);
-                foreach ($jj as $j)
-                    Messages::add($j, $type);
-            }
-        }
+    foreach ($psets as $fname) {
+        $data = file_get_contents($fname);
+        if ($data === false)
+            Multiconference::fail_message("$fname: Required configuration file cannot be read.");
+        $x = json_decode($data);
+        if (!$x) {
+            Json::decode($data); // our JSON decoder provides error positions
+            Multiconference::fail_message("$fname: Invalid JSON. " . Json::last_error_msg());
+        } else if (!is_object($x))
+            Multiconference::fail_message("$fname: Not a JSON object.");
         object_replace_recursive($PsetInfo, $x);
     }
-
-    // check psets contents
     if (!isset($PsetInfo->_defaults))
         $PsetInfo->_defaults = (object) array();
-    foreach ($PsetInfo as $pk => $p)
-        if (is_object($p) && isset($p->psetid)) {
-            foreach ($PsetInfo->_defaults as $k => $v) {
-                if (!property_exists($p, $k))
-                    $p->$k = $v;
-                else if (is_object($p->$k) && is_object($v))
-                    object_replace_recursive($p->$k, $v);
-            }
+
+    // parse psets
+    foreach ($PsetInfo as $pk => $p) {
+        if (!is_object($p) || !isset($p->psetid))
+            continue;
+        object_merge_recursive($p, $PsetInfo->_defaults);
+
+        try {
             $pset = new Pset($pk, $p);
             Pset::register($pset);
+        } catch (Exception $exception) {
+            // Want to give a good error message, so discover where the error is
+            // create pset landmark object
+            $locinfo = (object) array();
+            foreach ($psets as $fname) {
+                $x = Json::decode_landmarks(file_get_contents($fname), $fname);
+                object_replace_recursive($locinfo, $x);
+            }
+            $locp = $locinfo->$pk;
+            if (isset($locinfo->_defaults))
+                object_merge_recursive($locp, $locinfo->_defaults);
+            $path = $exception instanceof PsetConfigException ? $exception->path : array();
+            for ($pathpos = 0; $pathpos < count($path) && $locp && !is_string($locp); ++$pathpos) {
+                $component = $path[$pathpos];
+                $locp = is_array($locp) ? $locp[$component] : $locp->$component;
+            }
+            if (!is_string($locp))
+                $locp = $locinfo->$pk->__LANDMARK__;
+            Multiconference::fail_message($locp . ": Configuration error: " . $exception->getMessage());
         }
+    }
 
     // read message data
     if (!@$PsetInfo->_messagedefs)

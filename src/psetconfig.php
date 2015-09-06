@@ -1,5 +1,14 @@
 <?php
 
+class PsetConfigException extends Exception {
+    public $path;
+
+    public function __construct($msg, $path) {
+        $this->path = is_array($path) ? $path : array($path);
+        parent::__construct($msg);
+    }
+}
+
 class Pset {
     public $id;
     public $psetid;
@@ -54,12 +63,12 @@ class Pset {
     public function __construct($pk, $p) {
         // pset id
         if (!is_int(@$p->psetid) || $p->psetid <= 0)
-            throw new Exception("psetid must be positive integer");
+            throw new PsetConfigException("`psetid` must be positive integer", "psetid");
         $this->id = $this->psetid = $p->psetid;
 
         // pset key
         if (ctype_digit($pk) && intval($pk) !== $p->psetid)
-            throw new Exception("numeric pset key disagrees with psetid");
+            throw new Exception("numeric pset key disagrees with `psetid`");
         else if (!preg_match(',\A[^_./&;#][^/&;#]*\z,', $pk))
             throw new Exception("pset key format error");
         $this->psetkey = $pk;
@@ -69,7 +78,7 @@ class Pset {
             && preg_match(self::URLKEY_REGEX, $p->urlkey))
             $this->urlkey = $p->urlkey;
         else if (@$p->urlkey)
-            throw new Exception("`urlkey` format error");
+            throw new PsetConfigException("`urlkey` format error", "urlkey");
         else {
             $this->urlkey = $this->psetid;
             if (preg_match(self::URLKEY_REGEX, $this->psetkey)
@@ -93,10 +102,10 @@ class Pset {
         if (!$this->handout_repo_url && !$this->gitless)
             throw new Exception("`handout_repo_url` missing");
         if (isset($p->repo_transform_patterns))
-            $this->repo_transform_patterns = self::cstr_array($p->repo_transform_patterns);
+            $this->repo_transform_patterns = self::cstr_array($p, "repo_transform_patterns");
         if (@$p->directory !== null && @$p->directory !== false
             && !is_string($p->directory))
-            throw new Exception("`directory` format error");
+            throw new PsetConfigException("`directory` format error", "directory");
         $this->directory = @$p->directory ? : "";
         $this->directory_slash = preg_replace(',([^/])/*\z,', '$1/', $this->directory);
         $this->directory_noslash = preg_replace(',/+\z,', '', $this->directory_slash);
@@ -109,14 +118,14 @@ class Pset {
 
         // grades
         if (is_array(@$p->grades) || is_object(@$p->grades)) {
-            foreach (self::make_config_array($p->grades) as $k => $v) {
-                $g = new GradeEntryConfig($k, $v);
+            foreach ((array) $p->grades as $k => $v) {
+                $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v);
                 if (@$this->all_grades[$g->name])
-                    throw new Exception("grade `$g->name` reused");
+                    throw new PsetConfigException("grade `$g->name` reused", array("grades", $k));
                 $this->all_grades[$g->name] = $g;
             }
         } else if (@$p->grades)
-            throw new Exception("`grades` format error`");
+            throw new PsetConfigException("`grades` format error`", "grades");
         $this->grades = $this->all_grades;
         if (@$p->grade_order)
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
@@ -140,14 +149,14 @@ class Pset {
 
         // runners
         if (is_array(@$p->runners) || is_object(@$p->runners)) {
-            foreach (self::make_config_array($p->runners) as $k => $v) {
-                $r = new RunnerConfig($k, $v);
+            foreach ((array) $p->runners as $k => $v) {
+                $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v);
                 if (@$this->all_runners[$r->name])
-                    throw new Exception("runner `$r->name` reused");
+                    throw new PsetConfigException("runner `$r->name` reused", array("runners", $k));
                 $this->all_runners[$r->name] = $r;
             }
         } else if (@$p->runners)
-            throw new Exception("`runners` format error");
+            throw new PsetConfigException("`runners` format error", "runners");
         $this->runners = $this->all_runners;
         if (@$p->runner_order)
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
@@ -161,7 +170,7 @@ class Pset {
             foreach (self::make_config_array($p->diffs) as $k => $v)
                 $this->diffs[] = new DiffConfig($k, $v);
         } else if (@$p->diffs)
-            throw new Exception("`diffs` format error");
+            throw new PsetConfigException("`diffs` format error", "diffs");
         if (is_array(@$p->ignore))
             $this->ignore = self::cstr_array($p, "ignore");
         else if (@$p->ignore)
@@ -189,9 +198,9 @@ class Pset {
 
     private static function ccheck($callable, $args) {
         $i = 0;
-        $format = "";
-        if (is_string($args[$i])) {
-            $format = $args[$i] . " ";
+        $format = false;
+        if (!is_object($args[$i])) {
+            $format = $args[$i];
             ++$i;
         }
         $p = $args[$i];
@@ -201,12 +210,17 @@ class Pset {
                 $v = call_user_func($callable, $p->$x);
                 if (is_array($v) && $v[0])
                     return $v[1];
-                else if (is_array($v))
-                    throw new Exception("`$x` {$format}$v[1]");
-                else if ($v)
+                else if (!is_array($v) && $v)
                     return $p->$x;
-                else
-                    throw new Exception("`$x` {$format}format error");
+                else {
+                    $errormsg = is_array($v) ? $v[1] : "format error";
+                    if ($format) {
+                        $format = is_array($format) ? $format : array($format);
+                        $format[] = $x;
+                        throw new PsetConfigException("`$x` $errormsg", $format);
+                    } else
+                        throw new PsetConfigException("`$x` $errormsg", $x);
+                }
             }
         }
         return null;
@@ -248,18 +262,18 @@ class Pset {
 
     private static function reorder_config($k, $a, $order) {
         if (!is_array($order))
-            throw new Exception("`$k` format error");
+            throw new PsetConfigException("`$k` format error", $k);
         $b = array();
         foreach ($order as $name)
             if (is_string($name)) {
                 if (isset($a[$name]) && !isset($b[$name]))
                     $b[$name] = $a[$name];
                 else if (isset($a[$name]))
-                    throw new Exception("`$k` entry `$name` reused");
+                    throw new PsetConfigException("`$k` entry `$name` reused", $k);
                 else
-                    throw new Exception("`$k` entry `$name` unknown");
+                    throw new PsetConfigException("`$k` entry `$name` unknown", $k);
             } else
-                throw new Exception("`$k` format error");
+                throw new PsetConfigException("`$k` format error", $k);
         return $b;
     }
 }
@@ -275,17 +289,18 @@ class GradeEntryConfig {
     public $is_extra;
 
     public function __construct($name, $g) {
+        $loc = array("grades", $name);
         if (!is_object($g))
-            throw new Exception("grade entry format error");
+            throw new PsetConfigException("grade entry format error", $loc);
         $this->name = isset($g->name) ? $g->name : $name;
         if (!is_string($this->name) || $this->name === "")
-            throw new Exception("`name` grade entry format error");
-        $this->title = Pset::cstr("grade entry", $g, "title");
-        $this->max = Pset::cnum("grade entry", $g, "max");
-        $this->hide = Pset::cbool("grade entry", $g, "hide");
-        $this->hide_max = Pset::cbool("grade entry", $g, "hide_max");
-        $this->no_total = Pset::cbool("grade entry", $g, "no_total");
-        $this->is_extra = Pset::cbool("grade entry", $g, "is_extra");
+            throw new PsetConfigException("`name` grade entry format error", $loc);
+        $this->title = Pset::cstr($loc, $g, "title");
+        $this->max = Pset::cnum($loc, $g, "max");
+        $this->hide = Pset::cbool($loc, $g, "hide");
+        $this->hide_max = Pset::cbool($loc, $g, "hide_max");
+        $this->no_total = Pset::cbool($loc, $g, "no_total");
+        $this->is_extra = Pset::cbool($loc, $g, "is_extra");
     }
 }
 
@@ -302,25 +317,26 @@ class RunnerConfig {
     public $nconcurrent;
 
     public function __construct($name, $r) {
+        $loc = array("runners", $name);
         if (!is_object($r))
-            throw new Exception("runner format error");
+            throw new PsetConfigException("runner format error", $loc);
         $this->name = isset($r->name) ? $r->name : $name;
         if (!is_string($this->name) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->name))
-            throw new Exception("`name` runner format error");
-        $this->title = Pset::cstr("runner", $r, "title", "text");
+            throw new PsetConfigException("`name` runner format error", $loc);
+        $this->title = Pset::cstr($loc, $r, "title", "text");
         if ($this->title === null)
             $this->title = $this->name;
-        $this->output_title = Pset::cstr("runner", $r, "output_title", "output_text");
+        $this->output_title = Pset::cstr($loc, $r, "output_title", "output_text");
         if ($this->output_title === null)
             $this->output_title = $this->title . " output";
-        $this->disabled = Pset::cbool("runner", $r, "disabled");
-        $this->visible = Pset::cbool("runner", $r, "visible", "show_to_students");
-        $this->output_visible = Pset::cdate("runner", $r, "output_visible", "show_output_to_students");
-        $this->command = Pset::cstr("runner", $r, "command");
-        $this->load = Pset::cstr("runner", $r, "load");
-        $this->eval = Pset::cstr("runner", $r, "eval");
-        $this->queue = Pset::cstr("runner", $r, "queue");
-        $this->nconcurrent = Pset::cint("runner", $r, "nconcurrent");
+        $this->disabled = Pset::cbool($loc, $r, "disabled");
+        $this->visible = Pset::cbool($loc, $r, "visible", "show_to_students");
+        $this->output_visible = Pset::cdate($loc, $r, "output_visible", "show_output_to_students");
+        $this->command = Pset::cstr($loc, $r, "command");
+        $this->load = Pset::cstr($loc, $r, "load");
+        $this->eval = Pset::cstr($loc, $r, "eval");
+        $this->queue = Pset::cstr($loc, $r, "queue");
+        $this->nconcurrent = Pset::cint($loc, $r, "nconcurrent");
     }
 }
 
@@ -333,16 +349,17 @@ class DiffConfig {
     public $boring;
 
     public function __construct($regex, $d) {
+        $loc = array("diffs", $regex);
         if (!is_object($d))
-            throw new Exception("diff format error");
+            throw new PsetConfigException("diff format error", $loc);
         $this->regex = isset($d->regex) ? $d->regex : $regex;
         if (!is_string($this->regex) || $this->regex === "")
-            throw new Exception("`regex` diff format error");
-        $this->match_priority = (float) Pset::cint("diff", $d, "match_priority");
-        $this->priority = Pset::cnum("diff", $d, "priority");
-        $this->full = Pset::cbool("diff", $d, "full");
-        $this->ignore = Pset::cbool("diff", $d, "ignore");
-        $this->boring = Pset::cbool("diff", $d, "boring");
+            throw new PsetConfigException("`regex` diff format error", $loc);
+        $this->match_priority = (float) Pset::cint($loc, $d, "match_priority");
+        $this->priority = Pset::cnum($loc, $d, "priority");
+        $this->full = Pset::cbool($loc, $d, "full");
+        $this->ignore = Pset::cbool($loc, $d, "ignore");
+        $this->boring = Pset::cbool($loc, $d, "boring");
     }
 
     static public function combine($a, $b) {
