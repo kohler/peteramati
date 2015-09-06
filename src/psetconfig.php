@@ -305,7 +305,7 @@ class RunnerConfig {
         if (!is_object($r))
             throw new Exception("runner format error");
         $this->name = isset($r->name) ? $r->name : $name;
-        if (!is_string($this->name) || $this->name === "")
+        if (!is_string($this->name) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->name))
             throw new Exception("`name` runner format error");
         $this->title = Pset::cstr("runner", $r, "title", "text");
         if ($this->title === null)

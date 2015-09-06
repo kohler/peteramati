@@ -843,8 +843,7 @@ if ($Pset->gitless) {
     foreach ($Pset->runners as $r)
         if ($Me->can_view_run($Pset, $r, $User)) {
             if ($Me->can_run($Pset, $r, $User)) {
-                $text = isset($r->text) ? htmlspecialchars($r->text) : htmlspecialchars($r->name);
-                $b = Ht::button("run", $text,
+                $b = Ht::button("run", htmlspecialchars($r->title),
                                 array("value" => $r->name,
                                       "class" => "runner61",
                                       "style" => "font-weight:bold",
@@ -926,13 +925,11 @@ if ($Pset->gitless) {
         echo '<div id="run61out_' . $r->name . '"';
         if (!$rj || !isset($rj->timestamp))
             echo ' style="display:none"';
-        $text = isset($r->output_text) ? $r->output_text :
-            ((isset($r->text) ? $r->text : $r->name) . " output");
         echo '><h3><a class="fold61" href="#" onclick="',
             "return runfold61('$r->name')", '">',
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
-            $text, '</a></h3><div class="run61" id="run61_',
-            $r->name, '" style="display:none"';
+            htmlspecialchars($r->output_title), '</a></h3>',
+            '<div class="run61" id="run61_', $r->name, '" style="display:none"';
         if ($Pset->directory_noslash !== "")
             echo ' run61directory="', htmlspecialchars($Pset->directory_noslash), '"';
         if ($rj && isset($rj->timestamp))
