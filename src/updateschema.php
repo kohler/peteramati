@@ -142,7 +142,7 @@ function updateSchema($Conf) {
         && $Conf->ql("alter table RepositoryGrade add `placeholder_at` int(11) DEFAULT NULL"))
         update_schema_version($Conf, 87);
     if ($Conf->settings["allowPaperOption"] == 87
-        && $Conf->ql("alter table `ContactInfo` add `anon_username` varbinary(40) DEFAULT NULL"))
-        && $Conf->ql("alter table `ContactInfo` add unique key `anon_username` (`anon_username`)")
+        && $Conf->ql("alter table `ContactInfo` add `anon_username` varbinary(40) DEFAULT NULL")
+        && $Conf->ql("alter table `ContactInfo` add unique key `anon_username` (`anon_username`)"))
         update_schema_version($Conf, 88);
 }
