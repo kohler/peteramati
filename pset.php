@@ -382,7 +382,7 @@ if ($User->seascode_username && $Me->isPC) {
         if ($links[0])
             echo '<a href="', hoturl("pset", array("pset" => $Pset->urlkey, "u" => $Me->user_linkpart($links[0]), "sort" => @$_REQUEST["sort"])), '">« ', htmlspecialchars($links[0]->seascode_username), '</a>';
         if ($links[0] && $links[1])
-            echo ' | ';
+            echo ' · ';
         if ($links[1])
             echo '<a href="', hoturl("pset", array("pset" => $Pset->urlkey, "u" => $Me->user_linkpart($links[1]), "sort" => @$_REQUEST["sort"])), '">', htmlspecialchars($links[1]->seascode_username), ' »</a>';
         echo "</h3></div>";
