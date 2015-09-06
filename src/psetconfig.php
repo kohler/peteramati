@@ -75,13 +75,15 @@ class Pset {
         $this->psetkey = $pk;
 
         // url keys
-        if (@$p->urlkey && is_string($p->urlkey)
+        if (is_string(@$p->urlkey)
             && preg_match(self::URLKEY_REGEX, $p->urlkey))
             $this->urlkey = $p->urlkey;
+        else if (is_int(@$p->urlkey))
+            $this->urlkey = (string) $p->urlkey;
         else if (@$p->urlkey)
             throw new PsetConfigException("`urlkey` format error", "urlkey");
         else {
-            $this->urlkey = $this->psetid;
+            $this->urlkey = (string) $this->psetid;
             if (preg_match(self::URLKEY_REGEX, $this->psetkey)
                 && $this->psetkey !== "pset" . $this->psetid)
                 $this->urlkey = $this->psetkey;
