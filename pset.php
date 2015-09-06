@@ -703,7 +703,7 @@ function echo_commit($Info) {
             // they don't have the latest updates
             $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $last_handout)) . "\">see diff</a>)</span>. Run <code>git pull handout master</code> to merge these updates.");
         else if ($last_handout)
-            $remarks[] = array(true, "Please create your repository by cloning our repository. By creating a repository from the pset’s raw files, you have made it hard to get pset updates.");
+            $remarks[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.");
         else if (!$last_handout && $Me->isPC) {
             $handout_files = Contact::repo_ls_files(Contact::handout_repo($Pset), "master");
             if (!count($handout_files))

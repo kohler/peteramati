@@ -403,7 +403,7 @@ class ContactView {
         }
         if ($repo && isset($repo->truncated_psetdir)
             && defval($repo->truncated_psetdir, $pset->id))
-            $notes[] = array(true, "Please create your repository by cloning our repository. By creating a repository from the pset’s raw files, you have made it hard for us to grade and hard for you to get pset updates.");
+            $notes[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for us to grade and harder for you to get pset updates.");
         if (!$repo)
             $notes[] = array(false, "Enter your " . Contact::seascode_home("code.seas") . " repository URL here.");
 
