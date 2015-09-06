@@ -1914,7 +1914,7 @@ class Contact {
         if ($this->isPC && (!$user || $user != $this))
             return true;
         $s2s = $runner->visible;
-        $r2s = $runner->show_results_to_students;
+        $r2s = $runner->output_visible;
         return ($s2s === true || $r2s === true)
             || (($s2s === "grades" || $s2s === "grade"
                  || $r2s === "grades" || $r2s === "grade")

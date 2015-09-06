@@ -252,6 +252,10 @@ class Pset {
         return self::ccheck("check_date", func_get_args());
     }
 
+    public static function cdate_or_grades(/* ... */) {
+        return self::ccheck("check_date_or_grades", func_get_args());
+    }
+
     private static function make_config_array($x) {
         if (is_array($x)) {
             $y = array();
@@ -333,7 +337,7 @@ class RunnerConfig {
             $this->output_title = $this->title . " output";
         $this->disabled = Pset::cbool($loc, $r, "disabled");
         $this->visible = Pset::cbool($loc, $r, "visible", "show_to_students");
-        $this->output_visible = Pset::cdate($loc, $r, "output_visible", "show_output_to_students");
+        $this->output_visible = Pset::cdate_or_grades($loc, $r, "output_visible", "show_output_to_students", "show_results_to_students");
         $this->command = Pset::cstr($loc, $r, "command");
         $this->load = Pset::cstr($loc, $r, "load");
         $this->eval = Pset::cstr($loc, $r, "eval");
@@ -409,4 +413,11 @@ function check_date($x) {
         return array(false, "date parse error");
     else
         return false;
+}
+
+function check_date_or_grades($x) {
+    if ($x === "grades")
+        return array(true, $x);
+    else
+        return check_date($x);
 }
