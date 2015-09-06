@@ -622,7 +622,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
 
     $t .= "<td>";
     if ($s->url) {
-        $t .= Contact::seascode_repo($s->url, "repo");
+        $t .= $s->repo_link($s->url, "repo");
         if (!$s->working)
             $t .= ' <strong class="err">broken</strong>';
         else if (!$s->repoviewable)
@@ -734,6 +734,7 @@ function show_pset_table($pset) {
 
     $students = array();
     while ($result && ($s = $result->fetch_object("Contact"))) {
+        $s->is_anonymous = $pset->anonymous;
         Contact::set_sorter($s, @$_REQUEST["sort"]);
         $students[$s->contactId] = $s;
         // maybe lastpset links are out of order

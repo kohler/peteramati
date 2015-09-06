@@ -1201,9 +1201,12 @@ class Contact {
             return array("REPOGITURL" => null, "REPOBASE" => null);
     }
 
-    static function seascode_repo($repo, $text = null) {
-        $repo = self::seascode_repo_base($repo);
-        return self::_seascode_finish(self::SEASCODE_URL . htmlspecialchars($repo), $text);
+    function repo_link($repo, $text, $suffix = "") {
+        $repo = self::SEASCODE_URL . self::seascode_repo_base($repo) . $suffix;
+        if ($this->is_anonymous)
+            return '<a href="#" onclick=\'window.location=' . htmlspecialchars(json_encode($repo)) . ';return false\'>' . $text . '</a>';
+        else
+            return '<a href="' . htmlspecialchars($repo) . '">' . $text . '</a>';
     }
 
     static function seascode_repo_memberships($repo, $text = null) {

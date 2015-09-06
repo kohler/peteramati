@@ -358,7 +358,7 @@ class ContactView {
         $repo_url = $user->seascode_repo_base($repo ? $repo->url : "");
         $title = "repository";
         if ($repo_url && strpos($repo_url, ":") === false)
-            $title = $user->seascode_repo($repo_url, $title);
+            $title = $user->repo_link($repo_url, $title);
 
         if ($editable)
             $value = Ht::entry("repo", $repo_url, array("style" => "width:32em"))

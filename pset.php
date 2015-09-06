@@ -658,15 +658,8 @@ function echo_commit($Info) {
                         array("onchange" => "jQuery(this).closest('form').submit()"));
     if ($Me != $User) {
         $x = $Info->is_grading_commit() ? "" : "font-weight:bold";
-        $value .= " " . Ht::submit("grade", "Grade", array("style" => $x));
-        $url = "http://code.seas.harvard.edu/" . 
-               $User->seascode_repo_base($Info->repo->url) .
-               "/archive-tarball/" .
-               (substr($Info->commit_hash(), 0, 8) ?: "master");
-        if ($User->is_anonymous)
-            $value .= ' &nbsp;<a href="#" onclick=\'window.location=' . json_encode($url) . ';return false\'>Download repo</a>';
-        else
-            $value .= ' &nbsp;<a href="' . $url . '">Download repo</a>';
+        $value .= " " . Ht::submit("grade", "Grade", array("style" => $x))
+            . " &nbsp" . $User->repo_link($Info->repo->url, "Download repo", "/archive-tarball/" . (substr($Info->commit_hash(), 0, 8) ? : "master"));
     }
 
     // view options
