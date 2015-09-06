@@ -1931,7 +1931,7 @@ class Contact {
     }
 
     function user_linkpart($user = null, $is_anonymous = false) {
-        $user = $user ? $user : $this;
+        $user = $user ? : $this;
         if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous)))
             return $user->anon_username;
         else if ($this->isPC || @$_SESSION["last_actas"])

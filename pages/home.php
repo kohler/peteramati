@@ -274,7 +274,7 @@ if ($Me->isPC && check_post() && @$_REQUEST["setgrader"])
 
 function runmany() {
     global $Conf, $Me;
-    if (!($pset = Pset::find(@$_REQUEST["pset"])))
+    if (!($pset = Pset::find(@$_REQUEST["pset"])) || $pset->disabled)
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");

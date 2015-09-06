@@ -74,7 +74,8 @@ class ContactView {
                 $Conf->errorMsg("You can’t see that user’s information.");
                 $user = null;
             } else
-                $user->is_anonymous = (substr($usertext, 0, 5) === "[anon");
+                $user->is_anonymous = (substr($usertext, 0, 5) === "[anon")
+                    || ($pset && $pset->anonymous);
         }
         if ($user && ($Me->isPC || $Me->chairContact)) {
             if ($pset && $pset->anonymous)
