@@ -168,7 +168,6 @@ function set_ranks(&$students, &$selection, $key) {
 }
 
 function download_psets_report($request) {
-    global $PsetInfo;
     $where = array();
     $report = $request["report"];
     foreach (explode(" ", strtolower($report)) as $rep)
@@ -189,8 +188,8 @@ function download_psets_report($request) {
         $selection = array("name", "grade", "seascode_username", "huid", "extension");
     $maxbyg = array();
     $max = $max_noextra = 0;
-    foreach ($PsetInfo as $pset)
-        if (isset($pset->psetid) && !$pset->disabled) {
+    foreach (Pset::$all as $pset)
+        if (!$pset->disabled) {
             collect_pset_info($students, $pset, $where);
             if (($g = $pset->group)) {
                 if (!isset($maxbyg[$g]))
@@ -204,8 +203,8 @@ function download_psets_report($request) {
             }
         }
 
-    foreach ($PsetInfo as $pset)
-        if (isset($pset->psetid) && !$pset->disabled) {
+    foreach (Pset::$all as $pset)
+        if (!$pset->disabled) {
             set_ranks($students, $selection, $pset->psetkey);
             if ($pset->has_extra)
                 set_ranks($students, $selection, $pset->psetkey . "_noextra");
@@ -651,7 +650,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
 }
 
 function show_regrades($result) {
-    global $Conf, $Me, $Now, $LastPsetFix, $PsetInfo;
+    global $Conf, $Me, $Now, $LastPsetFix;
     $rows = array();
 
     echo "<h3>regrade requests</h3>";
@@ -666,10 +665,7 @@ function show_regrades($result) {
         if ($checkbox)
             echo '<td class="s61rownumber">', Ht::checkbox("s61_" . $Me->user_idpart($row->student), 1, array("class" => "s61check")), '</td>';
         echo '<td class="s61rownumber">', $trn, '.</td>';
-        $pset = null;
-        foreach ($PsetInfo as $pi)
-            if (@$pi->psetid == $row->pset)
-                $pset = $pi;
+        $pset = Pset::$all[$row->pset];
         echo '<td class="s61pset">', htmlspecialchars($pset->title), '</td>';
 
         $row->usernames = explode(" ", $row->usernames);
