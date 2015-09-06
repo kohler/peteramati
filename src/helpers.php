@@ -325,7 +325,7 @@ function hoturl_site_relative($page, $options = null) {
                 $t .= "/" . $m[2];
                 $options = $m[1] . $m[3];
             }
-        } else if ($page == "profile"
+        } else if (($page == "profile" || $page == "face")
                    && preg_match($are . 'u=([^&#?]+)' . $zre, $options, $m)) {
             $t .= "/" . $m[2];
             $options = $m[1] . $m[3];

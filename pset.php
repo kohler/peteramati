@@ -396,6 +396,10 @@ if ($User->seascode_username && $Me->isPC) {
 }
 
 $u = $Me->user_linkpart($User);
+
+if ($User !== $Me && !$User->is_anonymous && $User->contactImageId)
+    echo '<img class="smallface61" src="' . hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
+
 echo '<h2 class="homeemail"><a href="',
     hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
 if ($Me->privChair)

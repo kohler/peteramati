@@ -3005,6 +3005,20 @@ span.grademax61 {
         -webkit-transform-origin: 50% 50%;
 }
 
+.bigface61 {
+	float: left;
+	margin-right: 12px;
+	margin-bottom: 8px;
+	max-width: 128px;
+	max-height: 128px;
+}
+.smallface61 {
+	float: left;
+	margin-right: 12px;
+	margin-bottom: 8px;
+	max-width: 64px;
+	max-height: 64px;
+}
 
 /* folding */
 .foldc .fx, .foldo .fn,

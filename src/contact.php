@@ -25,6 +25,7 @@ class Contact {
 
     public $seascode_username;
     public $anon_username;
+    public $contactImageId;
     public $is_anonymous = false;
 
     private $links = null;
@@ -75,7 +76,7 @@ class Contact {
             $name = Text::analyze_name($user);
         $this->firstName = (string) @$name->firstName;
         $this->lastName = (string) @$name->lastName;
-        foreach (array("email", "preferredEmail", "affiliation", "seascode_username") as $k)
+        foreach (array("email", "preferredEmail", "affiliation") as $k)
             if (isset($user->$k))
                 $this->$k = simplify_whitespace($user->$k);
         if (isset($user->collaborators)) {
@@ -102,6 +103,12 @@ class Contact {
             $this->activity_at = (int) $user->lastLogin;
         if (isset($user->extension))
             $this->extension = !!$user->extension;
+        if (isset($user->seascode_username))
+            $this->seascode_username = $user->seascode_username;
+        if (isset($user->anon_username))
+            $this->anon_username = $user->anon_username;
+        if (isset($user->contactImageId))
+            $this->contactImageId = (int) $user->contactImageId;
         if (isset($user->roles) || isset($user->isPC) || isset($user->isAssistant)
             || isset($user->isChair)) {
             $roles = (int) @$user->roles;
@@ -133,6 +140,8 @@ class Contact {
             $this->activity_at = (int) $this->lastLogin;
         if (isset($this->extension))
             $this->extension = !!$this->extension;
+        if (isset($this->contactImageId))
+            $this->contactImageId = (int) $this->contactImageId;
         if (isset($this->roles))
             $this->assign_roles((int) $this->roles);
     }

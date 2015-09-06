@@ -145,4 +145,11 @@ function updateSchema($Conf) {
         && $Conf->ql("alter table `ContactInfo` add `anon_username` varbinary(40) DEFAULT NULL")
         && $Conf->ql("alter table `ContactInfo` add unique key `anon_username` (`anon_username`)"))
         update_schema_version($Conf, 88);
+    if ($Conf->settings["allowPaperOption"] == 88
+        && $Conf->ql("create table `ContactImage` ( `contactImageId` int(11) NOT NULL AUTO_INCREMENT, `contactId` int(11) NOT NULL, `mimetype` varbinary(128) DEFAULT NULL, `data` varbinary(32768) DEFAULT NULL, PRIMARY KEY (`contactImageId`), KEY `contactId` (`contactId`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8")
+        && $Conf->ql("alter table `ContactInfo` add `contactImageId` int(11) DEFAULT NULL"))
+        update_schema_version($Conf, 89);
+    if ($Conf->settings["allowPaperOption"] == 89
+        && $Conf->ql("alter table ContactImage change `data` `data` mediumblob DEFAULT NULL"))
+        update_schema_version($Conf, 90);
 }

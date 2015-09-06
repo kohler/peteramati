@@ -415,6 +415,8 @@ Sign in to tell us about your code.";
 if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
     echo "<div id='homeinfo'>";
     $u = $Me->user_linkpart($User);
+    if ($User !== $Me && !$User->is_anonymous && $User->contactImageId)
+        echo '<img class="bigface61" src="' . hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
     echo '<h2 class="homeemail"><a class="q" href="',
         hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
     if ($Me->privChair)
@@ -438,7 +440,8 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
 
     if ($User->dropped)
         ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
-    echo "</div>\n";
+
+    echo '<hr class="c" />', "</div>\n";
 }
 
 
