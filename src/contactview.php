@@ -61,7 +61,7 @@ class ContactView {
         }
     }
 
-    static function prepare_user(&$usertext) {
+    static function prepare_user(&$usertext, $pset = null) {
         global $Conf, $Me;
         $user = $Me;
         if (isset($usertext) && $usertext) {
@@ -73,10 +73,15 @@ class ContactView {
             else if (!$Me->isPC) {
                 $Conf->errorMsg("You can’t see that user’s information.");
                 $user = null;
-            }
+            } else
+                $user->is_anonymous = (substr($usertext, 0, 5) === "[anon");
         }
-        if ($user && ($Me->isPC || $Me->chairContact))
-            $usertext = $user->seascode_username ? : $user->email;
+        if ($user && ($Me->isPC || $Me->chairContact)) {
+            if ($pset && $pset->anonymous)
+                $usertext = $user->anon_username;
+            else
+                $usertext = $user->seascode_username ? : $user->email;
+        }
         return $user;
     }
 
@@ -284,28 +289,35 @@ class ContactView {
             return;
 
         // collect values
-        if ($info->can_set_repo)
-            $value = Ht::entry("partner", $partner ? $partner->email : "", array("style" => "width:32em"))
+        $partner_email = "";
+        if ($user->is_anonymous && $partner)
+            $partner_email = $partner->anon_username;
+        else if ($partner)
+            $partner_email = $partner->email;
+        $editable = $info->can_set_repo && !$user->is_anonymous;
+
+        if ($editable)
+            $value = Ht::entry("partner", $partner_email, array("style" => "width:32em"))
                 . " " . Ht::submit("Save");
         else
-            $value = htmlspecialchars($partner ? $partner->email : "(none)");
+            $value = htmlspecialchars($partner_email ? : "(none)");
 
         // check back-partner links
         $notes = array();
         $backpartners = array_unique($user->links(LINK_BACKPARTNER, $pset->id));
         $info->partner_same = false;
         if (count($backpartners) == 0 && $partner)
-            $notes[] = array(true, "ERROR: " . htmlspecialchars($partner->email) . " has not listed you as a partner yet.");
+            $notes[] = array(true, "ERROR: " . htmlspecialchars($partner_email) . " has not listed you as a partner yet.");
         else if (count($backpartners) == 1 && $partner && $backpartners[0] == $partner->contactId) {
             $info->partner_same = true;
             if ($partner->dropped)
                 $notes[] = array(true, "ERROR: We believe your partner has dropped the course.");
         } else if (count($backpartners) == 0 && !$partner) {
-            if ($info->can_set_repo)
+            if ($editable)
                 $notes[] = array(false, "Enter your partner’s email, username, or HUID here.");
         } else {
             $backpartners[] = -1;
-            $result = $Conf->qe("select email from ContactInfo where contactId in (" . join(",", $backpartners) . ")");
+            $result = $Conf->qe("select " . ($user->is_anonymous ? "email" : "anon_username") . " from ContactInfo where contactId in (" . join(",", $backpartners) . ")");
             $p = array();
             while (($row = edb_row($result)))
                 if ($Me->isPC)
@@ -315,11 +327,11 @@ class ContactView {
             $notes[] = array(true, "ERROR: These users have listed you as a partner for this pset: " . commajoin($p));
         }
 
-        if ($info->can_set_repo)
+        if ($editable)
             echo Ht::form(self_href(array("post" => post_value(), "set_partner" => 1, "pset" => $pset->urlkey))),
                 "<div class='f-contain'>";
         self::echo_group("partner", $value, $notes);
-        if ($info->can_set_repo)
+        if ($editable)
             echo "</div></form>";
         echo "\n";
     }
@@ -341,15 +353,18 @@ class ContactView {
             return;
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
+        $editable = $info->can_set_repo && !$user->is_anonymous;
 
         $repo_url = $user->seascode_repo_base($repo ? $repo->url : "");
         $title = "repository";
         if ($repo_url && strpos($repo_url, ":") === false)
             $title = $user->seascode_repo($repo_url, $title);
 
-        if ($info->can_set_repo)
+        if ($editable)
             $value = Ht::entry("repo", $repo_url, array("style" => "width:32em"))
                 . " " . Ht::submit("Save");
+        else if ($user->is_anonymous)
+            $value = $repo_url ? "[anonymous]" : "(none)";
         else
             $value = htmlspecialchars($repo_url ? $repo_url : "(none)");
         if ($repo_url) {
@@ -369,14 +384,14 @@ class ContactView {
                 $Now = time();
                 $Conf->qe("update Repository set `working`=$Now where repoid=$repo->repoid");
             } else
-                $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_unreadable", Contact::repo_messagedefs($repo)));
+                $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_unreadable", $user->repo_messagedefs($repo)));
         }
         if ($repo
             && ($repo->open || $Now - $repo->opencheckat > 86400)) {
             $open = $user->seascode_git_repo_open($repo);
             $Conf->qe("update Repository set `open`=$open, opencheckat=$Now where repoid=$repo->repoid");
             if ($open)
-                $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_toopublic", Contact::repo_messagedefs($repo)));
+                $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_toopublic", $user->repo_messagedefs($repo)));
         }
         if ($partner && $info->partner_same) {
             $prepo = $partner->repo($pset->id);
@@ -408,11 +423,11 @@ class ContactView {
             $notes[] = array(false, "Enter your " . Contact::seascode_home("code.seas") . " repository URL here.");
 
         // edit
-        if ($info->can_set_repo)
+        if ($editable)
             echo Ht::form(self_href(array("post" => post_value(), "set_seascode_repo" => 1, "pset" => $pset->urlkey))),
                 '<div class="f-contain">';
         self::echo_group($title, $value, $notes);
-        if ($info->can_set_repo)
+        if ($editable)
             echo "</div></form>\n";
 
         return $repo;

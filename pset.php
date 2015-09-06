@@ -334,13 +334,14 @@ function user_prev_next($user, $pset) {
     global $Conf;
 
     $result = $Conf->qe("select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.seascode_username, c.extension, pl.link
+	c.huid, c.anon_username, c.seascode_username, c.extension, pl.link
 	from ContactInfo c
 	left join ContactLink pl on (pl.cid=c.contactId and pl.type=" . LINK_PARTNER . " and pl.pset=$pset->id)
 	where (c.roles&" . Contact::ROLE_PCLIKE . ")=0 and not c.dropped
 	group by c.contactId");
     $students = array();
     while (($s = edb_orow($result))) {
+        $s->is_anonymous = $user->is_anonymous;
         Contact::set_sorter($s, @$_REQUEST["sort"]);
         $students[$s->contactId] = $s;
     }
@@ -373,29 +374,41 @@ function user_prev_next($user, $pset) {
 }
 
 echo "<div id='homeinfo'>";
-echo "<h2 class='homeemail'>", Text::user_html($User), "</h2>";
+
 if ($User->seascode_username && $Me->isPC) {
     // links to next/prev users
     $links = user_prev_next($User, $Pset);
     if ($links[0] || $links[1]) {
+        $userkey = $User->is_anonymous ? "anon_username" : "seascode_username";
         echo "<div style=\"color:gray;float:right\"><h3 style=\"margin-top:0\">";
-        if ($links[0])
-            echo '<a href="', hoturl("pset", array("pset" => $Pset->urlkey, "u" => $Me->user_linkpart($links[0]), "sort" => @$_REQUEST["sort"])), '">« ', htmlspecialchars($links[0]->seascode_username), '</a>';
+        if ($links[0]) {
+            $u = $Me->user_linkpart($links[0], $User->is_anonymous);
+            echo '<a href="', hoturl("pset", array("pset" => $Pset->urlkey, "u" => $u, "sort" => @$_REQUEST["sort"])), '">« ', htmlspecialchars($u), '</a>';
+        }
         if ($links[0] && $links[1])
             echo ' · ';
-        if ($links[1])
-            echo '<a href="', hoturl("pset", array("pset" => $Pset->urlkey, "u" => $Me->user_linkpart($links[1]), "sort" => @$_REQUEST["sort"])), '">', htmlspecialchars($links[1]->seascode_username), ' »</a>';
+        if ($links[1]) {
+            $u = $Me->user_linkpart($links[1], $User->is_anonymous);
+            echo '<a href="', hoturl("pset", array("pset" => $Pset->urlkey, "u" => $u, "sort" => @$_REQUEST["sort"])), '">', htmlspecialchars($u), ' »</a>';
+        }
         echo "</h3></div>";
     }
 }
-if ($User->seascode_username || $User->huid) {
-    echo '<h3><a href="', hoturl("index", array("u" => $Me->user_linkpart($User))), '">', htmlspecialchars($User->seascode_username ? : $User->huid), '</a>';
-    if ($Me->privChair)
-        echo "&nbsp;", become_user_link($User);
-    echo "</h3>";
-}
+
+$u = $Me->user_linkpart($User);
+echo '<h2 class="homeemail"><a href="',
+    hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
+if ($Me->privChair)
+    echo "&nbsp;", become_user_link($User);
+echo '</h2>';
+
+if (!$User->is_anonymous && $User !== $Me)
+    echo '<h3>', Text::user_html($User), '</h3>';
+
 if ($User->dropped)
     ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
+
+echo '<hr class="c" />';
 
 
 // Per-pset
@@ -650,7 +663,10 @@ function echo_commit($Info) {
                $User->seascode_repo_base($Info->repo->url) .
                "/archive-tarball/" .
                (substr($Info->commit_hash(), 0, 8) ?: "master");
-        $value .= " " . '<a href="'.$url.'">Download Repo</a>';
+        if ($User->is_anonymous)
+            $value .= ' &nbsp;<a href="#" onclick=\'window.location=' . json_encode($url) . ';return false\'>Download repo</a>';
+        else
+            $value .= ' &nbsp;<a href="' . $url . '">Download repo</a>';
     }
 
     // view options

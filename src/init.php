@@ -274,6 +274,13 @@ function load_pset_info() {
             && file_put_contents("$d/.htaccess", $x) != strlen($x))
             Multiconference::fail_message("Error creating `$d/.htaccess`");
     }
+
+    // if any anonymous problem sets, create anonymous usernames
+    foreach (Pset::$all as $p)
+        if (!$p->disabled && $p->anonymous) {
+            while (($row = Dbl::fetch_first_row(Dbl::qe("select contactId from ContactInfo where anon_username is null limit 1"))))
+                Dbl::q("update ContactInfo set anon_username='[anon" . sprintf("%08u", mt_rand(1, 99999999)) . "]' where contactId=?", $row[0]);
+        }
 }
 
 load_pset_info();

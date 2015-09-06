@@ -90,7 +90,7 @@ if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
 function collect_pset_info(&$students, $pset, $where) {
     global $Conf, $Me;
     $result = $Conf->qe("select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.seascode_username, c.extension,
+	c.huid, c.anon_username, c.seascode_username, c.extension,
 	r.repoid, r.url, r.open, r.working, r.lastpset,
 	rg.gradehash, rg.gradercid
 	from ContactInfo c
@@ -102,12 +102,18 @@ function collect_pset_info(&$students, $pset, $where) {
 	group by c.contactId");
     while (($s = edb_orow($result))) {
         Contact::set_sorter($s, @$_REQUEST["sort"]);
-        $ss = @$students[$s->seascode_username];
-        if (!$ss)
-            $students[$s->seascode_username] = $ss = (object)
+        $username = $pset->anonymous ? $s->anon_username : $s->seascode_username;
+        $ss = @$students[$username];
+        if (!$ss && $pset->anonymous)
+            $students[$username] = $ss = (object)
+                array("username" => $username,
+                      "extension" => ($s->extension ? "Y" : "N"),
+                      "sorter" => $username);
+        else
+            $students[$username] = $ss = (object)
                 array("name" => trim("$s->lastName, $s->firstName"),
                       "email" => $s->email,
-                      "seascode_username" => $s->seascode_username,
+                      "username" => $username,
                       "huid" => $s->huid,
                       "extension" => ($s->extension ? "Y" : "N"),
                       "sorter" => $s->sorter);
@@ -177,8 +183,8 @@ function download_psets_report($request) {
     $where = join(" and ", $where);
 
     $students = array();
-    if(isset($request["fields"]))
-	$selection = explode(",", $request["fields"]);
+    if (isset($request["fields"]))
+        $selection = explode(",", $request["fields"]);
     else
         $selection = array("name", "grade", "seascode_username", "huid", "extension");
     $maxbyg = array();
@@ -278,7 +284,7 @@ function runmany() {
         if (substr($k, 0, 4) == "s61_"
             && $v
             && ($uname = substr($k, 4))
-            && ($user = ContactView::prepare_user($uname)))
+            && ($user = ContactView::prepare_user($uname, $pset)))
             $users[] = $Me->user_linkpart($user);
     if (!count($users))
         return $Conf->errorMsg("No users selected.");
@@ -409,19 +415,30 @@ Sign in to tell us about your code.";
 // Top: user info
 if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
     echo "<div id='homeinfo'>";
-    echo "<h2 class='homeemail'>", htmlspecialchars($User->email), "</h2>";
-    echo Ht::form(hoturl_post("index", array("set_seascode_username" => 1,
-                                             "u" => $Me->user_linkpart($User)))),
-        '<div class="f-contain">';
-    $notes = array();
-    if (!$User->seascode_username)
-        $notes[] = array(true, "Please enter your " . Contact::seascode_home("code.seas.harvard.edu") . " username and click “Save.”");
-    ContactView::echo_group(Contact::seascode_home("code.seas") . " username",
-                            Ht::entry("username", $User->seascode_username)
-                            . "  " . Ht::submit("Save"), $notes);
+    $u = $Me->user_linkpart($User);
+    echo '<h2 class="homeemail"><a class="q" href="',
+        hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
+    if ($Me->privChair)
+        echo "&nbsp;", become_user_link($User);
+    echo '</h2>';
+    if (!$User->is_anonymous && $User !== $Me)
+        echo '<h3>', Text::user_html($User), '</h3>';
+
+    if (!$User->is_anonymous) {
+        echo Ht::form(hoturl_post("index", array("set_seascode_username" => 1,
+                                                 "u" => $Me->user_linkpart($User)))),
+            '<div class="f-contain">';
+        $notes = array();
+        if (!$User->seascode_username)
+            $notes[] = array(true, "Please enter your " . Contact::seascode_home("code.seas.harvard.edu") . " username and click “Save.”");
+        ContactView::echo_group(Contact::seascode_home("code.seas") . " username",
+                                Ht::entry("username", $User->seascode_username)
+                                . "  " . Ht::submit("Save"), $notes);
+        echo "</div></form>";
+    }
+
     if ($User->dropped)
         ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
-    echo "</div></form>";
     echo "</div>\n";
 }
 
@@ -528,7 +545,10 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     $t0 = $Profile ? microtime(true) : 0;
 
     $t = "<td class=\"s61username\">";
-    $x = $s->seascode_username ? : ($s->huid ? : $s->email);
+    if ($pset->anonymous)
+        $x = $s->anon_username;
+    else
+        $x = $s->seascode_username ? : ($s->huid ? : $s->email);
     $t .= "<a href=\"" . hoturl("pset", array("pset" => $pset->urlkey, "u" => $x, "sort" => @$_REQUEST["sort"])) . "\">"
         . htmlspecialchars($x) . "</a>";
     if ($Me->privChair)
@@ -536,8 +556,10 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     $t .= "</td>";
     ++$ncol;
 
-    $t .= "<td>" . Text::name_html($s) . ($s->extension ? " (X)" : "") . "</td>";
-    ++$ncol;
+    if (!$pset->anonymous) {
+        $t .= "<td>" . Text::name_html($s) . ($s->extension ? " (X)" : "") . "</td>";
+        ++$ncol;
+    }
 
     $t .= "<td>";
     if ($s->gradercid) {
@@ -698,7 +720,7 @@ function show_pset_table($pset) {
         $viewjoin = "";
     }
     $result = Dbl::qe("select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.seascode_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
+	c.huid, c.seascode_username, c.anon_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
 	pl.link pcid, group_concat(rpl.link) rpcid,
 	r.repoid, r.cacheid, r.heads, r.url, r.open, r.working, r.lastpset, r.snapcheckat, $view,
 	rg.gradehash, rg.gradercid, rg.placeholder, rg.placeholder_at

@@ -22,6 +22,7 @@ class Pset {
     public $visible;
     public $frozen;
     public $partner;
+    public $anonymous;
     public $gitless;
 
     public $handout_repo_url;
@@ -95,6 +96,7 @@ class Pset {
         $this->visible = self::cdate($p, "visible", "show_to_students");
         $this->frozen = self::cdate($p, "frozen", "freeze");
         $this->partner = self::cbool($p, "partner");
+        $this->anonymous = self::cbool($p, "anonymous");
         $this->gitless = self::cbool($p, "gitless");
 
         // directory

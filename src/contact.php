@@ -22,6 +22,11 @@ class Contact {
     public $disabled = false;
     public $activity_at = false;
     var $note;
+
+    public $seascode_username;
+    public $anon_username;
+    public $is_anonymous = false;
+
     private $links = null;
     private $repos = array();
     private $partners = array();
@@ -148,16 +153,20 @@ class Contact {
     }
 
     static public function set_sorter($o, $sorttype = null) {
-        $first = defval($o, "firstName", "");
-        if (($p = strpos($first, " ")))
-            $first = substr($first, 0, $p);
-        $last = defval($o, "lastName", "");
-        $email = defval($o, "email", "");
-        $username = defval($o, "seascode_username", "") ? : $email;
-        if ($sorttype === "last")
-            $o->sorter = trim("$last $first $username $email");
-        else
-            $o->sorter = trim("$first $last $username $email");
+        if ($o->is_anonymous)
+            $o->sorter = $o->anon_username;
+        else {
+            $first = defval($o, "firstName", "");
+            if (($p = strpos($first, " ")))
+                $first = substr($first, 0, $p);
+            $last = defval($o, "lastName", "");
+            $email = defval($o, "email", "");
+            $username = defval($o, "seascode_username", "") ? : $email;
+            if ($sorttype === "last")
+                $o->sorter = trim("$last $first $username $email");
+            else
+                $o->sorter = trim("$first $last $username $email");
+        }
     }
 
     static public function compare($a, $b) {
@@ -888,6 +897,8 @@ class Contact {
         if (preg_match('/\A\d{8}\z/', $whatever))
             return "ContactInfo.seascode_username='$whatever' or ContactInfo.huid='$whatever' "
                 . "order by ContactInfo.seascode_username='$whatever' desc limit 1";
+        else if (preg_match('/\A\[anon\w+\]\z/', $whatever))
+            return "ContactInfo.anon_username='$whatever'";
         else if (strpos($whatever, "@") === false)
             return "ContactInfo.seascode_username='" . sqlq($whatever)
                 . "' or (coalesce(ContactInfo.seascode_username,'')='' and "
@@ -1179,9 +1190,11 @@ class Contact {
         return $repo;
     }
 
-    static function repo_messagedefs($repo) {
+    function repo_messagedefs($repo) {
         if (!is_string($repo))
             $repo = $repo ? self::seascode_repo_base($repo->url) : "";
+        if ($this->is_anonymous && $repo)
+            $repo = "[anonymous]";
         if ($repo)
             return array("REPOGITURL" => "git@code.seas.harvard.edu:$repo.git", "REPOBASE" => $repo);
         else
@@ -1282,9 +1295,9 @@ class Contact {
         $answer = shell_exec("git ls-remote $ssh_url 2>&1");
         //$Conf->errorMsg("<pre>" . htmlspecialchars($answer) . "</pre>");
         if (!preg_match('/^[a-f0-9]{40}\s+/m', $answer))
-            return $error && $Conf->errorMsg(Messages::$main->expand_html("repo_unreadable", self::repo_messagedefs($repo)));
+            return $error && $Conf->errorMsg(Messages::$main->expand_html("repo_unreadable", $this->repo_messagedefs($repo)));
         if (!preg_match(',^[a-f0-9]{40}\s+refs/heads/master,m', $answer))
-            return $error && $Conf->errorMsg(Messages::$main->expand_html("repo_nomaster", self::repo_messagedefs($repo)));
+            return $error && $Conf->errorMsg(Messages::$main->expand_html("repo_nomaster", $this->repo_messagedefs($repo)));
 
         return $repo;
     }
@@ -1905,9 +1918,11 @@ class Contact {
                 && $this->can_see_grades($pset));
     }
 
-    function user_linkpart($user = null) {
+    function user_linkpart($user = null, $is_anonymous = false) {
         $user = $user ? $user : $this;
-        if ($this->isPC || @$_SESSION["last_actas"])
+        if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous)))
+            return $user->anon_username;
+        else if ($this->isPC || @$_SESSION["last_actas"])
             return $user->seascode_username ? : $user->email;
         else
             return null;

@@ -135,6 +135,10 @@ others are shown to users in different contexts.
     Set to true to prevent students from changing problem set data
     (repository, preferred commit).
 
+* `anonymous`: boolean
+
+    Set to true to hide student identities from graders.
+
 ### Git configuration
 
 * `gitless`: boolean
