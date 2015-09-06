@@ -78,6 +78,7 @@ class Multiconference {
     }
 
     static function fail_bad_options() {
+        global $Opt;
         $errors = array();
         if (@$Opt["multiconference"] && $Opt["confid"] === "__nonexistent__")
             $errors[] = "You haven’t specified a conference and this is a multiconference installation.";
@@ -91,12 +92,13 @@ class Multiconference {
             $errors[] = "Error: Unable to load options file `" . HOTCRP_OPTIONS . "`";
         else if (!@$Opt["loaded"])
             $errors[] = "Error: Unable to load options file";
-        else if (@$Opt["missing"])
+        if (@$Opt["missing"])
             $errors[] = "Error: Unable to load options from " . commajoin($Opt["missing"]);
         self::fail_message($errors);
     }
 
     static function fail_bad_database() {
+        global $Conf, $Opt;
         $errors = array();
         if (@$Opt["multiconference"] && $Opt["confid"] === "__nonexistent__")
             $errors[] = "You haven’t specified a conference and this is a multiconference installation.";
@@ -106,7 +108,7 @@ class Multiconference {
             $errors[] = "HotCRP was unable to load. A system administrator must fix this problem.";
             $errors[] = "Error: Unable to connect to database " . Dbl::sanitize_dsn($Conf->dsn);
             if (defined("HOTCRP_TESTHARNESS"))
-                $errors[] = "You may need to run `lib/createdb.sh -c test/testoptions.php` to create the database.";
+                $errors[] = "You may need to run `lib/createdb.sh -c test/options.php` to create the database.";
         }
         self::fail_message($errors);
     }
