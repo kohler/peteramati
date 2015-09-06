@@ -33,6 +33,7 @@ class Pset {
     public $grades_visible_extension;
     public $grade_cdf_visible;
     public $grade_cdf_cutoff;
+    public $separate_extension_grades;
     public $has_extra = false;
 
     public $all_runners = array();
@@ -135,6 +136,7 @@ class Pset {
         if (!$this->grades_visible_college && !$this->grades_visible_extension)
             $this->grade_cdf_visible = false;
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
+        $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
 
         // runners
         if (is_array(@$p->runners) || is_object(@$p->runners)) {

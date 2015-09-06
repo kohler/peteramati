@@ -194,6 +194,12 @@ others are shown to users in different contexts.
     then students in the bottom quarter of the grade distribution will not be
     shown their exact standing within that quarter.
 
+* `separate_extension_grades`: boolean
+
+    If true, then extension students are shown their performance relative to
+    other extension students (as well as all students); for instance, grade
+    CDFs will have a separate extension-only line.
+
 ### Grade entries
 
 A grade entry object defines a line in the grading rubric.
@@ -212,13 +218,21 @@ A grade entry object defines a line in the grading rubric.
 
     The maximum number of points for this entry.
 
+* `hide`: boolean
+
+    If true, then students cannot see this grade (graders can).
+
 * `hide_max`: boolean
 
-    If true, then only graders can see the value of `max`.
+    If true, then students cannot see the value of `max` (graders can).
 
 * `is_extra`: boolean
 
     If true, then this is an extra-credit entry.
+
+* `no_total`: boolean
+
+    If true, then this grade is not included in the total.
 
 Grade entries are displayed in order. Alternately, you can provide a
 `grade_order` setting in the problem set; this should be an array of entry
@@ -245,6 +259,9 @@ regular expression. For example, this setting says:
 
 * Files and directories named `out` are entirely ignored; they will not appear
   in diffs at all.
+
+Regular expressions must match full filename components, so the `"out"` entry
+will not match a file named `"out.txt"`.
 
 Alternately, the `ignore` setting is a shorthand way of specifying files to
 ignore; the setting `"ignore": "*.txt"` means the same as
