@@ -487,9 +487,9 @@ For example, try these commands. (You’ll have to enter a commit message for th
         }
 
         if ($commitgroup) {
-            echo "<div class=\"commitcontainer61\" hotmonster_pset=\"", htmlspecialchars($info->pset->urlkey);
+            echo "<div class=\"commitcontainer61\" peteramati_pset=\"", htmlspecialchars($info->pset->urlkey);
             if ($hash)
-                echo "\" hotmonster_commit=\"", $hash;
+                echo "\" peteramati_commit=\"", $hash;
             echo "\">";
             $Conf->footerScript("checklatest61()", "checklatest61");
         }

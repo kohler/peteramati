@@ -521,7 +521,7 @@ function show_pset($pset, $user) {
 }
 
 if (!$Me->is_empty() && $User->is_student()) {
-    $Conf->footerScript("hotmonster_uservalue=" . json_encode($Me->user_linkpart($User)));
+    $Conf->footerScript("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
     foreach (ContactView::pset_list(false, true) as $pset)
         show_pset($pset, $User);
     if ($Me->isPC) {

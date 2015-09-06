@@ -14,7 +14,7 @@ if (isset($_REQUEST["u"])
     && !($User = ContactView::prepare_user($_REQUEST["u"])))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
-$Conf->footerScript("hotmonster_uservalue=" . json_encode($Me->user_linkpart($User)));
+$Conf->footerScript("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
 $Info = ContactView::user_pset_info($User, $Pset);

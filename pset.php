@@ -14,7 +14,7 @@ if (isset($_REQUEST["u"])
     && !($User = ContactView::prepare_user($_REQUEST["u"])))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
-$Conf->footerScript("hotmonster_uservalue=" . json_encode($Me->user_linkpart($User)));
+$Conf->footerScript("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
 
@@ -723,7 +723,7 @@ function echo_commit($Info) {
     }
 
     // actually print
-    echo Ht::form($Info->hoturl_post("pset", array("commit" => null, "setcommit" => 1)), array("class" => "commitcontainer61", "hotmonster_pset" => $Info->pset->urlkey, "hotmonster_commit" => $Info->latest_hash())),
+    echo Ht::form($Info->hoturl_post("pset", array("commit" => null, "setcommit" => 1)), array("class" => "commitcontainer61", "peteramati_pset" => $Info->pset->urlkey, "peteramati_commit" => $Info->latest_hash())),
         "<div class=\"f-contain\">";
     ContactView::echo_group($key, $value, $remarks);
     echo "</div></form>\n";
@@ -1033,7 +1033,7 @@ if ($Pset->gitless) {
                             false, null);
     echo "</tbody></table>";
 } else {
-    echo "<div class=\"commitcontainer61\" hotmonster_pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
+    echo "<div class=\"commitcontainer61\" peteramati_pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
     ContactView::echo_group("this commit", "No commits yet for this problem set", array());
     echo "</div>\n";
 }

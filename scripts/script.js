@@ -4,7 +4,7 @@
 
 var siteurl, siteurl_postvalue, siteurl_suffix, siteurl_defaults,
     siteurl_absolute_base, hotcrp_paperid,
-    hotcrp_list, hotcrp_status, hotcrp_user, hotmonster_uservalue,
+    hotcrp_list, hotcrp_status, hotcrp_user, peteramati_uservalue,
     hotcrp_want_override_conflict;
 
 function $$(id) {
@@ -1776,16 +1776,16 @@ function checklatest61() {
             timeout = setTimeout(docheck, (now - start) * 1.25);
         else
             timeout = null;
-        jQuery.ajax(hoturl_post("pset", {u: hotmonster_uservalue, pset: pset}),
+        jQuery.ajax(hoturl_post("pset", {u: peteramati_uservalue, pset: pset}),
                     {
                         type: "GET", cache: false, data: "latestcommit=1",
                         dataType: "json", success: checkdata
                     });
     }
 
-    pset = jQuery(".commitcontainer61").first().attr("hotmonster_pset");
+    pset = jQuery(".commitcontainer61").first().attr("peteramati_pset");
     if (pset) {
-        hash = jQuery(".commitcontainer61").first().attr("hotmonster_commit");
+        hash = jQuery(".commitcontainer61").first().attr("peteramati_commit");
         setTimeout(docheck, 2000);
     }
 }
