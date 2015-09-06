@@ -24,16 +24,8 @@ Options -MultiViews
 # Add .php to suffixless URLs.
 <IfModule mod_rewrite.c>
 RewriteEngine on
-RewriteBase /
-RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteCond %{REQUEST_URI} ^(.*)$
-RewriteRule ^[^/]*$ %1.php [L,NE]
-RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteCond %{REQUEST_URI} ^(.*)/[^/]*$
-RewriteRule ^images(/[^/]*)$ %1$1.php [L,NE]
-RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteCond %{REQUEST_URI},,$1,, ^(.*)(.*,,)\2$
-RewriteRule ^[^/]*(/.*)$ %1.php$1 [L,NE]
+RewriteRule ^($|index|index\.php)(|/.*)$ index.php?__PATH__=$2 [QSA,L,B]
+RewriteRule ^(.*)$ index.php?__PATH__=/$1 [QSA,L,B]
 </IfModule>
 
 # Uncomment this line to ONLY grant access via https.  Requires mod_ssl.

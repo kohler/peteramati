@@ -4,7 +4,6 @@
 // Distributed under an MIT-like license; see LICENSE
 
 class Navigation {
-
     private static $protocol;           // "http://" or "https://"
     private static $server;             // "PROTOCOL://SITE[:PORT]"
     private static $sitedir;            // "/PATH", does not include $page, ends in /
@@ -41,6 +40,8 @@ class Navigation {
         self::$path = "";
         if (@$_SERVER["PATH_INFO"])
             self::$path = $_SERVER["PATH_INFO"];
+        if (isset($_GET["__PATH__"]))
+            self::$path = $_GET["__PATH__"];
 
         preg_match(',\A([^\?\#]*)(.*)\z,', $_SERVER["REQUEST_URI"], $m);
         self::$query = $m[2];
