@@ -296,6 +296,10 @@ class ContactView {
             $partner_email = $partner->email;
         $editable = $info->can_set_repo && !$user->is_anonymous;
 
+        $title = "partner";
+        if ($Me->isPC)
+            $title = '<a href="' . hoturl("pset", array("u" => $Me->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->commit_hash())) . '">' . $title . '</a>';
+
         if ($editable)
             $value = Ht::entry("partner", $partner_email, array("style" => "width:32em"))
                 . " " . Ht::submit("Save");
@@ -330,7 +334,7 @@ class ContactView {
         if ($editable)
             echo Ht::form(self_href(array("post" => post_value(), "set_partner" => 1, "pset" => $pset->urlkey))),
                 "<div class='f-contain'>";
-        self::echo_group("partner", $value, $notes);
+        self::echo_group($title, $value, $notes);
         if ($editable)
             echo "</div></form>";
         echo "\n";
