@@ -340,7 +340,7 @@ function user_prev_next($user, $pset) {
 	where (c.roles&" . Contact::ROLE_PCLIKE . ")=0 and not c.dropped
 	group by c.contactId");
     $students = array();
-    while (($s = edb_orow($result))) {
+    while ($result && ($s = $result->fetch_object("Contact"))) {
         $s->is_anonymous = $user->is_anonymous;
         Contact::set_sorter($s, @$_REQUEST["sort"]);
         $students[$s->contactId] = $s;
