@@ -89,9 +89,9 @@ class RunnerState {
 
         // collect user information
         $this->username = "jail61user";
-        if (@$this->runner->run_username)
+        if ($this->runner->run_username)
             $this->username = $this->runner->run_username;
-        else if (@$this->pset->run_sername)
+        else if ($this->pset->run_username)
             $this->username = $this->pset->run_username;
         if (!preg_match('/\A\w+\z/', $this->username))
             throw new RunnerException("bad run_username");

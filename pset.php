@@ -97,13 +97,12 @@ if (isset($_REQUEST["gradecdf"])) {
         $Conf->ajaxExit(array("error" => "Grades are not visible now"));
 
     if ($Conf->setting("gradejson_pset$Pset->id", 0) < $Now - 30) {
-        if (isset($Pset->grades_visible)
-            && is_int($Pset->grades_visible))
+        if (is_int($Pset->grades_visible))
             $notdropped = "(not c.dropped or c.dropped<$Pset->grades_visible)";
         else
             $notdropped = "not c.dropped";
         $q = "select cn.notes, c.extension from ContactInfo c\n";
-        if (@$Pset->gitless)
+        if ($Pset->gitless)
             $q .= "\t\tjoin ContactGrade cn on (cn.cid=c.contactId and cn.pset=$Pset->psetid)";
         else
             $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$Pset->id)
@@ -133,9 +132,9 @@ if (isset($_REQUEST["gradecdf"])) {
 
     $j = json_decode($Conf->setting_data("gradejson_pset$Pset->id"));
     $j->ok = true;
-    if (!@$Pset->separate_extension_grades || !$User->extension)
+    if (!$Pset->separate_extension_grades || !$User->extension)
         unset($j->extension);
-    if ($User == $Me && isset($Pset->grade_cdf_cutoff)) {
+    if ($User == $Me && $Pset->grade_cdf_cutoff) {
         Series::truncate_summary_below($j, $Pset->grade_cdf_cutoff);
         if (@$j->extension)
             Series::truncate_summary_below($j->extension, $Pset->grade_cdf_cutoff);
@@ -165,7 +164,7 @@ if (isset($_REQUEST["gradestatus"])) {
 
 // get commit data
 if (isset($_REQUEST["latestcommit"])) {
-    if (!$Info || @$Pset->gitless || !$Info->latest_commit())
+    if (!$Info || $Pset->gitless || !$Info->latest_commit())
         $j = array("hash" => false);
     else if (!$Info->can_view_repo_contents)
         $j = array("hash" => false, "error" => "Unconfirmed repository");
@@ -179,7 +178,7 @@ if (isset($_REQUEST["latestcommit"])) {
 
 // maybe set commit
 if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
-    && ($Commit || @$Pset->gitless) && $Me->can_set_grader($Pset, $User)) {
+    && ($Commit || $Pset->gitless) && $Me->can_set_grader($Pset, $User)) {
     $grader = 0;
     foreach (pcMembers() as $pcm)
         if ($pcm->email === $_POST["grader"])
@@ -190,7 +189,7 @@ if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
     $Conf->ajaxExit(array("ok" => null, "grader_email" => $_POST["grader"]));
 }
 if (isset($_REQUEST["setcommit"]) && isset($_REQUEST["grade"]) && check_post()
-    && ($Commit || @$Pset->gitless) && $Me->isPC && $Me != $User)
+    && ($Commit || $Pset->gitless) && $Me->isPC && $Me != $User)
     $Info->mark_grading_commit();
 if (isset($_REQUEST["setcommit"]))
     go($Info->hoturl("pset"));
@@ -221,7 +220,7 @@ if ($Me->isPC && $Me != $User && check_post()
 // save grades
 function save_grades($user, $pset, $info, $values, $isauto) {
     $grades = array();
-    foreach (ContactView::pgrades($pset) as $ge)
+    foreach ($pset->grades as $ge)
         if (isset($values[$ge->name])) {
             $g = trim($values[$ge->name]);
             if ($g === "")
@@ -232,7 +231,7 @@ function save_grades($user, $pset, $info, $values, $isauto) {
                 $grades[$ge->name] = floatval($g);
         }
     $key = $isauto ? "autogrades" : "grades";
-    if (count($grades) && @$pset->gitless)
+    if (count($grades) && $pset->gitless)
         $user->update_contact_grade($pset, array($key => $grades));
     else if (count($grades))
         $info->update_commit_info(array($key => $grades));
@@ -240,7 +239,7 @@ function save_grades($user, $pset, $info, $values, $isauto) {
 }
 
 if ($Me->isPC && $Me != $User && check_post()
-    && isset($_REQUEST["setgrade"]) && ($Info->commit() || @$Pset->gitless)) {
+    && isset($_REQUEST["setgrade"]) && ($Info->commit() || $Pset->gitless)) {
     $result = save_grades($User, $Pset, $Info, $_REQUEST, false);
     if (isset($_REQUEST["ajax"]))
         $Conf->ajaxExit($result != 0);
@@ -248,11 +247,11 @@ if ($Me->isPC && $Me != $User && check_post()
 }
 
 if ($Me->isPC && $Me != $User && check_post()
-    && isset($_REQUEST["setlatehours"]) && ($Info->commit() || @$Pset->gitless)) {
+    && isset($_REQUEST["setlatehours"]) && ($Info->commit() || $Pset->gitless)) {
     if (isset($_REQUEST["late_hours"])
         && preg_match('_\A(?:0|[1-9]\d*)\z_', $_REQUEST["late_hours"])) {
         $lh = intval($_REQUEST["late_hours"]);
-        if (@$Pset->gitless)
+        if ($Pset->gitless)
             $User->update_contact_grade($Pset, array("late_hours" => $lh));
         else
             $Info->update_commit_info(array("late_hours" => $lh));
@@ -462,7 +461,7 @@ function echo_linenote_entry_row($file, $lineid, $note, $displayed, $lnorder) {
 
 function echo_grade_cdf() {
     global $Conf, $Info, $Pset, $User, $Me;
-    $sepx = $User->extension && @$Pset->separate_extension_grades;
+    $sepx = $User->extension && $Pset->separate_extension_grades;
     $xmark = $sepx ? "extension " : "";
     echo '<div id="gradecdf61" style="float:right;position:relative">',
         '<table class="gradecdf61table"><tbody><tr>',
@@ -490,19 +489,19 @@ function echo_grade_entry($ge) {
     if (@$Notes->grades && property_exists($Notes->grades, $key))
         $grade = $Notes->grades->$key;
     if (!$Info->can_see_grades
-        || ($User == $Me && $grade === null && @$ge->is_extra))
+        || ($User == $Me && $grade === null && $ge->is_extra))
         return;
 
-    $class = "grader61" . (@$ge->no_total ? "" : " gradepart");
+    $class = "grader61" . ($ge->no_total ? "" : " gradepart");
     if ($User == $Me) {
         $value = '<span class="' . $class . '" name61="' . $ge->name . '">' . htmlspecialchars(+$grade) . '</span>';
-        if (isset($ge->max) && !@$ge->hide_max)
+        if ($ge->max && !$ge->hide_max)
             $value .= ' <span class="grademax61">of ' . htmlspecialchars($ge->max) . '</span>';
     } else {
         $value = '<span class="gradeholder61">'
             . Ht::entry($key, $grade, array("onchange" => "jQuery(this).closest('form').submit()", "class" => $class))
             . '</span>';
-        if (isset($ge->max))
+        if ($ge->max)
             $value .= ' <span class="grademax61" style="display:inline-block;min-width:3.5em">of ' . htmlspecialchars($ge->max) . '</span>';
         $value .= " " . Ht::submit("Save", array("tabindex" => 1));
         $value .= ' <span class="ajaxsave61"></span>';
@@ -511,7 +510,7 @@ function echo_grade_entry($ge) {
     }
 
     $remarks = array();
-    if ($grade !== null && isset($ge->max) && $grade > $ge->max && $User != $Me)
+    if ($grade !== null && $ge->max && $grade > $ge->max && $User != $Me)
         $remarks[] = array(true, "Grade is above max");
 
     if ($User != $Me)
@@ -754,7 +753,7 @@ function echo_grader() {
 function echo_grade_cdf_here() {
     global $Me, $User, $Pset, $Info;
     if ($Info->can_see_grades
-        && ($Me != $User || !@$Pset->hide_cdf_from_students)) {
+        && ($Me != $User || $Pset->grade_cdf_visible)) {
         $gj = ContactView::grade_json($Info);
         if (@$gj->grades)
             echo_grade_cdf();
@@ -766,7 +765,7 @@ function echo_all_grades() {
     $gj = ContactView::grade_json($Info);
     if (@$gj->grades || ($Info->can_see_grades && $Me != $User)) {
         echo_grade_total($gj);
-        foreach (ContactView::pgrades($Pset) as $ge)
+        foreach ($Pset->grades as $ge)
             echo_grade_entry($ge);
     }
 
@@ -821,27 +820,27 @@ if ($Me->isPC) {
 
 echo "<hr>\n";
 
-if (@$Pset->gitless) {
+if ($Pset->gitless) {
     echo_grade_cdf_here();
     echo_all_grades();
 
 } else if ($Info->repo && !$Info->can_view_repo_contents
            && !$Me->isPC) {
-    if (count(ContactView::pgrades($Pset)))
+    if ($Pset->grades)
         echo_grade_cdf_here();
     echo_grader();
-    if (count(ContactView::pgrades($Pset)))
+    if ($Pset->grades)
         echo_all_grades();
 
 } else if ($Info->repo && $Info->recent_commits()) {
-    if (count(ContactView::pgrades($Pset)))
+    if ($Pset->grades)
         echo_grade_cdf_here();
     echo_commit($Info);
 
     // print runners
     $runnerbuttons = array();
     $last_run = false;
-    foreach (ContactView::prunners($Pset) as $r)
+    foreach ($Pset->runners as $r)
         if ($Me->can_view_run($Pset, $r, $User)) {
             if ($Me->can_run($Pset, $r, $User)) {
                 $text = isset($r->text) ? htmlspecialchars($r->text) : htmlspecialchars($r->name);
@@ -865,7 +864,7 @@ if (@$Pset->gitless) {
                                "onclick" => "runsetting61.add()"));
     if (($Me->isPC && $Me != $User)
         || ($Info->grading_hash() && !$Info->is_grading_commit())
-        || (!$Info->grading_hash() && @$Pset->grades_visible)) {
+        || (!$Info->grading_hash() && $Pset->grades_visible)) {
         ContactView::add_regrades($Info);
         $already_requested = isset($Info->regrades[$Info->commit_hash()]);
         $runnerbuttons[] = ($last_run ? ' <span style="padding:0 1em"></span>' : "")
@@ -893,7 +892,7 @@ if (@$Pset->gitless) {
     echo_grader();
 
     // print grade entries
-    if (count(ContactView::pgrades($Pset)))
+    if ($Pset->grades)
         echo_all_grades();
 
     // collect diff and sort line notes
@@ -915,7 +914,7 @@ if (@$Pset->gitless) {
 
     // print runners
     $crunners = $Info->commit_info("run");
-    foreach (ContactView::prunners($Pset) as $r) {
+    foreach ($Pset->runners as $r) {
         if (!$Me->can_view_run($Pset, $r, $User))
             continue;
 
@@ -964,7 +963,7 @@ if (@$Pset->gitless) {
         $tabid = "file61_" . $fileid;
         $linenotes = defval($all_linenotes, $file, null);
         $display_table = $linenotes
-            || (!@$dinfo->boring
+            || (!$dinfo->boring
                 && ($Me != $User || !$Info->can_see_grades
                     || !$Info->is_grading_commit() || !$has_any_linenotes));
 
@@ -972,7 +971,7 @@ if (@$Pset->gitless) {
             "'#$tabid'", ',this)"><span class="foldarrow">',
             ($display_table ? "&#x25BC;" : "&#x25B6;"),
             "</span>&nbsp;", htmlspecialchars($file), "</a>";
-        if (!@$dinfo->removed)
+        if (!$dinfo->removed)
             echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $Info->hoturl("raw", array("file" => $file)), '">[Raw]</a>';
         echo '</h3>';
         echo '<table id="', $tabid, '" class="code61 diff61 filediff61';
@@ -1036,7 +1035,7 @@ if (@$Pset->gitless) {
 
 $Conf->footerScript('window.psetpost61="'
                     . self_href(array("post" => post_value())) . '"');
-if (!@$Pset->gitless)
+if (!$Pset->gitless)
     $Conf->footerScript("checklatest61()", "checklatest61");
 
 echo "<div class='clear'></div>\n";

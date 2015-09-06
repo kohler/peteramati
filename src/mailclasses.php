@@ -16,7 +16,7 @@ class MailRecipients {
         else
             $this->usertype = "students";
         if (preg_match(',\A(\w+):(openrepo|brokenrepo|repo|norepo|workingrepo|partner|nopartner)\z,', $type, $m)
-            && ($this->pset = ContactView::find_pset($m[1])))
+            && ($this->pset = Pset::find($m[1])))
             $this->type = $m[2];
         else if (preg_match(',\A(?:students|all|pc(?::\S+)?)\z,', $type))
             $this->type = $this->usertype = $type;
@@ -28,15 +28,15 @@ class MailRecipients {
         $sel = array("students" => "All students");
         foreach (ContactView::pset_list(true, false) as $pset)
             if (Contact::student_can_see_pset($pset)) {
-                if (!@$pset->gitless || @$pset->partner)
+                if (!$pset->gitless || $pset->partner)
                     $sel[] = array("optgroup", $pset->title);
-                if (!@$pset->gitless) {
+                if (!$pset->gitless) {
                     $sel[$pset->urlkey . ":workingrepo"] = "$pset->title, working repo";
                     $sel[$pset->urlkey . ":brokenrepo"] = "$pset->title, broken repo";
                     $sel[$pset->urlkey . ":openrepo"] = "$pset->title, open repo";
                     $sel[$pset->urlkey . ":norepo"] = "$pset->title, no repo";
                 }
-                if (@$pset->partner) {
+                if ($pset->partner) {
                     $sel[$pset->urlkey . ":partner"] = "$pset->title, partner";
                     $sel[$pset->urlkey . ":nopartner"] = "$pset->title, no partner";
                 }

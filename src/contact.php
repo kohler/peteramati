@@ -602,7 +602,7 @@ class Contact {
 
     static function handout_repo($pset, $inrepo = null) {
         global $Conf, $Now, $PsetInfo, $ConfSitePATH;
-        $url = @$pset->handout_repo_url;
+        $url = $pset->handout_repo_url;
         $hrepo = @self::$_handout_repo[$url];
         if (!$hrepo) {
             $result = Dbl::qe("select * from Repository where url=?", $url);
@@ -1262,7 +1262,7 @@ class Contact {
                 error_log("bad pset $pset: " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
             $pset = $PsetInfo->$pset;
         }
-        if ($pset && @$pset->repo_transform_patterns)
+        if ($pset && $pset->repo_transform_patterns)
             for ($i = 0; $i < count($pset->repo_transform_patterns); $i += 2) {
                 $x = preg_replace('{' . preg_quote($pset->repo_transform_patterns[$i]) . '}s',
                                   $pset->repo_transform_patterns[$i + 1],
@@ -1301,9 +1301,9 @@ class Contact {
     }
 
     function can_set_repo($pset, $user = null) {
-        global $Psets, $Now;
+        global $Now;
         if (is_string($pset) || is_int($pset))
-            $pset = defval($Psets, $pset, null);
+            $pset = @Pset::$all[$pset];
         if ($this->privChair)
             return true;
         $is_pc = $user && $user != $this && $this->isPC;
@@ -1313,7 +1313,7 @@ class Contact {
                 || (is_int($pset->repo_edit_deadline)
                     && $pset->repo_edit_deadline >= $Now))
             && (!$user || $user == $this || $is_pc)
-            && ($is_pc || !@$pset->frozen || !self::show_setting_on($pset->frozen));
+            && ($is_pc || !$pset->frozen || !self::show_setting_on($pset->frozen));
     }
 
     static function add_repo($url, $now, $open) {
@@ -1494,7 +1494,7 @@ class Contact {
         if ($pset && ($result = $Conf->setting_data("gitignore_pset{$pset->id}")))
             foreach (preg_split('/\s+/', $Conf->setting_data("gitignore_pset$pset->id")) as $x)
                 $regex .= self::_file_glob_to_regex($x, $pset->directory_noslash);
-        if ($pset && ($xarr = @$pset->ignore)) {
+        if ($pset && ($xarr = $pset->ignore)) {
             if (!is_array($xarr))
                 $xarr = preg_split('/\s+/', $xarr);
             foreach ($xarr as $x)
@@ -1542,31 +1542,8 @@ class Contact {
         return "truncated_$commit";
     }
 
-    const REPO_DIFF_MAXLEN = 16384;
-
     static private function save_repo_diff(&$diff_files, $fname, &$diff, $diffinfo, $blineno) {
-        $x = (object) array("filename" => $fname);
-        if (count($diff) > self::REPO_DIFF_MAXLEN) {
-            $diff[self::REPO_DIFF_MAXLEN][0] = "+";
-            $diff[self::REPO_DIFF_MAXLEN][3] = "*** OUTPUT TRUNCATED ***";
-            // array_slice($diff, 0, self::REPO_DIFF_MAXLEN + 1) -- not needed in current organization
-            $x->truncated = true;
-        }
-        if (count($diff) == 1 && $diff[0][3][0] === "B")
-            $x->binary = true;
-        if ($diffinfo && @$diffinfo->boring)
-            $x->boring = $diffinfo->boring;
-        else if ((!$diffinfo || @$diffinfo->boring === null)
-                 && @$x->binary)
-            $x->boring = true;
-        if ($diffinfo && @$diffinfo->priority)
-            $x->priority = $diffinfo->priority;
-        if ($blineno === 0
-            || (@$x->binary
-                && preg_match('_ and /dev/null differ$_', $diff[0][3])))
-            $x->removed = true;
-        $x->diff = $diff;
-        $diff = null;
+        $x = new DiffInfo($fname, $diff, $diffinfo, $blineno);
         $diff_files[$fname] = $x;
     }
 
@@ -1580,30 +1557,23 @@ class Contact {
 
     static private function pset_diffinfo($pset, $repo) {
         if ($pset && !@$pset->__applied_file_ignore_regex) {
-            if (($regex = self::file_ignore_regex($pset, $repo))) {
-                if (!isset($pset->diffs))
-                    $pset->diffs = (object) array();
-                $pset->diffs->$regex = (object) array("ignore" => true, "match_priority" => -10);
-            }
+            if (($regex = self::file_ignore_regex($pset, $repo)))
+                $pset->diffs[] = new DiffConfig($regex, (object) array("ignore" => true, "match_priority" => -10));
             $pset->__applied_file_ignore_regex = true;
         }
-        if (isset($pset->diffs))
-            return get_object_vars($pset->diffs);
-        else
-            return array();
+        return $pset->diffs;
     }
 
     static private function find_diffinfo($pset_diffs, $fname) {
         $diffinfo = false;
-        foreach ($pset_diffs as $regex => $d)
-            if (preg_match('{(?:\A|/)(?:' . $regex . ')(?:/|\z)}', $fname)
-                && (!$diffinfo || (float) @$diffinfo->match_priority <= (float) @$d->match_priority))
-                $diffinfo = $d;
+        foreach ($pset_diffs as $d)
+            if (preg_match('{(?:\A|/)(?:' . $d->regex . ')(?:/|\z)}', $fname))
+                $diffinfo = DiffConfig::combine($diffinfo, $d);
         return $diffinfo;
     }
 
     static function repo_diff_compare($a, $b) {
-        list($ap, $bp) = array((float) @$a->priority, (float) @$b->priority);
+        list($ap, $bp) = array((float) $a->priority, (float) $b->priority);
         if ($ap != $bp)
             return $ap < $bp ? 1 : -1;
         return strcmp($a->filename, $b->filename);
@@ -1639,8 +1609,8 @@ class Contact {
 
         // read "full" files
         $pset_diffs = self::pset_diffinfo($pset, $repo);
-        foreach ($pset_diffs as $regex => $diffinfo)
-            if (@$diffinfo->full && ($fname = self::unquote_filename_regex($regex)) !== false) {
+        foreach ($pset_diffs as $diffinfo)
+            if ($diffinfo->full && ($fname = self::unquote_filename_regex($diffinfo->regex)) !== false) {
                 $result = self::repo_gitrun($repo, "git show $hash:${repodir}$fname");
                 $fdiff = array();
                 foreach (explode("\n", $result) as $idx => $line)
@@ -1673,7 +1643,7 @@ class Contact {
             $lines = explode("\n", $result);
             while (($line = current($lines)) !== null && $line !== false) {
                 next($lines);
-                if (count($fdiff) > self::REPO_DIFF_MAXLEN) {
+                if (count($fdiff) > DiffInfo::MAXLINES) {
                     while ($line && ($line[0] == " " || $line[0] == "+" || $line[0] == "-"))
                         $line = next($lines);
                 }
@@ -1871,7 +1841,7 @@ class Contact {
     static function student_can_see_pset($pset) {
         return isset($pset->visible)
             && self::show_setting_on($pset->visible)
-            && !@$pset->disabled;
+            && !$pset->disabled;
     }
 
     static function student_can_see_grades($pset, $extension = null) {
@@ -1904,7 +1874,7 @@ class Contact {
     }
 
     function can_see_grades($pset, $user = null, $info = null) {
-        return (!$pset || !@$pset->disabled)
+        return (!$pset || !$pset->disabled)
             && (($this->isPC && $user && $user != $this)
                 || $this->privChair
                 || ($pset && self::student_can_see_grades($pset, $this->extension)
@@ -1912,23 +1882,23 @@ class Contact {
     }
 
     function can_run($pset, $runner, $user = null) {
-        if (!$runner || @$runner->disabled)
+        if (!$runner || $runner->disabled)
             return false;
         if ($this->isPC && (!$user || $user != $this))
             return true;
-        $s2s = @$runner->visible;
+        $s2s = $runner->visible;
         return $s2s === true
             || (($s2s === "grades" || $s2s === "grade")
                 && $this->can_see_grades($pset));
     }
 
     function can_view_run($pset, $runner, $user = null) {
-        if (!$runner || @$runner->disabled)
+        if (!$runner || $runner->disabled)
             return false;
         if ($this->isPC && (!$user || $user != $this))
             return true;
-        $s2s = @$runner->visible;
-        $r2s = @$runner->show_results_to_students;
+        $s2s = $runner->visible;
+        $r2s = $runner->show_results_to_students;
         return ($s2s === true || $r2s === true)
             || (($s2s === "grades" || $s2s === "grade"
                  || $r2s === "grades" || $r2s === "grade")

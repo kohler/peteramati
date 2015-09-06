@@ -43,21 +43,21 @@ if (isset($_POST["reqregrade"]) && check_post() && user_pset_info()) {
     $Conf->ajaxExit(array("ok" => true));
 }
 
-if (!isset($Pset->run_dirpattern))
+if (!$Pset->run_dirpattern)
     quit("Configuration error (run_dirpattern)");
-else if (!isset($Pset->run_jailfiles))
+else if (!$Pset->run_jailfiles)
     quit("Configuration error (run_jailfiles)");
 $Runner = null;
-foreach (ContactView::prunners($Pset) as $r)
+foreach ($Pset->runners as $r)
     if ($r->name == $_REQUEST["run"])
         $Runner = $r;
 $RunMany = $Me->isPC && @$_GET["runmany"] && check_post();
 if (!$Runner)
     quit("No such command");
 else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
-    if (!$Me->isPC && !@$Runner->visible)
+    if (!$Me->isPC && !$Runner->visible)
         quit("Command reserved for TFs");
-    else if (@$Runner->disabled)
+    else if ($Runner->disabled)
         quit("Command disabled");
     else
         quit("Can’t run command right now");
@@ -131,7 +131,7 @@ if ($checkt > 0
         $Conf->qe("delete from ExecutionQueue where queueid=$Queueid and repoid=" . $Info->repo->repoid);
     if ($answer->status == "done"
         && $Me->can_run($Pset, $Runner, $User)
-        && @$Runner->eval)
+        && $Runner->eval)
         runner_eval($Runner, $Info, $answer);
     $Conf->ajaxExit($answer);
 }
@@ -195,7 +195,7 @@ if (isset($Runner->queue)) {
         $qconf = (object) array("nconcurrent" => 1);
 
     $nconcurrent = defval($qconf, "nconcurrent", 1000);
-    if (@$Runner->nconcurrent > 0 && $Runner->nconcurrent < $nconcurrent)
+    if ($Runner->nconcurrent > 0 && $Runner->nconcurrent < $nconcurrent)
         $nconcurrent = $Runner->nconcurrent;
     if (@$Queue->ahead_nconcurrent > 0 && $Queue->ahead_nconcurrent < $nconcurrent)
         $nconcurrent = $Queue->ahead_nconcurrent;
@@ -219,7 +219,7 @@ $checkt = time();
 
 
 // maybe eval
-if (!@$Runner->command && @$Runner->eval) {
+if (!$Runner->command && $Runner->eval) {
     $json = ContactView::runner_generic_json($Info, $checkt);
     $json->done = true;
     $json->status = "done";

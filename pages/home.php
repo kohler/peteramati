@@ -42,9 +42,9 @@ if (!$Me->isPC || !$User)
 
 // check problem set openness
 $max_pset = $Conf->setting("pset_forwarded");
-foreach ($Psets as $pset)
+foreach (Pset::$all as $pset)
     if (Contact::student_can_see_pset($pset) && $pset->id > $max_pset
-        && !@$pset->gitless)
+        && !$pset->gitless)
         Contact::forward_pset_links($pset->id);
 
 if (!$Me->is_empty() && ($Me === $User || $Me->isPC)
@@ -57,9 +57,9 @@ if (!$Me->is_empty() && ($Me === $User || $Me->isPC)
     $User->set_seascode_username($m[1]);
 
 function try_set_seascode_repo() {
-    global $Me, $Conf, $Psets;
+    global $Me, $Conf;
     $min_pset = null;
-    foreach ((array) $Psets as $id => $p)
+    foreach (Pset::$all as $p)
         if (!$min_pset || ContactView::pset_compare($min_pset, $p) > 0)
             $min_pset = $p;
     if ($p && !$Me->repo($p->psetid))
@@ -110,7 +110,7 @@ function collect_pset_info(&$students, $pset, $where) {
                       "extension" => ($s->extension ? "Y" : "N"),
                       "sorter" => $s->sorter);
 
-        if (@$pset->gitless) {
+        if ($pset->gitless) {
             $gi = Contact::contact_grade_for($s, $pset);
             $gi = $gi ? $gi->notes : null;
         } else if (@$s->gradehash)
@@ -124,7 +124,7 @@ function collect_pset_info(&$students, $pset, $where) {
             $ss->$k = $gd->total;
             $k .= "_noextra";
             $ss->$k = $gd->total_noextra;
-            if (@($k = $pset->group)) {
+            if (($k = $pset->group)) {
                 @($ss->$k += $gd->total);
                 $k .= "_noextra";
                 @($ss->$k += $gd->total_noextra);
@@ -184,13 +184,13 @@ function download_psets_report($request) {
     foreach ($PsetInfo as $pset)
         if (isset($pset->psetid) && !$pset->disabled) {
             collect_pset_info($students, $pset, $where);
-            if (($g = @$pset->group)) {
+            if (($g = $pset->group)) {
                 if (!isset($maxbyg[$g]))
                     $maxbyg[$g] = $maxbyg["${g}_noextra"] = 0;
-                foreach (ContactView::pgrades($pset) as $ge)
-                    if (@$ge->max && !@$ge->no_total) {
+                foreach ($pset->grades as $ge)
+                    if ($ge->max && !$ge->no_total) {
                         $maxbyg[$g] += $ge->max;
-                        if (!@$ge->is_extra)
+                        if (!$ge->is_extra)
                             $maxbyg["${g}_noextra"] += $ge->max;
                     }
             }
@@ -229,9 +229,9 @@ if ($Me->isPC && isset($_REQUEST["report"]))
 
 function set_grader() {
     global $Conf, $Me;
-    if (!($pset = ContactView::find_pset(@$_REQUEST["pset"])))
+    if (!($pset = Pset::find(@$_REQUEST["pset"])))
         return $Conf->errorMsg("No such pset");
-    else if (@$pset->gitless)
+    else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
     $graders = array();
     foreach (pcMembers() as $pcm)
@@ -267,9 +267,9 @@ if ($Me->isPC && check_post() && @$_REQUEST["setgrader"])
 
 function runmany() {
     global $Conf, $Me;
-    if (!($pset = ContactView::find_pset(@$_REQUEST["pset"])))
+    if (!($pset = Pset::find(@$_REQUEST["pset"])))
         return $Conf->errorMsg("No such pset");
-    else if (@$pset->gitless)
+    else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
     $users = array();
     foreach ($_POST as $k => $v)
@@ -430,11 +430,11 @@ function render_grades($pset, $gi, $s) {
     $total = $nintotal = $max = 0;
     $lastintotal = null;
     $garr = array();
-    foreach (ContactView::pgrades($pset) as $ge) {
+    foreach ($pset->grades as $ge) {
         $k = $ge->name;
-        if (!@$ge->no_total) {
+        if (!$ge->no_total) {
             ++$nintotal;
-            if (isset($ge->max) && !@$ge->hide_max && !@$ge->is_extra)
+            if ($ge->max && !$ge->hide_max && !$ge->is_extra)
                 $max += $ge->max;
         }
         $gv = $ggv = $agv = "";
@@ -446,11 +446,11 @@ function render_grades($pset, $gi, $s) {
             else if ($agv !== null && $agv !== "")
                 $gv = $agv;
         }
-        if ($gv != "" && !@$ge->no_total) {
+        if ($gv != "" && !$ge->no_total) {
             $total += $gv;
             $lastintotal = count($garr);
         }
-        if ($gv === "" && !@$ge->is_extra && $s
+        if ($gv === "" && !$ge->is_extra && $s
             && $Me->contactId == $s->gradercid)
             $s->incomplete = true;
         $gv = htmlspecialchars($gv);
@@ -469,7 +469,7 @@ function render_grades($pset, $gi, $s) {
 
 function show_pset($pset, $user) {
     global $Me;
-    if (@$pset->gitless && $Me == $user && !@$pset->partner
+    if ($pset->gitless && $Me == $user && !$pset->partner
         && !$user->contact_grade($pset))
         return;
     echo "<hr/>\n";
@@ -548,7 +548,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     ++$ncol;
 
     // are any commits committed?
-    if (!@$pset->gitless) {
+    if (!$pset->gitless) {
         if (($s->placeholder || $s->gradehash === null)
             && $s->repoid
             && ($s->placeholder_at < $Now - 3600 && rand(0, 2) == 0
@@ -568,8 +568,8 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
             $row->sortprefix = "~1 ";
     }
 
-    if (count(ContactView::pgrades($pset))) {
-        if (@$pset->gitless) {
+    if (count($pset->grades)) {
+        if ($pset->gitless) {
             $gi = Contact::contact_grade_for($s, $pset);
             $gi = $gi ? $gi->notes : null;
         } else if ($s->gradehash && !$s->placeholder)
@@ -577,7 +577,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
         else
             $gi = null;
 
-        if (!@$pset->gitless) {
+        if (!$pset->gitless) {
             $t .= "<td>";
             if ($gi && @$gi->linenotes)
                 $t .= "♪";
@@ -723,7 +723,7 @@ function show_pset_table($pset) {
     uasort($students, "Contact::compare");
 
     $checkbox = $Me->privChair
-        || (!@$pset->gitless && count(ContactView::prunners($pset)));
+        || (!$pset->gitless && $pset->runners);
 
     $rows = array();
     $max_ncol = 0;
@@ -776,7 +776,7 @@ function show_pset_table($pset) {
     }
     echo "</tbody></table>\n";
 
-    if ($Me->privChair && !@$pset->gitless) {
+    if ($Me->privChair && !$pset->gitless) {
         echo "<div class='g'></div>";
         $sel = array("none" => "N/A");
         foreach (pcMembers() as $pcm)
@@ -788,11 +788,11 @@ function show_pset_table($pset) {
             '</span>';
     }
 
-    if (!@$pset->gitless) {
+    if (!$pset->gitless) {
         $sel = array();
-        foreach (ContactView::prunners($pset) as $r)
+        foreach ($pset->runners as $r)
             if ($Me->can_run($pset, $r))
-                $sel[$r->name] = htmlspecialchars($r->text);
+                $sel[$r->name] = htmlspecialchars($r->title);
         if (count($sel))
             echo '<span class="nowrap" style="padding-right:2em">',
                 Ht::select("runner", $sel),

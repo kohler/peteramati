@@ -18,7 +18,7 @@ $Conf->footerScript("hotmonster_uservalue=" . json_encode($Me->user_linkpart($Us
 
 $Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
 $Info = ContactView::user_pset_info($User, $Pset);
-if (!@$_GET["commit"] || !@$_GET["commit1"] || @$Pset->gitless)
+if (!@$_GET["commit"] || !@$_GET["commit1"] || $Pset->gitless)
     $Me->escape();
 $diff_options = array();
 
@@ -227,13 +227,13 @@ foreach ($diff as $file => $dinfo) {
     $fileid = html_id_encode($file);
     $tabid = "file61_" . $fileid;
     $linenotes = defval($all_linenotes, $file, null);
-    $display_table = $linenotes || !@$dinfo->boring;
+    $display_table = $linenotes || !$dinfo->boring;
 
     echo '<h3><a class="fold61" href="#" onclick="return fold61(',
         "'#$tabid'", ',this)"><span class="foldarrow">',
         ($display_table ? "&#x25BC;" : "&#x25B6;"),
         "</span>&nbsp;", htmlspecialchars($file), "</a>";
-    if (!@$dinfo->removed)
+    if (!$dinfo->removed)
         echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $Info->hoturl("raw", array("file" => $file)), '">[Raw]</a>';
     echo '</h3>';
     echo '<table id="', $tabid, '" class="code61 diff61 filediff61';

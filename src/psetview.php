@@ -4,7 +4,6 @@
 // Distributed under an MIT-like license; see LICENSE
 
 class PsetView {
-
     public $pset;
     public $user;
     public $repo = null;
@@ -29,7 +28,7 @@ class PsetView {
         $this->user = $user;
         $this->partner = $user->partner($pset->id);
         $this->can_set_repo = $Me->can_set_repo($pset, $user);
-        if (!@$pset->gitless)
+        if (!$pset->gitless)
             $this->repo = $user->repo($pset->id);
         $this->can_view_repo_contents = $this->repo
             && $user->can_view_repo_contents($this->repo);
@@ -157,7 +156,7 @@ class PsetView {
 
     public function load_grade() {
         global $Me;
-        if (@$this->pset->gitless) {
+        if ($this->pset->gitless) {
             $this->grade = $this->user->contact_grade($this->pset);
             $this->grade_notes = @$this->grade->notes;
         } else {
@@ -188,7 +187,7 @@ class PsetView {
     }
 
     public function grading_hash() {
-        if (@$this->pset->gitless)
+        if ($this->pset->gitless)
             return false;
         if ($this->grade === false)
             $this->load_grade();
@@ -198,7 +197,7 @@ class PsetView {
     }
 
     public function grading_commit() {
-        if (@$this->pset->gitless)
+        if ($this->pset->gitless)
             return false;
         if ($this->grade === false)
             $this->load_grade();
@@ -208,7 +207,7 @@ class PsetView {
     }
 
     public function is_grading_commit() {
-        if (@$this->pset->gitless)
+        if ($this->pset->gitless)
             return false;
         if ($this->grade === false)
             $this->load_grade();
@@ -220,7 +219,7 @@ class PsetView {
     public function gradercid() {
         if ($this->grade === false)
             $this->load_grade();
-        if (@$this->pset->gitless)
+        if ($this->pset->gitless)
             return $this->grade ? $this->grade->gradercid : 0;
         else if ($this->repo_grade
                  && $this->commit == $this->repo_grade->gradehash)
@@ -261,10 +260,10 @@ class PsetView {
             return (object) array("hours" => $cinfo->late_hours,
                                   "override" => true);
 
-        $deadline = @$this->pset->deadline;
-        if (!$this->user->extension && @$this->pset->deadline_college)
+        $deadline = $this->pset->deadline;
+        if (!$this->user->extension && $this->pset->deadline_college)
             $deadline = $this->pset->deadline_college;
-        else if ($this->user->extension && @$this->pset->deadline_extension)
+        else if ($this->user->extension && $this->pset->deadline_extension)
             $deadline = $this->pset->deadline_extension;
         if (!$deadline)
             return null;
@@ -289,7 +288,7 @@ class PsetView {
     function change_grader($grader) {
         if (is_object($grader))
             $grader = $grader->contactId;
-        if (@$this->pset->gitless)
+        if ($this->pset->gitless)
             $q = Dbl::format_query
                 ("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=values(gradercid)",
                  $this->user->contactId, $this->pset->psetid, $grader);
@@ -314,7 +313,7 @@ class PsetView {
 
     function mark_grading_commit() {
         global $Me;
-        if (@$this->pset->gitless)
+        if ($this->pset->gitless)
             Dbl::qe("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=gradercid",
                     $this->user->contactId, $this->pset->psetid,
                     $Me->contactId);

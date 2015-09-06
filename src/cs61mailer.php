@@ -87,7 +87,7 @@ class CS61Mailer extends Mailer {
             return $this->pset->title;
 
         if ($what == "%REPO%") {
-            if (@$this->pset->gitless)
+            if ($this->pset->gitless)
                 return $isbool ? false : self::EXPANDVAR_CONTINUE;
             $info = $this->get_pset_info();
             if (!$info || !$info->repo)
@@ -96,7 +96,7 @@ class CS61Mailer extends Mailer {
         }
 
         if ($what == "%PARTNER%") {
-            if (!@$this->pset->partner)
+            if (!$this->pset->partner)
                 return $isbool ? false : self::EXPANDVAR_CONTINUE;
             $info = $this->get_pset_info();
             if (!$info || !$info->partner)
@@ -105,7 +105,7 @@ class CS61Mailer extends Mailer {
         }
 
         if (preg_match(',\A%(?:COMMIT(?:|HASH|ABBREV|TITLE|DATE)|LATEHOURS)%\z,', $what)) {
-            if (@$this->pset->gitless)
+            if ($this->pset->gitless)
                 return $isbool ? false : self::EXPANDVAR_CONTINUE;
             $info = $this->get_pset_info();
             $recent = $info ? @$info->commit() : null;
@@ -136,14 +136,14 @@ class CS61Mailer extends Mailer {
                 return date("Y/m/d H:i:s", $recent->commitat);
             else if ($what == "%LATEHOURS%") {
                 // XXX should use PsetView::late_hours
-                if (@$this->pset->deadline_extension
+                if ($this->pset->deadline_extension
                     && ($this->recipient->extension
                         || ($info->partner && $info->partner->extension)))
                     $deadline = $this->pset->deadline_extension;
-                else if (@$this->pset->deadline_college)
+                else if ($this->pset->deadline_college)
                     $deadline = $this->pset->deadline_college;
                 else
-                    $deadline = @$this->pset->deadline;
+                    $deadline = $this->pset->deadline;
                 if (!$deadline || $recent->commitat <= $deadline)
                     return $isbool ? false : "0";
                 else

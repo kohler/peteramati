@@ -8,16 +8,6 @@ class ContactView {
     static private $_clipboard = false;
     static private $_reverse_pset_compare = false;
 
-    static function find_pset($psetkey) {
-        global $PsetKeys, $Psets;
-        if ($psetkey !== null && $psetkey !== "" && $psetkey !== false
-            && isset($PsetKeys->$psetkey)) {
-            $psetid = $PsetKeys->$psetkey;
-            return $Psets->$psetid;
-        }
-        return null;
-    }
-
     static function set_path_request($paths) {
         $path = Navigation::path();
         if ($path === "")
@@ -32,7 +22,7 @@ class ContactView {
             while ($ppos < strlen($p) && $xpos < count($x)) {
                 if ($p[$ppos] == "/")
                     ++$xpos;
-                else if ($p[$ppos] == "p" && self::find_pset(@$x[$xpos]))
+                else if ($p[$ppos] == "p" && Pset::find(@$x[$xpos]))
                     $settings["pset"] = $x[$xpos];
                 else if ($p[$ppos] == "H" && strlen($x[$xpos]) == 40
                          && ctype_xdigit($x[$xpos])) {
@@ -91,15 +81,15 @@ class ContactView {
     }
 
     static function find_pset_redirect($psetkey) {
-        global $Conf, $Psets, $PsetKeys;
-        $pset = self::find_pset($psetkey);
-        if ((!$pset || @$pset->disabled)
+        global $Conf;
+        $pset = Pset::find($psetkey);
+        if ((!$pset || $pset->disabled)
             && ($psetkey !== null && $psetkey !== "" && $psetkey !== false))
             $Conf->errorMsg("No such problem set “" . htmlspecialchars($psetkey) . "”.");
-        if (!$pset || @$pset->disabled) {
-            foreach (get_object_vars($PsetKeys) as $psetkey => $psetid)
-                if (!@$Psets->$psetid->disabled)
-                    redirectSelf(array("pset" => $psetkey));
+        if (!$pset || $pset->disabled) {
+            foreach (Pset::$all as $p)
+                if (!$p->disabled)
+                    redirectSelf(array("pset" => $p->urlkey));
             go("index");
         }
         if ($pset)
@@ -121,11 +111,10 @@ class ContactView {
     }
 
     static function pset_list($istf, $reverse) {
-        global $Psets;
         $psets = array();
-        foreach ($Psets as $pset)
+        foreach (Pset::$all as $pset)
             if (Contact::student_can_see_pset($pset)
-                || (!@$pset->disabled && @$pset->gitless && $istf))
+                || (!$pset->disabled && $pset->gitless && $istf))
                 $psets[$pset->id] = $pset;
         self::$_reverse_pset_compare = !!$reverse;
         uasort($psets, "ContactView::pset_compare");
@@ -138,7 +127,7 @@ class ContactView {
 
     static function add_regrades($info) {
         list($user, $repo) = array($info->user, $info->repo);
-        if (!isset($info->regrades) && !@$info->pset->gitless) {
+        if (!isset($info->regrades) && !$info->pset->gitless) {
             $info->regrades = array();
             $result = Dbl::qe("select * from RepositoryGradeRequest where repoid=? and pset=? order by requested_at desc", $repo->repoid, $info->pset->psetid);
             while (($row = edb_orow($result))) {
@@ -197,13 +186,13 @@ class ContactView {
     static function pset_grade_json($pset, $pcview) {
         $max = array();
         $count = $maxtotal = 0;
-        foreach (self::pgrades($pset) as $ge)
-            if (!@$ge->hide || $pcview) {
+        foreach ($pset->grades as $ge)
+            if (!$ge->hide || $pcview) {
                 $key = $ge->name;
                 ++$count;
-                if (isset($ge->max) && ($pcview || !@$ge->hide_max)) {
+                if ($ge->max && ($pcview || !$ge->hide_max)) {
                     $max[$key] = $ge->max;
-                    if (!@$ge->is_extra)
+                    if (!$ge->is_extra)
                         $maxtotal += $ge->max;
                 }
             }
@@ -224,15 +213,15 @@ class ContactView {
             || $info->is_grading_commit()) {
             $g = $ag = array();
             $total = 0;
-            foreach (self::pgrades($info->pset) as $ge)
-                if (!@$ge->hide || $pcview) {
+            foreach ($info->pset->grades as $ge)
+                if (!$ge->hide || $pcview) {
                     $key = $ge->name;
                     $gv = 0;
                     if (isset($notes->autogrades->$key))
                         $ag[$key] = $g[$key] = $gv = $notes->autogrades->$key;
                     if (isset($notes->grades->$key))
                         $g[$key] = $gv = $notes->grades->$key;
-                    if (!@$ge->no_total)
+                    if (!$ge->no_total)
                         $total += $gv;
                 }
             $g["total"] = $total;
@@ -291,7 +280,7 @@ class ContactView {
         global $Conf, $Me;
         list($user, $pset, $partner) =
             array($info->user, $info->pset, $info->partner);
-        if (!@$pset->partner)
+        if (!$pset->partner)
             return;
 
         // collect values
@@ -338,7 +327,7 @@ class ContactView {
     static function set_partner_action($user) {
         global $Conf, $Me;
         if (!($Me->has_database_account() && check_post()
-              && ($pset = self::find_pset(@$_REQUEST["pset"]))))
+              && ($pset = Pset::find(@$_REQUEST["pset"]))))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return $Conf->errorMsg("You can’t edit repository information for that problem set now.");
@@ -348,7 +337,7 @@ class ContactView {
 
     static function echo_repo_group($info) {
         global $Conf, $Me, $Now;
-        if (@$info->pset->gitless)
+        if ($info->pset->gitless)
             return;
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
@@ -432,7 +421,7 @@ class ContactView {
     static function set_seascode_repo_action($user) {
         global $Conf, $Me;
         if (!($Me->has_database_account() && check_post()
-              && ($pset = self::find_pset(@$_REQUEST["pset"]))))
+              && ($pset = Pset::find(@$_REQUEST["pset"]))))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return $Conf->errorMsg("You can’t edit repository information for that problem set now.");
@@ -443,7 +432,7 @@ class ContactView {
     static function echo_repo_last_commit_group($info, $commitgroup) {
         global $Me, $Conf;
         list($user, $repo) = array($info->user, $info->repo);
-        if (@$info->pset->gitless)
+        if ($info->pset->gitless)
             return;
 
         $hash = null;
@@ -496,12 +485,13 @@ For example, try these commands. (You’ll have to enter a commit message for th
 
     static function echo_repo_grade_commit_group($info) {
         list($user, $repo) = array($info->user, $info->repo);
-        if (@$info->pset->gitless)
+        if ($info->pset->gitless)
             return;
         else if (!$info->has_grading() || !$info->can_view_repo_contents)
             return self::echo_repo_last_commit_group($info, false);
         // XXX should check can_see_grades here
 
+        $value = "";
         $ginfo = $info->grading_commit();
         if ($ginfo) {
             if (!is_object($ginfo))
@@ -534,7 +524,7 @@ For example, try these commands. (You’ll have to enter a commit message for th
     }
 
     static function pset_grade($notesj, $pset) {
-        if (!count(self::pgrades($pset)))
+        if (!$pset->grades)
             return null;
 
         $total = $nonextra = 0;
@@ -542,7 +532,7 @@ For example, try these commands. (You’ll have to enter a commit message for th
         $g = @$notesj->grades;
         $ag = @$notesj->autogrades;
         $rag = array();
-        foreach (self::pgrades($pset) as $ge) {
+        foreach ($pset->grades as $ge) {
             $key = $ge->name;
             $gv = null;
             if ($ag && isset($ag->$key))
@@ -551,9 +541,9 @@ For example, try these commands. (You’ll have to enter a commit message for th
                 $gv = $g->$key;
             if ($gv !== null) {
                 $r[$key] = $gv;
-                if (!@$ge->no_total) {
+                if (!$ge->no_total) {
                     $total += $gv;
-                    if (!@$ge->is_extra)
+                    if (!$ge->is_extra)
                         $nonextra += $gv;
                 }
             }
@@ -567,25 +557,4 @@ For example, try these commands. (You’ll have to enter a commit message for th
         } else
             return null;
     }
-
-    static function prunners($pset) {
-        if (isset($pset->runner_order)) {
-            $ro = array();
-            foreach ($pset->runner_order as $name)
-                $ro[$name] = $pset->runners->$name;
-            return $ro;
-        } else
-            return array_values(get_object_vars($pset->runners));
-    }
-
-    static function pgrades($pset) {
-        if (isset($pset->grade_order)) {
-            $ro = array();
-            foreach ($pset->grade_order as $name)
-                $ro[$name] = $pset->grades->$name;
-            return $ro;
-        } else
-            return array_values(get_object_vars($pset->grades));
-    }
-
 }

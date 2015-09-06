@@ -52,6 +52,7 @@ function __autoload($class_name) {
                                "CS61Mailer" => "src/cs61mailer.php",
                                "CsvGenerator" => "lib/csv.php",
                                "CsvParser" => "lib/csv.php",
+                               "DiffInfo" => "src/diffinfo.php",
                                "DocumentHelper" => "lib/documenthelper.php",
                                "Ht" => "lib/ht.php",
                                "LoginHelper" => "lib/login.php",
@@ -60,6 +61,7 @@ function __autoload($class_name) {
                                "MimeText" => "lib/mailer.php",
                                "Mimetype" => "lib/mimetype.php",
                                "Multiconference" => "src/multiconference.php",
+                               "Pset" => "src/psetconfig.php",
                                "PsetView" => "src/psetview.php",
                                "RunnerState" => "src/runner.php",
                                "Qobject" => "lib/qobject.php",
@@ -192,43 +194,8 @@ if (function_exists("date_default_timezone_set")) {
 
 
 // Extract problem set information
-function load_pset_info_pset_order($p, $runkey, $orderkey) {
-    if (!isset($p->$runkey))
-        $p->$runkey = (object) array();
-    else if (is_array($p->$runkey)) {
-        $rs = (object) array();
-        foreach ($p->$runkey as $r) {
-            if (!isset($r->name))
-                $r->name = count($rs) + 1;
-            $n = $r->name;
-            if (isset($rs->$n))
-                Multiconference::fail_message("`psets.json` error: {$p->psetid}->{$runkey}->$n reused");
-            $rs->$n = $r;
-        }
-        $p->$runkey = $rs;
-    } else if (is_object($p->$runkey)) {
-        foreach (get_object_vars($p->$runkey) as $k => $r)
-            if (!isset($r->name))
-                $r->name = $k;
-    } else
-        Multiconference::fail_message("`psets.json` error: {$p->psetid}->$runkey isn’t an array");
-
-    foreach (get_object_vars($p->$runkey) as $k => $x)
-        if (!preg_match(',\A[-_\w]+\z,', $k))
-            Multiconference::fail_message("`psets.json` error: {$p->psetid}->$runkey format (bad key `$k`; consider using `title`)");
-
-    if (!isset($p->$orderkey))
-        $p->$orderkey = array_keys(get_object_vars($p->$runkey));
-    else if (is_array($p->$orderkey)) {
-        foreach ($p->$orderkey as $k)
-            if (!is_string($k) || $k === "" || !isset($p->$runkey->$k))
-                Multiconference::fail_message("`psets.json` error: {$p->psetid}->$orderkey format");
-    } else
-        Multiconference::fail_message("`psets.json` error: {$p->psetid}->$orderkey format");
-}
-
 function load_pset_info() {
-    global $ConfSitePATH, $Psets, $PsetKeys, $PsetInfo, $Opt;
+    global $ConfSitePATH, $PsetInfo, $Opt;
     // read initial messages
     Messages::$main = new Messages;
     $x = json_decode(file_get_contents("$ConfSitePATH/src/messages.json"));
@@ -262,123 +229,17 @@ function load_pset_info() {
     // check psets contents
     if (!isset($PsetInfo->_defaults))
         $PsetInfo->_defaults = (object) array();
-    $Psets = (object) array();
-    $PsetKeys = (object) array();
-    $psetids = array();
-    $pset_key_regex = '/\A[0-9A-Za-z][-0-9A-Za-z_.]*\z/';
     foreach ($PsetInfo as $pk => $p)
         if (is_object($p) && isset($p->psetid)) {
-            // pset id
-            if (!is_int($p->psetid) || $p->psetid <= 0)
-                Multiconference::fail_message("`psets.json` error: psetid “{$p->psetid}” must be positive integer");
-            if (@$psetids[$p->psetid])
-                Multiconference::fail_message("`psets.json` error: psetid {$p->psetid} reused");
-            $psetids[$p->psetid] = true;
-            $psetid = $p->id = $p->psetid;
-            $Psets->$psetid = $p;
-
-            // pset key
-            if (ctype_digit($pk) && intval($pk) !== $p->psetid)
-                Multiconference::fail_message("`psets.json` error: numeric pset key “{$pk}” disagrees with psetid");
-            if (!preg_match(',\A[^_./&;#][^/&;#]*\z,', $pk))
-                Multiconference::fail_message("`psets.json` error: pset key “{$pk}” format error");
-            $p->psetkey = $pk;
-
-            // title
-            if (!@$p->title)
-                $p->title = $pk;
-
-            // url keys
-            if (!isset($p->urlkey)) {
-                $p->urlkey = $p->psetid;
-                if (preg_match($pset_key_regex, $pk) && $pk != "pset" . $p->psetid)
-                    $p->urlkey = $pk;
-            }
-            if (!preg_match($pset_key_regex, $p->urlkey))
-                Multiconference::fail_message("`psets.json` error: invalid URL key “{$p->urlkey}”");
-            $x = $p->urlkey;
-            if (!property_exists($PsetKeys, $x))
-                $PsetKeys->$x = $p->id;
-            else if ($PsetKeys->$x !== $p->id)
-                Multiconference::fail_message("`psets.json` error: reusing URL key “{$p->urlkey}”");
-
-            // defaults
-            foreach ($PsetInfo->_defaults as $k => $v)
+            foreach ($PsetInfo->_defaults as $k => $v) {
                 if (!property_exists($p, $k))
                     $p->$k = $v;
                 else if (is_object($p->$k) && is_object($v))
                     object_replace_recursive($p->$k, $v);
-
-            // directory
-            if (!isset($p->directory))
-                $p->directory = "";
-            if (!is_string($p->directory))
-                Multiconference::fail_message("`psets.json` error: {$pk}->directory should be a string");
-            $p->directory_slash = $p->directory;
-            if ($p->directory_slash !== "" && !str_ends_with($p->directory_slash, "/"))
-                $p->directory_slash .= "/";
-            $p->directory_noslash = preg_replace(',/+\z,', '', $p->directory_slash);
-
-            // backwards compatibility
-            foreach (["deadline_college" => "college_deadline",
-                      "deadline_extension" => "extension_deadline",
-                      "visible" => "show_to_students",
-                      "grades_visible" => "show_grades_to_students",
-                      "grades_visible_college" => "show_grades_to_college",
-                      "grades_visible_extension" => "show_grades_to_extension",
-                      "grade_cdf_visible" => "show_grade_cdf_to_students",
-                      "frozen" => "freeze"]
-                      as $k => $oldk)
-                if (@$p->$k === null && @$p->$oldk !== null)
-                    $p->$k = $p->$oldk;
-
-            // grades
-            if (@$p->grades_visible_college == null && @$p->grades_visible)
-                $p->grades_visible_college = $p->grades_visible;
-            if (@$p->grades_visible_extension == null && @$p->grades_visible)
-                $p->grades_visible_extension = $p->grades_visible;
-
-            // deadlines
-            foreach (array("deadline", "deadline_college", "deadline_extension",
-                           "visible", "grades_visible", "repo_edit_deadline",
-                           "grades_visible_college", "grades_visible_extension",
-                           "grade_cdf_visible", "frozen") as $dl)
-                if (is_string(@$p->$dl) && ($p->$dl = parse_time($p->$dl)) <= 0)
-                    Multiconference::fail_message("`{$pk}->$dl` error: bad date format");
-
-            // runners, grades
-            load_pset_info_pset_order($p, "runners", "runner_order");
-            load_pset_info_pset_order($p, "grades", "grade_order");
-            $p->has_extra = false;
-            foreach (get_object_vars($p->runners) as $r)
-                if (@$r->visible === null && @$r->show_to_students !== null)
-                    $r->visible = $r->show_to_students;
-            foreach (get_object_vars($p->grades) as $ge)
-                if (@$ge->is_extra) {
-                    $p->has_extra = true;
-                    break;
-                }
-
-            // diffs
-            if (!isset($p->diffs))
-                $p->diffs = (object) array();
-            if (!is_object($p->diffs))
-                Multiconference::fail_message("`psets.json` error: {$pk}->diffs should be an object");
-            foreach (get_object_vars($p->diffs) as $k => $v)
-                if (!is_object($v))
-                    Multiconference::fail_message("`psets.json` error: {$pk}->diffs->$k should be an object");
-
-            // handout_repo_url
-            if (!is_string(@$p->handout_repo_url))
-                Multiconference::fail_message("`psets.json` error: {$pk}->handout_repo_url must exist and be a string");
+            }
+            $pset = new Pset($pk, $p);
+            Pset::register($pset);
         }
-
-    // make psetkeys available for URLs when they don't conflict
-    foreach ($Psets as $p) {
-        $x = $p->psetkey;
-        if (!property_exists($PsetKeys, $x))
-            $PsetKeys->$x = $p->id;
-    }
 
     // read message data
     if (!@$PsetInfo->_messagedefs)
