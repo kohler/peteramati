@@ -761,11 +761,11 @@ function show_pset_table($pset) {
                 $row->ptext = render_pset_row($pset, $students, $students[$s->pcid], $row, $pcmembers);
             $rows[$row->sortprefix . $s->sorter] = $row;
             $max_ncol = max($max_ncol, $row->ncol);
-            if (@$s->incomplete)
-                $incomplete[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey,
-                                                                   "u" => $Me->user_linkpart($s),
-                                                                   "sort" => @$_REQUEST["sort"])) . '">'
-                    . Text::name_html($s) . '</a>';
+            if (@$s->incomplete) {
+                $u = $Me->user_linkpart($s);
+                $incomplete[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $u, "sort" => @$_REQUEST["sort"])) . '">'
+                    . htmlspecialchars($u) . '</a>';
+            }
         }
     ksort($rows, SORT_NATURAL | SORT_FLAG_CASE);
 
