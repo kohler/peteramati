@@ -610,7 +610,7 @@ class Contact {
     }
 
     static function handout_repo($pset, $inrepo = null) {
-        global $Conf, $Now, $PsetInfo, $ConfSitePATH;
+        global $Conf, $Now, $ConfSitePATH;
         $url = $pset->handout_repo_url;
         $hrepo = @self::$_handout_repo[$url];
         if (!$hrepo) {
@@ -1262,7 +1262,7 @@ class Contact {
     }
 
     function check_seascode_repo($pset, $repo, $error) {
-        global $Conf, $ConfSitePATH, $PsetInfo;
+        global $Conf, $ConfSitePATH;
         $code_seas = "<a href='https://code.seas.harvard.edu/'>code.seas</a>";
 
         // get rid of git nonsense
@@ -1274,9 +1274,9 @@ class Contact {
 
         // clean it up some
         if (!is_object($pset)) {
-            if (!@$PsetInfo->$pset)
+            if (!Pset::$all[$pset])
                 error_log("bad pset $pset: " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
-            $pset = $PsetInfo->$pset;
+            $pset = Pset::$all[$pset];
         }
         if ($pset && $pset->repo_transform_patterns)
             for ($i = 0; $i < count($pset->repo_transform_patterns); $i += 2) {
