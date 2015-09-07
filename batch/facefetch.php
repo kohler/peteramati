@@ -1,4 +1,8 @@
 <?php
+// facefetch.php -- Peteramati script for fetching & storing faces
+// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// Distributed under an MIT-like license; see LICENSE
+
 $ConfSiteBase = preg_replace(',/batch/[^/]+,', '', __FILE__);
 require_once("$ConfSiteBase/src/init.php");
 require_once("$ConfSiteBase/lib/getopt.php");

@@ -1,6 +1,6 @@
 <?php
-// cs61mailer.php -- HotCRP mail template manager
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// cs61mailer.php -- Peteramati mail template manager
+// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
 // Distributed under an MIT-like license; see LICENSE
 
 class CS61Mailer extends Mailer {

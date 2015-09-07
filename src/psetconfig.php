@@ -1,4 +1,7 @@
 <?php
+// psetconfig.php -- Peteramati configuration classes
+// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// Distributed under an MIT-like license; see LICENSE
 
 class PsetConfigException extends Exception {
     public $path;

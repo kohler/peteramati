@@ -1,4 +1,7 @@
 <?php
+// diffinfo.php -- Peteramati class encapsulating diffs for a file
+// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// Distributed under an MIT-like license; see LICENSE
 
 class DiffInfo {
     public $filename;

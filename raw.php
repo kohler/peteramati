@@ -1,6 +1,6 @@
 <?php
-// raw.php -- HotCRP file download page
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// raw.php -- Peteramati file download page
+// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
 // Distributed under an MIT-like license; see LICENSE
 
 require_once("src/initweb.php");
