@@ -298,7 +298,7 @@ class ContactView {
         $editable = $info->can_set_repo && !$user->is_anonymous;
 
         $title = "partner";
-        if ($Me->isPC)
+        if ($Me->isPC && $partner)
             $title = '<a href="' . hoturl("pset", array("u" => $Me->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->commit_hash())) . '">' . $title . '</a>';
 
         if ($editable)
