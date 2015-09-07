@@ -28,8 +28,6 @@ if ($User
         header("Content-Length: " . strlen($row[1]));
     print $row[1];
 } else {
-    error_log($User ? "!" : ".");
-    error_log($User->contactImageId);
     header("Content-Type: image/gif");
     if (!$zlib_output_compression)
         header("Content-Length: 43");
