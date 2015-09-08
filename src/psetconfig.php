@@ -51,6 +51,7 @@ class Pset {
 
     public $all_runners = array();
     public $runners;
+    public $run_username;
     public $run_dirpattern;
     public $run_overlay;
     public $run_skeletondir;
@@ -167,6 +168,7 @@ class Pset {
         $this->runners = $this->all_runners;
         if (@$p->runner_order)
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
+        $this->run_username = self::cstr($p, "run_username");
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
         $this->run_overlay = self::cstr($p, "run_overlay");
         $this->run_skeletondir = self::cstr($p, "run_skeletondir");
@@ -322,6 +324,7 @@ class RunnerConfig {
     public $visible;
     public $output_visible;
     public $command;
+    public $run_username;
     public $load;
     public $eval;
     public $queue;
@@ -344,6 +347,7 @@ class RunnerConfig {
         $this->visible = Pset::cbool($loc, $r, "visible", "show_to_students");
         $this->output_visible = Pset::cdate_or_grades($loc, $r, "output_visible", "show_output_to_students", "show_results_to_students");
         $this->command = Pset::cstr($loc, $r, "command");
+        $this->run_username = Pset::cstr($loc, $r, "run_username");
         $this->load = Pset::cstr($loc, $r, "load");
         $this->eval = Pset::cstr($loc, $r, "eval");
         $this->queue = Pset::cstr($loc, $r, "queue");
