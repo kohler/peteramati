@@ -181,6 +181,9 @@ class CS61Mailer extends Mailer {
         return $e;
     }
 
+    function decorate_preparation($prep) {
+    }
+
 
     static function send_to($recipient, $template, $rest = array()) {
         if (!defval($recipient, "disabled")) {
