@@ -8,15 +8,30 @@ require_once("$ConfSiteBase/src/init.php");
 require_once("$ConfSiteBase/lib/getopt.php");
 
 $arg = getopt_rest($argv, "hn:l:", array("help", "name:", "limit:"));
-if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) != 1) {
-    fwrite(STDOUT, "Usage: php batch/facefetch.php FETCHSCRIPT\n");
+if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {
+    fwrite(STDOUT, "Usage: php batch/facefetch.php [FETCHSCRIPT]\n");
     exit(0);
 }
-$fetchscript = $arg["_"][0];
-if (!isset($Opt["facefetch_urlpattern"])) {
-    fwrite(STDERR, '$Opt["facefetch_urlpattern"] not set' . "\n");
+
+$facefetch_urlpattern = @$Opt["facefetch_urlpattern"];
+if (@$PsetInfo->_facefetch_urlpattern)
+    $facefetch_urlpattern = $PsetInfo->_facefetch_urlpattern;
+if (!$facefetch_urlpattern) {
+    fwrite(STDERR, 'Need `_facefetch_urlpattern` configuration option.' . "\n");
     exit(1);
 }
+
+$fetchscript = @$PsetInfo->_facefetch_script;
+if (count($arg["_"]))
+    $fetchscript = $arg["_"][0];
+if (!$fetchscript) {
+    fwrite(STDERR, "Need `_facefetch_script` configuration option or argument.\n");
+    exit(1);
+} else if (!is_executable($fetchscript)) {
+    fwrite(STDERR, "$fetchscript: Not executable.\n");
+    exit(1);
+}
+
 if (!isset($arg["limit"]))
     $arg["limit"] = @$arg["l"];
 $limit = (int) $arg["limit"];
@@ -24,7 +39,7 @@ $limit = (int) $arg["limit"];
 $result = Dbl::qe("select contactId, email, huid from ContactInfo where huid is not null and contactImageId is null");
 $n = $nworked = 0;
 while (($row = edb_row($result))) {
-    $url = $Opt["facefetch_urlpattern"];
+    $url = $facefetch_urlpattern;
     $url = str_replace('${ID}', urlencode($row[2]), $url);
     $url = str_replace('${EMAIL}', urlencode($row[1]), $url);
     fwrite(STDOUT, $row[1] . " ");
