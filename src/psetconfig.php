@@ -30,6 +30,7 @@ class Pset {
 
     public $handout_repo_url;
     public $repo_guess_patterns = array();
+    public $repo_tarball_patterns = array();
     public $directory;
     public $directory_slash;
     public $directory_noslash;
@@ -110,6 +111,10 @@ class Pset {
         if (!$this->handout_repo_url && !$this->gitless)
             throw new Exception("`handout_repo_url` missing");
         $this->repo_guess_patterns = self::cstr_array($p, "repo_guess_patterns", "repo_transform_patterns");
+        $this->repo_tarball_patterns = self::cstr_array($p, "repo_tarball_patterns");
+        if (!property_exists($p, "repo_tarball_patterns"))
+            $this->repo_tarball_patterns = array("^git@(.*?):(.*)\.git$",
+                "https://\$1/\$2/archive-tarball/\${HASH}");
         if (@$p->directory !== null && @$p->directory !== false
             && !is_string($p->directory))
             throw new PsetConfigException("`directory` format error", "directory");

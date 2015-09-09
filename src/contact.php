@@ -1288,7 +1288,7 @@ class Contact {
             $pset = Pset::$all[$pset];
         }
         if ($pset && $pset->repo_guess_patterns)
-            for ($i = 0; $i < count($pset->repo_guess_patterns); $i += 2) {
+            for ($i = 0; $i + 1 < count($pset->repo_guess_patterns); $i += 2) {
                 $x = preg_replace('`' . str_replace("`", "\\`", $pset->repo_guess_patterns[$i]) . '`s',
                                   $pset->repo_guess_patterns[$i + 1],
                                   $repo, -1, $nreplace);

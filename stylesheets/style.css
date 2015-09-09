@@ -573,14 +573,15 @@ a.button {
 	text-decoration: none;
 	color: black;
 }
-input.b, button.b, select.b, input.bsm, button.bsm, select.bsm, button.runner61 {
+input.b, button.b, select.b, a.b,
+input.bsm, button.bsm, select.bsm, a.bsm, button.runner61 {
 	padding: 2px 6px;
         border: 1px outset buttonface;
         border-radius: 6px;
         background-color: white;
 	white-space: nowrap;
 }
-input.bsm, button.bsm, select.bsm {
+input.bsm, button.bsm, select.bsm, a.bsm {
 	font-size: smaller;
 }
 #plact input, #plact button, #plact select,

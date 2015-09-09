@@ -52,6 +52,10 @@ class PsetView {
         return $this->commit;
     }
 
+    public function has_commit_set() {
+        return $this->commit !== null;
+    }
+
     public function commit_hash() {
         assert($this->commit !== null);
         return $this->commit;
@@ -151,6 +155,20 @@ class PsetView {
              $updates, $reset_keys);
         if ($this->repo_grade && $this->repo_grade->gradehash == $this->commit)
             $this->grade_notes = $this->commit_notes;
+    }
+
+    public function tarball_url() {
+        if ($this->repo && $this->commit !== null
+            && $this->pset->repo_tarball_patterns) {
+            for ($i = 0; $i + 1 < count($this->pset->repo_tarball_patterns); $i += 2) {
+                $x = preg_replace('`' . str_replace("`", "\\`", $this->pset->repo_tarball_patterns[$i]) . '`s',
+                                  $this->pset->repo_tarball_patterns[$i + 1],
+                                  $this->repo->url, -1, $nreplace);
+                if ($x !== null && $nreplace)
+                    return str_replace('${HASH}', $this->commit, $x);
+            }
+        }
+        return null;
     }
 
 

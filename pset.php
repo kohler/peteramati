@@ -660,11 +660,6 @@ function echo_commit($Info) {
         $key = "this commit";
     $value = Ht::select("newcommit", $sel, $Info->commit_hash(),
                         array("onchange" => "jQuery(this).closest('form').submit()"));
-    if ($Me != $User) {
-        $x = $Info->is_grading_commit() ? "" : "font-weight:bold";
-        $value .= " " . Ht::submit("grade", "Grade", array("style" => $x))
-            . " &nbsp" . $User->repo_link($Info->repo->url, "Download repo", "/archive-tarball/" . (substr($Info->commit_hash(), 0, 8) ? : "master"));
-    }
 
     // view options
     $fold_viewoptions = !isset($_REQUEST["tab"]) && !isset($_REQUEST["wdiff"]);
@@ -816,7 +811,7 @@ function show_pset($info) {
         echo '<div style="float:right"><button type="button" onclick="jQuery(\'#upload\').show()">upload</button></div>';
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);
-    ContactView::echo_repo_group($info);
+    ContactView::echo_repo_group($info, $Me != $info->user);
     ContactView::echo_repo_last_commit_group($info, false);
 }
 

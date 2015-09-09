@@ -352,7 +352,7 @@ class ContactView {
             redirectSelf();
     }
 
-    static function echo_repo_group($info) {
+    static function echo_repo_group($info, $include_tarball = false) {
         global $Conf, $Me, $Now;
         if ($info->pset->gitless)
             return;
@@ -375,11 +375,13 @@ class ContactView {
         if ($repo_url) {
             $value .= ' <button class="repoclip" style="display:none" data-clipboard-text="'
                 . htmlspecialchars($repo->url)
-                . '" type="button" onclick="false">Copy SSH URL to clipboard</button>';
+                . '" type="button" onclick="false">Copy URL to clipboard</button>';
             if (!self::$_clipboard) {
                 $Conf->footerScript("var zeroclip=new ZeroClipboard(jQuery('.repoclip'));zeroclip.on('load',function(){jQuery('.repoclip').show()});zeroclip.on('mousedown',function(){jQuery(this).css({color:'red'})});zeroclip.on('mouseup',function(){jQuery(this).css({color:''})})");
                 self::$_clipboard = true;
             }
+            if ($include_tarball && ($tarball_url = $info->tarball_url()))
+                $value .= ' <a class="bsm q" href="' . htmlspecialchars($tarball_url) . '">Download tarball for ' . substr($info->commit_hash(), 0, 7) . '</a>';
         }
 
         // check repo
