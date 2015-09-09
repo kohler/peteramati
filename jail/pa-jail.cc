@@ -1,3 +1,7 @@
+// pa-jail.cc -- Peteramati program sets up a jail for student code
+// Peteramati is Copyright (c) 2013-2015 Eddie Kohler and others
+// Distributed under an MIT-like license; see LICENSE
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
