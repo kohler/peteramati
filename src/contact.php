@@ -1314,17 +1314,6 @@ class Contact {
         return $repo;
     }
 
-    static function seascode_git_repo($repo) {
-        $repo = self::seascode_repo_base($repo);
-        return "git://code.seas.harvard.edu/$repo.git";
-    }
-
-    static function seascode_git_repo_open($repo) {
-        $git_url = self::seascode_git_repo($repo);
-        $answer = shell_exec("git ls-remote $git_url 2>/dev/null");
-        return preg_match('_\A[0-9a-f]{40}\s+_', $answer) ? 1 : 0;
-    }
-
     function can_set_repo($pset, $user = null) {
         global $Now;
         if (is_string($pset) || is_int($pset))
@@ -1366,10 +1355,7 @@ class Contact {
         $reporow = edb_orow($result);
 
         // check git url; should not work b/c student repos should require auth
-        $open = self::seascode_git_repo_open($repo);
-        // don't warn; the home page warns effectively
-        //if ($open)
-        //    $Conf->warnMsg(Messages::$main->expand_html("repo_toopublic", array("REPOGITURL" => $ssh_url, "REPOBASE" => $repo)));
+        $open = PsetView::is_repo_url_open($repo);
 
         // set repo
         $now = time();

@@ -1,4 +1,4 @@
-all: pa-jail stderrtostdout pa-jail-owner
+all: pa-jail pa-timeout stderrtostdout pa-jail-owner
 
 pa-jail: pa-jail.cc
 	$(CXX) -std=gnu++0x -W -Wall -g -O2 -o $@ $@.cc
@@ -14,11 +14,14 @@ pa-jail-owner: pa-jail
 	  sudo -n chown root:0 $< && sudo -n chmod u+s,g+s,go-w $<; \
 	fi
 
+pa-timeout: pa-timeout.c
+	$(CC) -std=gnu11 -W -Wall -g -O2 -o $@ $^
+
 stderrtostdout: stderrtostdout.c
 	$(CC) -W -Wall -g -O2 -o $@ $^
 
 clean:
-	rm -f pa-jail stderrtostdout
+	rm -f pa-jail pa-timeout stderrtostdout
 
 always:
 	@:

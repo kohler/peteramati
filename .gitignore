@@ -4,6 +4,7 @@ conf/gitssh_config
 conf/id_rsa_*
 conf/options.php
 jail/pa-jail
+jail/pa-timeout
 jail/stderrtostdout
 log/
 repo/

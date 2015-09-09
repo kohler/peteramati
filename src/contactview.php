@@ -391,13 +391,10 @@ class ContactView {
             } else
                 $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_unreadable", $user->repo_messagedefs($repo)));
         }
-        if ($repo
-            && ($repo->open || $Now - $repo->opencheckat > 86400)) {
-            $open = $user->seascode_git_repo_open($repo);
-            $Conf->qe("update Repository set `open`=$open, opencheckat=$Now where repoid=$repo->repoid");
-            if ($open)
-                $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_toopublic", $user->repo_messagedefs($repo)));
-        }
+        if (($open = $info->check_repo_open()) > 0)
+            $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_toopublic", $user->repo_messagedefs($repo)));
+        else if ($open < 0 && $Me->isPC)
+            $notes[] = array(true, "WARNING: " . Messages::$main->expand_html("repo_toopublic_timeout", $user->repo_messagedefs($repo)));
         if ($partner && $info->partner_same) {
             $prepo = $partner->repo($pset->id);
             if ((!$repo && $prepo) || ($repo && !$prepo)
