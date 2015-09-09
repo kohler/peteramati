@@ -772,7 +772,7 @@ function show_pset_table($pset) {
     if (count($incomplete)) {
         echo '<div id="incomplete_pset', $pset->id, '" style="display:none" class="merror">',
             '<strong>', htmlspecialchars($pset->title), '</strong>: ',
-            'Grading incomplete for ', join(", ", $incomplete), '</div>',
+            'Your grading is incomplete. Missing grades: ', join(", ", $incomplete), '</div>',
             '<script>jQuery("#incomplete_pset', $pset->id, '").remove().show().appendTo("#incomplete_notices")</script>';
     }
 
