@@ -1287,10 +1287,10 @@ class Contact {
                 error_log("bad pset $pset: " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
             $pset = Pset::$all[$pset];
         }
-        if ($pset && $pset->repo_transform_patterns)
-            for ($i = 0; $i < count($pset->repo_transform_patterns); $i += 2) {
-                $x = preg_replace('{' . preg_quote($pset->repo_transform_patterns[$i]) . '}s',
-                                  $pset->repo_transform_patterns[$i + 1],
+        if ($pset && $pset->repo_guess_patterns)
+            for ($i = 0; $i < count($pset->repo_guess_patterns); $i += 2) {
+                $x = preg_replace('`' . str_replace("`", "\\`", $pset->repo_guess_patterns[$i]) . '`s',
+                                  $pset->repo_guess_patterns[$i + 1],
                                   $repo, -1, $nreplace);
                 if ($x !== null && $nreplace) {
                     $repo = $x;

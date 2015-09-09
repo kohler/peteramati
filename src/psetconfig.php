@@ -29,7 +29,7 @@ class Pset {
     public $gitless;
 
     public $handout_repo_url;
-    public $repo_transform_patterns = array();
+    public $repo_guess_patterns = array();
     public $directory;
     public $directory_slash;
     public $directory_noslash;
@@ -109,8 +109,7 @@ class Pset {
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");
         if (!$this->handout_repo_url && !$this->gitless)
             throw new Exception("`handout_repo_url` missing");
-        if (isset($p->repo_transform_patterns))
-            $this->repo_transform_patterns = self::cstr_array($p, "repo_transform_patterns");
+        $this->repo_guess_patterns = self::cstr_array($p, "repo_guess_patterns", "repo_transform_patterns");
         if (@$p->directory !== null && @$p->directory !== false
             && !is_string($p->directory))
             throw new PsetConfigException("`directory` format error", "directory");

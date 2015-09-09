@@ -161,7 +161,7 @@ others are shown to users in different contexts.
     the specified `directory`, if any). Used to detect when a student ignores
     the subdirectory structure.
 
-* `repo_transform_patterns`: array of strings
+* `repo_guess_patterns`: array of strings
 
     These patterns are used to try to guess a student’s repository URL from
     their user name. If given, the array should contain a list of pattern,
