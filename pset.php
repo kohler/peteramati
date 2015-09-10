@@ -326,7 +326,7 @@ if ($User && $Info->repo)
     Contact::check_repo($Info->repo, 30);
 
 $Conf->header(htmlspecialchars($Pset->title), "home");
-$xsep = " <span class='barsep'>&nbsp;|&nbsp;</span> ";
+$xsep = " <span class='barsep'>&nbsp;·&nbsp;</span> ";
 
 
 // Top: user info

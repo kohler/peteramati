@@ -312,28 +312,67 @@ function psets_json_diff_from($original, $update) {
     return $res;
 }
 
-function savepset() {
-    global $Conf, $Me, $PsetOverrides;
-    if (!($pset = Pset::find(@$_REQUEST["pset"])))
-        return $Conf->errorMsg("No such pset");
-    $new_overrides = array();
-    if (isset($_POST["disabled"]))
-        $new_overrides["disabled"] = $_POST["disabled"] ? true : null;
-    if (isset($_POST["visible"]))
-        $new_overrides["visible"] = $_POST["visible"] ? true : null;
-    if (count($new_overrides)) {
-        $new_overrides = (object) array($pset->psetkey => (object) $new_overrides);
-        $override = $Conf->setting_json("psets_override") ? : (object) array();
-        object_replace_recursive($override, $new_overrides);
-        $override = psets_json_diff_from(load_psets_json(), $override);
-        $Conf->save_setting("psets_override", 1, $override);
-    }
+function save_config_overrides($psetkey, $overrides, $json = null) {
+    global $Conf;
+
+    $dbjson = $Conf->setting_json("psets_override") ? : (object) array();
+    $all_overrides = (object) array();
+    $all_overrides->$psetkey = $overrides;
+    object_replace_recursive($dbjson, $all_overrides);
+    $dbjson = psets_json_diff_from($json ? : load_psets_json(), $dbjson);
+    $Conf->save_setting("psets_override", 1, $dbjson);
+
     unset($_GET["pset"], $_REQUEST["pset"]);
-    redirectSelf();
+    redirectSelf(array("anchor" => $psetkey));
 }
 
-if ($Me->privChair && check_post() && @$_GET["savepset"])
-    savepset();
+function reconfig() {
+    global $Conf, $Me, $PsetOverrides, $PsetInfo;
+    if (!($pset = Pset::find(@$_REQUEST["pset"])))
+        return $Conf->errorMsg("No such pset");
+    $psetkey = $pset->psetkey;
+
+    $json = load_psets_json();
+    object_merge_recursive($json->$psetkey, $PsetInfo->_defaults);
+    $old_pset = new Pset($psetkey, $json->$psetkey);
+
+    $o = (object) array();
+    if (@$_POST["action"] === "setstate") {
+        $o->disabled = $o->visible = $o->grades_visible = null;
+        $state = @$_POST["state"];
+        if ($state === "disabled")
+            $o->disabled = true;
+        else if ($old_pset->disabled)
+            $o->disabled = false;
+        if ($state === "visible" || $state === "grades_visible")
+            $o->visible = true;
+        else if (!$old_pset->disabled && $old_pset->visible)
+            $o->visible = false;
+        if ($state === "grades_visible")
+            $o->grades_visible = true;
+        else if ($state === "visible" && $old_pset->grades_visible)
+            $o->grades_visible = false;
+    }
+
+    if (@$_POST["action"] = "setfrozen") {
+        if (@$_POST["frozen"] === "yes")
+            $o->frozen = true;
+        else
+            $o->frozen = ($old_pset->frozen ? false : null);
+    }
+
+    if (@$_POST["action"] = "setanonymous") {
+        if (@$_POST["anonymous"] === "yes")
+            $o->anonymous = true;
+        else
+            $o->anonymous = ($old_pset->anonymous ? false : null);
+    }
+
+    save_config_overrides($psetkey, $o, $json);
+}
+
+if ($Me->privChair && check_post() && @$_GET["reconfig"])
+    reconfig();
 
 
 // check global system settings
@@ -695,6 +734,7 @@ function show_regrades($result) {
     global $Conf, $Me, $Now, $LastPsetFix;
     $rows = array();
 
+    echo '<div id="_regrades">';
     echo "<h3>regrade requests</h3>";
     echo '<table class="s61"><tbody>';
     $trn = 0;
@@ -742,27 +782,46 @@ function show_regrades($result) {
 
         echo '</tr>';
     }
-    echo "</tbody></table>\n";
+    echo "</tbody></table></div>\n";
 }
 
 function show_pset_actions($pset) {
-    echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "savepset" => 1)), array("style" => "margin-bottom:1em"));
-    $buttons = array();
+    global $Conf;
+
+    echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "reconfig" => 1)), array("style" => "margin-bottom:1em"));
+    $options = array("disabled" => "Disabled",
+                     "invisible" => "Hidden",
+                     "visible" => "Visible without grades",
+                     "grades_visible" => "Visible with grades");
     if ($pset->disabled)
-        $buttons[] = Ht::submit("disabled", "Enable", array("value" => 0));
-    else {
-        $buttons[] = Ht::submit("disabled", "Disable", array("value" => 1));
-        if ($pset->visible)
-            $buttons[] = Ht::submit("visible", "Hide from students", array("value" => 0));
-        else
-            $buttons[] = Ht::submit("visible", "Show to students", array("value" => 1));
+        $state = "disabled";
+    else if (!$pset->visible)
+        $state = "invisible";
+    else if (!$pset->grades_visible)
+        $state = "visible";
+    else
+        $state = "grades_visible";
+    $Conf->footerScript("function reconfig(e, what) { var j = $(e).closest(\"form\"); j.find('input[name=\"action\"]').val(what); j.submit(); }", "reconfig");
+    echo Ht::select("state", $options, $state, array("onchange" => "reconfig(this, 'setstate')")),
+        Ht::hidden("action", "");
+
+    if (!$pset->disabled && $pset->visible) {
+        echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
+        echo Ht::select("frozen", array("no" => "Student updates allowed", "yes" => "Submissions frozen"), $pset->frozen ? "yes" : "no", array("onchange" => "reconfig(this, 'setfrozen')"));
     }
-    echo join(" ", $buttons), "</div></form>";
+
+    if (!$pset->disabled) {
+        echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
+        echo Ht::select("anonymous", array("no" => "Open grading", "yes" => "Anonymous grading"), $pset->anonymous ? "yes" : "no", array("onchange" => "reconfig(this, 'setanonymous')"));
+    }
+
+    echo "</div></form>";
 }
 
 function show_pset_table($pset) {
     global $Conf, $Me, $Now, $Opt, $Profile, $LastPsetFix;
 
+    echo '<div id="', $pset->urlkey, '">';
     echo "<h3>", htmlspecialchars($pset->title), "</h3>";
     if ($Me->privChair)
         show_pset_actions($pset);
@@ -891,6 +950,8 @@ function show_pset_table($pset) {
         $t2 = microtime(true);
         echo sprintf("<div>Δt %.06f DB, %.06f total</div>", $t1 - $t0, $t2 - $t0);
     }
+
+    echo "</div>\n";
 }
 
 if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
