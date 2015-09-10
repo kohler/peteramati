@@ -58,11 +58,16 @@ class Ht {
     }
 
     static function form_div($action, $extra = null) {
-        $div = "<div>";
+        $div = "<div";
         if (($divclass = @$extra["divclass"])) {
-            $div = '<div class="' . $divclass . '">';
+            $div .= ' class="' . $divclass . '"';
             unset($extra["divclass"]);
         }
+        if (($divstyle = @$extra["style"])) {
+            $div .= ' style="' . $divstyle . '"';
+            unset($extra["style"]);
+        }
+        $div .= '>';
         if (@$extra["method"] === "get" && ($qpos = strpos($action, "?")) !== false) {
             if (($hpos = strpos($action, "#", $qpos + 1)) === false)
                 $hpos = strlen($action);

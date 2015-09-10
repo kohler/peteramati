@@ -116,11 +116,14 @@ class ContactView {
         return $a->id < $b->id ? -1 : ($a->id == $b->id ? 0 : 1);
     }
 
-    static function pset_list($istf, $reverse) {
+    static function pset_list($contact, $reverse) {
         $psets = array();
+        $istf = $contact && ($contact === true || $contact->isPC);
+        $ischair = $contact instanceof Contact && $contact->privChair;
         foreach (Pset::$all as $pset)
             if (Contact::student_can_see_pset($pset)
-                || (!$pset->disabled && $pset->gitless && $istf))
+                || (!$pset->disabled && $pset->gitless && $istf)
+                || $ischair)
                 $psets[$pset->id] = $pset;
         self::$_reverse_pset_compare = !!$reverse;
         uasort($psets, "ContactView::pset_compare");

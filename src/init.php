@@ -194,22 +194,15 @@ if (function_exists("date_default_timezone_set")) {
 
 
 // Extract problem set information
-function load_pset_info() {
-    global $ConfSitePATH, $PsetInfo, $Opt;
-    // read initial messages
-    Messages::$main = new Messages;
-    $x = json_decode(file_get_contents("$ConfSitePATH/src/messages.json"));
-    foreach ($x as $j)
-        Messages::$main->add($j);
-
-    // read psets
-    $PsetInfo = (object) array();
-    $psets = expand_includes($ConfSitePATH, $Opt["psetsConfig"],
-                             array("CONFID" => @$Opt["confid"] ? : @$Opt["dbName"],
-                                   "HOSTTYPE" => @$Opt["hostType"] ? : ""));
-    if (!count($psets))
+function load_psets_json() {
+    global $ConfSitePATH, $Opt;
+    $fnames = expand_includes($ConfSitePATH, $Opt["psetsConfig"],
+                              array("CONFID" => @$Opt["confid"] ? : @$Opt["dbName"],
+                                    "HOSTTYPE" => @$Opt["hostType"] ? : ""));
+    if (!count($fnames))
         Multiconference::fail_message("\$Opt[\"psetsConfig\"] is not set correctly.");
-    foreach ($psets as $fname) {
+    $json = (object) array("_defaults" => (object) array());
+    foreach ($fnames as $fname) {
         $data = file_get_contents($fname);
         if ($data === false)
             Multiconference::fail_message("$fname: Required configuration file cannot be read.");
@@ -219,10 +212,29 @@ function load_pset_info() {
             Multiconference::fail_message("$fname: Invalid JSON. " . Json::last_error_msg());
         } else if (!is_object($x))
             Multiconference::fail_message("$fname: Not a JSON object.");
-        object_replace_recursive($PsetInfo, $x);
+        object_replace_recursive($json, $x);
     }
-    if (!isset($PsetInfo->_defaults))
-        $PsetInfo->_defaults = (object) array();
+    return $json;
+}
+
+function load_pset_info() {
+    global $ConfSitePATH, $Conf, $PsetInfo, $PsetOverrides, $Opt;
+    // read initial messages
+    Messages::$main = new Messages;
+    $x = json_decode(file_get_contents("$ConfSitePATH/src/messages.json"));
+    foreach ($x as $j)
+        Messages::$main->add($j);
+
+    // read psets
+    $PsetInfo = load_psets_json();
+    if (($data = $Conf->setting_data("psets_override"))) {
+        if (($x = json_decode($data)))
+            object_replace_recursive($PsetInfo, $x);
+        else {
+            Json::decode($data);
+            Multiconference::fail_message("Database settings: Invalid JSON. " . Json::last_error_msg());
+        }
+    }
 
     // parse psets
     foreach ($PsetInfo as $pk => $p) {

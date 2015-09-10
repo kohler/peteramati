@@ -268,7 +268,7 @@ function set_grader() {
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && @$_REQUEST["setgrader"])
+if ($Me->isPC && check_post() && @$_POST["setgrader"])
     set_grader();
 
 
@@ -293,8 +293,47 @@ function runmany() {
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && @$_REQUEST["runmany"])
+if ($Me->isPC && check_post() && @$_POST["runmany"])
     runmany();
+
+
+function psets_json_diff_from($original, $update) {
+    $res = null;
+    foreach (get_object_vars($update) as $k => $vu) {
+        $vo = @$original->$k;
+        if (is_object($vo) && is_object($vu)) {
+            if (!($vu = psets_json_diff_from($vo, $vu)))
+                continue;
+        } else if ($vo === $vu)
+            continue;
+        $res = $res ? : (object) array();
+        $res->$k = $vu;
+    }
+    return $res;
+}
+
+function savepset() {
+    global $Conf, $Me, $PsetOverrides;
+    if (!($pset = Pset::find(@$_REQUEST["pset"])))
+        return $Conf->errorMsg("No such pset");
+    $new_overrides = array();
+    if (isset($_POST["disabled"]))
+        $new_overrides["disabled"] = $_POST["disabled"] ? true : null;
+    if (isset($_POST["visible"]))
+        $new_overrides["visible"] = $_POST["visible"] ? true : null;
+    if (count($new_overrides)) {
+        $new_overrides = (object) array($pset->psetkey => (object) $new_overrides);
+        $override = $Conf->setting_json("psets_override") ? : (object) array();
+        object_replace_recursive($override, $new_overrides);
+        $override = psets_json_diff_from(load_psets_json(), $override);
+        $Conf->save_setting("psets_override", 1, $override);
+    }
+    unset($_GET["pset"], $_REQUEST["pset"]);
+    redirectSelf();
+}
+
+if ($Me->privChair && check_post() && @$_GET["savepset"])
+    savepset();
 
 
 // check global system settings
@@ -706,8 +745,30 @@ function show_regrades($result) {
     echo "</tbody></table>\n";
 }
 
+function show_pset_actions($pset) {
+    echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "savepset" => 1)), array("style" => "margin-bottom:1em"));
+    $buttons = array();
+    if ($pset->disabled)
+        $buttons[] = Ht::submit("disabled", "Enable", array("value" => 0));
+    else {
+        $buttons[] = Ht::submit("disabled", "Disable", array("value" => 1));
+        if ($pset->visible)
+            $buttons[] = Ht::submit("visible", "Hide from students", array("value" => 0));
+        else
+            $buttons[] = Ht::submit("visible", "Show to students", array("value" => 1));
+    }
+    echo join(" ", $buttons), "</div></form>";
+}
+
 function show_pset_table($pset) {
     global $Conf, $Me, $Now, $Opt, $Profile, $LastPsetFix;
+
+    echo "<h3>", htmlspecialchars($pset->title), "</h3>";
+    if ($Me->privChair)
+        show_pset_actions($pset);
+    if ($pset->disabled)
+        return;
+
     $t0 = $Profile ? microtime(true) : 0;
 
     // load students
@@ -776,7 +837,6 @@ function show_pset_table($pset) {
             '<script>jQuery("#incomplete_pset', $pset->id, '").remove().show().appendTo("#incomplete_notices")</script>';
     }
 
-    echo "<h3>", htmlspecialchars($pset->title), "</h3>";
     if ($checkbox)
         echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
     echo '<table class="s61"><tbody>';
@@ -857,7 +917,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
         $sep = "<hr />\n";
     }
 
-    foreach (ContactView::pset_list($Me->isPC, true) as $pset) {
+    foreach (ContactView::pset_list($Me, true) as $pset) {
         echo $sep;
         show_pset_table($pset, $Me);
         $sep = "<hr />\n";
