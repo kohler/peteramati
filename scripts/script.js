@@ -1539,6 +1539,13 @@ return Miniajax;
 })();
 
 
+// mail
+function setmailpsel(sel) {
+    fold("psel", !!sel.value.match(/^(?:pc$|pc:|all$)/), 9);
+    fold("psel", !sel.value.match(/^new.*rev$/), 10);
+}
+
+
 linenote61 = (function ($) {
 function analyze(target) {
     var table, linetype, linenumber, tr, result, x;

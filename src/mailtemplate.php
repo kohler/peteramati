@@ -376,24 +376,6 @@ We will grade this commit unless you tell us otherwise. If you're still working,
 Thanks,
 - %CONFSHORTNAME% Staff"),
 
-     "newpcrev" =>
-     array("mailtool_name" => "Review assignment notification",
-	   "mailtool_recipients" => "newpcrev",
-	   "subject" => "[%CONFSHORTNAME%] New review assignments",
-	   "body" => "Dear %NAME%,
-
-You have been assigned new reviews for %CONFNAME%. %IF(REVIEWDEADLINE)% Reviews are requested by %REVIEWDEADLINE%.%ENDIF%
-
-             Site: %URL%/
-     Your reviews: %URL(search, q=re:me)%
-  New assignments: %NEWASSIGNMENTS%
-
-Thank you for your help -- we appreciate that reviewing is hard work.
-
-Contact the site administrator, %ADMIN%, with any questions or concerns.
-
-- %CONFSHORTNAME% Submissions\n"),
-
      "registerpaper" =>
      array("subject" => "[%CONFSHORTNAME%] Registered paper #%NUMBER% %TITLEHINT%",
 	   "body" => "Paper #%PAPER% has been registered at the %CONFNAME% submissions site.
