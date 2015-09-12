@@ -203,7 +203,7 @@ function load_psets_json() {
         Multiconference::fail_message("\$Opt[\"psetsConfig\"] is not set correctly.");
     $json = (object) array("_defaults" => (object) array());
     foreach ($fnames as $fname) {
-        $data = file_get_contents($fname);
+        $data = @file_get_contents($fname);
         if ($data === false)
             Multiconference::fail_message("$fname: Required configuration file cannot be read.");
         $x = json_decode($data);
