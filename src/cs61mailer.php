@@ -184,6 +184,10 @@ class CS61Mailer extends Mailer {
     function decorate_preparation($prep) {
     }
 
+    static function preparation_differs($prep1, $prep2) {
+        return parent::preparation_differs($prep1, $prep2);
+    }
+
 
     static function send_to($recipient, $template, $rest = array()) {
         if (!defval($recipient, "disabled")) {

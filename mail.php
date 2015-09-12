@@ -7,7 +7,7 @@ require_once("src/initweb.php");
 require_once("src/mailclasses.php");
 if (!$Me->privChair && !$Me->isPC)
     $Me->escape();
-$Error = $Warning = array();
+$Error = array();
 
 // load mail from log
 if (isset($_REQUEST["fromlog"]) && ctype_digit($_REQUEST["fromlog"])
@@ -77,9 +77,9 @@ if (isset($papersel) && count($papersel) == 0) {
 }
 
 if (isset($_REQUEST["monreq"]))
-    $Conf->header("Monitor External Reviews", "mail", actionBar());
+    $Conf->header("Monitor external reviews", "mail", actionBar());
 else
-    $Conf->header("Send Mail", "mail", actionBar());
+    $Conf->header("Mail", "mail", actionBar());
 
 $subjectPrefix = "[" . $Opt["shortName"] . "] ";
 
@@ -90,6 +90,8 @@ class MailSender {
     private $sending;
 
     private $started = false;
+    private $group;
+    private $groupable = false;
     private $mcount = 0;
     private $mrecipients = array();
     private $mpapers = array();
@@ -99,6 +101,7 @@ class MailSender {
     function __construct($recip, $sending) {
         $this->recip = $recip;
         $this->sending = $sending;
+        $this->group = @$_REQUEST["group"] || !@$_REQUEST["ungroup"];
     }
 
     static function check($recip) {
@@ -111,6 +114,18 @@ class MailSender {
         $ms->run();
     }
 
+    private function echo_actions($extra_class = "") {
+        echo '<div class="aa', $extra_class, '">',
+            Ht::submit("send", "Send", array("style" => "margin-right:4em")),
+            ' &nbsp; ';
+        $style = $this->groupable ? "" : "display:none";
+        if (!@$_REQUEST["group"] && @$_REQUEST["ungroup"])
+            echo Ht::submit("group", "Gather recipients", array("style" => $style, "class" => "mail_groupable"));
+        else
+            echo Ht::submit("ungroup", "Separate recipients", array("style" => $style, "class" => "mail_groupable"));
+        echo ' &nbsp; ', Ht::submit("cancel", "Cancel"), '</div>';
+    }
+
     private function echo_prologue() {
         global $Conf, $Me;
         if ($this->started)
@@ -119,10 +134,14 @@ class MailSender {
         foreach (array("recipients", "subject", "emailBody", "cc", "replyto", "q", "t", "plimit") as $x)
             if (isset($_REQUEST[$x]))
                 echo Ht::hidden($x, $_REQUEST[$x]);
+        if (!$this->group)
+            echo Ht::hidden("ungroup", 1);
+        $recipients = defval($_REQUEST, "recipients", "");
         if ($this->sending) {
             echo "<div id='foldmail' class='foldc fold2c'>",
                 "<div class='fn fx2 merror'>In the process of sending mail.  <strong>Do not leave this page until this message disappears!</strong><br /><span id='mailcount'></span></div>",
                 "<div id='mailwarnings'></div>",
+                "<span id='mailinfo'></span>",
                 "<div class='fx'><div class='confirm'>Sent mail as follows.</div>",
                 "<div class='aa'>",
                 Ht::submit("go", "Prepare more mail"),
@@ -140,7 +159,7 @@ class MailSender {
                     echo "<div class='warning'>Mails to users who have not completed their own reviews will not include reviews or comments. (<a href='", hoturl("settings", "group=dec"), "' class='nowrap'>Change the setting</a>)</div>\n";
             }
             if (isset($_REQUEST["emailBody"]) && $Me->privChair
-                && substr($_REQUEST["recipients"], 0, 4) == "dec:") {
+                && substr($recipients, 0, 4) == "dec:") {
                 if (!$Conf->timeAuthorViewDecision())
                     echo "<div class='warning'>You appear to be sending an acceptance or rejection notification, but authors can’t see paper decisions on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nowrap'>Change this setting</a>)</div>\n";
             }
@@ -150,28 +169,34 @@ class MailSender {
                 "<div class='fx info'>Verify that the mails look correct, then select “Send” to send the checked mails.<br />",
                 "Mailing to:&nbsp;", $this->recip->unparse(),
                 "<span id='mailinfo'></span>";
-            if (!preg_match('/\A(?:pc\z|pc:|all\z)/', $_REQUEST["recipients"])
+            if (!preg_match('/\A(?:pc\z|pc:|all\z)/', $recipients)
                 && defval($_REQUEST, "plimit") && $_REQUEST["q"] !== "")
                 echo "<br />Paper selection:&nbsp;", htmlspecialchars($_REQUEST["q"]);
-            echo "</div><div class='aa fx'>", Ht::submit("send", "Send"),
-                " &nbsp; ", Ht::submit("cancel", "Cancel"), "</div>",
-                // This next is only displayed when Javascript is off
-                "<div class='fn2 warning'>Scroll down to send the prepared mail once the page finishes loading.</div>",
+            echo "</div>";
+            $this->echo_actions(" fx");
+            // This next is only displayed when Javascript is off
+            echo '<div class="fn2 warning">Scroll down to send the prepared mail once the page finishes loading.</div>',
                 "</div>\n";
         }
         $Conf->echoScript("fold('mail',0,2)");
         $this->started = true;
     }
 
-    private function echo_mailinfo() {
+    private function echo_mailinfo($nrows_done, $nrows_left) {
         global $Conf;
+        if (!$this->started)
+            $this->echo_prologue();
+        $s = "\$\$('mailcount').innerHTML=\"" . round(100 * $nrows_done / max(1, $nrows_left)) . "% done.\";";
         if (!$this->sending) {
             $m = plural($this->mcount, "mail") . ", "
                 . plural($this->mrecipients, "recipient");
             if (count($this->mpapers) != 0)
                 $m .= ", " . plural($this->mpapers, "paper");
-            $Conf->echoScript("\$\$('mailinfo').innerHTML=\" <span class='barsep'>|</span> " . $m . "\";");
+            $s .= "\$\$('mailinfo').innerHTML=\"<span class='barsep'>·</span>" . $m . "\";";
         }
+        if (!$this->sending && $this->groupable)
+            $s .= "\$('.mail_groupable').show();";
+        $Conf->echoScript($s);
     }
 
     private static function fix_body($prep) {
@@ -185,6 +210,7 @@ class MailSender {
         $cbkey = "c" . join("_", $prep->contacts);
         if ($this->sending && !defval($_REQUEST, $cbkey))
             return;
+        set_time_limit(30);
         $this->echo_prologue();
 
         self::fix_body($prep);
@@ -205,47 +231,51 @@ class MailSender {
 
         echo '<div class="mail"><table>';
         $nprintrows = 0;
-        foreach (array("to", "cc", "bcc", "reply-to", "subject") as $k) {
-            if ($k == "to")
-                $line = "To: " . join(", ", $show_prep->to);
-            else if ($k == "subject")
-                $line = "Subject: " . $show_prep->$k;
-            else
-                $line = @$show_prep->headers[$k];
-            if ($line) {
-                echo " <tr>";
-                if (++$nprintrows > 1)
-                    echo "<td class='mhpad'></td>";
-                else if ($this->sending)
-                    echo "<td class='mhx'></td>";
-                else {
-                    ++$this->cbcount;
-                    echo "<td class='mhcb'><input type='checkbox' class='cb' name='$cbkey' value='1' checked='checked' id='psel", $this->cbcount, "' onclick='pselClick(event,this)' /></td>";
-                }
-                $v = substr($line, strlen($k) + 2);
-                echo '<td class="mhnp">', substr($line, 0, strlen($k)), ":</td>",
-                    '<td class="mhdp">',
-                    htmlspecialchars(MimeText::decode_header($v)),
-                    "</td></tr>\n";
+        foreach (array("To", "cc", "bcc", "reply-to", "Subject") as $k) {
+            if ($k == "To") {
+                $vh = array();
+                foreach ($show_prep->to as $to)
+                    $vh[] = htmlspecialchars(MimeText::decode_header($to));
+                $vh = '<div style="max-width:60em"><span class="nw">' . join(',</span> <span class="nw">', $vh) . '</span></div>';
+            } else if ($k == "Subject")
+                $vh = htmlspecialchars(MimeText::decode_header($show_prep->subject));
+            else if (($line = @$show_prep->headers[$k])) {
+                $k = substr($line, 0, strlen($k));
+                $vh = htmlspecialchars(MimeText::decode_header(substr($line, strlen($k) + 2)));
+            } else
+                continue;
+            echo " <tr>";
+            if (++$nprintrows > 1)
+                echo "<td class='mhpad'></td>";
+            else if ($this->sending)
+                echo "<td class='mhx'></td>";
+            else {
+                ++$this->cbcount;
+                echo '<td class="mhcb"><input type="checkbox" class="cb" name="', $cbkey,
+                    '" value="1" checked="checked" rangetype="mhcb" id="psel', $this->cbcount,
+                    '" onclick="rangeclick(event,this)" /></td>';
             }
+            echo '<td class="mhnp">', $k, ":</td>",
+                '<td class="mhdp">', $vh, "</td></tr>\n";
         }
 
         echo " <tr><td></td><td></td><td class='mhb'><pre class='email'>",
-            preg_replace(',https?://\S+,', '<a href="$0">$0</a>', htmlspecialchars($show_prep->body)),
+            Ht::link_urls(htmlspecialchars($show_prep->body)),
             "</pre></td></tr>\n",
             "<tr><td class='mhpad'></td><td></td><td class='mhpad'></td></tr>",
             "</table></div>\n";
     }
 
     private function process_prep($prep, &$last_prep, $row) {
-        global $Me, $Opt;
-        $mail_differs = ($prep->subject != $last_prep->subject
-                         || $prep->body != $last_prep->body
-                         || @$prep->headers["cc"] != @$last_prep->headers["cc"]
-                         || @$prep->headers["reply-to"] != @$last_prep->headers["reply-to"]);
+        // Don't combine senders if anything differs. Also, don't combine
+        // mails from different papers, unless those mails are to the same
+        // person.
+        $mail_differs = CS61Mailer::preparation_differs($prep, $last_prep);
         $prep_to = $prep->to;
 
-        if ($mail_differs) {
+        if (!$mail_differs)
+            $this->groupable = true;
+        if ($mail_differs || !$this->group) {
             if (!@$last_prep->fake)
                 $this->send_prep($last_prep);
             $last_prep = $prep;
@@ -255,44 +285,52 @@ class MailSender {
 
         if (@$prep->fake || isset($last_prep->contacts[$row->contactId]))
             return false;
-
-        $last_prep->contacts[$row->contactId] = $row->contactId;
-        $this->mrecipients[$row->contactId] = true;
-        $last_prep->to[] = $prep_to;
-        return true;
+        else {
+            $last_prep->contacts[$row->contactId] = $row->contactId;
+            $this->mrecipients[$row->contactId] = true;
+            CS61Mailer::merge_preparation_to($last_prep, $prep_to);
+            return true;
+        }
     }
 
     private function run() {
-        global $Conf, $Opt, $Me, $Error, $subjectPrefix,
-            $mailer_options;
-        $q = $this->recip->query();
+        global $Conf, $Opt, $Me, $Error, $subjectPrefix, $mailer_options;
+
+        $subject = trim(defval($_REQUEST, "subject", ""));
+        if (substr($subject, 0, strlen($subjectPrefix)) != $subjectPrefix)
+            $subject = $subjectPrefix . $subject;
+        $emailBody = $_REQUEST["emailBody"];
+        $template = array("subject" => $subject, "body" => $emailBody);
+        $rest = array("cc" => $_REQUEST["cc"], "reply-to" => $_REQUEST["replyto"],
+                      "pset" => $this->recip->pset, "no_error_quit" => true);
+        $rest = array_merge($rest, $mailer_options);
+
+        $mailer = new CS61Mailer($Me, null, $rest);
+        $prep = $mailer->make_preparation($template, $rest);
+        $paper_sensitive = preg_match('/%[A-Z0-9]+[(%]/', $prep->subject . $prep->body);
+
+        $q = $this->recip->query($paper_sensitive);
         if (!$q)
             return $Conf->errorMsg("Bad recipients value");
         $result = $Conf->qe($q);
         if (!$result)
             return;
+        $recipients = defval($_REQUEST, "recipients", "");
 
-        $subject = trim(defval($_REQUEST, "subject", ""));
-        if (substr($subject, 0, strlen($subjectPrefix)) != $subjectPrefix)
-            $subject = $subjectPrefix . $subject;
         if ($this->sending) {
-            $q = "recipients='" . sqlq($_REQUEST["recipients"])
+            $q = "recipients='" . sqlq($recipients)
                 . "', cc='" . sqlq($_REQUEST["cc"])
                 . "', replyto='" . sqlq($_REQUEST["replyto"])
                 . "', subject='" . sqlq($_REQUEST["subject"])
                 . "', emailBody='" . sqlq($_REQUEST["emailBody"]) . "'";
             if ($Conf->sversion >= 79)
                 $q .= ", q='" . sqlq($_REQUEST["q"]) . "', t='" . sqlq($_REQUEST["t"]) . "'";
-            if (($log_result = Dbl::real_query("insert into MailLog set $q")))
+            if (($log_result = Dbl::query_raw("insert into MailLog set $q")))
                 $this->mailid_text = " #" . $log_result->insert_id;
             $Me->log_activity("Sending mail$this->mailid_text \"$subject\"");
-        }
-        $emailBody = $_REQUEST["emailBody"];
+        } else
+            $rest["no_send"] = true;
 
-        $template = array("subject" => $subject, "body" => $emailBody);
-        $rest = array("cc" => $_REQUEST["cc"], "reply-to" => $_REQUEST["replyto"],
-                      "pset" => $this->recip->pset, "no_error_quit" => true);
-        $rest = array_merge($rest, $mailer_options);
         $mailer = new CS61Mailer;
         $fake_prep = (object) array("subject" => "", "body" => "", "to" => array(),
                                     "contactId" => array(), "fake" => 1);
@@ -303,12 +341,8 @@ class MailSender {
         $preperrors = array();
         while (($row = edb_orow($result))) {
             ++$nrows_done;
-            if ($nrows_done % 5 == 0) {
-                $Conf->echoScript("\$\$('mailcount').innerHTML=\"" . round(100 * $nrows_done / $nrows_left) . "% done.\";");
-                $this->echo_mailinfo();
-            }
 
-            $contact = Contact::make($row);
+            $contact = new Contact($row);
             $mailer->reset($contact, $row, $rest);
             $prep = $mailer->make_preparation($template, $rest);
 
@@ -330,6 +364,8 @@ class MailSender {
                 }
             }
 
+            if ($nwarnings != $mailer->nwarnings() || $nrows_done % 5 == 0)
+                $this->echo_mailinfo($nrows_done, $nrows_left);
             if ($nwarnings != $mailer->nwarnings()) {
                 $this->echo_prologue();
                 $nwarnings = $mailer->nwarnings();
@@ -339,17 +375,14 @@ class MailSender {
         }
 
         $this->process_prep($fake_prep, $last_prep, (object) array());
-        $this->echo_mailinfo();
+        $this->echo_mailinfo($nrows_done, $nrows_left);
 
         if (!$this->started && !count($preperrors))
             return $Conf->errorMsg("No users match “" . $this->recip->unparse() . "” for that search.");
         else if (!$this->started)
             return false;
-        else if (!$this->sending) {
-            echo "<div class='aa'>",
-                Ht::submit("send", "Send"), " &nbsp; ", Ht::submit("cancel", "Cancel"),
-                "</div>\n";
-        }
+        else if (!$this->sending)
+            $this->echo_actions();
         echo "</div></form>";
         $Conf->echoScript("fold('mail', null);");
         $Conf->footer();
@@ -414,14 +447,13 @@ else
 
 
 // Check or send
-if (defval($_REQUEST, "loadtmpl"))
+if (defval($_REQUEST, "loadtmpl") || defval($_REQUEST, "cancel"))
     /* do nothing */;
-else if (defval($_REQUEST, "check") && check_post())
-    MailSender::check($recip);
-else if (defval($_REQUEST, "cancel"))
-    /* do nothing */;
-else if (defval($_REQUEST, "send") && check_post())
+else if (defval($_REQUEST, "send") && !$recip->error && check_post())
     MailSender::send($recip);
+else if ((@$_REQUEST["check"] || @$_REQUEST["group"] || @$_REQUEST["ungroup"])
+         && !$recip->error && check_post())
+    MailSender::check($recip);
 
 
 if (isset($_REQUEST["monreq"])) {
@@ -467,33 +499,40 @@ echo Ht::select("template", $tmpl, $_REQUEST["template"], array("onchange" => "h
  <span class='hint'>Templates are mail texts tailored for common conference tasks.</span>
 </div>
 
-<div class='mail' style='float:left;margin:4px 1em 12px 0'><table>
- <tr><td class='mhnp'>To:</td><td class='mhdd'>",
+<div class='mail' style='float:left;margin:4px 1em 12px 0'><table>\n";
+
+// ** TO
+echo '<tr><td class="mhnp">To:</td><td class="mhdd">',
     $recip->selectors(),
     "<div class='g'></div>\n";
 
 // paper selection
-echo "<div id='foldpsel' class='fold8c fold9o'><table class='fx9'><tr><td>",
+echo '<div id="foldpsel" class="fold8c fold9o fold10c">';
+echo '<table class="fx9"><tr><td>',
     Ht::checkbox("plimit", 1, isset($_REQUEST["plimit"]),
                   array("id" => "plimit",
                         "onchange" => "fold('psel', !this.checked, 8)")),
     "&nbsp;</td><td>", Ht::label("Choose individual papers", "plimit");
+echo "<span class='fx8'>:</span><br /><div class='fx8'>";
+$q = defval($_REQUEST, "q", "(All)");
+echo "Search&nbsp; ",
+    Ht::entry("q", @$_REQUEST["q"],
+              array("id" => "q", "hottemptext" => "(All)",
+                    "class" => "hotcrp_searchbox", "size" => 36,
+                    "title" => "Enter paper numbers or search terms")),
+    " &nbsp;in &nbsp;",
+    Ht::select("t", $tOpt, $_REQUEST["t"], array("id" => "t")),
+    "</div></td></tr></table>\n";
+
+echo '<div class="fx9 g"></div></div>';
+
 $Conf->footerScript("fold(\"psel\",!\$\$(\"plimit\").checked,8);"
                     . "setmailpsel(\$\$(\"recipients\"))");
-echo "<span class='fx8'>:</span><br />
-<div class='fx8'>";
-$q = defval($_REQUEST, "q", "(All)");
-$q = ($q == "" ? "(All)" : $q);
-echo "Search&nbsp; <input id='q' class='",
-    ($q == "(All)" ? "temptext" : "temptextoff"),
-    "' type='text' size='36' name='q' value=\"", htmlspecialchars($q), "\" title='Enter paper numbers or search terms' /> &nbsp;in &nbsp;",
-    Ht::select("t", $tOpt, $_REQUEST["t"], array("id" => "t")),
-    "</div>
-   </td></tr></table>
-<div class='g fx9'></div></div></td>
-</tr>\n";
+
+echo "</td></tr>\n";
 $Conf->footerScript("mktemptext('q','(All)')");
 
+// ** CC, REPLY-TO
 if ($Me->privChair) {
     foreach (Mailer::$email_fields as $lcfield => $field)
         if ($lcfield !== "to" && $lcfield !== "bcc") {
@@ -507,6 +546,7 @@ if ($Me->privChair) {
         }
 }
 
+// ** SUBJECT
 echo "  <tr><td class='mhnp'>Subject:</td><td class='mhdp'>",
     "<tt>[", htmlspecialchars($Opt["shortName"]), "]&nbsp;</tt><input type='text' class='textlite-tt' name='subject' value=\"", htmlspecialchars($_REQUEST["subject"]), "\" size='64' /></td></tr>
 

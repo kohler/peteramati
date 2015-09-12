@@ -134,7 +134,7 @@ class MailRecipients {
         // build query
         $where[] = "email not regexp '^anonymous[0-9]*\$'";
         return "select " . join(", ", $columns)
-            . " from ContactInfo c"
+            . " from ContactInfo c\n"
             . join(" ", $repojoin)
             . " where " . join(" and ", $where) . " order by email";
     }
