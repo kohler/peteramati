@@ -832,10 +832,10 @@ function quicklinks($id, $baseUrl, $args, $listtype) {
 
 function goPaperForm($baseUrl = null, $args = array()) {
     global $Conf, $Me, $CurrentList;
-    if (!$Me->valid())
-	return "";
+    if ($Me->is_empty())
+	    return "";
     if ($baseUrl === null)
-	$baseUrl = ($Me->isPC && $Conf->setting("rev_open") ? "review" : "paper");
+	    $baseUrl = ($Me->isPC && $Conf->setting("rev_open") ? "review" : "paper");
     $x = "<form class='gopaper' action='" . hoturl($baseUrl) . "' method='get' accept-charset='UTF-8'><div class='inform'>";
     $x .= "<input id='quicksearchq' class='textlite temptext' type='text' size='10' name='p' value='(All)' title='Enter paper numbers or search terms' />";
     $Conf->footerScript("mktemptext('quicksearchq','(All)')");
