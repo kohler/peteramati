@@ -660,6 +660,10 @@ function echo_commit($Info) {
         $key = "this commit";
     $value = Ht::select("newcommit", $sel, $Info->commit_hash(),
                         array("onchange" => "jQuery(this).closest('form').submit()"));
+    if ($Me != $User) {
+        $x = $Info->is_grading_commit() ? "" : "font-weight:bold";
+        $value .= " " . Ht::submit("grade", "Grade", array("style" => $x));
+    }
 
     // view options
     $fold_viewoptions = !isset($_REQUEST["tab"]) && !isset($_REQUEST["wdiff"]);
