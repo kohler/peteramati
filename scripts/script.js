@@ -1985,20 +1985,21 @@ function run61(button, opt) {
     function ansi_combine(a1, a2) {
         var m, i, a;
         if ((m = a2.match(/^\x1b\[([\d;]+)m$/))) {
-            a1 = a1 || "\x1b[0m";
+            a1 = a1 ? a1.substring(2, a1.length - 1) + ";" : "0;";
             a = m[1].split(/;/);
             for (i = 0; i < a.length; ++i) {
                 if (a[i] == "")
                     /* do nothing */;
                 else if (+a[i] == 0)
-                    a1 = "\x1b[0m";
+                    a1 = "0;";
                 else if (+a[i] <= 9)
-                    a1 = a1.replace(new RegExp(";" + a[i] + "(?=[;m])"), "").replace("m", ";" + a[i]);
+                    a1 = a1.replace(";" + a[i] + ";", ";") + a[i] + ";";
                 else if (+a[i] <= 29)
-                    a1 = a1.replace(new RegExp(";" + (a[i] - 20) + "(?=[;m])"), "");
+                    a1 = a1.replace(";" + (a[i] - 20) + ";", ";");
                 else
-                    a1 = a1.replace(new RegExp(";" + a[i].charAt(0) + "\\d(?=[;m])"), "").replace("m", ";" + a[i]);
+                    a1 = a1.replace(new RegExp(";" + a[i].charAt(0) + "\\d;"), ";") + a[i] + ";";
             }
+            a1 = "\x1b[" + a1.substring(0, a1.length - 1) + "m";
         }
         return a1;
     }
