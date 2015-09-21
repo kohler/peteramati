@@ -1950,21 +1950,28 @@ function run61(button, opt) {
             text = document.createTextNode(text);
         else if (text instanceof jQuery)
             text = text[0];
-        if (styles) {
-            var sclass = [],
-                fb = styles.rv ? {fg: "bg", bg: "fg"} : {fg: "fg", bg: "bg"};
-            if (styles[fb.fg] != null && styles[fb.fg] != 9)
-                sclass.push("ansifg" + styles[fb.fg]);
-            if (styles[fb.bg] != null && styles[fb.bg] != 9)
-                sclass.push("ansibg" + styles[fb.bg]);
-            if (styles.b)
+        if (styles && styles !== "\x1b[0m") {
+            var sclass = [], col = [], rv = 0, m;
+            if ((m = styles.match(/;3\d[;m]/)))
+                col[0] = m[0].charAt(2);
+            if ((m = styles.match(/;4\d[;m]/)))
+                col[1] = m[0].charAt(2);
+            if (/;1[;m]/.test(styles))
                 sclass.push("ansib");
-            if (styles.i)
+            if (/;3[;m]/.test(styles))
                 sclass.push("ansii");
-            if (styles.u)
+            if (/;4[;m]/.test(styles))
                 sclass.push("ansiu");
-            if (styles.rv)
+            if (/;7[;m]/.test(styles)) {
                 sclass.push("ansirv");
+                rv = 1;
+            }
+            if (/;9[;m]/.test(styles))
+                sclass.push("ansis");
+            if (col[rv] != null)
+                sclass.push("ansifg" + col[rv]);
+            if (col[1-rv] != null)
+                sclass.push("ansibg" + col[1-rv]);
             if (sclass.length) {
                 var decor = document.createElement("span");
                 decor.className = sclass.join(" ");
@@ -1975,56 +1982,117 @@ function run61(button, opt) {
         node.appendChild(text);
     }
 
-    function render_line(line, node, continuation) {
-        var m, filematch, dir, a, i, x, isnew = !node;
-        node = node || document.createElement("span");
-
-        var linerest = null;
-        if (line.length > 132) {
-            linerest = line.substr(132);
-            line = line.substr(0, 132) + "…\n";
-        }
-
-        if (!continuation && (m = line.match(/^([^:\s]+):(\d+):/))) {
-            filematch = jQuery(".filediff61[run61file='" + m[1] + "']");
-            if (!filematch.length && (dir = therun.attr("run61directory")))
-                filematch = jQuery(".filediff61[run61file='" + dir + "/" + m[1] + "']");
-            if (filematch.length) {
-                x = "Lb" + m[2] + "_" + filematch.attr("run61fileid");
-                if (document.getElementById(x)) {
-                    a = jQuery("<a href=\"#" + x + "\" onclick=\"return gotoline61(this)\"></a>");
-                    a.text(m[1] + ":" + m[2]);
-                    addlinepart(node, a);
-                    line = line.substr(1 + m[1].length + m[2].length);
-                }
-            }
-        }
-
-        while ((m = line.match(/^(.*?)\x1b\[([\d;]+)m([^]*)$/))) {
-            if (m[1] !== "")
-                addlinepart(node, m[1]);
-            a = m[2].split(/;/);
+    function ansi_combine(a1, a2) {
+        var m, i, a;
+        if ((m = a2.match(/^\x1b\[([\d;]+)m$/))) {
+            a1 = a1 || "\x1b[0m";
+            a = m[1].split(/;/);
             for (i = 0; i < a.length; ++i) {
                 if (a[i] == "")
                     /* do nothing */;
                 else if (+a[i] == 0)
-                    styles = null;
-                else if (run61.ansimap[+a[i]] != null)
-                    styles = jQuery.extend({}, styles, run61.ansimap[+a[i]]);
+                    a1 = "\x1b[0m";
+                else if (+a[i] <= 9)
+                    a1 = a1.replace(new RegExp(";" + a[i] + "(?=[;m])"), "").replace("m", ";" + a[i]);
+                else if (+a[i] <= 29)
+                    a1 = a1.replace(new RegExp(";" + (a[i] - 20) + "(?=[;m])"), "");
+                else
+                    a1 = a1.replace(new RegExp(";" + a[i].charAt(0) + "\\d(?=[;m])"), "").replace("m", ";" + a[i]);
             }
-            line = m[3];
         }
-
-        addlinepart(node, line);
-        if (isnew)
-            thepre[0].insertBefore(node, thepre[0].lastChild);
-
-        if (linerest !== null)
-            render_line(linerest, null, true);
+        return a1;
     }
 
     function ends_with_newline(str) {
         return str !== "" && str.charAt(str.length - 1) === "\n";
+    }
+
+    function clean_cr(line) {
+        var curstyle = styles || "\x1b[0m",
+            lines = line.split(/\r/),
+            lineno, i, m, r = [];
+        for (lineno = 0; lineno < lines.length; ++lineno) {
+            var g = [], glen = 0, j;
+            var lsplit = lines[lineno].split(/(\x1b\[[\d;]+m)/);
+            for (j = 0; j < lsplit.length; j += 2) {
+                if (lsplit[j] !== "") {
+                    g.push(curstyle, lsplit[j]);
+                    glen += lsplit[j].length;
+                }
+                if (j + 1 < lsplit.length)
+                    curstyle = ansi_combine(curstyle, m[2]);
+            }
+            var rpos = 0;
+            while (rpos < r.length && glen >= r[rpos + 1].length) {
+                glen -= r[rpos + 1].length;
+                rpos += 2;
+            }
+            if (g.length && !/\n$|\x1b\[0?K/.test(g[g.length - 1]))
+                while (rpos < r.length) {
+                    g.push(r[rpos], r[rpos + 1].substr(glen));
+                    glen = 0;
+                    rpos += 2;
+                }
+            r = g;
+        }
+        return r.join("");
+    }
+
+    function add_file_link(node, file, line, link) {
+        var filematch = $(".filediff61[run61file='" + file + "']"), dir;
+        if (!filematch.length && (dir = therun.attr("run61directory")))
+            filematch = $(".filediff61[run61file='" + dir + "/" + file + "']");
+        if (filematch.length) {
+            var anchor = "Lb" + line + "_" + filematch.attr("run61fileid");
+            if (document.getElementById(anchor)) {
+                var a = $("<a href=\"#" + anchor + "\" onclick=\"return gotoline61(this)\"></a>");
+                a.text(link);
+                addlinepart(node, a);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function render_line(line, node) {
+        var m, filematch, dir, a, i, x, isnew = !node, displaylen = 0;
+        node = node || document.createElement("span");
+
+        if (/\r/.test(line))
+            line = clean_cr(line);
+
+        if (((m = line.match(/^([^:\s]+):(\d+)(?=:)/))
+             || (m = line.match(/^file \"(.*?)\", line (\d+)/i)))
+            && add_file_link(node, m[1], m[2], m[0])) {
+            displaylen = m[0].length;
+            line = line.substr(displaylen);
+        }
+
+        var render;
+        while (line !== "") {
+            render = line;
+            if ((m = line.match(/^(.*?)(\x1b\[[\d;]+m|\x1b\[\d*K)([^]*)$/))) {
+                if (m[1] === "") {
+                    styles = ansi_combine(styles, m[2]);
+                    line = m[3];
+                    continue;
+                }
+                render = m[1];
+            }
+            if (displaylen + render.length > 132) {
+                render = render.substr(0, 132 - displaylen);
+                addlinepart(node, render + "…\n");
+                isnew && thepre[0].insertBefore(node, thepre[0].lastChild);
+                node = document.createElement("span");
+                isnew = true;
+                displaylen = 0;
+            } else {
+                addlinepart(node, render);
+                displaylen += render.length;
+            }
+            line = line.substr(render.length);
+        }
+        isnew && thepre[0].insertBefore(node, thepre[0].lastChild);
     }
 
     function append(str) {
@@ -2032,12 +2100,9 @@ function run61(button, opt) {
 
         // hide newline on last line
         var lines = str.split(/^/m);
-        if (lines.length && lines[lines.length - 1] === "")
+        if (lines[lines.length - 1] === "")
             lines.pop();
-        var last = lines[lines.length - 1];
-        var lastfull = ends_with_newline(last);
-        if (lastfull)
-            lines[lines.length - 1] = last.substring(0, last.length - 1);
+        var lastfull = ends_with_newline(lines[lines.length - 1]);
 
         var node = thepre[0].lastChild.previousSibling, str;
         if (node && (str = node.getAttribute("run61partline")) !== null
@@ -2052,10 +2117,15 @@ function run61(button, opt) {
             node = null;
         }
 
-        var laststyles = styles;
-        for (i = 0; i < lines.length; ++i) {
+        var laststyles = styles, i, j, last;
+        for (i = 0; i < lines.length; i = j) {
             laststyles = styles;
-            render_line(lines[i], i ? null : node);
+            last = lines[i];
+            for (j = i + 1; !ends_with_newline(last) && j < lines.length; ++j)
+                last += lines[j];
+            if (j == lines.length && lastfull)
+                last = last.substring(0, last.length - 1);
+            render_line(last, i ? null : node);
         }
 
         if (!lastfull) {
@@ -2182,17 +2252,6 @@ function run61(button, opt) {
     send();
     return false;
 }
-
-run61.ansimap = {
-    "1": {b: true}, "3": {i: true}, "4": {u: true}, "7": {rv: true},
-    "9": {s: true},
-    "22": {b: false}, "23": {i: false}, "24": {u: false}, "27": {rv: false},
-    "29": {s: false},
-    "30": {fg: 0}, "31": {fg: 1}, "32": {fg: 2}, "33": {fg: 3},
-    "34": {fg: 4}, "35": {fg: 5}, "36": {fg: 6}, "37": {fg: 7}, "39": {fg: 9},
-    "40": {bg: 0}, "41": {bg: 1}, "42": {bg: 2}, "43": {bg: 3},
-    "44": {bg: 4}, "45": {bg: 5}, "46": {bg: 6}, "47": {bg: 7}, "49": {bg: 9}
-};
 
 function runmany61() {
     var $manybutton = jQuery("#runmany61");
