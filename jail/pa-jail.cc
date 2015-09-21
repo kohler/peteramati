@@ -1014,24 +1014,206 @@ void jaildirinfo::check() {
     assert(dir.substr(0, permdir.length()) == permdir);
 }
 
+
+class jailownerinfo {
+  public:
+    uid_t owner;
+    gid_t group;
+    std::string owner_home;
+    std::string owner_sh;
+
+    jailownerinfo();
+    void init(const char* owner_name);
+    void exec(int argc, char** argv, jaildirinfo& jaildir, int caller_tty);
+};
+
+jailownerinfo::jailownerinfo()
+    : owner(ROOT), group(ROOT) {
+}
+
+void jailownerinfo::init(const char* owner_name) {
+    if (strlen(owner_name) >= 1024) {
+        fprintf(stderr, "%s: Username too long\n", owner_name);
+        exit(1);
+    }
+
+    struct passwd* pwnam = getpwnam(owner_name);
+    if (!pwnam) {
+        fprintf(stderr, "%s: No such user\n", owner_name);
+        exit(1);
+    }
+
+    owner = pwnam->pw_uid;
+    group = pwnam->pw_gid;
+    if (strcmp(pwnam->pw_dir, "/") == 0)
+        owner_home = "/home/nobody";
+    else if (strncmp(pwnam->pw_dir, "/home/", 6) == 0)
+        owner_home = pwnam->pw_dir;
+    else {
+        fprintf(stderr, "%s: Home directory %s not under /home\n", owner_name, pwnam->pw_dir);
+        exit(1);
+    }
+
+    if (strcmp(pwnam->pw_shell, "/bin/bash") == 0
+        || strcmp(pwnam->pw_shell, "/bin/sh") == 0
+        || check_shell(pwnam->pw_shell))
+        owner_sh = pwnam->pw_shell;
+    else {
+        fprintf(stderr, "%s: Shell %s not allowed by /etc/shells\n", owner_name, pwnam->pw_shell);
+        exit(1);
+    }
+
+    if (owner == ROOT) {
+        fprintf(stderr, "%s: Jail user cannot be root\n", owner_name);
+        exit(1);
+    }
+}
+
+void jailownerinfo::exec(int, char** argv, jaildirinfo& jaildir,
+                         int caller_tty) {
+    // enter the jail
+    if (verbose)
+        fprintf(verbosefile, "cd %s\n", jaildir.dir.c_str());
+    if (!dryrun && chdir(jaildir.dir.c_str()) != 0)
+        perror_exit(jaildir.dir.c_str());
+    if (verbose)
+        fprintf(verbosefile, "chroot .\n");
+    if (!dryrun && chroot(".") != 0)
+        perror_exit("chroot");
+
+    // reduce privileges permanently
+    if (verbose)
+        fprintf(verbosefile, "su %s\n", uid_to_name(owner));
+    if (!dryrun && setgid(group) != 0)
+        perror_exit("setgid");
+    if (!dryrun && setuid(owner) != 0)
+        perror_exit("setuid");
+
+    // create a pty
+    int ptymaster = -1;
+    char* ptyslavename = NULL;
+    if (!dryrun && makepty) {
+        if ((ptymaster = posix_openpt(O_RDWR)) == -1)
+            perror_exit("posix_openpt");
+        if (grantpt(ptymaster) == -1)
+            perror_exit("grantpt");
+        if (unlockpt(ptymaster) == -1)
+            perror_exit("unlockpt");
+        if ((ptyslavename = ptsname(ptymaster)) == NULL)
+            perror_exit("ptsname");
+    }
+    if (makepty && verbose)
+        fprintf(verbosefile, "make-pty %s\n", ptyslavename);
+
+    // change into their home directory
+    char buf[8192];
+    sprintf(buf, "HOME=%s", owner_home.c_str());
+    if (verbose)
+        fprintf(verbosefile, "cd %s\n", &buf[5]);
+    if (!dryrun && chdir(&buf[5]) != 0)
+        perror_exit(&buf[5]);
+
+    // adjust environment; make sure we have a PATH
+    const char* path = "PATH=/usr/local/bin:/bin:/usr/bin";
+    const char* ld_library_path = NULL;
+    {
+        extern char** environ;
+        for (char** eptr = environ; *eptr; ++eptr)
+            if (strncmp(*eptr, "PATH=", 5) == 0)
+                path = *eptr;
+            else if (strncmp(*eptr, "LD_LIBRARY_PATH=", 16) == 0)
+                ld_library_path = *eptr;
+    }
+    const char* newenv[4] = { path };
+    int newenvpos = 1;
+    if (ld_library_path)
+        newenv[newenvpos++] = ld_library_path;
+    newenv[newenvpos++] = buf; // HOME
+    newenv[newenvpos++] = NULL;
+
+    // create command
+    const char* newargv[6] = { owner_sh.c_str() };
+    int newargvpos = 1;
+    if (makepty)
+        newargv[newargvpos++] = "-l";
+    newargv[newargvpos++] = "-c";
+    newargv[newargvpos++] = argv[optind + 2];
+    newargv[newargvpos++] = NULL;
+
+    if (!dryrun) {
+        int f = open(owner_sh.c_str(), O_RDONLY);
+        if (f < 0)
+            perror_exit(("open" + owner_sh).c_str());
+        close(f);
+    }
+
+    // close stdin (jailfiles), reopen to /dev/null
+    if (caller_tty < 0) {
+        close(0);
+        (void) open("/dev/null", O_RDONLY);
+    } else if (caller_tty != 0) {
+        dup2(caller_tty, 0);
+        close(caller_tty);
+    }
+
+    if (verbose) {
+        for (int i = 0; newenv[i]; ++i)
+            fprintf(verbosefile, "%s ", newenv[i]);
+        for (int i = 0; i < newargvpos - 2; ++i)
+            fprintf(verbosefile, "%s ", newargv[i]);
+        fprintf(verbosefile, "'%s'\n", newargv[newargvpos - 2]);
+    }
+
+    if (!dryrun) {
+        pid_t child = (makepty ? fork() : 0);
+        if (child < 0)
+            perror_exit("fork");
+        else if (child == 0) {
+            if (makepty) {
+                if (setsid() == -1)
+                    perror_exit("setsid");
+                int ptyslave = open(ptyslavename, O_RDWR);
+                if (ptyslave == -1)
+                    perror_exit(ptyslavename);
+#ifdef TIOCGWINSZ
+                struct winsize ws;
+                ioctl(ptyslave, TIOCGWINSZ, &ws);
+                ws.ws_row = 24;
+                ws.ws_col = 80;
+                ioctl(ptyslave, TIOCSWINSZ, &ws);
+#endif
+                struct termios tty;
+                if (tcgetattr(ptyslave, &tty) >= 0) {
+                    tty.c_oflag = 0; // no NL->NLCR xlation, no other proc.
+                    tcsetattr(ptyslave, TCSANOW, &tty);
+                }
+                dup2(ptyslave, STDOUT_FILENO);
+                dup2(ptyslave, STDERR_FILENO);
+                close(ptymaster);
+                close(ptyslave);
+            }
+            // restore all signals to their default actions
+            // (e.g., PHP may have ignored SIGPIPE; don't want that
+            // to propagate to student code!)
+            for (int sig = 1; sig < NSIG; ++sig)
+                signal(sig, SIG_DFL);
+            if (execve(newargv[0], (char* const*) newargv,
+                       (char* const*) newenv) != 0)
+                perror_exit(("exec" + owner_sh).c_str());
+        } else {
+            assert(makepty);
+            handle_child(child, ptymaster);
+        }
+    }
+}
+
+
 static __attribute__((noreturn)) void usage() {
     fprintf(stderr, "Usage: pa-jail init [-n] [-f FILES] [-S SKELETON] JAILDIR [USER]\n");
     fprintf(stderr, "       pa-jail run [-ntL] [-f FILES] [-S SKELETON] JAILDIR USER COMMAND\n");
     fprintf(stderr, "       pa-jail mv OLDDIR NEWDIR\n");
     fprintf(stderr, "       pa-jail rm [-nf] JAILDIR\n");
     exit(1);
-}
-
-static __attribute__((noreturn)) void help() {
-    printf("pa-jail sets up a jail and optionally runs a command in it.\n\
-\n\
-Arguments:\n\
-  -d          Delete jail.\n\
-  -l DIR      Use DIR as skeleton.\n\
-  -V          Be more verbose.\n\
-  -n          Dry run.\n\
-  -t          Create a pty.\n");
-    exit(0);
 }
 
 static struct option longoptions_before[] = {
@@ -1096,9 +1278,7 @@ int main(int argc, char** argv) {
                 filesarg = optarg;
             else if (ch == 'r')
                 dokill = true;
-            else if (ch == 'H')
-                help();
-            else
+            else /* if (ch == 'H') */
                 usage();
         }
         if (action != do_start)
@@ -1138,48 +1318,9 @@ int main(int argc, char** argv) {
         makepty = dolive = false;
 
     // parse user
-    uid_t owner = ROOT;
-    gid_t group = ROOT;
-    std::string owner_home;
-    std::string owner_sh = "/bin/sh";
-    if ((action == do_init || action == do_run) && optind + 1 < argc) {
-        const char* owner_name = argv[optind + 1];
-        if (strlen(owner_name) >= 1024) {
-            fprintf(stderr, "%s: Username too long\n", owner_name);
-            exit(1);
-        }
-
-        struct passwd* pwnam = getpwnam(owner_name);
-        if (!pwnam) {
-            fprintf(stderr, "%s: No such user\n", owner_name);
-            exit(1);
-        }
-
-        owner = pwnam->pw_uid;
-        group = pwnam->pw_gid;
-        if (strcmp(pwnam->pw_dir, "/") == 0)
-            owner_home = "/home/nobody";
-        else if (strncmp(pwnam->pw_dir, "/home/", 6) == 0)
-            owner_home = pwnam->pw_dir;
-        else {
-            fprintf(stderr, "%s: Home directory %s not under /home\n", owner_name, pwnam->pw_dir);
-            exit(1);
-        }
-
-        if (strcmp(pwnam->pw_shell, "/bin/bash") == 0
-            || strcmp(pwnam->pw_shell, "/bin/sh") == 0
-            || check_shell(pwnam->pw_shell))
-            owner_sh = pwnam->pw_shell;
-        else {
-            fprintf(stderr, "%s: Shell %s not allowed by /etc/shells\n", owner_name, pwnam->pw_shell);
-            exit(1);
-        }
-
-        if (owner == ROOT) {
-            fprintf(stderr, "%s: Jail user cannot be root\n", owner_name);
-            exit(1);
-        }
-    }
+    jailownerinfo jailuser;
+    if ((action == do_init || action == do_run) && optind + 1 < argc)
+        jailuser.init(argv[optind + 1]);
 
     // open tty as current user
     int caller_tty = -1;
@@ -1291,21 +1432,21 @@ int main(int argc, char** argv) {
         copy_samedev = false;
 
     // create the home directory
-    if (!owner_home.empty()) {
+    if (!jailuser.owner_home.empty()) {
         if (x_ensuredir((jaildir.dir + "/home").c_str(), 0755) < 0)
             perror_exit((jaildir.dir + "/home").c_str());
-        std::string jailhome = jaildir.dir + owner_home;
+        std::string jailhome = jaildir.dir + jailuser.owner_home;
         int r = x_ensuredir(jailhome.c_str(), 0700);
-        uid_t want_owner = action == do_init ? caller_owner : owner;
-        gid_t want_group = action == do_init ? caller_group : group;
+        uid_t want_owner = action == do_init ? caller_owner : jailuser.owner;
+        gid_t want_group = action == do_init ? caller_group : jailuser.group;
         if (r < 0
             || (r > 0 && x_lchown(jailhome.c_str(), want_owner, want_group)))
             perror_exit(jailhome.c_str());
     }
 
     // set ownership
-    char buf[8192];
     if (action == do_run) {
+        char buf[8192];
         strcpy(buf, jaildir.dir.c_str());
         chown_recursive(buf, 0, ROOT, ROOT);
     }
@@ -1324,141 +1465,8 @@ int main(int argc, char** argv) {
     jaildir.parentfd = -1;
 
     // maybe execute a command in the jail
-    if (optind + 2 < argc) {
-        // enter the jail
-        if (verbose)
-            fprintf(verbosefile, "cd %s\n", jaildir.dir.c_str());
-        if (!dryrun && chdir(jaildir.dir.c_str()) != 0)
-            perror_exit(jaildir.dir.c_str());
-        if (verbose)
-            fprintf(verbosefile, "chroot .\n");
-        if (!dryrun && chroot(".") != 0)
-            perror_exit("chroot");
-
-        // reduce privileges permanently
-        if (verbose)
-            fprintf(verbosefile, "su %s\n", uid_to_name(owner));
-        if (!dryrun && setgid(group) != 0)
-            perror_exit("setgid");
-        if (!dryrun && setuid(owner) != 0)
-            perror_exit("setuid");
-
-        // create a pty
-        int ptymaster = -1;
-        char* ptyslavename = NULL;
-        if (!dryrun && makepty) {
-            if ((ptymaster = posix_openpt(O_RDWR)) == -1)
-                perror_exit("posix_openpt");
-            if (grantpt(ptymaster) == -1)
-                perror_exit("grantpt");
-            if (unlockpt(ptymaster) == -1)
-                perror_exit("unlockpt");
-            if ((ptyslavename = ptsname(ptymaster)) == NULL)
-                perror_exit("ptsname");
-        }
-        if (makepty && verbose)
-            fprintf(verbosefile, "make-pty %s\n", ptyslavename);
-
-        // change into their home directory
-        sprintf(buf, "HOME=%s", owner_home.c_str());
-        if (verbose)
-            fprintf(verbosefile, "cd %s\n", &buf[5]);
-        if (!dryrun && chdir(&buf[5]) != 0)
-            perror_exit(&buf[5]);
-
-        // adjust environment; make sure we have a PATH
-        const char* path = "PATH=/usr/local/bin:/bin:/usr/bin";
-        const char* ld_library_path = NULL;
-        {
-            extern char** environ;
-            for (char** eptr = environ; *eptr; ++eptr)
-                if (strncmp(*eptr, "PATH=", 5) == 0)
-                    path = *eptr;
-                else if (strncmp(*eptr, "LD_LIBRARY_PATH=", 16) == 0)
-                    ld_library_path = *eptr;
-        }
-        const char* newenv[4] = { path };
-        int newenvpos = 1;
-        if (ld_library_path)
-            newenv[newenvpos++] = ld_library_path;
-        newenv[newenvpos++] = buf; // HOME
-        newenv[newenvpos++] = NULL;
-
-        // create command
-        const char* newargv[6] = { owner_sh.c_str() };
-        int newargvpos = 1;
-        if (makepty)
-            newargv[newargvpos++] = "-l";
-        newargv[newargvpos++] = "-c";
-        newargv[newargvpos++] = argv[optind + 2];
-        newargv[newargvpos++] = NULL;
-
-        if (!dryrun) {
-            int f = open(owner_sh.c_str(), O_RDONLY);
-            if (f < 0)
-                perror_exit(("open" + owner_sh).c_str());
-            close(f);
-        }
-
-        // close stdin (jailfiles), reopen to /dev/null
-        if (caller_tty < 0) {
-            close(0);
-            (void) open("/dev/null", O_RDONLY);
-        } else if (caller_tty != 0) {
-            dup2(caller_tty, 0);
-            close(caller_tty);
-        }
-
-        if (verbose) {
-            for (int i = 0; newenv[i]; ++i)
-                fprintf(verbosefile, "%s ", newenv[i]);
-            for (int i = 0; i < newargvpos - 2; ++i)
-                fprintf(verbosefile, "%s ", newargv[i]);
-            fprintf(verbosefile, "'%s'\n", newargv[newargvpos - 2]);
-        }
-
-        if (!dryrun) {
-            pid_t child = (makepty ? fork() : 0);
-            if (child < 0)
-                perror_exit("fork");
-            else if (child == 0) {
-                if (makepty) {
-                    if (setsid() == -1)
-                        perror_exit("setsid");
-                    int ptyslave = open(ptyslavename, O_RDWR);
-                    if (ptyslave == -1)
-                        perror_exit(ptyslavename);
-#ifdef TIOCGWINSZ
-                    struct winsize ws;
-                    ioctl(ptyslave, TIOCGWINSZ, &ws);
-                    ws.ws_row = 24;
-                    ws.ws_col = 80;
-                    ioctl(ptyslave, TIOCSWINSZ, &ws);
-#endif
-                    struct termios tty;
-                    if (tcgetattr(ptyslave, &tty) >= 0) {
-                        tty.c_oflag = 0; // no NL->NLCR xlation, no other proc.
-                        tcsetattr(ptyslave, TCSANOW, &tty);
-                    }
-                    dup2(ptyslave, STDOUT_FILENO);
-                    dup2(ptyslave, STDERR_FILENO);
-                    close(ptymaster);
-                    close(ptyslave);
-                }
-                // restore all signals to their default actions
-                // (e.g., PHP may have ignored SIGPIPE; don't want that
-                // to propagate to student code!)
-                for (int sig = 1; sig < NSIG; ++sig)
-                    signal(sig, SIG_DFL);
-                if (execve(newargv[0], (char* const*) newargv,
-                           (char* const*) newenv) != 0)
-                    perror_exit(("exec" + owner_sh).c_str());
-            } else {
-                assert(makepty);
-                handle_child(child, ptymaster);
-            }
-        }
-    }
+    if (optind + 2 < argc)
+        jailuser.exec(argc, argv, jaildir, caller_tty);
 
     exit(0);
 }
