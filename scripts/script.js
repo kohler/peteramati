@@ -1789,8 +1789,7 @@ function runfold61(name) {
     var therun = jQuery("#run61_" + name), thebutton;
     if (therun.attr("run61timestamp") && !therun.is(":visible")) {
         thebutton = jQuery(".runner61[value='" + name + "']")[0];
-        run61(thebutton, +therun.attr("run61timestamp"));
-        therun.attr("run61timestamp", "");
+        run61(thebutton, {unfold: true});
     } else
         fold61(therun, jQuery("#run61out_" + name));
     return false;
@@ -1901,19 +1900,17 @@ function run61(button, opt) {
         therun = jQuery("#run61_" + button.value),
         thepre = therun.find("pre"), checkt;
 
-    if (typeof opt === "number")
-        checkt = opt;
     if (typeof opt !== "object")
         opt = {};
-    checkt = checkt || opt.checkt;
-
-    if (!checkt) {
+    if (opt.unfold && therun.attr("run61timestamp"))
+        checkt = +therun.attr("run61timestamp");
+    else {
         if (form.prop("outstanding"))
             return true;
         form.find("button").prop("disabled", true);
         form.prop("outstanding", true);
-        therun.attr("run61timestamp", "");
     }
+    therun.removeAttr("run61timestamp");
 
     fold61(therun, jQuery("#run61out_" + button.value).show(), true);
     if (!checkt && !opt.noclear)
@@ -2251,10 +2248,9 @@ function run61(button, opt) {
         append_html(opt.headline);
     else if (opt.headline)
         append("\x1b[01;37m" + opt.headline + "\x1b[0m\n");
-    if (therun.attr("run61data")) {
+    if (opt.unfold && therun.attr("run61data"))
         append(therun.attr("run61data"));
-        therun.removeAttr("run61data");
-    }
+    therun.removeAttr("run61data");
 
     send();
     return false;
