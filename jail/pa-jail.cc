@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <sys/mount.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,6 +50,7 @@ static bool verbose = false;
 static bool dryrun = false;
 static bool makepty = false;
 static bool copy_samedev = false;
+static bool foreground = false;
 static FILE* verbosefile = stdout;
 static std::string linkdir;
 static std::map<std::string, int> linkdir_dirtable;
@@ -170,6 +172,22 @@ static int x_lchown(const char* path, uid_t owner, gid_t group) {
     if (!dryrun && lchown(path, owner, group) != 0)
         return perror_fail("chown %s: %s\n", path);
     return 0;
+}
+
+static int x_waitpid(pid_t child, int flags) {
+    int status;
+    while (1) {
+        pid_t w = waitpid(child, &status, flags);
+        if (w == child && WIFEXITED(status))
+            return WEXITSTATUS(status);
+        else if (w == child)
+            return 128 + WTERMSIG(status);
+        else if (w == 0) {
+            errno = EAGAIN;
+            return -1;
+        } else if (w == -1 && errno != EINTR)
+            return -1;
+    }
 }
 
 
@@ -462,11 +480,10 @@ static int copy_for_xdev_link(const std::string& src, const std::string& lnk) {
     } else if (child < 0)
         return perror_fail("%s: %s\n", "fork");
 
-    int status;
-    pid_t wait_child = waitpid(child, &status, 0);
-    if (wait_child == child && WIFEXITED(status) && WEXITSTATUS(status) == 0)
+    int status = x_waitpid(child, 0);
+    if (status == 0)
         return 0;
-    else if (wait_child == child && WIFEXITED(status))
+    else if (status != -1)
         return perror_fail("/bin/cp %s: Bad exit status\n", lnk.c_str());
     else
         return perror_fail("/bin/cp %s: Did not exit\n", lnk.c_str());
@@ -991,7 +1008,7 @@ class jailownerinfo {
     ~jailownerinfo();
     void init(const char* owner_name);
     void exec(int argc, char** argv, jaildirinfo& jaildir, int caller_tty,
-              int pidfd);
+              int pidfd, double timeout);
     int exec_go();
 
   private:
@@ -1000,8 +1017,11 @@ class jailownerinfo {
     jaildirinfo* jaildir;
     int caller_tty;
     int pidfd;
+    struct timeval timeout;
 
     void write_pid(int p);
+    int check_child_timeout(pid_t child, bool waitpid);
+    void handle_child(pid_t child);
     void handle_child(pid_t child, int ptymaster);
 };
 
@@ -1070,7 +1090,7 @@ void jailownerinfo::write_pid(int p) {
 }
 
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         int caller_tty, int pidfd) {
+                         int caller_tty, int pidfd, double timeout) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     sprintf(homebuf, "HOME=%s", owner_home.c_str());
@@ -1111,6 +1131,14 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     this->jaildir = &jaildir;
     this->caller_tty = caller_tty;
     this->pidfd = pidfd;
+    if (timeout > 0) {
+        struct timeval now, delta;
+        gettimeofday(&now, 0);
+        delta.tv_sec = (long) timeout;
+        delta.tv_usec = (long) ((timeout - delta.tv_sec) * 1000000);
+        timeradd(&now, &delta, &this->timeout);
+    } else
+        timerclear(&this->timeout);
 
     // enter the jail
 #if __linux__
@@ -1119,17 +1147,26 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         fprintf(stderr, "Out of memory\n");
         exit(1);
     }
-    int r = clone(exec_clone_function, new_stack + 256 * 1024,
-                  CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID, this);
-    if (r == -1)
+    int child = clone(exec_clone_function, new_stack + 256 * 1024,
+                      CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID, this);
+    if (child == -1)
         perror_exit("clone");
-    write_pid(r);
 #else
-    write_pid(getpid());
-    exec_go();
+    int child = fork();
+    if (child == 0)
+        exit(exec_go());
 #endif
+    if (child == -1)
+        perror_exit("fork");
+    write_pid(child);
 
-    exit(0);
+    int exit_status = 0;
+    if (foreground) {
+        exit_status = x_waitpid(child, 0);
+        if (pidfd >= 0)
+            write_pid(0);
+    }
+    exit(exit_status);
 }
 
 int jailownerinfo::exec_go() {
@@ -1208,7 +1245,7 @@ int jailownerinfo::exec_go() {
     }
 
     if (!dryrun) {
-        pid_t child = (makepty ? fork() : 0);
+        pid_t child = (makepty || timerisset(&timeout) ? fork() : 0);
         if (child < 0)
             perror_exit("fork");
         else if (child == 0) {
@@ -1242,14 +1279,39 @@ int jailownerinfo::exec_go() {
                 signal(sig, SIG_DFL);
             if (execve(this->argv[0], (char* const*) this->argv,
                        (char* const*) newenv) != 0)
-                perror_exit(("exec" + owner_sh).c_str());
+                perror_exit(("exec " + owner_sh).c_str());
         } else {
-            assert(makepty);
-            handle_child(child, ptymaster);
+            if (makepty)
+                handle_child(child, ptymaster);
+            else
+                handle_child(child);
         }
     }
 
     return 0;
+}
+
+int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
+    if (waitpid) {
+        int r = x_waitpid(child, WNOHANG);
+        if (r != -1)
+            return r;
+        else if (errno != EAGAIN)
+            return 125;
+    }
+
+    struct timeval now;
+    if (timerisset(&timeout)
+        && gettimeofday(&now, NULL) == 0
+        && timercmp(&now, &timeout, >)) {
+#if !__linux__
+        kill(child, SIGKILL);
+#endif
+        return 124;
+    }
+
+    errno = EAGAIN;
+    return -1;
 }
 
 void jailownerinfo::handle_child(pid_t child, int ptymaster) {
@@ -1263,8 +1325,7 @@ void jailownerinfo::handle_child(pid_t child, int ptymaster) {
     }
 
     char buf[16384];
-    int status;
-    int exit_status = 1;
+    int exit_status = 125;
     fflush(stdout);
 
     while (1) {
@@ -1272,26 +1333,45 @@ void jailownerinfo::handle_child(pid_t child, int ptymaster) {
         if (nr != 0 && nr != -1) {
             size_t nw = fwrite(buf, 1, nr, stdout);
             if (nw != (size_t) nr)
-                goto done;
+                goto error_exit;
             fflush(stdout);
-            continue;           // read until no more to read
         }
+        int rerrno = errno;
 
-        // has child died?
-        int r = waitpid(child, &status, WNOHANG);
-        if (r == child && WIFEXITED(status))
-            exit_status = WEXITSTATUS(status);
-        if (r == child)
+        // check child and timeout
+        // (only wait for child if read done/failed)
+        exit_status = check_child_timeout(child, nr == 0 || nr == -1);
+        if (exit_status != -1)
             goto done;
 
         // if child has not died, and read produced error, report it
-        if (nr == -1 && (errno != EINTR && errno != EAGAIN && errno != EIO)) {
-            fprintf(stderr, "read: %s\n", strerror(errno));
+        if (nr == -1 && (rerrno != EINTR && rerrno != EAGAIN && rerrno != EIO)) {
+            fprintf(stderr, "read: %s\n", strerror(rerrno));
             goto done;
         }
     }
 
+ error_exit:
+    exit_status = 125;
  done:
+    write_pid(0);
+    exit(exit_status);
+}
+
+void jailownerinfo::handle_child(pid_t child) {
+    int exit_status = 125;
+    while (1) {
+        struct timeval delay;
+        delay.tv_sec = 0;
+        delay.tv_usec = 500000;
+        (void) select(0, NULL, NULL, NULL, &delay);
+
+        // has child died?
+        exit_status = check_child_timeout(child, true);
+        if (exit_status != -1)
+            break;
+    }
+
     write_pid(0);
     exit(exit_status);
 }
@@ -1299,7 +1379,8 @@ void jailownerinfo::handle_child(pid_t child, int ptymaster) {
 
 static __attribute__((noreturn)) void usage() {
     fprintf(stderr, "Usage: pa-jail init [-n] [-f FILES] [-S SKELETON] JAILDIR [USER]\n");
-    fprintf(stderr, "       pa-jail run [-nta] [-f FILES] [-S SKELETON] [-p PIDFILE] JAILDIR USER COMMAND\n");
+    fprintf(stderr, "       pa-jail run [--fg] [-nta] [-T TIMEOUT] [-p PIDFILE] \\\n");
+    fprintf(stderr, "                   [-f FILES] [-S SKELETON] JAILDIR USER COMMAND\n");
     fprintf(stderr, "       pa-jail mv OLDDIR NEWDIR\n");
     fprintf(stderr, "       pa-jail rm [-nf] JAILDIR\n");
     exit(1);
@@ -1322,6 +1403,8 @@ static struct option longoptions_run[] = {
     { "active", no_argument, NULL, 'a' },
     { "files", required_argument, NULL, 'f' },
     { "replace", no_argument, NULL, 'r' },
+    { "fg", no_argument, NULL, 'F' },
+    { "timeout", required_argument, NULL, 'T' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -1337,13 +1420,14 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:taf:p:r", "VnS:taf:p:r", "Vnf", "Vn"
+    "+Vn", "VnS:taf:p:rT:", "VnS:taf:p:rT:", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
     bool doactive = false, dokill = false, doforce = false;
+    double timeout = -1;
     std::string filesarg;
 
     int ch;
@@ -1370,7 +1454,14 @@ int main(int argc, char** argv) {
                 pidfilename = optarg;
             else if (ch == 'r')
                 dokill = true;
-            else /* if (ch == 'H') */
+            else if (ch == 'F')
+                foreground = true;
+            else if (ch == 'T') {
+                char* end;
+                timeout = strtod(optarg, &end);
+                if (end == optarg || *end != 0)
+                    usage();
+            } else /* if (ch == 'H') */
                 usage();
         }
         if (action != do_start)
@@ -1570,7 +1661,7 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc)
-        jailuser.exec(argc, argv, jaildir, caller_tty, pidfd);
+        jailuser.exec(argc, argv, jaildir, caller_tty, pidfd, timeout);
 
     exit(0);
 }

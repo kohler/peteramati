@@ -89,8 +89,8 @@ class RunnerState {
 
         // collect user information
         $this->username = "jail61user";
-        if ($this->runner->run_username)
-            $this->username = $this->runner->run_username;
+        if ($this->runner->username)
+            $this->username = $this->runner->username;
         else if ($this->pset->run_username)
             $this->username = $this->pset->run_username;
         if (!preg_match('/\A\w+\z/', $this->username))
@@ -142,6 +142,10 @@ class RunnerState {
             $command .= " -S" . escapeshellarg($this->pset->run_skeletondir);
         else if (isset($Opt["run_jailskeleton"]))
             $command .= " -S" . escapeshellarg($Opt["run_jailskeleton"]);
+        if ($this->runner->timeout > 0)
+            $command .= " -T" . $this->runner->timeout;
+        else if ($this->pset->run_timeout > 0)
+            $command .= " -T" . $this->pset->run_timeout;
         $command .= " " . escapeshellarg($this->jaildir)
             . " " . escapeshellarg($this->username)
             . " " . escapeshellarg($this->runner->command);

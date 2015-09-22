@@ -57,6 +57,7 @@ class Pset {
     public $run_overlay;
     public $run_skeletondir;
     public $run_jailfiles;
+    public $run_timeout;
 
     public $diffs = array();
     public $ignore;
@@ -177,6 +178,7 @@ class Pset {
         $this->run_overlay = self::cstr($p, "run_overlay");
         $this->run_skeletondir = self::cstr($p, "run_skeletondir");
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
+        $this->run_timeout = self::cnum($p, "run_timeout");
 
         // diffs
         if (is_array(@$p->diffs) || is_object(@$p->diffs)) {
@@ -328,7 +330,7 @@ class RunnerConfig {
     public $visible;
     public $output_visible;
     public $command;
-    public $run_username;
+    public $username;
     public $load;
     public $eval;
     public $queue;
@@ -351,7 +353,8 @@ class RunnerConfig {
         $this->visible = Pset::cbool($loc, $r, "visible", "show_to_students");
         $this->output_visible = Pset::cdate_or_grades($loc, $r, "output_visible", "show_output_to_students", "show_results_to_students");
         $this->command = Pset::cstr($loc, $r, "command");
-        $this->run_username = Pset::cstr($loc, $r, "run_username");
+        $this->username = Pset::cstr($loc, $r, "username", "run_username");
+        $this->timeout = Pset::cnum($loc, $r, "timeout", "run_timeout");
         $this->load = Pset::cstr($loc, $r, "load");
         $this->eval = Pset::cstr($loc, $r, "eval");
         $this->queue = Pset::cstr($loc, $r, "queue");
