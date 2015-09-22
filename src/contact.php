@@ -1410,7 +1410,12 @@ class Contact {
             error_log(json_encode($repo) . " / " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " user $Me->email");
         assert(isset($repo->repoid) && isset($repo->cacheid));
         $command = str_replace("REPO", "repo" . $repo->repoid, $command);
-        return shell_exec("cd $ConfSitePATH/repo/repo" . $repo->cacheid . " && $command");
+        $repodir = "$ConfSitePATH/repo/repo$repo->cacheid";
+        if (!file_exists("$repodir/.git/config")) {
+            is_dir($repodir) || mkdir($repodir, 0770);
+            shell_exec("cd $repodir && git init --shared");
+        }
+        return shell_exec("cd $repodir && $command");
     }
 
     static function repo_ls_files($repo, $tree, $files = array()) {
