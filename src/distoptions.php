@@ -10,6 +10,13 @@
 
 global $Opt;
 
+// PSETS.JSON CONFIGURATION
+//
+//   psetsConfig     Array of psets.json files to load. May include wildcards.
+
+$Opt["psetsConfig"] = "/dev/null";
+
+
 // DATABASE CONFIGURATION
 //
 //   dbName          Database name. NO SPACES ALLOWED.
@@ -138,9 +145,6 @@ $Opt["emailFrom"] = "you@example.com";
 //                   end with " <span class='barsep'>|</span> ".
 //   favicon         Optional link to favicon. Default is images/review24.png.
 //   noFooterVersion Set to true to avoid a version comment in footer HTML.
-//   disablePDF      Set to true to disable PDF format submissions.
-//   disablePS       Set to true to disable PostScript format submissions.
-//   noPapers        Set to true to collect abstracts only, not papers.
 //   pdftohtml       Pathname to pdftohtml executable (used only by the "banal"
 //                   paper format checker).
 //   banalLimit      Limit on number of parallel paper format checker
@@ -159,9 +163,6 @@ $Opt["emailFrom"] = "you@example.com";
 //                   `zip`.
 //   disableCSV      Set to true if all downloaded tabular text files should be
 //                   tab-separated rather than CSV.
-//   smartScoreCompare Set to true if a search like "ovemer:>B" should search
-//                   for scores better than B (i.e., A), rather than scores
-//                   alphabetically after B (i.e., C or D).
 //   filestoreSubdir Set to true (or a small number, like 3) if the filestore
 //                   should use subdirectories. This can be useful if you
 //                   expect thousands of submissions.
@@ -169,6 +170,4 @@ $Opt["emailFrom"] = "you@example.com";
 //                   on searchboxes.
 //   hideManager     If set, PC members are not shown paper managers.
 
-$Opt["disablePS"] = true;
-$Opt["smartScoreCompare"] = true;
 $Opt["restrictRepoView"] = true;
