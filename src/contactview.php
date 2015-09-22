@@ -474,7 +474,7 @@ class ContactView {
                 . ", fetched " . ago($repo->snapat)
                 . ", last checked " . ago($repo->snapcheckat);
             if ($Me->privChair)
-                $n .= " <small style=\"padding-left:1em;font-size:70%\">repo/repo" . $repo->cacheid . ":repo" . $repo->repoid . "</small>";
+                $n .= " <small style=\"padding-left:1em;font-size:70%\">group " . $repo->cacheid . ", repo" . $repo->repoid . "</small>";
             $notes[] = $n;
         } else if ($repo && !$info->can_view_repo_contents) {
             $uname = Text::analyze_name($user);
