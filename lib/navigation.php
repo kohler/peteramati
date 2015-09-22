@@ -33,9 +33,18 @@ class Navigation {
         self::$server = $x;
 
         // detect $sitedir
-        $uri = $_SERVER["REQUEST_URI"]; // URL-encoded
+        $sfilename = $_SERVER["SCRIPT_FILENAME"]; // pathname
+        $sfile = substr($sfilename, strrpos($sfilename, "/") + 1);
+
         $sname = $_SERVER["SCRIPT_NAME"]; // URL-decoded
         $sname_slash = strrpos($sname, "/");
+        if (substr($sname, $sname_slash + 1) !== $sfile) {
+            if ($sname[strlen($sname) - 1] !== "/")
+                $sname .= "/";
+            $sname_slash = strlen($sname) - 1;
+        }
+
+        $uri = $_SERVER["REQUEST_URI"]; // URL-encoded
         if (substr($uri, 0, $sname_slash) === substr($sname, 0, $sname_slash))
             $uri_slash = $sname_slash;
         else {
@@ -47,6 +56,7 @@ class Navigation {
         }
         if ($uri_slash === false || $uri_slash > strlen($uri))
             $uri_slash = strlen($uri);
+
         self::$sitedir = substr($uri, 0, $uri_slash) . "/";
 
         // separate $page, $path, $query
