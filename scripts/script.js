@@ -2251,6 +2251,11 @@ function run61(button, opt) {
         append_html(opt.headline);
     else if (opt.headline)
         append("\x1b[01;37m" + opt.headline + "\x1b[0m\n");
+    if (therun.attr("run61data")) {
+        append(therun.attr("run61data"));
+        therun.removeAttr("run61data");
+    }
+
     send();
     return false;
 }

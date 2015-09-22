@@ -930,13 +930,9 @@ if ($Pset->gitless) {
             echo ' run61directory="', htmlspecialchars($Pset->directory_noslash), '"';
         if ($rj && isset($rj->timestamp))
             echo ' run61timestamp="', $rj->timestamp, '"';
+        if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n")))
+            echo ' run61data="', htmlspecialchars(substr($rj->data, $pos + 2)), '"';
         echo '><div class="run61in"><pre class="run61pre">';
-        if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n"))) {
-            echo '<span class="run61timestamp">...started ',
-                simplify_whitespace(strftime("%l:%M:%S%P %e %b %Y", $rj->timestamp)),
-                "</span>\n";
-            echo htmlspecialchars(substr($rj->data, $pos + 2));
-        }
         echo '</pre></div></div></h3></div>', "\n";
     }
 
