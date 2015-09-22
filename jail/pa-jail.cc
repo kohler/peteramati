@@ -1278,8 +1278,10 @@ int jailownerinfo::exec_go() {
             for (int sig = 1; sig < NSIG; ++sig)
                 signal(sig, SIG_DFL);
             if (execve(this->argv[0], (char* const*) this->argv,
-                       (char* const*) newenv) != 0)
-                perror_exit(("exec " + owner_sh).c_str());
+                       (char* const*) newenv) != 0) {
+                fprintf(stderr, "exec %s: %s\n", owner_sh.c_str(), strerror(errno));
+                exit(126);
+            }
         } else {
             if (makepty)
                 handle_child(child, ptymaster);
