@@ -2080,7 +2080,8 @@ function run61(button, opt) {
                 }
                 render = m[1];
             }
-            if (displaylen + render.length > 132) {
+            if (displaylen + render.length > 133
+                || (displaylen + render.length == 133 && render.charAt(132) !== "\n")) {
                 render = render.substr(0, 132 - displaylen);
                 addlinepart(node, render + "…\n");
                 isnew && thepre[0].insertBefore(node, thepre[0].lastChild);
