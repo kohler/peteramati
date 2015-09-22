@@ -13,7 +13,8 @@
 static int sigpipe[2];
 static void sigchld_handler(int signo) {
     (void) signo;
-    write(sigpipe[1], "!", 1);
+    ssize_t w = write(sigpipe[1], "!", 1);
+    (void) w;
 }
 
 static void usage() {
