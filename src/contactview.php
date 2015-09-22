@@ -163,31 +163,25 @@ class ContactView {
         global $Now;
         if (!$json)
             $json = (object) array();
-        $lockfn = self::runner_logfile($info, $checkt) . ".lock";
-        $lockf = @fopen($lockfn, "r+");
-        if ($lockf === false) {
+        $lockfn = self::runner_logfile($info, $checkt) . ".pid";
+        $pid_data = @file_get_contents($lockfn);
+        if (ctype_digit(trim($pid_data))
+            && !posix_kill(trim($pid_data), 0)
+            && posix_get_last_error() == 3 /* ESRCH */)
+            $pid_data = "dead\n";
+        if ($pid_data === false || $pid_data === "0\n") {
             $json->done = true;
             $json->status = "done";
-        } else if (flock($lockf, LOCK_EX | LOCK_NB, $lockblock)) {
+        } else if ($pid_data === "" || ctype_digit(trim($pid_data))) {
+            $json->done = false;
+            $json->status = "working";
+            if ($Now - $checkt > 600)
+                $json->status = "old";
+        } else {
             $json->done = true;
             $json->status = "dead";
-            flock($lockf, LOCK_UN);
-        } else {
-            $lockdata = fread($lockf, 1000);
-            if (ctype_digit(trim($lockdata))
-                && !posix_kill(trim($lockdata), 0)) {
-                $json->done = true;
-                $json->status = "dead";
-            } else {
-                $json->done = false;
-                $json->status = "working";
-                if ($Now - $checkt > 600)
-                    $json->status = "old";
-            }
         }
-        if ($lockf)
-            fclose($lockf);
-        if ($json->status == "dead")
+        if ($json->done && $pid_data !== false)
             unlink($lockfn);
         return $json;
     }

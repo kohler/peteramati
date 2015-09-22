@@ -1146,7 +1146,7 @@ int jailownerinfo::exec_go() {
     {
         auto it = mount_table.find("/proc");
         if (it != mount_table.end() && it->second.allowed)
-            return handle_mount(it->second, "/proc");
+            handle_mount(it->second, "/proc");
     }
 #endif
 
@@ -1202,9 +1202,9 @@ int jailownerinfo::exec_go() {
             fprintf(verbosefile, "%s ", newenv[i]);
         for (int i = 0; this->argv[i]; ++i)
             if (strchr(this->argv[i], ' '))
-                fprintf(verbosefile, i ? "'%s'" : " '%s'", this->argv[i]);
+                fprintf(verbosefile, i ? " '%s'" : "'%s'", this->argv[i]);
             else
-                fprintf(verbosefile, i ? "%s" : " %s", this->argv[i]);
+                fprintf(verbosefile, i ? " %s" : "%s", this->argv[i]);
     }
 
     if (!dryrun) {
