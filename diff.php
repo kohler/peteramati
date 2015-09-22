@@ -49,9 +49,7 @@ if (!$hasha || !$hashb) {
 
 $Conf->header(htmlspecialchars($Pset->title), "home");
 echo "<div id='homeinfo'>";
-echo "<h2 class='homeemail'>", Text::user_html($User), "</h2>";
-if ($User->dropped)
-    ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
+ContactView::echo_heading($User);
 
 
 // Per-pset

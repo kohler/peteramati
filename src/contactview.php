@@ -264,6 +264,27 @@ class ContactView {
         return $json;
     }
 
+    static function echo_heading($user) {
+        global $Me;
+        $u = $Me->user_linkpart($user);
+        if ($user !== $Me && !$user->is_anonymous && $user->contactImageId)
+            echo '<img class="smallface61" src="' . hoturl("face", array("u" => $u, "imageid" => $user->contactImageId)) . '" />';
+
+        echo '<h2 class="homeemail"><a href="',
+            hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
+        if ($Me->privChair)
+            echo "&nbsp;", become_user_link($user);
+        echo '</h2>';
+
+        if ($user !== $Me && !$user->is_anonymous)
+            echo '<h3>', Text::user_html($user), '</h3>';
+
+        if ($user->dropped)
+            ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
+
+        echo '<hr class="c" />';
+    }
+
     static function echo_group($key, $value, $notes = null, $extra = null) {
         echo "<table class=\"cs61grp\"><tr><td class=\"cs61key\">", $key, "</td>",
             "<td";

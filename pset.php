@@ -395,24 +395,8 @@ if ($User->seascode_username && $Me->isPC) {
     }
 }
 
+ContactView::echo_heading($User);
 $u = $Me->user_linkpart($User);
-
-if ($User !== $Me && !$User->is_anonymous && $User->contactImageId)
-    echo '<img class="smallface61" src="' . hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
-
-echo '<h2 class="homeemail"><a href="',
-    hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
-if ($Me->privChair)
-    echo "&nbsp;", become_user_link($User);
-echo '</h2>';
-
-if (!$User->is_anonymous && $User !== $Me)
-    echo '<h3>', Text::user_html($User), '</h3>';
-
-if ($User->dropped)
-    ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
-
-echo '<hr class="c" />';
 
 
 // Per-pset
