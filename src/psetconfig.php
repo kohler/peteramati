@@ -178,7 +178,9 @@ class Pset {
         $this->run_overlay = self::cstr($p, "run_overlay");
         $this->run_skeletondir = self::cstr($p, "run_skeletondir");
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
-        $this->run_timeout = self::cnum($p, "run_timeout");
+        $this->run_timeout = self::cinterval($p, "run_timeout");
+        if ($this->run_timeout === null) // default run_timeout is 10m
+            $this->run_timeout = 600;
 
         // diffs
         if (is_array(@$p->diffs) || is_object(@$p->diffs)) {
@@ -269,6 +271,10 @@ class Pset {
         return self::ccheck("check_date_or_grades", func_get_args());
     }
 
+    public static function cinterval(/* ... */) {
+        return self::ccheck("check_interval", func_get_args());
+    }
+
     private static function make_config_array($x) {
         if (is_array($x)) {
             $y = array();
@@ -354,7 +360,7 @@ class RunnerConfig {
         $this->output_visible = Pset::cdate_or_grades($loc, $r, "output_visible", "show_output_to_students", "show_results_to_students");
         $this->command = Pset::cstr($loc, $r, "command");
         $this->username = Pset::cstr($loc, $r, "username", "run_username");
-        $this->timeout = Pset::cnum($loc, $r, "timeout", "run_timeout");
+        $this->timeout = Pset::cinterval($loc, $r, "timeout", "run_timeout");
         $this->load = Pset::cstr($loc, $r, "load");
         $this->eval = Pset::cstr($loc, $r, "eval");
         $this->queue = Pset::cstr($loc, $r, "queue");
@@ -436,4 +442,15 @@ function check_date_or_grades($x) {
         return array(true, $x);
     else
         return check_date($x);
+}
+
+function check_interval($x) {
+    if (is_int($x) || is_float($x))
+        return true;
+    else if (is_string($x)
+             && preg_match(',\A(\d+(?:\.\d*)?|\.\d+)(?:$|\s*)([smhd]?)\z,', strtolower($x), $m)) {
+        $mult = array("" => 1, "s" => 1, "m" => 60, "h" => 3600, "d" => 86400);
+        return array(true, $m[1] * $mult[$m[2]]);
+    } else
+        return false;
 }
