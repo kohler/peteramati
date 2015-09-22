@@ -109,7 +109,7 @@ class RunnerState {
         // create logfile and lockfile
         $this->checkt = time();
         $this->logfile = ContactView::runner_logfile($this->info, $this->checkt);
-        $this->lockfile = $this->logfile . ".lock";
+        $this->lockfile = $this->logfile . ".pid";
         file_put_contents($this->lockfile, "");
         $this->logstream = fopen($this->logfile, "a");
         if ($this->queue)
@@ -135,8 +135,9 @@ class RunnerState {
             $this->add_run_settings($runsettings);
 
         // actually run
-        $command = "echo; jail/loglock " . escapeshellarg($this->lockfile) . " -- "
-            . "jail/pa-jail run -t -f" . escapeshellarg($this->expand($this->pset->run_jailfiles));
+        $command = "echo; jail/pajail run -t"
+            . " -p" . escapeshellarg($this->lockfile)
+            . " -f" . escapeshellarg($this->expand($this->pset->run_jailfiles));
         if ($this->pset->run_skeletondir)
             $command .= " -S" . escapeshellarg($this->pset->run_skeletondir);
         else if (isset($Opt["run_jailskeleton"]))

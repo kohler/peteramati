@@ -165,9 +165,12 @@ function clean_queue($qname, $qconf, $qid) {
     $result = $Conf->qe("select * from ExecutionQueue where queueclass='" . sqlq($qname) . "' and queueid<$qid");
     while (($row = edb_orow($result))) {
         // remove dead items from queue
+        // - lockfile contains "0\n": child has exited, remove it
         // - lockfile specified but not there
         // - no lockfile & last update < 30sec ago
         // - running for more than 5min (configurable)
+        if ($row->lockfile && @file_get_contents($row->lockfile) === "0\n")
+            unlink($row->lockfile);
         if (($row->lockfile && !file_exists($row->lockfile))
             || ($row->runat <= 0 && $row->updateat < $Now - 30)
             || ($runtimeout && $row->runat > 0 && $row->runat < $Now - $runtimeout))
