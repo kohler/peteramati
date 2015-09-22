@@ -70,3 +70,14 @@ listening on port 9000):
     You may also set up separate `location` blocks so that Nginx
 directly serves static files under `/testclass/images/`,
 `/testclass/scripts/`, and `/testclass/stylesheets/`.
+
+4. Build the `pa-jail` program and other helper programs.
+
+        cd jail && make
+
+The `pa-jail` program must be set-uid/gid root, so you may need to
+build it using `sudo make`.
+
+5. XXX Configure conf/gitssh_config and conf/sshid
+
+6. XXX Configure the jail
