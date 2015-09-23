@@ -1007,7 +1007,7 @@ class jailownerinfo {
     jailownerinfo();
     ~jailownerinfo();
     void init(const char* owner_name);
-    void exec(int argc, char** argv, jaildirinfo& jaildir, int caller_tty,
+    void exec(int argc, char** argv, jaildirinfo& jaildir,
               int pidfd, int inputfd, double timeout);
     int exec_go();
 
@@ -1015,7 +1015,6 @@ class jailownerinfo {
     const char* newenv[4];
     char** argv;
     jaildirinfo* jaildir;
-    int caller_tty;
     int pidfd;
     int inputfd;
     struct timeval timeout;
@@ -1112,8 +1111,7 @@ void jailownerinfo::write_pid(int p) {
 }
 
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         int caller_tty, int pidfd, int inputfd,
-                         double timeout) {
+                         int pidfd, int inputfd, double timeout) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     sprintf(homebuf, "HOME=%s", owner_home.c_str());
@@ -1151,7 +1149,6 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 
     // store other arguments
     this->jaildir = &jaildir;
-    this->caller_tty = caller_tty;
     this->pidfd = pidfd;
     this->inputfd = inputfd;
     if (timeout > 0) {
@@ -1246,15 +1243,6 @@ int jailownerinfo::exec_go() {
         if (f < 0)
             perror_exit(("open" + owner_sh).c_str());
         close(f);
-    }
-
-    // close stdin (jailfiles), reopen to /dev/null
-    if (caller_tty < 0) {
-        close(0);
-        (void) open("/dev/null", O_RDONLY);
-    } else if (caller_tty != 0) {
-        dup2(caller_tty, 0);
-        close(caller_tty);
     }
 
     if (verbose) {
@@ -1521,7 +1509,6 @@ static struct option longoptions_run[] = {
     { "help", no_argument, NULL, 'H' },
     { "skeleton", required_argument, NULL, 'S' },
     { "pid-file", required_argument, NULL, 'p' },
-    { "active", no_argument, NULL, 'a' },
     { "files", required_argument, NULL, 'f' },
     { "replace", no_argument, NULL, 'r' },
     { "fg", no_argument, NULL, 'F' },
@@ -1542,13 +1529,13 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:af:p:rT:qi:", "VnS:af:p:rT:qi:", "Vnf", "Vn"
+    "+Vn", "VnS:f:p:rT:qi:", "VnS:f:p:rT:qi:", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
-    bool doactive = false, dokill = false, doforce = false;
+    bool dokill = false, doforce = false;
     double timeout = -1;
     std::string filesarg, inputarg;
 
@@ -1564,8 +1551,6 @@ int main(int argc, char** argv) {
                     linkdir = linkdir.substr(0, linkdir.length() - 1);
             } else if (ch == 'n')
                 verbose = dryrun = true;
-            else if (ch == 'a')
-                doactive = true;
             else if (ch == 'f' && action == do_rm)
                 doforce = true;
             else if (ch == 'f')
@@ -1614,25 +1599,18 @@ int main(int argc, char** argv) {
         || (action == do_mv && optind != argc - 2)
         || (action == do_init && optind != argc - 1 && optind != argc - 2)
         || (action == do_run && optind > argc - 3)
-        || (action == do_rm && (!linkdir.empty() || !filesarg.empty() || !inputarg.empty() || doactive))
-        || (action == do_mv && (!linkdir.empty() || !filesarg.empty() || !inputarg.empty() || doactive || dokill))
+        || (action == do_rm && (!linkdir.empty() || !filesarg.empty() || !inputarg.empty()))
+        || (action == do_mv && (!linkdir.empty() || !filesarg.empty() || !inputarg.empty() || dokill))
         || !argv[optind][0]
         || (action == do_mv && !argv[optind+1][0]))
         usage();
     if (verbose && !dryrun)
         verbosefile = stderr;
-    if (action != do_run)
-        doactive = false;
 
     // parse user
     jailownerinfo jailuser;
     if ((action == do_init || action == do_run) && optind + 1 < argc)
         jailuser.init(argv[optind + 1]);
-
-    // open tty as current user
-    int caller_tty = -1;
-    if (doactive)
-        caller_tty = open("/dev/tty", O_RDWR);
 
     // open file list as current user
     FILE* filesf = NULL;
@@ -1795,7 +1773,7 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc)
-        jailuser.exec(argc, argv, jaildir, caller_tty, pidfd, inputfd, timeout);
+        jailuser.exec(argc, argv, jaildir, pidfd, inputfd, timeout);
 
     exit(0);
 }
