@@ -1188,7 +1188,7 @@ return setLocalTime;
 var hotcrp_onload = [];
 function hotcrp_load(arg) {
     if (!arg)
-        for (x = 0; x < hotcrp_onload.length; ++x)
+        for (var x = 0; x < hotcrp_onload.length; ++x)
             hotcrp_onload[x]();
     else if (typeof arg === "string")
         hotcrp_onload.push(hotcrp_load[arg]);
@@ -1546,7 +1546,7 @@ function setmailpsel(sel) {
 }
 
 
-linenote61 = (function ($) {
+window.linenote61 = (function ($) {
 function analyze(target) {
     var table, linetype, linenumber, tr, result, x;
     if (!target || target.tagName == "TEXTAREA" || target.tagName == "A")
