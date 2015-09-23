@@ -1008,7 +1008,7 @@ class jailownerinfo {
     ~jailownerinfo();
     void init(const char* owner_name);
     void exec(int argc, char** argv, jaildirinfo& jaildir, int caller_tty,
-              int pidfd, double timeout);
+              int pidfd, int inputfd, double timeout);
     int exec_go();
 
   private:
@@ -1017,6 +1017,7 @@ class jailownerinfo {
     jaildirinfo* jaildir;
     int caller_tty;
     int pidfd;
+    int inputfd;
     struct timeval timeout;
     fd_set readset;
     fd_set writeset;
@@ -1025,13 +1026,15 @@ class jailownerinfo {
         size_t head;
         size_t tail;
         bool input_closed;
+        bool input_isfifo;
         bool output_closed;
         int rerrno;
         buffer()
-            : head(0), tail(0), input_closed(false), output_closed(false),
-              rerrno(0) {
+            : head(0), tail(0), input_closed(false), input_isfifo(false),
+              output_closed(false), rerrno(0) {
         }
-        void transfer(int from, int to);
+        void transfer_in(int from);
+        void transfer_out(int to);
     };
     buffer to_slave;
     buffer from_slave;
@@ -1109,7 +1112,8 @@ void jailownerinfo::write_pid(int p) {
 }
 
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         int caller_tty, int pidfd, double timeout) {
+                         int caller_tty, int pidfd, int inputfd,
+                         double timeout) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     sprintf(homebuf, "HOME=%s", owner_home.c_str());
@@ -1149,6 +1153,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     this->jaildir = &jaildir;
     this->caller_tty = caller_tty;
     this->pidfd = pidfd;
+    this->inputfd = inputfd;
     if (timeout > 0) {
         struct timeval now, delta;
         gettimeofday(&now, 0);
@@ -1328,7 +1333,8 @@ void jailownerinfo::start_sigpipe() {
     int r = pipe(sigpipe);
     if (r != 0)
         perror_exit("pipe");
-    make_nonblocking(STDIN_FILENO);
+    make_nonblocking(inputfd);
+    make_nonblocking(STDOUT_FILENO);
     make_nonblocking(sigpipe[0]);
     make_nonblocking(sigpipe[1]);
 
@@ -1343,7 +1349,7 @@ void jailownerinfo::start_sigpipe() {
     FD_ZERO(&writeset);
 }
 
-void jailownerinfo::buffer::transfer(int from, int to) {
+void jailownerinfo::buffer::transfer_in(int from) {
     if (tail == sizeof(buf) && head != 0) {
         memmove(buf, &buf[head], tail - head);
         tail -= head;
@@ -1354,14 +1360,21 @@ void jailownerinfo::buffer::transfer(int from, int to) {
         ssize_t nr = read(from, &buf[tail], sizeof(buf) - tail);
         if (nr != 0 && nr != -1)
             tail += nr;
-        else if (nr == 0)
-            input_closed = true;
-        else if (errno != EINTR && errno != EAGAIN) {
+        else if (nr == 0 && !input_isfifo) {
+            // don't want to give up on input if it's a fifo
+            struct stat st;
+            if (fstat(from, &st) == 0 && S_ISFIFO(st.st_mode))
+                input_isfifo = true;
+            else
+                input_closed = true;
+        } else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
             input_closed = true;
             rerrno = errno;
         }
     }
+}
 
+void jailownerinfo::buffer::transfer_out(int to) {
     if (to >= 0 && !output_closed && head != tail) {
         ssize_t nw = write(to, &buf[head], tail - head);
         if (nw != 0 && nw != -1)
@@ -1375,10 +1388,11 @@ void jailownerinfo::block(int ptymaster) {
     int maxfd = sigpipe[0];
     FD_SET(sigpipe[0], &readset);
 
-    if (!to_slave.input_closed && !to_slave.output_closed)
-        FD_SET(STDIN_FILENO, &readset);
-    else
-        FD_CLR(STDIN_FILENO, &readset);
+    if (!to_slave.input_closed && !to_slave.output_closed) {
+        FD_SET(inputfd, &readset);
+        maxfd < inputfd && (maxfd = inputfd);
+    } else
+        FD_CLR(inputfd, &readset);
     if (!to_slave.output_closed && to_slave.head != to_slave.tail) {
         FD_SET(ptymaster, &writeset);
         maxfd < ptymaster && (maxfd = ptymaster);
@@ -1447,8 +1461,14 @@ void jailownerinfo::handle_child(pid_t child, int ptymaster) {
 
     while (1) {
         block(ptymaster);
-        to_slave.transfer(STDIN_FILENO, ptymaster);
-        from_slave.transfer(ptymaster, STDOUT_FILENO);
+        to_slave.transfer_in(inputfd);
+        if (to_slave.head != to_slave.tail
+            && memmem(&to_slave.buf[to_slave.head], to_slave.tail - to_slave.head,
+                      "\x1b\x03", 2) != NULL)
+            exec_done(128 + SIGTERM);
+        to_slave.transfer_out(ptymaster);
+        from_slave.transfer_in(ptymaster);
+        from_slave.transfer_out(STDOUT_FILENO);
 
         // check child and timeout
         // (only wait for child if read done/failed)
@@ -1481,7 +1501,7 @@ void jailownerinfo::exec_done(int exit_status) {
 
 static __attribute__((noreturn)) void usage() {
     fprintf(stderr, "Usage: pa-jail init [-n] [-f FILES] [-S SKELETON] JAILDIR [USER]\n");
-    fprintf(stderr, "       pa-jail run [--fg] [-naq] [-T TIMEOUT] [-p PIDFILE] \\\n");
+    fprintf(stderr, "       pa-jail run [--fg] [-naq] [-T TIMEOUT] [-p PIDFILE] [-i INPUT]\\\n");
     fprintf(stderr, "                   [-f FILES] [-S SKELETON] JAILDIR USER COMMAND\n");
     fprintf(stderr, "       pa-jail mv OLDDIR NEWDIR\n");
     fprintf(stderr, "       pa-jail rm [-nf] JAILDIR\n");
@@ -1506,6 +1526,7 @@ static struct option longoptions_run[] = {
     { "replace", no_argument, NULL, 'r' },
     { "fg", no_argument, NULL, 'F' },
     { "timeout", required_argument, NULL, 'T' },
+    { "input", required_argument, NULL, 'i' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -1521,7 +1542,7 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:af:p:rT:q", "VnS:af:p:rT:q", "Vnf", "Vn"
+    "+Vn", "VnS:af:p:rT:qi:", "VnS:af:p:rT:qi:", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
@@ -1529,7 +1550,7 @@ int main(int argc, char** argv) {
     jailaction action = do_start;
     bool doactive = false, dokill = false, doforce = false;
     double timeout = -1;
-    std::string filesarg;
+    std::string filesarg, inputarg;
 
     int ch;
     while (1) {
@@ -1551,6 +1572,8 @@ int main(int argc, char** argv) {
                 filesarg = optarg;
             else if (ch == 'p')
                 pidfilename = optarg;
+            else if (ch == 'i')
+                inputarg = optarg;
             else if (ch == 'r')
                 dokill = true;
             else if (ch == 'F')
@@ -1590,9 +1613,9 @@ int main(int argc, char** argv) {
     if ((action == do_rm && optind != argc - 1)
         || (action == do_mv && optind != argc - 2)
         || (action == do_init && optind != argc - 1 && optind != argc - 2)
-        || (action == do_run && optind != argc - 3)
-        || (action == do_rm && (!linkdir.empty() || !filesarg.empty() || doactive))
-        || (action == do_mv && (!linkdir.empty() || !filesarg.empty() || doactive || dokill))
+        || (action == do_run && optind > argc - 3)
+        || (action == do_rm && (!linkdir.empty() || !filesarg.empty() || !inputarg.empty() || doactive))
+        || (action == do_mv && (!linkdir.empty() || !filesarg.empty() || !inputarg.empty() || doactive || dokill))
         || !argv[optind][0]
         || (action == do_mv && !argv[optind+1][0]))
         usage();
@@ -1635,6 +1658,16 @@ int main(int argc, char** argv) {
         pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
         if (pidfd == -1) {
             fprintf(stderr, "%s: %s\n", pidfilename.c_str(), strerror(errno));
+            exit(1);
+        }
+    }
+
+    // open infile non-blocking as current user
+    int inputfd = 0;
+    if (!inputarg.empty() && !dryrun) {
+        inputfd = open(inputarg.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+        if (inputfd == -1) {
+            fprintf(stderr, "%s: %s\n", inputarg.c_str(), strerror(errno));
             exit(1);
         }
     }
@@ -1762,7 +1795,7 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc)
-        jailuser.exec(argc, argv, jaildir, caller_tty, pidfd, timeout);
+        jailuser.exec(argc, argv, jaildir, caller_tty, pidfd, inputfd, timeout);
 
     exit(0);
 }

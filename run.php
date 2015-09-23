@@ -169,8 +169,10 @@ function clean_queue($qname, $qconf, $qid) {
         // - lockfile specified but not there
         // - no lockfile & last update < 30sec ago
         // - running for more than 5min (configurable)
-        if ($row->lockfile && @file_get_contents($row->lockfile) === "0\n")
+        if ($row->lockfile && @file_get_contents($row->lockfile) === "0\n") {
             unlink($row->lockfile);
+            $row->inputfifo && unlink($row->inputfifo);
+        }
         if (($row->lockfile && !file_exists($row->lockfile))
             || ($row->runat <= 0 && $row->updateat < $Now - 30)
             || ($runtimeout && $row->runat > 0 && $row->runat < $Now - $runtimeout))

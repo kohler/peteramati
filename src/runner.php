@@ -15,6 +15,7 @@ class RunnerState {
     public $checkt = null;
     private $logfile = null;
     private $lockfile = null;
+    private $inputfifo = null;
     private $logstream;
     private $username;
     private $userhome;
@@ -45,7 +46,7 @@ class RunnerState {
         $logfs = glob($this->logdir . "/repo" . $this->repo->repoid . ".pset" . $this->pset->id . ".*.log*");
         rsort($logfs);
         foreach ($logfs as $logf)
-            if (preg_match(',\.(\d+)\.log((?:\.lock)?)\z,', $logf, $m)) {
+            if (preg_match(',\.(\d+)\.log((?:\.pid)?)\z,', $logf, $m)) {
                 if ($m[2])
                     $this->running_checkts[] = intval($m[1]);
                 else
@@ -106,21 +107,24 @@ class RunnerState {
 
         $this->jailhomedir = $this->jaildir . "/" . $this->userhome;
 
+        if (!chdir($ConfSitePATH))
+            throw new RunnerException("can't cd to main directory");
+        if (!is_executable("jail/pa-jail"))
+            throw new RunnerException("the pa-jail program has not been compiled");
+
         // create logfile and lockfile
         $this->checkt = time();
         $this->logfile = ContactView::runner_logfile($this->info, $this->checkt);
         $this->lockfile = $this->logfile . ".pid";
         file_put_contents($this->lockfile, "");
+        $this->inputfifo = $this->logfile . ".in";
+        if (!posix_mkfifo($this->inputfifo, 0660))
+            $this->inputfifo = null;
         $this->logstream = fopen($this->logfile, "a");
         if ($this->queue)
-            Dbl::qe("update ExecutionQueue set runat=?, status=1, lockfile=? where queueid=?",
-                    $this->checkt, $this->lockfile, $this->queue->queueid);
+            Dbl::qe("update ExecutionQueue set runat=?, status=1, lockfile=?, inputfifo=? where queueid=?",
+                    $this->checkt, $this->lockfile, $this->inputfifo, $this->queue->queueid);
         register_shutdown_function(array($this, "cleanup"));
-
-        if (!chdir($ConfSitePATH))
-            throw new RunnerException("can't cd to main directory");
-        if (!is_executable("jail/pa-jail"))
-            throw new RunnerException("the pa-jail program has not been compiled");
 
         // create jail
         $this->remove_old_jails();
@@ -146,11 +150,13 @@ class RunnerState {
             $command .= " -T" . $this->runner->timeout;
         else if ($this->pset->run_timeout > 0)
             $command .= " -T" . $this->pset->run_timeout;
+        if ($this->inputfifo)
+            $command .= " -i" . escapeshellarg($this->inputfifo);
         $command .= " " . escapeshellarg($this->jaildir)
             . " " . escapeshellarg($this->username)
             . " " . escapeshellarg($this->runner->command);
         $this->lockfile = null; /* now owned by command */
-        return $this->run_and_log($command, true);
+        return $this->run_and_log($command);
     }
 
     private function remove_old_jails() {

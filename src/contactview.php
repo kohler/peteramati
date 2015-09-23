@@ -163,7 +163,8 @@ class ContactView {
         global $Now;
         if (!$json)
             $json = (object) array();
-        $lockfn = self::runner_logfile($info, $checkt) . ".pid";
+        $logfn = self::runner_logfile($info, $checkt);
+        $lockfn = $logfn . ".pid";
         $pid_data = @file_get_contents($lockfn);
         if (ctype_digit(trim($pid_data))
             && !posix_kill(trim($pid_data), 0)
@@ -181,8 +182,10 @@ class ContactView {
             $json->done = true;
             $json->status = "dead";
         }
-        if ($json->done && $pid_data !== false)
+        if ($json->done && $pid_data !== false) {
             unlink($lockfn);
+            unlink($logfn . ".in");
+        }
         return $json;
     }
 
@@ -245,7 +248,7 @@ class ContactView {
     static function runner_json($info, $checkt, $offset = -1) {
         if (ctype_digit($checkt))
             $logfn = self::runner_logfile($info, $checkt);
-        else if (preg_match(',\.(\d+)\.log(?:\.lock)?\z,', $checkt, $m)) {
+        else if (preg_match(',\.(\d+)\.log(?:\.lock|\.pid)?\z,', $checkt, $m)) {
             $logfn = $checkt;
             $checkt = $m[1];
         } else

@@ -152,4 +152,7 @@ function updateSchema($Conf) {
     if ($Conf->settings["allowPaperOption"] == 89
         && $Conf->ql("alter table ContactImage change `data` `data` mediumblob DEFAULT NULL"))
         update_schema_version($Conf, 90);
+    if ($Conf->settings["allowPaperOption"] == 90
+        && $Conf->ql("alter table ExecutionQueue add `inputfifo` varchar(1024) DEFAULT NULL"))
+        update_schema_version($Conf, 91);
 }
