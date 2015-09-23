@@ -127,6 +127,13 @@ function runner_eval($runner, $info, $answer) {
 // checkup
 if ($checkt > 0
     && $answer = ContactView::runner_json($Info, $checkt, $Offset)) {
+    if ($answer->status == "working" && @$_POST["stop"]) {
+        ContactView::runner_write($Info, $checkt, "\x1b\x03");
+        $now = microtime(true);
+        do {
+            $answer = ContactView::runner_json($Info, $checkt, $Offset);
+        } while ($answer->status == "working" && microtime(true) - $now < 0.1);
+    }
     if ($answer->status != "working" && $Queueid > 0)
         $Conf->qe("delete from ExecutionQueue where queueid=$Queueid and repoid=" . $Info->repo->repoid);
     if ($answer->status == "done"

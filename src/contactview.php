@@ -267,6 +267,21 @@ class ContactView {
         return $json;
     }
 
+    static function runner_write($info, $checkt, $data) {
+        global $ConfSitePATH;
+        if (!ctype_digit($checkt))
+            return false;
+        $logfn = self::runner_logfile($info, $checkt);
+        $proc = proc_open("$ConfSitePATH/jail/pa-writefifo " . escapeshellarg($logfn . ".in"),
+                          array(array("pipe", "r")), $pipes);
+        if ($pipes[0]) {
+            fwrite($pipes[0], $data);
+            fclose($pipes[0]);
+        }
+        if ($proc)
+            proc_close($proc);
+    }
+
     static function echo_heading($user) {
         global $Me;
         $u = $Me->user_linkpart($user);

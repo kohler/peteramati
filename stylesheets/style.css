@@ -581,6 +581,16 @@ input.bsm, button.bsm, select.bsm, a.bsm, button.runner61 {
         background-color: white;
 	white-space: nowrap;
 }
+button.run61stop {
+	display: inline-block;
+	margin-left: 12px;
+	padding: 4px 8px;
+	border: 1px outset buttonface;
+	border-radius: 6px;
+	background-color: red;
+	color: white;
+	white-space: nowrap;
+}
 input.bsm, button.bsm, select.bsm, a.bsm {
 	font-size: smaller;
 }

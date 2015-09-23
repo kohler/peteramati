@@ -1489,7 +1489,7 @@ void jailownerinfo::exec_done(int exit_status) {
 
 static __attribute__((noreturn)) void usage() {
     fprintf(stderr, "Usage: pa-jail init [-n] [-f FILES] [-S SKELETON] JAILDIR [USER]\n");
-    fprintf(stderr, "       pa-jail run [--fg] [-nq] [-T TIMEOUT] [-p PIDFILE] [-i INPUT]\\\n");
+    fprintf(stderr, "       pa-jail run [--fg] [-nq] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n");
     fprintf(stderr, "                   [-f FILES] [-S SKELETON] JAILDIR USER COMMAND\n");
     fprintf(stderr, "       pa-jail mv OLDDIR NEWDIR\n");
     fprintf(stderr, "       pa-jail rm [-nf] JAILDIR\n");

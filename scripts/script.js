@@ -2188,10 +2188,17 @@ function run61(button, opt) {
                     x = Math.round(data.headage / 5 + 0.5) * 5;
                 t += ", oldest began about " + x + (x == 1 ? " second" : " seconds") + " ago";
             }
-            thepre[0].insertBefore((jQuery("<span class='run61queue'>" + t + "</span>"))[0], thepre[0].lastChild);
+            thepre[0].insertBefore(($("<span class='run61queue'>" + t + "</span>"))[0], thepre[0].lastChild);
             setTimeout(send, 10000);
             return;
         }
+
+        if (data && data.status == "working") {
+            if (!$("#run61stop_" + button.value).length)
+                $("<button id=\"run61stop_" + button.value + "\" class=\"run61stop\" type=\"button\">Stop</button>")
+                    .click(stop).appendTo("#run61out_" + button.value + " > h3");
+        } else
+            $("#run61stop_" + button.value).remove();
 
         if (!data || !data.ok) {
             if (data && data.loggedout)
@@ -2205,6 +2212,8 @@ function run61(button, opt) {
         }
 
         checkt = checkt || data.timestamp;
+        if (data.data && data.offset < offset)
+            data.data = data.data.substring(offset - data.offset);
         if (data.data) {
             offset = data.lastoffset;
             append_data(data.data, data);
@@ -2226,12 +2235,13 @@ function run61(button, opt) {
             done();
     }
 
-    function send() {
+    function send(args) {
+        var a = {run: button.value, offset: offset};
+        checkt && (a.check = checkt);
+        queueid && (a.queueid = queueid);
+        args && $.extend(a, args);
         jQuery.ajax(form.attr("action"), {
-            data: form.serializeWith({run: button.value, ajax: 1,
-                                      offset: offset,
-                                      check: (checkt ? checkt : null),
-                                      queueid: (queueid ? queueid : null)}),
+            data: form.serializeWith(a),
             type: "POST", cache: false,
             dataType: "json",
             success: succeed,
@@ -2240,6 +2250,10 @@ function run61(button, opt) {
                 form.prop("outstanding", false);
             }
         });
+    }
+
+    function stop() {
+        send({stop: 1});
     }
 
     if (opt.headline && opt.noclear && thepre[0].firstChild != thecursor)
