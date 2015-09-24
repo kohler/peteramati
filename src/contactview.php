@@ -4,8 +4,6 @@
 // Distributed under an MIT-like license; see LICENSE
 
 class ContactView {
-
-    static private $_clipboard = false;
     static private $_reverse_pset_compare = false;
 
     static function set_path_request($paths) {
@@ -409,13 +407,10 @@ class ContactView {
         else
             $value = htmlspecialchars($repo_url ? $repo_url : "(none)");
         if ($repo_url) {
-            $value .= ' <button class="repoclip" style="display:none" data-clipboard-text="'
+            $value .= ' <button class="b repoclip hottooltip" data-tooltip="'
                 . htmlspecialchars($repo->url)
                 . '" type="button" onclick="false">Copy URL to clipboard</button>';
-            if (!self::$_clipboard) {
-                $Conf->footerScript("var zeroclip=new ZeroClipboard(jQuery('.repoclip'));zeroclip.on('load',function(){jQuery('.repoclip').show()});zeroclip.on('mousedown',function(){jQuery(this).css({color:'red'})});zeroclip.on('mouseup',function(){jQuery(this).css({color:''})})");
-                self::$_clipboard = true;
-            }
+            $Conf->footerScript('$(".repoclip").each(pa_init_repoclip)', "repoclip");
             if ($include_tarball && $info->commit_hash()
                 && ($tarball_url = $info->tarball_url()))
                 $value .= ' <a class="bsm q" href="' . htmlspecialchars($tarball_url) . '">Download tarball for ' . substr($info->commit_hash(), 0, 7) . '</a>';

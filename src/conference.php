@@ -1487,7 +1487,7 @@ class Conference {
 
         $this->scriptStuff .= $this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n";
         $this->scriptStuff .= $this->make_script_file("scripts/jquery.flot.min.js", true) . "\n";
-        $this->scriptStuff .= $this->make_script_file("scripts/ZeroClipboard.min.js", true) . "\n";
+        //$this->scriptStuff .= $this->make_script_file("scripts/ZeroClipboard.min.js", true) . "\n";
 
         // Javascript settings to set before script.js
         $this->scriptStuff .= "<script>siteurl=\"$ConfSiteBase\";siteurl_suffix=\"$ConfSiteSuffix\"";
@@ -1512,7 +1512,7 @@ class Conference {
         if ($pid && $Me && $Me->privChair
             && ($forceShow = @$_REQUEST["forceShow"]) && $forceShow != "0")
             $this->scriptStuff .= ";hotcrp_want_override_conflict=true";
-        $this->scriptStuff .= ";ZeroClipboard.setDefaults({moviePath:\"${ConfSiteBase}cacheable$ConfSiteSuffix?file=scripts/ZeroClipboard.swf&amp;mtime=" . filemtime("$ConfSitePATH/scripts/ZeroClipboard.swf") . "\"})";
+        //$this->scriptStuff .= ";ZeroClipboard.setDefaults({moviePath:\"${ConfSiteBase}cacheable$ConfSiteSuffix?file=scripts/ZeroClipboard.swf&amp;mtime=" . filemtime("$ConfSitePATH/scripts/ZeroClipboard.swf") . "\"})";
         $this->scriptStuff .= "</script>\n";
 
         // script.js

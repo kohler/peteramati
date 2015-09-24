@@ -894,7 +894,7 @@ function tooltip(elt) {
             return $();
     }
 
-    var content = j.attr("hottooltip") || jqnear("hottooltipcontent").html();
+    var content = j.attr("data-tooltip") || jqnear("data-tooltipcontent").html();
     if (!content)
         return null;
 
@@ -905,7 +905,7 @@ function tooltip(elt) {
             return tt;
     }
 
-    var dir = j.attr("hottooltipdir") || "v",
+    var dir = j.attr("data-tooltipdir") || "v",
         bub = make_bubble(content, {color: "tooltip", dir: dir}),
         to = null, refcount = 0;
     function erase() {
@@ -921,7 +921,7 @@ function tooltip(elt) {
             ++refcount;
         },
         exit: function () {
-            var delay = j.attr("hottooltiptype") == "focus" ? 0 : 200;
+            var delay = j.attr("data-tooltiptype") == "focus" ? 0 : 200;
             to = clearTimeout(to);
             if (--refcount == 0)
                 to = setTimeout(erase, delay);
@@ -929,7 +929,7 @@ function tooltip(elt) {
         erase: erase, elt: elt, content: content
     };
     j.data("hotcrp_tooltip", tt);
-    near = jqnear("hottooltipnear")[0] || elt;
+    near = jqnear("data-tooltipnear")[0] || elt;
     bub.near(near).hover(tt.enter, tt.exit);
     return window.global_tooltip = tt;
 }
@@ -951,7 +951,7 @@ function tooltip_leave(evt) {
 
 function add_tooltip() {
     var j = jQuery(this);
-    if (j.attr("hottooltiptype") == "focus")
+    if (j.attr("data-tooltiptype") == "focus")
         j.on("focus", tooltip_enter).on("blur", tooltip_leave);
     else
         j.hover(tooltip_enter, tooltip_leave);
@@ -2504,6 +2504,27 @@ function click_s61check(evt) {
         $form.attr("check_s61_last", pos);
     }
     return true;
+}
+
+function repoclip() {
+    var node = document.createTextNode(this.getAttribute("data-tooltip"));
+    var bub = make_bubble(node, {color: "tooltip", dir: "t"});
+    bub.near(this);
+    var range = document.createRange();
+    range.selectNode(node);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    var worked;
+    try {
+        worked = document.execCommand("copy");
+    } catch (err) {
+    }
+    window.getSelection().removeAllRanges();
+    bub.remove();
+}
+
+function pa_init_repoclip() {
+    $(this).click(repoclip);
 }
 
 
