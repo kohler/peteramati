@@ -1561,12 +1561,12 @@ function analyze(target) {
                   || /\bdiffl61\b.*\bgw\b/.test(tr.className)))
         tr = tr.previousSibling;
     table = tr;
-    while (table && !table.getAttribute("run61file"))
+    while (table && !table.getAttribute("data-pa-file"))
         table = table.parentNode;
     if (!tr || !table || !/\bdiffl61\b.*\bg[idc]\b/.test(tr.className))
         return null;
 
-    result = {filename: table.getAttribute("run61file"), tr: tr};
+    result = {filename: table.getAttribute("data-pa-file"), tr: tr};
     if ((x = $(tr).find("td.difflnb61").text()))
         result.lineid = "b" + x;
     else
@@ -1787,7 +1787,7 @@ function sb() {
 
 function runfold61(name) {
     var therun = jQuery("#run61_" + name), thebutton;
-    if (therun.attr("run61timestamp") && !therun.is(":visible")) {
+    if (therun.attr("data-pa-timestamp") && !therun.is(":visible")) {
         thebutton = jQuery(".runner61[value='" + name + "']")[0];
         run61(thebutton, {unfold: true});
     } else
@@ -1902,15 +1902,15 @@ function run61(button, opt) {
 
     if (typeof opt !== "object")
         opt = {};
-    if (opt.unfold && therun.attr("run61timestamp"))
-        checkt = +therun.attr("run61timestamp");
+    if (opt.unfold && therun.attr("data-pa-timestamp"))
+        checkt = +therun.attr("data-pa-timestamp");
     else {
         if (form.prop("outstanding"))
             return true;
         form.find("button").prop("disabled", true);
         form.prop("outstanding", true);
     }
-    therun.removeAttr("run61timestamp");
+    therun.removeAttr("data-pa-timestamp");
 
     fold61(therun, jQuery("#run61out_" + button.value).show(), true);
     if (!checkt && !opt.noclear)
@@ -2037,11 +2037,11 @@ function run61(button, opt) {
     }
 
     function add_file_link(node, file, line, link) {
-        var filematch = $(".filediff61[run61file='" + file + "']"), dir;
-        if (!filematch.length && (dir = therun.attr("run61directory")))
-            filematch = $(".filediff61[run61file='" + dir + "/" + file + "']");
+        var filematch = $(".filediff61[data-pa-file='" + file + "']"), dir;
+        if (!filematch.length && (dir = therun.attr("data-pa-directory")))
+            filematch = $(".filediff61[data-pa-file='" + dir + "/" + file + "']");
         if (filematch.length) {
-            var anchor = "Lb" + line + "_" + filematch.attr("run61fileid");
+            var anchor = "Lb" + line + "_" + filematch.attr("data-pa-fileid");
             if (document.getElementById(anchor)) {
                 var a = $("<a href=\"#" + anchor + "\" onclick=\"return gotoline61(this)\"></a>");
                 a.text(link);
@@ -2104,12 +2104,12 @@ function run61(button, opt) {
         var lastfull = ends_with_newline(lines[lines.length - 1]);
 
         var node = thepre[0].lastChild.previousSibling, str;
-        if (node && (str = node.getAttribute("run61partline")) !== null
+        if (node && (str = node.getAttribute("data-pa-outputpart")) !== null
             && str !== "" && lines.length) {
             while (node.firstChild)
                 node.removeChild(node.firstChild);
             lines[0] = str + lines[0];
-            node.removeAttribute("run61partline");
+            node.removeAttribute("data-pa-outputpart");
         } else {
             if (node && lines.length)
                 node.appendChild(document.createTextNode("\n"));
@@ -2130,7 +2130,7 @@ function run61(button, opt) {
         if (!lastfull) {
             styles = laststyles;
             if ((node = thepre[0].lastChild.previousSibling))
-                node.setAttribute("run61partline", last);
+                node.setAttribute("data-pa-outputpart", last);
         }
         if (atbottom)
             therun.scrollTop(Math.max(Math.ceil(therun.children().height() - therun.height()), 0));
@@ -2262,9 +2262,9 @@ function run61(button, opt) {
         append_html(opt.headline);
     else if (opt.headline)
         append("\x1b[01;37m" + opt.headline + "\x1b[0m\n");
-    if (opt.unfold && therun.attr("run61data"))
-        append(therun.attr("run61data"));
-    therun.removeAttr("run61data");
+    if (opt.unfold && therun.attr("data-pa-content"))
+        append(therun.attr("data-pa-content"));
+    therun.removeAttr("data-pa-content");
 
     send();
     return false;

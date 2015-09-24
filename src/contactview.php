@@ -416,7 +416,8 @@ class ContactView {
                 $Conf->footerScript("var zeroclip=new ZeroClipboard(jQuery('.repoclip'));zeroclip.on('load',function(){jQuery('.repoclip').show()});zeroclip.on('mousedown',function(){jQuery(this).css({color:'red'})});zeroclip.on('mouseup',function(){jQuery(this).css({color:''})})");
                 self::$_clipboard = true;
             }
-            if ($include_tarball && ($tarball_url = $info->tarball_url()))
+            if ($include_tarball && $info->commit_hash()
+                && ($tarball_url = $info->tarball_url()))
                 $value .= ' <a class="bsm q" href="' . htmlspecialchars($tarball_url) . '">Download tarball for ' . substr($info->commit_hash(), 0, 7) . '</a>';
         }
 

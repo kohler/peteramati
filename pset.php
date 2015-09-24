@@ -927,11 +927,11 @@ if ($Pset->gitless) {
             htmlspecialchars($r->output_title), '</a></h3>',
             '<div class="run61" id="run61_', $r->name, '" style="display:none"';
         if ($Pset->directory_noslash !== "")
-            echo ' run61directory="', htmlspecialchars($Pset->directory_noslash), '"';
+            echo ' data-pa-directory="', htmlspecialchars($Pset->directory_noslash), '"';
         if ($rj && isset($rj->timestamp))
-            echo ' run61timestamp="', $rj->timestamp, '"';
+            echo ' data-pa-timestamp="', $rj->timestamp, '"';
         if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n")))
-            echo ' run61data="', htmlspecialchars(substr($rj->data, $pos + 2)), '"';
+            echo ' data-pa-content="', htmlspecialchars(substr($rj->data, $pos + 2)), '"';
         echo '><div class="run61in"><pre class="run61pre">';
         echo '</pre></div></div></h3></div>', "\n";
     }
@@ -970,7 +970,7 @@ if ($Pset->gitless) {
             echo " hidegrade61";
         if (!$display_table)
             echo '" style="display:none';
-        echo '" run61file="', htmlspecialchars($file), '" run61fileid="', $fileid, "\"><tbody>\n";
+        echo '" data-pa-file="', htmlspecialchars($file), '" data-pa-fileid="', $fileid, "\"><tbody>\n";
         if ($Me->isPC && $Me != $User)
             $Conf->footerScript("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
         foreach ($dinfo->diff as $l) {

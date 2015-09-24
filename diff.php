@@ -241,7 +241,7 @@ foreach ($diff as $file => $dinfo) {
         echo " hidegrade61";
     if (!$display_table)
         echo '" style="display:none';
-    echo '" run61file="', htmlspecialchars($file), '" run61fileid="', $fileid, "\"><tbody>\n";
+    echo '" data-pa-file="', htmlspecialchars($file), '" data-pa-fileid="', $fileid, "\"><tbody>\n";
     if ($Me->isPC && $Me != $User)
         $Conf->footerScript("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
     foreach ($dinfo->diff as $l) {
