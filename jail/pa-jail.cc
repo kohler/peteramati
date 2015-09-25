@@ -56,6 +56,7 @@ static std::string linkdir;
 static std::map<std::string, int> linkdir_dirtable;
 static std::string dstroot;
 static std::string pidfilename;
+static int pidfd = -1;
 static std::map<std::string, int> umount_table;
 static volatile sig_atomic_t got_sigterm = 0;
 static int sigpipe[2];
@@ -1008,14 +1009,13 @@ class jailownerinfo {
     ~jailownerinfo();
     void init(const char* owner_name);
     void exec(int argc, char** argv, jaildirinfo& jaildir,
-              int pidfd, int inputfd, double timeout);
+              int inputfd, double timeout);
     int exec_go();
 
   private:
     const char* newenv[4];
     char** argv;
     jaildirinfo* jaildir;
-    int pidfd;
     int inputfd;
     struct timeval timeout;
     fd_set readset;
@@ -1038,7 +1038,6 @@ class jailownerinfo {
     buffer to_slave;
     buffer from_slave;
 
-    void write_pid(int p);
     void start_sigpipe();
     void block(int ptymaster);
     int check_child_timeout(pid_t child, bool waitpid);
@@ -1101,7 +1100,7 @@ static int exec_clone_function(void* arg) {
 }
 #endif
 
-void jailownerinfo::write_pid(int p) {
+static void write_pid(int p) {
     if (pidfd >= 0) {
         lseek(pidfd, 0, SEEK_SET);
         char buf[1024];
@@ -1113,7 +1112,7 @@ void jailownerinfo::write_pid(int p) {
 }
 
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         int pidfd, int inputfd, double timeout) {
+                         int inputfd, double timeout) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     sprintf(homebuf, "HOME=%s", owner_home.c_str());
@@ -1151,7 +1150,6 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 
     // store other arguments
     this->jaildir = &jaildir;
-    this->pidfd = pidfd;
     this->inputfd = inputfd;
     if (timeout > 0) {
         struct timeval now, delta;
@@ -1183,10 +1181,10 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     write_pid(child);
 
     int exit_status = 0;
-    if (foreground) {
+    if (foreground)
         exit_status = x_waitpid(child, 0);
-        write_pid(0);
-    }
+    else
+        pidfd = -1;
     exit(exit_status);
 }
 
@@ -1311,6 +1309,11 @@ void sighandler(int signo) {
     char c = (char) signo;
     ssize_t w = write(sigpipe[1], &c, 1);
     (void) w;
+}
+
+void cleanup_pidfd(void) {
+    if (pidfd >= 0)
+        write_pid(0);
 }
 }
 
@@ -1474,7 +1477,6 @@ void jailownerinfo::handle_child(pid_t child, int ptymaster) {
 }
 
 void jailownerinfo::exec_done(int exit_status) {
-    write_pid(0);
     if (exit_status == 124 && !quiet)
         fprintf(stdout, "\n\x1b[3;7;31m...timed out\x1b[0m\n");
     if (exit_status == 128 + SIGTERM && !quiet)
@@ -1629,18 +1631,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    // open pidfile as current user
-    int pidfd = -1;
-    if (!pidfilename.empty() && verbose)
-        fprintf(verbosefile, "touch %s\n", pidfilename.c_str());
-    if (!pidfilename.empty() && !dryrun) {
-        pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
-        if (pidfd == -1) {
-            fprintf(stderr, "%s: %s\n", pidfilename.c_str(), strerror(errno));
-            exit(1);
-        }
-    }
-
     // open infile non-blocking as current user
     int inputfd = 0;
     if (!inputarg.empty() && !dryrun) {
@@ -1649,6 +1639,18 @@ int main(int argc, char** argv) {
             fprintf(stderr, "%s: %s\n", inputarg.c_str(), strerror(errno));
             exit(1);
         }
+    }
+
+    // open pidfile as current user
+    if (!pidfilename.empty() && verbose)
+        fprintf(verbosefile, "touch %s\n", pidfilename.c_str());
+    if (!pidfilename.empty() && !dryrun) {
+        pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
+        if (pidfd == -1) {
+            fprintf(stderr, "%s: %s\n", pidfilename.c_str(), strerror(errno));
+            exit(1);
+        }
+        atexit(cleanup_pidfd);
     }
 
     // escalate so that the real (not just effective) UID/GID is root. this is
@@ -1774,7 +1776,7 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc)
-        jailuser.exec(argc, argv, jaildir, pidfd, inputfd, timeout);
+        jailuser.exec(argc, argv, jaildir, inputfd, timeout);
 
     exit(0);
 }
