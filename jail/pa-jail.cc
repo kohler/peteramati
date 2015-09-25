@@ -1102,12 +1102,14 @@ static int exec_clone_function(void* arg) {
 #endif
 
 void jailownerinfo::write_pid(int p) {
-    lseek(pidfd, 0, SEEK_SET);
-    char buf[1024];
-    int l = sprintf(buf, "%d\n", p);
-    ssize_t w = write(pidfd, buf, l);
-    if (w != l || ftruncate(pidfd, l) != 0)
-        perror_exit(pidfilename.c_str());
+    if (pidfd >= 0) {
+        lseek(pidfd, 0, SEEK_SET);
+        char buf[1024];
+        int l = sprintf(buf, "%d\n", p);
+        ssize_t w = write(pidfd, buf, l);
+        if (w != l || ftruncate(pidfd, l) != 0)
+            perror_exit(pidfilename.c_str());
+    }
 }
 
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
@@ -1183,8 +1185,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     int exit_status = 0;
     if (foreground) {
         exit_status = x_waitpid(child, 0);
-        if (pidfd >= 0)
-            write_pid(0);
+        write_pid(0);
     }
     exit(exit_status);
 }
