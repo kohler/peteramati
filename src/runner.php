@@ -215,6 +215,7 @@ class RunnerState {
 
         if ($overlayfile[0] != "/")
             $overlayfile = $ConfSitePATH . "/" . $overlayfile;
+        $overlayfile = $this->expand($overlayfile);
         if ($this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($overlayfile)))
             throw new RunnerException("can't unpack overlay");
 
