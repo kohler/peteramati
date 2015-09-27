@@ -24,7 +24,7 @@ $Opt["psetsConfig"] = "/dev/null";
 //   dbPassword      Password for database user.
 //   dbHost          Database host. Defaults to localhost.
 
-$Opt["dbName"] = "YourConfI";
+$Opt["dbName"] = "YourClass";
 
 
 // CONFERENCE SETTINGS
@@ -39,9 +39,9 @@ $Opt["dbName"] = "YourConfI";
 //                   end in a dash. Example: "hotnets5-". Defaults to
 //                   $Opt["dbName"] plus a dash.
 
-$Opt["shortName"] = "YourConf I";
-$Opt["longName"] = "Your Conference I";
-$Opt["paperSite"] = "http://example.com/";
+$Opt["shortName"] = "CS 101";
+$Opt["longName"] = "Introduction to Computer Science";
+$Opt["paperSite"] = "http://example.edu/";
 
 
 // USER PASSWORDS
@@ -95,9 +95,9 @@ $Opt["passwordHmacKey"] = null;
 //                   resulting mails may not be standards compliant.
 
 $Opt["contactName"] = "Your Name";
-$Opt["contactEmail"] = "you@example.com";
+$Opt["contactEmail"] = "you@example.edu";
 $Opt["sendEmail"] = true;
-$Opt["emailFrom"] = "you@example.com";
+$Opt["emailFrom"] = "you@example.edu";
 
 
 // OPTIONAL SETTINGS (the defaults are reasonable)
