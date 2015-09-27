@@ -844,7 +844,7 @@ struct jaildirinfo {
     void check();
 
 private:
-    std::string alternate_permdir;
+    std::string alternate_permfile;
 
     void check_permfile(int fd, std::string dir);
 };
@@ -924,14 +924,14 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
             }
         }
 
-        // check for "JAIL61" allowance
+        // check for "pa-jail.conf" allowance
         if (permdir.empty() && parent.length())
             check_permfile(fd, thisdir);
     }
     if (permdir.empty()) {
-        fprintf(stderr, "%s: No ancestor directory contains a `JAIL61` with `enablejail`\n", dir.c_str());
-        if (!alternate_permdir.empty())
-            fprintf(stderr, "  (Perhaps you need to edit `%sJAIL61`.)\n", alternate_permdir.c_str());
+        fprintf(stderr, "%s: No ancestor directory contains a `pa-jail.conf` with `enablejail`\n", dir.c_str());
+        if (!alternate_permfile.empty())
+            fprintf(stderr, "  (Perhaps you need to edit `%s`.)\n", alternate_permfile.c_str());
         exit(1);
     }
     if (fd >= 0)
@@ -939,31 +939,36 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
 }
 
 void jaildirinfo::check_permfile(int fd, std::string thisdir) {
-    int jail61f = openat(fd, "JAIL61", O_RDONLY | O_NOFOLLOW);
+    const char* permfilename = "pa-jail.conf";
+    int jail61f = openat(fd, permfilename, O_RDONLY | O_NOFOLLOW);
+    if (jail61f == -1 && errno == ENOENT) {
+        permfilename = "JAIL61";
+        jail61f = openat(fd, permfilename, O_RDONLY | O_NOFOLLOW);
+    }
     if (jail61f == -1) {
         if (errno != ENOENT && errno != ELOOP) {
-            fprintf(stderr, "%s/JAIL61: %s\n", thisdir.c_str(), strerror(errno));
+            fprintf(stderr, "%s/%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
             exit(1);
         }
         return;
     }
 
+    if (thisdir[thisdir.length() - 1] != '/')
+        thisdir += '/';
+
     struct stat s;
     if (fstat(jail61f, &s) != 0) {
-        fprintf(stderr, "%s/JAIL61: %s\n", thisdir.c_str(), strerror(errno));
+        fprintf(stderr, "%s%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
         exit(1);
     } else if (s.st_uid != ROOT
                || (s.st_gid != ROOT && (s.st_mode & S_IWGRP))
                || (s.st_mode & S_IWOTH)) {
-        fprintf(stderr, "%s/JAIL61: Writable by non-root\n", thisdir.c_str());
+        fprintf(stderr, "%s%s: Writable by non-root\n", thisdir.c_str(), permfilename);
         exit(1);
     }
 
     char buf[8192];
     ssize_t nr = read(jail61f, buf, sizeof(buf));
-    if (thisdir[thisdir.length() - 1] != '/')
-        thisdir += '/';
-
     std::string str(buf, nr < 0 ? 0 : nr);
     size_t pos = 0;
     while (pos < str.length()) {
@@ -989,17 +994,17 @@ void jaildirinfo::check_permfile(int fd, std::string thisdir) {
         if (word1 == "allowjail")
             word1 = "enablejail";
         if (word1 == "disablejail" && word2.empty()) {
-            fprintf(stderr, "%sJAIL61: Jails are disabled here\n", thisdir.c_str());
+            fprintf(stderr, "%s%s: Jails are disabled here\n", thisdir.c_str(), permfilename);
             exit(1);
         } else if (word1 == "disablejail" && dirmatch) {
-            fprintf(stderr, "%sJAIL61: Jails are disabled under %s\n", thisdir.c_str(), word2.c_str());
+            fprintf(stderr, "%s%s: Jails are disabled under %s\n", thisdir.c_str(), word2.c_str(), permfilename);
             exit(1);
         } else if (word1 == "enablejail" && word2.empty())
             permdir = thisdir;
         else if (word1 == "enablejail" && dirmatch)
             permdir = word2;
         else if (word1 == "enablejail" && thisdir.substr(0, word2.length()) != word2)
-            alternate_permdir = thisdir;
+            alternate_permfile = thisdir + permfilename;
     }
 
     close(jail61f);
@@ -1678,14 +1683,14 @@ int main(int argc, char** argv) {
     // check the jail directory
     // - no special characters
     // - path has no symlinks
-    // - at least one permdir has a file `JAIL61` owned by root and writable
-    //   only by root, that contains `enablejail`
+    // - at least one permdir has a file `pa-jail.conf` owned by root
+    //   and writable only by root, that contains `enablejail`
     // - everything above that dir is owned by by root and writable only by
     //   root
-    // - no permdir has a file `JAIL61` not owned by root, writable by other
-    //   than root, or containing `disablejail`
-    // - stuff below the dir containing `JAIL61` dynamically created
-    //   if necessary
+    // - no permdir has a file `pa-jail.conf` not owned by root,
+    //   writable by other than root, or containing `disablejail`
+    // - stuff below the dir containing the allowing `pa-jail.conf`
+    //   dynamically created if necessary
     // - try to eliminate TOCTTOU
     jaildirinfo jaildir(argv[optind], action, doforce);
 

@@ -18,17 +18,18 @@ letters, numbers, and characters in `-._~`.
 2. There must be no symbolic links in the path.
 
 3. The jail directory, or one of its parent directories, must contain
-a `JAIL61` file, owned by root and writable only by root, that
+a `pa-jail.conf` file, owned by root and writable only by root, that
 “enables” the jail directory (see below for how this works).
 
 4. The jail directory and all of its parent directories _must not_
-contain a `JAIL61` file that is not owned by root, that is writable by
-a user other than root, or that “disables” the jail directory.
+contain a `pa-jail.conf` file that is not owned by root, that is
+writable by a user other than root, or that “disables” the jail
+directory.
 
-5. All of the directories above the “enabling” `JAIL61` file must be
-owned by root and writable only by root.
+5. All of the directories above the enabling `pa-jail.conf` file must
+be owned by root and writable only by root.
 
-A `JAIL61` file “enables” a jail directory by containing a line
+A `pa-jail.conf` file “enables” a jail directory by containing a line
 `enablejail` or `enablejail SUBDIR` (where `SUBDIR` matches the rest
 of the jail). It “disables” a jail directory by containing a line
 `disablejail` or `disablejail SUBDIR`.
