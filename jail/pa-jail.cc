@@ -177,6 +177,14 @@ static int x_lchown(const char* path, uid_t owner, gid_t group) {
     return 0;
 }
 
+static int x_lchownat(int fd, const char* component, uid_t owner, gid_t group, const std::string& dirpath) {
+    if (verbose)
+        fprintf(verbosefile, "chown -h %s:%s %s%s\n", uid_to_name(owner), gid_to_name(group), dirpath.c_str(), component);
+    if (!dryrun && fchownat(fd, component, owner, group, AT_SYMLINK_NOFOLLOW) != 0)
+        return perror_fail("chown %s: %s\n", (dirpath + component).c_str());
+    return 0;
+}
+
 static int x_waitpid(pid_t child, int flags) {
     int status;
     while (1) {
@@ -197,82 +205,6 @@ static int x_waitpid(pid_t child, int flags) {
 static __attribute__((noreturn)) void perror_exit(const char* message) {
     fprintf(stderr, "%s: %s\n", message, strerror(errno));
     exit(1);
-}
-
-static void chown_recursive(char* buf, int depth, uid_t owner, gid_t group) {
-    int len = strlen(buf);
-    if (len == 0 || len == PATH_MAX - 1) {
-        fprintf(stderr, "%s: Bad pathname\n", buf);
-        exit(1);
-    }
-    if (buf[len - 1] != '/') {
-        strcpy(&buf[len], "/");
-        ++len;
-    }
-
-    typedef std::pair<uid_t, gid_t> ug_t;
-    std::map<std::string, ug_t>* home_map = NULL;
-    if (depth == 1 && len >= 6 && memcmp(&buf[len - 6], "/home/", 6) == 0) {
-        home_map = new std::map<std::string, ug_t>;
-        setpwent();
-        while (struct passwd* pw = getpwent()) {
-            std::string name;
-            if (pw->pw_dir && strncmp(pw->pw_dir, "/home/", 6) == 0
-                && strchr(pw->pw_dir + 6, '/') == NULL)
-                name = pw->pw_dir + 6;
-            else
-                name = pw->pw_name;
-            (*home_map)[name] = ug_t(pw->pw_uid, pw->pw_gid);
-        }
-    }
-
-    DIR* dir = opendir(buf);
-    if (!dir) {
-        if (errno == ENOENT && depth == 0 && dryrun)
-            return;
-        perror_exit(buf);
-    }
-
-    struct dirent* de;
-    uid_t u;
-    gid_t g;
-
-    while ((de = readdir(dir))) {
-        if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
-            continue;
-
-        // construct name
-        int namelen = strlen(de->d_name);
-        if (len + namelen + 1 >= PATH_MAX) {
-            fprintf(stderr, "%.*s%s: Name too long\n", len, buf, de->d_name);
-            exit(1);
-        }
-        memcpy(&buf[len], de->d_name, namelen + 1);
-
-        // don't follow symbolic links
-        if (de->d_type == DT_LNK) {
-            if (x_lchown(buf, owner, group))
-                perror_exit(buf);
-            continue;
-        }
-
-        // change its uid/gid
-        u = owner, g = group;
-        if (home_map) {
-            auto it = home_map->find(de->d_name);
-            if (it != home_map->end())
-                u = it->second.first, g = it->second.second;
-        }
-        if (x_lchown(buf, u, g))
-            perror_exit(buf);
-
-        // recurse
-        if (de->d_type == DT_DIR)
-            chown_recursive(buf, depth + 1, u, g);
-    }
-
-    closedir(dir);
-    delete home_map;
 }
 
 
@@ -842,11 +774,13 @@ struct jaildirinfo {
 
     jaildirinfo(const char* str, jailaction action, bool doforce);
     void check();
+    void chown_recursive();
 
 private:
     std::string alternate_permfile;
 
     void check_permfile(int fd, std::string dir);
+    void chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group);
 };
 
 jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
@@ -1013,6 +947,83 @@ void jaildirinfo::check_permfile(int fd, std::string thisdir) {
 void jaildirinfo::check() {
     assert(!permdir.empty() && permdir[permdir.length() - 1] == '/');
     assert(dir.substr(0, permdir.length()) == permdir);
+}
+
+void jaildirinfo::chown_recursive() {
+    std::string buf = dir;
+    int dirfd = openat(parentfd, component.c_str(), O_CLOEXEC | O_NOFOLLOW);
+    if (dirfd == -1)
+        perror_exit(buf.c_str());
+    chown_recursive(dirfd, buf, 0, ROOT, ROOT);
+}
+
+void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group) {
+    if (dirbuf.length() && dirbuf.back() != '/')
+        dirbuf += '/';
+    size_t dirbuflen = dirbuf.length();
+
+    typedef std::pair<uid_t, gid_t> ug_t;
+    std::map<std::string, ug_t>* home_map = NULL;
+    if (depth == 1 && dirbuf.length() >= 6
+        && memcmp(dirbuf.data() + dirbuf.length() - 6, "/home/", 6) == 0) {
+        home_map = new std::map<std::string, ug_t>;
+        setpwent();
+        while (struct passwd* pw = getpwent()) {
+            std::string name;
+            if (pw->pw_dir && strncmp(pw->pw_dir, "/home/", 6) == 0
+                && strchr(pw->pw_dir + 6, '/') == NULL)
+                name = pw->pw_dir + 6;
+            else
+                name = pw->pw_name;
+            (*home_map)[name] = ug_t(pw->pw_uid, pw->pw_gid);
+        }
+    }
+
+    DIR* dir = fdopendir(dirfd);
+    if (!dir) {
+        if (errno == ENOENT && depth == 0 && dryrun)
+            return;
+        perror_exit(dirbuf.c_str());
+    }
+
+    struct dirent* de;
+    uid_t u;
+    gid_t g;
+
+    while ((de = readdir(dir))) {
+        if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+            continue;
+
+        // don't follow symbolic links
+        if (de->d_type == DT_LNK) {
+            if (x_lchownat(dirfd, de->d_name, owner, group, dirbuf))
+                perror_exit((dirbuf + de->d_name).c_str());
+            continue;
+        }
+
+        // change its uid/gid
+        u = owner, g = group;
+        if (home_map) {
+            auto it = home_map->find(de->d_name);
+            if (it != home_map->end())
+                u = it->second.first, g = it->second.second;
+        }
+        if (x_lchownat(dirfd, de->d_name, u, g, dirbuf))
+            perror_exit((dirbuf + de->d_name).c_str());
+
+        // recurse
+        if (de->d_type == DT_DIR) {
+            dirbuf += de->d_name;
+            int subdirfd = openat(dirfd, de->d_name, O_CLOEXEC | O_NOFOLLOW);
+            if (subdirfd == -1)
+                perror(dirbuf.c_str());
+            chown_recursive(subdirfd, dirbuf, depth + 1, u, g);
+            dirbuf.resize(dirbuflen);
+        }
+    }
+
+    closedir(dir);
+    delete home_map;
 }
 
 
@@ -1774,11 +1785,8 @@ int main(int argc, char** argv) {
     }
 
     // set ownership
-    if (action == do_run) {
-        char buf[8192];
-        strcpy(buf, jaildir.dir.c_str());
-        chown_recursive(buf, 0, ROOT, ROOT);
-    }
+    if (action == do_run)
+        jaildir.chown_recursive();
 
     // construct the jail
     if (filesf) {
