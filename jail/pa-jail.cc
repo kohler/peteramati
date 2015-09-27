@@ -915,7 +915,7 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
             if (s.st_uid != ROOT) {
                 fprintf(stderr, "%s: Not owned by root\n", thisdir.c_str());
                 exit(1);
-            } else if ((st.st_gid != ROOT && (s.st_mode & S_IWGRP))
+            } else if ((s.st_gid != ROOT && (s.st_mode & S_IWGRP))
                        || (s.st_mode & S_IWOTH)) {
                 fprintf(stderr, "%s: Writable by non-root\n", thisdir.c_str());
                 exit(1);
