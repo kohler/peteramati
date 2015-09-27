@@ -75,8 +75,8 @@ directly serves static files under `/testclass/images/`,
 
         cd jail && make
 
-The `pa-jail` program must be set-uid/gid root, so you may need to
-build it using `sudo make`.
+    The `pa-jail` program must be set-uid/gid root, so you may need to build
+    it using `sudo make`.
 
 5. XXX Configure conf/gitssh_config and conf/sshid
 

@@ -289,4 +289,4 @@ ignore; the setting `"ignore": "*.txt"` means the same as
 
 ### Running code
 
-See [runners.md].
+See [runners.md](runners.md).

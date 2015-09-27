@@ -26,17 +26,40 @@ contain a `pa-jail.conf` file that is not owned by root, that is
 writable by a user other than root, or that “disables” the jail
 directory.
 
-5. All of the directories above the enabling `pa-jail.conf` file must
-be owned by root and writable only by root.
+5. The directory containing the enabling `pa-jail.conf` file must be owned by
+   root and writable only by root, as must all of its parent directories.
 
 A `pa-jail.conf` file “enables” a jail directory by containing a line
 `enablejail` or `enablejail SUBDIR` (where `SUBDIR` matches the rest
 of the jail). It “disables” a jail directory by containing a line
 `disablejail` or `disablejail SUBDIR`.
 
-Container initialization
-------------------------
+Container components
+--------------------
 
-To initialize a student container, peteramati runs the following
-steps.
+A peteramati student container is built from the following components.
 
+1. The _container list_, which is a list of files on the host file system that
+   are copied into the jail. The container list should include important
+   utilities like `/bin/sh` and configuration files like `/etc/passwd`, as
+   well as files and programs used by student submissions (e.g. header files,
+   libraries, and compilers).
+
+2. The student’s code repository. This is checked out into
+   `/home/STUDENTUSER/repo`, where STUDENTUSER is an unprivileged system user
+   that runs the student’s code.
+
+3. An optional _overlay_ tarball, which is unpacked over
+   `/home/STUDENTUSER/repo`. Typically the overlay is used to reset files to
+   pristine states—for instance, to reset a grading script, in case the
+   student modified the one you handed out—or to add semi-secret configuration
+   information, input files, or grading scripts.
+
+The container list, student user, and overlay tarball are configured via
+`psets.json`.
+
+Creating a container list
+-------------------------
+
+The `jail/pa-trace` program offers a pretty easy way to create a container
+list.
