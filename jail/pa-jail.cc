@@ -99,31 +99,31 @@ static const char* gid_to_name(gid_t g) {
 }
 
 
-static int x_mkdir(const char* pathname, mode_t mode) {
+static int v_mkdir(const char* pathname, mode_t mode) {
     if (verbose)
         fprintf(verbosefile, "mkdir -m 0%o %s\n", mode, pathname);
     return dryrun ? 0 : mkdir(pathname, mode);
 }
 
-static int x_mkdirat(int dirfd, const char* component, mode_t mode, const std::string& pathname) {
+static int v_mkdirat(int dirfd, const char* component, mode_t mode, const std::string& pathname) {
     if (verbose)
         fprintf(verbosefile, "mkdir -m 0%o %s\n", mode, pathname.c_str());
     return dryrun ? 0 : mkdirat(dirfd, component, mode);
 }
 
-static int x_fchmod(int fd, mode_t mode, const std::string& pathname) {
+static int v_fchmod(int fd, mode_t mode, const std::string& pathname) {
     if (verbose)
         fprintf(verbosefile, "chmod 0%o %s\n", mode, pathname.c_str());
     return dryrun ? 0 : fchmod(fd, mode);
 }
 
-static int x_ensuredir(const char* pathname, mode_t mode) {
+static int v_ensuredir(const char* pathname, mode_t mode) {
     struct stat s;
     int r = stat(pathname, &s);
     if (r == 0 && S_ISDIR(s.st_mode))
         return 0;
     else if (r != 0 && errno == ENOENT) {
-        int r = x_mkdir(pathname, mode);
+        int r = v_mkdir(pathname, mode);
         return r ? r : 1;
     } else {
         if (r == 0)
@@ -132,7 +132,14 @@ static int x_ensuredir(const char* pathname, mode_t mode) {
     }
 }
 
-static bool x_link_eexist_ok(const char* newpath) {
+static bool x_link_eexist_ok(const char* oldpath, const char* newpath) {
+    // Maybe the file is already linked.
+    struct stat oldstat, newstat;
+    if (stat(oldpath, &oldstat) == 0 && stat(newpath, &newstat) == 0
+        && oldstat.st_dev == newstat.st_dev
+        && oldstat.st_ino == newstat.st_ino)
+        return true;
+
     // Maybe we are trying to link a file using two pathnames, where
     // an intermediate directory was a symbolic link.
     std::string dst(newpath);
@@ -156,7 +163,7 @@ static int x_link(const char* oldpath, const char* newpath) {
     if (verbose)
         fprintf(verbosefile, "ln %s %s\n", oldpath, newpath);
     if (!dryrun && link(oldpath, newpath) != 0
-        && (errno != EEXIST || !x_link_eexist_ok(newpath)))
+        && (errno != EEXIST || !x_link_eexist_ok(oldpath, newpath)))
         return -1;
     return 0;
 }
@@ -182,6 +189,58 @@ static int x_lchownat(int fd, const char* component, uid_t owner, gid_t group, c
         fprintf(verbosefile, "chown -h %s:%s %s%s\n", uid_to_name(owner), gid_to_name(group), dirpath.c_str(), component);
     if (!dryrun && fchownat(fd, component, owner, group, AT_SYMLINK_NOFOLLOW) != 0)
         return perror_fail("chown %s: %s\n", (dirpath + component).c_str());
+    return 0;
+}
+
+static int x_fchown(int fd, uid_t owner, gid_t group, const std::string& path) {
+    if (verbose)
+        fprintf(verbosefile, "chown -h %s:%s %s\n", uid_to_name(owner), gid_to_name(group), path.c_str());
+    if (!dryrun && fchown(fd, owner, group) != 0)
+        return perror_fail("chown %s: %s\n", path.c_str());
+    return 0;
+}
+
+static bool x_mknod_eexist_ok(const char* path, mode_t mode, dev_t dev) {
+    struct stat st;
+    if (stat(path, &st) == 0 && st.st_mode == mode && st.st_rdev == dev)
+        return true;
+    return false;
+}
+
+static const char* dev_name(mode_t m, dev_t d) {
+    static char buf[128];
+    if (S_ISCHR(m))
+        snprintf(buf, sizeof(buf), "c %d %d", major(d), minor(d));
+    else if (S_ISBLK(m))
+        snprintf(buf, sizeof(buf), "b %d %d", major(d), minor(d));
+    else if (S_ISFIFO(m))
+        return "p";
+    else
+        snprintf(buf, sizeof(buf), "%u %u", (unsigned) m, (unsigned) d);
+    return buf;
+}
+
+static int x_mknod(const char* path, mode_t mode, dev_t dev) {
+    if (verbose)
+        fprintf(verbosefile, "mknod -m 0%o %s %s\n", mode, path, dev_name(mode, dev));
+    if (!dryrun && mknod(path, mode, dev) != 0
+        && (errno != EEXIST || !x_mknod_eexist_ok(path, mode, dev)))
+        return perror_fail("mknod %s: %s\n", path);
+    return 0;
+}
+
+static bool x_symlink_eexist_ok(const char* oldpath, const char* newpath) {
+    char lnkbuf[4096];
+    ssize_t r = readlink(newpath, lnkbuf, sizeof(lnkbuf));
+    return (size_t) r == (size_t) strlen(oldpath) && memcmp(lnkbuf, oldpath, r) == 0;
+}
+
+static int x_symlink(const char* oldpath, const char* newpath) {
+    if (verbose)
+        fprintf(verbosefile, "ln -s %s %s\n", oldpath, newpath);
+    if (!dryrun && symlink(oldpath, newpath) != 0
+        && (errno != EEXIST || !x_symlink_eexist_ok(oldpath, newpath)))
+        return perror_fail("symlink %s: %s\n", (std::string(oldpath) + " " + newpath).c_str());
     return 0;
 }
 
@@ -258,6 +317,10 @@ static const mountarg mountargs[] = {
 };
 
 static int populate_mount_table() {
+    static bool mount_table_populated = false;
+    if (mount_table_populated)
+        return 0;
+    mount_table_populated = true;
 #if __linux__
     FILE* f = setmntent("/proc/mounts", "r");
     if (!f)
@@ -311,6 +374,14 @@ int umount(const char* dir) {
 #endif
 
 static int handle_mount(const mountslot& ms, std::string dst) {
+    auto it = mount_table.find(dst);
+    if (it != mount_table.end()
+        && it->second.fsname == ms.fsname
+        && it->second.type == ms.type
+        && it->second.opts == ms.opts
+        && it->second.data == ms.data)
+        // already mounted
+        return 0;
     if (verbose)
         fprintf(verbosefile, "mount -i -n -t %s%s%s %s %s\n",
                 ms.type.c_str(), ms.alloptions.empty() ? "" : " -o ",
@@ -391,7 +462,7 @@ static int copy_for_xdev_link(const std::string& src, const std::string& lnk) {
             if (lstat(lnksuper.c_str(), &dst) != 0) {
                 if (errno != ENOENT)
                     return perror_fail("lstat %s: %s\n", lnksuper.c_str());
-                if (x_mkdir(lnksuper.c_str(), 0770) != 0 && errno != EEXIST)
+                if (v_mkdir(lnksuper.c_str(), 0770) != 0 && errno != EEXIST)
                     return perror_fail("mkdir %s: %s\n", lnksuper.c_str());
             } else if (!S_ISDIR(dst.st_mode))
                 return perror_fail("lstat %s: Not a directory\n", lnksuper.c_str());
@@ -443,21 +514,8 @@ static int handle_xdev_link(const std::string& src, const std::string& dst,
     }
 
     if (x_link(lnk.c_str(), dst.c_str()) != 0)
-        return perror_fail("link %s: %s\n", (dst+lnk).c_str());
+        return perror_fail("link %s: %s\n", (dst + " " + lnk).c_str());
     return 0;
-}
-
-static const char* dev_name(mode_t m, dev_t d) {
-    static char buf[128];
-    if (S_ISCHR(m))
-        snprintf(buf, sizeof(buf), "c %d %d", major(d), minor(d));
-    else if (S_ISBLK(m))
-        snprintf(buf, sizeof(buf), "b %d %d", major(d), minor(d));
-    else if (S_ISFIFO(m))
-        return "p";
-    else
-        snprintf(buf, sizeof(buf), "%u %u", (unsigned) m, (unsigned) d);
-    return buf;
 }
 
 static int handle_copy(const std::string& src, const std::string& dst,
@@ -495,7 +553,7 @@ static int handle_copy(const std::string& src, const std::string& dst,
     if (S_ISREG(ss.st_mode) && !copy_samedev && !(flags & FLAG_CP)
         && ss.st_dev == jaildev) {
         if (x_link(src.c_str(), dst.c_str()) != 0)
-            return perror_fail("link %s: %s\n", (dst+src).c_str());
+            return perror_fail("link %s: %s\n", (dst + " " + src).c_str());
         ds = ss;
     } else if (S_ISREG(ss.st_mode)
                || (S_ISLNK(ss.st_mode) && (flags & FLAG_CP))) {
@@ -507,7 +565,7 @@ static int handle_copy(const std::string& src, const std::string& dst,
         // allow setuid/setgid bits
         // allow the presence of a different directory
         mode_t perm = ss.st_mode & (S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
-        if (x_mkdir(dst.c_str(), perm) == 0)
+        if (v_mkdir(dst.c_str(), perm) == 0)
             ds.st_mode = perm | S_IFDIR;
         else if (lstat(dst.c_str(), &ds) != 0)
             return perror_fail("lstat %s: %s\n", dst.c_str());
@@ -515,10 +573,8 @@ static int handle_copy(const std::string& src, const std::string& dst,
             return perror_fail("lstat %s: Not a directory\n", dst.c_str());
     } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
         ss.st_mode &= (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
-        if (verbose)
-            fprintf(verbosefile, "mknod -m 0%o %s %s\n", ss.st_mode, dst.c_str(), dev_name(ss.st_mode, ss.st_rdev));
-        if (!dryrun && mknod(dst.c_str(), ss.st_mode, ss.st_rdev) != 0)
-            return perror_fail("mknod %s: %s\n", dst.c_str());
+        if (!dryrun && x_mknod(dst.c_str(), ss.st_mode, ss.st_rdev) != 0)
+            return 1;
         ds.st_mode = ss.st_mode;
     } else if (S_ISLNK(ss.st_mode)) {
         char lnkbuf[4096];
@@ -528,10 +584,8 @@ static int handle_copy(const std::string& src, const std::string& dst,
         else if (r == sizeof(lnkbuf))
             return perror_fail("%s: Symbolic link too long\n", src.c_str());
         lnkbuf[r] = 0;
-        if (verbose)
-            fprintf(verbosefile, "ln -s %s %s\n", lnkbuf, dst.c_str());
-        if (!dryrun && symlink(lnkbuf, dst.c_str()) != 0)
-            return perror_fail("symlink %s: %s\n", src.c_str());
+        if (x_symlink(lnkbuf, dst.c_str()) != 0)
+            return 1;
         ds.st_mode = ss.st_mode;
         handle_symlink_dst(src, dst, std::string(lnkbuf), jaildev);
     } else
@@ -815,14 +869,14 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
         if ((fd == -1 && dryrunning)
             || (fd == -1 && !permdir.empty() && errno == ENOENT
                 && (action == do_init || action == do_run))) {
-            if (x_mkdirat(parentfd, component.c_str(), 0755, thisdir) != 0) {
+            if (v_mkdirat(parentfd, component.c_str(), 0755, thisdir) != 0) {
                 fprintf(stderr, "mkdir %s: %s\n", thisdir.c_str(), strerror(errno));
                 exit(1);
             }
             fd = openat(parentfd, component.c_str(), O_CLOEXEC | O_NOFOLLOW);
             // turn off suid+sgid on created root directory
             if (last_pos == dir.length() && (fd >= 0 || dryrun)
-                && x_fchmod(fd, 0755, thisdir) != 0) {
+                && v_fchmod(fd, 0755, thisdir) != 0) {
                 fprintf(stderr, "chmod %s: %s\n", thisdir.c_str(), strerror(errno));
                 exit(1);
             }
@@ -1764,7 +1818,7 @@ int main(int argc, char** argv) {
     }
 
     // check link directory
-    if (!linkdir.empty() && x_ensuredir(linkdir.c_str(), 0755) < 0)
+    if (!linkdir.empty() && v_ensuredir(linkdir.c_str(), 0755) < 0)
         perror_exit(linkdir.c_str());
     if (!linkdir.empty())
         linkdir = absolute(linkdir);
@@ -1773,10 +1827,10 @@ int main(int argc, char** argv) {
 
     // create the home directory
     if (!jailuser.owner_home.empty()) {
-        if (x_ensuredir((jaildir.dir + "/home").c_str(), 0755) < 0)
+        if (v_ensuredir((jaildir.dir + "/home").c_str(), 0755) < 0)
             perror_exit((jaildir.dir + "/home").c_str());
         std::string jailhome = jaildir.dir + jailuser.owner_home;
-        int r = x_ensuredir(jailhome.c_str(), 0700);
+        int r = v_ensuredir(jailhome.c_str(), 0700);
         uid_t want_owner = action == do_init ? caller_owner : jailuser.owner;
         gid_t want_group = action == do_init ? caller_group : jailuser.group;
         if (r < 0
