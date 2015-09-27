@@ -654,7 +654,7 @@ static int construct_jail(std::string jaildir, dev_t jaildev, FILE* f) {
         int l = strlen(buf);
         while (l > 0 && isspace((unsigned char) buf[l-1]))
             buf[--l] = 0;
-        if (l == 0)
+        if (l == 0 || buf[0] == '#')
             continue;
 
         // 'directory:'
