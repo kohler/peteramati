@@ -844,6 +844,8 @@ struct jaildirinfo {
     void check();
 
 private:
+    std::string alternate_permdir;
+
     void check_permfile(int fd, std::string dir);
 };
 
@@ -927,7 +929,9 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
             check_permfile(fd, thisdir);
     }
     if (permdir.empty()) {
-        fprintf(stderr, "%s: No ancestor directory contains a `JAIL61` with `allowjail`\n", dir.c_str());
+        fprintf(stderr, "%s: No ancestor directory contains a `JAIL61` with `enablejail`\n", dir.c_str());
+        if (!alternate_permdir.empty())
+            fprintf(stderr, "  (Perhaps you need to edit `%sJAIL61`.)\n", alternate_permdir.c_str());
         exit(1);
     }
     if (fd >= 0)
@@ -985,17 +989,17 @@ void jaildirinfo::check_permfile(int fd, std::string thisdir) {
         if (word1 == "allowjail")
             word1 = "enablejail";
         if (word1 == "disablejail" && word2.empty()) {
-            fprintf(stderr, "%sJAIL61: Jails are not allowed under here\n", thisdir.c_str());
+            fprintf(stderr, "%sJAIL61: Jails are disabled here\n", thisdir.c_str());
             exit(1);
         } else if (word1 == "disablejail" && dirmatch) {
-            fprintf(stderr, "%sJAIL61: Jails are not allowed under %s\n", thisdir.c_str(), word2.c_str());
+            fprintf(stderr, "%sJAIL61: Jails are disabled under %s\n", thisdir.c_str(), word2.c_str());
             exit(1);
         } else if (word1 == "enablejail" && word2.empty())
             permdir = thisdir;
         else if (word1 == "enablejail" && dirmatch)
             permdir = word2;
         else if (word1 == "enablejail" && thisdir.substr(0, word2.length()) != word2)
-            fprintf(stderr, "%sJAIL61: Warning: `allowjail` for wrong directory\n", thisdir.c_str());
+            alternate_permdir = thisdir;
     }
 
     close(jail61f);
