@@ -237,5 +237,7 @@ class RunnerState {
     public function cleanup() {
         if ($this->lockfile)
             unlink($this->lockfile);
+        if ($this->lockfile && $this->inputfifo)
+            unlink($this->inputfifo);
     }
 }
