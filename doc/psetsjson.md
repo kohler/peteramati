@@ -249,9 +249,11 @@ A grade entry object defines a line in the grading rubric.
 
     If true, then this grade is not included in the total.
 
-Grade entries are displayed in order. Alternately, you can provide a
-`grade_order` setting in the problem set; this should be an array of entry
-names.
+* `priority`: number
+
+    Determines display order. Grade entries are sorted first by
+    descending `priority`, and second by the order they appear in
+    `psets.json`.
 
 ### Code display
 
