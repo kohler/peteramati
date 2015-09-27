@@ -356,7 +356,7 @@ class ContactView {
                 $notes[] = array(false, "Enter your partner’s email, username, or HUID here.");
         } else {
             $backpartners[] = -1;
-            $result = $Conf->qe("select " . ($user->is_anonymous ? "email" : "anon_username") . " from ContactInfo where contactId in (" . join(",", $backpartners) . ")");
+            $result = $Conf->qe("select " . ($user->is_anonymous ? "anon_username" : "email") . " from ContactInfo where contactId in (" . join(",", $backpartners) . ")");
             $p = array();
             while (($row = edb_row($result)))
                 if ($Me->isPC)
