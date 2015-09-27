@@ -6,16 +6,17 @@ use Getopt::Long qw(:config bundling no_ignore_case require_order);
 my $DTRUSS = -x "/usr/bin/dtruss";
 
 sub usage (;$) {
-    print STDERR "Usage: tracejail.pl [-o OUTFILE] COMMAND ARG...\n";
-    print STDERR "       tracejail.pl [-o OUTFILE] < STRACERESULT\n";
+    print STDERR "Usage: jail/pa-trace [-o OUTFILE] COMMAND ARG...\n";
+    print STDERR "       jail/pa-trace [-o OUTFILE] < STRACERESULT\n";
     print STDERR "Options are:\n";
     print STDERR "  -n, --no-defaults     Do not include default programs.\n";
     print STDERR "  -o, --output=OUTFILE  Add to files listed in OUTFILE.\n";
     print STDERR "  -u, --user=USER       Don't exclude USER dotfiles.\n";
     print STDERR "  -f, --file=FILE       Include files in FILE (one per line).\n";
+    print STDERR "  -x, --exclude=PATTERN Exclude files matching PATTERN.\n";
     print STDERR "  -V, --verbose         Be verbose.\n";
     print STDERR "Example:\n";
-    print STDERR "  jail/tracejail.pl -o class/XXX/jfiles.txt sh -c \"cd ~/cs61-psets/pset5; make\"\n";
+    print STDERR "  jail/pa-trace -o class/XXX/jfiles.txt sh -c \"cd ~/cs61-psets/pset5; make\"\n";
     exit (@_ ? $_[0] : 1);
 }
 
@@ -61,13 +62,14 @@ sub run_trace (@) {
 
 my($jailfile, $defaults, $nodefaults, $help) = (undef, undef, 0, 0);
 my($user) = undef;
-my(@extras);
+my(@extras, @excludes);
 GetOptions("output|o=s" => \$jailfile,
            "defaults" => \$defaults,
            "n" => \$nodefaults,
            "help" => \$help,
            "user|u=s" => \$user,
            "file|f=s" => \@extras,
+           "exclude|x=s" => \@excludes,
            "verbose|V" => \$verbose);
 usage(0) if $help;
 usage(1) if defined($defaults) && $defaults && $nodefaults;
@@ -82,6 +84,45 @@ if (defined($user)) {
 if (@ARGV > 0 && $ARGV[0] =~ /\A-/) {
     usage();
 }
+
+@excludes = map {
+        my(@x) = split(//);
+        my($y, $i, $bs, $state) = "";
+        for ($i = $bs = $state = 0; $i < @x; ++$i) {
+            if ($bs && $x[$i] =~ /\A[\[\]\\\*\?\{\}\,]\z/) {
+                $y .= "\\" . $x[$i];
+                $bs = 0;
+                next;
+            } elsif ($bs) {
+                $y .= "\\\\";
+                $bs = 0;
+            }
+            if ($state == 1 && $x[$i] eq ']') {
+                $y .= "]";
+                $state = 0;
+            } elsif ($state == 2 && $x[$i] eq '}') {
+                $y .= ")";
+                $state = 0;
+            } elsif ($state == 2 && $x[$i] eq ',') {
+                $y .= "|";
+            } elsif ($x[$i] eq '*') {
+                $y .= ".*";
+            } elsif ($x[$i] eq '?') {
+                $y .= ".";
+            } elsif ($state == 0 && $x[$i] eq '[') {
+                $y .= "[";
+                $state = 1;
+            } elsif ($state == 0 && $x[$i] eq '{') {
+                $y .= "(?:";
+                $state = 2;
+            } else {
+                $y .= quotemeta($x[$i]);
+            }
+        }
+        $y .= "]" if $state == 1;
+        $y .= ")" if $state == 2;
+        "\\A" . $y . "\\z";
+    } @excludes;
 
 my(%files, %allfiles, %execfiles);
 
@@ -107,7 +148,7 @@ if (defined($jailfile) && open(FOO, "<", $jailfile)) {
 
 sub shquote ($) {
     my($t) = @_;
-    $t =~ s,','"'"',g;
+    $t =~ s{'}{'"'"'}g;
     return $t;
 }
 
@@ -134,12 +175,18 @@ sub addfile ($$$) {
     return if $f eq "";
     return if exists($allfiles{$f}) && (!$isexec || exists($execfiles{$f}));
 
-    print STDERR ($f eq $inf ? "ADD $f\n" : "ADD $f <= $inf\n") if $verbose;
     $allfiles{$f} = $allfiles{$inf} = 1;
-    if ($always
-        || $f !~ m,\A/(?:home/|tmp/|proc/|sys/|dev/pts/.|Users/|(?:etc/)?ld\.so\.conf\.d/kernel),
-        || ($userdir && $f =~ m,\A$userdir/[.],)) {
+    my($match) = $always
+        || $f !~ m{\A/(?:home/|tmp/|proc/|sys/|dev/pts/.|Users/|(?:etc/)?ld\.so\.conf\.d/kernel)}
+        || ($userdir && $f =~ m{\A$userdir/\.});
+    if ($match && @excludes) {
+        foreach my $e (@excludes) {
+            $match = 0 if $f =~ /$e/;
+        }
+    }
+    if ($match) {
         $files{$f} = 1;
+        print STDERR ($f eq $inf ? "ADD $f\n" : "ADD $f <= $inf\n") if $verbose;
     }
 
     # special handling required for executables
