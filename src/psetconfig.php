@@ -139,9 +139,10 @@ class Pset {
             }
         } else if (@$p->grades)
             throw new PsetConfigException("`grades` format error`", "grades");
-        $this->grades = $this->all_grades;
         if (@$p->grade_order)
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
+        else
+            $this->grades = self::priority_sort("grades", $this->all_grades);
         foreach ($this->grades as $g)
             if ($g->is_extra)
                 $this->has_extra = true;
@@ -170,9 +171,10 @@ class Pset {
             }
         } else if (@$p->runners)
             throw new PsetConfigException("`runners` format error", "runners");
-        $this->runners = $this->all_runners;
         if (@$p->runner_order)
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
+        else
+            $this->runners = self::priority_sort("runners", $this->all_runners);
         $this->run_username = self::cstr($p, "run_username");
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
         $this->run_overlay = self::cstr($p, "run_overlay");
@@ -285,20 +287,40 @@ class Pset {
             return get_object_vars($x);
     }
 
-    private static function reorder_config($k, $a, $order) {
+    private static function reorder_config($what, $a, $order) {
         if (!is_array($order))
-            throw new PsetConfigException("`$k` format error", $k);
+            throw new PsetConfigException("`$what` format error", $what);
         $b = array();
         foreach ($order as $name)
             if (is_string($name)) {
                 if (isset($a[$name]) && !isset($b[$name]))
                     $b[$name] = $a[$name];
                 else if (isset($a[$name]))
-                    throw new PsetConfigException("`$k` entry `$name` reused", $k);
+                    throw new PsetConfigException("`$what` entry `$name` reused", $what);
                 else
-                    throw new PsetConfigException("`$k` entry `$name` unknown", $k);
+                    throw new PsetConfigException("`$what` entry `$name` unknown", $what);
             } else
-                throw new PsetConfigException("`$k` format error", $k);
+                throw new PsetConfigException("`$what` format error", $what);
+        return $b;
+    }
+
+    private static function priority_sort($what, $a) {
+        $i = 0;
+        $b = array();
+        foreach ($a as $k => $v) {
+            $b[$k] = array($v->priority, $i);
+            ++$i;
+        }
+        uasort($b, function ($a, $b) {
+                if ($a[0] != $b[0])
+                    return $a[0] > $b[0] ? -1 : 1;
+                else if ($a[1] != $b[1])
+                    return $a[1] < $b[1] ? -1 : 1;
+                else
+                    return 0;
+            });
+        foreach ($b as $k => &$v)
+            $v = $a[$k];
         return $b;
     }
 }
@@ -312,6 +334,7 @@ class GradeEntryConfig {
     public $hide_max;
     public $no_total;
     public $is_extra;
+    public $priority;
 
     public function __construct($name, $g) {
         $loc = array("grades", $name);
@@ -326,6 +349,7 @@ class GradeEntryConfig {
         $this->hide_max = Pset::cbool($loc, $g, "hide_max");
         $this->no_total = Pset::cbool($loc, $g, "no_total");
         $this->is_extra = Pset::cbool($loc, $g, "is_extra");
+        $this->priority = Pset::cnum($loc, $g, "priority");
     }
 }
 
@@ -341,6 +365,7 @@ class RunnerConfig {
     public $eval;
     public $queue;
     public $nconcurrent;
+    public $priority;
 
     public function __construct($name, $r) {
         $loc = array("runners", $name);
@@ -365,6 +390,7 @@ class RunnerConfig {
         $this->eval = Pset::cstr($loc, $r, "eval");
         $this->queue = Pset::cstr($loc, $r, "queue");
         $this->nconcurrent = Pset::cint($loc, $r, "nconcurrent");
+        $this->priority = Pset::cnum($loc, $r, "priority");
     }
 }
 
