@@ -911,9 +911,15 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
         if (!S_ISDIR(s.st_mode)) {
             fprintf(stderr, "%s: Not a directory\n", thisdir.c_str());
             exit(1);
-        } else if (s.st_uid != ROOT && permdir.empty() && last_pos != dir.length()) {
-            fprintf(stderr, "%s: Not owned by root\n", thisdir.c_str());
-            exit(1);
+        } else if (permdir.empty() && last_pos != dir.length()) {
+            if (s.st_uid != ROOT) {
+                fprintf(stderr, "%s: Not owned by root\n", thisdir.c_str());
+                exit(1);
+            } else if ((st.st_gid != ROOT && (s.st_mode & S_IWGRP))
+                       || (s.st_mode & S_IWOTH)) {
+                fprintf(stderr, "%s: Writable by non-root\n", thisdir.c_str());
+                exit(1);
+            }
         }
 
         // check for "JAIL61" allowance
@@ -945,9 +951,8 @@ void jaildirinfo::check_permfile(int fd, std::string thisdir) {
     } else if (s.st_uid != ROOT
                || (s.st_gid != ROOT && (s.st_mode & S_IWGRP))
                || (s.st_mode & S_IWOTH)) {
-        fprintf(stderr, "%s/JAIL61: Ignoring, writable by non-root\n", thisdir.c_str());
-        close(jail61f);
-        return;
+        fprintf(stderr, "%s/JAIL61: Writable by non-root\n", thisdir.c_str());
+        exit(1);
     }
 
     char buf[8192];
@@ -975,17 +980,21 @@ void jaildirinfo::check_permfile(int fd, std::string thisdir) {
             word2 = thisdir + word2;
 
         bool dirmatch = word2.length() && dir.substr(0, word2.length()) == word2;
-        if (word1 == "nojail" && word2.empty()) {
+        if (word1 == "nojail")
+            word1 = "disablejail";
+        if (word1 == "allowjail")
+            word1 = "enablejail";
+        if (word1 == "disablejail" && word2.empty()) {
             fprintf(stderr, "%sJAIL61: Jails are not allowed under here\n", thisdir.c_str());
             exit(1);
-        } else if (word1 == "nojail" && dirmatch) {
+        } else if (word1 == "disablejail" && dirmatch) {
             fprintf(stderr, "%sJAIL61: Jails are not allowed under %s\n", thisdir.c_str(), word2.c_str());
             exit(1);
-        } else if (word1 == "allowjail" && word2.empty())
+        } else if (word1 == "enablejail" && word2.empty())
             permdir = thisdir;
-        else if (word1 == "allowjail" && dirmatch)
+        else if (word1 == "enablejail" && dirmatch)
             permdir = word2;
-        else if (word1 == "allowjail" && thisdir.substr(0, word2.length()) != word2)
+        else if (word1 == "enablejail" && thisdir.substr(0, word2.length()) != word2)
             fprintf(stderr, "%sJAIL61: Warning: `allowjail` for wrong directory\n", thisdir.c_str());
     }
 
@@ -1665,11 +1674,12 @@ int main(int argc, char** argv) {
     // check the jail directory
     // - no special characters
     // - path has no symlinks
-    // - at least one permdir has a file `JAIL61` owned by root
-    //   containing `allowjail`
-    // - no permdir has a file `JAIL61` not owned by root,
-    //   or containing `nojail`
-    // - everything above that dir is owned by by root
+    // - at least one permdir has a file `JAIL61` owned by root and writable
+    //   only by root, that contains `enablejail`
+    // - everything above that dir is owned by by root and writable only by
+    //   root
+    // - no permdir has a file `JAIL61` not owned by root, writable by other
+    //   than root, or containing `disablejail`
     // - stuff below the dir containing `JAIL61` dynamically created
     //   if necessary
     // - try to eliminate TOCTTOU
