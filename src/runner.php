@@ -181,6 +181,7 @@ class RunnerState {
             && $this->pset->directory_noslash !== "")
             $checkoutdir .= "/" . $this->pset->directory_noslash;
 
+        fwrite($this->logstream, "++ mkdir $checkoutdir\n");
         if (!mkdir($checkoutdir, 0777, true))
             throw new RunnerException("can't initialize user repo in jail");
 
