@@ -1259,10 +1259,12 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
                       CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID, this);
     if (child == -1)
         perror_exit("clone");
+    int child_waitflags = __WALL;
 #else
     int child = fork();
     if (child == 0)
         exit(exec_go());
+    int child_waitflags = 0;
 #endif
     if (child == -1)
         perror_exit("fork");
@@ -1270,7 +1272,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 
     int exit_status = 0;
     if (foreground)
-        exit_status = x_waitpid(child, 0);
+        exit_status = x_waitpid(child, child_waitflags);
     else
         pidfd = -1;
     exit(exit_status);
