@@ -1350,6 +1350,9 @@ int jailownerinfo::exec_go() {
         if (child < 0)
             perror_exit("fork");
         else if (child == 0) {
+            close(sigpipe[0]);
+            close(sigpipe[1]);
+
             if (setsid() == -1)
                 perror_exit("setsid");
 
@@ -1855,6 +1858,7 @@ int main(int argc, char** argv) {
         mode_t old_umask = umask(0);
         if (construct_jail(jaildir.dir, jaildev, filesf) != 0)
             exit(1);
+        fclose(filesf);
         umask(old_umask);
     }
 
