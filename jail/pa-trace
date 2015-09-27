@@ -159,6 +159,7 @@ sub addfile ($$$) {
     $inf =~ s,/+,/,g;
     return if exists($allfiles{$inf}) && (!$isexec || exists($execfiles{$inf}));
     return if $op eq "exec.optional" && !-f $inf;
+    return if $op eq "optional" && !-e $inf;
     $inf =~ s,\\0\z,,;
 
     $f = $inf;
@@ -316,6 +317,7 @@ __DATA__
 /bin/rmdir exec
 /bin/sed exec.optional
 /bin/true exec
+/dev/fd optional
 /dev/null
 /dev/urandom
 /etc/group
