@@ -720,8 +720,11 @@ class Contact {
         if (!array_key_exists($pset, $this->partners)) {
             $this->partners[$pset] = null;
             if (($pcid = $this->pcid($pset))
-                && ($pc = self::find_by_id($pcid)))
+                && ($pc = self::find_by_id($pcid))) {
+                if ($this->is_anonymous)
+                    $pc->is_anonymous = true;
                 $this->partners[$pset] = $pc;
+            }
         }
         return $this->partners[$pset];
     }
