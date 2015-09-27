@@ -926,7 +926,7 @@ function tooltip(elt) {
             if (--refcount == 0)
                 to = setTimeout(erase, delay);
         },
-        erase: erase, elt: elt, content: content
+        erase: erase, elt: elt, content: content, bubble: bub
     };
     j.data("hotcrp_tooltip", tt);
     near = jqnear("data-tooltipnear")[0] || elt;
@@ -2507,7 +2507,7 @@ function click_s61check(evt) {
 }
 
 function repoclip() {
-    var node = document.createTextNode(this.getAttribute("data-tooltip"));
+    var node = document.createTextNode(this.getAttribute("data-pa-repo"));
     var bub = make_bubble(node, {color: "tooltip", dir: "t"});
     bub.near(this);
     var range = document.createRange();
@@ -2521,6 +2521,8 @@ function repoclip() {
     }
     window.getSelection().removeAllRanges();
     bub.remove();
+    if (global_tooltip && global_tooltip.elt == this)
+        global_tooltip.bubble.text(this.getAttribute("data-pa-repo"));
 }
 
 function pa_init_repoclip() {

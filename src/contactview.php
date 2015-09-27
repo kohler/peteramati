@@ -407,9 +407,12 @@ class ContactView {
         else
             $value = htmlspecialchars($repo_url ? $repo_url : "(none)");
         if ($repo_url) {
-            $value .= ' <button class="b repoclip hottooltip" data-tooltip="'
-                . htmlspecialchars($repo->url)
-                . '" type="button" onclick="false">Copy URL to clipboard</button>';
+            $value .= ' <button class="b repoclip hottooltip" data-pa-repo="' . htmlspecialchars($repo->url) . '"';
+            if ($user->is_anonymous)
+                $value .= ' data-tooltip="[anonymous]"';
+            else
+                $value .= ' data-tooltip="' . htmlspecialchars($repo->url) . '"';
+            $value .= ' type="button" onclick="false">Copy URL to clipboard</button>';
             $Conf->footerScript('$(".repoclip").each(pa_init_repoclip)', "repoclip");
             if ($include_tarball && $info->commit_hash()
                 && ($tarball_url = $info->tarball_url()))
