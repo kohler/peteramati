@@ -1004,6 +1004,7 @@ void jaildirinfo::check() {
 }
 
 void jaildirinfo::chown_recursive() {
+    populate_mount_table();
     std::string buf = dir;
     int dirfd = openat(parentfd, component.c_str(), O_CLOEXEC | O_NOFOLLOW);
     if (dirfd == -1)
@@ -1051,29 +1052,33 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf, int depth, uid
         // don't follow symbolic links
         if (de->d_type == DT_LNK) {
             if (x_lchownat(dirfd, de->d_name, owner, group, dirbuf))
-                perror_exit((dirbuf + de->d_name).c_str());
+                exit(exit_value);
             continue;
         }
 
-        // change its uid/gid
+        // look up uid/gid
         u = owner, g = group;
         if (home_map) {
             auto it = home_map->find(de->d_name);
             if (it != home_map->end())
                 u = it->second.first, g = it->second.second;
         }
-        if (x_lchownat(dirfd, de->d_name, u, g, dirbuf))
-            perror_exit((dirbuf + de->d_name).c_str());
 
         // recurse
         if (de->d_type == DT_DIR) {
             dirbuf += de->d_name;
-            int subdirfd = openat(dirfd, de->d_name, O_CLOEXEC | O_NOFOLLOW);
-            if (subdirfd == -1)
-                perror(dirbuf.c_str());
-            chown_recursive(subdirfd, dirbuf, depth + 1, u, g);
+            auto it = mount_table.find(dirbuf);
+            if (it == mount_table.end()) { // not a mount point
+                int subdirfd = openat(dirfd, de->d_name, O_CLOEXEC | O_NOFOLLOW);
+                if (subdirfd == -1)
+                    perror_exit(dirbuf.c_str());
+                if (x_fchown(subdirfd, u, g, dirbuf))
+                    exit(exit_value);
+                chown_recursive(subdirfd, dirbuf, depth + 1, u, g);
+            }
             dirbuf.resize(dirbuflen);
-        }
+        } else if (x_lchownat(dirfd, de->d_name, u, g, dirbuf))
+            exit(exit_value);
     }
 
     closedir(dir);
