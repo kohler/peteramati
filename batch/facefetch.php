@@ -54,15 +54,21 @@ while (($row = edb_row($result))) {
         && ($headers = file_get_contents($fprefix . ".h")) !== false
         && ($data = file_get_contents($fprefix . ".d")) !== false
         && preg_match(',^Content-Type:\s*(image/\S+),mi', $headers, $headerm)) {
-        $iresult = Dbl::qe("insert into ContactImage set contactId=?, mimetype=?, data=?", $row[0], $headerm[1], $data);
-        if ($iresult) {
-            Dbl::qe("update ContactInfo set contactImageId=? where contactId=?", $iresult->insert_id, $row[0]);
-            ++$nworked;
-            $worked = true;
+        $sresult = Dbl::fetch_first_object(Dbl::qe("select ContactImage.* from ContactImage join ContactInfo using (contactImageId) where contactId=?", $row[0]));
+        if ($sresult && $sresult->mimetype === $headerm[1] && $sresult->data === $data)
+            $worked = "unchanged";
+        else {
+            $iresult = Dbl::qe("insert into ContactImage set contactId=?, mimetype=?, data=?", $row[0], $headerm[1], $data);
+            if ($iresult) {
+                Dbl::qe("update ContactInfo set contactImageId=? where contactId=?", $iresult->insert_id, $row[0]);
+                $worked = true;
+            }
         }
     }
 
-    if ($worked)
+    if ($worked === "unchanged")
+        fwrite(STDERR, strlen($data) . "B " . $headerm[1] . " (unchanged)\n");
+    else if ($worked)
         fwrite(STDERR, strlen($data) . "B " . $headerm[1] . "\n");
     else
         fwrite(STDERR, "failed\n");
@@ -72,6 +78,7 @@ while (($row = edb_row($result))) {
         unlink($fprefix . ".d");
     }
 
+    $nworked += $worked ? 1 : 0;
     ++$n;
     if ($n == $limit)
         break;
