@@ -9,7 +9,7 @@ require_once("$ConfSiteBase/lib/getopt.php");
 
 $arg = getopt_rest($argv, "hn:l:", array("help", "name:", "limit:"));
 if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {
-    fwrite(STDOUT, "Usage: php batch/facefetch.php [FETCHSCRIPT]\n");
+    fwrite(STDOUT, "Usage: php batch/facefetch.php [-l LIMIT] [FETCHSCRIPT]\n");
     exit(0);
 }
 
