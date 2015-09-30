@@ -27,9 +27,6 @@ if (count($arg["_"]))
 if (!$fetchscript) {
     fwrite(STDERR, "Need `_facefetch_script` configuration option or argument.\n");
     exit(1);
-} else if (!is_executable($fetchscript)) {
-    fwrite(STDERR, "$fetchscript: Not executable.\n");
-    exit(1);
 }
 
 if (!isset($arg["limit"]))
@@ -45,20 +42,23 @@ while (($row = edb_row($result))) {
     fwrite(STDOUT, $row[1] . " ");
 
     $handle = popen($fetchscript . " -q " . escapeshellarg($url), "r");
-    $fprefix = trim(stream_get_contents($handle));
+    $data = stream_get_contents($handle);
     $status = pclose($handle);
+
+    $content_type = "";
+    if ($data && ($nl = strpos($data, "\n")) !== false) {
+        $content_type = substr($data, 0, $nl);
+        $data = substr($data, $nl + 1);
+    }
 
     $worked = false;
     if (pcntl_wifexited($status) && pcntl_wexitstatus($status) == 0
-        && $fprefix
-        && ($headers = file_get_contents($fprefix . ".h")) !== false
-        && ($data = file_get_contents($fprefix . ".d")) !== false
-        && preg_match(',^Content-Type:\s*(image/\S+),mi', $headers, $headerm)) {
+        && preg_match(',\Aimage/,', $content_type)) {
         $sresult = Dbl::fetch_first_object(Dbl::qe("select ContactImage.* from ContactImage join ContactInfo using (contactImageId) where contactId=?", $row[0]));
-        if ($sresult && $sresult->mimetype === $headerm[1] && $sresult->data === $data)
+        if ($sresult && $sresult->mimetype === $content_type && $sresult->data === $data)
             $worked = "unchanged";
         else {
-            $iresult = Dbl::qe("insert into ContactImage set contactId=?, mimetype=?, data=?", $row[0], $headerm[1], $data);
+            $iresult = Dbl::qe("insert into ContactImage set contactId=?, mimetype=?, data=?", $row[0], $content_type, $data);
             if ($iresult) {
                 Dbl::qe("update ContactInfo set contactImageId=? where contactId=?", $iresult->insert_id, $row[0]);
                 $worked = true;
@@ -67,16 +67,11 @@ while (($row = edb_row($result))) {
     }
 
     if ($worked === "unchanged")
-        fwrite(STDERR, strlen($data) . "B " . $headerm[1] . " (unchanged)\n");
+        fwrite(STDERR, strlen($data) . "B " . $content_type . " (unchanged)\n");
     else if ($worked)
-        fwrite(STDERR, strlen($data) . "B " . $headerm[1] . "\n");
+        fwrite(STDERR, strlen($data) . "B " . $content_type . "\n");
     else
         fwrite(STDERR, "failed\n");
-
-    if ($fprefix && file_exists($fprefix . ".h") && $worked) {
-        unlink($fprefix . ".h");
-        unlink($fprefix . ".d");
-    }
 
     $nworked += $worked ? 1 : 0;
     ++$n;
