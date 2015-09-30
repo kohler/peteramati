@@ -702,31 +702,31 @@ static int construct_jail(std::string jaildir, dev_t jaildev, FILE* f) {
 
 // main program
 
-static int check_filename(const char *name, int allow_slash,
-                          int allow_absolute) {
+static std::string check_filename(std::string name) {
     const char *allowed_chars = "/0123456789-._ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~";
-    const char *name2, *dotdot;
+    char buf[1024];
 
-    if (!allow_slash)
-        ++allowed_chars;
-    if (strspn(name, allowed_chars) != strlen(name) || name[0] == '~')
-        return 0;
+    if (strspn(name.c_str(), allowed_chars) != name.length()
+        || name.empty()
+        || name[0] == '~'
+        || name.length() >= sizeof(buf))
+        return std::string();
 
-    name2 = name;
-    while ((dotdot = strstr(name2, ".."))) {
-        if ((dotdot == name || dotdot[-1] == '/')
-            && (dotdot[2] == 0 || dotdot[2] == '/'))
-            return 0;
-        name2 = dotdot + 2;
+    char* out = buf;
+    for (const char* s = name.c_str(); *s; ++s) {
+        *out++ = *s;
+        if (*s == '.' && (s[1] == '/' || s[1] == '\0')
+            && s != name.c_str() && s[-1] == '/') {
+            --out;
+            ++s;
+        } else if (*s == '.' && s[1] == '.' && (s[2] == '/' || s[2] == '\0')
+                   && (s == name.c_str() || s[-1] == '/'))
+            return std::string();
+        while (*s == '/' && s[1] == '/')
+            ++s;
     }
-
-    if (!allow_absolute && name[0] == '/')
-        return 0;
-
-    if (strlen(name) >= 1024)
-        return 0;
-
-    return 1;
+    *out = '\0';
+    return std::string(buf, out - buf);
 }
 
 static dev_t closest_ancestor_dev(std::string dir) {
@@ -824,6 +824,7 @@ struct jaildirinfo {
     std::string parent;
     int parentfd;
     std::string component;
+    bool allowed;
     std::string permdir;
 
     jaildirinfo(const char* str, jailaction action, bool doforce);
@@ -834,18 +835,26 @@ private:
     std::string alternate_permfile;
 
     void check_permfile(int fd, std::string dir);
+    void parse_permfile(int conff, std::string thisdir,
+                        const char* permfilename, bool islocal);
     void chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group);
 };
 
 jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
-    : dir(absolute(str)), parentfd(-1) {
-    if (!check_filename(dir.c_str(), 1, 1) || dir.empty() || dir[0] != '/') {
+    : dir(check_filename(absolute(str))), parentfd(-1), allowed(false) {
+    if (dir.empty() || dir[0] != '/') {
         fprintf(stderr, "%s: Bad characters in filename\n", str);
         exit(1);
     }
 
+    int fd = open("/etc/pa-jail.conf", O_RDONLY | O_NOFOLLOW);
+    if (fd != -1) {
+        parse_permfile(fd, "/etc/", "pa-jail.conf", true);
+        close(fd);
+    }
+
     size_t last_pos = 0;
-    int fd = -1;
+    fd = -1;
     bool dryrunning = false;
     while (last_pos != dir.length()) {
         // extract component
@@ -861,13 +870,18 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
         while (last_pos != dir.length() && dir[last_pos] == '/')
             ++last_pos;
 
+        // check whether we are below the permission directory
+        bool allowed_here = !permdir.empty()
+            && last_pos >= permdir.length()
+            && dir.substr(0, permdir.length()) == permdir;
+
         // open it and swap it in
         if (parentfd >= 0)
             close(parentfd);
         parentfd = fd;
         fd = openat(parentfd, component.c_str(), O_PATH | O_CLOEXEC | O_NOFOLLOW);
         if ((fd == -1 && dryrunning)
-            || (fd == -1 && !permdir.empty() && errno == ENOENT
+            || (fd == -1 && allowed_here && errno == ENOENT
                 && (action == do_init || action == do_run))) {
             if (v_mkdirat(parentfd, component.c_str(), 0755, thisdir) != 0) {
                 fprintf(stderr, "mkdir %s: %s\n", thisdir.c_str(), strerror(errno));
@@ -901,7 +915,7 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
         if (!S_ISDIR(s.st_mode)) {
             fprintf(stderr, "%s: Not a directory\n", thisdir.c_str());
             exit(1);
-        } else if (permdir.empty() && last_pos != dir.length()) {
+        } else if (!allowed_here && last_pos != dir.length()) {
             if (s.st_uid != ROOT) {
                 fprintf(stderr, "%s: Not owned by root\n", thisdir.c_str());
                 exit(1);
@@ -913,11 +927,11 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
         }
 
         // check for "pa-jail.conf" allowance
-        if (permdir.empty() && parent.length())
+        if (parent.length())
             check_permfile(fd, thisdir);
     }
-    if (permdir.empty()) {
-        fprintf(stderr, "%s: No ancestor directory contains a `pa-jail.conf` with `enablejail`\n", dir.c_str());
+    if (!allowed) {
+        fprintf(stderr, "%s: No `pa-jail.conf` enables jails here.\n", dir.c_str());
         if (!alternate_permfile.empty())
             fprintf(stderr, "  (Perhaps you need to edit `%s`.)\n", alternate_permfile.c_str());
         exit(1);
@@ -933,19 +947,22 @@ void jaildirinfo::check_permfile(int fd, std::string thisdir) {
         permfilename = "JAIL61";
         jail61f = openat(fd, permfilename, O_RDONLY | O_NOFOLLOW);
     }
-    if (jail61f == -1) {
-        if (errno != ENOENT && errno != ELOOP) {
-            fprintf(stderr, "%s/%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
-            exit(1);
-        }
-        return;
+    if (jail61f != -1) {
+        parse_permfile(jail61f, thisdir, permfilename, false);
+        close(jail61f);
+    } else if (errno != ENOENT && errno != ELOOP) {
+        fprintf(stderr, "%s/%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
+        exit(1);
     }
+}
 
+void jaildirinfo::parse_permfile(int conff, std::string thisdir,
+                                 const char* permfilename, bool islocal) {
     if (thisdir[thisdir.length() - 1] != '/')
         thisdir += '/';
 
     struct stat s;
-    if (fstat(jail61f, &s) != 0) {
+    if (fstat(conff, &s) != 0) {
         fprintf(stderr, "%s%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
         exit(1);
     } else if (s.st_uid != ROOT
@@ -956,9 +973,12 @@ void jaildirinfo::check_permfile(int fd, std::string thisdir) {
     }
 
     char buf[8192];
-    ssize_t nr = read(jail61f, buf, sizeof(buf));
+    ssize_t nr = read(conff, buf, sizeof(buf));
     std::string str(buf, nr < 0 ? 0 : nr);
     size_t pos = 0;
+    int allowed_globally = -1, allowed_locally = -1;
+    std::string allowed_permdir;
+
     while (pos < str.length()) {
         std::string word1 = take_word(str, pos);
         std::string word2 = take_word(str, pos);
@@ -967,35 +987,51 @@ void jaildirinfo::check_permfile(int fd, std::string thisdir) {
         while (pos < str.length() && str[pos] == '\n')
             ++pos;
 
-        while (word2.length() > 2 && word2[0] == '.' && word2[1] == '/')
-            word2 = word2.substr(2, word2.length());
-        if (word2 == ".")
-            word2 = thisdir;
-        if (!word2.empty() && word2[word2.length() - 1] != '/')
-            word2 += '/';
-        if (!word2.empty() && word2[0] != '/')
-            word2 = thisdir + word2;
+        std::string dir = word2;
+        while (dir.length() > 2 && dir[0] == '.' && dir[1] == '/')
+            dir = dir.substr(2, dir.length());
+        if (dir.empty() || dir == ".")
+            dir = thisdir;
+        if (dir[dir.length() - 1] != '/')
+            dir += '/';
+        if (dir[0] != '/')
+            dir = thisdir + dir;
 
-        bool dirmatch = word2.length() && dir.substr(0, word2.length()) == word2;
-        if (word1 == "nojail")
-            word1 = "disablejail";
-        if (word1 == "allowjail")
-            word1 = "enablejail";
-        if (word1 == "disablejail" && word2.empty()) {
-            fprintf(stderr, "%s%s: Jails are disabled here\n", thisdir.c_str(), permfilename);
-            exit(1);
-        } else if (word1 == "disablejail" && dirmatch) {
-            fprintf(stderr, "%s%s: Jails are disabled under %s\n", thisdir.c_str(), word2.c_str(), permfilename);
-            exit(1);
-        } else if (word1 == "enablejail" && word2.empty())
-            permdir = thisdir;
-        else if (word1 == "enablejail" && dirmatch)
-            permdir = word2;
-        else if (word1 == "enablejail" && thisdir.substr(0, word2.length()) != word2)
-            alternate_permfile = thisdir + permfilename;
+        bool dirmatch = dir.substr(0, word2.length()) == word2;
+        if (word1 == "disablejail" || word1 == "nojail") {
+            if (word2.empty())
+                allowed_globally = allowed_locally = 0;
+            else if (dirmatch) {
+                allowed_locally = 0;
+                allowed_permdir = word2;
+            }
+        } else if (word1 == "enablejail" || word1 == "allowjail") {
+            if (word2.empty())
+                allowed_globally = 1;
+            else if (dirmatch) {
+                allowed_locally = 1;
+                allowed_permdir = dir;
+            } else
+                alternate_permfile = thisdir + permfilename;
+        }
     }
 
-    close(jail61f);
+    if (allowed_locally > 0) {
+        allowed = true;
+        permdir = allowed_permdir;
+    } else if (allowed_locally == 0) {
+        fprintf(stderr, "%s%s: Jails are disabled under %s\n", thisdir.c_str(), permfilename, allowed_permdir.c_str());
+        exit(1);
+    } else if (allowed_globally > 0 && islocal) {
+        allowed = true;
+        permdir = thisdir;
+    } else if (allowed_globally == 0 && islocal) {
+        fprintf(stderr, "%s%s: Jails are disabled here\n", thisdir.c_str(), permfilename);
+        exit(1);
+    } else if (allowed_globally == 0) {
+        fprintf(stderr, "%s%s: Jails are disabled\n", thisdir.c_str(), permfilename);
+        exit(1);
+    }
 }
 
 void jaildirinfo::check() {
@@ -1130,7 +1166,7 @@ class jailownerinfo {
     void block(int ptymaster);
     int check_child_timeout(pid_t child, bool waitpid);
     void handle_child(pid_t child, int ptymaster);
-    void exec_done(int exit_status) __attribute__((noreturn));
+    void exec_done(pid_t child, int exit_status) __attribute__((noreturn));
 };
 
 jailownerinfo::jailownerinfo()
@@ -1550,7 +1586,7 @@ void jailownerinfo::handle_child(pid_t child, int ptymaster) {
         if (to_slave.head != to_slave.tail
             && memmem(&to_slave.buf[to_slave.head], to_slave.tail - to_slave.head,
                       "\x1b\x03", 2) != NULL)
-            exec_done(128 + SIGTERM);
+            exec_done(child, 128 + SIGTERM);
         to_slave.transfer_out(ptymaster);
         from_slave.transfer_in(ptymaster);
         from_slave.transfer_out(STDOUT_FILENO);
@@ -1559,17 +1595,17 @@ void jailownerinfo::handle_child(pid_t child, int ptymaster) {
         // (only wait for child if read done/failed)
         int exit_status = check_child_timeout(child, from_slave.input_closed);
         if (exit_status != -1)
-            exec_done(exit_status);
+            exec_done(child, exit_status);
 
         // if child has not died, and read produced error, report it
         if (from_slave.input_closed && from_slave.rerrno != EIO) {
             fprintf(stderr, "read: %s\n", strerror(from_slave.rerrno));
-            exec_done(125);
+            exec_done(child, 125);
         }
     }
 }
 
-void jailownerinfo::exec_done(int exit_status) {
+void jailownerinfo::exec_done(pid_t child, int exit_status) {
     if (exit_status == 124 && !quiet)
         fprintf(stdout, "\n\x1b[3;7;31m...timed out\x1b[0m\n");
     if (exit_status == 128 + SIGTERM && !quiet)
@@ -1577,6 +1613,8 @@ void jailownerinfo::exec_done(int exit_status) {
 #if !__linux__
     if (exit_status >= 124)
         kill(child, SIGKILL);
+#else
+    (void) child;
 #endif
     fflush(stdout);
     exit(exit_status);
@@ -1771,13 +1809,12 @@ int main(int argc, char** argv) {
 
     // move the sandbox if asked
     if (action == do_mv) {
-        if (!check_filename(argv[optind + 1], 1, 1)) {
+        std::string newpath = check_filename(absolute(argv[optind + 1]));
+        if (newpath.empty() || newpath[0] != '/') {
             fprintf(stderr, "%s: Bad characters in move destination\n", argv[optind + 1]);
             exit(1);
-        }
-        std::string newpath = absolute(argv[optind + 1]);
-        if (newpath.length() <= jaildir.permdir.length()
-            || newpath.substr(0, jaildir.permdir.length()) != jaildir.permdir) {
+        } else if (newpath.length() <= jaildir.permdir.length()
+                   || newpath.substr(0, jaildir.permdir.length()) != jaildir.permdir) {
             fprintf(stderr, "%s: Not a subdirectory of %s\n", newpath.c_str(), jaildir.permdir.c_str());
             exit(1);
         }
