@@ -725,6 +725,8 @@ static std::string check_filename(std::string name) {
         while (*s == '/' && s[1] == '/')
             ++s;
     }
+    while (out > buf + 1 && out[-1] == '/')
+        --out;
     *out = '\0';
     return std::string(buf, out - buf);
 }
@@ -842,10 +844,11 @@ private:
 
 jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
     : dir(check_filename(absolute(str))), parentfd(-1), allowed(false) {
-    if (dir.empty() || dir[0] != '/') {
+    if (dir.empty() || dir == "/" || dir[0] != '/') {
         fprintf(stderr, "%s: Bad characters in filename\n", str);
         exit(1);
     }
+    dir += "/";
 
     int fd = open("/etc/pa-jail.conf", O_RDONLY | O_NOFOLLOW);
     if (fd != -1) {
@@ -987,17 +990,17 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
         while (pos < str.length() && str[pos] == '\n')
             ++pos;
 
-        std::string dir = word2;
-        while (dir.length() > 2 && dir[0] == '.' && dir[1] == '/')
-            dir = dir.substr(2, dir.length());
-        if (dir.empty() || dir == ".")
-            dir = thisdir;
-        if (dir[dir.length() - 1] != '/')
-            dir += '/';
-        if (dir[0] != '/')
-            dir = thisdir + dir;
+        std::string wdir = word2;
+        while (wdir.length() > 2 && wdir[0] == '.' && wdir[1] == '/')
+            wdir = wdir.substr(2, wdir.length());
+        if (wdir.empty() || wdir == ".")
+            wdir = thisdir;
+        if (wdir[wdir.length() - 1] != '/')
+            wdir += '/';
+        if (wdir[0] != '/')
+            wdir = thisdir + wdir;
 
-        bool dirmatch = dir.substr(0, word2.length()) == word2;
+        bool dirmatch = dir.substr(0, wdir.length()) == wdir;
         if (word1 == "disablejail" || word1 == "nojail") {
             if (word2.empty())
                 allowed_globally = allowed_locally = 0;
@@ -1010,7 +1013,7 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
                 allowed_globally = 1;
             else if (dirmatch) {
                 allowed_locally = 1;
-                allowed_permdir = dir;
+                allowed_permdir = wdir;
             } else
                 alternate_permfile = thisdir + permfilename;
         }
