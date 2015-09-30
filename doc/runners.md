@@ -17,9 +17,11 @@ letters, numbers, and characters in `-._~`.
 
 2. There must be no symbolic links in the path.
 
-3. The jail directory, or one of its parent directories, must contain
-a `pa-jail.conf` file, owned by root and writable only by root, that
-“enables” the jail directory (see below for how this works).
+3. The file `/etc/pa-jail.conf` exists, is owned by root and writable
+only by root, and “enables” the jail directory (see below for how this
+works). Alternately, the jail directory, or one of its parent
+directories, can contain a `pa-jail.conf` file, owned by root and
+writable only by root, that “enables” the jail directory.
 
 4. The jail directory and all of its parent directories _must not_
 contain a `pa-jail.conf` file that is not owned by root, that is
@@ -30,9 +32,10 @@ directory.
    root and writable only by root, as must all of its parent directories.
 
 A `pa-jail.conf` file “enables” a jail directory by containing a line
-`enablejail` or `enablejail SUBDIR` (where `SUBDIR` matches the rest
-of the jail). It “disables” a jail directory by containing a line
-`disablejail` or `disablejail SUBDIR`.
+`enablejail` or `enablejail PATTERN` (where `PATTERN` is a shell-style
+filename pattern that matches the jail directory). It “disables” a
+jail directory by containing a line `disablejail` or `disablejail
+PATTERN`.
 
 Container components
 --------------------

@@ -22,6 +22,7 @@
 #include <utime.h>
 #include <assert.h>
 #include <getopt.h>
+#include <fnmatch.h>
 #include <string>
 #include <map>
 #include <iostream>
@@ -1000,7 +1001,17 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
         if (wdir[0] != '/')
             wdir = thisdir + wdir;
 
-        bool dirmatch = dir.substr(0, wdir.length()) == wdir;
+        // `superdir` is the prefix of `dir` that has the same number
+        // of slashes as `wdir`
+        size_t slcount = 0, slpos = 0;
+        while ((slpos = wdir.find('/', slpos)) != std::string::npos)
+            ++slcount, ++slpos;
+        slpos = 0;
+        while (slcount > 0 && (slpos = dir.find('/', slpos)) != std::string::npos)
+            --slcount, ++slpos;
+        std::string superdir = dir.substr(0, slpos);
+        bool dirmatch = fnmatch(wdir.c_str(), superdir.c_str(), FNM_PATHNAME) == 0;
+
         if (word1 == "disablejail" || word1 == "nojail") {
             if (word2.empty())
                 allowed_globally = allowed_locally = 0;
@@ -1013,7 +1024,7 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
                 allowed_globally = 1;
             else if (dirmatch) {
                 allowed_locally = 1;
-                allowed_permdir = wdir;
+                allowed_permdir = superdir;
             } else
                 alternate_permfile = thisdir + permfilename;
         }
