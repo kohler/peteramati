@@ -487,7 +487,7 @@ function echo_grade_entry($ge) {
     $key = $ge->name;
     $grade = $autograde = null;
     $title = isset($ge->title) ? $ge->title : $key;
-    $Notes = $Info->commit_info();
+    $Notes = $Info->commit_or_grading_info();
     if (@$Notes->autogrades && property_exists($Notes->autogrades, $key))
         $grade = $autograde = $Notes->autogrades->$key;
     if (@$Notes->grades && property_exists($Notes->grades, $key))
@@ -673,7 +673,7 @@ function echo_commit($Info) {
 
     // warnings
     $remarks = array();
-    if (!$Info->grading_hash() && $Me != $User)
+    if (!$Info->grading_hash() && $Me != $User && !$Pset->gitless_grades)
         $remarks[] = array(true, "No commit has been marked for grading.");
     else if (!$Info->is_grading_commit() && $Info->grading_hash())
         $remarks[] = array(true, "This is not "
@@ -752,7 +752,8 @@ function echo_grader() {
 function echo_grade_cdf_here() {
     global $Me, $User, $Pset, $Info;
     if ($Info->can_see_grades
-        && ($Me != $User || $Pset->grade_cdf_visible)) {
+        && ($Me != $User || $Pset->grade_cdf_visible)
+        && $Pset->grades) {
         $gj = ContactView::grade_json($Info);
         if (@$gj->grades)
             echo_grade_cdf();
@@ -821,19 +822,17 @@ echo "<hr>\n";
 
 if ($Pset->gitless) {
     echo_grade_cdf_here();
+    echo_grader();
     echo_all_grades();
 
 } else if ($Info->repo && !$Info->can_view_repo_contents
            && !$Me->isPC) {
-    if ($Pset->grades)
-        echo_grade_cdf_here();
+    echo_grade_cdf_here();
     echo_grader();
-    if ($Pset->grades)
-        echo_all_grades();
+    echo_all_grades();
 
 } else if ($Info->repo && $Info->recent_commits()) {
-    if ($Pset->grades)
-        echo_grade_cdf_here();
+    echo_grade_cdf_here();
     echo_commit($Info);
 
     // print runners
@@ -890,8 +889,7 @@ if ($Pset->gitless) {
     echo_grader();
 
     // print grade entries
-    if ($Pset->grades)
-        echo_all_grades();
+    echo_all_grades();
 
     // collect diff and sort line notes
     $diff = $User->repo_diff($Info->repo, $Info->commit_hash(), $Pset, array("wdiff" => $WDIFF));
@@ -1019,9 +1017,17 @@ if ($Pset->gitless) {
                             false, null);
     echo "</tbody></table>";
 } else {
+    if ($Pset->gitless_grades)
+        echo_grade_cdf_here();
+
     echo "<div class=\"commitcontainer61\" peteramati_pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
     ContactView::echo_group("this commit", "No commits yet for this problem set", array());
     echo "</div>\n";
+
+    if ($Pset->gitless_grades) {
+        echo_grader();
+        echo_all_grades();
+    }
 }
 
 

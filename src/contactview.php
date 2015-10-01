@@ -211,7 +211,7 @@ class ContactView {
         if (!$Me->can_see_grades($info->pset, $info->user, $info))
             return null;
         $pcview = $Me->isPC && $Me != $info->user;
-        $notes = $info->commit_info();
+        $notes = $info->commit_or_grading_info();
         $result = self::pset_grade_json($info->pset, $pcview);
         if (isset($notes->autogrades) || isset($notes->grades)
             || $info->is_grading_commit()) {

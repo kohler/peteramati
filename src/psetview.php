@@ -230,7 +230,7 @@ class PsetView {
 
     public function is_grading_commit() {
         if ($this->pset->gitless_grades)
-            return false;
+            return true;
         if ($this->grade === false)
             $this->load_grade();
         return $this->commit
@@ -258,6 +258,13 @@ class PsetView {
             return $this->grade_notes;
         else
             return $this->grade_notes ? @$this->grade_notes->$key : null;
+    }
+
+    public function commit_or_grading_info() {
+        if ($this->pset->gitless_grades || !$this->commit())
+            return $this->grading_info();
+        else
+            return $this->commit_info();
     }
 
     public function grading_info_empty() {
