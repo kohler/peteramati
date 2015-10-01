@@ -134,7 +134,7 @@ class ContactView {
 
     static function add_regrades($info) {
         list($user, $repo) = array($info->user, $info->repo);
-        if (!isset($info->regrades) && !$info->pset->gitless) {
+        if (!isset($info->regrades) && !$info->pset->gitless_grades) {
             $info->regrades = array();
             $result = Dbl::qe("select * from RepositoryGradeRequest where repoid=? and pset=? order by requested_at desc", $repo->repoid, $info->pset->psetid);
             while (($row = edb_orow($result))) {
@@ -539,7 +539,7 @@ For example, try these commands. (You’ll have to enter a commit message for th
 
     static function echo_repo_grade_commit_group($info) {
         list($user, $repo) = array($info->user, $info->repo);
-        if ($info->pset->gitless)
+        if ($info->pset->gitless_grades)
             return;
         else if (!$info->has_grading() || !$info->can_view_repo_contents)
             return self::echo_repo_last_commit_group($info, false);

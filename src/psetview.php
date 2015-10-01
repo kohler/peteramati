@@ -73,6 +73,10 @@ class PsetView {
             return false;
     }
 
+    public function can_have_grades() {
+        return $this->pset->gitless_grades || $this->commit();
+    }
+
     public function load_recent_commits() {
         list($user, $repo, $pset) = array($this->user, $this->repo, $this->pset);
         if (!$repo)
@@ -174,7 +178,7 @@ class PsetView {
 
     public function load_grade() {
         global $Me;
-        if ($this->pset->gitless) {
+        if ($this->pset->gitless_grades) {
             $this->grade = $this->user->contact_grade($this->pset);
             $this->grade_notes = @$this->grade->notes;
         } else {
@@ -205,7 +209,7 @@ class PsetView {
     }
 
     public function grading_hash() {
-        if ($this->pset->gitless)
+        if ($this->pset->gitless_grades)
             return false;
         if ($this->grade === false)
             $this->load_grade();
@@ -215,7 +219,7 @@ class PsetView {
     }
 
     public function grading_commit() {
-        if ($this->pset->gitless)
+        if ($this->pset->gitless_grades)
             return false;
         if ($this->grade === false)
             $this->load_grade();
@@ -225,7 +229,7 @@ class PsetView {
     }
 
     public function is_grading_commit() {
-        if ($this->pset->gitless)
+        if ($this->pset->gitless_grades)
             return false;
         if ($this->grade === false)
             $this->load_grade();
@@ -237,7 +241,7 @@ class PsetView {
     public function gradercid() {
         if ($this->grade === false)
             $this->load_grade();
-        if ($this->pset->gitless)
+        if ($this->pset->gitless_grades)
             return $this->grade ? $this->grade->gradercid : 0;
         else if ($this->repo_grade
                  && $this->commit == $this->repo_grade->gradehash)
@@ -306,7 +310,7 @@ class PsetView {
     function change_grader($grader) {
         if (is_object($grader))
             $grader = $grader->contactId;
-        if ($this->pset->gitless)
+        if ($this->pset->gitless_grades)
             $q = Dbl::format_query
                 ("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=values(gradercid)",
                  $this->user->contactId, $this->pset->psetid, $grader);
@@ -331,7 +335,7 @@ class PsetView {
 
     function mark_grading_commit() {
         global $Me;
-        if ($this->pset->gitless)
+        if ($this->pset->gitless_grades)
             Dbl::qe("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=gradercid",
                     $this->user->contactId, $this->pset->psetid,
                     $Me->contactId);

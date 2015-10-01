@@ -27,6 +27,7 @@ class Pset {
     public $partner;
     public $anonymous;
     public $gitless;
+    public $gitless_grades;
 
     public $handout_repo_url;
     public $repo_guess_patterns = array();
@@ -106,6 +107,11 @@ class Pset {
         $this->partner = self::cbool($p, "partner");
         $this->anonymous = self::cbool($p, "anonymous");
         $this->gitless = self::cbool($p, "gitless");
+        $this->gitless_grades = self::cbool($p, "gitless_grades");
+        if ($this->gitless_grades === null)
+            $this->gitless = $this->gitless_grades;
+        if (!$this->gitless_grades && $this->gitless)
+            throw new Exception("`gitless` requires `gitless_grades`");
 
         // directory
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");

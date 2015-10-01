@@ -102,7 +102,7 @@ if (isset($_REQUEST["gradecdf"])) {
         else
             $notdropped = "not c.dropped";
         $q = "select cn.notes, c.extension from ContactInfo c\n";
-        if ($Pset->gitless)
+        if ($Pset->gitless_grades)
             $q .= "\t\tjoin ContactGrade cn on (cn.cid=c.contactId and cn.pset=$Pset->psetid)";
         else
             $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$Pset->id)
@@ -164,7 +164,7 @@ if (isset($_REQUEST["gradestatus"])) {
 
 // get commit data
 if (isset($_REQUEST["latestcommit"])) {
-    if (!$Info || $Pset->gitless || !$Info->latest_commit())
+    if (!$Info || $Pset->gitless_grades || !$Info->latest_commit())
         $j = array("hash" => false);
     else if (!$Info->can_view_repo_contents)
         $j = array("hash" => false, "error" => "Unconfirmed repository");
@@ -178,7 +178,7 @@ if (isset($_REQUEST["latestcommit"])) {
 
 // maybe set commit
 if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
-    && ($Commit || $Pset->gitless) && $Me->can_set_grader($Pset, $User)) {
+    && $Info->can_have_grades() && $Me->can_set_grader($Pset, $User)) {
     $grader = 0;
     foreach (pcMembers() as $pcm)
         if ($pcm->email === $_POST["grader"])
@@ -189,7 +189,7 @@ if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
     $Conf->ajaxExit(array("ok" => null, "grader_email" => $_POST["grader"]));
 }
 if (isset($_REQUEST["setcommit"]) && isset($_REQUEST["grade"]) && check_post()
-    && ($Commit || $Pset->gitless) && $Me->isPC && $Me != $User)
+    && $Info->can_have_grades() && $Me->isPC && $Me != $User)
     $Info->mark_grading_commit();
 if (isset($_REQUEST["setcommit"]))
     go($Info->hoturl("pset"));
@@ -231,7 +231,7 @@ function save_grades($user, $pset, $info, $values, $isauto) {
                 $grades[$ge->name] = floatval($g);
         }
     $key = $isauto ? "autogrades" : "grades";
-    if (count($grades) && $pset->gitless)
+    if (count($grades) && $pset->gitless_grades)
         $user->update_contact_grade($pset, array($key => $grades));
     else if (count($grades))
         $info->update_commit_info(array($key => $grades));
@@ -239,7 +239,7 @@ function save_grades($user, $pset, $info, $values, $isauto) {
 }
 
 if ($Me->isPC && $Me != $User && check_post()
-    && isset($_REQUEST["setgrade"]) && ($Info->commit() || $Pset->gitless)) {
+    && isset($_REQUEST["setgrade"]) && $Info->can_have_grades()) {
     $result = save_grades($User, $Pset, $Info, $_REQUEST, false);
     if (isset($_REQUEST["ajax"]))
         $Conf->ajaxExit($result != 0);
@@ -247,11 +247,11 @@ if ($Me->isPC && $Me != $User && check_post()
 }
 
 if ($Me->isPC && $Me != $User && check_post()
-    && isset($_REQUEST["setlatehours"]) && ($Info->commit() || $Pset->gitless)) {
+    && isset($_REQUEST["setlatehours"]) && $Info->can_have_grades()) {
     if (isset($_REQUEST["late_hours"])
         && preg_match('_\A(?:0|[1-9]\d*)\z_', $_REQUEST["late_hours"])) {
         $lh = intval($_REQUEST["late_hours"]);
-        if ($Pset->gitless)
+        if ($Pset->gitless_grades)
             $User->update_contact_grade($Pset, array("late_hours" => $lh));
         else
             $Info->update_commit_info(array("late_hours" => $lh));
@@ -265,13 +265,16 @@ if ($Me->isPC && $Me != $User && check_post()
 
 function upload_grades($pset, $text, $fname) {
     global $Conf;
-    assert($pset->gitless);
+    assert($pset->gitless_grades);
     $csv = new CsvParser($text);
     $csv->set_header($csv->next());
     while (($line = $csv->next())) {
         if (@$line["seascode_username"]) {
             $who = $line["seascode_username"];
             $user = Contact::find_by_username($who);
+        } else if (@$line["email"]) {
+            $who = $line["email"];
+            $user = Contact::find_by_email($who);
         } else if (@$line["name"]) {
             $who = $line["name"];
             list($first, $last) = Text::split_name($who);
@@ -795,7 +798,7 @@ function echo_all_grades() {
 function show_pset($info) {
     global $Me;
     echo "<hr/>\n";
-    if ($Me->isPC && @$info->pset->gitless)
+    if ($Me->isPC && @$info->pset->gitless_grades)
         echo '<div style="float:right"><button type="button" onclick="jQuery(\'#upload\').show()">upload</button></div>';
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);

@@ -118,7 +118,7 @@ function collect_pset_info(&$students, $pset, $where) {
                       "extension" => ($s->extension ? "Y" : "N"),
                       "sorter" => $s->sorter);
 
-        if ($pset->gitless) {
+        if ($pset->gitless_grades) {
             $gi = Contact::contact_grade_for($s, $pset);
             $gi = $gi ? $gi->notes : null;
         } else if (@$s->gradehash)
@@ -568,7 +568,7 @@ function render_grades($pset, $gi, $s) {
 
 function show_pset($pset, $user) {
     global $Me;
-    if ($pset->gitless && $Me == $user && !$pset->partner
+    if ($pset->gitless_grades && $Me == $user && !$pset->partner
         && !$user->contact_grade($pset))
         return;
     echo "<hr/>\n";
@@ -652,7 +652,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     ++$ncol;
 
     // are any commits committed?
-    if (!$pset->gitless) {
+    if (!$pset->gitless_grades) {
         if (($s->placeholder || $s->gradehash === null)
             && $s->repoid
             && ($s->placeholder_at < $Now - 3600 && rand(0, 2) == 0
@@ -673,7 +673,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     }
 
     if (count($pset->grades)) {
-        if ($pset->gitless) {
+        if ($pset->gitless_grades) {
             $gi = Contact::contact_grade_for($s, $pset);
             $gi = $gi ? $gi->notes : null;
         } else if ($s->gradehash && !$s->placeholder)
@@ -681,7 +681,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
         else
             $gi = null;
 
-        if (!$pset->gitless) {
+        if (!$pset->gitless_grades) {
             $t .= "<td>";
             if ($gi && @$gi->linenotes)
                 $t .= "♪";
@@ -919,7 +919,7 @@ function show_pset_table($pset) {
     }
     echo "</tbody></table>\n";
 
-    if ($Me->privChair && !$pset->gitless) {
+    if ($Me->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";
         $sel = array("none" => "N/A");
         foreach (pcMembers() as $pcm)
