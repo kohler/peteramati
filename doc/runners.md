@@ -8,34 +8,44 @@ Jail configuration
 ------------------
 
 Student code containers are stored in a directory called the _jail_.
-Restrictions on the jail directory aim to prevent accidental
-misconfiguration from dumping student code onto random parts of your
-filesystem.
+Restrictions on the jail directory aim to prevent accidental misconfiguration
+from dumping student code all over your filesystem.
 
-1. The absolute pathname can contain no special characters---only
-letters, numbers, and characters in `-._~`.
+The jail directory is specified as an absolute pathname. It can contain no
+special characters—only letters, numbers, and characters in `-._~`. There must
+be no symbolic links in the path.
 
-2. There must be no symbolic links in the path.
+The jail directory must also be _enabled_ by a `pa-jail.conf` configuration
+file. Peteramati searches for `pa-jail.conf` files in `/etc`, and in all
+ancestors of the jail directory, starting at the root. For instance, if the
+jail directory were `/usr/local/pa-jails/cs101/user1`, peteramati would check
+for:
 
-3. The file `/etc/pa-jail.conf` exists, is owned by root and writable
-only by root, and “enables” the jail directory (see below for how this
-works). Alternately, the jail directory, or one of its parent
-directories, can contain a `pa-jail.conf` file, owned by root and
-writable only by root, that “enables” the jail directory.
+    /etc/pa-jail.conf
+    /pa-jail.conf
+    /usr/pa-jail.conf
+    /usr/local/pa-jail.conf
+    /usr/local/pa-jails/pa-jail.conf
+    /usr/local/pa-jails/cs101/pa-jail.conf
 
-4. The jail directory and all of its parent directories _must not_
-contain a `pa-jail.conf` file that is not owned by root, that is
-writable by a user other than root, or that “disables” the jail
-directory.
+To enable a directory `DIR` and its descendants for jails, add a
+`pa-jail.conf` line `enablejail DIR`. In the example above,
+`/etc/pa-jail.conf` could include `enablejail /usr/local/pa-jails`, making
+`/usr/local/pa-jails` the enabled ancestor of the full jail directory
+`/usr/local/pa-jails/cs101/user1`. `DIR` can also be a shell-style matching
+pattern, such as `/usr/local/pa-jail-*`.
 
-5. The directory containing the enabling `pa-jail.conf` file must be owned by
-   root and writable only by root, as must all of its parent directories.
+To disable a jail directory and its descendants, add a line `disablejail DIR`
+or `disablejail`. Peteramati will reject any jail that isn’t enabled.
 
-A `pa-jail.conf` file “enables” a jail directory by containing a line
-`enablejail` or `enablejail PATTERN` (where `PATTERN` is a shell-style
-filename pattern that matches the jail directory). It “disables” a
-jail directory by containing a line `disablejail` or `disablejail
-PATTERN`.
+Peteramati only _trusts_ `pa-jail.conf` files that are owned by root, writable
+only by root, and located in directories owned by and writable only by root.
+When encountering an untrusted `pa-jail.conf` file, peteramati ignores it if
+the jail directory has been enabled by a past configuration file, and exits
+with a fatal error if it has not.
+
+Peteramati automatically creates missing directories, `mkdir -p` style,
+underneath the enabled ancestor.
 
 Container components
 --------------------

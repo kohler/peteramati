@@ -837,7 +837,7 @@ struct jaildirinfo {
 private:
     std::string alternate_permfile;
 
-    void check_permfile(int fd, std::string dir);
+    void check_permfile(int dirfd, struct stat& dirstat, std::string dir);
     void parse_permfile(int conff, std::string thisdir,
                         const char* permfilename, bool islocal);
     void chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group);
@@ -932,7 +932,7 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
 
         // check for "pa-jail.conf" allowance
         if (parent.length())
-            check_permfile(fd, thisdir);
+            check_permfile(fd, s, thisdir);
     }
     if (!allowed) {
         fprintf(stderr, "%s: No `pa-jail.conf` enables jails here.\n", dir.c_str());
@@ -944,20 +944,29 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
         close(fd);
 }
 
-void jaildirinfo::check_permfile(int fd, std::string thisdir) {
+static bool writable_only_by_root(const struct stat& st) {
+    return st.st_uid == ROOT
+        && (st.st_gid == ROOT || !(st.st_mode & S_IWGRP))
+        && !(st.st_mode & S_IWOTH);
+}
+
+void jaildirinfo::check_permfile(int dirfd, struct stat& dirstat,
+                                 std::string thisdir) {
     const char* permfilename = "pa-jail.conf";
-    int jail61f = openat(fd, permfilename, O_RDONLY | O_NOFOLLOW);
-    if (jail61f == -1 && errno == ENOENT) {
+    int conff = openat(dirfd, permfilename, O_RDONLY | O_NOFOLLOW);
+    if (conff == -1 && errno == ENOENT) {
         permfilename = "JAIL61";
-        jail61f = openat(fd, permfilename, O_RDONLY | O_NOFOLLOW);
+        conff = openat(dirfd, permfilename, O_RDONLY | O_NOFOLLOW);
     }
-    if (jail61f != -1) {
-        parse_permfile(jail61f, thisdir, permfilename, false);
-        close(jail61f);
-    } else if (errno != ENOENT && errno != ELOOP) {
+    if (conff == -1 && errno != ENOENT && errno != ELOOP) {
         fprintf(stderr, "%s/%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
         exit(1);
     }
+    if (conff == -1)
+        return;
+    if (writable_only_by_root(dirstat))
+        parse_permfile(conff, thisdir, permfilename, false);
+    close(conff);
 }
 
 void jaildirinfo::parse_permfile(int conff, std::string thisdir,
@@ -965,15 +974,16 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
     if (thisdir[thisdir.length() - 1] != '/')
         thisdir += '/';
 
-    struct stat s;
-    if (fstat(conff, &s) != 0) {
+    struct stat st;
+    if (fstat(conff, &st) != 0) {
         fprintf(stderr, "%s%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
         exit(1);
-    } else if (s.st_uid != ROOT
-               || (s.st_gid != ROOT && (s.st_mode & S_IWGRP))
-               || (s.st_mode & S_IWOTH)) {
-        fprintf(stderr, "%s%s: Writable by non-root\n", thisdir.c_str(), permfilename);
-        exit(1);
+    } else if (!writable_only_by_root(st)) {
+        if (!allowed || verbose)
+            fprintf(stderr, allowed ? "%s%s: Writable by non-root, ignoring\n" : "%s%s: Writable by non-root\n", thisdir.c_str(), permfilename);
+        if (!allowed)
+            exit(1);
+        return;
     }
 
     char buf[8192];
@@ -1010,7 +1020,7 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
         while (slcount > 0 && (slpos = dir.find('/', slpos)) != std::string::npos)
             --slcount, ++slpos;
         std::string superdir = dir.substr(0, slpos);
-        bool dirmatch = fnmatch(wdir.c_str(), superdir.c_str(), FNM_PATHNAME) == 0;
+        bool dirmatch = fnmatch(wdir.c_str(), superdir.c_str(), FNM_PATHNAME | FNM_PERIOD) == 0;
 
         if (word1 == "disablejail" || word1 == "nojail") {
             if (word2.empty())
