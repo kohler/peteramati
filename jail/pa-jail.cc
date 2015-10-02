@@ -635,6 +635,7 @@ static int construct_jail(std::string jaildir, dev_t jaildev, FILE* f) {
 
     // Read a line at a time
     std::string cursrcdir("/"), curdstdir(dstroot);
+    int base_flags = linkdir.empty() ? FLAG_CP : 0;
 
     char buf[BUFSIZ];
     while (fgets(buf, BUFSIZ, f)) {
@@ -663,7 +664,7 @@ static int construct_jail(std::string jaildir, dev_t jaildev, FILE* f) {
         }
 
         // '[FLAGS]'
-        int flags = 0;
+        int flags = base_flags;
         if (buf[l - 1] == ']') {
             for (--l; l > 0 && buf[l-1] != '['; --l)
                 /* do nothing */;
