@@ -38,7 +38,8 @@
 
 #define ROOT 0
 
-#define FLAG_CP 1
+#define FLAG_CP 1        // copy even if source is symlink
+#define FLAG_NOLINK 2    // never link from source
 
 #ifndef O_PATH
 #define O_PATH 0
@@ -232,8 +233,11 @@ static int x_mknod(const char* path, mode_t mode, dev_t dev) {
 
 static bool x_symlink_eexist_ok(const char* oldpath, const char* newpath) {
     char lnkbuf[4096];
+    int old_errno = errno;
     ssize_t r = readlink(newpath, lnkbuf, sizeof(lnkbuf));
-    return (size_t) r == (size_t) strlen(oldpath) && memcmp(lnkbuf, oldpath, r) == 0;
+    bool answer = (size_t) r == (size_t) strlen(oldpath) && memcmp(lnkbuf, oldpath, r) == 0;
+    errno = old_errno;
+    return answer;
 }
 
 static int x_symlink(const char* oldpath, const char* newpath) {
@@ -453,6 +457,31 @@ static void handle_symlink_dst(std::string src, std::string dst,
     }
 }
 
+static int x_cp_p(const std::string& src, const std::string& dst) {
+    if (verbose)
+        fprintf(verbosefile, "cp -p %s %s\n", src.c_str(), dst.c_str());
+    if (dryrun)
+        return 0;
+
+    pid_t child = fork();
+    if (child == 0) {
+        const char* args[6] = {
+            "/bin/cp", "-p", src.c_str(), dst.c_str(), NULL
+        };
+        execv("/bin/cp", (char**) args);
+        exit(1);
+    } else if (child < 0)
+        return perror_fail("%s: %s\n", "fork");
+
+    int status = x_waitpid(child, 0);
+    if (status == 0)
+        return 0;
+    else if (status != -1)
+        return perror_fail("/bin/cp %s: Bad exit status\n", dst.c_str());
+    else
+        return perror_fail("/bin/cp %s: Did not exit\n", dst.c_str());
+}
+
 static int copy_for_xdev_link(const std::string& src, const std::string& lnk) {
     // create superdirectories
     size_t pos = linkdir.length() - 1;
@@ -472,28 +501,7 @@ static int copy_for_xdev_link(const std::string& src, const std::string& lnk) {
     }
 
     // run /bin/cp -p
-    if (verbose)
-        fprintf(verbosefile, "cp -p %s %s\n", src.c_str(), lnk.c_str());
-    if (dryrun)
-        return 0;
-
-    pid_t child = fork();
-    if (child == 0) {
-        const char* args[6] = {
-            "/bin/cp", "-p", src.c_str(), lnk.c_str(), NULL
-        };
-        execv("/bin/cp", (char**) args);
-        exit(1);
-    } else if (child < 0)
-        return perror_fail("%s: %s\n", "fork");
-
-    int status = x_waitpid(child, 0);
-    if (status == 0)
-        return 0;
-    else if (status != -1)
-        return perror_fail("/bin/cp %s: Bad exit status\n", lnk.c_str());
-    else
-        return perror_fail("/bin/cp %s: Did not exit\n", lnk.c_str());
+    return x_cp_p(src, lnk);
 }
 
 static int handle_xdev_link(const std::string& src, const std::string& dst,
@@ -551,8 +559,12 @@ static int handle_copy(const std::string& src, const std::string& dst,
         *srcmode = ss.st_mode;
     ds.st_uid = ds.st_gid = ROOT;
 
-    if (S_ISREG(ss.st_mode) && !copy_samedev && !(flags & FLAG_CP)
-        && ss.st_dev == jaildev) {
+    if (S_ISREG(ss.st_mode) && (flags & FLAG_NOLINK)) {
+        if (x_cp_p(src, dst) != 0)
+            return 1;
+        ds = ss;
+    } else if (S_ISREG(ss.st_mode) && !copy_samedev && !(flags & FLAG_CP)
+               && ss.st_dev == jaildev) {
         if (x_link(src.c_str(), dst.c_str()) != 0)
             return perror_fail("link %s: %s\n", (dst + " " + src).c_str());
         ds = ss;
@@ -635,7 +647,7 @@ static int construct_jail(std::string jaildir, dev_t jaildev, FILE* f) {
 
     // Read a line at a time
     std::string cursrcdir("/"), curdstdir(dstroot);
-    int base_flags = linkdir.empty() ? FLAG_CP : 0;
+    int base_flags = linkdir.empty() ? FLAG_NOLINK : 0;
 
     char buf[BUFSIZ];
     while (fgets(buf, BUFSIZ, f)) {
