@@ -854,7 +854,7 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
 
     int fd = open("/etc/pa-jail.conf", O_RDONLY | O_NOFOLLOW);
     if (fd != -1) {
-        parse_permfile(fd, "/etc/", "pa-jail.conf", true);
+        parse_permfile(fd, "/etc/", "pa-jail.conf", false);
         close(fd);
     }
 
@@ -966,7 +966,7 @@ void jaildirinfo::check_permfile(int dirfd, struct stat& dirstat,
     if (conff == -1)
         return;
     if (writable_only_by_root(dirstat))
-        parse_permfile(conff, thisdir, permfilename, false);
+        parse_permfile(conff, thisdir, permfilename, true);
     close(conff);
 }
 
