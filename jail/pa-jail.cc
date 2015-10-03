@@ -68,6 +68,57 @@ enum jailaction {
 };
 
 
+// pathname helpers
+
+static std::string path_endslash(const std::string& path) {
+    if (path.empty() || path.back() != '/')
+        return path + "/";
+    else
+        return path;
+}
+
+static std::string path_noendslash(std::string path) {
+    while (path.length() > 1 && path.back() == '/')
+        path = path.substr(0, path.length() - 1);
+    return path;
+}
+
+static std::string path_parentdir(const std::string& path) {
+    size_t npos = path.length();
+    while (npos > 0 && path[npos - 1] == '/')
+        --npos;
+    while (npos > 0 && path[npos - 1] != '/')
+        --npos;
+    return path.substr(0, npos);
+}
+
+static std::string shell_quote(const std::string& argument) {
+    std::string quoted;
+    size_t last = 0;
+    for (size_t pos = 0; pos != argument.length(); ++pos)
+        if ((pos == 0 && argument[pos] == '~')
+            || !(isalnum((unsigned char) argument[pos])
+                 || argument[pos] == '_'
+                 || argument[pos] == '-'
+                 || argument[pos] == '~'
+                 || argument[pos] == '.'
+                 || argument[pos] == '/')) {
+            if (quoted.empty())
+                quoted = "'";
+            if (argument[pos] == '\'') {
+                quoted += argument.substr(last, pos - last) + "'\\''";
+                last = pos + 1;
+            }
+        }
+    if (quoted.empty())
+        return argument;
+    else {
+        quoted += argument.substr(last) + "'";
+        return quoted;
+    }
+}
+
+
 static int perror_fail(const char* format, const char* arg1) {
     fprintf(stderr, format, arg1, strerror(errno));
     exit_value = 1;
@@ -621,11 +672,7 @@ static int handle_copy(const std::string& src, const std::string& dst,
     return 0;
 }
 
-static int construct_jail(std::string jaildir, dev_t jaildev, FILE* f) {
-    dstroot = jaildir;
-    while (dstroot.length() > 1 && dstroot[dstroot.length() - 1] == '/')
-        dstroot = dstroot.substr(0, dstroot.length() - 1);
-
+static int construct_jail(dev_t jaildev, FILE* f) {
     // prepare root
     if (x_chmod(dstroot.c_str(), 0755)
         || x_lchown(dstroot.c_str(), 0, 0))
@@ -745,17 +792,6 @@ static std::string check_filename(std::string name) {
     return std::string(buf, out - buf);
 }
 
-static dev_t closest_ancestor_dev(std::string dir) {
-    while (1) {
-        struct stat s;
-        if (lstat(dir.c_str(), &s) == 0)
-            return s.st_dev;
-        dir = dir.substr(0, dir.rfind('/'));
-        if (dir.empty())
-            dir = "/";
-    }
-}
-
 static std::string absolute(const std::string& dir) {
     if (!dir.empty() && dir[0] == '/')
         return dir;
@@ -779,8 +815,7 @@ static std::string absolute(const std::string& dir) {
 
 static void x_rm_rf_under(int parentdirfd, std::string component,
                           std::string dirname) {
-    if (dirname.empty() || dirname[dirname.length() - 1] != '/')
-        dirname += "/";
+    dirname = path_endslash(dirname);
     int dirfd = openat(parentdirfd, component.c_str(), O_RDONLY);
     if (dirfd == -1) {
         fprintf(stderr, "%s: %s\n", dirname.c_str(), strerror(errno));
@@ -842,6 +877,7 @@ struct jaildirinfo {
     std::string component;
     bool allowed;
     std::string permdir;
+    dev_t dev;
 
     jaildirinfo(const char* str, jailaction action, bool doforce);
     void check();
@@ -857,12 +893,13 @@ private:
 };
 
 jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
-    : dir(check_filename(absolute(str))), parentfd(-1), allowed(false) {
+    : dir(check_filename(absolute(str))), parentfd(-1), allowed(false),
+      dev(-1) {
     if (dir.empty() || dir == "/" || dir[0] != '/') {
         fprintf(stderr, "%s: Bad characters in filename\n", str);
         exit(1);
     }
-    dir += "/";
+    dir = path_endslash(dir);
 
     int fd = open("/etc/pa-jail.conf", O_RDONLY | O_NOFOLLOW);
     if (fd != -1) {
@@ -942,6 +979,7 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
                 exit(1);
             }
         }
+        dev = s.st_dev;
 
         // check for "pa-jail.conf" allowance
         if (parent.length())
@@ -984,8 +1022,7 @@ void jaildirinfo::check_permfile(int dirfd, struct stat& dirstat,
 
 void jaildirinfo::parse_permfile(int conff, std::string thisdir,
                                  const char* permfilename, bool islocal) {
-    if (thisdir[thisdir.length() - 1] != '/')
-        thisdir += '/';
+    thisdir = path_endslash(thisdir);
 
     struct stat st;
     if (fstat(conff, &st) != 0) {
@@ -1019,8 +1056,7 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
             wdir = wdir.substr(2, wdir.length());
         if (wdir.empty() || wdir == ".")
             wdir = thisdir;
-        if (wdir[wdir.length() - 1] != '/')
-            wdir += '/';
+        wdir = path_endslash(wdir);
         if (wdir[0] != '/')
             wdir = thisdir + wdir;
 
@@ -1086,8 +1122,7 @@ void jaildirinfo::chown_recursive() {
 }
 
 void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group) {
-    if (dirbuf.length() && dirbuf.back() != '/')
-        dirbuf += '/';
+    dirbuf = path_endslash(dirbuf);
     size_t dirbuflen = dirbuf.length();
 
     typedef std::pair<uid_t, gid_t> ug_t;
@@ -1302,11 +1337,18 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         exit(1);
     }
     int newargvpos = 0;
+    std::string command;
     this->argv[newargvpos++] = (char*) owner_sh.c_str();
     this->argv[newargvpos++] = (char*) "-l";
     this->argv[newargvpos++] = (char*) "-c";
-    for (int i = optind + 2; i < argc; ++i)
-        this->argv[newargvpos++] = argv[i];
+    if (optind + 3 == argc)
+        command = argv[optind + 2];
+    else {
+        command = shell_quote(argv[optind + 2]);
+        for (int i = optind + 3; i < argc; ++i)
+            command += std::string(" ") + shell_quote(argv[i]);
+    }
+    this->argv[newargvpos++] = const_cast<char*>(command.c_str());
     this->argv[newargvpos++] = NULL;
 
     // store other arguments
@@ -1411,10 +1453,8 @@ int jailownerinfo::exec_go() {
         for (int i = 0; newenv[i]; ++i)
             fprintf(verbosefile, "%s ", newenv[i]);
         for (int i = 0; this->argv[i]; ++i)
-            if (strchr(this->argv[i], ' '))
-                fprintf(verbosefile, i ? " '%s'" : "'%s'", this->argv[i]);
-            else
-                fprintf(verbosefile, i ? " %s" : "%s", this->argv[i]);
+            fprintf(verbosefile, i ? " %s" : "%s", shell_quote(this->argv[i]).c_str());
+        fprintf(verbosefile, "\n");
     }
 
     if (!dryrun) {
@@ -1716,11 +1756,9 @@ int main(int argc, char** argv) {
                                  longoptions_action[(int) action], NULL)) != -1) {
             if (ch == 'V')
                 verbose = true;
-            else if (ch == 'S') {
-                linkdir = optarg;
-                while (!linkdir.empty() && linkdir[linkdir.length() - 1] == '/')
-                    linkdir = linkdir.substr(0, linkdir.length() - 1);
-            } else if (ch == 'n')
+            else if (ch == 'S')
+                linkdir = path_noendslash(optarg);
+            else if (ch == 'n')
                 verbose = dryrun = true;
             else if (ch == 'f' && action == do_rm)
                 doforce = true;
@@ -1858,11 +1896,8 @@ int main(int argc, char** argv) {
 
         // allow second argument to be a directory
         struct stat s;
-        if (stat(newpath.c_str(), &s) == 0 && S_ISDIR(s.st_mode)) {
-            if (newpath[newpath.length() - 1] != '/')
-                newpath += "/";
-            newpath += jaildir.component;
-        }
+        if (stat(newpath.c_str(), &s) == 0 && S_ISDIR(s.st_mode))
+            newpath = path_endslash(newpath) + jaildir.component;
 
         if (verbose)
             fprintf(verbosefile, "mv %s%s %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str());
@@ -1877,8 +1912,7 @@ int main(int argc, char** argv) {
     if (action == do_rm || dokill) {
         // unmount EVERYTHING mounted in the jail!
         // INCLUDING MY HOME DIRECTORY
-        if (jaildir.dir[jaildir.dir.length() - 1] != '/')
-            jaildir.dir += "/";
+        jaildir.dir = path_endslash(jaildir.dir);
         populate_mount_table();
         for (auto it = mount_table.begin(); it != mount_table.end(); ++it)
             if (it->first.length() >= jaildir.dir.length()
@@ -1925,12 +1959,13 @@ int main(int argc, char** argv) {
     // set ownership
     if (action == do_run)
         jaildir.chown_recursive();
+    dstroot = path_noendslash(jaildir.dir);
+    assert(dstroot != "/");
 
     // construct the jail
     if (filesf) {
-        dev_t jaildev = closest_ancestor_dev(jaildir.dir);
         mode_t old_umask = umask(0);
-        if (construct_jail(jaildir.dir, jaildev, filesf) != 0)
+        if (construct_jail(jaildir.dev, filesf) != 0)
             exit(1);
         fclose(filesf);
         umask(old_umask);
