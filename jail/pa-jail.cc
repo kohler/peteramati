@@ -936,6 +936,8 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
             close(parentfd);
         parentfd = fd;
         fd = openat(parentfd, component.c_str(), O_PATH | O_CLOEXEC | O_NOFOLLOW);
+        if (fd == -1 && !allowed_here && errno == ENOENT)
+            break;
         if ((fd == -1 && dryrunning)
             || (fd == -1 && allowed_here && errno == ENOENT
                 && (action == do_init || action == do_run))) {
