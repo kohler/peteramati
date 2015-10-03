@@ -429,23 +429,35 @@ int umount(const char* dir) {
 }
 #endif
 
-static int handle_mount(const mountslot& ms, std::string dst) {
+static int handle_mount(const mountslot& ms, std::string dst, bool chrooted) {
     auto it = mount_table.find(dst);
     if (it != mount_table.end()
         && it->second.fsname == ms.fsname
         && it->second.type == ms.type
         && it->second.opts == ms.opts
-        && it->second.data == ms.data)
+        && it->second.data == ms.data
+        && !chrooted)
         // already mounted
         return 0;
     if (verbose)
         fprintf(verbosefile, "mount -i -n -t %s%s%s %s %s\n",
                 ms.type.c_str(), ms.alloptions.empty() ? "" : " -o ",
                 ms.alloptions.c_str(), ms.fsname.c_str(), dst.c_str());
-    if (!dryrun && mount(ms.fsname.c_str(), dst.c_str(), ms.type.c_str(),
-                         ms.opts,
-                         ms.data.empty() ? NULL : ms.data.c_str()) != 0)
-        return perror_fail("mount %s: %s\n", dst.c_str());
+    if (!dryrun) {
+        std::string datastr = ms.data;
+#if __linux__
+        if (ms.type == "devpts" && chrooted)
+            datastr += std::string(datastr.empty() ? "" : ",") + "newinstance,ptmxmode=0666";
+#endif
+        const char* data = datastr.empty() ? NULL : datastr.c_str();
+        int r = mount(ms.fsname.c_str(), dst.c_str(), ms.type.c_str(),
+                      ms.opts, data);
+        if (r != 0 && errno == EBUSY && chrooted)
+            r = mount(ms.fsname.c_str(), dst.c_str(), ms.type.c_str(),
+                      ms.opts | MS_REMOUNT, data);
+        if (r != 0)
+            return perror_fail("mount %s: %s\n", dst.c_str());
+    }
     return 0;
 }
 
@@ -666,7 +678,7 @@ static int handle_copy(const std::string& src, const std::string& dst,
     if (S_ISDIR(ss.st_mode)) {
         auto it = mount_table.find(src.c_str());
         if (it != mount_table.end() && it->second.allowed)
-            return handle_mount(it->second, dst);
+            return handle_mount(it->second, dst, false);
     }
 
     return 0;
@@ -681,16 +693,6 @@ static int construct_jail(dev_t jaildev, FILE* f) {
 
     // Mounts
     populate_mount_table();
-#if __linux__
-    {
-        std::string proc("/proc");
-        handle_copy(proc, dstroot + proc, true, 0, jaildev, NULL);
-        std::string devpts("/dev/pts");
-        handle_copy(devpts, dstroot + devpts, true, 0, jaildev, NULL);
-        std::string devptmx("/dev/ptmx");
-        handle_copy(devptmx, dstroot + devptmx, true, 0, jaildev, NULL);
-    }
-#endif
 
     // Read a line at a time
     std::string cursrcdir("/"), curdstdir(dstroot);
@@ -1394,6 +1396,10 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 }
 
 int jailownerinfo::exec_go() {
+#if __linux__
+    populate_mount_table();     // ensure we know how to mount /proc
+#endif
+
     // chroot, remount /proc
     if (verbose)
         fprintf(verbosefile, "cd %s\n", jaildir->dir.c_str());
@@ -1405,9 +1411,16 @@ int jailownerinfo::exec_go() {
         perror_exit("chroot");
 #if __linux__
     {
-        auto it = mount_table.find("/proc");
-        if (it != mount_table.end() && it->second.allowed)
-            handle_mount(it->second, "/proc");
+        const char* const mounts[] = {"/proc", "/dev/pts", NULL};
+        for (const char* const* m = mounts; *m; ++m) {
+            auto it = mount_table.find(*m);
+            if (it != mount_table.end() && it->second.allowed) {
+                v_ensuredir(*m, 0555);
+                handle_mount(it->second, *m, true);
+            }
+        }
+        (void) unlink("/dev/ptmx");
+        x_symlink("pts/ptmx", "/dev/ptmx");
     }
 #endif
 
