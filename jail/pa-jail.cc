@@ -1766,11 +1766,9 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     // go back to being the caller
     // XXX (preserve the saved root identity just in case)
-    if (setresgid(caller_group, caller_group, ROOT) != 0) {
-        perror("setresgid");
-        exec_done(child, 127);
-    }
-    if (setresuid(caller_owner, caller_owner, ROOT) != 0) {
+    if (setresuid(ROOT, ROOT, ROOT) != 0
+        || setresgid(caller_group, caller_group, ROOT) != 0
+        || setresuid(caller_owner, caller_owner, ROOT) != 0) {
         perror("setresuid");
         exec_done(child, 127);
     }
