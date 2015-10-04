@@ -54,6 +54,8 @@ static bool dryrun = false;
 static bool foreground = false;
 static bool quiet = false;
 static FILE* verbosefile = stdout;
+static uid_t caller_owner;
+static gid_t caller_group;
 static std::string linkdir;
 static std::unordered_map<std::string, int> dirtable;
 static std::string dstroot;
@@ -1477,9 +1479,13 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     close(STDERR_FILENO);
 
     int exit_status = 0;
-    if (foreground)
+    if (foreground) {
+        int r = setresgid(caller_group, caller_group, caller_group);
+        (void) r;
+        r = setresuid(caller_owner, caller_owner, caller_owner);
+        (void) r;
         exit_status = x_waitpid(child, child_waitflags);
-    else
+    } else
         pidfd = -1;
     exit(exit_status);
 }
@@ -1523,7 +1529,7 @@ int jailownerinfo::exec_go() {
     if (verbose)
         fprintf(verbosefile, "sudo -u %s make-pty\n", uid_to_name(owner));
     if (!dryrun) {
-        // change effective uid/gid
+        // change effective uid/gid, but save root for later
         if (setresgid(group, group, ROOT) != 0)
             perror_exit("setresgid");
         if (setresuid(owner, owner, ROOT) != 0)
@@ -1758,6 +1764,17 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
 }
 
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
+    // go back to being the caller
+    // XXX (preserve the saved root identity just in case)
+    if (setresgid(caller_group, caller_group, ROOT) != 0) {
+        perror("setresgid");
+        exec_done(child, 127);
+    }
+    if (setresuid(caller_owner, caller_owner, ROOT) != 0) {
+        perror("setresuid");
+        exec_done(child, 127);
+    }
+
     // if input is a tty, put it in raw mode
     struct termios tty;
     if (tcgetattr(STDIN_FILENO, &stdin_termios) >= 0) {
@@ -1769,16 +1786,6 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         tty.c_cc[VMIN] = 1;
         tty.c_cc[VTIME] = 0;
         (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &tty);
-    }
-
-    // go back to being root
-    if (setresgid(ROOT, ROOT, ROOT) != 0) {
-        perror("setresgid");
-        exec_done(child, 127);
-    }
-    if (setresuid(ROOT, ROOT, ROOT) != 0) {
-        perror("setresuid");
-        exec_done(child, 127);
     }
 
     // blocking reads please (well, block for up to 0.5sec)
@@ -2000,12 +2007,12 @@ int main(int argc, char** argv) {
 
     // escalate so that the real (not just effective) UID/GID is root. this is
     // so that the system processes will execute as root
-    uid_t caller_owner = getuid();
-    gid_t caller_group = getgid();
-    if (!dryrun && setgid(ROOT) < 0)
-        perror_exit("setgid");
-    if (!dryrun && setuid(ROOT) < 0)
-        perror_exit("setuid");
+    caller_owner = getuid();
+    caller_group = getgid();
+    if (!dryrun && setresgid(ROOT, ROOT, ROOT) < 0)
+        perror_exit("setresgid");
+    if (!dryrun && setresuid(ROOT, ROOT, ROOT) < 0)
+        perror_exit("setresuid");
 
     // check the jail directory
     // - no special characters
