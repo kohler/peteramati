@@ -178,7 +178,7 @@ sub addfile ($$$) {
 
     $allfiles{$f} = $allfiles{$inf} = 1;
     my($match) = $always
-        || $f !~ m{\A/(?:home/|tmp/|proc/|sys/|dev/pts/.|Users/|(?:etc/)?ld\.so\.conf\.d/kernel)}
+        || $f !~ m{\A/(?:home/|tmp/|proc/|sys/|dev/pts/|Users/|(?:etc/)?ld\.so\.conf\.d/kernel)}
         || ($userdir && $f =~ m{\A$userdir/\.});
     if ($match && @excludes) {
         foreach my $e (@excludes) {
