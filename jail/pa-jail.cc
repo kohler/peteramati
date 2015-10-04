@@ -1076,10 +1076,6 @@ void jaildirinfo::check_permfile(int dirfd, struct stat& dirstat,
                                  std::string thisdir) {
     const char* permfilename = "pa-jail.conf";
     int conff = openat(dirfd, permfilename, O_RDONLY | O_NOFOLLOW);
-    if (conff == -1 && errno == ENOENT) {
-        permfilename = "JAIL61";
-        conff = openat(dirfd, permfilename, O_RDONLY | O_NOFOLLOW);
-    }
     if (conff == -1 && errno != ENOENT && errno != ELOOP) {
         fprintf(stderr, "%s/%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
         exit(1);
