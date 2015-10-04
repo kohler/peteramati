@@ -1319,6 +1319,8 @@ class jailownerinfo {
     };
     buffer to_slave;
     buffer from_slave;
+    bool has_stdin_termios;
+    struct termios stdin_termios;
 
     void start_sigpipe();
     void block(int ptymaster);
@@ -1330,7 +1332,7 @@ class jailownerinfo {
 };
 
 jailownerinfo::jailownerinfo()
-    : owner(ROOT), group(ROOT), argv() {
+    : owner(ROOT), group(ROOT), argv(), has_stdin_termios(false) {
 }
 
 jailownerinfo::~jailownerinfo() {
@@ -1760,6 +1762,19 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
 }
 
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
+    // if input is a tty, put it in raw mode
+    struct termios tty;
+    if (tcgetattr(STDIN_FILENO, &stdin_termios) >= 0) {
+        has_stdin_termios = true;
+        tty = stdin_termios;
+        // Noncanonical mode, disable signals, no echoing
+        tty.c_lflag &= ~(ICANON | ISIG | ECHO);
+        // Character-at-a-time input with blocking
+        tty.c_cc[VMIN] = 1;
+        tty.c_cc[VTIME] = 0;
+        (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &tty);
+    }
+
     // go back to being root
     if (setresgid(ROOT, ROOT, ROOT) != 0) {
         perror("setresgid");
@@ -1772,7 +1787,6 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 
     // blocking reads please (well, block for up to 0.5sec)
     // the 0.5sec wait means we avoid long race conditions
-    struct termios tty;
     if (tcgetattr(ptymaster, &tty) >= 0) {
         tty.c_cc[VMIN] = 1;
         tty.c_cc[VTIME] = 5;
@@ -1818,6 +1832,8 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
         kill(child, SIGKILL);
 #endif
     fflush(stdout);
+    if (has_stdin_termios)
+        (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &stdin_termios);
     exit(exit_status);
 }
 
