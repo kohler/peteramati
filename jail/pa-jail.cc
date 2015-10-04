@@ -25,6 +25,7 @@
 #include <fnmatch.h>
 #include <string>
 #include <map>
+#include <unordered_map>
 #include <iostream>
 #include <sys/ioctl.h>
 #if __linux__
@@ -45,21 +46,20 @@
 #define O_PATH 0
 #endif
 
-static std::map<std::string, int> dst_table;
+static std::unordered_map<std::string, int> dst_table;
 static std::multimap<std::string, std::string> lnk_table;
 static int exit_value = 0;
 static bool verbose = false;
 static bool dryrun = false;
-static bool copy_samedev = false;
 static bool foreground = false;
 static bool quiet = false;
 static FILE* verbosefile = stdout;
 static std::string linkdir;
-static std::map<std::string, int> linkdir_dirtable;
+static std::unordered_map<std::string, int> dirtable;
 static std::string dstroot;
 static std::string pidfilename;
 static int pidfd = -1;
-static std::map<std::string, int> umount_table;
+static std::unordered_map<std::string, int> umount_table;
 static volatile sig_atomic_t got_sigterm = 0;
 static int sigpipe[2];
 
@@ -170,22 +170,31 @@ static int v_fchmod(int fd, mode_t mode, const std::string& pathname) {
     return dryrun ? 0 : fchmod(fd, mode);
 }
 
-static int v_ensuredir(const char* pathname, mode_t mode) {
-    struct stat s;
-    int r = stat(pathname, &s);
-    if (r == 0 && S_ISDIR(s.st_mode))
-        return 0;
-    else if (r != 0 && errno == ENOENT) {
-        int r = v_mkdir(pathname, mode);
-        return r ? r : 1;
-    } else {
-        if (r == 0)
-            errno = ENOTDIR;
-        return -1;
+static int v_ensuredir(std::string pathname, mode_t mode) {
+    pathname = path_noendslash(pathname);
+    auto it = dirtable.find(pathname);
+    if (it != dirtable.end())
+        return it->second;
+    struct stat st;
+    int r = stat(pathname.c_str(), &st);
+    if (r == 0 && !S_ISDIR(st.st_mode)) {
+        errno = ENOTDIR;
+        r = -1;
     }
+    if (r == -1 && errno == ENOENT) {
+        std::string parent_pathname = path_parentdir(pathname);
+        if ((parent_pathname.length() == pathname.length()
+             || v_ensuredir(parent_pathname, mode) >= 0)
+            && v_mkdir(pathname.c_str(), mode) == 0)
+            r = 1;
+    }
+    dirtable.insert(std::make_pair(pathname, r == 1 ? 0 : r));
+    return r;
 }
 
 static bool x_link_eexist_ok(const char* oldpath, const char* newpath) {
+    int old_errno = errno;
+
     // Maybe the file is already linked.
     struct stat oldstat, newstat;
     if (stat(oldpath, &oldstat) == 0 && stat(newpath, &newstat) == 0
@@ -209,6 +218,8 @@ static bool x_link_eexist_ok(const char* oldpath, const char* newpath) {
         }
         npos = slash;
     }
+
+    errno = old_errno;
     return false;
 }
 
@@ -217,7 +228,7 @@ static int x_link(const char* oldpath, const char* newpath) {
         fprintf(verbosefile, "ln %s %s\n", oldpath, newpath);
     if (!dryrun && link(oldpath, newpath) != 0
         && (errno != EEXIST || !x_link_eexist_ok(oldpath, newpath)))
-        return -1;
+        return perror_fail("ln %s: %s\n", (std::string(oldpath) + " " + std::string(newpath)).c_str());
     return 0;
 }
 
@@ -255,9 +266,10 @@ static int x_fchown(int fd, uid_t owner, gid_t group, const std::string& path) {
 
 static bool x_mknod_eexist_ok(const char* path, mode_t mode, dev_t dev) {
     struct stat st;
-    if (stat(path, &st) == 0 && st.st_mode == mode && st.st_rdev == dev)
-        return true;
-    return false;
+    int old_errno = errno;
+    bool ok = stat(path, &st) == 0 && st.st_mode == mode && st.st_rdev == dev;
+    errno = old_errno;
+    return ok;
 }
 
 static const char* dev_name(mode_t m, dev_t d) {
@@ -325,24 +337,6 @@ static __attribute__((noreturn)) void perror_exit(const char* message) {
 
 // jailmaking
 
-struct mountslot {
-    std::string fsname;
-    std::string type;
-    std::string alloptions;
-    unsigned long opts;
-    std::string data;
-    bool allowed;
-};
-typedef std::map<std::string, mountslot> mount_table_type;
-mount_table_type mount_table;
-
-static bool allow_mount(const char* dest, const mountslot& ms) {
-    return ((strcmp(dest, "/proc") == 0 && ms.type == "proc")
-            || (strcmp(dest, "/sys") == 0 && ms.type == "sysfs")
-            || (strcmp(dest, "/dev") == 0 && ms.type == "udev")
-            || (strcmp(dest, "/dev/pts") == 0 && ms.type == "devpts"));
-}
-
 #if __linux__
 #define MFLAG(x) MS_ ## x
 #elif __APPLE__
@@ -350,27 +344,120 @@ static bool allow_mount(const char* dest, const mountslot& ms) {
 #endif
 
 struct mountarg {
-    const char *name;
+    const char* name;
     int value;
 };
 static const mountarg mountargs[] = {
-    { ",nosuid,", MFLAG(NOSUID) },
-    { ",nodev,", MFLAG(NODEV) },
-    { ",noexec,", MFLAG(NOEXEC) },
-    { ",ro,", MFLAG(RDONLY) },
-    { ",rw,", 0 },
 #if __linux__
-    { ",noatime,", MS_NOATIME },
-    { ",nodiratime,", MS_NODIRATIME },
-#ifdef MS_RELATIME
-    { ",relatime,", MS_RELATIME },
+    { "noatime", MS_NOATIME },
 #endif
-#ifdef MS_STRICTATIME
-    { ",strictatime,", MS_STRICTATIME },
+    { "nodev", MFLAG(NODEV) },
+#if __linux__
+    { "nodiratime", MS_NODIRATIME },
 #endif
+    { "noexec", MFLAG(NOEXEC) },
+    { "nosuid", MFLAG(NOSUID) },
+#if __linux__ && defined(MS_RELATIME)
+    { "relatime", MS_RELATIME },
 #endif
-    { NULL, 0 }
+    { "ro", MFLAG(RDONLY) },
+    { "rw", 0 },
+#if __linux__ && defined(MS_STRICTATIME)
+    { "strictatime", MS_STRICTATIME },
+#endif
 };
+static const mountarg* find_mountarg(const char* name, int namelen) {
+    const mountarg* ma = mountargs;
+    const mountarg* maend = ma + sizeof(mountargs) / sizeof(mountargs[0]);
+    for (; ma != maend; ++ma)
+        if ((int) strlen(ma->name) == namelen
+            && memcmp(ma->name, name, namelen) == 0)
+            return ma;
+    return 0;
+}
+
+
+struct mountslot {
+    std::string fsname;
+    std::string type;
+    unsigned long opts;
+    std::string data;
+    bool allowed;
+    mountslot() : opts(0), allowed(false) {}
+    mountslot(const char* fsname, const char* type, const char* mountopts,
+              const char* dir);
+    std::string debug_mountopts() const;
+    void add_mountopt(const char* mopt);
+    const char* mount_data() const;
+};
+
+mountslot::mountslot(const char* fsname_, const char* type_,
+                     const char* mopt, const char* dir)
+    : fsname(fsname_), type(type_), opts(0), allowed(false) {
+    while (mopt && *mopt) {
+        const char* ok_first = mopt + strspn(mopt, ",");
+        const char* ok_last = ok_first + strcspn(ok_first, ",=");
+        const char* ov_last = ok_last + strcspn(ok_last, ",");
+        if (const mountarg* ma = find_mountarg(ok_first, ok_last - ok_first))
+            opts |= ma->value;
+        else if (ok_first != ov_last)
+            data += (data.empty() ? "" : ",") + std::string(ok_first, ov_last);
+        mopt = ov_last;
+    }
+
+    allowed = ((strcmp(dir, "/proc") == 0 && type == "proc")
+               || (strcmp(dir, "/sys") == 0 && type == "sysfs")
+               || (strcmp(dir, "/dev") == 0 && type == "udev")
+               || (strcmp(dir, "/dev/pts") == 0 && type == "devpts"));
+}
+
+std::string mountslot::debug_mountopts() const {
+    std::string arg;
+    if (!(opts & MFLAG(RDONLY)))
+        arg = "rw";
+    const mountarg* ma = mountargs;
+    const mountarg* ma_last = ma + sizeof(mountargs) / sizeof(mountargs[0]);
+    for (; ma != ma_last; ++ma)
+        if (ma->value && (opts & ma->value))
+            arg += (arg.empty() ? "" : ",") + std::string(ma->name);
+    if (!data.empty())
+        arg += (arg.empty() ? "" : ",") + data;
+    return arg;
+}
+
+void mountslot::add_mountopt(const char* inopt) {
+    int inopt_len = strcspn(inopt, ",=");
+    if (const mountarg* ma = find_mountarg(inopt, inopt_len)) {
+        if (ma->value)
+            opts |= ma->value;
+        else
+            opts &= ~MFLAG(RDONLY);
+    } else {
+        const char* mopt = data.c_str();
+        while (*mopt) {
+            const char* ok_first = mopt + strspn(mopt, ",");
+            const char* ok_last = ok_first + strcspn(ok_first, ",=");
+            const char* ov_last = ok_last + strcspn(ok_last, ",");
+            if (ok_last - ok_first == inopt_len
+                && memcmp(inopt, ok_first, inopt_len) == 0) {
+                int offset = ok_first - data.data();
+                data = std::string(data.data(), mopt)
+                    + std::string(ov_last, data.data() + data.length());
+                mopt = data.c_str() + offset;
+            } else
+                mopt = ov_last;
+        }
+        data += (data.empty() ? "" : ",") + std::string(inopt);
+    }
+}
+
+const char* mountslot::mount_data() const {
+    return data.empty() ? NULL : data.c_str();
+}
+
+
+typedef std::map<std::string, mountslot> mount_table_type;
+mount_table_type mount_table;
 
 static int populate_mount_table() {
     static bool mount_table_populated = false;
@@ -382,21 +469,7 @@ static int populate_mount_table() {
     if (!f)
         return perror_fail("open %s: %s\n", "/proc/mounts");
     while (struct mntent* me = getmntent(f)) {
-        char options[BUFSIZ], *options_pos;
-        snprintf(options, sizeof(options), ",%s,", me->mnt_opts);
-        unsigned long opts = 0;
-        for (const mountarg *ma = mountargs; ma->name; ++ma)
-            if ((options_pos = strstr(options, ma->name))) {
-                opts |= ma->value;
-                char* post = options_pos + strlen(ma->name) - 1;
-                memmove(options_pos, post, strlen(post) + 1);
-            }
-        int l;
-        while ((l = strlen(options)) > 1 && options[l - 1] == ',')
-            options[l - 1] = '\0';
-        mountslot ms{me->mnt_fsname, me->mnt_type, me->mnt_opts,
-                opts, &options[1], false};
-        ms.allowed = allow_mount(me->mnt_dir, ms);
+        mountslot ms(me->mnt_fsname, me->mnt_type, me->mnt_opts, me->mnt_dir);
         mount_table[me->mnt_dir] = ms;
     }
     fclose(f);
@@ -405,13 +478,8 @@ static int populate_mount_table() {
     struct statfs* mntbuf;
     int nmntbuf = getmntinfo(&mntbuf, MNT_NOWAIT);
     for (struct statfs* me = mntbuf; me != mntbuf + nmntbuf; ++me) {
-        mountslot ms{me->f_mntfromname, me->f_fstypename, std::string(),
-                me->f_flags, std::string(), false};
-        for (const mountarg* ma = mountargs; ma->name; ++ma)
-            if (ma->value & me->f_flags)
-                ms.alloptions += (ms.alloptions.empty() ? "" : ",")
-                    + std::string(&ma->name[1], strlen(ma->name) - 2);
-        ms.allowed = allow_mount(me->f_mntonname, ms);
+        mountslot ms(me->f_mntfromname, me->f_fstypename, "", me->m_mntonname);
+        ms.opts = me->f_flags;
         mount_table[me->f_mntonname] = ms;
     }
     return 0;
@@ -429,7 +497,7 @@ int umount(const char* dir) {
 }
 #endif
 
-static int handle_mount(const mountslot& ms, std::string dst, bool chrooted) {
+static int handle_mount(mountslot ms, std::string dst, bool chrooted) {
     auto it = mount_table.find(dst);
     if (it != mount_table.end()
         && it->second.fsname == ms.fsname
@@ -439,22 +507,25 @@ static int handle_mount(const mountslot& ms, std::string dst, bool chrooted) {
         && !chrooted)
         // already mounted
         return 0;
-    if (verbose)
-        fprintf(verbosefile, "mount -i -n -t %s%s%s %s %s\n",
-                ms.type.c_str(), ms.alloptions.empty() ? "" : " -o ",
-                ms.alloptions.c_str(), ms.fsname.c_str(), dst.c_str());
-    if (!dryrun) {
-        std::string datastr = ms.data;
+    mountslot msx(ms);
 #if __linux__
-        if (ms.type == "devpts" && chrooted)
-            datastr += std::string(datastr.empty() ? "" : ",") + "newinstance,ptmxmode=0666";
+    if (msx.type == "devpts" && chrooted) {
+        msx.add_mountopt("newinstance");
+        msx.add_mountopt("ptmxmode=0666");
+    }
 #endif
-        const char* data = datastr.empty() ? NULL : datastr.c_str();
-        int r = mount(ms.fsname.c_str(), dst.c_str(), ms.type.c_str(),
-                      ms.opts, data);
+    if (verbose) {
+        std::string opts = msx.debug_mountopts();
+        fprintf(verbosefile, "mount -i -n -t %s%s%s %s %s\n",
+                msx.type.c_str(), opts.empty() ? "" : " -o ", opts.c_str(),
+                msx.fsname.c_str(), dst.c_str());
+    }
+    if (!dryrun) {
+        int r = mount(msx.fsname.c_str(), dst.c_str(), msx.type.c_str(),
+                      msx.opts, msx.mount_data());
         if (r != 0 && errno == EBUSY && chrooted)
-            r = mount(ms.fsname.c_str(), dst.c_str(), ms.type.c_str(),
-                      ms.opts | MS_REMOUNT, data);
+            r = mount(msx.fsname.c_str(), dst.c_str(), msx.type.c_str(),
+                      msx.opts | MS_REMOUNT, msx.mount_data());
         if (r != 0)
             return perror_fail("mount %s: %s\n", dst.c_str());
     }
@@ -473,9 +544,8 @@ static int handle_umount(const mount_table_type::iterator& it) {
     return 0;
 }
 
-static int handle_copy(const std::string& src, const std::string& dst,
-                       bool check_parents, int flags,
-                       dev_t jaildev, mode_t* srcmode);
+static int handle_copy(const std::string& src, std::string subdst,
+                       int flags, dev_t jaildev, mode_t* srcmode);
 
 static void handle_symlink_dst(std::string src, std::string dst,
                                std::string lnk, dev_t jaildev)
@@ -511,7 +581,8 @@ static void handle_symlink_dst(std::string src, std::string dst,
 
     if (dst.substr(dstroot.length(), 6) != "/proc/") {
         mode_t srcmode;
-        int r = handle_copy(src, dst, true, 0, jaildev, &srcmode);
+        int r = handle_copy(src, dst.substr(dstroot.length()),
+                            0, jaildev, &srcmode);
         // remember directory-level symbolic links
         if (r == 0 && S_ISDIR(srcmode)) {
             lnk_table.insert(std::make_pair(dst, dst_lnkin));
@@ -522,9 +593,14 @@ static void handle_symlink_dst(std::string src, std::string dst,
 
 static int x_cp_p(const std::string& src, const std::string& dst) {
     if (verbose)
-        fprintf(verbosefile, "cp -p %s %s\n", src.c_str(), dst.c_str());
+        fprintf(verbosefile, "rm -f %s; cp -p %s %s\n",
+                dst.c_str(), src.c_str(), dst.c_str());
     if (dryrun)
         return 0;
+
+    int r = unlink(dst.c_str());
+    if (r == -1 && errno != ENOENT)
+        return perror_fail("%s: %s\n", dst.c_str());
 
     pid_t child = fork();
     if (child == 0) {
@@ -545,74 +621,45 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
         return perror_fail("/bin/cp %s: Did not exit\n", dst.c_str());
 }
 
-static int copy_for_xdev_link(const std::string& src, const std::string& lnk) {
-    // create superdirectories
-    size_t pos = linkdir.length() - 1;
-    while ((pos = lnk.find('/', pos + 1)) != std::string::npos) {
-        std::string lnksuper = lnk.substr(0, pos);
-        if (linkdir_dirtable.find(lnksuper) == linkdir_dirtable.end()) {
-            struct stat dst;
-            if (lstat(lnksuper.c_str(), &dst) != 0) {
-                if (errno != ENOENT)
-                    return perror_fail("lstat %s: %s\n", lnksuper.c_str());
-                if (v_mkdir(lnksuper.c_str(), 0770) != 0 && errno != EEXIST)
-                    return perror_fail("mkdir %s: %s\n", lnksuper.c_str());
-            } else if (!S_ISDIR(dst.st_mode))
-                return perror_fail("lstat %s: Not a directory\n", lnksuper.c_str());
-            linkdir_dirtable[lnksuper] = 1;
-        }
-    }
-
-    // run /bin/cp -p
-    return x_cp_p(src, lnk);
+static bool same_contents(const std::string&, const struct stat& st1,
+                          const std::string& fn2) {
+    struct stat st2;
+    int r = lstat(fn2.c_str(), &st2);
+    return r == 0
+        && st1.st_mode == st2.st_mode
+        && st1.st_uid == st2.st_uid
+        && st1.st_gid == st2.st_gid
+        && st1.st_size == st2.st_size
+        && st1.st_mtime == st2.st_mtime;
 }
 
-static int handle_xdev_link(const std::string& src, const std::string& dst,
-                            const struct stat& st) {
-    struct stat lst;
-    std::string lnk = linkdir + src;
+static int handle_copy(const std::string& src, std::string subdst,
+                       int flags, dev_t jaildev, mode_t* srcmode) {
+    assert(subdst[0] == '/');
+    assert(subdst.length() == 1 || subdst[1] != '/');
+    assert(dstroot.back() != '/');
+    if (subdst.substr(0, dstroot.length()) == dstroot)
+        fprintf(stderr, "XXX %s %s\n", subdst.c_str(), dstroot.c_str());
+    assert(subdst.substr(0, dstroot.length()) != dstroot);
 
-    int r = lstat(lnk.c_str(), &lst);
-    if (r != 0
-        || lst.st_mode != st.st_mode
-        || lst.st_uid != st.st_uid
-        || lst.st_gid != st.st_gid
-        || lst.st_size != st.st_size
-        || lst.st_mtime != st.st_mtime) {
-        if (r == 0 && S_ISDIR(lst.st_mode))
-            return perror_fail("%s: Is a directory\n", lnk.c_str());
-        if (copy_for_xdev_link(src, lnk))
-            return 1;
-    }
-
-    if (x_link(lnk.c_str(), dst.c_str()) != 0)
-        return perror_fail("link %s: %s\n", (dst + " " + lnk).c_str());
-    return 0;
-}
-
-static int handle_copy(const std::string& src, const std::string& dst,
-                       bool check_parents, int flags,
-                       dev_t jaildev, mode_t* srcmode) {
+    std::string dst = dstroot + subdst;
     if (dst_table.find(dst) != dst_table.end())
         return 1;
     dst_table[dst] = 1;
 
     struct stat ss, ds;
 
-    if (check_parents) {
-        size_t last_slash = dst.rfind('/');
-        if (last_slash != 0
-            && last_slash != std::string::npos
-            && last_slash != dst.length() - 1) {
-            size_t last_nchars = dst.length() - last_slash;
-            if (src.length() > last_nchars
-                && src.substr(src.length() - last_nchars) == dst.substr(dst.length() - last_nchars)) {
-                std::string dstdir = dst.substr(0, last_slash);
-                if (lstat(dstdir.c_str(), &ss) == -1 && errno == ENOENT)
-                    handle_copy(src.substr(0, src.length() - last_nchars),
-                                dst.substr(0, dst.length() - last_nchars),
-                                true, 0, jaildev, NULL);
-            }
+    if (dst.back() != '/') {
+        std::string parent_dst = path_parentdir(dst);
+        if (dirtable.find(parent_dst) == dirtable.end()) {
+            int r = lstat(parent_dst.c_str(), &ss);
+            if (r == -1 && errno == ENOENT
+                && handle_copy(path_parentdir(src),
+                               parent_dst.substr(dstroot.length()),
+                               0, jaildev, NULL) == 0)
+                r = 0;
+            if (r != 0)
+                return r;
         }
     }
 
@@ -622,26 +669,31 @@ static int handle_copy(const std::string& src, const std::string& dst,
         *srcmode = ss.st_mode;
     ds.st_uid = ds.st_gid = ROOT;
 
-    if (S_ISREG(ss.st_mode) && (flags & FLAG_NOLINK)) {
-        if (x_cp_p(src, dst) != 0)
+    // check linkdir version
+    if (S_ISREG(ss.st_mode) && !linkdir.empty() && !(flags & FLAG_CP)) {
+        std::string lnk = linkdir + src;
+        if (!same_contents(src, ss, lnk)) {
+            if (v_ensuredir(path_parentdir(lnk), 0700) < 0)
+                return perror_fail("mkdir -p %s: %s\n", path_parentdir(lnk).c_str());
+            if (x_cp_p(src, lnk) != 0)
+                return 1;
+        }
+        if (x_link(lnk.c_str(), dst.c_str()) != 0)
             return 1;
-        ds = ss;
-    } else if (S_ISREG(ss.st_mode) && !copy_samedev && !(flags & FLAG_CP)
-               && ss.st_dev == jaildev) {
-        if (x_link(src.c_str(), dst.c_str()) != 0)
-            return perror_fail("link %s: %s\n", (dst + " " + src).c_str());
+        // XXX get true linkdir stats?
+        // XXX copying same dev/inode twice, make hardlink in jail?
         ds = ss;
     } else if (S_ISREG(ss.st_mode)
                || (S_ISLNK(ss.st_mode) && (flags & FLAG_CP))) {
-        errno = EXDEV;
-        if (linkdir.empty() || handle_xdev_link(src, dst, ss) != 0)
-            return perror_fail("link %s: %s\n", dst.c_str());
+        // XXX copying same dev/inode twice, make hardlink in jail?
+        if (x_cp_p(src, dst) != 0)
+            return 1;
         ds = ss;
     } else if (S_ISDIR(ss.st_mode)) {
         // allow setuid/setgid bits
         // allow the presence of a different directory
         mode_t perm = ss.st_mode & (S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
-        if (v_mkdir(dst.c_str(), perm) == 0)
+        if (v_ensuredir(dst, perm) >= 0)
             ds.st_mode = perm | S_IFDIR;
         else if (lstat(dst.c_str(), &ds) != 0)
             return perror_fail("lstat %s: %s\n", dst.c_str());
@@ -695,13 +747,16 @@ static int construct_jail(dev_t jaildev, FILE* f) {
     populate_mount_table();
 
     // Read a line at a time
-    std::string cursrcdir("/"), curdstdir(dstroot);
+    std::string cursrcdir("/"), curdstsubdir("/");
     int base_flags = linkdir.empty() ? FLAG_NOLINK : 0;
 
-    char buf[BUFSIZ];
-    while (fgets(buf, BUFSIZ, f)) {
+    char xbuf[BUFSIZ];
+    while (fgets(xbuf, BUFSIZ, f)) {
+        char* buf = xbuf;
+        while (isspace((unsigned char) *buf))
+            ++buf;
         int l = strlen(buf);
-        while (l > 0 && isspace((unsigned char) buf[l-1]))
+        while (l > 0 && isspace((unsigned char) buf[l - 1]))
             buf[--l] = 0;
         if (l == 0 || buf[0] == '#')
             continue;
@@ -720,7 +775,8 @@ static int construct_jail(dev_t jaildev, FILE* f) {
                 cursrcdir = cursrcdir.substr(0, cursrcdir.length() - 1);
             if (cursrcdir[cursrcdir.length() - 1] != '/')
                 cursrcdir += '/';
-            curdstdir = dstroot + cursrcdir;
+            curdstsubdir = cursrcdir;
+            assert(curdstsubdir.back() == '/');
             continue;
         }
 
@@ -743,20 +799,18 @@ static int construct_jail(dev_t jaildev, FILE* f) {
 
         std::string src, dst;
         char* arrow = strstr(buf, " <- ");
-        if (buf[0] == '/' && arrow) {
+        if (buf[0] == '/' && arrow)
             src = std::string(arrow + 4);
-            dst = curdstdir + std::string(buf, arrow);
-        } else if (buf[0] == '/') {
+        else if (buf[0] == '/')
             src = std::string(buf);
-            dst = curdstdir + std::string(buf, buf + l);
-        } else if (arrow) {
+        else if (arrow)
             src = std::string(arrow + 4, buf + l);
-            dst = curdstdir + std::string(buf, arrow);
-        } else {
+        else
             src = cursrcdir + std::string(buf, buf + l);
-            dst = curdstdir + std::string(buf, buf + l);
-        }
-        handle_copy(src, dst, buf[0] == '/', flags, jaildev, NULL);
+        if (!arrow)
+            arrow = buf + l;
+        dst = curdstsubdir + std::string(buf + (buf[0] == '/'), arrow);
+        handle_copy(src, dst, flags, jaildev, NULL);
     }
 
     return exit_value;
@@ -881,9 +935,13 @@ struct jaildirinfo {
     std::string permdir;
     dev_t dev;
 
-    jaildirinfo(const char* str, jailaction action, bool doforce);
+    std::string skeletondir;
+    bool skeleton_allowed;
+
+    jaildirinfo(const char* str, const std::string& skeletondir,
+                jailaction action, bool doforce);
     void check();
-    void chown_recursive();
+    void chown_home();
 
 private:
     std::string alternate_permfile;
@@ -894,14 +952,18 @@ private:
     void chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group);
 };
 
-jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
-    : dir(check_filename(absolute(str))), parentfd(-1), allowed(false),
-      dev(-1) {
+jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
+                         jailaction action, bool doforce)
+    : dir(check_filename(absolute(str))),
+      parentfd(-1), allowed(false), dev(-1),
+      skeletondir(skeletonstr), skeleton_allowed(false) {
     if (dir.empty() || dir == "/" || dir[0] != '/') {
         fprintf(stderr, "%s: Bad characters in filename\n", str);
         exit(1);
     }
     dir = path_endslash(dir);
+    if (!skeletondir.empty())
+        skeletondir = path_endslash(absolute(skeletondir));
 
     int fd = open("/etc/pa-jail.conf", O_RDONLY | O_NOFOLLOW);
     if (fd != -1) {
@@ -945,6 +1007,7 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
                 fprintf(stderr, "mkdir %s: %s\n", thisdir.c_str(), strerror(errno));
                 exit(1);
             }
+            dirtable.insert(std::make_pair(thisdir, 0));
             fd = openat(parentfd, component.c_str(), O_CLOEXEC | O_NOFOLLOW);
             // turn off suid+sgid on created root directory
             if (last_pos == dir.length() && (fd >= 0 || dryrun)
@@ -995,6 +1058,10 @@ jaildirinfo::jaildirinfo(const char* str, jailaction action, bool doforce)
             fprintf(stderr, "  (Perhaps you need to edit `%s`.)\n", alternate_permfile.c_str());
         exit(1);
     }
+    if (!skeleton_allowed && !skeletondir.empty()) {
+        fprintf(stderr, "%s: No `pa-jail.conf` enables skeleton directories here.\n", skeletondir.c_str());
+        exit(1);
+    }
     if (fd >= 0)
         close(fd);
 }
@@ -1022,6 +1089,25 @@ void jaildirinfo::check_permfile(int dirfd, struct stat& dirstat,
     if (writable_only_by_root(dirstat))
         parse_permfile(conff, thisdir, permfilename, true);
     close(conff);
+}
+
+static std::string dirmatch_prefix(const std::string& pattern,
+                                   const std::string& dir) {
+    // return the prefix of `dir` that has the same number of slashes as
+    // `pattern`
+    size_t slcount = 0, slpos = 0;
+    while ((slpos = pattern.find('/', slpos)) != std::string::npos)
+        ++slcount, ++slpos;
+    slpos = 0;
+    while (slcount > 0 && (slpos = dir.find('/', slpos)) != std::string::npos)
+        --slcount, ++slpos;
+    return dir.substr(0, slpos);
+}
+
+static bool check_dirmatch_prefix(const std::string& pattern,
+                                  const std::string& str) {
+    return fnmatch(pattern.c_str(), dirmatch_prefix(pattern, str).c_str(),
+                   FNM_PATHNAME | FNM_PERIOD) == 0;
 }
 
 void jaildirinfo::parse_permfile(int conff, std::string thisdir,
@@ -1064,32 +1150,27 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
         if (wdir[0] != '/')
             wdir = thisdir + wdir;
 
-        // `superdir` is the prefix of `dir` that has the same number
-        // of slashes as `wdir`
-        size_t slcount = 0, slpos = 0;
-        while ((slpos = wdir.find('/', slpos)) != std::string::npos)
-            ++slcount, ++slpos;
-        slpos = 0;
-        while (slcount > 0 && (slpos = dir.find('/', slpos)) != std::string::npos)
-            --slcount, ++slpos;
-        std::string superdir = dir.substr(0, slpos);
-        bool dirmatch = fnmatch(wdir.c_str(), superdir.c_str(), FNM_PATHNAME | FNM_PERIOD) == 0;
-
         if (word1 == "disablejail" || word1 == "nojail") {
             if (word2.empty())
                 allowed_globally = allowed_locally = 0;
-            else if (dirmatch) {
+            else if (check_dirmatch_prefix(wdir, dir)) {
                 allowed_locally = 0;
                 allowed_permdir = word2;
             }
         } else if (word1 == "enablejail" || word1 == "allowjail") {
             if (word2.empty())
                 allowed_globally = 1;
-            else if (dirmatch) {
+            else if (check_dirmatch_prefix(wdir, dir)) {
                 allowed_locally = 1;
-                allowed_permdir = superdir;
+                allowed_permdir = dirmatch_prefix(wdir, dir);
             } else
                 alternate_permfile = thisdir + permfilename;
+        } else if ((word1 == "enableskeleton" || word1 == "disableskeleton")
+                   && !skeletondir.empty()) {
+            if (word2.empty()
+                ? check_dirmatch_prefix(thisdir, skeletondir)
+                : check_dirmatch_prefix(wdir, skeletondir))
+                skeleton_allowed = word1 == "enableskeleton";
         }
     }
 
@@ -1116,13 +1197,14 @@ void jaildirinfo::check() {
     assert(dir.substr(0, permdir.length()) == permdir);
 }
 
-void jaildirinfo::chown_recursive() {
+void jaildirinfo::chown_home() {
     populate_mount_table();
-    std::string buf = dir;
-    int dirfd = openat(parentfd, component.c_str(), O_CLOEXEC | O_NOFOLLOW);
+    std::string buf = dir + "home/";
+    int dirfd = openat(parentfd, (component + "/home").c_str(),
+                       O_CLOEXEC | O_NOFOLLOW);
     if (dirfd == -1)
         perror_exit(buf.c_str());
-    chown_recursive(dirfd, buf, 0, ROOT, ROOT);
+    chown_recursive(dirfd, buf, 1, ROOT, ROOT);
 }
 
 void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group) {
@@ -1241,7 +1323,7 @@ class jailownerinfo {
     void start_sigpipe();
     void block(int ptymaster);
     int check_child_timeout(pid_t child, bool waitpid);
-    void handle_child(pid_t child, int ptymaster);
+    void wait_background(pid_t child, int ptymaster);
     void exec_done(pid_t child, int exit_status) __attribute__((noreturn));
 };
 
@@ -1389,6 +1471,11 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         perror_exit("fork");
     write_pid(child);
 
+    // we don't need file descriptors any more
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+
     int exit_status = 0;
     if (foreground)
         exit_status = x_waitpid(child, child_waitflags);
@@ -1438,7 +1525,7 @@ int jailownerinfo::exec_go() {
     int ptymaster = -1;
     char* ptyslavename = NULL;
     if (verbose)
-        fprintf(verbosefile, "make-pty %s\n", ptyslavename);
+        fprintf(verbosefile, "make-pty\n");
     if (!dryrun) {
         if ((ptymaster = posix_openpt(O_RDWR)) == -1)
             perror_exit("posix_openpt");
@@ -1517,7 +1604,7 @@ int jailownerinfo::exec_go() {
                 exit(126);
             }
         } else
-            handle_child(child, ptymaster);
+            wait_background(child, ptymaster);
     }
 
     return 0;
@@ -1660,7 +1747,7 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
     return -1;
 }
 
-void jailownerinfo::handle_child(pid_t child, int ptymaster) {
+void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     // blocking reads please (well, block for up to 0.5sec)
     // the 0.5sec wait means we avoid long race conditions
     struct termios tty;
@@ -1714,8 +1801,8 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
 
 
 static __attribute__((noreturn)) void usage() {
-    fprintf(stderr, "Usage: pa-jail init [-n] [-f FILES] [-S SKELETON] JAILDIR [USER]\n");
-    fprintf(stderr, "       pa-jail run [--fg] [-nq] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n");
+    fprintf(stderr, "Usage: pa-jail init [-nh] [-f FILES] [-S SKELETON] JAILDIR [USER]\n");
+    fprintf(stderr, "       pa-jail run [--fg] [-nqh] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n");
     fprintf(stderr, "                   [-f FILES] [-S SKELETON] JAILDIR USER COMMAND\n");
     fprintf(stderr, "       pa-jail mv OLDDIR NEWDIR\n");
     fprintf(stderr, "       pa-jail rm [-nf] JAILDIR\n");
@@ -1740,6 +1827,7 @@ static struct option longoptions_run[] = {
     { "fg", no_argument, NULL, 'F' },
     { "timeout", required_argument, NULL, 'T' },
     { "input", required_argument, NULL, 'i' },
+    { "chown-home", no_argument, NULL, 'h' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -1755,15 +1843,15 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:f:p:rT:qi:", "VnS:f:p:rT:qi:", "Vnf", "Vn"
+    "+Vn", "VnS:f:p:rT:qi:h", "VnS:f:p:rT:qi:h", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
-    bool dokill = false, doforce = false;
+    bool dokill = false, doforce = false, chown_home = false;
     double timeout = -1;
-    std::string filesarg, inputarg;
+    std::string filesarg, inputarg, linkarg;
 
     int ch;
     while (1) {
@@ -1772,7 +1860,7 @@ int main(int argc, char** argv) {
             if (ch == 'V')
                 verbose = true;
             else if (ch == 'S')
-                linkdir = path_noendslash(optarg);
+                linkarg = optarg;
             else if (ch == 'n')
                 verbose = dryrun = true;
             else if (ch == 'f' && action == do_rm)
@@ -1787,6 +1875,8 @@ int main(int argc, char** argv) {
                 dokill = true;
             else if (ch == 'F')
                 foreground = true;
+            else if (ch == 'h')
+                chown_home = true;
             else if (ch == 'q')
                 quiet = true;
             else if (ch == 'T') {
@@ -1823,8 +1913,8 @@ int main(int argc, char** argv) {
         || (action == do_mv && optind != argc - 2)
         || (action == do_init && optind != argc - 1 && optind != argc - 2)
         || (action == do_run && optind > argc - 3)
-        || (action == do_rm && (!linkdir.empty() || !filesarg.empty() || !inputarg.empty()))
-        || (action == do_mv && (!linkdir.empty() || !filesarg.empty() || !inputarg.empty() || dokill))
+        || (action == do_rm && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty()))
+        || (action == do_mv && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty() || dokill))
         || !argv[optind][0]
         || (action == do_mv && !argv[optind+1][0]))
         usage();
@@ -1895,7 +1985,7 @@ int main(int argc, char** argv) {
     // - stuff below the dir containing the allowing `pa-jail.conf`
     //   dynamically created if necessary
     // - try to eliminate TOCTTOU
-    jaildirinfo jaildir(argv[optind], action, doforce);
+    jaildirinfo jaildir(argv[optind], linkarg, action, doforce);
 
     // move the sandbox if asked
     if (action == do_mv) {
@@ -1950,20 +2040,20 @@ int main(int argc, char** argv) {
         }
     }
 
-    // check link directory
-    if (!linkdir.empty() && v_ensuredir(linkdir.c_str(), 0755) < 0)
-        perror_exit(linkdir.c_str());
-    if (!linkdir.empty())
-        linkdir = absolute(linkdir);
-    else
-        copy_samedev = false;
+    // check skeleton directory
+    // XXX check that skeleton directory is enabled?
+    if (jaildir.skeleton_allowed) {
+        if (v_ensuredir(jaildir.skeletondir, 0700) < 0)
+            perror_exit(jaildir.skeletondir.c_str());
+        linkdir = path_noendslash(jaildir.skeletondir);
+    }
 
     // create the home directory
     if (!jailuser.owner_home.empty()) {
-        if (v_ensuredir((jaildir.dir + "/home").c_str(), 0755) < 0)
+        if (v_ensuredir(jaildir.dir + "/home", 0755) < 0)
             perror_exit((jaildir.dir + "/home").c_str());
         std::string jailhome = jaildir.dir + jailuser.owner_home;
-        int r = v_ensuredir(jailhome.c_str(), 0700);
+        int r = v_ensuredir(jailhome, 0700);
         uid_t want_owner = action == do_init ? caller_owner : jailuser.owner;
         gid_t want_group = action == do_init ? caller_group : jailuser.group;
         if (r < 0
@@ -1972,8 +2062,8 @@ int main(int argc, char** argv) {
     }
 
     // set ownership
-    if (action == do_run)
-        jaildir.chown_recursive();
+    if (chown_home)
+        jaildir.chown_home();
     dstroot = path_noendslash(jaildir.dir);
     assert(dstroot != "/");
 

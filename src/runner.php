@@ -139,7 +139,7 @@ class RunnerState {
             $this->add_run_settings($runsettings);
 
         // actually run
-        $command = "echo; jail/pa-jail run"
+        $command = "echo; jail/pa-jail run -h"
             . " -p" . escapeshellarg($this->lockfile)
             . " -f" . escapeshellarg($this->expand($this->pset->run_jailfiles));
         if ($this->pset->run_skeletondir)
