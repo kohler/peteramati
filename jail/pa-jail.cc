@@ -1325,6 +1325,8 @@ class jailownerinfo {
     int check_child_timeout(pid_t child, bool waitpid);
     void wait_background(pid_t child, int ptymaster);
     void exec_done(pid_t child, int exit_status) __attribute__((noreturn));
+
+    static const char* const runmounts[];
 };
 
 jailownerinfo::jailownerinfo()
@@ -1484,6 +1486,13 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     exit(exit_status);
 }
 
+const char* const jailownerinfo::runmounts[] = {
+#if __linux__
+    "/proc", "/dev/pts",
+#endif
+    NULL
+};
+
 int jailownerinfo::exec_go() {
 #if __linux__
     populate_mount_table();     // ensure we know how to mount /proc
@@ -1499,34 +1508,29 @@ int jailownerinfo::exec_go() {
     if (!dryrun && chroot(".") != 0)
         perror_exit("chroot");
 #if __linux__
-    {
-        const char* const mounts[] = {"/proc", "/dev/pts", NULL};
-        for (const char* const* m = mounts; *m; ++m) {
-            auto it = mount_table.find(*m);
-            if (it != mount_table.end() && it->second.allowed) {
-                v_ensuredir(*m, 0555);
-                handle_mount(it->second, *m, true);
-            }
+    for (const char* const* m = runmounts; *m; ++m) {
+        auto it = mount_table.find(*m);
+        if (it != mount_table.end() && it->second.allowed) {
+            v_ensuredir(*m, 0555);
+            handle_mount(it->second, *m, true);
         }
-        (void) unlink("/dev/ptmx");
-        x_symlink("pts/ptmx", "/dev/ptmx");
     }
+    (void) unlink("/dev/ptmx");
+    x_symlink("pts/ptmx", "/dev/ptmx");
 #endif
-
-    // reduce privileges permanently
-    if (verbose)
-        fprintf(verbosefile, "su %s\n", uid_to_name(owner));
-    if (!dryrun && setgid(group) != 0)
-        perror_exit("setgid");
-    if (!dryrun && setuid(owner) != 0)
-        perror_exit("setuid");
 
     // create a pty
     int ptymaster = -1;
     char* ptyslavename = NULL;
     if (verbose)
-        fprintf(verbosefile, "make-pty\n");
+        fprintf(verbosefile, "sudo -u %s make-pty\n", uid_to_name(owner));
     if (!dryrun) {
+        // change effective uid/gid
+        if (setresgid(group, group, ROOT) != 0)
+            perror_exit("setresgid");
+        if (setresuid(owner, owner, ROOT) != 0)
+            perror_exit("setresuid");
+        // create pty
         if ((ptymaster = posix_openpt(O_RDWR)) == -1)
             perror_exit("posix_openpt");
         if (grantpt(ptymaster) == -1)
@@ -1567,6 +1571,14 @@ int jailownerinfo::exec_go() {
         else if (child == 0) {
             close(sigpipe[0]);
             close(sigpipe[1]);
+
+            // reduce privileges permanently
+            if (verbose)
+                fprintf(verbosefile, "su %s\n", uid_to_name(owner));
+            if (setresgid(group, group, group) != 0)
+                perror_exit("setresgid");
+            if (setresuid(owner, owner, owner) != 0)
+                perror_exit("setresuid");
 
             if (setsid() == -1)
                 perror_exit("setsid");
@@ -1748,6 +1760,16 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
 }
 
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
+    // go back to being root
+    if (setresgid(ROOT, ROOT, ROOT) != 0) {
+        perror("setresgid");
+        exec_done(child, 127);
+    }
+    if (setresuid(ROOT, ROOT, ROOT) != 0) {
+        perror("setresuid");
+        exec_done(child, 127);
+    }
+
     // blocking reads please (well, block for up to 0.5sec)
     // the 0.5sec wait means we avoid long race conditions
     struct termios tty;
@@ -1789,11 +1811,11 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
         fprintf(stdout, "\n\x1b[3;7;31m...timed out\x1b[0m\n");
     if (exit_status == 128 + SIGTERM && !quiet)
         fprintf(stdout, "\n\x1b[3;7;31m...terminated\x1b[0m\n");
-#if !__linux__
+#if __linux__
+    (void) child;
+#else
     if (exit_status >= 124)
         kill(child, SIGKILL);
-#else
-    (void) child;
 #endif
     fflush(stdout);
     exit(exit_status);
