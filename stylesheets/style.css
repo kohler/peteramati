@@ -2867,6 +2867,7 @@ span.foldarrow {
 .run61cursor {
 	color: #66ee66;
         background-color: #66ee66;
+	display: inline-block;
 }
 .viewoptions61 {
 	display: inline-block;
