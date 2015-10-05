@@ -2075,7 +2075,6 @@ int main(int argc, char** argv) {
     }
 
     // check skeleton directory
-    // XXX check that skeleton directory is enabled?
     if (jaildir.skeleton_allowed) {
         if (v_ensuredir(jaildir.skeletondir, 0700, true) < 0)
             perror_exit(jaildir.skeletondir.c_str());
