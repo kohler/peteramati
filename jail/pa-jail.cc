@@ -1487,7 +1487,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 
 const char* const jailownerinfo::runmounts[] = {
 #if __linux__
-    "/proc", "/dev/pts",
+    "/proc", "/dev/pts", "/tmp",
 #endif
     NULL
 };
