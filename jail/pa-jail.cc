@@ -854,22 +854,14 @@ static std::string check_filename(std::string name) {
 static std::string absolute(const std::string& dir) {
     if (!dir.empty() && dir[0] == '/')
         return dir;
-    FILE* p = popen("pwd", "r");
-    char buf[BUFSIZ], crap[1];
-    size_t buflen;
-    if (fgets(buf, BUFSIZ, p)
-        && (!fgets(crap, 1, p) || crap[0] == '\0')
-        && (buflen = strnlen(buf, BUFSIZ)) < BUFSIZ) {
-        pclose(p);
-        while (isspace((unsigned char) buf[buflen - 1]))
-            buf[--buflen] = '\0';
-        while (buflen > 0 && buf[buflen - 1] == '/')
-            buf[--buflen] = '\0';
-        return std::string(buf) + std::string("/") + dir;
-    } else {
-        fprintf(stderr, "pwd: Bogus absolute path\n");
-        exit(1);
-    }
+    char buf[BUFSIZ];
+    if (getcwd(buf, BUFSIZ - 1))
+        perror_exit("getcwd");
+    char* endbuf = buf + strlen(buf);
+    while (endbuf - buf > 1 && endbuf[-1] == '/')
+        --endbuf;
+    memcpy(endbuf, "/", 2);
+    return std::string(buf) + dir;
 }
 
 static void x_rm_rf_under(int parentdirfd, std::string component,
