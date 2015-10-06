@@ -1863,7 +1863,6 @@ static struct option longoptions_run[] = {
     { "skeleton", required_argument, NULL, 'S' },
     { "pid-file", required_argument, NULL, 'p' },
     { "files", required_argument, NULL, 'f' },
-    { "replace", no_argument, NULL, 'r' },
     { "fg", no_argument, NULL, 'F' },
     { "timeout", required_argument, NULL, 'T' },
     { "input", required_argument, NULL, 'i' },
@@ -1883,13 +1882,13 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:f:p:rT:qi:h", "VnS:f:p:rT:qi:h", "Vnf", "Vn"
+    "+Vn", "VnS:f:p:T:qi:h", "VnS:f:p:T:qi:h", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
-    bool dokill = false, doforce = false, chown_home = false;
+    bool doforce = false, chown_home = false;
     double timeout = -1;
     std::string filesarg, inputarg, linkarg;
 
@@ -1911,8 +1910,6 @@ int main(int argc, char** argv) {
                 pidfilename = optarg;
             else if (ch == 'i')
                 inputarg = optarg;
-            else if (ch == 'r')
-                dokill = true;
             else if (ch == 'F')
                 foreground = true;
             else if (ch == 'h')
@@ -1954,7 +1951,7 @@ int main(int argc, char** argv) {
         || (action == do_init && optind != argc - 1 && optind != argc - 2)
         || (action == do_run && optind > argc - 3)
         || (action == do_rm && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty()))
-        || (action == do_mv && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty() || dokill))
+        || (action == do_mv && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty()))
         || !argv[optind][0]
         || (action == do_mv && !argv[optind+1][0]))
         usage();
@@ -2054,7 +2051,7 @@ int main(int argc, char** argv) {
     }
 
     // kill the sandbox if asked
-    if (action == do_rm || dokill) {
+    if (action == do_rm) {
         // unmount EVERYTHING mounted in the jail!
         // INCLUDING MY HOME DIRECTORY
         jaildir.dir = path_endslash(jaildir.dir);
@@ -2066,18 +2063,16 @@ int main(int argc, char** argv) {
                 handle_umount(it);
         // remove the jail
         x_rm_rf_under(jaildir.parentfd, jaildir.component, jaildir.dir);
-        if (action == do_rm) {
-            jaildir.dir = jaildir.dir.substr(0, jaildir.dir.length() - 1);
-            if (verbose)
-                fprintf(verbosefile, "rmdir %s\n", jaildir.dir.c_str());
-            if (!dryrun
-                && unlinkat(jaildir.parentfd, jaildir.component.c_str(), AT_REMOVEDIR) != 0
-                && !(errno == ENOENT && doforce)) {
-                fprintf(stderr, "rmdir %s: %s\n", jaildir.dir.c_str(), strerror(errno));
-                exit(1);
-            }
-            exit(0);
+        jaildir.dir = jaildir.dir.substr(0, jaildir.dir.length() - 1);
+        if (verbose)
+            fprintf(verbosefile, "rmdir %s\n", jaildir.dir.c_str());
+        if (!dryrun
+            && unlinkat(jaildir.parentfd, jaildir.component.c_str(), AT_REMOVEDIR) != 0
+            && !(errno == ENOENT && doforce)) {
+            fprintf(stderr, "rmdir %s: %s\n", jaildir.dir.c_str(), strerror(errno));
+            exit(1);
         }
+        exit(0);
     }
 
     // check skeleton directory
