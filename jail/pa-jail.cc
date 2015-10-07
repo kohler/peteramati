@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
@@ -78,6 +79,34 @@ enum jailaction {
 };
 
 
+// error helpers
+
+static int perror_fail(const char* format, const char* arg1) {
+    fprintf(stderr, format, arg1, strerror(errno));
+    exit_value = 1;
+    return 1;
+}
+
+static __attribute__((noreturn))
+void die(const char* fmt, ...) {
+    va_list val;
+    va_start(val, fmt);
+    vfprintf(stderr, fmt, val);
+    va_end(val);
+    exit(1);
+}
+
+static __attribute__((noreturn))
+void perror_exit(const char* message) {
+    die("%s: %s\n", message, strerror(errno));
+}
+
+static inline __attribute__((noreturn))
+void perror_exit(const std::string& message) {
+    perror_exit(message.c_str());
+}
+
+
 // pathname helpers
 
 static std::string path_endslash(const std::string& path) {
@@ -128,12 +157,6 @@ static std::string shell_quote(const std::string& argument) {
     }
 }
 
-
-static int perror_fail(const char* format, const char* arg1) {
-    fprintf(stderr, format, arg1, strerror(errno));
-    exit_value = 1;
-    return 1;
-}
 
 static const char* uid_to_name(uid_t u) {
     static uid_t old_uid = -1;
@@ -312,18 +335,6 @@ static int x_waitpid(pid_t child, int flags) {
         } else if (w == -1 && errno != EINTR)
             return -1;
     }
-}
-
-
-static __attribute__((noreturn))
-void perror_exit(const char* message) {
-    fprintf(stderr, "%s: %s\n", message, strerror(errno));
-    exit(1);
-}
-
-static inline __attribute__((noreturn))
-void perror_exit(const std::string& message) {
-    perror_exit(message.c_str());
 }
 
 
@@ -1024,22 +1035,17 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
 
         // stat it
         struct stat s;
-        if (fstat(fd, &s) != 0) {
-            fprintf(stderr, "%s: %s\n", thisdir.c_str(), strerror(errno));
-            exit(1);
-        }
+        if (fstat(fd, &s) != 0)
+            perror_exit(thisdir);
         if (!S_ISDIR(s.st_mode)) {
-            fprintf(stderr, "%s: Not a directory\n", thisdir.c_str());
-            exit(1);
+            errno = ENOTDIR;
+            perror_exit(thisdir);
         } else if (!allowed_here && last_pos != dir.length()) {
-            if (s.st_uid != ROOT) {
-                fprintf(stderr, "%s: Not owned by root\n", thisdir.c_str());
-                exit(1);
-            } else if ((s.st_gid != ROOT && (s.st_mode & S_IWGRP))
-                       || (s.st_mode & S_IWOTH)) {
-                fprintf(stderr, "%s: Writable by non-root\n", thisdir.c_str());
-                exit(1);
-            }
+            if (s.st_uid != ROOT)
+                die("%s: Not owned by root\n", thisdir.c_str());
+            else if ((s.st_gid != ROOT && (s.st_mode & S_IWGRP))
+                     || (s.st_mode & S_IWOTH))
+                die("%s: Writable by non-root\n", thisdir.c_str());
         }
         dev = s.st_dev;
 
@@ -1106,12 +1112,11 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
     thisdir = path_endslash(thisdir);
 
     struct stat st;
-    if (fstat(conff, &st) != 0) {
-        fprintf(stderr, "%s%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
-        exit(1);
-    } else if (!writable_only_by_root(st)) {
+    if (fstat(conff, &st) != 0)
+        die("%s: %s\n", filename.c_str(), strerror(errno));
+    else if (!writable_only_by_root(st)) {
         if (!allowed || verbose)
-            fprintf(stderr, allowed ? "%s%s: Writable by non-root, ignoring\n" : "%s%s: Writable by non-root\n", thisdir.c_str(), permfilename);
+            fprintf(stderr, allowed ? "%s: Writable by non-root, ignoring\n" : "%s: Writable by non-root\n", filename.c_str());
         if (!allowed)
             exit(1);
         return;
@@ -1331,16 +1336,12 @@ jailownerinfo::~jailownerinfo() {
 }
 
 void jailownerinfo::init(const char* owner_name) {
-    if (strlen(owner_name) >= 1024) {
-        fprintf(stderr, "%s: Username too long\n", owner_name);
-        exit(1);
-    }
+    if (strlen(owner_name) >= 1024)
+        die("%s: Username too long\n", owner_name);
 
     struct passwd* pwnam = getpwnam(owner_name);
-    if (!pwnam) {
-        fprintf(stderr, "%s: No such user\n", owner_name);
-        exit(1);
-    }
+    if (!pwnam)
+        die("%s: No such user\n", owner_name);
 
     owner = pwnam->pw_uid;
     group = pwnam->pw_gid;
@@ -1348,24 +1349,18 @@ void jailownerinfo::init(const char* owner_name) {
         owner_home = "/home/nobody";
     else if (strncmp(pwnam->pw_dir, "/home/", 6) == 0)
         owner_home = pwnam->pw_dir;
-    else {
-        fprintf(stderr, "%s: Home directory %s not under /home\n", owner_name, pwnam->pw_dir);
-        exit(1);
-    }
+    else
+        die("%s: Home directory %s not under /home\n", owner_name, pwnam->pw_dir);
 
     if (strcmp(pwnam->pw_shell, "/bin/bash") == 0
         || strcmp(pwnam->pw_shell, "/bin/sh") == 0
         || check_shell(pwnam->pw_shell))
         owner_sh = pwnam->pw_shell;
-    else {
-        fprintf(stderr, "%s: Shell %s not allowed by /etc/shells\n", owner_name, pwnam->pw_shell);
-        exit(1);
-    }
+    else
+        die("%s: Shell %s not allowed by /etc/shells\n", owner_name, pwnam->pw_shell);
 
-    if (owner == ROOT) {
-        fprintf(stderr, "%s: Jail user cannot be root\n", owner_name);
-        exit(1);
-    }
+    if (owner == ROOT)
+        die("%s: Jail user cannot be root\n", owner_name);
 }
 
 #if __linux__
@@ -1413,10 +1408,8 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     // create command
     delete[] this->argv;
     this->argv = new char*[5 + argc - (optind + 2)];
-    if (!this->argv) {
-        fprintf(stderr, "Out of memory\n");
-        exit(1);
-    }
+    if (!this->argv)
+        die("Out of memory\n");
     int newargvpos = 0;
     std::string command;
     this->argv[newargvpos++] = (char*) owner_sh.c_str();
@@ -1447,10 +1440,8 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     // enter the jail
 #if __linux__
     char* new_stack = (char*) malloc(256 * 1024);
-    if (!new_stack) {
-        fprintf(stderr, "Out of memory\n");
-        exit(1);
-    }
+    if (!new_stack)
+        die("Out of memory\n");
     int child = clone(exec_clone_function, new_stack + 256 * 1024,
                       CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID, this);
     if (child == -1)
@@ -1959,26 +1950,20 @@ int main(int argc, char** argv) {
     FILE* filesf = NULL;
     if (filesarg == "-") {
         filesf = stdin;
-        if (isatty(STDIN_FILENO)) {
-            fprintf(stderr, "stdin: Is a tty\n");
-            exit(1);
-        }
+        if (isatty(STDIN_FILENO))
+            die("stdin: Is a tty\n");
     } else if (!filesarg.empty()) {
         filesf = fopen(filesarg.c_str(), "r");
-        if (!filesf) {
-            fprintf(stderr, "%s: %s\n", filesarg.c_str(), strerror(errno));
-            exit(1);
-        }
+        if (!filesf)
+            die("%s: %s\n", filesarg.c_str(), strerror(errno));
     }
 
     // open infile non-blocking as current user
     int inputfd = 0;
     if (!inputarg.empty() && !dryrun) {
         inputfd = open(inputarg.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
-        if (inputfd == -1) {
-            fprintf(stderr, "%s: %s\n", inputarg.c_str(), strerror(errno));
-            exit(1);
-        }
+        if (inputfd == -1)
+            die("%s: %s\n", inputarg.c_str(), strerror(errno));
     }
 
     // open pidfile as current user
@@ -1986,10 +1971,8 @@ int main(int argc, char** argv) {
         fprintf(verbosefile, "touch %s\n", pidfilename.c_str());
     if (!pidfilename.empty() && !dryrun) {
         pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
-        if (pidfd == -1) {
-            fprintf(stderr, "%s: %s\n", pidfilename.c_str(), strerror(errno));
-            exit(1);
-        }
+        if (pidfd == -1)
+            die("%s: %s\n", pidfilename.c_str(), strerror(errno));
         atexit(cleanup_pidfd);
     }
 
@@ -2019,14 +2002,11 @@ int main(int argc, char** argv) {
     // move the sandbox if asked
     if (action == do_mv) {
         std::string newpath = check_filename(absolute(argv[optind + 1]));
-        if (newpath.empty() || newpath[0] != '/') {
-            fprintf(stderr, "%s: Bad characters in move destination\n", argv[optind + 1]);
-            exit(1);
-        } else if (newpath.length() <= jaildir.permdir.length()
-                   || newpath.substr(0, jaildir.permdir.length()) != jaildir.permdir) {
-            fprintf(stderr, "%s: Not a subdirectory of %s\n", newpath.c_str(), jaildir.permdir.c_str());
-            exit(1);
-        }
+        if (newpath.empty() || newpath[0] != '/')
+            die("%s: Bad characters in move destination\n", argv[optind + 1]);
+        else if (newpath.length() <= jaildir.permdir.length()
+                 || newpath.substr(0, jaildir.permdir.length()) != jaildir.permdir)
+            die("%s: Not a subdirectory of %s\n", newpath.c_str(), jaildir.permdir.c_str());
 
         // allow second argument to be a directory
         struct stat s;
@@ -2035,10 +2015,8 @@ int main(int argc, char** argv) {
 
         if (verbose)
             fprintf(verbosefile, "mv %s%s %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str());
-        if (!dryrun && renameat(jaildir.parentfd, jaildir.component.c_str(), jaildir.parentfd, newpath.c_str()) != 0) {
-            fprintf(stderr, "mv %s%s %s: %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str(), strerror(errno));
-            exit(1);
-        }
+        if (!dryrun && renameat(jaildir.parentfd, jaildir.component.c_str(), jaildir.parentfd, newpath.c_str()) != 0)
+            die("mv %s%s %s: %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str(), strerror(errno));
         exit(0);
     }
 
@@ -2060,10 +2038,8 @@ int main(int argc, char** argv) {
             fprintf(verbosefile, "rmdir %s\n", jaildir.dir.c_str());
         if (!dryrun
             && unlinkat(jaildir.parentfd, jaildir.component.c_str(), AT_REMOVEDIR) != 0
-            && !(errno == ENOENT && doforce)) {
-            fprintf(stderr, "rmdir %s: %s\n", jaildir.dir.c_str(), strerror(errno));
-            exit(1);
-        }
+            && !(errno == ENOENT && doforce))
+            die("rmdir %s: %s\n", jaildir.dir.c_str(), strerror(errno));
         exit(0);
     }
 
