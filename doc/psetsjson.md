@@ -149,10 +149,10 @@ others are shown to users in different contexts.
 * `gitless_grades`: boolean
 
     Set to true to store the problem set’s grades independently of the
-    student’s git history. Normally, peteramati can store a different grade
-    per commit in the student’s history. (This facilitates regrades and can
-    keep some grading history.) With `gitless_grades`, grades are stored once
-    per student.
+    student’s git history. Normally, peteramati stores a different grade per
+    commit in the student’s history. (This facilitates regrades and can keep
+    some grading history.) With `gitless_grades`, grades are stored once per
+    student.
 
 * `handout_repo_url`: string
 
