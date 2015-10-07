@@ -97,13 +97,13 @@ void die(const char* fmt, ...) {
 }
 
 static __attribute__((noreturn))
-void perror_exit(const char* message) {
+void perror_die(const char* message) {
     die("%s: %s\n", message, strerror(errno));
 }
 
 static inline __attribute__((noreturn))
-void perror_exit(const std::string& message) {
-    perror_exit(message.c_str());
+void perror_die(const std::string& message) {
+    perror_die(message.c_str());
 }
 
 
@@ -867,7 +867,7 @@ static std::string absolute(const std::string& dir) {
         return dir;
     char buf[BUFSIZ];
     if (getcwd(buf, BUFSIZ - 1))
-        perror_exit("getcwd");
+        perror_die("getcwd");
     char* endbuf = buf + strlen(buf);
     while (endbuf - buf > 1 && endbuf[-1] == '/')
         --endbuf;
@@ -1027,10 +1027,10 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
         // stat it
         struct stat s;
         if (fstat(fd, &s) != 0)
-            perror_exit(thisdir);
+            perror_die(thisdir);
         if (!S_ISDIR(s.st_mode)) {
             errno = ENOTDIR;
-            perror_exit(thisdir);
+            perror_die(thisdir);
         } else if (!allowed_here && last_pos != dir.length()) {
             if (s.st_uid != ROOT)
                 die("%s: Not owned by root\n", thisdir.c_str());
@@ -1148,7 +1148,7 @@ void jaildirinfo::chown_home() {
     int dirfd = openat(parentfd, (component + "/home").c_str(),
                        O_CLOEXEC | O_NOFOLLOW);
     if (dirfd == -1)
-        perror_exit(buf);
+        perror_die(buf);
     chown_recursive(dirfd, buf, 1, ROOT, ROOT);
 }
 
@@ -1177,7 +1177,7 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf, int depth, uid
     if (!dir) {
         if (errno == ENOENT && depth == 0 && dryrun)
             return;
-        perror_exit(dirbuf);
+        perror_die(dirbuf);
     }
 
     struct dirent* de;
@@ -1210,7 +1210,7 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf, int depth, uid
             if (it == mount_table.end()) { // not a mount point
                 int subdirfd = openat(dirfd, de->d_name, O_CLOEXEC | O_NOFOLLOW);
                 if (subdirfd == -1)
-                    perror_exit(dirbuf);
+                    perror_die(dirbuf);
                 if (x_fchown(subdirfd, u, g, dirbuf))
                     exit(exit_value);
                 chown_recursive(subdirfd, dirbuf, depth + 1, u, g);
@@ -1337,7 +1337,7 @@ static void write_pid(int p) {
         int l = sprintf(buf, "%d\n", p);
         ssize_t w = write(pidfd, buf, l);
         if (w != l || ftruncate(pidfd, l) != 0)
-            perror_exit(pidfilename);
+            perror_die(pidfilename);
     }
 }
 
@@ -1403,7 +1403,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     int child = clone(exec_clone_function, new_stack + 256 * 1024,
                       CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID, this);
     if (child == -1)
-        perror_exit("clone");
+        perror_die("clone");
     int child_waitflags = __WALL;
 #else
     int child = fork();
@@ -1412,7 +1412,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     int child_waitflags = 0;
 #endif
     if (child == -1)
-        perror_exit("fork");
+        perror_die("fork");
     write_pid(child);
 
     // we don't need file descriptors any more
@@ -1448,11 +1448,11 @@ int jailownerinfo::exec_go() {
     if (verbose)
         fprintf(verbosefile, "cd %s\n", jaildir->dir.c_str());
     if (!dryrun && chdir(jaildir->dir.c_str()) != 0)
-        perror_exit(jaildir->dir);
+        perror_die(jaildir->dir);
     if (verbose)
         fprintf(verbosefile, "chroot .\n");
     if (!dryrun && chroot(".") != 0)
-        perror_exit("chroot");
+        perror_die("chroot");
 #if __linux__
     for (const char* const* m = runmounts; *m; ++m) {
         auto it = mount_table.find(*m);
@@ -1473,31 +1473,31 @@ int jailownerinfo::exec_go() {
     if (!dryrun) {
         // change effective uid/gid, but save root for later
         if (setresgid(group, group, ROOT) != 0)
-            perror_exit("setresgid");
+            perror_die("setresgid");
         if (setresuid(owner, owner, ROOT) != 0)
-            perror_exit("setresuid");
+            perror_die("setresuid");
         // create pty
         if ((ptymaster = posix_openpt(O_RDWR)) == -1)
-            perror_exit("posix_openpt");
+            perror_die("posix_openpt");
         if (grantpt(ptymaster) == -1)
-            perror_exit("grantpt");
+            perror_die("grantpt");
         if (unlockpt(ptymaster) == -1)
-            perror_exit("unlockpt");
+            perror_die("unlockpt");
         if ((ptyslavename = ptsname(ptymaster)) == NULL)
-            perror_exit("ptsname");
+            perror_die("ptsname");
     }
 
     // change into their home directory
     if (verbose)
         fprintf(verbosefile, "cd %s\n", owner_home.c_str());
     if (!dryrun && chdir(owner_home.c_str()) != 0)
-        perror_exit(owner_home);
+        perror_die(owner_home);
 
     // check that shell exists
     if (!dryrun) {
         int f = open(owner_sh.c_str(), O_RDONLY);
         if (f < 0)
-            perror_exit("open" + owner_sh);
+            perror_die("open" + owner_sh);
         close(f);
     }
 
@@ -1513,7 +1513,7 @@ int jailownerinfo::exec_go() {
         start_sigpipe();
         pid_t child = fork();
         if (child < 0)
-            perror_exit("fork");
+            perror_die("fork");
         else if (child == 0) {
             close(sigpipe[0]);
             close(sigpipe[1]);
@@ -1522,16 +1522,16 @@ int jailownerinfo::exec_go() {
             if (verbose)
                 fprintf(verbosefile, "su %s\n", uid_to_name(owner));
             if (setresgid(group, group, group) != 0)
-                perror_exit("setresgid");
+                perror_die("setresgid");
             if (setresuid(owner, owner, owner) != 0)
-                perror_exit("setresuid");
+                perror_die("setresuid");
 
             if (setsid() == -1)
-                perror_exit("setsid");
+                perror_die("setsid");
 
             int ptyslave = open(ptyslavename, O_RDWR);
             if (ptyslave == -1)
-                perror_exit(ptyslavename);
+                perror_die(ptyslavename);
 #ifdef TIOCGWINSZ
             struct winsize ws;
             ioctl(ptyslave, TIOCGWINSZ, &ws);
@@ -1590,7 +1590,7 @@ static void make_nonblocking(int fd) {
 void jailownerinfo::start_sigpipe() {
     int r = pipe(sigpipe);
     if (r != 0)
-        perror_exit("pipe");
+        perror_die("pipe");
     make_nonblocking(inputfd);
     make_nonblocking(STDOUT_FILENO);
     make_nonblocking(sigpipe[0]);
@@ -1913,7 +1913,7 @@ int main(int argc, char** argv) {
     } else if (!filesarg.empty()) {
         filesf = fopen(filesarg.c_str(), "r");
         if (!filesf)
-            die("%s: %s\n", filesarg.c_str(), strerror(errno));
+            perror_die(filesarg);
     }
 
     // open infile non-blocking as current user
@@ -1921,7 +1921,7 @@ int main(int argc, char** argv) {
     if (!inputarg.empty() && !dryrun) {
         inputfd = open(inputarg.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
         if (inputfd == -1)
-            die("%s: %s\n", inputarg.c_str(), strerror(errno));
+            perror_die(inputarg);
     }
 
     // open pidfile as current user
@@ -1930,7 +1930,7 @@ int main(int argc, char** argv) {
     if (!pidfilename.empty() && !dryrun) {
         pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
         if (pidfd == -1)
-            die("%s: %s\n", pidfilename.c_str(), strerror(errno));
+            perror_die(pidfilename);
         atexit(cleanup_pidfd);
     }
 
@@ -1939,9 +1939,9 @@ int main(int argc, char** argv) {
     caller_owner = getuid();
     caller_group = getgid();
     if (!dryrun && setresgid(ROOT, ROOT, ROOT) < 0)
-        perror_exit("setresgid");
+        perror_die("setresgid");
     if (!dryrun && setresuid(ROOT, ROOT, ROOT) < 0)
-        perror_exit("setresuid");
+        perror_die("setresuid");
 
     // check the jail directory
     // - no special characters
@@ -2004,21 +2004,21 @@ int main(int argc, char** argv) {
     // check skeleton directory
     if (jaildir.skeleton_allowed) {
         if (v_ensuredir(jaildir.skeletondir, 0700, true) < 0)
-            perror_exit(jaildir.skeletondir);
+            perror_die(jaildir.skeletondir);
         linkdir = path_noendslash(jaildir.skeletondir);
     }
 
     // create the home directory
     if (!jailuser.owner_home.empty()) {
         if (v_ensuredir(jaildir.dir + "/home", 0755, true) < 0)
-            perror_exit(jaildir.dir + "/home");
+            perror_die(jaildir.dir + "/home");
         std::string jailhome = jaildir.dir + jailuser.owner_home;
         int r = v_ensuredir(jailhome, 0700, true);
         uid_t want_owner = action == do_init ? caller_owner : jailuser.owner;
         gid_t want_group = action == do_init ? caller_group : jailuser.group;
         if (r < 0
             || (r > 0 && x_lchown(jailhome.c_str(), want_owner, want_group)))
-            perror_exit(jailhome);
+            perror_die(jailhome);
     }
 
     // set ownership
