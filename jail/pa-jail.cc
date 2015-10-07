@@ -54,19 +54,19 @@ namespace std { template <> struct hash<devino> {
     }
 }; }
 
+static uid_t caller_owner;
+static gid_t caller_group;
+
+static std::unordered_map<std::string, int> dirtable;
 static std::unordered_map<std::string, int> dst_table;
 static std::multimap<std::string, std::string> lnk_table;
 static std::unordered_map<devino, std::string> devino_table;
 static int exit_value = 0;
 static bool verbose = false;
 static bool dryrun = false;
-static bool foreground = false;
 static bool quiet = false;
 static FILE* verbosefile = stdout;
-static uid_t caller_owner;
-static gid_t caller_group;
 static std::string linkdir;
-static std::unordered_map<std::string, int> dirtable;
 static std::string dstroot;
 static std::string pidfilename;
 static int pidfd = -1;
@@ -923,15 +923,6 @@ static std::string take_word(const std::string& str, size_t& pos) {
         return std::string();
 }
 
-static bool check_shell(const char* shell) {
-    bool found = false;
-    char* sh;
-    while (!found && (sh = getusershell()))
-        found = strcmp(sh, shell) == 0;
-    endusershell();
-    return found;
-}
-
 struct jaildirinfo {
     std::string dir;
     std::string parent;
@@ -950,11 +941,7 @@ struct jaildirinfo {
     void chown_home();
 
 private:
-    std::string alternate_permfile;
-
-    void check_permfile(int dirfd, struct stat& dirstat, std::string dir);
-    void parse_permfile(int conff, std::string thisdir,
-                        const char* permfilename, bool islocal);
+    void parse_permfile(int conff, std::string conffname);
     void chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group);
 };
 
@@ -973,8 +960,12 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
 
     int fd = open("/etc/pa-jail.conf", O_RDONLY | O_NOFOLLOW);
     if (fd != -1) {
-        parse_permfile(fd, "/etc/", "pa-jail.conf", false);
+        parse_permfile(fd, "/etc/pa-jail.conf");
         close(fd);
+    }
+    if (!allowed) {
+        fprintf(stderr, "Jails are disabled; perhaps you need to edit `/etc/pa-jail.conf`\n");
+        exit(1);
     }
 
     size_t last_pos = 0;
@@ -1048,21 +1039,9 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
                 die("%s: Writable by non-root\n", thisdir.c_str());
         }
         dev = s.st_dev;
-
-        // check for "pa-jail.conf" allowance
-        if (parent.length())
-            check_permfile(fd, s, thisdir);
     }
-    if (!allowed) {
-        fprintf(stderr, "%s: No `pa-jail.conf` enables jails here.\n", dir.c_str());
-        if (!alternate_permfile.empty())
-            fprintf(stderr, "  (Perhaps you need to edit `%s`.)\n", alternate_permfile.c_str());
-        exit(1);
-    }
-    if (!skeleton_allowed && !skeletondir.empty()) {
-        fprintf(stderr, "%s: No `pa-jail.conf` enables skeleton directories here.\n", skeletondir.c_str());
-        exit(1);
-    }
+    if (!skeleton_allowed && !skeletondir.empty())
+        die("%s: No `pa-jail.conf` enables skeleton directories here.\n", skeletondir.c_str());
     if (fd >= 0)
         close(fd);
 }
@@ -1071,21 +1050,6 @@ static bool writable_only_by_root(const struct stat& st) {
     return st.st_uid == ROOT
         && (st.st_gid == ROOT || !(st.st_mode & S_IWGRP))
         && !(st.st_mode & S_IWOTH);
-}
-
-void jaildirinfo::check_permfile(int dirfd, struct stat& dirstat,
-                                 std::string thisdir) {
-    const char* permfilename = "pa-jail.conf";
-    int conff = openat(dirfd, permfilename, O_RDONLY | O_NOFOLLOW);
-    if (conff == -1 && errno != ENOENT && errno != ELOOP) {
-        fprintf(stderr, "%s/%s: %s\n", thisdir.c_str(), permfilename, strerror(errno));
-        exit(1);
-    }
-    if (conff == -1)
-        return;
-    if (writable_only_by_root(dirstat))
-        parse_permfile(conff, thisdir, permfilename, true);
-    close(conff);
 }
 
 static std::string dirmatch_prefix(const std::string& pattern,
@@ -1107,10 +1071,7 @@ static bool check_dirmatch_prefix(const std::string& pattern,
                    FNM_PATHNAME | FNM_PERIOD) == 0;
 }
 
-void jaildirinfo::parse_permfile(int conff, std::string thisdir,
-                                 const char* permfilename, bool islocal) {
-    thisdir = path_endslash(thisdir);
-
+void jaildirinfo::parse_permfile(int conff, std::string filename) {
     struct stat st;
     if (fstat(conff, &st) != 0)
         die("%s: %s\n", filename.c_str(), strerror(errno));
@@ -1127,6 +1088,7 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
     std::string str(buf, nr < 0 ? 0 : nr);
     size_t pos = 0;
     int allowed_globally = -1, allowed_locally = -1;
+    int skeleton_allowed_globally = -1;
     std::string allowed_permdir;
 
     while (pos < str.length()) {
@@ -1136,16 +1098,10 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
             /* do nothing */;
         while (pos < str.length() && str[pos] == '\n')
             ++pos;
+        if (!word2.empty() && word2[0] != '/')
+            continue;
 
-        std::string wdir = word2;
-        while (wdir.length() > 2 && wdir[0] == '.' && wdir[1] == '/')
-            wdir = wdir.substr(2, wdir.length());
-        if (wdir.empty() || wdir == ".")
-            wdir = thisdir;
-        wdir = path_endslash(wdir);
-        if (wdir[0] != '/')
-            wdir = thisdir + wdir;
-
+        std::string wdir = path_endslash(word2);
         if (word1 == "disablejail" || word1 == "nojail") {
             if (word2.empty())
                 allowed_globally = allowed_locally = 0;
@@ -1159,13 +1115,13 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
             else if (check_dirmatch_prefix(wdir, dir)) {
                 allowed_locally = 1;
                 allowed_permdir = dirmatch_prefix(wdir, dir);
-            } else
-                alternate_permfile = thisdir + permfilename;
+            }
         } else if ((word1 == "enableskeleton" || word1 == "disableskeleton")
                    && !skeletondir.empty()) {
-            if (word2.empty()
-                ? check_dirmatch_prefix(thisdir, skeletondir)
-                : check_dirmatch_prefix(wdir, skeletondir))
+            bool allowed = word1 == "enableskeleton";
+            if (word2.empty())
+                skeleton_allowed_globally = allowed;
+            else if (check_dirmatch_prefix(wdir, skeletondir))
                 skeleton_allowed = word1 == "enableskeleton";
         }
     }
@@ -1173,19 +1129,12 @@ void jaildirinfo::parse_permfile(int conff, std::string thisdir,
     if (allowed_locally > 0) {
         allowed = true;
         permdir = allowed_permdir;
-    } else if (allowed_locally == 0) {
-        fprintf(stderr, "%s%s: Jails are disabled under %s\n", thisdir.c_str(), permfilename, allowed_permdir.c_str());
-        exit(1);
-    } else if (allowed_globally > 0 && islocal) {
-        allowed = true;
-        permdir = thisdir;
-    } else if (allowed_globally == 0 && islocal) {
-        fprintf(stderr, "%s%s: Jails are disabled here\n", thisdir.c_str(), permfilename);
-        exit(1);
-    } else if (allowed_globally == 0) {
-        fprintf(stderr, "%s%s: Jails are disabled\n", thisdir.c_str(), permfilename);
-        exit(1);
-    }
+    } else if (allowed_locally == 0)
+        die("%s: Jails are disabled under here\n", allowed_permdir.c_str());
+    else if (allowed_globally == 0)
+        die("Jails are disabled\n");
+    if (skeleton_allowed_globally == 0)
+        skeleton_allowed = false;
 }
 
 void jaildirinfo::check() {
@@ -1287,7 +1236,7 @@ class jailownerinfo {
     ~jailownerinfo();
     void init(const char* owner_name);
     void exec(int argc, char** argv, jaildirinfo& jaildir,
-              int inputfd, double timeout);
+              int inputfd, double timeout, bool foreground);
     int exec_go();
 
   private:
@@ -1333,6 +1282,15 @@ jailownerinfo::jailownerinfo()
 
 jailownerinfo::~jailownerinfo() {
     delete[] argv;
+}
+
+static bool check_shell(const char* shell) {
+    bool found = false;
+    char* sh;
+    while (!found && (sh = getusershell()))
+        found = strcmp(sh, shell) == 0;
+    endusershell();
+    return found;
 }
 
 void jailownerinfo::init(const char* owner_name) {
@@ -1384,7 +1342,7 @@ static void write_pid(int p) {
 }
 
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         int inputfd, double timeout) {
+                         int inputfd, double timeout, bool foreground) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     sprintf(homebuf, "HOME=%s", owner_home.c_str());
@@ -1757,7 +1715,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         exec_done(child, 127);
     }
 
-    // if input is a tty, put it in raw mode
+    // if input is a tty, put it in non-canonical mode
     struct termios tty;
     if (tcgetattr(STDIN_FILENO, &stdin_termios) >= 0) {
         has_stdin_termios = true;
@@ -1871,7 +1829,7 @@ static const char* shortoptions_action[] = {
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
-    bool doforce = false, chown_home = false;
+    bool doforce = false, chown_home = false, foreground = false;
     double timeout = -1;
     std::string filesarg, inputarg, linkarg;
 
@@ -1929,10 +1887,10 @@ int main(int argc, char** argv) {
     // check arguments
     if (action == do_run && optind + 2 >= argc)
         action = do_init;
-    if ((action == do_rm && optind != argc - 1)
-        || (action == do_mv && optind != argc - 2)
-        || (action == do_init && optind != argc - 1 && optind != argc - 2)
-        || (action == do_run && optind > argc - 3)
+    if ((action == do_rm && optind + 1 != argc)
+        || (action == do_mv && optind + 2 != argc)
+        || (action == do_init && optind != argc - 1 && optind + 2 != argc)
+        || (action == do_run && optind + 3 > argc)
         || (action == do_rm && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty()))
         || (action == do_mv && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty()))
         || !argv[optind][0]
@@ -2084,7 +2042,7 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc)
-        jailuser.exec(argc, argv, jaildir, inputfd, timeout);
+        jailuser.exec(argc, argv, jaildir, inputfd, timeout, foreground);
 
     exit(0);
 }
