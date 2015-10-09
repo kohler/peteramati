@@ -65,6 +65,7 @@ static int exit_value = 0;
 static bool verbose = false;
 static bool dryrun = false;
 static bool quiet = false;
+static bool doforce = false;
 static FILE* verbosefile = stdout;
 static std::string linkdir;
 static std::string dstroot;
@@ -875,42 +876,6 @@ static std::string absolute(const std::string& dir) {
     return std::string(buf) + dir;
 }
 
-static void x_rm_rf_under(int parentdirfd, std::string component,
-                          std::string dirname) {
-    dirname = path_endslash(dirname);
-    int dirfd = openat(parentdirfd, component.c_str(), O_RDONLY);
-    if (dirfd == -1) {
-        fprintf(stderr, "%s: %s\n", dirname.c_str(), strerror(errno));
-        exit(1);
-    }
-    DIR* dir = fdopendir(dirfd);
-    if (!dir) {
-        fprintf(stderr, "%s: %s\n", dirname.c_str(), strerror(errno));
-        exit(1);
-    }
-    while (struct dirent* de = readdir(dir)) {
-        // XXX check file system type?
-        if (de->d_type == DT_DIR) {
-            if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
-                continue;
-            std::string next_component = de->d_name;
-            std::string next_dirname = dirname + next_component;
-            if (umount_table.find(next_dirname) != umount_table.end())
-                continue;
-            x_rm_rf_under(dirfd, next_component, next_dirname);
-        }
-        const char* op = de->d_type == DT_DIR ? "rmdir" : "rm";
-        if (verbose)
-            fprintf(verbosefile, "%s %s%s\n", op, dirname.c_str(), de->d_name);
-        if (!dryrun && unlinkat(dirfd, de->d_name, de->d_type == DT_DIR ? AT_REMOVEDIR : 0) != 0) {
-            fprintf(stderr, "%s %s%s: %s\n", op, dirname.c_str(), de->d_name, strerror(errno));
-            exit(1);
-        }
-    }
-    closedir(dir);
-    close(dirfd);
-}
-
 static std::string take_word(const std::string& str, size_t& pos) {
     while (pos < str.length() && str[pos] != '\n' && isspace((unsigned char) str[pos]))
         ++pos;
@@ -936,17 +901,19 @@ struct jaildirinfo {
     bool skeleton_allowed;
 
     jaildirinfo(const char* str, const std::string& skeletondir,
-                jailaction action, bool doforce);
+                jailaction action);
     void check();
     void chown_home();
+    void remove();
 
 private:
     void parse_permfile(int conff, std::string conffname);
     void chown_recursive(int dirfd, std::string& dirbuf, int depth, uid_t owner, gid_t group);
+    void remove_recursive(int dirfd, std::string component, std::string name);
 };
 
 jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
-                         jailaction action, bool doforce)
+                         jailaction action)
     : dir(check_filename(absolute(str))),
       parentfd(-1), allowed(false), dev(-1),
       skeletondir(skeletonstr), skeleton_allowed(false) {
@@ -1223,6 +1190,50 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf, int depth, uid
     closedir(dir);
     delete home_map;
 }
+
+void jaildirinfo::remove() {
+    remove_recursive(parentfd, component, path_endslash(dir));
+    if (verbose)
+        fprintf(verbosefile, "rmdir %s\n", dir.c_str());
+    if (!dryrun
+        && unlinkat(parentfd, component.c_str(), AT_REMOVEDIR) != 0
+        && !(errno == ENOENT && doforce))
+        perror_die("rmdir " + dir);
+}
+
+void jaildirinfo::remove_recursive(int parentdirfd, std::string component,
+                                   std::string dirname) {
+    int dirfd = openat(parentdirfd, component.c_str(), O_RDONLY);
+    struct stat dirst;
+    if (dirfd == -1 || fstat(dirfd, &dirst) != 0)
+        perror_die(dirname);
+    if (dirst.st_dev != dev) { // --one-file-system
+        close(dirfd);
+        return;
+    }
+    DIR* dir = fdopendir(dirfd);
+    if (!dir)
+        perror_die(dirname);
+    while (struct dirent* de = readdir(dir)) {
+        if (de->d_type == DT_DIR) {
+            if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+                continue;
+            std::string next_component = de->d_name;
+            std::string next_dirname = dirname + next_component;
+            if (umount_table.find(next_dirname) != umount_table.end())
+                continue;
+            remove_recursive(dirfd, next_component, next_dirname);
+        }
+        const char* op = de->d_type == DT_DIR ? "rmdir " : "rm ";
+        if (verbose)
+            fprintf(verbosefile, "%s%s%s\n", op, dirname.c_str(), de->d_name);
+        if (!dryrun && unlinkat(dirfd, de->d_name, de->d_type == DT_DIR ? AT_REMOVEDIR : 0) != 0)
+            perror_die(std::string(op) + dirname + de->d_name);
+    }
+    closedir(dir);
+    close(dirfd);
+}
+
 
 
 class jailownerinfo {
@@ -1764,10 +1775,14 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 }
 
 void jailownerinfo::exec_done(pid_t child, int exit_status) {
+    const char* xmsg = nullptr;
     if (exit_status == 124 && !quiet)
-        fprintf(stdout, "\n\x1b[3;7;31m...timed out\x1b[0m\n");
+        xmsg = "...timed out";
     if (exit_status == 128 + SIGTERM && !quiet)
-        fprintf(stdout, "\n\x1b[3;7;31m...terminated\x1b[0m\n");
+        xmsg = "...terminated";
+    if (xmsg)
+        printf(isatty(STDOUT_FILENO) ? "\n\x1b[3;7;31m%s\x1b[0m\n" : "\n%s\n",
+               xmsg);
 #if __linux__
     (void) child;
 #else
@@ -1829,7 +1844,7 @@ static const char* shortoptions_action[] = {
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
-    bool doforce = false, chown_home = false, foreground = false;
+    bool chown_home = false, foreground = false;
     double timeout = -1;
     std::string filesarg, inputarg, linkarg;
 
@@ -1955,7 +1970,7 @@ int main(int argc, char** argv) {
     // - stuff below the dir containing the allowing `pa-jail.conf`
     //   dynamically created if necessary
     // - try to eliminate TOCTTOU
-    jaildirinfo jaildir(argv[optind], linkarg, action, doforce);
+    jaildirinfo jaildir(argv[optind], linkarg, action);
 
     // move the sandbox if asked
     if (action == do_mv) {
@@ -1990,14 +2005,7 @@ int main(int argc, char** argv) {
                           jaildir.dir.length()) == 0)
                 handle_umount(it);
         // remove the jail
-        x_rm_rf_under(jaildir.parentfd, jaildir.component, jaildir.dir);
-        jaildir.dir = jaildir.dir.substr(0, jaildir.dir.length() - 1);
-        if (verbose)
-            fprintf(verbosefile, "rmdir %s\n", jaildir.dir.c_str());
-        if (!dryrun
-            && unlinkat(jaildir.parentfd, jaildir.component.c_str(), AT_REMOVEDIR) != 0
-            && !(errno == ENOENT && doforce))
-            die("rmdir %s: %s\n", jaildir.dir.c_str(), strerror(errno));
+        jaildir.remove();
         exit(0);
     }
 
