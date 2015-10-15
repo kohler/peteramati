@@ -16,6 +16,7 @@ if (isset($_REQUEST["u"]))
 if (isset($_REQUEST["imageid"])) {
     if ($User
         && ($User === $Me || $Me->isPC)
+        && $_REQUEST["imageid"]
         && ($result = Dbl::qe("select mimetype, `data` from ContactImage where contactId=? and contactImageId=?", $User->contactId, $_REQUEST["imageid"]))
         && ($row = edb_row($result))) {
         header("Content-Type: $row[0]");
@@ -41,7 +42,7 @@ function output($User) {
     $u = $Me->user_linkpart($User);
     echo '<div class="facebook61">',
         '<a href="', hoturl("index", ["u" => $u]), '">',
-        '<img class="bigface61" src="' . hoturl("face", ["u" => $u, "imageid" => $User->contactImageId]) . '" border="0" />',
+        '<img class="bigface61" src="' . hoturl("face", ["u" => $u, "imageid" => $User->contactImageId ? : 0]) . '" border="0" />',
         '</a>',
         '<h2 class="infacebook61"><a class="q" href="', hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
     if ($Me->privChair)
