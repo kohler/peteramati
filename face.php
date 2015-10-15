@@ -13,23 +13,49 @@ $User = $Me;
 if (isset($_REQUEST["u"]))
     $User = ContactView::prepare_user($_REQUEST["u"]);
 
-if ($User
-    && ($User === $Me || $Me->isPC)
-    && $User->contactImageId
-    && ($result = Dbl::qe("select mimetype, `data` from ContactImage where contactImageId=?", $User->contactImageId))
-    && ($row = edb_row($result))) {
-    $age = 3600;
-    if (@$_GET["imageid"] == $User->contactImageId)
-        $age = 31557600;
-    header("Content-Type: $row[0]");
-    header("Cache-Control: public, max-age=$age");
-    header("Expires: " . gmdate("D, d M Y H:i:s", $Now + $age) . " GMT");
-    if (!$zlib_output_compression)
-        header("Content-Length: " . strlen($row[1]));
-    print $row[1];
-} else {
-    header("Content-Type: image/gif");
-    if (!$zlib_output_compression)
-        header("Content-Length: 43");
-    print "GIF89a\001\0\001\0\x80\0\0\0\0\0\0\0\0\x21\xf9\x04\x01\0\0\0\0\x2c\0\0\0\0\x01\0\x01\0\0\x02\x02\x44\x01\0\x3b";
+if (isset($_REQUEST["imageid"])) {
+    if ($User
+        && ($User === $Me || $Me->isPC)
+        && ($result = Dbl::qe("select mimetype, `data` from ContactImage where contactId=? and contactImageId=?", $User->contactId, $_REQUEST["imageid"]))
+        && ($row = edb_row($result))) {
+        header("Content-Type: $row[0]");
+        header("Cache-Control: public, max-age=31557600");
+        header("Expires: " . gmdate("D, d M Y H:i:s", $Now + 31557600) . " GMT");
+        if (!$zlib_output_compression)
+            header("Content-Length: " . strlen($row[1]));
+        print $row[1];
+    } else {
+        header("Content-Type: image/gif");
+        if (!$zlib_output_compression)
+            header("Content-Length: 43");
+        print "GIF89a\001\0\001\0\x80\0\0\0\0\0\0\0\0\x21\xf9\x04\x01\0\0\0\0\x2c\0\0\0\0\x01\0\x01\0\0\x02\x02\x44\x01\0\x3b";
+    }
+    exit;
 }
+
+function output($User) {
+    global $Me;
+    $u = $Me->user_linkpart($User);
+    echo '<div class="faceentry">',
+        '<div class="facepicture">',
+        '<a href="', hoturl("index", ["u" => $u]), '">',
+        '<img class="bigface61" src="' . hoturl("face", ["u" => $u, "imageid" => $User->contactImageId]) . '" border="0" />',
+        '</a>',
+        '</div>',
+        '<h2 class="homeemail"><a class="q" href="', hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+    if ($Me->privChair)
+        echo "&nbsp;", become_user_link($User);
+    echo '</h2>';
+    if ($User !== $Me)
+        echo '<h3>', Text::user_html($User), '</h3>';
+    echo '</div>';
+}
+
+$Conf->header("Thefacebook", "face");
+
+$u = Dbl::qe("select contactId, email, firstName, lastName, seascode_username, contactImageId from ContactInfo where college!=0 or extension!=0");
+while (($user = edb_orow($u)))
+    output($user);
+
+echo "<div class='clear'></div>\n";
+$Conf->footer();
