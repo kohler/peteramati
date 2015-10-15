@@ -3045,6 +3045,21 @@ span.grademax61 {
 	max-width: 64px;
 	max-height: 64px;
 }
+.facebook61 {
+	float: left;
+	max-width: 200px;
+	min-height: 232px;
+	padding: 0 10px 10px 0;
+	word-wrap: break-word;
+}
+h2.infacebook61 {
+	font-size: normal;
+	clear: both;
+	margin: 0 auto;
+}
+h3.infacebook61 {
+	font-size: smaller;
+}
 
 /* folding */
 .foldc .fx, .foldo .fn,

@@ -33,21 +33,22 @@ if (isset($_REQUEST["imageid"])) {
     exit;
 }
 
+if (!$Me->isPC)
+    $Me->escape();
+
 function output($User) {
     global $Me;
     $u = $Me->user_linkpart($User);
-    echo '<div class="faceentry">',
-        '<div class="facepicture">',
+    echo '<div class="facebook61">',
         '<a href="', hoturl("index", ["u" => $u]), '">',
         '<img class="bigface61" src="' . hoturl("face", ["u" => $u, "imageid" => $User->contactImageId]) . '" border="0" />',
         '</a>',
-        '</div>',
-        '<h2 class="homeemail"><a class="q" href="', hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+        '<h2 class="infacebook61"><a class="q" href="', hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
     if ($Me->privChair)
         echo "&nbsp;", become_user_link($User);
     echo '</h2>';
     if ($User !== $Me)
-        echo '<h3>', Text::user_html($User), '</h3>';
+        echo '<h3 class="infacebook61">', Text::user_html($User), '</h3>';
     echo '</div>';
 }
 
