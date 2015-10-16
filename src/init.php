@@ -194,16 +194,25 @@ if (function_exists("date_default_timezone_set")) {
 
 
 // Extract problem set information
-function load_psets_json() {
-    global $ConfSitePATH, $Opt;
+function psets_json_data() {
+    global $Conf, $ConfSitePATH, $Opt;
+    $datamap = array();
     $fnames = expand_includes($ConfSitePATH, $Opt["psetsConfig"],
-                              array("CONFID" => @$Opt["confid"] ? : @$Opt["dbName"],
-                                    "HOSTTYPE" => @$Opt["hostType"] ? : ""));
-    if (!count($fnames))
+                              ["CONFID" => @$Opt["confid"] ? : @$Opt["dbName"],
+                               "HOSTTYPE" => @$Opt["hostType"] ? : ""]);
+    foreach ($fnames as $fname)
+        $datamap[$fname] = @file_get_contents($fname);
+    if (($override_data = $Conf->setting_data("psets_override")))
+        $datamap["<overrides>"] = $override_data;
+    return $datamap;
+}
+
+function load_psets_json() {
+    $datamap = psets_json_data();
+    if (!count($datamap))
         Multiconference::fail_message("\$Opt[\"psetsConfig\"] is not set correctly.");
     $json = (object) array("_defaults" => (object) array());
-    foreach ($fnames as $fname) {
-        $data = @file_get_contents($fname);
+    foreach ($datamap as $fname => $data) {
         if ($data === false)
             Multiconference::fail_message("$fname: Required configuration file cannot be read.");
         $x = json_decode($data);
@@ -227,14 +236,6 @@ function load_pset_info() {
 
     // read psets
     $PsetInfo = load_psets_json();
-    if (($data = $Conf->setting_data("psets_override"))) {
-        if (($x = json_decode($data)))
-            object_replace_recursive($PsetInfo, $x);
-        else {
-            Json::decode($data);
-            Multiconference::fail_message("Database settings: Invalid JSON. " . Json::last_error_msg());
-        }
-    }
 
     // parse psets
     foreach ($PsetInfo as $pk => $p) {
@@ -249,8 +250,8 @@ function load_pset_info() {
             // Want to give a good error message, so discover where the error is
             // create pset landmark object
             $locinfo = (object) array();
-            foreach ($psets as $fname) {
-                $x = Json::decode_landmarks(file_get_contents($fname), $fname);
+            foreach (psets_json_data() as $fname => $data) {
+                $x = Json::decode_landmarks($data, $fname);
                 object_replace_recursive($locinfo, $x);
             }
             $locp = $locinfo->$pk;
@@ -261,7 +262,9 @@ function load_pset_info() {
                 $component = $path[$pathpos];
                 $locp = is_array($locp) ? $locp[$component] : $locp->$component;
             }
-            if (!is_string($locp))
+            if (is_object($locp) && @$locp->__LANDMARK__)
+                $locp = $locp->__LANDMARK__;
+            else if (!is_string($locp))
                 $locp = $locinfo->$pk->__LANDMARK__;
             Multiconference::fail_message($locp . ": Configuration error: " . $exception->getMessage());
         }

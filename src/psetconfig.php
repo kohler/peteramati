@@ -7,7 +7,12 @@ class PsetConfigException extends Exception {
     public $path;
 
     public function __construct($msg, $path) {
-        $this->path = is_array($path) ? $path : array($path);
+        $this->path = array();
+        foreach (func_get_args() as $i => $x)
+            if ($i && is_array($x))
+                $this->path = array_merge($this->path, $x);
+            else if ($i && $x !== false && $x !== null)
+                $this->path[] = $x;
         parent::__construct($msg);
     }
 }
@@ -76,9 +81,9 @@ class Pset {
 
         // pset key
         if (ctype_digit($pk) && intval($pk) !== $p->psetid)
-            throw new Exception("numeric pset key disagrees with `psetid`");
+            throw new PsetConfigException("numeric pset key disagrees with `psetid`");
         else if (!preg_match(',\A[^_./&;#][^/&;#]*\z,', $pk))
-            throw new Exception("pset key format error");
+            throw new PsetConfigException("pset key format error");
         $this->psetkey = $pk;
 
         // url keys
@@ -111,12 +116,12 @@ class Pset {
         if ($this->gitless_grades === null)
             $this->gitless = $this->gitless_grades;
         if (!$this->gitless_grades && $this->gitless)
-            throw new Exception("`gitless` requires `gitless_grades`");
+            throw new PsetConfigException("`gitless` requires `gitless_grades`", "gitless_grades");
 
         // directory
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");
         if (!$this->handout_repo_url && !$this->gitless)
-            throw new Exception("`handout_repo_url` missing");
+            throw new PsetConfigException("`handout_repo_url` missing");
         $this->repo_guess_patterns = self::cstr_array($p, "repo_guess_patterns", "repo_transform_patterns");
         $this->repo_tarball_patterns = self::cstr_array($p, "repo_tarball_patterns");
         if (!property_exists($p, "repo_tarball_patterns"))
@@ -140,7 +145,7 @@ class Pset {
             foreach ((array) $p->grades as $k => $v) {
                 $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v);
                 if (@$this->all_grades[$g->name])
-                    throw new PsetConfigException("grade `$g->name` reused", array("grades", $k));
+                    throw new PsetConfigException("grade `$g->name` reused", "grades", $k);
                 $this->all_grades[$g->name] = $g;
             }
         } else if (@$p->grades)
@@ -172,7 +177,7 @@ class Pset {
             foreach ((array) $p->runners as $k => $v) {
                 $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v);
                 if (@$this->all_runners[$r->name])
-                    throw new PsetConfigException("runner `$r->name` reused", array("runners", $k));
+                    throw new PsetConfigException("runner `$r->name` reused", "runners", $k);
                 $this->all_runners[$r->name] = $r;
             }
         } else if (@$p->runners)
@@ -239,12 +244,7 @@ class Pset {
                     return $p->$x;
                 else {
                     $errormsg = is_array($v) ? $v[1] : "format error";
-                    if ($format) {
-                        $format = is_array($format) ? $format : array($format);
-                        $format[] = $x;
-                        throw new PsetConfigException("`$x` $errormsg", $format);
-                    } else
-                        throw new PsetConfigException("`$x` $errormsg", $x);
+                    throw new PsetConfigException("`$x` $errormsg", $format, $x);
                 }
             }
         }
@@ -348,7 +348,7 @@ class GradeEntryConfig {
             throw new PsetConfigException("grade entry format error", $loc);
         $this->name = isset($g->name) ? $g->name : $name;
         if (!is_string($this->name) || $this->name === "")
-            throw new PsetConfigException("`name` grade entry format error", $loc);
+            throw new PsetConfigException("grade entry name format error", $loc);
         $this->title = Pset::cstr($loc, $g, "title");
         $this->max = Pset::cnum($loc, $g, "max");
         $this->hide = Pset::cbool($loc, $g, "hide");
@@ -379,7 +379,7 @@ class RunnerConfig {
             throw new PsetConfigException("runner format error", $loc);
         $this->name = isset($r->name) ? $r->name : $name;
         if (!is_string($this->name) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->name))
-            throw new PsetConfigException("`name` runner format error", $loc);
+            throw new PsetConfigException("runner name format error", $loc);
         $this->title = Pset::cstr($loc, $r, "title", "text");
         if ($this->title === null)
             $this->title = $this->name;
