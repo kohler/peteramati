@@ -87,7 +87,7 @@ if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
 
 
 // download
-function collect_pset_info(&$students, $pset, $where) {
+function collect_pset_info(&$students, $pset, $where, $entries = false) {
     global $Conf, $Me;
     $result = $Conf->qe("select c.contactId, c.firstName, c.lastName, c.email,
 	c.huid, c.anon_username, c.seascode_username, c.extension,
@@ -137,6 +137,12 @@ function collect_pset_info(&$students, $pset, $where) {
                 $k .= "_noextra";
                 @($ss->$k += $gd->total_noextra);
             }
+            if ($entries)
+                foreach ($pset->grades as $ge) {
+                    $k = $ge->name;
+                    if (@$gd->$k !== null)
+                        $ss->$k = $gd->$k;
+                }
         }
     }
 }
@@ -181,6 +187,10 @@ function download_psets_report($request) {
     $where[] = "not c.dropped";
     $where = join(" and ", $where);
 
+    $sel_pset = null;
+    if (@$request["pset"] && !($sel_pset = Pset::find($request["pset"])))
+        return $Conf->errorMsg("No such pset");
+
     $students = array();
     if (isset($request["fields"]))
         $selection = explode(",", $request["fields"]);
@@ -189,8 +199,8 @@ function download_psets_report($request) {
     $maxbyg = array();
     $max = $max_noextra = 0;
     foreach (Pset::$all as $pset)
-        if (!$pset->disabled) {
-            collect_pset_info($students, $pset, $where);
+        if (!$pset->disabled && (!$sel_pset || $sel_pset === $pset)) {
+            collect_pset_info($students, $pset, $where, !!$sel_pset);
             if (($g = $pset->group)) {
                 if (!isset($maxbyg[$g]))
                     $maxbyg[$g] = $maxbyg["${g}_noextra"] = 0;
@@ -204,26 +214,31 @@ function download_psets_report($request) {
         }
 
     foreach (Pset::$all as $pset)
-        if (!$pset->disabled) {
+        if (!$pset->disabled && (!$sel_pset || $sel_pset === $pset)) {
             set_ranks($students, $selection, $pset->psetkey);
             if ($pset->has_extra)
                 set_ranks($students, $selection, $pset->psetkey . "_noextra");
+            if ($sel_pset)
+                foreach ($pset->grades as $ge)
+                    $selection[] = $ge->name;
         }
 
-    set_ranks($students, $selection, "psets");
-    set_ranks($students, $selection, "psets_noextra");
-    set_ranks($students, $selection, "tests");
+    if (!$sel_pset) {
+        set_ranks($students, $selection, "psets");
+        set_ranks($students, $selection, "psets_noextra");
+        set_ranks($students, $selection, "tests");
 
-    foreach ($students as $s)
-        $s->performance = sprintf("%.1f",
-                                  100 * @(0.9 * ($s->psets_noextra / $maxbyg["psets_noextra"])
-                                          + 0.75 * ($s->psets / $maxbyg["psets"])
-                                          + 1.2 * ($s->tests / $maxbyg["tests"])));
-    set_ranks($students, $selection, "performance");
+        foreach ($students as $s)
+            $s->performance = sprintf("%.1f",
+                                      100 * @(0.9 * ($s->psets_noextra / $maxbyg["psets_noextra"])
+                                              + 0.75 * ($s->psets / $maxbyg["psets"])
+                                              + 1.2 * ($s->tests / $maxbyg["tests"])));
+        set_ranks($students, $selection, "performance");
+    }
 
     $csv = new CsvGenerator;
-    $csv->set_selection($selection);
     $csv->set_header($selection);
+    $csv->set_selection($selection);
     foreach ($students as $s)
         $csv->add($s);
     $csv->download_headers("gradereport.csv");
@@ -231,7 +246,7 @@ function download_psets_report($request) {
     exit;
 }
 
-if ($Me->isPC && isset($_REQUEST["report"]))
+if ($Me->isPC && check_post() && @$_GET["report"])
     download_psets_report($_REQUEST);
 
 function set_grader() {
@@ -813,6 +828,9 @@ function show_pset_actions($pset) {
     if (!$pset->disabled) {
         echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
         echo Ht::select("anonymous", array("no" => "Open grading", "yes" => "Anonymous grading"), $pset->anonymous ? "yes" : "no", array("onchange" => "reconfig(this, 'setanonymous')"));
+
+        echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
+        echo Ht::js_button("Grade report", "window.location=\"" . hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]) . "\"");
     }
 
     echo "</div></form>";
