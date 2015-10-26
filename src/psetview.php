@@ -284,7 +284,7 @@ class PsetView {
     }
 
     public function late_hours($no_auto = false) {
-        $cinfo = $this->commit_info();
+        $cinfo = $this->commit_or_grading_info();
         if (!$no_auto && @$cinfo->late_hours !== null)
             return (object) array("hours" => $cinfo->late_hours,
                                   "override" => true);
