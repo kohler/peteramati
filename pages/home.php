@@ -195,7 +195,7 @@ function download_psets_report($request) {
     if (isset($request["fields"]))
         $selection = explode(",", $request["fields"]);
     else
-        $selection = array("name", "grade", "seascode_username", "huid", "extension");
+        $selection = array("name", "grade", "username", "huid", "extension");
     $maxbyg = array();
     $max = $max_noextra = 0;
     foreach (Pset::$all as $pset)
