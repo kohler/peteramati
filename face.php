@@ -55,7 +55,7 @@ function output($User) {
 
 $Conf->header("Thefacebook", "face");
 
-$u = Dbl::qe("select contactId, email, firstName, lastName, seascode_username, contactImageId from ContactInfo where college!=0 or extension!=0");
+$u = Dbl::qe("select contactId, email, firstName, lastName, seascode_username, contactImageId from ContactInfo where roles=0");
 while (($user = edb_orow($u)))
     output($user);
 
