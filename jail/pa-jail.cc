@@ -322,19 +322,19 @@ static int x_symlink(const char* oldpath, const char* newpath) {
     return 0;
 }
 
-static int x_waitpid(pid_t child, int flags) {
+static std::pair<pid_t, int> x_waitpid(pid_t child, int flags) {
     int status;
     while (1) {
         pid_t w = waitpid(child, &status, flags);
-        if (w == child && WIFEXITED(status))
-            return WEXITSTATUS(status);
-        else if (w == child)
-            return 128 + WTERMSIG(status);
+        if (w > 0 && WIFEXITED(status))
+            return std::make_pair(w, WEXITSTATUS(status));
+        else if (w > 0)
+            return std::make_pair(w, 128 + WTERMSIG(status));
         else if (w == 0) {
             errno = EAGAIN;
-            return -1;
+            return std::make_pair((pid_t) -1, -1);
         } else if (w == -1 && errno != EINTR)
-            return -1;
+            return std::make_pair((pid_t) -1, -1);
     }
 }
 
@@ -616,7 +616,7 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
     } else if (child < 0)
         return perror_fail("%s: %s\n", "fork");
 
-    int status = x_waitpid(child, 0);
+    int status = x_waitpid(child, 0).second;
     if (status == 0)
         return 0;
     else if (status != -1)
@@ -1277,6 +1277,7 @@ class jailownerinfo {
     buffer from_slave;
     bool has_stdin_termios;
     struct termios stdin_termios;
+    int child_status;
 
     void start_sigpipe();
     void block(int ptymaster);
@@ -1288,7 +1289,8 @@ class jailownerinfo {
 };
 
 jailownerinfo::jailownerinfo()
-    : owner(ROOT), group(ROOT), argv(), has_stdin_termios(false) {
+    : owner(ROOT), group(ROOT), argv(), has_stdin_termios(false),
+      child_status(-1) {
 }
 
 jailownerinfo::~jailownerinfo() {
@@ -1437,7 +1439,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         (void) r;
         r = setresuid(caller_owner, caller_owner, caller_owner);
         (void) r;
-        exit_status = x_waitpid(child, child_waitflags);
+        exit_status = x_waitpid(child, child_waitflags).second;
     } else
         pidfd = -1;
     exit(exit_status);
@@ -1695,13 +1697,17 @@ void jailownerinfo::block(int ptymaster) {
 }
 
 int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
-    if (waitpid) {
-        int r = x_waitpid(child, WNOHANG);
-        if (r != -1)
-            return r;
-        else if (errno != EAGAIN)
-            return 125;
-    }
+    std::pair<pid_t, int> xr;
+    do {
+        xr = x_waitpid(-1, WNOHANG);
+        if (xr.first == child)
+            child_status = xr.second;
+    } while (xr.first != -1);
+    if (errno != EAGAIN && errno != ECHILD)
+        return 125;
+
+    if (child_status >= 0 && waitpid)
+        return child_status;
 
     if (got_sigterm)
         return 128 + SIGTERM;
