@@ -194,7 +194,7 @@ if (function_exists("date_default_timezone_set")) {
 
 
 // Extract problem set information
-function psets_json_data() {
+function psets_json_data($exclude_overrides) {
     global $Conf, $ConfSitePATH, $Opt;
     $datamap = array();
     $fnames = expand_includes($ConfSitePATH, $Opt["psetsConfig"],
@@ -202,13 +202,14 @@ function psets_json_data() {
                                "HOSTTYPE" => @$Opt["hostType"] ? : ""]);
     foreach ($fnames as $fname)
         $datamap[$fname] = @file_get_contents($fname);
-    if (($override_data = $Conf->setting_data("psets_override")))
+    if (!$exclude_overrides
+        && ($override_data = $Conf->setting_data("psets_override")))
         $datamap["<overrides>"] = $override_data;
     return $datamap;
 }
 
-function load_psets_json() {
-    $datamap = psets_json_data();
+function load_psets_json($exclude_overrides) {
+    $datamap = psets_json_data($exclude_overrides);
     if (!count($datamap))
         Multiconference::fail_message("\$Opt[\"psetsConfig\"] is not set correctly.");
     $json = (object) array("_defaults" => (object) array());
@@ -235,7 +236,7 @@ function load_pset_info() {
         Messages::$main->add($j);
 
     // read psets
-    $PsetInfo = load_psets_json();
+    $PsetInfo = load_psets_json(false);
 
     // parse psets
     foreach ($PsetInfo as $pk => $p) {
@@ -247,21 +248,23 @@ function load_pset_info() {
             $pset = new Pset($pk, $p);
             Pset::register($pset);
         } catch (Exception $exception) {
-            // Want to give a good error message, so discover where the error is
-            // create pset landmark object
+            // Want to give a good error message, so discover where the error is.
+            // - create pset landmark object
             $locinfo = (object) array();
-            foreach (psets_json_data() as $fname => $data) {
+            foreach (psets_json_data(false) as $fname => $data) {
                 $x = Json::decode_landmarks($data, $fname);
                 object_replace_recursive($locinfo, $x);
             }
             $locp = $locinfo->$pk;
             if (isset($locinfo->_defaults))
                 object_merge_recursive($locp, $locinfo->_defaults);
+            // - lookup exception path in landmark object
             $path = $exception instanceof PsetConfigException ? $exception->path : array();
             for ($pathpos = 0; $pathpos < count($path) && $locp && !is_string($locp); ++$pathpos) {
                 $component = $path[$pathpos];
                 $locp = is_array($locp) ? $locp[$component] : $locp->$component;
             }
+            // - report error
             if (is_object($locp) && @$locp->__LANDMARK__)
                 $locp = $locp->__LANDMARK__;
             else if (!is_string($locp))

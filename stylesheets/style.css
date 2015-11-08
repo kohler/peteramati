@@ -600,6 +600,7 @@ input.bsm, button.bsm, select.bsm, a.bsm {
 }
 input.b.alert, input.bsm.alert {
 	font-weight: bold;
+	background: #ffaaaa;
 }
 input.bb, button.bb {
 	font-weight: bold;

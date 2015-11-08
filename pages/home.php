@@ -334,7 +334,7 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
     $all_overrides = (object) array();
     $all_overrides->$psetkey = $overrides;
     object_replace_recursive($dbjson, $all_overrides);
-    $dbjson = psets_json_diff_from($json ? : load_psets_json(), $dbjson);
+    $dbjson = psets_json_diff_from($json ? : load_psets_json(true), $dbjson);
     $Conf->save_setting("psets_override", 1, $dbjson);
 
     unset($_GET["pset"], $_REQUEST["pset"]);
@@ -347,41 +347,35 @@ function reconfig() {
         return $Conf->errorMsg("No such pset");
     $psetkey = $pset->psetkey;
 
-    $json = load_psets_json();
-    object_merge_recursive($json->$psetkey, $PsetInfo->_defaults);
+    $json = load_psets_json(true);
+    object_merge_recursive($json->$psetkey, $json->_defaults);
     $old_pset = new Pset($psetkey, $json->$psetkey);
 
     $o = (object) array();
-    if (@$_POST["action"] === "setstate") {
-        $o->disabled = $o->visible = $o->grades_visible = null;
-        $state = @$_POST["state"];
-        if ($state === "disabled")
-            $o->disabled = true;
-        else if ($old_pset->disabled)
-            $o->disabled = false;
-        if ($state === "visible" || $state === "grades_visible")
-            $o->visible = true;
-        else if (!$old_pset->disabled && $old_pset->visible)
-            $o->visible = false;
-        if ($state === "grades_visible")
-            $o->grades_visible = true;
-        else if ($state === "visible" && $old_pset->grades_visible)
-            $o->grades_visible = false;
-    }
+    $o->disabled = $o->visible = $o->grades_visible = null;
+    $state = @$_POST["state"];
+    if ($state === "disabled")
+        $o->disabled = true;
+    else if ($old_pset->disabled)
+        $o->disabled = false;
+    if ($state === "visible" || $state === "grades_visible")
+        $o->visible = true;
+    else if (!$old_pset->disabled && $old_pset->visible)
+        $o->visible = false;
+    if ($state === "grades_visible")
+        $o->grades_visible = true;
+    else if ($state === "visible" && $old_pset->grades_visible)
+        $o->grades_visible = false;
 
-    if (@$_POST["action"] = "setfrozen") {
-        if (@$_POST["frozen"] === "yes")
-            $o->frozen = true;
-        else
-            $o->frozen = ($old_pset->frozen ? false : null);
-    }
+    if (@$_POST["frozen"] === "yes")
+        $o->frozen = true;
+    else
+        $o->frozen = ($old_pset->frozen ? false : null);
 
-    if (@$_POST["action"] = "setanonymous") {
-        if (@$_POST["anonymous"] === "yes")
-            $o->anonymous = true;
-        else
-            $o->anonymous = ($old_pset->anonymous ? false : null);
-    }
+    if (@$_POST["anonymous"] === "yes")
+        $o->anonymous = true;
+    else
+        $o->anonymous = ($old_pset->anonymous ? false : null);
 
     save_config_overrides($psetkey, $o, $json);
 }
@@ -803,7 +797,7 @@ function show_regrades($result) {
 function show_pset_actions($pset) {
     global $Conf;
 
-    echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "reconfig" => 1)), array("style" => "margin-bottom:1em"));
+    echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "reconfig" => 1)), ["style" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
     $options = array("disabled" => "Disabled",
                      "invisible" => "Hidden",
                      "visible" => "Visible without grades",
@@ -816,24 +810,25 @@ function show_pset_actions($pset) {
         $state = "visible";
     else
         $state = "grades_visible";
-    $Conf->footerScript("function reconfig(e, what) { var j = $(e).closest(\"form\"); j.find('input[name=\"action\"]').val(what); j.submit(); }", "reconfig");
-    echo Ht::select("state", $options, $state, array("onchange" => "reconfig(this, 'setstate')")),
-        Ht::hidden("action", "");
+    echo Ht::select("state", $options, $state);
 
-    if (!$pset->disabled && $pset->visible) {
-        echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
-        echo Ht::select("frozen", array("no" => "Student updates allowed", "yes" => "Submissions frozen"), $pset->frozen ? "yes" : "no", array("onchange" => "reconfig(this, 'setfrozen')"));
-    }
+    echo '<span class="pa-if-visible"> &nbsp;<span class="barsep">·</span>&nbsp; ',
+        Ht::select("frozen", array("no" => "Student updates allowed", "yes" => "Submissions frozen"), $pset->frozen ? "yes" : "no"),
+        '</span>';
+
+    echo '<span class="pa-if-enabled"> &nbsp;<span class="barsep">·</span>&nbsp; ',
+        Ht::select("anonymous", array("no" => "Open grading", "yes" => "Anonymous grading"), $pset->anonymous ? "yes" : "no"),
+        '</span>';
+
+    echo ' &nbsp;', Ht::submit("reconfig", "Save");
 
     if (!$pset->disabled) {
-        echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
-        echo Ht::select("anonymous", array("no" => "Open grading", "yes" => "Anonymous grading"), $pset->anonymous ? "yes" : "no", array("onchange" => "reconfig(this, 'setanonymous')"));
-
-        echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
+        echo ' &nbsp;<span class="barsep">|</span>&nbsp; ';
         echo Ht::js_button("Grade report", "window.location=\"" . hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]) . "\"");
     }
 
     echo "</div></form>";
+    $Conf->echoScript("$('.need-pa-pset-actions').each(pa_pset_actions)");
 }
 
 function show_pset_table($pset) {

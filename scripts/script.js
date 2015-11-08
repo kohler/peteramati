@@ -2529,6 +2529,21 @@ function pa_init_repoclip() {
     $(this).click(repoclip);
 }
 
+function pa_pset_actions() {
+    var $f = $(this);
+    function update() {
+        var st = $f.find("select[name='state']").val();
+        $f.find(".pa-if-enabled").toggle(st !== "disabled");
+        $f.find(".pa-if-visible").toggle(st !== "disabled" && st !== "invisible");
+    }
+    update();
+    $f.find("select[name='state']").on("change", update);
+    $f.find("input, select").on("change", function () {
+        $f.find("[type='submit']").addClass("alert");
+    });
+    $f.removeClass("need-pa-pset-actions");
+}
+
 
 // autogrowing text areas; based on https://github.com/jaz303/jquery-grab-bag
 function textarea_shadow($self) {
