@@ -798,18 +798,29 @@ static int construct_jail(dev_t jaildev, FILE* f) {
         // '[FLAGS]'
         int flags = base_flags;
         if (buf[l - 1] == ']') {
+            // skip ' [FLAGS]'
             for (--l; l > 0 && buf[l-1] != '['; --l)
                 /* do nothing */;
             if (l == 0)
                 continue;
-            char* p;
-            if ((p = strstr(&buf[l], "cp"))
-                && (p[-1] == '[' || p[-1] == ',')
-                && (p[2] == ']' || p[2] == ','))
-                flags |= FLAG_CP;
+            char* opts = &buf[l];
             do {
                 buf[--l] = 0;
             } while (l > 0 && isspace((unsigned char) buf[l-1]));
+            // parse flags
+            while (1) {
+                while (isspace((unsigned char) *opts) || *opts == ',')
+                    ++opts;
+                if (!*opts || *opts == ']')
+                    break;
+                char* optstart = opts;
+                ++opts;
+                while (*opts && *opts != ']' && *opts != ','
+                       && !isspace((unsigned char) *opts))
+                    ++opts;
+                if (opts - optstart == 2 && memcmp(optstart, "cp", 2) == 0)
+                    flags |= FLAG_CP;
+            }
         }
 
         std::string src, dst;
