@@ -24,7 +24,7 @@ stderrtostdout: stderrtostdout.c
 	$(CC) -W -Wall -g -O2 -o $@ $^
 
 clean:
-	rm -f pa-jail pa-timeout stderrtostdout
+	rm -f pa-jail pa-timeout pa-writefifo stderrtostdout
 
 always:
 	@:
