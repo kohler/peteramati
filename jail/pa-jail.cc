@@ -27,6 +27,7 @@
 #include <string>
 #include <map>
 #include <unordered_map>
+#include <vector>
 #include <iostream>
 #include <sys/ioctl.h>
 #if __linux__
@@ -473,7 +474,8 @@ const char* mountslot::mount_data() const {
 
 
 typedef std::map<std::string, mountslot> mount_table_type;
-mount_table_type mount_table;
+static mount_table_type mount_table;
+static std::vector<std::string> runmounts;
 
 static int populate_mount_table() {
     static bool mount_table_populated = false;
@@ -513,17 +515,26 @@ int umount(const char* dir) {
 }
 #endif
 
-static int handle_mount(mountslot ms, std::string dst, bool chrooted) {
-    auto it = mount_table.find(dst);
-    if (it != mount_table.end()
-        && it->second.fsname == ms.fsname
-        && it->second.type == ms.type
-        && it->second.opts == ms.opts
-        && it->second.data == ms.data
+static int handle_mount(std::string src, std::string dst, bool chrooted) {
+    auto it = mount_table.find(src);
+    if (it == mount_table.end()
+        || !it->second.allowed)
+        return 0;
+    mountslot msx(it->second);
+
+    auto dit = mount_table.find(dst);
+    if (dit != mount_table.end()
+        && it->second.fsname == msx.fsname
+        && it->second.type == msx.type
+        && it->second.opts == msx.opts
+        && it->second.data == msx.data
         && !chrooted)
         // already mounted
         return 0;
-    mountslot msx(ms);
+
+    if (chrooted)
+        v_ensuredir(dst, 0555, true);
+
 #if __linux__
     if (msx.type == "devpts" && chrooted) {
         msx.add_mountopt("newinstance");
@@ -559,6 +570,7 @@ static int handle_umount(const mount_table_type::iterator& it) {
         umount_table[it->first.c_str()] = 1;
     return 0;
 }
+
 
 static int handle_copy(const std::string& src, std::string subdst,
                        int flags, dev_t jaildev, mode_t* srcmode);
@@ -754,12 +766,8 @@ static int handle_copy(const std::string& src, std::string subdst,
         && x_lchown(dst.c_str(), ss.st_uid, ss.st_gid))
         return 1;
 
-    if (S_ISDIR(ss.st_mode)) {
-        auto it = mount_table.find(src.c_str());
-        if (it != mount_table.end() && it->second.allowed)
-            return handle_mount(it->second, dst, false);
-    }
-
+    if (S_ISDIR(ss.st_mode))
+        return handle_mount(src, dst, false);
     return 0;
 }
 
@@ -1322,8 +1330,6 @@ class jailownerinfo {
     int check_child_timeout(pid_t child, bool waitpid);
     void wait_background(pid_t child, int ptymaster);
     void exec_done(pid_t child, int exit_status) __attribute__((noreturn));
-
-    static const char* const runmounts[];
 };
 
 jailownerinfo::jailownerinfo()
@@ -1483,16 +1489,14 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     exit(exit_status);
 }
 
-const char* const jailownerinfo::runmounts[] = {
-#if __linux__
-    "/proc", "/dev/pts", "/tmp",
-#endif
-    NULL
-};
-
 int jailownerinfo::exec_go() {
 #if __linux__
     populate_mount_table();     // ensure we know how to mount /proc
+    for (auto it = runmounts.begin(); it != runmounts.end(); ++it)
+        handle_mount(*it, jaildir->dir + *it, true);
+    std::string dev_ptmx = jaildir->dir + "dev/ptmx";
+    (void) unlink(dev_ptmx.c_str());
+    x_symlink("pts/ptmx", dev_ptmx.c_str());
 #endif
 
     // chroot, remount /proc
@@ -1504,17 +1508,6 @@ int jailownerinfo::exec_go() {
         fprintf(verbosefile, "chroot .\n");
     if (!dryrun && chroot(".") != 0)
         perror_die("chroot");
-#if __linux__
-    for (const char* const* m = runmounts; *m; ++m) {
-        auto it = mount_table.find(*m);
-        if (it != mount_table.end() && it->second.allowed) {
-            v_ensuredir(*m, 0555, true);
-            handle_mount(it->second, *m, true);
-        }
-    }
-    (void) unlink("/dev/ptmx");
-    x_symlink("pts/ptmx", "/dev/ptmx");
-#endif
 
     // create a pty
     int ptymaster = -1;
@@ -1886,6 +1879,12 @@ static const char* shortoptions_action[] = {
 };
 
 int main(int argc, char** argv) {
+#if __linux__
+    runmounts.push_back("/proc");
+    runmounts.push_back("/dev/pts");
+    runmounts.push_back("/tmp");
+#endif
+
     // parse arguments
     jailaction action = do_start;
     bool chown_home = false, foreground = false;
