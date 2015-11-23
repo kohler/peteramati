@@ -42,6 +42,8 @@
 
 #define FLAG_CP 1        // copy even if source is symlink
 #define FLAG_NOLINK 2    // never link from source
+#define FLAG_BIND 4
+#define FLAG_BIND_RO 8
 
 #ifndef O_PATH
 #define O_PATH 0
@@ -350,24 +352,26 @@ static std::pair<pid_t, int> x_waitpid(pid_t child, int flags) {
 struct mountarg {
     const char* name;
     int value;
+    bool unparse;
 };
 static const mountarg mountargs[] = {
 #if __linux__
-    { "noatime", MS_NOATIME },
+    { "bind", MS_BIND, false },
+    { "noatime", MS_NOATIME, true },
 #endif
-    { "nodev", MFLAG(NODEV) },
+    { "nodev", MFLAG(NODEV), true },
 #if __linux__
-    { "nodiratime", MS_NODIRATIME },
+    { "nodiratime", MS_NODIRATIME, true },
 #endif
-    { "noexec", MFLAG(NOEXEC) },
-    { "nosuid", MFLAG(NOSUID) },
+    { "noexec", MFLAG(NOEXEC), true },
+    { "nosuid", MFLAG(NOSUID), true },
 #if __linux__ && defined(MS_RELATIME)
-    { "relatime", MS_RELATIME },
+    { "relatime", MS_RELATIME, true },
 #endif
-    { "ro", MFLAG(RDONLY) },
-    { "rw", 0 },
+    { "ro", MFLAG(RDONLY), true },
+    { "rw", 0, true },
 #if __linux__ && defined(MS_STRICTATIME)
-    { "strictatime", MS_STRICTATIME },
+    { "strictatime", MS_STRICTATIME, true },
 #endif
 };
 static const mountarg* find_mountarg(const char* name, int namelen) {
@@ -390,7 +394,7 @@ struct mountslot {
     mountslot() : opts(0), allowed(false) {}
     mountslot(const char* fsname, const char* type, const char* mountopts,
               const char* dir);
-    std::string debug_mountopts() const;
+    std::string debug_mountopts_args() const;
     void add_mountopt(const char* mopt);
     const char* mount_data() const;
 };
@@ -415,17 +419,25 @@ mountslot::mountslot(const char* fsname_, const char* type_,
                || (strcmp(dir, "/dev/pts") == 0 && type == "devpts"));
 }
 
-std::string mountslot::debug_mountopts() const {
+std::string mountslot::debug_mountopts_args() const {
     std::string arg;
     if (!(opts & MFLAG(RDONLY)))
         arg = "rw";
     const mountarg* ma = mountargs;
     const mountarg* ma_last = ma + sizeof(mountargs) / sizeof(mountargs[0]);
     for (; ma != ma_last; ++ma)
-        if (ma->value && (opts & ma->value))
+        if (ma->value && (opts & ma->value) && ma->unparse)
             arg += (arg.empty() ? "" : ",") + std::string(ma->name);
     if (!data.empty())
         arg += (arg.empty() ? "" : ",") + data;
+#ifdef MS_BIND
+    if ((opts & MS_BIND) && arg == "rw")
+        return " --bind ";
+    if (opts & MS_BIND)
+        return " --bind -o " + arg;
+#endif
+    if (!arg.empty())
+        return " -o " + arg;
     return arg;
 }
 
@@ -519,9 +531,9 @@ static int handle_mount(mountslot ms, std::string dst, bool chrooted) {
     }
 #endif
     if (verbose) {
-        std::string opts = msx.debug_mountopts();
-        fprintf(verbosefile, "mount -i -n -t %s%s%s %s %s\n",
-                msx.type.c_str(), opts.empty() ? "" : " -o ", opts.c_str(),
+        std::string opts = msx.debug_mountopts_args();
+        fprintf(verbosefile, "mount -i -n -t %s%s %s %s\n",
+                msx.type.c_str(), opts.c_str(),
                 msx.fsname.c_str(), dst.c_str());
     }
     if (!dryrun) {
@@ -820,6 +832,10 @@ static int construct_jail(dev_t jaildev, FILE* f) {
                     ++opts;
                 if (opts - optstart == 2 && memcmp(optstart, "cp", 2) == 0)
                     flags |= FLAG_CP;
+                if (opts - optstart == 4 && memcmp(optstart, "bind", 4) == 0)
+                    flags |= FLAG_BIND;
+                if (opts - optstart == 7 && memcmp(optstart, "bind-ro", 7) == 0)
+                    flags |= FLAG_BIND_RO;
             }
         }
 
@@ -836,6 +852,17 @@ static int construct_jail(dev_t jaildev, FILE* f) {
         if (!arrow)
             arrow = buf + l;
         dst = curdstsubdir + std::string(buf + (buf[0] == '/'), arrow);
+
+        // act on flags
+        if (flags & (FLAG_BIND | FLAG_BIND_RO)) {
+            mountslot ms(src.c_str(), "none",
+                         flags & FLAG_BIND_RO ? "bind,ro" : "bind",
+                         dst.c_str());
+            ms.allowed = true;
+            populate_mount_table();
+            mount_table[dst] = ms;
+        }
+
         handle_copy(src, dst, flags, jaildev, NULL);
     }
 
