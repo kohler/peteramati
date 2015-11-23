@@ -1646,8 +1646,15 @@ class Contact {
         foreach (explode("\n", $result) as $line)
             if ($line != "") {
                 $diffinfo = self::find_diffinfo($pset_diffs, $truncpfx . $line);
-                if (!$diffinfo || (!@$diffinfo->ignore && !@$diffinfo->full))
-                    $files[] = escapeshellarg(quotemeta($line));
+                // skip files presented in their entirety
+                if ($diffinfo && @$diffinfo->full)
+                    continue;
+                // skip ignored files, unless user requested them
+                if ($diffinfo && @$diffinfo->ignore
+                    && (!@$options["needfiles"]
+                        || !@$options["needfiles"][$truncpfx . $line]))
+                    continue;
+                $files[] = escapeshellarg(quotemeta($line));
             }
 
         if (count($files)) {
