@@ -520,14 +520,13 @@ static int handle_mount(std::string src, std::string dst, bool chrooted) {
     if (it == mount_table.end()
         || !it->second.allowed)
         return 0;
-    mountslot msx(it->second);
 
     auto dit = mount_table.find(dst);
     if (dit != mount_table.end()
-        && it->second.fsname == msx.fsname
-        && it->second.type == msx.type
-        && it->second.opts == msx.opts
-        && it->second.data == msx.data
+        && dit->second.fsname == it->second.fsname
+        && dit->second.type == it->second.type
+        && dit->second.opts == it->second.opts
+        && dit->second.data == it->second.data
         && !chrooted)
         // already mounted
         return 0;
@@ -535,6 +534,7 @@ static int handle_mount(std::string src, std::string dst, bool chrooted) {
     if (chrooted)
         v_ensuredir(dst, 0555, true);
 
+    mountslot msx(it->second);
 #if __linux__
     if (msx.type == "devpts" && chrooted) {
         msx.add_mountopt("newinstance");

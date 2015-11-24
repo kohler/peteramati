@@ -63,6 +63,7 @@ class Pset {
     public $run_overlay;
     public $run_skeletondir;
     public $run_jailfiles;
+    public $run_binddir;
     public $run_timeout;
 
     public $diffs = array();
@@ -194,6 +195,7 @@ class Pset {
         $this->run_timeout = self::cinterval($p, "run_timeout");
         if ($this->run_timeout === null) // default run_timeout is 10m
             $this->run_timeout = 600;
+        $this->run_binddir = self::cstr($p, "run_binddir");
 
         // diffs
         if (is_array(@$p->diffs) || is_object(@$p->diffs)) {
