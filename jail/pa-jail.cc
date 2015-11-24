@@ -62,7 +62,6 @@ static gid_t caller_group;
 
 static std::unordered_map<std::string, int> dirtable;
 static std::unordered_map<std::string, int> dst_table;
-static std::multimap<std::string, std::string> lnk_table;
 static std::unordered_map<devino, std::string> devino_table;
 static int exit_value = 0;
 static bool verbose = false;
@@ -283,7 +282,7 @@ static int v_ensure_linkdir(std::string pathname, bool nolink) {
 
 static int x_link(const char* oldpath, const char* newpath) {
     if (verbose)
-        fprintf(verbosefile, "rm -f %s; ln %s %s\n", newpath, oldpath, newpath);
+        fprintf(verbosefile, "rm -f %s\nln %s %s\n", newpath, oldpath, newpath);
     if (!dryrun) {
         if (unlink(newpath) == -1 && errno != ENOENT)
             return perror_fail("rm %s: %s\n", newpath);
@@ -605,7 +604,7 @@ static int handle_umount(const mount_table_type::iterator& it) {
 
 
 static int handle_copy(const std::string& src, std::string subdst,
-                       int flags, dev_t jaildev, mode_t* srcmode);
+                       int flags, dev_t jaildev);
 
 static void handle_symlink_dst(std::string src, std::string dst,
                                std::string lnk, dev_t jaildev)
@@ -639,21 +638,13 @@ static void handle_symlink_dst(std::string src, std::string dst,
         dst += lnk;
     }
 
-    if (dst.substr(dstroot.length(), 6) != "/proc/") {
-        mode_t srcmode;
-        int r = handle_copy(src, dst.substr(dstroot.length()),
-                            0, jaildev, &srcmode);
-        // remember directory-level symbolic links
-        if (r == 0 && S_ISDIR(srcmode)) {
-            lnk_table.insert(std::make_pair(dst, dst_lnkin));
-            lnk_table.insert(std::make_pair(dst_lnkin, dst));
-        }
-    }
+    if (dst.substr(dstroot.length(), 6) != "/proc/")
+        handle_copy(src, dst.substr(dstroot.length()), 0, jaildev);
 }
 
 static int x_cp_p(const std::string& src, const std::string& dst) {
     if (verbose)
-        fprintf(verbosefile, "rm -f %s; cp -p %s %s\n",
+        fprintf(verbosefile, "rm -f %s\ncp -p %s %s\n",
                 dst.c_str(), src.c_str(), dst.c_str());
     if (dryrun)
         return 0;
@@ -681,20 +672,76 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
         return perror_fail("/bin/cp %s: Did not exit\n", dst.c_str());
 }
 
-static bool same_contents(const std::string&, const struct stat& st1,
-                          const std::string& fn2) {
-    struct stat st2;
-    int r = lstat(fn2.c_str(), &st2);
-    return r == 0
-        && st1.st_mode == st2.st_mode
-        && st1.st_uid == st2.st_uid
-        && st1.st_gid == st2.st_gid
-        && st1.st_size == st2.st_size
-        && st1.st_mtime == st2.st_mtime;
+#define DO_COPY_SKELETON 1
+#define DO_COPY_LINK 2
+
+static int do_copy(const std::string& dst, const std::string& src,
+                   const struct stat& ss, int flags, dev_t jaildev) {
+    struct stat dstst;
+    int r = lstat(dst.c_str(), &dstst);
+    if (r == 0
+        && ss.st_mode == dstst.st_mode
+        && ss.st_uid == dstst.st_uid
+        && ss.st_gid == dstst.st_gid
+        && ((!S_ISREG(ss.st_mode) && !S_ISLNK(ss.st_mode))
+            || ss.st_size == dstst.st_size)
+        && ((!S_ISBLK(ss.st_mode) && !S_ISCHR(ss.st_mode))
+            || ss.st_rdev == dstst.st_rdev)
+        && (!S_ISREG(ss.st_mode)
+            || ss.st_mtime == dstst.st_mtime)) {
+        if (S_ISREG(ss.st_mode)) {
+            auto di = std::make_pair(ss.st_dev, ss.st_ino);
+            devino_table.insert(std::make_pair(di, dst));
+        }
+        return 0;
+    }
+
+    if ((flags & DO_COPY_SKELETON)
+        && v_ensure_linkdir(path_parentdir(dst), true) < 0)
+        return perror_fail("mkdir -p %s: %s\n", path_parentdir(dst).c_str());
+
+    // check for hard link to already-created file
+    if (S_ISREG(ss.st_mode)) {
+        if (flags & DO_COPY_LINK) {
+            auto di = std::make_pair(ss.st_dev, ss.st_ino);
+            auto it = devino_table.find(di);
+            if (it != devino_table.end())
+                return x_link(it->second.c_str(), dst.c_str());
+            devino_table.insert(std::make_pair(di, dst));
+        }
+        return x_cp_p(src, dst);
+    } else if (S_ISDIR(ss.st_mode)) {
+        mode_t perm = ss.st_mode & (S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
+        if (v_ensuredir(dst, perm, true) < 0)
+            return perror_fail("mkdir %s: %s\n", dst.c_str());
+        return x_lchown(dst.c_str(), ss.st_uid, ss.st_gid);
+    } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
+        mode_t mode = ss.st_mode & (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
+        if (x_mknod(dst.c_str(), mode, ss.st_rdev))
+            return 1;
+    } else if (S_ISLNK(ss.st_mode)) {
+        char lnkbuf[4096];
+        ssize_t r = readlink(src.c_str(), lnkbuf, sizeof(lnkbuf));
+        if (r == -1)
+            return perror_fail("readlink %s: %s\n", src.c_str());
+        else if (r == sizeof(lnkbuf))
+            return perror_fail("%s: Symbolic link too long\n", src.c_str());
+        lnkbuf[r] = 0;
+        if (x_symlink(lnkbuf, dst.c_str()))
+            return 1;
+        if (!(flags & DO_COPY_SKELETON))
+            handle_symlink_dst(src, dst, std::string(lnkbuf), jaildev);
+    } else
+        // cannot deal
+        return perror_fail("%s: Odd file type\n", src.c_str());
+
+    if (ss.st_uid != ROOT || ss.st_gid != ROOT)
+        return x_lchown(dst.c_str(), ss.st_uid, ss.st_gid);
+    return 0;
 }
 
 static int handle_copy(const std::string& src, std::string subdst,
-                       int flags, dev_t jaildev, mode_t* srcmode) {
+                       int flags, dev_t jaildev) {
     assert(subdst[0] == '/');
     assert(subdst.length() == 1 || subdst[1] != '/');
     assert(dstroot.back() != '/');
@@ -707,7 +754,7 @@ static int handle_copy(const std::string& src, std::string subdst,
         return 1;
     dst_table[dst] = 1;
 
-    struct stat ss, ds;
+    struct stat ss;
 
     if (dst.back() != '/') {
         std::string parent_dst = path_parentdir(dst);
@@ -716,7 +763,7 @@ static int handle_copy(const std::string& src, std::string subdst,
             if (r == -1 && errno == ENOENT
                 && handle_copy(path_parentdir(src),
                                parent_dst.substr(dstroot.length()),
-                               0, jaildev, NULL) == 0)
+                               0, jaildev) == 0)
                 r = 0;
             if (r != 0)
                 return r;
@@ -725,82 +772,12 @@ static int handle_copy(const std::string& src, std::string subdst,
 
     if (lstat(src.c_str(), &ss) != 0)
         return perror_fail("lstat %s: %s\n", src.c_str());
-    if (srcmode)
-        *srcmode = ss.st_mode;
-    ds.st_uid = ds.st_gid = ROOT;
 
-    // check for hard link to already-created file
-    if (S_ISREG(ss.st_mode) && !(flags & FLAG_CP)) {
-        auto di = std::make_pair(ss.st_dev, ss.st_ino);
-        auto it = devino_table.find(di);
-        if (it != devino_table.end()) {
-            if (x_link(it->second.c_str(), dst.c_str()) != 0)
-                return 1;
-            return 0;
-        } else
-            devino_table.insert(std::make_pair(di, dst));
-    }
+    // set up skeleton directory version
+    if (!linkdir.empty())
+        do_copy(linkdir + subdst, src, ss, DO_COPY_SKELETON | DO_COPY_LINK, jaildev);
 
-    if (S_ISREG(ss.st_mode) && !linkdir.empty() && !(flags & FLAG_CP)) {
-        // regular file: link from skeleton directory
-        std::string lnk = linkdir + src;
-        if (!same_contents(src, ss, lnk)) {
-            if (v_ensure_linkdir(path_parentdir(lnk), true) < 0)
-                return perror_fail("mkdir -p %s: %s\n", path_parentdir(lnk).c_str());
-            if (x_cp_p(src, lnk) != 0)
-                return 1;
-        }
-        if (x_link(lnk.c_str(), dst.c_str()) != 0)
-            return 1;
-        // XXX get true linkdir stats?
-        ds = ss;
-    } else if (S_ISREG(ss.st_mode)
-               || (S_ISLNK(ss.st_mode) && (flags & FLAG_CP))) {
-        // regular file (or [cp]-marked symlink): copy to destination
-        if (x_cp_p(src, dst) != 0)
-            return 1;
-        ds = ss;
-    } else if (S_ISDIR(ss.st_mode)) {
-        // directory
-        mode_t perm = ss.st_mode & (S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
-        if (v_ensuredir(dst, perm, true) < 0)
-            return perror_fail("lstat %s: %s\n", dst.c_str());
-        if (!dryrun && !linkdir.empty())
-            v_ensuredir(linkdir + src, perm, true);
-        ds.st_mode = perm | S_IFDIR;
-    } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
-        // device file
-        ss.st_mode &= (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
-        if (!dryrun && x_mknod(dst.c_str(), ss.st_mode, ss.st_rdev) != 0)
-            return 1;
-        if (!dryrun && !linkdir.empty())
-            x_mknod((linkdir + src).c_str(), ss.st_mode, ss.st_rdev);
-        ds.st_mode = ss.st_mode;
-    } else if (S_ISLNK(ss.st_mode)) {
-        // symbolic link
-        char lnkbuf[4096];
-        ssize_t r = readlink(src.c_str(), lnkbuf, sizeof(lnkbuf));
-        if (r == -1)
-            return perror_fail("readlink %s: %s\n", src.c_str());
-        else if (r == sizeof(lnkbuf))
-            return perror_fail("%s: Symbolic link too long\n", src.c_str());
-        lnkbuf[r] = 0;
-        if (x_symlink(lnkbuf, dst.c_str()) != 0)
-            return 1;
-        if (!dryrun && !linkdir.empty()) // also populate skeletondir
-            x_symlink(lnkbuf, (linkdir + src).c_str());
-        ds.st_mode = ss.st_mode;
-        handle_symlink_dst(src, dst, std::string(lnkbuf), jaildev);
-    } else
-        // cannot deal
-        return perror_fail("%s: Odd file type\n", src.c_str());
-
-    // XXX preserve sticky bits/setuid/setgid?
-    if (ds.st_mode != ss.st_mode
-        && x_chmod(dst.c_str(), ss.st_mode))
-        return 1;
-    if ((ds.st_uid != ss.st_uid || ds.st_gid != ss.st_gid)
-        && x_lchown(dst.c_str(), ss.st_uid, ss.st_gid))
+    if (do_copy(dst, src, ss, flags & FLAG_CP ? 0 : DO_COPY_LINK, jaildev))
         return 1;
 
     if (S_ISDIR(ss.st_mode))
@@ -909,7 +886,7 @@ static int construct_jail(dev_t jaildev, std::string& str) {
             mount_table[dst] = ms;
             runmounts.push_back(dst);
         } else
-            handle_copy(src, dst, flags, jaildev, NULL);
+            handle_copy(src, dst, flags, jaildev);
     }
 
     return exit_value;
