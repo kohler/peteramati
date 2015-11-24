@@ -139,20 +139,30 @@ class RunnerState {
             $this->add_run_settings($runsettings);
 
         // actually run
-        $command = "echo; jail/pa-jail run -h"
-            . " -p" . escapeshellarg($this->lockfile)
-            . " -f" . escapeshellarg($this->expand($this->pset->run_jailfiles));
-        if ($this->pset->run_skeletondir)
-            $command .= " -S" . escapeshellarg($this->pset->run_skeletondir);
-        else if (isset($Opt["run_jailskeleton"]))
-            $command .= " -S" . escapeshellarg($Opt["run_jailskeleton"]);
+        $command = "echo; jail/pa-jail run -V"
+            . " -p" . escapeshellarg($this->lockfile);
+        $skeletondir = $this->pset->run_skeletondir ? : @$Opt["run_skeletondir"];
+        $binddir = $this->pset->run_binddir ? : @$Opt["run_binddir"];
+        if ($skeletondir && $binddir) {
+            $binddir = preg_replace(',/+\z,', '', $binddir);
+            $contents = "/ <- " . $skeletondir . " [bind-ro]\n"
+                . $this->userhome . " <- " . $this->jailhomedir . " [bind]\n";
+            $command .= " -u" . escapeshellarg($this->jailhomedir)
+                . " -F" . escapeshellarg($contents);
+            $homedir = $binddir;
+        } else {
+            $command .= " -h -f" . escapeshellarg($this->expand($this->pset->run_jailfiles));
+            if ($skeletondir)
+                $command .= " -S" . escapeshellarg($skeletondir);
+            $homedir = $this->jaildir;
+        }
         if ($this->runner->timeout > 0)
             $command .= " -T" . $this->runner->timeout;
         else if ($this->pset->run_timeout > 0)
             $command .= " -T" . $this->pset->run_timeout;
         if ($this->inputfifo)
             $command .= " -i" . escapeshellarg($this->inputfifo);
-        $command .= " " . escapeshellarg($this->jaildir)
+        $command .= " " . escapeshellarg($homedir)
             . " " . escapeshellarg($this->username)
             . " " . escapeshellarg($this->runner->command);
         $this->lockfile = null; /* now owned by command */
