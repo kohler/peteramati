@@ -1079,11 +1079,12 @@ struct jaildirinfo {
                 jailaction action, pajailconf& jailconf);
     void check();
     void chown_home();
+    void chown_recursive(const std::string& dir, uid_t owner, gid_t group);
     void remove();
 
 private:
     void chown_recursive(int dirfd, std::string& dirbuf, uid_t owner,
-                         gid_t group, bool ishome);
+                         gid_t group, bool ishome, dev_t dev);
     void remove_recursive(int dirfd, std::string component, std::string name);
 };
 
@@ -1196,13 +1197,25 @@ void jaildirinfo::chown_home() {
     std::string dirbuf = dir + "home/";
     int dirfd = openat(parentfd, (component + "/home").c_str(),
                        O_CLOEXEC | O_NOFOLLOW);
-    if (dirfd == -1)
+    struct stat dirst;
+    if (dirfd == -1 || fstat(dirfd, &dirst) != 0)
         perror_die(dirbuf);
-    chown_recursive(dirfd, dirbuf, ROOT, ROOT, true);
+    chown_recursive(dirfd, dirbuf, ROOT, ROOT, true, dirst.st_dev);
+}
+
+void jaildirinfo::chown_recursive(const std::string& dir,
+                                  uid_t owner, gid_t group) {
+    std::string dirbuf = path_endslash(dir);
+    int dirfd = open(dir.c_str(), O_CLOEXEC | O_NOFOLLOW);
+    struct stat dirst;
+    if (dirfd == -1 || fstat(dirfd, &dirst) != 0)
+        perror_die(dirbuf);
+    chown_recursive(dirfd, dirbuf, owner, group, false, dirst.st_dev);
 }
 
 void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
-                                  uid_t owner, gid_t group, bool ishome) {
+                                  uid_t owner, gid_t group,
+                                  bool ishome, dev_t dev) {
     dirbuf = path_endslash(dirbuf);
     size_t dirbuflen = dirbuf.length();
 
@@ -1253,11 +1266,14 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
             auto it = mount_table.find(dirbuf);
             if (it == mount_table.end()) { // not a mount point
                 int subdirfd = openat(dirfd, de->d_name, O_CLOEXEC | O_NOFOLLOW);
-                if (subdirfd == -1)
+                struct stat subdirst;
+                if (subdirfd == -1 || fstat(subdirfd, &subdirst) != 0)
                     perror_die(dirbuf);
-                if (x_fchown(subdirfd, u, g, dirbuf))
-                    exit(exit_value);
-                chown_recursive(subdirfd, dirbuf, u, g, false);
+                if (subdirst.st_dev == dev) {
+                    if (x_fchown(subdirfd, u, g, dirbuf))
+                        exit(exit_value);
+                    chown_recursive(subdirfd, dirbuf, u, g, false, dev);
+                }
             }
             dirbuf.resize(dirbuflen);
         } else if (x_lchownat(dirfd, de->d_name, u, g, dirbuf))
@@ -1957,6 +1973,7 @@ int main(int argc, char** argv) {
     bool chown_home = false, foreground = false;
     double timeout = -1;
     std::string filesarg, inputarg, linkarg;
+    std::vector<std::string> chown_user_args;
 
     int ch;
     while (1) {
@@ -1982,6 +1999,8 @@ int main(int argc, char** argv) {
                 chown_home = true;
             else if (ch == 'q')
                 quiet = true;
+            else if (ch == 'u')
+                chown_user_args.push_back(optarg);
             else if (ch == 'T') {
                 char* end;
                 timeout = strtod(optarg, &end);
@@ -2146,10 +2165,16 @@ int main(int argc, char** argv) {
     // set ownership
     if (chown_home)
         jaildir.chown_home();
-    dstroot = path_noendslash(jaildir.dir);
-    assert(dstroot != "/");
+    for (const auto& f : chown_user_args) {
+        if (!jailconf.allow_jail(f))
+            die("%s: --chown-user disabled by /etc/pa-jail.conf\n%s",
+                f.c_str(), jailconf.allowance_dir_fail_message().c_str());
+        jaildir.chown_recursive(f, jailuser.owner, jailuser.group);
+    }
 
     // construct the jail
+    dstroot = path_noendslash(jaildir.dir);
+    assert(dstroot != "/");
     if (filesf) {
         mode_t old_umask = umask(0);
         if (construct_jail(jaildir.dev, filesf) != 0)
