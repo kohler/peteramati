@@ -1071,9 +1071,7 @@ struct jaildirinfo {
     bool allowed;
     std::string permdir;
     dev_t dev;
-
     std::string skeletondir;
-    bool skeleton_allowed;
 
     jaildirinfo(const char* str, const std::string& skeletondir,
                 jailaction action, pajailconf& jailconf);
@@ -1092,7 +1090,7 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
                          jailaction action, pajailconf& jailconf)
     : dir(check_filename(absolute(str))),
       parentfd(-1), allowed(false), dev(-1),
-      skeletondir(skeletonstr), skeleton_allowed(false) {
+      skeletondir(skeletonstr) {
     if (dir.empty() || dir == "/" || dir[0] != '/') {
         fprintf(stderr, "%s: Bad characters in filename\n", str);
         exit(1);
@@ -2151,7 +2149,7 @@ int main(int argc, char** argv) {
     }
 
     // check skeleton directory
-    if (jaildir.skeleton_allowed) {
+    if (!jaildir.skeletondir.empty()) {
         if (v_ensuredir(jaildir.skeletondir, 0700, true) < 0)
             perror_die(jaildir.skeletondir);
         linkdir = path_noendslash(jaildir.skeletondir);
