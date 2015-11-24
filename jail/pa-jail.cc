@@ -892,6 +892,12 @@ struct pajailconf {
     const std::string& allowance_dir() const {
         return allowance_dir_;
     }
+    std::string allowance_dir_fail_message() const {
+        if (!allowance_dir_.empty())
+            return "  (disabled under " + allowance_dir_ + ")\n";
+        else
+            return std::string();
+    }
 private:
     char buf[8192];
     size_t len;
@@ -1093,19 +1099,15 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
     dir = path_endslash(dir);
     if (jailconf.allow_jail(dir))
         permdir = jailconf.allowance_dir();
-    else if (!jailconf.allowance_dir().empty())
-        die("%s: Jails are disabled under here\n", jailconf.allowance_dir().c_str());
     else
-        die("Jails are disabled (enable them in /etc/pa-jail.conf)\n");
+        die("%s: Jail disabled by /etc/pa-jail.conf\n%s",
+            dir.c_str(), jailconf.allowance_dir_fail_message().c_str());
 
     if (!skeletondir.empty()) {
         skeletondir = path_endslash(absolute(skeletondir));
-        if (!jailconf.allow_skeleton(skeletondir)) {
-            if (!jailconf.allowance_dir().empty())
-                die("%s: Skeleton directories are disabled under here\n", jailconf.allowance_dir().c_str());
-            else
-                die("Skeletons are disabled (enable them in /etc/pa-jail.conf)\n");
-        }
+        if (!jailconf.allow_skeleton(skeletondir))
+            die("%s: Skeleton disabled by /etc/pa-jail.conf\n%s",
+                skeletondir.c_str(), jailconf.allowance_dir_fail_message().c_str());
     }
 
     size_t last_pos = 0;
@@ -1871,14 +1873,14 @@ static __attribute__((noreturn)) void usage(jailaction action = do_start) {
        pa-jail rm [-nf] JAILDIR\n");
     } else if (action == do_mv) {
         fprintf(stderr, "Usage: pa-jail mv [-n] SOURCE DEST\n\
-Safely move a jail from SOURCE to DEST. SOURCE and DEST must be absolute\n\
-pathnames allowed by /etc/pa-jail.conf.\n\
+Safely move a jail from SOURCE to DEST. SOURCE and DEST must be allowed\n\
+by /etc/pa-jail.conf.\n\
 \n\
   -n, --dry-run     print the actions that would be taken, don't run them\n");
     } else if (action == do_rm) {
         fprintf(stderr, "Usage: pa-jail rm [-nf] JAILDIR\n\
 Unmount and remove a jail. Like `rm -r[f] --one-file-system JAILDIR`.\n\
-JAILDIR must be an absolute pathname allowed by /etc/pa-jail.conf.\n\
+JAILDIR must be allowed by /etc/pa-jail.conf.\n\
 \n\
   -f, --force       do not complain if JAILDIR doesn't exist\n\
   -n, --dry-run     print the actions that would be taken, don't run them\n\
@@ -1886,12 +1888,11 @@ JAILDIR must be an absolute pathname allowed by /etc/pa-jail.conf.\n\
     } else {
         if (action == do_add)
             fprintf(stderr, "Usage: pa-jail add [OPTIONS...] JAILDIR [USER]\n\
-Create or augment a jail. JAILDIR must be an absolute pathname allowed by\n\
-/etc/pa-jail.conf.\n\n");
+Create or augment a jail. JAILDIR must be allowed by /etc/pa-jail.conf.\n\n");
         else
             fprintf(stderr, "Usage: pa-jail run [OPTIONS...] JAILDIR USER COMMAND...\n\
-Run COMMAND as USER in the JAILDIR jail. JAILDIR must be an absolute pathname\n\
-allowed by /etc/pa-jail.conf.\n\n");
+Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
+/etc/pa-jail.conf.\n\n");
         fprintf(stderr, "  -f, --files FILES\n");
         fprintf(stderr, "  -h, --chown-home\n");
         fprintf(stderr, "  -S, --skeleton SKELETONDIR\n");
@@ -2088,14 +2089,16 @@ int main(int argc, char** argv) {
         std::string newpath = check_filename(absolute(argv[optind + 1]));
         if (newpath.empty() || newpath[0] != '/')
             die("%s: Bad characters in move destination\n", argv[optind + 1]);
-        else if (newpath.length() <= jaildir.permdir.length()
-                 || newpath.substr(0, jaildir.permdir.length()) != jaildir.permdir)
-            die("%s: Not a subdirectory of %s\n", newpath.c_str(), jaildir.permdir.c_str());
 
         // allow second argument to be a directory
         struct stat s;
         if (stat(newpath.c_str(), &s) == 0 && S_ISDIR(s.st_mode))
             newpath = path_endslash(newpath) + jaildir.component;
+
+        // check jail allowance
+        if (!jailconf.allow_jail(newpath))
+            die("%s: Destination jail disabled by /etc/pa-jail.conf\n%s",
+                newpath.c_str(), jailconf.allowance_dir_fail_message().c_str());
 
         if (verbose)
             fprintf(verbosefile, "mv %s%s %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str());
