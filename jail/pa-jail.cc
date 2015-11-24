@@ -772,7 +772,7 @@ static int handle_copy(const std::string& src, std::string subdst,
     return 0;
 }
 
-static int construct_jail(dev_t jaildev, FILE* f) {
+static int construct_jail(dev_t jaildev, std::string& str) {
     // prepare root
     if (x_chmod(dstroot.c_str(), 0755)
         || x_lchown(dstroot.c_str(), 0, 0))
@@ -786,25 +786,27 @@ static int construct_jail(dev_t jaildev, FILE* f) {
     std::string cursrcdir("/"), curdstsubdir("/");
     int base_flags = linkdir.empty() ? FLAG_NOLINK : 0;
 
-    char xbuf[BUFSIZ];
-    while (fgets(xbuf, BUFSIZ, f)) {
-        char* buf = xbuf;
-        while (isspace((unsigned char) *buf))
-            ++buf;
-        int l = strlen(buf);
-        while (l > 0 && isspace((unsigned char) buf[l - 1]))
-            buf[--l] = 0;
-        if (l == 0 || buf[0] == '#')
+    const char* pos = str.data(), *endpos = pos + str.length();
+    while (pos < endpos) {
+        while (pos < endpos && isspace((unsigned char) *pos))
+            ++pos;
+        const char* line = pos;
+        while (pos < endpos && *pos != '\n')
+            ++pos;
+        const char* endline = pos;
+        while (line < endline && isspace((unsigned char) endline[-1]))
+            --endline;
+        if (line == endline || line[0] == '#')
             continue;
 
         // 'directory:'
-        if (buf[l - 1] == ':') {
-            if (l == 2 && buf[0] == '.')
+        if (endline[-1] == ':') {
+            if (line + 2 == endline && line[0] == '.')
                 cursrcdir = std::string("/");
-            else if (l > 2 && buf[0] == '.' && buf[1] == '/')
-                cursrcdir = std::string(buf + 1, buf + l - 1);
+            else if (line + 2 > endline && line[0] == '.' && line[1] == '/')
+                cursrcdir = std::string(line + 1, endline - 1);
             else
-                cursrcdir = std::string(buf, buf + l - 1);
+                cursrcdir = std::string(line, endline - 1);
             if (cursrcdir[0] != '/')
                 cursrcdir = std::string("/") + cursrcdir;
             while (cursrcdir.length() > 1 && cursrcdir[cursrcdir.length() - 1] == '/' && cursrcdir[cursrcdir.length() - 2] == '/')
@@ -818,25 +820,25 @@ static int construct_jail(dev_t jaildev, FILE* f) {
 
         // '[FLAGS]'
         int flags = base_flags;
-        if (buf[l - 1] == ']') {
+        if (endline[-1] == ']') {
             // skip ' [FLAGS]'
-            for (--l; l > 0 && buf[l-1] != '['; --l)
+            for (--endline; line < endline && endline[-1] != '['; --endline)
                 /* do nothing */;
-            if (l == 0)
+            if (line == endline)
                 continue;
-            char* opts = &buf[l];
+            const char* opts = endline;
             do {
-                buf[--l] = 0;
-            } while (l > 0 && isspace((unsigned char) buf[l-1]));
+                --endline;
+            } while (line < endline && isspace((unsigned char) endline[-1]));
             // parse flags
             while (1) {
                 while (isspace((unsigned char) *opts) || *opts == ',')
                     ++opts;
-                if (!*opts || *opts == ']')
+                if (*opts == ']')
                     break;
-                char* optstart = opts;
+                const char* optstart = opts;
                 ++opts;
-                while (*opts && *opts != ']' && *opts != ','
+                while (*opts != ']' && *opts != ','
                        && !isspace((unsigned char) *opts))
                     ++opts;
                 if (opts - optstart == 2 && memcmp(optstart, "cp", 2) == 0)
@@ -849,18 +851,16 @@ static int construct_jail(dev_t jaildev, FILE* f) {
         }
 
         std::string src, dst;
-        char* arrow = strstr(buf, " <- ");
-        if (buf[0] == '/' && arrow)
-            src = std::string(arrow + 4);
-        else if (buf[0] == '/')
-            src = std::string(buf);
-        else if (arrow)
-            src = std::string(arrow + 4, buf + l);
+        const char* arrow = (const char*) memmem(line, endline - line, " <- ", 4);
+        if (arrow)
+            src = std::string(arrow + 4, endline);
+        else if (line[0] == '/')
+            src = std::string(line, endline);
         else
-            src = cursrcdir + std::string(buf, buf + l);
+            src = cursrcdir + std::string(line, endline);
         if (!arrow)
-            arrow = buf + l;
-        dst = curdstsubdir + std::string(buf + (buf[0] == '/'), arrow);
+            arrow = endline;
+        dst = curdstsubdir + std::string(line + (line[0] == '/'), arrow);
 
         // act on flags
         if (flags & (FLAG_BIND | FLAG_BIND_RO)) {
@@ -1972,7 +1972,7 @@ int main(int argc, char** argv) {
     jailaction action = do_start;
     bool chown_home = false, foreground = false;
     double timeout = -1;
-    std::string filesarg, inputarg, linkarg;
+    std::string inputarg, linkarg, contents;
     std::vector<std::string> chown_user_args;
 
     int ch;
@@ -1987,9 +1987,29 @@ int main(int argc, char** argv) {
                 verbose = dryrun = true;
             else if (ch == 'f' && action == do_rm)
                 doforce = true;
-            else if (ch == 'f')
-                filesarg = optarg;
-            else if (ch == 'p')
+            else if (ch == 'f') {
+                FILE* f;
+                if (strcmp(optarg, "-") == 0) {
+                    f = stdin;
+                    if (isatty(STDIN_FILENO))
+                        die("stdin: Is a tty\n");
+                } else {
+                    f = fopen(optarg, "r");
+                    if (!f)
+                        perror_die(optarg);
+                }
+                while (!feof(f) && !ferror(f)) {
+                    char buf[BUFSIZ];
+                    size_t n = fread(buf, 1, BUFSIZ, f);
+                    if (n > 0)
+                        contents.append(buf, n);
+                }
+                if (ferror(f))
+                    perror_die(optarg);
+                fclose(f);
+                if (!contents.empty() && contents.back() != '\n')
+                    contents.push_back('\n');
+            } else if (ch == 'p')
                 pidfilename = optarg;
             else if (ch == 'i')
                 inputarg = optarg;
@@ -2036,8 +2056,8 @@ int main(int argc, char** argv) {
         || (action == do_mv && optind + 2 != argc)
         || (action == do_add && optind != argc - 1 && optind + 2 != argc)
         || (action == do_run && optind + 3 > argc)
-        || (action == do_rm && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty()))
-        || (action == do_mv && (!linkarg.empty() || !filesarg.empty() || !inputarg.empty()))
+        || (action == do_rm && (!linkarg.empty() || !contents.empty() || !inputarg.empty()))
+        || (action == do_mv && (!linkarg.empty() || !contents.empty() || !inputarg.empty()))
         || !argv[optind][0]
         || (action == do_mv && !argv[optind+1][0]))
         usage();
@@ -2048,18 +2068,6 @@ int main(int argc, char** argv) {
     jailownerinfo jailuser;
     if ((action == do_add || action == do_run) && optind + 1 < argc)
         jailuser.init(argv[optind + 1]);
-
-    // open file list as current user
-    FILE* filesf = NULL;
-    if (filesarg == "-") {
-        filesf = stdin;
-        if (isatty(STDIN_FILENO))
-            die("stdin: Is a tty\n");
-    } else if (!filesarg.empty()) {
-        filesf = fopen(filesarg.c_str(), "r");
-        if (!filesf)
-            perror_die(filesarg);
-    }
 
     // open infile non-blocking as current user
     int inputfd = 0;
@@ -2175,11 +2183,10 @@ int main(int argc, char** argv) {
     // construct the jail
     dstroot = path_noendslash(jaildir.dir);
     assert(dstroot != "/");
-    if (filesf) {
+    if (!contents.empty()) {
         mode_t old_umask = umask(0);
-        if (construct_jail(jaildir.dev, filesf) != 0)
+        if (construct_jail(jaildir.dev, contents) != 0)
             exit(1);
-        fclose(filesf);
         umask(old_umask);
     }
 
