@@ -1584,6 +1584,13 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 int jailownerinfo::exec_go() {
 #if __linux__
     mount_delayable = false;
+
+    // ensure we truly have a private mount namespace: no shared mounts
+    if (verbose)
+        fprintf(verbosefile, "mount --make-rslave /\n");
+    if (mount("none", "/", NULL, MS_REC | MS_SLAVE, NULL) != 0)
+        perror_die("mount --make-rslave /");
+
     populate_mount_table();     // ensure we know how to mount /proc
     for (size_t i = 0; i != delayed_mounts.size(); i += 2)
         handle_mount(delayed_mounts[i], delayed_mounts[i+1], true);
