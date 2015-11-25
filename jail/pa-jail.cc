@@ -387,8 +387,11 @@ static const mountarg mountargs[] = {
 #endif
     { "noexec", MFLAG(NOEXEC), true },
     { "nosuid", MFLAG(NOSUID), true },
-#if __linux__ && defined(MS_RELATIME)
+#if __linux__
+    { "private", MS_PRIVATE, true },
     { "rec", MS_REC, true },
+#endif
+#if __linux__ && defined(MS_RELATIME)
     { "relatime", MS_RELATIME, true },
 #endif
     { "remount", MS_REMOUNT, true },
@@ -500,6 +503,7 @@ bool mountslot::mountable(std::string src, std::string dst) const {
     if ((src == "/proc" && type == "proc")
         || (src == "/dev/pts" && type == "devpts")
         || (src == "/tmp" && type == "tmpfs")
+        || (src == "/run" && type == "tmpfs")
         || (src == "/sys" && type == "sysfs")
         || (src == "/dev" && type == "udev")
         || wanted) {
@@ -1586,6 +1590,7 @@ int jailownerinfo::exec_go() {
     handle_mount("/proc", jaildir->dir + "proc", true);
     handle_mount("/dev/pts", jaildir->dir + "dev/pts", true);
     handle_mount("/tmp", jaildir->dir + "tmp", true);
+    handle_mount("/run", jaildir->dir + "run", true);
     std::string dev_ptmx = jaildir->dir + "dev/ptmx";
     (void) unlink(dev_ptmx.c_str());
     x_symlink("pts/ptmx", dev_ptmx.c_str());
