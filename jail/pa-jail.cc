@@ -25,7 +25,6 @@
 #include <getopt.h>
 #include <fnmatch.h>
 #include <string>
-#include <map>
 #include <unordered_map>
 #include <vector>
 #include <iostream>
@@ -73,7 +72,6 @@ static std::string linkdir;
 static std::string dstroot;
 static std::string pidfilename;
 static int pidfd = -1;
-static std::unordered_map<std::string, int> umount_table;
 static volatile sig_atomic_t got_sigterm = 0;
 static int sigpipe[2];
 
@@ -393,8 +391,12 @@ static const mountarg mountargs[] = {
     { "rec", MS_REC, true },
     { "relatime", MS_RELATIME, true },
 #endif
+    { "remount", MS_REMOUNT, true },
     { "ro", MFLAG(RDONLY), true },
     { "rw", 0, true },
+#if __linux__
+    { "slave", MS_SLAVE, true },
+#endif
 #if __linux__ && defined(MS_STRICTATIME)
     { "strictatime", MS_STRICTATIME, true },
 #endif
@@ -415,18 +417,18 @@ struct mountslot {
     std::string type;
     unsigned long opts;
     std::string data;
-    bool allowed;
-    mountslot() : opts(0), allowed(false) {}
-    mountslot(const char* fsname, const char* type, const char* mountopts,
-              const char* dir);
-    std::string debug_mountopts_args() const;
+    bool wanted;
+    mountslot() : opts(0), wanted(false) {}
+    mountslot(const char* fsname, const char* type, const char* mountopts);
+    std::string debug_mountopts_args(unsigned long opts) const;
     void add_mountopt(const char* mopt);
     const char* mount_data() const;
+    bool mountable(std::string src, std::string dst) const;
+    int x_mount(std::string dst, unsigned long opts);
 };
 
-mountslot::mountslot(const char* fsname_, const char* type_,
-                     const char* mopt, const char* dir)
-    : fsname(fsname_), type(type_), opts(0), allowed(false) {
+mountslot::mountslot(const char* fsname_, const char* type_, const char* mopt)
+    : fsname(fsname_), type(type_), opts(0), wanted(false) {
     while (mopt && *mopt) {
         const char* ok_first = mopt + strspn(mopt, ",");
         const char* ok_last = ok_first + strcspn(ok_first, ",=");
@@ -437,14 +439,9 @@ mountslot::mountslot(const char* fsname_, const char* type_,
             data += (data.empty() ? "" : ",") + std::string(ok_first, ov_last);
         mopt = ov_last;
     }
-
-    allowed = ((strcmp(dir, "/proc") == 0 && type == "proc")
-               || (strcmp(dir, "/sys") == 0 && type == "sysfs")
-               || (strcmp(dir, "/dev") == 0 && type == "udev")
-               || (strcmp(dir, "/dev/pts") == 0 && type == "devpts"));
 }
 
-std::string mountslot::debug_mountopts_args() const {
+std::string mountslot::debug_mountopts_args(unsigned long opts) const {
     std::string arg;
     if (!(opts & MFLAG(RDONLY)))
         arg = "rw";
@@ -496,10 +493,40 @@ const char* mountslot::mount_data() const {
     return data.empty() ? NULL : data.c_str();
 }
 
+static bool mount_delayable = false;
+static std::vector<std::string> delayed_mounts;
 
-typedef std::map<std::string, mountslot> mount_table_type;
+bool mountslot::mountable(std::string src, std::string dst) const {
+    if ((src == "/proc" && type == "proc")
+        || (src == "/dev/pts" && type == "devpts")
+        || (src == "/tmp" && type == "tmpfs")
+        || (src == "/sys" && type == "sysfs")
+        || (src == "/dev" && type == "udev")
+        || wanted) {
+        if (mount_delayable) {
+            delayed_mounts.push_back(src);
+            delayed_mounts.push_back(dst);
+            return false;
+        } else
+            return true;
+    } else
+        return false;
+}
+
+int mountslot::x_mount(std::string dst, unsigned long opts) {
+    if (verbose) {
+        std::string optstr = debug_mountopts_args(opts);
+        fprintf(verbosefile, "mount -i -n -t %s%s %s %s\n",
+                type.c_str(), optstr.c_str(), fsname.c_str(), dst.c_str());
+    }
+    if (dryrun)
+        return 0;
+    return mount(fsname.c_str(), dst.c_str(), type.c_str(), opts, mount_data());
+}
+
+
+typedef std::unordered_map<std::string, mountslot> mount_table_type;
 static mount_table_type mount_table;
-static std::vector<std::string> runmounts;
 
 static int populate_mount_table() {
     static bool mount_table_populated = false;
@@ -511,7 +538,7 @@ static int populate_mount_table() {
     if (!f)
         return perror_fail("open %s: %s\n", "/proc/mounts");
     while (struct mntent* me = getmntent(f)) {
-        mountslot ms(me->mnt_fsname, me->mnt_type, me->mnt_opts, me->mnt_dir);
+        mountslot ms(me->mnt_fsname, me->mnt_type, me->mnt_opts);
         mount_table[me->mnt_dir] = ms;
     }
     fclose(f);
@@ -520,7 +547,7 @@ static int populate_mount_table() {
     struct statfs* mntbuf;
     int nmntbuf = getmntinfo(&mntbuf, MNT_NOWAIT);
     for (struct statfs* me = mntbuf; me != mntbuf + nmntbuf; ++me) {
-        mountslot ms(me->f_mntfromname, me->f_fstypename, "", me->m_mntonname);
+        mountslot ms(me->f_mntfromname, me->f_fstypename, "");
         ms.opts = me->f_flags;
         mount_table[me->f_mntonname] = ms;
     }
@@ -542,7 +569,7 @@ int umount(const char* dir) {
 static int handle_mount(std::string src, std::string dst, bool in_child) {
     auto it = mount_table.find(src);
     if (it == mount_table.end()
-        || !it->second.allowed)
+        || !it->second.mountable(src, dst))
         return 0;
 
     auto dit = mount_table.find(dst);
@@ -555,6 +582,12 @@ static int handle_mount(std::string src, std::string dst, bool in_child) {
         // already mounted
         return 0;
 
+    auto xit = dst_table.find(dst);
+    if (xit != dst_table.end()
+        && xit->second > 1)
+        return 0;
+    dst_table[dst] = 2;
+
     if (in_child)
         v_ensuredir(dst, 0555, true);
 
@@ -564,29 +597,20 @@ static int handle_mount(std::string src, std::string dst, bool in_child) {
         msx.add_mountopt("newinstance");
         msx.add_mountopt("ptmxmode=0666");
     }
+    if ((msx.opts & MS_BIND) && in_child)
+        msx.add_mountopt("slave");
 #endif
-    if (verbose) {
-        std::string opts = msx.debug_mountopts_args();
-        fprintf(verbosefile, "mount -i -n -t %s%s %s %s\n",
-                msx.type.c_str(), opts.c_str(),
-                msx.fsname.c_str(), dst.c_str());
-    }
-    if (!dryrun) {
-        int r = mount(msx.fsname.c_str(), dst.c_str(), msx.type.c_str(),
-                      msx.opts, msx.mount_data());
-        // if in child, try one more time with remount
-        if (r != 0 && errno == EBUSY && in_child)
-            r = mount(msx.fsname.c_str(), dst.c_str(), msx.type.c_str(),
-                      msx.opts | MS_REMOUNT, msx.mount_data());
+    int r = msx.x_mount(dst, msx.opts);
+    // if in child, try one more time with remount
+    if (!dryrun && r != 0 && errno == EBUSY && in_child)
+        r = msx.x_mount(dst, msx.opts | MS_REMOUNT);
 #if __linux__
-        // if read-only bind mount, need to remount
-        if (r == 0 && (msx.opts & MS_BIND) && (msx.opts & MS_RDONLY))
-            r = mount(msx.fsname.c_str(), dst.c_str(), msx.type.c_str(),
-                      msx.opts | MS_REMOUNT | MS_SLAVE, msx.mount_data());
+    // if bind mount, need to remount as slave
+    if (r == 0 && (msx.opts & MS_BIND))
+        r = msx.x_mount(dst, msx.opts | MS_REMOUNT);
 #endif
-        if (r != 0)
-            return perror_fail("mount %s: %s\n", dst.c_str());
-    }
+    if (r != 0)
+        return perror_fail("mount %s: %s\n", dst.c_str());
     return 0;
 }
 
@@ -598,7 +622,7 @@ static int handle_umount(const mount_table_type::iterator& it) {
         exit(1);
     }
     if (dryrun)
-        umount_table[it->first.c_str()] = 1;
+        dst_table[it->first.c_str()] = 3;
     return 0;
 }
 
@@ -878,13 +902,12 @@ static int construct_jail(dev_t jaildev, std::string& str) {
         // act on flags
         if (flags & (FLAG_BIND | FLAG_BIND_RO)) {
             mountslot ms(src.c_str(), "none",
-                         flags & FLAG_BIND_RO ? "bind,rec,ro" : "bind,rec",
-                         dst.c_str());
-            ms.allowed = true;
+                         flags & FLAG_BIND_RO ? "bind,rec,ro" : "bind,rec");
+            ms.wanted = true;
             populate_mount_table();
-            dst = dstroot + "/" + dst;
-            mount_table[dst] = ms;
-            runmounts.push_back(dst);
+            mount_table[src] = ms;
+            v_ensuredir(dstroot + dst, 0555, true);
+            handle_mount(src, dstroot + dst, false);
         } else
             handle_copy(src, dst, flags, jaildev);
     }
@@ -1235,10 +1258,10 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
     size_t dirbuflen = dirbuf.length();
 
     typedef std::pair<uid_t, gid_t> ug_t;
-    std::map<std::string, ug_t>* home_map = nullptr;
+    std::unordered_map<std::string, ug_t>* home_map = nullptr;
     if (ishome) {
         setpwent();
-        home_map = new std::map<std::string, ug_t>;
+        home_map = new std::unordered_map<std::string, ug_t>;
         while (struct passwd* pw = getpwent()) {
             std::string name;
             if (pw->pw_dir && strncmp(pw->pw_dir, "/home/", 6) == 0
@@ -1301,16 +1324,14 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
 
 void jaildirinfo::remove() {
     remove_recursive(parentfd, component, path_endslash(dir));
-    if (verbose)
-        fprintf(verbosefile, "rmdir %s\n", dir.c_str());
-    if (!dryrun
-        && unlinkat(parentfd, component.c_str(), AT_REMOVEDIR) != 0
-        && !(errno == ENOENT && doforce))
-        perror_die("rmdir " + dir);
 }
 
 void jaildirinfo::remove_recursive(int parentdirfd, std::string component,
                                    std::string dirname) {
+    auto it = dst_table.find(dirname);
+    if (it != dst_table.end() && it->second == 3) // unmounted file system
+        return;
+
     int dirfd = openat(parentdirfd, component.c_str(), O_RDONLY);
     struct stat dirst;
     if (dirfd == -1 || fstat(dirfd, &dirst) != 0)
@@ -1319,27 +1340,30 @@ void jaildirinfo::remove_recursive(int parentdirfd, std::string component,
         close(dirfd);
         return;
     }
+
     DIR* dir = fdopendir(dirfd);
     if (!dir)
         perror_die(dirname);
-    while (struct dirent* de = readdir(dir)) {
+    while (struct dirent* de = readdir(dir))
         if (de->d_type == DT_DIR) {
             if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
                 continue;
             std::string next_component = de->d_name;
             std::string next_dirname = dirname + next_component;
-            if (umount_table.find(next_dirname) != umount_table.end())
-                continue;
-            remove_recursive(dirfd, next_component, next_dirname);
+            remove_recursive(dirfd, next_component, dirname + next_component);
+        } else {
+            if (verbose)
+                fprintf(verbosefile, "rm %s%s\n", dirname.c_str(), de->d_name);
+            if (!dryrun && unlinkat(dirfd, de->d_name, de->d_type == DT_DIR ? AT_REMOVEDIR : 0) != 0)
+                perror_die("rm " + dirname + de->d_name);
         }
-        const char* op = de->d_type == DT_DIR ? "rmdir " : "rm ";
-        if (verbose)
-            fprintf(verbosefile, "%s%s%s\n", op, dirname.c_str(), de->d_name);
-        if (!dryrun && unlinkat(dirfd, de->d_name, de->d_type == DT_DIR ? AT_REMOVEDIR : 0) != 0)
-            perror_die(std::string(op) + dirname + de->d_name);
-    }
     closedir(dir);
     close(dirfd);
+
+    if (verbose)
+        fprintf(verbosefile, "rmdir %s\n", dirname.c_str());
+    if (!dryrun && unlinkat(parentdirfd, component.c_str(), AT_REMOVEDIR) != 0)
+        perror_die("rmdir " + dirname);
 }
 
 
@@ -1519,6 +1543,8 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     char* new_stack = (char*) malloc(256 * 1024);
     if (!new_stack)
         die("Out of memory\n");
+    if (verbose)
+        fprintf(stderr, "-clone-\n");
     int child = clone(exec_clone_function, new_stack + 256 * 1024,
                       CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID, this);
     if (child == -1)
@@ -1553,12 +1579,13 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 
 int jailownerinfo::exec_go() {
 #if __linux__
+    mount_delayable = false;
     populate_mount_table();     // ensure we know how to mount /proc
-    for (auto it = runmounts.begin(); it != runmounts.end(); ++it)
-        handle_mount(*it, *it, true);
-    handle_mount("/proc", jaildir->dir + "/proc", true);
-    handle_mount("/dev/pts", jaildir->dir + "/dev/pts", true);
-    handle_mount("/tmp", jaildir->dir + "/tmp", true);
+    for (size_t i = 0; i != delayed_mounts.size(); i += 2)
+        handle_mount(delayed_mounts[i], delayed_mounts[i+1], true);
+    handle_mount("/proc", jaildir->dir + "proc", true);
+    handle_mount("/dev/pts", jaildir->dir + "dev/pts", true);
+    handle_mount("/tmp", jaildir->dir + "tmp", true);
     std::string dev_ptmx = jaildir->dir + "dev/ptmx";
     (void) unlink(dev_ptmx.c_str());
     x_symlink("pts/ptmx", dev_ptmx.c_str());
@@ -2205,6 +2232,7 @@ int main(int argc, char** argv) {
     }
 
     // construct the jail
+    mount_delayable = optind + 2 < argc;
     dstroot = path_noendslash(jaildir.dir);
     assert(dstroot != "/");
     if (!contents.empty()) {
