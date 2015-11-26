@@ -1888,6 +1888,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     make_nonblocking(ptymaster);
     fflush(stdout);
 
+    bool sent_eof = false;
     while (1) {
         block(ptymaster);
         to_slave.transfer_in(inputfd);
@@ -1896,6 +1897,12 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
                       "\x1b\x03", 2) != NULL)
             exec_done(child, 128 + SIGTERM);
         to_slave.transfer_out(ptymaster);
+        if (to_slave.input_closed && !sent_eof) {
+            char buf = VEOF;
+            write(ptymaster, &buf, 1);
+            sent_eof = true;
+        }
+
         from_slave.transfer_in(ptymaster);
         from_slave.transfer_out(STDOUT_FILENO);
 
