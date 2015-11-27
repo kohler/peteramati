@@ -607,15 +607,17 @@ static int handle_umount(const mount_table_type::iterator& it) {
 static int handle_copy(std::string src, std::string subdst,
                        int flags, dev_t jaildev);
 
-static void handle_symlink_dst(std::string src, std::string dst,
+static void handle_symlink_dst(std::string dst, std::string src,
                                std::string lnk, dev_t jaildev)
 {
-    std::string dst_lnkin = dst;
+    std::string root = dstroot;
+    if (!linkdir.empty() && dst.substr(0, dstroot.length()) != dstroot)
+        root = linkdir;
 
     // expand `lnk` into `dst`
     if (lnk[0] == '/') {
         src = lnk;
-        dst = dstroot + lnk;
+        dst = root + lnk;
     } else {
         while (1) {
             if (src.length() == 1) {
@@ -625,7 +627,7 @@ static void handle_symlink_dst(std::string src, std::string dst,
             size_t srcslash = src.rfind('/', src.length() - 2),
                 dstslash = dst.rfind('/', dst.length() - 2);
             if (srcslash == std::string::npos || dstslash == std::string::npos
-                || dstslash < dstroot.length())
+                || dstslash < root.length())
                 goto give_up;
             src = src.substr(0, srcslash + 1);
             dst = dst.substr(0, dstslash + 1);
@@ -639,8 +641,8 @@ static void handle_symlink_dst(std::string src, std::string dst,
         dst += lnk;
     }
 
-    if (dst.substr(dstroot.length(), 6) != "/proc/")
-        handle_copy(src, dst.substr(dstroot.length()), 0, jaildev);
+    if (dst.substr(root.length(), 6) != "/proc/")
+        handle_copy(src, dst.substr(root.length()), 0, jaildev);
 }
 
 static int x_cp_p(const std::string& src, const std::string& dst) {
@@ -730,8 +732,7 @@ static int do_copy(const std::string& dst, const std::string& src,
         lnkbuf[r] = 0;
         if (x_symlink(lnkbuf, dst.c_str()))
             return 1;
-        if (!(flags & DO_COPY_SKELETON))
-            handle_symlink_dst(src, dst, std::string(lnkbuf), jaildev);
+        handle_symlink_dst(dst, src, std::string(lnkbuf), jaildev);
     } else
         // cannot deal
         return perror_fail("%s: Odd file type\n", src.c_str());
