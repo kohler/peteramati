@@ -41,9 +41,8 @@
 #define ROOT 0
 
 #define FLAG_CP 1        // copy even if source is symlink
-#define FLAG_NOLINK 2    // never link from source
-#define FLAG_BIND 4
-#define FLAG_BIND_RO 8
+#define FLAG_BIND 2
+#define FLAG_BIND_RO 4
 
 #ifndef O_PATH
 #define O_PATH 0
@@ -469,18 +468,20 @@ const char* mountslot::mount_data() const {
     return data.empty() ? NULL : data.c_str();
 }
 
-static bool mount_delayable = false;
+static int mount_status = 0; // 0: add, 1: run pre-fork, 2: in child
 static std::vector<std::string> delayed_mounts;
 
 bool mountslot::mountable(std::string src, std::string dst) const {
     if ((src == "/proc" && type == "proc")
-        || (src == "/dev/pts" && type == "devpts")
-        || (src == "/tmp" && type == "tmpfs")
-        || (src == "/run" && type == "tmpfs")
-        || (src == "/sys" && type == "sysfs")
-        || (src == "/dev" && type == "udev")
-        || wanted) {
-        if (mount_delayable) {
+        || (src == "/dev/pts" && type == "devpts"))
+        return mount_status == 2;
+    else if ((src == "/tmp" && type == "tmpfs")
+             || (src == "/run" && type == "tmpfs"))
+        return mount_status != 1;
+    else if ((src == "/sys" && type == "sysfs")
+             || (src == "/dev" && type == "udev")
+             || wanted) {
+        if (mount_status == 1) {
             delayed_mounts.push_back(src);
             delayed_mounts.push_back(dst);
             return false;
@@ -1568,7 +1569,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 
 int jailownerinfo::exec_go() {
 #if __linux__
-    mount_delayable = false;
+    mount_status = 2;
 
     // ensure we truly have a private mount namespace: no shared mounts
     // (some Linux distros, such as Ubuntu 15.10, have / a shared mount
@@ -2229,7 +2230,7 @@ int main(int argc, char** argv) {
     }
 
     // construct the jail
-    mount_delayable = optind + 2 < argc;
+    mount_status = optind + 2 < argc;
     dstroot = path_noendslash(jaildir.dir);
     assert(dstroot != "/");
     if (!contents.empty()) {
