@@ -1387,10 +1387,11 @@ class jailownerinfo {
         bool input_closed;
         bool input_isfifo;
         bool output_closed;
+        bool transfer_eof;
         int rerrno;
         buffer()
             : head(0), tail(0), input_closed(false), input_isfifo(false),
-              output_closed(false), rerrno(0) {
+              output_closed(false), transfer_eof(false), rerrno(0) {
         }
         void transfer_in(int from);
         void transfer_out(int to);
@@ -1762,6 +1763,12 @@ void jailownerinfo::buffer::transfer_in(int from) {
             rerrno = errno;
         }
     }
+
+    if (input_closed && transfer_eof && tail != sizeof(buf)) {
+        buf[tail] = VEOF;
+        ++tail;
+        transfer_eof = false;
+    }
 }
 
 void jailownerinfo::buffer::transfer_out(int to) {
@@ -1875,6 +1882,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     }
     make_nonblocking(ptymaster);
     fflush(stdout);
+    to_slave.transfer_eof = true;
 
     while (1) {
         block(ptymaster);
