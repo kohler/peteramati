@@ -678,18 +678,18 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
 
 static int do_copy(const std::string& dst, const std::string& src,
                    const struct stat& ss, int flags, dev_t jaildev) {
-    struct stat dstst;
-    int r = lstat(dst.c_str(), &dstst);
+    struct stat ds;
+    int r = lstat(dst.c_str(), &ds);
     if (r == 0
-        && ss.st_mode == dstst.st_mode
-        && ss.st_uid == dstst.st_uid
-        && ss.st_gid == dstst.st_gid
+        && ss.st_mode == ds.st_mode
+        && ss.st_uid == ds.st_uid
+        && ss.st_gid == ds.st_gid
         && ((!S_ISREG(ss.st_mode) && !S_ISLNK(ss.st_mode))
-            || ss.st_size == dstst.st_size)
+            || ss.st_size == ds.st_size)
         && ((!S_ISBLK(ss.st_mode) && !S_ISCHR(ss.st_mode))
-            || ss.st_rdev == dstst.st_rdev)
+            || ss.st_rdev == ds.st_rdev)
         && (!S_ISREG(ss.st_mode)
-            || ss.st_mtime == dstst.st_mtime)) {
+            || ss.st_mtime == ds.st_mtime)) {
         if (S_ISREG(ss.st_mode)) {
             auto di = std::make_pair(ss.st_dev, ss.st_ino);
             devino_table.insert(std::make_pair(di, dst));
@@ -709,8 +709,12 @@ static int do_copy(const std::string& dst, const std::string& src,
         return x_cp_p(src, dst);
     } else if (S_ISDIR(ss.st_mode)) {
         mode_t perm = ss.st_mode & (S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
-        if (v_ensuredir(dst, perm, true) < 0)
-            return perror_fail("mkdir %s: %s\n", dst.c_str());
+        if (r == 0 && !S_ISDIR(ds.st_mode)) {
+            errno = ENOTDIR;
+            return perror_fail("%s: %s\n", dst.c_str());
+        }
+        if (v_mkdir(dst.c_str(), perm) != 0)
+            return 1;
         return x_lchown(dst.c_str(), ss.st_uid, ss.st_gid);
     } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
         mode_t mode = ss.st_mode & (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
@@ -760,17 +764,14 @@ static int handle_copy(std::string src, std::string subdst,
 
     struct stat ss;
 
-    if (last_parentdir.empty()
-        || dst.length() <= last_parentdir.length()
-        || memcmp(dst.data(), last_parentdir.data(), last_parentdir.length()) != 0) {
-        last_parentdir = path_parentdir(dst); // ends in slash
-        if (dirtable.find(last_parentdir) == dirtable.end()) {
-            int r = lstat(last_parentdir.c_str(), &ss);
-            if (r == -1 && errno == ENOENT
-                && handle_copy(path_parentdir(src),
-                               last_parentdir.substr(dstroot.length()),
-                               0, jaildev) == 0)
-                r = 0;
+    std::string dst_parentdir = path_noendslash(path_parentdir(dst));
+    if (dst_parentdir != last_parentdir
+        && dst_parentdir.length() > dstroot.length()) {
+        last_parentdir = dst_parentdir;
+        if (dst_table.find(last_parentdir) == dst_table.end()) {
+            int r = handle_copy(path_noendslash(path_parentdir(src)),
+                                last_parentdir.substr(dstroot.length()),
+                                0, jaildev);
             if (r != 0)
                 return r;
         }
