@@ -319,6 +319,8 @@ __DATA__
 /bin/true exec
 /dev/fd optional
 /dev/null
+/dev/pts
+/dev/ptmx
 /dev/urandom
 /etc/group
 /etc/ld.so.conf
@@ -326,6 +328,7 @@ __DATA__
 /etc/nsswitch.conf
 /etc/passwd
 /etc/profile
+/proc
 /usr/bin/head exec
 /usr/bin/id exec
 /usr/bin/ldd exec
