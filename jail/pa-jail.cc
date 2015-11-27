@@ -1385,13 +1385,12 @@ class jailownerinfo {
         size_t head;
         size_t tail;
         bool input_closed;
-        bool input_isfifo;
         bool output_closed;
         bool transfer_eof;
         int rerrno;
         buffer()
-            : head(0), tail(0), input_closed(false), input_isfifo(false),
-              output_closed(false), transfer_eof(false), rerrno(0) {
+            : head(0), tail(0), input_closed(false), output_closed(false),
+              transfer_eof(false), rerrno(0) {
         }
         void transfer_in(int from);
         void transfer_out(int to);
@@ -1751,16 +1750,9 @@ void jailownerinfo::buffer::transfer_in(int from) {
         ssize_t nr = read(from, &buf[tail], sizeof(buf) - tail);
         if (nr != 0 && nr != -1)
             tail += nr;
-        else if (nr == 0 && !input_isfifo) {
-            // don't want to give up on input if it's a named fifo
-            // (we assume pipes have major(st.st_dev) == 0)
-            struct stat st;
-            if (fstat(from, &st) == 0 && S_ISFIFO(st.st_mode)
-                && major(st.st_dev) != 0)
-                input_isfifo = true;
-            else
-                input_closed = true;
-        } else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
+        else if (nr == 0)
+            input_closed = true;
+        else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
             input_closed = true;
             rerrno = errno;
         }
@@ -2123,9 +2115,14 @@ int main(int argc, char** argv) {
         jailuser.init(argv[optind + 1]);
 
     // open infile non-blocking as current user
+    // if it is a named FIFO, open it read-write so we never get EOF
     int inputfd = 0;
     if (!inputarg.empty() && !dryrun) {
-        inputfd = open(inputarg.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+        struct stat st;
+        int mode = O_RDONLY;
+        if (stat(inputarg.c_str(), &st) == 0 && S_ISFIFO(st.st_mode))
+            mode = O_RDWR;
+        inputfd = open(inputarg.c_str(), mode | O_CLOEXEC | O_NONBLOCK);
         if (inputfd == -1)
             perror_die(inputarg);
     }
