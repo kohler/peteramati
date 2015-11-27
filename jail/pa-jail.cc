@@ -993,6 +993,7 @@ static bool check_dirmatch_prefix(const std::string& pattern,
 bool pajailconf::allows_type(const char* type, const std::string& dir) const {
     size_t pos = 0, typelen = strlen(type);
     int allowed_globally = -1, allowed_locally = -1;
+    allowance_dir_ = std::string();
 
     while (pos < len) {
         auto action = take_word(pos);
