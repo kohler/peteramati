@@ -1752,9 +1752,11 @@ void jailownerinfo::buffer::transfer_in(int from) {
         if (nr != 0 && nr != -1)
             tail += nr;
         else if (nr == 0 && !input_isfifo) {
-            // don't want to give up on input if it's a fifo
+            // don't want to give up on input if it's a named fifo
+            // (we assume pipes have major(st.st_dev) == 0)
             struct stat st;
-            if (fstat(from, &st) == 0 && S_ISFIFO(st.st_mode))
+            if (fstat(from, &st) == 0 && S_ISFIFO(st.st_mode)
+                && major(st.st_dev) != 0)
                 input_isfifo = true;
             else
                 input_closed = true;
