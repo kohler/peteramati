@@ -1586,6 +1586,9 @@ int jailownerinfo::exec_go() {
     mount_delayable = false;
 
     // ensure we truly have a private mount namespace: no shared mounts
+    // (some Linux distros, such as Ubuntu 15.10, have / a shared mount
+    // by default, which means mount changes propagate despite CLONE_NEWFS.
+    // This undoes the shared mount)
     if (verbose)
         fprintf(verbosefile, "mount --make-rslave /\n");
     if (mount("none", "/", NULL, MS_REC | MS_SLAVE, NULL) != 0)
