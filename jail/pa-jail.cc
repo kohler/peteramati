@@ -810,7 +810,7 @@ static int construct_jail(dev_t jaildev, std::string& str) {
 
     // Read a line at a time
     std::string cursrcdir("/"), curdstsubdir("/");
-    int base_flags = linkdir.empty() ? FLAG_NOLINK : 0;
+    int base_flags = 0;
 
     const char* pos = str.data(), *endpos = pos + str.length();
     while (pos < endpos) {
