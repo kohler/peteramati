@@ -1864,11 +1864,13 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &tty);
     }
 
-    // blocking reads please (well, block for up to 0.5sec)
-    // the 0.5sec wait means we avoid long race conditions
     if (tcgetattr(ptymaster, &tty) >= 0) {
+        // blocking reads please (well, block for up to 0.5sec)
+        // the 0.5sec wait means we avoid long race conditions
         tty.c_cc[VMIN] = 1;
         tty.c_cc[VTIME] = 5;
+        // disable echo so we don't read our own input
+        tty.c_lflag &= ~ECHO;
         tcsetattr(ptymaster, TCSANOW, &tty);
     }
     make_nonblocking(ptymaster);
