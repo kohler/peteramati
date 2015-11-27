@@ -1801,13 +1801,12 @@ void jailownerinfo::block(int ptymaster) {
     } else
         FD_CLR(STDOUT_FILENO, &writeset);
 
+    struct timeval delay = {3600, 0};
     if (timerisset(&timeout)) {
-        struct timeval delay;
         gettimeofday(&delay, 0);
         timersub(&timeout, &delay, &delay);
-        select(maxfd + 1, &readset, &writeset, NULL, &delay);
-    } else
-        select(maxfd + 1, &readset, &writeset, NULL, NULL);
+    }
+    select(maxfd + 1, &readset, &writeset, NULL, &delay);
 
     if (FD_ISSET(sigpipe[0], &readset)) {
         char buf[128];
