@@ -123,11 +123,12 @@ static std::string path_noendslash(std::string path) {
     return path;
 }
 
+// returns a non-empty path that ends in slash
 static std::string path_parentdir(const std::string& path) {
     size_t npos = path.length();
-    while (npos > 0 && path[npos - 1] == '/')
+    while (npos > 1 && path[npos - 1] == '/')
         --npos;
-    while (npos > 0 && path[npos - 1] != '/')
+    while (npos > 1 && path[npos - 1] != '/')
         --npos;
     return path.substr(0, npos);
 }
@@ -631,7 +632,7 @@ static int handle_umount(const mount_table_type::iterator& it) {
 }
 
 
-static int handle_copy(const std::string& src, std::string subdst,
+static int handle_copy(std::string src, std::string subdst,
                        int flags, dev_t jaildev);
 
 static void handle_symlink_dst(std::string src, std::string dst,
@@ -724,10 +725,6 @@ static int do_copy(const std::string& dst, const std::string& src,
         return 0;
     }
 
-    if ((flags & DO_COPY_SKELETON)
-        && v_ensure_linkdir(path_parentdir(dst), true) < 0)
-        return perror_fail("mkdir -p %s: %s\n", path_parentdir(dst).c_str());
-
     // check for hard link to already-created file
     if (S_ISREG(ss.st_mode)) {
         if (flags & DO_COPY_LINK) {
@@ -768,14 +765,21 @@ static int do_copy(const std::string& dst, const std::string& src,
     return 0;
 }
 
-static int handle_copy(const std::string& src, std::string subdst,
+static int handle_copy(std::string src, std::string subdst,
                        int flags, dev_t jaildev) {
+    static std::string last_parentdir;
+
     assert(subdst[0] == '/');
     assert(subdst.length() == 1 || subdst[1] != '/');
     assert(dstroot.back() != '/');
-    if (subdst.substr(0, dstroot.length()) == dstroot)
-        fprintf(stderr, "XXX %s %s\n", subdst.c_str(), dstroot.c_str());
     assert(subdst.substr(0, dstroot.length()) != dstroot);
+
+    // do not end in slash. lstat() on a symlink path actually follows the
+    // symlink if the path ends in slash
+    while (src.length() > 1 && src.back() == '/')
+        src = src.substr(0, src.length() - 1);
+    while (subdst.length() > 1 && subdst.back() == '/')
+        subdst = subdst.substr(0, subdst.length() - 1);
 
     std::string dst = dstroot + subdst;
     if (dst_table.find(dst) != dst_table.end())
@@ -784,13 +788,15 @@ static int handle_copy(const std::string& src, std::string subdst,
 
     struct stat ss;
 
-    if (dst.back() != '/') {
-        std::string parent_dst = path_parentdir(dst);
-        if (dirtable.find(parent_dst) == dirtable.end()) {
-            int r = lstat(parent_dst.c_str(), &ss);
+    if (last_parentdir.empty()
+        || dst.length() <= last_parentdir.length()
+        || memcmp(dst.data(), last_parentdir.data(), last_parentdir.length()) != 0) {
+        last_parentdir = path_parentdir(dst); // ends in slash
+        if (dirtable.find(last_parentdir) == dirtable.end()) {
+            int r = lstat(last_parentdir.c_str(), &ss);
             if (r == -1 && errno == ENOENT
                 && handle_copy(path_parentdir(src),
-                               parent_dst.substr(dstroot.length()),
+                               last_parentdir.substr(dstroot.length()),
                                0, jaildev) == 0)
                 r = 0;
             if (r != 0)
