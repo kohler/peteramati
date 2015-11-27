@@ -719,6 +719,10 @@ static int do_copy(const std::string& dst, const std::string& src,
             return 1;
         return x_lchown(dst.c_str(), ss.st_uid, ss.st_gid);
     } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
+        // XXX special handling for /dev/ptmx; there is probably a
+        // cleaner way
+        if (src.length() == 9 && src == "/dev/ptmx")
+            return x_symlink("pts/ptmx", dst.c_str());
         mode_t mode = ss.st_mode & (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
         if (x_mknod(dst.c_str(), mode, ss.st_rdev))
             return 1;
@@ -1582,9 +1586,6 @@ int jailownerinfo::exec_go() {
     handle_mount("/dev/pts", jaildir->dir + "dev/pts", true);
     handle_mount("/tmp", jaildir->dir + "tmp", true);
     handle_mount("/run", jaildir->dir + "run", true);
-    std::string dev_ptmx = jaildir->dir + "dev/ptmx";
-    (void) unlink(dev_ptmx.c_str());
-    x_symlink("pts/ptmx", dev_ptmx.c_str());
 #endif
 
     // chroot, remount /proc
