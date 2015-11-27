@@ -251,34 +251,6 @@ static int v_ensuredir(std::string pathname, mode_t mode, bool nolink) {
     return r;
 }
 
-static int v_ensure_linkdir(std::string pathname, bool nolink) {
-    pathname = path_noendslash(pathname);
-    auto it = dirtable.find(pathname);
-    if (it != dirtable.end())
-        return it->second;
-    struct stat st;
-    int r = (nolink ? lstat : stat)(pathname.c_str(), &st);
-    if (r == 0 && !S_ISDIR(st.st_mode)) {
-        errno = ENOTDIR;
-        r = -1;
-    }
-    if (r == -1 && errno == ENOENT) {
-        std::string parent_pathname = path_parentdir(pathname);
-        size_t linkdir_len = linkdir.length();
-        if (linkdir[linkdir_len - 1] == '/')
-            --linkdir_len;
-        int baser = stat(pathname.substr(linkdir_len).c_str(), &st);
-        mode_t mode = baser < 0 ? 0700 : st.st_mode;
-        if ((parent_pathname.length() == pathname.length()
-             || v_ensure_linkdir(parent_pathname, false) >= 0)
-            && v_mkdir(pathname.c_str(), mode) == 0
-            && (baser < 0 || x_lchown(pathname.c_str(), st.st_uid, st.st_gid) == 0))
-            r = 1;
-    }
-    dirtable.insert(std::make_pair(pathname, r == 1 ? 0 : r));
-    return r;
-}
-
 static int x_link(const char* oldpath, const char* newpath) {
     if (verbose)
         fprintf(verbosefile, "rm -f %s\nln %s %s\n", newpath, oldpath, newpath);
