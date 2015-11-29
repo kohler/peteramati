@@ -1,4 +1,4 @@
-all: pa-jail pa-timeout pa-writefifo stderrtostdout pa-jail-owner
+all: pa-jail pa-timeout pa-writefifo pa-jail-owner
 
 pa-jail: pa-jail.cc
 	$(CXX) -std=gnu++0x -W -Wall -g -O2 -o $@ $@.cc
@@ -20,11 +20,8 @@ pa-timeout: pa-timeout.c
 pa-writefifo: pa-writefifo.c
 	$(CC) -std=gnu11 -W -Wall -g -O2 -o $@ $^
 
-stderrtostdout: stderrtostdout.c
-	$(CC) -W -Wall -g -O2 -o $@ $^
-
 clean:
-	rm -f pa-jail pa-timeout pa-writefifo stderrtostdout
+	rm -f pa-jail pa-timeout pa-writefifo
 
 always:
 	@:

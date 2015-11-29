@@ -34,9 +34,7 @@ sub run_trace (@) {
         my(@args);
         if ($DTRUSS) {
             my($dir) = dirname($0);
-            die "missing $dir/stderrtostdout" if !-x "$dir/stderrtostdout";
-            @args = ("/usr/bin/dtruss", "-f", "-l",
-                     "$dir/stderrtostdout");
+            @args = ("/usr/bin/dtruss", "-f", "-l");
         } else {
             @args = ("/usr/bin/strace", "-e", "trace=file,process",
                      "-q", "-f", "-o", "/dev/fd/" . fileno(OUT));
