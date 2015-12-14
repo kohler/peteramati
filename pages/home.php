@@ -432,6 +432,7 @@ if ($Me->privChair) {
     <!-- <li><a href='", hoturl("settings"), "'>Settings</a></li>
     <li><a href='", hoturl("users", "t=all"), "'>Users</a></li> -->
     <li><a href='", hoturl("mail"), "'>Send mail</a></li>
+    <li><a href='", hoturl_post("index", "report=1"), "'>Grade report</a></li>
     <!-- <li><a href='", hoturl("log"), "'>Action log</a></li> -->
   </ul>
 </div>\n";
