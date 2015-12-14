@@ -87,7 +87,7 @@ if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
 
 
 // download
-function collect_pset_info(&$students, $pset, $where, $entries = false) {
+function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
     global $Conf, $Me;
     $result = $Conf->qe("select c.contactId, c.firstName, c.lastName, c.email,
 	c.huid, c.anon_username, c.seascode_username, c.extension,
@@ -101,15 +101,16 @@ function collect_pset_info(&$students, $pset, $where, $entries = false) {
 	and (rg.repoid is not null or not c.dropped)
 	group by c.contactId");
     while (($s = edb_orow($result))) {
+        $s->is_anonymous = $pset->anonymous && !$nonanonymous;
         Contact::set_sorter($s, @$_REQUEST["sort"]);
-        $username = $pset->anonymous ? $s->anon_username : $s->seascode_username;
+        $username = $s->is_anonymous ? $s->anon_username : $s->seascode_username;
         $ss = @$students[$username];
-        if (!$ss && $pset->anonymous)
+        if (!$ss && $s->is_anonymous)
             $students[$username] = $ss = (object)
                 array("username" => $username,
                       "extension" => ($s->extension ? "Y" : "N"),
                       "sorter" => $username);
-        else
+        else if (!$ss)
             $students[$username] = $ss = (object)
                 array("name" => trim("$s->lastName, $s->firstName"),
                       "email" => $s->email,
@@ -122,37 +123,38 @@ function collect_pset_info(&$students, $pset, $where, $entries = false) {
             $gi = Contact::contact_grade_for($s, $pset);
             $gi = $gi ? $gi->notes : null;
         } else if (@$s->gradehash)
-            $gi = $Me->commit_info($s->gradehash, $pset);
+            $gi = Contact::commit_info($s->gradehash, $pset);
         else
             continue;
 
         $gd = ContactView::pset_grade($gi, $pset);
         if ($gd) {
             $k = $pset->psetkey;
-            $ss->$k = $gd->total;
+            $ss->{$k} = $gd->total;
             $k .= "_noextra";
-            $ss->$k = $gd->total_noextra;
+            $ss->{$k} = $gd->total_noextra;
             if (($k = $pset->group)) {
-                @($ss->$k += $gd->total);
+                @($ss->{$k} += $gd->total);
                 $k .= "_noextra";
-                @($ss->$k += $gd->total_noextra);
+                @($ss->{$k} += $gd->total_noextra);
             }
             if ($entries)
                 foreach ($pset->grades as $ge) {
                     $k = $ge->name;
-                    if (@$gd->$k !== null)
-                        $ss->$k = $gd->$k;
+                    if (@$gd->{$k} !== null)
+                        $ss->{$k} = $gd->{$k};
                 }
         }
     }
+    Dbl::free($result);
 }
 
 function set_ranks(&$students, &$selection, $key) {
     $selection[] = $key;
     $selection[] = $key . "_rank";
     uasort($students, function ($a, $b) use ($key) {
-            $av = @$a->$key;
-            $bv = @$b->$key;
+            $av = @$a->{$key};
+            $bv = @$b->{$key};
             if (!$av)
                 return $bv ? 1 : -1;
             else if (!$bv)
@@ -164,11 +166,11 @@ function set_ranks(&$students, &$selection, $key) {
     $r = $i = 1;
     $lastval = null;
     foreach ($students as $s) {
-        if (@$s->$key != $lastval) {
-            $lastval = @$s->$key;
+        if (@$s->{$key} != $lastval) {
+            $lastval = @$s->{$key};
             $r = $i;
         }
-        $s->$rank = $r;
+        $s->{$rank} = $r;
         ++$i;
     }
 }
@@ -176,11 +178,14 @@ function set_ranks(&$students, &$selection, $key) {
 function download_psets_report($request) {
     $where = array();
     $report = $request["report"];
+    $nonanonymous = false;
     foreach (explode(" ", strtolower($report)) as $rep)
         if ($rep === "college")
             $where[] = "not c.extension";
         else if ($rep === "extension")
             $where[] = "c.extension";
+        else if ($rep === "nonanonymous")
+            $nonanonymous = true;
     if (count($where))
         $where = array("(" . join(" or ", $where) . ")");
     $where[] = "(c.roles&" . Contact::ROLE_PCLIKE . ")=0";
@@ -200,7 +205,7 @@ function download_psets_report($request) {
     $max = $max_noextra = 0;
     foreach (Pset::$all as $pset)
         if (!$pset->disabled && (!$sel_pset || $sel_pset === $pset)) {
-            collect_pset_info($students, $pset, $where, !!$sel_pset);
+            collect_pset_info($students, $pset, $where, !!$sel_pset, $nonanonymous);
             if (($g = $pset->group)) {
                 if (!isset($maxbyg[$g]))
                     $maxbyg[$g] = $maxbyg["${g}_noextra"] = 0;
@@ -432,7 +437,7 @@ if ($Me->privChair) {
     <!-- <li><a href='", hoturl("settings"), "'>Settings</a></li>
     <li><a href='", hoturl("users", "t=all"), "'>Users</a></li> -->
     <li><a href='", hoturl("mail"), "'>Send mail</a></li>
-    <li><a href='", hoturl_post("index", "report=1"), "'>Grade report</a></li>
+    <li><a href='", hoturl_post("index", "report=nonanonymous"), "'>Overall grade report</a></li>
     <!-- <li><a href='", hoturl("log"), "'>Action log</a></li> -->
   </ul>
 </div>\n";

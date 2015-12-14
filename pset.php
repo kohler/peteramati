@@ -544,7 +544,7 @@ class LinenotesOrder {
     private $lnseq = array();
     private $lnorder = null;
     private $totalorder = null;
-    function __construct($linenotes, $diff, $seegradenotes) {
+    function __construct($linenotes, $seegradenotes) {
         if ($linenotes)
             foreach ($linenotes as $file => $notelist) {
                 if (!isset($this->fileorder[$file]))
