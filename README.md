@@ -1,11 +1,15 @@
 Peteramati
 ==========
 
-Peteramati is a Web system for collecting, evaluating, and grading
-student programming assignments. It collects student assignments using
-Git. It uses Linux containers to run student assignments; assignment
-code is segregated from the main machine. Students can run test code
-themselves.
+Peteramati is a Web system for collecting, evaluating, and grading student
+programming assignments. It collects student assignments using Git. Student
+assignment code runs in Linux containers, segregated from the main machine.
+Students can run test code themselves.
+
+Peteramati is named after Peter Amati, one of my most important teachers. Mr.
+Amati taught AP biology at Holliston High School, Holliston, Massachusetts. In
+the classroom, he was exacting, passionate, warm, inspirational, and fun as
+hell. -Eddie Kohler
 
 Configuration
 -------------
