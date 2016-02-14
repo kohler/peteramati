@@ -1485,6 +1485,10 @@ class Contact {
         return $list;
     }
 
+    static function repo_has_tag($repo, $tag) {
+        return self::repo_gitrun($repo, "git show-ref --verify -- refs/tags/REPO/$tag") !== null;
+    }
+
     static private function _file_glob_to_regex($x, $prefix) {
         $x = str_replace(array('\*', '\?', '\[', '\]', '\-', '_'),
                          array('[^/]*', '[^/]', '[', ']', '-', '\_'),
@@ -1623,7 +1627,9 @@ class Contact {
 
         if (@$options["basehash"])
             $base = $options["basehash"];
-        else {
+        elseif ($pset->start_tag) {
+            $base = "REPO/$pset->start_tag";
+        } else {
             $hrepo = self::handout_repo($pset, $repo);
             $base = "repo{$hrepo->repoid}/master";
             if ($pset && isset($pset->gradebranch))

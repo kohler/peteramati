@@ -73,6 +73,10 @@ class PsetView {
             return false;
     }
 
+    public function has_start_tag() {
+        return !$this->pset->start_tag || $this->user->repo_has_tag($this->repo, $this->pset->start_tag);
+    }
+
     public function can_have_grades() {
         return $this->pset->gitless_grades || $this->commit();
     }

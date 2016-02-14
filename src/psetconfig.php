@@ -41,6 +41,7 @@ class Pset {
     public $directory_slash;
     public $directory_noslash;
     public $test_file;
+    public $start_tag;
 
     public $deadline;
     public $deadline_college;
@@ -172,6 +173,7 @@ class Pset {
             $this->grade_cdf_visible = false;
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
+	$this->start_tag = @$p->start_tag;
 
         // runners
         if (is_array(@$p->runners) || is_object(@$p->runners)) {

@@ -169,6 +169,12 @@ others are shown to users in different contexts.
     the specified `directory`, if any). Used to detect when a student ignores
     the subdirectory structure.
 
+* `start_tag`: string
+
+    The name of a tag that should be used as the base for diffs instead of the
+    handout repository. Useful for assignments that build on previous
+    submissions.
+
 * `repo_guess_patterns`: array of strings
 
     These patterns are used to try to guess a student’s repository URL from
