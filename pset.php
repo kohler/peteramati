@@ -649,6 +649,8 @@ function echo_commit($Info) {
         $x = utf8_substr($k->subject, 0, 72);
         if (strlen($x) != strlen($k->subject))
             $x .= "...";
+        if ($k->tags)
+            $x .= " (tags: " . htmlspecialchars(implode(", ", $k->tags)) . ")";
         $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
     }
     $result = $Conf->qe("select hash from CommitNotes where (haslinenotes&" . ($Me == $User && !$Info->can_see_grades ? HASNOTES_COMMENT : HASNOTES_ANY) . ")!=0 and pset=$Pset->psetid and hash in ('" . join("','", array_keys($sel)) . "')");

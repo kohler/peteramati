@@ -1466,14 +1466,21 @@ class Contact {
         $heads = explode(" ", $repo->heads);
         $heads[0] = "REPO/master";
         foreach ($heads as $h) {
-            $result = self::repo_gitrun($repo, "git log$limit --simplify-merges --format='%ct %H %s' $h$dir");
+            $result = self::repo_gitrun($repo, "git log$limit --simplify-merges --format='%ct %H %d %s' $h$dir");
             foreach (explode("\n", $result) as $line)
-                if (preg_match(',\A(\S+)\s+(\S+)\s+(.*)\z,', $line, $m)
-                    && !isset($list[$m[2]]))
+                if (preg_match(',\A(\S+)\s+(\S+)\s+(?:\(([^)]+)\))?\s+(.*)\z,', $line, $m)
+                    && !isset($list[$m[2]])) {
+                    $tags = explode(",", $m[3]);
+                    $tags = array_filter(array_map(function ($tag) use ($repo) {
+                        if (preg_match(',tag: repo'.$repo->repoid.'/(.*),', $tag, $mt))
+                            return $mt[1];
+                    }, $tags));
                     $list[$m[2]] = (object) array("commitat" => (int) $m[1],
                                                   "hash" => $m[2],
-                                                  "subject" => $m[3],
+                                                  "tags" => $tags,
+                                                  "subject" => $m[4],
                                                   "fromhead" => $h);
+            }
         }
         return $list;
     }

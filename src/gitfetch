@@ -90,7 +90,7 @@ if test -f .git/FETCH_HEAD -a ! -w .git/FETCH_HEAD; then
     rm -f .git/FETCH_HEAD
 fi
 
-git fetch repo$repoid
+git fetch repo$repoid +refs/heads/*:refs/remotes/repo$repoid/* +refs/tags/*:refs/tags/repo$repoid/*
 gitfetch_status=$?
 
 now=`date '+%Y%m%d.%H%M%S<%s>%d/%b/%Y:%H:%M:%S %z'`
