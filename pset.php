@@ -692,6 +692,10 @@ function echo_commit($Info) {
     $remarks = array();
     if (!$Info->has_start_tag())
         $remarks[] = array(true, "You have not tagged your start commit with " . $Info->pset->start_tag . ".");
+    else if ($Info->pset->start_tag && !$Info->start_tag_is_ancestor()) {
+        $type = $Info->grading_hash() ? "the grading" : "the latest";
+        $remarks[] = array(true, "Your start tag is not an ancestor of $type commit. Please re-tag the correct start commit with " . $Info->pset->start_tag . ".");
+    }
     if (!$Info->grading_hash() && $Me != $User && !$Pset->gitless_grades)
         $remarks[] = array(true, "No commit has been marked for grading.");
     else if (!$Info->is_grading_commit() && $Info->grading_hash())

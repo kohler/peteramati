@@ -77,6 +77,11 @@ class PsetView {
         return !$this->pset->start_tag || $this->user->repo_has_tag($this->repo, $this->pset->start_tag);
     }
 
+    public function start_tag_is_ancestor() {
+        $commit = $this->grading_commit() ?: $this->latest_commit();
+        return $commit && $this->user->repo_gitrun($this->repo, "git merge-base --is-ancestor REPO/" . $this->pset->start_tag . " " . $commit->hash . " && echo true");
+    }
+
     public function can_have_grades() {
         return $this->pset->gitless_grades || $this->commit();
     }
