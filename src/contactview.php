@@ -343,12 +343,10 @@ class ContactView {
 
         // check back-partner links
         $notes = array();
-        $backpartners = array_unique($user->links(LINK_BACKPARTNER, $pset->id));
-        $info->partner_same = false;
+        $backpartners = $info->backpartners();
         if (count($backpartners) == 0 && $partner)
             $notes[] = array(true, "ERROR: " . htmlspecialchars($partner_email) . " has not listed you as a partner yet.");
         else if (count($backpartners) == 1 && $partner && $backpartners[0] == $partner->contactId) {
-            $info->partner_same = true;
             if ($partner->dropped)
                 $notes[] = array(true, "ERROR: We believe your partner has dropped the course.");
         } else if (count($backpartners) == 0 && !$partner) {
@@ -432,7 +430,7 @@ class ContactView {
             $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_toopublic", $user->repo_messagedefs($repo)));
         else if ($open < 0 && $Me->isPC)
             $notes[] = array(true, "WARNING: " . Messages::$main->expand_html("repo_toopublic_timeout", $user->repo_messagedefs($repo)));
-        if ($partner && $info->partner_same) {
+        if ($partner && $info->partner_same()) {
             $prepo = $partner->repo($pset->id);
             if ((!$repo && $prepo) || ($repo && !$prepo)
                 || ($repo && $prepo && $repo->repoid != $prepo->repoid)) {

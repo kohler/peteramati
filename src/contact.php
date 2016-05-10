@@ -1511,8 +1511,9 @@ class Contact {
         $regex = '.*\.swp|.*~|#.*#|.*\.core|.*\.dSYM|.*\.o|core.*\z|.*\.backup|tags|tags\..*|typescript';
         if ($pset && $Conf->setting("__gitignore_pset{$pset->id}_at", 0) < $Now - 900) {
             $hrepo = self::handout_repo($pset, $repo);
+            $result = "";
             if ($pset->directory_slash !== "")
-                $result = self::repo_gitrun($repo, "git show repo{$hrepo->repoid}/master:" . escapeshellarg($pset->directory_slash) . ".gitignore 2>/dev/null");
+                $result .= self::repo_gitrun($repo, "git show repo{$hrepo->repoid}/master:" . escapeshellarg($pset->directory_slash) . ".gitignore 2>/dev/null");
             $result .= self::repo_gitrun($repo, "git show repo{$hrepo->repoid}/master:.gitignore 2>/dev/null");
             $Conf->save_setting("__gitignore_pset{$pset->id}_at", $Now);
             $Conf->save_setting("gitignore_pset{$pset->id}", 1, $result);

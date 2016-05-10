@@ -8,6 +8,7 @@ class PsetView {
     public $user;
     public $repo = null;
     public $partner;
+    private $partner_same = null;
     public $can_set_repo;
     public $can_view_repo_contents;
     public $can_see_grades;
@@ -173,6 +174,21 @@ class PsetView {
             }
         }
         return null;
+    }
+
+
+    public function backpartners() {
+        return array_unique($this->user->links(LINK_BACKPARTNER, $this->pset->id));
+    }
+
+    public function partner_same() {
+        if ($this->partner_same === null && $this->partner) {
+            $backpartners = $this->backpartners();
+            $this->partner_same = count($backpartners) == 1
+                && $this->partner->contactId == $backpartners[0];
+        } else if ($this->partner_same === null)
+            $this->partner_same = false;
+        return $this->partner_same;
     }
 
 
