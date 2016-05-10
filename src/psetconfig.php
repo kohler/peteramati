@@ -115,7 +115,7 @@ class Pset {
         $this->gitless = self::cbool($p, "gitless");
         $this->gitless_grades = self::cbool($p, "gitless_grades");
         if ($this->gitless_grades === null)
-            $this->gitless = $this->gitless_grades;
+            $this->gitless_grades = $this->gitless;
         if (!$this->gitless_grades && $this->gitless)
             throw new PsetConfigException("`gitless` requires `gitless_grades`", "gitless_grades");
 
