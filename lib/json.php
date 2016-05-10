@@ -1,6 +1,6 @@
 <?php
 // json.php -- HotCRP JSON function replacements (if PHP JSON not available)
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // Distributed under an MIT-like license; see LICENSE
 
 @define("JSON_ERROR_NONE", 0);
@@ -17,6 +17,12 @@
 @define("JSON_UNESCAPED_UNICODE", 32);
 
 define("JSON_HOTCRP", 1);
+
+if (!interface_exists("JsonSerializable")) {
+    interface JsonSerializable {
+        public function jsonSerialize();
+    }
+}
 
 class Json {
     static $string_map =
@@ -185,6 +191,8 @@ class Json {
     // XXX not a full emulation of json_encode(); hopefully that won't matter
     // in the fullness of time
     static function encode($x, $options = 0) {
+        if ($x instanceof JsonSerializable)
+            $x = $x->jsonSerialize();
         if ($x === null)
             return "null";
         else if ($x === false)
