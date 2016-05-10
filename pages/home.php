@@ -875,7 +875,7 @@ function show_pset_table($pset) {
     $t1 = $Profile ? microtime(true) : 0;
 
     $students = array();
-    while ($result && ($s = $result->fetch_object("Contact"))) {
+    while ($result && ($s = Contact::fetch($result))) {
         $s->is_anonymous = $pset->anonymous;
         Contact::set_sorter($s, @$_REQUEST["sort"]);
         $students[$s->contactId] = $s;

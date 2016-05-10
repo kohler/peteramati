@@ -56,6 +56,13 @@ class Contact {
             $this->db_load();
     }
 
+    public static function fetch($result) {
+        $acct = $result ? $result->fetch_object("Contact") : null;
+        if ($acct && !is_int($acct->contactId))
+            $acct->db_load();
+        return $acct;
+    }
+
     static public function make($o) {
         return new Contact($o);
     }
@@ -795,7 +802,7 @@ class Contact {
 
     static function find_by_id($cid) {
         $result = Dbl::q("select ContactInfo.* from ContactInfo where contactId=" . (int) $cid);
-        return $result ? $result->fetch_object("Contact") : null;
+        return self::fetch($result);
     }
 
     static function safe_registration($reg) {
@@ -885,7 +892,7 @@ class Contact {
         $email = trim($email ? $email : "");
         if ($email != "") {
             $result = Dbl::q("select ContactInfo.* from ContactInfo where email=?", $email);
-            if (($acct = $result ? $result->fetch_object("Contact") : null))
+            if (($acct = self::fetch($result)))
                 return $acct;
         }
 
@@ -941,7 +948,7 @@ class Contact {
     static function find_by_query($q, $args = array()) {
         if ($q != "") {
             $result = Dbl::q_apply("select ContactInfo.* from ContactInfo where $q", $args);
-            if (($acct = $result ? $result->fetch_object("Contact") : null)
+            if (($acct = self::fetch($result))
                 && $acct->contactId)
                 return $acct;
         }
