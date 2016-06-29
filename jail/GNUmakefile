@@ -29,7 +29,7 @@ clean:
 install: pa-jail pa-timeout pa-writefifo
 	install -d $(BINDIR)
 	install -mu+rwxs,g+rxs,o+rx pa-jail $(BINDIR)
-	install pa-timeout pa-writefifo $(BINDIR)
+	install pa-timeout pa-trace pa-writefifo $(BINDIR)
 
 always:
 	@:
