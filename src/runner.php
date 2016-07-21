@@ -105,7 +105,7 @@ class RunnerState {
         if (!$this->jaildir)
             throw new RunnerException("bad run_dirpattern");
 
-        $this->jailhomedir = $this->jaildir . "/" . $this->userhome;
+        $this->jailhomedir = $this->jaildir . "/" . preg_replace(',\A/+,', '', $this->userhome);
 
         if (!chdir($ConfSitePATH))
             throw new RunnerException("can't cd to main directory");
