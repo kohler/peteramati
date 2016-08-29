@@ -111,7 +111,7 @@ class LoginHelper {
         // look up user in our database
         if (strpos($_REQUEST["email"], "@") === false)
             self::unquote_double_quoted_request();
-        $user = Contact::find_by_email($_REQUEST["email"]);
+        $user = Contact::find_by_whatever($_REQUEST["email"]);
 
         // look up or create user in contact database
         $cdb_user = null;
