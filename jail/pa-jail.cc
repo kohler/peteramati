@@ -1772,7 +1772,7 @@ void jailownerinfo::buffer::transfer_out(int to) {
         if (tcgetattr(to, &tty) >= 0) {
             tty.c_lflag |= ICANON;
             (void) tcsetattr(to, TCSADRAIN, &tty);
-            buf[tail] = VEOF;
+            buf[tail] = tty.c_cc[VEOF];
             ++tail;
             transfer_eof = false;
         }
@@ -1881,11 +1881,14 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         // the 0.1sec wait means we avoid long race conditions
         tty.c_cc[VMIN] = 1;
         tty.c_cc[VTIME] = 1;
-        // No echoing (don't read own input)
-        tty.c_lflag &= ~ECHO;
-        // If stdin isn't a terminal, turn off canonical mode
-        if (!has_stdin_termios)
-            tty.c_lflag &= ~ICANON;
+        // If stdin is a terminal, echo its mode; otherwise,
+        // turn off canonical mode and echo
+        if (has_stdin_termios) {
+            tty.c_iflag = stdin_termios.c_iflag;
+            tty.c_oflag = stdin_termios.c_oflag;
+            tty.c_lflag = stdin_termios.c_lflag;
+        } else
+            tty.c_lflag &= ~(ICANON | ECHO | ECHONL);
         tcsetattr(ptymaster, TCSANOW, &tty);
     }
     make_nonblocking(ptymaster);
