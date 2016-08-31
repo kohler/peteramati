@@ -1763,15 +1763,21 @@ void jailownerinfo::buffer::transfer_in(int from) {
             rerrno = errno;
         }
     }
-
-    if (input_closed && transfer_eof && tail != sizeof(buf)) {
-        buf[tail] = VEOF;
-        ++tail;
-        transfer_eof = false;
-    }
 }
 
 void jailownerinfo::buffer::transfer_out(int to) {
+    if (input_closed && transfer_eof && head == tail) {
+        // send EOF character in canonical mode
+        struct termios tty;
+        if (tcgetattr(to, &tty) >= 0) {
+            tty.c_lflag |= ICANON;
+            (void) tcsetattr(to, TCSADRAIN, &tty);
+            buf[tail] = VEOF;
+            ++tail;
+            transfer_eof = false;
+        }
+    }
+
     if (to >= 0 && !output_closed && head != tail) {
         ssize_t nw = write(to, &buf[head], tail - head);
         if (nw != 0 && nw != -1)
@@ -1871,12 +1877,15 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     }
 
     if (tcgetattr(ptymaster, &tty) >= 0) {
-        // blocking reads please (well, block for up to 0.5sec)
-        // the 0.5sec wait means we avoid long race conditions
+        // blocking reads please (well, block for up to 0.1sec)
+        // the 0.1sec wait means we avoid long race conditions
         tty.c_cc[VMIN] = 1;
-        tty.c_cc[VTIME] = 5;
-        // disable echo so we don't read our own input
+        tty.c_cc[VTIME] = 1;
+        // No echoing (don't read own input)
         tty.c_lflag &= ~ECHO;
+        // If stdin isn't a terminal, turn off canonical mode
+        if (!has_stdin_termios)
+            tty.c_lflag &= ~ICANON;
         tcsetattr(ptymaster, TCSANOW, &tty);
     }
     make_nonblocking(ptymaster);
