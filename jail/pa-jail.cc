@@ -1396,6 +1396,7 @@ class jailownerinfo {
         }
         void transfer_in(int from);
         void transfer_out(int to);
+        bool done();
     };
     buffer to_slave;
     buffer from_slave;
@@ -1787,6 +1788,10 @@ void jailownerinfo::buffer::transfer_out(int to) {
     }
 }
 
+bool jailownerinfo::buffer::done() {
+    return input_closed && head == tail;
+}
+
 void jailownerinfo::block(int ptymaster) {
     int maxfd = sigpipe[0];
     FD_SET(sigpipe[0], &readset);
@@ -1908,7 +1913,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 
         // check child and timeout
         // (only wait for child if read done/failed)
-        int exit_status = check_child_timeout(child, from_slave.input_closed);
+        int exit_status = check_child_timeout(child, from_slave.done());
         if (exit_status != -1)
             exec_done(child, exit_status);
 
