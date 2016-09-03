@@ -1709,6 +1709,13 @@ int jailownerinfo::exec_go() {
 
             if (inputfd > 0 || stdin_tty)
                 dup2(ptyslave, STDIN_FILENO);
+            if (inputfd > 0 && !stdout_tty) {
+                struct termios tty;
+                if (tcgetattr(ptyslave, &tty) >= 0) {
+                    tty.c_oflag = 0; // no NL->NLCR xlation, no other proc.
+                    tcsetattr(ptyslave, TCSANOW, &tty);
+                }
+            }
             if (inputfd > 0 || stdout_tty)
                 dup2(ptyslave, STDOUT_FILENO);
             if (inputfd > 0 || stderr_tty)
