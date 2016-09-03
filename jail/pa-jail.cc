@@ -2005,9 +2005,9 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
 
 static __attribute__((noreturn)) void usage(jailaction action = do_start) {
     if (action == do_start) {
-        fprintf(stderr, "Usage: pa-jail add [-nh] [-f FILES | -F DATA] [-S SKELETON] JAILDIR [USER]\n\
+        fprintf(stderr, "Usage: pa-jail add [-nh] [-f FILE | -F DATA] [-S SKELETON] JAILDIR [USER]\n\
        pa-jail run [--fg] [-nqh] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n\
-                   [-f FILES | -F DATA] [-S SKELETON] JAILDIR USER COMMAND\n\
+                   [-f FILE | -F DATA] [-S SKELETON] JAILDIR USER COMMAND\n\
        pa-jail mv SOURCE DEST\n\
        pa-jail rm [-nf] JAILDIR\n");
     } else if (action == do_mv) {
@@ -2032,15 +2032,15 @@ Create or augment a jail. JAILDIR must be allowed by /etc/pa-jail.conf.\n\n");
             fprintf(stderr, "Usage: pa-jail run [OPTIONS...] JAILDIR USER COMMAND...\n\
 Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
 /etc/pa-jail.conf.\n\n");
-        fprintf(stderr, "  -f, --contents-file FILES\n");
-        fprintf(stderr, "  -F, --contents FILES\n");
-        fprintf(stderr, "  -h, --chown-home\n");
-        fprintf(stderr, "  -S, --skeleton SKELETONDIR\n");
+        fprintf(stderr, "  -f, --contents-file FILE  populate jail with contents of FILE\n");
+        fprintf(stderr, "  -F, --contents DATA       populate jail with DATA\n");
+        fprintf(stderr, "  -h, --chown-home          change ownership of USER homedir\n");
+        fprintf(stderr, "  -S, --skeleton SKELDIR    use SKELDIR to populate jail\n");
         if (action == do_run) {
-            fprintf(stderr, "  -p, --pid-file PIDFILE\n\
-  -i, --input INPUTSOCKET\n\
-  -T, --timeout TIMEOUT\n\
-      --fg\n");
+            fprintf(stderr, "  -p, --pid-file PIDFILE    write jail process PID to PIDFILE\n\
+  -i, --input INPUTSOCKET   use TTY, read input from INPUTSOCKET\n\
+  -T, --timeout TIMEOUT     kill the jail after TIMEOUT\n\
+      --fg          run in the foreground\n");
         }
         fprintf(stderr, "  -n, --dry-run     print the actions that would be taken, don't run them\n\
   -V, --verbose     print actions as well as running them\n");
