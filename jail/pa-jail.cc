@@ -1385,18 +1385,17 @@ class jailownerinfo {
     char** argv;
     jaildirinfo* jaildir;
     int inputfd;
-    struct timeval timeout;
+    struct timeval expiry;
     struct buffer {
         char buf[8192];
         size_t head;
         size_t tail;
         bool input_closed;
         bool output_closed;
-        bool transfer_eof;
         int rerrno;
         buffer()
             : head(0), tail(0), input_closed(false), output_closed(false),
-              transfer_eof(false), rerrno(0) {
+              rerrno(0) {
         }
         void transfer_in(int from);
         void transfer_out(int to);
@@ -1404,7 +1403,9 @@ class jailownerinfo {
     };
     buffer to_slave;
     buffer from_slave;
-    bool has_stdin_termios;
+    bool stdin_tty;
+    bool stdout_tty;
+    bool stderr_tty;
     struct termios stdin_termios;
     int child_status;
 
@@ -1416,8 +1417,10 @@ class jailownerinfo {
 };
 
 jailownerinfo::jailownerinfo()
-    : owner(ROOT), group(ROOT), argv(), has_stdin_termios(false),
-      child_status(-1) {
+    : owner(ROOT), group(ROOT), argv(), child_status(-1) {
+    stdin_tty = tcgetattr(STDIN_FILENO, &stdin_termios) >= 0;
+    stdout_tty = isatty(STDOUT_FILENO);
+    stderr_tty = isatty(STDERR_FILENO);
 }
 
 jailownerinfo::~jailownerinfo() {
@@ -1540,9 +1543,9 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         gettimeofday(&now, 0);
         delta.tv_sec = (long) timeout;
         delta.tv_usec = (long) ((timeout - delta.tv_sec) * 1000000);
-        timeradd(&now, &delta, &this->timeout);
+        timeradd(&now, &delta, &this->expiry);
     } else
-        timerclear(&this->timeout);
+        timerclear(&this->expiry);
 
     // enter the jail
 #if __linux__
@@ -1694,14 +1697,12 @@ int jailownerinfo::exec_go() {
 #ifdef TIOCSCTTY
             ioctl(ptyslave, TIOCSCTTY, 0);
 #endif
-            struct termios tty;
-            if (tcgetattr(ptyslave, &tty) >= 0) {
-                tty.c_oflag = 0; // no NL->NLCR xlation, no other proc.
-                tcsetattr(ptyslave, TCSANOW, &tty);
-            }
-            dup2(ptyslave, STDIN_FILENO);
-            dup2(ptyslave, STDOUT_FILENO);
-            dup2(ptyslave, STDERR_FILENO);
+            if (inputfd > 0 || stdin_tty)
+                dup2(ptyslave, STDIN_FILENO);
+            if (stdout_tty)
+                dup2(ptyslave, STDOUT_FILENO);
+            if (stderr_tty)
+                dup2(ptyslave, STDERR_FILENO);
             close(ptymaster);
             close(ptyslave);
 
@@ -1770,8 +1771,10 @@ void jailownerinfo::start_sigpipe() {
     sigaction(SIGTERM, &sa, NULL);
 #endif
 
-    make_nonblocking(inputfd);
-    make_nonblocking(STDOUT_FILENO);
+    if (inputfd > 0 || stdin_tty)
+        make_nonblocking(inputfd);
+    if (stdout_tty)
+        make_nonblocking(STDOUT_FILENO);
 }
 
 void jailownerinfo::buffer::transfer_in(int from) {
@@ -1795,18 +1798,6 @@ void jailownerinfo::buffer::transfer_in(int from) {
 }
 
 void jailownerinfo::buffer::transfer_out(int to) {
-    if (input_closed && transfer_eof && head == tail) {
-        // send EOF character in canonical mode
-        struct termios tty;
-        if (tcgetattr(to, &tty) >= 0) {
-            tty.c_lflag |= ICANON;
-            (void) tcsetattr(to, TCSADRAIN, &tty);
-            buf[tail] = tty.c_cc[VEOF];
-            ++tail;
-            transfer_eof = false;
-        }
-    }
-
     if (to >= 0 && !output_closed && head != tail) {
         ssize_t nw = write(to, &buf[head], tail - head);
         if (nw != 0 && nw != -1)
@@ -1855,11 +1846,11 @@ void jailownerinfo::block(int ptymaster) {
     }
 
     int timeout_ms = 3600000;
-    if (timerisset(&timeout)) {
+    if (timerisset(&expiry)) {
         struct timeval now;
         gettimeofday(&now, 0);
-        if (timercmp(&now, &timeout, >)) {
-            timersub(&timeout, &now, &now);
+        if (timercmp(&now, &expiry, >)) {
+            timersub(&expiry, &now, &now);
             timeout_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
         } else
             timeout_ms = 0;
@@ -1870,10 +1861,12 @@ void jailownerinfo::block(int ptymaster) {
     if (p[0].revents & POLLIN) {
 #if __linux__
         struct signalfd_siginfo ssi;
-        while (read(sigfd, &ssi, sizeof(ssi)) == sizeof(ssi)) {
+        ssize_t r;
+        while ((r = read(sigfd, &ssi, sizeof(ssi))) == sizeof(ssi)) {
             if (ssi.ssi_signo == SIGTERM)
                 got_sigterm = 1;
         }
+        assert(r == 0 || (r == -1 && errno == EAGAIN));
 #else
         char buf[128];
         while (read(sigpipe[0], buf, sizeof(buf)) > 0)
@@ -1899,9 +1892,9 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
         return 128 + SIGTERM;
 
     struct timeval now;
-    if (timerisset(&timeout)
+    if (timerisset(&expiry)
         && gettimeofday(&now, NULL) == 0
-        && timercmp(&now, &timeout, >))
+        && timercmp(&now, &expiry, >))
         return 124;
 
     errno = EAGAIN;
@@ -1909,6 +1902,9 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
 }
 
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
+    // This process is the `init` (pid 1) of the new process namespace.
+    // On Linux, if it dies, everything in the jail dies too.
+
     // go back to being the caller
     // XXX (preserve the saved root identity just in case)
     if (setresuid(ROOT, ROOT, ROOT) != 0
@@ -1918,49 +1914,28 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         exec_done(child, 127);
     }
 
-    // if input is a tty, put it in non-canonical mode
+    // if input is a tty, put it in raw mode with short blocking
     struct termios tty;
-    if (tcgetattr(STDIN_FILENO, &stdin_termios) >= 0) {
-        has_stdin_termios = true;
+    if (stdin_tty) {
         tty = stdin_termios;
-        // Noncanonical mode, disable signals, no echoing
-        tty.c_lflag &= ~(ICANON | ISIG | ECHO);
-        // Character-at-a-time input with blocking
-        tty.c_cc[VMIN] = 1;
-        tty.c_cc[VTIME] = 0;
-        (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &tty);
-    }
-
-    if (tcgetattr(ptymaster, &tty) >= 0) {
-        // blocking reads please (well, block for up to 0.1sec)
-        // the 0.1sec wait means we avoid long race conditions
+        cfmakeraw(&tty);
         tty.c_cc[VMIN] = 1;
         tty.c_cc[VTIME] = 1;
-        // If stdin is a terminal, echo its mode; otherwise,
-        // turn off canonical mode and echo
-        if (has_stdin_termios) {
-            tty.c_iflag = stdin_termios.c_iflag;
-            tty.c_oflag = stdin_termios.c_oflag;
-            tty.c_lflag = stdin_termios.c_lflag;
-        } else
-            tty.c_lflag &= ~(ICANON | ECHO | ECHONL);
-        tcsetattr(ptymaster, TCSANOW, &tty);
+        (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
     }
+
     make_nonblocking(ptymaster);
     fflush(stdout);
-    to_slave.transfer_eof = true;
+    if (inputfd == 0 && !stdin_tty) {
+        close(STDIN_FILENO);
+        to_slave.input_closed = to_slave.output_closed = true;
+    }
+    if (!stdout_tty && !stderr_tty) {
+        close(STDOUT_FILENO);
+        from_slave.input_closed = from_slave.output_closed = true;
+    }
 
     while (1) {
-        block(ptymaster);
-        to_slave.transfer_in(inputfd);
-        if (to_slave.head != to_slave.tail
-            && memmem(&to_slave.buf[to_slave.head], to_slave.tail - to_slave.head,
-                      "\x1b\x03", 2) != NULL)
-            exec_done(child, 128 + SIGTERM);
-        to_slave.transfer_out(ptymaster);
-        from_slave.transfer_in(ptymaster);
-        from_slave.transfer_out(STDOUT_FILENO);
-
         // check child and timeout
         // (only wait for child if read done/failed)
         int exit_status = check_child_timeout(child, from_slave.done());
@@ -1969,9 +1944,21 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 
         // if child has not died, and read produced error, report it
         if (from_slave.input_closed && from_slave.rerrno != EIO) {
-            fprintf(stderr, "read: %s\n", strerror(from_slave.rerrno));
+            fprintf(stderr, "read: %s%s", strerror(from_slave.rerrno), stderr_tty ? "\r\n" : "\n");
             exec_done(child, 125);
         }
+
+        // wait for something to occur
+        block(ptymaster);
+
+        // transfer data
+        to_slave.transfer_in(inputfd);
+        if (to_slave.head != to_slave.tail
+            && memmem(&to_slave.buf[to_slave.head], to_slave.tail - to_slave.head, "\x1b\x03", 2) != NULL)
+            exec_done(child, 128 + SIGTERM);
+        to_slave.transfer_out(ptymaster);
+        from_slave.transfer_in(ptymaster);
+        from_slave.transfer_out(STDOUT_FILENO);
     }
 }
 
@@ -1982,8 +1969,7 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
     if (exit_status == 128 + SIGTERM && !quiet)
         xmsg = "...terminated";
     if (xmsg)
-        printf(isatty(STDOUT_FILENO) ? "\n\x1b[3;7;31m%s\x1b[0m\n" : "\n%s\n",
-               xmsg);
+        fprintf(stderr, stderr_tty ? "\r\n\x1b[3;7;31m%s\x1b[0m\r\n" : "\n%s\n", xmsg);
 #if __linux__
     (void) child;
 #else
@@ -1991,7 +1977,7 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
         kill(child, SIGKILL);
 #endif
     fflush(stdout);
-    if (has_stdin_termios)
+    if (stdin_tty)
         (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &stdin_termios);
     exit(exit_status);
 }
