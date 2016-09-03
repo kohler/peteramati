@@ -1709,9 +1709,9 @@ int jailownerinfo::exec_go() {
 
             if (inputfd > 0 || stdin_tty)
                 dup2(ptyslave, STDIN_FILENO);
-            if (stdout_tty)
+            if (inputfd > 0 || stdout_tty)
                 dup2(ptyslave, STDOUT_FILENO);
-            if (stderr_tty)
+            if (inputfd > 0 || stderr_tty)
                 dup2(ptyslave, STDERR_FILENO);
             close(ptymaster);
             close(ptyslave);
@@ -1783,7 +1783,7 @@ void jailownerinfo::start_sigpipe() {
 
     if (inputfd > 0 || stdin_tty)
         make_nonblocking(inputfd);
-    if (stdout_tty)
+    if (inputfd > 0 || stdout_tty)
         make_nonblocking(STDOUT_FILENO);
 }
 
@@ -1940,7 +1940,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         close(STDIN_FILENO);
         to_slave.input_closed = to_slave.output_closed = true;
     }
-    if (!stdout_tty && !stderr_tty) {
+    if (inputfd == 0 && !stdout_tty && !stderr_tty) {
         close(STDOUT_FILENO);
         from_slave.input_closed = from_slave.output_closed = true;
         from_slave.rerrno = EIO; // don't misinterpret closed as error
