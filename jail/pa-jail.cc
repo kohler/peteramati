@@ -1084,7 +1084,7 @@ static std::string absolute(const std::string& dir) {
     if (!dir.empty() && dir[0] == '/')
         return dir;
     char buf[BUFSIZ];
-    if (getcwd(buf, BUFSIZ - 1))
+    if (getcwd(buf, BUFSIZ - 1) == NULL)
         perror_die("getcwd");
     char* endbuf = buf + strlen(buf);
     while (endbuf - buf > 1 && endbuf[-1] == '/')
