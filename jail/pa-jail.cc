@@ -33,6 +33,7 @@
 #if __linux__
 #include <mntent.h>
 #include <sched.h>
+#include <sys/signalfd.h>
 #elif __APPLE__
 #include <sys/param.h>
 #include <sys/ucred.h>
@@ -73,7 +74,11 @@ static std::string dstroot;
 static std::string pidfilename;
 static int pidfd = -1;
 static volatile sig_atomic_t got_sigterm = 0;
+#if __linux__
+static int sigfd = -1;
+#else
 static int sigpipe[2];
+#endif
 
 enum jailaction {
     do_start, do_add, do_run, do_rm, do_mv
@@ -1655,8 +1660,10 @@ int jailownerinfo::exec_go() {
         if (child < 0)
             perror_die("fork");
         else if (child == 0) {
+#if !__linux__
             close(sigpipe[0]);
             close(sigpipe[1]);
+#endif
 
             // reduce privileges permanently
             if (setresgid(group, group, group) != 0)
@@ -1712,6 +1719,7 @@ int jailownerinfo::exec_go() {
 }
 
 extern "C" {
+#if !__linux__
 void sighandler(int signo) {
     if (signo == SIGTERM)
         got_sigterm = 1;
@@ -1719,6 +1727,7 @@ void sighandler(int signo) {
     ssize_t w = write(sigpipe[1], &c, 1);
     (void) w;
 }
+#endif
 
 void cleanup_pidfd(void) {
     if (pidfd >= 0)
@@ -1731,11 +1740,20 @@ static void make_nonblocking(int fd) {
 }
 
 void jailownerinfo::start_sigpipe() {
+#if __linux__
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    sigaddset(&mask, SIGTERM);
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+        perror_die("sigprocmask");
+    sigfd = signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
+    if (sigfd == -1)
+        perror_die("signalfd");
+#else
     int r = pipe(sigpipe);
     if (r != 0)
         perror_die("pipe");
-    make_nonblocking(inputfd);
-    make_nonblocking(STDOUT_FILENO);
     make_nonblocking(sigpipe[0]);
     make_nonblocking(sigpipe[1]);
 
@@ -1745,6 +1763,10 @@ void jailownerinfo::start_sigpipe() {
     sa.sa_flags = 0;
     sigaction(SIGCHLD, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
+#endif
+
+    make_nonblocking(inputfd);
+    make_nonblocking(STDOUT_FILENO);
 }
 
 void jailownerinfo::buffer::transfer_in(int from) {
@@ -1796,7 +1818,11 @@ bool jailownerinfo::buffer::done() {
 void jailownerinfo::block(int ptymaster) {
     struct pollfd p[4];
 
+#if __linux__
+    p[0].fd = sigfd;
+#else
     p[0].fd = sigpipe[0];
+#endif
     p[0].events = POLLIN;
     int nfd = 1;
 
@@ -1837,9 +1863,17 @@ void jailownerinfo::block(int ptymaster) {
     poll(p, nfd, timeout_ms);
 
     if (p[0].revents & POLLIN) {
+#if __linux__
+        struct signalfd_siginfo ssi;
+        while (read(sigfd, &ssi, sizeof(ssi)) == sizeof(ssi)) {
+            if (ssi.ssi_signo == SIGTERM)
+                got_sigterm = 1;
+        }
+#else
         char buf[128];
         while (read(sigpipe[0], buf, sizeof(buf)) > 0)
             /* skip */;
+#endif
     }
 }
 
