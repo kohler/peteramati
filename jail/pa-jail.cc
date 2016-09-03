@@ -1381,7 +1381,7 @@ class jailownerinfo {
     int exec_go();
 
   private:
-    const char* newenv[5];
+    const char* newenv[6];
     char** argv;
     jaildirinfo* jaildir;
     int inputfd;
@@ -1488,6 +1488,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     sprintf(homebuf, "HOME=%s", owner_home.c_str());
     const char* path = "PATH=/usr/local/bin:/bin:/usr/bin";
     const char* lang = "LANG=C";
+    const char* term = NULL;
     const char* ld_library_path = NULL;
     {
         extern char** environ;
@@ -1496,12 +1497,16 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
                 path = *eptr;
             else if (strncmp(*eptr, "LANG=", 5) == 0)
                 lang = *eptr;
+            else if (strncmp(*eptr, "TERM=", 5) == 0)
+                term = *eptr;
             else if (strncmp(*eptr, "LD_LIBRARY_PATH=", 16) == 0)
                 ld_library_path = *eptr;
     }
     int newenvpos = 0;
     newenv[newenvpos++] = path;
     newenv[newenvpos++] = lang;
+    if (term)
+        newenv[newenvpos++] = term;
     if (ld_library_path)
         newenv[newenvpos++] = ld_library_path;
     newenv[newenvpos++] = homebuf;
