@@ -1388,11 +1388,10 @@ class jailownerinfo {
         size_t tail;
         bool input_closed;
         bool output_closed;
-        bool transfer_eof;
         int rerrno;
         buffer()
             : head(0), tail(0), input_closed(false), output_closed(false),
-              transfer_eof(false), rerrno(0) {
+              rerrno(0) {
         }
         void transfer_in(int from);
         void transfer_out(int to);
@@ -1767,18 +1766,6 @@ void jailownerinfo::buffer::transfer_in(int from) {
 }
 
 void jailownerinfo::buffer::transfer_out(int to) {
-    if (input_closed && transfer_eof && head == tail) {
-        // send EOF character in canonical mode
-        struct termios tty;
-        if (tcgetattr(to, &tty) >= 0) {
-            tty.c_lflag |= ICANON;
-            (void) tcsetattr(to, TCSADRAIN, &tty);
-            buf[tail] = tty.c_cc[VEOF];
-            ++tail;
-            transfer_eof = false;
-        }
-    }
-
     if (to >= 0 && !output_closed && head != tail) {
         ssize_t nw = write(to, &buf[head], tail - head);
         if (nw != 0 && nw != -1)
@@ -1884,7 +1871,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     if (tcgetattr(ptymaster, &tty) >= 0) {
         // blocking reads please (well, block for up to 0.1sec)
         // the 0.1sec wait means we avoid long race conditions
-        tty.c_cc[VMIN] = 1;
+        tty.c_cc[VMIN] = 0;
         tty.c_cc[VTIME] = 1;
         // If stdin is a terminal, echo its mode; otherwise,
         // turn off canonical mode and echo
@@ -1898,7 +1885,6 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     }
     make_nonblocking(ptymaster);
     fflush(stdout);
-    to_slave.transfer_eof = true;
 
     while (1) {
         block(ptymaster);
