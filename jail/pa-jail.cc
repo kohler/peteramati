@@ -1668,6 +1668,7 @@ int jailownerinfo::exec_go() {
         if (child < 0)
             perror_die("fork");
         else if (child == 0) {
+            child = getpid();
 #if !__linux__
             close(sigpipe[0]);
             close(sigpipe[1]);
@@ -1697,6 +1698,8 @@ int jailownerinfo::exec_go() {
 #ifdef TIOCSCTTY
             ioctl(ptyslave, TIOCSCTTY, 0);
 #endif
+            tcsetpgrp(ptyslave, child);
+
             if (inputfd > 0 || stdin_tty)
                 dup2(ptyslave, STDIN_FILENO);
             if (stdout_tty)
