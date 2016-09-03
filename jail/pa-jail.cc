@@ -1406,7 +1406,8 @@ class jailownerinfo {
     bool stdin_tty;
     bool stdout_tty;
     bool stderr_tty;
-    struct termios stdin_termios;
+    int ttyfd;
+    struct termios ttyfd_termios;
     int child_status;
 
     void start_sigpipe();
@@ -1418,9 +1419,15 @@ class jailownerinfo {
 
 jailownerinfo::jailownerinfo()
     : owner(ROOT), group(ROOT), argv(), child_status(-1) {
-    stdin_tty = tcgetattr(STDIN_FILENO, &stdin_termios) >= 0;
+    stdin_tty = isatty(STDIN_FILENO);
     stdout_tty = isatty(STDOUT_FILENO);
     stderr_tty = isatty(STDERR_FILENO);
+    // Assume all tty-opened fds are to the same tty.
+    if (stdin_tty || stdout_tty || stderr_tty) {
+        ttyfd = stdin_tty ? STDIN_FILENO : (stdout_tty ? STDOUT_FILENO : STDERR_FILENO);
+        tcgetattr(ttyfd, &ttyfd_termios);
+    } else
+        ttyfd = -1;
 }
 
 jailownerinfo::~jailownerinfo() {
@@ -1919,12 +1926,12 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 
     // if input is a tty, put it in raw mode with short blocking
     struct termios tty;
-    if (stdin_tty) {
-        tty = stdin_termios;
+    if (ttyfd >= 0) {
+        tty = ttyfd_termios;
         cfmakeraw(&tty);
         tty.c_cc[VMIN] = 1;
         tty.c_cc[VTIME] = 1;
-        (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+        (void) tcsetattr(ttyfd, TCSANOW, &tty);
     }
 
     make_nonblocking(ptymaster);
@@ -1972,17 +1979,19 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
         xmsg = "...timed out";
     if (exit_status == 128 + SIGTERM && !quiet)
         xmsg = "...terminated";
-    if (xmsg)
-        fprintf(stderr, stderr_tty ? "\r\n\x1b[3;7;31m%s\x1b[0m\r\n" : "\n%s\n", xmsg);
+    if (xmsg) {
+        const char* nl = stderr_tty ? "\r\n" : "\n";
+        fprintf(stderr, inputfd > 0 || stderr_tty ? "%s\x1b[3;7;31m%s\x1b[0m%s" : "%s%s%s", nl, xmsg, nl);
+    }
 #if __linux__
     (void) child;
 #else
     if (exit_status >= 124)
         kill(child, SIGKILL);
 #endif
-    fflush(stdout);
-    if (stdin_tty)
-        (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &stdin_termios);
+    fflush(stderr);
+    if (ttyfd >= 0)
+        (void) tcsetattr(ttyfd, TCSAFLUSH, &ttyfd_termios);
     exit(exit_status);
 }
 
