@@ -1371,7 +1371,7 @@ class jailownerinfo {
     ~jailownerinfo();
     void init(const char* owner_name);
     void exec(int argc, char** argv, jaildirinfo& jaildir,
-              int inputfd, double timeout, bool foreground);
+              int inputfd, double timeout, bool foreground, bool makepty);
     int exec_go();
 
   private:
@@ -1379,6 +1379,7 @@ class jailownerinfo {
     char** argv;
     jaildirinfo* jaildir;
     int inputfd;
+    bool makepty;
     struct timeval timeout;
     fd_set readset;
     fd_set writeset;
@@ -1400,8 +1401,6 @@ class jailownerinfo {
     };
     buffer to_slave;
     buffer from_slave;
-    bool has_stdin_termios;
-    struct termios stdin_termios;
     int child_status;
 
     void start_sigpipe();
@@ -1412,7 +1411,7 @@ class jailownerinfo {
 };
 
 jailownerinfo::jailownerinfo()
-    : owner(ROOT), group(ROOT), argv(), has_stdin_termios(false),
+    : owner(ROOT), group(ROOT), argv(),
       child_status(-1) {
 }
 
@@ -1478,7 +1477,8 @@ static void write_pid(int p) {
 }
 
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         int inputfd, double timeout, bool foreground) {
+                         int inputfd, double timeout, bool foreground,
+                         bool makepty) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     sprintf(homebuf, "HOME=%s", owner_home.c_str());
@@ -1526,6 +1526,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     // store other arguments
     this->jaildir = &jaildir;
     this->inputfd = inputfd;
+    this->makepty = makepty;
     if (timeout > 0) {
         struct timeval now, delta;
         gettimeofday(&now, 0);
@@ -1609,9 +1610,9 @@ int jailownerinfo::exec_go() {
     // create a pty
     int ptymaster = -1;
     char* ptyslavename = NULL;
-    if (verbose)
+    if (verbose && makepty)
         fprintf(verbosefile, "su %s\nmake-pty\n", uid_to_name(owner));
-    if (!dryrun) {
+    if (!dryrun && makepty) {
         // change effective uid/gid, but save root for later
         if (setresgid(group, group, ROOT) != 0)
             perror_die("setresgid");
@@ -1665,29 +1666,34 @@ int jailownerinfo::exec_go() {
             if (setresuid(owner, owner, owner) != 0)
                 perror_die("setresuid");
 
-            if (setsid() == -1)
-                perror_die("setsid");
+            if (makepty) {
+                if (setsid() == -1)
+                    perror_die("setsid");
 
-            int ptyslave = open(ptyslavename, O_RDWR);
-            if (ptyslave == -1)
-                perror_die(ptyslavename);
+                int ptyslave = open(ptyslavename, O_RDWR);
+                if (ptyslave == -1)
+                    perror_die(ptyslavename);
 #ifdef TIOCGWINSZ
-            struct winsize ws;
-            ioctl(ptyslave, TIOCGWINSZ, &ws);
-            ws.ws_row = 24;
-            ws.ws_col = 80;
-            ioctl(ptyslave, TIOCSWINSZ, &ws);
+                struct winsize ws;
+                ioctl(ptyslave, TIOCGWINSZ, &ws);
+                ws.ws_row = 24;
+                ws.ws_col = 80;
+                ioctl(ptyslave, TIOCSWINSZ, &ws);
 #endif
-            struct termios tty;
-            if (tcgetattr(ptyslave, &tty) >= 0) {
-                tty.c_oflag = 0; // no NL->NLCR xlation, no other proc.
-                tcsetattr(ptyslave, TCSANOW, &tty);
+                struct termios tty;
+                if (tcgetattr(ptyslave, &tty) >= 0) {
+                    tty.c_oflag = 0; // no NL->NLCR xlation, no other proc.
+                    tcsetattr(ptyslave, TCSANOW, &tty);
+                }
+                dup2(ptyslave, STDIN_FILENO);
+                dup2(ptyslave, STDOUT_FILENO);
+                dup2(ptyslave, STDERR_FILENO);
+                close(ptymaster);
+                close(ptyslave);
+            } else {
+                dup2(inputfd, STDIN_FILENO);
+                close(inputfd);
             }
-            dup2(ptyslave, STDIN_FILENO);
-            dup2(ptyslave, STDOUT_FILENO);
-            dup2(ptyslave, STDERR_FILENO);
-            close(ptymaster);
-            close(ptyslave);
 
             // restore all signals to their default actions
             // (e.g., PHP may have ignored SIGPIPE; don't want that
@@ -1730,8 +1736,6 @@ void jailownerinfo::start_sigpipe() {
     int r = pipe(sigpipe);
     if (r != 0)
         perror_die("pipe");
-    make_nonblocking(inputfd);
-    make_nonblocking(STDOUT_FILENO);
     make_nonblocking(sigpipe[0]);
     make_nonblocking(sigpipe[1]);
 
@@ -1767,18 +1771,6 @@ void jailownerinfo::buffer::transfer_in(int from) {
 }
 
 void jailownerinfo::buffer::transfer_out(int to) {
-    if (input_closed && transfer_eof && head == tail) {
-        // send EOF character in canonical mode
-        struct termios tty;
-        if (tcgetattr(to, &tty) >= 0) {
-            tty.c_lflag |= ICANON;
-            (void) tcsetattr(to, TCSADRAIN, &tty);
-            buf[tail] = tty.c_cc[VEOF];
-            ++tail;
-            transfer_eof = false;
-        }
-    }
-
     if (to >= 0 && !output_closed && head != tail) {
         ssize_t nw = write(to, &buf[head], tail - head);
         if (nw != 0 && nw != -1)
@@ -1796,27 +1788,29 @@ void jailownerinfo::block(int ptymaster) {
     int maxfd = sigpipe[0];
     FD_SET(sigpipe[0], &readset);
 
-    if (!to_slave.input_closed && !to_slave.output_closed) {
-        FD_SET(inputfd, &readset);
-        maxfd < inputfd && (maxfd = inputfd);
-    } else
-        FD_CLR(inputfd, &readset);
-    if (!to_slave.output_closed && to_slave.head != to_slave.tail) {
-        FD_SET(ptymaster, &writeset);
-        maxfd < ptymaster && (maxfd = ptymaster);
-    } else
-        FD_CLR(ptymaster, &writeset);
+    if (makepty) {
+        if (!to_slave.input_closed && !to_slave.output_closed) {
+            FD_SET(inputfd, &readset);
+            maxfd < inputfd && (maxfd = inputfd);
+        } else
+            FD_CLR(inputfd, &readset);
+        if (!to_slave.output_closed && to_slave.head != to_slave.tail) {
+            FD_SET(ptymaster, &writeset);
+            maxfd < ptymaster && (maxfd = ptymaster);
+        } else
+            FD_CLR(ptymaster, &writeset);
 
-    if (!from_slave.input_closed && !from_slave.output_closed) {
-        FD_SET(ptymaster, &readset);
-        maxfd < ptymaster && (maxfd = ptymaster);
-    } else
-        FD_CLR(ptymaster, &readset);
-    if (!from_slave.output_closed && from_slave.head != from_slave.tail) {
-        FD_SET(STDOUT_FILENO, &writeset);
-        maxfd < STDOUT_FILENO && (maxfd = STDOUT_FILENO);
-    } else
-        FD_CLR(STDOUT_FILENO, &writeset);
+        if (!from_slave.input_closed && !from_slave.output_closed) {
+            FD_SET(ptymaster, &readset);
+            maxfd < ptymaster && (maxfd = ptymaster);
+        } else
+            FD_CLR(ptymaster, &readset);
+        if (!from_slave.output_closed && from_slave.head != from_slave.tail) {
+            FD_SET(STDOUT_FILENO, &writeset);
+            maxfd < STDOUT_FILENO && (maxfd = STDOUT_FILENO);
+        } else
+            FD_CLR(STDOUT_FILENO, &writeset);
+    }
 
     struct timeval delay = {3600, 0};
     if (timerisset(&timeout)) {
@@ -1859,66 +1853,45 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
 }
 
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
-    // go back to being the caller
-    // XXX (preserve the saved root identity just in case)
-    if (setresuid(ROOT, ROOT, ROOT) != 0
-        || setresgid(caller_group, caller_group, ROOT) != 0
-        || setresuid(caller_owner, caller_owner, ROOT) != 0) {
-        perror("setresuid");
-        exec_done(child, 127);
-    }
+    if (makepty) {
+        // go back to being the caller
+        // XXX (preserve the saved root identity just in case)
+        if (setresuid(ROOT, ROOT, ROOT) != 0
+            || setresgid(caller_group, caller_group, ROOT) != 0
+            || setresuid(caller_owner, caller_owner, ROOT) != 0) {
+            perror("setresuid");
+            exec_done(child, 127);
+        }
 
-    // if input is a tty, put it in non-canonical mode
-    struct termios tty;
-    if (tcgetattr(STDIN_FILENO, &stdin_termios) >= 0) {
-        has_stdin_termios = true;
-        tty = stdin_termios;
-        // Noncanonical mode, disable signals, no echoing
-        tty.c_lflag &= ~(ICANON | ISIG | ECHO);
-        // Character-at-a-time input with blocking
-        tty.c_cc[VMIN] = 1;
-        tty.c_cc[VTIME] = 0;
-        (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &tty);
+        make_nonblocking(inputfd);
+        make_nonblocking(ptymaster);
+        make_nonblocking(STDOUT_FILENO);
+        fflush(stdout);
+        to_slave.transfer_eof = true;
     }
-
-    if (tcgetattr(ptymaster, &tty) >= 0) {
-        // blocking reads please (well, block for up to 0.1sec)
-        // the 0.1sec wait means we avoid long race conditions
-        tty.c_cc[VMIN] = 1;
-        tty.c_cc[VTIME] = 1;
-        // If stdin is a terminal, echo its mode; otherwise,
-        // turn off canonical mode and echo
-        if (has_stdin_termios) {
-            tty.c_iflag = stdin_termios.c_iflag;
-            tty.c_oflag = stdin_termios.c_oflag;
-            tty.c_lflag = stdin_termios.c_lflag;
-        } else
-            tty.c_lflag &= ~(ICANON | ECHO | ECHONL);
-        tcsetattr(ptymaster, TCSANOW, &tty);
-    }
-    make_nonblocking(ptymaster);
-    fflush(stdout);
-    to_slave.transfer_eof = true;
 
     while (1) {
         block(ptymaster);
-        to_slave.transfer_in(inputfd);
-        if (to_slave.head != to_slave.tail
-            && memmem(&to_slave.buf[to_slave.head], to_slave.tail - to_slave.head,
-                      "\x1b\x03", 2) != NULL)
-            exec_done(child, 128 + SIGTERM);
-        to_slave.transfer_out(ptymaster);
-        from_slave.transfer_in(ptymaster);
-        from_slave.transfer_out(STDOUT_FILENO);
+
+        if (makepty) {
+            to_slave.transfer_in(inputfd);
+            if (to_slave.head != to_slave.tail
+                && memmem(&to_slave.buf[to_slave.head], to_slave.tail - to_slave.head,
+                          "\x1b\x03", 2) != NULL)
+                exec_done(child, 128 + SIGTERM);
+            to_slave.transfer_out(ptymaster);
+            from_slave.transfer_in(ptymaster);
+            from_slave.transfer_out(STDOUT_FILENO);
+        }
 
         // check child and timeout
         // (only wait for child if read done/failed)
-        int exit_status = check_child_timeout(child, from_slave.done());
+        int exit_status = check_child_timeout(child, !makepty || from_slave.done());
         if (exit_status != -1)
             exec_done(child, exit_status);
 
         // if child has not died, and read produced error, report it
-        if (from_slave.input_closed && from_slave.rerrno != EIO) {
+        if (makepty && from_slave.input_closed && from_slave.rerrno != EIO) {
             fprintf(stderr, "read: %s\n", strerror(from_slave.rerrno));
             exec_done(child, 125);
         }
@@ -1941,8 +1914,6 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
         kill(child, SIGKILL);
 #endif
     fflush(stdout);
-    if (has_stdin_termios)
-        (void) tcsetattr(STDIN_FILENO, TCSAFLUSH, &stdin_termios);
     exit(exit_status);
 }
 
@@ -1950,7 +1921,7 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
 static __attribute__((noreturn)) void usage(jailaction action = do_start) {
     if (action == do_start) {
         fprintf(stderr, "Usage: pa-jail add [-nh] [-f FILES | -F DATA] [-S SKELETON] JAILDIR [USER]\n\
-       pa-jail run [--fg] [-nqh] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n\
+       pa-jail run [--fg] [-ntqh] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n\
                    [-f FILES | -F DATA] [-S SKELETON] JAILDIR USER COMMAND\n\
        pa-jail mv SOURCE DEST\n\
        pa-jail rm [-nf] JAILDIR\n");
@@ -1983,6 +1954,7 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
         if (action == do_run) {
             fprintf(stderr, "  -p, --pid-file PIDFILE\n\
   -i, --input INPUTSOCKET\n\
+  -t, --pty\n\
   -T, --timeout TIMEOUT\n\
       --fg\n");
         }
@@ -2009,6 +1981,7 @@ static struct option longoptions_run[] = {
     { "contents", required_argument, NULL, 'F' },
     { "fg", no_argument, NULL, 'g' },
     { "timeout", required_argument, NULL, 'T' },
+    { "pty", no_argument, NULL, 't' },
     { "input", required_argument, NULL, 'i' },
     { "chown-home", no_argument, NULL, 'h' },
     { "chown-user", required_argument, NULL, 'u' },
@@ -2027,13 +2000,13 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:f:F:p:T:qi:hu:", "VnS:f:F:p:T:qi:hu:", "Vnf", "Vn"
+    "+Vn", "VnS:f:F:p:T:tqi:hu:", "VnS:f:F:p:T:tqi:hu:", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
-    bool chown_home = false, foreground = false;
+    bool chown_home = false, foreground = false, makepty = false;
     double timeout = -1;
     std::string inputarg, linkarg, contents;
     std::vector<std::string> chown_user_args;
@@ -2088,6 +2061,8 @@ int main(int argc, char** argv) {
                 quiet = true;
             else if (ch == 'u')
                 chown_user_args.push_back(optarg);
+            else if (ch == 't')
+                makepty = true;
             else if (ch == 'T') {
                 char* end;
                 timeout = strtod(optarg, &end);
@@ -2277,7 +2252,8 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc)
-        jailuser.exec(argc, argv, jaildir, inputfd, timeout, foreground);
+        jailuser.exec(argc, argv, jaildir, inputfd, timeout, foreground,
+                      makepty);
 
     exit(0);
 }
