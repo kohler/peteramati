@@ -1672,11 +1672,16 @@ int jailownerinfo::exec_go() {
             if (ptyslave == -1)
                 perror_die(ptyslavename);
 #ifdef TIOCGWINSZ
-            struct winsize ws;
-            ioctl(ptyslave, TIOCGWINSZ, &ws);
-            ws.ws_row = 24;
-            ws.ws_col = 80;
-            ioctl(ptyslave, TIOCSWINSZ, &ws);
+            {
+                struct winsize ws;
+                ioctl(ptyslave, TIOCGWINSZ, &ws);
+                ws.ws_row = 24;
+                ws.ws_col = 80;
+                ioctl(ptyslave, TIOCSWINSZ, &ws);
+            }
+#endif
+#ifdef TIOCSCTTY
+            ioctl(ptyslave, TIOCSCTTY, 0);
 #endif
             struct termios tty;
             if (tcgetattr(ptyslave, &tty) >= 0) {

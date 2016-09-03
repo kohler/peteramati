@@ -319,6 +319,7 @@ __DATA__
 /dev/null
 /dev/pts
 /dev/ptmx
+/dev/tty
 /dev/urandom
 /etc/group
 /etc/ld.so.conf
