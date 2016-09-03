@@ -15,6 +15,7 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <poll.h>
 #include <dirent.h>
 #include <termios.h>
 #include <pwd.h>
@@ -1380,8 +1381,6 @@ class jailownerinfo {
     jaildirinfo* jaildir;
     int inputfd;
     struct timeval timeout;
-    fd_set readset;
-    fd_set writeset;
     struct buffer {
         char buf[8192];
         size_t head;
@@ -1746,9 +1745,6 @@ void jailownerinfo::start_sigpipe() {
     sa.sa_flags = 0;
     sigaction(SIGCHLD, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
-
-    FD_ZERO(&readset);
-    FD_ZERO(&writeset);
 }
 
 void jailownerinfo::buffer::transfer_in(int from) {
@@ -1798,39 +1794,49 @@ bool jailownerinfo::buffer::done() {
 }
 
 void jailownerinfo::block(int ptymaster) {
-    int maxfd = sigpipe[0];
-    FD_SET(sigpipe[0], &readset);
+    struct pollfd p[4];
+
+    p[0].fd = sigpipe[0];
+    p[0].events = POLLIN;
+    int nfd = 1;
 
     if (!to_slave.input_closed && !to_slave.output_closed) {
-        FD_SET(inputfd, &readset);
-        maxfd < inputfd && (maxfd = inputfd);
-    } else
-        FD_CLR(inputfd, &readset);
-    if (!to_slave.output_closed && to_slave.head != to_slave.tail) {
-        FD_SET(ptymaster, &writeset);
-        maxfd < ptymaster && (maxfd = ptymaster);
-    } else
-        FD_CLR(ptymaster, &writeset);
-
-    if (!from_slave.input_closed && !from_slave.output_closed) {
-        FD_SET(ptymaster, &readset);
-        maxfd < ptymaster && (maxfd = ptymaster);
-    } else
-        FD_CLR(ptymaster, &readset);
-    if (!from_slave.output_closed && from_slave.head != from_slave.tail) {
-        FD_SET(STDOUT_FILENO, &writeset);
-        maxfd < STDOUT_FILENO && (maxfd = STDOUT_FILENO);
-    } else
-        FD_CLR(STDOUT_FILENO, &writeset);
-
-    struct timeval delay = {3600, 0};
-    if (timerisset(&timeout)) {
-        gettimeofday(&delay, 0);
-        timersub(&timeout, &delay, &delay);
+        p[nfd].fd = inputfd;
+        p[nfd].events = POLLIN;
+        ++nfd;
     }
-    select(maxfd + 1, &readset, &writeset, NULL, &delay);
 
-    if (FD_ISSET(sigpipe[0], &readset)) {
+    int ptymaster_events = 0;
+    if (!from_slave.input_closed && !from_slave.output_closed)
+        ptymaster_events |= POLLIN;
+    if (!to_slave.output_closed && to_slave.head != to_slave.tail)
+        ptymaster_events |= POLLOUT;
+    if (ptymaster_events) {
+        p[nfd].fd = ptymaster;
+        p[nfd].events = ptymaster_events;
+        ++nfd;
+    }
+
+    if (!from_slave.output_closed && from_slave.head != from_slave.tail) {
+        p[nfd].fd = STDOUT_FILENO;
+        p[nfd].events = POLLOUT;
+        ++nfd;
+    }
+
+    int timeout_ms = 3600000;
+    if (timerisset(&timeout)) {
+        struct timeval now;
+        gettimeofday(&now, 0);
+        if (timercmp(&now, &timeout, >)) {
+            timersub(&timeout, &now, &now);
+            timeout_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
+        } else
+            timeout_ms = 0;
+    }
+
+    poll(p, nfd, timeout_ms);
+
+    if (p[0].revents & POLLIN) {
         char buf[128];
         while (read(sigpipe[0], buf, sizeof(buf)) > 0)
             /* skip */;
