@@ -1936,6 +1936,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     if (!stdout_tty && !stderr_tty) {
         close(STDOUT_FILENO);
         from_slave.input_closed = from_slave.output_closed = true;
+        from_slave.rerrno = EIO; // don't misinterpret closed as error
     }
 
     while (1) {
