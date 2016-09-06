@@ -1,6 +1,6 @@
 ## dbhelper.sh -- shell program helpers for HotCRP database access
 ## HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
-## Distributed under an MIT-like license; see LICENSE
+## See LICENSE for open-source distribution terms
 
 echo_n () {
         # suns can't echo -n, and Mac OS X can't echo "x\c"
