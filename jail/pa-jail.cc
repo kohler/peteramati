@@ -1866,7 +1866,7 @@ void jailownerinfo::block(int ptymaster) {
     if (timerisset(&expiry)) {
         struct timeval now;
         gettimeofday(&now, 0);
-        if (timercmp(&now, &expiry, >)) {
+        if (timercmp(&now, &expiry, <)) {
             timersub(&expiry, &now, &now);
             timeout_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
         } else
