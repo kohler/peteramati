@@ -1,7 +1,7 @@
 <?php
 // homeadmin.php -- HotCRP home page administrative messages
 // HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
-// Distributed under an MIT-like license; see LICENSE
+// See LICENSE for open-source distribution terms
 
 // access only allowed through index.php
 if (!$Conf)

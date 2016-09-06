@@ -85,3 +85,9 @@ directly serves static files under `/testclass/images/`,
 5. XXX Configure conf/gitssh_config and conf/sshid
 
 6. XXX Configure the jail
+
+License
+-------
+
+    Peteramati is distributed under the GNU General Public License, version
+2.0 (GPLv2). See LICENSE for a copy of this license.

@@ -1,7 +1,7 @@
 <?php
 // useractions.php -- HotCRP helpers for user actions
 // HotCRP is Copyright (c) 2008-2015 Eddie Kohler and Regents of the UC
-// Distributed under an MIT-like license; see LICENSE
+// See LICENSE for open-source distribution terms
 
 class UserActions {
 

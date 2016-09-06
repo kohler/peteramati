@@ -1,7 +1,7 @@
 <?php
 // mail.php -- HotCRP mail tool
 // HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
-// Distributed under an MIT-like license; see LICENSE
+// See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
 require_once("src/mailclasses.php");

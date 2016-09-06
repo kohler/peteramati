@@ -1,7 +1,7 @@
 <?php
 // updateschema.php -- HotCRP function for updating old schemata
 // HotCRP is Copyright (c) 2006-2012 Eddie Kohler and Regents of the UC
-// Distributed under an MIT-like license; see LICENSE
+// See LICENSE for open-source distribution terms
 
 function _update_schema_haslinenotes($Conf) {
     $Conf->ql("lock tables CommitNotes write");

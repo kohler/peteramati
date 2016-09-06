@@ -1,7 +1,7 @@
 <?php
 // helpers.php -- HotCRP non-class helper functions
 // HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
-// Distributed under an MIT-like license; see LICENSE
+// See LICENSE for open-source distribution terms
 
 function defappend(&$var, $str) {
     if (!isset($var))

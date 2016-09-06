@@ -1,7 +1,7 @@
 <?php
 // pset.php -- Peteramati problem set page
 // HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
-// Distributed under an MIT-like license; see LICENSE
+// See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/H", "/p", "/p/H", "/p/u", "/p/u/H"));
