@@ -89,5 +89,5 @@ directly serves static files under `/testclass/images/`,
 License
 -------
 
-    Peteramati is distributed under the GNU General Public License, version
-2.0 (GPLv2). See LICENSE for a copy of this license.
+Peteramati is distributed under the GNU General Public License, version 2.0
+(GPLv2). See LICENSE for a copy of this license.
