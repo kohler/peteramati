@@ -196,6 +196,11 @@ function updateSchema($conf) {
     if ($conf->sversion == 92
         && $conf->ql("alter table ContactInfo add `github_username` varbinary(120) DEFAULT NULL"))
         $conf->update_schema_version(93);
+    if ($conf->sversion == 93
+        && $conf->ql("alter table ContactInfo add `passwordUseTime` int(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table ContactInfo add `updateTime` int(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("update ContactInfo set passwordUseTime=lastLogin where passwordUseTime=0"))
+        $conf->update_schema_version(94);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

@@ -37,9 +37,11 @@ class Contact {
 
     private $password = "";
     private $passwordTime = 0;
+    private $passwordUseTime = 0;
     private $defaultWatch;
     private $visits;
     private $creationTime;
+    private $updateTime;
     private $lastLogin;
 
     public $disabled = false;
