@@ -631,7 +631,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     if ($pset->anonymous)
         $x = $s->anon_username;
     else
-        $x = ($s->github_username ? : $s->seascode_username) ? : ($s->huid ? : $s->email);
+        $x = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
     $t .= "<a href=\"" . hoturl("pset", array("pset" => $pset->urlkey, "u" => $x, "sort" => req("sort"))) . "\">"
         . htmlspecialchars($x) . "</a>";
     if ($Me->privChair)
