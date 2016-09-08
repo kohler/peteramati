@@ -181,9 +181,6 @@ class CS61Mailer extends Mailer {
         return $e;
     }
 
-    function decorate_preparation($prep) {
-    }
-
     static function preparation_differs($prep1, $prep2) {
         return parent::preparation_differs($prep1, $prep2);
     }

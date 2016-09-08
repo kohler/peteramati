@@ -72,8 +72,7 @@ function simplify_whitespace($x) {
     return trim(preg_replace('/(?:\s|\xC2\xA0|\xE2\x80[\x80-\x8A\xAF]|\xE2\x81\x9F|\xE3\x80\x80)+/', " ", $x));
 }
 
-function prefix_word_wrap($prefix, $text, $indent = 18, $totWidth = 75,
-                          $prefix_right_justify = true) {
+function prefix_word_wrap($prefix, $text, $indent = 18, $totWidth = 75) {
     if (is_int($indent)) {
         $indentlen = $indent;
         $indent = str_pad("", $indent);
@@ -81,18 +80,52 @@ function prefix_word_wrap($prefix, $text, $indent = 18, $totWidth = 75,
         $indentlen = strlen($indent);
 
     $out = "";
-    while ($text !== "" && ctype_space($text[0])) {
-        $out .= $text[0];
-        $text = substr($text, 1);
-    }
+    if ($prefix !== false) {
+        while ($text !== "" && ctype_space($text[0])) {
+            $out .= $text[0];
+            $text = substr($text, 1);
+        }
+    } else if (($line = UnicodeHelper::utf8_line_break($text, $totWidth)) !== false)
+        $out .= $line . "\n";
 
-    $out .= preg_replace("/^(?!\\Z)/m", $indent, wordwrap($text, $totWidth - $indentlen));
-    if (strlen($prefix) <= $indentlen) {
-        $prefix = str_pad($prefix, $indentlen, " ",
-                          ($prefix_right_justify ? STR_PAD_LEFT : STR_PAD_RIGHT));
-        return $prefix . substr($out, $indentlen);
+    while (($line = UnicodeHelper::utf8_line_break($text, $totWidth - $indentlen)) !== false)
+        $out .= $indent . preg_replace('/^\pZ+/u', '', $line) . "\n";
+
+    if ($prefix === false)
+        /* skip */;
+    else if (strlen($prefix) <= $indentlen) {
+        $prefix = str_pad($prefix, $indentlen, " ", STR_PAD_LEFT);
+        $out = $prefix . substr($out, $indentlen);
     } else
-        return $prefix . "\n" . $out;
+        $out = $prefix . "\n" . $out;
+
+    if (!str_ends_with($out, "\n"))
+        $out .= "\n";
+    return $out;
+}
+
+function center_word_wrap($text, $totWidth = 75, $multi_center = false) {
+    if (strlen($text) <= $totWidth && !preg_match('/[\200-\377]/', $text))
+        return str_pad($text, (int) (($totWidth + strlen($text)) / 2), " ", STR_PAD_LEFT) . "\n";
+    $out = "";
+    while (($line = UnicodeHelper::utf8_line_break($text, $totWidth)) !== false) {
+        $linelen = UnicodeHelper::utf8_glyphlen($line);
+        $out .= str_pad($line, (int) (($totWidth + $linelen) / 2), " ", STR_PAD_LEFT) . "\n";
+    }
+    return $out;
+}
+
+function count_words($text) {
+    return preg_match_all('/[^-\s.,;:<>!?*_~`#|]\S*/', $text);
+}
+
+function friendly_boolean($x) {
+    if (is_bool($x))
+        return $x;
+    else if (is_string($x) || is_int($x))
+        return filter_var($x, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    else
+        return null;
 }
 
 

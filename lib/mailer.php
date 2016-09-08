@@ -477,10 +477,8 @@ class Mailer {
 
         if ($prep->errors && !get($rest, "no_error_quit"))
             return false;
-        else {
-            $this->decorate_preparation($prep);
+        else
             return $prep;
-        }
     }
 
     static function preparation_differs($prep1, $prep2) {
