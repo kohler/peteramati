@@ -489,7 +489,7 @@ class ContactView {
             }
 
         // does it contain odd characters?
-        if (preg_match('_[@,;\[\](){}\\<>&#=\\000-\\027]_', $repo_url))
+        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $repo_url))
             return Conf::msg_error("That repository contains funny characters. Remove them.");
 
         // record interested repositories

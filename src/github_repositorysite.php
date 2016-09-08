@@ -16,20 +16,22 @@ class GitHubResponse {
 }
 
 class GitHub_RepositorySite extends RepositorySite {
+    public $conf;
     public $base;
     public $siteclass = "github";
-    function __construct($url, $base) {
+    function __construct($url, $base, Conf $conf) {
         $this->url = $url;
         $this->base = $base;
+        $this->conf = $conf;
     }
 
     const MAINURL = "https://github.com/";
     static function make_url($url, Conf $conf) {
         $url = preg_replace('_\s*/\s*_', '/', $url);
         if (preg_match('_\A(?:github(?:\.com)?[:/])?/*([^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m))
-            return new GitHub_RepositorySite("git@github.com:" . $m[1], $m[1]);
+            return new GitHub_RepositorySite("git@github.com:" . $m[1], $m[1], $conf);
         if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)github.com(?::/*|/+)([^/]+?/[^/]+?)(?:\.git|)\z_i', $url, $m))
-            return new GitHub_RepositorySite($url, $m[1]);
+            return new GitHub_RepositorySite($url, $m[1], $conf);
         return null;
     }
     static function sniff_url($url) {
@@ -188,34 +190,48 @@ class GitHub_RepositorySite extends RepositorySite {
 
     function message_defs(Contact $user) {
         $base = $user->is_anonymous ? "[anonymous]" : $this->base;
-        return ["REPOGITURL" => "git@github.com:$base", "REPOBASE" => $base];
+        return ["REPOURL" => "https://github.com/$base", "REPOGITURL" => "git@github.com:$base", "REPOBASE" => $base, "GITHUB" => 1];
+    }
+    function expand_message($name, Contact $user) {
+        return Messages::$main->expand_html($name, $this->message_defs($user));
     }
 
     function validate_open(MessageSet $ms = null) {
-        return RepositorySite::run_ls_remote($this->git_url(), $output);
+        $response = self::api($this->conf, "https://api.github.com/repos/" . $this->base);
+        if ($response->status == 200 && $response->j && $response->j->private)
+            return 0;
+        if ($response->status == 200 && $response->j && !$response->j->private) {
+            $ms && $ms->set_error_html("open", $this->expand_message("repo_toopublic", $ms->user));
+            return 1;
+        }
+        if ($response->status == 404) {
+            $ms && $ms->set_error_html("open", $this->expand_message("repo_nonexistent", $ms->user));
+            return 1;
+        }
+        return -1;
     }
     function validate_working(MessageSet $ms = null) {
         $status = RepositorySite::run_ls_remote($this->ssh_url(), $output);
         $answer = join("\n", $output);
         if ($status == 0 && $ms)
-            $ms->set_error_html("working", Messages::$main->expand_html("repo_unreadable", $this->message_defs($ms->user)));
+            $ms->set_error_html("working", $this->expand_message("repo_unreadable", $ms->user));
         if ($status > 0 && !preg_match(',^[0-9a-f]{40}\s+refs/heads/master,m', $answer)) {
             if ($ms)
-                $ms->set_error_html("working", Messages::$main->expand_html("repo_nomaster", $this->message_defs($ms->user)));
+                $ms->set_error_html("working", $this->expand_message("repo_nomaster", $ms->user));
             $status = 0;
         }
         return $status;
     }
     function validate_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
-        $xpartner = $partner && $partner->seascode_username;
-        if (!str_starts_with($this->base, "~") || !$user->seascode_username)
+        if (!$user->github_username)
             return -1;
-        if (preg_match('_\A~(?:' . preg_quote($user->seascode_username)
-                       . ($partner ? "|" . preg_quote($partner->seascode_username) : "")
-                       . ')/_i', $this->base))
+        $response = self::api($this->conf, "https://api.github.com/repos/" . $this->base . "/collaborators/" . urlencode($user->github_username));
+        if ($response->status == 204)
             return 1;
-        if ($ms)
-            $ms->set_error_html("ownership", $partner ? "This repository belongs to neither you nor your partner." : "This repository does not belong to you.");
-        return 0;
+        if ($response->status == 404) {
+            $ms && $ms->set_error_html("ownership", "Your GitHub account isn’t a collaborator on this repository, which may prevent you from committing. This can be changed on " . Ht::link("“Settings”", $this->web_url() . "/settings") . ".");
+            return 0;
+        }
+        return -1;
     }
 }

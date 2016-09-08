@@ -910,7 +910,6 @@ class Conf {
         }
 
         // jQuery
-        $stash = Ht::unstash();
         if (isset($this->opt["jqueryUrl"]))
             $jquery = $this->opt["jqueryUrl"];
         else if ($this->opt("jqueryCdn"))

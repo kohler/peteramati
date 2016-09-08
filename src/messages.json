@@ -1,5 +1,9 @@
 [
     {
+        "type": "repo_nonexistent",
+        "html": "No such repository %REPOURL%. Check the repository name and try again."
+    },
+    {
         "type": "repo_unreadable",
         "html": "We can’t access the repository at %REPOGITURL%. Check the repository name and try again."
     },
@@ -15,6 +19,11 @@
     {
         "type": "repo_toopublic",
         "html": "The %REPOBASE% repository is too public. Use <a href=\"https://code.seas.harvard.edu/%REPOBASE%/memberships\">“Manage read access”</a> to grant the %SYSTEAM% team read access; this should shut down public access."
+    },
+    {
+        "type": "repo_toopublic",
+        "html": "The %REPOBASE% repository is too public. Use <a href=\"%REPOURL%/settings\">“Settings”</a> to make the repository private.",
+        "require": "GITHUB"
     },
     {
         "type": "repo_toopublic_timeout",
