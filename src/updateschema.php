@@ -178,6 +178,7 @@ function updateSchema($conf) {
         && $conf->ql("alter table CapabilityMap ENGINE=InnoDB")
         && $conf->ql("alter table CommitNotes ENGINE=InnoDB")
         && $conf->ql("alter table ContactGrade ENGINE=InnoDB")
+        && update_schema_drop_keys_if_exist($conf, "ContactInfo", ["name", "affiliation", "email_3", "firstName_2", "lastName"])
         && $conf->ql("alter table ContactInfo ENGINE=InnoDB")
         && $conf->ql("alter table ContactLink ENGINE=InnoDB")
         && $conf->ql("alter table ExecutionQueue ENGINE=InnoDB")
