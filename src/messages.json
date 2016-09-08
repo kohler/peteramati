@@ -32,5 +32,14 @@
     {
         "type": "repo_working_timeout",
         "html": "I can’t verify whether %REPOBASE% is working."
+    },
+    {
+        "type": "repo_notowner",
+        "html": "Your GitHub account isn’t a collaborator on this repository. This can be changed on <a href=\"%REPOURL%/settings\">“Settings”</a>.",
+        "require": "GITHUB"
+    },
+    {
+        "type": "repo_notowner",
+        "html": "Your account isn’t a collaborator on this repository."
     }
 ]

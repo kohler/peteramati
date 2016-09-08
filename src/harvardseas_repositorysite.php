@@ -129,7 +129,8 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
         }
         return $status;
     }
-    function validate_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
+    function validate_ownership(Repository $repo, Contact $user, Contact $partner = null,
+                                MessageSet $ms = null) {
         $xpartner = $partner && $partner->seascode_username;
         if (!str_starts_with($this->base, "~") || !$user->seascode_username)
             return -1;

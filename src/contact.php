@@ -47,6 +47,8 @@ class Contact {
     public $disabled = false;
     public $activity_at = false;
     public $note;
+    public $data;
+    public $studentYear;
 
     public $huid;
     public $college;

@@ -44,6 +44,8 @@ class Repository {
         $this->lastpset = (int) $this->lastpset;
         $this->working = (int) $this->working;
         $this->snapcommitat = (int) $this->snapcommitat;
+        if ($this->notes !== null)
+            $this->notes = json_decode($this->notes, true);
         $this->reposite = RepositorySite::make($this->url, $this->conf);
     }
 
@@ -96,6 +98,10 @@ class Repository {
         return $this->url;
     }
 
+    function expand_message($name, Contact $user) {
+        return Messages::$main->expand_html($name, $this->reposite->message_defs($user));
+    }
+
     const VALIDATE_TIMEOUT = 5;
     const VALIDATE_TOTAL_TIMEOUT = 15;
     static private $validate_time_used = 0;
@@ -115,9 +121,7 @@ class Repository {
         global $Now;
         // Recheck repository openness after a day for closed repositories,
         // and after 30 seconds for open or failed-check repositories.
-        if ($this->open == 0 && $Now - $this->opencheckat <= 86400)
-            return 0;
-        if ($this->open != 0 && $Now - $this->opencheckat > 30) {
+        if ($Now - $this->opencheckat > ($this->open == 0 ? 86400 : 30)) {
             $open = $this->validate_open($ms);
             if ($open != $this->open || $Now != $this->opencheckat) {
                 if ($this->repoid > 0)
@@ -156,15 +160,39 @@ class Repository {
                     $this->conf->qe("update Repository set working=? where repoid=?", $Now, $this->repoid);
             }
         }
-        if ($working < 0 && $ms && $ms->user->isPC && !$ms->has_problems())
+        if ($working < 0 && $ms && $ms->user->isPC && !$ms->has_problem("working"))
             $ms->set_warning_html("working", Messages::$main->expand_html("repo_working_timeout", $this->reposite->message_defs($ms->user)));
-        if ($working == 0 && $ms && !$ms->has_problems())
+        if ($working == 0 && $ms && !$ms->has_problem("working"))
             $ms->set_error_html("working", Messages::$main->expand_html("repo_unreadable", $this->reposite->message_defs($ms->user)));
         return $working > 0;
     }
 
+    function validate_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
+        return $this->reposite->validate_ownership($this, $user, $partner, $ms);
+    }
     function check_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
-        return $this->reposite->validate_ownership($user, $partner, $ms);
+        global $Now;
+        list($when, $ownership) = [0, -1];
+        $always = $this->reposite->validate_ownership_always();
+        if ($this->notes && isset($this->notes["owner." . $user->contactId]))
+            list($when, $ownership) = $this->notes["owner." . $user->contactId];
+        if ($Now - $when > ($ownership > 0 ? 86400 : 30) || $always) {
+            $ownership = $this->validate_ownership($user, $partner, $ms);
+            if (!$always)
+                Dbl::compare_and_swap($user->conf->dblink,
+                    "select notes from Repository where repoid=?", [$this->repoid],
+                    function ($value) use ($user, $ownership) {
+                        $value = json_decode($value, true) ? : [];
+                        $value["owner." . $user->contactId] = [time(), $ownership];
+                        $this->notes = $value;
+                        return json_encode($value);
+                    },
+                    "update Repository set notes=?{desired} where notes?{expected}e and repoid=?", [$this->repoid]);
+        }
+        if ($ownership == 0 && $ms && !$ms->has_problem("ownership"))
+            $ms->set_warning_html("ownership", $this->expand_message("repo_notowner", $ms->user));
+
+        return $ownership;
     }
 
     function truncated_psetdir(Pset $pset) {

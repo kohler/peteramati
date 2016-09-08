@@ -58,7 +58,11 @@ class RepositorySite {
     function validate_working(MessageSet $ms = null) {
         return -1;
     }
-    function validate_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
+    function validate_ownership_always() {
+        return true;
+    }
+    function validate_ownership(Repository $repo, Contact $user, Contact $partner = null,
+                                MessageSet $ms = null) {
         return -1;
     }
 

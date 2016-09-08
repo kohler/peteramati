@@ -222,16 +222,18 @@ class GitHub_RepositorySite extends RepositorySite {
         }
         return $status;
     }
-    function validate_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
+    function validate_ownership_always() {
+        return false;
+    }
+    function validate_ownership(Repository $repo, Contact $user, Contact $partner = null,
+                                MessageSet $ms = null) {
         if (!$user->github_username)
             return -1;
         $response = self::api($this->conf, "https://api.github.com/repos/" . $this->base . "/collaborators/" . urlencode($user->github_username));
         if ($response->status == 204)
             return 1;
-        if ($response->status == 404) {
-            $ms && $ms->set_error_html("ownership", "Your GitHub account isn’t a collaborator on this repository, which may prevent you from committing. This can be changed on " . Ht::link("“Settings”", $this->web_url() . "/settings") . ".");
+        if ($response->status == 404)
             return 0;
-        }
         return -1;
     }
 }

@@ -26,6 +26,7 @@ class Messages {
     }
 
     private function check($j, $defs) {
+        $nrequire = 1;
         if (get($j, "require")) {
             $reqs = is_array($j->require) ? $j->require : array($j->require);
             foreach ($reqs as $req)
@@ -33,19 +34,29 @@ class Messages {
                     $exists = (array_key_exists($m[2], $defs) ? $defs[$m[2]] !== null :
                                get($this->defs, $m[2]) !== null);
                     if ($exists ? $m[1] === "!" : $m[1] === "")
-                        return false;
+                        return 0;
+                    ++$nrequire;
                 }
         }
-        return true;
+        return $nrequire;
     }
 
     public function find($type, $kind, $defs = array()) {
         $reqj = null;
-        foreach (get($this->mtype, $type) ? : array() as $j)
-            if ((!$reqj || (float) get($reqj, "priority") <= (float) get($j, "priority"))
-                && $this->check($j, $defs)
-                && get($j, $kind) !== null)
-                $reqj = $j;
+        $reqprio = -10000;
+        $reqnrequire = 0;
+        foreach (get($this->mtype, $type) ? : array() as $j) {
+            if (get($j, $kind) === null)
+                continue;
+            if (($nrequire = $this->check($j, $defs)) <= 0)
+                continue;
+            $prio = (float) get($reqj, "priority");
+            if ($prio < $reqprio || ($prio == $reqprio && $nrequire < $reqnrequire))
+                continue;
+            $reqj = $j;
+            $reqprio = $prio;
+            $reqnrequire = $nrequire;
+        }
         return $reqj;
     }
 
