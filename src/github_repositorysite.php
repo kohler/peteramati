@@ -129,15 +129,19 @@ class GitHub_RepositorySite extends RepositorySite {
             return Conf::msg_error("That username is already in use.");
 
         // is it valid? XXX GitHub API
-        if (($org = $user->conf->opt("githubOrganization")))
+        $response = null;
+        if (($org = $user->conf->opt("githubOrganization"))) {
             $url = "https://api.github.com/orgs/" . urlencode($org) . "/members/" . urlencode($username);
-        else
+            $response = self::api($user->conf, $url);
+            if ($response->status == 404 && $user->conf->opt("githubRequireOrganizationMembership"))
+                return Conf::msg_error("That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . " that manages the class. Follow the link for registering with the class, or contact course staff.");
+        }
+        if (!$response || $response->status == 404) {
             $url = "https://api.github.com/users/" . urlencode($username);
-        $response = self::api($user->conf, $url);
+            $response = self::api($user->conf, $url);
+        }
 
-        if ($response->status == 404 && $org)
-            return Conf::msg_error("That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . " that manages the class. Follow the link for registering with the class, or contact course staff.");
-        else if ($response->status == 404)
+        if ($response->status == 404)
             return Conf::msg_error("That username doesn’t appear to exist. Check your spelling.");
         else if ($response->status != 200 && $response->status != 204)
             return Conf::msg_error("Error contacting " . htmlspecialchars($userurl) . " (response code $response_code). Maybe try again?");
