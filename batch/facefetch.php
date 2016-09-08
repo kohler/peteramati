@@ -3,9 +3,9 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-$ConfSiteBase = preg_replace(',/batch/[^/]+,', '', __FILE__);
-require_once("$ConfSiteBase/src/init.php");
-require_once("$ConfSiteBase/lib/getopt.php");
+$ConfSitePATH = preg_replace(',/batch/[^/]+,', '', __FILE__);
+require_once("$ConfSitePATH/src/init.php");
+require_once("$ConfSitePATH/lib/getopt.php");
 
 $arg = getopt_rest($argv, "hn:l:a", array("help", "name:", "limit:", "all"));
 if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {

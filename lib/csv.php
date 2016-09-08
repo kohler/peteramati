@@ -1,6 +1,6 @@
 <?php
 // csv.php -- HotCRP CSV parsing functions
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and others
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class CsvParser {
@@ -118,7 +118,7 @@ class CsvParser {
             if ($i && $line[$pos] === ",")
                 ++$pos;
             $bpos = $pos;
-            if ($line[$pos] === "\"") {
+            if ($pos != $linelen && $line[$pos] === "\"") {
                 while (1) {
                     $pos = strpos($line, "\"", $pos + 1);
                     if ($pos === false) {
@@ -128,7 +128,7 @@ class CsvParser {
                         $line .= $this->lines[$this->pos];
                         ++$this->pos;
                         $linelen = self::linelen($line);
-                    } else if (@$line[$pos + 1] === "\"")
+                    } else if ($pos + 1 < $linelen && $line[$pos + 1] === "\"")
                         ++$pos;
                     else
                         break;
@@ -142,7 +142,7 @@ class CsvParser {
                     $pos = $linelen;
                 $field = substr($line, $bpos, $pos - $bpos);
             }
-            if (@((string) $header[$i]) !== "")
+            if ($header && get_s($header, $i) !== "")
                 $a[$header[$i]] = $field;
             else
                 $a[$i] = $field;
@@ -162,7 +162,7 @@ class CsvParser {
             if ($pos === false)
                 $pos = $linelen;
             $field = substr($line, $bpos, $pos - $bpos);
-            if (@((string) $header[$i]) !== "")
+            if ($header && get_s($header, $i) !== "")
                 $a[$header[$i]] = $field;
             else
                 $a[$i] = $field;
@@ -184,7 +184,7 @@ class CsvParser {
             if ($pos === false)
                 $pos = $linelen;
             $field = substr($line, $bpos, $pos - $bpos);
-            if (@((string) $header[$i]) !== "")
+            if ($header && get_s($header, $i) !== "")
                 $a[$header[$i]] = $field;
             else
                 $a[$i] = $field;
@@ -199,7 +199,7 @@ class CsvParser {
         $i = 0;
         $a = array();
         foreach ($line as $field) {
-            if (@((string) $header[$i]) !== "")
+            if ($header && get_s($header, $i) !== "")
                 $a[$header[$i]] = $field;
             else
                 $a[$i] = $field;
@@ -207,22 +207,39 @@ class CsvParser {
         }
         return $a;
     }
-
 }
 
 class CsvGenerator {
-
     const TYPE_COMMA = 0;
     const TYPE_PIPE = 1;
     const TYPE_TAB = 2;
+    const FLAG_TYPE = 3;
+    const FLAG_ALWAYS_QUOTE = 4;
+    const FLAG_CRLF = 8;
+    const FLAG_CR = 16;
+    const FLAG_LF = 0;
 
     private $type;
+    private $flags;
     private $lines = array();
-    private $header = false;
+    private $lines_length = 0;
+    public $headerline = "";
     private $selection = null;
+    private $lf = "\n";
+    private $comment;
 
-    function __construct($type = self::TYPE_COMMA) {
-        $this->type = $type;
+    function __construct($type = self::TYPE_COMMA, $comment = false) {
+        $this->type = $type & self::FLAG_TYPE;
+        $this->flags = $type;
+        if ($this->flags & self::FLAG_CRLF)
+            $this->lf = "\r\n";
+        else if ($this->flags & self::FLAG_CR)
+            $this->lf = "\r";
+        $this->comment = $comment;
+    }
+
+    static function always_quote($text) {
+        return '"' . str_replace('"', '""', $text) . '"';
     }
 
     static function quote($text, $quote_empty = false) {
@@ -231,7 +248,7 @@ class CsvGenerator {
         else if (preg_match('/\A[-_@\$#+A-Za-z0-9.](?:[-_@\$#+A-Za-z0-9. \t]*[-_\$#+A-Za-z0-9.]|)\z/', $text))
             return $text;
         else
-            return '"' . str_replace('"', '""', $text) . '"';
+            return self::always_quote($text);
     }
 
     function is_csv() {
@@ -243,12 +260,12 @@ class CsvGenerator {
     }
 
     function select($row) {
-        if (!is_array($this->selection))
+        if (!$this->selection)
             return $row;
         $selected = array();
         $i = 0;
         foreach ($this->selection as $key) {
-            $val = @(is_array($row) ? $row[$key] : $row->$key);
+            $val = get($row, $key);
             if ($val !== null) {
                 while (count($selected) < $i)
                     $selected[] = "";
@@ -264,9 +281,15 @@ class CsvGenerator {
         return $selected;
     }
 
+    function add_string($text) {
+        $this->lines[] = $text;
+        $this->lines_length += strlen($text);
+    }
+
     function add($row) {
         if (is_string($row)) {
-            $this->lines[] = $row;
+            error_log("unexpected CsvGenerator::add(string): " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
+            $this->add_string($row);
             return;
         }
         reset($row);
@@ -275,36 +298,53 @@ class CsvGenerator {
             foreach ($row as $x)
                 $this->add($x);
         } else {
-            if (is_array($this->selection))
-                $row = $this->select($row);
+            $srow = $this->selection ? $this->select($row) : $row;
             if ($this->type == self::TYPE_COMMA) {
-                foreach ($row as &$x)
-                    $x = self::quote($x);
-                $this->lines[] = join(",", $row) . "\n";
+                if ($this->flags & self::FLAG_ALWAYS_QUOTE) {
+                    foreach ($srow as &$x)
+                        $x = self::always_quote($x);
+                } else {
+                    foreach ($srow as &$x)
+                        $x = self::quote($x);
+                }
+                $this->add_string(join(",", $srow) . $this->lf);
             } else if ($this->type == self::TYPE_TAB)
-                $this->lines[] = join("\t", $row) . "\n";
+                $this->add_string(join("\t", $srow) . $this->lf);
             else
-                $this->lines[] = join("|", $row) . "\n";
+                $this->add_string(join("|", $srow) . $this->lf);
+            if ($this->comment && $this->selection && ($cmt = get($row, "__postcomment__"))) {
+                preg_match_all('/([^\r\n]*)(?:\r\n?|\n|\z)/', $cmt, $m);
+                if ($m[1][count($m[1]) - 1] === "")
+                    array_pop($m[1]);
+                foreach ($m[1] as $x)
+                    $this->add_string($this->comment . $x . $this->lf);
+                $this->add_string($this->lf);
+            }
         }
     }
 
     function set_header($header, $comment = false) {
-        assert(!count($this->lines) && !$this->header);
+        assert(!count($this->lines) && $this->headerline === "");
         $this->add($header);
         if ($this->type == self::TYPE_TAB && $comment)
             $this->lines[0] = "#" . $this->lines[0];
         if ($this->selection === null && is_associative_array($header))
             $this->selection = array_keys($header);
-        $this->header = true;
+        $this->headerline = $this->lines[0];
+        $this->lines = [];
+        $this->lines_length = 0;
     }
 
     function set_selection($selection) {
-        $this->selection = $selection;
+        if (is_associative_array($selection))
+            $this->selection = array_keys($selection);
+        else
+            $this->selection = $selection;
     }
 
     function download_headers($downloadname = null, $attachment = null) {
         if ($this->is_csv())
-            header("Content-Type: text/csv; charset=utf-8; header=" . ($this->header ? "present" : "absent"));
+            header("Content-Type: text/csv; charset=utf-8; header=" . ($this->headerline !== "" ? "present" : "absent"));
         else
             header("Content-Type: text/plain; charset=utf-8");
         if ($attachment === null)
@@ -316,16 +356,24 @@ class CsvGenerator {
         header("X-Content-Type-Options: nosniff");
     }
 
+    function sort($flags = SORT_NORMAL) {
+        sort($this->lines, $flags);
+    }
+
     function unparse() {
-        return join("", $this->lines);
+        return $this->headerline . join("", $this->lines);
     }
 
     function download() {
         global $zlib_output_compression;
-        $text = join("", $this->lines);
         if (!$zlib_output_compression)
-            header("Content-Length: " . strlen($text));
-        echo $text;
+            header("Content-Length: " . (strlen($this->headerline) + $this->lines_length));
+        echo $this->headerline;
+        // try to avoid out-of-memory
+        if ($this->lines_length <= 10000000)
+            echo join("", $this->lines);
+        else
+            foreach ($this->lines as $line)
+                echo $line;
     }
-
 }

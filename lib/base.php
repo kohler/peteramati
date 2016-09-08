@@ -1,6 +1,6 @@
 <?php
 // base.php -- HotCRP base helper functions
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 // string helpers
@@ -30,8 +30,46 @@ function cleannl($text) {
     return $text;
 }
 
+function is_valid_utf8($str) {
+    return !!preg_match('//u', $str);
+}
+
+if (function_exists("iconv")) {
+    function windows_1252_to_utf8($str) {
+        return iconv("Windows-1252", "UTF-8//IGNORE", $str);
+    }
+    function mac_os_roman_to_utf8($str) {
+        return iconv("Mac", "UTF-8//IGNORE", $str);
+    }
+} else if (function_exists("mb_convert_encoding")) {
+    function windows_1252_to_utf8($str) {
+        return mb_convert_encoding($str, "UTF-8", "Windows-1252");
+    }
+}
+if (!function_exists("windows_1252_to_utf8")) {
+    function windows_1252_to_utf8($str) {
+        return UnicodeHelper::windows_1252_to_utf8($str);
+    }
+}
+if (!function_exists("mac_os_roman_to_utf8")) {
+    function mac_os_roman_to_utf8($str) {
+        return UnicodeHelper::mac_os_roman_to_utf8($str);
+    }
+}
+
+function convert_to_utf8($str) {
+    if (is_valid_utf8($str))
+        return $str;
+    $pfx = substr($str, 0, 5000);
+    if (substr_count($pfx, "\r") > 1.5 * substr_count($pfx, "\n"))
+        return mac_os_roman_to_utf8($str);
+    else
+        return windows_1252_to_utf8($str);
+}
+
 function simplify_whitespace($x) {
-    return trim(preg_replace('/\s+/', " ", $x));
+    // Replace ALL invisible Unicode space-type characters with true spaces
+    return trim(preg_replace('/(?:\s|\xC2\xA0|\xE2\x80[\x80-\x8A\xAF]|\xE2\x81\x9F|\xE3\x80\x80)+/', " ", $x));
 }
 
 function prefix_word_wrap($prefix, $text, $indent = 18, $totWidth = 75,
@@ -131,6 +169,88 @@ if (!defined("JSON_UNESCAPED_UNICODE"))
 
 // array and object helpers
 
+function get($var, $idx, $default = null) {
+    if (is_array($var))
+        return array_key_exists($idx, $var) ? $var[$idx] : $default;
+    else if (is_object($var))
+        return property_exists($var, $idx) ? $var->$idx : $default;
+    else if ($var === null)
+        return $default;
+    else {
+        error_log("inappropriate get: " . var_export($var, true) . ": " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
+        return $default;
+    }
+}
+
+function get_s($var, $idx, $default = null) {
+    return (string) get($var, $idx, $default);
+}
+
+function get_i($var, $idx, $default = null) {
+    return (int) get($var, $idx, $default);
+}
+
+function get_f($var, $idx, $default = null) {
+    return (float) get($var, $idx, $default);
+}
+
+function opt($idx, $default = null) {
+    global $Conf, $Opt;
+    return get($Conf ? $Conf->opt : $Opt, $idx, $default);
+}
+
+function req($idx, $default = null) {
+    if (isset($_POST[$idx]))
+        return $_POST[$idx];
+    else if (isset($_GET[$idx]))
+        return $_GET[$idx];
+    else
+        return $default;
+}
+
+function req_s($idx, $default = null) {
+    return (string) req($idx, $default);
+}
+
+function set_req($idx, $value) {
+    $_GET[$idx] = $_POST[$idx] = $_REQUEST[$idx] = $value;
+}
+
+function uploaded_file_error($finfo) {
+    $e = $finfo["error"];
+    $name = get($finfo, "name") ? "<span class=\"lineno\">" . htmlspecialchars($finfo["name"]) . ":</span> " : "";
+    if ($e == UPLOAD_ERR_INI_SIZE || $e == UPLOAD_ERR_FORM_SIZE)
+        return $name . "Uploaded file too big. The maximum upload size is " . ini_get("upload_max_filesize") . "B.";
+    else if ($e == UPLOAD_ERR_PARTIAL)
+        return $name . "Upload process interrupted.";
+    else if ($e != UPLOAD_ERR_NO_FILE)
+        return $name . "Unknown upload error.";
+    else
+        return false;
+}
+
+function make_qreq() {
+    $qreq = new Qobject;
+    foreach ($_GET as $k => $v)
+        $qreq[$k] = $v;
+    foreach ($_POST as $k => $v)
+        $qreq[$k] = $v;
+
+    // $_FILES requires special processing since we want error messages.
+    $qreq->_FILES = new Qobject;
+    $errors = [];
+    foreach ($_FILES as $f => $finfo) {
+        if (($e = $finfo["error"]) == UPLOAD_ERR_OK) {
+            if (is_uploaded_file($finfo["tmp_name"]))
+                $qreq->_FILES[$f] = $finfo;
+        } else if (($err = uploaded_file_error($finfo)))
+            $errors[] = $err;
+    }
+    if (count($errors) && Conf::$g)
+        Conf::msg_error("<div class=\"parseerr\"><p>" . join("</p>\n<p>", $errors) . "</p></div>");
+    return $qreq;
+}
+
 function defval($var, $idx, $defval = null) {
     if (is_array($var))
         return (isset($var[$idx]) ? $var[$idx] : $defval);
@@ -154,17 +274,24 @@ function array_to_object_recursive($a) {
         return $a;
 }
 
-function object_replace_recursive($a, $b) {
-    foreach (get_object_vars($b) as $k => $v)
+function object_replace($a, $b) {
+    foreach (is_object($b) ? get_object_vars($b) : $b as $k => $v)
         if ($v === null)
             unset($a->$k);
-        else if (!is_object($v))
+        else
             $a->$k = $v;
-        else {
-            if (!property_exists($a, $k) || !is_object($a->$k))
-                $a->$k = (object) array();
+}
+
+function object_replace_recursive($a, $b) {
+    foreach (is_object($b) ? get_object_vars($b) : $b as $k => $v)
+        if ($v === null)
+            unset($a->$k);
+        else if (!property_exists($a, $k)
+                 || !is_object($a->$k)
+                 || !is_object($v))
+            $a->$k = $v;
+        else
             object_replace_recursive($a->$k, $v);
-        }
 }
 
 function object_merge_recursive($a, $b) {
@@ -173,6 +300,20 @@ function object_merge_recursive($a, $b) {
             $a->$k = $v;
         else if (is_object($a->$k) && is_object($v))
             object_merge_recursive($a->$k, $v);
+}
+
+function json_object_replace($j, $updates, $nullable = false) {
+    if ($j === null)
+        $j = (object) [];
+    else if (is_array($j))
+        $j = (object) $j;
+    object_replace($j, $updates);
+    if ($nullable) {
+        $x = get_object_vars($j);
+        if (empty($x))
+            $j = null;
+    }
+    return $j;
 }
 
 
@@ -184,14 +325,14 @@ function caller_landmark($position = 1, $skipfunction_re = null) {
     $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
     $fname = null;
     for (++$position; isset($trace[$position]); ++$position) {
-        $fname = (string) @$trace[$position]["class"];
+        $fname = get_s($trace[$position], "class");
         $fname .= ($fname ? "::" : "") . $trace[$position]["function"];
         if ((!$skipfunction_re || !preg_match($skipfunction_re, $fname))
-            && ($fname !== "call_user_func" || @$trace[$position - 1]["file"]))
+            && ($fname !== "call_user_func" || get($trace[$position - 1], "file")))
             break;
     }
     $t = "";
-    if ($position > 0 && ($pi = @$trace[$position - 1]) && @$pi["file"])
+    if ($position > 0 && ($pi = $trace[$position - 1]) && isset($pi["file"]))
         $t = $pi["file"] . ":" . $pi["line"];
     if ($fname)
         $t .= ($t ? ":" : "") . $fname;
@@ -201,11 +342,12 @@ function caller_landmark($position = 1, $skipfunction_re = null) {
 
 // pcntl helpers
 
-if (!function_exists("pcntl_wifexited")) {
-    function pcntl_wifexited($status) {
-        return ($status & 0x7f) == 0;
+if (function_exists("pcntl_wifexited") && pcntl_wifexited(0) !== null) {
+    function pcntl_wifexitedsuccess($status) {
+        return pcntl_wifexited($status) && pcntl_wexitstatus($status) == 0;
     }
-    function pcntl_wexitstatus($status) {
-        return ($status & 0xff00) >> 8;
+} else {
+    function pcntl_wifexitedsuccess($status) {
+        return ($status & 0x7f) == 0 && (($status & 0xff00) >> 8) == 0;
     }
 }

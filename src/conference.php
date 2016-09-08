@@ -1,34 +1,49 @@
 <?php
 // conference.php -- HotCRP central helper class (singleton)
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
-class Conference {
-
+class Conf {
     public $dblink = null;
 
     var $settings;
     var $settingTexts;
-    var $sversion;
+    public $sversion;
     var $deadlineCache;
+
+    public $dbname;
+    public $dsn = null;
+
+    public $short_name;
+    public $long_name;
+    public $download_prefix;
+    public $opt;
+    public $opt_override = null;
 
     private $save_messages = true;
     var $headerPrinted = false;
     private $_save_logs = false;
 
-    private $scriptStuff = "";
     private $usertimeId = 1;
 
-    function __construct($dsn) {
-        global $Opt;
+    private $_date_format_initialized = false;
+
+    static public $g = null;
+
+    function __construct($options, $make_dsn) {
         // unpack dsn, connect to database, load current settings
-        if (($this->dsn = $dsn))
-            list($this->dblink, $Opt["dbName"]) = Dbl::connect_dsn($this->dsn);
-        if (!@$Opt["confid"])
-            $Opt["confid"] = @$Opt["dbName"];
-        if ($this->dblink) {
+        if ($make_dsn && ($this->dsn = Dbl::make_dsn($options)))
+            list($this->dblink, $options["dbName"]) = Dbl::connect_dsn($this->dsn);
+        if (!isset($options["confid"]))
+            $options["confid"] = get($options, "dbName");
+        $this->opt = $options;
+        $this->dbname = $options["dbName"];
+        if ($this->dblink && !Dbl::$default_dblink) {
             Dbl::set_default_dblink($this->dblink);
             Dbl::set_error_handler(array($this, "query_error_handler"));
+        }
+        if ($this->dblink) {
+            Dbl::$landmark_sanitizer = "/^(?:Dbl::|Conf::q|call_user_func)/";
             $this->load_settings();
         } else
             $this->crosscheck_options();
@@ -40,75 +55,80 @@ class Conference {
     //
 
     function load_settings() {
-        global $Opt, $OptOverride, $Now, $OK;
+        global $Now;
 
         // load settings from database
         $this->settings = array();
         $this->settingTexts = array();
+        foreach ($this->opt_override ? : [] as $k => $v) {
+            if ($v === null)
+                unset($this->opt[$k]);
+            else
+                $this->opt[$k] = $v;
+        }
+        $this->opt_override = [];
+
         $this->_pc_seeall_cache = null;
         $this->deadlineCache = null;
 
-        $result = $this->q("select name, value, data from Settings");
+        $result = $this->q_raw("select name, value, data from Settings");
         while ($result && ($row = $result->fetch_row())) {
             $this->settings[$row[0]] = (int) $row[1];
             if ($row[2] !== null)
                 $this->settingTexts[$row[0]] = $row[2];
             if (substr($row[0], 0, 4) == "opt.") {
                 $okey = substr($row[0], 4);
-                if (!array_key_exists($okey, $OptOverride))
-                    $OptOverride[$okey] = @$Opt[$okey];
-                $Opt[$okey] = ($row[2] === null ? $row[1] : $row[2]);
+                $this->opt_override[$okey] = get($this->opt, $okey);
+                $this->opt[$okey] = ($row[2] === null ? (int) $row[1] : $row[2]);
             }
         }
         Dbl::free($result);
 
         // update schema
-        if ($this->settings["allowPaperOption"] < 91) {
-            require_once("updateschema.php");
-            $oldOK = $OK;
-            updateSchema($this);
-            $OK = $oldOK;
-        }
         $this->sversion = $this->settings["allowPaperOption"];
-
-        // invalidate caches after loading from backup
-        if (isset($this->settings["frombackup"])
-            && $this->invalidateCaches()) {
-            $this->qe("delete from Settings where name='frombackup' and value=" . $this->settings["frombackup"]);
-            unset($this->settings["frombackup"]);
+        if ($this->sversion < 93) {
+            require_once("updateschema.php");
+            $old_nerrors = Dbl::$nerrors;
+            updateSchema($this);
+            Dbl::$nerrors = $old_nerrors;
         }
+
+        // invalidate all caches after loading from backup
+        if (isset($this->settings["frombackup"])
+            && $this->invalidate_caches()) {
+            $this->qe_raw("delete from Settings where name='frombackup' and value=" . $this->settings["frombackup"]);
+            unset($this->settings["frombackup"]);
+        } else
+            $this->invalidate_caches(["rf" => true]);
 
         // update options
-        if (isset($Opt["ldapLogin"]) && !$Opt["ldapLogin"])
-            unset($Opt["ldapLogin"]);
-        if (isset($Opt["httpAuthLogin"]) && !$Opt["httpAuthLogin"])
-            unset($Opt["httpAuthLogin"]);
+        if (isset($this->opt["ldapLogin"]) && !$this->opt["ldapLogin"])
+            unset($this->opt["ldapLogin"]);
+        if (isset($this->opt["httpAuthLogin"]) && !$this->opt["httpAuthLogin"])
+            unset($this->opt["httpAuthLogin"]);
 
         // set conferenceKey
-        if (!isset($Opt["conferenceKey"])) {
+        if (!isset($this->opt["conferenceKey"])) {
             if (!isset($this->settingTexts["conf_key"])
                 && ($key = hotcrp_random_bytes(32)) !== false)
                 $this->save_setting("conf_key", 1, $key);
-            $Opt["conferenceKey"] = defval($this->settingTexts, "conf_key", "");
+            $this->opt["conferenceKey"] = get($this->settingTexts, "conf_key", "");
         }
 
         // set capability key
-        if (!@$this->settings["cap_key"]
-            && !@$Opt["disableCapabilities"]
+        if (!get($this->settings, "cap_key")
+            && !get($this->opt, "disableCapabilities")
             && !(($key = hotcrp_random_bytes(16)) !== false
                  && ($key = base64_encode($key))
                  && $this->save_setting("cap_key", 1, $key)))
-            $Opt["disableCapabilities"] = true;
+            $this->opt["disableCapabilities"] = true;
 
         // GC old capabilities
-        if ($this->sversion >= 58
-            && defval($this->settings, "__capability_gc", 0) < $Now - 86400) {
+        if (defval($this->settings, "__capability_gc", 0) < $Now - 86400) {
             foreach (array($this->dblink, Contact::contactdb()) as $db)
-                if ($db) {
+                if ($db)
                     Dbl::ql($db, "delete from Capability where timeExpires>0 and timeExpires<$Now");
-                    Dbl::ql($db, "delete from CapabilityMap where timeExpires>0 and timeExpires<$Now");
-                }
-            $this->q("insert into Settings (name, value) values ('__capability_gc', $Now) on duplicate key update value=values(value)");
+            $this->q_raw("insert into Settings (name, value) values ('__capability_gc', $Now) on duplicate key update value=values(value)");
             $this->settings["__capability_gc"] = $Now;
         }
 
@@ -120,91 +140,131 @@ class Conference {
     }
 
     private function crosscheck_options() {
-        global $Opt, $ConfSiteBase;
+        global $ConfSitePATH;
 
         // set longName, downloadPrefix, etc.
-        $confid = $Opt["confid"];
-        if ((!isset($Opt["longName"]) || $Opt["longName"] == "")
-            && (!isset($Opt["shortName"]) || $Opt["shortName"] == "")) {
-            $Opt["shortNameDefaulted"] = true;
-            $Opt["longName"] = $Opt["shortName"] = $confid;
-        } else if (!isset($Opt["longName"]) || $Opt["longName"] == "")
-            $Opt["longName"] = $Opt["shortName"];
-        else if (!isset($Opt["shortName"]) || $Opt["shortName"] == "")
-            $Opt["shortName"] = $Opt["longName"];
-        if (!isset($Opt["downloadPrefix"]) || $Opt["downloadPrefix"] == "")
-            $Opt["downloadPrefix"] = $confid . "-";
+        $confid = $this->opt["confid"];
+        if ((!isset($this->opt["longName"]) || $this->opt["longName"] == "")
+            && (!isset($this->opt["shortName"]) || $this->opt["shortName"] == "")) {
+            $this->opt["shortNameDefaulted"] = true;
+            $this->opt["longName"] = $this->opt["shortName"] = $confid;
+        } else if (!isset($this->opt["longName"]) || $this->opt["longName"] == "")
+            $this->opt["longName"] = $this->opt["shortName"];
+        else if (!isset($this->opt["shortName"]) || $this->opt["shortName"] == "")
+            $this->opt["shortName"] = $this->opt["longName"];
+        if (!isset($this->opt["downloadPrefix"]) || $this->opt["downloadPrefix"] == "")
+            $this->opt["downloadPrefix"] = $confid . "-";
+        $this->short_name = $this->opt["shortName"];
+        $this->long_name = $this->opt["longName"];
 
         // expand ${confid}, ${confshortname}
         foreach (array("sessionName", "downloadPrefix", "conferenceSite",
                        "paperSite", "defaultPaperSite", "contactName",
-                       "contactEmail", "emailFrom", "emailSender",
-                       "emailCc", "emailReplyTo") as $k)
-            if (isset($Opt[$k]) && is_string($Opt[$k])
-                && strpos($Opt[$k], "$") !== false) {
-                $Opt[$k] = preg_replace(',\$\{confid\}|\$confid\b,', $confid, $Opt[$k]);
-                $Opt[$k] = preg_replace(',\$\{confshortname\}|\$confshortname\b,', $Opt["shortName"], $Opt[$k]);
+                       "contactEmail", "docstore") as $k)
+            if (isset($this->opt[$k]) && is_string($this->opt[$k])
+                && strpos($this->opt[$k], "$") !== false) {
+                $this->opt[$k] = preg_replace(',\$\{confid\}|\$confid\b,', $confid, $this->opt[$k]);
+                $this->opt[$k] = preg_replace(',\$\{confshortname\}|\$confshortname\b,', $this->short_name, $this->opt[$k]);
+            }
+        $this->download_prefix = $this->opt["downloadPrefix"];
+
+        foreach (array("emailFrom", "emailSender", "emailCc", "emailReplyTo") as $k)
+            if (isset($this->opt[$k]) && is_string($this->opt[$k])
+                && strpos($this->opt[$k], "$") !== false) {
+                $this->opt[$k] = preg_replace(',\$\{confid\}|\$confid\b,', $confid, $this->opt[$k]);
+                if (strpos($this->opt[$k], "confshortname") !== false) {
+                    $v = rfc2822_words_quote($this->short_name);
+                    if ($v[0] === "\"" && strpos($this->opt[$k], "\"") !== false)
+                        $v = substr($v, 1, strlen($v) - 2);
+                    $this->opt[$k] = preg_replace(',\$\{confshortname\}|\$confshortname\b,', $v, $this->opt[$k]);
+                }
             }
 
         // remove final slash from $Opt["paperSite"]
-        if (!isset($Opt["paperSite"]) || $Opt["paperSite"] == "")
-            $Opt["paperSite"] = Navigation::site_absolute();
-        if ($Opt["paperSite"] == "" && isset($Opt["defaultPaperSite"]))
-            $Opt["paperSite"] = $Opt["defaultPaperSite"];
-        $Opt["paperSite"] = preg_replace('|/+\z|', "", $Opt["paperSite"]);
+        if (!isset($this->opt["paperSite"]) || $this->opt["paperSite"] == "")
+            $this->opt["paperSite"] = Navigation::site_absolute();
+        if ($this->opt["paperSite"] == "" && isset($this->opt["defaultPaperSite"]))
+            $this->opt["paperSite"] = $this->opt["defaultPaperSite"];
+        $this->opt["paperSite"] = preg_replace('|/+\z|', "", $this->opt["paperSite"]);
+
+        // option name updates (backwards compatibility)
+        foreach (array("assetsURL" => "assetsUrl",
+                       "jqueryURL" => "jqueryUrl", "jqueryCDN" => "jqueryCdn",
+                       "disableCSV" => "disableCsv") as $kold => $knew)
+            if (isset($this->opt[$kold]) && !isset($this->opt[$knew]))
+                $this->opt[$knew] = $this->opt[$kold];
 
         // set assetsUrl and scriptAssetsUrl
-        if (!isset($Opt["scriptAssetsUrl"]) && isset($_SERVER["HTTP_USER_AGENT"])
+        if (!isset($this->opt["scriptAssetsUrl"]) && isset($_SERVER["HTTP_USER_AGENT"])
             && strpos($_SERVER["HTTP_USER_AGENT"], "MSIE") !== false)
-            $Opt["scriptAssetsUrl"] = $ConfSiteBase;
-        if (!isset($Opt["assetsUrl"]))
-            $Opt["assetsUrl"] = $ConfSiteBase;
-        if ($Opt["assetsUrl"] !== "" && !str_ends_with($Opt["assetsUrl"], "/"))
-            $Opt["assetsUrl"] .= "/";
-        if (!isset($Opt["scriptAssetsUrl"]))
-            $Opt["scriptAssetsUrl"] = $Opt["assetsUrl"];
-        Ht::$img_base = $Opt["assetsUrl"] . "images/";
+            $this->opt["scriptAssetsUrl"] = Navigation::siteurl();
+        if (!isset($this->opt["assetsUrl"]))
+            $this->opt["assetsUrl"] = Navigation::siteurl();
+        if ($this->opt["assetsUrl"] !== "" && !str_ends_with($this->opt["assetsUrl"], "/"))
+            $this->opt["assetsUrl"] .= "/";
+        if (!isset($this->opt["scriptAssetsUrl"]))
+            $this->opt["scriptAssetsUrl"] = $this->opt["assetsUrl"];
+        Ht::$img_base = $this->opt["assetsUrl"] . "images/";
 
-        // set docstore from filestore
-        if (@$Opt["docstore"] === true)
-            $Opt["docstore"] = "docs";
-        else if (!@$Opt["docstore"] && @$Opt["filestore"]) {
-            if (($Opt["docstore"] = $Opt["filestore"]) === true)
-                $Opt["docstore"] = "filestore";
-            $Opt["docstoreSubdir"] = @$Opt["filestoreSubdir"];
+        // set docstore
+        if (get($this->opt, "docstore") === true)
+            $this->opt["docstore"] = "docs";
+        else if (!get($this->opt, "docstore") && get($this->opt, "filestore")) { // backwards compat
+            $this->opt["docstore"] = $this->opt["filestore"];
+            if ($this->opt["docstore"] === true)
+                $this->opt["docstore"] = "filestore";
+            $this->opt["docstoreSubdir"] = get($this->opt, "filestoreSubdir");
+        }
+        if (get($this->opt, "docstore") && $this->opt["docstore"][0] !== "/")
+            $this->opt["docstore"] = $ConfSitePATH . "/" . $this->opt["docstore"];
+        $this->_docstore = false;
+        if (($fdir = get($this->opt, "docstore"))) {
+            $fpath = $fdir;
+            $use_subdir = get($this->opt, "docstoreSubdir");
+            if ($use_subdir && ($use_subdir === true || $use_subdir > 0))
+                $fpath .= "/%" . ($use_subdir === true ? 2 : $use_subdir) . "h";
+            $this->_docstore = [$fdir, $fpath . "/%h%x"];
         }
 
         // handle timezone
         if (function_exists("date_default_timezone_set")) {
-            if (isset($Opt["timezone"])) {
-                if (!date_default_timezone_set($Opt["timezone"])) {
-                    $this->errorMsg("Timezone option “" . htmlspecialchars($Opt["timezone"]) . "” is invalid; falling back to “America/New_York”.");
+            if (isset($this->opt["timezone"])) {
+                if (!date_default_timezone_set($this->opt["timezone"])) {
+                    self::msg_error("Timezone option “" . htmlspecialchars($this->opt["timezone"]) . "” is invalid; falling back to “America/New_York”.");
                     date_default_timezone_set("America/New_York");
                 }
             } else if (!ini_get("date.timezone") && !getenv("TZ"))
                 date_default_timezone_set("America/New_York");
         }
+        $this->_date_format_initialized = false;
 
         // set safePasswords
-        if (!@$Opt["safePasswords"] || (is_int($Opt["safePasswords"]) && $Opt["safePasswords"] < 1))
-            $Opt["safePasswords"] = 0;
-        else if ($Opt["safePasswords"] === true)
-            $Opt["safePasswords"] = 1;
+        if (!get($this->opt, "safePasswords")
+            || (is_int($this->opt["safePasswords"]) && $this->opt["safePasswords"] < 1))
+            $this->opt["safePasswords"] = 0;
+        else if ($this->opt["safePasswords"] === true)
+            $this->opt["safePasswords"] = 1;
+        if (!isset($this->opt["contactdb_safePasswords"]))
+            $this->opt["contactdb_safePasswords"] = $this->opt["safePasswords"];
     }
 
-    function setting($name, $defval = false) {
-        return defval($this->settings, $name, $defval);
+    function has_setting($name) {
+        return isset($this->settings[$name]);
     }
 
-    function setting_data($name) {
-        $x = @$this->settingTexts[$name];
+    function setting($name, $defval = null) {
+        return get($this->settings, $name, $defval);
+    }
+
+    function setting_data($name, $defval = false) {
+        $x = get($this->settingTexts, $name, $defval);
         if ($x && is_object($x))
             $x = $this->settingTexts[$name] = json_encode($x);
         return $x;
     }
 
-    function setting_json($name) {
-        $x = @$this->settingTexts[$name];
+    function setting_json($name, $defval = false) {
+        $x = get($this->settingTexts, $name, $defval);
         if ($x && is_string($x)) {
             $x = json_decode($x);
             if (is_object($x))
@@ -212,6 +272,204 @@ class Conference {
         }
         return $x;
     }
+
+    function opt($name, $defval = null) {
+        return get($this->opt, $name, $defval);
+    }
+
+    function set_opt($name, $value) {
+        global $Opt;
+        $Opt[$name] = $this->opt[$name] = $value;
+    }
+
+    function unset_opt($name) {
+        global $Opt;
+        unset($Opt[$name], $this->opt[$name]);
+    }
+
+
+    // database
+
+    function q(/* $qstr, ... */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), 0);
+    }
+    function q_raw(/* $qstr */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_RAW);
+    }
+    function q_apply(/* $qstr, $args */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_APPLY);
+    }
+
+    function ql(/* $qstr, ... */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_LOG);
+    }
+    function ql_raw(/* $qstr */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_RAW | Dbl::F_LOG);
+    }
+    function ql_apply(/* $qstr, $args */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_APPLY | Dbl::F_LOG);
+    }
+
+    function qe(/* $qstr, ... */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR);
+    }
+    function qe_raw(/* $qstr */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_RAW | Dbl::F_ERROR);
+    }
+    function qe_apply(/* $qstr, $args */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_APPLY | Dbl::F_ERROR);
+    }
+
+    function qx(/* $qstr, ... */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ALLOWERROR);
+    }
+    function qx_raw(/* $qstr */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_RAW | Dbl::F_ALLOWERROR);
+    }
+    function qx_apply(/* $qstr, $args */) {
+        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_APPLY | Dbl::F_ALLOWERROR);
+    }
+
+    function fetch_rows(/* $qstr, ... */) {
+        return Dbl::fetch_rows(Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR));
+    }
+    function fetch_value(/* $qstr, ... */) {
+        return Dbl::fetch_value(Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR));
+    }
+    function fetch_ivalue(/* $qstr, ... */) {
+        return Dbl::fetch_ivalue(Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR));
+    }
+
+    function db_error_html($getdb = true, $while = "") {
+        $text = "<p>Database error";
+        if ($while)
+            $text .= " $while";
+        if ($getdb)
+            $text .= ": " . htmlspecialchars($this->dblink->error);
+        return $text . "</p>";
+    }
+
+    function db_error_text($getdb = true, $while = "") {
+        $text = "Database error";
+        if ($while)
+            $text .= " $while";
+        if ($getdb)
+            $text .= ": " . $this->dblink->error;
+        return $text;
+    }
+
+    function query_error_handler($dblink, $query) {
+        $landmark = caller_landmark(1, "/^(?:Dbl::|Conf::q|call_user_func)/");
+        if (PHP_SAPI == "cli")
+            fwrite(STDERR, "$landmark: database error: $dblink->error in $query\n");
+        else {
+            error_log("$landmark: database error: $dblink->error in $query");
+            self::msg_error("<p>" . htmlspecialchars($landmark) . ": database error: " . htmlspecialchars($this->dblink->error) . " in " . Ht::pre_text_wrap($query) . "</p>");
+        }
+    }
+
+
+    // name
+
+    function full_name() {
+        if ($this->short_name && $this->short_name != $this->long_name)
+            return $this->long_name . " (" . $this->short_name . ")";
+        else
+            return $this->long_name;
+    }
+
+
+    // documents
+
+    function docstore() {
+        return $this->_docstore;
+    }
+
+
+    // users
+
+    function external_login() {
+        return isset($this->opt["ldapLogin"]) || isset($this->opt["httpAuthLogin"]);
+    }
+
+    function site_contact() {
+        $contactEmail = $this->opt("contactEmail");
+        if (!$contactEmail || $contactEmail == "you@example.com") {
+            $result = $this->ql("select firstName, lastName, email from ContactInfo where (roles&" . (Contact::ROLE_CHAIR | Contact::ROLE_ADMIN) . ")!=0 order by (roles&" . Contact::ROLE_CHAIR . ") desc limit 1");
+            if ($result && ($row = $result->fetch_object())) {
+                $this->set_opt("defaultSiteContact", true);
+                $this->set_opt("contactName", Text::name_text($row));
+                $this->set_opt("contactEmail", $row->email);
+            }
+            Dbl::free($result);
+        }
+        return new Contact((object) array("fullName" => $this->opt["contactName"],
+                                          "email" => $this->opt["contactEmail"],
+                                          "isChair" => true,
+                                          "isPC" => true,
+                                          "is_site_contact" => true,
+                                          "contactTags" => null), $this);
+    }
+
+    function user_by_id($id) {
+        $result = $this->qe("select ContactInfo.* from ContactInfo where contactId=?", $id);
+        $acct = Contact::fetch($result, $this);
+        Dbl::free($result);
+        return $acct;
+    }
+
+    function user_by_email($email) {
+        $acct = null;
+        if (($email = trim((string) $email)) !== "") {
+            $result = $this->qe("select * from ContactInfo where email=?", $email);
+            $acct = Contact::fetch($result, $this);
+            Dbl::free($result);
+        }
+        return $acct;
+    }
+
+    function user_by_query($qpart, $args) {
+        $result = $this->qe_apply("select ContactInfo.* from ContactInfo where $qpart", $args);
+        $acct = Contact::fetch($result, $this);
+        Dbl::free($result);
+        return $acct && $acct->contactId ? $acct : null;
+    }
+
+    private function user_by_whatever_query($whatever) {
+        $whatever = trim($whatever);
+        if (preg_match('/\A\d{8}\z/', $whatever))
+            return ["ContactInfo.seascode_username=? or ContactInfo.huid=? order by ContactInfo.seascode_username=? desc limit 1",
+                    [$whatever, $whatever]];
+        else if (preg_match('/\A\[anon\w+\]\z/', $whatever))
+            return ["ContactInfo.anon_username=?", [$whatever]];
+        else if (strpos($whatever, "@") === false)
+            return ["ContactInfo.github_username=? or ContactInfo.seascode_username=?
+                     or (coalesce(ContactInfo.github_username,ContactInfo.seascode_username,'')='' and email like ?l)
+                     order by ContactInfo.github_username=? desc, ContactInfo.seascode_username=? desc limit 1",
+                    [$whatever, $whatever, $whatever, $whatever, $whatever]];
+        else {
+            if (preg_match('_.*@(?:fas|college|seas)\z_', $whatever))
+                $whatever .= ".harvard.edu";
+            else if (preg_match('_.*@.*?\.harvard\z_', $whatever))
+                $whatever .= ".edu";
+            return ["ContactInfo.email=?", [$whatever]];
+        }
+    }
+
+    function user_by_whatever($whatever) {
+        list($qpart, $args) = $this->user_by_whatever_query($whatever);
+        return $this->user_by_query($qpart, $args);
+    }
+
+    function user_id_by_email($email) {
+        $result = $this->qe("select contactId from ContactInfo where email=?", trim($email));
+        $row = edb_row($result);
+        Dbl::free($result);
+        return $row ? (int) $row[0] : false;
+    }
+
+
+    // session data
 
     function session($name, $defval = null) {
         if (isset($_SESSION[$this->dsn][$name]))
@@ -228,7 +486,8 @@ class Conference {
     }
 
     function save_session_array($name, $index, $value) {
-        if (!is_array(@$_SESSION[$this->dsn][$name]))
+        if (!isset($_SESSION[$this->dsn][$name])
+            || !is_array($_SESSION[$this->dsn][$name]))
             $_SESSION[$this->dsn][$name] = array();
         if ($index !== true)
             $_SESSION[$this->dsn][$name][$index] = $value;
@@ -267,52 +526,26 @@ class Conference {
         return $start . $suffix;
     }
 
-    // update the 'papersub' setting: are there any submitted papers?
-    function updatePapersubSetting($forsubmit) {
-        $papersub = defval($this->settings, "papersub");
-        if ($papersub === null && $forsubmit)
-            $this->q("insert into Settings (name, value) values ('papersub',1) on duplicate key update name=name");
-        else if ($papersub <= 0 || !$forsubmit)
-            // see also settings.php
-            $this->q("update Settings set value=(select ifnull(min(paperId),0) from Paper where " . (defval($this->settings, "pc_seeall") <= 0 ? "timeSubmitted>0" : "timeWithdrawn<=0") . ") where name='papersub'");
-    }
-
-    function updatePaperaccSetting($foraccept) {
-        if (!isset($this->settings["paperacc"]) && $foraccept)
-            $this->q("insert into Settings (name, value) values ('paperacc', " . time() . ") on duplicate key update name=name");
-        else if (defval($this->settings, "paperacc") <= 0 || !$foraccept)
-            $this->q("update Settings set value=(select max(outcome) from Paper where timeSubmitted>0 group by paperId>0) where name='paperacc'");
-    }
-
-    function updateRevTokensSetting($always) {
-        if ($always || defval($this->settings, "rev_tokens", 0) < 0)
-            $this->qe("insert into Settings (name, value) select 'rev_tokens', count(reviewId) from PaperReview where reviewToken!=0 on duplicate key update value=values(value)");
-    }
 
     function save_setting($name, $value, $data = null) {
-        $qname = $this->dblink->escape_string($name);
         $change = false;
         if ($value === null && $data === null) {
-            if ($this->qe("delete from Settings where name='$qname'")) {
+            if ($this->qe("delete from Settings where name=?", $name)) {
                 unset($this->settings[$name]);
                 unset($this->settingTexts[$name]);
                 $change = true;
             }
         } else {
-            if ($data === null)
-                $dval = "null";
-            else if (is_string($data))
-                $dval = "'" . $this->dblink->escape_string($data) . "'";
-            else
-                $dval = "'" . $this->dblink->escape_string(json_encode($data)) . "'";
-            if ($this->qe("insert into Settings (name, value, data) values ('$qname', $value, $dval) on duplicate key update value=values(value), data=values(data)")) {
+            $dval = $data;
+            if (is_array($dval) || is_object($dval))
+                $dval = json_encode($dval);
+            if ($this->qe("insert into Settings (name, value, data) values (?, ?, ?) on duplicate key update value=values(value), data=values(data)", $name, $value, $dval)) {
                 $this->settings[$name] = $value;
                 $this->settingTexts[$name] = $data;
                 $change = true;
             }
         }
         if ($change) {
-            $this->_pc_seeall_cache = null;
             $this->crosscheck_settings();
             if (str_starts_with($name, "opt."))
                 $this->crosscheck_options();
@@ -320,7 +553,17 @@ class Conference {
         return $change;
     }
 
-    function invalidateCaches($caches = null) {
+    function update_schema_version($n) {
+        if (!$n)
+            $n = $this->fetch_ivalue("select value from Settings where name='allowPaperOption'");
+        if ($n && $this->ql("update Settings set value=$n where name='allowPaperOption'")) {
+            $this->sversion = $this->settings["allowPaperOption"] = $n;
+            return true;
+        } else
+            return false;
+    }
+
+    function invalidate_caches($caches = null) {
         global $OK;
         $inserts = array();
         $removes = array();
@@ -336,72 +579,10 @@ class Conference {
         }
         $ok = true;
         if (count($inserts))
-            $ok = $ok && ($this->qe("insert into Settings (name, value) values " . join(",", $inserts) . " on duplicate key update value=values(value)") !== false);
+            $ok = $ok && ($this->qe_raw("insert into Settings (name, value) values " . join(",", $inserts) . " on duplicate key update value=values(value)") !== false);
         if (count($removes))
-            $ok = $ok && ($this->qe("delete from Settings where name in (" . join(",", $removes) . ")") !== false);
+            $ok = $ok && ($this->qe_raw("delete from Settings where name in (" . join(",", $removes) . ")") !== false);
         return $ok;
-    }
-
-    function qx($query) {
-        return $this->dblink->query($query);
-    }
-
-    function ql($query) {
-        $result = $this->dblink->query($query);
-        if (!$result)
-            error_log(caller_landmark() . ": " . $this->dblink->error);
-        return $result;
-    }
-
-    function q($query) {
-        global $OK;
-        $result = $this->dblink->query($query);
-        if ($result === false)
-            $OK = false;
-        return $result;
-    }
-
-    function db_error_html($getdb = true, $while = "") {
-        global $Opt;
-        $text = "<p>Database error";
-        if ($while)
-            $text .= " $while";
-        if ($getdb)
-            $text .= ": " . htmlspecialchars($this->dblink->error);
-        return $text . "</p>";
-    }
-
-    function db_error_text($getdb = true, $while = "") {
-        $text = "Database error";
-        if ($while)
-            $text .= " $while";
-        if ($getdb)
-            $text .= ": " . $this->dblink->error;
-        return $text;
-    }
-
-    function query_error_handler($dblink, $query) {
-        global $OK;
-        if (PHP_SAPI == "cli")
-            fwrite(STDERR, caller_landmark(1, "/^(?:Dbl::|Conference::q|call_user_func)/") . ": database error: $dblink->error in $query\n");
-        else
-            $this->errorMsg($this->db_error_html(true, Ht::pre_text_wrap($query)));
-        $OK = false;
-    }
-
-    function qe($query, $while = "", $suggestRetry = false) {
-        global $OK;
-        if ($while || $suggestRetry)
-            error_log(caller_landmark() . ": bad call to Conference::qe");
-        $result = $this->dblink->query($query);
-        if ($result === false) {
-            if (PHP_SAPI == "cli")
-                fwrite(STDERR, caller_landmark() . ": " . $this->db_error_text(true, "[$query]") . "\n");
-            else
-                $this->errorMsg($this->db_error_html(true, Ht::pre_text_wrap($query)));
-            $OK = false;
-        }
-        return $result;
     }
 
 
@@ -428,60 +609,54 @@ class Conference {
         return plural($amt, $what);
     }
 
-    static function _dateFormat($long) {
-        global $Opt;
-        if (!isset($Opt["_dateFormatInitialized"])) {
-            if (!isset($Opt["time24hour"]) && isset($Opt["time24Hour"]))
-                $Opt["time24hour"] = $Opt["time24Hour"];
-            if (!isset($Opt["dateFormatLong"]) && isset($Opt["dateFormat"]))
-                $Opt["dateFormatLong"] = $Opt["dateFormat"];
-            if (!isset($Opt["dateFormat"])) {
-                if (isset($Opt["time24hour"]) && $Opt["time24hour"])
-                    $Opt["dateFormat"] = "j M Y H:i:s";
-                else
-                    $Opt["dateFormat"] = "j M Y g:i:sa";
-            }
-            if (!isset($Opt["dateFormatLong"]))
-                $Opt["dateFormatLong"] = "l " . $Opt["dateFormat"];
-            if (!isset($Opt["timestampFormat"]))
-                $Opt["timestampFormat"] = $Opt["dateFormat"];
-            if (!isset($Opt["dateFormatSimplifier"])) {
-                if (isset($Opt["time24hour"]) && $Opt["time24hour"])
-                    $Opt["dateFormatSimplifier"] = "/:00(?!:)/";
-                else
-                    $Opt["dateFormatSimplifier"] = "/:00(?::00|)(?= ?[ap]m)/";
-            }
-            if (!isset($Opt["dateFormatTimezone"]))
-                $Opt["dateFormatTimezone"] = null;
-            $Opt["_dateFormatInitialized"] = true;
+    private function _dateFormat($type) {
+        if (!$this->_date_format_initialized) {
+            if (!isset($this->opt["time24hour"]) && isset($this->opt["time24Hour"]))
+                $this->opt["time24hour"] = $this->opt["time24Hour"];
+            if (!isset($this->opt["dateFormatLong"]) && isset($this->opt["dateFormat"]))
+                $this->opt["dateFormatLong"] = $this->opt["dateFormat"];
+            if (!isset($this->opt["dateFormat"]))
+                $this->opt["dateFormat"] = get($this->opt, "time24hour") ? "j M Y H:i:s" : "j M Y g:i:sa";
+            if (!isset($this->opt["dateFormatLong"]))
+                $this->opt["dateFormatLong"] = "l " . $this->opt["dateFormat"];
+            if (!isset($this->opt["dateFormatObscure"]))
+                $this->opt["dateFormatObscure"] = "j M Y";
+            if (!isset($this->opt["timestampFormat"]))
+                $this->opt["timestampFormat"] = $this->opt["dateFormat"];
+            if (!isset($this->opt["dateFormatSimplifier"]))
+                $this->opt["dateFormatSimplifier"] = get($this->opt, "time24hour") ? "/:00(?!:)/" : "/:00(?::00|)(?= ?[ap]m)/";
+            if (!isset($this->opt["dateFormatTimezone"]))
+                $this->opt["dateFormatTimezone"] = null;
+            $this->_date_format_initialized = true;
         }
-        if ($long == "timestamp")
-            return $Opt["timestampFormat"];
-        else if ($long)
-            return $Opt["dateFormatLong"];
+        if ($type == "timestamp")
+            return $this->opt["timestampFormat"];
+        else if ($type == "obscure")
+            return $this->opt["dateFormatObscure"];
+        else if ($type)
+            return $this->opt["dateFormatLong"];
         else
-            return $Opt["dateFormat"];
+            return $this->opt["dateFormat"];
     }
 
     function parseableTime($value, $include_zone) {
-        global $Opt;
-        $f = self::_dateFormat(false);
+        $f = $this->_dateFormat(false);
         $d = date($f, $value);
-        if ($Opt["dateFormatSimplifier"])
-            $d = preg_replace($Opt["dateFormatSimplifier"], "", $d);
+        if ($this->opt["dateFormatSimplifier"])
+            $d = preg_replace($this->opt["dateFormatSimplifier"], "", $d);
         if ($include_zone) {
-            if ($Opt["dateFormatTimezone"] === null)
+            if ($this->opt["dateFormatTimezone"] === null)
                 $d .= " " . date("T", $value);
-            else if ($Opt["dateFormatTimezone"])
-                $d .= " " . $Opt["dateFormatTimezone"];
+            else if ($this->opt["dateFormatTimezone"])
+                $d .= " " . $this->opt["dateFormatTimezone"];
         }
         return $d;
     }
     function parse_time($d, $reference = null) {
-        global $Now, $Opt;
+        global $Now;
         if ($reference === null)
             $reference = $Now;
-        if (!isset($Opt["dateFormatTimezoneRemover"])
+        if (!isset($this->opt["dateFormatTimezoneRemover"])
             && function_exists("timezone_abbreviations_list")) {
             $mytz = date_default_timezone_get();
             $x = array();
@@ -492,26 +667,27 @@ class Conference {
             }
             if (count($x) == 0)
                 $x[] = preg_quote(date("T", $reference));
-            $Opt["dateFormatTimezoneRemover"] =
+            $this->opt["dateFormatTimezoneRemover"] =
                 "/(?:\\s|\\A)(?:" . join("|", $x) . ")(?:\\s|\\z)/i";
         }
-        if (@$Opt["dateFormatTimezoneRemover"])
-            $d = preg_replace($Opt["dateFormatTimezoneRemover"], " ", $d);
+        if ($this->opt["dateFormatTimezoneRemover"])
+            $d = preg_replace($this->opt["dateFormatTimezoneRemover"], " ", $d);
         $d = preg_replace('/\butc([-+])/i', 'GMT$1', $d);
         return strtotime($d, $reference);
     }
 
-    function _printableTime($value, $long, $useradjust, $preadjust = null) {
-        global $Opt;
+    function _printableTime($value, $type, $useradjust, $preadjust = null) {
         if ($value <= 0)
             return "N/A";
-        $t = date(self::_dateFormat($long), $value);
-        if ($Opt["dateFormatSimplifier"])
-            $t = preg_replace($Opt["dateFormatSimplifier"], "", $t);
-        if ($Opt["dateFormatTimezone"] === null)
-            $t .= " " . date("T", $value);
-        else if ($Opt["dateFormatTimezone"])
-            $t .= " " . $Opt["dateFormatTimezone"];
+        $t = date($this->_dateFormat($type), $value);
+        if ($this->opt["dateFormatSimplifier"])
+            $t = preg_replace($this->opt["dateFormatSimplifier"], "", $t);
+        if ($type !== "obscure") {
+            if ($this->opt["dateFormatTimezone"] === null)
+                $t .= " " . date("T", $value);
+            else if ($this->opt["dateFormatTimezone"])
+                $t .= " " . $this->opt["dateFormatTimezone"];
+        }
         if ($preadjust)
             $t .= $preadjust;
         if ($useradjust) {
@@ -528,8 +704,16 @@ class Conference {
     function printableTimestamp($value, $useradjust = false, $preadjust = null) {
         return $this->_printableTime($value, "timestamp", $useradjust, $preadjust);
     }
-    function printableTimeShort($value, $useradjust = false, $preadjust = null) {
-        return $this->_printableTime($value, false, $useradjust, $preadjust);
+    function obscure_time($timestamp) {
+        if ($timestamp !== null)
+            $timestamp = (int) ($timestamp + 0.5);
+        if ($timestamp > 0) {
+            $offset = 0;
+            if (($zone = timezone_open(date_default_timezone_get())))
+                $offset = $zone->getOffset(new DateTime("@$timestamp"));
+            $timestamp += 43200 - ($timestamp + $offset) % 86400;
+        }
+        return $timestamp;
     }
     function unparse_time_log($value) {
         return date("d/M/Y:H:i:s O", $value);
@@ -547,31 +731,31 @@ class Conference {
 
     function settingsAfter($name) {
         global $Now;
-        $t = @$this->settings[$name];
+        $t = get($this->settings, $name);
         return $t !== null && $t > 0 && $t <= $Now;
     }
     function deadlinesAfter($name, $grace = null) {
         global $Now;
-        $t = @$this->settings[$name];
-        if ($t !== null && $t > 0 && $grace && ($g = @$this->settings[$grace]))
-            $t += $grace;
+        $t = get($this->settings, $name);
+        if ($t !== null && $t > 0 && $grace && ($g = get($this->settings, $grace)))
+            $t += $g;
         return $t !== null && $t > 0 && $t <= $Now;
     }
     function deadlinesBetween($name1, $name2, $grace = null) {
         global $Now;
-        $t = @$this->settings[$name1];
+        $t = get($this->settings, $name1);
         if (($t === null || $t <= 0 || $t > $Now) && $name1)
             return false;
-        $t = @$this->settings[$name2];
-        if ($t !== null && $t > 0 && $grace && ($g = @$this->settings[$grace]))
-            $t += $grace;
+        $t = get($this->settings, $name2);
+        if ($t !== null && $t > 0 && $grace && ($g = get($this->settings, $grace)))
+            $t += $g;
         return $t === null || $t <= 0 || $t >= $Now;
     }
 
 
     function cacheableImage($name, $alt, $title = null, $class = null, $style = null) {
-        global $ConfSiteBase, $ConfSitePATH;
-        $t = "<img src='${ConfSiteBase}images/$name' alt=\"$alt\"";
+        global $ConfSitePATH;
+        $t = "<img src=\"" . Navigation::siteurl() . "images/$name\" alt=\"$alt\"";
         if ($title)
             $t .= " title=\"$title\"";
         if ($class)
@@ -581,825 +765,70 @@ class Conference {
         return $t . " />";
     }
 
-    function echoScript($script) {
-        if ($this->scriptStuff)
-            echo $this->scriptStuff;
-        $this->scriptStuff = "";
-        if ($script)
-            echo "<script>", $script, "</script>";
-    }
-
-    function footerScript($script, $uniqueid = null) {
-        Ht::stash_script($script, $uniqueid);
-    }
-
-    function footerHtml($html, $uniqueid = null) {
-        Ht::stash_html($html, $uniqueid);
-    }
-
-
-    //
-    // Paper storage
-    //
-
-    function storeDocument($uploadId, $paperId, $documentType) {
-        return DocumentHelper::upload(new HotCRPDocument($documentType),
-                                      $uploadId,
-                                      (object) array("paperId" => $paperId));
-    }
-
-    function storePaper($uploadId, $prow, $final) {
-        global $Opt;
-        $paperId = (is_numeric($prow) ? $prow : $prow->paperId);
-
-        $doc = $this->storeDocument($uploadId, $paperId, $final ? DTYPE_FINAL : DTYPE_SUBMISSION);
-        if (isset($doc->error_html)) {
-            $this->errorMsg($doc->error_html);
-            return false;
-        }
-
-        if (!$this->qe("update Paper set "
-                . ($final ? "finalPaperStorageId" : "paperStorageId") . "=" . $doc->paperStorageId
-                . ", size=" . $doc->size
-                . ", mimetype='" . sqlq($doc->mimetype)
-                . "', timestamp=" . $doc->timestamp
-                . ", sha1='" . sqlq($doc->sha1)
-                . "' where paperId=$paperId and timeWithdrawn<=0"))
-            return false;
-
-        return $doc->size;
-    }
-
-    function downloadPaperName($paperId, $mimetype, $documentType) {
-        global $Opt;
-        $title = $Opt["downloadPrefix"];
-        $dtn = HotCRPDocument::unparse_dtype($documentType);
-        $title .= ($dtn ? $dtn : "xxx");
-        if (ctype_digit($title[strlen($title) - 1]))
-            $title .= "-";
-        return $title . $paperId . Mimetype::extension($mimetype);
-    }
-
-    function document_result($prow, $documentType, $docid = null) {
-        global $Opt;
-        if (is_array($prow) && count($prow) <= 1)
-            $prow = (count($prow) ? $prow[0] : -1);
-        if (is_numeric($prow))
-            $paperMatch = "=" . $prow;
-        else if (is_array($prow))
-            $paperMatch = " in (" . join(",", $prow) . ")";
-        else
-            $paperMatch = "=" . $prow->paperId;
-        $q = "select p.paperId, s.mimetype, s.sha1, s.timestamp, ";
-        if (!@$Opt["docstore"] && !is_array($prow))
-            $q .= "s.paper as content, ";
-        $q .= "s.filename, s.infoJson, $documentType documentType, s.paperStorageId from Paper p";
-        if ($docid)
-            $sjoin = $docid;
-        else if ($documentType == DTYPE_SUBMISSION)
-            $sjoin = "p.paperStorageId";
-        else if ($documentType == DTYPE_FINAL)
-            $sjoin = "p.finalPaperStorageId";
-        else {
-            $q .= " left join PaperOption o on (o.paperId=p.paperId and o.optionId=$documentType)";
-            $sjoin = "o.value";
-        }
-        return $this->q($q . " left join PaperStorage s on (s.paperStorageId=$sjoin) where p.paperId$paperMatch");
-    }
-
-    function document_row($result, $dtype = DTYPE_SUBMISSION) {
-        if (!($doc = edb_orow($result)))
-            return $doc;
-        // type doesn't matter
-        if ($dtype === null && isset($doc->documentType))
-            $dtype = $doc->documentType = (int) $doc->documentType;
-        $doc->docclass = new HotCRPDocument($dtype);
-        // in modern versions sha1 is set at storage time; before it wasn't
-        if ($doc->paperStorageId && $doc->sha1 == "") {
-            if (!$doc->docclass->load_content($doc))
-                return false;
-            $doc->sha1 = sha1($doc->content, true);
-            $this->q("update PaperStorage set sha1='" . sqlq($doc->sha1) . "' where paperStorageId=" . $doc->paperStorageId);
-        }
-        return $doc;
-    }
-
-    private function __downloadPaper($paperId, $attachment, $documentType, $docid) {
-        global $Opt, $Me, $zlib_output_compression;
-
-        $result = $this->document_result($paperId, $documentType, $docid);
-        if (!$result) {
-            $this->log("Download error: " . $this->dblink->error, $Me, $paperId);
-            return set_error_html("Database error while downloading paper.");
-        } else if (edb_nrows($result) == 0)
-            return set_error_html("No such document.");
-
-        // Check data
-        $docs = array();
-        while (($doc = $this->document_row($result, $documentType))) {
-            if (!$doc->mimetype)
-                $doc->mimetype = MIMETYPEID_PDF;
-            $doc->filename = HotCRPDocument::filename($doc);
-            $docs[] = $doc;
-        }
-        if (count($docs) == 1 && $docs[0]->paperStorageId <= 1)
-            return set_error_html("Paper #" . $docs[0]->paperId . " hasn’t been uploaded yet.");
-        $downloadname = false;
-        if (count($docs) > 1)
-            $downloadname = $Opt["downloadPrefix"] . pluralx(2, HotCRPDocument::unparse_dtype($documentType)) . ".zip";
-        return DocumentHelper::download($docs, $downloadname, $attachment);
-    }
-
-    function downloadPaper($paperId, $attachment, $documentType = DTYPE_SUBMISSION, $docid = null) {
-        global $Me;
-        $result = $this->__downloadPaper($paperId, $attachment, $documentType, $docid);
-        if ($result->error) {
-            $this->errorMsg($result->error_html);
-            return false;
-        } else
-            return true;
-    }
-
-
-    //
-    // Paper search
-    //
-
-    static private function _cvt_numeric_set($optarr) {
-        $ids = array();
-        foreach (mkarray($optarr) as $x)
-            if (($x = cvtint($x)) > 0)
-                $ids[] = $x;
-        return $ids;
-    }
-
-    function query_all_reviewer_preference() {
-        if ($this->sversion >= 69)
-            return "group_concat(concat(contactId,' ',preference,' ',coalesce(expertise,'.')) separator ',')";
-        else
-            return "group_concat(concat(contactId,' ',preference,' .') separator ',')";
-    }
-
-    function query_topic_interest($table = "") {
-        if ($this->sversion >= 73)
-            return $table . "interest";
-        else
-            return "if(" . $table . "interest=2,4,(" . $table . "interest-1)*2)";
-    }
-
-    function query_topic_interest_score() {
-        if ($this->sversion >= 73)
-            return "interest";
-        else
-            return "(if(interest=2,2,interest-1)*2)";
-    }
-
-    function paperQuery($contact, $options = array()) {
-        // Options:
-        //   "paperId" => $pid  Only paperId $pid (if array, any of those)
-        //   "reviewId" => $rid Only paper reviewed by $rid
-        //   "commentId" => $c  Only paper where comment is $c
-        //   "finalized"        Only submitted papers
-        //   "unsub"            Only unsubmitted papers
-        //   "accepted"         Only accepted papers
-        //   "active"           Only nonwithdrawn papers
-        //   "author"           Only papers authored by $contactId
-        //   "myReviewRequests" Only reviews requested by $contactId
-        //   "myReviews"        All reviews authored by $contactId
-        //   "myOutstandingReviews" All unsubmitted reviews auth by $contactId
-        //   "myReviewsOpt"     myReviews, + include papers not yet reviewed
-        //   "allReviews"       All reviews (multiple rows per paper)
-        //   "allReviewScores"  All review scores (multiple rows per paper)
-        //   "allComments"      All comments (multiple rows per paper)
-        //   "reviewerName"     Include reviewer names
-        //   "commenterName"    Include commenter names
-        //   "reviewer" => $cid Include reviewerConflictType/reviewerReviewType
-        //   "tags"             Include paperTags
-        //   "tagIndex" => $tag Include tagIndex of named tag
-        //   "tagIndex" => tag array -- include tagIndex, tagIndex1, ...
-        //   "topics"
-        //   "options"
-        //   "scores" => array(fields to score)
-        //   "order" => $sql    $sql is SQL 'order by' clause (or empty)
-
-        $reviewerQuery = isset($options["myReviews"]) || isset($options["allReviews"]) || isset($options["myReviewRequests"]) || isset($options["myReviewsOpt"]) || isset($options["myOutstandingReviews"]);
-        $allReviewerQuery = isset($options["allReviews"]) || isset($options["allReviewScores"]);
-        $scoresQuery = !$reviewerQuery && isset($options["allReviewScores"]);
-        if (is_object($contact))
-            $contactId = $contact->contactId;
-        else {
-            $contactId = (int) $contact;
-            $contact = null;
-        }
-        if (isset($options["reviewer"]) && is_object($options["reviewer"]))
-            $reviewerContactId = $options["reviewer"]->contactId;
-        else if (isset($options["reviewer"]))
-            $reviewerContactId = $options["reviewer"];
-        else
-            $reviewerContactId = $contactId;
-        if (@$options["author"])
-            $myPaperReview = null;
-        else if ($allReviewerQuery)
-            $myPaperReview = "MyPaperReview";
-        else
-            $myPaperReview = "PaperReview";
-
-        // paper selection
-        $paperset = array();
-        if (isset($options["paperId"]))
-            $paperset[] = self::_cvt_numeric_set($options["paperId"]);
-        if (isset($options["reviewId"])) {
-            if (is_numeric($options["reviewId"])) {
-                $result = Dbl::qe("select paperId from PaperReview where reviewId=" . $options["reviewId"]);
-                $paperset[] = self::_cvt_numeric_set(edb_first_columns($result));
-            } else if (preg_match('/^(\d+)([A-Z][A-Z]?)$/i', $options["reviewId"], $m)) {
-                $result = Dbl::qe("select paperId from PaperReview where paperId=$m[1] and reviewOrdinal=" . parseReviewOrdinal($m[2]));
-                $paperset[] = self::_cvt_numeric_set(edb_first_columns($result));
-            } else
-                $paperset[] = array();
-        }
-        if (isset($options["commentId"])) {
-            $result = Dbl::qe("select paperId from PaperComment where commentId" . sql_in_numeric_set(self::_cvt_numeric_set($options["commentId"])));
-            $paperset[] = self::_cvt_numeric_set(edb_first_columns($result));
-        }
-        if (count($paperset) > 1)
-            $paperset = array(call_user_func_array("array_intersect", $paperset));
-        $papersel = "";
-        if (count($paperset))
-            $papersel = "paperId" . sql_in_numeric_set($paperset[0]) . " and ";
-
-        // prepare query: basic tables
-        $where = array();
-
-        $joins = array("Paper");
-
-        $cols = array("Paper.*, PaperConflict.conflictType");
-
-        $aujoinwhere = null;
-        if (@$options["author"] && $contact
-            && ($aujoinwhere = $contact->actAuthorSql("PaperConflict", true)))
-            $where[] = $aujoinwhere;
-        if (@$options["author"] && !$aujoinwhere)
-            $joins[] = "join PaperConflict on (PaperConflict.paperId=Paper.paperId and PaperConflict.contactId=$contactId and PaperConflict.conflictType>=" . CONFLICT_AUTHOR . ")";
-        else
-            $joins[] = "left join PaperConflict on (PaperConflict.paperId=Paper.paperId and PaperConflict.contactId=$contactId)";
-
-        // my review
-        $qr = "";
-        if ($contact && ($tokens = $contact->review_tokens()))
-            $qr = " or PaperReview.reviewToken in (" . join(", ", $tokens) . ")";
-        if (@$options["myReviewRequests"])
-            $joins[] = "join PaperReview on (PaperReview.paperId=Paper.paperId and PaperReview.requestedBy=$contactId and PaperReview.reviewType=" . REVIEW_EXTERNAL . ")";
-        else if (@$options["myReviews"])
-            $joins[] = "join PaperReview on (PaperReview.paperId=Paper.paperId and (PaperReview.contactId=$contactId$qr))";
-        else if (@$options["myOutstandingReviews"])
-            $joins[] = "join PaperReview on (PaperReview.paperId=Paper.paperId and (PaperReview.contactId=$contactId$qr) and PaperReview.reviewNeedsSubmit!=0)";
-        else if (@$options["myReviewsOpt"])
-            $joins[] = "left join PaperReview on (PaperReview.paperId=Paper.paperId and (PaperReview.contactId=$contactId$qr))";
-        else if (@$options["allReviews"] || @$options["allReviewScores"]) {
-            $x = (@$options["reviewLimitSql"] ? " and (" . $options["reviewLimitSql"] . ")" : "");
-            $joins[] = "join PaperReview on (PaperReview.paperId=Paper.paperId$x)";
-        } else if (!@$options["author"])
-            $joins[] = "left join PaperReview on (PaperReview.paperId=Paper.paperId and (PaperReview.contactId=$contactId$qr))";
-
-        // all reviews
-        $joins[] = "left join (select paperId, count(*) count from PaperReview where {$papersel}(reviewSubmitted or reviewNeedsSubmit>0) group by paperId) R_started on (R_started.paperId=Paper.paperId)";
-        $cols[] = "coalesce(R_started.count,0) startedReviewCount";
-
-        $j = "select paperId, count(*) count";
-        $cols[] = "coalesce(R_submitted.count,0) reviewCount";
-        if (@$options["scores"])
-            foreach ($options["scores"] as $fid) {
-                $cols[] = "R_submitted.{$fid}Scores";
-                if ($myPaperReview)
-                    $cols[] = "$myPaperReview.$fid";
-                $j .= ", group_concat($fid order by reviewId) {$fid}Scores";
-            }
-        if (@$options["reviewTypes"]) {
-            $cols[] = "R_submitted.reviewTypes";
-            $j .= ", group_concat(reviewType order by reviewId) reviewTypes";
-        }
-        if (@$options["reviewTypes"] || @$options["scores"]) {
-            $cols[] = "R_submitted.reviewContactIds";
-            $j .= ", group_concat(contactId order by reviewId) reviewContactIds";
-        }
-        $joins[] = "left join ($j from PaperReview where {$papersel}reviewSubmitted>0 group by paperId) R_submitted on (R_submitted.paperId=Paper.paperId)";
-
-        // fields
-        if (@$options["author"])
-            $cols[] = "null reviewType, null reviewId, null myReviewType";
-        else {
-            // see also papercolumn.php
-            array_push($cols, "PaperReview.reviewType, PaperReview.reviewId",
-                       "PaperReview.reviewModified, PaperReview.reviewSubmitted",
-                       "PaperReview.reviewNeedsSubmit, PaperReview.reviewOrdinal",
-                       "PaperReview.reviewBlind, PaperReview.reviewToken",
-                       "PaperReview.contactId as reviewContactId, PaperReview.requestedBy",
-                       "max($myPaperReview.reviewType) as myReviewType",
-                       "max($myPaperReview.reviewSubmitted) as myReviewSubmitted",
-                       "min($myPaperReview.reviewNeedsSubmit) as myReviewNeedsSubmit",
-                       "$myPaperReview.contactId as myReviewContactId",
-                       "PaperReview.reviewRound");
-        }
-
-        if ($reviewerQuery || $scoresQuery) {
-            $cols[] = "PaperReview.reviewEditVersion as reviewEditVersion";
-            foreach (ReviewForm::field_list_all_rounds() as $f)
-                if ($reviewerQuery || $f->has_options)
-                    $cols[] = "PaperReview.$f->id as $f->id";
-        }
-
-        if ($myPaperReview == "MyPaperReview")
-            $joins[] = "left join PaperReview as MyPaperReview on (MyPaperReview.paperId=Paper.paperId and MyPaperReview.contactId=$contactId)";
-
-        if (@$options["topics"] || @$options["topicInterestScore"]) {
-            $j = "left join (select paperId";
-            if (@$options["topics"]) {
-                $j .= ", group_concat(PaperTopic.topicId) as topicIds, group_concat(ifnull(" . $this->query_topic_interest("TopicInterest.") . ",0)) as topicInterest";
-                $cols[] = "PaperTopics.topicIds, PaperTopics.topicInterest";
-            }
-            if (@$options["topicInterestScore"]) {
-                $j .= ", sum(" . $this->query_topic_interest_score() . ") as topicInterestScore";
-                $cols[] = "coalesce(PaperTopics.topicInterestScore,0) as topicInterestScore";
-            }
-            $j .= " from PaperTopic left join TopicInterest on (TopicInterest.topicId=PaperTopic.topicId and TopicInterest.contactId=$reviewerContactId) where {$papersel}true group by paperId) as PaperTopics on (PaperTopics.paperId=Paper.paperId)";
-            $joins[] = $j;
-        }
-
-        if (@$options["options"] && @$this->settingTexts["options"]) {
-            $joins[] = "left join (select paperId, group_concat(PaperOption.optionId, '#', value) as optionIds from PaperOption where {$papersel}true group by paperId) as PaperOptions on (PaperOptions.paperId=Paper.paperId)";
-            $cols[] = "PaperOptions.optionIds";
-        } else if (@$options["options"])
-            $cols[] = "'' as optionIds";
-
-        if (@$options["tags"]) {
-            $joins[] = "left join (select paperId, group_concat(' ', tag, '#', tagIndex order by tag separator '') as paperTags from PaperTag where {$papersel}true group by paperId) as PaperTags on (PaperTags.paperId=Paper.paperId)";
-            $cols[] = "PaperTags.paperTags";
-        }
-        if (@$options["tagIndex"] && !is_array($options["tagIndex"]))
-            $options["tagIndex"] = array($options["tagIndex"]);
-        if (@$options["tagIndex"])
-            for ($i = 0; $i < count($options["tagIndex"]); ++$i) {
-                $joins[] = "left join PaperTag as TagIndex$i on (TagIndex$i.paperId=Paper.paperId and TagIndex$i.tag='" . sqlq($options["tagIndex"][$i]) . "')";
-                $cols[] = "TagIndex$i.tagIndex as tagIndex" . ($i ? : "");
-            }
-
-        if (@$options["reviewerPreference"]) {
-            $joins[] = "left join PaperReviewPreference on (PaperReviewPreference.paperId=Paper.paperId and PaperReviewPreference.contactId=$reviewerContactId)";
-            $cols[] = "coalesce(PaperReviewPreference.preference, 0) as reviewerPreference";
-            if ($this->sversion >= 69)
-                $cols[] = "PaperReviewPreference.expertise as reviewerExpertise";
-            else
-                $cols[] = "NULL as reviewerExpertise";
-        }
-
-        if (@$options["allReviewerPreference"] || @$options["desirability"]) {
-            $subq = "select paperId";
-            if (@$options["allReviewerPreference"]) {
-                $subq .= ", " . $this->query_all_reviewer_preference() . " as allReviewerPreference";
-                $cols[] = "APRP.allReviewerPreference";
-            }
-            if (@$options["desirability"]) {
-                $subq .= ", sum(if(preference<=-100,0,greatest(least(preference,1),-1))) as desirability";
-                $cols[] = "coalesce(APRP.desirability,0) as desirability";
-            }
-            $subq .= " from PaperReviewPreference where {$papersel}true group by paperId";
-            $joins[] = "left join ($subq) as APRP on (APRP.paperId=Paper.paperId)";
-        }
-
-        if (@$options["allConflictType"]) {
-            $joins[] = "left join (select paperId, group_concat(concat(contactId,' ',conflictType) separator ',') as allConflictType from PaperConflict where {$papersel}conflictType>0 group by paperId) as AllConflict on (AllConflict.paperId=Paper.paperId)";
-            $cols[] = "AllConflict.allConflictType";
-        }
-
-        if (@$options["reviewer"]) {
-            $joins[] = "left join PaperConflict RPC on (RPC.paperId=Paper.paperId and RPC.contactId=$reviewerContactId)";
-            $joins[] = "left join PaperReview RPR on (RPR.paperId=Paper.paperId and RPR.contactId=$reviewerContactId)";
-            $cols[] = "RPC.conflictType reviewerConflictType, RPR.reviewType reviewerReviewType";
-        }
-
-        if (@$options["allComments"]) {
-            $joins[] = "join PaperComment on (PaperComment.paperId=Paper.paperId)";
-            $joins[] = "left join PaperConflict as CommentConflict on (CommentConflict.paperId=PaperComment.paperId and CommentConflict.contactId=PaperComment.contactId)";
-            array_push($cols, "PaperComment.commentId, PaperComment.contactId as commentContactId",
-                       "CommentConflict.conflictType as commentConflictType",
-                       "PaperComment.timeModified, PaperComment.comment",
-                       "PaperComment.replyTo, PaperComment.commentType");
-        }
-
-        if (@$options["reviewerName"]) {
-            if (@$options["reviewerName"] === "lead" || @$options["reviewerName"] === "shepherd")
-                $joins[] = "left join ContactInfo as ReviewerContactInfo on (ReviewerContactInfo.contactId=Paper.{$options['reviewerName']}ContactId)";
-            else if (@$options["allComments"])
-                $joins[] = "left join ContactInfo as ReviewerContactInfo on (ReviewerContactInfo.contactId=PaperComment.contactId)";
-            else if (@$options["reviewerName"])
-                $joins[] = "left join ContactInfo as ReviewerContactInfo on (ReviewerContactInfo.contactId=PaperReview.contactId)";
-            array_push($cols, "ReviewerContactInfo.firstName as reviewFirstName",
-                       "ReviewerContactInfo.lastName as reviewLastName",
-                       "ReviewerContactInfo.email as reviewEmail",
-                       "ReviewerContactInfo.lastLogin as reviewLastLogin");
-        }
-
-        if (@$options["foldall"])
-            $cols[] = "1 as folded";
-
-        // conditions
-        if (count($paperset))
-            $where[] = "Paper.paperId" . sql_in_numeric_set($paperset[0]);
-        if (@$options["finalized"])
-            $where[] = "timeSubmitted>0";
-        else if (@$options["unsub"])
-            $where[] = "timeSubmitted<=0";
-        if (@$options["accepted"])
-            $where[] = "outcome>0";
-        if (@$options["undecided"])
-            $where[] = "outcome=0";
-        if (@$options["active"] || @$options["myReviews"]
-            || @$options["myReviewRequests"])
-            $where[] = "timeWithdrawn<=0";
-        if (@$options["myLead"])
-            $where[] = "leadContactId=$contactId";
-        if (@$options["unmanaged"])
-            $where[] = "managerContactId=0";
-
-        $pq = "select " . join(",\n    ", $cols)
-            . "\nfrom " . join("\n    ", $joins);
-        if (count($where))
-            $pq .= "\nwhere " . join("\n    and ", $where);
-
-        // grouping and ordering
-        if (@$options["allComments"])
-            $pq .= "\ngroup by Paper.paperId, PaperComment.commentId";
-        else if ($reviewerQuery || $scoresQuery)
-            $pq .= "\ngroup by Paper.paperId, PaperReview.reviewId";
-        else
-            $pq .= "\ngroup by Paper.paperId";
-        if (@$options["order"] && $options["order"] != "order by Paper.paperId")
-            $pq .= "\n" . $options["order"];
-        else {
-            $pq .= "\norder by Paper.paperId";
-            if ($reviewerQuery || $scoresQuery)
-                $pq .= ", PaperReview.reviewOrdinal";
-            if (isset($options["allComments"]))
-                $pq .= ", PaperComment.commentId";
-        }
-
-        //$this->infoMsg(Ht::pre_text_wrap($pq));
-        return $pq . "\n";
-    }
-
-    function paperRow($sel, $contact, &$whyNot = null) {
-        $whyNot = array();
-        if (!is_array($sel))
-            $sel = array("paperId" => $sel);
-        if (isset($sel["paperId"]))
-            $whyNot["paperId"] = $sel["paperId"];
-        if (isset($sel["reviewId"]))
-            $whyNot["reviewId"] = $sel["reviewId"];
-
-        if (isset($sel['paperId']) && cvtint($sel['paperId']) < 0)
-            $whyNot['invalidId'] = 'paper';
-        else if (isset($sel['reviewId']) && cvtint($sel['reviewId']) < 0
-                 && !preg_match('/^\d+[A-Z][A-Z]?$/i', $sel['reviewId']))
-            $whyNot['invalidId'] = 'review';
-        else {
-            $q = $this->paperQuery($contact, $sel);
-            $result = $this->q($q);
-
-            if (!$result)
-                $whyNot['dbError'] = "Database error while fetching paper (" . htmlspecialchars($q) . "): " . htmlspecialchars($this->dblink->error);
-            else if (edb_nrows($result) == 0)
-                $whyNot['noPaper'] = 1;
-            else
-                return PaperInfo::fetch($result, $contact);
-        }
-
-        return null;
-    }
-
-    function review_rows($q, $contact) {
-        $result = $this->qe($q);
-        $rrows = array();
-        while (($row = PaperInfo::fetch($result, $contact)))
-            $rrows[$row->reviewId] = $row;
-        return $rrows;
-    }
-
-    function comment_query($where) {
-        return "select PaperComment.*, firstName reviewFirstName, lastName reviewLastName, email reviewEmail
-                from PaperComment join ContactInfo on (ContactInfo.contactId=PaperComment.contactId)
-                where $where order by commentId";
-    }
-
-    function comment_rows($q, $contact) {
-        $result = $this->qe($q);
-        $crows = array();
-        while (($row = PaperInfo::fetch($result, $contact))) {
-            $crows[$row->commentId] = $row;
-            if (isset($row->commentContactId))
-                $cid = $row->commentContactId;
-            else
-                $cid = $row->contactId;
-            $row->threadContacts = array($cid => 1);
-            for ($r = $row; defval($r, "replyTo", 0) && isset($crows[$r->replyTo]); $r = $crows[$r->replyTo])
-                /* do nothing */;
-            $row->threadHead = $r->commentId;
-            $r->threadContacts[$cid] = 1;
-        }
-        foreach ($crows as $row)
-            if ($row->threadHead != $row->commentId)
-                $row->threadContacts = $crows[$row->threadHead]->threadContacts;
-        return $crows;
-    }
-
-
-    function reviewRow($selector, &$whyNot = null) {
-        $whyNot = array();
-
-        if (!is_array($selector))
-            $selector = array('reviewId' => $selector);
-        if (isset($selector['reviewId'])) {
-            $whyNot['reviewId'] = $selector['reviewId'];
-            if (($reviewId = cvtint($selector['reviewId'])) <= 0) {
-                $whyNot['invalidId'] = 'review';
-                return null;
-            }
-        }
-        if (isset($selector['paperId'])) {
-            $whyNot['paperId'] = $selector['paperId'];
-            if (($paperId = cvtint($selector['paperId'])) <= 0) {
-                $whyNot['invalidId'] = 'paper';
-                return null;
-            }
-        }
-
-        $q = "select PaperReview.*,
-                ContactInfo.firstName, ContactInfo.lastName, ContactInfo.email, ContactInfo.roles as contactRoles,
-                ContactInfo.contactTags,
-                ReqCI.firstName as reqFirstName, ReqCI.lastName as reqLastName, ReqCI.email as reqEmail";
-        if (isset($selector["ratings"]))
-            $q .= ",
-                group_concat(ReviewRating.rating order by ReviewRating.rating desc) as allRatings,
-                count(ReviewRating.rating) as numRatings";
-        if (isset($selector["myRating"]))
-            $q .= ",
-                MyRating.rating as myRating";
-        $q .= "\n               from PaperReview
-                join ContactInfo using (contactId)
-                left join ContactInfo as ReqCI on (ReqCI.contactId=PaperReview.requestedBy)\n";
-        if (isset($selector["ratings"]))
-            $q .= "             left join ReviewRating on (ReviewRating.reviewId=PaperReview.reviewId)\n";
-        if (isset($selector["myRating"]))
-            $q .= "             left join ReviewRating as MyRating on (MyRating.reviewId=PaperReview.reviewId and MyRating.contactId=" . $selector["myRating"] . ")\n";
-
-        $where = array();
-        $order = array("paperId");
-        if (isset($reviewId))
-            $where[] = "PaperReview.reviewId=$reviewId";
-        if (isset($paperId))
-            $where[] = "PaperReview.paperId=$paperId";
-        $cwhere = array();
-        if (isset($selector["contactId"]))
-            $cwhere[] = "PaperReview.contactId=" . cvtint($selector["contactId"]);
-        if (@$selector["rev_tokens"])
-            $cwhere[] = "PaperReview.reviewToken in (" . join(",", $selector["rev_tokens"]) . ")";
-        if (count($cwhere))
-            $where[] = "(" . join(" or ", $cwhere) . ")";
-        if (count($cwhere) > 1)
-            $order[] = "(PaperReview.contactId=" . cvtint($selector["contactId"]) . ") desc";
-        if (isset($selector['reviewOrdinal']))
-            $where[] = "PaperReview.reviewSubmitted>0 and reviewOrdinal=" . cvtint($selector['reviewOrdinal']);
-        else if (isset($selector['submitted']))
-            $where[] = "PaperReview.reviewSubmitted>0";
-        if (!count($where)) {
-            $whyNot['internal'] = 1;
-            return null;
-        }
-
-        $q = $q . " where " . join(" and ", $where) . " group by PaperReview.reviewId
-                order by " . join(", ", $order) . ", reviewOrdinal, reviewType desc, reviewId";
-
-        $result = $this->q($q);
-        if (!$result) {
-            $whyNot['dbError'] = "Database error while fetching review (" . htmlspecialchars($q) . "): " . htmlspecialchars($this->dblink->error);
-            return null;
-        }
-
-        $x = array();
-        while (($row = edb_orow($result)))
-            $x[] = $row;
-
-        if (isset($selector["array"]))
-            return $x;
-        else if (count($x) == 1 || defval($selector, "first"))
-            return @$x[0];
-        if (count($x) == 0)
-            $whyNot['noReview'] = 1;
-        else
-            $whyNot['multipleReviews'] = 1;
-        return null;
-    }
-
-
-    // Activity
-
-    private static function _flowQueryWheres(&$where, $table, $t0) {
-        $time = $table . ($table == "PaperReview" ? ".reviewSubmitted" : ".timeModified");
-        if (is_array($t0))
-            $where[] = "($time<$t0[0] or ($time=$t0[0] and $table.contactId>$t0[1]) or ($time=$t0[0] and $table.contactId=$t0[1] and $table.paperId>$t0[2]))";
-        else if ($t0)
-            $where[] = "$time<$t0";
-    }
-
-    private function _flowQueryRest() {
-        return "          Paper.title,
-                substring(Paper.title from 1 for 80) as shortTitle,
-                Paper.timeSubmitted,
-                Paper.timeWithdrawn,
-                Paper.blind as paperBlind,
-                Paper.outcome,
-                Paper.managerContactId,
-                ContactInfo.firstName as reviewFirstName,
-                ContactInfo.lastName as reviewLastName,
-                ContactInfo.email as reviewEmail,
-                PaperConflict.conflictType,
-                MyPaperReview.reviewType as myReviewType,
-                MyPaperReview.reviewSubmitted as myReviewSubmitted,
-                MyPaperReview.reviewNeedsSubmit as myReviewNeedsSubmit,
-                MyPaperReview.contactId as myReviewContactId\n";
-    }
-
-    private function _commentFlowQuery($contact, $t0, $limit) {
-        // XXX review tokens
-        $q = "select PaperComment.*,
-                substring(PaperComment.comment from 1 for 300) as shortComment,\n"
-            . $this->_flowQueryRest()
-            . "\t\tfrom PaperComment
-                join ContactInfo on (ContactInfo.contactId=PaperComment.contactId)
-                join Paper on (Paper.paperId=PaperComment.paperId)
-                left join PaperConflict on (PaperConflict.paperId=PaperComment.paperId and PaperConflict.contactId=$contact->contactId)
-                left join PaperReview as MyPaperReview on (MyPaperReview.paperId=PaperComment.paperId and MyPaperReview.contactId=$contact->contactId)\n";
-        $where = $contact->canViewCommentReviewWheres();
-        self::_flowQueryWheres($where, "PaperComment", $t0);
-        if (count($where))
-            $q .= " where " . join(" and ", $where);
-        $q .= " order by PaperComment.timeModified desc, PaperComment.contactId asc, PaperComment.paperId asc";
-        if ($limit)
-            $q .= " limit $limit";
-        return $q;
-    }
-
-    private function _reviewFlowQuery($contact, $t0, $limit) {
-        // XXX review tokens
-        $q = "select PaperReview.*,\n"
-            . $this->_flowQueryRest()
-            . "\t\tfrom PaperReview
-                join ContactInfo on (ContactInfo.contactId=PaperReview.contactId)
-                join Paper on (Paper.paperId=PaperReview.paperId)
-                left join PaperConflict on (PaperConflict.paperId=PaperReview.paperId and PaperConflict.contactId=$contact->contactId)
-                left join PaperReview as MyPaperReview on (MyPaperReview.paperId=PaperReview.paperId and MyPaperReview.contactId=$contact->contactId)\n";
-        $where = $contact->canViewCommentReviewWheres();
-        self::_flowQueryWheres($where, "PaperReview", $t0);
-        $where[] = "PaperReview.reviewSubmitted>0";
-        $q .= " where " . join(" and ", $where);
-        $q .= " order by PaperReview.reviewSubmitted desc, PaperReview.contactId asc, PaperReview.paperId asc";
-        if ($limit)
-            $q .= " limit $limit";
-        return $q;
-    }
-
-    function _activity_compar($a, $b) {
-        if (!$a || !$b)
-            return !$a && !$b ? 0 : ($a ? -1 : 1);
-        $at = isset($a->timeModified) ? $a->timeModified : $a->reviewSubmitted;
-        $bt = isset($b->timeModified) ? $b->timeModified : $b->reviewSubmitted;
-        if ($at != $bt)
-            return $at > $bt ? -1 : 1;
-        else if ($a->contactId != $b->contactId)
-            return $a->contactId < $b->contactId ? -1 : 1;
-        else if ($a->paperId != $b->paperId)
-            return $a->paperId < $b->paperId ? -1 : 1;
-        else
-            return 0;
-    }
-
-    function reviewerActivity($contact, $t0, $limit) {
-        // Return the $limit most recent pieces of activity on or before $t0.
-        // Requires some care, since comments and reviews are loaded from
-        // different queries, and we want to return the results sorted.  So we
-        // load $limit comments and $limit reviews -- but if the comments run
-        // out before the $limit is reached (because some comments cannot be
-        // seen by the current user), we load additional comments & try again,
-        // and the same for reviews.
-
-        if ($t0 && preg_match('/\A(\d+)\.(\d+)\.(\d+)\z/', $t0, $m))
-            $ct0 = $rt0 = array($m[1], $m[2], $m[3]);
-        else
-            $ct0 = $rt0 = $t0;
-        $activity = array();
-
-        $crows = $rrows = array(); // comment/review rows being worked through
-        $curcr = $currr = null;    // current comment/review row
-        // We read new comment/review rows when the current set is empty.
-
-        while (count($activity) < $limit) {
-            // load $curcr with most recent viewable comment
-            if ($curcr)
-                /* do nothing */;
-            else if (($curcr = array_pop($crows))) {
-                if (!$contact->can_view_comment($curcr, $curcr, false)) {
-                    $curcr = null;
-                    continue;
-                }
-            } else if ($ct0) {
-                $crows = array_reverse($this->comment_rows(self::_commentFlowQuery($contact, $ct0, $limit), $contact));
-                if (count($crows) == $limit)
-                    $ct0 = array($crows[0]->timeModified, $crows[0]->contactId, $crows[0]->paperId);
-                else
-                    $ct0 = null;
-                continue;
-            }
-
-            // load $currr with most recent viewable review
-            if ($currr)
-                /* do nothing */;
-            else if (($currr = array_pop($rrows))) {
-                if (!$contact->can_view_review($currr, $currr, false)) {
-                    $currr = null;
-                    continue;
-                }
-            } else if ($rt0) {
-                $rrows = array_reverse($this->review_rows(self::_reviewFlowQuery($contact, $rt0, $limit), $contact));
-                if (count($rrows) == $limit)
-                    $rt0 = array($rrows[0]->reviewSubmitted, $rrows[0]->contactId, $rrows[0]->paperId);
-                else
-                    $rt0 = null;
-                continue;
-            }
-
-            // if neither, ran out of activity
-            if (!$curcr && !$currr)
-                break;
-
-            // otherwise, choose the later one first
-            if (self::_activity_compar($curcr, $currr) < 0) {
-                $curcr->isComment = true;
-                $activity[] = $curcr;
-                $curcr = null;
-            } else {
-                $currr->isComment = false;
-                $activity[] = $currr;
-                $currr = null;
-            }
-        }
-
-        return $activity;
-    }
-
 
     //
     // Message routines
     //
 
-    function msg($text, $type) {
+    function msg($type, $text) {
         if (PHP_SAPI == "cli") {
             if ($type === "xmerror" || $type === "merror")
                 fwrite(STDERR, "$text\n");
-            else if ($type === "xwarning" || $type === "mxwarning"
+            else if ($type === "xwarning" || $type === "warning"
                      || !defined("HOTCRP_TESTHARNESS"))
                 fwrite(STDOUT, "$text\n");
-        } else {
-            $text = "<div class=\"$type\">$text</div>\n";
-            if ($this->save_messages) {
-                ensure_session();
-                $this->save_session_array("msgs", true, $text);
-            } else
-                echo $text;
-        }
+        } else if ($this->save_messages) {
+            ensure_session();
+            $this->save_session_array("msgs", true, array($type, $text));
+        } else if ($type[0] == "x")
+            echo Ht::xmsg($type, $text);
+        else
+            echo "<div class=\"$type\">$text</div>";
     }
 
     function infoMsg($text, $minimal = false) {
-        $this->msg($text, $minimal ? "xinfo" : "info");
+        $this->msg($minimal ? "xinfo" : "info", $text);
+    }
+
+    static public function msg_info($text, $minimal = false) {
+        self::$g->msg($minimal ? "xinfo" : "info", $text);
     }
 
     function warnMsg($text, $minimal = false) {
-        $this->msg($text, $minimal ? "xwarning" : "warning");
+        $this->msg($minimal ? "xwarning" : "warning", $text);
+    }
+
+    static public function msg_warning($text, $minimal = false) {
+        self::$g->msg($minimal ? "xwarning" : "warning", $text);
     }
 
     function confirmMsg($text, $minimal = false) {
-        $this->msg($text, $minimal ? "xconfirm" : "confirm");
+        $this->msg($minimal ? "xconfirm" : "confirm", $text);
+    }
+
+    static public function msg_confirm($text, $minimal = false) {
+        self::$g->msg($minimal ? "xconfirm" : "confirm", $text);
     }
 
     function errorMsg($text, $minimal = false) {
-        $this->msg($text, $minimal ? "xmerror" : "merror");
+        $this->msg($minimal ? "xmerror" : "merror", $text);
         return false;
     }
 
-    function errorMsgExit($text) {
-        if ($text)
-            $this->msg($text, "merror");
-        $this->footer();
-        exit;
+    static public function msg_error($text, $minimal = false) {
+        self::$g->msg($minimal ? "xmerror" : "merror", $text);
+        return false;
+    }
+
+    static public function msg_debugt($text) {
+        if (is_object($text) || is_array($text) || $text === null || $text === false || $text === true)
+            $text = json_encode($text);
+        self::$g->msg("merror", Ht::pre_text_wrap($text));
+        return false;
+    }
+
+    function post_missing_msg() {
+        $this->msg("merror", "Your uploaded data wasn’t received. This can happen on unusually slow connections, or if you tried to upload a file larger than I can accept.");
     }
 
 
@@ -1407,40 +836,41 @@ class Conference {
     // Conference header, footer
     //
 
-    function make_css_link($url) {
-        global $ConfSitePATH, $Opt;
+    function make_css_link($url, $media = null) {
+        global $ConfSitePATH;
         $t = '<link rel="stylesheet" type="text/css" href="';
         if (str_starts_with($url, "stylesheets/")
             || !preg_match(',\A(?:https?:|/),i', $url))
-            $t .= $Opt["assetsUrl"];
+            $t .= $this->opt["assetsUrl"];
         $t .= $url;
         if (($mtime = @filemtime("$ConfSitePATH/$url")) !== false)
             $t .= "?mtime=$mtime";
+        if ($media)
+            $t .= '" media="' . $media;
         return $t . '" />';
     }
 
     function make_script_file($url, $no_strict = false) {
-        global $ConfSiteBase, $ConfSitePATH, $Opt;
+        global $ConfSitePATH;
         if (str_starts_with($url, "scripts/")) {
             $post = "";
             if (($mtime = @filemtime("$ConfSitePATH/$url")) !== false)
                 $post = "mtime=$mtime";
-            if (@$Opt["strictJavascript"] && !$no_strict)
-                $url = $Opt["scriptAssetsUrl"] . "cacheable.php?file=" . urlencode($url)
+            if (get($this->opt, "strictJavascript") && !$no_strict)
+                $url = $this->opt["scriptAssetsUrl"] . "cacheable.php?file=" . urlencode($url)
                     . "&strictjs=1" . ($post ? "&$post" : "");
             else
-                $url = $Opt["scriptAssetsUrl"] . $url . ($post ? "?$post" : "");
-            if ($Opt["scriptAssetsUrl"] === $ConfSiteBase)
+                $url = $this->opt["scriptAssetsUrl"] . $url . ($post ? "?$post" : "");
+            if ($this->opt["scriptAssetsUrl"] === Navigation::siteurl())
                 return Ht::script_file($url);
         }
         return Ht::script_file($url, array("crossorigin" => "anonymous"));
     }
 
     private function header_head($title) {
-        global $Me, $ConfSiteBase, $ConfSiteSuffix, $ConfSitePATH,
-            $Opt, $CurrentList;
+        global $Me, $ConfSitePATH, $CurrentList;
         echo "<!DOCTYPE html>
-<html>
+<html lang=\"en\">
 <head>
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
 <meta http-equiv=\"Content-Style-Type\" content=\"text/css\" />
@@ -1450,21 +880,24 @@ class Conference {
         if (strstr($title, "<") !== false)
             $title = preg_replace("/<([^>\"']|'[^']*'|\"[^\"]*\")*>/", "", $title);
 
-        if (isset($Opt["fontScript"]))
-            echo $Opt["fontScript"];
+        echo $this->opt("fontScript", "");
 
         echo $this->make_css_link("stylesheets/style.css"), "\n";
-        if (isset($Opt["stylesheets"]))
-            foreach ($Opt["stylesheets"] as $css)
-                echo $this->make_css_link($css), "\n";
+        if ($this->opt("mobileStylesheet")) {
+            echo '<meta name="viewport" content="width=device-width, initial-scale=1">', "\n";
+            echo $this->make_css_link("stylesheets/mobile.css", "screen and (max-width: 768px)"), "\n";
+        }
+        foreach (mkarray($this->opt("stylesheets", [])) as $css)
+            echo $this->make_css_link($css), "\n";
 
         // favicon
-        if (($favicon = defval($Opt, "favicon"))) {
+        $favicon = $this->opt("favicon");
+        if ($favicon) {
             if (strpos($favicon, "://") === false && $favicon[0] != "/") {
-                if (@$Opt["assetsUrl"] && substr($favicon, 0, 7) === "images/")
-                    $favicon = $Opt["assetsUrl"] . $favicon;
+                if ($this->opt["assetsUrl"] && substr($favicon, 0, 7) === "images/")
+                    $favicon = $this->opt["assetsUrl"] . $favicon;
                 else
-                    $favicon = $ConfSiteBase . $favicon;
+                    $favicon = Navigation::siteurl() . $favicon;
             }
             if (substr($favicon, -4) == ".png")
                 echo "<link rel=\"icon\" type=\"image/png\" href=\"$favicon\" />\n";
@@ -1477,107 +910,107 @@ class Conference {
         }
 
         // jQuery
-        if (isset($Opt["jqueryUrl"]))
-            $jquery = $Opt["jqueryUrl"];
-        else if (@$Opt["jqueryCdn"])
-            $jquery = "//code.jquery.com/jquery-1.11.3.min.js";
+        $stash = Ht::unstash();
+        if (isset($this->opt["jqueryUrl"]))
+            $jquery = $this->opt["jqueryUrl"];
+        else if ($this->opt("jqueryCdn"))
+            $jquery = "//code.jquery.com/jquery-1.12.3.min.js";
         else
-            $jquery = "scripts/jquery-1.11.3.min.js";
-        $this->scriptStuff = $this->make_script_file($jquery, true) . "\n";
-
-        $this->scriptStuff .= $this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n";
-        $this->scriptStuff .= $this->make_script_file("scripts/jquery.flot.min.js", true) . "\n";
-        //$this->scriptStuff .= $this->make_script_file("scripts/ZeroClipboard.min.js", true) . "\n";
+            $jquery = "scripts/jquery-1.12.3.min.js";
+        Ht::stash_html($this->make_script_file($jquery, true) . "\n");
+        Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
+        Ht::stash_html($this->make_script_file("scripts/jquery.flot.min.js", true) . "\n");
+        //Ht::stash_html($this->make_script_file("scripts/ZeroClipboard.min.js", true) . "\n");
 
         // Javascript settings to set before script.js
-        $this->scriptStuff .= "<script>siteurl=\"$ConfSiteBase\";siteurl_suffix=\"$ConfSiteSuffix\"";
+        Ht::stash_script("siteurl=" . json_encode(Navigation::siteurl()) . ";siteurl_suffix=\"" . Navigation::php_suffix() . "\"");
         if (session_id() !== "")
-            $this->scriptStuff .= ";siteurl_postvalue=\"" . post_value() . "\"";
+            Ht::stash_script("siteurl_postvalue=\"" . post_value() . "\"");
         if (@$CurrentList
             && ($list = SessionList::lookup($CurrentList)))
-            $this->scriptStuff .= ";hotcrp_list={num:$CurrentList,id:\"" . addcslashes($list->listid, "\n\r\\\"/") . "\"}";
+            Ht::stash_script("hotcrp_list={num:$CurrentList,id:\"" . addcslashes($list->listid, "\n\r\\\"/") . "\"}");
         if (($urldefaults = hoturl_defaults()))
-            $this->scriptStuff .= ";siteurl_defaults=" . json_encode($urldefaults);
+            Ht::stash_script("siteurl_defaults=" . json_encode($urldefaults) . ";");
+        Ht::stash_script("assetsurl=" . json_encode($this->opt["assetsUrl"]) . ";");
         $huser = (object) array();
         if ($Me && $Me->email)
             $huser->email = $Me->email;
         if ($Me && $Me->is_pclike())
             $huser->is_pclike = true;
-        $this->scriptStuff .= ";hotcrp_user=" . json_encode($huser);
+        Ht::stash_script("hotcrp_user=" . json_encode($huser));
 
-        $pid = @$_REQUEST["paperId"];
-        $pid = $pid && ctype_digit($pid) ? (int) $pid : 0;
-        if ($pid)
-            $this->scriptStuff .= ";hotcrp_paperid=$pid";
-        if ($pid && $Me && $Me->privChair
-            && ($forceShow = @$_REQUEST["forceShow"]) && $forceShow != "0")
-            $this->scriptStuff .= ";hotcrp_want_override_conflict=true";
-        //$this->scriptStuff .= ";ZeroClipboard.setDefaults({moviePath:\"${ConfSiteBase}cacheable$ConfSiteSuffix?file=scripts/ZeroClipboard.swf&amp;mtime=" . filemtime("$ConfSitePATH/scripts/ZeroClipboard.swf") . "\"})";
-        $this->scriptStuff .= "</script>\n";
+        //Ht::stash_script("ZeroClipboard.setDefaults({moviePath:\"" . Navigation::siteurl() . "cacheable" . Navigation::php_suffix() . "?file=scripts/ZeroClipboard.swf&amp;mtime=" . filemtime("$ConfSitePATH/scripts/ZeroClipboard.swf") . "\"})");
 
         // script.js
-        $this->scriptStuff .= $this->make_script_file("scripts/script.js") . "\n";
+        if (!$this->opt("noDefaultScript"))
+            Ht::stash_html($this->make_script_file("scripts/script.js") . "\n");
 
-        echo $this->scriptStuff;
-        $this->scriptStuff = "";
+        echo Ht::unstash();
 
-        echo "<title>", $title, " - ", htmlspecialchars($Opt["shortName"]),
-            "</title>\n</head>\n";
+        echo "<title>";
+        if ($title)
+            echo $title, " - ";
+        echo htmlspecialchars($this->short_name), "</title>\n</head>\n";
     }
 
     function header($title, $id = "", $actionBar = null, $showTitle = true) {
-        global $ConfSiteBase, $ConfSiteSuffix, $ConfSitePATH, $Me, $Now, $Opt;
+        global $ConfSitePATH, $Me, $Now;
         if ($this->headerPrinted)
             return;
 
         // <head>
+        if ($title === "Home")
+            $title = "";
         $this->header_head($title);
 
         // <body>
-        echo "<body", ($id ? " id='$id'" : ""), " onload='hotcrp_load()'>\n";
-
-        // on load of script.js
-        $this->scriptStuff .= "<script>";
+        echo "<body", ($id ? " id=\"$id\"" : ""), " onload=\"hotcrp_load()\">\n";
 
         // initial load (JS's timezone offsets are negative of PHP's)
-        $this->scriptStuff .= "hotcrp_load.time(" . (-date("Z", $Now) / 60) . "," . (@$Opt["time24hour"] ? 1 : 0) . ")";
-
-        $this->scriptStuff .= "</script>";
+        Ht::stash_script("hotcrp_load.time(" . (-date("Z", $Now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
 
         echo "<div id='prebody'>\n";
 
         echo "<div id='header'>\n<div id='header_left_conf'><h1>";
         if ($title && $showTitle && ($title == "Home" || $title == "Sign in"))
-            echo "<a name='' class='qq' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($Opt["shortName"]), "</a>";
+            echo "<a name='' class='qq' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
         else
-            echo "<a name='' class='uu' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($Opt["shortName"]), "</a></h1></div><div id='header_left_page'><h1>", $title;
+            echo "<a name='' class='uu' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
         echo "</h1></div><div id='header_right'>";
         if ($Me && !$Me->is_empty()) {
             // profile link
-            $xsep = ' <span class="barsep">&nbsp;|&nbsp;</span> ';
-            if ($Me->has_email() && false) {
-                echo '<a class="q" href="', hoturl("profile"), '"><strong>',
+            $profile_parts = [];
+            if ($Me->has_email() && !$Me->disabled) {
+	        $profile_parts[] = '<strong>' . htmlspecialchars($Me->email) . '</strong>';
+                /*echo '<a class="q" href="', hoturl("profile"), '"><strong>',
                     htmlspecialchars($Me->email),
                     '</strong></a> &nbsp; <a href="', hoturl("profile"), '">Profile</a>',
-                    $xsep;
-            } else if ($Me->has_email())
-                echo '<strong>', htmlspecialchars($Me->email), '</strong>', $xsep;
+                    $xsep;*/
+            }
 
             // "act as" link
-            if (($actas = @$_SESSION["last_actas"]) && @$_SESSION["trueuser"]) {
-                // Become true user if not currently chair.
+            if (($actas = get($_SESSION, "last_actas"))
+                && get($_SESSION, "trueuser")
+                && ($Me->privChair || Contact::$trueuser_privChair === $Me)) {
+                // Link becomes true user if not currently chair.
                 if (!$Me->privChair || strcasecmp($Me->email, $actas) == 0)
                     $actas = $_SESSION["trueuser"]->email;
                 if (strcasecmp($Me->email, $actas) != 0)
-                    echo "<a href=\"", self_href(array("actas" => $actas)), "\">", ($Me->privChair ? htmlspecialchars($actas) : "Admin"), "&nbsp;", Ht::img("viewas.png", "Act as " . htmlspecialchars($actas)), "</a>", $xsep;
+                    $profile_parts[] = "<a href=\"" . self_href(["actas" => $actas]) . "\">"
+                        . ($Me->privChair ? htmlspecialchars($actas) : "Admin")
+                        . "&nbsp;" . Ht::img("viewas.png", "Act as " . htmlspecialchars($actas))
+                        . "</a>";
             }
 
             // help, sign out
             $x = ($id == "search" ? "t=$id" : ($id == "settings" ? "t=chair" : ""));
-            if (!$Me->has_email() && !isset($Opt["httpAuthLogin"]))
-                echo '<a href="', hoturl("index", "signin=1"), '">Sign&nbsp;in</a>';
-            if (!$Me->is_empty() || isset($Opt["httpAuthLogin"]))
-                echo '<a href="', hoturl_post("index", "signout=1"), '">Sign&nbsp;out</a>';
+            if (!$Me->has_email() && !isset($this->opt["httpAuthLogin"]))
+                $profile_parts[] = '<a href="' . hoturl("index", "signin=1") . '">Sign&nbsp;in</a>';
+            if (!$Me->is_empty() || isset($this->opt["httpAuthLogin"]))
+                $profile_parts[] = '<a href="' . hoturl_post("index", "signout=1") . '">Sign&nbsp;out</a>';
+
+            if (!empty($profile_parts))
+                echo join(' <span class="barsep">·</span> ', $profile_parts);
         }
         echo '<div id="maindeadline" style="display:none"></div></div>', "\n";
 
@@ -1586,15 +1019,15 @@ class Conference {
         echo $actionBar;
 
         echo "</div>\n<div id=\"initialmsgs\">\n";
-        if (@$Opt["maintenance"])
-            echo "<div class=\"merror\"><strong>The site is down for maintenance.</strong> ", (is_string($Opt["maintenance"]) ? $Opt["maintenance"] : "Please check back later."), "</div>";
+        if (($x = $this->opt("maintenance")))
+            echo "<div class=\"merror\"><strong>The site is down for maintenance.</strong> ", (is_string($x) ? $x : "Please check back later."), "</div>";
+        $this->save_messages = false;
         if (($msgs = $this->session("msgs")) && count($msgs)) {
-            foreach ($msgs as $m)
-                echo $m;
             $this->save_session("msgs", null);
+            foreach ($msgs as $m)
+                $this->msg($m[0], $m[1]);
             echo "<div id=\"initialmsgspacer\"></div>";
         }
-        $this->save_messages = false;
         echo "</div>\n";
 
         $this->headerPrinted = true;
@@ -1602,13 +1035,13 @@ class Conference {
     }
 
     function footer() {
-        global $Opt, $Me, $ConfSitePATH;
+        global $Me, $ConfSitePATH;
         echo "</div>\n", // class='body'
             "<div id='footer'>\n";
-        $footy = defval($Opt, "extraFooter", "");
+        $footy = $this->opt("extraFooter", "");
         if (false)
             $footy .= "<a href='http://read.seas.harvard.edu/~kohler/hotcrp/'>HotCRP</a> Conference Management Software";
-        if (!defval($Opt, "noFooterVersion", 0)) {
+        if (!$this->opt("noFooterVersion")) {
             if ($Me && $Me->privChair) {
                 if (is_dir("$ConfSitePATH/.git")) {
                     $args = array();
@@ -1621,8 +1054,7 @@ class Conference {
         if ($footy)
             echo "<div id='footer_crp'>$footy</div>";
         echo "<div class='clear'></div></div>\n";
-        echo $this->scriptStuff, Ht::take_stash(), "</body>\n</html>\n";
-        $this->scriptStuff = "";
+        echo Ht::take_stash(), "</body>\n</html>\n";
     }
 
     function output_ajax($values = null, $div = false) {
@@ -1718,91 +1150,12 @@ class Conference {
     //
 
     public function capability_manager($for) {
-        global $Opt;
-        if (@$Opt["contactdb_dsn"]
-            && ($cdb = Contact::contactdb())
-            && ((is_string($for) && substr($for, 0, 1) === "U")
-                || ($for instanceof Contact && $for->contactDbId)))
-            return new CapabilityManager($cdb, "U");
-        else
+        if ($for && substr($for, 0, 1) === "U") {
+            if (($cdb = Contact::contactdb()))
+                return new CapabilityManager($cdb, "U");
+            else
+                return null;
+        } else
             return new CapabilityManager($this->dblink, "");
     }
-
-
-    function makeDownloadPath($doc) {
-        global $ConfSiteBase, $ConfSiteSuffix;
-        if (!property_exists($doc, "mimetype") || !isset($doc->documentType)) {
-            $trace = debug_backtrace();
-            error_log($trace[0]["file"] . ":" . $trace[0]["line"] . ": makeDownloadPath called with incomplete document");
-        }
-        if ($doc->mimetype)
-            return $ConfSiteBase . "doc$ConfSiteSuffix/" . HotCRPDocument::filename($doc);
-        else {
-            $x = $ConfSiteBase . "doc$ConfSiteSuffix?p=" . $doc->paperId;
-            if ($doc->documentType == DTYPE_FINAL)
-                return $x . "&amp;final=1";
-            else if ($doc->documentType > 0)
-                return $x . "&amp;dt=$doc->documentType";
-            else
-                return $x;
-        }
-    }
-
-    function allowEmailTo($email) {
-        global $Opt;
-        return $Opt["sendEmail"]
-            && ($at = strpos($email, "@")) !== false
-            && substr($email, $at) != "@_.com";
-    }
-
-
-    public function encode_capability($capid, $salt, $timeExpires, $save) {
-        global $Opt;
-        list($keyid, $key) = Contact::password_hmac_key(null, true);
-        if (($hash_method = defval($Opt, "capabilityHashMethod")))
-            /* OK */;
-        else if (($hash_method = $this->setting_data("capabilityHashMethod")))
-            /* OK */;
-        else {
-            $hash_method = (PHP_INT_SIZE == 8 ? "sha512" : "sha256");
-            $this->save_setting("capabilityHashMethod", 1, $hash_method);
-        }
-        $text = substr(hash_hmac($hash_method, $capid . " " . $timeExpires . " " . $salt, $key, true), 0, 16);
-        if ($save)
-            $this->q("insert ignore into CapabilityMap (capabilityValue, capabilityId, timeExpires) values ('" . sqlq($text) . "', $capid, $timeExpires)");
-        return "1" . str_replace(array("+", "/", "="), array("-", "_", ""),
-                                 base64_encode($text));
-    }
-
-    public function create_capability($capabilityType, $options = array()) {
-        $contactId = defval($options, "contactId", 0);
-        $paperId = defval($options, "paperId", 0);
-        $timeExpires = defval($options, "timeExpires", time() + 259200);
-        $salt = hotcrp_random_bytes(24);
-        $data = defval($options, "data");
-        $this->q("insert into Capability (capabilityType, contactId, paperId, timeExpires, salt, data) values ($capabilityType, $contactId, $paperId, $timeExpires, '" . sqlq($salt) . "', " . ($data === null ? "null" : "'" . sqlq($data) . "'") . ")");
-        $capid = $this->dblink->insert_id;
-        if (!$capid || !function_exists("hash_hmac"))
-            return false;
-        return $this->encode_capability($capid, $salt, $timeExpires, true);
-    }
-
-    public function check_capability($capabilityText) {
-        if ($capabilityText[0] != "1")
-            return false;
-        $value = base64_decode(str_replace(array("-", "_"), array("+", "/"),
-                                           substr($capabilityText, 1)));
-        if (strlen($value) >= 16
-            && ($result = $this->q("select * from CapabilityMap where capabilityValue='" . sqlq($value) . "'"))
-            && ($row = edb_orow($result))
-            && ($row->timeExpires == 0 || $row->timeExpires >= time())) {
-            $result = $this->q("select * from Capability where capabilityId=" . $row->capabilityId);
-            if (($row = edb_orow($result))) {
-                $row->capabilityValue = $value;
-                return $row;
-            }
-        }
-        return false;
-    }
-
 }

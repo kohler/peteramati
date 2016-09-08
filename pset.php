@@ -14,7 +14,7 @@ if (isset($_REQUEST["u"])
     && !($User = ContactView::prepare_user($_REQUEST["u"])))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
-$Conf->footerScript("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
+Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
 
@@ -108,7 +108,7 @@ if (isset($_REQUEST["gradecdf"])) {
             $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$Pset->id)
 		join RepositoryGrade rg on (rg.repoid=l.link and rg.pset=$Pset->id and not rg.placeholder)
 		join CommitNotes cn on (cn.hash=rg.gradehash and cn.pset=rg.pset)\n";
-        $result = $Conf->qe($q . " where $notdropped");
+        $result = $Conf->qe_raw($q . " where $notdropped");
 
         $series = new Series;
         $xseries = new Series;
@@ -195,10 +195,10 @@ if (isset($_REQUEST["setcommit"]))
     go($Info->hoturl("pset"));
 
 // maybe set partner/repo
-if (isset($_REQUEST["set_partner"]))
+if (req("set_partner"))
     ContactView::set_partner_action($User);
-if (isset($_REQUEST["set_seascode_repo"]))
-    ContactView::set_seascode_repo_action($User);
+if (req("set_repo"))
+    ContactView::set_repo_action($User);
 
 // save line notes
 if ($Me->isPC && $Me != $User && check_post()
@@ -269,16 +269,17 @@ function upload_grades($pset, $text, $fname) {
     $csv = new CsvParser($text);
     $csv->set_header($csv->next());
     while (($line = $csv->next())) {
-        if (@$line["seascode_username"]) {
-            $who = $line["seascode_username"];
-            $user = Contact::find_by_username($who);
-        } else if (@$line["email"]) {
-            $who = $line["email"];
-            $user = Contact::find_by_email($who);
-        } else if (@$line["name"]) {
-            $who = $line["name"];
+        if (($who = get($line, "github_username")) && $who !== "-")
+            $user = $Conf->user_by_query("github_username=?", [$who]);
+        else if (($who = get($line, "seascode_username")) && $who !== "-")
+            $user = $Conf->user_by_query("seascode_username=?", [$who]);
+        else if (($who = get($line, "username")) && $who !== "-")
+            $user = $Conf->user_by_query("github_username=? or seascode_username=? order by github_username=? desc limit 1", [$who, $who, $who]);
+        else if (($who = get($line, "email")))
+            $user = $Conf->user_by_email($who);
+        else if (($who = get($line, "name"))) {
             list($first, $last) = Text::split_name($who);
-            $user = Contact::find_by_query("firstName like '" . sqlqtrim($first) . "%' and lastName='" . sqlqtrim($last) . "'");
+            $user = $Conf->user_by_query("firstName like '?s%' and lastName=?", [$first, $last]);
             if ($user && $user->firstName != $first
                 && !str_starts_with($user->firstName, "$first "))
                 $user = null;
@@ -337,15 +338,16 @@ function user_prev_next($user, $pset) {
     global $Conf;
 
     $result = $Conf->qe("select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.anon_username, c.seascode_username, c.extension, pl.link
+	c.huid, c.anon_username, c.github_username, c.seascode_username, c.extension, group_concat(pl.link) pcid
 	from ContactInfo c
 	left join ContactLink pl on (pl.cid=c.contactId and pl.type=" . LINK_PARTNER . " and pl.pset=$pset->id)
 	where (c.roles&" . Contact::ROLE_PCLIKE . ")=0 and not c.dropped
 	group by c.contactId");
+    $sort = req("sort");
     $students = array();
     while ($result && ($s = Contact::fetch($result))) {
-        $s->is_anonymous = $user->is_anonymous;
-        Contact::set_sorter($s, @$_REQUEST["sort"]);
+        $s->set_anonymous($user->is_anonymous);
+        Contact::set_sorter($s, $sort);
         $students[$s->contactId] = $s;
     }
     uasort($students, "Contact::compare");
@@ -354,20 +356,26 @@ function user_prev_next($user, $pset) {
     $pos = 0;
     $uid = is_object($user) ? $user->contactId : $user;
 
-    // mark user's partner as visited
-    if (($s = @$students[$uid]) && $s->link && ($ss = @$students[$s->link]))
-        $ss->visited = true;
+    // mark user's partners as visited
+    if (($s = get($students, $uid)) && $s->pcid) {
+        foreach (explode(",", $s->pcid) as $pcid)
+            if (($ss = get($students, $pcid)))
+                $ss->visited = true;
+    }
 
     foreach ($students as $s) {
         if ($s->contactId == $uid)
             $pos = 1;
-        else if (!@$s->visited) {
+        else if (!get($s, "visited")) {
             $links[$pos] = $s;
             if ($pos)
                 break;
             $s->visited = true;
-            if ($s->link && ($ss = @$students[$s->link]))
-                $ss->visited = true;
+            if ($s->pcid) {
+                foreach (explode(",", $s->pcid) as $pcid)
+                    if (($ss = get($students, $pcid)))
+                        $ss->visited = true;
+            }
         }
     }
 
@@ -378,21 +386,21 @@ function user_prev_next($user, $pset) {
 
 echo "<div id='homeinfo'>";
 
-if ($User->seascode_username && $Me->isPC) {
+if ($User->username && $Me->isPC) {
     // links to next/prev users
     $links = user_prev_next($User, $Pset);
     if ($links[0] || $links[1]) {
-        $userkey = $User->is_anonymous ? "anon_username" : "seascode_username";
+        $sort = req("sort");
         echo "<div style=\"color:gray;float:right\"><h3 style=\"margin-top:0\">";
         if ($links[0]) {
             $u = $Me->user_linkpart($links[0], $User->is_anonymous);
-            echo '<a href="', hoturl("pset", array("pset" => $Pset->urlkey, "u" => $u, "sort" => @$_REQUEST["sort"])), '">« ', htmlspecialchars($u), '</a>';
+            echo '<a href="', hoturl("pset", ["pset" => $Pset->urlkey, "u" => $u, "sort" => $sort]), '">« ', htmlspecialchars($u), '</a>';
         }
         if ($links[0] && $links[1])
             echo ' · ';
         if ($links[1]) {
             $u = $Me->user_linkpart($links[1], $User->is_anonymous);
-            echo '<a href="', hoturl("pset", array("pset" => $Pset->urlkey, "u" => $u, "sort" => @$_REQUEST["sort"])), '">', htmlspecialchars($u), ' »</a>';
+            echo '<a href="', hoturl("pset", ["pset" => $Pset->urlkey, "u" => $u, "sort" => $sort]), '">', htmlspecialchars($u), ' »</a>';
         }
         echo "</h3></div>";
     }
@@ -479,7 +487,7 @@ function echo_grade_cdf() {
         '<tr class="gradecdf61stddev"><td class="cap">', $xmark, ' stddev</td><td class="val"></td></tr>',
         '</tbody></table>',
         '</div>';
-    $Conf->footerScript("gradecdf61(\"" . $Info->hoturl("pset", array("gradecdf" => 1)) . "\")");
+    Ht::stash_script("gradecdf61(\"" . $Info->hoturl("pset", array("gradecdf" => 1)) . "\")");
 }
 
 function echo_grade_entry($ge) {
@@ -602,7 +610,7 @@ class LinenotesOrder {
     function compar($a, $b) {
         if ($a[0] != $b[0])
             return $this->fileorder[$a[0]] - $this->fileorder[$b[0]];
-        if (!$this->diff || !$this->diff[$a[0]])
+        if (!$this->diff || !get($this->diff, $a[0]))
             return strcmp($a[1], $b[1]);
         if ($a[1][0] == $b[1][0])
             return (int) substr($a[1], 1) - (int) substr($b[1], 1);
@@ -651,7 +659,9 @@ function echo_commit($Info) {
             $x .= "...";
         $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
     }
-    $result = $Conf->qe("select hash from CommitNotes where (haslinenotes&" . ($Me == $User && !$Info->can_see_grades ? HASNOTES_COMMENT : HASNOTES_ANY) . ")!=0 and pset=$Pset->psetid and hash in ('" . join("','", array_keys($sel)) . "')");
+    $result = $Conf->qe("select hash from CommitNotes where (haslinenotes & ?)!=0 and pset=? and hash ?a",
+                        $Me == $User && !$Info->can_see_grades ? HASNOTES_COMMENT : HASNOTES_ANY,
+                        $Pset->psetid, array_keys($sel));
     while (($row = edb_row($result)))
         $sel[$row[0]] .= " &nbsp;♪";
     if (($h = $Info->grading_hash()) && isset($sel[$h]))
@@ -728,7 +738,7 @@ function echo_commit($Info) {
     }
 
     // actually print
-    echo Ht::form($Info->hoturl_post("pset", array("commit" => null, "setcommit" => 1)), array("class" => "commitcontainer61", "peteramati_pset" => $Info->pset->urlkey, "peteramati_commit" => $Info->latest_hash())),
+    echo Ht::form($Info->hoturl_post("pset", array("commit" => null, "setcommit" => 1)), array("class" => "commitcontainer61", "data-pa-pset" => $Info->pset->urlkey, "data-pa-commit" => $Info->latest_hash())),
         "<div class=\"f-contain\">";
     ContactView::echo_group($key, $value, $remarks);
     echo "</div></form>\n";
@@ -897,7 +907,7 @@ if ($Pset->gitless) {
             if (($runsettings = $Info->commit_info("runsettings")))
                 echo '<script>runsetting61.load(', json_encode($runsettings), ')</script>';
         }
-        $Conf->footerScript("jQuery('button.runner61').prop('disabled',false)");
+        Ht::stash_script("jQuery('button.runner61').prop('disabled',false)");
     }
 
     // print current grader
@@ -989,7 +999,7 @@ if ($Pset->gitless) {
             echo '" style="display:none';
         echo '" data-pa-file="', htmlspecialchars($file), '" data-pa-fileid="', $fileid, "\"><tbody>\n";
         if ($Me->isPC && $Me != $User)
-            $Conf->footerScript("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
+            Ht::stash_script("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
         foreach ($dinfo->diff as $l) {
             if ($l[0] == "@")
                 $x = array(" gx", "difflctx61", "", "", $l[3]);
@@ -1027,7 +1037,7 @@ if ($Pset->gitless) {
         echo "</tbody></table>\n";
     }
 
-    $Conf->footerScript('jQuery(".diffnoteentry61").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
+    Ht::stash_script('jQuery(".diffnoteentry61").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
     echo "<table id=\"diff61linenotetemplate\" style=\"display:none\"><tbody>";
     echo_linenote_entry_row("", "", array($Info->is_grading_commit(), ""),
                             false, null);
@@ -1036,7 +1046,7 @@ if ($Pset->gitless) {
     if ($Pset->gitless_grades)
         echo_grade_cdf_here();
 
-    echo "<div class=\"commitcontainer61\" peteramati_pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
+    echo "<div class=\"commitcontainer61\" data-pa-pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
     ContactView::echo_group("this commit", "No commits yet for this problem set", array());
     echo "</div>\n";
 
@@ -1047,10 +1057,9 @@ if ($Pset->gitless) {
 }
 
 
-$Conf->footerScript('window.psetpost61="'
-                    . self_href(array("post" => post_value())) . '"');
+Ht::stash_script('window.psetpost61="' . self_href(array("post" => post_value())) . '"');
 if (!$Pset->gitless)
-    $Conf->footerScript("checklatest61()", "checklatest61");
+    Ht::stash_script("checklatest61()", "checklatest61");
 
 echo "<div class='clear'></div>\n";
 $Conf->footer();

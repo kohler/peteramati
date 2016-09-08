@@ -1,6 +1,6 @@
 <?php
 // init.php -- HotCRP initialization (test or site)
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 define("TAG_REGEX", '~?~?[a-zA-Z!@*_:.][-a-zA-Z0-9!@*_:.\/]*');
@@ -21,13 +21,15 @@ define("HASNOTES_ANY", 3);
 
 global $OK;
 $OK = 1;
-global $Now;
+global $Now, $ConfSitePATH;
 $Now = time();
+$ConfSitePATH = null;
 
-// set $ConfSitePATH (path to conference site), $ConfSiteBase, and $ConfSiteSuffix
+
+// set $ConfSitePATH (path to conference site)
 function set_path_variables() {
-    global $ConfSitePATH, $ConfSiteBase, $ConfSiteSuffix;
-    if (!@$ConfSitePATH) {
+    global $ConfSitePATH;
+    if (!isset($ConfSitePATH)) {
         $ConfSitePATH = substr(__FILE__, 0, strrpos(__FILE__, "/"));
         while ($ConfSitePATH !== "" && !file_exists("$ConfSitePATH/src/init.php"))
             $ConfSitePATH = substr($ConfSitePATH, 0, strrpos($ConfSitePATH, "/"));
@@ -35,10 +37,6 @@ function set_path_variables() {
             $ConfSitePATH = "/var/www/html";
     }
     require_once("$ConfSitePATH/lib/navigation.php");
-    if (@$ConfSiteBase === null)
-        $ConfSiteBase = Navigation::siteurl();
-    if (@$ConfSiteSuffix === null)
-        $ConfSiteSuffix = Navigation::php_suffix();
 }
 set_path_variables();
 
@@ -47,22 +45,28 @@ set_path_variables();
 function __autoload($class_name) {
     global $ConfSitePATH, $ConfAutoloads;
     if (!@$ConfAutoloads)
-        $ConfAutoloads = array("ContactView" => "src/contactview.php",
+        $ConfAutoloads = array("CapabilityManager" => "src/capability.php",
+                               "ContactView" => "src/contactview.php",
                                "CS61Mailer" => "src/cs61mailer.php",
                                "CsvGenerator" => "lib/csv.php",
                                "CsvParser" => "lib/csv.php",
                                "DiffInfo" => "src/diffinfo.php",
                                "DocumentHelper" => "lib/documenthelper.php",
+                               "GitHub_RepositorySite" => "src/github_repositorysite.php",
+                               "HarvardSEAS_RepositorySite" => "src/harvardseas_repositorysite.php",
                                "Ht" => "lib/ht.php",
                                "Json" => "lib/json.php",
                                "LoginHelper" => "lib/login.php",
                                "Mailer" => "lib/mailer.php",
+                               "MessageSet" => "lib/messageset.php",
                                "Messages" => "lib/messages.php",
                                "MimeText" => "lib/mailer.php",
                                "Mimetype" => "lib/mimetype.php",
                                "Multiconference" => "src/multiconference.php",
                                "Pset" => "src/psetconfig.php",
                                "PsetView" => "src/psetview.php",
+                               "Repository" => "src/repository.php",
+                               "RepositorySite" => "src/repositorysite.php",
                                "RunnerState" => "src/runner.php",
                                "Qobject" => "lib/qobject.php",
                                "Text" => "lib/text.php",
@@ -88,56 +92,101 @@ setlocale(LC_CTYPE, "C");
 
 
 // Set up conference options (also used in mailer.php)
-function expand_includes($sitedir, $files, $expansions = array()) {
-    global $Opt;
-    if (is_string($files))
+function expand_includes($files, $expansions = array()) {
+    global $Opt, $ConfSitePATH;
+    if (!is_array($files))
         $files = array($files);
-    $confname = @$Opt["confid"] ? : @$Opt["dbName"];
+    $confname = get($Opt, "confid") ? : get($Opt, "dbName");
+    $expansions["confid"] = $expansions["confname"] = $confname;
+    $expansions["siteclass"] = get($Opt, "siteclass");
+
+    if (isset($expansions["autoload"]) && strpos($files[0], "/") === false)
+        $includepath = [$ConfSitePATH . "/src/", $ConfSitePATH . "/lib/"];
+    else
+        $includepath = [$ConfSitePATH . "/"];
+    if (isset($Opt["includepath"]) && is_array($Opt["includepath"])) {
+        foreach ($Opt["includepath"] as $i)
+            if ($i)
+                $includepath[] = str_ends_with($i, "/") ? $i : $i . "/";
+    }
+
     $results = array();
-    $cwd = null;
     foreach ($files as $f) {
-        if (strpos($f, '$') !== false) {
-            $f = preg_replace(',\$\{conf(?:id|name)\}|\$conf(?:id|name)\b,', $confname, $f);
+        if (strpos((string) $f, '$') !== false) {
             foreach ($expansions as $k => $v)
                 if ($v !== false && $v !== null)
                     $f = preg_replace(',\$\{' . $k . '\}|\$' . $k . '\b,', $v, $f);
                 else if (preg_match(',\$\{' . $k . '\}|\$' . $k . '\b,', $f)) {
-                    $f = false;
+                    $f = "";
                     break;
                 }
         }
-        if ($f === false)
-            /* skip */;
-        else if (preg_match(',[\[\]\*\?],', $f)) {
-            if ($cwd === null) {
-                $cwd = getcwd();
-                chdir($sitedir);
-            }
-            foreach (glob($f, GLOB_BRACE) as $x)
-                $results[] = $x;
-        } else
-            $results[] = $f;
+        if ((string) $f === "")
+            continue;
+        $matches = [];
+        $globby = preg_match(',[\[\]\*\?\{\}],', $f);
+        foreach ($f[0] === "/" ? array("") : $includepath as $idir) {
+            $e = $idir . $f;
+            if ($globby)
+                $matches = glob($f, GLOB_BRACE);
+            else if (is_readable($e))
+                $matches = [$e];
+            if (!empty($matches))
+                break;
+        }
+        $results = array_merge($results, $matches);
+        if (empty($matches) && !$globby)
+            $results[] = $f[0] === "/" ? $f : $includepath[0] . $f;
     }
-    foreach ($results as &$f)
-        $f = ($f[0] == "/" ? $f : "$sitedir/$f");
-    if ($cwd)
-        chdir($cwd);
     return $results;
 }
 
-function read_included_options($sitedir, $files) {
+function read_included_options(&$files) {
     global $Opt;
-    foreach (expand_includes($sitedir, $files) as $f)
-        if (!@include $f)
-            $Opt["missing"][] = $f;
+    if (is_string($files))
+        $files = [$files];
+    for ($i = 0; $i != count($files); ++$i) {
+        foreach (expand_includes($files[$i]) as $f)
+            if (!@include $f)
+                $Opt["missing"][] = $f;
+    }
 }
 
-global $Opt, $OptOverride;
-if (!@$Opt)
+function expand_json_includes_callback($includelist, $callback, $extra_arg = null) {
+    $includes = [];
+    foreach (is_array($includelist) ? $includelist : [$includelist] as $k => $str)
+        if (is_string($str) && str_starts_with($str, "@")) {
+            foreach (expand_includes(substr($str, 1)) as $f)
+                if (($x = file_get_contents($f)))
+                    $includes[] = [$x, $f];
+        } else
+            $includes[] = [$str, "entry $k"];
+    foreach ($includes as $xentry) {
+        list($entry, $landmark) = $xentry;
+        if (is_string($entry)) {
+            if (($x = json_decode($entry)) !== false)
+                $entry = $x;
+            else {
+                if (json_last_error()) {
+                    Json::decode($entry);
+                    error_log("$landmark: Invalid JSON. " . Json::last_error_msg());
+                }
+                continue;
+            }
+        }
+        if (is_object($entry) && !isset($entry->id) && !isset($entry->factory)
+            && !isset($entry->factory_class) && !isset($entry->callback))
+            $entry = get_object_vars($entry);
+        foreach (is_array($entry) ? $entry : [$entry] as $obj)
+            if (!is_object($obj) || !call_user_func($callback, $obj, $extra_arg))
+                error_log("$landmark: Invalid $callback " . json_encode($obj) . ".");
+    }
+}
+
+global $Opt;
+if (!$Opt)
     $Opt = array();
-if (!@$OptOverride)
-    $OptOverride = array();
-if (!@$Opt["loaded"]) {
+if (!get($Opt, "loaded")) {
     if (defined("HOTCRP_OPTIONS")) {
         if ((@include HOTCRP_OPTIONS) !== false)
             $Opt["loaded"] = true;
@@ -145,61 +194,39 @@ if (!@$Opt["loaded"]) {
                || (@include "$ConfSitePATH/conf/options.inc") !== false
                || (@include "$ConfSitePATH/Code/options.inc") !== false)
         $Opt["loaded"] = true;
-    if (@$Opt["multiconference"])
+    if (get($Opt, "multiconference"))
         Multiconference::init();
-    if (@$Opt["include"])
-        read_included_options($ConfSitePATH, $Opt["include"]);
+    if (get($Opt, "include"))
+        read_included_options($Opt["include"]);
 }
-if (!@$Opt["loaded"] || @$Opt["missing"])
+if (!get($Opt, "loaded") || get($Opt, "missing"))
     Multiconference::fail_bad_options();
+if (get($Opt, "dbLogQueries"))
+    Dbl::log_queries($Opt["dbLogQueries"]);
 
 
 // Allow lots of memory
-function set_memory_limit() {
-    global $Opt;
-    if (!@$Opt["memoryLimit"]) {
-        $suf = array("" => 1, "k" => 1<<10, "m" => 1<<20, "g" => 1<<30);
-        if (preg_match(',\A(\d+)\s*([kmg]?)\z,', strtolower(ini_get("memory_limit")), $m)
-            && $m[1] * $suf[$m[2]] < (128<<20))
-            $Opt["memoryLimit"] = "128M";
-    }
-    if (@$Opt["memoryLimit"])
-        ini_set("memory_limit", $Opt["memoryLimit"]);
-}
-set_memory_limit();
+if (!get($Opt, "memoryLimit") && ini_get_bytes("memory_limit") < (128 << 20))
+    $Opt["memoryLimit"] = "128M";
+if (get($Opt, "memoryLimit"))
+    ini_set("memory_limit", $Opt["memoryLimit"]);
 
 
 // Create the conference
-// XXX more modern method
-if (isset($Opt["dbName"])) {
-    if (!isset($Opt["sessionName"]))
-	$Opt["sessionName"] = $Opt["dbName"];
-    if (!isset($Opt["downloadPrefix"]))
-	$Opt["downloadPrefix"] = $Opt["dbName"] . "-";
-}
-
 global $Conf;
-if (!@$Conf)
-    $Conf = new Conference(Dbl::make_dsn($Opt));
+if (!$Conf)
+    $Conf = Conf::$g = new Conf($Opt, true);
 if (!$Conf->dblink)
     Multiconference::fail_bad_database();
-
-// Set server timezone
-if (function_exists("date_default_timezone_set")) {
-    if (isset($Opt["timezone"]))
-        date_default_timezone_set($Opt["timezone"]);
-    else if (!ini_get("date.timezone") && !getenv("TZ"))
-        date_default_timezone_set("America/New_York");
-}
 
 
 // Extract problem set information
 function psets_json_data($exclude_overrides) {
-    global $Conf, $ConfSitePATH, $Opt;
+    global $Conf;
     $datamap = array();
-    $fnames = expand_includes($ConfSitePATH, $Opt["psetsConfig"],
-                              ["CONFID" => @$Opt["confid"] ? : @$Opt["dbName"],
-                               "HOSTTYPE" => @$Opt["hostType"] ? : ""]);
+    $fnames = expand_includes($Conf->opt("psetsConfig"),
+                              ["CONFID" => $Conf->opt("confid") ? : $Conf->dbname,
+                               "HOSTTYPE" => $Conf->opt("hostType", "")]);
     foreach ($fnames as $fname)
         $datamap[$fname] = @file_get_contents($fname);
     if (!$exclude_overrides
@@ -228,7 +255,7 @@ function load_psets_json($exclude_overrides) {
 }
 
 function load_pset_info() {
-    global $ConfSitePATH, $Conf, $PsetInfo, $PsetOverrides, $Opt;
+    global $ConfSitePATH, $Conf, $PsetInfo, $PsetOverrides;
     // read initial messages
     Messages::$main = new Messages;
     $x = json_decode(file_get_contents("$ConfSitePATH/src/messages.json"));
@@ -306,5 +333,5 @@ load_pset_info();
 putenv("GIT_SSH=$ConfSitePATH/src/gitssh");
 putenv("GITSSH_CONFIG=$ConfSitePATH/conf/gitssh_config");
 putenv("GITSSH_REPOCACHE=$ConfSitePATH/repo");
-if (isset($Opt["mysql"]))
-    putenv("MYSQL=" . $Opt["mysql"]);
+if ($Conf->opt("mysql", null) !== null)
+    putenv("MYSQL=" . $Conf->opt("mysql"));

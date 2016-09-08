@@ -35,6 +35,7 @@ class Pset {
     public $gitless_grades;
 
     public $handout_repo_url;
+    public $handout_repo_branch;
     public $repo_guess_patterns = array();
     public $repo_tarball_patterns = array();
     public $directory;
@@ -123,6 +124,7 @@ class Pset {
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");
         if (!$this->handout_repo_url && !$this->gitless)
             throw new PsetConfigException("`handout_repo_url` missing");
+        $this->handout_repo_branch = self::cstr($p, "handout_repo_branch");
         $this->repo_guess_patterns = self::cstr_array($p, "repo_guess_patterns", "repo_transform_patterns");
         $this->repo_tarball_patterns = self::cstr_array($p, "repo_tarball_patterns");
         if (!property_exists($p, "repo_tarball_patterns"))

@@ -1,14 +1,14 @@
 <?php
 // initweb.php -- HotCRP initialization for web scripts
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 require_once("init.php");
-global $Conf, $Opt;
+global $Conf, $Me, $Opt;
 
 // Check for redirect to https
-if (@$Opt["redirectToHttps"])
-    Navigation::redirect_http_to_https(@$Opt["allowLocalHttp"]);
+if (get($Opt, "redirectToHttps"))
+    Navigation::redirect_http_to_https(get($Opt, "allowLocalHttp"));
 
 // Check and fix zlib output compression
 global $zlib_output_compression;
@@ -20,41 +20,42 @@ if ($zlib_output_compression) {
     header("Vary: Accept-Encoding", false);
 }
 
-// Set up sessions
+// Mark as already expired to discourage caching, but allow the browser
+// to cache for history buttons
+header("Cache-Control: max-age=0,must-revalidate,private");
+
+// Don't set up a session if $Me is false
+if ($Me === false)
+    return;
+
+
+// Set up session
 $Opt["globalSessionLifetime"] = ini_get("session.gc_maxlifetime");
 if (!isset($Opt["sessionLifetime"]))
     $Opt["sessionLifetime"] = 86400;
 ini_set("session.gc_maxlifetime", $Opt["sessionLifetime"]);
 ensure_session();
 
-
 // Initialize user
 function initialize_user() {
-    global $Conf, $Opt, $Me;
-
-    // backwards compat: set $_SESSION["user"] from $_SESSION["Me"]
-    if (!isset($_SESSION["user"]) && isset($_SESSION["Me"])) {
-        $x = $_SESSION["Me"];
-        $_SESSION["user"] = "$x->contactId $x->confDsn $x->email";
-        unset($_SESSION["Me"], $_SESSION["pcmembers"]);
-    }
-    if (!isset($_SESSION["trueuser"]) && isset($_SESSION["user"]))
-        $_SESSION["trueuser"] = $_SESSION["user"];
-    if (is_string(@$_SESSION["trueuser"])) {
-        $userwords = explode(" ", $_SESSION["trueuser"]);
-        $_SESSION["trueuser"] = (object) array("contactId" => $userwords[0], "dsn" => $userwords[1], "email" => @$userwords[2]);
-    }
+    global $Conf, $Me;
 
     // load current user
     $Me = null;
-    $trueuser = @$_SESSION["trueuser"];
-    if ($trueuser && $trueuser->dsn == $Conf->dsn)
-        $Me = Contact::find_by_id($trueuser->contactId);
-    if (!$Me && $trueuser && $trueuser->email)
-        $Me = Contact::find_by_email($trueuser->email);
+    $trueuser = get($_SESSION, "trueuser");
+    if ($trueuser && $trueuser->email)
+        $Me = $Conf->user_by_email($trueuser->email);
     if (!$Me)
         $Me = new Contact($trueuser);
     $Me = $Me->activate();
+
+    // redirect if disabled
+    if ($Me->disabled) {
+        if (Navigation::page() === "api")
+            json_exit(["ok" => false, "error" => "Your account is disabled."]);
+        else if (Navigation::page() !== "index")
+            Navigation::redirect_site(hoturl_site_relative("index"));
+    }
 
     // if bounced through login, add post data
     if (isset($_SESSION["login_bounce"]) && !$Me->is_empty()) {
@@ -67,9 +68,19 @@ function initialize_user() {
         }
         unset($_SESSION["login_bounce"]);
     }
+
+    // set $_SESSION["addrs"]
+    if ($_SERVER["REMOTE_ADDR"]
+        && (!is_array(get($_SESSION, "addrs")) || get($_SESSION["addrs"], 0) !== $_SERVER["REMOTE_ADDR"])) {
+        $as = array($_SERVER["REMOTE_ADDR"]);
+        if (is_array(get($_SESSION, "addrs")))
+            foreach ($_SESSION["addrs"] as $a)
+                if ($a !== $_SERVER["REMOTE_ADDR"] && count($as) < 5)
+                    $as[] = $a;
+        $_SESSION["addrs"] = $as;
+    }
 }
 
-global $Me;
 initialize_user();
 
 
@@ -79,9 +90,3 @@ if (isset($_SESSION["redirect_error"])) {
     $Error = $_SESSION["redirect_error"];
     unset($_SESSION["redirect_error"]);
 }
-
-// Mark as already expired to discourage caching, but allow the browser
-// to cache for history buttons
-session_cache_limiter("");
-header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
-header("Cache-Control: private");

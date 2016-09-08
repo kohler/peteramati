@@ -1,7 +1,6 @@
 <?php
 
 class Messages {
-
     public $mtype = array();
     public $defs = array();
 
@@ -13,7 +12,7 @@ class Messages {
     public function add($j, $type = null) {
         if (!$type)
             $type = $j->type;
-        if (!@$j->type) {
+        if (!get($j, "type")) {
             $j = clone $j;
             $j->type = $type;
         }
@@ -27,12 +26,12 @@ class Messages {
     }
 
     private function check($j, $defs) {
-        if (@$j->require) {
+        if (get($j, "require")) {
             $reqs = is_array($j->require) ? $j->require : array($j->require);
             foreach ($reqs as $req)
                 if (preg_match('/\A(!?)(\w+)\z/', $req, $m)) {
                     $exists = (array_key_exists($m[2], $defs) ? $defs[$m[2]] !== null :
-                               @$this->defs[$m[2]] !== null);
+                               get($this->defs, $m[2]) !== null);
                     if ($exists ? $m[1] === "!" : $m[1] === "")
                         return false;
                 }
@@ -42,10 +41,10 @@ class Messages {
 
     public function find($type, $kind, $defs = array()) {
         $reqj = null;
-        foreach (@$this->mtype[$type] ? : array() as $j)
-            if ((!$reqj || (float) @$reqj->priority <= (float) @$j->priority)
+        foreach (get($this->mtype, $type) ? : array() as $j)
+            if ((!$reqj || (float) get($reqj, "priority") <= (float) get($j, "priority"))
                 && $this->check($j, $defs)
-                && @$j->$kind !== null)
+                && get($j, $kind) !== null)
                 $reqj = $j;
         return $reqj;
     }
@@ -59,7 +58,7 @@ class Messages {
                 $t .= $m[1];
                 if (array_key_exists($m[2], $defs))
                     $t .= (string) $defs[$m[2]];
-                else if (@$this->defs[$m[2]])
+                else if (get($this->defs, $m[2]))
                     $t .= $this->defs[$m[2]];
                 $u = $m[3];
             }
@@ -75,5 +74,4 @@ class Messages {
     public function expand_html($type, $defs = array()) {
         return $this->expand($type, "html", $defs);
     }
-
 }

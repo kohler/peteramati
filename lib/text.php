@@ -1,10 +1,11 @@
 <?php
 // text.php -- HotCRP text helper functions
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 class NameInfo {
     public $firstName = null;
+    public $middleName = null;
     public $lastName = null;
     public $email = null;
     public $withMiddle = null;
@@ -12,10 +13,10 @@ class NameInfo {
     public $nameAmbiguous = null;
     public $name = null;
     public $affiliation = null;
+    public $unaccentedName = null;
 }
 
 class Text {
-
     static private $argkeys = array("firstName", "lastName", "email",
                                     "withMiddle", "middleName", "lastFirst",
                                     "nameAmbiguous", "name");
@@ -47,9 +48,10 @@ class Text {
     static private $boring_words = array("a" => true, "an" => true, "as" => true,
                                          "by" => true, "in" => true, "on" => true,
                                          "the" => true, "through" => true,
-                                         "with" => true);
+                                         "with" => true, "is" => true);
 
     static function analyze_von($lastName) {
+        // see also split_name
         if (preg_match('@\A(v[oa]n|d[eu])\s+(.*)\z@s', $lastName, $m))
             return array($m[1], $m[2]);
         else
@@ -59,37 +61,39 @@ class Text {
     static function analyze_name_args($args, $ret = null) {
         $ret = $ret ? : new NameInfo;
         $delta = 0;
+        if (count($args) == 1 && is_string($args[0]))
+            $args = self::split_name($args[0], true);
         foreach ($args as $i => $v) {
             if (is_string($v) || is_bool($v)) {
                 if ($i + $delta < 4) {
                     $k = self::$argkeys[$i + $delta];
-                    if (@$ret->$k === null)
+                    if (get($ret, $k) === null)
                         $ret->$k = $v;
                 }
             } else if (is_array($v) && isset($v[0])) {
                 for ($j = 0; $j < 3 && $j < count($v); ++$j) {
                     $k = self::$argkeys[$j];
-                    if (@$ret->$k === null)
+                    if (get($ret, $k) === null)
                         $ret->$k = $v[$j];
                 }
             } else if (is_array($v)) {
                 foreach ($v as $k => $x)
-                    if (@($mk = self::$mapkeys[$k])
-                        && @$ret->$mk === null)
+                    if (($mk = get(self::$mapkeys, $k))
+                        && get($ret, $mk) === null)
                         $ret->$mk = $x;
                 $delta = 3;
             } else if (is_object($v)) {
                 foreach (self::$mapkeys as $k => $mk)
-                    if (@$ret->$mk === null
-                        && @$v->$k !== null
-                        && (@self::$boolkeys[$mk]
+                    if (get($ret, $mk) === null
+                        && get($v, $k) !== null
+                        && (get(self::$boolkeys, $mk)
                             ? is_bool($v->$k)
                             : is_string($v->$k)))
                         $ret->$mk = $v->$k;
             }
         }
         foreach (self::$defaults as $k => $v)
-            if (@$ret->$k === null)
+            if (get($ret, $k) === null)
                 $ret->$k = $v;
         if ($ret->name && $ret->firstName === "" && $ret->lastName === "")
             list($ret->firstName, $ret->lastName) = self::split_name($ret->name);
@@ -105,7 +109,7 @@ class Text {
         }
         if ($ret->lastName === "" || $ret->firstName === "")
             $ret->name = $ret->firstName . $ret->lastName;
-        else if (@$ret->lastFirst)
+        else if (get($ret, "lastFirst"))
             $ret->name = $ret->lastName . ", " . $ret->firstName;
         else
             $ret->name = $ret->firstName . " " . $ret->lastName;
@@ -159,7 +163,7 @@ class Text {
     static function name_text(/* ... */) {
         // was contactNameText
         $r = self::analyze_name_args(func_get_args());
-	if ($r->nameAmbiguous && $r->name && $r->email)
+        if ($r->nameAmbiguous && $r->name && $r->email)
             return "$r->name <$r->email>";
         else
             return $r->name ? : $r->email;
@@ -218,6 +222,8 @@ class Text {
         return htmlspecialchars($x);
     }
 
+    const SUFFIX_REGEX = 'Jr\.?|Sr\.?|Esq\.?|Ph\.?D\.?|M\.?[SD]\.?|Junior|Senior|Esquire|I+|IV|V|VI*|IX|XI*|2n?d|3r?d|[4-9]th|1\dth';
+
     static function split_name($name, $with_email = false) {
         $name = simplify_whitespace($name);
         $ret = array("", "");
@@ -234,21 +240,54 @@ class Text {
                 list($name, $ret[2]) = array($m[2], $m[1]);
         }
 
-        if (($p1 = strrpos($name, ",")) !== false) {
-            $first = trim(substr($name, $p1 + 1));
-            if (!preg_match('@^(Esq\.?|Ph\.?D\.?|M\.?[SD]\.?|Esquire|Junior|Senior|Jr.?|Sr.?|I+)$@i', $first)) {
-                list($ret[0], $ret[1]) = array($first, trim(substr($name, 0, $p1)));
+        // parenthetical comment on name attaches to first or last whole
+        $paren = "";
+        if ($name !== "" && $name[strlen($name) - 1] === ")"
+            && preg_match('{\A(.*?)(\s*\(.*?\))\z}', $name, $m)) {
+            $name = $m[1];
+            $paren = $m[2];
+        }
+
+        // `last, first`
+        $suffix = "";
+        while (($comma = strrpos($name, ",")) !== false) {
+            $first = ltrim(substr($name, $comma + 1));
+            if (!preg_match('{\A(?:' . self::SUFFIX_REGEX . ')\z}i', $first)) {
+                $ret[0] = $first . $paren;
+                $ret[1] = trim(substr($name, 0, $comma)) . $suffix;
                 return $ret;
             }
+            $suffix = substr($name, $comma) . $suffix . $paren;
+            $paren = "";
+            $name = rtrim(substr($name, 0, $comma));
         }
-        if (preg_match('@[^\s,]+(\s+Jr\.?|\s+Sr\.?|\s+i+|\s+Ph\.?D\.?|\s+M\.?[SD]\.?)?(,.*)?\s*$@i', $name, $m)) {
-            $ret[0] = trim(substr($name, 0, strlen($name) - strlen($m[0])));
-            $ret[1] = trim($m[0]);
+
+        if (preg_match('{[^\s,]+(?:\s+(?:' . self::SUFFIX_REGEX . '))?(?:,.*)?\z}i', $name, $m)) {
+            $ret[0] = rtrim(substr($name, 0, strlen($name) - strlen($m[0])));
+            $ret[1] = ltrim($m[0]) . $suffix . $paren;
+            // see also split_von
             if (preg_match('@^(\S.*?)\s+(v[oa]n|d[eu])$@i', $ret[0], $m))
                 list($ret[0], $ret[1]) = array($m[1], $m[2] . " " . $ret[1]);
         } else
-            $ret[1] = trim($name);
+            $ret[1] = $name . $suffix . $paren;
         return $ret;
+    }
+
+    static function split_first_middle($first) {
+        if (preg_match('%\A((?:\pL\.\s*)*\pL[^\s.]\S*)\s+(.*)\z%', $first, $m)
+            || preg_match('%\A(\pL[^\s.]\S*)\s*(.*)\z%', $first, $m))
+            return [$m[1], $m[2]];
+        else
+            return [$first, ""];
+    }
+
+    static function split_last_suffix($last) {
+        if (preg_match('{\A(.*?\S)(?:\s+|\s*,\s*)(' . self::SUFFIX_REGEX . ')\z}i', $last, $m)) {
+            if (preg_match('{\A(?:jr|sr|esq)\z}i', $m[2]))
+                $m[2] .= ".";
+            return [$m[1], $m[2]];
+        } else
+            return [$last, ""];
     }
 
     public static function unaccented_name(/* ... */) {
@@ -360,5 +399,19 @@ class Text {
 
     public static function is_boring_word($word) {
         return isset(self::$boring_words[strtolower($word)]);
+    }
+
+    public static function single_line_paragraphs($text) {
+        preg_match_all('/.*?(?:\r\n?|\n|\z)/', $text, $m);
+        $out = "";
+        $last = false;
+        foreach ($m[0] as $line) {
+            if ($line !== "" && $last && !ctype_space(substr($line, 0, 1)))
+                $out = rtrim($out) . " " . $line;
+            else
+                $out .= $line;
+            $last = strlen($line) > 50;
+        }
+        return $out;
     }
 }

@@ -1,6 +1,6 @@
 <?php
 // home.php -- HotCRP home page
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
@@ -14,25 +14,35 @@ ContactView::set_path_request(array("/u"));
 $email_class = "";
 $password_class = "";
 $LastPsetFix = false;
-$Profile = $Me && $Me->privChair && @$_REQUEST["profile"];
+$Profile = $Me && $Me->privChair && req("profile");
 
 // signin links
+// auto-signin when email & password set
 if (isset($_REQUEST["email"]) && isset($_REQUEST["password"])) {
     $_REQUEST["action"] = defval($_REQUEST, "action", "login");
     $_REQUEST["signin"] = defval($_REQUEST, "signin", "go");
 }
-
-if ((isset($_REQUEST["email"]) && isset($_REQUEST["password"])
-     && isset($_REQUEST["signin"]) && !isset($Opt["httpAuthLogin"]))
-    || isset($_REQUEST["signout"]))
-    LoginHelper::logout();
-
-if (isset($Opt["httpAuthLogin"]))
+// CSRF protection: ignore unvalidated signin/signout for known users
+if (!$Me->is_empty() && !check_post())
+    unset($_REQUEST["signout"]);
+if ($Me->has_email()
+    && (!check_post() || strcasecmp($Me->email, trim(req("email"))) == 0))
+    unset($_REQUEST["signin"]);
+if (!isset($_REQUEST["email"]) || !isset($_REQUEST["action"]))
+    unset($_REQUEST["signin"]);
+// signout
+if (isset($_REQUEST["signout"]))
+    LoginHelper::logout(true);
+else if (isset($_REQUEST["signin"]) && !opt("httpAuthLogin"))
+    LoginHelper::logout(false);
+// signin
+if (opt("httpAuthLogin"))
     LoginHelper::check_http_auth();
-else if (isset($_REQUEST["email"])
-         && isset($_REQUEST["action"])
-         && isset($_REQUEST["signin"]))
+else if (isset($_REQUEST["signin"]))
     LoginHelper::check_login();
+else if ((isset($_REQUEST["signin"]) || isset($_REQUEST["signout"]))
+         && isset($_REQUEST["post"]))
+    redirectSelf();
 
 // set interesting user
 $User = null;
@@ -49,33 +59,17 @@ foreach (Pset::$all as $pset)
         && !$pset->gitless)
         Contact::forward_pset_links($pset->id);
 
-if (!$Me->is_empty() && ($Me === $User || $Me->isPC)
-    && isset($_REQUEST["set_seascode_username"]) && check_post()) {
-    if ($User->set_seascode_username(defval($_REQUEST, "username")))
+if (!$Me->is_empty() && ($Me === $User || $Me->isPC) && req("set_username") && check_post()
+    && ($repoclass = RepositorySite::$sitemap[req("reposite")])
+    && in_array($repoclass, RepositorySite::site_classes($Conf))) {
+    if ($repoclass::save_username($User, req("username")))
         redirectSelf();
-} else if (!$Me->is_empty() && !$User->seascode_username
-           && preg_match('/\A(.*?)@.*harvard\.edu\z/', $User->email, $m)
-           && $User->check_seascode_username($m[1], false))
-    $User->set_seascode_username($m[1]);
-
-function try_set_seascode_repo() {
-    global $Me, $Conf;
-    $min_pset = null;
-    foreach (Pset::$all as $p)
-        if (!$min_pset || ContactView::pset_compare($min_pset, $p) > 0)
-            $min_pset = $p;
-    if ($p && !$Me->repo($p->psetid))
-        $Me->set_seascode_repo($p->psetid, $Me->seascode_username, false);
-    $Conf->save_session("autorepotry", $Me->contactId);
 }
 
-if (!$Me->is_empty() && isset($_REQUEST["set_seascode_repo"]))
-    ContactView::set_seascode_repo_action($User);
-else if (!$Me->is_empty() && !$Me->isPC && $Me->seascode_username
-         && $Conf->session("autorepotry", 0) != $Me->contactId)
-    try_set_seascode_repo();
+if (!$Me->is_empty() && req("set_repo") !== null)
+    ContactView::set_repo_action($User);
 
-if (isset($_REQUEST["set_partner"]))
+if (req("set_partner") !== null)
     ContactView::set_partner_action($User);
 
 if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
@@ -89,8 +83,8 @@ if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
 // download
 function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
     global $Conf, $Me;
-    $result = $Conf->qe("select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.anon_username, c.seascode_username, c.extension,
+    $result = $Conf->qe_raw("select c.contactId, c.firstName, c.lastName, c.email,
+	c.huid, c.anon_username, c.seascode_username, c.github_username, c.extension,
 	r.repoid, r.url, r.open, r.working, r.lastpset,
 	rg.gradehash, rg.gradercid
 	from ContactInfo c
@@ -100,11 +94,12 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
 	where ($where)
 	and (rg.repoid is not null or not c.dropped)
 	group by c.contactId");
+    $sort = req("sort");
     while (($s = edb_orow($result))) {
         $s->is_anonymous = $pset->anonymous && !$nonanonymous;
-        Contact::set_sorter($s, @$_REQUEST["sort"]);
-        $username = $s->is_anonymous ? $s->anon_username : $s->seascode_username;
-        $ss = @$students[$username];
+        $username = $s->is_anonymous ? $s->anon_username : ($s->github_username ? : $s->seascode_username);
+        Contact::set_sorter($s, $sort);
+        $ss = get($students, $username);
         if (!$ss && $s->is_anonymous)
             $students[$username] = $ss = (object)
                 array("username" => $username,
@@ -122,7 +117,7 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
         if ($pset->gitless_grades) {
             $gi = Contact::contact_grade_for($s, $pset);
             $gi = $gi ? $gi->notes : null;
-        } else if (@$s->gradehash)
+        } else if (get($s, "gradehash"))
             $gi = Contact::commit_info($s->gradehash, $pset);
         else
             continue;
@@ -134,14 +129,14 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
             $k .= "_noextra";
             $ss->{$k} = $gd->total_noextra;
             if (($k = $pset->group)) {
-                @($ss->{$k} += $gd->total);
+                $ss->{$k} = get_f($ss, $k) + $gd->total;
                 $k .= "_noextra";
-                @($ss->{$k} += $gd->total_noextra);
+                $ss->{$k} = get_f($ss, $k) + $gd->total_noextra;
             }
             if ($entries)
                 foreach ($pset->grades as $ge) {
                     $k = $ge->name;
-                    if (@$gd->{$k} !== null)
+                    if (get($gd, $k) !== null)
                         $ss->{$k} = $gd->{$k};
                 }
         }
@@ -153,8 +148,8 @@ function set_ranks(&$students, &$selection, $key) {
     $selection[] = $key;
     $selection[] = $key . "_rank";
     uasort($students, function ($a, $b) use ($key) {
-            $av = @$a->{$key};
-            $bv = @$b->{$key};
+            $av = get($a, $key);
+            $bv = get($b, $key);
             if (!$av)
                 return $bv ? 1 : -1;
             else if (!$bv)
@@ -166,8 +161,8 @@ function set_ranks(&$students, &$selection, $key) {
     $r = $i = 1;
     $lastval = null;
     foreach ($students as $s) {
-        if (@$s->{$key} != $lastval) {
-            $lastval = @$s->{$key};
+        if (get($s, $key) != $lastval) {
+            $lastval = get($s, $key);
             $r = $i;
         }
         $s->{$rank} = $r;
@@ -193,7 +188,7 @@ function download_psets_report($request) {
     $where = join(" and ", $where);
 
     $sel_pset = null;
-    if (@$request["pset"] && !($sel_pset = Pset::find($request["pset"])))
+    if (get($request, "pset") && !($sel_pset = Pset::find($request["pset"])))
         return $Conf->errorMsg("No such pset");
 
     $students = array();
@@ -232,12 +227,15 @@ function download_psets_report($request) {
         set_ranks($students, $selection, "psets");
         set_ranks($students, $selection, "psets_noextra");
         set_ranks($students, $selection, "tests");
+        $m_noextra = $maxbyg["psets_noextra"];
+        $m_psets = $maxbyg["psets"];
+        $m_tests = $maxbyg["tests"];
 
-        foreach ($students as $s)
-            $s->performance = sprintf("%.1f",
-                                      100 * @(0.9 * ($s->psets_noextra / $maxbyg["psets_noextra"])
-                                              + 0.75 * ($s->psets / $maxbyg["psets"])
-                                              + 1.2 * ($s->tests / $maxbyg["tests"])));
+        foreach ($students as $s) {
+            $s->performance = sprintf("%.1f", 100 * (0.9 * ($s->psets_noextra / $m_noextra)
+                                                     + 0.75 * ($s->psets / $m_psets)
+                                                     + 1.2 * ($s->tests / $m_tests)));
+        }
         set_ranks($students, $selection, "performance");
     }
 
@@ -251,21 +249,21 @@ function download_psets_report($request) {
     exit;
 }
 
-if ($Me->isPC && check_post() && @$_GET["report"])
+if ($Me->isPC && check_post() && req("report"))
     download_psets_report($_REQUEST);
 
 function set_grader() {
     global $Conf, $Me;
-    if (!($pset = Pset::find(@$_REQUEST["pset"])))
+    if (!($pset = Pset::find(req("pset"))))
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
     $graders = array();
     foreach (pcMembers() as $pcm)
-        if ($pcm->email == @$_POST["grader"]
-            || (!$pcm->privChair && @$_POST["grader"] == "__random__"))
+        if ($pcm->email == get($_POST, "grader")
+            || (!$pcm->privChair && get($_POST, "grader") == "__random__"))
             $graders[] = $pcm;
-    if (!@$_POST["grader"] || !count($graders))
+    if (!get($_POST, "grader") || !count($graders))
         return $Conf->errorMsg("No grader");
     $cur_graders = $graders;
     foreach ($_POST as $k => $v)
@@ -288,13 +286,13 @@ function set_grader() {
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && @$_POST["setgrader"])
+if ($Me->isPC && check_post() && get($_POST, "setgrader"))
     set_grader();
 
 
 function runmany() {
     global $Conf, $Me;
-    if (!($pset = Pset::find(@$_REQUEST["pset"])) || $pset->disabled)
+    if (!($pset = Pset::find(req("pset"))) || $pset->disabled)
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
@@ -313,14 +311,14 @@ function runmany() {
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && @$_POST["runmany"])
+if ($Me->isPC && check_post() && get($_POST, "runmany"))
     runmany();
 
 
 function psets_json_diff_from($original, $update) {
     $res = null;
     foreach (get_object_vars($update) as $k => $vu) {
-        $vo = @$original->$k;
+        $vo = get($original, $k);
         if (is_object($vo) && is_object($vu)) {
             if (!($vu = psets_json_diff_from($vo, $vu)))
                 continue;
@@ -348,7 +346,7 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
 
 function reconfig() {
     global $Conf, $Me, $PsetOverrides, $PsetInfo;
-    if (!($pset = Pset::find(@$_REQUEST["pset"])))
+    if (!($pset = Pset::find(req("pset"))))
         return $Conf->errorMsg("No such pset");
     $psetkey = $pset->psetkey;
 
@@ -358,7 +356,7 @@ function reconfig() {
 
     $o = (object) array();
     $o->disabled = $o->visible = $o->grades_visible = null;
-    $state = @$_POST["state"];
+    $state = get($_POST, "state");
     if ($state === "disabled")
         $o->disabled = true;
     else if ($old_pset->disabled)
@@ -372,12 +370,12 @@ function reconfig() {
     else if ($state === "visible" && $old_pset->grades_visible)
         $o->grades_visible = false;
 
-    if (@$_POST["frozen"] === "yes")
+    if (get($_POST, "frozen") === "yes")
         $o->frozen = true;
     else
         $o->frozen = ($old_pset->frozen ? false : null);
 
-    if (@$_POST["anonymous"] === "yes")
+    if (get($_POST, "anonymous") === "yes")
         $o->anonymous = true;
     else
         $o->anonymous = ($old_pset->anonymous ? false : null);
@@ -385,7 +383,7 @@ function reconfig() {
     save_config_overrides($psetkey, $o, $json);
 }
 
-if ($Me->privChair && check_post() && @$_GET["reconfig"])
+if ($Me->privChair && check_post() && get($_GET, "reconfig"))
     reconfig();
 
 
@@ -453,10 +451,10 @@ if (($v = $Conf->setting_data("homemsg")))
 // Sign in
 if ($Me->is_empty() || isset($_REQUEST["signin"])) {
     echo "<div class='homegrp'>
-This is the ", htmlspecialchars($Opt["longName"]), " turnin site.
+This is the ", htmlspecialchars($Conf->long_name), " turnin site.
 Sign in to tell us about your code.";
-    if (isset($Opt["conferenceSite"]))
-	echo " For general information about ", htmlspecialchars($Opt["shortName"]), ", see <a href=\"", htmlspecialchars($Opt["conferenceSite"]), "\">the conference site</a>.";
+    if ($Conf->opt("conferenceSite"))
+	echo " For general information about ", htmlspecialchars($Conf->short_name), ", see <a href=\"", htmlspecialchars($Conf->opt("conferenceSite")), "\">the conference site</a>.";
     $passwordFocus = ($email_class == "" && $password_class != "");
     echo "</div>
 <hr class='home' />
@@ -466,7 +464,7 @@ Sign in to tell us about your code.";
 <input type='hidden' name='cookie' value='1' />
 <div class='f-ii'>
   <div class='f-c", $email_class, "'><span class='fx2'>",
-	(isset($Opt["ldapLogin"]) ? "Username" : "Email/<a href='https://code.seas.harvard.edu/'>code.seas</a>&nbsp;username/HUID"),
+	($Conf->opt("ldapLogin") ? "Username" : "Email/username/HUID"),
 	"</span><span class='fn2'>Email</span></div>
   <div class='f-e", $email_class, "'><input",
 	($passwordFocus ? "" : " id='login_d'"),
@@ -481,7 +479,7 @@ Sign in to tell us about your code.";
 	($passwordFocus ? " id='login_d'" : ""),
 	" type='password' class='textlite' name='password' size='36' tabindex='1' value='' /></div>
 </div>\n";
-    if (isset($Opt["ldapLogin"]))
+    if ($Conf->opt("ldapLogin"))
 	echo "<input type='hidden' name='action' value='login' />\n";
     else {
 	echo "<div class='f-i'>\n  ",
@@ -489,10 +487,10 @@ Sign in to tell us about your code.";
 	    "&nbsp;", Ht::label("<b>Sign me in</b>"), "<br />\n";
 	echo Ht::radio("action", "forgot", false, array("tabindex" => 2, "onclick" => "fold('logingroup',true);fold('logingroup',false,2);\$\$('signin').value='Reset password'")),
 	    "&nbsp;", Ht::label("I forgot my password"), "<br />\n";
-        if (!@$Opt["disableNewUsers"])
+        if (!$Conf->opt("disableNewUsers"))
             echo Ht::radio("action", "new", false, array("id" => "signin_action_new", "tabindex" => 2, "onclick" => "fold('logingroup',true);fold('logingroup',true,2);\$\$('signin').value='Create account'")),
                 "&nbsp;", Ht::label("Create an account"), "<br />\n";
-	$Conf->footerScript("jQuery('#homeacct input[name=action]:checked').click()");
+	Ht::stash_script("jQuery('#homeacct input[name=action]:checked').click()");
 	echo "\n</div>\n";
     }
     echo "<div class='f-i'>
@@ -500,7 +498,7 @@ Sign in to tell us about your code.";
 </div>
 </div></form>
 <hr class='home' /></div>\n";
-    $Conf->footerScript("crpfocus(\"login\", null, 2)");
+    Ht::stash_script("crpfocus(\"login\", null, 2)");
 }
 
 
@@ -518,18 +516,8 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
     if (!$User->is_anonymous && $User !== $Me)
         echo '<h3>', Text::user_html($User), '</h3>';
 
-    if (!$User->is_anonymous) {
-        echo Ht::form(hoturl_post("index", array("set_seascode_username" => 1,
-                                                 "u" => $Me->user_linkpart($User)))),
-            '<div class="f-contain">';
-        $notes = array();
-        if (!$User->seascode_username)
-            $notes[] = array(true, "Please enter your " . Contact::seascode_home("code.seas.harvard.edu") . " username and click “Save.”");
-        ContactView::echo_group(Contact::seascode_home("code.seas") . " username",
-                                Ht::entry("username", $User->seascode_username)
-                                . "  " . Ht::submit("Save"), $notes);
-        echo "</div></form>";
-    }
+    if (!$User->is_anonymous)
+        RepositorySite::echo_username_forms($User);
 
     if ($User->dropped)
         ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
@@ -552,14 +540,14 @@ function render_grades($pset, $gi, $s) {
                 $max += $ge->max;
         }
         $gv = $ggv = $agv = "";
-        if ($gi) {
-            $ggv = @$gi->grades->$k;
-            $agv = @$gi->autogrades->$k;
-            if ($ggv !== null && $ggv !== "")
-                $gv = $ggv;
-            else if ($agv !== null && $agv !== "")
-                $gv = $agv;
-        }
+        if ($gi && isset($gi->grades))
+            $ggv = get($gi->grades, $k);
+        if ($gi && isset($gi->autogrades))
+            $agv = get($gi->autogrades, $k);
+        if ($ggv !== null && $ggv !== "")
+            $gv = $ggv;
+        else if ($agv !== null && $agv !== "")
+            $gv = $agv;
         if ($gv != "" && !$ge->no_total) {
             $total += $gv;
             $lastintotal = count($garr);
@@ -589,7 +577,7 @@ function show_pset($pset, $user) {
     echo "<hr/>\n";
     $pseturl = hoturl("pset", array("pset" => $pset->urlkey,
                                     "u" => $Me->user_linkpart($user),
-                                    "sort" => @$_REQUEST["sort"]));
+                                    "sort" => req("sort")));
     echo "<h2><a href=\"", $pseturl, "\">",
         htmlspecialchars($pset->title), "</a>";
     $info = ContactView::user_pset_info($user, $pset);
@@ -617,7 +605,7 @@ function show_pset($pset, $user) {
 }
 
 if (!$Me->is_empty() && $User->is_student()) {
-    $Conf->footerScript("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
+    Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
     foreach (ContactView::pset_list(false, true) as $pset)
         show_pset($pset, $User);
     if ($Me->isPC) {
@@ -634,7 +622,7 @@ if (!$Me->is_empty() && $User->is_student()) {
 }
 
 function render_pset_row($pset, $students, $s, $row, $pcmembers) {
-    global $Me, $Now, $Profile;
+    global $Conf, $Me, $Now, $Profile;
     $row->sortprefix = "";
     $ncol = 0;
     $t0 = $Profile ? microtime(true) : 0;
@@ -643,8 +631,8 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     if ($pset->anonymous)
         $x = $s->anon_username;
     else
-        $x = $s->seascode_username ? : ($s->huid ? : $s->email);
-    $t .= "<a href=\"" . hoturl("pset", array("pset" => $pset->urlkey, "u" => $x, "sort" => @$_REQUEST["sort"])) . "\">"
+        $x = ($s->github_username ? : $s->seascode_username) ? : ($s->huid ? : $s->email);
+    $t .= "<a href=\"" . hoturl("pset", array("pset" => $pset->urlkey, "u" => $x, "sort" => req("sort"))) . "\">"
         . htmlspecialchars($x) . "</a>";
     if ($Me->privChair)
         $t .= "&nbsp;" . become_user_link($x, Text::name_html($s));
@@ -698,11 +686,11 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
 
         if (!$pset->gitless_grades) {
             $t .= "<td>";
-            if ($gi && @$gi->linenotes)
+            if ($gi && get($gi, "linenotes"))
                 $t .= "♪";
             else if ($Me->contactId == $s->gradercid)
                 $s->incomplete = true;
-            if ($gi && $s->gradercid != @$gi->gradercid && $Me->privChair)
+            if ($gi && $s->gradercid != get($gi, "gradercid") && $Me->privChair)
                 $t .= "<sup>*</sup>";
             $t .= "</td>";
             ++$ncol;
@@ -717,8 +705,8 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     //htmlspecialchars($s->email), "</a></td>";
 
     $t .= "<td>";
-    if ($s->url) {
-        $t .= $s->repo_link($s->url, "repo");
+    if (!$pset->gitless && $s->url) {
+        $t .= $s->link_repo("repo", RepositorySite::make_web_url($s->url, $Conf));
         if (!$s->working)
             $t .= ' <strong class="err">broken</strong>';
         else if (!$s->repoviewable)
@@ -738,10 +726,10 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
         ++$ncol;
     }
 
-    if (!@$row->ncol || $ncol > $row->ncol)
+    if (!get($row, "ncol") || $ncol > $row->ncol)
         $row->ncol = $ncol;
 
-    $s->printed = true;
+    $s->visited = true;
     return $t;
 }
 
@@ -755,6 +743,7 @@ function show_regrades($result) {
     $trn = 0;
     $checkbox = false;
     $sprefix = "";
+    $reqsort = req("sort");
     $pcmembers = pcMembers();
     while (($row = edb_orow($result))) {
         ++$trn;
@@ -769,12 +758,12 @@ function show_regrades($result) {
         sort($row->usernames);
         $x = array();
         foreach ($row->usernames as $u)
-            $x[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $u, "commit" => $row->hash, "sort" => @$_REQUEST["sort"])) . '">' . htmlspecialchars($u) . '</a>';
+            $x[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $u, "commit" => $row->hash, "sort" => $reqsort)) . '">' . htmlspecialchars($u) . '</a>';
         echo '<td class="s61username">', join(", ", $x), '</td>';
-        echo '<td class="s61hash"><a href="', hoturl("pset", array("pset" => $pset->urlkey, "u" => $row->usernames[0], "commit" => $row->hash, "sort" => @$_REQUEST["sort"])), '">', substr($row->hash, 0, 7), '</a></td>';
+        echo '<td class="s61hash"><a href="', hoturl("pset", array("pset" => $pset->urlkey, "u" => $row->usernames[0], "commit" => $row->hash, "sort" => $reqsort)), '">', substr($row->hash, 0, 7), '</a></td>';
 
-        if (@$row->gradercid || @$row->main_gradercid) {
-            $gcid = @$row->gradercid ? : $row->main_gradercid;
+        if (get($row, "gradercid") || get($row, "main_gradercid")) {
+            $gcid = get($row, "gradercid") ? : get($row, "main_gradercid");
             if (isset($pcmembers[$gcid]))
                 echo "<td>" . htmlspecialchars($pcmembers[$gcid]->firstName) . "</td>";
             else
@@ -803,7 +792,7 @@ function show_regrades($result) {
 function show_pset_actions($pset) {
     global $Conf;
 
-    echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "reconfig" => 1)), ["style" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
+    echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "reconfig" => 1)), ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
     $options = array("disabled" => "Disabled",
                      "invisible" => "Hidden",
                      "visible" => "Visible without grades",
@@ -829,16 +818,16 @@ function show_pset_actions($pset) {
     echo ' &nbsp;', Ht::submit("reconfig", "Save");
 
     if (!$pset->disabled) {
-        echo ' &nbsp;<span class="barsep">|</span>&nbsp; ';
+        echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
         echo Ht::js_button("Grade report", "window.location=\"" . hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]) . "\"");
     }
 
     echo "</div></form>";
-    $Conf->echoScript("$('.need-pa-pset-actions').each(pa_pset_actions)");
+    echo Ht::unstash_script("$('.need-pa-pset-actions').each(pa_pset_actions)");
 }
 
 function show_pset_table($pset) {
-    global $Conf, $Me, $Now, $Opt, $Profile, $LastPsetFix;
+    global $Conf, $Me, $Now, $Profile, $LastPsetFix;
 
     echo '<div id="', $pset->urlkey, '">';
     echo "<h3>", htmlspecialchars($pset->title), "</h3>";
@@ -850,7 +839,7 @@ function show_pset_table($pset) {
     $t0 = $Profile ? microtime(true) : 0;
 
     // load students
-    if (@$Opt["restrictRepoView"]) {
+    if ($Conf->opt("restrictRepoView")) {
         $view = "l2.link repoviewable";
         $viewjoin = "left join ContactLink l2 on (l2.cid=c.contactId and l2.type=" . LINK_REPOVIEW . " and l2.link=l.link)\n";
     } else {
@@ -858,8 +847,8 @@ function show_pset_table($pset) {
         $viewjoin = "";
     }
     $result = Dbl::qe("select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.seascode_username, c.anon_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
-	pl.link pcid, group_concat(rpl.link) rpcid,
+	c.huid, c.github_username, c.seascode_username, c.anon_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
+	group_concat(pl.link) pcid, group_concat(rpl.link) rpcid,
 	r.repoid, r.cacheid, r.heads, r.url, r.open, r.working, r.lastpset, r.snapcheckat, $view,
 	rg.gradehash, rg.gradercid, rg.placeholder, rg.placeholder_at
 	from ContactInfo c
@@ -871,13 +860,13 @@ function show_pset_table($pset) {
 	left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.pset=$pset->id)
 	where (c.roles&" . Contact::ROLE_PCLIKE . ")=0
 	and (rg.repoid is not null or not c.dropped)
-	group by c.contactId");
+	group by c.contactId, r.repoid");
     $t1 = $Profile ? microtime(true) : 0;
 
     $students = array();
     while ($result && ($s = Contact::fetch($result))) {
-        $s->is_anonymous = $pset->anonymous;
-        Contact::set_sorter($s, @$_REQUEST["sort"]);
+        $s->set_anonymous($pset->anonymous);
+        Contact::set_sorter($s, req("sort"));
         $students[$s->contactId] = $s;
         // maybe lastpset links are out of order
         if ($s->lastpset < $pset)
@@ -893,16 +882,19 @@ function show_pset_table($pset) {
     $incomplete = array();
     $pcmembers = pcMembers();
     foreach ($students as $s)
-        if (!isset($s->printed)) {
-            $row = (object) array("student" => $s);
+        if (!$s->visited) {
+            $row = (object) ["student" => $s, "text" => "", "ptext" => []];
             $row->text = render_pset_row($pset, $students, $s, $row, $pcmembers);
-            if ($s->pcid && isset($students[$s->pcid]))
-                $row->ptext = render_pset_row($pset, $students, $students[$s->pcid], $row, $pcmembers);
+            if ($s->pcid) {
+                foreach (explode(",", $s->pcid) as $pcid)
+                    if (isset($students[$pcid]))
+                        $row->ptext[] = render_pset_row($pset, $students, $students[$pcid], $row, $pcmembers);
+            }
             $rows[$row->sortprefix . $s->sorter] = $row;
             $max_ncol = max($max_ncol, $row->ncol);
-            if (@$s->incomplete) {
+            if ($s->incomplete) {
                 $u = $Me->user_linkpart($s);
-                $incomplete[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $u, "sort" => @$_REQUEST["sort"])) . '">'
+                $incomplete[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $u, "sort" => req("sort"))) . '">'
                     . htmlspecialchars($u) . '</a>';
             }
         }
@@ -929,11 +921,11 @@ function show_pset_table($pset) {
         if ($checkbox)
             echo '<td class="s61rownumber">', Ht::checkbox("s61_" . $Me->user_idpart($row->student), 1, array("class" => "s61check")), '</td>';
         echo '<td class="s61rownumber">', $trn, '.</td>', $row->text, "</tr>\n";
-        if (@$row->ptext) {
+        foreach ($row->ptext as $ptext) {
             echo '<tr class="k', ($trn % 2), ' s61partner">';
             if ($checkbox)
                 echo '<td></td>';
-            echo '<td></td>', $row->ptext, "</tr>\n";
+            echo '<td></td>', $ptext, "</tr>\n";
         }
     }
     echo "</tbody></table>\n";
@@ -983,7 +975,8 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
 	from RepositoryGradeRequest rgr
 	left join CommitNotes cn on (cn.hash=rgr.hash and cn.pset=rgr.pset)
 	left join RepositoryGrade rg on (rg.repoid=rgr.repoid and rg.pset=rgr.pset and not rg.placeholder)
-	left join (select link repoid, pset, group_concat(cid separator ' ') as cids, group_concat(seascode_username separator ' ') as usernames
+	left join (select link repoid, pset, group_concat(cid separator ' ') as cids,
+               group_concat(coalesce(github_username, seascode_username) separator ' ') as usernames
 		   from ContactLink l
 		   join ContactInfo c on (l.cid=c.contactId and l.type=" . LINK_REPO . ")
 		   group by repoid, pset) u

@@ -3,18 +3,14 @@
 // HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
-@define("JSON_ERROR_NONE", 0);
-@define("JSON_ERROR_DEPTH", 1);
-@define("JSON_ERROR_STATE_MISMATCH", 2);
-@define("JSON_ERROR_CTRL_CHAR", 3);
-@define("JSON_ERROR_SYNTAX", 4);
-@define("JSON_ERROR_UTF8", 5);
-@define("JSON_ERROR_EMPTY_KEY", 100);
-
-@define("JSON_FORCE_OBJECT", 1);
-@define("JSON_PRETTY_PRINT", 8);
-@define("JSON_UNESCAPED_SLASHES", 16);
-@define("JSON_UNESCAPED_UNICODE", 32);
+foreach (["JSON_ERROR_NONE" => 0, "JSON_ERROR_DEPTH" => 1,
+          "JSON_ERROR_STATE_MISMATCH" => 2, "JSON_ERROR_CTRL_CHAR" => 3,
+          "JSON_ERROR_SYNTAX" => 4, "JSON_ERROR_UTF8" => 5,
+          "JSON_ERROR_EMPTY_KEY" => 100,
+          "JSON_FORCE_OBJECT" => 1, "JSON_PRETTY_PRINT" => 8,
+          "JSON_UNESCAPED_SLASHES" => 16, "JSON_UNESCAPED_UNICODE" => 32] as $k => $v)
+    if (!defined($k))
+        define($k, $v);
 
 define("JSON_HOTCRP", 1);
 
@@ -239,7 +235,7 @@ class Json {
         self::$error_type = JSON_ERROR_NONE;
         self::$error_input = $x;
         $v = self::decode_part($x, $assoc, $depth, $options);
-        if ($x !== null && $x !== false && !ctype_space($x))
+        if ($x !== null && $x !== false && $x !== "" && !ctype_space($x))
             self::set_error($x, JSON_ERROR_SYNTAX, var_export($x, true));
         self::$error_input = null;
         return $x === null ? null : $v;
@@ -336,7 +332,7 @@ class Json {
         self::$error_type = JSON_ERROR_NONE;
         self::$error_input = $x;
         $v = self::decode_landmarks_part($x, $filename, $assoc, $depth);
-        if ($x !== null && $x !== false && !ctype_space($x))
+        if ($x !== null && $x !== false && $x !== "" && !ctype_space($x))
             self::set_error($x, JSON_ERROR_SYNTAX, var_export($x, true));
         self::$error_input = null;
         return $x === null ? null : $v;

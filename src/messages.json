@@ -13,6 +13,10 @@
     },
     {
         "type": "repo_toopublic_timeout",
-        "html": "I can’t check whether %REPOBASE% is too public."
+        "html": "I can’t verify whether %REPOBASE% is too public."
+    },
+    {
+        "type": "repo_working_timeout",
+        "html": "I can’t verify whether %REPOBASE% is working."
     }
 ]

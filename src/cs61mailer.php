@@ -92,7 +92,7 @@ class CS61Mailer extends Mailer {
             $info = $this->get_pset_info();
             if (!$info || !$info->repo)
                 return $isbool ? false : "(no repo)";
-            return Contact::repo_https_url($info->repo->url);
+            return $info->repo->web_url();
         }
 
         if ($what == "%PARTNER%") {

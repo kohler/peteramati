@@ -1,19 +1,22 @@
 <?php
 // resetpassword.php -- HotCRP password reset page
-// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2016 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
-if (!isset($_REQUEST["resetcap"])
-    && preg_match(',\A/(U?1[-\w]+)(?:/|\z),i', Navigation::path(), $m))
-    $_REQUEST["resetcap"] = $m[1];
 
-if (!isset($_REQUEST["resetcap"]))
+if ($Conf->external_login())
+    error_go(false, "Password reset links aren’t used for this conference. Contact your system administrator if you’ve forgotten your password.");
+
+$resetcap = req("resetcap");
+if ($resetcap === null && preg_match(',\A/(U?1[-\w]+)(?:/|\z),i', Navigation::path(), $m))
+    $resetcap = $m[1];
+if (!$resetcap)
     error_go(false, "You didn’t enter the full password reset link into your browser. Make sure you include the reset code (the string of letters, numbers, and other characters at the end).");
 
-$iscdb = substr($_REQUEST["resetcap"], 0, 1) === "U";
-$capmgr = $Conf->capability_manager($_REQUEST["resetcap"]);
-$capdata = $capmgr->check($_REQUEST["resetcap"]);
+$iscdb = substr($resetcap, 0, 1) === "U";
+$capmgr = $Conf->capability_manager($resetcap);
+$capdata = $capmgr->check($resetcap);
 if (!$capdata || $capdata->capabilityType != CAPTYPE_RESETPASSWORD)
     error_go(false, "That password reset code has expired, or you didn’t enter it correctly.");
 
@@ -24,83 +27,73 @@ else
 if (!$Acct)
     error_go(false, "That password reset code refers to a user who no longer exists. Either create a new account or contact the conference administrator.");
 
-if (isset($Opt["ldapLogin"]) || isset($Opt["httpAuthLogin"]))
-    error_go(false, "Password reset links aren’t used for this conference. Contact your system administrator if you’ve forgotten your password.");
-
 // don't show information about the current user, if there is one
 $Me = new Contact;
 
 $password_class = "";
-if (isset($_REQUEST["go"]) && check_post()) {
-    if (defval($_REQUEST, "useauto") == "y")
-        $_REQUEST["upassword"] = $_REQUEST["upassword2"] = $_REQUEST["autopassword"];
-    if (!isset($_REQUEST["upassword"]) || $_REQUEST["upassword"] == "")
-        $Conf->errorMsg("You must enter a password.");
-    else if ($_REQUEST["upassword"] !== $_REQUEST["upassword2"])
-        $Conf->errorMsg("The two passwords you entered did not match.");
-    else if (!Contact::valid_password($_REQUEST["upassword"]))
-        $Conf->errorMsg("Invalid password.");
+if (isset($_POST["go"]) && check_post()) {
+    $_POST["password"] = trim(get_s($_POST, "password"));
+    $_POST["password2"] = trim(get_s($_POST, "password2"));
+    if ($_POST["password"] == "")
+        Conf::msg_error("You must enter a password.");
+    else if ($_POST["password"] !== $_POST["password2"])
+        Conf::msg_error("The two passwords you entered did not match.");
+    else if (!Contact::valid_password($_POST["password"]))
+        Conf::msg_error("Invalid password.");
     else {
-        $Acct->change_password($_REQUEST["upassword"], true);
-        $Acct->log_activity("Reset password");
+        $flags = 0;
+        if ($_POST["password"] === get($_POST, "autopassword"))
+            $flags |= Contact::CHANGE_PASSWORD_PLAINTEXT;
+        $Acct->change_password(null, $_POST["password"], $flags);
+        if (!$iscdb || !($log_acct = $Conf->user_by_email($Acct->email)))
+            $log_acct = $Acct;
+        $log_acct->log_activity("Password reset via " . substr($resetcap, 0, 8) . "...");
         $Conf->confirmMsg("Your password has been changed. You may now sign in to the conference site.");
         $capmgr->delete($capdata);
-        $Conf->save_session("password_reset", (object) array("time" => $Now, "email" => $Acct->email, "password" => $_REQUEST["upassword"]));
+        $Conf->save_session("password_reset", (object) array("time" => $Now, "email" => $Acct->email, "password" => $_POST["password"]));
         go(hoturl("index"));
     }
     $password_class = " error";
 }
 
-$Conf->header("Reset Password", "resetpassword", null);
+$Conf->header("Reset password", "resetpassword", null);
 
-if (!isset($_REQUEST["autopassword"])
-    || trim($_REQUEST["autopassword"]) != $_REQUEST["autopassword"]
-    || strlen($_REQUEST["autopassword"]) < 16
-    || !preg_match("/\\A[-0-9A-Za-z@_+=]*\\z/", $_REQUEST["autopassword"]))
-    $_REQUEST["autopassword"] = Contact::random_password();
-if (!isset($_REQUEST["useauto"]) || $_REQUEST["useauto"] != "n")
-    $_REQUEST["useauto"] = "y";
+if (!isset($_POST["autopassword"])
+    || trim($_POST["autopassword"]) != $_POST["autopassword"]
+    || strlen($_POST["autopassword"]) < 16
+    || !preg_match("/\\A[-0-9A-Za-z@_+=]*\\z/", $_POST["autopassword"]))
+    $_POST["autopassword"] = Contact::random_password();
 
-$confname = $Opt["longName"];
-if ($Opt["shortName"] && $Opt["shortName"] != $Opt["longName"])
-    $confname .= " (" . $Opt["shortName"] . ")";
 echo "<div class='homegrp'>
-Welcome to the ", htmlspecialchars($confname), " submissions site.";
-if (isset($Opt["conferenceSite"]))
-    echo " For general information about ", htmlspecialchars($Opt["shortName"]), ", see <a href=\"", htmlspecialchars($Opt["conferenceSite"]), "\">the conference site</a>.";
+Welcome to the ", htmlspecialchars($Conf->full_name()), " submissions site.";
+if (opt("conferenceSite"))
+    echo " For general information about ", htmlspecialchars($Conf->short_name), ", see <a href=\"", htmlspecialchars(opt("conferenceSite")), "\">the conference site</a>.";
 
 echo "</div>
 <hr class='home' />
 <div class='homegrp' id='homereset'>\n",
     Ht::form(hoturl_post("resetpassword")),
     '<div class="f-contain">',
-    Ht::hidden("resetcap", $_REQUEST["resetcap"]),
-    Ht::hidden("autopassword", $_REQUEST["autopassword"]),
-    "<p>This form will reset the password for <b>", htmlspecialchars($Acct->email), "</b>. Use our suggested replacement password, or choose your own.</p>
-<table>
-  <tr><td>",
-    Ht::radio("useauto", "y", null),
-    "&nbsp;</td><td>", Ht::label("Use password <tt>" . htmlspecialchars($_REQUEST["autopassword"]) . "</tt>"),
-    "</td></tr>
-  <tr><td>",
-    Ht::radio("useauto", "n", null, array("id" => "usemy", "onclick" => "x=\$\$(\"login_d\");if(document.activeElement!=x)x.focus()")),
-    "&nbsp;</td><td style='padding-top:1em'>", Ht::label("Use this password:"), "</td></tr>
-  <tr><td></td><td><div class='f-i'>
-  <div class='f-c", $password_class, "'>Password</div>
-  <div class='f-e'><input id='login_d' type='password' name='upassword' size='36' tabindex='1' value='' onkeypress='if(!((x=\$\$(\"usemy\")).checked)) x.click()' /></div>
+    Ht::hidden("resetcap", $resetcap),
+    Ht::hidden("autopassword", $_POST["autopassword"]),
+    "<p>Use this form to reset your password. You may want to use the random password we’ve chosen.</p>";
+echo '<table style="margin-bottom:2em">',
+    '<tr><td class="lcaption">Your email</td><td>', htmlspecialchars($Acct->email), '</td></tr>
+<tr><td class="lcaption">Suggested password</td><td>', htmlspecialchars($_POST["autopassword"]), '</td></tr></table>';
+echo '<div class="f-i">
+  <div class="f-c', $password_class, '">New password</div>
+  <div class="f-e">', Ht::password("password", "", array("id" => "login_d", "tabindex" => 1, "size" => 36)), '</div>
 </div>
-<div class='f-i'>
-  <div class='f-c", $password_class, "'>Password (again)</div>
-  <div class='f-e'><input id='login_d' type='password' name='upassword2' size='36' tabindex='1' value='' /></div>
-</div></td></tr>
-<tr><td colspan='2' style='padding-top:1em'>
-<div class='f-i'>",
+<div class="f-i">
+  <div class="f-c', $password_class, '">New password (again)</div>
+  <div class="f-e">', Ht::password("password2", "", array("tabindex" => 1, "size" => 36)), '</div>
+</div>
+<div class="f-i" style="margin-top:2em">',
     Ht::submit("go", "Reset password", array("tabindex" => 1)),
-    "</div></td>
-</tr></table>
+    "</div>
 </div></form>
 <hr class='home' /></div>\n";
-$Conf->footerScript("crpfocus(\"login\", null, 2)");
+Ht::stash_script("crpfocus(\"login\", null, 2)");
 
 echo '<hr class="c" />', "\n";
 $Conf->footer();

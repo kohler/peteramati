@@ -1,7 +1,12 @@
+# Apache settings for peteramati
+
 # These directives limit how large a paper can be uploaded.
 # post_max_size should be >= upload_max_filesize.
-php_value upload_max_filesize 15M
-php_value post_max_size 15M
+#php_value upload_max_filesize 15M
+#php_value post_max_size 20M
+
+# Some pages involve a lot of post variables.
+#php_value max_input_vars 4096
 
 # A large memory_limit helps when sending very large zipped files.
 php_value memory_limit 128M
@@ -15,11 +20,20 @@ AddDefaultCharset UTF-8
 # Use index.php for directory access.
 DirectoryIndex index.php
 
-# Prevent access to git directories, MySQL files, regardless of case.
-RedirectMatch 403 ^.*/(\.[Gg][Ii][Tt].*|\.[Mm][Yy].*)($|/.*$)
+# Prevent access to SCM directory, logs, test, README, regardless of case.
+RedirectMatch 403 ^.*/(\.[Gg][Ii][Tt].*|\.[Mm][Yy].*|[Rr][Ee][Aa][Dd][Mm][Ee].*|[Ff][Ii][Ll][Ee][Ss][Tt][Oo][Rr][Ee]|[Dd][Oo][Cc][Ss]|[Cc][Oo][Nn][Ff]|[Cc][Oo][Dd][Ee]|[Ll][Oo][Gg][Ss]|[Ll][Oo][Gg]|[Rr][Ee][Pp][Oo])($|/.*$)
 
 # Don't use MultiViews, which can conflict with mod_rewrite suffixless URLs.
 Options -MultiViews
+
+# Add .php to suffixless URLs.
+<IfModule mod_rewrite.c>
+RewriteEngine on
+RewriteBase /
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_URI},,$1,, ^(.*)(.*,,)\2$
+RewriteRule ^(.*)$ %1index.php/$1 [L,NE]
+</IfModule>
 
 # Uncomment this line to ONLY grant access via https.  Requires mod_ssl.
 #
@@ -27,8 +41,8 @@ Options -MultiViews
 
 # HTTP Authentication: To ask the server to authenticate users,
 # uncomment these lines and set $Opt["httpAuthLogin"] in
-# Code/options.inc. The $Opt["httpAuthLogin"] value should correspond
-# to your AuthType and AuthName.
+# conf/options.php. The $Opt["httpAuthLogin"] value should correspond
+# to your AuthType and AuthName (AuthName is the "realm").
 #
 # AuthType Basic
 # AuthName "HotCRP"

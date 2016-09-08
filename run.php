@@ -85,7 +85,7 @@ if ($Me->isPC && @$_GET["runmany"] && check_post()) {
         htmlspecialchars($_GET["runmany"]),
         '</div>';
 
-    $Conf->footerScript('runmany61()');
+    Ht::stash_script('runmany61()');
     echo '<div class="clear"></div>', "\n";
     $Conf->footer();
     exit;
@@ -135,7 +135,7 @@ if ($checkt > 0
         } while ($answer->status == "working" && microtime(true) - $now < 0.1);
     }
     if ($answer->status != "working" && $Queueid > 0)
-        $Conf->qe("delete from ExecutionQueue where queueid=$Queueid and repoid=" . $Info->repo->repoid);
+        $Conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $Queueid, $Info->repo->repoid);
     if ($answer->status == "done"
         && $Me->can_run($Pset, $Runner, $User)
         && $Runner->eval)
@@ -169,7 +169,7 @@ function load_queue($queueid, $repo) {
 function clean_queue($qname, $qconf, $qid) {
     global $Conf, $Now;
     $runtimeout = isset($qconf->runtimeout) ? $qconf->runtimeout : 300;
-    $result = $Conf->qe("select * from ExecutionQueue where queueclass='" . sqlq($qname) . "' and queueid<$qid");
+    $result = $Conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $qname, $qid);
     while (($row = edb_orow($result))) {
         // remove dead items from queue
         // - lockfile contains "0\n": child has exited, remove it
@@ -183,7 +183,7 @@ function clean_queue($qname, $qconf, $qid) {
         if (($row->lockfile && !file_exists($row->lockfile))
             || ($row->runat <= 0 && $row->updateat < $Now - 30)
             || ($runtimeout && $row->runat > 0 && $row->runat < $Now - $runtimeout))
-            $Conf->qe("delete from ExecutionQueue where queueid=$row->queueid");
+            $Conf->qe("delete from ExecutionQueue where queueid=?", $row->queueid);
     }
 }
 
@@ -192,14 +192,13 @@ if (isset($Runner->queue)) {
     if ($Queueid < 0 && $checkt > 0)
         quit("No such job");
     if ($Queueid < 0) {
-        $Conf->qe("insert into ExecutionQueue set
-            queueclass='" . sqlq($Runner->queue) . "',
-            insertat=$Now, updateat=$Now, repoid={$Info->repo->repoid},
-            runat=0, status=0, psetid={$Pset->id}, hash='" . sqlq($Info->commit_hash()) . "',
-            nconcurrent=" . (isset($Runner->nconcurrent) && $Runner->nconcurrent ? sqlq($Runner->nconcurrent) : "null"));
+        $Conf->qe("insert into ExecutionQueue set queueclass=?, insertat=?, updateat=?, repoid=?, runat=0, status=0, psetid=?, hash=?, nconcurrent=?",
+                  $Runner->queue, $Now, $Now, $Info->repo->repoid,
+                  $Pset->id, $Info->commit_hash(),
+                  isset($Runner->nconcurrent) && $Runner->nconcurrent ? $Runner->nconcurrent : null);
         $Queueid = $Conf->dblink->insert_id;
     } else
-        $Conf->qe("update ExecutionQueue set updateat=$Now where queueid=$Queueid");
+        $Conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $Queueid);
     $Queue = load_queue($Queueid, $Info->repo);
 
     $qconf = defval(defval($PsetInfo, "_queues", array()), $Runner->queue);

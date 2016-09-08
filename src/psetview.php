@@ -62,6 +62,10 @@ class PsetView {
         return $this->commit;
     }
 
+    public function maybe_commit_hash() {
+        return $this->commit;
+    }
+
     public function commit() {
         if ($this->commit === null) {
             global $Me;
@@ -85,9 +89,7 @@ class PsetView {
         $this->recent_commits = $user->repo_recent_commits($repo, $pset, 100);
         if (!$this->recent_commits && isset($pset->test_file)
             && $user->repo_ls_files($repo, "REPO/master", $pset->test_file)) {
-            if (!isset($repo->truncated_psetdir))
-                $repo->truncated_psetdir = array();
-            $repo->truncated_psetdir[$pset->id] = true;
+            $repo->_truncated_psetdir[$pset->id] = true;
             $this->recent_commits = $user->repo_recent_commits($repo, null, 100);
         }
         $this->recent_commits_truncated = count($this->recent_commits) == 100;
@@ -391,66 +393,5 @@ class PsetView {
 
     function hoturl_post($base, $args = null) {
         return hoturl_post($base, $this->hoturl_args($args));
-    }
-
-
-    const REPO_OPEN_TIMEOUT = 5;
-    const REPO_OPEN_TOTAL_TIMEOUT = 15;
-
-    static private $repo_url_open_time_used = 0;
-    static private $repo_url_open_cache = array();
-
-    static function is_repo_url_open($url) {
-        global $ConfSitePATH;
-        if (isset(self::$repo_url_open_cache[$url]))
-            return self::$repo_url_open_cache[$url];
-        if (!preg_match(',^[^@:]+\@([^@:]+\.[^@:]+):/?([^/].*),', $url, $m))
-            return -1;
-        $git_url = "git://" . $m[1] . "/" . $m[2];
-        if (!count(self::$repo_url_open_cache)
-            && !is_executable("$ConfSitePATH/jail/pa-timeout")) {
-            error_log("$ConfSitePATH/jail/pa-timeout: Not executable");
-            return -1;
-        }
-        if (self::$repo_url_open_time_used >= self::REPO_OPEN_TOTAL_TIMEOUT)
-            return -1;
-
-        $before = microtime(true);
-        $command = "$ConfSitePATH/jail/pa-timeout " . self::REPO_OPEN_TIMEOUT
-            . " git ls-remote " . escapeshellarg($git_url) . " 2>&1 | head -n 1";
-        exec($command, $output, $status);
-        self::$repo_url_open_time_used += microtime(true) - $before;
-
-        if ($status >= 124) // timeout or pa-timeout error
-            $r = -1;
-        else if (count($output)
-                 && preg_match(',\A[0-9a-f]{40}\s+,', $output[0]))
-            $r = 1;
-        else
-            $r = 0;
-        return (self::$repo_url_open_cache[$url] = $r);
-    }
-
-    function is_repo_open() {
-        return self::is_repo_url_open($this->repo->url);
-    }
-
-    function check_repo_open() {
-        global $Now;
-        // Recheck repository openness after a day for closed repositories,
-        // and after 30 seconds for open or failed-check repositories.
-        if (!$this->repo
-            || (!$this->repo->open && $Now - $this->repo->opencheckat <= 86400))
-            return 0;
-        else if ($this->repo->open && $Now - $this->repo->opencheckat <= 30)
-            return (int) $this->repo->open;
-        $r = $this->is_repo_open();
-        if ($r != $this->repo->open || $Now != $this->repo->opencheckat) {
-            Dbl::qe("update Repository set `open`=?, opencheckat=? where repoid=?",
-                    $r, $Now, $this->repo->repoid);
-            $this->repo->open = $r;
-            $this->repo->opencheckat = $Now;
-        }
-        return $r;
     }
 }

@@ -178,7 +178,7 @@ class MailSender {
             echo '<div class="fn2 warning">Scroll down to send the prepared mail once the page finishes loading.</div>',
                 "</div>\n";
         }
-        $Conf->echoScript("fold('mail',0,2)");
+        echo Ht::unstash_script("fold('mail',0,2)");
         $this->started = true;
     }
 
@@ -196,7 +196,7 @@ class MailSender {
         }
         if (!$this->sending && $this->groupable)
             $s .= "\$('.mail_groupable').show();";
-        $Conf->echoScript($s);
+        echo Ht::unstash_script($s);
     }
 
     private static function fix_body($prep) {
@@ -312,7 +312,7 @@ class MailSender {
         $q = $this->recip->query($paper_sensitive);
         if (!$q)
             return $Conf->errorMsg("Bad recipients value");
-        $result = $Conf->qe($q);
+        $result = $Conf->qe_raw($q);
         if (!$result)
             return;
         $recipients = defval($_REQUEST, "recipients", "");
@@ -370,7 +370,7 @@ class MailSender {
                 $this->echo_prologue();
                 $nwarnings = $mailer->nwarnings();
                 echo "<div id='foldmailwarn$nwarnings' class='hidden'><div class='warning'>", join("<br />", $mailer->warnings()), "</div></div>";
-                $Conf->echoScript("\$\$('mailwarnings').innerHTML = \$\$('foldmailwarn$nwarnings').innerHTML;");
+                echo Ht::unstash_script("\$\$('mailwarnings').innerHTML = \$\$('foldmailwarn$nwarnings').innerHTML;");
             }
         }
 
@@ -384,7 +384,7 @@ class MailSender {
         else if (!$this->sending)
             $this->echo_actions();
         echo "</div></form>";
-        $Conf->echoScript("fold('mail', null);");
+        echo Ht::unstash_script("fold('mail', null);");
         $Conf->footer();
         exit;
     }
@@ -526,11 +526,11 @@ echo "Search&nbsp; ",
 
 echo '<div class="fx9 g"></div></div>';
 
-$Conf->footerScript("fold(\"psel\",!\$\$(\"plimit\").checked,8);"
-                    . "setmailpsel(\$\$(\"recipients\"))");
+Ht::stash_script("fold(\"psel\",!\$\$(\"plimit\").checked,8);"
+                 . "setmailpsel(\$\$(\"recipients\"))");
 
 echo "</td></tr>\n";
-$Conf->footerScript("mktemptext('q','(All)')");
+Ht::stash_script("mktemptext('q','(All)')");
 
 // ** CC, REPLY-TO
 if ($Me->privChair) {

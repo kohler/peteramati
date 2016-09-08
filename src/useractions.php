@@ -8,7 +8,7 @@ class UserActions {
     static private function modify_password_mail($where, $dopassword, $sendtype, $ids) {
         global $Conf;
         $j = (object) array("ok" => true);
-        $result = $Conf->qe("select * from ContactInfo where $where and contactId" . sql_in_numeric_set($ids));
+        $result = $Conf->qe_raw("select * from ContactInfo where $where and contactId" . sql_in_numeric_set($ids));
         while (($row = edb_orow($result))) {
             $Acct = Contact::make($row);
             if ($dopassword)
@@ -34,7 +34,7 @@ class UserActions {
 
     static function enable($ids, $contact) {
         global $Conf;
-        $result = $Conf->qe("update ContactInfo set disabled=1 where contactId" . sql_in_numeric_set($ids) . " and password='' and contactId!=" . $contact->contactId);
+        $result = $Conf->qe_raw("update ContactInfo set disabled=1 where contactId" . sql_in_numeric_set($ids) . " and password='' and contactId!=" . $contact->contactId);
         $result = Dbl::qe("update ContactInfo set disabled=0 where contactId" . sql_in_numeric_set($ids) . " and contactId!=" . $contact->contactId);
         if ($result && $result->affected_rows)
             return self::modify_password_mail("password='' and contactId!=" . $contact->contactId, true, "create", $ids);

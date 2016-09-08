@@ -20,7 +20,7 @@ class ContactView {
             while ($ppos < strlen($p) && $xpos < count($x)) {
                 if ($p[$ppos] == "/")
                     ++$xpos;
-                else if ($p[$ppos] == "p" && Pset::find(@$x[$xpos]))
+                else if ($p[$ppos] == "p" && Pset::find(get($x, $xpos)))
                     $settings["pset"] = $x[$xpos];
                 else if ($p[$ppos] == "H" && strlen($x[$xpos]) == 40
                          && ctype_xdigit($x[$xpos])) {
@@ -63,7 +63,7 @@ class ContactView {
         global $Conf, $Me;
         $user = $Me;
         if (isset($usertext) && $usertext) {
-            $user = Contact::find_by_whatever($usertext);
+            $user = $Conf->user_by_whatever($usertext);
             if (!$user)
                 $Conf->errorMsg("No such user “" . htmlspecialchars($usertext) . "”.");
             else if ($user->contactId == $Me->contactId)
@@ -72,14 +72,14 @@ class ContactView {
                 $Conf->errorMsg("You can’t see that user’s information.");
                 $user = null;
             } else
-                $user->is_anonymous = (substr($usertext, 0, 5) === "[anon")
-                    || ($pset && $pset->anonymous);
+                $user->set_anonymous(substr($usertext, 0, 5) === "[anon"
+                                     || ($pset && $pset->anonymous));
         }
         if ($user && ($Me->isPC || $Me->chairContact)) {
             if ($pset && $pset->anonymous)
                 $usertext = $user->anon_username;
             else
-                $usertext = $user->seascode_username ? : $user->email;
+                $usertext = $user->username ? : $user->email;
         }
         return $user;
     }
@@ -333,7 +333,7 @@ class ContactView {
 
         $title = "partner";
         if ($Me->isPC && $partner)
-            $title = '<a href="' . hoturl("pset", array("u" => $Me->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->commit_hash())) . '">' . $title . '</a>';
+            $title = '<a href="' . hoturl("pset", ["u" => $Me->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->maybe_commit_hash()]) . '">' . $title . '</a>';
 
         if ($editable)
             $value = Ht::entry("partner", $partner_email, array("style" => "width:32em"))
@@ -354,7 +354,7 @@ class ContactView {
                 $notes[] = array(false, "Enter your partner’s email, username, or HUID here.");
         } else {
             $backpartners[] = -1;
-            $result = $Conf->qe("select " . ($user->is_anonymous ? "anon_username" : "email") . " from ContactInfo where contactId in (" . join(",", $backpartners) . ")");
+            $result = $Conf->qe("select " . ($user->is_anonymous ? "anon_username" : "email") . " from ContactInfo where contactId ?a", $backpartners);
             $p = array();
             while (($row = edb_row($result)))
                 if ($Me->isPC)
@@ -376,7 +376,7 @@ class ContactView {
     static function set_partner_action($user) {
         global $Conf, $Me;
         if (!($Me->has_database_account() && check_post()
-              && ($pset = Pset::find(@$_REQUEST["pset"]))))
+              && ($pset = Pset::find(req("pset")))))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return $Conf->errorMsg("You can’t edit repository information for that problem set now.");
@@ -392,10 +392,12 @@ class ContactView {
             array($info->user, $info->pset, $info->partner, $info->repo);
         $editable = $info->can_set_repo && !$user->is_anonymous;
 
-        $repo_url = $user->seascode_repo_base($repo ? $repo->url : "");
+        $repo_url = $repo ? $repo->friendly_url() : "";
         $title = "repository";
-        if ($repo_url && strpos($repo_url, ":") === false)
-            $title = $user->repo_link($repo_url, $title);
+        if (!RepositorySite::is_primary($repo))
+            $title = $repo->reposite->friendly_siteclass() . " " . $title;
+        if ($repo && $repo->url)
+            $title = $user->link_repo($title, $repo->web_url());
 
         if ($editable)
             $value = Ht::entry("repo", $repo_url, array("style" => "width:32em"))
@@ -411,57 +413,52 @@ class ContactView {
             else
                 $value .= ' data-tooltip="' . htmlspecialchars($repo->url) . '"';
             $value .= ' type="button" onclick="false">Copy URL to clipboard</button>';
-            $Conf->footerScript('$(".repoclip").each(pa_init_repoclip)', "repoclip");
+            Ht::stash_script('$(".repoclip").each(pa_init_repoclip)', "repoclip");
             if ($include_tarball && $info->commit_hash()
                 && ($tarball_url = $info->tarball_url()))
                 $value .= ' <a class="bsm q" href="' . htmlspecialchars($tarball_url) . '">Download tarball for ' . substr($info->commit_hash(), 0, 7) . '</a>';
         }
 
         // check repo
-        $notes = array();
-        if ($repo && !$repo->working) {
-            if ($user->check_seascode_repo($pset, $repo, false)) {
-                $Now = time();
-                $Conf->qe("update Repository set `working`=$Now where repoid=$repo->repoid");
-            } else
-                $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_unreadable", $user->repo_messagedefs($repo)));
+        $ms = new MessageSet($user);
+        if ($repo) {
+            $repo->check_working($ms);
+            $repo->check_open($ms);
         }
-        if (($open = $info->check_repo_open()) > 0)
-            $notes[] = array(true, "ERROR: " . Messages::$main->expand_html("repo_toopublic", $user->repo_messagedefs($repo)));
-        else if ($open < 0 && $Me->isPC)
-            $notes[] = array(true, "WARNING: " . Messages::$main->expand_html("repo_toopublic_timeout", $user->repo_messagedefs($repo)));
         if ($partner && $info->partner_same()) {
             $prepo = $partner->repo($pset->id);
             if ((!$repo && $prepo) || ($repo && !$prepo)
                 || ($repo && $prepo && $repo->repoid != $prepo->repoid)) {
-                if ($prepo)
-                    $prepo_url = ", " . htmlspecialchars($user->seascode_repo_base($prepo->url));
+                if ($prepo && $repo)
+                    $prepo_url = ", " . htmlspecialchars($prepo->friendly_url_like($repo));
+                else if ($prepo)
+                    $prepo_url = ", " . htmlspecialchars($prepo->friendly_url());
                 else
                     $prepo_url = "";
                 $your_partner = "your partner’s";
                 if ($Me->isPC)
                     $your_partner = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $Me->user_linkpart($partner))) . '">' . $your_partner . '</a>';
-                $notes[] = array(true, "ERROR: This repository differs from $your_partner$prepo_url.");
+                $ms->set_error_html("partner", "This repository differs from $your_partner$prepo_url.");
             }
         }
-        if ($repo && $repo_url[0] == "~" && $user->seascode_username
-            && !preg_match("_\A~(?:" . preg_quote($user->seascode_username)
-                           . ($partner ? "|" . preg_quote($partner->seascode_username) : "")
-                           . ")/_i", $repo_url)) {
-            if ($partner)
-                $notes[] = array(true, "ERROR: This repository belongs to neither you nor your partner.");
-            else
-                $notes[] = array(true, "ERROR: This repository does not belong to you.");
-        }
-        if ($repo && isset($repo->truncated_psetdir)
-            && defval($repo->truncated_psetdir, $pset->id))
+        if ($repo)
+            $repo->check_ownership($user, $partner, $ms);
+        $prefixes = ["", "WARNING: ", "ERROR: "];
+        $notes = array_map(function ($m) use ($prefixes) {
+            return [$m[2] > 0, $prefixes[$m[2]] . $m[1]];
+        }, $ms->messages(true));
+        if ($repo && $repo->truncated_psetdir($pset))
             $notes[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for us to grade and harder for you to get pset updates.");
-        if (!$repo)
-            $notes[] = array(false, "Enter your " . Contact::seascode_home("code.seas") . " repository URL here.");
+        if (!$repo) {
+            $repoclasses = RepositorySite::site_classes($Conf);
+            $x = commajoin(array_map(function ($k) { return Ht::link($k::global_friendly_siteclass(), $k::global_friendly_siteurl()); }, $repoclasses), "or");
+            if ($editable)
+                $notes[] = array(false, "Enter your $x repository URL here.");
+        }
 
         // edit
         if ($editable)
-            echo Ht::form(self_href(array("post" => post_value(), "set_seascode_repo" => 1, "pset" => $pset->urlkey))),
+            echo Ht::form(self_href(array("post" => post_value(), "set_repo" => 1, "pset" => $pset->urlkey))),
                 '<div class="f-contain">';
         self::echo_group($title, $value, $notes);
         if ($editable)
@@ -470,14 +467,67 @@ class ContactView {
         return $repo;
     }
 
-    static function set_seascode_repo_action($user) {
-        global $Conf, $Me;
+    static function set_repo_action($user) {
+        global $Conf, $Me, $ConfSitePATH;
         if (!($Me->has_database_account() && check_post()
-              && ($pset = Pset::find(@$_REQUEST["pset"]))))
+              && ($pset = Pset::find(req("pset")))))
             return;
         if (!$Me->can_set_repo($pset, $user))
-            return $Conf->errorMsg("You can’t edit repository information for that problem set now.");
-        if ($user->set_seascode_repo($pset, $_REQUEST["repo"]))
+            return Conf::msg_error("You can’t edit repository information for that problem set now.");
+
+        // clean up repo url
+        $repo_url = trim(req("repo"));
+        if ($pset->repo_guess_patterns)
+            for ($i = 0; $i + 1 < count($pset->repo_guess_patterns); $i += 2) {
+                $x = preg_replace('`' . str_replace("`", "\\`", $pset->repo_guess_patterns[$i]) . '`s',
+                                  $pset->repo_guess_patterns[$i + 1],
+                                  $repo_url, -1, $nreplace);
+                if ($x !== null && $nreplace) {
+                    $repo_url = $x;
+                    break;
+                }
+            }
+
+        // does it contain odd characters?
+        if (preg_match('_[@,;\[\](){}\\<>&#=\\000-\\027]_', $repo_url))
+            return Conf::msg_error("That repository contains funny characters. Remove them.");
+
+        // record interested repositories
+        $try_classes = [];
+        foreach (RepositorySite::site_classes($user->conf) as $sitek) {
+            $sniff = $sitek::sniff_url($repo_url);
+            if ($sniff == 2) {
+                $try_classes = [$sitek];
+                break;
+            } else if ($sniff)
+                $try_classes[] = $sitek;
+        }
+        if (empty($try_classes))
+            return Conf::msg_error("Invalid repository URL “" . htmlspecialchars($repo_url) . "”.");
+
+        // check repositories
+        $working = false;
+        $ms = new MessageSet($user);
+        foreach ($try_classes as $sitek) {
+            $reposite = $sitek::make_url($repo_url, $user->conf);
+            if ($reposite && $reposite->validate_working($ms) > 0) {
+                $working = true;
+                break;
+            }
+        }
+
+        // if !working, complain
+        if (!$working && !$ms->has_problems())
+            return Conf::msg_error("Invalid repository URL “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
+        else if (!$working) {
+            $msgs = join("<br />", $ms->messages()) ? : "Repository unreachable at the moment.";
+            return Conf::msg_error($msgs);
+        }
+
+        // store repo
+        $repo = Repository::find_or_create_url($reposite->url, $user->conf);
+        $repo && $repo->check_open();
+        if ($user->set_repo($pset, $repo))
             redirectSelf();
     }
 
@@ -524,11 +574,11 @@ For example, try these commands. (You’ll have to enter a commit message for th
         }
 
         if ($commitgroup) {
-            echo "<div class=\"commitcontainer61\" peteramati_pset=\"", htmlspecialchars($info->pset->urlkey);
+            echo "<div class=\"commitcontainer61\" data-pa-pset=\"", htmlspecialchars($info->pset->urlkey);
             if ($hash)
-                echo "\" peteramati_commit=\"", $hash;
+                echo "\" data-pa-commit=\"", $hash;
             echo "\">";
-            $Conf->footerScript("checklatest61()", "checklatest61");
+            Ht::stash_script("checklatest61()", "checklatest61");
         }
         self::echo_group("last commit", $value, $notes);
         if ($commitgroup)
@@ -581,8 +631,8 @@ For example, try these commands. (You’ll have to enter a commit message for th
 
         $total = $nonextra = 0;
         $r = array();
-        $g = @$notesj->grades;
-        $ag = @$notesj->autogrades;
+        $g = get($notesj, "grades");
+        $ag = get($notesj, "autogrades");
         $rag = array();
         foreach ($pset->grades as $ge) {
             $key = $ge->name;

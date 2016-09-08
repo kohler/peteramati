@@ -56,13 +56,13 @@ class RunnerState {
 
 
     public function expand($x) {
-        global $Opt;
+        global $Conf;
         if (strpos($x, '${') !== false) {
             $x = str_replace('${REPOID}', $this->repo->repoid, $x);
             $x = str_replace('${PSET}', $this->pset->id, $x);
             $x = str_replace('${CONFDIR}', "conf/", $x);
             $x = str_replace('${SRCDIR}', "src/", $x);
-            $x = str_replace('${HOSTTYPE}', defval($Opt, "hostType", ""), $x);
+            $x = str_replace('${HOSTTYPE}', $Conf->opt("hostType", ""), $x);
             $x = str_replace('${COMMIT}', $this->info->commit_hash(), $x);
             $x = str_replace('${HASH}', $this->info->commit_hash(), $x);
         }
@@ -85,7 +85,7 @@ class RunnerState {
     }
 
     public function start() {
-        global $ConfSitePATH, $Opt;
+        global $ConfSitePATH, $Conf;
         assert($this->checkt === null && $this->logfile === null);
 
         // collect user information
@@ -141,8 +141,8 @@ class RunnerState {
         // actually run
         $command = "echo; jail/pa-jail run"
             . " -p" . escapeshellarg($this->lockfile);
-        $skeletondir = $this->pset->run_skeletondir ? : @$Opt["run_skeletondir"];
-        $binddir = $this->pset->run_binddir ? : @$Opt["run_binddir"];
+        $skeletondir = $this->pset->run_skeletondir ? : $Conf->opt("run_skeletondir");
+        $binddir = $this->pset->run_binddir ? : $Conf->opt("run_binddir");
         if ($skeletondir && $binddir) {
             $binddir = preg_replace(',/+\z,', '', $binddir);
             $contents = "/ <- " . $skeletondir . " [bind-ro]\n"
@@ -186,8 +186,7 @@ class RunnerState {
         global $ConfSitePATH, $Now;
 
         $checkoutdir = $this->jailhomedir . "/repo";
-        if (isset($this->repo->truncated_psetdir)
-            && defval($this->repo->truncated_psetdir, $this->pset->id)
+        if ($this->repo->truncated_psetdir($this->pset)
             && $this->pset->directory_noslash !== "")
             $checkoutdir .= "/" . $this->pset->directory_noslash;
 

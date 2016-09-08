@@ -1,32 +1,79 @@
 <?php
 // contact.php -- HotCRP helper class representing system users
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
-class Contact {
+class Contact_Update {
+    public $qv = [];
+    public $cdb_uqv = [];
+    public $different_email;
+    public function __construct($inserting, $different_email) {
+        if ($inserting)
+            $this->qv["firstName"] = $this->qv["lastName"] = "";
+        $this->different_email = $different_email;
+    }
+}
 
-    // Information from the SQL definition
+class Contact {
+    static public $rights_version = 1;
+    static public $trueuser_privChair = null;
+    static public $allow_nonexistent_properties = false;
+
     public $contactId = 0;
     public $contactDbId = 0;
     private $cid;               // for forward compatibility
-    var $firstName = "";
-    var $lastName = "";
-    var $email = "";
-    var $preferredEmail = "";
-    var $sorter = "";
-    var $affiliation = "";
-    var $password = "";
-    public $password_type = 0;
-    public $password_plaintext = "";
-    public $passwordTime = 0;
+    public $conf;
+
+    public $firstName = "";
+    public $lastName = "";
+    public $unaccentedName = "";
+    public $nameAmbiguous = null;
+    public $email = "";
+    public $preferredEmail = "";
+    public $sorter = "";
+    public $sort_position = null;
+
+    public $affiliation = "";
+
+    private $password = "";
+    private $passwordTime = 0;
+    private $defaultWatch;
+    private $visits;
+    private $creationTime;
+    private $lastLogin;
+
     public $disabled = false;
     public $activity_at = false;
-    var $note;
+    public $note;
 
+    public $huid;
+    public $college;
+    public $extension;
+    public $dropped;
+    public $username;
     public $seascode_username;
+    public $github_username;
     public $anon_username;
     public $contactImageId;
     public $is_anonymous = false;
+
+    public $visited = false;
+    public $incomplete = false;
+    public $pcid;
+    public $rpcid;
+    public $repoid;
+    public $cacheid;
+    public $heads;
+    public $url;
+    public $open;
+    public $working;
+    public $lastpset;
+    public $snapcheckat;
+    public $repoviewable;
+    public $gradehash;
+    public $gradercid;
+    public $placeholder;
+    public $placeholder_at;
 
     private $links = null;
     private $repos = array();
@@ -37,39 +84,47 @@ class Contact {
     const ROLE_ADMIN = 2;
     const ROLE_CHAIR = 4;
     const ROLE_PCLIKE = 15;
-    var $roles = 0;
-    var $isPC = false;
-    var $privChair = false;
-    var $contactTags = null;
+    public $is_site_contact = false;
+    public $roles = 0;
+    public $isPC = false;
+    public $privChair = false;
+    public $contactTags = null;
     const CAP_AUTHORVIEW = 1;
     private $capabilities = null;
     private $activated_ = false;
 
-    private static $_handout_repo = array();
-    private static $_handout_repo_cacheid = array();
+    static private $_handout_repo = array();
+    static private $_handout_repo_cacheid = array();
+    static private $contactdb_dblink = false;
+    static private $active_forceShow = false;
 
 
-    public function __construct($trueuser = null) {
+    public function __construct($trueuser = null, Conf $conf = null) {
+        global $Conf;
+        $this->conf = $conf ? : $Conf;
         if ($trueuser)
             $this->merge($trueuser);
-        else if ($this->contactId)
+        else if ($this->contactId || $this->contactDbId)
             $this->db_load();
+        else if ($this->conf->opt("disableNonPC"))
+            $this->disabled = true;
     }
 
-    public static function fetch($result) {
-        $acct = $result ? $result->fetch_object("Contact") : null;
-        if ($acct && !is_int($acct->contactId))
-            $acct->db_load();
-        return $acct;
-    }
-
-    static public function make($o) {
-        return new Contact($o);
+    public static function fetch($result, Conf $conf = null) {
+        global $Conf;
+        $conf = $conf ? : $Conf;
+        $user = $result ? $result->fetch_object("Contact", [null, $conf]) : null;
+        if ($user && !is_int($user->contactId)) {
+            $user->conf = $conf;
+            $user->db_load();
+        }
+        return $user;
     }
 
     private function merge($user) {
-        global $Conf;
-        if (!isset($user->dsn) || $user->dsn == $Conf->dsn) {
+        if (is_array($user))
+            $user = (object) $user;
+        if (!isset($user->dsn) || $user->dsn == $this->conf->dsn) {
             if (isset($user->contactId))
                 $this->contactId = $this->cid = (int) $user->contactId;
             //else if (isset($user->cid))
@@ -81,8 +136,14 @@ class Contact {
             $name = $user;
         else
             $name = Text::analyze_name($user);
-        $this->firstName = (string) @$name->firstName;
-        $this->lastName = (string) @$name->lastName;
+        $this->firstName = get_s($name, "firstName");
+        $this->lastName = get_s($name, "lastName");
+        if (isset($user->unaccentedName))
+            $this->unaccentedName = $user->unaccentedName;
+        else if (isset($name->unaccentedName))
+            $this->unaccentedName = $name->unaccentedName;
+        else
+            $this->unaccentedName = Text::unaccented_name($name);
         foreach (array("email", "preferredEmail", "affiliation") as $k)
             if (isset($user->$k))
                 $this->$k = simplify_whitespace($user->$k);
@@ -94,10 +155,11 @@ class Contact {
         }
         self::set_sorter($this);
         if (isset($user->password))
-            $this->set_encoded_password($user->password);
+            $this->password = (string) $user->password;
         if (isset($user->disabled))
             $this->disabled = !!$user->disabled;
-        foreach (array("defaultWatch", "passwordTime") as $k)
+        foreach (["defaultWatch", "passwordTime", "passwordUseTime",
+                  "updateTime", "creationTime"] as $k)
             if (isset($user->$k))
                 $this->$k = (int) $user->$k;
         if (property_exists($user, "contactTags"))
@@ -112,35 +174,41 @@ class Contact {
             $this->extension = !!$user->extension;
         if (isset($user->seascode_username))
             $this->seascode_username = $user->seascode_username;
+        if (isset($user->github_username))
+            $this->github_username = $user->github_username;
         if (isset($user->anon_username))
             $this->anon_username = $user->anon_username;
         if (isset($user->contactImageId))
             $this->contactImageId = (int) $user->contactImageId;
         if (isset($user->roles) || isset($user->isPC) || isset($user->isAssistant)
             || isset($user->isChair)) {
-            $roles = (int) @$user->roles;
-            if (@$user->isPC)
+            $roles = (int) get($user, "roles");
+            if (get($user, "isPC"))
                 $roles |= self::ROLE_PC;
-            if (@$user->isAssistant)
+            if (get($user, "isAssistant"))
                 $roles |= self::ROLE_ADMIN;
-            if (@$user->isChair)
+            if (get($user, "isChair"))
                 $roles |= self::ROLE_CHAIR;
             $this->assign_roles($roles);
         }
+        if (!$this->isPC && $this->conf->opt("disableNonPC"))
+            $this->disabled = true;
+        if (isset($user->is_site_contact))
+            $this->is_site_contact = $user->is_site_contact;
+        $this->username = $this->github_username ? : $this->seascode_username;
     }
 
     private function db_load() {
         $this->contactId = $this->cid = (int) $this->contactId;
-        if (isset($this->contactDbId))
-            $this->contactDbId = (int) $this->contactDbId;
+        $this->contactDbId = (int) $this->contactDbId;
+        if ($this->unaccentedName === "")
+            $this->unaccentedName = Text::unaccented_name($this->firstName, $this->lastName);
         self::set_sorter($this);
-        if (isset($this->password))
-            $this->set_encoded_password($this->password);
+        $this->password = (string) $this->password;
         if (isset($this->disabled))
             $this->disabled = !!$this->disabled;
-        foreach (array("defaultWatch", "passwordTime") as $k)
-            if (isset($this->$k))
-                $this->$k = (int) $this->$k;
+        foreach (["defaultWatch", "passwordTime"] as $k)
+            $this->$k = (int) $this->$k;
         if (isset($this->activity_at))
             $this->activity_at = (int) $this->activity_at;
         else if (isset($this->lastLogin))
@@ -151,56 +219,68 @@ class Contact {
             $this->contactImageId = (int) $this->contactImageId;
         if (isset($this->roles))
             $this->assign_roles((int) $this->roles);
+        if (!$this->isPC && $this->conf->opt("disableNonPC"))
+            $this->disabled = true;
+        $this->username = $this->github_username ? : $this->seascode_username;
     }
 
     // begin changing contactId to cid
     public function __get($name) {
-        if ($name == "cid")
+        if ($name === "cid")
             return $this->contactId;
         else
             return null;
     }
 
     public function __set($name, $value) {
-        if ($name == "cid")
+        if ($name === "cid")
             $this->contactId = $this->cid = $value;
-        else
-            $this->$name = $value;
-    }
-
-    static public function set_sorter($o, $sorttype = null) {
-        if ($o->is_anonymous)
-            $o->sorter = $o->anon_username;
         else {
-            $first = defval($o, "firstName", "");
-            if (($p = strpos($first, " ")))
-                $first = substr($first, 0, $p);
-            $last = defval($o, "lastName", "");
-            $email = defval($o, "email", "");
-            $username = defval($o, "seascode_username", "") ? : $email;
-            if ($sorttype === "last")
-                $o->sorter = trim("$last $first $username $email");
-            else
-                $o->sorter = trim("$first $last $username $email");
+            if (!self::$allow_nonexistent_properties)
+                error_log(caller_landmark(1) . ": writing nonexistent property $name");
+            $this->$name = $value;
         }
     }
 
-    static public function compare($a, $b) {
-        return strcasecmp($a->sorter, $b->sorter);
+    function set_anonymous($is_anonymous) {
+        if ($is_anonymous !== $this->is_anonymous) {
+            $this->is_anonymous = $is_anonymous;
+            if ($this->is_anonymous)
+                $this->username = $this->anon_username;
+            else
+                $this->username = $this->github_username ? : $this->seascode_username;
+        }
     }
 
-    public function set_encoded_password($password) {
-        if ($password === null || $password === false)
-            $password = "";
-        $this->password = $password;
-        $this->password_type = substr($this->password, 0, 1) == " " ? 1 : 0;
-        if ($this->password_type == 0)
-            $this->password_plaintext = $password;
+    static public function set_sorter($c, $sorttype = null) {
+        $sort_by_last = $sorttype === "last";
+        if ($c->is_anonymous) {
+            $c->sorter = $c->anon_username;
+            return;
+        } else if (isset($c->unaccentedName) && $sort_by_last) {
+            $c->sorter = trim("$c->unaccentedName $c->email");
+            return;
+        }
+        list($first, $middle) = Text::split_first_middle($c->firstName);
+        if ($sort_by_last) {
+            if (($m = Text::analyze_von($c->lastName)))
+                $c->sorter = "$m[1] $first $m[0]";
+            else
+                $c->sorter = "$c->lastName $first";
+        } else
+            $c->sorter = "$first $c->last";
+        $c->sorter = trim($c->sorter . " " . $c->username . " " . $c->email);
+        if (preg_match('/[\x80-\xFF]/', $c->sorter))
+            $c->sorter = UnicodeHelper::deaccent($c->sorter);
+    }
+
+    static public function compare($a, $b) {
+        return strnatcasecmp($a->sorter, $b->sorter);
     }
 
     static public function site_contact() {
         global $Opt;
-        if (!@$Opt["contactEmail"] || $Opt["contactEmail"] == "you@example.com") {
+        if (!get($Opt, "contactEmail") || $Opt["contactEmail"] == "you@example.com") {
             $result = Dbl::ql("select firstName, lastName, email from ContactInfo where (roles&" . (self::ROLE_CHAIR | self::ROLE_ADMIN) . ")!=0 order by (roles&" . self::ROLE_CHAIR . ") desc limit 1");
             if ($result && ($row = $result->fetch_object())) {
                 $Opt["defaultSiteContact"] = true;
@@ -222,92 +302,122 @@ class Contact {
         $this->privChair = ($roles & (self::ROLE_ADMIN | self::ROLE_CHAIR)) != 0;
     }
 
-    static function external_login() {
-        global $Opt;
-        return @$Opt["ldapLogin"] || @$Opt["httpAuthLogin"];
-    }
-
 
     // initialization
 
-    function activate() {
-        global $Conf, $Opt;
+    public function activate() {
+        global $Now;
         $this->activated_ = true;
-        $trueuser = @$_SESSION["trueuser"];
+        $trueuser = get($_SESSION, "trueuser");
+        $truecontact = null;
 
         // Handle actas requests
-        if (isset($_REQUEST["actas"]) && $trueuser) {
-            $actasemail = $_REQUEST["actas"];
-            if ($actasemail === "admin")
+        $actas = req("actas");
+        if ($actas && $trueuser) {
+            if (is_numeric($actas)) {
+                $acct = $this->conf->user_by_id($actas);
+                $actasemail = $acct ? $acct->email : null;
+            } else if ($actas === "admin")
                 $actasemail = $trueuser->email;
-            unset($_REQUEST["actas"]);
+            else
+                $actasemail = $actas;
+            unset($_GET["actas"], $_POST["actas"], $_REQUEST["actas"]);
             if ($actasemail
                 && strcasecmp($actasemail, $this->email) != 0
                 && (strcasecmp($actasemail, $trueuser->email) == 0
                     || $this->privChair
-                    || (($truecontact = self::find_by_email($trueuser->email))
+                    || (($truecontact = $this->conf->user_by_email($trueuser->email))
                         && $truecontact->privChair))
-                && ($actascontact = self::find_by_whatever($actasemail))) {
-                $Conf->save_session("l", null);
+                && ($actascontact = $this->conf->user_by_whatever($actasemail))) {
+                $this->conf->save_session("l", null);
                 if ($actascontact->email !== $trueuser->email) {
                     hoturl_defaults(array("actas" => $actascontact->email));
                     $_SESSION["last_actas"] = $actascontact->email;
                 }
+                if ($this->privChair || ($truecontact && $truecontact->privChair))
+                    self::$trueuser_privChair = $actascontact;
                 return $actascontact->activate();
             }
         }
 
         // Handle invalidate-caches requests
-        if (@$_REQUEST["invalidatecaches"] && $this->privChair) {
-            unset($_REQUEST["invalidatecaches"]);
-            $Conf->invalidateCaches();
+        if (req("invalidatecaches") && $this->privChair) {
+            unset($_GET["invalidatecaches"], $_POST["invalidatecaches"], $_REQUEST["invalidatecaches"]);
+            $this->conf->invalidate_caches();
         }
 
         // If validatorContact is set, use it
-        if ($this->contactId <= 0 && @$Opt["validatorContact"]
-            && @$_REQUEST["validator"]) {
-            unset($_REQUEST["validator"]);
-            if (($newc = self::find_by_email($Opt["validatorContact"]))) {
+        if ($this->contactId <= 0 && req("validator")
+            && ($vc = $this->conf->opt("validatorContact"))) {
+            unset($_GET["validator"], $_POST["validator"], $_REQUEST["validator"]);
+            if (($newc = $this->conf->user_by_email($vc))) {
                 $this->activated_ = false;
                 return $newc->activate();
             }
         }
 
         // Add capabilities from session and request
-        if (!@$Opt["disableCapabilities"]) {
-            if (($caps = $Conf->session("capabilities"))) {
+        if (!$this->conf->opt("disableCapabilities")) {
+            if (($caps = $this->conf->session("capabilities"))) {
                 $this->capabilities = $caps;
-                ++$this->rights_version_;
+                ++self::$rights_version;
             }
             if (isset($_REQUEST["cap"]) || isset($_REQUEST["testcap"]))
                 $this->activate_capabilities();
         }
 
         // Maybe set up the shared contacts database
-        if (@$Opt["contactdb_dsn"] && $this->has_database_account()
-            && $Conf->session("contactdb_roles", 0) != $this->all_roles()) {
+        if ($this->conf->opt("contactdb_dsn") && $this->has_database_account()
+            && $this->conf->session("contactdb_roles", 0) != $this->all_roles()) {
             if ($this->contactdb_update())
-                $Conf->save_session("contactdb_roles", $this->all_roles());
+                $this->conf->save_session("contactdb_roles", $this->all_roles());
         }
+
+        // Check forceShow
+        self::$active_forceShow = $this->privChair && req("forceShow");
 
         return $this;
     }
 
+    public function set_forceShow($on) {
+        global $Me;
+        if ($this->contactId == $Me->contactId) {
+            self::$active_forceShow = $this->privChair && $on;
+            if (self::$active_forceShow)
+                $_GET["forceShow"] = $_POST["forceShow"] = $_REQUEST["forceShow"] = 1;
+            else
+                unset($_GET["forceShow"], $_POST["forceShow"], $_REQUEST["forceShow"]);
+        }
+    }
+
     public function activate_database_account() {
-        assert(!$this->has_database_account() && $this->has_email());
-        $contact = self::find_by_email($this->email, $_SESSION["trueuser"], false);
-        return $contact ? $contact->activate() : $this;
+        assert($this->has_email());
+        if (!$this->has_database_account()) {
+            $reg = clone $_SESSION["trueuser"];
+            if (strcasecmp($reg->email, $this->email) != 0)
+                $reg = (object) array();
+            $reg->email = $this->email;
+            if (($c = Contact::create($this->conf, $reg))) {
+                $this->load_by_id($c->contactId);
+                $this->activate();
+            }
+        }
+        return $this;
     }
 
     static public function contactdb() {
         return null;
     }
 
+    public function contactdb_user() {
+        return null;
+    }
+
     public function update_trueuser($always) {
-        if (($trueuser = @$_SESSION["trueuser"])
+        if (($trueuser = get($_SESSION, "trueuser"))
             && strcasecmp($trueuser->email, $this->email) == 0) {
-            foreach (array("firstName", "lastName", "affiliation") as $k)
-                if ($this->$k && ($always || !@$trueuser->$k))
+            foreach (array("firstName", "lastName", "affiliation", "country") as $k)
+                if ($this->$k && ($always || !get($trueuser, $k)))
                     $trueuser->$k = $this->$k;
             return true;
         } else
@@ -324,7 +434,8 @@ class Contact {
 
     static function is_anonymous_email($email) {
         // see also PaperSearch, Mailer
-        return preg_match('/\Aanonymous\d*\z/', $email);
+        return substr($email, 0, 9) === "anonymous"
+            && (strlen($email) === 9 || ctype_digit(substr($email, 9)));
     }
 
     function is_anonymous_user() {
@@ -340,9 +451,8 @@ class Contact {
     }
 
     function is_admin_force() {
-        return $this->privChair
-            && ($fs = @$_REQUEST["forceShow"])
-            && $fs != "0";
+        global $Me;
+        return self::$active_forceShow && $this->contactId == $Me->contactId;
     }
 
     function is_pc_member() {
@@ -358,19 +468,30 @@ class Contact {
     }
 
     function has_tag($t) {
+        if (($this->roles & self::ROLE_PC) && strcasecmp($t, "pc") == 0)
+            return true;
         if ($this->contactTags)
-            return strpos($this->contactTags, " $t ") !== false;
+            return stripos($this->contactTags, " $t#") !== false;
         if ($this->contactTags === false) {
-            trigger_error(caller_landmark(1, "/^Conference::/") . ": Contact $this->email contactTags missing");
+            trigger_error(caller_landmark(1, "/^Conf::/") . ": Contact $this->email contactTags missing");
             $this->contactTags = null;
         }
+        return false;
+    }
+
+    function tag_value($t) {
+        if (($this->roles & self::ROLE_PC) && strcasecmp($t, "pc") == 0)
+            return 0.0;
+        if ($this->contactTags
+            && ($p = stripos($this->contactTags, " $t#")) !== false)
+            return (float) substr($this->contactTags, $p + strlen($t) + 2);
         return false;
     }
 
     static function roles_all_contact_tags($roles, $tags) {
         $t = "";
         if ($roles & self::ROLE_PC)
-            $t = " pc";
+            $t = " pc#0";
         if ($tags)
             return $t . $tags;
         else
@@ -381,32 +502,38 @@ class Contact {
         return self::roles_all_contact_tags($this->roles, $this->contactTags);
     }
 
-    function change_capability($pid, $c, $on) {
-        global $Conf;
+    function capability($pid) {
+        $caps = $this->capabilities ? : array();
+        return get($caps, $pid) ? : 0;
+    }
+
+    function change_capability($pid, $c, $on = null) {
         if (!$this->capabilities)
             $this->capabilities = array();
-        $oldval = @$cap[$pid] ? $cap[$pid] : 0;
-        $newval = ($oldval | ($on ? $c : 0)) & ~($on ? 0 : $c);
-        if ($newval != $oldval) {
-            ++$this->rights_version_;
-            if ($newval != 0)
+        $oldval = get($this->capabilities, $pid) ? : 0;
+        if ($on === null)
+            $newval = ($c != null ? $c : 0);
+        else
+            $newval = ($oldval | ($on ? $c : 0)) & ~($on ? 0 : $c);
+        if ($newval !== $oldval) {
+            ++self::$rights_version;
+            if ($newval !== 0)
                 $this->capabilities[$pid] = $newval;
             else
                 unset($this->capabilities[$pid]);
         }
         if (!count($this->capabilities))
             $this->capabilities = null;
-        if ($this->activated_ && $newval != $oldval)
-            $Conf->save_session("capabilities", $this->capabilities);
+        if ($this->activated_ && $newval !== $oldval)
+            $this->conf->save_session("capabilities", $this->capabilities);
         return $newval != $oldval;
     }
 
     function apply_capability_text($text) {
-        global $Conf;
         if (preg_match(',\A([-+]?)0([1-9][0-9]*)(a)(\S+)\z,', $text, $m)
-            && ($result = $Conf->ql("select paperId, capVersion from Paper where paperId=$m[2]"))
+            && ($result = $this->conf->ql("select paperId, capVersion from Paper where paperId=$m[2]"))
             && ($row = edb_orow($result))) {
-            $rowcap = $Conf->capability_text($row, $m[3]);
+            $rowcap = $this->conf->capability_text($row, $m[3]);
             $text = substr($text, strlen($m[1]));
             if ($rowcap === $text
                 || $rowcap === str_replace("/", "_", $text))
@@ -425,7 +552,7 @@ class Contact {
     function data($key = null) {
         $this->make_data();
         if ($key)
-            return @$this->data_->$key;
+            return get($this->data_, $key);
         else
             return $this->data_;
     }
@@ -447,12 +574,22 @@ class Contact {
     }
 
     function merge_and_save_data($data) {
+        $this->activate_database_account();
         $this->make_data();
         $old = $this->encode_data();
         object_replace_recursive($this->data_, array_to_object_recursive($data));
         $new = $this->encode_data();
         if ($old !== $new)
-            Dbl::qe("update ContactInfo set data=? where contactId=$this->contactId", $new);
+            $this->conf->qe("update ContactInfo set data=? where contactId=?", $new, $this->contactId);
+    }
+
+    private function data_str() {
+        $d = null;
+        if (is_string($this->data))
+            $d = $this->data;
+        else if (is_object($this->data))
+            $d = json_encode($this->data);
+        return $d === "{}" ? null : $d;
     }
 
     private function trim() {
@@ -468,12 +605,11 @@ class Contact {
     }
 
     function escape() {
-        global $Conf;
-        if (@$_REQUEST["ajax"]) {
+        if (req("ajax")) {
             if ($this->is_empty())
-                $Conf->ajaxExit(array("ok" => 0, "loggedout" => 1));
+                $this->conf->ajaxExit(array("ok" => 0, "loggedout" => 1));
             else
-                $Conf->ajaxExit(array("ok" => 0, "error" => "You don’t have permission to access that page."));
+                $this->conf->ajaxExit(array("ok" => 0, "error" => "You don’t have permission to access that page."));
         }
 
         if ($this->is_empty()) {
@@ -481,10 +617,10 @@ class Contact {
             $x = array();
             if (Navigation::path())
                 $x["__PATH__"] = preg_replace(",^/+,", "", Navigation::path());
-            if (@$_REQUEST["anchor"])
-                $x["anchor"] = $_REQUEST["anchor"];
+            if (req("anchor"))
+                $x["anchor"] = req("anchor");
             $url = self_href($x, array("raw" => true, "site_relative" => true));
-            $_SESSION["login_bounce"] = array($Conf->dsn, $url, Navigation::page(), $_POST);
+            $_SESSION["login_bounce"] = array($this->conf->dsn, $url, Navigation::page(), $_POST);
             if (check_post())
                 error_go(false, "You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.");
             else
@@ -494,7 +630,7 @@ class Contact {
     }
 
     function save() {
-        global $Conf, $Now, $Opt;
+        global $Now;
         $this->trim();
         $inserting = !$this->contactId;
         $qf = $qv = array();
@@ -516,21 +652,21 @@ class Contact {
             $q .= ", creationTime=$Now";
         } else
             $q .= " where contactId=" . $this->contactId;
-        $result = Dbl::qe_apply($Conf->dblink, $q, $qv);
+        $result = $this->conf->qe_apply($q, $qv);
         if (!$result)
             return $result;
         if ($inserting)
             $this->contactId = $this->cid = $result->insert_id;
 
         // add to contact database
-        if (@$Opt["contactdb_dsn"] && ($cdb = self::contactdb())) {
+        if ($this->conf->opt("contactdb_dsn") && ($cdb = self::contactdb())) {
             Dbl::ql($cdb, "insert into ContactInfo set firstName=?, lastName=?, email=?, affiliation=? on duplicate key update firstName=values(firstName), lastName=values(lastName), affiliation=values(affiliation)",
                     $this->firstName, $this->lastName, $this->email, $this->affiliation);
             if ($this->password_plaintext
                 && ($cdb_user = self::contactdb_find_by_email($this->email))
                 && !$cdb_user->password
                 && !$cdb_user->disable_shared_password
-                && !@$Opt["contactdb_noPasswords"])
+                && !$this->conf->opt("contactdb_noPasswords"))
                 $cdb_user->change_password($this->password_plaintext, true);
         }
 
@@ -538,29 +674,24 @@ class Contact {
     }
 
     private function load_links() {
-        $result = Dbl::qe("select type, pset, link from ContactLink where cid=$this->contactId");
-        $this->links = array();
+        $result = $this->conf->qe("select type, pset, link from ContactLink where cid=?", $this->contactId);
+        $this->links = [1 => [], 2 => [], 3 => [], 4 => []];
         while (($row = edb_row($result)))
-            @($this->links[(int) $row[0]][(int) $row[1]][] = (int)$row[2]);
+            $this->links[(int) $row[0]][(int) $row[1]][] = (int)$row[2];
     }
 
     function link($type, $pset = 0) {
         if ($this->links === null)
             $this->load_links();
-        if (count(@$this->links[$type][$pset]) == 1)
-            return $this->links[$type][$pset][0];
-        else
-            return null;
+        $l = get($this->links[$type], $pset);
+        return count($l) == 1 ? $l[0] : null;
     }
 
     function links($type, $pset = 0) {
         if ($this->links === null)
             $this->load_links();
         $pset = is_object($pset) ? $pset->psetid : $pset;
-        if (@isset($this->links[$type][$pset]))
-            return $this->links[$type][$pset];
-        else
-            return array();
+        return get($this->links[$type], $pset, []);
     }
 
     private function adjust_links($type, $pset) {
@@ -571,40 +702,37 @@ class Contact {
     }
 
     function clear_links($type, $pset = 0, $nolog = false) {
-        global $Conf;
         unset($this->links[$type][$pset]);
         $this->adjust_links($type, $pset);
-        if ($Conf->qe("delete from ContactLink where cid=$this->contactId and type=$type and pset=$pset")) {
+        if ($this->conf->qe("delete from ContactLink where cid=? and type=? and pset=?", $this->contactId, $type, $pset)) {
             if (!$nolog)
-                $Conf->log("Clear links [$type,$pset]", $this);
+                $this->conf->log("Clear links [$type,$pset]", $this);
             return true;
         } else
             return false;
     }
 
     function set_link($type, $pset, $value) {
-        global $Conf;
         if ($this->links === null)
             $this->load_links();
         $this->clear_links($type, $pset, false);
         $this->links[$type][$pset] = array($value);
-        if ($Conf->qe("insert into ContactLink (cid,type,pset,link) values ($this->contactId,$type,$pset,$value)")) {
-            $Conf->log("Set links [$type,$pset,$value]", $this);
+        if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $pset, $value)) {
+            $this->conf->log("Set links [$type,$pset,$value]", $this);
             return true;
         } else
             return false;
     }
 
     function add_link($type, $pset, $value) {
-        global $Conf;
         if ($this->links === null)
             $this->load_links();
         if (!isset($this->links[$type][$pset]))
             $this->links[$type][$pset] = array();
         if (!in_array($value, $this->links[$type][$pset])) {
             $this->links[$type][$pset][] = array($value);
-            if ($Conf->qe("insert into ContactLink (cid,type,pset,link) values ($this->contactId,$type,$pset,$value)")) {
-                $Conf->log("Add link [$type,$pset,$value]", $this);
+            if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $pset, $value)) {
+                $this->conf->log("Add link [$type,$pset,$value]", $this);
                 return true;
             } else
                 return false;
@@ -613,14 +741,11 @@ class Contact {
     }
 
     function repo($pset) {
-        global $Conf, $Opt;
         $pset = is_object($pset) ? $pset->id : $pset;
         if (!array_key_exists($pset, $this->repos)) {
             $this->repos[$pset] = null;
-            if (($link = $this->link(LINK_REPO, $pset))
-                && ($result = Dbl::qe("select * from Repository where repoid=" . $link))
-                && ($row = edb_orow($result)))
-                $this->repos[$pset] = $row;
+            if (($link = $this->link(LINK_REPO, $pset)))
+                $this->repos[$pset] = Repository::find_id($link, $this->conf);
         }
         return $this->repos[$pset];
     }
@@ -628,14 +753,11 @@ class Contact {
     static function handout_repo($pset, $inrepo = null) {
         global $Conf, $Now, $ConfSitePATH;
         $url = $pset->handout_repo_url;
-        $hrepo = @self::$_handout_repo[$url];
-        if (!$hrepo) {
-            $result = Dbl::qe("select * from Repository where url=?", $url);
-            $hrepo = edb_orow($result);
-            if (!$hrepo)
-                $hrepo = self::add_repo($url, time(), 1);
-            if ($hrepo)
-                $hrepo->repo_is_handout = true;
+        if ($Conf->opt("noGitTransport") && substr($url, 0, 6) === "git://")
+            $url = "ssh://git@" . substr($url, 6);
+        $hrepo = get(self::$_handout_repo, $url);
+        if (!$hrepo && ($hrepo = Repository::find_or_create_url($url, $Conf))) {
+            $hrepo->is_handout = true;
             self::$_handout_repo[$url] = $hrepo;
         }
         if ($hrepo) {
@@ -645,9 +767,9 @@ class Contact {
             $save = false;
             if (!$hset)
                 $save = $hset = (object) array();
-            if (!($hme = @$hset->$hrepoid))
+            if (!($hme = get($hset, $hrepoid)))
                 $save = $hme = $hset->$hrepoid = (object) array();
-            if ((int) @$hme->$cacheid + 300 < $Now) {
+            if ((int) get($hme, $cacheid) + 300 < $Now) {
                 $save = $hme->$cacheid = $Now;
                 shell_exec("$ConfSitePATH/src/gitfetch $hrepo->repoid $cacheid " . escapeshellarg($hrepo->url) . " 1>&2 &");
             }
@@ -666,8 +788,8 @@ class Contact {
         $hset = $Conf->setting_json($key);
         if (!$hset)
             $hset = (object) array();
-        if (@$hset->snaphash !== $hrepo->snaphash
-            || (int) @$hset->snaphash_at + 300 < $Now
+        if (get($hset, "snaphash") !== $hrepo->snaphash
+            || (int) get($hset, "snaphash_at") + 300 < $Now
             || $hset->recent === null) {
             $xlist = array();
             foreach (self::repo_recent_commits($hrepo, $pset, 100) as $c)
@@ -696,11 +818,10 @@ class Contact {
 
     private static function update_repo_lastpset($pset, $repo) {
         global $Conf;
-        $Conf->qe("update Repository set lastpset=(select coalesce(max(pset),0) from ContactLink l where l.type=" . LINK_REPO . " and l.link=$repo->repoid) where repoid=$repo->repoid");
+        $Conf->qe("update Repository set lastpset=(select coalesce(max(pset),0) from ContactLink l where l.type=" . LINK_REPO . " and l.link=?) where repoid=?", $repo->repoid, $repo->repoid);
     }
 
     function set_repo($pset, $repo) {
-        global $Conf;
         $pset = is_object($pset) ? $pset->psetid : $pset;
         $old_repo = $this->repo($pset);
 
@@ -722,56 +843,25 @@ class Contact {
     }
 
     function partner($pset) {
-        global $Conf;
         $pset = is_object($pset) ? $pset->id : $pset;
         if (!array_key_exists($pset, $this->partners)) {
             $this->partners[$pset] = null;
             if (($pcid = $this->pcid($pset))
                 && ($pc = self::find_by_id($pcid))) {
                 if ($this->is_anonymous)
-                    $pc->is_anonymous = true;
+                    $pc->set_anonymous(true);
                 $this->partners[$pset] = $pc;
             }
         }
         return $this->partners[$pset];
     }
 
-    function email_authored_papers($email, $reg) {
-        global $Conf;
-        $aupapers = array();
-        $result = $Conf->q("select paperId, authorInformation from Paper where authorInformation like '%\t" . sqlq_for_like($email) . "\t%'");
-        while (($row = edb_orow($result))) {
-            cleanAuthor($row);
-            foreach ($row->authorTable as $au)
-                if (strcasecmp($au[2], $email) == 0) {
-                    $aupapers[] = $row->paperId;
-                    if ($reg && !@$reg->firstName && $au[0])
-                        $reg->firstName = $au[0];
-                    if ($reg && !@$reg->lastName && $au[1])
-                        $reg->lastName = $au[1];
-                    if ($reg && !@$reg->affiliation && $au[3])
-                        $reg->affiliation = $au[3];
-                    break;
-                }
-        }
-        return $aupapers;
-    }
-
-    function save_authored_papers($aupapers) {
-        if (count($aupapers) && $this->contactId) {
-            $q = array();
-            foreach ($aupapers as $pid)
-                $q[] = "($pid, $this->contactId, " . CONFLICT_AUTHOR . ")";
-            Dbl::ql("insert into PaperConflict (paperId, contactId, conflictType) values " . join(", ", $q) . " on duplicate key update conflictType=greatest(conflictType, " . CONFLICT_AUTHOR . ")");
-        }
-    }
 
     function save_roles($new_roles, $actor) {
-        global $Conf;
         $old_roles = $this->roles;
         // ensure there's at least one system administrator
         if (!($new_roles & self::ROLE_ADMIN) && ($old_roles & self::ROLE_ADMIN)
-            && !(($result = Dbl::qe("select contactId from ContactInfo where (roles&" . self::ROLE_ADMIN . ")!=0 and contactId!=" . $this->contactId . " limit 1"))
+            && !(($result = $this->conf->qe("select contactId from ContactInfo where (roles&" . self::ROLE_ADMIN . ")!=0 and contactId!=" . $this->contactId . " limit 1"))
                  && edb_nrows($result) > 0))
             $new_roles |= self::ROLE_ADMIN;
         // log role change
@@ -780,24 +870,23 @@ class Contact {
                        self::ROLE_ADMIN => "sysadmin",
                        self::ROLE_CHAIR => "chair") as $role => $type)
             if (($new_roles & $role) && !($old_roles & $role))
-                $Conf->log("Added as $type$actor_email", $this);
+                $this->conf->log("Added as $type$actor_email", $this);
             else if (!($new_roles & $role) && ($old_roles & $role))
-                $Conf->log("Removed as $type$actor_email", $this);
+                $this->conf->log("Removed as $type$actor_email", $this);
         // save the roles bits
         if ($old_roles != $new_roles) {
-            Dbl::qe("update ContactInfo set roles=$new_roles where contactId=$this->contactId");
+            $this->conf->qe("update ContactInfo set roles=$new_roles where contactId=$this->contactId");
             $this->assign_roles($new_roles);
         }
         return $old_roles != $new_roles;
     }
 
     private function load_by_query($where) {
-        $result = Dbl::q("select ContactInfo.* from ContactInfo where $where");
-        if ($result && ($row = $result->fetch_object())) {
+        $result = $this->conf->q_raw("select ContactInfo.* from ContactInfo where $where");
+        if (($row = $result ? $result->fetch_object() : null))
             $this->merge($row);
-            return true;
-        } else
-            return false;
+        Dbl::free($result);
+        return !!$row;
     }
 
     static function find_by_id($cid) {
@@ -806,200 +895,171 @@ class Contact {
     }
 
     static function safe_registration($reg) {
-        $safereg = array();
-        foreach (array("firstName", "lastName", "name", "preferredEmail",
-                       "affiliation", "collaborators", "seascode_username")
-                 as $k)
+        $safereg = (object) array();
+        foreach (array("email", "firstName", "lastName", "name", "preferredEmail",
+                       "affiliation", "collaborators", "seascode_username", "github_username",
+                       "unaccentedName") as $k)
             if (isset($reg[$k]))
-                $safereg[$k] = $reg[$k];
+                $safereg->$k = $reg[$k];
         return $safereg;
     }
 
-    private function register_by_email($email, $reg) {
-        // For more complicated registrations, use UserStatus
-        global $Conf, $Opt, $Now;
-        $reg = (object) ($reg === true ? array() : $reg);
-        $reg_keys = array("firstName", "lastName", "affiliation", "collaborators",
-                          "voicePhoneNumber", "preferredEmail");
-
-        // Set up registration
-        $name = Text::analyze_name($reg);
-        $reg->firstName = $name->firstName;
-        $reg->lastName = $name->lastName;
-
-        // Combine with information from contact database
-        $cdb_user = null;
-        if (@$Opt["contactdb_dsn"])
-            $cdb_user = self::contactdb_find_by_email($email);
-        if ($cdb_user)
-            foreach ($reg_keys as $k)
-                if (@$cdb_user->$k && !@$reg->$k)
-                    $reg->$k = $cdb_user->$k;
-
-        if (($password = @trim($reg->password)) !== "")
-            $this->change_password($password, false);
-        else if ($cdb_user && $cdb_user->password
-                 && !$cdb_user->disable_shared_password)
-            $this->set_encoded_password($cdb_user->password);
-        else
-            // Always store initial, randomly-generated user passwords in
-            // plaintext. The first time a user logs in, we will encrypt
-            // their password.
-            //
-            // Why? (1) There is no real security problem to storing random
-            // values. (2) We get a better UI by storing the textual password.
-            // Specifically, if someone tries to "create an account", then
-            // they don't get the email, then they try to create the account
-            // again, the password will be visible in both emails.
-            $this->set_encoded_password(self::random_password());
-
-        $best_email = @$reg->preferredEmail ? $reg->preferredEmail : $email;
-        $authored_papers = Contact::email_authored_papers($best_email, $reg);
-
-        // Insert
-        $qf = array("email=?, password=?, creationTime=$Now");
-        $qv = array($email, $this->password);
-        foreach ($reg_keys as $k)
-            if (isset($reg->$k)) {
-                $qf[] = "$k=?";
-                $qv[] = $reg->$k;
-            }
-        $result = Dbl::ql_apply("insert into ContactInfo set " . join(", ", $qf), $qv);
-        if (!$result)
-            return false;
-        $cid = (int) $result->insert_id;
-        if (!$cid)
-            return false;
-
-        // Having added, load it
-        if (!$this->load_by_query("ContactInfo.contactId=$cid"))
-            return false;
-
-        // Success! Save newly authored papers
-        if (count($authored_papers))
-            $this->save_authored_papers($authored_papers);
-        // Maybe add to contact db
-        if (@$Opt["contactdb_dsn"] && !$cdb_user)
-            $this->contactdb_update();
-
-        return true;
+    private function _create_password($cdbu, Contact_Update $cu) {
+        global $Now;
+        if ($cdbu && ($cdbu = $cdbu->contactdb_user())
+            && $cdbu->allow_contactdb_password()) {
+            $cu->qv["password"] = $this->password = "";
+            $cu->qv["passwordTime"] = $this->passwordTime = $cdbu->passwordTime;
+        } else if (!$this->conf->external_login()) {
+            $cu->qv["password"] = $this->password = self::random_password();
+            $cu->qv["passwordTime"] = $this->passwordTime = $Now;
+        } else
+            $cu->qv["password"] = $this->password = "";
     }
 
-    static function find_by_email($email, $reg = false, $send = false) {
-        global $Conf, $Me;
+    static function create(Conf $conf, $reg, $send = false) {
+        global $Me, $Now;
+        if (is_array($reg))
+            $reg = (object) $reg;
+        assert(is_string($reg->email));
+        $email = trim($reg->email);
+        assert($email !== "");
 
-        // Lookup by email
-        $email = trim($email ? $email : "");
-        if ($email != "") {
-            $result = Dbl::q("select ContactInfo.* from ContactInfo where email=?", $email);
-            if (($acct = self::fetch($result)))
-                return $acct;
-        }
+        // look up account first
+        if (($acct = $conf->user_by_email($email)))
+            return $acct;
 
-        // Not found: register
-        if (!$reg || !validate_email($email))
+        // validate email, check contactdb
+        if (!get($reg, "no_validate_email") && !validate_email($email))
             return null;
+        $cdbu = Contact::contactdb_find_by_email($email);
+        if (get($reg, "only_if_contactdb") && !$cdbu)
+            return null;
+
+        $cj = (object) array();
+        foreach (array("firstName", "lastName", "email", "affiliation",
+                       "collaborators", "preferredEmail") as $k)
+            if (($v = $cdbu && $cdbu->$k ? $cdbu->$k : get($reg, $k)))
+                $cj->$k = $v;
+        if (($v = $cdbu && $cdbu->voicePhoneNumber ? $cdbu->voicePhoneNumber : get($reg, "voicePhoneNumber")))
+            $cj->phone = $v;
+        if (($cdbu && $cdbu->disabled) || get($reg, "disabled"))
+            $cj->disabled = true;
+
         $acct = new Contact;
-        $ok = $acct->register_by_email($email, $reg);
-
-        // Log
-        if ($ok)
-            $acct->mark_create($send, true);
-        else
-            $Conf->log("Account $email creation failure", $Me);
-
-        return $ok ? $acct : null;
-    }
-
-    static function query_by_whatever($whatever) {
-        $whatever = trim($whatever);
-        if (preg_match('/\A\d{8}\z/', $whatever))
-            return "ContactInfo.seascode_username='$whatever' or ContactInfo.huid='$whatever' "
-                . "order by ContactInfo.seascode_username='$whatever' desc limit 1";
-        else if (preg_match('/\A\[anon\w+\]\z/', $whatever))
-            return "ContactInfo.anon_username='$whatever'";
-        else if (strpos($whatever, "@") === false)
-            return "ContactInfo.seascode_username='" . sqlq($whatever)
-                . "' or (coalesce(ContactInfo.seascode_username,'')='' and "
-                . "email like '" . sqlq_for_like(sqlq($whatever)) . "') "
-                . "order by ContactInfo.seascode_username='" . sqlq($whatever) . "' desc "
-                . "limit 1";
-        else {
-            if (preg_match('_.*@(?:fas|college|seas)\z_', $whatever))
-                $whatever .= ".harvard.edu";
-            else if (preg_match('_.*@.*?\.harvard\z_', $whatever))
-                $whatever .= ".edu";
-            return "ContactInfo.email='" . sqlq($whatever) . "'";
+        if ($acct->save_json($cj, null, $send)) {
+            if ($Me && $Me->privChair) {
+                $type = $acct->disabled ? "disabled " : "";
+                $conf->infoMsg("Created {$type}account for <a href=\"" . hoturl("profile", "u=" . urlencode($acct->email)) . "\">" . Text::user_html_nolink($acct) . "</a>.");
+            }
+            return $acct;
+        } else {
+            $conf->log("Account $email creation failure", $Me);
+            return null;
         }
     }
 
     function mark_create($send_email, $message_chair) {
-        global $Conf, $Me;
+        global $Me;
         if ($Me && $Me->privChair && $message_chair)
-            $Conf->infoMsg("Created account for <a href=\"" . hoturl("profile", "u=" . urlencode($this->email)) . "\">" . Text::user_html_nolink($this) . "</a>.");
+            $this->conf->infoMsg("Created account for <a href=\"" . hoturl("profile", "u=" . urlencode($this->email)) . "\">" . Text::user_html_nolink($this) . "</a>.");
         if ($send_email)
             $this->sendAccountInfo("create", false);
         if ($Me && $Me->has_email() && $Me->email !== $this->email)
-            $Conf->log("Created account ($Me->email)", $this);
+            $this->conf->log("Created account ($Me->email)", $this);
         else
-            $Conf->log("Created account", $this);
+            $this->conf->log("Created account", $this);
     }
 
-    static function find_by_query($q, $args = array()) {
-        if ($q != "") {
-            $result = Dbl::q_apply("select ContactInfo.* from ContactInfo where $q", $args);
-            if (($acct = self::fetch($result))
-                && $acct->contactId)
-                return $acct;
-        }
-        return null;
+
+    // PASSWORDS
+    //
+    // password "": disabled user; example: anonymous users for review tokens
+    // password "*": invalid password, used to require the contactdb
+    // password starting with " ": legacy hashed password using hash_hmac
+    //     format: " HASHMETHOD KEYID SALT[16B]HMAC"
+    // password starting with " $": password hashed by password_hash
+    //
+    // contactdb_user password falsy: contactdb password unusable
+    // contactdb_user password truthy: follows rules above (but no "*")
+    //
+    // PASSWORD PRINCIPLES
+    //
+    // - prefer contactdb password
+    // - require contactdb password if it is newer
+    //
+    // PASSWORD CHECKING RULES
+    //
+    // if (contactdb password exists)
+    //     check contactdb password;
+    // if (contactdb password matches && contactdb password needs upgrade)
+    //     upgrade contactdb password;
+    // if (contactdb password matches && local password was from contactdb)
+    //     set local password to contactdb password;
+    // if (local password was not from contactdb || no contactdb)
+    //     check local password;
+    // if (local password matches && local password needs upgrade)
+    //     upgrade local password;
+    //
+    // PASSWORD CHANGING RULES
+    //
+    // change(expected, new):
+    // if (contactdb password allowed
+    //     && (!expected || expected matches contactdb)) {
+    //     change contactdb password and update time;
+    //     set local password to "*";
+    // } else
+    //     change local password and update time;
+
+    public static function valid_password($input) {
+        return $input !== "" && $input !== "0" && $input !== "*"
+            && trim($input) === $input;
     }
 
-    static function find_by_whatever($whatever) {
-        return self::find_by_query(self::query_by_whatever($whatever));
+    public static function random_password($length = 14) {
+        return hotcrp_random_password($length);
     }
 
-    static function find_by_username($x) {
-        $x = trim($x);
-        if ($x != "")
-            return self::find_by_query("seascode_username='" . sqlq($x) . "'");
+    public static function password_storage_cleartext() {
+        return opt("safePasswords") < 1;
+    }
+
+    public function allow_contactdb_password() {
+        $cdbu = $this->contactdb_user();
+        return $cdbu && $cdbu->password;
+    }
+
+    private function prefer_contactdb_password() {
+        $cdbu = $this->contactdb_user();
+        return $cdbu && $cdbu->password
+            && (!$this->has_database_account() || $this->password === "");
+    }
+
+    public function plaintext_password() {
+        // Return the currently active plaintext password. This might not
+        // equal $this->password because of the cdb.
+        if ($this->password === "") {
+            if ($this->contactId
+                && ($cdbu = $this->contactdb_user()))
+                return $cdbu->plaintext_password();
+            else
+                return false;
+        } else if ($this->password[0] === " ")
+            return false;
         else
-            return null;
-    }
-
-    static function id_by_query($q) {
-        global $Conf;
-        $result = $Conf->q("select c.contactId from ContactInfo c where $q");
-        $row = edb_row($result);
-        return $row ? $row[0] : null;
-    }
-
-    static function id_by_whatever($whatever) {
-        return self::id_by_query(self::query_by_whatever($whatever));
-    }
-
-    static function id_by_email($email) {
-        $result = Dbl::qe("select contactId from ContactInfo where email=?", trim($email));
-        $row = edb_row($result);
-        return $row ? $row[0] : false;
-    }
-
-    static function email_by_id($id) {
-        $result = Dbl::qe("select email from ContactInfo where contactId=" . (int) $id);
-        $row = edb_row($result);
-        return $row ? $row[0] : false;
+            return $this->password;
     }
 
 
-    public static function password_hmac_key($keyid) {
-        global $Conf, $Opt;
+    // obsolete
+    private function password_hmac_key($keyid) {
         if ($keyid === null)
-            $keyid = defval($Opt, "passwordHmacKeyid", 0);
-        $key = @$Opt["passwordHmacKey.$keyid"];
+            $keyid = $this->conf->opt("passwordHmacKeyid", 0);
+        $key = $this->conf->opt("passwordHmacKey.$keyid");
         if (!$key && $keyid == 0)
-            $key = @$Opt["passwordHmacKey"];
+            $key = $this->conf->opt("passwordHmacKey");
         if (!$key) /* backwards compatibility */
-            $key = $Conf->setting_data("passwordHmacKey.$keyid");
+            $key = $this->conf->setting_data("passwordHmacKey.$keyid");
         if (!$key) {
             error_log("missing passwordHmacKey.$keyid, using default");
             $key = "NdHHynw6JwtfSZyG3NYPTSpgPFG8UN8NeXp4tduTk2JhnSVy";
@@ -1007,327 +1067,251 @@ class Contact {
         return $key;
     }
 
-    public static function valid_password($password) {
-        return $password != "" && trim($password) === $password
-            && $password !== "*";
-    }
-
-    public function check_password($password) {
-        global $Conf, $Opt;
-        assert(!isset($Opt["ldapLogin"]) && !isset($Opt["httpAuthLogin"]));
-        if ($password == "" || $password === "*")
+    private function check_hashed_password($input, $pwhash, $email) {
+        if ($input == "" || $input === "*" || $pwhash === null || $pwhash === "")
             return false;
-        if ($this->password_type == 0)
-            return $password === $this->password;
-        if ($this->password_type == 1
-            && ($hash_method_pos = strpos($this->password, " ", 1)) !== false
-            && ($keyid_pos = strpos($this->password, " ", $hash_method_pos + 1)) !== false
-            && strlen($this->password) > $keyid_pos + 17
-            && function_exists("hash_hmac")) {
-            $hash_method = substr($this->password, 1, $hash_method_pos - 1);
-            $keyid = substr($this->password, $hash_method_pos + 1, $keyid_pos - $hash_method_pos - 1);
-            $salt = substr($this->password, $keyid_pos + 1, 16);
-            return hash_hmac($hash_method, $salt . $password,
-                             self::password_hmac_key($keyid), true)
-                == substr($this->password, $keyid_pos + 17);
-        } else if ($this->password_type == 1)
-            error_log("cannot check hashed password for user " . $this->email);
+        else if ($pwhash[0] !== " ")
+            return $pwhash === $input;
+        else if ($pwhash[1] === "\$") {
+            if (function_exists("password_verify"))
+                return password_verify($input, substr($pwhash, 2));
+        } else {
+            if (($method_pos = strpos($pwhash, " ", 1)) !== false
+                && ($keyid_pos = strpos($pwhash, " ", $method_pos + 1)) !== false
+                && strlen($pwhash) > $keyid_pos + 17
+                && function_exists("hash_hmac")) {
+                $method = substr($pwhash, 1, $method_pos - 1);
+                $keyid = substr($pwhash, $method_pos + 1, $keyid_pos - $method_pos - 1);
+                $salt = substr($pwhash, $keyid_pos + 1, 16);
+                return hash_hmac($method, $salt . $input, $this->password_hmac_key($keyid), true)
+                    == substr($pwhash, $keyid_pos + 17);
+            }
+        }
+        error_log("cannot check hashed password for user $email");
         return false;
     }
 
-    static public function password_hash_method() {
-        global $Opt;
-        if (isset($Opt["passwordHashMethod"]) && $Opt["passwordHashMethod"])
-            return $Opt["passwordHashMethod"];
-        else
-            return PHP_INT_SIZE == 8 ? "sha512" : "sha256";
-    }
-
-    static public function password_cleartext() {
-        global $Opt;
-        return $Opt["safePasswords"] < 1;
-    }
-
-    private function preferred_password_keyid() {
-        global $Opt;
-        if ($this->contactDbId)
-            return defval($Opt, "contactdb_passwordHmacKeyid", 0);
-        else
-            return defval($Opt, "passwordHmacKeyid", 0);
-    }
-
-    public function check_password_encryption($is_change) {
-        global $Opt;
-        if ($Opt["safePasswords"] < 1
-            || ($Opt["safePasswords"] == 1 && !$is_change)
-            || !function_exists("hash_hmac"))
+    private function password_hash_method() {
+        $m = $this->conf->opt("passwordHashMethod");
+        if (function_exists("password_verify") && !is_string($m))
+            return is_int($m) ? $m : PASSWORD_DEFAULT;
+        if (!function_exists("hash_hmac"))
             return false;
-        if ($this->password_type == 0)
+        if (is_string($m))
+            return $m;
+        return PHP_INT_SIZE == 8 ? "sha512" : "sha256";
+    }
+
+    private function preferred_password_keyid($iscdb) {
+        if ($iscdb)
+            return $this->conf->opt("contactdb_passwordHmacKeyid", 0);
+        else
+            return $this->conf->opt("passwordHmacKeyid", 0);
+    }
+
+    private function check_password_encryption($hash, $iscdb) {
+        $safe = $this->conf->opt($iscdb ? "contactdb_safePasswords" : "safePasswords");
+        if ($safe < 1
+            || ($method = $this->password_hash_method()) === false
+            || ($hash !== "" && $safe == 1 && $hash[0] !== " "))
+            return false;
+        else if ($hash === "" || $hash[0] !== " ")
             return true;
-        $expected_prefix = " " . self::password_hash_method() . " "
-            . $this->preferred_password_keyid() . " ";
-        return $this->password_type == 1
-            && !str_starts_with($this->password, $expected_prefix . " ");
+        else if (is_int($method))
+            return $hash[1] !== "\$"
+                || password_needs_rehash(substr($hash, 2), $method);
+        else {
+            $prefix = " " . $method . " " . $this->preferred_password_keyid($iscdb) . " ";
+            return !str_starts_with($hash, $prefix);
+        }
     }
 
-    public function change_password($new_password, $save) {
-        global $Conf, $Opt, $Now;
-        // set password fields
-        $this->password_type = 0;
-        if ($new_password && $this->check_password_encryption(true))
-            $this->password_type = 1;
-        if (!$new_password)
-            $new_password = self::random_password();
-        $this->password_plaintext = $new_password;
-        if ($this->password_type == 1) {
-            $keyid = $this->preferred_password_keyid();
-            $key = self::password_hmac_key($keyid);
-            $hash_method = self::password_hash_method();
-            $salt = hotcrp_random_bytes(16);
-            $this->password = " " . $hash_method . " " . $keyid . " " . $salt
-                . hash_hmac($hash_method, $salt . $new_password, $key, true);
-        } else
-            $this->password = $new_password;
-        $this->passwordTime = $Now;
-        // save possibly-encrypted password
-        if ($save && $this->contactId)
-            Dbl::ql($Conf->dblink, "update ContactInfo set password=?, passwordTime=? where contactId=?", $this->password, $this->passwordTime, $this->contactId);
-        if ($save && $this->contactDbId)
-            Dbl::ql(self::contactdb(), "update ContactInfo set password=?, passwordTime=? where contactDbId=?", $this->password, $this->passwordTime, $this->contactDbId);
+    private function hash_password($input, $iscdb) {
+        $method = $this->password_hash_method();
+        if ($method === false)
+            return $input;
+        else if (is_int($method))
+            return " \$" . password_hash($input, $method);
+        else {
+            $keyid = $this->preferred_password_keyid($iscdb);
+            $key = $this->password_hmac_key($keyid);
+            $salt = random_bytes(16);
+            return " " . $method . " " . $keyid . " " . $salt
+                . hash_hmac($method, $salt . $input, $key, true);
+        }
     }
 
-    static function random_password($length = 14) {
-        global $Opt;
-        if (isset($Opt["ldapLogin"]))
-            return "<stored in LDAP>";
-        else if (isset($Opt["httpAuthLogin"]))
-            return "<using HTTP authentication>";
+    public function check_password($input) {
+        global $Now;
+        assert(!$this->conf->external_login());
+        if (($this->contactId && $this->disabled)
+            || !self::valid_password($input))
+            return false;
+        // update passwordUseTime once a month
+        $update_use_time = $Now - 31 * 86400;
 
-        // see also regexp in randompassword.php
-        $l = explode(" ", "a e i o u y a e i o u y a e i o u y a e i o u y a e i o u y b c d g h j k l m n p r s t u v w tr cr br fr th dr ch ph wr st sp sw pr sl cl 2 3 4 5 6 7 8 9 - @ _ + =");
-        $n = count($l);
-
-        $bytes = hotcrp_random_bytes($length + 10, true);
-        if ($bytes === false) {
-            $bytes = "";
-            while (strlen($bytes) < $length)
-                $bytes .= sha1($Opt["conferenceKey"] . pack("V", mt_rand()));
+        $cdbu = $this->contactdb_user();
+        $cdbok = false;
+        if ($cdbu && ($hash = $cdbu->password)
+            && $cdbu->allow_contactdb_password()
+            && ($cdbok = $this->check_hashed_password($input, $hash, $this->email))) {
+            if ($this->check_password_encryption($hash, true)) {
+                $hash = $this->hash_password($input, true);
+                Dbl::ql(self::contactdb(), "update ContactInfo set password=? where contactDbId=?", $hash, $cdbu->contactDbId);
+                $cdbu->password = $hash;
+            }
+            if ($cdbu->passwordUseTime <= $update_use_time) {
+                Dbl::ql(self::contactdb(), "update ContactInfo set passwordUseTime=? where contactDbId=?", $Now, $cdbu->contactDbId);
+                $cdbu->passwordUseTime = $Now;
+            }
         }
 
-        $pw = "";
-        $nvow = 0;
-        for ($i = 0;
-             $i < strlen($bytes) &&
-                 strlen($pw) < $length + max(0, ($nvow - 3) / 3);
-             ++$i) {
-            $x = ord($bytes[$i]) % $n;
-            if ($x < 30)
-                ++$nvow;
-            $pw .= $l[$x];
+        $localok = false;
+        if ($this->contactId && ($hash = $this->password)
+            && ($localok = $this->check_hashed_password($input, $hash, $this->email))) {
+            if ($this->check_password_encryption($hash, false)) {
+                $hash = $this->hash_password($input, false);
+                $this->conf->ql("update ContactInfo set password=? where contactId=?", $hash, $this->contactId);
+                $this->password = $hash;
+            }
+            if ($this->passwordUseTime <= $update_use_time) {
+                $this->conf->ql("update ContactInfo set passwordUseTime=? where contactId=?", $Now, $this->contactId);
+                $this->passwordUseTime = $Now;
+            }
         }
-        return $pw;
+
+        return $cdbok || $localok;
     }
+
+    const CHANGE_PASSWORD_PLAINTEXT = 1;
+    const CHANGE_PASSWORD_NO_CDB = 2;
+
+    public function change_password($old, $new, $flags) {
+        global $Now;
+        assert(!$this->conf->external_login());
+        if ($new === null)
+            $new = self::random_password();
+        assert(self::valid_password($new));
+
+        $cdbu = null;
+        if (!($flags & self::CHANGE_PASSWORD_NO_CDB))
+            $cdbu = $this->contactdb_user();
+        if ($cdbu
+            && (!$old || $cdbu->password)
+            && (!$old || $this->check_hashed_password($old, $cdbu->password, $this->email))) {
+            $hash = $new;
+            if ($hash && !($flags & self::CHANGE_PASSWORD_PLAINTEXT)
+                && $this->check_password_encryption("", true))
+                $hash = $this->hash_password($hash, true);
+            $cdbu->password = $hash;
+            if (!$old || $old !== $new)
+                $cdbu->passwordTime = $Now;
+            Dbl::ql(self::contactdb(), "update ContactInfo set password=?, passwordTime=? where contactDbId=?", $cdbu->password, $cdbu->passwordTime, $cdbu->contactDbId);
+            if ($this->contactId && $this->password) {
+                $this->password = "";
+                $this->passwordTime = $cdbu->passwordTime;
+                $this->conf->ql("update ContactInfo set password=?, passwordTime=? where contactId=?", $this->password, $this->passwordTime, $this->contactId);
+            }
+        } else if ($this->contactId
+                   && (!$old || $this->check_hashed_password($old, $this->password, $this->email))) {
+            $hash = $new;
+            if ($hash && !($flags & self::CHANGE_PASSWORD_PLAINTEXT)
+                && $this->check_password_encryption("", false))
+                $hash = $this->hash_password($hash, false);
+            $this->password = $hash;
+            if (!$old || $old !== $new)
+                $this->passwordTime = $Now;
+            $this->conf->ql("update ContactInfo set password=?, passwordTime=? where contactId=?", $this->password, $this->passwordTime, $this->contactId);
+        }
+    }
+
 
     function sendAccountInfo($sendtype, $sensitive) {
-        global $Conf, $Opt;
+        assert(!$this->disabled);
         $rest = array();
-        if ($sendtype == "create")
+        if ($sendtype == "create" && $this->prefer_contactdb_password())
+            $template = "@activateaccount";
+        else if ($sendtype == "create")
             $template = "@createaccount";
-        else if ($this->password_type == 0
-                 && (!@$Opt["safePasswords"]
-                     || (is_int($Opt["safePasswords"]) && $Opt["safePasswords"] <= 1)
-                     || $sendtype != "forgot")
-                 && $this->password !== "*")
+        else if ($this->plaintext_password()
+                 && ($this->conf->opt("safePasswords") <= 1 || $sendtype != "forgot"))
             $template = "@accountinfo";
         else {
-            $rest["capability"] = $Conf->create_capability(CAPTYPE_RESETPASSWORD, array("contactId" => $this->contactId, "timeExpires" => time() + 259200));
-            $Conf->log("Created password reset request", $this);
+            if ($this->contactDbId && $this->prefer_contactdb_password())
+                $capmgr = $this->conf->capability_manager("U");
+            else
+                $capmgr = $this->conf->capability_manager();
+            $rest["capability"] = $capmgr->create(CAPTYPE_RESETPASSWORD, array("user" => $this, "timeExpires" => time() + 259200));
+            $this->conf->log("Created password reset " . substr($rest["capability"], 0, 8) . "...", $this);
             $template = "@resetpassword";
         }
 
         $mailer = new CS61Mailer($this, null, $rest);
         $prep = $mailer->make_preparation($template, $rest);
         if ($prep->sendable || !$sensitive
-            || @$Opt["debugShowSensitiveEmail"]) {
+            || $this->conf->opt("debugShowSensitiveEmail")) {
             Mailer::send_preparation($prep);
             return $template;
         } else {
-            $Conf->errorMsg("Mail cannot be sent to " . htmlspecialchars($this->email) . " at this time.");
+            Conf::msg_error("Mail cannot be sent to " . htmlspecialchars($this->email) . " at this time.");
             return false;
         }
     }
 
 
-    function mark_activity() {
+    public function mark_login() {
+        global $Now;
+        // at least one login every 90 days is marked as activity
+        if (!$this->activity_at || $this->activity_at <= $Now - 7776000
+            || (($cdbu = $this->contactdb_user())
+                && (!$cdbu->activity_at || $cdbu->activity_at <= $Now - 7776000)))
+            $this->mark_activity();
+    }
+
+    public function mark_activity() {
+        global $Now;
+        if (!$this->activity_at || $this->activity_at < $Now) {
+            $this->activity_at = $Now;
+            if ($this->contactId && !$this->is_anonymous_user())
+                $this->conf->ql("update ContactInfo set lastLogin=$Now where contactId=$this->contactId");
+            if ($this->contactDbId)
+                Dbl::ql(self::contactdb(), "update ContactInfo set activity_at=$Now where contactDbId=$this->contactDbId");
+        }
     }
 
     function log_activity($text, $paperId = null) {
-        global $Conf;
         $this->mark_activity();
         if (!$this->is_anonymous_user())
-            $Conf->log($text, $this, $paperId);
+            $this->conf->log($text, $this, $paperId);
     }
 
     function log_activity_for($user, $text, $paperId = null) {
-        global $Conf;
         $this->mark_activity();
         if (!$this->is_anonymous_user())
-            $Conf->log($text . " by $this->email", $user, $paperId);
+            $this->conf->log($text . " by $this->email", $user, $paperId);
     }
 
-
-
-
-    // code.seas integration
-    const SEASCODE_URL = "https://code.seas.harvard.edu/";
-
-    static private function _seascode_finish($url, $text) {
-        return $text ? "<a href=\"$url\">$text</a>" : $url;
-    }
-
-    static function seascode_home($text = null) {
-        return self::_seascode_finish(self::SEASCODE_URL, $text);
-    }
-
-    static function seascode_user($user, $text = null) {
-        $user = is_object($user) ? $user->seascode_username : $user;
-        return self::_seascode_finish(self::SEASCODE_URL . "~" . htmlspecialchars($user), $text);
-    }
-
-    static function repo_https_url($repo) {
-        if (preg_match('_\A(?:(?:https?|git|ssh)://code\.seas\.harvard\.edu/|(?:git@)?code\.seas\.harvard\.edu:|)/*(.*?)(?:\.git|)\z_', $repo, $m))
-            return self::SEASCODE_URL . $m[1];
-        else
-            return $repo;
-    }
-
-    static function seascode_repo_base($repo) {
-        if (is_object($repo))
-            $repo = $repo->url;
-        if (preg_match('_\A(?:(?:https?|git|ssh)://code\.seas\.harvard\.edu/|(?:git@)?code\.seas\.harvard\.edu:|)/*(.*?)(?:\.git|)\z_', $repo, $m))
-            $repo = $m[1];
-        return $repo;
-    }
-
-    function repo_messagedefs($repo) {
-        if (!is_string($repo))
-            $repo = $repo ? self::seascode_repo_base($repo->url) : "";
-        if ($this->is_anonymous && $repo)
-            $repo = "[anonymous]";
-        if ($repo)
-            return array("REPOGITURL" => "git@code.seas.harvard.edu:$repo.git", "REPOBASE" => $repo);
-        else
-            return array("REPOGITURL" => null, "REPOBASE" => null);
-    }
-
-    function repo_link($repo, $text, $suffix = "") {
-        $repo = self::SEASCODE_URL . self::seascode_repo_base($repo) . $suffix;
-        if ($this->is_anonymous)
-            return '<a href="#" onclick=\'window.location=' . htmlspecialchars(json_encode($repo)) . ';return false\'>' . $text . '</a>';
-        else
-            return '<a href="' . htmlspecialchars($repo) . '">' . $text . '</a>';
-    }
-
-    static function seascode_repo_memberships($repo, $text = null) {
-        $repo = self::seascode_repo_base($repo);
-        return self::_seascode_finish(self::SEASCODE_URL . htmlspecialchars($repo) . "/memberships", $text);
-    }
-
-    function check_seascode_username($username, $error = true) {
-        global $Conf;
-        $code_seas = self::seascode_home("code.seas");
-
-        // does it contain odd characters?
-        if (preg_match('_[@,;:~/\[\](){}\\<>&#=\\000-\\027]_', $username))
-            return $error && $Conf->errorMsg("The $code_seas username “" . htmlspecialchars($username) . "” contains funny characters. Remove them.");
-
-        // is it in use?
-        $result = $Conf->qe("select contactId from ContactInfo where seascode_username='" . sqlq($username) . "'");
-        if (($row = edb_row($result)) && $row[0] != $this->contactId)
-            return $error && $Conf->errorMsg("That $code_seas username is already in use.");
-
-        // is it valid?
-        $htopt = array("timeout" => 5, "ignore_errors" => true);
-        $context = stream_context_create(array("http" => $htopt));
-        $response_code = 509;
-        if (($stream = fopen(self::seascode_user($username), "r", false, $context))) {
-            if (($metadata = stream_get_meta_data($stream))
-                && ($w = @$metadata["wrapper_data"])
-                && is_array($w)
-                && preg_match(',\AHTTP/[\d.]+\s+(\d+)\s+(.+)\z,', $w[0], $m))
-                $response_code = (int) $m[1];
-            fclose($stream);
-        }
-
-        if ($response_code == 200)
-            return true;
-        else if ($response_code == 404)
-            return $error && $Conf->errorMsg("That username doesn’t appear to have a $code_seas account. Check your spelling.");
-        else
-            return $error && $Conf->errorMsg("Error contacting $code_seas at " . htmlspecialchars(self::seascode_user($username)) . " (response code $response_code). Maybe try again?");
-    }
-
-    function set_seascode_username($username) {
-        global $Conf;
-
-        // does it contain odd characters?
-        if (!$this->check_seascode_username($username, true))
-            return false;
-
-        $this->seascode_username = $username;
-        if ($Conf->qe("update ContactInfo set seascode_username='" . sqlq($username) . "' where contactId=" . $this->contactId))
-            $Conf->log("Set seascode_username to $username", $this);
+    function change_username($prefix, $username) {
+        assert($prefix === "github" || $prefix === "seascode");
+        $k = $prefix . "_username";
+        $this->$k = $username;
+        if ($this->conf->qe("update ContactInfo set $k=? where contactId=?", $username, $this->contactId))
+            $this->conf->log("Set $k to $username", $this);
         return true;
     }
 
-    function check_seascode_repo($pset, $repo, $error) {
-        global $Conf, $ConfSitePATH;
-        $code_seas = "<a href='https://code.seas.harvard.edu/'>code.seas</a>";
 
-        // get rid of git nonsense
-        $repo = self::seascode_repo_base($repo);
-
-        // does it contain odd characters?
-        if (preg_match('_[@,;:\[\](){}\\<>&#=\\000-\\027]_', $repo))
-            return $error && $Conf->errorMsg("That $code_seas repository contains funny characters. Remove them.");
-
-        // clean it up some
-        if (!is_object($pset)) {
-            if (!Pset::$all[$pset])
-                error_log("bad pset $pset: " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
-            $pset = Pset::$all[$pset];
-        }
-        if ($pset && $pset->repo_guess_patterns)
-            for ($i = 0; $i + 1 < count($pset->repo_guess_patterns); $i += 2) {
-                $x = preg_replace('`' . str_replace("`", "\\`", $pset->repo_guess_patterns[$i]) . '`s',
-                                  $pset->repo_guess_patterns[$i + 1],
-                                  $repo, -1, $nreplace);
-                if ($x !== null && $nreplace) {
-                    $repo = $x;
-                    break;
-                }
-            }
-        if (preg_match(':\A(.*?)\.git\z:', $repo, $m))
-            $repo = $m[1];
-        if (!$repo)
-            return false;
-
-        // check ssh url; should work
-        $ssh_url = "git@code.seas.harvard.edu:$repo.git";
-        $answer = shell_exec("git ls-remote $ssh_url 2>&1");
-        //$Conf->errorMsg("<pre>" . htmlspecialchars($answer) . "</pre>");
-        if (!preg_match('/^[a-f0-9]{40}\s+/m', $answer))
-            return $error && $Conf->errorMsg(Messages::$main->expand_html("repo_unreadable", $this->repo_messagedefs($repo)));
-        if (!preg_match(',^[a-f0-9]{40}\s+refs/heads/master,m', $answer))
-            return $error && $Conf->errorMsg(Messages::$main->expand_html("repo_nomaster", $this->repo_messagedefs($repo)));
-
-        return $repo;
+    function link_repo($html, $url) {
+        if ($this->is_anonymous)
+            return '<a href="#" onclick=\'window.location=' . htmlspecialchars(json_encode($url)) . ';return false\'>' . $html . '</a>';
+        else
+            return '<a href="' . htmlspecialchars($url) . '">' . $html . '</a>';
     }
 
     function can_set_repo($pset, $user = null) {
         global $Now;
         if (is_string($pset) || is_int($pset))
-            $pset = @Pset::$all[$pset];
+            $pset = get(Pset::$all, $pset);
         if ($this->privChair)
             return true;
         $is_pc = $user && $user != $this && $this->isPC;
@@ -1340,65 +1324,26 @@ class Contact {
             && ($is_pc || !$pset->frozen || !self::show_setting_on($pset->frozen));
     }
 
-    static function add_repo($url, $now, $open) {
-        global $Conf;
-        $repo_hash = substr(sha1($url), 10, 1);
-        $result = $Conf->qe("insert into Repository (url,cacheid,working,open,opencheckat) values ('" . sqlq($url) . "','$repo_hash',$now,$open,$now)");
-        if (!$result)
-            return false;
-        $repoid = $Conf->dblink->insert_id;
-        $result = $Conf->qe("select * from Repository where repoid=$repoid");
-        return edb_orow($result);
-    }
-
-    function set_seascode_repo($pset, $repo, $error = true) {
-        global $Conf, $ConfSitePATH;
-        $code_seas = "<a href='http://code.seas.harvard.edu/'>code.seas</a>";
-
-        // is it valid?
-        if (!($repo = $this->check_seascode_repo($pset, $repo, $error)))
-            return false;
-
-        // is it the current repo?
-        $ssh_url = "git@code.seas.harvard.edu:$repo.git";
-        $result = $Conf->qe("select * from Repository where url='" . sqlq($ssh_url) . "'");
-        $reporow = edb_orow($result);
-
-        // check git url; should not work b/c student repos should require auth
-        $open = PsetView::is_repo_url_open($repo);
-
-        // set repo
-        $now = time();
-        if ($reporow) {
-            $Conf->qe("update Repository set `open`=$open, opencheckat=$now, working=$now where repoid=$reporow->repoid");
-            $reporow->open = $open;
-            $reporow->opencheckat = $now;
-            $reporow->working = $now;
-        } else if (!($reporow = self::add_repo($ssh_url, $now, $open)))
-            return false;
-        return $this->set_repo($pset, $reporow);
-    }
-
     function set_partner($pset, $partner) {
-        global $Conf, $ConfSitePATH;
+        global $ConfSitePATH;
         $pset = is_object($pset) ? $pset->psetid : $pset;
-        $code_seas = "<a href='http://code.seas.harvard.edu/'>code.seas</a>";
 
         // does it contain odd characters?
         $partner = trim($partner);
-        $pc = Contact::find_by_whatever($partner);
+        $pc = $this->conf->user_by_whatever($partner);
         if (!$pc && ($partner == "" || strcasecmp($partner, "none") == 0))
             $pc = $this;
         else if (!$pc || !$pc->contactId)
-            return $Conf->errorMsg("I can’t find someone with email/username " . htmlspecialchars($partner) . ". Check your spelling.");
+            return Conf::msg_error("I can’t find someone with email/username " . htmlspecialchars($partner) . ". Check your spelling.");
 
         foreach ($this->links(LINK_PARTNER, $pset) as $link)
-            $Conf->qe("delete from ContactLink where cid=$link and type=" . LINK_BACKPARTNER . " and pset=$pset and link=$this->contactId");
+            $this->conf->qe("delete from ContactLink where cid=? and type=? and pset=? and link=?", $link, LINK_BACKPARTNER, $pset, $this->contactId);
         if ($pc->contactId == $this->contactId)
             return $this->clear_links(LINK_PARTNER, $pset);
         else
             return $this->set_link(LINK_PARTNER, $pset, $pc->contactId)
-                && $Conf->qe("insert into ContactLink (cid,type,pset,link) values ($pc->contactId," . LINK_BACKPARTNER . ",$pset,$this->contactId)");
+                && $this->conf->qe("insert into ContactLink set cid=?, type=?, pset=?, link=?",
+                                   $pc->contactId, LINK_BACKPARTNER, $pset, $this->contactId);
     }
 
     static function check_repo($repo, $delta, $foreground = false) {
@@ -1506,7 +1451,7 @@ class Contact {
 
     private static function file_ignore_regex($pset, $repo) {
         global $Conf, $Now;
-        if ($pset && @$pset->file_ignore_regex)
+        if ($pset && get($pset, "file_ignore_regex"))
             return $pset->file_ignore_regex;
         $regex = '.*\.swp|.*~|#.*#|.*\.core|.*\.dSYM|.*\.o|core.*\z|.*\.backup|tags|tags\..*|typescript';
         if ($pset && $Conf->setting("__gitignore_pset{$pset->id}_at", 0) < $Now - 900) {
@@ -1583,7 +1528,7 @@ class Contact {
     }
 
     static private function pset_diffinfo($pset, $repo) {
-        if ($pset && !@$pset->__applied_file_ignore_regex) {
+        if ($pset && !get($pset, "__applied_file_ignore_regex")) {
             if (($regex = self::file_ignore_regex($pset, $repo)))
                 $pset->diffs[] = new DiffConfig($regex, (object) array("ignore" => true, "match_priority" => -10));
             $pset->__applied_file_ignore_regex = true;
@@ -1613,8 +1558,7 @@ class Contact {
         assert($pset); // code remains for `!$pset`; maybe revive it?
 
         $psetdir = $pset ? escapeshellarg($pset->directory_noslash) : null;
-        if (isset($repo->truncated_psetdir) && $pset
-            && defval($repo->truncated_psetdir, $pset->id)) {
+        if ($pset && $repo->truncated_psetdir($pset)) {
             $repodir = "";
             $truncpfx = $pset->directory_noslash . "/";
         } else {
@@ -1622,16 +1566,19 @@ class Contact {
             $truncpfx = "";
         }
 
-        if (@$options["basehash"])
+        if (get($options, "basehash"))
             $base = $options["basehash"];
         else {
             $hrepo = self::handout_repo($pset, $repo);
-            $base = "repo{$hrepo->repoid}/master";
             if ($pset && isset($pset->gradebranch))
                 $base = "repo{$hrepo->repoid}/" . $pset->gradebranch;
+            else if ($pset && isset($pset->handout_repo_branch))
+                $base = "repo{$hrepo->repoid}/" . $pset->handout_repo_branch;
+            else
+                $base = "repo{$hrepo->repoid}/master";
             $options["basehash_hrepo"] = true;
         }
-        if ($truncpfx && @$options["basehash_hrepo"])
+        if ($truncpfx && get($options, "basehash_hrepo"))
             $base = self::_repo_prepare_truncated_handout($repo, $base, $pset);
 
         // read "full" files
@@ -1655,19 +1602,19 @@ class Contact {
             if ($line != "") {
                 $diffinfo = self::find_diffinfo($pset_diffs, $truncpfx . $line);
                 // skip files presented in their entirety
-                if ($diffinfo && @$diffinfo->full)
+                if ($diffinfo && get($diffinfo, "full"))
                     continue;
                 // skip ignored files, unless user requested them
-                if ($diffinfo && @$diffinfo->ignore
-                    && (!@$options["needfiles"]
-                        || !@$options["needfiles"][$truncpfx . $line]))
+                if ($diffinfo && get($diffinfo, "ignore")
+                    && (!get($options, "needfiles")
+                        || !get($options["needfiles"], $truncpfx . $line)))
                     continue;
                 $files[] = escapeshellarg(quotemeta($line));
             }
 
         if (count($files)) {
             $command = "git diff";
-            if (@$options["wdiff"])
+            if (get($options, "wdiff"))
                 $command .= " -w";
             $command .= " $base $hash -- " . join(" ", $files);
             $result = self::repo_gitrun($repo, $command);
@@ -1723,22 +1670,19 @@ class Contact {
         $result = $Conf->qe("select rg.*, cn.notes
                 from RepositoryGrade rg
                 left join CommitNotes cn on (cn.hash=rg.gradehash and cn.pset=rg.pset)
-                where rg.repoid=" . $repo->repoid . " and rg.pset='" . sqlq($pset) . "' and not rg.placeholder");
+                where rg.repoid=? and rg.pset=? and not rg.placeholder",
+                $repo->repoid, $pset);
         if (($rg = edb_orow($result)) && $rg->notes)
             $rg->notes = json_decode($rg->notes);
         return $rg;
     }
 
     function can_view_repo_contents($repo, $cache_only = false) {
-        global $Opt;
-        if (!@$Opt["restrictRepoView"]
+        if (!$this->conf->opt("restrictRepoView")
             || $this->isPC
-            || @$repo->repo_is_handout)
+            || $repo->is_handout)
             return true;
-        if (!isset($repo->repo_viewable_by))
-            $repo->repo_viewable_by = array();
-        assert(is_array($repo->repo_viewable_by));
-        $allowed = @$repo->repo_viewable_by[$this->contactId];
+        $allowed = get($repo->viewable_by, $this->contactId);
         if ($allowed === null) {
             $allowed = in_array($this->contactId, $this->links(LINK_REPOVIEW));
             if (!$allowed && !$cache_only) {
@@ -1748,7 +1692,7 @@ class Contact {
                     $this->add_link(LINK_REPOVIEW, 0, $repo->repoid);
             }
             if ($allowed || !$cache_only)
-                $repo->repo_viewable_by[$this->contactId] = $allowed;
+                $repo->viewable_by[$this->contactId] = $allowed;
         }
         return $allowed;
     }
@@ -1756,8 +1700,8 @@ class Contact {
     static function commit_info($commit, $pset) {
         global $Conf;
         $pset = is_object($pset) ? $pset->psetid : $pset;
-        $psetlim = $pset <= 0 ? " limit 1" : " and pset=$pset";
-        if (($result = $Conf->qe("select notes from CommitNotes where hash='" . sqlq($commit) . "'$psetlim"))
+        $psetlim = $pset <= 0 ? "limit 1" : "and pset=$pset";
+        if (($result = $Conf->qe("select notes from CommitNotes where hash=? $psetlim", $commit))
             && ($row = edb_row($result)))
             return json_decode($row[0]);
         else
@@ -1784,20 +1728,19 @@ class Contact {
                 && isset($info->grades) && is_object($info->grades)
                 && isset($info->autogrades) && is_object($info->autogrades)) {
                 foreach ($info->autogrades as $k => $v) {
-                    if (@$info->grades->$k === $v)
+                    if (get($info->grades, $k) === $v)
                         unset($info->grades->$k);
                 }
                 if (!count(get_object_vars($info->grades)))
                     unset($info->grades);
             }
 
-            $Conf->qe("insert into CommitNotes (hash, pset, notes, haslinenotes, repoid)
-                values ('" . sqlq($commit) . "', $pset, '" . sqlq(json_encode($info))
-                . "'," . self::commit_info_haslinenotes($info) . ","
-                . ($repo ? $repo : 0) . ")
-                on duplicate key update notes=values(notes), haslinenotes=values(haslinenotes)");
+            $Conf->qe("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, repoid=?
+                       on duplicate key update notes=values(notes), haslinenotes=values(haslinenotes)",
+                      $commit, $pset, json_encode($info),
+                      self::commit_info_haslinenotes($info), $repo ? $repo : 0);
         } else
-            $Conf->qe("delete from CommitNotes where hash='" . sqlq($commit) . "' and pset=$pset");
+            $Conf->qe("delete from CommitNotes where hash=? and pset=?", $commit, $pset);
     }
 
     static function update_commit_info($commit, $repo, $pset,
@@ -1818,8 +1761,7 @@ class Contact {
         global $Conf;
         $cid = is_object($cid) ? $cid->contactId : $cid;
         $pset = is_object($pset) ? $pset->psetid : $pset;
-        $result = $Conf->qe("select * from ContactGrade
-                where cid='" . sqlq($cid) . "' and pset='" . sqlq($pset) . "'");
+        $result = $Conf->qe("select * from ContactGrade where cid=? and pset=?", $cid, $pset);
         $cg = edb_orow($result);
         if ($cg && $cg->notes)
             $cg->notes = json_decode($cg->notes);
@@ -1833,11 +1775,8 @@ class Contact {
     function save_contact_grade($pset, $info) {
         global $Conf;
         $pset = is_object($pset) ? $pset->psetid : $pset;
-        $Conf->qe("insert into ContactGrade (cid, pset, notes)
-                values ($this->contactId, $pset, "
-                  . ($info ? "'" . sqlq(json_encode($info)) . "'" : "NULL")
-                  . ")
-                on duplicate key update notes=values(notes)");
+        $Conf->qe("insert into ContactGrade set cid=?, pset=?, notes=? on duplicate key update notes=values(notes)",
+                  $this->contactId, $pset, $info ? json_encode($info) : null);
     }
 
     function update_contact_grade($pset, $updates) {
@@ -1860,7 +1799,13 @@ class Contact {
         assert(is_int($pset));
         $forwarded = $Conf->setting("pset_forwarded");
         if ($forwarded) {
-            $Conf->qe("insert into ContactLink (cid,type,pset,link) select l.cid, l.type, $pset, l.link from ContactLink l left join ContactLink l2 on (l2.cid=l.cid and l2.type=l.type and l2.pset=$pset) where l.pset=" . $forwarded . " and l2.cid is null group by l.cid, l.type, l.link");
+            $Conf->qe("insert into ContactLink (cid, type, pset, link)
+                    select l.cid, l.type, ?, l.link
+                    from ContactLink l
+                    left join ContactLink l2 on (l2.cid=l.cid and l2.type=l.type and l2.pset=?)
+                    where l.pset=? and l2.cid is null
+                    group by l.cid, l.type, l.link",
+                    $pset, $pset, $forwarded);
             self::update_all_repo_lastpset();
             $Conf->log("forward pset links from $forwarded to $pset", $Me);
         }
@@ -1943,20 +1888,17 @@ class Contact {
         $user = $user ? : $this;
         if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous)))
             return $user->anon_username;
-        else if ($this->isPC || @$_SESSION["last_actas"])
-            return $user->seascode_username ? : $user->email;
+        else if ($this->isPC || get($_SESSION, "last_actas"))
+            return $user->username ? : $user->email;
         else
             return null;
     }
 
     function user_idpart($user = null) {
         $user = $user ? $user : $this;
-        if (!$this->isPC && !@$_SESSION["last_actas"])
+        if (!$this->isPC && !get($_SESSION, "last_actas"))
             return null;
-        else if ($user->seascode_username)
-            return $user->seascode_username;
         else
-            return $user->huid;
+            return $user->github_username ? : ($user->seascode_username ? : $user->huid);
     }
-
 }

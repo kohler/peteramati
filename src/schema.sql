@@ -53,46 +53,6 @@ CREATE TABLE `CapabilityMap` (
 
 
 --
--- Table structure for table `Chair`
---
-
-DROP TABLE IF EXISTS `Chair`;
-CREATE TABLE `Chair` (
-  `contactId` int(11) NOT NULL,
-  UNIQUE KEY `contactId` (`contactId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
-
-
---
--- Table structure for table `ChairAssistant`
---
-
-DROP TABLE IF EXISTS `ChairAssistant`;
-CREATE TABLE `ChairAssistant` (
-  `contactId` int(11) NOT NULL,
-  UNIQUE KEY `contactId` (`contactId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
-
-
---
--- Table structure for table `CommitInfo`
---
-
-DROP TABLE IF EXISTS `CommitInfo`;
-CREATE TABLE `CommitInfo` (
-  `commitid` int(11) NOT NULL AUTO_INCREMENT,
-  `repoid` int(11) NOT NULL,
-  `sha1` varbinary(20) NOT NULL,
-  `timestamp` int(11) NOT NULL,
-  PRIMARY KEY (`commitid`),
-  UNIQUE KEY `commitid` (`commitid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
-
-
---
 -- Table structure for table `CommitNotes`
 --
 
@@ -126,6 +86,22 @@ CREATE TABLE `ContactGrade` (
 
 
 --
+-- Table structure for table `ContactImage`
+--
+
+DROP TABLE IF EXISTS `ContactImage`;
+CREATE TABLE `ContactImage` (
+  `contactImageId` int(11) NOT NULL AUTO_INCREMENT,
+  `contactId` int(11) NOT NULL,
+  `mimetype` varbinary(128) DEFAULT NULL,
+  `data` mediumblob,
+  PRIMARY KEY (`contactImageId`),
+  KEY `contactId` (`contactId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
+--
 -- Table structure for table `ContactInfo`
 --
 
@@ -152,10 +128,13 @@ CREATE TABLE `ContactInfo` (
   `extension` tinyint(1) NOT NULL DEFAULT '0',
   `dropped` int(11) NOT NULL DEFAULT '0',
   `passwordTime` int(11) NOT NULL DEFAULT '0',
+  `anon_username` varbinary(40) DEFAULT NULL,
+  `contactImageId` int(11) DEFAULT NULL,
   PRIMARY KEY (`contactId`),
   UNIQUE KEY `contactId` (`contactId`),
   UNIQUE KEY `contactIdRoles` (`contactId`,`roles`),
   UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `anon_username` (`anon_username`),
   KEY `fullName` (`lastName`,`firstName`,`email`),
   KEY `seascode_username` (`seascode_username`),
   FULLTEXT KEY `name` (`lastName`,`firstName`,`email`),
@@ -201,6 +180,7 @@ CREATE TABLE `ExecutionQueue` (
   `psetid` int(11) DEFAULT NULL,
   `runnername` varbinary(128) DEFAULT NULL,
   `hash` binary(40) DEFAULT NULL,
+  `inputfifo` varchar(1024) DEFAULT NULL,
   PRIMARY KEY (`queueid`),
   KEY `queueclass` (`queueclass`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
@@ -260,18 +240,6 @@ CREATE TABLE `OptionType` (
   `sortOrder` tinyint(1) NOT NULL DEFAULT '0',
   `displayType` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`optionId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
-
-
---
--- Table structure for table `PCMember`
---
-
-DROP TABLE IF EXISTS `PCMember`;
-CREATE TABLE `PCMember` (
-  `contactId` int(11) NOT NULL,
-  UNIQUE KEY `contactId` (`contactId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 
@@ -367,6 +335,8 @@ CREATE TABLE `RepositoryGrade` (
   `gradehash` binary(40) DEFAULT NULL,
   `gradercid` int(11) DEFAULT NULL,
   `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
+  `placeholder` tinyint(1) NOT NULL DEFAULT '0',
+  `placeholder_at` int(11) DEFAULT NULL,
   UNIQUE KEY `repopset` (`repoid`,`pset`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
@@ -402,7 +372,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 85);
+insert into Settings (name, value) values ('allowPaperOption', 91);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

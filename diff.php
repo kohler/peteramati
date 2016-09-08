@@ -14,7 +14,7 @@ if (isset($_REQUEST["u"])
     && !($User = ContactView::prepare_user($_REQUEST["u"])))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
-$Conf->footerScript("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
+Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
 $Info = ContactView::user_pset_info($User, $Pset);
@@ -243,7 +243,7 @@ foreach ($diff as $file => $dinfo) {
         echo '" style="display:none';
     echo '" data-pa-file="', htmlspecialchars($file), '" data-pa-fileid="', $fileid, "\"><tbody>\n";
     if ($Me->isPC && $Me != $User)
-        $Conf->footerScript("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
+        Ht::stash_script("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
     foreach ($dinfo->diff as $l) {
         if ($l[0] == "@")
             $x = array(" gx", "difflctx61", "", "", $l[3]);
@@ -281,7 +281,7 @@ foreach ($diff as $file => $dinfo) {
     echo "</tbody></table>\n";
 }
 
-$Conf->footerScript('jQuery(".diffnoteentry61").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
+Ht::stash_script('jQuery(".diffnoteentry61").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
 echo "<table id=\"diff61linenotetemplate\" style=\"display:none\"><tbody>";
 echo_linenote_entry_row("", "", array($Info->is_grading_commit(), ""),
                         false, null);

@@ -2476,9 +2476,9 @@ function checklatest61() {
                     });
     }
 
-    pset = jQuery(".commitcontainer61").first().attr("peteramati_pset");
+    pset = jQuery(".commitcontainer61").first().attr("data-pa-pset");
     if (pset) {
-        hash = jQuery(".commitcontainer61").first().attr("peteramati_commit");
+        hash = jQuery(".commitcontainer61").first().attr("data-pa-commit");
         setTimeout(docheck, 2000);
     }
 }

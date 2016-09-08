@@ -1,6 +1,6 @@
 <?php
 // redirect.php -- HotCRP redirection helper functions
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 function go($url = false) {
@@ -8,10 +8,9 @@ function go($url = false) {
 }
 
 function error_go($url, $message) {
-    global $Conf;
     if ($url === false)
         $url = hoturl("index");
-    $Conf->errorMsg($message);
+    Conf::msg_error($message);
     go($url);
 }
 
@@ -20,36 +19,36 @@ function session_name_fixer($m) {
 }
 
 function make_session_name($n) {
-    global $Opt;
-    if (($n === "" || $n === null || $n === true) && @$Opt["dbName"])
-        $n = $Opt["dbName"];
-    if (@$Opt["confid"])
-        $n = preg_replace(',\*|\$\{confid\}|\$confid\b,', $Opt["confid"], $n);
+    if (($n === "" || $n === null || $n === true) && opt("dbName"))
+        $n = opt("dbName");
+    if (opt("confid"))
+        $n = preg_replace(',\*|\$\{confid\}|\$confid\b,', opt("confid"), $n);
     return preg_replace_callback(',[^A-Ya-z0-9],', "session_name_fixer", $n);
 }
 
 function ensure_session() {
-    global $Opt;
     if (session_id() !== "")
         return true;
-    if (!($sn = make_session_name(@$Opt["sessionName"])))
+    if (!($sn = make_session_name(opt("sessionName"))))
         return false;
     // maybe upgrade from an old session name to this one
     if (!isset($_COOKIE[$sn])
-        && isset($Opt["sessionUpgrade"])
-        && ($upgrade_sn = make_session_name($Opt["sessionUpgrade"]))
+        && ($upgrade_sn = opt("sessionUpgrade"))
+        && ($upgrade_sn = make_session_name($upgrade_sn))
         && isset($_COOKIE[$upgrade_sn])) {
         session_id($_COOKIE[$upgrade_sn]);
         setcookie($upgrade_sn, "", time() - 3600, "/",
-                  defval($Opt, "sessionUpgradeDomain", defval($Opt, "sessionDomain", "")),
-                  defval($Opt, "sessionSecure", false));
+                  opt("sessionUpgradeDomain", opt("sessionDomain", "")),
+                  opt("sessionSecure", false));
     }
-    if (isset($Opt["sessionSecure"]) || isset($Opt["sessionDomain"])) {
+    $secure = opt("sessionSecure");
+    $domain = opt("sessionDomain");
+    if ($secure !== null || $domain !== null) {
         $params = session_get_cookie_params();
-        if (isset($Opt["sessionSecure"]))
-            $params["secure"] = !!$Opt["sessionSecure"];
-        if (isset($Opt["sessionDomain"]))
-            $params["domain"] = $Opt["sessionDomain"];
+        if ($secure !== null)
+            $params["secure"] = !!$secure;
+        if ($domain !== null)
+            $params["domain"] = $domain;
         session_set_cookie_params($params["lifetime"], $params["path"],
                                   $params["domain"], $params["secure"]);
     }
@@ -74,6 +73,11 @@ function post_value() {
     return urlencode($sid);
 }
 
-function check_post() {
-    return isset($_REQUEST["post"]) && $_REQUEST["post"] == post_value();
+function check_post($qreq = null) {
+    $pv = post_value();
+    if ($qreq)
+        return isset($qreq->post) && $qreq->post == $pv;
+    else
+        return (isset($_GET["post"]) && $_GET["post"] == $pv)
+            || (isset($_POST["post"]) && $_POST["post"] == $pv);
 }
