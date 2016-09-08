@@ -111,7 +111,7 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
 
     function message_defs(Contact $user) {
         $base = $user->is_anonymous ? "[anonymous]" : $this->base;
-        return ["REPOGITURL" => "git@code.seas.harvard.edu:$base.git", "REPOBASE" => $base];
+        return ["REPOGITURL" => "git@code.seas.harvard.edu:$base.git", "REPOBASE" => $base, "HARVARDSEAS" => 1];
     }
 
     function validate_open(MessageSet $ms = null) {

@@ -317,7 +317,7 @@ class Contact {
         $actas = req("actas");
         if ($actas && $trueuser) {
             if (is_numeric($actas)) {
-                $acct = $this->conf->user_by_id($actas);
+                $acct = $this->conf->user_by_query("contactId=? or huid=? order by contactId=? desc limit 1", [$actas, $actas, $actas]);
                 $actasemail = $acct ? $acct->email : null;
             } else if ($actas === "admin")
                 $actasemail = $trueuser->email;

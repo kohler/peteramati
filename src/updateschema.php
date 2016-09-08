@@ -201,6 +201,10 @@ function updateSchema($conf) {
         && $conf->ql("alter table ContactInfo add `updateTime` int(11) NOT NULL DEFAULT '0'")
         && $conf->ql("update ContactInfo set passwordUseTime=lastLogin where passwordUseTime=0"))
         $conf->update_schema_version(94);
+    if ($conf->sversion == 94
+        && $conf->ql("alter table ContactInfo add `data` varbinary(32767) DEFAULT NULL")
+        && $conf->ql("alter table ContactInfo add `studentYear` varbinary(4) DEFAULT NULL"))
+        $conf->update_schema_version(95);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

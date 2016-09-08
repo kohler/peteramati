@@ -1,7 +1,12 @@
 [
     {
         "type": "repo_unreadable",
-        "html": "We can’t access the repository at %REPOGITURL%. Check the repository name and make sure that you have listed the %SYSTEAM% team as a collaborator (use <a href=\"https://code.seas.harvard.edu/\">code.seas</a>’s <a href=\"https://code.seas.harvard.edu/%REPOBASE%/memberships\">“Manage read access”</a> link)."
+        "html": "We can’t access the repository at %REPOGITURL%. Check the repository name and try again."
+    },
+    {
+        "type": "repo_unreadable",
+        "html": "We can’t access the repository at %REPOGITURL%. Check the repository name and make sure that you have listed the %SYSTEAM% team as a collaborator (use <a href=\"https://code.seas.harvard.edu/\">code.seas</a>’s <a href=\"https://code.seas.harvard.edu/%REPOBASE%/memberships\">“Manage read access”</a> link).",
+        "require": "HARVARDSEAS"
     },
     {
         "type": "repo_nomain",
