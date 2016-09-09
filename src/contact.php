@@ -78,6 +78,7 @@ class Contact {
     public $gradercid;
     public $placeholder;
     public $placeholder_at;
+    public $viewable_by;
 
     private $links = null;
     private $repos = array();

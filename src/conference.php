@@ -439,7 +439,7 @@ class Conf {
         $whatever = trim($whatever);
         if (preg_match('/\A\d{8}\z/', $whatever))
             return ["ContactInfo.seascode_username=? or ContactInfo.huid=? order by ContactInfo.seascode_username=? desc limit 1",
-                    [$whatever, $whatever]];
+                    [$whatever, $whatever, $whatever]];
         else if (preg_match('/\A\[anon\w+\]\z/', $whatever))
             return ["ContactInfo.anon_username=?", [$whatever]];
         else if (strpos($whatever, "@") === false)
@@ -1148,7 +1148,7 @@ class Conf {
     // Miscellaneous
     //
 
-    public function capability_manager($for) {
+    public function capability_manager($for = null) {
         if ($for && substr($for, 0, 1) === "U") {
             if (($cdb = Contact::contactdb()))
                 return new CapabilityManager($cdb, "U");
