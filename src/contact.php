@@ -776,7 +776,7 @@ class Contact {
                 $save = $hme = $hset->$hrepoid = (object) array();
             if ((int) get($hme, $cacheid) + 300 < $Now) {
                 $save = $hme->$cacheid = $Now;
-                shell_exec("$ConfSitePATH/src/gitfetch $hrepo->repoid $cacheid " . escapeshellarg($hrepo->url) . " 1>&2 &");
+                shell_exec("$ConfSitePATH/src/gitfetch $hrepo->repoid $cacheid " . escapeshellarg($hrepo->ssh_url()) . " 1>&2 &");
             }
             if ($save)
                 $Conf->save_setting("handoutrepos", 1, $hset);
@@ -1360,7 +1360,8 @@ class Contact {
             if ($foreground)
                 set_time_limit(30);
             // see also handout_repo
-            shell_exec("$ConfSitePATH/src/gitfetch $repo->repoid $repo->cacheid " . escapeshellarg($repo->url) . " 1>&2" . ($foreground ? "" : " &"));
+            $command = "$ConfSitePATH/src/gitfetch $repo->repoid $repo->cacheid " . escapeshellarg($repo->ssh_url()) . " 1>&2" . ($foreground ? "" : " &");
+            shell_exec($command);
         }
     }
 

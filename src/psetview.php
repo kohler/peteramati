@@ -170,7 +170,7 @@ class PsetView {
             for ($i = 0; $i + 1 < count($this->pset->repo_tarball_patterns); $i += 2) {
                 $x = preg_replace('`' . str_replace("`", "\\`", $this->pset->repo_tarball_patterns[$i]) . '`s',
                                   $this->pset->repo_tarball_patterns[$i + 1],
-                                  $this->repo->url, -1, $nreplace);
+                                  $this->repo->ssh_url(), -1, $nreplace);
                 if ($x !== null && $nreplace)
                     return str_replace('${HASH}', $this->commit, $x);
             }

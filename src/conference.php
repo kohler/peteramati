@@ -1064,21 +1064,21 @@ class Conf {
         else if (is_object($values))
             $values = get_object_vars($values);
         $t = "";
-        $msgs = $this->session("msgs", array());
-        $this->save_session("msgs", null);
-        foreach ($msgs as $msg)
-            if (preg_match('|\A<div class="(.*?)">([\s\S]*)</div>\s*\z|', $msg, $m)) {
-                if ($m[1] == "merror" && !isset($values["error"]))
-                    $values["error"] = $m[2];
+        if (session_id() !== ""
+            && ($msgs = $this->session("msgs", array()))) {
+            $this->save_session("msgs", null);
+            foreach ($msgs as $msg) {
+                if (($msg[0] === "merror" || $msg[0] === "xmerror")
+                    && !isset($values["error"]))
+                    $values["error"] = $msg[1];
                 if ($div)
-                    $t .= "<div class=\"x$m[1]\">$m[2]</div>\n";
+                    $t .= Ht::xmsg($msg[0], $msg[1]);
                 else
-                    $t .= "<span class=\"$m[1]\">$m[2]</span>\n";
+                    $t .= "<span class=\"$msg[0]\">$msg[1]</span>";
             }
-        if (!isset($values["response"]) && $t !== "")
-            $values["response"] = $t;
-        if (array_key_exists("ok", $values) && $values["ok"] === null)
-            $values["ok"] = !@$values["error"];
+        }
+        if ($t !== "")
+            $values["response"] = $t . get_s($values, "response");
         if (isset($_REQUEST["jsontext"]) && $_REQUEST["jsontext"])
             header("Content-Type: text/plain");
         else

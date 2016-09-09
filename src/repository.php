@@ -89,6 +89,9 @@ class Repository {
     function web_url() {
         return $this->reposite->web_url();
     }
+    function ssh_url() {
+        return $this->reposite->ssh_url();
+    }
     function friendly_url() {
         return $this->reposite->friendly_url();
     }
