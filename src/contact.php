@@ -1557,7 +1557,7 @@ class Contact {
         return strcmp($a->filename, $b->filename);
     }
 
-    static function repo_diff($repo, $hash, $pset, $options = null) {
+    static function repo_diff($repo, $hashb, $pset, $options = null) {
         global $Conf, $Now;
         $options = $options ? : array();
         $diff_files = array();
@@ -1572,33 +1572,37 @@ class Contact {
             $truncpfx = "";
         }
 
-        if (get($options, "basehash"))
-            $base = $options["basehash"];
+        if (get($options, "hasha"))
+            $hasha = $options["hasha"];
         else {
             $hrepo = self::handout_repo($pset, $repo);
             if ($pset && isset($pset->gradebranch))
-                $base = "repo{$hrepo->repoid}/" . $pset->gradebranch;
+                $hasha = "repo{$hrepo->repoid}/" . $pset->gradebranch;
             else if ($pset && isset($pset->handout_repo_branch))
-                $base = "repo{$hrepo->repoid}/" . $pset->handout_repo_branch;
+                $hasha = "repo{$hrepo->repoid}/" . $pset->handout_repo_branch;
             else
-                $base = "repo{$hrepo->repoid}/master";
-            $options["basehash_hrepo"] = true;
+                $hasha = "repo{$hrepo->repoid}/master";
+            $options["hasha_hrepo"] = true;
         }
-        if ($truncpfx && get($options, "basehash_hrepo"))
-            $base = self::_repo_prepare_truncated_handout($repo, $base, $pset);
+        if ($truncpfx && get($options, "hasha_hrepo") && !get($options, "hashb_hrepo"))
+            $hasha = self::_repo_prepare_truncated_handout($repo, $hasha, $pset);
+
+        $ignore_diffinfo = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
 
         // read "full" files
         $pset_diffs = self::pset_diffinfo($pset, $repo);
         foreach ($pset_diffs as $diffinfo)
-            if ($diffinfo->full && ($fname = self::unquote_filename_regex($diffinfo->regex)) !== false) {
-                $result = self::repo_gitrun($repo, "git show $hash:${repodir}$fname");
+            if (!$ignore_diffinfo
+                && $diffinfo->full
+                && ($fname = self::unquote_filename_regex($diffinfo->regex)) !== false) {
+                $result = self::repo_gitrun($repo, "git show $hashb:${repodir}$fname");
                 $fdiff = array();
                 foreach (explode("\n", $result) as $idx => $line)
                     $fdiff[] = array("+", 0, $idx + 1, $line);
                 self::save_repo_diff($diff_files, "{$pset->directory_slash}$fname", $fdiff, $diffinfo, count($fdiff) ? 1 : 0);
             }
 
-        $command = "git diff --name-only $base $hash";
+        $command = "git diff --name-only $hasha $hashb";
         if ($pset && !$truncpfx)
             $command .= " -- " . escapeshellarg($pset->directory_noslash);
         $result = self::repo_gitrun($repo, $command);
@@ -1608,10 +1612,10 @@ class Contact {
             if ($line != "") {
                 $diffinfo = self::find_diffinfo($pset_diffs, $truncpfx . $line);
                 // skip files presented in their entirety
-                if ($diffinfo && get($diffinfo, "full"))
+                if ($diffinfo && !$ignore_diffinfo && get($diffinfo, "full"))
                     continue;
                 // skip ignored files, unless user requested them
-                if ($diffinfo && get($diffinfo, "ignore")
+                if ($diffinfo && !$ignore_diffinfo && get($diffinfo, "ignore")
                     && (!get($options, "needfiles")
                         || !get($options["needfiles"], $truncpfx . $line)))
                     continue;
@@ -1622,7 +1626,7 @@ class Contact {
             $command = "git diff";
             if (get($options, "wdiff"))
                 $command .= " -w";
-            $command .= " $base $hash -- " . join(" ", $files);
+            $command .= " $hasha $hashb -- " . join(" ", $files);
             $result = self::repo_gitrun($repo, $command);
             $file = null;
             $alineno = $blineno = null;

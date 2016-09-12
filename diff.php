@@ -20,7 +20,7 @@ $Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
 $Info = ContactView::user_pset_info($User, $Pset);
 if (!@$_GET["commit"] || !@$_GET["commit1"] || $Pset->gitless)
     $Me->escape();
-$diff_options = array();
+$diff_options = ["wdiff" => false];
 
 $hasha = $hashb = $hasha_mine = $hashb_mine = null;
 if ($Info->repo) {
@@ -33,10 +33,12 @@ if (!$hasha || !$hashb) {
     $hrecent = Contact::handout_repo_recent_commits($Pset);
     if (!$hasha) {
         $hasha = git_commit_in_list($hrecent, $_GET["commit"]);
-        $diff_options["basehash_hrepo"] = true;
+        $diff_options["hasha_hrepo"] = true;
     }
-    if (!$hashb)
+    if (!$hashb) {
         $hashb = git_commit_in_list($hrecent, $_GET["commit1"]);
+        $diff_options["hashb_hrepo"] = true;
+    }
 }
 
 if (!$hasha || !$hashb) {
@@ -46,6 +48,8 @@ if (!$hasha || !$hashb) {
         $Conf->errorMsg("Commit " . htmlspecialchars($_GET["commit1"]) . " is not connected to your repository.");
     $Me->escape();
 }
+
+$diff_options["hasha"] = $hasha;
 
 $Conf->header(htmlspecialchars($Pset->title), "home");
 echo "<div id='homeinfo'>";
@@ -195,8 +199,7 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
     "</td></tr></table><hr>\n";
 
 // collect diff and sort line notes
-$diff = $User->repo_diff($Info->repo, $hashb, $Pset, array("wdiff" => false /*$WDIFF*/,
-                                                           "basehash" => $hasha));
+$diff = $User->repo_diff($Info->repo, $hashb, $Pset, $diff_options);
 $all_linenotes = $hashb_mine ? $Info->commit_info("linenotes") : array();
 $lnorder = new LinenotesOrder($all_linenotes, $diff, $Info->can_see_grades);
 
