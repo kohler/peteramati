@@ -18,29 +18,20 @@ Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)
 
 $Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
 $Info = ContactView::user_pset_info($User, $Pset);
-if (!@$_GET["commit"] || !@$_GET["commit1"] || $Pset->gitless)
+if (!get($_GET, "commit") || !get($_GET, "commit1") || $Pset->gitless)
     $Me->escape();
 $diff_options = ["wdiff" => false];
 
 $hasha = $hashb = $hasha_mine = $hashb_mine = null;
-if ($Info->repo) {
+$hrecent = Contact::handout_repo_recent_commits($Pset);
+if (($hasha = git_commit_in_list($hrecent, $_GET["commit"])))
+    $diff_options["hasha_hrepo"] = true;
+else
     $hasha = $hasha_mine = $Info->set_commit($_GET["commit"]);
+if (($hashb = git_commit_in_list($hrecent, $_GET["commit1"])))
+    $diff_options["hashb_hrepo"] = true;
+else
     $hashb = $hashb_mine = $Info->set_commit($_GET["commit1"]);
-}
-
-$hrepo = null;
-if (!$hasha || !$hashb) {
-    $hrecent = Contact::handout_repo_recent_commits($Pset);
-    if (!$hasha) {
-        $hasha = git_commit_in_list($hrecent, $_GET["commit"]);
-        $diff_options["hasha_hrepo"] = true;
-    }
-    if (!$hashb) {
-        $hashb = git_commit_in_list($hrecent, $_GET["commit1"]);
-        $diff_options["hashb_hrepo"] = true;
-    }
-}
-
 if (!$hasha || !$hashb) {
     if (!$hasha)
         $Conf->errorMsg("Commit " . htmlspecialchars($_GET["commit"]) . " is not connected to your repository.");
@@ -228,7 +219,7 @@ foreach ($diff as $file => $dinfo) {
     $fileid = html_id_encode($file);
     $tabid = "file61_" . $fileid;
     $linenotes = defval($all_linenotes, $file, null);
-    $display_table = $linenotes || !$dinfo->boring;
+    $display_table = $linenotes || !$dinfo->boring || (!$hasha_mine && !$hashb_mine);
 
     echo '<h3><a class="fold61" href="#" onclick="return fold61(',
         "'#$tabid'", ',this)"><span class="foldarrow">',
