@@ -31,7 +31,7 @@ class GitHub_RepositorySite extends RepositorySite {
         if (preg_match('_\A(?:github(?:\.com)?[:/])?/*([^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m))
             return new GitHub_RepositorySite("git@github.com:" . $m[1], $m[1], $conf);
         if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)github.com(?::/*|/+)([^/]+?/[^/]+?)(?:\.git|)\z_i', $url, $m))
-            return new GitHub_RepositorySite($url, $m[1], $conf);
+            return new GitHub_RepositorySite("git@github.com:" . $m[1], $m[1], $conf);
         return null;
     }
     static function sniff_url($url) {
