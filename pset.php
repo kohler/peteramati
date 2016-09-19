@@ -306,7 +306,7 @@ if ($Me->isPC && check_post() && isset($_REQUEST["uploadgrades"])
 if (isset($_REQUEST["tab"]) && ctype_digit($_REQUEST["tab"])
     && $_REQUEST["tab"] >= 1 && $_REQUEST["tab"] <= 16) {
     $tab = (int) $_REQUEST["tab"];
-    $tab = $tab == 8 ? null : $tab;
+    $tab = $tab == 4 ? null : $tab;
     $Info->update_commit_info(array("tabwidth" => $tab));
 } else if (isset($_REQUEST["tab"])
            && ($_REQUEST["tab"] == "" || $_REQUEST["tab"] == "none"))
@@ -634,7 +634,7 @@ function echo_commit($Info) {
     global $TABWIDTH, $WDIFF;
 
     $Notes = $Info->commit_info();
-    $TABWIDTH = defval($Notes, "tabwidth", 8);
+    $TABWIDTH = $Info->commit_info("tabwidth") ? : 4;
     $WDIFF = isset($Notes->wdiff) ? $Notes->wdiff : false;
 
     // current commit and commit selector

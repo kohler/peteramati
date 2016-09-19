@@ -182,7 +182,7 @@ if ($commita->hash === $Info->grading_hash())
     $commita->subject .= "  ✱"; // space, nbsp
 if ($commitb->hash === $Info->grading_hash())
     $commitb->subject .= "  ✱"; // space, nbsp
-$TABWIDTH = $Info->commit_info("tabwidth") ? : 8;
+$TABWIDTH = $Info->commit_info("tabwidth") ? : 4;
 
 echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height:110%\">",
     "<div class=\"diffl61 gd\" style=\"padding:2px 5px\"><big><code>", substr($hasha, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</big></div>",
