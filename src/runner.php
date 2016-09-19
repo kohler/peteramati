@@ -185,13 +185,13 @@ class RunnerState {
     private function checkout_code() {
         global $ConfSitePATH, $Now;
 
-        $checkoutdir = $this->jailhomedir . "/repo";
+        $checkoutdir = $clonedir = $this->jailhomedir . "/repo";
         if ($this->repo->truncated_psetdir($this->pset)
             && $this->pset->directory_noslash !== "")
-            $checkoutdir .= "/" . $this->pset->directory_noslash;
+            $clonedir .= "/" . $this->pset->directory_noslash;
 
         fwrite($this->logstream, "++ mkdir $checkoutdir\n");
-        if (!mkdir($checkoutdir, 0777, true))
+        if (!mkdir($clonedir, 0777, true))
             throw new RunnerException("can't initialize user repo in jail");
 
         $repodir = $ConfSitePATH . "/repo/repo" . $this->repo->cacheid;
@@ -202,7 +202,7 @@ class RunnerState {
             throw new RunnerException("can't create branch for checkout");
 
         // make the checkout
-        $status = $this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && "
+        $status = $this->run_and_log("cd " . escapeshellarg($clonedir) . " && "
                                      . "if test ! -d .git; then git init --shared=group; fi && "
                                      . "git fetch " . escapeshellarg($repodir) . " $branch && "
                                      . "git reset --hard " . $this->info->commit_hash());
@@ -212,7 +212,7 @@ class RunnerState {
         if ($status)
             throw new RunnerException("can't check out code into jail");
 
-        if ($this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && rm -rf .git .gitcheckout"))
+        if ($this->run_and_log("cd " . escapeshellarg($clonedir) . " && rm -rf .git .gitcheckout"))
             throw new RunnerException("can't clean up checkout in jail");
 
         // create overlay
