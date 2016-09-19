@@ -444,6 +444,8 @@ function echo_linenote_entry_row($file, $lineid, $note, $displayed, $lnorder) {
                     echo '<div class="difflnoteptr61">',
                         join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
             }
+            if (!is_string($note[1]))
+                error_log("$User->github_username error: " . json_encode($note));
             echo '<div class="note61',
                 ($note[0] ? ' commentnote' : ' gradenote'),
                 '">', htmlspecialchars($note[1]), '</div>',
