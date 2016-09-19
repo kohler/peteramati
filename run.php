@@ -16,8 +16,8 @@ function quit($err = null) {
 function user_pset_info() {
     global $Conf, $User, $Pset, $Info;
     $Info = ContactView::user_pset_info($User, $Pset);
-    if (($Commit = @$_REQUEST["newcommit"]) == null)
-        $Commit = @$_REQUEST["commit"];
+    if (($Commit = req("newcommit")) == null)
+        $Commit = req("commit");
     if (!$Info->set_commit($Commit))
         $Conf->ajaxExit(array("ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."));
     return $Info;
@@ -32,7 +32,7 @@ if (isset($_REQUEST["u"])
     $Conf->ajaxExit(array("ok" => false));
 assert($User == $Me || $Me->isPC);
 
-$Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
+$Pset = ContactView::find_pset_redirect(req("pset"));
 $Psetid = $Pset->id;
 
 if (isset($_POST["reqregrade"]) && check_post() && user_pset_info()) {
@@ -51,7 +51,7 @@ $Runner = null;
 foreach ($Pset->runners as $r)
     if ($r->name == $_REQUEST["run"])
         $Runner = $r;
-$RunMany = $Me->isPC && @$_GET["runmany"] && check_post();
+$RunMany = $Me->isPC && get($_GET, "runmany") && check_post();
 if (!$Runner)
     quit("No such command");
 else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
@@ -64,7 +64,7 @@ else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
 }
 
 // magic multi-runner
-if ($Me->isPC && @$_GET["runmany"] && check_post()) {
+if ($Me->isPC && get($_GET, "runmany") && check_post()) {
     $Conf->header(htmlspecialchars($Pset->title . " " . $Runner->title), "home");
 
     echo '<h2 id="runmany61_who"></h2>',
@@ -127,7 +127,7 @@ function runner_eval($runner, $info, $answer) {
 // checkup
 if ($checkt > 0
     && $answer = ContactView::runner_json($Info, $checkt, $Offset)) {
-    if ($answer->status == "working" && @$_POST["stop"]) {
+    if ($answer->status == "working" && get($_POST, "stop")) {
         ContactView::runner_write($Info, $checkt, "\x1b\x03");
         $now = microtime(true);
         do {
@@ -208,7 +208,7 @@ if (isset($Runner->queue)) {
     $nconcurrent = defval($qconf, "nconcurrent", 1000);
     if ($Runner->nconcurrent > 0 && $Runner->nconcurrent < $nconcurrent)
         $nconcurrent = $Runner->nconcurrent;
-    if (@$Queue->ahead_nconcurrent > 0 && $Queue->ahead_nconcurrent < $nconcurrent)
+    if (get($Queue, "ahead_nconcurrent") > 0 && $Queue->ahead_nconcurrent < $nconcurrent)
         $nconcurrent = $Queue->ahead_nconcurrent;
 
     for ($tries = 0; $tries < 2; ++$tries) {
@@ -244,9 +244,9 @@ try {
     $rs = new RunnerState($Info, $Runner, $Queue);
 
     // recent
-    if (@$_REQUEST["check"] == "recent" && count($rs->logged_checkts))
+    if (req("check") == "recent" && count($rs->logged_checkts))
         $Conf->ajaxExit(ContactView::runner_json($Info, $rs->logged_checkts[0], $Offset));
-    else if (@$_REQUEST["check"] == "recent")
+    else if (req("check") == "recent")
         quit("no logs yet");
 
     if ($rs->is_recent_job_running())
