@@ -7,7 +7,6 @@ require_once("src/initweb.php");
 if ($Me->is_empty())
     $Me->escape();
 global $User, $Pset, $Psetid, $Info, $RecentCommits, $Qreq;
-$Qreq = make_qreq();
 
 function quit($err = null) {
     global $Conf;
@@ -25,6 +24,7 @@ function user_pset_info() {
 }
 
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/H", "/p", "/p/H", "/p/u", "/p/u/H"));
+$Qreq = make_qreq();
 
 // user, pset, runner
 $User = $Me;
