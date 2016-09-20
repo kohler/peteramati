@@ -976,8 +976,10 @@ if ($Pset->gitless) {
         }
 
     // line notes
-    if (count($diff))
+    if (!empty($diff)) {
         echo "<hr style=\"clear:both\" />\n";
+        $truncated = $Info->repo->truncated_psetdir($Info->pset);
+    }
     foreach ($diff as $file => $dinfo) {
         $fileid = html_id_encode($file);
         $tabid = "file61_" . $fileid;
@@ -991,8 +993,12 @@ if ($Pset->gitless) {
             "'#$tabid'", ',this)"><span class="foldarrow">',
             ($display_table ? "&#x25BC;" : "&#x25B6;"),
             "</span>&nbsp;", htmlspecialchars($file), "</a>";
-        if (!$dinfo->removed)
-            echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $Info->hoturl("raw", array("file" => $file)), '">[Raw]</a>';
+        if (!$dinfo->removed) {
+            $rawfile = $file;
+            if ($truncated && str_starts_with($rawfile, $Info->pset->directory_slash))
+                $rawfile = substr($rawfile, strlen($Info->pset->directory_slash));
+            echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $Info->hoturl("raw", ["file" => $rawfile]), '">[Raw]</a>';
+        }
         echo '</h3>';
         echo '<table id="', $tabid, '" class="code61 diff61 filediff61';
         if ($Me != $User)

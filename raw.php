@@ -6,7 +6,7 @@
 require_once("src/initweb.php");
 if ($Me->is_empty())
     $Me->escape();
-global $User, $Pset, $Psetid, $Info, $Commit, $RecentCommits;
+global $User, $Pset, $Psetid, $Info, $Commit, $RecentCommits, $Qreq;
 
 function quit($err = null) {
     global $Conf;
@@ -14,10 +14,10 @@ function quit($err = null) {
 }
 
 function user_pset_info() {
-    global $Conf, $User, $Pset, $Info, $Commit;
+    global $Conf, $User, $Pset, $Info, $Commit, $Qreq;
     $Info = ContactView::user_pset_info($User, $Pset);
-    if (($Commit = @$_REQUEST["newcommit"]) == null)
-        $Commit = @$_REQUEST["commit"];
+    if (($Commit = $Qreq->newcommit) == null)
+        $Commit = $Qreq->commit;
     if (!$Info->set_commit($Commit))
         $Conf->ajaxExit(array("ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."));
     return $Info;
@@ -25,15 +25,16 @@ function user_pset_info() {
 
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/h/f", "/@/p/f",
                                     "/p/h/f", "/p/f"));
+$Qreq = make_qreq();
 
 // user, pset, runner
 $User = $Me;
-if (isset($_REQUEST["u"])
-    && !($User = ContactView::prepare_user($_REQUEST["u"])))
+if (isset($Qreq->u)
+    && !($User = ContactView::prepare_user($Qreq->u)))
     exit;
 assert($User == $Me || $Me->isPC);
 
-$Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
+$Pset = ContactView::find_pset_redirect($Qreq->pset);
 $Psetid = $Pset->id;
 
 // repo
@@ -41,13 +42,13 @@ $Info = user_pset_info();
 $Repo = $Info->repo;
 $Commit = $Info->commit_hash();
 $RecentCommits = $Info->recent_commits();
-if (!$Repo || !$Commit || !$Info->can_view_repo_contents || !@$_REQUEST["file"])
+if (!$Repo || !$Commit || !$Info->can_view_repo_contents || !$Qreq->file)
     exit;
 
 // file
-$result = Contact::repo_gitrun($Repo, "git cat-file blob $Commit:" . escapeshellarg($_REQUEST["file"]));
+$result = Contact::repo_gitrun($Repo, "git cat-file blob $Commit:" . escapeshellarg($Qreq->file));
 if ($result === null || $result === "") {
-    $sizeresult = Contact::repo_gitrun($Repo, "git cat-file -s $Commit:" . escapeshellarg($_REQUEST["file"]));
+    $sizeresult = Contact::repo_gitrun($Repo, "git cat-file -s $Commit:" . escapeshellarg($Qreq->file));
     if (trim($sizeresult) !== "0")
         exit;
 }
@@ -73,7 +74,7 @@ else
     header("Content-Type: application/octet-stream");
 
 // when commit is named, object doesn't change
-if (@$_REQUEST["commit"]) {
+if ($Qreq->commit) {
     session_cache_limiter("");
     header("Cache-Control: public, max-age=315576000");
     header("Expires: " . gmdate("D, d M Y H:i:s", time() + 315576000) . " GMT");
