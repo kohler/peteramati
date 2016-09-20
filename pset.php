@@ -542,7 +542,7 @@ function echo_grade_total($gj) {
         $value = '<span class="gradetotal61">' . $gj->grades->total . '</span>';
         if ($Me != $User)
             $value = '<span class="gradeholder61">' . $value . '</span>';
-        if (get($gj->max, "total"))
+        if (isset($gj->max) && get($gj->max, "total"))
             $value .= ' <span class="grademax61">of ' . $gj->maxgrades->total . '</span>';
         ContactView::echo_group("total", $value, null, array("nowrap" => true));
     }
