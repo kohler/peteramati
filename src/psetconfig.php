@@ -365,6 +365,7 @@ class GradeEntryConfig {
 
 class RunnerConfig {
     public $name;
+    public $runclass;
     public $title;
     public $disabled;
     public $visible;
@@ -384,6 +385,9 @@ class RunnerConfig {
         $this->name = isset($r->name) ? $r->name : $name;
         if (!is_string($this->name) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->name))
             throw new PsetConfigException("runner name format error", $loc);
+        $this->runclass = isset($r->runclass) ? $r->runclass : $this->name;
+        if (!is_string($this->runclass) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->runclass))
+            throw new PsetConfigException("runner runclass format error", $loc);
         $this->title = Pset::cstr($loc, $r, "title", "text");
         if ($this->title === null)
             $this->title = $this->name;
@@ -401,6 +405,9 @@ class RunnerConfig {
         $this->queue = Pset::cstr($loc, $r, "queue");
         $this->nconcurrent = Pset::cint($loc, $r, "nconcurrent");
         $this->priority = Pset::cnum($loc, $r, "priority");
+    }
+    function runclass_argument() {
+        return $this->runclass === $this->name ? null : $this->runclass;
     }
 }
 

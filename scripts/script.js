@@ -552,8 +552,8 @@ function hoturl_absolute_base() {
 function rangeclick(evt, elt, kind) {
     elt = elt || this;
     var jelt = jQuery(elt), jform = jelt.closest("form"), kindsearch;
-    if ((kind = kind || jelt.attr("rangetype")))
-        kindsearch = "[rangetype~='" + kind + "']";
+    if ((kind = kind || jelt.attr("data-range-type")))
+        kindsearch = "[data-range-type~='" + kind + "']";
     else
         kindsearch = "[name='" + elt.name + "']";
     var cbs = jform.find("input[type=checkbox]" + kindsearch);
@@ -1840,7 +1840,7 @@ function loadgrade61() {
         dataType: "json", success: function (d) {
             jQuery(".grader61").each(function (i, elt) {
                 elt = jQuery(elt);
-                var n = elt.attr("name61") || elt.attr("name");
+                var n = elt.attr("data-pa-grade") || elt.attr("name");
                 if (n in d.grades) {
                     if (elt.is("input"))
                         elt.val(d.grades[n]);
@@ -1896,9 +1896,9 @@ function reqregrade61(button) {
 }
 
 function run61(button, opt) {
-    var form = jQuery(button).closest("form"),
-        therun = jQuery("#run61_" + button.value),
-        thepre = therun.find("pre"), checkt;
+    var form = $(button).closest("form"),
+        runclass = button.getAttribute("data-pa-runclass") || button.value,
+        therun = $("#run61_" + runclass), thepre = therun.find("pre"), checkt;
 
     if (typeof opt !== "object")
         opt = {};
@@ -1912,7 +1912,7 @@ function run61(button, opt) {
     }
     therun.removeAttr("data-pa-timestamp");
 
-    fold61(therun, jQuery("#run61out_" + button.value).show(), true);
+    fold61(therun, jQuery("#run61out_" + runclass).show(), true);
     if (!checkt && !opt.noclear)
         thepre.html("");
     else
@@ -1938,7 +1938,7 @@ function run61(button, opt) {
         form.find("button").prop("disabled", false);
         form.prop("outstanding", false);
         jQuery(thecursor).finish().remove();
-        if (jQuery(button).attr("loadgrade61"))
+        if (jQuery(button).attr("data-pa-loadgrade"))
             loadgrade61();
     }
 
@@ -2194,11 +2194,11 @@ function run61(button, opt) {
         }
 
         if (data && data.status == "working") {
-            if (!$("#run61stop_" + button.value).length)
-                $("<button id=\"run61stop_" + button.value + "\" class=\"run61stop\" type=\"button\">Stop</button>")
-                    .click(stop).appendTo("#run61out_" + button.value + " > h3");
+            if (!$("#run61stop_" + runclass).length)
+                $("<button id=\"run61stop_" + runclass + "\" class=\"run61stop\" type=\"button\">Stop</button>")
+                    .click(stop).appendTo("#run61out_" + runclass + " > h3");
         } else
-            $("#run61stop_" + button.value).remove();
+            $("#run61stop_" + runclass).remove();
 
         if (!data || !data.ok) {
             if (data && data.loggedout)
@@ -2236,7 +2236,7 @@ function run61(button, opt) {
     }
 
     function send(args) {
-        var a = {run: button.value, offset: offset};
+        var a = {run: runclass, offset: offset};
         checkt && (a.check = checkt);
         queueid && (a.queueid = queueid);
         args && $.extend(a, args);

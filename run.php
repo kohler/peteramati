@@ -6,7 +6,8 @@
 require_once("src/initweb.php");
 if ($Me->is_empty())
     $Me->escape();
-global $User, $Pset, $Psetid, $Info, $RecentCommits;
+global $User, $Pset, $Psetid, $Info, $RecentCommits, $Qreq;
+$Qreq = make_qreq();
 
 function quit($err = null) {
     global $Conf;
@@ -14,10 +15,10 @@ function quit($err = null) {
 }
 
 function user_pset_info() {
-    global $Conf, $User, $Pset, $Info;
+    global $Conf, $User, $Pset, $Info, $Qreq;
     $Info = ContactView::user_pset_info($User, $Pset);
-    if (($Commit = req("newcommit")) == null)
-        $Commit = req("commit");
+    if (($Commit = $Qreq->newcommit) == null)
+        $Commit = $Qreq->commit;
     if (!$Info->set_commit($Commit))
         $Conf->ajaxExit(array("ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."));
     return $Info;
@@ -27,12 +28,12 @@ ContactView::set_path_request(array("/@", "/@/p", "/@/p/H", "/p", "/p/H", "/p/u"
 
 // user, pset, runner
 $User = $Me;
-if (isset($_REQUEST["u"])
-    && !($User = ContactView::prepare_user($_REQUEST["u"])))
-    $Conf->ajaxExit(array("ok" => false));
+if ($Qreq->u !== null
+    && !($User = ContactView::prepare_user($Qreq->u)))
+    $Conf->ajaxExit(["ok" => false]);
 assert($User == $Me || $Me->isPC);
 
-$Pset = ContactView::find_pset_redirect(req("pset"));
+$Pset = ContactView::find_pset_redirect($Qreq->pset);
 $Psetid = $Pset->id;
 
 if (isset($_POST["reqregrade"]) && check_post() && user_pset_info()) {
@@ -49,7 +50,7 @@ else if (!$Pset->run_jailfiles)
     quit("Configuration error (run_jailfiles)");
 $Runner = null;
 foreach ($Pset->runners as $r)
-    if ($r->name == $_REQUEST["run"])
+    if ($r->name == $Qreq->run)
         $Runner = $r;
 $RunMany = $Me->isPC && get($_GET, "runmany") && check_post();
 if (!$Runner)
@@ -72,11 +73,11 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
         '<div class="f-contain">',
         Ht::hidden("u", ""),
         Ht::hidden("pset", $Pset->urlkey),
-        Ht::hidden("run", $Runner->name, array("id" => "runmany61")),
+        Ht::hidden("run", $Runner->name, ["id" => "runmany61", "data-pa-runclass" => $Runner->runclass_argument()]),
         '</div></form>';
 
-    echo '<div id="run61out_' . $Runner->name . '">',
-        '<div class="run61" id="run61_' . $Runner->name . '">',
+    echo '<div id="run61out_' . $Runner->runclass . '">',
+        '<div class="run61" id="run61_' . $Runner->runclass . '">',
         '<div class="run61in"><pre class="run61pre"></pre></div>',
         '</div>',
         '</div>';
@@ -101,16 +102,16 @@ if (!$Repo)
     quit("No repository to run");
 else if (!$Info->commit())
     quit("No commit to run");
-else if (!isset($_REQUEST["run"]) || !check_post())
+else if ($Qreq->run === null || !check_post())
     quit("Permission error");
 else if (!$Info->can_view_repo_contents && !$Me->isPC)
     quit("Unconfirmed repository");
 
 
 // extract request info
-$Queueid = cvtint(defval($_REQUEST, "queueid", -1));
-$checkt = cvtint(defval($_REQUEST, "check"));
-$Offset = cvtint(defval($_REQUEST, "offset", -1));
+$Queueid = cvtint($Qreq->get("queueid", -1));
+$checkt = cvtint($Qreq->get("check"));
+$Offset = cvtint($Qreq->get("offset", -1));
 
 
 // maybe eval
@@ -244,9 +245,9 @@ try {
     $rs = new RunnerState($Info, $Runner, $Queue);
 
     // recent
-    if (req("check") == "recent" && count($rs->logged_checkts))
+    if ($Qreq->check == "recent" && count($rs->logged_checkts))
         $Conf->ajaxExit(ContactView::runner_json($Info, $rs->logged_checkts[0], $Offset));
-    else if (req("check") == "recent")
+    else if ($Qreq->check == "recent")
         quit("no logs yet");
 
     if ($rs->is_recent_job_running())
@@ -256,7 +257,7 @@ try {
     $rs->start();
 
     // save information about execution
-    $Info->update_commit_info(array("run" => array($Runner->name => $rs->checkt)));
+    $Info->update_commit_info(["run" => [$Runner->runclass => $rs->checkt]]);
 
     $Conf->ajaxExit(array("ok" => true,
                           "done" => false,

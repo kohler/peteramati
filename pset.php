@@ -16,7 +16,7 @@ if (isset($_REQUEST["u"])
 assert($User == $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
 
-$Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
+$Pset = ContactView::find_pset_redirect(req("pset"));
 
 class Series {
 
@@ -36,7 +36,7 @@ class Series {
 
     public function add($g) {
         $this->series[] = $g;
-        $this->byg[$g] = @($this->byg[$g] + 1);
+        $this->byg[$g] = get($this->byg, $g) + 1;
         $this->n += 1;
         $this->sum += $g;
         $this->sumsq += $g * $g;
@@ -136,7 +136,7 @@ if (isset($_REQUEST["gradecdf"])) {
         unset($j->extension);
     if ($User == $Me && $Pset->grade_cdf_cutoff) {
         Series::truncate_summary_below($j, $Pset->grade_cdf_cutoff);
-        if (@$j->extension)
+        if (get($j, "extension"))
             Series::truncate_summary_below($j->extension, $Pset->grade_cdf_cutoff);
     }
     $Conf->ajaxExit($j);
@@ -144,8 +144,8 @@ if (isset($_REQUEST["gradecdf"])) {
 
 // load user repo and current commit
 $Info = ContactView::user_pset_info($User, $Pset);
-if (($Commit = @$_REQUEST["newcommit"]) == null)
-    $Commit = @$_REQUEST["commit"];
+if (($Commit = req("newcommit")) == null)
+    $Commit = req("commit");
 if (!$Info->set_commit($Commit) && $Commit && $Info->repo) {
     $Conf->errorMsg("Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository.");
     redirectSelf(array("newcommit" => null, "commit" => null));
@@ -317,8 +317,8 @@ if (isset($_REQUEST["wdiff"]))
 // save run settings
 if ($Me->isPC && $Me != $User && isset($_REQUEST["saverunsettings"])
     && check_post()) {
-    $x = @$_REQUEST["runsettings"];
-    if (!count($x))
+    $x = req("runsettings");
+    if (empty($x))
         $x = null;
     $Info->update_commit_info(array("runsettings" => $x), true);
     if (isset($_REQUEST["ajax"]))
@@ -489,7 +489,7 @@ function echo_grade_cdf() {
         '<tr class="gradecdf61stddev"><td class="cap">', $xmark, ' stddev</td><td class="val"></td></tr>',
         '</tbody></table>',
         '</div>';
-    Ht::stash_script("gradecdf61(\"" . $Info->hoturl("pset", array("gradecdf" => 1)) . "\")");
+    Ht::stash_script("gradecdf61(" . json_encode($Info->hoturl("pset", ["gradecdf" => 1])) . ")");
 }
 
 function echo_grade_entry($ge) {
@@ -498,9 +498,9 @@ function echo_grade_entry($ge) {
     $grade = $autograde = null;
     $title = isset($ge->title) ? $ge->title : $key;
     $Notes = $Info->commit_or_grading_info();
-    if (@$Notes->autogrades && property_exists($Notes->autogrades, $key))
+    if (get($Notes, "autogrades") && property_exists($Notes->autogrades, $key))
         $grade = $autograde = $Notes->autogrades->$key;
-    if (@$Notes->grades && property_exists($Notes->grades, $key))
+    if (get($Notes, "grades") && property_exists($Notes->grades, $key))
         $grade = $Notes->grades->$key;
     if (!$Info->can_see_grades
         || ($User == $Me && $grade === null && $ge->is_extra))
@@ -508,7 +508,7 @@ function echo_grade_entry($ge) {
 
     $class = "grader61" . ($ge->no_total ? "" : " gradepart");
     if ($User == $Me) {
-        $value = '<span class="' . $class . '" name61="' . $ge->name . '">' . htmlspecialchars(+$grade) . '</span>';
+        $value = '<span class="' . $class . '" data-pa-grade="' . $ge->name . '">' . htmlspecialchars(+$grade) . '</span>';
         if ($ge->max && !$ge->hide_max)
             $value .= ' <span class="grademax61">of ' . htmlspecialchars($ge->max) . '</span>';
     } else {
@@ -538,11 +538,11 @@ function echo_grade_entry($ge) {
 
 function echo_grade_total($gj) {
     global $User, $Me, $Pset, $Info;
-    if ($Info->can_see_grades && $gj && @$gj->grades && $gj->nentries > 1) {
+    if ($Info->can_see_grades && $gj && get($gj, "grades") && $gj->nentries > 1) {
         $value = '<span class="gradetotal61">' . $gj->grades->total . '</span>';
         if ($Me != $User)
             $value = '<span class="gradeholder61">' . $value . '</span>';
-        if (@$gj->max->total)
+        if (get($gj->max, "total"))
             $value .= ' <span class="grademax61">of ' . $gj->maxgrades->total . '</span>';
         ContactView::echo_group("total", $value, null, array("nowrap" => true));
     }
@@ -616,7 +616,7 @@ class LinenotesOrder {
             return strcmp($a[1], $b[1]);
         if ($a[1][0] == $b[1][0])
             return (int) substr($a[1], 1) - (int) substr($b[1], 1);
-        if (!($to = @$this->totalorder[$a[0]])) {
+        if (!($to = get($this->totalorder, $a[0]))) {
             $to = array();
             $n = 0;
             foreach ($this->diff[$a[0]]->diff as $l) {
@@ -712,9 +712,9 @@ function echo_commit($Info) {
                            . " <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit1" => $Info->latest_hash())) . "\">see diff</a>)</span>.");
     if (($lh = $Info->late_hours()) && $lh->hours > 0) {
         $extra = array();
-        if (@$lh->commitat)
+        if (get($lh, "commitat"))
             $extra[] = "commit at " . $Conf->printableTimestamp($lh->commitat);
-        if (@$lh->deadline)
+        if (get($lh, "deadline"))
             $extra[] = "deadline " . $Conf->printableTimestamp($lh->deadline);
         $extra = count($extra) ? ' <span style="font-weight:normal">(' . join(", ", $extra) . ')</span>' : "";
         $remarks[] = array(true, "This commit uses " . plural($lh->hours, "late hour") . $extra . ".");
@@ -751,7 +751,7 @@ function echo_grader() {
     $gradercid = $Info->gradercid();
     if ($Info->is_grading_commit() && $Me->can_see_grader($Pset, $User)) {
         $pcm = pcMembers();
-        $gpc = @$pcm[$gradercid];
+        $gpc = get($pcm, $gradercid);
         $value_post = "";
         if ($Me->can_set_grader($Pset, $User)) {
             $sel = array();
@@ -782,7 +782,7 @@ function echo_grade_cdf_here() {
         && ($Me != $User || $Pset->grade_cdf_visible)
         && $Pset->grades) {
         $gj = ContactView::grade_json($Info);
-        if (@$gj->grades)
+        if (get($gj, "grades"))
             echo_grade_cdf();
     }
 }
@@ -790,7 +790,7 @@ function echo_grade_cdf_here() {
 function echo_all_grades() {
     global $Me, $User, $Pset, $Info;
     $gj = ContactView::grade_json($Info);
-    if (@$gj->grades || ($Info->can_see_grades && $Me != $User)) {
+    if (get($gj, "grades") || ($Info->can_see_grades && $Me != $User)) {
         echo_grade_total($gj);
         foreach ($Pset->grades as $ge)
             echo_grade_entry($ge);
@@ -798,9 +798,9 @@ function echo_all_grades() {
 
     $lhg = $Info->late_hours();
     if ($lhg && $User == $Me && $Info->can_see_grades) {
-        if ($lhg->hours || @$gj->grades) {
+        if ($lhg->hours || get($gj, "grades")) {
             echo '<div style="margin-top:1.5em">';
-            ContactView::echo_group("late hours", '<span class="grader61" name61="late_hours">' . htmlspecialchars($lhg->hours) . '</span>',
+            ContactView::echo_group("late hours", '<span class="grader61" data-pa-grade="late_hours">' . htmlspecialchars($lhg->hours) . '</span>',
                                     array(), array("nowrap" => true));
             echo '</div>';
         }
@@ -826,7 +826,7 @@ function echo_all_grades() {
 function show_pset($info) {
     global $Me;
     echo "<hr/>\n";
-    if ($Me->isPC && @$info->pset->gitless_grades)
+    if ($Me->isPC && get($info->pset, "gitless_grades"))
         echo '<div style="float:right"><button type="button" onclick="jQuery(\'#upload\').show()">upload</button></div>';
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);
@@ -873,7 +873,8 @@ if ($Pset->gitless) {
                                       "class" => "runner61",
                                       "style" => "font-weight:bold",
                                       "onclick" => "run61(this)",
-                                      "loadgrade61" => isset($r->eval) ? "true" : null));
+                                      "data-pa-runclass" => $r->runclass_argument(),
+                                      "data-pa-loadgrade" => isset($r->eval) ? "true" : null));
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
                 $last_run = true;
             } else
@@ -938,23 +939,24 @@ if ($Pset->gitless) {
 
     // print runners
     $crunners = $Info->commit_info("run");
+    $runclasses = [];
     foreach ($Pset->runners as $r) {
-        if (!$Me->can_view_run($Pset, $r, $User))
+        if (!$Me->can_view_run($Pset, $r, $User) || isset($runclasses[$r->runclass]))
             continue;
 
-        $checkt = defval($crunners, $r->name);
+        $checkt = defval($crunners, $r->runclass);
         $rj = $checkt ? ContactView::runner_json($Info, $checkt) : null;
         if (!$rj && !$Me->can_run($Pset, $r, $User))
             continue;
 
-        echo '<div id="run61out_' . $r->name . '"';
+        echo '<div id="run61out_' . $r->runclass . '"';
         if (!$rj || !isset($rj->timestamp))
             echo ' style="display:none"';
         echo '><h3><a class="fold61" href="#" onclick="',
-            "return runfold61('$r->name')", '">',
+            "return runfold61('$r->runclass')", '">',
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
             htmlspecialchars($r->output_title), '</a></h3>',
-            '<div class="run61" id="run61_', $r->name, '" style="display:none"';
+            '<div class="run61" id="run61_', $r->runclass, '" style="display:none"';
         if ($Pset->directory_noslash !== "")
             echo ' data-pa-directory="', htmlspecialchars($Pset->directory_noslash), '"';
         if ($rj && isset($rj->timestamp))
