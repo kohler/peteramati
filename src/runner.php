@@ -239,8 +239,8 @@ class RunnerState {
     private function add_run_settings($s) {
         $x = array();
         foreach ((array) $s as $k => $v)
-            $s[] = "$k = $v\n";
-        file_put_contents($this->jailhomedir . "/config.mk", join("", $s), true);
+            $x[] = "$k = $v\n";
+        file_put_contents($this->jailhomedir . "/config.mk", join("", $x), true);
     }
 
 
