@@ -9,12 +9,14 @@ require_once("src/initweb.php");
 if (!$Conf)
     exit();
 
+global $Qreq;
 ContactView::set_path_request(array("/u"));
+$Qreq = make_qreq();
 
 $email_class = "";
 $password_class = "";
 $LastPsetFix = false;
-$Profile = $Me && $Me->privChair && req("profile");
+$Profile = $Me && $Me->privChair && $Qreq->profile;
 
 // signin links
 // auto-signin when email & password set
@@ -26,7 +28,7 @@ if (isset($_REQUEST["email"]) && isset($_REQUEST["password"])) {
 if (!$Me->is_empty() && !check_post())
     unset($_REQUEST["signout"]);
 if ($Me->has_email()
-    && (!check_post() || strcasecmp($Me->email, trim(req("email"))) == 0))
+    && (!check_post() || strcasecmp($Me->email, trim($Qreq->email)) == 0))
     unset($_REQUEST["signin"]);
 if (!isset($_REQUEST["email"]) || !isset($_REQUEST["action"]))
     unset($_REQUEST["signin"]);
@@ -59,17 +61,17 @@ foreach (Pset::$all as $pset)
         && !$pset->gitless)
         Contact::forward_pset_links($pset->id);
 
-if (!$Me->is_empty() && ($Me === $User || $Me->isPC) && req("set_username") && check_post()
-    && ($repoclass = RepositorySite::$sitemap[req("reposite")])
+if (!$Me->is_empty() && ($Me === $User || $Me->isPC) && $Qreq->set_username && check_post()
+    && ($repoclass = RepositorySite::$sitemap[$Qreq->reposite])
     && in_array($repoclass, RepositorySite::site_classes($Conf))) {
-    if ($repoclass::save_username($User, req("username")))
+    if ($repoclass::save_username($User, $Qreq->username))
         redirectSelf();
 }
 
-if (!$Me->is_empty() && req("set_repo") !== null)
+if (!$Me->is_empty() && $Qreq->set_repo !== null)
     ContactView::set_repo_action($User);
 
-if (req("set_partner") !== null)
+if ($Qreq->set_partner !== null)
     ContactView::set_partner_action($User);
 
 if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
@@ -94,7 +96,7 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
 	where ($where)
 	and (rg.repoid is not null or not c.dropped)
 	group by c.contactId");
-    $sort = req("sort");
+    $sort = $Qreq->sort;
     while (($s = edb_orow($result))) {
         $s->is_anonymous = $pset->anonymous && !$nonanonymous;
         $username = $s->is_anonymous ? $s->anon_username : ($s->github_username ? : $s->seascode_username);
@@ -249,24 +251,24 @@ function download_psets_report($request) {
     exit;
 }
 
-if ($Me->isPC && check_post() && req("report"))
-    download_psets_report($_REQUEST);
+if ($Me->isPC && check_post() && $Qreq->report)
+    download_psets_report($Qreq);
 
-function set_grader() {
+function set_grader($qreq) {
     global $Conf, $Me;
-    if (!($pset = Pset::find(req("pset"))))
+    if (!($pset = Pset::find($qreq->pset)))
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
     $graders = array();
     foreach (pcMembers() as $pcm)
-        if ($pcm->email == get($_POST, "grader")
-            || (!$pcm->privChair && get($_POST, "grader") == "__random__"))
+        if ($pcm->email == $qreq->grader
+            || (!$pcm->privChair && $qreq->grader == "__random__"))
             $graders[] = $pcm;
-    if (!get($_POST, "grader") || !count($graders))
+    if (!$qreq->grader || !count($graders))
         return $Conf->errorMsg("No grader");
     $cur_graders = $graders;
-    foreach ($_POST as $k => $v)
+    foreach ($qreq as $k => $v)
         if (substr($k, 0, 4) == "s61_"
             && $v
             && ($uname = substr($k, 4))
@@ -286,33 +288,33 @@ function set_grader() {
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && get($_POST, "setgrader"))
-    set_grader();
+if ($Me->isPC && check_post() && $Qreq->setgrader)
+    set_grader($Qreq);
 
 
-function runmany() {
+function runmany($qreq) {
     global $Conf, $Me;
-    if (!($pset = Pset::find(req("pset"))) || $pset->disabled)
+    if (!($pset = Pset::find($qreq->pset)) || $pset->disabled)
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
     $users = array();
-    foreach ($_POST as $k => $v)
+    foreach ($qreq as $k => $v)
         if (substr($k, 0, 4) == "s61_"
             && $v
             && ($uname = substr($k, 4))
             && ($user = ContactView::prepare_user($uname, $pset)))
             $users[] = $Me->user_linkpart($user);
-    if (!count($users))
+    if (empty($users))
         return $Conf->errorMsg("No users selected.");
     go(hoturl_post("run", array("pset" => $pset->urlkey,
-                                "run" => $_REQUEST["runner"],
+                                "run" => $qreq->runner,
                                 "runmany" => join(" ", $users))));
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && get($_POST, "runmany"))
-    runmany();
+if ($Me->isPC && check_post() && $Qreq->runmany)
+    runmany($Qreq);
 
 
 function psets_json_diff_from($original, $update) {
@@ -621,14 +623,14 @@ if (!$Me->is_empty() && $User->is_student()) {
     }
 }
 
-function render_pset_row($pset, $students, $s, $row, $pcmembers) {
+function render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
     $row->sortprefix = "";
     $ncol = 0;
     $t0 = $Profile ? microtime(true) : 0;
 
     $t = "<td class=\"s61username\">";
-    if ($pset->anonymous)
+    if ($anonymous)
         $x = $s->anon_username;
     else
         $x = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
@@ -639,7 +641,7 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers) {
     $t .= "</td>";
     ++$ncol;
 
-    if (!$pset->anonymous) {
+    if (!$anonymous) {
         $t .= "<td>" . Text::name_html($s) . ($s->extension ? " (X)" : "") . "</td>";
         ++$ncol;
     }
@@ -744,6 +746,7 @@ function show_regrades($result) {
     $checkbox = false;
     $sprefix = "";
     $reqsort = req("sort");
+    $reqanonymize = req("anonymize");
     $pcmembers = pcMembers();
     while (($row = edb_orow($result))) {
         ++$trn;
@@ -863,9 +866,12 @@ function show_pset_table($pset) {
 	group by c.contactId, r.repoid");
     $t1 = $Profile ? microtime(true) : 0;
 
+    $anonymous = $pset->anonymous;
+    if (req("anonymous") !== null && $Me->privChair)
+        $anonymous = !!req("anonymous");
     $students = array();
     while ($result && ($s = Contact::fetch($result))) {
-        $s->set_anonymous($pset->anonymous);
+        $s->set_anonymous($anonymous);
         Contact::set_sorter($s, req("sort"));
         $students[$s->contactId] = $s;
         // maybe lastpset links are out of order
@@ -884,11 +890,11 @@ function show_pset_table($pset) {
     foreach ($students as $s)
         if (!$s->visited) {
             $row = (object) ["student" => $s, "text" => "", "ptext" => []];
-            $row->text = render_pset_row($pset, $students, $s, $row, $pcmembers);
+            $row->text = render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous);
             if ($s->pcid) {
                 foreach (explode(",", $s->pcid) as $pcid)
                     if (isset($students[$pcid]))
-                        $row->ptext[] = render_pset_row($pset, $students, $students[$pcid], $row, $pcmembers);
+                        $row->ptext[] = render_pset_row($pset, $students, $students[$pcid], $row, $pcmembers, $anonymous);
             }
             $rows[$row->sortprefix . $s->sorter] = $row;
             $max_ncol = max($max_ncol, $row->ncol);
