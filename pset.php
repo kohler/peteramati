@@ -421,6 +421,13 @@ function diff_line_code($t) {
 
 function echo_linenote_entry_row($file, $lineid, $note, $displayed, $lnorder) {
     global $Pset, $Me, $User, $Info;
+    $note_object = null;
+    if (is_object($note)) { // How the fuck did this shit get in the DB, why does PHP suck
+        $note_object = $note;
+        $note = [];
+        for ($i = 0; property_exists($note_object, $i); ++$i)
+            $note[] = $note_object->$i;
+    }
     if (!is_array($note))
         $note = array(false, $note);
     if (!$Me->isPC || $Me == $User || $displayed) {
@@ -445,7 +452,7 @@ function echo_linenote_entry_row($file, $lineid, $note, $displayed, $lnorder) {
                         join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
             }
             if (!is_string($note[1]))
-                error_log("$User->github_username error: " . json_encode($note));
+                error_log("fudge $User->github_username error: " . json_encode($note));
             echo '<div class="note61',
                 ($note[0] ? ' commentnote' : ' gradenote'),
                 '">', htmlspecialchars($note[1]), '</div>',
