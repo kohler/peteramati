@@ -187,32 +187,13 @@ class ContactView {
         return $json;
     }
 
-    static function pset_grade_json($pset, $pcview) {
-        $max = array();
-        $count = $maxtotal = 0;
-        foreach ($pset->grades as $ge)
-            if (!$ge->hide || $pcview) {
-                $key = $ge->name;
-                ++$count;
-                if ($ge->max && ($pcview || !$ge->hide_max)) {
-                    $max[$key] = $ge->max;
-                    if (!$ge->is_extra)
-                        $maxtotal += $ge->max;
-                }
-            }
-        if ($maxtotal)
-            $max["total"] = $maxtotal;
-        return (object) array("nentries" => $count,
-                              "maxgrades" => (object) $max);
-    }
-
     static function grade_json($info) {
         global $Me;
         if (!$Me->can_see_grades($info->pset, $info->user, $info))
             return null;
         $pcview = $Me->isPC && $Me != $info->user;
         $notes = $info->commit_or_grading_info();
-        $result = self::pset_grade_json($info->pset, $pcview);
+        $result = $info->pset->gradeinfo_json($pcview);
         if (isset($notes->autogrades) || isset($notes->grades)
             || $info->is_grading_commit()) {
             $g = $ag = array();
@@ -221,9 +202,9 @@ class ContactView {
                 if (!$ge->hide || $pcview) {
                     $key = $ge->name;
                     $gv = 0;
-                    if (isset($notes->autogrades->$key))
+                    if (property_exists($notes->autogrades, $key))
                         $ag[$key] = $g[$key] = $gv = $notes->autogrades->$key;
-                    if (isset($notes->grades->$key))
+                    if (property_exists($notes->grades, $key))
                         $g[$key] = $gv = $notes->grades->$key;
                     if (!$ge->no_total)
                         $total += $gv;

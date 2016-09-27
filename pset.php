@@ -123,7 +123,7 @@ if (isset($_REQUEST["gradecdf"])) {
         if ($xseries->n)
             $r->extension = $xseries->summary();
 
-        $pgj = ContactView::pset_grade_json($Pset, false);
+        $pgj = $Pset->gradeinfo_json(false);
         if ($pgj && isset($pgj->maxgrades->total))
             $r->maxtotal = $pgj->maxgrades->total;
 
@@ -495,16 +495,13 @@ function echo_grade_cdf() {
 function echo_grade_entry($ge) {
     global $User, $Me, $Info;
     $key = $ge->name;
-    $grade = $autograde = null;
-    $title = isset($ge->title) ? $ge->title : $key;
-    $Notes = $Info->commit_or_grading_info();
-    if (get($Notes, "autogrades") && property_exists($Notes->autogrades, $key))
-        $grade = $autograde = $Notes->autogrades->$key;
-    if (get($Notes, "grades") && property_exists($Notes->grades, $key))
-        $grade = $Notes->grades->$key;
+    $grade = $Info->commit_or_grading_entry($key);
     if (!$Info->can_see_grades
         || ($User == $Me && $grade === null && $ge->is_extra))
         return;
+    $title = isset($ge->title) ? $ge->title : $key;
+    $autograde = $Info->commit_or_grading_entry($key, "autograde");
+    $Notes = $Info->commit_or_grading_info();
 
     $class = "grader61" . ($ge->no_total ? "" : " gradepart");
     if ($User == $Me) {

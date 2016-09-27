@@ -108,7 +108,9 @@ class CS61Mailer extends Mailer {
             if ($this->pset->gitless)
                 return $isbool ? false : self::EXPANDVAR_CONTINUE;
             $info = $this->get_pset_info();
-            $recent = $info ? @$info->commit() : null;
+            $recent = null;
+            if ($info && $info->has_commit_set())
+                $recent = $info->commit();
             if (!$recent) {
                 if ($isbool)
                     return false;
@@ -149,6 +151,33 @@ class CS61Mailer extends Mailer {
                 else
                     return (string) (int) (($recent->commitat - $deadline + 3599) / 3600);
             }
+        }
+        if ($what == "%GRADEENTRIES%") {
+            $info = $this->get_pset_info();
+            if (!$info->can_see_grades)
+                return $isbool ? false : "";
+            $t = "";
+            $total = $maxtotal = 0; // XXX better computation
+            foreach ($this->pset->grades as $ge) {
+                $g = $info->commit_or_grading_entry($ge->name);
+                if ($ge->is_extra ? $g : $g !== null) {
+                    $t .= (isset($ge->title) ? $ge->title : $ge->name) . ": " . ($g ? : 0);
+                    if ($ge->max && !$ge->hide_max)
+                        $t .= " / " . $ge->max;
+                    $t .= "\n";
+                }
+                if ($g && !$ge->no_total)
+                    $total += $g;
+                if (!$ge->is_extra && !$ge->no_total && !$ge->hide_max)
+                    $maxtotal += $ge->max;
+            }
+            if ($total || $maxtotal) {
+                $t .= "TOTAL: " . $total;
+                if ($maxtotal)
+                    $t .= " / " . $maxtotal;
+                $t .= "\n";
+            }
+            return $t;
         }
 
         return self::EXPANDVAR_CONTINUE;

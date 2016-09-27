@@ -106,7 +106,7 @@ class PsetView {
             return $this->recent_commits;
         if (strlen($hash) != 40)
             $hash = git_commit_in_list($this->recent_commits, $hash);
-        if (($c = @$this->recent_commits[$hash]))
+        if (($c = get($this->recent_commits, $hash)))
             return $c;
         return false;
     }
@@ -134,7 +134,7 @@ class PsetView {
         foreach (Contact::handout_repo_recent_commits($this->pset) as $c)
             $hbases[$c->hash] = true;
         foreach ($this->recent_commits() as $c)
-            if (@$hbases[$c->hash])
+            if (get($hbases, $c->hash))
                 return $c->hash;
         return false;
     }
@@ -152,7 +152,7 @@ class PsetView {
         if (!$key)
             return $this->commit_notes;
         else
-            return $this->commit_notes ? @$this->commit_notes->$key : null;
+            return $this->commit_notes ? get($this->commit_notes, $key) : null;
     }
 
     public function update_commit_info($updates, $reset_keys = false) {
@@ -198,21 +198,21 @@ class PsetView {
         global $Me;
         if ($this->pset->gitless_grades) {
             $this->grade = $this->user->contact_grade($this->pset);
-            $this->grade_notes = @$this->grade->notes;
+            $this->grade_notes = get($this->grade, "notes");
         } else {
             $this->repo_grade = null;
             if ($this->repo)
                 $this->repo_grade = $this->user->repo_grade
                     ($this->repo, $this->pset);
             $this->grade = $this->repo_grade;
-            $this->grade_notes = @$this->grade->notes;
+            $this->grade_notes = get($this->grade, "notes");
             if ($this->grade_notes
-                && @$this->grade->gradercid
-                && !@$this->grade_notes->gradercid)
+                && get($this->grade, "gradercid")
+                && !get($this->grade_notes, "gradercid"))
                 $this->grade_notes = Contact::update_commit_info
                     ($this->grade->gradehash, $this->repo, $this->pset,
                      array("gradercid" => $this->grade->gradercid));
-            if (@$this->grade->gradehash)
+            if (get($this->grade, "gradehash"))
                 // NB don't check recent_commits association here
                 $this->commit = $this->grade->gradehash;
         }
@@ -269,13 +269,10 @@ class PsetView {
     }
 
 
-    public function grading_info($key = null) {
+    public function grading_info() {
         if ($this->grade === false)
             $this->load_grade();
-        if (!$key)
-            return $this->grade_notes;
-        else
-            return $this->grade_notes ? @$this->grade_notes->$key : null;
+        return $this->grade_notes;
     }
 
     public function commit_or_grading_info() {
@@ -291,7 +288,7 @@ class PsetView {
         if (!$this->grade_notes)
             return true;
         $gn = (array) $this->grade_notes;
-        return !$gn || count($gn) == 0
+        return !$gn || empty($gn)
             || (count($gn) == 1 && isset($gn["gradercid"]));
     }
 
@@ -301,9 +298,19 @@ class PsetView {
         return $this->grade && $this->grade->hidegrade;
     }
 
+    public function commit_or_grading_entry($k, $type = null) {
+        $gn = $this->commit_or_grading_info();
+        $grade = null;
+        if ((!$type || $type == "autograde") && isset($gn->autogrades) && property_exists($gn->autogrades, $k))
+            $grade = $gn->autogrades->$k;
+        if ((!$type || $type == "grade") && isset($gn->grades) && property_exists($gn->grades, $k))
+            $grade = $gn->grades->$k;
+        return $grade;
+    }
+
     public function late_hours($no_auto = false) {
         $cinfo = $this->commit_or_grading_info();
-        if (!$no_auto && @$cinfo->late_hours !== null)
+        if (!$no_auto && get($cinfo, "late_hours") !== null)
             return (object) array("hours" => $cinfo->late_hours,
                                   "override" => true);
 
@@ -315,7 +322,7 @@ class PsetView {
         if (!$deadline)
             return null;
 
-        $timestamp = @$cinfo->timestamp;
+        $timestamp = get($cinfo, "timestamp");
         if (!$timestamp
             && ($h = $this->commit ? : $this->grading_hash())
             && ($ls = $this->recent_commits($h)))

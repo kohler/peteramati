@@ -75,9 +75,9 @@ class Pset {
 
     const URLKEY_REGEX = '/\A[0-9A-Za-z][-0-9A-Za-z_.]*\z/';
 
-    public function __construct($pk, $p) {
+    function __construct($pk, $p) {
         // pset id
-        if (!is_int(@$p->psetid) || $p->psetid <= 0)
+        if (!isset($p->psetid) || !is_int($p->psetid) || $p->psetid <= 0)
             throw new PsetConfigException("`psetid` must be positive integer", "psetid");
         $this->id = $this->psetid = $p->psetid;
 
@@ -89,12 +89,12 @@ class Pset {
         $this->psetkey = $pk;
 
         // url keys
-        if (is_string(@$p->urlkey)
-            && preg_match(self::URLKEY_REGEX, $p->urlkey))
-            $this->urlkey = $p->urlkey;
-        else if (is_int(@$p->urlkey))
-            $this->urlkey = (string) $p->urlkey;
-        else if (@$p->urlkey)
+        $urlkey = get($p, "urlkey");
+        if (is_string($urlkey) && preg_match(self::URLKEY_REGEX, $urlkey))
+            $this->urlkey = $urlkey;
+        else if (is_int($urlkey))
+            $this->urlkey = (string) $urlkey;
+        else if ($urlkey)
             throw new PsetConfigException("`urlkey` format error", "urlkey");
         else {
             $this->urlkey = (string) $this->psetid;
@@ -130,10 +130,11 @@ class Pset {
         if (!property_exists($p, "repo_tarball_patterns"))
             $this->repo_tarball_patterns = array("^git@(.*?):(.*)\.git$",
                 "https://\$1/\$2/archive-tarball/\${HASH}");
-        if (@$p->directory !== null && @$p->directory !== false
-            && !is_string($p->directory))
+        $this->directory = "";
+        if (isset($p->directory) && is_string($p->directory))
+            $this->directory = $p->directory;
+        else if (isset($p->directory) && $p->directory !== false)
             throw new PsetConfigException("`directory` format error", "directory");
-        $this->directory = @$p->directory ? : "";
         $this->directory_slash = preg_replace(',([^/])/*\z,', '$1/', $this->directory);
         $this->directory_noslash = preg_replace(',/+\z,', '', $this->directory_slash);
         $this->test_file = self::cstr($p, "test_file");
@@ -144,16 +145,17 @@ class Pset {
         $this->deadline_extension = self::cdate($p, "deadline_extension", "college_extension");
 
         // grades
-        if (is_array(@$p->grades) || is_object(@$p->grades)) {
+        $grades = get($p, "grades");
+        if (is_array($grades) || is_object($grades)) {
             foreach ((array) $p->grades as $k => $v) {
                 $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v);
-                if (@$this->all_grades[$g->name])
+                if (get($this->all_grades, $g->name))
                     throw new PsetConfigException("grade `$g->name` reused", "grades", $k);
                 $this->all_grades[$g->name] = $g;
             }
-        } else if (@$p->grades)
+        } else if ($grades)
             throw new PsetConfigException("`grades` format error`", "grades");
-        if (@$p->grade_order)
+        if (get($p, "grade_order"))
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         else
             $this->grades = self::priority_sort("grades", $this->all_grades);
@@ -176,16 +178,17 @@ class Pset {
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
 
         // runners
-        if (is_array(@$p->runners) || is_object(@$p->runners)) {
+        $runners = get($p, "runners");
+        if (is_array($runners) || is_object($runners)) {
             foreach ((array) $p->runners as $k => $v) {
                 $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v);
-                if (@$this->all_runners[$r->name])
+                if (get($this->all_runners, $r->name))
                     throw new PsetConfigException("runner `$r->name` reused", "runners", $k);
                 $this->all_runners[$r->name] = $r;
             }
-        } else if (@$p->runners)
+        } else if ($runners)
             throw new PsetConfigException("`runners` format error", "runners");
-        if (@$p->runner_order)
+        if (get($p, "runner_order"))
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
         else
             $this->runners = self::priority_sort("runners", $this->all_runners);
@@ -200,18 +203,20 @@ class Pset {
         $this->run_binddir = self::cstr($p, "run_binddir");
 
         // diffs
-        if (is_array(@$p->diffs) || is_object(@$p->diffs)) {
+        $diffs = get($p, "diffs");
+        if (is_array($diffs) || is_object($diffs)) {
             foreach (self::make_config_array($p->diffs) as $k => $v)
                 $this->diffs[] = new DiffConfig($k, $v);
-        } else if (@$p->diffs)
+        } else if ($diffs)
             throw new PsetConfigException("`diffs` format error", "diffs");
-        if (is_array(@$p->ignore))
+        $ignore = get($p, "ignore");
+        if (is_array($ignore))
             $this->ignore = self::cstr_array($p, "ignore");
-        else if (@$p->ignore)
+        else if ($ignore)
             $this->ignore = self::cstr($p, "ignore");
     }
 
-    static public function register($pset) {
+    static function register($pset) {
         if (isset(self::$all[$pset->id]))
             throw new Exception("pset id `{$pset->id}` reused");
         self::$all[$pset->id] = $pset;
@@ -220,13 +225,32 @@ class Pset {
         self::$by_urlkey[$pset->urlkey] = $pset;
     }
 
-    static public function find($key) {
-        if (($p = @self::$by_urlkey[$key]))
+    static function find($key) {
+        if (($p = get(self::$by_urlkey, $key)))
             return $p;
         foreach (self::$all as $p)
             if ($key === $p->psetkey)
                 return $p;
         return null;
+    }
+
+
+    function gradeinfo_json($pcview) {
+        $max = (object) [];
+        $count = $maxtotal = 0;
+        foreach ($this->grades as $ge)
+            if (!$ge->hide || $pcview) {
+                $key = $ge->name;
+                ++$count;
+                if ($ge->max && ($pcview || !$ge->hide_max)) {
+                    $max->$key = $ge->max;
+                    if (!$ge->is_extra)
+                        $maxtotal += $ge->max;
+                }
+            }
+        if ($maxtotal)
+            $max->total = $maxtotal;
+        return (object) ["nentries" => $count, "maxgrades" => $max];
     }
 
 
