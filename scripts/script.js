@@ -2390,6 +2390,9 @@ function gradecdf61(url) {
                 if (dx)
                     series = [{data: gradecdf61_series(dx, total), color: "#ee6666", label: "extension"},
                               {data: gradecdf61_series(d, total), color: "#ffaaaa", lines: {lineWidth: 0.8}, label: "all"}];
+                else if (d.noextra)
+                    series = [{data: gradecdf61_series(d, total), color: "#ee6666", label: "all"},
+                              {data: gradecdf61_series(d.noextra, total), color: "#ffaaaa", lines: {lineWidth: 0.8}, label: "noextra"}];
                 else
                     series = [{data: gradecdf61_series(d, total), color: "#ee6666"}];
                 series.push({data: [[total, series[0].data.totalx]], color: "#222266", points: {show: true, radius: 5, fillColor: "#ffff00"}});

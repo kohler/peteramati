@@ -197,7 +197,7 @@ class ContactView {
         if (isset($notes->autogrades) || isset($notes->grades)
             || $info->is_grading_commit()) {
             $g = $ag = array();
-            $total = 0;
+            $total = $total_noextra = 0;
             foreach ($info->pset->grades as $ge)
                 if (!$ge->hide || $pcview) {
                     $key = $ge->name;
@@ -206,10 +206,15 @@ class ContactView {
                         $ag[$key] = $g[$key] = $gv = $notes->autogrades->$key;
                     if (property_exists($notes->grades, $key))
                         $g[$key] = $gv = $notes->grades->$key;
-                    if (!$ge->no_total)
+                    if (!$ge->no_total) {
                         $total += $gv;
+                        if (!$ge->is_extra)
+                            $total_noextra += $gv;
+                    }
                 }
             $g["total"] = $total;
+            if ($total != $total_noextra)
+                $g["total_noextra"] = $total_noextra;
             $result->grades = (object) $g;
             if ($pcview && count($ag))
                 $result->autogrades = (object) $ag;
