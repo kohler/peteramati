@@ -285,6 +285,8 @@ function upload_grades($pset, $text, $fname) {
             $user = $Conf->user_by_query("github_username=?", [$who]);
         else if (($who = get($line, "seascode_username")) && $who !== "-")
             $user = $Conf->user_by_query("seascode_username=?", [$who]);
+        else if (($who = get($line, "huid")) && $who !== "-")
+            $user = $Conf->user_by_query("huid=?", [$who]);
         else if (($who = get($line, "username")) && $who !== "-")
             $user = $Conf->user_by_query("github_username=? or seascode_username=? order by github_username=? desc limit 1", [$who, $who, $who]);
         else if (($who = get($line, "email")))
