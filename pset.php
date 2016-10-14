@@ -289,7 +289,7 @@ function upload_grades($pset, $text, $fname) {
             $user = $Conf->user_by_query("huid=?", [$who]);
         else if (($who = get($line, "username")) && $who !== "-")
             $user = $Conf->user_by_query("github_username=? or seascode_username=? order by github_username=? desc limit 1", [$who, $who, $who]);
-        else if (($who = get($line, "email")))
+        else if (($who = get($line, "email")) && $who !== "-")
             $user = $Conf->user_by_email($who);
         else if (($who = get($line, "name"))) {
             list($first, $last) = Text::split_name($who);
