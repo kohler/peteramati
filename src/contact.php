@@ -1833,7 +1833,7 @@ class Contact {
             && !$pset->disabled;
     }
 
-    static function student_can_see_grades($pset, $extension = null) {
+    static function student_can_see_grades(Pset $pset, $extension = null) {
         if ($extension === null)
             $k = "grades_visible";
         else if ($extension)
@@ -1845,24 +1845,31 @@ class Contact {
             && self::show_setting_on($pset->$k);
     }
 
-    static function student_can_see_grade_cdf($pset) {
+    static function student_can_see_grade_cdf(Pset $pset) {
         return self::student_can_see_pset($pset)
             && (isset($pset->grade_cdf_visible)
                 ? self::show_setting_on($pset->grade_cdf_visible)
                 : self::student_can_see_grades($pset));
     }
 
-    function can_see_grader($pset, $user) {
+    function can_see_grader(Pset $pset, Contact $user = null) {
         return ($this->isPC && (!$user || $user != $this))
             || $this->privChair;
     }
 
-    function can_set_grader($pset, $user) {
+    function can_set_grader(Pset $pset, Contact $user = null) {
         return ($this->isPC && (!$user || $user != $this))
             || $this->privChair;
     }
 
-    function can_see_grades($pset, $user = null, $info = null) {
+    function can_see_comments(Pset $pset, Contact $user = null, $info = null) {
+        return (!$pset || !$pset->disabled)
+            && (($this->isPC && $user && $user != $this)
+                || $this->privChair
+                || (!$pset || !$pset->hide_comments));
+    }
+
+    function can_see_grades(Pset $pset, Contact $user = null, $info = null) {
         return (!$pset || !$pset->disabled)
             && (($this->isPC && $user && $user != $this)
                 || $this->privChair
@@ -1870,7 +1877,7 @@ class Contact {
                     && (!$info || !$info->grades_hidden())));
     }
 
-    function can_run($pset, $runner, $user = null) {
+    function can_run(Pset $pset, $runner, $user = null) {
         if (!$runner || $runner->disabled)
             return false;
         if ($this->isPC && (!$user || $user != $this))
@@ -1881,7 +1888,7 @@ class Contact {
                 && $this->can_see_grades($pset));
     }
 
-    function can_view_run($pset, $runner, $user = null) {
+    function can_view_run(Pset $pset, $runner, $user = null) {
         if (!$runner || $runner->disabled)
             return false;
         if ($this->isPC && (!$user || $user != $this))
@@ -1894,7 +1901,7 @@ class Contact {
                 && $this->can_see_grades($pset));
     }
 
-    function user_linkpart($user = null, $is_anonymous = false) {
+    function user_linkpart(Contact $user = null, $is_anonymous = false) {
         $user = $user ? : $this;
         if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous)))
             return $user->anon_username;
@@ -1904,7 +1911,7 @@ class Contact {
             return null;
     }
 
-    function user_idpart($user = null) {
+    function user_idpart(Contact $user = null) {
         $user = $user ? $user : $this;
         if (!$this->isPC && !get($_SESSION, "last_actas"))
             return null;
