@@ -938,8 +938,8 @@ if ($Pset->gitless) {
     echo_all_grades();
 
     // collect diff and sort line notes
-    $all_linenotes = $Info->commit_info("linenotes");
-    $lnorder = new LinenotesOrder($Info->can_see_comments ? $all_linenotes : null, $Info->can_see_grades);
+    $all_linenotes = $Info->can_see_comments ? $Info->commit_info("linenotes") : null;
+    $lnorder = new LinenotesOrder($all_linenotes, $Info->can_see_grades);
     $diff = $User->repo_diff($Info->repo, $Info->commit_hash(), $Pset, array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
     $lnorder->set_diff($diff);
 
