@@ -11,6 +11,7 @@ class PsetView {
     private $partner_same = null;
     public $can_set_repo;
     public $can_view_repo_contents;
+    public $can_see_comments;
     public $can_see_grades;
 
     private $grade = false;
@@ -216,6 +217,7 @@ class PsetView {
                 // NB don't check recent_commits association here
                 $this->commit = $this->grade->gradehash;
         }
+        $this->can_see_comments = $Me->can_see_comments($this->pset, $this->user, $this);
         $this->can_see_grades = $Me->can_see_grades($this->pset, $this->user, $this);
         $this->user_can_see_grades = $this->user->can_see_grades($this->pset, $this->user, $this);
     }

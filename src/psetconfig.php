@@ -33,6 +33,7 @@ class Pset {
     public $anonymous;
     public $gitless;
     public $gitless_grades;
+    public $hide_comments = false;
 
     public $handout_repo_url;
     public $handout_repo_branch;
@@ -119,6 +120,7 @@ class Pset {
             $this->gitless_grades = $this->gitless;
         if (!$this->gitless_grades && $this->gitless)
             throw new PsetConfigException("`gitless` requires `gitless_grades`", "gitless_grades");
+        $this->hide_comments = self::cbool($p, "hide_comments");
 
         // directory
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");
