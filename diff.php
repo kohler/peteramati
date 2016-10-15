@@ -104,7 +104,7 @@ foreach ($diff as $file => $dinfo) {
 
 Ht::stash_script('jQuery(".diffnoteentry61").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
 echo "<table id=\"diff61linenotetemplate\" style=\"display:none\"><tbody>";
-$Info->echo_linenote_entry_row("", "", [$Info->is_grading_commit(), ""], false);
+$Info->echo_linenote_entry_prototype();
 echo "</tbody></table>";
 
 echo "<div class='clear'></div>\n";

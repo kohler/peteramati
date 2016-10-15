@@ -13,6 +13,7 @@ class PsetView {
     public $can_view_repo_contents;
     public $can_see_comments;
     public $can_see_grades;
+    public $user_can_see_grades;
 
     private $grade = false;
     private $repo_grade = null;
@@ -461,16 +462,15 @@ class PsetView {
                 '<td class="', $x[1], '">', diff_line_code($x[4]), "</td></tr>\n";
 
             if ($linenotes && $bln && isset($linenotes->$bln))
-                $this->echo_linenote_entry_row($file, $bln, $linenotes->$bln, true, $lnorder);
+                $this->echo_linenote($file, $bln, $linenotes->$bln, $lnorder);
             if ($linenotes && $aln && isset($linenotes->$aln))
-                $this->echo_linenote_entry_row($file, $aln, $linenotes->$aln, true, $lnorder);
+                $this->echo_linenote($file, $aln, $linenotes->$aln, $lnorder);
         }
         echo "</tbody></table>\n";
     }
 
-    function echo_linenote_entry_row($file, $lineid, $note, $displayed,
-                                     LinenotesOrder $lnorder = null) {
-        global $Me;
+    function echo_linenote($file, $lineid, $note,
+                           LinenotesOrder $lnorder = null) {
         $note_object = null;
         if (is_object($note)) { // How the fuck did this shit get in the DB, why does PHP suck
             $note_object = $note;
@@ -480,53 +480,55 @@ class PsetView {
         }
         if (!is_array($note))
             $note = array(false, $note);
-        if (!$Me->isPC || $Me == $this->user || $displayed) {
-            if ($this->can_see_grades || $note[0]) {
-                echo '<tr class="diffl61 gw">', /* NB script depends on this class */
-                    '<td colspan="2" class="difflnoteborder61"></td>',
-                    '<td class="difflnote61">';
-                if ($lnorder) {
-                    $links = array();
-                    //list($pfile, $plineid) = $lnorder->get_prev($file, $lineid);
-                    //if ($pfile)
-                    //    $links[] = '<a href="#L' . $plineid . '_'
-                    //        . html_id_encode($pfile) . '">&larr; Prev</a>';
-                    list($nfile, $nlineid) = $lnorder->get_next($file, $lineid);
-                    if ($nfile)
-                        $links[] = '<a href="#L' . $nlineid . '_'
-                            . html_id_encode($nfile) . '">Next &gt;</a>';
-                    else
-                        $links[] = '<a href="#">Top</a>';
-                    if (!empty($links))
-                        echo '<div class="difflnoteptr61">',
-                            join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
-                }
-                if (!is_string($note[1]))
-                    error_log("fudge {$this->user->github_username} error: " . json_encode($note));
-                echo '<div class="note61',
-                    ($note[0] ? ' commentnote' : ' gradenote'),
-                    '">', htmlspecialchars($note[1]), '</div>',
-                    '<div class="clear"></div></td></tr>';
+        if ($this->can_see_grades || $note[0]) {
+            echo '<tr class="diffl61 gw">', /* NB script depends on this class */
+                '<td colspan="2" class="difflnoteborder61"></td>',
+                '<td class="difflnote61">';
+            if ($lnorder) {
+                $links = array();
+                //list($pfile, $plineid) = $lnorder->get_prev($file, $lineid);
+                //if ($pfile)
+                //    $links[] = '<a href="#L' . $plineid . '_'
+                //        . html_id_encode($pfile) . '">&larr; Prev</a>';
+                list($nfile, $nlineid) = $lnorder->get_next($file, $lineid);
+                if ($nfile)
+                    $links[] = '<a href="#L' . $nlineid . '_'
+                        . html_id_encode($nfile) . '">Next &gt;</a>';
+                else
+                    $links[] = '<a href="#">Top</a>';
+                if (!empty($links))
+                    echo '<div class="difflnoteptr61">',
+                        join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
             }
-            return;
+            if (!is_string($note[1]))
+                error_log("fudge {$this->user->github_username} error: " . json_encode($note));
+            echo '<div class="note61',
+                ($note[0] ? ' commentnote' : ' gradenote'),
+                '">', htmlspecialchars($note[1]), '</div>',
+                '<div class="clear"></div></td></tr>';
         }
-        echo '<tr class="diffl61 gw',
-            ($note[0] ? ' isgrade61' : ' iscomment61'),
-            '" data-pa-savednote="', htmlspecialchars($note[1]), '">', /* NB script depends on this class */
+    }
+
+    function echo_linenote_entry_prototype() {
+        echo '<tr class="diffl61 gw iscomment61"',
+            ' data-pa-savednote="">', /* NB script depends on this class */
             '<td colspan="2" class="difflnoteborder61"></td>',
-            '<td class="difflnote61">',
-            '<div class="diffnoteholder61"',
-            ($displayed ? "" : " style=\"display:none\""), ">",
+            '<td class="difflnote61"><div class="diffnoteholder61" style="display:none">',
             Ht::form($this->hoturl_post("pset", array("savelinenote" => 1)),
                      array("onsubmit" => "return savelinenote61(this)")),
-            "<div class=\"f-contain\">",
-            Ht::hidden("file", $file),
-            Ht::hidden("line", $lineid),
+            '<div class="f-contain">',
+            Ht::hidden("file", ""),
+            Ht::hidden("line", ""),
             Ht::hidden("iscomment", "", array("class" => "iscomment")),
-            "<textarea class=\"diffnoteentry61\" name=\"note\">", htmlspecialchars($note[1]), "</textarea><br />";
-        echo Ht::submit("Comment", array("onclick" => "return setiscomment61(this,1)")),
-            ' ', Ht::submit("Grade", array("onclick" => "return setiscomment61(this,'')")),
-            '<span class="ajaxsave61"></span>',
-            "</div></form></div></td></tr>";
+            '<textarea class="diffnoteentry61" name="note"></textarea>',
+            '<div class="aab aabr difflnoteaa61">',
+            '<div class="aabut">',
+            Ht::submit("Save comment"),
+            '</div><div class="aabut">';
+        if ($this->user_can_see_grades)
+            echo Ht::hidden("iscomment", 1);
+        else
+            echo Ht::checkbox("iscomment", 1), '&nbsp;', Ht::label("Show immediately");
+        echo '</div></div></div></form></div></td></tr>';
     }
 }

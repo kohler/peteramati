@@ -1682,19 +1682,20 @@ function remove_tr(tr) {
 }
 
 function unedit(tr) {
-    while (tr && tr.getAttribute("data-pa-savednote") === null)
+    var savednote;
+    while (tr && (savednote = tr.getAttribute("data-pa-savednote")) === null)
         tr = tr.parentNode;
-    if (tr && note_same(tr.getAttribute("data-pa-savednote"), $(tr).find("textarea").val())) {
+    if (tr && note_same(savednote, $(tr).find("textarea").val())) {
         var $tr = $(tr);
         $tr.find(":focus").blur();
-        if (tr.getAttribute("data-pa-savednote") === "")
+        if (savednote === "")
             remove_tr(tr);
         else {
             var iscomment = !!tr.getAttribute("data-pa-iscomment"),
                 $td = $tr.find("td.difflnote61"),
                 $note = $('<div class="note61' + (iscomment ? " commentnote" : " gradenote") + '" style="display:none"></div>'),
                 $edit = $td.find(".diffnoteholder61");
-            $note.text(tr.getAttribute("data-pa-savednote"));
+            $note.text(savednote);
             $td.append($note);
             $edit.slideUp(80).queue(function () { $edit.remove(); });
             $note.slideDown(80);
@@ -1742,7 +1743,7 @@ function linenote61(event) {
         return true;
     }
 
-    var $tr = anal.notetr && $(anal.notetr), j, text = null, iscomment = null;
+    var $tr = anal.notetr && $(anal.notetr), j, text = null, iscomment = false;
     if ($tr && !$tr.find("textarea").length) {
         text = $tr.find("div.note61").text();
         iscomment = $tr.find("div.note61").is(".commentnote");
@@ -1767,8 +1768,9 @@ function linenote61(event) {
         j[0].setSelectionRange && j[0].setSelectionRange(text.length, text.length);
     }
     j.autogrow().keyup(keyup);
-    $tr.find("[name='file']").val(anal.filename);
-    $tr.find("[name='line']").val(anal.lineid);
+    $tr.find("input[name=file]").val(anal.filename);
+    $tr.find("input[name=line]").val(anal.lineid);
+    $tr.find("input[name=iscomment]").prop("checked", iscomment);
     $tr.children().hide().slideDown(100);
     return false;
 }
@@ -1840,11 +1842,6 @@ function gradetotal61() {
 
 function gradesubmit61(form) {
     return ajaxsave61(form, gradetotal61);
-}
-
-function setiscomment61(e, val) {
-    jQuery(e).closest("form").find(".iscomment").val(val);
-    return true;
 }
 
 function fold61(sel, arrowholder, direction) {
