@@ -525,13 +525,11 @@ class ContactView {
         if ($info->pset->gitless)
             return;
 
-        $hash = null;
         if ($repo && !$info->user_can_view_repo_contents)
             $value = "(unconfirmed repository)";
-        else if ($repo && $repo->snaphash) {
+        else if ($repo && $repo->snaphash)
             $value = substr($repo->snaphash, 0, 7) . " " . htmlspecialchars($repo->snapcommitline);
-            $hash = $repo->snaphash;
-        } else if ($repo)
+        else if ($repo)
             $value = "(checking)";
         else
             $value = "(no repo yet)";
@@ -568,8 +566,8 @@ class ContactView {
 
         if ($commitgroup) {
             echo "<div class=\"commitcontainer61\" data-pa-pset=\"", htmlspecialchars($info->pset->urlkey);
-            if ($hash)
-                echo "\" data-pa-commit=\"", $hash;
+            if ($repo && $repo->snaphash && $info->can_view_repo_contents)
+                echo "\" data-pa-commit=\"", $repo->snaphash;
             echo "\">";
             Ht::stash_script("checklatest61()", "checklatest61");
         }
