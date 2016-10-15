@@ -45,28 +45,15 @@ function add_callback(cb1, cb2) {
         return cb1 || cb2;
 }
 
-function staged_foreach(a, f, backwards) {
-    var i = (backwards ? a.length - 1 : 0);
-    var step = (backwards ? -1 : 1);
-    var stagef = function () {
-        var x;
-        for (x = 0; i >= 0 && i < a.length && x < 100; i += step, ++x)
-            f(a[i]);
-        if (i < a.length)
-            setTimeout(stagef, 0);
-    };
-    stagef();
-}
-
 
 // promises
-function Promise(value) {
+function HPromise(value) {
     this.value = value;
     this.state = value === undefined ? false : 1;
     this.c = [];
 }
-Promise.prototype.then = function (yes, no) {
-    var next = new Promise;
+HPromise.prototype.then = function (yes, no) {
+    var next = new HPromise;
     this.c.push([no, yes, next]);
     if (this.state !== false)
         this._resolve();
@@ -76,7 +63,7 @@ Promise.prototype.then = function (yes, no) {
     }
     return next;
 };
-Promise.prototype._resolve = function () {
+HPromise.prototype._resolve = function () {
     var i, x, f, v;
     for (i in this.c) {
         x = this.c[i];
@@ -93,21 +80,21 @@ Promise.prototype._resolve = function () {
     }
     this.c = [];
 };
-Promise.prototype.fulfill = function (value) {
+HPromise.prototype.fulfill = function (value) {
     if (this.state === false) {
         this.value = value;
         this.state = 1;
         this._resolve();
     }
 };
-Promise.prototype.reject = function (reason) {
+HPromise.prototype.reject = function (reason) {
     if (this.state === false) {
         this.value = reason;
         this.state = 0;
         this._resolve();
     }
 };
-Promise.prototype.onThen = function (f) {
+HPromise.prototype.onThen = function (f) {
     this.on = add_callback(this.on, f);
     return this;
 };
@@ -178,7 +165,10 @@ jQuery.fn.extend({
         return g;
     },
     scrollIntoView: function () {
-        var p = this.geometry(), w = jQuery(window).geometry();
+        var p = this.geometry(), x = this[0].parentNode;
+        while (x && x.tagName && $(x).css("overflow-y") === "visible")
+            x = x.parentNode;
+        var w = jQuery(x && x.tagName ? x : window).geometry();
         if (p.top < w.top)
             this[0].scrollIntoView();
         else if (p.bottom > w.bottom)
@@ -205,9 +195,16 @@ window.escape_entities = (function () {
     return function (s) {
         if (s === null || typeof s === "number")
             return s;
-        return s.replace(re, function (match) {
-            return rep[match];
-        });
+        return s.replace(re, function (match) { return rep[match]; });
+    };
+})();
+
+window.unescape_entities = (function () {
+    var re = /&.*?;/g, rep = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&apos;": "'", "&#039;": "'"};
+    return function (s) {
+        if (s === null || typeof s === "number")
+            return s;
+        return s.replace(re, function (match) { return rep[match]; });
     };
 })();
 
@@ -247,15 +244,16 @@ function ordinal(n) {
 }
 
 function commajoin(a, joinword) {
+    var l = a.length;
     joinword = joinword || "and";
-    if (a.length == 0)
+    if (l == 0)
         return "";
-    else if (a.length == 1)
+    else if (l == 1)
         return a[0];
-    else if (a.length == 2)
+    else if (l == 2)
         return a[0] + " " + joinword + " " + a[1];
     else
-        return a.slice(0, a.length - 1).join(", ") + ", " + joinword + " " + a[a.length - 1];
+        return a.slice(0, l - 1).join(", ") + ", " + joinword + " " + a[l - 1];
 }
 
 function sprintf(fmt) {
@@ -280,7 +278,7 @@ function sprintf(fmt) {
                 conv[3] = 6;
             if (conv[4] == "g") {
                 arg = Number(arg).toPrecision(conv[3]).toString();
-                arg = arg.replace(/[.](\d*[1-9])?0+(|e.*)$/,
+                arg = arg.replace(/\.(\d*[1-9])?0+(|e.*)$/,
                                   function (match, p1, p2) {
                                       return (p1 == null ? "" : "." + p1) + p2;
                                   });
@@ -588,19 +586,15 @@ function rangeclick(evt, elt, kind) {
 var make_bubble = (function () {
 var capdir = ["Top", "Right", "Bottom", "Left"],
     lcdir = ["top", "right", "bottom", "left"],
-    dir_to_taildir = {
-        "0": 0, "1": 1, "2": 2, "3": 3,
-        "t": 0, "r": 1, "b": 2, "l": 3,
-        "n": 0, "e": 1, "s": 2, "w": 3
-    },
+    szdir = ["height", "width"],
     SPACE = 8;
 
-function cssbc(dir) {
-    return "border" + capdir[dir] + "Color";
+function cssborder(dir, suffix) {
+    return "border" + capdir[dir] + suffix;
 }
 
-function cssbw(dir) {
-    return "border" + capdir[dir] + "Width";
+function cssbc(dir) {
+    return cssborder(dir, "Color");
 }
 
 var roundpixel = Math.round;
@@ -619,20 +613,15 @@ function make_model(color) {
 }
 
 function calculate_sizes(color) {
-    var j = make_model(color), tail = j.children();
+    var $model = make_model(color), tail = $model.children(), ds, x;
     var sizes = [tail.width(), tail.height()];
-    j.remove();
+    for (ds = 0; ds < 4; ++ds) {
+        sizes[lcdir[ds]] = 0;
+        if ((x = $model.css("margin" + capdir[ds])) && (x = parseFloat(x)))
+            sizes[lcdir[ds]] = x;
+    }
+    $model.remove();
     return sizes;
-}
-
-function expand_near(epos, color) {
-    var dir, x, j = make_model(color);
-    epos = jQuery.extend({}, epos);
-    for (dir = 0; dir < 4; ++dir)
-        if ((x = j.css("margin" + capdir[dir])) && (x = parseFloat(x)))
-            epos[lcdir[dir]] += (dir == 0 || dir == 3 ? -x : x);
-    j.remove();
-    return epos;
 }
 
 return function (content, bubopt) {
@@ -644,7 +633,7 @@ return function (content, bubopt) {
     else if (typeof bubopt === "string")
         bubopt = {color: bubopt};
 
-    var nearpos = null, dirspec = bubopt.dir || "r", dir = null,
+    var nearpos = null, dirspec = bubopt.dir, dir = null,
         color = bubopt.color ? " " + bubopt.color : "";
 
     var bubdiv = $('<div class="bubble' + color + '" style="margin:0"><div class="bubtail bubtail0' + color + '" style="width:0;height:0"></div><div class="bubcontent"></div><div class="bubtail bubtail1' + color + '" style="width:0;height:0"></div></div>')[0];
@@ -656,104 +645,174 @@ return function (content, bubopt) {
     var divbw = null;
 
     function change_tail_direction() {
-        var bw = [0, 0, 0, 0];
-        divbw = parseFloat($(bubdiv).css(cssbw(dir)));
+        var bw = [0, 0, 0, 0], trw = sizes[1], trh = sizes[0] / 2;
+        divbw = parseFloat($(bubdiv).css(cssborder(dir, "Width")));
         divbw !== divbw && (divbw = 0); // eliminate NaN
-        bw[dir^1] = bw[dir^3] = (sizes[0] / 2) + "px";
-        bw[dir^2] = sizes[1] + "px";
+        bw[dir^1] = bw[dir^3] = trh + "px";
+        bw[dir^2] = trw + "px";
         bubch[0].style.borderWidth = bw.join(" ");
-        bw[dir^1] = bw[dir^3] = Math.max(sizes[0] / 2 - 0.77*divbw, 0) + "px";
-        bw[dir^2] = Math.max(sizes[1] - 0.77*divbw, 0) + "px";
+        bw[dir^1] = bw[dir^3] = trh + "px";
+        bw[dir^2] = trw + "px";
         bubch[2].style.borderWidth = bw.join(" ");
 
-        var i, yc;
-        for (i = 1; i <= 3; ++i)
+        for (var i = 1; i <= 3; ++i)
             bubch[0].style[lcdir[dir^i]] = bubch[2].style[lcdir[dir^i]] = "";
-        bubch[0].style[lcdir[dir]] = (-sizes[1]) + "px";
-        bubch[2].style[lcdir[dir]] = (-sizes[1] + divbw) + "px";
+        bubch[0].style[lcdir[dir]] = (-trw - divbw) + "px";
+        // Offset the inner triangle so that the border width in the diagonal
+        // part of the tail, is visually similar to the border width
+        var trdelta = (divbw / trh) * Math.sqrt(trw * trw + trh * trh);
+        bubch[2].style[lcdir[dir]] = (-trw - divbw + trdelta) + "px";
 
         for (i = 0; i < 3; i += 2)
             bubch[i].style.borderLeftColor = bubch[i].style.borderRightColor =
             bubch[i].style.borderTopColor = bubch[i].style.borderBottomColor = "transparent";
 
-        yc = to_rgba($(bubdiv).css("backgroundColor")).replace(/([\d.]+)\)/, function (s, p1) {
+        var yc = to_rgba($(bubdiv).css("backgroundColor")).replace(/([\d.]+)\)/, function (s, p1) {
             return (0.75 * p1 + 0.25) + ")";
         });
         bubch[0].style[cssbc(dir^2)] = $(bubdiv).css(cssbc(dir));
-        bubch[2].style[cssbc(dir^2)] = yc;
+        assign_style_property(bubch[2], cssbc(dir^2), yc);
     }
 
-    function constrain(za, z0, z1, bdim, noconstrain) {
-        var z = za - bdim / 2, size = sizes[0];
+    function constrainmid(nearpos, wpos, ds, ds2) {
+        var z0 = nearpos[lcdir[ds]], z1 = nearpos[lcdir[ds^2]],
+            z = (1 - ds2) * z0 + ds2 * z1;
+        z = Math.max(z, Math.min(z1, wpos[lcdir[ds]] + SPACE));
+        return Math.min(z, Math.max(z0, wpos[lcdir[ds^2]] - SPACE));
+    }
+
+    function constrain(za, wpos, bpos, ds, ds2, noconstrain) {
+        var z0 = wpos[lcdir[ds]], z1 = wpos[lcdir[ds^2]],
+            bdim = bpos[szdir[ds&1]],
+            z = za - ds2 * bdim;
         if (!noconstrain && z < z0 + SPACE)
-            z = Math.min(za - size, z0 + SPACE);
+            z = Math.min(za - sizes[0], z0 + SPACE);
         else if (!noconstrain && z + bdim > z1 - SPACE)
-            z = Math.max(za + size - bdim, z1 - SPACE - bdim);
+            z = Math.max(za + sizes[0] - bdim, z1 - SPACE - bdim);
         return z;
     }
 
-    function errlog(d, ya, y, wpos, bpos, err) {
-        var ex = [d, divbw, ya, y];
-        if (window.JSON)
-            ex.push(JSON.stringify({"n": nearpos, "w": wpos, "b": bpos}));
-        log_jserror({"error": ex.join(" ")}, err);
+    function bpos_wconstraint(wpos, ds) {
+        var xw = Math.max(ds === 3 ? 0 : nearpos.left - wpos.left,
+                          ds === 1 ? 0 : wpos.right - nearpos.right);
+        if ((ds === "h" || ds === 1 || ds === 3) && xw > 100)
+            return Math.min(wpos.width, xw) - 3*SPACE;
+        else
+            return wpos.width - 3*SPACE;
     }
 
     function make_bpos(wpos, ds) {
-        var bj = $(bubdiv);
-        bj.css("maxWidth", "");
-        var bpos = bj.geometry(true);
-        var lw = nearpos.left - wpos.left, rw = wpos.right - nearpos.right;
-        var xw = Math.max(ds === 1 ? 0 : lw, ds === 3 ? 0 : rw);
-        var wb = wpos.width;
-        if ((ds === "h" || ds === 1 || ds === 3) && xw > 100)
-            wb = Math.min(wb, xw);
-        if (wb < bpos.width - 3*SPACE) {
-            bj.css("maxWidth", wb - 3*SPACE);
-            bpos = bj.geometry(true);
+        var $b = $(bubdiv);
+        $b.css("maxWidth", "");
+        var bg = $b.geometry(true);
+        var wconstraint = bpos_wconstraint(wpos, ds);
+        if (wconstraint < bg.width) {
+            $b.css("maxWidth", wconstraint);
+            bg = $b.geometry(true);
         }
+        // bpos[D] is the furthest position in direction D, assuming
+        // the bubble was placed on that side. E.g., bpos[0] is the
+        // top of the bubble, assuming the bubble is placed over the
+        // reference.
+        var bpos = [nearpos.top - sizes.bottom - bg.height - sizes[0],
+                    nearpos.right + sizes.left + bg.width + sizes[0],
+                    nearpos.bottom + sizes.top + bg.height + sizes[0],
+                    nearpos.left - sizes.right - bg.width - sizes[0]];
+        bpos.width = bg.width;
+        bpos.height = bg.height;
+        bpos.wconstraint = wconstraint;
         return bpos;
     }
 
+    function remake_bpos(bpos, wpos, ds) {
+        var wconstraint = bpos_wconstraint(wpos, ds);
+        if ((wconstraint < bpos.wconstraint && wconstraint < bpos.width)
+            || (wconstraint > bpos.wconstraint && bpos.width >= bpos.wconstraint))
+            bpos = make_bpos(wpos, ds);
+        return bpos;
+    }
+
+    function parse_dirspec(dirspec, pos) {
+        var res;
+        if (dirspec.length > pos
+            && (res = "0123trblnesw".indexOf(dirspec.charAt(pos))) >= 0)
+            return res % 4;
+        return -1;
+    }
+
+    function csscornerradius(corner, index) {
+        var divbr = $(bubdiv).css("border" + corner + "Radius"), pos;
+        if (!divbr)
+            return 0;
+        if ((pos = divbr.indexOf(" ")) > -1)
+            divbr = index ? divbr.substring(pos + 1) : divbr.substring(0, pos);
+        return parseFloat(divbr);
+    }
+
+    function constrainradius(x, bpos, ds) {
+        var x0, x1;
+        if (ds & 1) {
+            x0 = csscornerradius(capdir[0] + capdir[ds], 1);
+            x1 = csscornerradius(capdir[2] + capdir[ds], 1);
+        } else {
+            x0 = csscornerradius(capdir[ds] + capdir[3], 1);
+            x1 = csscornerradius(capdir[ds] + capdir[1], 1);
+        }
+        return Math.min(Math.max(x, x0), bpos[szdir[(ds&1)^1]] - x1 - sizes[0]);
+    }
+
     function show() {
-        var noflip = /!/.test(dirspec), noconstrain = /\*/.test(dirspec),
-            ds = dirspec.replace(/[!*]/g, "");
-        if (dir_to_taildir[ds] != null)
-            ds = dir_to_taildir[ds];
         if (!sizes)
             sizes = calculate_sizes(color);
 
-        var wpos = $(window).geometry();
-        var bpos = make_bpos(wpos, ds);
-        var size = sizes[0];
-        var bw = bpos.width + size, bh = bpos.height + size;
+        // parse dirspec
+        if (dirspec == null)
+            dirspec = "r";
+        var noflip = /!/.test(dirspec),
+            noconstrain = /\*/.test(dirspec),
+            dsx = dirspec.replace(/[^a0-3neswtrblhv]/, ""),
+            ds = parse_dirspec(dsx, 0),
+            ds2 = parse_dirspec(dsx, 1);
+        if (ds >= 0 && ds2 >= 0 && (ds2 & 1) != (ds & 1))
+            ds2 = (ds2 === 1 || ds2 === 2 ? 1 : 0);
+        else
+            ds2 = 0.5;
+        if (ds < 0)
+            ds = /^[ahv]$/.test(dsx) ? dsx : "a";
 
-        if (ds === "a" || ds === "") {
-            if (bh > Math.max(nearpos.top - wpos.top, wpos.bottom - nearpos.bottom))
+        var wpos = $(window).geometry();
+        var bpos = make_bpos(wpos, dsx);
+
+        if (ds === "a") {
+            if (bpos.height + sizes[0] > Math.max(nearpos.top - wpos.top, wpos.bottom - nearpos.bottom)) {
                 ds = "h";
-            else
+                bpos = remake_bpos(bpos, wpos, ds);
+            } else
                 ds = "v";
         }
-        if ((ds === "v" || ds === 0 || ds === 2) && !noflip
-            && nearpos.bottom + bh > wpos.bottom - 3*SPACE
-            && nearpos.top - bh < wpos.top + 3*SPACE
-            && (nearpos.left - bw >= wpos.left + 3*SPACE
-                || nearpos.right + bw <= wpos.right - 3*SPACE))
+
+        var wedge = [wpos.top + 3*SPACE, wpos.right - 3*SPACE,
+                     wpos.bottom - 3*SPACE, wpos.left + 3*SPACE];
+        if ((ds === "v" || ds === 0 || ds === 2) && !noflip && ds2 < 0
+            && bpos[2] > wedge[2] && bpos[0] < wedge[0]
+            && (bpos[3] >= wedge[3] || bpos[1] <= wedge[1])) {
             ds = "h";
-        if ((ds === "v" && nearpos.bottom + bh > wpos.bottom - 3*SPACE
-             && nearpos.top - bh > wpos.top + 3*SPACE)
-            || (ds === 0 && !noflip && nearpos.bottom + bh > wpos.bottom)
-            || (ds === 2 && (noflip || nearpos.top - bh >= wpos.top + SPACE)))
+            bpos = remake_bpos(bpos, wpos, ds);
+        }
+        if ((ds === "v" && bpos[2] > wedge[2] && bpos[0] > wedge[0])
+            || (ds === 0 && !noflip && bpos[2] > wpos.bottom
+                && wpos.top - bpos[0] < bpos[2] - wpos.bottom)
+            || (ds === 2 && (noflip || bpos[0] >= wpos.top + SPACE)))
             ds = 2;
         else if (ds === "v" || ds === 0 || ds === 2)
             ds = 0;
-        else if ((ds === "h" && nearpos.left - bw < wpos.left + 3*SPACE
-                  && nearpos.right + bw < wpos.right - 3*SPACE)
-                 || (ds === 1 && !noflip && nearpos.left - bw < wpos.left)
-                 || (ds === 3 && (noflip || nearpos.right + bw <= wpos.right - SPACE)))
+        else if ((ds === "h" && bpos[3] - wpos.left < wpos.right - bpos[1])
+                 || (ds === 1 && !noflip && bpos[3] < wpos.left)
+                 || (ds === 3 && (noflip || bpos[1] <= wpos.right - SPACE)))
             ds = 3;
         else
             ds = 1;
+        bpos = remake_bpos(bpos, wpos, ds);
 
         if (ds !== dir) {
             dir = ds;
@@ -761,36 +820,27 @@ return function (content, bubopt) {
         }
 
         var x, y, xa, ya, d;
-        if (dir & 1) {
-            ya = (nearpos.top + nearpos.bottom) / 2;
-            y = constrain(ya, wpos.top, wpos.bottom, bpos.height, noconstrain);
-            d = roundpixel(ya - y - size / 2);
-            try {
-                bubch[0].style.top = d + "px";
-                bubch[2].style.top = (d + 0.77*divbw) + "px";
-            } catch (err) {
-                errlog(d, ya, y, wpos, bpos, err);
-            }
+        var divbw = parseFloat($(bubdiv).css(cssborder(ds & 1 ? 0 : 3, "Width")));
+        if (ds & 1) {
+            ya = constrainmid(nearpos, wpos, 0, ds2);
+            y = constrain(ya, wpos, bpos, 0, ds2, noconstrain);
+            d = constrainradius(roundpixel(ya - y - sizes[0] / 2 - divbw), bpos, ds);
+            bubch[0].style.top = bubch[2].style.top = d + "px";
 
-            if (dir == 1)
-                x = nearpos.left - bpos.width - sizes[1] - 1;
+            if (ds == 1)
+                x = nearpos.left - sizes.right - bpos.width - sizes[1] - 1;
             else
-                x = nearpos.right + sizes[1];
+                x = nearpos.right + sizes.left + sizes[1];
         } else {
-            xa = (nearpos.left + nearpos.right) / 2;
-            x = constrain(xa, wpos.left, wpos.right, bpos.width, noconstrain);
-            d = roundpixel(xa - x - size / 2);
-            try {
-                bubch[0].style.left = d + "px";
-                bubch[2].style.left = (d + 0.77*divbw) + "px";
-            } catch (err) {
-                errlog(d, xa, x, wpos, bpos, err);
-            }
+            xa = constrainmid(nearpos, wpos, 3, ds2);
+            x = constrain(xa, wpos, bpos, 3, ds2, noconstrain);
+            d = constrainradius(roundpixel(xa - x - sizes[0] / 2 - divbw), bpos, ds);
+            bubch[0].style.left = bubch[2].style.left = d + "px";
 
-            if (dir == 0)
-                y = nearpos.bottom + sizes[1];
+            if (ds == 0)
+                y = nearpos.bottom + sizes.top + sizes[1];
             else
-                y = nearpos.top - bpos.height - sizes[1] - 1;
+                y = nearpos.top - sizes.bottom - bpos.height - sizes[1] - 1;
         }
 
         bubdiv.style.left = roundpixel(x) + "px";
@@ -806,22 +856,24 @@ return function (content, bubopt) {
     var bubble = {
         near: function (epos, reference) {
             var i, off;
-            if (typeof epos === "string" || epos.tagName || epos.jquery)
-                epos = $(epos).geometry(true);
+            if (typeof epos === "string" || epos.tagName || epos.jquery) {
+                epos = $(epos);
+                if (dirspec == null)
+                    dirspec = epos.attr("data-tooltip-dir");
+                epos = epos.geometry(true);
+            }
             for (i = 0; i < 4; ++i)
                 if (!(lcdir[i] in epos) && (lcdir[i ^ 2] in epos))
                     epos[lcdir[i]] = epos[lcdir[i ^ 2]];
             if (reference && (reference = $(reference)) && reference.length
                 && reference[0] != window)
                 epos = geometry_translate(epos, reference.geometry());
-            if (!epos.exact)
-                epos = expand_near(epos, color);
             nearpos = epos;
             show();
             return bubble;
         },
         at: function (x, y, reference) {
-            return bubble.near({top: y, left: x, exact: true}, reference);
+            return bubble.near({top: y, left: x}, reference);
         },
         dir: function (dir) {
             dirspec = dir;
@@ -881,11 +933,16 @@ return function (content, bubopt) {
 })();
 
 
-function tooltip(elt) {
-    var j = $(elt), near, tt;
+function tooltip(info) {
+    if (window.disable_tooltip)
+        return null;
 
-    function jqnear(attr) {
-        var x = j.attr(attr);
+    var j;
+    if (info.tagName)
+        info = {element: info};
+    j = $(info.element);
+
+    function jqnear(x) {
         if (x && x.charAt(0) == ">")
             return j.find(x.substr(1));
         else if (x)
@@ -894,109 +951,135 @@ function tooltip(elt) {
             return $();
     }
 
-    var content = j.attr("data-tooltip") || jqnear("data-tooltipcontent").html();
-    if (!content)
-        return null;
-
-    if ((tt = window.global_tooltip)) {
-        if (tt.elt !== elt || tt.content !== content)
-            tt.erase();
-        else
-            return tt;
-    }
-
-    var dir = j.attr("data-tooltipdir") || "v",
-        bub = make_bubble(content, {color: "tooltip", dir: dir}),
-        to = null, refcount = 0;
+    var tt = null, content = info.content, bub = null, to = null, refcount = 0;
     function erase() {
         to = clearTimeout(to);
-        bub.remove();
+        bub && bub.remove();
         j.removeData("hotcrp_tooltip");
         if (window.global_tooltip === tt)
             window.global_tooltip = null;
+    }
+    function show_bub() {
+        if (content && !bub) {
+            bub = make_bubble(content, {color: "tooltip dark", dir: info.dir});
+            bub.near(info.near || info.element).hover(tt.enter, tt.exit);
+        } else if (content)
+            bub.html(content);
+        else if (bub) {
+            bub && bub.remove();
+            bub = null;
+        }
     }
     tt = {
         enter: function () {
             to = clearTimeout(to);
             ++refcount;
+            return tt;
         },
         exit: function () {
-            var delay = j.attr("data-tooltiptype") == "focus" ? 0 : 200;
+            var delay = info.type == "focus" ? 0 : 200;
             to = clearTimeout(to);
             if (--refcount == 0)
                 to = setTimeout(erase, delay);
+            return tt;
         },
-        erase: erase, elt: elt, content: content, bubble: bub
+        erase: erase,
+        elt: info.element,
+        html: function (new_content) {
+            if (new_content === undefined)
+                return content;
+            else {
+                content = new_content;
+                bub_show();
+            }
+            return tt;
+        }
     };
-    j.data("hotcrp_tooltip", tt);
-    near = jqnear("data-tooltipnear")[0] || elt;
-    bub.near(near).hover(tt.enter, tt.exit);
-    return window.global_tooltip = tt;
+
+    if (info.dir == null)
+        info.dir = j.attr("data-tooltip-dir") || "v";
+    if (info.type == null)
+        info.type = j.attr("data-tooltip-type");
+    if (info.near == null)
+        info.near = j.attr("data-tooltip-near");
+    if (info.near)
+        info.near = jqnear(info.near)[0];
+
+    function complete(new_content) {
+        var tx = window.global_tooltip;
+        content = new_content;
+        if (tx && tx.elt == info.element && tx.html() == content && !info.done)
+            tt = tx;
+        else {
+            tx && tx.erase();
+            j.data("hotcrp_tooltip", tt);
+            show_bub();
+            window.global_tooltip = tt;
+        }
+    }
+
+    if (content == null && j[0].hasAttribute("data-tooltip"))
+        content = j.attr("data-tooltip");
+    if (content == null && j[0].hasAttribute("data-tooltip-content-selector"))
+        content = jqnear(j.attr("data-tooltip-content-selector")).html();
+    if (content == null && j[0].hasAttribute("data-tooltip-content-promise"))
+        geval.call(this, j[0].getAttribute("data-tooltip-content-promise")).then(complete);
+    else
+        complete(content);
+    info.done = true;
+    return tt;
 }
 
-function tooltip_enter(evt) {
-    var j = $(this), x, text;
-    var tt = j.data("hotcrp_tooltip");
-    if (!tt && !window.disable_tooltip)
-        tt = tooltip(this);
-    if (tt)
-        tt.enter();
+function tooltip_enter() {
+    var tt = $(this).data("hotcrp_tooltip") || tooltip(this);
+    tt && tt.enter();
 }
 
-function tooltip_leave(evt) {
-    var j = $(this), tt;
-    if ((tt = j.data("hotcrp_tooltip")))
-        tt.exit();
+function tooltip_leave() {
+    var tt = $(this).data("hotcrp_tooltip");
+    tt && tt.exit();
+}
+
+function tooltip_erase() {
+    var tt = $(this).data("hotcrp_tooltip");
+    tt && tt.erase();
 }
 
 function add_tooltip() {
     var j = jQuery(this);
-    if (j.attr("data-tooltiptype") == "focus")
+    if (j.attr("data-tooltip-type") == "focus")
         j.on("focus", tooltip_enter).on("blur", tooltip_leave);
     else
         j.hover(tooltip_enter, tooltip_leave);
+    j.removeClass("need-tooltip");
 }
 
-jQuery(function () { jQuery(".hottooltip").each(add_tooltip); });
+jQuery(function () { jQuery(".hottooltip, .need-tooltip").each(add_tooltip); });
 
 
 // temporary text
 window.mktemptext = (function () {
-function setclass(e, on) {
-    jQuery(e).toggleClass("temptext", on);
-}
-function blank() {
+function ttaction(event) {
+    var $e = $(this), p = $e.attr("placeholder"), v = $e.val();
+    if (event.type == "focus" && v === p)
+        $e.val("");
+    if (event.type == "blur" && (v === "" | v === p))
+        $e.val(p);
+    $e.toggleClass("temptext", event.type != "focus" && (v === "" || v === p));
 }
 
-return function (e, text) {
-    if (typeof this === "object" && typeof this.tagName === "string"
-        && this.tagName.toUpperCase() == "INPUT") {
-        text = typeof e === "number" ? this.getAttribute("hottemptext") : e;
-        e = this;
-    } else if (typeof e === "string")
-        e = $$(e);
-    var onfocus = e.onfocus || blank, onblur = e.onblur || blank;
-    e.onfocus = function (evt) {
-        if (this.value == text) {
-            this.value = "";
-            setclass(this, false);
-        }
-        onfocus.call(this, evt);
+if (Object.prototype.toString.call(window.operamini) === '[object OperaMini]'
+    || !("placeholder" in document.createElement("input"))
+    || !("placeholder" in document.createElement("textarea")))
+    return function (e) {
+        e = typeof e === "number" ? this : e;
+        $(e).on("focus blur change", ttaction);
+        ttaction.call(e, {type: "blur"});
     };
-    e.onblur = function (evt) {
-        if (this.value == "" || this.value == text) {
-            this.value = text;
-            setclass(this, true);
-        }
-        onblur.call(this, evt);
+else
+    return function (e) {
+        ttaction.call(typeof e === "number" ? this : e, {type: "focus"});
     };
-    jQuery(e).on("change", function () {
-        setclass(this, this.value == "" || this.value == text);
-    });
-    if (e.value == "")
-        e.value = text;
-    setclass(e, e.value == text);
-};
 })();
 
 
@@ -1155,6 +1238,8 @@ var strftime = (function () {
     };
 })();
 
+
+// initialization
 window.setLocalTime = (function () {
 var servhr24, showdifference = false;
 function setLocalTime(elt, servtime) {
@@ -1167,7 +1252,7 @@ function setLocalTime(elt, servtime) {
             s = strftime("%A %#e %b %Y %#R your time", d);
         else
             s = strftime("%A %#e %b %Y %#r your time", d);
-        if (elt.tagName.toUpperCase() == "SPAN") {
+        if (elt.tagName == "SPAN") {
             elt.innerHTML = " (" + s + ")";
             elt.style.display = "inline";
         } else {
@@ -1376,24 +1461,37 @@ function setajaxcheck(elt, rv) {
 
 // popup dialogs
 function popup_near(elt, anchor) {
+    var parent_offset = {left: 0, top: 0};
+    if (/popupbg/.test(elt.parentNode.className)) {
+        elt.parentNode.style.display = "block";
+        parent_offset = $(elt.parentNode).offset();
+    }
     var anchorPos = $(anchor).geometry();
     var wg = $(window).geometry();
     var x = (anchorPos.right + anchorPos.left - elt.offsetWidth) / 2;
     var y = (anchorPos.top + anchorPos.bottom - elt.offsetHeight) / 2;
-    elt.style.left = Math.max(wg.left + 5, Math.min(wg.right - 5 - elt.offsetWidth, x)) + "px";
-    elt.style.top = Math.max(wg.top + 5, Math.min(wg.bottom - 5 - elt.offsetHeight, y)) + "px";
+    x = Math.max(wg.left + 5, Math.min(wg.right - 5 - elt.offsetWidth, x)) - parent_offset.left;
+    y = Math.max(wg.top + 5, Math.min(wg.bottom - 5 - elt.offsetHeight, y)) - parent_offset.top;
+    elt.style.left = x + "px";
+    elt.style.top = y + "px";
+    var efocus = $(elt).find("input, button, textarea, select").filter(":visible").filter(":not(.dangerous)")[0];
+    efocus && efocus.focus();
 }
 
 function popup(anchor, which, dofold, populate) {
     var elt, form, elts, populates, i, xelt, type;
     if (typeof which === "string") {
         elt = $$("popup_" + which);
+        if (!elt)
+            log_jserror("no popup " + which);
         anchor = anchor || $$("popupanchor_" + which);
     }
 
-    if (elt && dofold)
+    if (dofold) {
         elt.className = "popupc";
-    else if (elt) {
+        if (/popupbg/.test(elt.parentNode.className))
+            elt.parentNode.style.display = "none";
+    } else {
         elt.className = "popupo";
         popup_near(elt, anchor);
     }
@@ -1406,7 +1504,7 @@ function popup(anchor, which, dofold, populate) {
             if (elts[i].className.indexOf("popup_populate") >= 0)
                 populates[elts[i].name] = elts[i];
         form = anchor;
-        while (form && form.tagName && form.tagName.toUpperCase() != "FORM")
+        while (form && form.tagName && form.tagName != "FORM")
             form = form.parentNode;
         elts = (form && form.tagName ? form.getElementsByTagName("input") : []);
         for (i = 0; i < elts.length; ++i)
@@ -1419,15 +1517,6 @@ function popup(anchor, which, dofold, populate) {
     }
 
     return false;
-}
-
-
-// JSON
-if (!window.JSON || !JSON.parse) {
-    JSON = window.JSON || {};
-    JSON.parse = function (text) {
-        return eval("(" + text + ")"); /* sigh */
-    };
 }
 
 
