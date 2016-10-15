@@ -433,67 +433,6 @@ function diff_line_code($t) {
     return str_replace("  ", " &nbsp;", htmlspecialchars($t));
 }
 
-function echo_linenote_entry_row($file, $lineid, $note, $displayed, $lnorder) {
-    global $Pset, $Me, $User, $Info;
-    $note_object = null;
-    if (is_object($note)) { // How the fuck did this shit get in the DB, why does PHP suck
-        $note_object = $note;
-        $note = [];
-        for ($i = 0; property_exists($note_object, $i); ++$i)
-            $note[] = $note_object->$i;
-    }
-    if (!is_array($note))
-        $note = array(false, $note);
-    if (!$Me->isPC || $Me == $User || $displayed) {
-        if ($Info->can_see_grades || $note[0]) {
-            echo '<tr class="diffl61 gw">', /* NB script depends on this class */
-                '<td colspan="2" class="difflnoteborder61"></td>',
-                '<td class="difflnote61">';
-            if ($lnorder) {
-                $links = array();
-                //list($pfile, $plineid) = $lnorder->get_prev($file, $lineid);
-                //if ($pfile)
-                //    $links[] = '<a href="#L' . $plineid . '_'
-                //        . html_id_encode($pfile) . '">&larr; Prev</a>';
-                list($nfile, $nlineid) = $lnorder->get_next($file, $lineid);
-                if ($nfile)
-                    $links[] = '<a href="#L' . $nlineid . '_'
-                        . html_id_encode($nfile) . '">Next &gt;</a>';
-                else
-                    $links[] = '<a href="#">Top</a>';
-                if (count($links))
-                    echo '<div class="difflnoteptr61">',
-                        join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
-            }
-            if (!is_string($note[1]))
-                error_log("fudge $User->github_username error: " . json_encode($note));
-            echo '<div class="note61',
-                ($note[0] ? ' commentnote' : ' gradenote'),
-                '">', htmlspecialchars($note[1]), '</div>',
-                '<div class="clear"></div></td></tr>';
-        }
-        return;
-    }
-    echo '<tr class="diffl61 gw',
-        ($note[0] ? ' isgrade61' : ' iscomment61'),
-        '" savednote61="', htmlspecialchars($note[1]), '">', /* NB script depends on this class */
-        '<td colspan="2" class="difflnoteborder61"></td>',
-        '<td class="difflnote61">',
-        '<div class="diffnoteholder61"',
-        ($displayed ? "" : " style=\"display:none\""), ">",
-        Ht::form($Info->hoturl_post("pset", array("savelinenote" => 1)),
-                 array("onsubmit" => "return savelinenote61(this)")),
-        "<div class=\"f-contain\">",
-        Ht::hidden("file", $file),
-        Ht::hidden("line", $lineid),
-        Ht::hidden("iscomment", "", array("class" => "iscomment")),
-        "<textarea class=\"diffnoteentry61\" name=\"note\">", htmlspecialchars($note[1]), "</textarea><br />";
-    echo Ht::submit("Comment", array("onclick" => "return setiscomment61(this,1)")),
-        ' ', Ht::submit("Grade", array("onclick" => "return setiscomment61(this,'')")),
-        '<span class="ajaxsave61"></span>',
-        "</div></form></div></td></tr>";
-}
-
 function echo_grade_cdf() {
     global $Conf, $Info, $Pset, $User, $Me;
     $sepx = $User->extension && $Pset->separate_extension_grades;
@@ -924,8 +863,7 @@ if ($Pset->gitless) {
 
     Ht::stash_script('jQuery(".diffnoteentry61").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
     echo "<table id=\"diff61linenotetemplate\" style=\"display:none\"><tbody>";
-    echo_linenote_entry_row("", "", array($Info->is_grading_commit(), ""),
-                            false, null);
+    $Info->echo_linenote_entry_row("", "", [$Info->is_grading_commit(), ""], false);
     echo "</tbody></table>";
 } else {
     if ($Pset->gitless_grades)

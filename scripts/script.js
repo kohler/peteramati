@@ -1593,19 +1593,19 @@ function remove_tr(tr) {
 }
 
 function unedit(tr) {
-    while (tr && tr.getAttribute("savednote61") === null)
+    while (tr && tr.getAttribute("data-pa-savednote") === null)
         tr = tr.parentNode;
-    if (tr && note_same(tr.getAttribute("savednote61"), $(tr).find("textarea").val())) {
+    if (tr && note_same(tr.getAttribute("data-pa-savednote"), $(tr).find("textarea").val())) {
         var $tr = $(tr);
         $tr.find(":focus").blur();
-        if (tr.getAttribute("savednote61") === "")
+        if (tr.getAttribute("data-pa-savednote") === "")
             remove_tr(tr);
         else {
-            var iscomment = !!tr.getAttribute("iscomment61"),
+            var iscomment = !!tr.getAttribute("data-pa-iscomment"),
                 $td = $tr.find("td.difflnote61"),
                 $note = $('<div class="note61' + (iscomment ? " commentnote" : " gradenote") + '" style="display:none"></div>'),
                 $edit = $td.find(".diffnoteholder61");
-            $note.text(tr.getAttribute("savednote61"));
+            $note.text(tr.getAttribute("data-pa-savednote"));
             $td.append($note);
             $edit.slideUp(80).queue(function () { $edit.remove(); });
             $note.slideDown(80);
@@ -1669,7 +1669,7 @@ function linenote61(event) {
 
     $tr = $($("#diff61linenotetemplate > tbody").html());
     $tr.insertAfter(anal.tr);
-    $tr.attr("savednote61", text === null ? "" : text).attr("iscomment61", iscomment ? "1" : null);
+    $tr.attr("data-pa-savednote", text === null ? "" : text).attr("data-pa-iscomment", iscomment ? "1" : null);
     $tr.find(".diffnoteholder61").show();
     j = $tr.find("textarea").focus();
     if (text !== null) {
@@ -1730,8 +1730,8 @@ function ajaxsave61(form, success) {
 
 function savelinenote61(form) {
     return ajaxsave61(form, function (data) {
-            jQuery(form).closest("tr").attr("savednote61", data.savednote)
-                .attr("iscomment61", data.iscomment ? "1" : null);
+            jQuery(form).closest("tr").attr("data-pa-savednote", data.savednote)
+                .attr("data-pa-iscomment", data.iscomment ? "1" : null);
             linenote61.unedit(form);
         });
 }
@@ -1827,7 +1827,7 @@ function gotoline61(x) {
 function beforeunload61(evt) {
     var x = jQuery("tr.gw"), i, j, textarea, note;
     for (i = 0; i < x.length; ++i)
-        if ((note = x[i].getAttribute("savednote61")) !== null) {
+        if ((note = x[i].getAttribute("data-pa-savednote")) !== null) {
             textarea = jQuery(x[i]).find("textarea");
             if (textarea.length && textarea.val() != note)
                 return (event.returnValue = "You have unsaved notes. You will lose them if you leave the page now.");
