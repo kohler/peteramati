@@ -77,9 +77,9 @@ if (isset($papersel) && count($papersel) == 0) {
 }
 
 if (isset($_REQUEST["monreq"]))
-    $Conf->header("Monitor external reviews", "mail", actionBar());
+    $Conf->header("Monitor external reviews", "mail");
 else
-    $Conf->header("Mail", "mail", actionBar());
+    $Conf->header("Mail", "mail");
 
 $subjectPrefix = "[" . $Opt["shortName"] . "] ";
 
@@ -154,14 +154,14 @@ class MailSender {
                 && (strpos($_REQUEST["emailBody"], "%REVIEWS%")
                     || strpos($_REQUEST["emailBody"], "%COMMENTS%"))) {
                 if (!$Conf->timeAuthorViewReviews())
-                    echo "<div class='warning'>Although these mails contain reviews and/or comments, authors can’t see reviews or comments on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nowrap'>Change this setting</a>)</div>\n";
+                    echo "<div class='warning'>Although these mails contain reviews and/or comments, authors can’t see reviews or comments on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change this setting</a>)</div>\n";
                 else if (!$Conf->timeAuthorViewReviews(true))
-                    echo "<div class='warning'>Mails to users who have not completed their own reviews will not include reviews or comments. (<a href='", hoturl("settings", "group=dec"), "' class='nowrap'>Change the setting</a>)</div>\n";
+                    echo "<div class='warning'>Mails to users who have not completed their own reviews will not include reviews or comments. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change the setting</a>)</div>\n";
             }
             if (isset($_REQUEST["emailBody"]) && $Me->privChair
                 && substr($recipients, 0, 4) == "dec:") {
                 if (!$Conf->timeAuthorViewDecision())
-                    echo "<div class='warning'>You appear to be sending an acceptance or rejection notification, but authors can’t see paper decisions on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nowrap'>Change this setting</a>)</div>\n";
+                    echo "<div class='warning'>You appear to be sending an acceptance or rejection notification, but authors can’t see paper decisions on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change this setting</a>)</div>\n";
             }
             echo "<div id='foldmail' class='foldc fold2c'>",
                 "<div class='fn fx2 warning'>In the process of preparing mail.  You will be able to send the prepared mail once this message disappears.<br /><span id='mailcount'></span></div>",

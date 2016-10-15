@@ -659,93 +659,6 @@ function _tryNewList($opt, $listtype) {
     }
 }
 
-function _one_quicklink($id, $baseUrl, $urlrest, $listtype, $isprev) {
-    global $Conf;
-    if ($listtype == "u") {
-        $result = $Conf->qx("select email from ContactInfo where email=?", $id);
-        $row = edb_row($result);
-        $paperText = htmlspecialchars($row ? $row[0] : $id);
-        $urlrest = "u=" . urlencode($id) . $urlrest;
-    } else {
-        $paperText = "#$id";
-        $urlrest = "p=" . $id . $urlrest;
-    }
-    return "<a id=\"quicklink_" . ($isprev ? "prev" : "next")
-        . "\" href=\"" . hoturl($baseUrl, $urlrest)
-        . "\" onclick=\"return !Miniajax.isoutstanding('revprevform', make_link_callback(this))\">"
-        . ($isprev ? $Conf->cacheableImage("_.gif", "&lt;-", null, "prev") : "")
-        . $paperText
-        . ($isprev ? "" : $Conf->cacheableImage("_.gif", "-&gt;", null, "next"))
-        . "</a>";
-}
-
-function quicklinks($id, $baseUrl, $args, $listtype) {
-    global $Me, $Conf, $CurrentList;
-
-    $list = false;
-    $CurrentList = 0;
-    if (isset($_REQUEST["ls"])
-        && ($listno = rcvtint($_REQUEST["ls"])) > 0
-        && isset($_SESSION["l"][$listno])
-        && substr(defval($_SESSION["l"][$listno], "listid", "p"), 0, 1) == $listtype) {
-        $list = $_SESSION["l"][$listno];
-        $CurrentList = $listno;
-    } else if (isset($_REQUEST["list"]) && $listtype == "p") {
-        $l = $_REQUEST["list"];
-        if (preg_match('/\A[a-z]+\z/', $l))
-            $list = _tryNewList(array("t" => $l), $listtype);
-        else if (preg_match('/\A(all|s):(.*)\z/s', $l, $m))
-            $list = _tryNewList(array("t" => $m[1], "q" => $m[2]), $listtype);
-        else
-            $list = _tryNewList(array("q" => $l), $listtype);
-    }
-
-    $k = false;
-    if ($list)
-        $k = array_search($id, $list);
-
-    if ($k === false && !isset($_REQUEST["list"])) {
-        $CurrentList = 0;
-        $list = _tryNewList(array(), $listtype);
-        $k = array_search($id, $list);
-        if ($k === false && $Me->privChair) {
-            $list = _tryNewList(array("t" => "all"), $listtype);
-            $k = array_search($id, $list);
-        }
-        if ($k === false)
-            $list = false;
-    }
-
-    if (!$list)
-        return "";
-
-    if ($CurrentList == 0) {
-        $CurrentList = allocateListNumber($list["listid"]);
-        $_SESSION["l"][$CurrentList] = $list;
-    }
-    $_SESSION["l"][$CurrentList]["timestamp"] = time();
-
-    $urlrest = "&amp;ls=" . $CurrentList;
-    foreach ($args as $what => $val)
-        $urlrest .= "&amp;" . urlencode($what) . "=" . urlencode($val);
-
-    $x = "";
-    if ($k > 0)
-        $x .= _one_quicklink($list[$k - 1], $baseUrl, $urlrest, $listtype, true);
-    if (isset($list["description"])) {
-        $x .= ($k > 0 ? "&nbsp;&nbsp;" : "");
-        if (defval($list, "url"))
-            $x .= "<a href=\"" . Navigation::siteurl() . htmlspecialchars($list["url"]) . "\">" . $list["description"] . "</a>";
-        else
-            $x .= $list["description"];
-    }
-    if (isset($list[$k + 1])) {
-        $x .= ($k > 0 || isset($list["description"]) ? "&nbsp;&nbsp;" : "");
-        $x .= _one_quicklink($list[$k + 1], $baseUrl, $urlrest, $listtype, false);
-    }
-    return $x;
-}
-
 function goPaperForm($baseUrl = null, $args = array()) {
     global $Conf, $Me, $CurrentList;
     if ($Me->is_empty())
@@ -1189,7 +1102,7 @@ function whyNotText($whyNot, $action) {
                 $text .= "Authors can’t view paper reviews at the moment. ";
         } else
             $text .= "You can’t $action $thisPaper at the moment. ";
-        $text .= "(<a class='nowrap' href='" . hoturl("deadlines") . "'>View deadlines</a>) ";
+        $text .= "(<a class='nw' href='" . hoturl("deadlines") . "'>View deadlines</a>) ";
     }
     if (isset($whyNot['override']) && $whyNot['override'])
         $text .= "“Override deadlines” can override this restriction. ";
@@ -1207,66 +1120,12 @@ function whyNotText($whyNot, $action) {
         $text .= "If you know a valid review token, enter it above to edit that review. ";
     // finish it off
     if (isset($whyNot['chairMode']))
-        $text .= "(<a class='nowrap' href=\"" . self_href(array("forceShow" => 1)) . "\">" . ucfirst($action) . " the paper anyway</a>) ";
+        $text .= "(<a class='nw' href=\"" . self_href(array("forceShow" => 1)) . "\">" . ucfirst($action) . " the paper anyway</a>) ";
     if (isset($whyNot['forceShow']))
-        $text .= "(<a class='nowrap' href=\"". self_href(array("forceShow" => 1)) . "\">Override conflict</a>) ";
+        $text .= "(<a class='nw' href=\"". self_href(array("forceShow" => 1)) . "\">Override conflict</a>) ";
     if ($text && $action == "view")
         $text .= "Enter a paper number above, or <a href='" . hoturl("search", "q=") . "'>list the papers you can view</a>. ";
     return rtrim($text);
-}
-
-function actionTab($text, $url, $default) {
-    if ($default)
-        return "    <td><div class='vbtab1'><div class='vbtab1x'><div class='vbtab1y'><a href='$url'>$text</a></div></div></div></td>\n";
-    else
-        return "    <td><div class='vbtab'><a href='$url'>$text</a></div></td>\n";
-}
-
-function actionBar($mode = "", $prow = null) {
-    global $Me, $Conf, $CurrentList;
-    $forceShow = ($Me->is_admin_force() ? "&amp;forceShow=1" : "");
-
-    $goBase = "paper";
-    $paperArg = "p=*";
-    $xmode = array();
-    $listtype = "p";
-
-    if ($mode == "assign")
-        $goBase = "assign";
-    else if ($mode == "r" || $mode == "re" || $mode == "review")
-        $goBase = "review";
-    else if ($mode == "c" || $mode == "comment")
-        $goBase = "comment";
-    else if ($mode == "contactauthors")
-        $goBase = "contactauthors";
-    else if ($mode == "account") {
-        $listtype = "u";
-        if ($Me->privChair)
-            $goBase = "profile";
-        else
-            $prow = null;
-    } else if ($mode == "" && $Me->isPC && $Conf->setting("rev_open"))
-        $goBase = "review";
-    else if (($wantmode = defval($_REQUEST, "m", defval($_REQUEST, "mode"))))
-        $xmode["m"] = $wantmode;
-
-    $listarg = $forceShow;
-    $quicklinks_txt = "";
-    if ($prow) {
-        $id = ($listtype === "u" ? $prow->email : $prow->paperId);
-        $quicklinks_txt = quicklinks($id, $goBase, $xmode, $listtype);
-        if (isset($CurrentList) && $CurrentList > 0)
-            $listarg .= "&amp;ls=$CurrentList";
-    }
-
-    // collect actions
-    $x = "<div class='nvbar'><table class='vbar'><tr><td class='spanner'></td>\n";
-    if ($quicklinks_txt)
-        $x .= "  <td class='quicklinks nowrap'>" . $quicklinks_txt . "</td>\n";
-
-    $x .= "  <td class='gopaper nowrap'>" . goPaperForm($goBase, $xmode) . "</td>\n";
-
-    return $x . "</tr></table></div>";
 }
 
 function parseReviewOrdinal($text) {

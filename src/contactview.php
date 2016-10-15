@@ -292,7 +292,7 @@ class ContactView {
         echo "<table class=\"cs61grp\"><tr><td class=\"cs61key\">", $key, "</td>",
             "<td";
         if ($extra && isset($extra["nowrap"]) && $extra["nowrap"])
-            echo " class=\"nowrap\"";
+            echo " class=\"nw\"";
         echo ">", $value, "</td></tr><tr><td colspan=\"2\"><div class=\"cs61infgroup\">";
         if ($notes)
             foreach ($notes as $v) {

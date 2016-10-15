@@ -942,7 +942,7 @@ function show_pset_table($pset) {
         foreach (pcMembers() as $pcm)
             $sel[$pcm->email] = Text::name_html($pcm);
         $sel["__random__"] = "Random";
-        echo '<span class="nowrap" style="padding-right:2em">',
+        echo '<span class="nb" style="padding-right:2em">',
             Ht::select("grader", $sel, "none"),
             Ht::submit("setgrader", "Set grader"),
             '</span>';
@@ -954,7 +954,7 @@ function show_pset_table($pset) {
             if ($Me->can_run($pset, $r))
                 $sel[$r->name] = htmlspecialchars($r->title);
         if (count($sel))
-            echo '<span class="nowrap" style="padding-right:2em">',
+            echo '<span class="nb" style="padding-right:2em">',
                 Ht::select("runner", $sel),
                 Ht::submit("runmany", "Run all"),
                 '</span>';
