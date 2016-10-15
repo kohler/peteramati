@@ -104,7 +104,7 @@ else if (!$Info->commit())
     quit("No commit to run");
 else if ($Qreq->run === null || !check_post())
     quit("Permission error");
-else if (!$Info->can_view_repo_contents && !$Me->isPC)
+else if (!$Info->can_view_repo_contents)
     quit("Unconfirmed repository");
 
 

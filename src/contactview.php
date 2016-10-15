@@ -128,8 +128,9 @@ class ContactView {
         return $psets;
     }
 
-    static function user_pset_info($user, $pset) {
-        return new PsetView($pset, $user);
+    static function user_pset_info(Contact $user, Pset $pset) {
+        global $Me;
+        return new PsetView($pset, $user, $Me);
     }
 
     static function add_regrades($info) {
@@ -525,7 +526,7 @@ class ContactView {
             return;
 
         $hash = null;
-        if ($repo && !$info->can_view_repo_contents)
+        if ($repo && !$info->user_can_view_repo_contents)
             $value = "(unconfirmed repository)";
         else if ($repo && $repo->snaphash) {
             $value = substr($repo->snaphash, 0, 7) . " " . htmlspecialchars($repo->snapcommitline);
@@ -543,20 +544,25 @@ class ContactView {
             if ($Me->privChair)
                 $n .= " <small style=\"padding-left:1em;font-size:70%\">group " . $repo->cacheid . ", repo" . $repo->repoid . "</small>";
             $notes[] = $n;
-        } else if ($repo && !$info->can_view_repo_contents) {
-            $uname = Text::analyze_name($user);
-            if ($uname->name && $uname->email)
-                $uname = "$uname->name <$uname->email>";
-            else if ($uname->email)
-                $uname = "Your Name <$uname->email>";
-            else if ($uname->name)
-                $uname = "$uname->name <youremail@example.com>";
-            else
-                $uname = "Your Name <youremail@example.com>";
-            $notes[] = array(true, "ERROR: We haven’t confirmed that you can view this repository.<br>
-We only let you view repositories that you’ve committed to.<br>
-Fix this error by making a commit from your email address, " . htmlspecialchars($user->email) . ", and pushing that commit to the repository.<br>
-For example, try these commands. (You’ll have to enter a commit message for the first command.) <pre>git commit --allow-empty --author=" . htmlspecialchars(escapeshellarg($uname)) . "; git push</pre>");
+        }
+        if ($repo && !$info->user_can_view_repo_contents) {
+            if ($user->is_anonymous)
+                $notes[] = array(true, "ERROR: The user hasn’t confirmed that they can view this repository.");
+            else {
+                $uname = Text::analyze_name($user);
+                if ($uname->name && $uname->email)
+                    $uname = "$uname->name <$uname->email>";
+                else if ($uname->email)
+                    $uname = "Your Name <$uname->email>";
+                else if ($uname->name)
+                    $uname = "$uname->name <youremail@example.com>";
+                else
+                    $uname = "Your Name <youremail@example.com>";
+                $notes[] = array(true, "ERROR: We haven’t confirmed that you can view this repository.<br>
+    We only let you view repositories that you’ve committed to.<br>
+    Fix this error by making a commit from your email address, " . htmlspecialchars($user->email) . ", and pushing that commit to the repository.<br>
+    For example, try these commands: <pre>git commit --allow-empty --author=" . htmlspecialchars(escapeshellarg($uname)) . " -m \"Confirm repository\"\ngit push</pre>");
+            }
             $commitgroup = true;
         }
 

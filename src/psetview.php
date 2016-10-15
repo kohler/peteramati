@@ -6,11 +6,14 @@
 class PsetView {
     public $pset;
     public $user;
+    public $viewer;
+    public $pc_view;
     public $repo = null;
     public $partner;
     private $partner_same = null;
     public $can_set_repo;
     public $can_view_repo_contents;
+    public $user_can_view_repo_contents;
     public $can_see_comments;
     public $can_see_grades;
     public $user_can_see_grades;
@@ -25,15 +28,18 @@ class PsetView {
     private $recent_commits_truncated = null;
     private $latest_commit = null;
 
-    public function __construct($pset, $user) {
-        global $Me;
+    public function __construct(Pset $pset, Contact $user, Contact $viewer) {
         $this->pset = $pset;
         $this->user = $user;
+        $this->viewer = $viewer;
+        $this->pc_view = $viewer->isPC && $viewer !== $user;
         $this->partner = $user->partner($pset->id);
-        $this->can_set_repo = $Me->can_set_repo($pset, $user);
+        $this->can_set_repo = $viewer->can_set_repo($pset, $user);
         if (!$pset->gitless)
             $this->repo = $user->repo($pset->id);
         $this->can_view_repo_contents = $this->repo
+            && $viewer->can_view_repo_contents($this->repo);
+        $this->user_can_view_repo_contents = $this->repo
             && $user->can_view_repo_contents($this->repo);
         $this->load_grade();
     }
@@ -69,10 +75,8 @@ class PsetView {
     }
 
     public function commit() {
-        if ($this->commit === null) {
-            global $Me;
-            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $Me->email);
-        }
+        if ($this->commit === null)
+            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $this->viewer->email);
         assert($this->commit !== null);
         if ($this->commit)
             return $this->recent_commits($this->commit);
@@ -197,7 +201,6 @@ class PsetView {
 
 
     public function load_grade() {
-        global $Me;
         if ($this->pset->gitless_grades) {
             $this->grade = $this->user->contact_grade($this->pset);
             $this->grade_notes = get($this->grade, "notes");
@@ -218,8 +221,8 @@ class PsetView {
                 // NB don't check recent_commits association here
                 $this->commit = $this->grade->gradehash;
         }
-        $this->can_see_comments = $Me->can_see_comments($this->pset, $this->user, $this);
-        $this->can_see_grades = $Me->can_see_grades($this->pset, $this->user, $this);
+        $this->can_see_comments = $this->viewer->can_see_comments($this->pset, $this->user, $this);
+        $this->can_see_grades = $this->viewer->can_see_grades($this->pset, $this->user, $this);
         $this->user_can_see_grades = $this->user->can_see_grades($this->pset, $this->user, $this);
     }
 
@@ -369,11 +372,10 @@ class PsetView {
     }
 
     function mark_grading_commit() {
-        global $Me;
         if ($this->pset->gitless_grades)
             Dbl::qe("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=gradercid",
                     $this->user->contactId, $this->pset->psetid,
-                    $Me->contactId);
+                    $this->viewer->contactId);
         else {
             assert(!!$this->commit);
             $grader = $this->commit_info("gradercid") ? : null;
@@ -386,9 +388,8 @@ class PsetView {
 
 
     function hoturl_args($args = null) {
-        global $Me;
         $xargs = array("pset" => $this->pset->urlkey,
-                       "u" => $Me->user_linkpart($this->user));
+                       "u" => $this->viewer->user_linkpart($this->user));
         if ($this->commit)
             $xargs["commit"] = $this->commit_hash();
         if ($args)
@@ -407,7 +408,6 @@ class PsetView {
 
 
     function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open) {
-        global $Me;
         $fileid = html_id_encode($file);
         $tabid = "file61_" . $fileid;
         $linenotes = $lnorder->file($file);
@@ -425,14 +425,14 @@ class PsetView {
         }
         echo '</h3>';
         echo '<table id="', $tabid, '" class="code61 diff61 filediff61';
-        if ($Me != $this->user)
+        if ($this->pc_view)
             echo " live";
         if (!$this->user_can_see_grades)
             echo " hidegrade61";
         if (!$open)
             echo '" style="display:none';
         echo '" data-pa-file="', htmlspecialchars($file), '" data-pa-fileid="', $fileid, "\"><tbody>\n";
-        if ($Me->isPC && $Me != $this->user)
+        if ($this->pc_view)
             Ht::stash_script("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
         foreach ($dinfo->diff as $l) {
             if ($l[0] == "@")
