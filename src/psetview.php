@@ -403,4 +403,70 @@ class PsetView {
     function hoturl_post($base, $args = null) {
         return hoturl_post($base, $this->hoturl_args($args));
     }
+
+
+    function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open) {
+        global $Me;
+        $fileid = html_id_encode($file);
+        $tabid = "file61_" . $fileid;
+        $linenotes = $lnorder->file($file);
+
+        echo '<h3><a class="fold61" href="#" onclick="return fold61(',
+            "'#$tabid'", ',this)"><span class="foldarrow">',
+            ($open ? "&#x25BC;" : "&#x25B6;"),
+            "</span>&nbsp;", htmlspecialchars($file), "</a>";
+        if (!$dinfo->removed) {
+            $rawfile = $file;
+            if ($this->repo->truncated_psetdir($this->pset)
+                && str_starts_with($rawfile, $this->pset->directory_slash))
+                $rawfile = substr($rawfile, strlen($this->pset->directory_slash));
+            echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $this->hoturl("raw", ["file" => $rawfile]), '">[Raw]</a>';
+        }
+        echo '</h3>';
+        echo '<table id="', $tabid, '" class="code61 diff61 filediff61';
+        if ($Me != $this->user)
+            echo " live";
+        if (!$this->user_can_see_grades)
+            echo " hidegrade61";
+        if (!$open)
+            echo '" style="display:none';
+        echo '" data-pa-file="', htmlspecialchars($file), '" data-pa-fileid="', $fileid, "\"><tbody>\n";
+        if ($Me->isPC && $Me != $this->user)
+            Ht::stash_script("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
+        foreach ($dinfo->diff as $l) {
+            if ($l[0] == "@")
+                $x = array(" gx", "difflctx61", "", "", $l[3]);
+            else if ($l[0] == " ")
+                $x = array(" gc", "difflc61", $l[1], $l[2], $l[3]);
+            else if ($l[0] == "-")
+                $x = array(" gd", "difflc61", $l[1], "", $l[3]);
+            else
+                $x = array(" gi", "difflc61", "", $l[2], $l[3]);
+
+            $aln = $x[2] ? "a" . $x[2] : "";
+            $bln = $x[3] ? "b" . $x[3] : "";
+
+            $ak = $bk = "";
+            if ($linenotes && $aln && isset($linenotes->$aln))
+                $ak = ' id="L' . $aln . '_' . $fileid . '"';
+            if ($bln)
+                $bk = ' id="L' . $bln . '_' . $fileid . '"';
+
+            if (!$x[2] && !$x[3])
+                $x[2] = $x[3] = "...";
+
+            echo '<tr class="diffl61', $x[0], '">',
+                '<td class="difflna61"', $ak, '>', $x[2], '</td>',
+                '<td class="difflnb61"', $bk, '>', $x[3], '</td>',
+                '<td class="', $x[1], '">', diff_line_code($x[4]), "</td></tr>\n";
+
+            if ($linenotes && $bln && isset($linenotes->$bln))
+                echo_linenote_entry_row($file, $bln, $linenotes->$bln, true,
+                                        $lnorder);
+            if ($linenotes && $aln && isset($linenotes->$aln))
+                echo_linenote_entry_row($file, $aln, $linenotes->$aln, true,
+                                        $lnorder);
+        }
+        echo "</tbody></table>\n";
+    }
 }

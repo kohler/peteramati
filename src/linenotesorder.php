@@ -6,18 +6,19 @@
 class LinenotesOrder {
     private $diff = null;
     private $fileorder = [];
+    private $ln;
     private $lnseq = [];
     private $lnorder = null;
     private $totalorder = null;
     function __construct($linenotes, $seegradenotes) {
-        if ($linenotes)
-            foreach ($linenotes as $file => $notelist) {
-                if (!isset($this->fileorder[$file]))
-                    $this->fileorder[$file] = count($this->fileorder);
-                foreach ($notelist as $line => $note)
-                    if ($seegradenotes || (is_array($note) && $note[0]))
-                        $this->lnseq[] = array($file, $line, is_array($note) && $note[0]);
-            }
+        $this->ln = $linenotes ? : [];
+        foreach ($this->ln as $file => $notelist) {
+            if (!isset($this->fileorder[$file]))
+                $this->fileorder[$file] = count($this->fileorder);
+            foreach ($notelist as $line => $note)
+                if ($seegradenotes || (is_array($note) && $note[0]))
+                    $this->lnseq[] = array($file, $line, is_array($note) && $note[0]);
+        }
     }
     function note_files() {
         return $this->fileorder;
@@ -43,6 +44,9 @@ class LinenotesOrder {
             foreach ($this->lnseq as $i => $fl)
                 $this->lnorder[$fl[1] . "_" . $fl[0]] = $i;
         }
+    }
+    function file($file) {
+        return get($this->ln, $file);
     }
     function seq() {
         $this->ensure_lnorder();
