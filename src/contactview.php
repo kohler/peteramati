@@ -194,18 +194,19 @@ class ContactView {
         $pcview = $Me->isPC && $Me != $info->user;
         $notes = $info->commit_or_grading_info();
         $result = $info->pset->gradeinfo_json($pcview);
-        if (isset($notes->autogrades) || isset($notes->grades)
-            || $info->is_grading_commit()) {
+        $agx = get($notes, "autogrades");
+        $gx = get($notes, "grades");
+        if ($agx || $gx || $info->is_grading_commit()) {
             $g = $ag = array();
             $total = $total_noextra = 0;
             foreach ($info->pset->grades as $ge)
                 if (!$ge->hide || $pcview) {
                     $key = $ge->name;
                     $gv = 0;
-                    if (property_exists($notes->autogrades, $key))
-                        $ag[$key] = $g[$key] = $gv = $notes->autogrades->$key;
-                    if (property_exists($notes->grades, $key))
-                        $g[$key] = $gv = $notes->grades->$key;
+                    if ($agx && property_exists($agx, $key))
+                        $ag[$key] = $g[$key] = $gv = $agx->$key;
+                    if ($gx && property_exists($gx, $key))
+                        $g[$key] = $gv = $gx->$key;
                     if (!$ge->no_total) {
                         $total += $gv;
                         if (!$ge->is_extra)
