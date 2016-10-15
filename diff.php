@@ -107,74 +107,6 @@ function echo_linenote_entry_row($file, $lineid, $note, $displayed, $lnorder) {
         "</div></form></div></td></tr>";
 }
 
-class LinenotesOrder {
-    private $diff;
-    private $fileorder = array();
-    private $lnseq;
-    private $lnorder;
-    private $totalorder;
-    function __construct($linenotes, $diff, $seegradenotes) {
-        $this->diff = $diff;
-        $this->fileorder = array();
-        $this->lnseq = array();
-        $this->lnorder = array();
-        $this->totalorder = array();
-        if ($linenotes) {
-            foreach ($this->diff as $file => $x)
-                $this->fileorder[$file] = count($this->fileorder);
-            foreach ($linenotes as $file => $notelist) {
-                // Normally every file with notes will be present
-                // already, but just in case---for example, the
-                // handout repo got corrupted...
-                if (!isset($this->fileorder[$file]))
-                    $this->fileorder[$file] = count($this->fileorder);
-                foreach ($notelist as $line => $note)
-                    if ($seegradenotes || (is_array($note) && $note[0]))
-                        $this->lnseq[] = array($file, $line, is_array($note) && $note[0]);
-            }
-            usort($this->lnseq, array($this, "compar"));
-            foreach ($this->lnseq as $i => $fl)
-                $this->lnorder[$fl[1] . "_" . $fl[0]] = $i;
-        }
-    }
-    function seq() {
-        return $this->lnseq;
-    }
-    function get_next($file, $lineid) {
-        $seq = $this->lnorder[$lineid . "_" . $file];
-        if ($seq === null || $seq == count($this->lnseq) - 1)
-            return array(null, null);
-        else
-            return $this->lnseq[$seq + 1];
-    }
-    function get_prev($file, $lineid) {
-        $seq = $this->lnorder[$lineid . "_" . $file];
-        if ($seq === null || $seq == 0)
-            return array(null, null);
-        else
-            return $this->lnseq[$seq - 1];
-    }
-    function compar($a, $b) {
-        if ($a[0] != $b[0])
-            return $this->fileorder[$a[0]] - $this->fileorder[$b[0]];
-        if ($a[1][0] == $b[1][0])
-            return (int) substr($a[1], 1) - (int) substr($b[1], 1);
-        if (!isset($this->totalorder[$a[0]])) {
-            $to = array();
-            $n = 0;
-            foreach ($this->diff[$a[0]]->diff as $l) {
-                if ($l[0] == "+" || $l[0] == " ")
-                    $to["b" . $l[2]] = ++$n;
-                if ($l[0] == "-" || $l[0] == " ")
-                    $to["a" . $l[1]] = ++$n;
-            }
-            $this->totalorder[$a[0]] = $to;
-        } else
-            $to = $this->totalorder[$a[0]];
-        return $to[$a[1]] - $to[$b[1]];
-    }
-}
-
 
 $commita = $hasha_mine ? $Info->recent_commits($hasha) : $hrecent[$hasha];
 $commitb = $hashb_mine ? $Info->recent_commits($hashb) : $hrecent[$hashb];
@@ -192,7 +124,8 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
 // collect diff and sort line notes
 $diff = $User->repo_diff($Info->repo, $hashb, $Pset, $diff_options);
 $all_linenotes = $hashb_mine ? $Info->commit_info("linenotes") : array();
-$lnorder = new LinenotesOrder($all_linenotes, $diff, $Info->can_see_grades);
+$lnorder = new LinenotesOrder($all_linenotes, $Info->can_see_grades);
+$lnorder->set_diff($diff);
 
 // print line notes
 $notelinks = array();

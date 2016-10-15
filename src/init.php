@@ -42,40 +42,29 @@ set_path_variables();
 
 
 // Load code
+class SiteLoader {
+    static $map = [
+        "CapabilityManager" => "src/capability.php",
+        "CsvGenerator" => "lib/csv.php",
+        "CsvParser" => "lib/csv.php",
+        "LoginHelper" => "lib/login.php",
+        "MimeText" => "lib/mailer.php",
+        "Pset" => "src/psetconfig.php",
+        "RunnerState" => "src/runner.php",
+        "XlsxGenerator" => "lib/xlsx.php",
+        "ZipDocument" => "lib/documenthelper.php"
+    ];
+}
+
 function __autoload($class_name) {
-    global $ConfSitePATH, $ConfAutoloads;
-    if (!@$ConfAutoloads)
-        $ConfAutoloads = array("CapabilityManager" => "src/capability.php",
-                               "ContactView" => "src/contactview.php",
-                               "CS61Mailer" => "src/cs61mailer.php",
-                               "CsvGenerator" => "lib/csv.php",
-                               "CsvParser" => "lib/csv.php",
-                               "DiffInfo" => "src/diffinfo.php",
-                               "DocumentHelper" => "lib/documenthelper.php",
-                               "GitHub_RepositorySite" => "src/github_repositorysite.php",
-                               "HarvardSEAS_RepositorySite" => "src/harvardseas_repositorysite.php",
-                               "Ht" => "lib/ht.php",
-                               "Json" => "lib/json.php",
-                               "LoginHelper" => "lib/login.php",
-                               "Mailer" => "lib/mailer.php",
-                               "MessageSet" => "lib/messageset.php",
-                               "Messages" => "lib/messages.php",
-                               "MimeText" => "lib/mailer.php",
-                               "Mimetype" => "lib/mimetype.php",
-                               "Multiconference" => "src/multiconference.php",
-                               "Pset" => "src/psetconfig.php",
-                               "PsetView" => "src/psetview.php",
-                               "Repository" => "src/repository.php",
-                               "RepositorySite" => "src/repositorysite.php",
-                               "RunnerState" => "src/runner.php",
-                               "Qobject" => "lib/qobject.php",
-                               "Text" => "lib/text.php",
-                               "UnicodeHelper" => "lib/unicodehelper.php",
-                               "UserActions" => "src/useractions.php",
-                               "XlsxGenerator" => "lib/xlsx.php",
-                               "ZipDocument" => "lib/documenthelper.php");
-    if (($f = @$ConfAutoloads[$class_name]))
-        require_once("$ConfSitePATH/$f");
+    global $ConfSitePATH;
+    $f = null;
+    if (isset(SiteLoader::$map[$class_name]))
+        $f = SiteLoader::$map[$class_name];
+    if (!$f)
+        $f = strtolower($class_name) . ".php";
+    foreach (expand_includes($f, ["autoload" => true]) as $fx)
+        require_once($fx);
 }
 
 require_once("$ConfSitePATH/lib/base.php");
@@ -124,7 +113,13 @@ function expand_includes($files, $expansions = array()) {
         if ((string) $f === "")
             continue;
         $matches = [];
-        $globby = preg_match(',[\[\]\*\?\{\}],', $f);
+        $ignore_not_found = $globby = false;
+        if (str_starts_with($f, "?")) {
+            $ignore_not_found = true;
+            $f = substr($f, 1);
+        }
+        if (preg_match(',[\[\]\*\?\{\}],', $f))
+            $ignore_not_found = $globby = true;
         foreach ($f[0] === "/" ? array("") : $includepath as $idir) {
             $e = $idir . $f;
             if ($globby)
@@ -135,7 +130,7 @@ function expand_includes($files, $expansions = array()) {
                 break;
         }
         $results = array_merge($results, $matches);
-        if (empty($matches) && !$globby)
+        if (empty($matches) && !$ignore_not_found)
             $results[] = $f[0] === "/" ? $f : $includepath[0] . $f;
     }
     return $results;
@@ -152,15 +147,23 @@ function read_included_options(&$files) {
     }
 }
 
-function expand_json_includes_callback($includelist, $callback, $extra_arg = null) {
+function expand_json_includes_callback($includelist, $callback, $extra_arg = null, $no_validate = false) {
     $includes = [];
-    foreach (is_array($includelist) ? $includelist : [$includelist] as $k => $str)
-        if (is_string($str) && str_starts_with($str, "@")) {
-            foreach (expand_includes(substr($str, 1)) as $f)
+    foreach (is_array($includelist) ? $includelist : [$includelist] as $k => $str) {
+        $expandable = null;
+        if (is_string($str)) {
+            if (str_starts_with($str, "@"))
+                $expandable = substr($str, 1);
+            else if (!preg_match('/\A[\s\[\{]/', $str))
+                $expandable = $str;
+        }
+        if ($expandable) {
+            foreach (expand_includes($expandable) as $f)
                 if (($x = file_get_contents($f)))
                     $includes[] = [$x, $f];
         } else
             $includes[] = [$str, "entry $k"];
+    }
     foreach ($includes as $xentry) {
         list($entry, $landmark) = $xentry;
         if (is_string($entry)) {
@@ -174,12 +177,12 @@ function expand_json_includes_callback($includelist, $callback, $extra_arg = nul
                 continue;
             }
         }
-        if (is_object($entry) && !isset($entry->id) && !isset($entry->factory)
-            && !isset($entry->factory_class) && !isset($entry->callback))
+        if (is_object($entry) && !$no_validate
+            && !isset($entry->id) && !isset($entry->factory) && !isset($entry->factory_class) && !isset($entry->callback))
             $entry = get_object_vars($entry);
         foreach (is_array($entry) ? $entry : [$entry] as $obj)
-            if (!is_object($obj) || !call_user_func($callback, $obj, $extra_arg))
-                error_log("$landmark: Invalid $callback " . json_encode($obj) . ".");
+            if ((!is_object($obj) && !$no_validate) || !call_user_func($callback, $obj, $extra_arg))
+                error_log("$landmark: Invalid expansion " . json_encode($obj) . ".");
     }
 }
 

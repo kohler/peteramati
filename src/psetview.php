@@ -1,6 +1,6 @@
 <?php
 // psetview.php -- CS61-monster helper class for pset view
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2016 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class PsetView {
