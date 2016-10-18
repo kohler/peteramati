@@ -505,7 +505,7 @@ function echo_grade_total($gj) {
         if (isset($gj->maxgrades) && get($gj->maxgrades, "total")) {
             $value .= ' <span class="grademax61">of ' . $gj->maxgrades->total . '</span>';
             if ($gj->maxgrades->total != 100 && $gj->maxgrades->total > 50)
-                $value .= ' <span class="gradepercent61" data-pa-maxtotal="' . $gj->maxgrades->total . '" style="display:inline-block;padding-left:1em">' . sprintf("%.0f", $gj->grades->total / $gj->maxgrades->total) . '</span>';
+                $value .= ' <span class="gradepercent61" data-pa-maxtotal="' . $gj->maxgrades->total . '" style="display:inline-block;padding-left:1em">' . sprintf("(%.0f%%)", 100 * $gj->grades->total / $gj->maxgrades->total) . '</span>';
         }
         ContactView::echo_group("total", $value, null, array("nowrap" => true));
     }
