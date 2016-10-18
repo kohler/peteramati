@@ -817,7 +817,10 @@ tr, textarea, select {
 td.textarea, td.top {
 	vertical-align: top;
 }
-td.r {
+th.l, td.l {
+	text-align: left;
+}
+th.r, td.r {
 	text-align: right;
 }
 td.rcaption {
@@ -2311,10 +2314,11 @@ td.mhcb {
 	font-weight: bold;
 	white-space: nowrap;
 }
-table.s61 > tbody > tr > td:nth-child(n + 3) {
+table.s61 > tbody > tr > td:nth-child(n + 3),
+table.s61 > thead > tr > th:nth-child(n + 3) {
 	padding-left: 12px;
 }
-.s61rownumber {
+.s61rownumber, .s61checkbox {
 	text-align: right;
         padding: 0 5px;
 }
@@ -2323,6 +2327,15 @@ tr.s61partner > td.s61username {
 }
 tr.s61partner {
 	font-size: smaller;
+}
+.s61total {
+	font-weight: bold;
+}
+.s61highlight {
+	color: red;
+}
+.s61anonymous .s61nonanonymous {
+	display: none;
 }
 .gradecdf61summary {
 	font-size: 90%;

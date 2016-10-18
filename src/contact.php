@@ -28,6 +28,7 @@ class Contact {
     public $lastName = "";
     public $unaccentedName = "";
     public $nameAmbiguous = null;
+    public $firstNameAmbiguous = null;
     public $email = "";
     public $preferredEmail = "";
     public $sorter = "";

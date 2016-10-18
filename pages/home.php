@@ -533,7 +533,7 @@ function render_grades($pset, $gi, $s) {
     global $Me;
     $total = $nintotal = $max = 0;
     $lastintotal = null;
-    $garr = array();
+    $garr = $gvarr = $different = [];
     foreach ($pset->grades as $ge) {
         $k = $ge->name;
         if (!$ge->no_total) {
@@ -557,9 +557,11 @@ function render_grades($pset, $gi, $s) {
         if ($gv === "" && !$ge->is_extra && $s
             && $Me->contactId == $s->gradercid)
             $s->incomplete = true;
-        $gv = htmlspecialchars($gv);
-        if ($ggv && $agv && $ggv != $agv)
-            $gv = "<span style=\"color:red\">$gv</span>";
+        $gvarr[] = $gv;
+        if ($ggv && $agv && $ggv != $agv) {
+            $different[$k] = true;
+            $gv = '<span style="color:red">' . $gv . '</span>';
+        }
         $garr[] = $gv;
     }
     if ($nintotal > 1) {
@@ -567,8 +569,8 @@ function render_grades($pset, $gi, $s) {
         $lastintotal = 0;
     } else if ($nintotal == 1 && $lastintotal !== null)
         $garr[$lastintotal] = '<strong>' . $garr[$lastintotal] . '</strong>';
-    return (object) array("all" => $garr, "totalindex" => $lastintotal,
-                          "maxtotal" => $max);
+    return (object) array("all" => $garr, "allv" => $gvarr,  "totalv" => $total, "differentk" => $different,
+                          "totalindex" => $lastintotal, "maxtotal" => $max);
 }
 
 function show_pset($pset, $user) {
@@ -623,37 +625,25 @@ if (!$Me->is_empty() && $User->is_student()) {
     }
 }
 
-function render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous) {
+function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
     $row->sortprefix = "";
     $ncol = 0;
     $t0 = $Profile ? microtime(true) : 0;
+    $j = [];
 
-    $t = "<td class=\"s61username\">";
+    $j["username"] = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
     if ($anonymous)
-        $x = $s->anon_username;
-    else
-        $x = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
-    $t .= "<a href=\"" . hoturl("pset", array("pset" => $pset->urlkey, "u" => $x, "sort" => req("sort"))) . "\">"
-        . htmlspecialchars($x) . "</a>";
-    if ($Me->privChair)
-        $t .= "&nbsp;" . become_user_link($x, Text::name_html($s));
-    $t .= "</td>";
+        $j["anon_username"] = $s->anon_username;
+    $j["sorter"] = $s->sorter;
     ++$ncol;
 
-    if (!$anonymous) {
-        $t .= "<td>" . Text::name_html($s) . ($s->extension ? " (X)" : "") . "</td>";
+    $j["name"] = Text::name_text($s) . ($s->extension ? " (X)" : "");
+    if (!$anonymous)
         ++$ncol;
-    }
 
-    $t .= "<td>";
-    if ($s->gradercid) {
-        if (isset($pcmembers[$s->gradercid]))
-            $t .= htmlspecialchars($pcmembers[$s->gradercid]->firstName);
-        else
-            $t .= "???";
-    }
-    $t .= "</td>";
+    if ($s->gradercid)
+        $j["gradercid"] = $s->gradercid;
     ++$ncol;
 
     // are any commits committed?
@@ -687,52 +677,46 @@ function render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous) {
             $gi = null;
 
         if (!$pset->gitless_grades) {
-            $t .= "<td>";
             if ($gi && get($gi, "linenotes"))
-                $t .= "♪";
+                $j["has_notes"] = true;
             else if ($Me->contactId == $s->gradercid)
                 $s->incomplete = true;
             if ($gi && $s->gradercid != get($gi, "gradercid") && $Me->privChair)
-                $t .= "<sup>*</sup>";
-            $t .= "</td>";
+                $j["has_nongrader_notes"] = true;
             ++$ncol;
         }
 
         $garr = render_grades($pset, $gi, $s);
-        $t .= '<td class="r">' . join('</td><td class="r">', $garr->all) . '</td>';
         $ncol += count($garr->all);
+        $j["grades"] = $garr->allv;
+        $j["total"] = $garr->totalv;
+        if ($garr->differentk)
+            $j["highlight_grades"] = $garr->differentk;
     }
 
     //echo "<td><a href=\"mailto:", htmlspecialchars($s->email), "\">",
     //htmlspecialchars($s->email), "</a></td>";
 
-    $t .= "<td>";
     if (!$pset->gitless && $s->url) {
-        $t .= $s->link_repo("repo", RepositorySite::make_web_url($s->url, $Conf));
+        $j["repo"] = RepositorySite::make_web_url($s->url, $Conf);
         if (!$s->working)
-            $t .= ' <strong class="err">broken</strong>';
+            $j["repo_broken"] = true;
         else if (!$s->repoviewable)
-            $t .= ' <strong class="err">unconfirmed</strong>';
+            $j["repo_unconfirmed"] = true;
         if ($s->open)
-            $t .= ' <strong class="err">open</strong>';
+            $j["repo_too_open"] = true;
         if ($s->pcid != $s->rpcid
             || ($s->pcid && (!isset($students[$s->pcid])
                              || $students[$s->pcid]->repoid != $s->repoid)))
-            $t .= ' <strong class="err">partner</strong>';
+            $j["repo_partner_error"] = true;
     }
-    $t .= "</td>";
     ++$ncol;
-
-    if ($Profile) {
-        $t .= sprintf("<td class=\"r\">%.06f</td>", microtime(true) - $t0);
-        ++$ncol;
-    }
 
     if (!get($row, "ncol") || $ncol > $row->ncol)
         $row->ncol = $ncol;
 
     $s->visited = true;
-    return $t;
+    return $j;
 }
 
 function show_regrades($result) {
@@ -752,7 +736,7 @@ function show_regrades($result) {
         ++$trn;
         echo '<tr class="k', ($trn % 2), '">';
         if ($checkbox)
-            echo '<td class="s61rownumber">', Ht::checkbox("s61_" . $Me->user_idpart($row->student), 1, array("class" => "s61check")), '</td>';
+            echo '<td class="s61checkbox">', Ht::checkbox("s61_" . $Me->user_idpart($row->student), 1, array("class" => "s61check")), '</td>';
         echo '<td class="s61rownumber">', $trn, '.</td>';
         $pset = Pset::$all[$row->pset];
         echo '<td class="s61pset">', htmlspecialchars($pset->title), '</td>';
@@ -887,16 +871,21 @@ function show_pset_table($pset) {
     $max_ncol = 0;
     $incomplete = array();
     $pcmembers = pcMembers();
+    $jx = [];
     foreach ($students as $s)
         if (!$s->visited) {
             $row = (object) ["student" => $s, "text" => "", "ptext" => []];
-            $row->text = render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous);
+            $j = render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous);
             if ($s->pcid) {
                 foreach (explode(",", $s->pcid) as $pcid)
-                    if (isset($students[$pcid]))
-                        $row->ptext[] = render_pset_row($pset, $students, $students[$pcid], $row, $pcmembers, $anonymous);
+                    if (isset($students[$pcid])) {
+                        $jj = render_pset_row($pset, $students, $students[$pcid], $row, $pcmembers, $anonymous);
+                        $j["partners"][] = $jj;
+                    }
             }
-            $rows[$row->sortprefix . $s->sorter] = $row;
+            if ($row->sortprefix)
+                $j["boring"] = true;
+            $jx[$row->sortprefix . $s->sorter] = $j;
             $max_ncol = max($max_ncol, $row->ncol);
             if ($s->incomplete) {
                 $u = $Me->user_linkpart($s);
@@ -904,7 +893,6 @@ function show_pset_table($pset) {
                     . htmlspecialchars($u) . '</a>';
             }
         }
-    ksort($rows, SORT_NATURAL | SORT_FLAG_CASE);
 
     if (count($incomplete)) {
         echo '<div id="incomplete_pset', $pset->id, '" style="display:none" class="merror">',
@@ -915,26 +903,30 @@ function show_pset_table($pset) {
 
     if ($checkbox)
         echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
-    echo '<table class="s61"><tbody>';
-    $trn = 0;
-    $sprefix = "";
-    foreach ($rows as $row) {
-        ++$trn;
-        if ($row->sortprefix !== $sprefix && $row->sortprefix[0] == "~")
-            echo "\n", '<tr><td colspan="' . ($max_ncol + ($checkbox ? 2 : 1)) . '"><hr></td></tr>', "\n";
-        $sprefix = $row->sortprefix;
-        echo '<tr class="k', ($trn % 2), '">';
-        if ($checkbox)
-            echo '<td class="s61rownumber">', Ht::checkbox("s61_" . $Me->user_idpart($row->student), 1, array("class" => "s61check")), '</td>';
-        echo '<td class="s61rownumber">', $trn, '.</td>', $row->text, "</tr>\n";
-        foreach ($row->ptext as $ptext) {
-            echo '<tr class="k', ($trn % 2), ' s61partner">';
-            if ($checkbox)
-                echo '<td></td>';
-            echo '<td></td>', $ptext, "</tr>\n";
+
+    $sort_key = $anonymous ? "anon_username" : "username";
+    usort($jx, function ($a, $b) use ($sort_key) {
+        if (get($a, "boring") != get($b, "boring"))
+            return get($a, "boring") ? 1 : -1;
+        return strcmp($a[$sort_key], $b[$sort_key]);
+    });
+    echo '<table class="s61', ($anonymous ? " s61anonymous" : ""), '" id="pa-pset' . $pset->id . '"></table>';
+    $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous, "grade_keys" => array_keys($pset->grades),
+           "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
+           "urlpattern" => hoturl("pset", ["pset" => $pset->urlkey, "u" => "@", "sort" => req("sort")])];
+    $i = $nintotal = $last_in_total = 0;
+    foreach ($pset->grades as $ge) {
+        if (!$ge->no_total) {
+            ++$nintotal;
+            $last_in_total = $ge->name;
         }
+        ++$i;
     }
-    echo "</tbody></table>\n";
+    if ($nintotal > 1)
+        $jd["need_total"] = true;
+    else if ($nintotal == 1)
+        $jd["total_key"] = $last_in_total;
+    echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode($jd), ',', json_encode(array_values($jx)), ')</script>';
 
     if ($Me->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";
@@ -995,6 +987,14 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             echo "<div>Δt ", sprintf("%.06f", microtime(true) - $t0), "</div>";
         $sep = "<hr />\n";
     }
+
+    $pctable = [];
+    foreach (pcMembers() as $pc)
+        if ($pc->firstName && !$pc->firstNameAmbiguous)
+            $pctable[$pc->contactId] = $pc->firstName;
+        else
+            $pctable[$pc->contactId] = Text::name_text($pc);
+    Ht::stash_script('peteramati_grader_map=' . json_encode($pctable) . ';');
 
     foreach (ContactView::pset_list($Me, true) as $pset) {
         echo $sep;

@@ -13,15 +13,15 @@ if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {
     exit(0);
 }
 
-$facefetch_urlpattern = @$Opt["facefetch_urlpattern"];
-if (@$PsetInfo->_facefetch_urlpattern)
+$facefetch_urlpattern = get($Opt, "facefetch_urlpattern");
+if (get($PsetInfo, "_facefetch_urlpattern"))
     $facefetch_urlpattern = $PsetInfo->_facefetch_urlpattern;
 if (!$facefetch_urlpattern) {
     fwrite(STDERR, 'Need `_facefetch_urlpattern` configuration option.' . "\n");
     exit(1);
 }
 
-$fetchscript = @$PsetInfo->_facefetch_script;
+$fetchscript = get($PsetInfo, "_facefetch_script");
 if (count($arg["_"]))
     $fetchscript = $arg["_"][0];
 if (!$fetchscript) {
@@ -30,7 +30,7 @@ if (!$fetchscript) {
 }
 
 if (!isset($arg["limit"]))
-    $arg["limit"] = @$arg["l"];
+    $arg["limit"] = get($arg, "l");
 $limit = (int) $arg["limit"];
 
 $result = Dbl::qe("select contactId, email, huid from ContactInfo" . (isset($arg["all"]) || isset($arg["a"]) ? "" : " where contactImageId is null"));

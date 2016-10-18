@@ -5,7 +5,7 @@
 var siteurl, siteurl_postvalue, siteurl_suffix, siteurl_defaults,
     siteurl_absolute_base,
     hotcrp_paperid, hotcrp_list, hotcrp_status, hotcrp_user,
-    peteramati_uservalue,
+    peteramati_uservalue, peteramati_grader_map,
     hotcrp_want_override_conflict;
 
 function $$(id) {
@@ -2631,6 +2631,224 @@ function pa_pset_actions() {
         $f.find("[type='submit']").addClass("alert");
     });
     $f.removeClass("need-pa-pset-actions");
+}
+
+function pa_render_pset_table(psetid, pconf, data) {
+    var $j = $("#pa-pset" + psetid), dmap = {}, sorting_by = "username", sort_reverse = 1;
+    var username_key = pconf.anonymous ? "anon_username" : "username";
+
+    function calculate_ncol() {
+        return (pconf.checkbox ? 1 : 0) + 4 + (pconf.gitless_grades ? 0 : 1) +
+            (pconf.need_total ? 1 : 0) + (pconf.grade_keys || []).length + (pconf.gitless ? 0 : 1);
+    }
+    function render_tds(s, row_number) {
+        var username = pconf.anonymous ? s.anon_username : s.username;
+        var grades = pconf.grade_keys || [];
+        var a = [], txt, j, klass;
+        if (row_number == "") {
+            if (pconf.checkbox)
+                a.push('<td></td>');
+            a.push('<td></td>');
+        } else {
+            if (pconf.checkbox)
+                a.push('<td class="s61checkbox"><input type="checkbox" name="s61_' + escape_entities(s.username) + '" value="1" class="s61check" /></td>');
+            a.push('<td class="s61rownumber">' + row_number + '.</td>');
+        }
+        a.push('<td class="s61username"><a href=\"' + pconf.urlpattern.replace(/%40/, encodeURIComponent(username)) + '\">' + escape_entities(username) + '</a></td>');
+        a.push('<td class="s61nonanonymous">' + escape_entities(s.name || "") + '</td>');
+        if (s.gradercid && peteramati_grader_map[s.gradercid])
+            a.push('<td>' + escape_entities(peteramati_grader_map[s.gradercid]) + '</td>');
+        else
+            a.push(s.gradercid ? '<td>???</td>' : '<td></td>');
+        if (!pconf.gitless_grades) {
+            txt = '';
+            if (s.has_notes)
+                txt += '♪';
+            if (s.has_nongrader_notes)
+                txt += '<sup>*</sup>';
+            a.push('<td>' + txt + '</td>');
+        }
+        if (pconf.need_total)
+            a.push('<td class="r s61total">' + s.total + '</td>');
+        for (j = 0; j < grades.length; ++j) {
+            klass = "r";
+            if (grades[j] == pconf.total_key && s.grades[j] != null && s.grades[j] != "")
+                klass += " s61total";
+            if (s.highlight_grades && s.highlight_grades[grades[j]])
+                klass += " s61highlight";
+            a.push('<td class="' + klass + '">' + (s.grades[j] == null ? '' : s.grades[j]) + '</td>');
+        }
+        if (!pconf.gitless) {
+            if (pconf.anonymous)
+                txt = '<a href="#" onclick="window.location=' + escape_entities(JSON.stringify(s.repo)) + ';return false">repo</a>';
+            else
+                txt = '<a href="' + escape_entities(s.repo) + '">repo</a>';
+            if (s.repo_broken)
+                txt += ' <strong class="err">broken</strong>';
+            if (s.repo_unconfirmed)
+                txt += ' <strong class="err">unconfirmed</strong>';
+            if (s.repo_too_open)
+                txt += ' <strong class="err">open</strong>';
+            if (s.repo_partner_error)
+                txt += ' <strong class="err">partner</strong>';
+            a.push('<td>' + txt + '</td>');
+        }
+        return a.join('');
+    }
+    function render_body() {
+        var $b = $j.find("tbody");
+        $b.html("");
+        var i, s, a, trn = 0, was_boring = false;
+        for (i = 0; i < data.length; ++i) {
+            s = data[i];
+            a = [];
+            ++trn;
+            if (s.boring && !was_boring && trn != 1)
+                a.push('<tr class="s61boring"><td colspan="' + calculate_ncol() + '"><hr /></td></tr>');
+            was_boring = s.boring;
+            a.push('<tr class="k' + (trn % 2) + '" data-pa-student="' + escape_entities(s.username) + '">' + render_tds(s, trn) + '</tr>');
+            if (s.partners)
+                for (var j = 0; j < s.partners.length; ++j)
+                    a.push('<tr class="k' + (trn % 2) + ' s61partner" data-pa-student="' + escape_entities(s.partners[j].username) + '" data-pa-partner="1">' + render_tds(s.partners[j], "") + '</tr>');
+            $b.append(a.join(''));
+            dmap[s.username] = s;
+        }
+    }
+    function resort() {
+        var $b = $j.find("tbody"), tb = $b[0];
+        var rmap = {}, last = null, tr = tb.firstChild;
+        while (tr) {
+            if (tr.hasAttribute("data-pa-partner"))
+                last.push(tr);
+            else
+                rmap[tr.getAttribute("data-pa-student")] = last = [tr];
+            tr = tr.nextSibling;
+        }
+        var i, j, trn = 0, was_boring = false;
+        last = tb.firstChild;
+        for (i = 0; i < data.length; ++i) {
+            ++trn;
+            while ((j = last) && j.className === "s61boring") {
+                last = last.nextSibling;
+                tb.removeChild(j);
+            }
+            if (data[i].boring && !was_boring && trn != 1)
+                tb.insertBefore($('<tr class="s61boring"><td colspan="' + calculate_ncol() + '"><hr /></td></tr>')[0], last);
+            was_boring = data[i].boring;
+            tr = rmap[data[i].username];
+            for (j = 0; j < tr.length; ++j) {
+                if (last != tr[j])
+                    tb.insertBefore(tr[j], last);
+                else
+                    last = last.nextSibling;
+                tr[j].className = "k" + (trn % 2) + " " + tr[j].className.replace(/\bk[01]\s*/, "");
+            }
+            $(tr[0]).find(".s61rownumber").html(trn + ".");
+        }
+    }
+    function render_head() {
+        var a = [], j, grades = pconf.grade_keys || [];
+        if (pconf.checkbox)
+            a.push('<th></th>');
+        a.push('<th></th>');
+        a.push('<th class="l s61username" data-pa-sort="username">Username</th>');
+        a.push('<th class="l s61nonanonymous" data-pa-sort="name">Name</th>');
+        a.push('<th class="l" data-pa-sort="grader">Grader</th>');
+        if (!pconf.gitless_grades)
+            a.push('<th></th>');
+        if (pconf.need_total)
+            a.push('<th class="r" data-pa-sort="total">Tot</th>');
+        for (j = 0; j < grades.length; ++j)
+            a.push('<th class="r" data-pa-sort="grade' + j + '">' + grades[j].substr(0, 3) + '</th>');
+        if (!pconf.gitless)
+            a.push('<th></th>');
+        $j.find("thead").html('<tr>' + a.join('') + '</tr>');
+    }
+    function user_compar(a, b) {
+        if (a[username_key] < b[username_key])
+            return -sort_reverse;
+        else if (a[username_key] > b[username_key])
+            return sort_reverse;
+        else
+            return 0;
+    }
+    function head_click(event) {
+        if (!this.hasAttribute("data-pa-sort"))
+            return;
+        var sort_by = this.getAttribute("data-pa-sort"), m;
+        if (sorting_by == sort_by)
+            sort_reverse = -sort_reverse;
+        else {
+            sorting_by = sort_by;
+            if (sort_by == "username" || sort_by == "name" || sort_by == "grader")
+                sort_reverse = 1;
+            else
+                sort_reverse = -1;
+        }
+
+        if (sort_by == "username")
+            data.sort(function (a, b) {
+                if (a.boring != b.boring)
+                    return a.boring ? 1 : -1;
+                else
+                    return user_compar(a, b);
+            });
+        else if (sort_by == "name")
+            data.sort(function (a, b) {
+                if (a.boring != b.boring)
+                    return a.boring ? 1 : -1;
+                else if (a.name != b.name)
+                    return a.name < b.name ? -sort_reverse : sort_reverse;
+                else
+                    return user_compar(a, b);
+            })
+        else if (sort_by == "grader")
+            data.sort(function (a, b) {
+                if (a.boring != b.boring)
+                    return a.boring ? 1 : -1;
+                else {
+                    var ag = (a.gradercid && peteramati_grader_map[a.gradercid]) || "~~~";
+                    var bg = (b.gradercid && peteramati_grader_map[b.gradercid]) || "~~~";
+                    if (ag != bg)
+                        return ag < bg ? -sort_reverse : sort_reverse;
+                    else
+                        return user_compar(a, b);
+                }
+            });
+        else if (sort_by == "total")
+            data.sort(function (a, b) {
+                if (a.boring != b.boring)
+                    return a.boring ? 1 : -1;
+                else if (a.total != b.total)
+                    return a.total < b.total ? -sort_reverse : sort_reverse;
+                else
+                    return -user_compar(a, b);
+            });
+        else if ((m = /^grade(\d+)$/.exec(sort_by)))
+            data.sort(function (a, b) {
+                if (a.boring != b.boring)
+                    return a.boring ? 1 : -1;
+                else {
+                    var ag = a.grades && a.grades[m[1]];
+                    if (ag === "" || ag == null)
+                        ag = -1000;
+                    var bg = b.grades && b.grades[m[1]];
+                    if (bg === "" || bg == null)
+                        bg = -1000;
+                    if (ag != bg)
+                        return ag < bg ? -sort_reverse : sort_reverse;
+                    else
+                        return -user_compar(a, b);
+                }
+            });
+
+        resort();
+    }
+
+    $j.html("<thead></thead><tbody></tbody>");
+    $j.find("thead").on("click", "th", head_click);
+    render_head();
+    render_body();
 }
 
 

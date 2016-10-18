@@ -1261,7 +1261,7 @@ function pcMembers() {
         $pc = array();
         $qa = ($Conf->sversion >= 35 ? ", contactTags" : "") . ($Conf->sversion >= 47 ? ", disabled" : "");
         $result = $Conf->q("select firstName, lastName, affiliation, email, u.contactId contactId, roles$qa from ContactInfo u where (roles&" . Contact::ROLE_PC . ")!=0");
-        $by_name_text = array();
+        $by_first_text = $by_name_text = array();
         while (($row = Contact::fetch($result, $Conf))) {
             $pc[$row->contactId] = $row;
             if ($row->firstName || $row->lastName) {
@@ -1269,6 +1269,11 @@ function pcMembers() {
                 if (isset($by_name_text[$name_text]))
                     $row->nameAmbiguous = $by_name_text[$name_text]->nameAmbiguous = true;
                 $by_name_text[$name_text] = $row;
+            }
+            if ($row->firstName) {
+                if (isset($by_first_text[$row->firstName]))
+                    $row->firstNameAmbiguous = $by_first_text[$row->firstName]->firstNameAmbiguous = true;
+                $by_first_text[$row->firstName] = $row;
             }
         }
         uasort($pc, "Contact::compare");
