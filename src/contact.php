@@ -1309,7 +1309,7 @@ class Contact {
 
     function link_repo($html, $url) {
         if ($this->is_anonymous)
-            return '<a href="#" onclick=\'window.location=' . htmlspecialchars(json_encode($url)) . ';return false\'>' . $html . '</a>';
+            return '<a href="#" onclick=\'return pa_anonymize_linkto(' . htmlspecialchars(json_encode($url)) . ',event)\'>' . $html . '</a>';
         else
             return '<a href="' . htmlspecialchars($url) . '">' . $html . '</a>';
     }

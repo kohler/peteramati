@@ -2633,6 +2633,14 @@ function pa_pset_actions() {
     $f.removeClass("need-pa-pset-actions");
 }
 
+function pa_anonymize_linkto(link, event) {
+    if (event && event.metaKey)
+        window.open(link);
+    else
+        window.location = link;
+    return false;
+}
+
 function pa_render_pset_table(psetid, pconf, data) {
     var $j = $("#pa-pset" + psetid), dmap = {}, sorting_by = "username", sort_reverse = 1;
     var username_key = pconf.anonymous ? "anon_username" : "username";
@@ -2680,7 +2688,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
         if (!pconf.gitless) {
             if (pconf.anonymous)
-                txt = '<a href="#" onclick="window.location=' + escape_entities(JSON.stringify(s.repo)) + ';return false">repo</a>';
+                txt = '<a href="#" onclick="return pa_anonymize_linkto(' + escape_entities(JSON.stringify(s.repo)) + ',event)">repo</a>';
             else
                 txt = '<a href="' + escape_entities(s.repo) + '">repo</a>';
             if (s.repo_broken)
