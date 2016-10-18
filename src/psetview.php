@@ -500,6 +500,15 @@ class PsetView {
                     echo '<div class="difflnoteptr61">',
                         join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
             }
+            if ($this->pc_view && get($note, 2)) {
+                $pcmembers = pcMembers();
+                if (isset($pcmembers[$note[2]])) {
+                    $p = $pcmembers[$note[2]];
+                    echo '<div class="difflnoteauthor61">[',
+                        htmlspecialchars($p->firstNameAmbiguous ? Text::name_text($p) : $p->firstName),
+                        ']</div>';
+                }
+            }
             if (!is_string($note[1]))
                 error_log("fudge {$this->user->github_username} error: " . json_encode($note));
             echo '<div class="note61',

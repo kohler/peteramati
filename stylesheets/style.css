@@ -2458,7 +2458,7 @@ span.foldarrow {
             linear-gradient(55deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center;
         background-size: 100% 7px, 100% 5px, 25px 100%, 10px 20px, 10px 20px;
 }
-.difflnoteptr61, .difflnoteaa61 {
+.difflnoteptr61, .difflnoteaa61, .difflnoteauthor61 {
         font-family: Helvetica, sans-serif;
         font-style: normal;
 }
@@ -2475,6 +2475,12 @@ span.foldarrow {
 }
 .difflnoteptr61 > a:hover {
         text-decoration: underline;
+}
+.difflnoteauthor61 {
+	float: right;
+	font-size: smaller;
+	padding-left: 1em;
+	color: #7777aa;
 }
 .run61, .run61 a {
 	color: #e5f8e5;
