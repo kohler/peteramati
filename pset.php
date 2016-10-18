@@ -219,9 +219,11 @@ if ($Me->isPC && $Me != $User && check_post()
     $lineid = $_REQUEST["line"];
     if (ctype_digit($lineid))
         $lineid = "b" . $lineid;
-    $note = $_REQUEST["savelinenote"];
-    if ($note != "")
+    $note = get($_REQUEST, "note", null);
+    if ((string) $note !== "")
         $note = [isset($_REQUEST["iscomment"]) && $_REQUEST["iscomment"], $note, $Me->contactId];
+    else
+        $note = null;
     $Info->update_commit_info(array("linenotes" =>
                                     array($_REQUEST["file"] => array($lineid => ($note ? $note : null)))));
     if (isset($_REQUEST["ajax"]))
