@@ -1251,48 +1251,12 @@ function _sort_pcMember($a, $b) {
 
 function pcMembers() {
     global $Conf;
-    $version = 2;
-    if (!isset($_SESSION["pcmembers"]) || !is_array($_SESSION["pcmembers"])
-        || count($_SESSION["pcmembers"]) < 3
-        || $Conf->setting("pc") <= 0
-        || $_SESSION["pcmembers"][0] < $Conf->setting("pc")
-        || $_SESSION["pcmembers"][1] != $version
-        || count($_SESSION["pcmembers"][2]) == 0) {
-        $pc = array();
-        $qa = ($Conf->sversion >= 35 ? ", contactTags" : "") . ($Conf->sversion >= 47 ? ", disabled" : "");
-        $result = $Conf->q("select firstName, lastName, affiliation, email, u.contactId contactId, roles$qa from ContactInfo u where (roles&" . Contact::ROLE_PC . ")!=0");
-        $by_first_text = $by_name_text = array();
-        while (($row = Contact::fetch($result, $Conf))) {
-            $pc[$row->contactId] = $row;
-            if ($row->firstName || $row->lastName) {
-                $name_text = Text::name_text($row);
-                if (isset($by_name_text[$name_text]))
-                    $row->nameAmbiguous = $by_name_text[$name_text]->nameAmbiguous = true;
-                $by_name_text[$name_text] = $row;
-            }
-            if ($row->firstName) {
-                if (isset($by_first_text[$row->firstName]))
-                    $row->firstNameAmbiguous = $by_first_text[$row->firstName]->firstNameAmbiguous = true;
-                $by_first_text[$row->firstName] = $row;
-            }
-        }
-        uasort($pc, "Contact::compare");
-        $_SESSION["pcmembers"] = array($Conf->setting("pc"), $version, $pc);
-    }
-    return $_SESSION["pcmembers"][2];
+    return $Conf->pc_members();
 }
 
 function pcTags() {
-    $pcm = pcMembers();
-    $tags = array();
-    foreach ($pcm as $pc)
-        if (isset($pc->contactTags) && $pc->contactTags) {
-            foreach (explode(" ", $pc->contactTags) as $t)
-                if ($t !== "")
-                    $tags[strtolower($t)] = $t;
-        }
-    ksort($tags);
-    return $tags;
+    global $Conf;
+    return $Conf->pc_tags();
 }
 
 function pcByEmail($email) {

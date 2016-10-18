@@ -17,6 +17,7 @@ class Conf {
     public $short_name;
     public $long_name;
     public $download_prefix;
+    public $sort_by_last;
     public $opt;
     public $opt_override = null;
 
@@ -27,6 +28,9 @@ class Conf {
     private $usertimeId = 1;
 
     private $_date_format_initialized = false;
+    private $_pc_members_cache = null;
+    private $_pc_tags_cache = null;
+    private $_pc_members_and_admins_cache = null;
 
     static public $g = null;
 
@@ -246,6 +250,11 @@ class Conf {
             $this->opt["safePasswords"] = 1;
         if (!isset($this->opt["contactdb_safePasswords"]))
             $this->opt["contactdb_safePasswords"] = $this->opt["safePasswords"];
+
+        $sort_by_last = !!get($this->opt, "sortByLastName");
+        if (!$this->sort_by_last != !$sort_by_last)
+            $this->_pc_members_cache = $this->_pc_members_and_admins_cache = null;
+        $this->sort_by_last = $sort_by_last;
     }
 
     function has_setting($name) {
@@ -466,6 +475,74 @@ class Conf {
         $row = edb_row($result);
         Dbl::free($result);
         return $row ? (int) $row[0] : false;
+    }
+
+    function pc_members() {
+        if ($this->_pc_members_cache === null) {
+            $pc = $pca = array();
+            $result = $this->q("select firstName, lastName, affiliation, email, contactId, roles, contactTags, disabled from ContactInfo where roles!=0 and (roles&" . Contact::ROLE_PCLIKE . ")!=0");
+            $by_name_text = $by_first_text = [];
+            $this->_pc_tags_cache = ["pc" => "pc"];
+            while ($result && ($row = Contact::fetch($result, $this))) {
+                $pca[$row->contactId] = $row;
+                if ($row->roles & Contact::ROLE_PC)
+                    $pc[$row->contactId] = $row;
+                if ($row->firstName || $row->lastName) {
+                    $name_text = Text::name_text($row);
+                    if (isset($by_name_text[$name_text]))
+                        $row->nameAmbiguous = $by_name_text[$name_text]->nameAmbiguous = true;
+                    $by_name_text[$name_text] = $row;
+                }
+                if ($row->firstName) {
+                    if (isset($by_first_text[$row->firstName]))
+                        $row->firstNameAmbiguous = $by_first_text[$row->firstName]->firstNameAmbiguous = true;
+                    $by_first_text[$row->firstName] = $row;
+                }
+                if ($row->contactTags)
+                    foreach (explode(" ", $row->contactTags) as $t) {
+                        list($tag, $value) = TagInfo::split_index($t);
+                        if ($tag)
+                            $this->_pc_tags_cache[strtolower($tag)] = $tag;
+                    }
+            }
+            Dbl::free($result);
+            uasort($pc, "Contact::compare");
+            $order = 0;
+            foreach ($pc as $row) {
+                $row->sort_position = $order;
+                ++$order;
+            }
+            $this->_pc_members_cache = $pc;
+            uasort($pca, "Contact::compare");
+            $this->_pc_members_and_admins_cache = $pca;
+            ksort($this->_pc_tags_cache);
+        }
+        return $this->_pc_members_cache;
+    }
+
+    function pc_members_and_admins() {
+        if ($this->_pc_members_and_admins_cache === null)
+            $this->pc_members();
+        return $this->_pc_members_and_admins_cache;
+    }
+
+    function pc_member_by_email($email) {
+        foreach ($this->pc_members() as $p)
+            if (strcasecmp($p->email, $email) == 0)
+                return $p;
+        return null;
+    }
+
+    function pc_tags() {
+        if ($this->_pc_tags_cache === null)
+            $this->pc_members();
+        return $this->_pc_tags_cache;
+    }
+
+    function pc_tag_exists($tag) {
+        if ($this->_pc_tags_cache === null)
+            $this->pc_members();
+        return isset($this->_pc_tags_cache[strtolower($tag)]);
     }
 
 

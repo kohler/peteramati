@@ -501,7 +501,8 @@ class PsetView {
                         join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
             }
             if ($this->pc_view && get($note, 2)) {
-                $pcmembers = pcMembers();
+                global $Conf;
+                $pcmembers = $Conf->pc_members_and_admins();
                 if (isset($pcmembers[$note[2]])) {
                     $p = $pcmembers[$note[2]];
                     echo '<div class="difflnoteauthor61">[',
