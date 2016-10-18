@@ -1828,14 +1828,15 @@ function savelinenote61(form) {
 }
 
 function gradetotal61() {
-    var i, j = jQuery(".grader61.gradepart"), total = 0, x;
+    var i, j = $(".grader61.gradepart"), total = 0, x;
     for (i = 0; i < j.length; ++i) {
         x = parseFloat(jQuery(j[i]).val());
         x == x && (total += x);
     }
     total = Math.floor(total * 100 + 0.5) / 100;
-    if (jQuery(".gradetotal61").text() != total) {
-        jQuery(".gradetotal61").text(total);
+    var $gt = $(".gradetotal61");
+    if ($gt.text() != total) {
+        $gt.text(total);
         gradecdf61();
     }
 }

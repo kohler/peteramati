@@ -57,6 +57,7 @@ class Pset {
     public $grade_cdf_cutoff;
     public $separate_extension_grades;
     public $has_extra = false;
+    public $max_total;
 
     public $all_runners = array();
     public $runners;
