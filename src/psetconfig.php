@@ -247,7 +247,7 @@ class Pset {
                 ++$count;
                 if ($ge->max && ($pcview || !$ge->hide_max)) {
                     $max->$key = $ge->max;
-                    if (!$ge->is_extra)
+                    if (!$ge->is_extra && !$ge->no_total)
                         $maxtotal += $ge->max;
                 }
             }
