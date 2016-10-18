@@ -112,24 +112,24 @@ if (isset($_REQUEST["gradecdf"])) {
 
         $series = new Series;
         $xseries = new Series;
-        $noextra_series = new Series;
+        $noextra_series = $Pset->has_extra ? new Series : null;
         $has_extra = false;
         while (($row = edb_row($result)))
             if (($g = ContactView::pset_grade(json_decode($row[0]), $Pset))) {
                 $series->add($g->total);
                 if ($row[1])
                     $xseries->add($g->total);
-                if (isset($g->total_noextra)) {
+                if ($noextra_series) {
                     $noextra_series->add($g->total_noextra);
-                    $has_extra = true;
-                } else
-                    $noextra_series->add($g->total);
+                    if ($g->total_noextra != $g->total)
+                        $has_extra = true;
+                }
             }
 
         $r = $series->summary();
         if ($xseries->n)
             $r->extension = $xseries->summary();
-        if ($noextra_series->n)
+        if ($has_extra)
             $r->noextra = $noextra_series->summary();
 
         $pgj = $Pset->gradeinfo_json(false);
