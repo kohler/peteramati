@@ -2687,7 +2687,9 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<td class="' + klass + '">' + (s.grades[j] == null ? '' : s.grades[j]) + '</td>');
         }
         if (!pconf.gitless) {
-            if (pconf.anonymous)
+            if (!s.repo)
+                txt = '';
+            else if (pconf.anonymous)
                 txt = '<a href="#" onclick="return pa_anonymize_linkto(' + escape_entities(JSON.stringify(s.repo)) + ',event)">repo</a>';
             else
                 txt = '<a href="' + escape_entities(s.repo) + '">repo</a>';
