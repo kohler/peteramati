@@ -33,7 +33,7 @@ body {
 	padding: 0.2em 0.8em 0.3em 24px;
 	border-bottom: 2px solid #dfa5b2;
 	border-right: 1px solid #dfa5b2;
-        color: white;
+	color: white;
 	background-color: #1f1f4a;
 }
 #header_left_page {
@@ -516,9 +516,9 @@ a.button {
 input.b, button.b, select.b, a.b,
 input.bsm, button.bsm, select.bsm, a.bsm, button.runner61 {
 	padding: 2px 6px;
-        border: 1px outset buttonface;
-        border-radius: 6px;
-        background-color: white;
+	border: 1px outset buttonface;
+	border-radius: 6px;
+	background-color: white;
 	white-space: nowrap;
 }
 button.run61stop {
@@ -1167,10 +1167,10 @@ span.asspref-1 {
 .rt4, .rt4n, .rt3, .rt3n, .rt2, .rt2n, .rt1, .rt1n, .rt0, .rt-1, .rt-2, .rt-3 {
 	display: inline-block;
 	width: 0.75em;
-        height: 0.75em;
+	height: 0.75em;
 	line-height: 0.75em;
-        border-width: 1px;
-        position: relative;
+	border-width: 1px;
+	position: relative;
 	bottom: -0.1em;
 }
 .rt4, .rt4n, .rt3, .rt3n, .rt2, .rt2n {
@@ -1193,10 +1193,10 @@ span.asspref-1 {
 }
 .rti {
 	display: table-cell;
-        position: absolute;
+	position: absolute;
 	width: 100%;
 	height: 100%;
-        font-family: "Helvetica Neue", Helvetica, verdana, tahoma, sans-serif;
+	font-family: "Helvetica Neue", Helvetica, verdana, tahoma, sans-serif;
 	font-size: 70%;
 	text-align: center;
 }
@@ -1325,6 +1325,21 @@ table.pt_buttons td.ptb_button {
 .pltable_full {
 	width: 100%;
 	position: relative;
+}
+
+.plsortable:hover {
+	text-decoration: underline;
+	cursor: pointer;
+}
+.plsortactive:after {
+	content: "\25bc";
+	font-size: 90%;
+	opacity: 0.5;
+}
+.plsortactive.plsortreverse:after {
+	content: "\25b2";
+	font-size: 90%;
+	opacity: 0.5;
 }
 
 div.plsplit_col {
@@ -2285,7 +2300,7 @@ td.mhcb {
 }
 .cs61key {
 	font-weight: bold;
-        width: 168px;
+	width: 168px;
 }
 .cs61infgroup {
 	padding-left: 168px;
@@ -2295,7 +2310,7 @@ td.mhcb {
 }
 .cs61einf {
 	font-weight: bold;
-        color: red;
+	color: red;
 }
 .cs61einf:before {
 	content: "\26a0 ";
@@ -2305,7 +2320,7 @@ td.mhcb {
 }
 .cs61hienote {
 	color: white;
-        background: red;
+	background: red;
 }
 #runsettings61 input {
 	font-size: 10px;
@@ -2318,9 +2333,13 @@ table.s61 > tbody > tr > td:nth-child(n + 3),
 table.s61 > thead > tr > th:nth-child(n + 3) {
 	padding-left: 12px;
 }
+table.s61 > thead {
+	font-size: smaller;
+	color: #7777aa;
+}
 .s61rownumber, .s61checkbox {
 	text-align: right;
-        padding: 0 5px;
+	padding: 0 5px;
 }
 tr.s61partner > td.s61username {
 	padding-left: 1em;
@@ -2339,7 +2358,7 @@ tr.s61partner {
 }
 .gradecdf61summary {
 	font-size: 90%;
-        margin: 0.5em auto;
+	margin: 0.5em auto;
 }
 .gradecdf61summary .cap {
 	padding-right: 1em;
@@ -2357,7 +2376,7 @@ code, .difflna61, .difflnb61, .difflc61, .difflctx61,
 .difflnote61, .diffnotetext61, .diffnoteentry61,
 .noteref61 {
 	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;
-        line-height: 18px;
+	line-height: 18px;
 }
 .note61 {
 	white-space: pre-wrap;
@@ -2376,8 +2395,8 @@ table.hidegrade61 .note61.gradenote {
 }
 .difflna61, .difflnb61 {
 	text-align: right;
-        color: rgba(0, 0, 0, 0.3);
-        padding: 0 0.5em;
+	color: rgba(0, 0, 0, 0.3);
+	padding: 0 0.5em;
 	width: 1%;
 }
 .difflc61, .difflctx61 {
@@ -2405,13 +2424,13 @@ table.hidegrade61 .note61.gradenote {
 }
 .ajaxsave61 {
 	padding-left: 1em;
-        font-size: smaller;
-        font-style: italic;
+	font-size: smaller;
+	font-style: italic;
 }
 .autograde61 {
 	padding-left: 1em;
-        font-size: smaller;
-        color: red;
+	font-size: smaller;
+	color: red;
 }
 a.fold61 {
 	color: inherit;
@@ -2426,55 +2445,55 @@ span.foldarrow {
 }
 .gradesready {
 	color: #009900;
-        text-decoration: none;
+	text-decoration: none;
 }
 .difflnote61 {
 	background: #f3d1fc;
 	background:
-            -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-            -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-            #f3d1fc;
-        -webkit-background-size: 100% 7px, 100% 5px, 100% 100%;
+	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
+	    -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    #f3d1fc;
+	-webkit-background-size: 100% 7px, 100% 5px, 100% 100%;
 	background:
-            linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-            linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-            #f3d1fc;
-        background-size: 100% 7px, 100% 5px, 100% 100%;
+	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
+	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    #f3d1fc;
+	background-size: 100% 7px, 100% 5px, 100% 100%;
 	font-style: italic;
-        padding: 0.8em 1em 0.8em 0.5em;
+	padding: 0.8em 1em 0.8em 0.5em;
 }
 .difflnoteborder61 {
 	background: #f3d1fc;
 	background:
-            -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-            -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
+	    -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
 	    -webkit-linear-gradient(right, #f3d1fc 20%, #e3a3e3 100%, transparent 100%) repeat-y right top;
-        -webkit-background-size: 100% 7px, 100% 5px, 25px 100%;
+	-webkit-background-size: 100% 7px, 100% 5px, 25px 100%;
 	background:
-            linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-            linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
+	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
 	    linear-gradient(270deg, #f3d1fc 20%, #e3a3e3 100%, transparent 100%) repeat-y right top,
 	    linear-gradient(125deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center,
-            linear-gradient(55deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center;
-        background-size: 100% 7px, 100% 5px, 25px 100%, 10px 20px, 10px 20px;
+	    linear-gradient(55deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center;
+	background-size: 100% 7px, 100% 5px, 25px 100%, 10px 20px, 10px 20px;
 }
 .difflnoteptr61, .difflnoteaa61, .difflnoteauthor61 {
-        font-family: Helvetica, sans-serif;
-        font-style: normal;
+	font-family: Helvetica, sans-serif;
+	font-style: normal;
 }
 .difflnoteptr61 {
 	float: right;
-        font-size: smaller;
-        text-transform: uppercase;
-        font-weight: bold;
-        padding-left: 1em;
+	font-size: smaller;
+	text-transform: uppercase;
+	font-weight: bold;
+	padding-left: 1em;
 }
 .difflnoteptr61 > a {
 	color: #7777aa;
-        text-decoration: none;
+	text-decoration: none;
 }
 .difflnoteptr61 > a:hover {
-        text-decoration: underline;
+	text-decoration: underline;
 }
 .difflnoteauthor61 {
 	float: right;
@@ -2490,22 +2509,22 @@ span.foldarrow {
 }
 .run61 {
 	background-color: #000022;
-        color: #d5e8d5;
+	color: #d5e8d5;
 	font-size: 85%;
-        overflow: auto;
-        max-height: 32em;
+	overflow: auto;
+	max-height: 32em;
 }
 .run61timestamp {
 	color: #88aa88;
-        font-style: italic;
+	font-style: italic;
 }
 .run61pre {
 	padding: 1.5em 1em 1.5em 2em;
-        margin: 0;
+	margin: 0;
 }
 .run61cursor {
 	color: #66ee66;
-        background-color: #66ee66;
+	background-color: #66ee66;
 	display: inline-block;
 }
 .viewoptions61 {
@@ -2524,7 +2543,7 @@ span.gradetotal61 {
 }
 span.gradeholder61 {
 	display: inline-block;
-        position: relative;
+	position: relative;
 	width: 8em;
 }
 span.grademax61 {
@@ -2658,16 +2677,16 @@ span.grademax61 {
 }
 .xaxislabel {
 	padding-left: 1em;
-        text-align: center;
+	text-align: center;
 }
 .yaxislabel {
 	position: absolute;
-        top: 45%;
+	top: 45%;
 	white-space: nowrap;
 	transform: rotate(-90deg);
-        -webkit-transform: rotate(-90deg);
-        transform-origin: 50% 50%;
-        -webkit-transform-origin: 50% 50%;
+	-webkit-transform: rotate(-90deg);
+	transform-origin: 50% 50%;
+	-webkit-transform-origin: 50% 50%;
 }
 
 .bigface61 {
@@ -2812,31 +2831,31 @@ span.sc6, span.sc7, span.sc8, span.sc9 {
 	font-weight: bold;
 }
 span.sc1, span.rev_num.sc1 {
-        color: #9c3131;
+	color: #9c3131;
 }
 span.sc2, span.rev_num.sc2 {
-        color: #89442b;
+	color: #89442b;
 }
 span.sc3, span.rev_num.sc3 {
-        color: #755825;
+	color: #755825;
 }
 span.sc4, span.rev_num.sc4 {
-        color: #626b1f;
+	color: #626b1f;
 }
 span.sc5, span.rev_num.sc5 {
-        color: #4e7f19;
+	color: #4e7f19;
 }
 span.sc6, span.rev_num.sc6 {
-        color: #3b9212;
+	color: #3b9212;
 }
 span.sc7, span.rev_num.sc7 {
-        color: #27a50c;
+	color: #27a50c;
 }
 span.sc8, span.rev_num.sc8 {
-        color: #14b906;
+	color: #14b906;
 }
 span.sc9, span.rev_num.sc9 {
-        color: #00cc00;
+	color: #00cc00;
 }
 span.sc_sum {
 	font-size: smaller;

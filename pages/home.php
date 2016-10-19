@@ -877,7 +877,7 @@ function show_pset_table($pset) {
             $row = (object) ["student" => $s, "text" => "", "ptext" => []];
             $j = render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous);
             if ($s->pcid) {
-                foreach (explode(",", $s->pcid) as $pcid)
+                foreach (array_unique(explode(",", $s->pcid)) as $pcid)
                     if (isset($students[$pcid])) {
                         $jj = render_pset_row($pset, $students, $students[$pcid], $row, $pcmembers, $anonymous);
                         $j["partners"][] = $jj;

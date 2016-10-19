@@ -2643,15 +2643,17 @@ function pa_anonymize_linkto(link, event) {
 }
 
 function pa_render_pset_table(psetid, pconf, data) {
-    var $j = $("#pa-pset" + psetid), dmap = {}, sorting_by = "username", sort_reverse = 1;
-    var username_key = pconf.anonymous ? "anon_username" : "username";
+    var $j = $("#pa-pset" + psetid), dmap = {}, sorting_by = "username", sort_reverse = 1, anonymous = pconf.anonymous;
+    var username_key = anonymous ? "anon_username" : "username";
 
     function calculate_ncol() {
         return (pconf.checkbox ? 1 : 0) + 4 + (pconf.gitless_grades ? 0 : 1) +
             (pconf.need_total ? 1 : 0) + (pconf.grade_keys || []).length + (pconf.gitless ? 0 : 1);
     }
+    function render_username_td(s) {
+        return '<a href="' + pconf.urlpattern.replace(/%40/, encodeURIComponent(s[username_key])) + '">' + escape_entities(s[username_key]) + '</a>';
+    }
     function render_tds(s, row_number) {
-        var username = pconf.anonymous ? s.anon_username : s.username;
         var grades = pconf.grade_keys || [];
         var a = [], txt, j, klass;
         if (row_number == "") {
@@ -2663,7 +2665,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 a.push('<td class="s61checkbox"><input type="checkbox" name="s61_' + escape_entities(s.username) + '" value="1" class="s61check" /></td>');
             a.push('<td class="s61rownumber">' + row_number + '.</td>');
         }
-        a.push('<td class="s61username"><a href=\"' + pconf.urlpattern.replace(/%40/, encodeURIComponent(username)) + '\">' + escape_entities(username) + '</a></td>');
+        a.push('<td class="s61username">' + render_username_td(s) + '</td>');
         a.push('<td class="s61nonanonymous">' + escape_entities(s.name || "") + '</td>');
         if (s.gradercid && peteramati_grader_map[s.gradercid])
             a.push('<td>' + escape_entities(peteramati_grader_map[s.gradercid]) + '</td>');
@@ -2690,7 +2692,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         if (!pconf.gitless) {
             if (!s.repo)
                 txt = '';
-            else if (pconf.anonymous)
+            else if (anonymous)
                 txt = '<a href="#" onclick="return pa_anonymize_linkto(' + escape_entities(JSON.stringify(s.repo)) + ',event)">repo</a>';
             else
                 txt = '<a href="' + escape_entities(s.repo) + '">repo</a>';
@@ -2712,17 +2714,18 @@ function pa_render_pset_table(psetid, pconf, data) {
         var i, s, a, trn = 0, was_boring = false;
         for (i = 0; i < data.length; ++i) {
             s = data[i];
+            dmap[s.username] = s;
             a = [];
             ++trn;
             if (s.boring && !was_boring && trn != 1)
                 a.push('<tr class="s61boring"><td colspan="' + calculate_ncol() + '"><hr /></td></tr>');
             was_boring = s.boring;
             a.push('<tr class="k' + (trn % 2) + '" data-pa-student="' + escape_entities(s.username) + '">' + render_tds(s, trn) + '</tr>');
-            if (s.partners)
-                for (var j = 0; j < s.partners.length; ++j)
-                    a.push('<tr class="k' + (trn % 2) + ' s61partner" data-pa-student="' + escape_entities(s.partners[j].username) + '" data-pa-partner="1">' + render_tds(s.partners[j], "") + '</tr>');
+            for (var j = 0; s.partners && j < s.partners.length; ++j) {
+                a.push('<tr class="k' + (trn % 2) + ' s61partner" data-pa-student="' + escape_entities(s.partners[j].username) + '" data-pa-partner="1">' + render_tds(s.partners[j], "") + '</tr>');
+                dmap[s.partners[j].username] = s.partners[j];
+            }
             $b.append(a.join(''));
-            dmap[s.username] = s;
         }
     }
     function resort() {
@@ -2757,23 +2760,34 @@ function pa_render_pset_table(psetid, pconf, data) {
             $(tr[0]).find(".s61rownumber").html(trn + ".");
         }
     }
+    function switch_anon() {
+        anonymous = !anonymous;
+        username_key = anonymous ? "anon_username" : "username";
+        $j.find("tbody td.s61username").each(function () {
+            var s = dmap[this.parentNode.getAttribute("data-pa-student")];
+            $(this).html(render_username_td(s));
+        });
+        return false;
+    }
     function render_head() {
-        var a = [], j, grades = pconf.grade_keys || [];
+        var a = [], j, grades = pconf.grade_keys || [], t;
         if (pconf.checkbox)
             a.push('<th></th>');
         a.push('<th></th>');
-        a.push('<th class="l s61username" data-pa-sort="username">Username</th>');
-        a.push('<th class="l s61nonanonymous" data-pa-sort="name">Name</th>');
-        a.push('<th class="l" data-pa-sort="grader">Grader</th>');
+        t = pconf.anonymous ? ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>' : '';
+        a.push('<th class="l s61username plsortable plsortactive" data-pa-sort="username">Username' + t + '</th>');
+        a.push('<th class="l s61nonanonymous plsortable" data-pa-sort="name">Name</th>');
+        a.push('<th class="l plsortable" data-pa-sort="grader">Grader</th>');
         if (!pconf.gitless_grades)
             a.push('<th></th>');
         if (pconf.need_total)
-            a.push('<th class="r" data-pa-sort="total">Tot</th>');
+            a.push('<th class="r plsortable" data-pa-sort="total">Tot</th>');
         for (j = 0; j < grades.length; ++j)
-            a.push('<th class="r" data-pa-sort="grade' + j + '">' + grades[j].substr(0, 3) + '</th>');
+            a.push('<th class="r plsortable" data-pa-sort="grade' + j + '">' + grades[j].substr(0, 3) + '</th>');
         if (!pconf.gitless)
             a.push('<th></th>');
         $j.find("thead").html('<tr>' + a.join('') + '</tr>');
+        $j.find("thead .s61username a").click(switch_anon);
     }
     function user_compar(a, b) {
         if (a[username_key] < b[username_key])
@@ -2854,6 +2868,8 @@ function pa_render_pset_table(psetid, pconf, data) {
             });
 
         resort();
+        $j.find(".plsortable").removeClass("plsortactive plsortreverse");
+        $(this).addClass("plsortactive" + (sort_reverse < 0 ? " plsortreverse" : ""));
     }
 
     $j.html("<thead></thead><tbody></tbody>");
