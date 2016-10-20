@@ -1,5 +1,5 @@
-// script.js -- HotCRP JavaScript library
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// script.js -- Peteramati JavaScript library
+// Peteramati is Copyright (c) 2006-2016 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 var siteurl, siteurl_postvalue, siteurl_suffix, siteurl_defaults,
@@ -10,6 +10,10 @@ var siteurl, siteurl_postvalue, siteurl_suffix, siteurl_defaults,
 
 function $$(id) {
     return document.getElementById(id);
+}
+
+function geval(__str) {
+    return eval(__str);
 }
 
 function serialize_object(x) {
@@ -115,9 +119,8 @@ function log_jserror(errormsg, error, noconsole) {
         errormsg.colno = error.columnNumber;
     if (error && error.stack)
         errormsg.stack = error.stack;
-    jQuery.ajax({
-        url: hoturl("api", "fn=jserror"),
-        type: "POST", cache: false, data: errormsg
+    $.ajax(hoturl("api", "fn=jserror"), {
+        global: false, method: "POST", cache: false, data: errormsg
     });
     if (error && !noconsole && typeof console === "object" && console.error)
         console.error(errormsg.error);
@@ -126,8 +129,8 @@ function log_jserror(errormsg, error, noconsole) {
 (function () {
     var old_onerror = window.onerror, nerrors_logged = 0;
     window.onerror = function (errormsg, url, lineno, colno, error) {
-        if (++nerrors_logged <= 10) {
-            var x = {"error": errormsg, "url": url, "lineno": lineno};
+        if ((url || !lineno) && ++nerrors_logged <= 10) {
+            var x = {error: errormsg, url: url, lineno: lineno};
             if (colno)
                 x.colno = colno;
             log_jserror(x, error, true);
@@ -135,6 +138,45 @@ function log_jserror(errormsg, error, noconsole) {
         return old_onerror ? old_onerror.apply(this, arguments) : false;
     };
 })();
+
+function jqxhr_error_message(jqxhr, status, errormsg) {
+    if (status == "parsererror")
+        return "Internal error: bad response from server.";
+    else if (errormsg)
+        return errormsg.toString();
+    else if (status == "timeout")
+        return "Connection timed out.";
+    else if (status)
+        return "Error [" + status + "].";
+    else
+        return "Error.";
+}
+
+$(document).ajaxError(function (event, jqxhr, settings, httperror) {
+    if (jqxhr.readyState == 4)
+        log_jserror(settings.url + " API failure: status " + jqxhr.status + ", " + httperror);
+});
+
+$.ajaxPrefilter(function (options, originalOptions, jqxhr) {
+    if (options.global === false)
+        return;
+    var f = options.success;
+    function onerror(jqxhr, status, errormsg) {
+        f && f({ok: false, error: jqxhr_error_message(jqxhr, status, errormsg)}, jqxhr, status);
+    }
+    if (!options.error)
+        options.error = onerror;
+    else if ($.isArray(options.error))
+        options.error.push(onerror);
+    else
+        options.error = [options.error, onerror];
+    if (options.timeout == null)
+        options.timeout = 10000;
+    if (options.method == null)
+        options.method = "POST";
+    if (options.dataType == null)
+        options.dataType = "json";
+});
 
 
 // geometry
@@ -212,6 +254,18 @@ function text_to_html(text) {
     var n = document.createElement("div");
     n.appendChild(document.createTextNode(text));
     return n.innerHTML;
+}
+
+function text_eq(a, b) {
+    if (a === b)
+        return true;
+    a = (a == null ? "" : a).replace(/\r\n?/g, "\n");
+    b = (b == null ? "" : b).replace(/\r\n?/g, "\n");
+    return a === b;
+}
+
+function regexp_quote(s) {
+    return String(s).replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1').replace(/\x08/g, '\\x08');
 }
 
 function plural_noun(n, what) {
@@ -394,19 +448,51 @@ function event_prevent(evt) {
 
 var event_key = (function () {
 var key_map = {"Spacebar": " ", "Esc": "Escape"},
-    code_map = {
-        "9": "Tab", "13": "Enter", "16": "Shift", "17": "Control", "18": "Option",
-        "27": "Escape", "186": ":", "219": "[", "221": "]"
+    charCode_map = {"9": "Tab", "13": "Enter", "27": "Escape"},
+    keyCode_map = {
+        "9": "Tab", "13": "Enter", "16": "ShiftLeft", "17": "ControlLeft",
+        "18": "AltLeft", "20": "CapsLock", "27": "Escape", "33": "PageUp",
+        "34": "PageDown", "37": "ArrowLeft", "38": "ArrowUp", "39": "ArrowRight",
+        "40": "ArrowDown", "91": "OSLeft", "92": "OSRight", "93": "OSRight",
+        "224": "OSLeft", "225": "AltRight"
+    },
+    nonprintable_map = {
+        "AltLeft": true,
+        "AltRight": true,
+        "CapsLock": true,
+        "ControlLeft": true,
+        "ControlRight": true,
+        "OSLeft": true,
+        "OSRight": true,
+        "ShiftLeft": true,
+        "ShiftRight": true,
+        "ArrowLeft": true,
+        "ArrowRight": true,
+        "ArrowUp": true,
+        "ArrowDown": true,
+        "PageUp": true,
+        "PageDown": true,
+        "Escape": true,
+        "Enter": true
     };
-return function (evt) {
-    if (evt.key != null)
-        return key_map[evt.key] || evt.key;
-    var code = evt.charCode || evt.keyCode;
-    if (code)
-        return code_map[code] || String.fromCharCode(code);
-    else
-        return "";
+function event_key(evt) {
+    var x;
+    if ((x = evt.key) != null)
+        return key_map[x] || x;
+    if ((x = evt.charCode))
+        return charCode_map[x] || String.fromCharCode(x);
+    if ((x = evt.keyCode)) {
+        if (keyCode_map[x])
+            return keyCode_map[x];
+        else if ((x >= 48 && x <= 57) || (x >= 65 && x <= 90))
+            return String.fromCharCode(x);
+    }
+    return "";
+}
+event_key.printable = function (evt) {
+    return !nonprintable_map[event_key(evt)];
 };
+return event_key;
 })();
 
 function event_modkey(evt) {
@@ -1080,6 +1166,25 @@ else
     return function (e) {
         ttaction.call(typeof e === "number" ? this : e, {type: "focus"});
     };
+})();
+
+
+// style properties
+// IE8 can't handle rgba and throws exceptions. Those exceptions
+// clutter my inbox. XXX Revisit in mid-2016.
+window.assign_style_property = (function () {
+var e = document.createElement("div");
+try {
+    e.style.outline = "4px solid rgba(9,9,9,0.3)";
+    return function (elt, property, value) {
+        elt.style[property] = value;
+    };
+} catch (err) {
+    return function (elt, property, value) {
+        value = value.replace(/\brgba\((.*?),\s*[\d.]+\)/, "rgb($1)");
+        elt.style[property] = value;
+    };
+}
 })();
 
 
