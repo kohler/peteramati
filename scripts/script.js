@@ -1076,9 +1076,12 @@ function tooltip(info) {
                 return content;
             else {
                 content = new_content;
-                bub_show();
+                show_bub();
             }
             return tt;
+        },
+        text: function (new_text) {
+            return tt.html(escape_entities(new_text));
         }
     };
 
@@ -2717,7 +2720,7 @@ function repoclip() {
     window.getSelection().removeAllRanges();
     bub.remove();
     if (global_tooltip && global_tooltip.elt == this)
-        global_tooltip.bubble.text(this.getAttribute("data-pa-repo"));
+        global_tooltip.text(this.getAttribute("data-pa-repo"));
 }
 
 function pa_init_repoclip() {
@@ -2895,44 +2898,35 @@ function pa_render_pset_table(psetid, pconf, data) {
         $j.find("thead .s61username a").click(switch_anon);
     }
     function user_compar(a, b) {
-        if (a[username_key] < b[username_key])
+        var au = a[username_key].toLowerCase(), bu = b[username_key].toLowerCase();
+        if (au < bu)
             return -sort_reverse;
-        else if (a[username_key] > b[username_key])
+        else if (au > bu)
             return sort_reverse;
         else
             return 0;
     }
-    function head_click(event) {
-        if (!this.hasAttribute("data-pa-sort"))
-            return;
-        var sort_by = this.getAttribute("data-pa-sort"), m;
-        if (sorting_by == sort_by)
-            sort_reverse = -sort_reverse;
-        else {
-            sorting_by = sort_by;
-            if (sort_by == "username" || sort_by == "name" || sort_by == "grader")
-                sort_reverse = 1;
-            else
-                sort_reverse = -1;
-        }
-
-        if (sort_by == "username")
+    function sort_data() {
+        if (sorting_by == "username")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
                 else
                     return user_compar(a, b);
             });
-        else if (sort_by == "name")
+        else if (sorting_by == "name")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
-                else if (a.name != b.name)
-                    return a.name < b.name ? -sort_reverse : sort_reverse;
-                else
-                    return user_compar(a, b);
-            })
-        else if (sort_by == "grader")
+                else {
+                    var an = a.name.toLowerCase(), bn = b.name.toLowerCase();
+                    if (an != bn)
+                        return an < bn ? -sort_reverse : sort_reverse;
+                    else
+                        return user_compar(a, b);
+                }
+            });
+        else if (sorting_by == "grader")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
@@ -2945,7 +2939,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                         return user_compar(a, b);
                 }
             });
-        else if (sort_by == "total")
+        else if (sorting_by == "total")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
@@ -2954,7 +2948,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 else
                     return -user_compar(a, b);
             });
-        else if ((m = /^grade(\d+)$/.exec(sort_by)))
+        else if ((m = /^grade(\d+)$/.exec(sorting_by)))
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
@@ -2971,7 +2965,21 @@ function pa_render_pset_table(psetid, pconf, data) {
                         return -user_compar(a, b);
                 }
             });
-
+    }
+    function head_click(event) {
+        if (!this.hasAttribute("data-pa-sort"))
+            return;
+        var sort_by = this.getAttribute("data-pa-sort"), m;
+        if (sorting_by == sort_by)
+            sort_reverse = -sort_reverse;
+        else {
+            sorting_by = sort_by;
+            if (sort_by == "username" || sort_by == "name" || sort_by == "grader")
+                sort_reverse = 1;
+            else
+                sort_reverse = -1;
+        }
+        sort_data();
         resort();
         $j.find(".plsortable").removeClass("plsortactive plsortreverse");
         $(this).addClass("plsortactive" + (sort_reverse < 0 ? " plsortreverse" : ""));
@@ -2980,6 +2988,7 @@ function pa_render_pset_table(psetid, pconf, data) {
     $j.html("<thead></thead><tbody></tbody>");
     $j.find("thead").on("click", "th", head_click);
     render_head();
+    sort_data();
     render_body();
 }
 
