@@ -2770,7 +2770,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<td></td>');
         } else {
             if (pconf.checkbox)
-                a.push('<td class="s61checkbox"><input type="checkbox" name="s61_' + escape_entities(s.username) + '" value="1" class="s61check" /></td>');
+                a.push('<td class="s61checkbox"><input type="checkbox" name="s61_' + encodeURIComponent(s.username).replace(/\./g, "%2E") + '" value="1" class="s61check" /></td>');
             a.push('<td class="s61rownumber">' + row_number + '.</td>');
         }
         a.push('<td class="s61username">' + render_username_td(s) + '</td>');

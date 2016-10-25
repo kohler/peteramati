@@ -271,7 +271,7 @@ function set_grader($qreq) {
     foreach ($qreq as $k => $v)
         if (substr($k, 0, 4) == "s61_"
             && $v
-            && ($uname = substr($k, 4))
+            && ($uname = urldecode(substr($k, 4)))
             && ($user = ContactView::prepare_user($uname))) {
             $info = ContactView::user_pset_info($user, $pset);
             if ($info->repo)
