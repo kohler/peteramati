@@ -275,10 +275,13 @@ class PsetView {
     }
 
 
-    public function grading_info() {
+    public function grading_info($key = null) {
         if ($this->grade === false)
             $this->load_grade();
-        return $this->grade_notes;
+        if (!$key)
+            return $this->grade_notes;
+        else
+            return $this->grade_notes ? get($this->grade_notes, $key) : null;
     }
 
     public function commit_or_grading_info() {
@@ -378,10 +381,12 @@ class PsetView {
                     $this->viewer->contactId);
         else {
             assert(!!$this->commit);
-            $grader = $this->commit_info("gradercid") ? : null;
+            $grader = $this->commit_info("gradercid");
+            if (!$grader)
+                $grader = $this->grading_info("gradercid");
             Dbl::qe("insert into RepositoryGrade (repoid,pset,gradehash,gradercid,placeholder) values (?, ?, ?, ?, 0) on duplicate key update gradehash=values(gradehash), gradercid=values(gradercid), placeholder=0",
                     $this->repo->repoid, $this->pset->psetid,
-                    $this->commit ? : null, $grader);
+                    $this->commit ? : null, $grader ? : null);
         }
         $this->grade = $this->repo_grade = false;
     }
