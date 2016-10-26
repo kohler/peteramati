@@ -302,7 +302,7 @@ function runmany($qreq) {
     foreach ($qreq as $k => $v)
         if (substr($k, 0, 4) == "s61_"
             && $v
-            && ($uname = substr($k, 4))
+            && ($uname = urldecode(substr($k, 4)))
             && ($user = ContactView::prepare_user($uname, $pset)))
             $users[] = $Me->user_linkpart($user);
     if (empty($users))
@@ -736,7 +736,7 @@ function show_regrades($result) {
         ++$trn;
         echo '<tr class="k', ($trn % 2), '">';
         if ($checkbox)
-            echo '<td class="s61checkbox">', Ht::checkbox("s61_" . $Me->user_idpart($row->student), 1, array("class" => "s61check")), '</td>';
+            echo '<td class="s61checkbox">', Ht::checkbox("s61_" . urlencode($Me->user_idpart($row->student)), 1, array("class" => "s61check")), '</td>';
         echo '<td class="s61rownumber">', $trn, '.</td>';
         $pset = Pset::$all[$row->pset];
         echo '<td class="s61pset">', htmlspecialchars($pset->title), '</td>';

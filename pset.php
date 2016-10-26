@@ -19,7 +19,6 @@ Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)
 $Pset = ContactView::find_pset_redirect(req("pset"));
 
 class Series {
-
     public $n;
     public $sum;
     public $sumsq;
