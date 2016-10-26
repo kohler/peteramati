@@ -2488,7 +2488,7 @@ function runmany61() {
         jQuery("#runmany61_who").text(user);
         $f.find("[name='u']").val(user);
         jQuery("#runmany61_users").text(users.join(" "));
-        var $x = jQuery("<a href=\"pset/" + $f.find("[name='pset']").val() + "/" + encodeURIComponent(user) + "\" class=\"q ansib ansifg7\"></a>");
+        var $x = jQuery("<a href=\"" + siteurl + "pset/" + $f.find("[name='pset']").val() + "/" + encodeURIComponent(user) + "\" class=\"q ansib ansifg7\"></a>");
         $x.text(user);
         run61($manybutton[0], {noclear: true, headline: $x[0]});
     }
