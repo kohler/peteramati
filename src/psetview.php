@@ -24,7 +24,7 @@ class PsetView {
 
     private $commit = null;
     private $commit_notes = false;
-    private $recent_commits = false;
+    private $recent_commits = null;
     private $recent_commits_truncated = null;
     private $latest_commit = null;
 
@@ -44,18 +44,28 @@ class PsetView {
         $this->load_grade();
     }
 
+    function connected_commit($commit) {
+        if ($this->recent_commits === null)
+            $this->load_recent_commits();
+        if (($c = git_commit_in_list($this->recent_commits, $commit)))
+            return $c;
+        else if (($c = $this->repo->find_snapshot($commit))) {
+            $this->recent_commits[$c->hash] = $c;
+            return $c->hash;
+        } else
+            return false;
+    }
+
     public function set_commit($reqcommit) {
-        global $Conf;
         $this->commit = $this->commit_notes = false;
         if (!$this->repo)
             return false;
-        if ($this->recent_commits === false)
+        if ($this->recent_commits === null)
             $this->load_recent_commits();
         if ($reqcommit)
-            $this->commit = git_commit_in_list($this->recent_commits, $reqcommit);
-        else if ($this->repo_grade
-                 && isset($this->recent_commits[$this->repo_grade->gradehash]))
-            $this->commit = $this->repo_grade->gradehash;
+            $this->commit = $this->connected_commit($reqcommit);
+        else if ($this->repo_grade && ($c = $this->connected_commit($this->repo_grade->gradehash)))
+            $this->commit = $c;
         else if ($this->latest_commit)
             $this->commit = $this->latest_commit->hash;
         return $this->commit;
@@ -92,11 +102,11 @@ class PsetView {
         list($user, $repo, $pset) = array($this->user, $this->repo, $this->pset);
         if (!$repo)
             return;
-        $this->recent_commits = $user->repo_recent_commits($repo, $pset, 100);
+        $this->recent_commits = $user->repo_recent_commits($repo, $pset, 100) ? : [];
         if (!$this->recent_commits && isset($pset->test_file)
             && $user->repo_ls_files($repo, "REPO/master", $pset->test_file)) {
             $repo->_truncated_psetdir[$pset->id] = true;
-            $this->recent_commits = $user->repo_recent_commits($repo, null, 100);
+            $this->recent_commits = $user->repo_recent_commits($repo, null, 100) ? : [];
         }
         $this->recent_commits_truncated = count($this->recent_commits) == 100;
         if (!empty($this->recent_commits))

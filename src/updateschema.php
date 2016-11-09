@@ -205,6 +205,15 @@ function updateSchema($conf) {
         && $conf->ql("alter table ContactInfo add `data` varbinary(32767) DEFAULT NULL")
         && $conf->ql("alter table ContactInfo add `studentYear` varbinary(4) DEFAULT NULL"))
         $conf->update_schema_version(95);
+    if ($conf->sversion == 95
+        && $conf->ql("create table `RepositoryCommitSnapshot` ( `repoid` int(11) NOT NULL, `hash` binary(40) NOT NULL, `snapshot` bigint(11) NOT NULL, PRIMARY KEY (`repoid`,`hash`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8"))
+        $conf->update_schema_version(96);
+    if ($conf->sversion == 96
+        && $conf->ql("alter table Repository add `analyzedsnapat` bigint(11) NOT NULL DEFAULT '0'"))
+        $conf->update_schema_version(97);
+    if ($conf->sversion == 97
+        && $conf->ql("alter table RepositoryCommitSnapshot change `hash` `hash` varbinary(32) NOT NULL"))
+        $conf->update_schema_version(98);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

@@ -3,6 +3,19 @@
 // Peteramati is Copyright (c) 2013-2016 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
+class RepositoryCommitInfo {
+    public $commitat;
+    public $hash;
+    public $subject;
+    public $fromhead;
+    function __construct($commitat, $hash, $subject, $fromhead = null) {
+        $this->commitat = $commitat;
+        $this->hash = $hash;
+        $this->subject = $subject;
+        $this->fromhead = $fromhead;
+    }
+}
+
 class Repository {
     public $conf;
 
@@ -19,12 +32,14 @@ class Repository {
     public $working;
     public $snapcommitat;
     public $snapcommitline;
+    public $analyzedsnapat;
     public $notes;
     public $heads;
 
     public $is_handout = false;
     public $viewable_by = [];
     public $_truncated_psetdir = [];
+    private $_commitinfo = [];
 
     function __construct(Conf $conf = null) {
         global $Conf;
@@ -44,6 +59,7 @@ class Repository {
         $this->lastpset = (int) $this->lastpset;
         $this->working = (int) $this->working;
         $this->snapcommitat = (int) $this->snapcommitat;
+        $this->analyzedsnapat = (int) $this->analyzedsnapat;
         if ($this->notes !== null)
             $this->notes = json_decode($this->notes, true);
         $this->reposite = RepositorySite::make($this->url, $this->conf);
@@ -200,5 +216,109 @@ class Repository {
 
     function truncated_psetdir(Pset $pset) {
         return get($this->_truncated_psetdir, $pset->id);
+    }
+
+
+    function gitrun($command) {
+        global $ConfSitePATH;
+        $command = str_replace("REPO", "repo" . $this->repoid, $command);
+        $repodir = "$ConfSitePATH/repo/repo$this->cacheid";
+        if (!file_exists("$repodir/.git/config")) {
+            is_dir($repodir) || mkdir($repodir, 0770);
+            shell_exec("cd $repodir && git init --shared");
+        }
+        return shell_exec("cd $repodir && $command");
+    }
+
+    function commits_from_head($head, $limit = null, $directory = null) {
+        $dirarg = "";
+        if ((string) $directory !== "")
+            $dirarg = " -- " . escapeshellarg($directory);
+        $limitarg = $limit ? " -n$limit" : "";
+        $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' $head$dirarg");
+        $list = [];
+        foreach (explode("\n", $result) as $line)
+            if (preg_match(',\A(\S+)\s+(\S+)\s+(.*)\z,', $line, $m)
+                && !isset($list[$m[2]]))
+                $list[$m[2]] = new RepositoryCommitInfo((int) $m[1], $m[2], $m[3], $head);
+        return $list;
+    }
+
+    function commits($pset = null, $limit = null) {
+        $dir = null;
+        if (is_object($pset) && $pset->directory_noslash !== "")
+            $dir = $pset->directory_noslash;
+        else if (is_string($pset) && $pset !== "")
+            $dir = $pset;
+        $list = [];
+        $heads = explode(" ", $this->heads);
+        $heads[0] = "REPO/master";
+        foreach ($heads as $h) {
+            $xlist = $this->commits_from_head($h, $limit, $dir);
+            $list = $list ? array_merge($list, $xlist) : $xlist;
+        }
+        return $list;
+    }
+
+
+    function analyze_snapshots() {
+        global $ConfSitePATH;
+        if ($this->snapat <= $this->analyzedsnapat)
+            return;
+        $timematch = " ";
+        if ($this->analyzedsnapat)
+            $timematch = gmstrftime("%Y%m%d.%H%M%S", $this->analyzedsnapat);
+        $qv = [];
+        $analyzed_snaptime = 0;
+        foreach (glob("$ConfSitePATH/repo/repo$this->cacheid/.git/refs/tags/repo{$this->repoid}.snap*") as $snapfile) {
+            $time = substr($snapfile, strrpos($snapfile, ".snap") + 5);
+error_log(json_encode([$time, $timematch]));
+            if (strcmp($time, $timematch) <= 0
+                || !preg_match('/\A(\d\d\d\d)(\d\d)(\d\d)\.(\d\d)(\d\d)(\d\d)\z/', $time, $m))
+                continue;
+            $snaptime = gmmktime($m[4], $m[5], $m[6], $m[2], $m[3], $m[1]);
+            $analyzed_snaptime = max($snaptime, $analyzed_snaptime);
+            $head = file_get_contents($snapfile);
+            $result = $this->gitrun("git log -n2000 --simplify-merges --format=%H $head");
+            foreach (explode("\n", $result) as $line)
+                if (strlen($line) == 40
+                    && (!isset($qv[$line]) || $qv[$line][2] > $snaptime))
+                    $qv[$line] = [$this->repoid, hex2bin($line), $snaptime];
+        }
+        if (!empty($qv))
+            $this->conf->qe("insert into RepositoryCommitSnapshot (repoid, hash, snapshot) values ?v on duplicate key update snapshot=least(snapshot,values(snapshot))", $qv);
+        if ($analyzed_snaptime)
+            $this->conf->qe("update Repository set analyzedsnapat=greatest(analyzedsnapat,?) where repoid=?", $analyzed_snaptime, $this->repoid);
+    }
+
+    function find_snapshot($commit) {
+        if (isset($this->_commitinfo[$commit]))
+            return $this->_commitinfo[$commit];
+        $this->analyze_snapshots();
+        $bcommit = hex2bin(substr($commit, 0, strlen($commit) & ~1));
+        if (strlen($bcommit) == 20)
+            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and hash=?", $this->repoid, $bcommit);
+        else
+            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and hash like '?ls%'", $this->repoid, $bcommit);
+        $match = null;
+        while (($row = $result->fetch_object())) {
+            $h = bin2hex($row->hash);
+            if (str_starts_with($h, $commit)) {
+                if ($match) {
+                    $match = false;
+                    break;
+                }
+                $match = $row;
+            }
+        }
+        Dbl::free($result);
+        if ($match) {
+            $list = $this->commits_from_head("repo{$this->repoid}.snap" . gmstrftime("%Y%m%d.%H%M%S", $match->snapshot));
+            $cinfo = $list[bin2hex($match->hash)];
+            $cinfo->fromhead = "snapshot of " . strftime("%Y-%m-%d %H:%M:%S", $match->snapshot);
+        } else
+            $cinfo = false;
+        $this->_commitinfo[$commit] = $cinfo;
+        return $cinfo;
     }
 }

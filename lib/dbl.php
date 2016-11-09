@@ -231,7 +231,7 @@ class Dbl {
                         unset($y);
                         break;
                     }
-                if (count($arg) === 0) {
+                if (empty($arg)) {
                     // We want `foo IN ()` and `foo NOT IN ()`.
                     // That is, we want `false` and `true`. We compromise. The
                     // statement `foo=NULL` is always NULL -- which is falsy
@@ -249,11 +249,38 @@ class Dbl {
                 ++$nextpos;
             } else if ($nextch === "l") {
                 $arg = sqlq_for_like($arg);
+                ++$nextpos;
                 if (substr($qstr, $nextpos + 1, 1) === "s")
-                    $nextpos += 2;
-                else {
-                    $arg = "'" . $arg . "'";
                     ++$nextpos;
+                else
+                    $arg = "'" . $arg . "'";
+            } else if ($nextch === "v") {
+                ++$nextpos;
+                if (!is_array($arg) || empty($arg)) {
+                    trigger_error(self::landmark() . ": query '$original_qstr' argument " . (is_int($thisarg) ? $thisarg + 1 : $thisarg) . " should be nonempty array");
+                    $arg = "NULL";
+                } else {
+                    $alln = -1;
+                    $vs = [];
+                    foreach ($arg as $x) {
+                        if (!is_array($x))
+                            $x = [$x];
+                        $n = count($x);
+                        if ($alln === -1)
+                            $alln = $n;
+                        if ($alln !== $n && $alln !== -2) {
+                            trigger_error(self::landmark() . ": query '$original_qstr' argument " . (is_int($thisarg) ? $thisarg + 1 : $thisarg) . " has components of different lengths");
+                            $alln = -2;
+                        }
+                        foreach ($x as &$y)
+                            if ($y === null)
+                                $y = "NULL";
+                            else if (!is_int($y) && !is_float($y))
+                                $y = "'" . $dblink->real_escape_string($y) . "'";
+                        unset($y);
+                        $vs[] = "(" . join(",", $x) . ")";
+                    }
+                    $arg = join(", ", $vs);
                 }
             } else {
                 if ($arg === null)
@@ -279,6 +306,17 @@ class Dbl {
         return self::format_query_args($dblink, $qstr, $argv);
     }
 
+    static private function call_query($dblink, $qfunc, $qstr) {
+        if (self::$query_log_key) {
+            $time = microtime(true);
+            $result = $dblink->$qfunc($qstr);
+            self::$query_log[self::$query_log_key][0] += microtime(true) - $time;
+            self::$query_log_key = false;
+        } else
+            $result = $dblink->$qfunc($qstr);
+        return $result;
+    }
+
     static private function do_query_with($dblink, $qstr, $argv, $flags) {
         if (!($flags & self::F_RAW))
             $qstr = self::format_query_args($dblink, $qstr, $argv);
@@ -286,14 +324,7 @@ class Dbl {
             error_log(self::landmark() . ": empty query");
             return false;
         }
-        if (self::$query_log_key) {
-            $time = microtime(true);
-            $result = $dblink->query($qstr);
-            self::$query_log[self::$query_log_key][0] += microtime(true) - $time;
-            self::$query_log_key = false;
-        } else
-            $result = $dblink->query($qstr);
-        return self::do_result($dblink, $flags, $qstr, $result);
+        return self::do_result($dblink, $flags, $qstr, self::call_query($dblink, "query", $qstr));
     }
 
     static private function do_query($args, $flags) {
@@ -330,7 +361,7 @@ class Dbl {
         list($dblink, $qstr, $argv) = self::query_args($args, $flags, true);
         if (!($flags & self::F_RAW))
             $qstr = self::format_query_args($dblink, $qstr, $argv);
-        return new Dbl_MultiResult($dblink, $flags, $qstr, $dblink->multi_query($qstr));
+        return new Dbl_MultiResult($dblink, $flags, $qstr, self::call_query($dblink, "multi_query", $qstr));
     }
 
     static function query(/* [$dblink,] $qstr, ... */) {

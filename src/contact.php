@@ -1368,7 +1368,7 @@ class Contact {
 
     static function repo_gitrun($repo, $command) {
         global $Me, $ConfSitePATH;
-        if (!isset($repo->repoid) || !isset($repo->cacheid))
+        if (!($repo instanceof Repository))
             error_log(json_encode($repo) . " / " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " user $Me->email");
         assert(isset($repo->repoid) && isset($repo->cacheid));
         $command = str_replace("REPO", "repo" . $repo->repoid, $command);
