@@ -244,7 +244,13 @@ class ContactView {
         if ($data === false)
             return (object) array("error" => true, "message" => "No such log");
 
-        // XXX UTF-8 argh
+        // Fix up $data if it is not valid UTF-8.
+        if (!is_valid_utf8($data)) {
+            $data = UnicodeHelper::utf8_truncate_invalid($data);
+            if (!is_valid_utf8($data))
+                $data = UnicodeHelper::utf8_replace_invalid($data);
+        }
+
         $json = self::runner_generic_json($info, $checkt);
         $json->data = $data;
         $json->offset = max($offset, 0);
