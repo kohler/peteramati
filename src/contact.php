@@ -611,7 +611,7 @@ class Contact {
     }
 
     function escape() {
-        if (req("ajax")) {
+        if (req("ajax") || req("latestcommit")) {
             if ($this->is_empty())
                 $this->conf->ajaxExit(array("ok" => 0, "loggedout" => 1));
             else
