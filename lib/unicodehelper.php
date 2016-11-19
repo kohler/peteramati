@@ -237,7 +237,7 @@ class UnicodeHelper {
         $c = $len ? ord($str[$len - 1]) : 0;
         if ($c < 0x80)
             return $str;
-        else if ($c < 0xC0 || $len == 1
+        else if ($c >= 0xC0 || $len == 1
                  || ($d = ord($str[$len - 2])) < 0x80)
             return substr($str, 0, $len - 1);
         else if ($d >= 0xC0 && $d < 0xE0)
