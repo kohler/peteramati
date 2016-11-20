@@ -454,107 +454,6 @@ function reviewType($paperId, $row, $long = 0) {
         return "";
 }
 
-function paperDocumentData($prow, $documentType = DTYPE_SUBMISSION, $paperStorageId = 0) {
-    global $Conf, $Opt;
-    assert($paperStorageId || $documentType == DTYPE_SUBMISSION || $documentType == DTYPE_FINAL);
-    if ($documentType == DTYPE_FINAL && $prow->finalPaperStorageId <= 0)
-        $documentType = DTYPE_SUBMISSION;
-    if ($paperStorageId == 0 && $documentType == DTYPE_FINAL)
-        $paperStorageId = $prow->finalPaperStorageId;
-    else if ($paperStorageId == 0)
-        $paperStorageId = $prow->paperStorageId;
-    if ($paperStorageId <= 1)
-        return null;
-
-    // pre-load document object from paper
-    $doc = (object) array("paperId" => $prow->paperId,
-                          "mimetype" => defval($prow, "mimetype", ""),
-                          "size" => defval($prow, "size", 0),
-                          "timestamp" => defval($prow, "timestamp", 0),
-                          "sha1" => defval($prow, "sha1", ""));
-    if ($prow->finalPaperStorageId > 0) {
-        $doc->paperStorageId = $prow->finalPaperStorageId;
-        $doc->documentType = DTYPE_FINAL;
-    } else {
-        $doc->paperStorageId = $prow->paperStorageId;
-        $doc->documentType = DTYPE_SUBMISSION;
-    }
-
-    // load document object from database if pre-loaded version doesn't work
-    if ($paperStorageId > 0
-        && ($doc->documentType != $documentType
-            || $paperStorageId != $doc->paperStorageId)) {
-        $result = $Conf->qe("select paperStorageId, paperId, length(paper) as size, mimetype, timestamp, sha1, filename, documentType from PaperStorage where paperStorageId=$paperStorageId", "while reading documents");
-        $doc = edb_orow($result);
-    }
-
-    return $doc;
-}
-
-function requestDocumentType($req, $default = DTYPE_SUBMISSION) {
-    if (is_string($req))
-        $req = array("dt" => $req);
-    if (($dt = defval($req, "dt"))) {
-        if (preg_match('/\A-?\d+\z/', $dt))
-            return (int) $dt;
-        $dt = strtolower($dt);
-        if ($dt == "paper" || $dt == "submission")
-            return DTYPE_SUBMISSION;
-        if ($dt == "final")
-            return DTYPE_FINAL;
-        if (substr($dt, 0, 4) == "opt-")
-            $dt = substr($dt, 4);
-        foreach (paperOptions() as $o)
-            if ($dt == $o->optionAbbrev)
-                return $o->optionId;
-    }
-    if (defval($req, "final", 0) != 0)
-        return DTYPE_FINAL;
-    return $default;
-}
-
-function topicTable($prow, $active = 0) {
-    global $Conf;
-    $rf = reviewForm();
-    $paperId = ($prow ? $prow->paperId : -1);
-
-    // read from paper row if appropriate
-    if ($paperId > 0 && $active < 0 && isset($prow->topicIds)) {
-        $top = $rf->webTopicArray($prow->topicIds, defval($prow, "topicInterest"));
-        return join(" <span class='sep'>&nbsp;</span> ", $top);
-    }
-
-    // get current topics
-    $paperTopic = array();
-    if ($paperId > 0) {
-        $result = $Conf->q("select topicId from PaperTopic where paperId=$paperId");
-        while ($row = edb_row($result))
-            $paperTopic[$row[0]] = $rf->topicName[$row[0]];
-    }
-    $allTopics = ($active < 0 ? $paperTopic : $rf->topicName);
-    if (count($allTopics) == 0)
-        return "";
-
-    $out = "<table><tr><td class='pad'>";
-    $colheight = (int) ((count($allTopics) + 1) / 2);
-    $i = 0;
-    foreach ($rf->topicOrder as $tid => $bogus) {
-        if (!isset($allTopics[$tid]))
-            continue;
-        if ($i > 0 && ($i % $colheight) == 0)
-            $out .= "</td><td>";
-        $tname = htmlspecialchars($rf->topicName[$tid]);
-        if ($paperId <= 0 || $active >= 0) {
-            $out .= tagg_checkbox_h("top$tid", 1, ($active > 0 ? isset($_REQUEST["top$tid"]) : isset($paperTopic[$tid])),
-                                    array("disabled" => $active < 0))
-                . "&nbsp;" . tagg_label($tname) . "<br />\n";
-        } else
-            $out .= $tname . "<br />\n";
-        $i++;
-    }
-    return $out . "</td></tr></table>";
-}
-
 function become_user_link($link, $text = "user") {
     global $Conf;
     if (is_object($link) && $link->seascode_username)
@@ -563,27 +462,6 @@ function become_user_link($link, $text = "user") {
         $link = $link->email;
     return "<a class=\"actas\" href=\"" . self_href(array("actas" => $link)) . "\">"
         . $Conf->cacheableImage("viewas.png", "[Become user]", "Act as " . htmlspecialchars($text)) . "</a>";
-}
-
-function authorTable($aus, $viewAs = null) {
-    global $Conf;
-    $out = "";
-    if (!is_array($aus))
-        $aus = explode("\n", $aus);
-    foreach ($aus as $aux) {
-        $au = trim(is_array($aux) ? Text::user_html($aux) : $aux);
-        if ($au != '') {
-            if (strlen($au) > 30)
-                $out .= "<span class='autblentry_long'>";
-            else
-                $out .= "<span class='autblentry'>";
-            $out .= $au;
-            if ($viewAs !== null && is_array($aux) && count($aux) >= 2 && $viewAs->email != $aux[2] && $viewAs->privChair)
-                $out .= " " . become_user_link($aux[2], Text::name_html($aux));
-            $out .= "</span> ";
-        }
-    }
-    return $out;
 }
 
 function highlightMatch($match, $text, &$n = null) {
@@ -603,23 +481,6 @@ function decorateNumber($n) {
         return $n;
     else
         return 0;
-}
-
-function preferenceSpan($preference, $topicInterestScore = 0) {
-    if (is_array($preference))
-        list($preference, $topicInterestScore) = $preference;
-    if ($preference != 0)
-        $type = ($preference > 0 ? 1 : -1);
-    else
-        $type = ($topicInterestScore > 0 ? 1 : -1);
-    $t = " <span class='asspref$type'>";
-    if ($preference)
-        $t .= "P" . decorateNumber($preference);
-    if ($preference && $topicInterestScore)
-        $t .= " ";
-    if ($topicInterestScore)
-        $t .= "T" . decorateNumber($topicInterestScore);
-    return $t . "</span>";
 }
 
 function allocateListNumber($listid) {
