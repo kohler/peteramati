@@ -214,6 +214,33 @@ function updateSchema($conf) {
     if ($conf->sversion == 97
         && $conf->ql("alter table RepositoryCommitSnapshot change `hash` `hash` varbinary(32) NOT NULL"))
         $conf->update_schema_version(98);
+    if ($conf->sversion == 98
+        && $conf->ql("alter table Capability change `capabilityId` `capabilityId` int(11) NOT NULL")
+        && update_schema_drop_keys_if_exist($conf, "Capability", ["capabilityId", "PRIMARY"])
+        && $conf->ql("alter table Capability add primary key (`salt`)")
+        && $conf->ql("alter table Capability drop column `capabilityId`"))
+        $conf->update_schema_version(99);
+    if ($conf->sversion == 99
+        && $conf->ql("drop table if exists `CapabilityMap`"))
+        $conf->update_schema_version(100);
+    if ($conf->sversion == 100
+        && $conf->ql("alter table ContactImage add unique key `contactImageId` (`contactImageId`)")
+        && update_schema_drop_keys_if_exist($conf, "ContactImage", ["contactId", "PRIMARY"])
+        && $conf->ql("alter table ContactImage add primary key (`contactId`,`contactImageId`)"))
+        $conf->update_schema_version(101);
+    if ($conf->sversion == 101
+        && $conf->ql("drop table if exists `PaperStorage`")
+        && $conf->ql("drop table if exists `PsetGrade`"))
+        $conf->update_schema_version(102);
+    if ($conf->sversion == 102
+        && update_schema_drop_keys_if_exist($conf, "RepositoryGrade", ["repopset"])
+        && $conf->ql("alter table RepositoryGrade add primary key (`repoid`,`pset`)"))
+        $conf->update_schema_version(103);
+    if ($conf->sversion == 103
+        && $conf->ql("alter table Settings change `name` `name` varbinary(256) NOT NULL")
+        && update_schema_drop_keys_if_exist($conf, "Settings", ["name"])
+        && $conf->ql("alter table Settings add primary key (`name`)"))
+        $conf->update_schema_version(104);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

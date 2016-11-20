@@ -24,30 +24,13 @@ CREATE TABLE `ActionLog` (
 
 DROP TABLE IF EXISTS `Capability`;
 CREATE TABLE `Capability` (
-  `capabilityId` int(11) NOT NULL AUTO_INCREMENT,
   `capabilityType` int(11) NOT NULL,
   `contactId` int(11) NOT NULL,
   `paperId` int(11) NOT NULL,
   `timeExpires` int(11) NOT NULL,
   `salt` varbinary(255) NOT NULL,
   `data` blob,
-  PRIMARY KEY (`capabilityId`),
-  UNIQUE KEY `capabilityId` (`capabilityId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
--- Table structure for table `CapabilityMap`
---
-
-DROP TABLE IF EXISTS `CapabilityMap`;
-CREATE TABLE `CapabilityMap` (
-  `capabilityValue` varbinary(255) NOT NULL,
-  `capabilityId` int(11) NOT NULL,
-  `timeExpires` int(11) NOT NULL,
-  PRIMARY KEY (`capabilityValue`),
-  UNIQUE KEY `capabilityValue` (`capabilityValue`)
+  PRIMARY KEY (`salt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -59,9 +42,9 @@ CREATE TABLE `CapabilityMap` (
 DROP TABLE IF EXISTS `CommitNotes`;
 CREATE TABLE `CommitNotes` (
   `hash` binary(40) NOT NULL,
+  `pset` int(11) NOT NULL DEFAULT '0',
   `notes` varbinary(32767) DEFAULT NULL,
   `haslinenotes` tinyint(1) NOT NULL DEFAULT '0',
-  `pset` int(11) NOT NULL DEFAULT '0',
   `repoid` int(11) NOT NULL DEFAULT '0',
   `nrepo` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`hash`,`pset`)
@@ -95,8 +78,8 @@ CREATE TABLE `ContactImage` (
   `contactId` int(11) NOT NULL,
   `mimetype` varbinary(128) DEFAULT NULL,
   `data` mediumblob,
-  PRIMARY KEY (`contactImageId`),
-  KEY `contactId` (`contactId`)
+  PRIMARY KEY (`contactId`,`contactImageId`),
+  UNIQUE KEY `contactImageId` (`contactImageId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -280,44 +263,6 @@ CREATE TABLE `PaperConflict` (
 
 
 --
--- Table structure for table `PaperStorage`
---
-
-DROP TABLE IF EXISTS `PaperStorage`;
-CREATE TABLE `PaperStorage` (
-  `paperStorageId` int(11) NOT NULL AUTO_INCREMENT,
-  `paperId` int(11) NOT NULL,
-  `timestamp` int(11) NOT NULL,
-  `mimetype` varchar(80) NOT NULL DEFAULT '',
-  `paper` longblob,
-  `compression` tinyint(1) NOT NULL DEFAULT '0',
-  `sha1` varbinary(20) NOT NULL DEFAULT '',
-  `documentType` int(3) NOT NULL DEFAULT '0',
-  `filename` varchar(255) DEFAULT NULL,
-  `infoJson` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`paperStorageId`),
-  UNIQUE KEY `paperStorageId` (`paperStorageId`),
-  KEY `paperId` (`paperId`),
-  KEY `mimetype` (`mimetype`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
--- Table structure for table `PsetGrade`
---
-
-DROP TABLE IF EXISTS `PsetGrade`;
-CREATE TABLE `PsetGrade` (
-  `commitid` int(11) NOT NULL,
-  `pset` int(1) NOT NULL,
-  `autograde` int(11) DEFAULT NULL,
-  KEY `commitidPset` (`commitid`,`pset`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
 -- Table structure for table `Repository`
 --
 
@@ -337,9 +282,24 @@ CREATE TABLE `Repository` (
   `snapcommitline` varchar(100) DEFAULT NULL,
   `notes` varbinary(32767) DEFAULT NULL,
   `heads` varbinary(8192) DEFAULT NULL,
+  `analyzedsnapat` bigint(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`repoid`),
   UNIQUE KEY `repoid` (`repoid`),
   UNIQUE KEY `url` (`url`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
+--
+-- Table structure for table `RepositoryCommitSnapshot`
+--
+
+DROP TABLE IF EXISTS `RepositoryCommitSnapshot`;
+CREATE TABLE `RepositoryCommitSnapshot` (
+  `repoid` int(11) NOT NULL,
+  `hash` varbinary(32) NOT NULL,
+  `snapshot` bigint(11) NOT NULL,
+  PRIMARY KEY (`repoid`,`hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -357,7 +317,7 @@ CREATE TABLE `RepositoryGrade` (
   `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder_at` int(11) DEFAULT NULL,
-  UNIQUE KEY `repopset` (`repoid`,`pset`)
+  PRIMARY KEY (`repoid`,`pset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -383,16 +343,16 @@ CREATE TABLE `RepositoryGradeRequest` (
 
 DROP TABLE IF EXISTS `Settings`;
 CREATE TABLE `Settings` (
-  `name` char(40) NOT NULL,
+  `name` varbinary(256) NOT NULL,
   `value` int(11) NOT NULL,
   `data` varbinary(32767) DEFAULT NULL,
-  UNIQUE KEY `name` (`name`)
+  PRIMARY KEY (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 95);
+insert into Settings (name, value) values ('allowPaperOption', 104);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators
@@ -405,9 +365,3 @@ insert into Settings (name, value) values ('sub_sha1', 1);
 insert into Settings (name, value) values ('pcrev_any', 1);
 -- allow external reviewers to see the other reviews by default
 insert into Settings (name, value) values ('extrev_view', 2);
-
-insert into PaperStorage set paperStorageId=1, paperId=0, timestamp=0, mimetype='text/plain', paper='' on duplicate key update paper='';
-
-
-delete from Settings where name='revform_update';
-insert into Settings set name='revform_update', value=unix_timestamp(current_timestamp);
