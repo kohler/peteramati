@@ -14,7 +14,7 @@ CREATE TABLE `ActionLog` (
   UNIQUE KEY `logId` (`logId`),
   KEY `contactId` (`contactId`),
   KEY `paperId` (`paperId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -33,7 +33,7 @@ CREATE TABLE `Capability` (
   `data` blob,
   PRIMARY KEY (`capabilityId`),
   UNIQUE KEY `capabilityId` (`capabilityId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -48,7 +48,7 @@ CREATE TABLE `CapabilityMap` (
   `timeExpires` int(11) NOT NULL,
   PRIMARY KEY (`capabilityValue`),
   UNIQUE KEY `capabilityValue` (`capabilityValue`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -64,8 +64,8 @@ CREATE TABLE `CommitNotes` (
   `pset` int(11) NOT NULL DEFAULT '0',
   `repoid` int(11) NOT NULL DEFAULT '0',
   `nrepo` int(11) NOT NULL DEFAULT '0',
-  UNIQUE KEY `hashpset` (`hash`,`pset`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  PRIMARY KEY (`hash`,`pset`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -80,8 +80,8 @@ CREATE TABLE `ContactGrade` (
   `gradercid` int(11) DEFAULT NULL,
   `notes` varbinary(32767) DEFAULT NULL,
   `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
-  UNIQUE KEY `cidpset` (`cid`,`pset`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  PRIMARY KEY (`cid`,`pset`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -130,6 +130,11 @@ CREATE TABLE `ContactInfo` (
   `passwordTime` int(11) NOT NULL DEFAULT '0',
   `anon_username` varbinary(40) DEFAULT NULL,
   `contactImageId` int(11) DEFAULT NULL,
+  `github_username` varbinary(120) DEFAULT NULL,
+  `passwordUseTime` int(11) NOT NULL DEFAULT '0',
+  `updateTime` int(11) NOT NULL DEFAULT '0',
+  `data` varbinary(32767) DEFAULT NULL,
+  `studentYear` varbinary(4) DEFAULT NULL,
   PRIMARY KEY (`contactId`),
   UNIQUE KEY `contactId` (`contactId`),
   UNIQUE KEY `contactIdRoles` (`contactId`,`roles`),
@@ -142,7 +147,7 @@ CREATE TABLE `ContactInfo` (
   FULLTEXT KEY `email_3` (`email`),
   FULLTEXT KEY `firstName_2` (`firstName`),
   FULLTEXT KEY `lastName` (`lastName`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -157,7 +162,22 @@ CREATE TABLE `ContactLink` (
   `pset` int(1) NOT NULL DEFAULT '0',
   `link` int(11) NOT NULL,
   KEY `cid_type` (`cid`,`type`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
+--
+-- Table structure for table `ContactUlink`
+--
+
+DROP TABLE IF EXISTS `ContactUlink`;
+CREATE TABLE `ContactUlink` (
+  `cid` int(11) NOT NULL,
+  `type` int(1) NOT NULL,
+  `pset` int(1) NOT NULL,
+  `link` int(11) NOT NULL,
+  PRIMARY KEY (`cid`,`type`,`pset`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -183,7 +203,7 @@ CREATE TABLE `ExecutionQueue` (
   `inputfifo` varchar(1024) DEFAULT NULL,
   PRIMARY KEY (`queueid`),
   KEY `queueclass` (`queueclass`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -203,7 +223,7 @@ CREATE TABLE `Formula` (
   `timeModified` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`formulaId`),
   UNIQUE KEY `formulaId` (`formulaId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -221,7 +241,7 @@ CREATE TABLE `MailLog` (
   `subject` text,
   `emailBody` text,
   PRIMARY KEY (`mailId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -240,7 +260,7 @@ CREATE TABLE `OptionType` (
   `sortOrder` tinyint(1) NOT NULL DEFAULT '0',
   `displayType` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`optionId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -255,7 +275,7 @@ CREATE TABLE `PaperConflict` (
   `conflictType` tinyint(1) NOT NULL DEFAULT '0',
   UNIQUE KEY `contactPaper` (`contactId`,`paperId`),
   UNIQUE KEY `contactPaperConflict` (`contactId`,`paperId`,`conflictType`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -279,7 +299,7 @@ CREATE TABLE `PaperStorage` (
   UNIQUE KEY `paperStorageId` (`paperStorageId`),
   KEY `paperId` (`paperId`),
   KEY `mimetype` (`mimetype`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -293,7 +313,7 @@ CREATE TABLE `PsetGrade` (
   `pset` int(1) NOT NULL,
   `autograde` int(11) DEFAULT NULL,
   KEY `commitidPset` (`commitid`,`pset`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -320,7 +340,7 @@ CREATE TABLE `Repository` (
   PRIMARY KEY (`repoid`),
   UNIQUE KEY `repoid` (`repoid`),
   UNIQUE KEY `url` (`url`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -338,7 +358,7 @@ CREATE TABLE `RepositoryGrade` (
   `placeholder` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder_at` int(11) DEFAULT NULL,
   UNIQUE KEY `repopset` (`repoid`,`pset`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -353,7 +373,7 @@ CREATE TABLE `RepositoryGradeRequest` (
   `hash` binary(40) DEFAULT NULL,
   `requested_at` int(11) NOT NULL,
   UNIQUE KEY `repopsethash` (`repoid`,`pset`,`hash`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -367,12 +387,12 @@ CREATE TABLE `Settings` (
   `value` int(11) NOT NULL,
   `data` varbinary(32767) DEFAULT NULL,
   UNIQUE KEY `name` (`name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 91);
+insert into Settings (name, value) values ('allowPaperOption', 95);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators
