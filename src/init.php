@@ -275,8 +275,8 @@ function load_pset_info() {
         object_merge_recursive($p, $PsetInfo->_defaults);
 
         try {
-            $pset = new Pset($pk, $p);
-            Pset::register($pset);
+            $pset = new Pset($Conf, $pk, $p);
+            $Conf->register_pset($pset);
         } catch (Exception $exception) {
             // Want to give a good error message, so discover where the error is.
             // - create pset landmark object
@@ -304,9 +304,9 @@ function load_pset_info() {
     }
 
     // read message data
-    if (!@$PsetInfo->_messagedefs)
+    if (!get($PsetInfo, "_messagedefs"))
         $PsetInfo->_messagedefs = (object) array();
-    if (!@$PsetInfo->_messagedefs->SYSTEAM)
+    if (!get($PsetInfo->_messagedefs, "SYSTEAM"))
         $PsetInfo->_messagedefs->SYSTEAM = "cs61-staff";
     foreach ($PsetInfo->_messagedefs as $k => $v)
         Messages::$main->define($k, $v);
@@ -324,7 +324,7 @@ function load_pset_info() {
     }
 
     // if any anonymous problem sets, create anonymous usernames
-    foreach (Pset::$all as $p)
+    foreach ($Conf->psets() as $p)
         if (!$p->disabled && $p->anonymous) {
             while (($row = Dbl::fetch_first_row(Dbl::qe("select contactId from ContactInfo where anon_username is null limit 1"))))
                 Dbl::q("update ContactInfo set anon_username='[anon" . sprintf("%08u", mt_rand(1, 99999999)) . "]' where contactId=?", $row[0]);

@@ -1317,7 +1317,7 @@ class Contact {
     function can_set_repo($pset, $user = null) {
         global $Now;
         if (is_string($pset) || is_int($pset))
-            $pset = get(Pset::$all, $pset);
+            $pset = $this->conf->pset_by_id($pset);
         if ($this->privChair)
             return true;
         $is_pc = $user && $user != $this && $this->isPC;

@@ -24,6 +24,8 @@ class Conf {
     private $save_messages = true;
     var $headerPrinted = false;
     private $_save_logs = false;
+    private $_psets = [];
+    private $_psets_by_urlkey = [];
 
     private $usertimeId = 1;
 
@@ -1233,5 +1235,32 @@ class Conf {
                 return null;
         } else
             return new CapabilityManager($this->dblink, "");
+    }
+
+
+    function register_pset(Pset $pset) {
+        if (isset($this->_psets[$pset->id]))
+            throw new Exception("pset id `{$pset->id}` reused");
+        $this->_psets[$pset->id] = $pset;
+        if (isset($this->_psets_by_urlkey[$pset->urlkey]))
+            throw new Exception("pset urlkey `{$pset->urlkey}` reused");
+        $this->_psets_by_urlkey[$pset->urlkey] = $pset;
+    }
+
+    function psets() {
+        return $this->_psets;
+    }
+
+    function pset_by_id($id) {
+        return get($this->_psets, $id);
+    }
+
+    function pset_by_key($key) {
+        if (($p = get($this->_psets_by_urlkey, $key)))
+            return $p;
+        foreach ($this->_psets as $p)
+            if ($key === $p->psetkey)
+                return $p;
+        return null;
     }
 }

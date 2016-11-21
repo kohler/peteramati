@@ -56,7 +56,7 @@ if (!$Me->isPC || !$User)
 
 // check problem set openness
 $max_pset = $Conf->setting("pset_forwarded");
-foreach (Pset::$all as $pset)
+foreach ($Conf->psets() as $pset)
     if (Contact::student_can_see_pset($pset) && $pset->id > $max_pset
         && !$pset->gitless)
         Contact::forward_pset_links($pset->id);
@@ -173,6 +173,7 @@ function set_ranks(&$students, &$selection, $key) {
 }
 
 function download_psets_report($request) {
+    global $Conf;
     $where = array();
     $report = $request["report"];
     $nonanonymous = false;
@@ -190,7 +191,7 @@ function download_psets_report($request) {
     $where = join(" and ", $where);
 
     $sel_pset = null;
-    if (get($request, "pset") && !($sel_pset = Pset::find($request["pset"])))
+    if (get($request, "pset") && !($sel_pset = $Conf->pset_by_key($request["pset"])))
         return $Conf->errorMsg("No such pset");
 
     $students = array();
@@ -200,7 +201,7 @@ function download_psets_report($request) {
         $selection = array("name", "grade", "username", "huid", "extension");
     $maxbyg = array();
     $max = $max_noextra = 0;
-    foreach (Pset::$all as $pset)
+    foreach ($Conf->psets() as $pset)
         if (!$pset->disabled && (!$sel_pset || $sel_pset === $pset)) {
             collect_pset_info($students, $pset, $where, !!$sel_pset, $nonanonymous);
             if (($g = $pset->group)) {
@@ -215,7 +216,7 @@ function download_psets_report($request) {
             }
         }
 
-    foreach (Pset::$all as $pset)
+    foreach ($Conf->psets() as $pset)
         if (!$pset->disabled && (!$sel_pset || $sel_pset === $pset)) {
             set_ranks($students, $selection, $pset->psetkey);
             if ($pset->has_extra)
@@ -256,7 +257,7 @@ if ($Me->isPC && check_post() && $Qreq->report)
 
 function set_grader($qreq) {
     global $Conf, $Me;
-    if (!($pset = Pset::find($qreq->pset)))
+    if (!($pset = $Conf->pset_by_key($qreq->pset)))
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
@@ -294,7 +295,7 @@ if ($Me->isPC && check_post() && $Qreq->setgrader)
 
 function runmany($qreq) {
     global $Conf, $Me;
-    if (!($pset = Pset::find($qreq->pset)) || $pset->disabled)
+    if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled)
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
@@ -348,13 +349,13 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
 
 function reconfig() {
     global $Conf, $Me, $PsetOverrides, $PsetInfo;
-    if (!($pset = Pset::find(req("pset"))))
+    if (!($pset = $Conf->pset_by_key(req("pset"))))
         return $Conf->errorMsg("No such pset");
     $psetkey = $pset->psetkey;
 
     $json = load_psets_json(true);
     object_merge_recursive($json->$psetkey, $json->_defaults);
-    $old_pset = new Pset($psetkey, $json->$psetkey);
+    $old_pset = new Pset($Conf, $psetkey, $json->$psetkey);
 
     $o = (object) array();
     $o->disabled = $o->visible = $o->grades_visible = null;
@@ -738,7 +739,7 @@ function show_regrades($result) {
         if ($checkbox)
             echo '<td class="s61checkbox">', Ht::checkbox("s61_" . urlencode($Me->user_idpart($row->student)), 1, array("class" => "s61check")), '</td>';
         echo '<td class="s61rownumber">', $trn, '.</td>';
-        $pset = Pset::$all[$row->pset];
+        $pset = $Conf->pset_by_id($row->pset);
         echo '<td class="s61pset">', htmlspecialchars($pset->title), '</td>';
 
         $row->usernames = explode(" ", $row->usernames);

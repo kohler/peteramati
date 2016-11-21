@@ -16,7 +16,7 @@ class MailRecipients {
         else
             $this->usertype = "students";
         if (preg_match(',\A(\w+):(openrepo|brokenrepo|repo|norepo|workingrepo|partner|nopartner)\z,', $type, $m)
-            && ($this->pset = Pset::find($m[1])))
+            && ($this->pset = $Conf->pset_by_key($m[1])))
             $this->type = $m[2];
         else if (preg_match(',\A(?:students|all|pc(?::\S+)?)\z,', $type))
             $this->type = $this->usertype = $type;

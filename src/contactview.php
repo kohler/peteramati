@@ -7,6 +7,7 @@ class ContactView {
     static private $_reverse_pset_compare = false;
 
     static function set_path_request($paths) {
+        global $Conf;
         $path = Navigation::path();
         if ($path === "")
             return;
@@ -20,7 +21,7 @@ class ContactView {
             while ($ppos < strlen($p) && $xpos < count($x)) {
                 if ($p[$ppos] == "/")
                     ++$xpos;
-                else if ($p[$ppos] == "p" && Pset::find(get($x, $xpos)))
+                else if ($p[$ppos] == "p" && $Conf->pset_by_key(get($x, $xpos)))
                     $settings["pset"] = $x[$xpos];
                 else if ($p[$ppos] == "H" && strlen($x[$xpos]) == 40
                          && ctype_xdigit($x[$xpos])) {
@@ -86,12 +87,12 @@ class ContactView {
 
     static function find_pset_redirect($psetkey) {
         global $Conf;
-        $pset = Pset::find($psetkey);
+        $pset = $Conf->pset_by_key($psetkey);
         if ((!$pset || $pset->disabled)
             && ($psetkey !== null && $psetkey !== "" && $psetkey !== false))
             $Conf->errorMsg("No such problem set “" . htmlspecialchars($psetkey) . "”.");
         if (!$pset || $pset->disabled) {
-            foreach (Pset::$all as $p)
+            foreach ($Conf->psets() as $p)
                 if (!$p->disabled)
                     redirectSelf(array("pset" => $p->urlkey));
             go("index");
@@ -115,10 +116,11 @@ class ContactView {
     }
 
     static function pset_list($contact, $reverse) {
+        global $Conf;
         $psets = array();
         $istf = $contact && ($contact === true || $contact->isPC);
         $ischair = $contact instanceof Contact && $contact->privChair;
-        foreach (Pset::$all as $pset)
+        foreach ($Conf->psets() as $pset)
             if (Contact::student_can_see_pset($pset)
                 || (!$pset->disabled && $pset->gitless && $istf)
                 || $ischair)
@@ -370,7 +372,7 @@ class ContactView {
     static function set_partner_action($user) {
         global $Conf, $Me;
         if (!($Me->has_database_account() && check_post()
-              && ($pset = Pset::find(req("pset")))))
+              && ($pset = $Conf->pset_by_key(req("pset")))))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return $Conf->errorMsg("You can’t edit repository information for that problem set now.");
@@ -464,7 +466,7 @@ class ContactView {
     static function set_repo_action($user) {
         global $Conf, $Me, $ConfSitePATH;
         if (!($Me->has_database_account() && check_post()
-              && ($pset = Pset::find(req("pset")))))
+              && ($pset = $Conf->pset_by_key(req("pset")))))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return Conf::msg_error("You can’t edit repository information for that problem set now.");

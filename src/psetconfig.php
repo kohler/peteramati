@@ -18,6 +18,7 @@ class PsetConfigException extends Exception {
 }
 
 class Pset {
+    public $conf;
     public $id;
     public $psetid;
     public $psetkey;
@@ -72,12 +73,11 @@ class Pset {
     public $diffs = array();
     public $ignore;
 
-    static public $all = array();
-    static private $by_urlkey = array();
-
     const URLKEY_REGEX = '/\A[0-9A-Za-z][-0-9A-Za-z_.]*\z/';
 
-    function __construct($pk, $p) {
+    function __construct(Conf $conf, $pk, $p) {
+        $this->conf = $conf;
+
         // pset id
         if (!isset($p->psetid) || !is_int($p->psetid) || $p->psetid <= 0)
             throw new PsetConfigException("`psetid` must be positive integer", "psetid");
@@ -217,24 +217,6 @@ class Pset {
             $this->ignore = self::cstr_array($p, "ignore");
         else if ($ignore)
             $this->ignore = self::cstr($p, "ignore");
-    }
-
-    static function register($pset) {
-        if (isset(self::$all[$pset->id]))
-            throw new Exception("pset id `{$pset->id}` reused");
-        self::$all[$pset->id] = $pset;
-        if (isset(self::$by_urlkey[$pset->urlkey]))
-            throw new Exception("pset urlkey `{$pset->urlkey}` reused");
-        self::$by_urlkey[$pset->urlkey] = $pset;
-    }
-
-    static function find($key) {
-        if (($p = get(self::$by_urlkey, $key)))
-            return $p;
-        foreach (self::$all as $p)
-            if ($key === $p->psetkey)
-                return $p;
-        return null;
     }
 
 
