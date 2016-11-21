@@ -241,6 +241,9 @@ function updateSchema($conf) {
         && update_schema_drop_keys_if_exist($conf, "Settings", ["name"])
         && $conf->ql("alter table Settings add primary key (`name`)"))
         $conf->update_schema_version(104);
+    if ($conf->sversion == 104
+        && $conf->ql("alter table CommitNotes drop `nrepo`"))
+        $conf->update_schema_version(105);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }
