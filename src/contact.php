@@ -1366,20 +1366,6 @@ class Contact {
         }
     }
 
-    static function repo_gitrun($repo, $command) {
-        global $Me, $ConfSitePATH;
-        if (!($repo instanceof Repository))
-            error_log(json_encode($repo) . " / " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " user $Me->email");
-        assert(isset($repo->repoid) && isset($repo->cacheid));
-        $command = str_replace("REPO", "repo" . $repo->repoid, $command);
-        $repodir = "$ConfSitePATH/repo/repo$repo->cacheid";
-        if (!file_exists("$repodir/.git/config")) {
-            is_dir($repodir) || mkdir($repodir, 0770);
-            shell_exec("cd $repodir && git init --shared");
-        }
-        return shell_exec("cd $repodir && $command");
-    }
-
     static function repo_author_emails($repo, $pset = null, $limit = null) {
         if (is_object($pset) && $pset->directory_noslash !== "")
             $dir = " -- " . escapeshellarg($pset->directory_noslash);
@@ -1392,7 +1378,7 @@ class Contact {
         $heads = explode(" ", $repo->heads);
         $heads[0] = "REPO/master";
         foreach ($heads as $h) {
-            $result = self::repo_gitrun($repo, "git log$limit --simplify-merges --format=%ae $h$dir");
+            $result = $repo->gitrun("git log$limit --simplify-merges --format=%ae $h$dir");
             foreach (explode("\n", $result) as $line)
                 if ($line !== "")
                     $users[strtolower($line)] = $line;
@@ -1412,7 +1398,7 @@ class Contact {
         $heads = explode(" ", $repo->heads);
         $heads[0] = "REPO/master";
         foreach ($heads as $h) {
-            $result = self::repo_gitrun($repo, "git log$limit --simplify-merges --format='%ct %H %s' $h$dir");
+            $result = $repo->gitrun("git log$limit --simplify-merges --format='%ct %H %s' $h$dir");
             foreach (explode("\n", $result) as $line)
                 if (preg_match(',\A(\S+)\s+(\S+)\s+(.*)\z,', $line, $m)
                     && !isset($list[$m[2]]))
@@ -1452,8 +1438,8 @@ class Contact {
             $hrepo = self::handout_repo($pset, $repo);
             $result = "";
             if ($pset->directory_slash !== "")
-                $result .= self::repo_gitrun($repo, "git show repo{$hrepo->repoid}/master:" . escapeshellarg($pset->directory_slash) . ".gitignore 2>/dev/null");
-            $result .= self::repo_gitrun($repo, "git show repo{$hrepo->repoid}/master:.gitignore 2>/dev/null");
+                $result .= $repo->gitrun("git show repo{$hrepo->repoid}/master:" . escapeshellarg($pset->directory_slash) . ".gitignore 2>/dev/null");
+            $result .= $repo->gitrun("git show repo{$hrepo->repoid}/master:.gitignore 2>/dev/null");
             $Conf->save_setting("__gitignore_pset{$pset->id}_at", $Now);
             $Conf->save_setting("gitignore_pset{$pset->id}", 1, $result);
         }
@@ -1484,8 +1470,8 @@ class Contact {
     }
 
     static private function _repo_prepare_truncated_handout($repo, $base, $pset) {
-        $commit = trim(self::repo_gitrun($repo, "git log --format=%H -n1 $base"));
-        $check_tag = trim(self::repo_gitrun($repo, "test -f .git/refs/heads/truncated_$commit && echo yes"));
+        $commit = trim($repo->gitrun("git log --format=%H -n1 $base"));
+        $check_tag = trim($repo->gitrun("test -f .git/refs/heads/truncated_$commit && echo yes"));
         if ($check_tag == "yes")
             return "truncated_$commit";
 
@@ -1497,7 +1483,7 @@ class Contact {
         if (!($trepo = self::_temp_repo_clone($repo)))
             return false;
         foreach ($pset_files as $f)
-            self::repo_gitrun($repo, "mkdir -p \"`dirname $trepo/$f`\" && git show $commit:$pset->directory_slash$f > $trepo/$f");
+            $repo->gitrun("mkdir -p \"`dirname $trepo/$f`\" && git show $commit:$pset->directory_slash$f > $trepo/$f");
 
         foreach ($pset_files as &$f)
             $f = escapeshellarg($f);
@@ -1583,7 +1569,7 @@ class Contact {
             if (!$ignore_diffinfo
                 && $diffinfo->full
                 && ($fname = self::unquote_filename_regex($diffinfo->regex)) !== false) {
-                $result = self::repo_gitrun($repo, "git show $hashb:${repodir}$fname");
+                $result = $repo->gitrun("git show $hashb:${repodir}$fname");
                 $fdiff = array();
                 foreach (explode("\n", $result) as $idx => $line)
                     $fdiff[] = array("+", 0, $idx + 1, $line);
@@ -1593,7 +1579,7 @@ class Contact {
         $command = "git diff --name-only $hasha $hashb";
         if ($pset && !$truncpfx)
             $command .= " -- " . escapeshellarg($pset->directory_noslash);
-        $result = self::repo_gitrun($repo, $command);
+        $result = $repo->gitrun($command);
 
         $files = array();
         foreach (explode("\n", $result) as $line)
@@ -1615,7 +1601,7 @@ class Contact {
             if (get($options, "wdiff"))
                 $command .= " -w";
             $command .= " $hasha $hashb -- " . join(" ", $files);
-            $result = self::repo_gitrun($repo, $command);
+            $result = $repo->gitrun($command);
             $file = null;
             $alineno = $blineno = null;
             $fdiff = null;

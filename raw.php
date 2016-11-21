@@ -46,9 +46,9 @@ if (!$Repo || !$Commit || !$Info->can_view_repo_contents || !$Qreq->file)
     exit;
 
 // file
-$result = Contact::repo_gitrun($Repo, "git cat-file blob $Commit:" . escapeshellarg($Qreq->file));
+$result = $Repo->gitrun("git cat-file blob $Commit:" . escapeshellarg($Qreq->file));
 if ($result === null || $result === "") {
-    $sizeresult = Contact::repo_gitrun($Repo, "git cat-file -s $Commit:" . escapeshellarg($Qreq->file));
+    $sizeresult = $Repo->gitrun("git cat-file -s $Commit:" . escapeshellarg($Qreq->file));
     if (trim($sizeresult) !== "0")
         exit;
 }
