@@ -28,7 +28,7 @@ class PsetView {
     private $recent_commits_truncated = null;
     private $latest_commit = null;
 
-    public function __construct(Pset $pset, Contact $user, Contact $viewer) {
+    function __construct(Pset $pset, Contact $user, Contact $viewer) {
         $this->pset = $pset;
         $this->user = $user;
         $this->viewer = $viewer;
@@ -56,7 +56,7 @@ class PsetView {
             return false;
     }
 
-    public function set_commit($reqcommit) {
+    function set_commit($reqcommit) {
         $this->commit = $this->commit_notes = false;
         if (!$this->repo)
             return false;
@@ -71,20 +71,20 @@ class PsetView {
         return $this->commit;
     }
 
-    public function has_commit_set() {
+    function has_commit_set() {
         return $this->commit !== null;
     }
 
-    public function commit_hash() {
+    function commit_hash() {
         assert($this->commit !== null);
         return $this->commit;
     }
 
-    public function maybe_commit_hash() {
+    function maybe_commit_hash() {
         return $this->commit;
     }
 
-    public function commit() {
+    function commit() {
         if ($this->commit === null)
             error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $this->viewer->email);
         assert($this->commit !== null);
@@ -94,17 +94,17 @@ class PsetView {
             return false;
     }
 
-    public function can_have_grades() {
+    function can_have_grades() {
         return $this->pset->gitless_grades || $this->commit();
     }
 
-    public function load_recent_commits() {
+    function load_recent_commits() {
         list($user, $repo, $pset) = array($this->user, $this->repo, $this->pset);
         if (!$repo)
             return;
         $this->recent_commits = $user->repo_recent_commits($repo, $pset, 100) ? : [];
         if (!$this->recent_commits && isset($pset->test_file)
-            && $user->repo_ls_files($repo, "REPO/master", $pset->test_file)) {
+            && $repo->ls_files("REPO/master", $pset->test_file)) {
             $repo->_truncated_psetdir[$pset->id] = true;
             $this->recent_commits = $user->repo_recent_commits($repo, null, 100) ? : [];
         }
@@ -115,7 +115,7 @@ class PsetView {
             $this->latest_commit = false;
     }
 
-    public function recent_commits($hash = null) {
+    function recent_commits($hash = null) {
         if ($this->recent_commits === false)
             $this->load_recent_commits();
         if (!$hash)
@@ -127,25 +127,25 @@ class PsetView {
         return false;
     }
 
-    public function latest_commit() {
+    function latest_commit() {
         if ($this->recent_commits === false)
             $this->load_recent_commits();
         return $this->latest_commit;
     }
 
-    public function latest_hash() {
+    function latest_hash() {
         if ($this->recent_commits === false)
             $this->load_recent_commits();
         return $this->latest_commit ? $this->latest_commit->hash : false;
     }
 
-    public function is_latest_commit() {
+    function is_latest_commit() {
         return $this->commit
             && ($lc = $this->latest_commit())
             && $this->commit == $lc->hash;
     }
 
-    public function derived_handout_hash() {
+    function derived_handout_hash() {
         $hbases = array();
         foreach (Contact::handout_repo_recent_commits($this->pset) as $c)
             $hbases[$c->hash] = true;
@@ -155,7 +155,7 @@ class PsetView {
         return false;
     }
 
-    public function commit_info($key = null) {
+    function commit_info($key = null) {
         if ($this->commit_notes === false) {
             if (!$this->commit
                 || ($this->repo_grade
@@ -195,11 +195,11 @@ class PsetView {
     }
 
 
-    public function backpartners() {
+    function backpartners() {
         return array_unique($this->user->links(LINK_BACKPARTNER, $this->pset->id));
     }
 
-    public function partner_same() {
+    function partner_same() {
         if ($this->partner_same === null && $this->partner) {
             $backpartners = $this->backpartners();
             $this->partner_same = count($backpartners) == 1
@@ -210,7 +210,7 @@ class PsetView {
     }
 
 
-    public function load_grade() {
+    function load_grade() {
         if ($this->pset->gitless_grades) {
             $this->grade = $this->user->contact_grade($this->pset);
             $this->grade_notes = get($this->grade, "notes");
@@ -236,13 +236,13 @@ class PsetView {
         $this->user_can_see_grades = $this->user->can_see_grades($this->pset, $this->user, $this);
     }
 
-    public function has_grading() {
+    function has_grading() {
         if ($this->grade === false)
             $this->load_grade();
         return !!$this->grade;
     }
 
-    public function grading_hash() {
+    function grading_hash() {
         if ($this->pset->gitless_grades)
             return false;
         if ($this->grade === false)
@@ -252,7 +252,7 @@ class PsetView {
         return false;
     }
 
-    public function grading_commit() {
+    function grading_commit() {
         if ($this->pset->gitless_grades)
             return false;
         if ($this->grade === false)
@@ -262,7 +262,7 @@ class PsetView {
         return false;
     }
 
-    public function is_grading_commit() {
+    function is_grading_commit() {
         if ($this->pset->gitless_grades)
             return true;
         if ($this->grade === false)
@@ -272,7 +272,7 @@ class PsetView {
             && $this->commit == $this->repo_grade->gradehash;
     }
 
-    public function gradercid() {
+    function gradercid() {
         if ($this->grade === false)
             $this->load_grade();
         if ($this->pset->gitless_grades)
@@ -285,7 +285,7 @@ class PsetView {
     }
 
 
-    public function grading_info($key = null) {
+    function grading_info($key = null) {
         if ($this->grade === false)
             $this->load_grade();
         if (!$key)
@@ -294,14 +294,14 @@ class PsetView {
             return $this->grade_notes ? get($this->grade_notes, $key) : null;
     }
 
-    public function commit_or_grading_info() {
+    function commit_or_grading_info() {
         if ($this->pset->gitless_grades || !$this->commit())
             return $this->grading_info();
         else
             return $this->commit_info();
     }
 
-    public function grading_info_empty() {
+    function grading_info_empty() {
         if ($this->grade === false)
             $this->load_grade();
         if (!$this->grade_notes)
@@ -311,13 +311,13 @@ class PsetView {
             || (count($gn) == 1 && isset($gn["gradercid"]));
     }
 
-    public function grades_hidden() {
+    function grades_hidden() {
         if ($this->grade === false)
             $this->load_grade();
         return $this->grade && $this->grade->hidegrade;
     }
 
-    public function commit_or_grading_entry($k, $type = null) {
+    function commit_or_grading_entry($k, $type = null) {
         $gn = $this->commit_or_grading_info();
         $grade = null;
         if ((!$type || $type == "autograde") && isset($gn->autogrades) && property_exists($gn->autogrades, $k))
@@ -327,7 +327,7 @@ class PsetView {
         return $grade;
     }
 
-    public function late_hours($no_auto = false) {
+    function late_hours($no_auto = false) {
         $cinfo = $this->commit_or_grading_info();
         if (!$no_auto && get($cinfo, "late_hours") !== null)
             return (object) array("hours" => $cinfo->late_hours,

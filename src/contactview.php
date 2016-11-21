@@ -647,7 +647,7 @@ class ContactView {
                 }
             }
         }
-        if (count($r)) {
+        if (!empty($r)) {
             $r["total"] = $total;
             $r["total_noextra"] = $nonextra;
             if (count($rag))

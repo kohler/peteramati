@@ -1380,19 +1380,6 @@ class Contact {
         return shell_exec("cd $repodir && $command");
     }
 
-    static function repo_ls_files($repo, $tree, $files = array()) {
-        $suffix = "";
-        if (is_string($files))
-            $files = array($files);
-        foreach ($files as $f)
-            $suffix .= " " . escapeshellarg(preg_replace(',/+\z,', '', $f));
-        $result = self::repo_gitrun($repo, "git ls-tree -r --name-only $tree" . $suffix);
-        $x = explode("\n", $result);
-        if (count($x) && $x[count($x) - 1] == "")
-            array_pop($x);
-        return $x;
-    }
-
     static function repo_author_emails($repo, $pset = null, $limit = null) {
         if (is_object($pset) && $pset->directory_noslash !== "")
             $dir = " -- " . escapeshellarg($pset->directory_noslash);
@@ -1502,7 +1489,7 @@ class Contact {
         if ($check_tag == "yes")
             return "truncated_$commit";
 
-        $pset_files = self::repo_ls_files($repo, $commit, $pset->directory_noslash);
+        $pset_files = $repo->ls_files($commit, $pset->directory_noslash);
         foreach ($pset_files as &$f)
             $f = substr($f, strlen($pset->directory_slash));
         unset($f);

@@ -260,6 +260,19 @@ class Repository {
         return $list;
     }
 
+    function ls_files($tree, $files = []) {
+        $suffix = "";
+        if (is_string($files))
+            $files = array($files);
+        foreach ($files as $f)
+            $suffix .= " " . escapeshellarg(preg_replace(',/+\z,', '', $f));
+        $result = $this->gitrun("git ls-tree -r --name-only $tree" . $suffix);
+        $x = explode("\n", $result);
+        if (!empty($x) && $x[count($x) - 1] == "")
+            array_pop($x);
+        return $x;
+    }
+
 
     function analyze_snapshots() {
         global $ConfSitePATH;
@@ -272,7 +285,6 @@ class Repository {
         $analyzed_snaptime = 0;
         foreach (glob("$ConfSitePATH/repo/repo$this->cacheid/.git/refs/tags/repo{$this->repoid}.snap*") as $snapfile) {
             $time = substr($snapfile, strrpos($snapfile, ".snap") + 5);
-error_log(json_encode([$time, $timematch]));
             if (strcmp($time, $timematch) <= 0
                 || !preg_match('/\A(\d\d\d\d)(\d\d)(\d\d)\.(\d\d)(\d\d)(\d\d)\z/', $time, $m))
                 continue;
