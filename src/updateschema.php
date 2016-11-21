@@ -244,6 +244,10 @@ function updateSchema($conf) {
     if ($conf->sversion == 104
         && $conf->ql("alter table CommitNotes drop `nrepo`"))
         $conf->update_schema_version(105);
+    if ($conf->sversion == 105
+        && $conf->ql("alter table ContactGrade add `notesversion` int(11) NOT NULL DEFAULT 1")
+        && $conf->ql("alter table CommitNotes add `notesversion` int(11) NOT NULL DEFAULT 1"))
+        $conf->update_schema_version(106);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }
