@@ -754,43 +754,6 @@ class Contact {
         return $this->repos[$pset];
     }
 
-    public static function handout_repo_recent_commits(Pset $pset) {
-        global $Conf, $Now;
-        if (!($hrepo = $pset->handout_repo()))
-            return null;
-        $hrepoid = $hrepo->repoid;
-        $key = "handoutcommits_{$hrepoid}" . ($pset ? "_" . $pset->id : "");
-        $hset = $Conf->setting_json($key);
-        if (!$hset)
-            $hset = (object) array();
-        if (get($hset, "snaphash") !== $hrepo->snaphash
-            || (int) get($hset, "snaphash_at") + 300 < $Now
-            || $hset->recent === null) {
-            $xlist = array();
-            foreach (self::repo_recent_commits($hrepo, $pset, 100) as $c)
-                $xlist[] = array($c->hash, $c->commitat, $c->subject);
-            $hset->snaphash = $hrepo->snaphash;
-            $hset->snaphash_at = $Now;
-            $hset->recent = $xlist;
-            $Conf->save_setting($key, 1, $hset);
-            Dbl::qe("delete from Settings where name!=? and name like 'handoutcommits_%_?s'",
-                    $key, $pset->id);
-        }
-        $list = array();
-        foreach ($hset->recent as $c)
-            $list[$c[0]] = (object) array("commitat" => $c[1], "hash" => $c[0], "subject" => $c[2]);
-        return $list;
-    }
-
-    static function handout_repo_latest_commit($pset) {
-        $recent = self::handout_repo_recent_commits($pset);
-        if ($recent) {
-            $first = current($recent);
-            return $first->hash;
-        } else
-            return false;
-    }
-
     private static function update_repo_lastpset($pset, $repo) {
         global $Conf;
         $Conf->qe("update Repository set lastpset=(select coalesce(max(pset),0) from ContactLink l where l.type=" . LINK_REPO . " and l.link=?) where repoid=?", $repo->repoid, $repo->repoid);
@@ -1335,50 +1298,6 @@ class Contact {
         }
     }
 
-    static function repo_author_emails($repo, $pset = null, $limit = null) {
-        if (is_object($pset) && $pset->directory_noslash !== "")
-            $dir = " -- " . escapeshellarg($pset->directory_noslash);
-        else if (is_string($pset) && $pset !== "")
-            $dir = " -- " . escapeshellarg($pset);
-        else
-            $dir = "";
-        $limit = $limit ? " -n$limit" : "";
-        $users = array();
-        $heads = explode(" ", $repo->heads);
-        $heads[0] = "REPO/master";
-        foreach ($heads as $h) {
-            $result = $repo->gitrun("git log$limit --simplify-merges --format=%ae $h$dir");
-            foreach (explode("\n", $result) as $line)
-                if ($line !== "")
-                    $users[strtolower($line)] = $line;
-        }
-        return $users;
-    }
-
-    static function repo_recent_commits($repo, $pset = null, $limit = null) {
-        if (is_object($pset) && $pset->directory_noslash !== "")
-            $dir = " -- " . escapeshellarg($pset->directory_noslash);
-        else if (is_string($pset) && $pset !== "")
-            $dir = " -- " . escapeshellarg($pset);
-        else
-            $dir = "";
-        $limit = $limit ? " -n$limit" : "";
-        $list = array();
-        $heads = explode(" ", $repo->heads);
-        $heads[0] = "REPO/master";
-        foreach ($heads as $h) {
-            $result = $repo->gitrun("git log$limit --simplify-merges --format='%ct %H %s' $h$dir");
-            foreach (explode("\n", $result) as $line)
-                if (preg_match(',\A(\S+)\s+(\S+)\s+(.*)\z,', $line, $m)
-                    && !isset($list[$m[2]]))
-                    $list[$m[2]] = (object) array("commitat" => (int) $m[1],
-                                                  "hash" => $m[2],
-                                                  "subject" => $m[3],
-                                                  "fromhead" => $h);
-        }
-        return $list;
-    }
-
     static private function _file_glob_to_regex($x, $prefix) {
         $x = str_replace(array('\*', '\?', '\[', '\]', '\-', '_'),
                          array('[^/]*', '[^/]', '[', ']', '-', '\_'),
@@ -1639,7 +1558,7 @@ class Contact {
         if ($allowed === null) {
             $allowed = in_array($this->contactId, $this->links(LINK_REPOVIEW));
             if (!$allowed && !$cache_only) {
-                $users = self::repo_author_emails($repo);
+                $users = $repo->author_emails();
                 $allowed = isset($users[strtolower($this->email)]);
                 if ($allowed)
                     $this->add_link(LINK_REPOVIEW, 0, $repo->repoid);

@@ -34,6 +34,7 @@ class Conf {
     private $_pc_tags_cache = null;
     private $_pc_members_and_admins_cache = null;
     private $_handout_repos = [];
+    private $_handout_commits = [];
 
     static public $g = null;
 
@@ -1293,5 +1294,34 @@ class Conf {
                 $this->save_setting("handoutrepos", 1, $hset);
         }
         return $hrepo;
+    }
+
+    function handout_commits(Pset $pset) {
+        global $Now;
+        if (($commits = get($this->_handout_commits, $pset->id)))
+            return $commits;
+        if (!($hrepo = $this->handout_repo($pset)))
+            return null;
+        $hrepoid = $hrepo->repoid;
+        $key = "handoutcommits_{$hrepoid}_{$pset->id}";
+        $hset = $this->setting_json($key);
+        if (!$hset)
+            $hset = (object) array();
+        if (get($hset, "snaphash") !== $hrepo->snaphash
+            || (int) get($hset, "snaphash_at") + 300 < $Now
+            || !get($hset, "commits")) {
+            $hset->snaphash = $hrepo->snaphash;
+            $hset->snaphash_at = $Now;
+            $hset->commits = [];
+            foreach ($hrepo->commits($pset) as $c)
+                $hset->commits[] = [$c->hash, $c->commitat, $c->subject];
+            $this->save_setting($key, 1, $hset);
+            $this->qe("delete from Settings where name!=? and name like 'handoutcommits_%_?s'", $key, $pset->id);
+        }
+        $commits = [];
+        foreach ($hset->commits as $c)
+            $commits[$c[0]] = new RepositoryCommitInfo($c[1], $c[0], $c[2]);
+        $this->_handout_commits[$pset->id] = $commits;
+        return $commits;
     }
 }

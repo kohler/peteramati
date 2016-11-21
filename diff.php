@@ -23,7 +23,7 @@ if (!get($_GET, "commit") || !get($_GET, "commit1") || $Pset->gitless)
 $diff_options = ["wdiff" => false];
 
 $hasha = $hashb = $hasha_mine = $hashb_mine = null;
-$hrecent = Contact::handout_repo_recent_commits($Pset);
+$hrecent = $Pset->handout_commits();
 if (($hasha = git_commit_in_list($hrecent, $_GET["commit"])))
     $diff_options["hasha_hrepo"] = true;
 else

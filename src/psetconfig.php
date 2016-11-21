@@ -224,6 +224,10 @@ class Pset {
         return $this->conf->handout_repo($this, $inrepo);
     }
 
+    function handout_commits() {
+        return $this->conf->handout_commits($this);
+    }
+
     function gradeinfo_json($pcview) {
         $max = (object) [];
         $count = $maxtotal = 0;

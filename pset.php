@@ -600,7 +600,7 @@ function echo_commit($Info) {
     }
     if (($Info->is_latest_commit() || $Me->isPC)
         && $Pset->handout_repo_url) {
-        $last_handout = Contact::handout_repo_latest_commit($Pset);
+        $last_handout = $Pset->handout_commits();
         $last_myhandout = $last_handout ? $Info->derived_handout_hash() : false;
         if ($last_handout && $last_myhandout && $last_handout == $last_myhandout)
             /* this is ideal: they have the latest handout commit */;

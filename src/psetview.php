@@ -102,11 +102,11 @@ class PsetView {
         list($user, $repo, $pset) = array($this->user, $this->repo, $this->pset);
         if (!$repo)
             return;
-        $this->recent_commits = $user->repo_recent_commits($repo, $pset, 100) ? : [];
+        $this->recent_commits = $repo->commits($pset, 100) ? : [];
         if (!$this->recent_commits && isset($pset->test_file)
             && $repo->ls_files("REPO/master", $pset->test_file)) {
             $repo->_truncated_psetdir[$pset->id] = true;
-            $this->recent_commits = $user->repo_recent_commits($repo, null, 100) ? : [];
+            $this->recent_commits = $repo->commits(null, 100) ? : [];
         }
         $this->recent_commits_truncated = count($this->recent_commits) == 100;
         if (!empty($this->recent_commits))
@@ -146,11 +146,9 @@ class PsetView {
     }
 
     function derived_handout_hash() {
-        $hbases = array();
-        foreach (Contact::handout_repo_recent_commits($this->pset) as $c)
-            $hbases[$c->hash] = true;
+        $hbases = $this->pset->handout_commits();
         foreach ($this->recent_commits() as $c)
-            if (get($hbases, $c->hash))
+            if (isset($hbases[$c->hash]))
                 return $c->hash;
         return false;
     }

@@ -260,6 +260,25 @@ class Repository {
         return $list;
     }
 
+    function author_emails($pset = null, $limit = null) {
+        $dir = "";
+        if (is_object($pset) && $pset->directory_noslash !== "")
+            $dir = " -- " . escapeshellarg($pset->directory_noslash);
+        else if (is_string($pset) && $pset !== "")
+            $dir = " -- " . escapeshellarg($pset);
+        $limit = $limit ? " -n$limit" : "";
+        $users = [];
+        $heads = explode(" ", $this->heads);
+        $heads[0] = "REPO/master";
+        foreach ($heads as $h) {
+            $result = $this->gitrun("git log$limit --simplify-merges --format=%ae $h$dir");
+            foreach (explode("\n", $result) as $line)
+                if ($line !== "")
+                    $users[strtolower($line)] = $line;
+        }
+        return $users;
+    }
+
     function ls_files($tree, $files = []) {
         $suffix = "";
         if (is_string($files))
