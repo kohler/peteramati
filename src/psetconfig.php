@@ -220,6 +220,10 @@ class Pset {
     }
 
 
+    function handout_repo(Repository $inrepo = null) {
+        return $this->conf->handout_repo($this, $inrepo);
+    }
+
     function gradeinfo_json($pcview) {
         $max = (object) [];
         $count = $maxtotal = 0;

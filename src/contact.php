@@ -99,8 +99,6 @@ class Contact {
     private $capabilities = null;
     private $activated_ = false;
 
-    static private $_handout_repo = array();
-    static private $_handout_repo_cacheid = array();
     static private $contactdb_dblink = false;
     static private $active_forceShow = false;
 
@@ -756,38 +754,9 @@ class Contact {
         return $this->repos[$pset];
     }
 
-    static function handout_repo($pset, $inrepo = null) {
-        global $Conf, $Now, $ConfSitePATH;
-        $url = $pset->handout_repo_url;
-        if ($Conf->opt("noGitTransport") && substr($url, 0, 6) === "git://")
-            $url = "ssh://git@" . substr($url, 6);
-        $hrepo = get(self::$_handout_repo, $url);
-        if (!$hrepo && ($hrepo = Repository::find_or_create_url($url, $Conf))) {
-            $hrepo->is_handout = true;
-            self::$_handout_repo[$url] = $hrepo;
-        }
-        if ($hrepo) {
-            $hrepoid = $hrepo->repoid;
-            $cacheid = $inrepo ? $inrepo->cacheid : $hrepo->cacheid;
-            $hset = $Conf->setting_json("handoutrepos");
-            $save = false;
-            if (!$hset)
-                $save = $hset = (object) array();
-            if (!($hme = get($hset, $hrepoid)))
-                $save = $hme = $hset->$hrepoid = (object) array();
-            if ((int) get($hme, $cacheid) + 300 < $Now) {
-                $save = $hme->$cacheid = $Now;
-                shell_exec("$ConfSitePATH/src/gitfetch $hrepo->repoid $cacheid " . escapeshellarg($hrepo->ssh_url()) . " 1>&2 &");
-            }
-            if ($save)
-                $Conf->save_setting("handoutrepos", 1, $hset);
-        }
-        return $hrepo;
-    }
-
-    public static function handout_repo_recent_commits($pset) {
+    public static function handout_repo_recent_commits(Pset $pset) {
         global $Conf, $Now;
-        if (!($hrepo = self::handout_repo($pset)))
+        if (!($hrepo = $pset->handout_repo()))
             return null;
         $hrepoid = $hrepo->repoid;
         $key = "handoutcommits_{$hrepoid}" . ($pset ? "_" . $pset->id : "");
@@ -1429,13 +1398,13 @@ class Contact {
         }
     }
 
-    private static function file_ignore_regex($pset, $repo) {
+    private static function file_ignore_regex(Pset $pset, Repository $repo) {
         global $Conf, $Now;
         if ($pset && get($pset, "file_ignore_regex"))
             return $pset->file_ignore_regex;
         $regex = '.*\.swp|.*~|#.*#|.*\.core|.*\.dSYM|.*\.o|core.*\z|.*\.backup|tags|tags\..*|typescript';
         if ($pset && $Conf->setting("__gitignore_pset{$pset->id}_at", 0) < $Now - 900) {
-            $hrepo = self::handout_repo($pset, $repo);
+            $hrepo = $pset->handout_repo($repo);
             $result = "";
             if ($pset->directory_slash !== "")
                 $result .= $repo->gitrun("git show repo{$hrepo->repoid}/master:" . escapeshellarg($pset->directory_slash) . ".gitignore 2>/dev/null");
@@ -1531,7 +1500,7 @@ class Contact {
         return strcmp($a->filename, $b->filename);
     }
 
-    static function repo_diff($repo, $hashb, $pset, $options = null) {
+    static function repo_diff(Repository $repo, $hashb, Pset $pset, $options = null) {
         global $Conf, $Now;
         $options = $options ? : array();
         $diff_files = array();
@@ -1549,7 +1518,7 @@ class Contact {
         if (get($options, "hasha"))
             $hasha = $options["hasha"];
         else {
-            $hrepo = self::handout_repo($pset, $repo);
+            $hrepo = $pset->handout_repo($repo);
             if ($pset && isset($pset->gradebranch))
                 $hasha = "repo{$hrepo->repoid}/" . $pset->gradebranch;
             else if ($pset && isset($pset->handout_repo_branch))

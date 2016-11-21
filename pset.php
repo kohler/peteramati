@@ -610,7 +610,7 @@ function echo_commit($Info) {
         else if ($last_handout)
             $remarks[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.");
         else if (!$last_handout && $Me->isPC) {
-            $handout_files = Contact::handout_repo($Pset)->ls_files("master");
+            $handout_files = $Pset->handout_repo()->ls_files("master");
             if (!count($handout_files))
                 $remarks[] = array(true, "The handout repository, " . htmlspecialchars($Pset->handout_repo_url) . ", contains no files; perhaps handout_repo_url is misconfigured.");
             else

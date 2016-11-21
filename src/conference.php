@@ -33,6 +33,7 @@ class Conf {
     private $_pc_members_cache = null;
     private $_pc_tags_cache = null;
     private $_pc_members_and_admins_cache = null;
+    private $_handout_repos = [];
 
     static public $g = null;
 
@@ -1262,5 +1263,35 @@ class Conf {
             if ($key === $p->psetkey)
                 return $p;
         return null;
+    }
+
+
+    function handout_repo(Pset $pset, Repository $inrepo = null) {
+        global $Now, $ConfSitePATH;
+        $url = $pset->handout_repo_url;
+        if ($this->opt("noGitTransport") && substr($url, 0, 6) === "git://")
+            $url = "ssh://git@" . substr($url, 6);
+        $hrepo = get($this->_handout_repos, $url);
+        if (!$hrepo && ($hrepo = Repository::find_or_create_url($url, $this))) {
+            $hrepo->is_handout = true;
+            $this->_handout_repos[$url] = $hrepo;
+        }
+        if ($hrepo) {
+            $hrepoid = $hrepo->repoid;
+            $cacheid = $inrepo ? $inrepo->cacheid : $hrepo->cacheid;
+            $hset = $this->setting_json("handoutrepos");
+            $save = false;
+            if (!$hset)
+                $save = $hset = (object) array();
+            if (!($hme = get($hset, $hrepoid)))
+                $save = $hme = $hset->$hrepoid = (object) array();
+            if ((int) get($hme, $cacheid) + 300 < $Now) {
+                $save = $hme->$cacheid = $Now;
+                shell_exec("$ConfSitePATH/src/gitfetch $hrepo->repoid $cacheid " . escapeshellarg($hrepo->ssh_url()) . " 1>&2 &");
+            }
+            if ($save)
+                $this->save_setting("handoutrepos", 1, $hset);
+        }
+        return $hrepo;
     }
 }
