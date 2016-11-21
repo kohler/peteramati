@@ -247,6 +247,18 @@ class Pset {
     }
 
 
+    function contact_grade_for($student) {
+        assert(!!$this->gitless_grades);
+        $cid = is_object($student) ? $student->contactId : $sstudent;
+        $result = $this->conf->qe("select * from ContactGrade where cid=? and pset=?", $cid, $this->psetid);
+        $cg = edb_orow($result);
+        if ($cg && $cg->notes)
+            $cg->notes = json_decode($cg->notes);
+        Dbl::free($result);
+        return $cg;
+    }
+
+
     private static function ccheck($callable, $args) {
         $i = 0;
         $format = false;

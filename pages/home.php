@@ -117,7 +117,7 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
                       "sorter" => $s->sorter);
 
         if ($pset->gitless_grades) {
-            $gi = Contact::contact_grade_for($s, $pset);
+            $gi = $pset->contact_grade_for($s);
             $gi = $gi ? $gi->notes : null;
         } else if (get($s, "gradehash"))
             $gi = Contact::commit_info($s->gradehash, $pset);
@@ -577,7 +577,7 @@ function render_grades($pset, $gi, $s) {
 function show_pset($pset, $user) {
     global $Me;
     if ($pset->gitless_grades && $Me == $user && !$pset->partner
-        && !$user->contact_grade($pset))
+        && !$pset->contact_grade_for($user))
         return;
     echo "<hr/>\n";
     $pseturl = hoturl("pset", array("pset" => $pset->urlkey,
@@ -670,7 +670,7 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
 
     if (count($pset->grades)) {
         if ($pset->gitless_grades) {
-            $gi = Contact::contact_grade_for($s, $pset);
+            $gi = $pset->contact_grade_for($s);
             $gi = $gi ? $gi->notes : null;
         } else if ($s->gradehash && !$s->placeholder)
             $gi = $Me->commit_info($s->gradehash, $pset);

@@ -1629,21 +1629,6 @@ class Contact {
         return $cinfo;
     }
 
-    static function contact_grade_for($cid, $pset) {
-        global $Conf;
-        $cid = is_object($cid) ? $cid->contactId : $cid;
-        $pset = is_object($pset) ? $pset->psetid : $pset;
-        $result = $Conf->qe("select * from ContactGrade where cid=? and pset=?", $cid, $pset);
-        $cg = edb_orow($result);
-        if ($cg && $cg->notes)
-            $cg->notes = json_decode($cg->notes);
-        return $cg;
-    }
-
-    function contact_grade($pset) {
-        return self::contact_grade_for($this, $pset);
-    }
-
     function save_contact_grade($pset, $info) {
         global $Conf;
         $pset = is_object($pset) ? $pset->psetid : $pset;
@@ -1654,7 +1639,7 @@ class Contact {
     function update_contact_grade($pset, $updates) {
         global $Conf;
         $Conf->qe("lock tables ContactGrade write");
-        $cg = $this->contact_grade($pset);
+        $cg = $pset->contact_grade_for($this);
         $info = json_update($cg ? $cg->notes : null, $updates);
         self::save_contact_grade($pset, $info);
         $Conf->qe("unlock tables");

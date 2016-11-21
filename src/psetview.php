@@ -210,7 +210,7 @@ class PsetView {
 
     function load_grade() {
         if ($this->pset->gitless_grades) {
-            $this->grade = $this->user->contact_grade($this->pset);
+            $this->grade = $this->pset->contact_grade_for($this->user);
             $this->grade_notes = get($this->grade, "notes");
         } else {
             $this->repo_grade = null;
