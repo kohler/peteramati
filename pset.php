@@ -781,7 +781,7 @@ if ($Pset->gitless) {
             $runnerbuttons[] = $x . "<br />";
         }
         if ($all_resolved)
-            $runnerbuttons[] = Ht::button("flag", "Flag", ["style" => "font-weight:bold", "onclick" => "flag61(this)"]);
+            $runnerbuttons[] = Ht::button("flag", "Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "onclick" => "flag61(this)"]);
     }
     if (!empty($runnerbuttons)) {
         echo Ht::form($Info->hoturl_post("run")),
