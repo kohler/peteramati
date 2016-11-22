@@ -2083,7 +2083,7 @@ function flag61(button) {
             success: function (data) {
                 if (data && data.ok) {
                     $form.find(".flagreason").remove();
-                    $b.replace("<strong>Flagged</strong>");
+                    $b.replaceWith("<strong>Flagged</strong>");
                 }
             },
             error: function () {
@@ -2097,7 +2097,7 @@ function flag61(button) {
             dataType: "json",
             success: function (data) {
                 if (data && data.ok)
-                    $b.html("<strong>Resolved</strong>");
+                    $b.replaceWith("<strong>Resolved</strong>");
             },
             error: function () {
                 $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
