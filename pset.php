@@ -776,8 +776,9 @@ if ($Pset->gitless) {
             if ($conversation !== "")
                 $x .= " (" . $conversation . ")";
             if (!$resolved)
-                $x .= Ht::button("resolveflag", "Resolve",
-                                 ["style" => "margin-left:1em", "onclick" => "flag61(this)", "data-flagid" => $k]);
+                $x .= '<span style="display:inline-block;margin-left:1em">'
+                    . Ht::button("resolveflag", "Resolve", ["onclick" => "flag61(this)", "data-flagid" => $k])
+                    . '</span>';
             $runnerbuttons[] = $x . "<br />";
         }
         if ($all_resolved)
