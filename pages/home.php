@@ -791,7 +791,7 @@ function show_regrades($result) {
 
         $total = "";
         if ($row->notes) {
-            $garr = render_grades($pset, json_decode($row->notes), null);
+            $garr = render_grades($pset, $row->notes, null);
             if ($garr->totalindex !== null)
                 $total = $garr->all[$garr->totalindex];
         }
