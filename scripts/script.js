@@ -503,6 +503,18 @@ event_modkey.CTRL = 2;
 event_modkey.ALT = 4;
 event_modkey.META = 8;
 
+function make_onkeypress_enter(f) {
+    return function (evt) {
+        if (!event_modkey(evt) && event_key(evt) == "Enter") {
+            evt.preventDefault();
+            evt.stopImmediatePropagation();
+            f.call(this);
+            return false;
+        } else
+            return true;
+    };
+}
+
 
 // localStorage
 var wstorage = function () { return false; };
@@ -1495,23 +1507,6 @@ function crpfocus(id, subfocus, seltype) {
     return !(selt || felt);
 }
 
-function crpSubmitKeyFilter(elt, e) {
-    e = e || window.event;
-    var form;
-    if (event_modkey(e) || event_key(e) != "Enter")
-        return true;
-    form = elt;
-    while (form && form.tagName && form.tagName.toUpperCase() != "FORM")
-        form = form.parentNode;
-    if (form && form.tagName) {
-        elt.blur();
-        if (!form.onsubmit || !(form.onsubmit instanceof Function) || form.onsubmit())
-            form.submit();
-        return false;
-    } else
-        return true;
-}
-
 function make_link_callback(elt) {
     return function () {
         window.location = elt.href;
@@ -2072,6 +2067,43 @@ function setgrader61(button) {
             form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
         }
     });
+}
+
+function flag61(button) {
+    var $b = $(button), $form = $b.closest("form");
+    if (button.name == "flag" && !$form.find("[name=flagreason]").length) {
+        $b.before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" /> &nbsp;</span>');
+        $form.find("[name=flagreason]").on("keypress", make_onkeypress_enter(function () { $b.click(); })).autogrow()[0].focus();
+        $b.html("OK");
+    } else if (button.name == "flag") {
+        $.ajax($form.attr("action"), {
+            data: $form.serializeWith({flag: 1}),
+            type: "POST", cache: false,
+            dataType: "json",
+            success: function (data) {
+                if (data && data.ok) {
+                    $form.find(".flagreason").remove();
+                    $b.replace("<strong>Flagged</strong>");
+                }
+            },
+            error: function () {
+                $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
+            }
+        });
+    } else if (button.name == "resolveflag") {
+        $.ajax($form.attr("action"), {
+            data: $form.serializeWith({resolveflag: 1, flagid: $b.attr("data-flagid")}),
+            type: "POST", cache: false,
+            dataType: "json",
+            success: function (data) {
+                if (data && data.ok)
+                    $b.html("<strong>Resolved</strong>");
+            },
+            error: function () {
+                $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
+            }
+        })
+    }
 }
 
 function reqregrade61(button) {
@@ -3011,45 +3043,72 @@ function textarea_shadow($self) {
 }
 
 (function ($) {
-$.fn.autogrow = function (options) {
-	return this.filter("textarea").each(function () {
-	    var self	     = this;
-	    var $self	     = $(self);
-	    var minHeight    = $self.height();
-	    var noFlickerPad = $self.hasClass('autogrow-short') ? 0 : parseInt($self.css('lineHeight')) || 0;
-        var settings = $.extend({
-            preGrowCallback: null,
-            postGrowCallback: null
-        }, options);
+function do_autogrow_textarea($self) {
+    if ($self.data("autogrowing")) {
+        $self.data("autogrowing")();
+        return;
+    }
 
-        var shadow = textarea_shadow($self);
-        var update = function (event) {
-            var val = self.value;
-
-            // Did enter get pressed?  Resize in this keydown event so that the flicker doesn't occur.
-            if (event && event.data && event.data.event === 'keydown' && event.keyCode === 13) {
-                val += "\n";
-            }
-
-            shadow.css('width', $self.width());
-            shadow.text(val + (noFlickerPad === 0 ? '...' : '')); // Append '...' to resize pre-emptively.
-
-            var newHeight=Math.max(shadow.height() + noFlickerPad, minHeight);
-            if(settings.preGrowCallback!=null){
-                newHeight=settings.preGrowCallback($self,shadow,newHeight,minHeight);
-            }
-
-            $self.height(newHeight);
-
-            if(settings.postGrowCallback!=null){
-                settings.postGrowCallback($self);
-            }
+    var shadow, minHeight, lineHeight;
+    var update = function (event) {
+        var width = $self.width();
+        if (width <= 0)
+            return;
+        if (!shadow) {
+            shadow = textarea_shadow($self);
+            minHeight = $self.height();
+            lineHeight = shadow.text("!").height();
         }
 
-        $self.on("change keyup", update).keydown({event:'keydown'}, update);
-        $(window).resize(update);
+        // Did enter get pressed?  Resize in this keydown event so that the flicker doesn't occur.
+        var val = $self[0].value;
+        if (event && event.type == "keydown" && event.keyCode === 13)
+            val += "\n";
+        shadow.css("width", width).text(val + "...");
 
-        update();
-	});
+        var wh = Math.max($(window).height() - 4 * lineHeight, 4 * lineHeight);
+        $self.height(Math.min(wh, Math.max(shadow.height(), minHeight)));
+    }
+
+    $self.on("change keyup keydown", update).data("autogrowing", update);
+    $(window).resize(update);
+    $self.val() && update();
+}
+function do_autogrow_text_input($self) {
+    if ($self.data("autogrowing")) {
+        $self.data("autogrowing")();
+        return;
+    }
+
+    var shadow;
+    var update = function (event) {
+        var width = $self.width(), val = $self[0].value, ws;
+        if (width <= 0)
+            return;
+        if (!shadow) {
+            shadow = textarea_shadow($self);
+            var p = $self.css(["paddingRight", "paddingLeft", "borderLeftWidth", "borderRightWidth"]);
+            shadow.css({width: "auto", display: "table-cell", paddingLeft: $self.css("paddingLeft"), paddingLeft: (parseFloat(p.paddingRight) + parseFloat(p.paddingLeft) + parseFloat(p.borderLeftWidth) + parseFloat(p.borderRightWidth)) + "px"});
+            ws = $self.css(["minWidth", "maxWidth"]);
+            if (ws.minWidth == "0px")
+                $self.css("minWidth", width + "px");
+            if (ws.maxWidth == "none")
+                $self.css("maxWidth", "640px");
+        }
+        shadow.text($self[0].value + "  ");
+        ws = $self.css(["minWidth", "maxWidth"]);
+        $self.outerWidth(Math.max(Math.min(shadow.outerWidth(), parseFloat(ws.maxWidth), $(window).width()), parseFloat(ws.minWidth)));
+    }
+
+    $self.on("change input", update).data("autogrowing", update);
+    $(window).resize(update);
+    $self.val() && update();
+}
+$.fn.autogrow = function () {
+    this.filter("textarea").each(function () { do_autogrow_textarea($(this)); });
+    this.filter("input[type='text']").each(function () { do_autogrow_text_input($(this)); });
+    return this;
 };
 })(jQuery);
+
+$(function () { $(".need-autogrow").autogrow().removeClass("need-autogrow"); });

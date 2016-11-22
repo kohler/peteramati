@@ -39,20 +39,20 @@ $Psetid = $Pset->id;
 // XXX this should be under `api`
 if ($Qreq->flag && check_post($Qreq) && user_pset_info()) {
     $flags = (array) $Info->current_info("flags");
-    if ($Qreq->flag_at && !isset($flags["t" . $Qreq->flag_at]))
+    if ($Qreq->flagid && !isset($flags["t" . $Qreq->flagid]))
         json_exit(["ok" => false, "error" => "No such flag"]);
-    if (!$Qreq->flag_at)
-        $Qreq->flag_at = $Now;
-    $flag = get($flags, "t" . $Qreq->flag_at, []);
+    if (!$Qreq->flagid)
+        $Qreq->flagid = "t" . $Now;
+    $flag = get($flags, $Qreq->flagid, []);
     if (!get($flag, "uid"))
         $flag["uid"] = $Me->contactId;
     if (!get($flag, "started"))
         $flag["started"] = $Now;
-    if (get($flag, "started", $Qreq->flag_at) != $Now)
+    if (get($flag, "started", $Qreq->flagid) != $Now)
         $flag["updated"] = $Now;
-    if ($Qreq->conversation)
-        $flag["conversation"][] = [$Now, $Me->contactId, $Qreq->note];
-    $updates = ["flags" => ["t" . $Qreq->flag_at => $flag]];
+    if ($Qreq->flagreason)
+        $flag["conversation"][] = [$Now, $Me->contactId, $Qreq->flagreason];
+    $updates = ["flags" => [$Qreq->flagid => $flag]];
     $Info->update_current_info($updates);
     json_exit(["ok" => true]);
 }
@@ -60,11 +60,11 @@ if ($Qreq->flag && check_post($Qreq) && user_pset_info()) {
 // XXX this should be under `api`
 if ($Qreq->resolveflag && check_post($Qreq) && user_pset_info()) {
     $flags = (array) $Info->current_info("flags");
-    if (!$Qreq->flag_at || !isset($flags["t" . $Qreq->flag_at]))
+    if (!$Qreq->flagid || !isset($flags[$Qreq->flagid]))
         json_exit(["ok" => false, "error" => "No such flag"]);
-    if (get($flags[$Qreq->flag_at], "resolved"))
+    if (get($flags[$Qreq->flagid], "resolved"))
         json_exit(["ok" => true]);
-    $updates = ["flags" => ["t" . $Qreq->flag_at => ["resolved" => [$Now, $Me->contactId]]]];
+    $updates = ["flags" => [$Qreq->flagid => ["resolved" => [$Now, $Me->contactId]]]];
     $Info->update_current_info($updates);
     json_exit(["ok" => true]);
 }

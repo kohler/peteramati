@@ -722,7 +722,31 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
 
 function show_regrades($result) {
     global $Conf, $Me, $Now, $LastPsetFix;
-    $rows = array();
+    $rows = $uids = [];
+    while (($row = edb_orow($result))) {
+        $row->notes = json_decode($row->notes);
+        $latest = "";
+        $uid = 0;
+        foreach (get($row->notes, "flags", []) as $t => $v)
+            if (!get($v, "resolved") && $t > $latest) {
+                $latest = $t;
+                $uid = get($v, "uid");
+            }
+        if ($latest) {
+            $rows[] = [$latest, $uid, $row];
+            $uids[$uid] = true;
+        }
+    }
+    Dbl::free($result);
+    if (empty($rows))
+        return;
+    usort($rows, function ($a, $b) { return strcmp($a[0], $b[0]); });
+
+    $contacts = [];
+    $result = $Conf->qe("select * from ContactInfo where contactId?a", array_keys($uids));
+    while (($c = Contact::fetch($result, $Conf)))
+        $contacts[$c->contactId] = $c;
+    Dbl::free($result);
 
     echo '<div id="_regrades">';
     echo "<h3>regrade requests</h3>";
@@ -733,22 +757,23 @@ function show_regrades($result) {
     $reqsort = req("sort");
     $reqanonymize = req("anonymize");
     $pcmembers = pcMembers();
-    while (($row = edb_orow($result))) {
+    foreach ($rows as $rowx) {
+        $uid = $rowx[1];
+        $row = $rowx[2];
+        $u = $contacts[$uid];
         ++$trn;
         echo '<tr class="k', ($trn % 2), '">';
         if ($checkbox)
-            echo '<td class="s61checkbox">', Ht::checkbox("s61_" . urlencode($Me->user_idpart($row->student)), 1, array("class" => "s61check")), '</td>';
+            echo '<td class="s61checkbox">', Ht::checkbox("s61_" . urlencode($Me->user_idpart($u)), 1, array("class" => "s61check")), '</td>';
         echo '<td class="s61rownumber">', $trn, '.</td>';
         $pset = $Conf->pset_by_id($row->pset);
         echo '<td class="s61pset">', htmlspecialchars($pset->title), '</td>';
 
-        $row->usernames = explode(" ", $row->usernames);
-        sort($row->usernames);
-        $x = array();
-        foreach ($row->usernames as $u)
-            $x[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $u, "commit" => $row->hash, "sort" => $reqsort)) . '">' . htmlspecialchars($u) . '</a>';
-        echo '<td class="s61username">', join(", ", $x), '</td>';
-        echo '<td class="s61hash"><a href="', hoturl("pset", array("pset" => $pset->urlkey, "u" => $row->usernames[0], "commit" => $row->hash, "sort" => $reqsort)), '">', substr($row->hash, 0, 7), '</a></td>';
+        echo '<td class="s61username">',
+            '<a href="', hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash, "sort" => $reqsort]),
+            '">', htmlspecialchars($Me->user_linkpart($u)), '</a></td>',
+
+            '<td class="s61hash"><a href="', hoturl("pset", array("pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash, "sort" => $reqsort)), '">', substr($row->hash, 0, 7), '</a></td>';
 
         if (get($row, "gradercid") || get($row, "main_gradercid")) {
             $gcid = get($row, "gradercid") ? : get($row, "main_gradercid");
@@ -969,18 +994,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $sep = "";
     $t0 = $Profile ? microtime(true) : 0;
 
-    $result = Dbl::qe("select rgr.*, rg.gradercid main_gradercid,
-	cn.notes, cn.haslinenotes, u.cids, u.usernames
-	from RepositoryGradeRequest rgr
-	left join CommitNotes cn on (cn.hash=rgr.hash and cn.pset=rgr.pset)
-	left join RepositoryGrade rg on (rg.repoid=rgr.repoid and rg.pset=rgr.pset and not rg.placeholder)
-	left join (select link repoid, pset, group_concat(cid separator ' ') as cids,
-               group_concat(coalesce(github_username, seascode_username) separator ' ') as usernames
-		   from ContactLink l
-		   join ContactInfo c on (l.cid=c.contactId and l.type=" . LINK_REPO . ")
-		   group by repoid, pset) u
-	on (rgr.repoid=u.repoid and rgr.pset=u.pset)
-	order by requested_at");
+    $result = Dbl::qe("select * from CommitNotes where hasactiveflags=1");
     if (edb_nrows($result)) {
         echo $sep;
         show_regrades($result);

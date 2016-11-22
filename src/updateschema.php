@@ -35,7 +35,7 @@ function _update_schema_regrade_flags(Conf $conf) {
             && ($pset = $conf->pset_by_id($row->pset))) {
             $info = new PsetView($pset, $u, $u);
             $info->force_set_commit($row->hash);
-            $update = ["flags" => ["t" . $row->requested_at => ["uid" => 0]]];
+            $update = ["flags" => ["t" . $row->requested_at => ["uid" => $u->contactId]]];
             $info->update_current_info($update);
         }
     Dbl::free($result);

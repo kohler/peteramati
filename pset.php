@@ -762,15 +762,28 @@ if ($Pset->gitless) {
     if (($Me->isPC && $Me != $User)
         || ($Info->grading_hash() && !$Info->is_grading_commit())
         || (!$Info->grading_hash() && $Pset->grades_visible)) {
-        ContactView::add_regrades($Info);
-        $already_requested = isset($Info->regrades[$Info->commit_hash()]);
-        $runnerbuttons[] = ($last_run ? ' <span style="padding:0 1em"></span>' : "")
-            . Ht::button("reqgrade",
-                         $already_requested ? "Regrade Requested" : "Request Regrade",
-                         array("style" => "font-weight:bold" . ($already_requested ? ";font-style:italic" : ""),
-                               "onclick" => "reqregrade61(this)"));
+        $runnerbuttons[] = '<div class="g"></div>';
+        $all_resolved = true;
+        foreach ($Info->current_info("flags") ? : [] as $k => $v) {
+            $resolved = get($v, "resolved");
+            $all_resolved = $all_resolved && $resolved;
+            $conversation = "";
+            if (get($v, "conversation"))
+                $conversation = htmlspecialchars((string) $v->conversation[0][2]);
+            if ($resolved && $conversation === "")
+                continue;
+            $x = $resolved ? "Resolved" : "<strong>Flagged</strong>";
+            if ($conversation !== "")
+                $x .= " (" . $conversation . ")";
+            if (!$resolved)
+                $x .= Ht::button("resolveflag", "Resolve",
+                                 ["style" => "margin-left:1em", "onclick" => "flag61(this)", "data-flagid" => $k]);
+            $runnerbuttons[] = $x . "<br />";
+        }
+        if ($all_resolved)
+            $runnerbuttons[] = Ht::button("flag", "Flag", ["style" => "font-weight:bold", "onclick" => "flag61(this)"]);
     }
-    if (count($runnerbuttons)) {
+    if (!empty($runnerbuttons)) {
         echo Ht::form($Info->hoturl_post("run")),
             '<div class="f-contain">';
         ContactView::echo_group("", join("", $runnerbuttons));
