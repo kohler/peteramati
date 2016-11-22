@@ -69,14 +69,6 @@ if ($Qreq->resolveflag && check_post($Qreq) && user_pset_info()) {
     json_exit(["ok" => true]);
 }
 
-if (isset($_POST["reqregrade"]) && check_post() && user_pset_info()) {
-    Dbl::qe("insert into RepositoryGradeRequest (repoid,pset,hash,requested_at) values (?, ?, ?, ?) on duplicate key update requested_at=values(requested_at)",
-            $Info->repo->repoid, $Info->pset->psetid, $Info->commit_hash(), $Now);
-    Dbl::qe("delete from RepositoryGradeRequest where repoid=? and pset=? and requested_at<?",
-            $Info->repo->repoid, $Info->pset->psetid, $Now);
-    $Conf->ajaxExit(array("ok" => true));
-}
-
 if (!$Pset->run_dirpattern)
     quit("Configuration error (run_dirpattern)");
 else if (!$Pset->run_jailfiles)

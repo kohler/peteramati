@@ -2106,22 +2106,6 @@ function flag61(button) {
     }
 }
 
-function reqregrade61(button) {
-    var form = jQuery(button).closest("form");
-    jQuery.ajax(form.attr("action"), {
-        data: form.serializeWith({reqregrade: 1}),
-        type: "POST", cache: false,
-        dataType: "json",
-        success: function (data) {
-            if (data && data.ok)
-                jQuery(button).html("Regrade Requested");
-        },
-        error: function () {
-            form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
-        }
-    });
-}
-
 function run61(button, opt) {
     var form = $(button).closest("form"),
         runclass = button.getAttribute("data-pa-runclass") || button.value,
