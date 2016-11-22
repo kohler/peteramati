@@ -749,7 +749,7 @@ function show_regrades($result) {
     Dbl::free($result);
 
     echo '<div id="_regrades">';
-    echo "<h3>regrade requests</h3>";
+    echo "<h3>flagged commits</h3>";
     echo '<table class="s61"><tbody>';
     $trn = 0;
     $checkbox = false;
