@@ -78,15 +78,6 @@ function parse_time($d, $reference = null) {
 
 // string helpers
 
-function csvq($text, $quote_empty = false) {
-    if ($text == "")
-        return $quote_empty ? '""' : $text;
-    else if (preg_match('/\A[-_@\$#+A-Za-z0-9.](?:[-_@\$#+A-Za-z0-9. \t]*[-_\$#+A-Za-z0-9.]|)\z/', $text))
-        return $text;
-    else
-        return '"' . str_replace('"', '""', $text) . '"';
-}
-
 function cvtint($value, $default = -1) {
     $v = trim((string) $value);
     if (is_numeric($v)) {
@@ -106,28 +97,6 @@ function cvtnum($value, $default = -1) {
 
 function rcvtint(&$value, $default = -1) {
     return (isset($value) ? cvtint($value, $default) : $default);
-}
-
-if (function_exists("iconv")) {
-    function utf8_substr($str, $off, $len) {
-        return iconv_substr($str, $off, $len, "UTF-8");
-    }
-} else if (function_exists("mb_substr")) {
-    function utf8_substr($str, $off, $len) {
-        return mb_substr($str, $off, $len, "UTF-8");
-    }
-} else {
-    function utf8_substr($str, $off, $len) {
-        $x = substr($str, $off, $len);
-        $poff = 0;
-        while (($n = preg_match_all("/[\200-\277]/", $x, $m, PREG_PATTERN_ORDER, $poff))) {
-            $poff = strlen($x);
-            $x .= substr($str, $poff, $n);
-        }
-        if (preg_match("/\\A([\200-\277]+)/", substr($str, strlen($x)), $m))
-            $x .= $m[1];
-        return $x;
-    }
 }
 
 function json_update($j, $updates) {
@@ -410,22 +379,20 @@ function redirectSelf($extra = array()) {
     go(self_href($extra, array("raw" => true)));
 }
 
-function foldsessionpixel($name, $var, $sub = false) {
-    $val = "&amp;val=";
-    if ($sub === false)
-        $val .= defval($_SESSION, $var, 1);
-    else if ($sub === null)
-        $val .= "&amp;sub=";
-    else if ($sub !== null) {
-        if (!isset($_SESSION[$var])
-            || array_search($sub, explode(" ", $_SESSION[$var])) === false)
-            $val .= "1";
-        else
-            $val .= "0";
-        $val = "&amp;sub=" . $sub . $val;
+class JsonResultException extends Exception {
+    public $result;
+    static public $capturing = false;
+    function __construct($j) {
+        $this->result = $j;
     }
+}
 
-    return "<img id='foldsession." . $name . "' alt='' src='" . hoturl("sessionvar", "var=" . $var . $val . "&amp;cache=1") . "' width='1' height='1' />";
+function json_exit($json, $div = false) {
+    global $Conf;
+    if (JsonResultException::$capturing)
+        throw new JsonResultException($json);
+    else
+        $Conf->ajaxExit($json, $div);
 }
 
 function foldbutton($foldtype, $title, $foldnum = 0) {
@@ -434,23 +401,6 @@ function foldbutton($foldtype, $title, $foldnum = 0) {
     $foldclass = ($foldnum ? $foldnum : "");
     $foldnum = ($foldnum ? ",$foldnum" : "");
     return "<a href=\"javascript:void fold('$foldtype',0$foldnum)\" class='foldbutton fn$foldclass'$showtitle>+</a><a href=\"javascript:void fold('$foldtype',1$foldnum)\" class='foldbutton fx$foldclass'$hidetitle>&minus;</a>";
-}
-
-function reviewType($paperId, $row, $long = 0) {
-    if ($row->reviewType == REVIEW_PRIMARY)
-        return "<span class='rtype rtype_pri'>Primary</span>";
-    else if ($row->reviewType == REVIEW_SECONDARY)
-        return "<span class='rtype rtype_sec'>Secondary</span>";
-    else if ($row->reviewType == REVIEW_EXTERNAL)
-        return "<span class='rtype rtype_req'>External</span>";
-    else if ($row->conflictType >= CONFLICT_AUTHOR)
-        return "<span class='author'>Author</span>";
-    else if ($row->conflictType > 0)
-        return "<span class='conflict'>Conflict</span>";
-    else if (!($row->reviewId === null) || $long)
-        return "<span class='rtype rtype_pc'>PC</span>";
-    else
-        return "";
 }
 
 function become_user_link($link, $text = "user") {
@@ -536,6 +486,11 @@ function goPaperForm($baseUrl = null, $args = array()) {
     return $x;
 }
 
+function rm_rf_tempdir($tempdir) {
+    assert(substr($tempdir, 0, 1) === "/");
+    exec("/bin/rm -rf " . escapeshellarg($tempdir));
+}
+
 function clean_tempdirs() {
     $dir = null;
     if (function_exists("sys_get_temp_dir"))
@@ -550,13 +505,8 @@ function clean_tempdirs() {
         if (preg_match('/\Ahotcrptmp\d+\z/', $fname)
             && is_dir("$dir/$fname")
             && ($mtime = @filemtime("$dir/$fname")) !== false
-            && $mtime < $now - 1800) {
-            $xdirh = @opendir("$dir/$fname");
-            while (($xfname = readdir($xdirh)) !== false)
-                @unlink("$dir/$fname/$xfname");
-            @closedir("$dir/$fname");
-            @rmdir("$dir/$fname");
-        }
+            && $mtime < $now - 1800)
+            rm_rf_tempdir("$dir/$fname");
     closedir($dirh);
 }
 
@@ -570,126 +520,12 @@ function tempdir($mode = 0700) {
         $dir = substr($dir, 0, -1);
     for ($i = 0; $i < 100; $i++) {
         $path = $dir . "/hotcrptmp" . mt_rand(0, 9999999);
-        if (mkdir($path, $mode))
+        if (mkdir($path, $mode)) {
+            register_shutdown_function("rm_rf_tempdir", $path);
             return $path;
+        }
     }
     return false;
-}
-
-
-function reviewBlind($rrow) {
-    global $Conf;
-    $br = $Conf->blindReview();
-    return $br == BLIND_ALWAYS
-        || ($br == BLIND_OPTIONAL && (!$rrow || $rrow->reviewBlind));
-}
-
-function setCommentType($crow) {
-    if ($crow && !isset($crow->commentType)) {
-        if ($crow->forAuthors == 2)
-            $crow->commentType = COMMENTTYPE_RESPONSE | COMMENTTYPE_AUTHOR
-                | ($crow->forReviewers ? 0 : COMMENTTYPE_DRAFT);
-        else if ($crow->forAuthors == 1)
-            $crow->commentType = COMMENTTYPE_AUTHOR;
-        else if ($crow->forReviewers == 2)
-            $crow->commentType = COMMENTTYPE_ADMINONLY;
-        else if ($crow->forReviewers)
-            $crow->commentType = COMMENTTYPE_REVIEWER;
-        else
-            $crow->commentType = COMMENTTYPE_PCONLY;
-        if (isset($crow->commentBlind) ? $crow->commentBlind : $crow->blind)
-            $crow->commentType |= COMMENTTYPE_BLIND;
-    }
-}
-
-// watch functions
-function saveWatchPreference($paperId, $contactId, $watchtype, $on) {
-    global $Conf, $OK;
-    $explicit = ($watchtype << WATCHSHIFT_EXPLICIT);
-    $selected = ($watchtype << WATCHSHIFT_NORMAL);
-    $onvalue = $explicit | ($on ? $selected : 0);
-    $Conf->qe("insert into PaperWatch (paperId, contactId, watch)
-                values ($paperId, $contactId, $onvalue)
-                on duplicate key update watch = (watch & ~" . ($explicit | $selected) . ") | $onvalue",
-              "while saving email notification preference");
-    return $OK;
-}
-
-function genericWatch($prow, $watchtype, $callback) {
-    global $Conf, $Me;
-
-    $q = "select C.contactId, firstName, lastName, email,
-                password, roles, defaultWatch,
-                R.reviewType as myReviewType,
-                R.reviewSubmitted as myReviewSubmitted,
-                R.reviewNeedsSubmit as myReviewNeedsSubmit,
-                conflictType, watch, preferredEmail";
-    if ($Conf->sversion >= 47)
-        $q .= ", disabled";
-
-    $q .= "\nfrom ContactInfo C
-                left join PaperConflict Conf on (Conf.paperId=$prow->paperId and Conf.contactId=C.contactId)
-                left join PaperWatch W on (W.paperId=$prow->paperId and W.contactId=C.contactId)
-                left join PaperReview R on (R.paperId=$prow->paperId and R.contactId=C.contactId)
-                left join PaperComment Cmt on (Cmt.paperId=$prow->paperId and Cmt.contactId=C.contactId)\n";
-
-    $q .= "where watch is not null"
-        . " or conflictType>=" . CONFLICT_AUTHOR
-        . " or reviewType is not null or commentId is not null"
-        . " or (defaultWatch & " . ($watchtype << WATCHSHIFT_ALL) . ")!=0";
-
-    // save review information since we modify $prow
-    $saveProw = (object) null;
-    setReviewInfo($saveProw, $prow);
-
-    $result = $Conf->qe($q, "while processing email notifications");
-    $watchers = array();
-    $lastContactId = 0;
-    while (($row = edb_orow($result))) {
-        if ($row->contactId == $lastContactId
-            || $row->contactId == $Me->contactId
-            || preg_match('/\Aanonymous\d*\z/', $row->email))
-            continue;
-        $lastContactId = $row->contactId;
-
-        if ($row->watch
-            && ($row->watch & ($watchtype << WATCHSHIFT_EXPLICIT))) {
-            if (!($row->watch & ($watchtype << WATCHSHIFT_NORMAL)))
-                continue;
-        } else {
-            if (!($row->defaultWatch & (($watchtype << WATCHSHIFT_NORMAL) | ($watchtype << WATCHSHIFT_ALL))))
-                continue;
-        }
-
-        $watchers[$row->contactId] = $row;
-    }
-
-    // Need to check for outstanding reviews if the settings might prevent a
-    // person with outstanding reviews from seeing a comment.
-    if (count($watchers)
-        && (($Conf->timePCViewAllReviews(false, false) && !$Conf->timePCViewAllReviews(false, true))
-            || ($Conf->timeAuthorViewReviews(false) && !$Conf->timeAuthorViewReviews(true)))) {
-        $result = $Conf->qe("select C.contactId, R.contactId, max(R.reviewNeedsSubmit) from ContactInfo C
-                left join PaperReview R on (R.contactId=C.contactId)
-                where C.contactId in (" . join(",", array_keys($watchers)) . ")
-                group by C.contactId", "while processing email notifications");
-        while (($row = edb_row($result))) {
-            $watchers[$row[0]]->isReviewer = $row[1] > 0;
-            $watchers[$row[0]]->reviewsOutstanding = $row[2] > 0;
-        }
-    }
-
-    $method = is_array($callback) ? $callback[1] : null;
-    foreach ($watchers as $row) {
-        $minic = Contact::fetch($row);
-        setReviewInfo($prow, $row);
-        if ($method)
-            $callback[0]->$method($prow, $minic);
-        else
-            $callback($prow, $minic);
-    }
-
-    setReviewInfo($prow, $saveProw);
 }
 
 
@@ -781,105 +617,10 @@ function tabLength($text, $all) {
     return $len;
 }
 
-function wordWrapIndent($text, $info, $indent = 18, $totWidth = 75, $rjinfo = true) {
-    if (is_int($indent)) {
-        $indentlen = $indent;
-        $indent = str_pad("", $indent);
-    } else
-        $indentlen = strlen($indent);
-
-    $out = "";
-    while ($text != "" && ctype_space($text[0])) {
-        $out .= $text[0];
-        $text = substr($text, 1);
-    }
-
-    $out .= preg_replace("/^(?!\\Z)/m", $indent, wordwrap($text, $totWidth - $indentlen));
-    if (strlen($info) <= $indentlen) {
-        $info = str_pad($info, $indentlen, " ", ($rjinfo ? STR_PAD_LEFT : STR_PAD_RIGHT));
-        return $info . substr($out, $indentlen);
-    } else
-        return $info . "\n" . $out;
-}
-
-function htmlWrapText($text) {
-    $lines = explode("\n", $text);
-    while (count($lines) && $lines[count($lines) - 1] == "")
-        array_pop($lines);
-    $text = "";
-    for ($i = 0; $i < count($lines); $i++) {
-        $l = $lines[$i];
-        while (($pos = strpos($l, "\t")) !== false)
-            $l = substr($l, 0, $pos) . substr('        ', 0, 8 - ($pos % 8)) . substr($l, $pos + 1);
-        if (preg_match("/\\A  +.*[^\s.?!-'\")]   +/", $l))
-            $l = str_replace(" ", "\xC2\xA0", $l);
-        else if (strlen($l) && $l[0] == " ") {
-            for ($x = 0; $x < strlen($l) && $l[$x] == " "; $x++)
-                /* nada */;
-            $l = str_repeat("\xC2\xA0", $x) . substr($l, $x);
-        }
-        $l = preg_replace('@((?:https?|ftp)://\S+[^\s").,:;])([").,:;]*(?:\s|\z))@',
-                          '<a href="$1" rel="noreferrer">$1</a>$2', $l);
-        $lines[$i] = $l . "<br />\n";
-    }
-    return join("", $lines);
-
-    // $lines = explode("\n", $text);
-    // Rules: Indented line that starts with "-", "*", or "#[.]" starts
-    //   indented text.
-    //      Other indented text is preformatted.
-    //
-    // States: -1 initial, 0 normal text, 1 preformatted text, 2 indented text
-    // $state = -1;
-    // $savedPar = "";
-    // $savedParLines = 0;
-    // $indent = 0;
-    // $out = "";
-    // for ($i = 0; $i < count($lines); $i++) {
-    //    $line = $lines[$i];
-    //    if (preg_match("/^\\s*\$/", $line)) {
-    //          $savedPar .= $line . "\n";
-    //          $savedParLines++;
-    //    } else if ($state == 1 && ctype_isspace($line[0]))
-    //          $out .= $line . "\n";
-    //    else if (preg_match("/^(\\s+)(-+|\\*+|\\d+\\.?)\\s/", $line, $matches)) {
-    //          $x = tabLength($line, false);
-    //    }
-    // }
-}
-
-function htmlFold($text, $maxWords) {
-    global $foldId;
-
-    if (strlen($text) < $maxWords * 7)
-        return $text;
-    $words = preg_split('/\\s+/', $text);
-    if (count($words) < $maxWords)
-        return $text;
-
-    $x = join(" ", array_slice($words, 0, $maxWords));
-
-    $fid = (isset($foldId) ? $foldId : 1);
-    $foldId = $fid + 1;
-
-    $x .= "<span id='fold$fid' class='foldc'><span class='fn'> ... </span><a class='fn' href='javascript:void fold($fid, 0)'>[More]</a><span class='fx'> " . join(" ", array_slice($words, $maxWords)) . " </span><a class='fx' href='javascript:void fold($fid, 1)'>[Less]</a></span>";
-
-    return $x;
-}
-
-function ini_get_bytes($varname) {
-    // from PHP manual
-    $val = trim(ini_get($varname));
-    $last = strtolower($val[strlen($val)-1]);
-    switch ($last) {
-    case 'g':
-        $val *= 1024; // fallthru
-    case 'm':
-        $val *= 1024; // fallthru
-    case 'k':
-        $val *= 1024;
-    }
-    return $val;
+function ini_get_bytes($varname, $value = null) {
+    $val = trim($value !== null ? $value : ini_get($varname));
+    $last = strlen($val) ? strtolower($val[strlen($val) - 1]) : ".";
+    return $val * (1 << (+strpos(".kmg", $last) * 10));
 }
 
 function whyNotText($whyNot, $action) {
@@ -1013,98 +754,6 @@ function unparseReviewOrdinal($ord) {
         return chr(intval(($ord - 1) / 26) + 64) . chr((($ord - 1) % 26) + 65);
 }
 
-function titleWords($title, $chars = 40) {
-    // assume that title whitespace has been simplified
-    if (strlen($title) <= $chars)
-        return $title;
-    // don't over-shorten due to UTF-8
-    $xtitle = utf8_substr($title, 0, $chars);
-    if (($pos = strrpos($xtitle, " ")) > 0
-        && substr($title, strlen($xtitle), 1) != " ")
-        $xtitle = substr($xtitle, 0, $pos);
-    return $xtitle . "...";
-}
-
-function __downloadCSV(&$row, $csv) {
-    $t = array();
-    reset($row);
-    if (count($row) == 0)
-        return "";
-    else if (is_array(current($row))) {
-        foreach ($row as &$x)
-            $t[] = __downloadCSV($x, $csv);
-        unset($x);
-        return join("", $t);
-    } else if ($csv) {
-        foreach ($row as &$x)
-            $t[] = csvq($x);
-        unset($x);
-        return join(",", $t) . "\n";
-    } else
-        return join("\t", $row) . "\n";
-}
-
-function downloadCSV($info, $header, $filename, $description, $opt = array()) {
-    global $Conf, $Opt, $zlib_output_compression;
-    $iscsv = defval($opt, "type", "csv") == "csv" && !isset($Opt["disableCSV"]);
-    if (is_array($info))
-        $text = __downloadCSV($info, $iscsv);
-    else
-        $text = $info;
-    if ($header && $iscsv)
-        $headertext = __downloadCSV($header, $iscsv);
-    else if ($header)
-        $headertext = "#" . __downloadCSV($header, $iscsv);
-    else
-        $headertext = "";
-    header("Content-Description: " . $Opt["shortName"] . " $description, PHP generated data");
-    header("Content-Disposition: " . (defval($opt, "inline") ? "inline" : "attachment") . "; filename=" . mime_quote_string($Opt["downloadPrefix"] . $filename . ($iscsv ? ".csv" : ".txt")));
-    if ($iscsv)
-        header("Content-Type: text/csv; charset=utf-8; header=" . ($headertext ? "present" : "absent"));
-    else
-        header("Content-Type: text/plain; charset=utf-8");
-    if (!defval($opt, "nolength") && !$zlib_output_compression)
-        header("Content-Length: " . (strlen($headertext) + strlen($text)));
-    echo $headertext, $text;
-}
-
-function downloadText($text, $filename, $description, $inline = false, $length = true) {
-    downloadCSV($text, false, preg_replace('/\.txt\z/', "", $filename), $description, array("inline" => $inline, "nolength" => !$length, "type" => "txt"));
-}
-
-function cvtpref($n) {
-    $n = trim($n);
-    if (preg_match('/^-+$/', $n))
-        return -strlen($n);
-    else if (preg_match('/^\++$/', $n))
-        return strlen($n);
-    else if ($n == "")
-        return 0;
-    else if (is_numeric($n) && $n <= 1000000)
-        return round($n);
-    else if (strpos($n, "\xE2") !== false)
-        // Translate UTF-8 for minus sign into a real minus sign ;)
-        return cvtpref(str_replace("\xE2\x88\x92", '-', $n));
-    else
-        return -1000001;
-}
-
-function decisionSelector($curOutcome = 0, $id = null, $extra = "") {
-    $text = "<select" . ($id === null ? "" : " id='$id'") . " name='decision'$extra>\n";
-    $rf = reviewForm();
-    $outcomeMap = $rf->options['outcome'];
-    if (!isset($outcomeMap[$curOutcome]))
-        $curOutcome = null;
-    $outcomes = array_keys($outcomeMap);
-    sort($outcomes);
-    $outcomes = array_unique(array_merge(array(0), $outcomes));
-    if ($curOutcome === null)
-        $text .= "    <option value='' selected='selected'><b>Set decision...</b></option>\n";
-    foreach ($outcomes as $key)
-        $text .= "    <option value='$key'" . ($curOutcome == $key && $curOutcome !== null ? " selected='selected'" : "") . ">" . htmlspecialchars($outcomeMap[$key]) . "</option>\n";
-    return $text . "  </select>";
-}
-
 function _sort_pcMember($a, $b) {
     return strcasecmp($a->sorter, $b->sorter);
 }
@@ -1211,91 +860,6 @@ function matchValue($a, $word, $allowKey = false) {
         return $outb;
     else
         return $outc;
-}
-
-function paperOptions($id = null) {
-    global $Conf;
-    if ($Conf->setting("paperOption") <= 0 || $Conf->sversion <= 0)
-        return array();
-    $svar = defval($_SESSION, "paperOption", null);
-    if (!$svar || !is_array($svar) || count($svar) < 3 || $svar[2] < 2
-        || $svar[0] < $Conf->setting("paperOption")) {
-        $opt = array();
-        $result = $Conf->q("select * from OptionType order by sortOrder, optionName");
-        $order = 0;
-        while (($row = edb_orow($result))) {
-            // begin backwards compatibility to old schema versions
-            if (!isset($row->optionValues))
-                $row->optionValues = "";
-            if (!isset($row->type) && $row->optionValues == "\x7Fi")
-                $row->type = PaperOption::T_NUMERIC;
-            else if (!isset($row->type))
-                $row->type = ($row->optionValues ? PaperOption::T_SELECTOR : PaperOption::T_CHECKBOX);
-            // end backwards compatibility to old schema versions
-            $row->optionAbbrev = preg_replace("/-+\$/", "", preg_replace("/[^a-z0-9_]+/", "-", strtolower($row->optionName)));
-            if ($row->optionAbbrev == "paper" || $row->optionAbbrev == "submission"
-                || $row->optionAbbrev == "final" || ctype_digit($row->optionAbbrev))
-                $row->optionAbbrev = "opt" . $row->optionId;
-            $row->sortOrder = $order++;
-            if (!isset($row->displayType))
-                $row->displayType = PaperOption::DT_NORMAL;
-            if ($row->type == PaperOption::T_FINALPDF)
-                $row->displayType = PaperOption::DT_SUBMISSION;
-            $row->isDocument = PaperOption::type_is_document($row->type);
-            $row->isFinal = PaperOption::type_is_final($row->type);
-            $opt[$row->optionId] = $row;
-        }
-        $_SESSION["paperOption"] = $svar = array($Conf->setting("paperOption"), $opt, 2);
-    }
-    return $id ? defval($svar[1], $id, null) : $svar[1];
-}
-
-function scoreCounts($text, $max = null) {
-    $merit = ($max ? array_fill(1, $max, 0) : array());
-    $n = $sum = $sumsq = 0;
-    foreach (preg_split('/[\s,]+/', $text) as $i)
-        if (($i = cvtint($i)) > 0) {
-            while ($i > count($merit))
-                $merit[count($merit) + 1] = 0;
-            $merit[$i]++;
-            $sum += $i;
-            $sumsq += $i * $i;
-            $n++;
-        }
-    $avg = ($n > 0 ? $sum / $n : 0);
-    $dev = ($n > 1 ? sqrt(($sumsq - $sum*$sum/$n) / ($n - 1)) : 0);
-    return (object) array("v" => $merit, "max" => count($merit),
-                          "n" => $n, "avg" => $avg, "stddev" => $dev);
-}
-
-function displayOptionsSet($sessionvar, $var = null, $val = null) {
-    global $Conf;
-    if (isset($_SESSION[$sessionvar]))
-        $x = $_SESSION[$sessionvar];
-    else if ($sessionvar == "pldisplay")
-        $x = (string) $Conf->setting_data("pldisplay_default");
-    else if ($sessionvar == "ppldisplay")
-        $x = (string) $Conf->setting_data("ppldisplay_default");
-    else
-        $x = "";
-    if ($x == null || strpos($x, " ") === false) {
-        if ($sessionvar == "pldisplay")
-            $x = " overAllMerit ";
-        else if ($sessionvar == "ppldisplay")
-            $x = " tags ";
-        else
-            $x = " ";
-    }
-
-    // set $var to $val in list
-    if ($var) {
-        $x = str_replace(" $var ", " ", $x);
-        if ($val)
-            $x .= "$var ";
-    }
-
-    // store list in $_SESSION
-    return ($_SESSION[$sessionvar] = $x);
 }
 
 

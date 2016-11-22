@@ -529,7 +529,7 @@ function echo_commit($Info) {
             $curhead = $grouphead = $k->fromhead;
         }
         // actual option
-        $x = utf8_substr($k->subject, 0, 72);
+        $x = UnicodeHelper::utf8_prefix($k->subject, 72);
         if (strlen($x) != strlen($k->subject))
             $x .= "...";
         $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);

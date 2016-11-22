@@ -917,6 +917,18 @@ class Conf {
     // Conference header, footer
     //
 
+    function set_siteurl($base) {
+        $old_siteurl = Navigation::siteurl();
+        $base = Navigation::set_siteurl($base);
+        if ($this->opt["assetsUrl"] === $old_siteurl) {
+            $this->opt["assetsUrl"] = $base;
+            Ht::$img_base = $this->opt["assetsUrl"] . "images/";
+        }
+        if ($this->opt["scriptAssetsUrl"] === $old_siteurl)
+            $this->opt["scriptAssetsUrl"] = $base;
+    }
+
+
     function make_css_link($url, $media = null) {
         global $ConfSitePATH;
         $t = '<link rel="stylesheet" type="text/css" href="';

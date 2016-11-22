@@ -130,7 +130,7 @@ class CS61Mailer extends Mailer {
             else if ($what == "%COMMITTITLE%")
                 return $recent->subject ? : "(empty)";
             else if ($what == "%COMMIT%") {
-                $subject = utf8_substr($recent->subject, 0, 72);
+	        $subject = UnicodeHelper::utf8_prefix($recent->subject, 72);
                 if (strlen($subject) != strlen($recent->subject))
                     $subject .= "...";
                 return substr($recent->hash, 0, 7) . ($subject === "" ? "" : " $subject");
