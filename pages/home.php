@@ -775,8 +775,8 @@ function show_regrades($result) {
 
             '<td class="s61hash"><a href="', hoturl("pset", array("pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash, "sort" => $reqsort)), '">', substr($row->hash, 0, 7), '</a></td>';
 
-        if (get($row, "gradercid") || get($row, "main_gradercid")) {
-            $gcid = get($row, "gradercid") ? : get($row, "main_gradercid");
+        if (get($row->notes, "gradercid") || $row->main_gradercid) {
+            $gcid = get($row->notes, "gradercid") ? : $row->main_gradercid;
             if (isset($pcmembers[$gcid]))
                 echo "<td>" . htmlspecialchars($pcmembers[$gcid]->firstName) . "</td>";
             else
@@ -994,7 +994,10 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $sep = "";
     $t0 = $Profile ? microtime(true) : 0;
 
-    $result = Dbl::qe("select * from CommitNotes where hasactiveflags=1");
+    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid
+        from CommitNotes cn
+        left join RepositoryGrade rg on (rg.repoid=cn.repoid and rg.pset=cn.pset)
+        where hasactiveflags=1");
     if (edb_nrows($result)) {
         echo $sep;
         show_regrades($result);
