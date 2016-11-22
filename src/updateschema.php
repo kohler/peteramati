@@ -8,7 +8,7 @@ function _update_schema_haslinenotes($conf) {
     $hashes = array(array(), array(), array(), array());
     $result = $conf->ql("select hash, notes from CommitNotes");
     while (($row = edb_row($result))) {
-        $x = Contact::commit_info_haslinenotes(json_decode($row[1]));
+        $x = PsetView::notes_haslinenotes(json_decode($row[1]));
         $hashes[$x][] = $row[0];
     }
     foreach ($hashes as $x => $h)

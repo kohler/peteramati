@@ -4,6 +4,7 @@
 // See LICENSE for open-source distribution terms
 
 class PsetView {
+    public $conf;
     public $pset;
     public $user;
     public $viewer;
@@ -18,17 +19,19 @@ class PsetView {
     public $can_see_grades;
     public $user_can_see_grades;
 
-    private $grade = false;
-    private $repo_grade = null;
+    private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
+    private $repo_grade = null;     // RepositoryGrade+CommitNotes
     private $grade_notes = null;
 
     private $commit = null;
+    private $commit_record = false; // CommitNotes (maybe +RepositoryGrade)
     private $commit_notes = false;
     private $recent_commits = null;
     private $recent_commits_truncated = null;
     private $latest_commit = null;
 
     function __construct(Pset $pset, Contact $user, Contact $viewer) {
+        $this->conf = $pset->conf;
         $this->pset = $pset;
         $this->user = $user;
         $this->viewer = $viewer;
@@ -153,32 +156,147 @@ class PsetView {
         return false;
     }
 
-    function commit_info($key = null) {
-        if ($this->commit_notes === false) {
+    function commit_record() {
+        if ($this->commit_record === false) {
             if (!$this->commit
-                || ($this->repo_grade
-                    && $this->repo_grade->gradehash == $this->commit))
+                || ($this->repo_grade && $this->repo_grade->gradehash == $this->commit)) {
+                $this->commit_record = $this->repo_grade;
                 $this->commit_notes = $this->grade_notes;
-            else
-                $this->commit_notes = $this->user->commit_info
-                    ($this->commit, $this->pset);
+            } else {
+                $this->commit_record = $this->pset->commit_notes($this->commit);
+                $this->commit_notes = $this->commit_record ? $this->commit_record->notes : null;
+            }
         }
-        if (!$key)
-            return $this->commit_notes;
+        return $this->commit_record;
+    }
+
+    function commit_info($key = null) {
+        $this->commit_record();
+        if ($key && $this->commit_notes)
+            return get($this->commit_notes, $key);
         else
-            return $this->commit_notes ? get($this->commit_notes, $key) : null;
+            return $this->commit_notes;
     }
 
-    public function update_commit_info($updates, $reset_keys = false) {
+    static private function clean_notes($j) {
+        if (is_object($j)
+            && isset($j->grades) && is_object($j->grades)
+            && isset($j->autogrades) && is_object($j->autogrades)) {
+            foreach ($j->autogrades as $k => $v) {
+                if (get($j->grades, $k) === $v)
+                    unset($j->grades->$k);
+            }
+            if (!count(get_object_vars($j->grades)))
+                unset($j->grades);
+        }
+    }
+
+    static function notes_haslinenotes($j) {
+        $x = 0;
+        if ($j && isset($j->linenotes))
+            foreach ($j->linenotes as $fn => $fnn) {
+                foreach ($fnn as $ln => $n)
+                    $x |= (is_array($n) && $n[0] ? HASNOTES_COMMENT : HASNOTES_GRADE);
+            }
+        return $x;
+    }
+
+    function update_commit_info_at($commit, $updates, $reset_keys = false) {
+        // find original
+        $this_commit_record = $this->commit === $commit
+            || (!$this->commit && $this->repo_grade && $this->repo_grade->gradehash === $commit);
+        if ($this_commit_record)
+            $record = $this->commit_record();
+        else
+            $record = $this->pset->commit_notes($commit);
+
+        // compare-and-swap loop
+        while (1) {
+            // change notes
+            $new_notes = json_update($record ? $record->notes : null, $updates);
+            self::clean_notes($new_notes);
+
+            // update database
+            $notes = json_encode($new_notes);
+            $haslinenotes = self::notes_haslinenotes($new_notes);
+            if (!$record)
+                $result = $this->conf->qe("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, repoid=?",
+                                          $commit, $this->pset->psetid, $notes, $haslinenotes, $this->repo->repoid);
+            else
+                $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, notesversion=? where hash=? and pset=? and notesversion=?",
+                                          $notes, $haslinenotes, $record->notesversion + 1, $commit, $this->pset->psetid, $record->notesversion);
+            if ($result->affected_rows)
+                break;
+
+            // reload record
+            $record = $this->pset->commit_notes($commit);
+        }
+
+        if (!$record)
+            $record = (object) ["hash" => $commit, "pset" => $this->pset->psetid, "repoid" => $this->repo->repoid, "notesversion" => 0];
+        $record->notes = $new_notes;
+        $record->haslinenotes = $haslinenotes;
+        $record->notesversion = $record->notesversion + 1;
+        if ($this_commit_record) {
+            $this->commit_record = $record;
+            $this->commit_notes = $new_notes;
+        }
+        if ($this->repo_grade && $this->repo_grade->gradehash === $commit) {
+            $this->repo_grade->notes = $record->notes;
+            $this->repo_grade->haslinenotes = $record->haslinenotes;
+            $this->repo_grade->notesversion = $record->notesversion;
+            $this->grade_notes = $record->notes;
+        }
+    }
+
+    function update_commit_info($updates, $reset_keys = false) {
         assert(!!$this->commit);
-        $this->commit_notes = Contact::update_commit_info
-            ($this->commit, $this->repo, $this->pset,
-             $updates, $reset_keys);
-        if ($this->repo_grade && $this->repo_grade->gradehash == $this->commit)
-            $this->grade_notes = $this->commit_notes;
+        $this->update_commit_info_at($this->commit, $updates, $reset_keys);
     }
 
-    public function tarball_url() {
+    function update_contact_grade_info($updates, $reset_keys = false) {
+        assert($this->pset->gitless);
+        // find original
+        $record = $this->grade;
+
+        // compare-and-swap loop
+        while (1) {
+            // change notes
+            $new_notes = json_update($record ? $record->notes : null, $updates);
+            self::clean_notes($new_notes);
+
+            // update database
+            $notes = json_encode($new_notes);
+            if (!$record)
+                $result = $this->conf->qe("insert into ContactGrade set cid=?, pset=?, notes=?",
+                                          $this->user->contactId, $this->pset->psetid, $notes);
+            else
+                $result = $this->conf->qe("update ContactGrade set notes=?, notesversion=? where cid=? and pset=? and notesversion=?",
+                                          $notes, $record->notesversion + 1, $this->user->contactId, $this->pset->psetid, $record->notesversion);
+            if ($result->affected_rows)
+                break;
+
+            // reload record
+            $record = $this->pset->contact_grade_for($this->user);
+        }
+
+        if (!$record)
+            $record = (object) ["cid" => $this->user->contactId, "pset" => $this->pset->psetid, "gradercid" => null, "hidegrade" => 0, "notesversion" => 0];
+        $record->notes = $new_notes;
+        $record->notesversion = $record->notesversion + 1;
+        $this->grade = $record;
+        $this->grade_notes = $record->notes;
+    }
+
+    function update_grade_info($updates, $reset_keys = false) {
+        if ($this->pset->gitless)
+            $this->update_contact_grade_info($updates, $reset_keys);
+        else
+            $this->update_commit_info($updates, $reset_keys);
+    }
+
+
+    function tarball_url() {
         if ($this->repo && $this->commit !== null
             && $this->pset->repo_tarball_patterns) {
             for ($i = 0; $i + 1 < count($this->pset->repo_tarball_patterns); $i += 2) {
@@ -214,17 +332,23 @@ class PsetView {
             $this->grade_notes = get($this->grade, "notes");
         } else {
             $this->repo_grade = null;
-            if ($this->repo)
-                $this->repo_grade = $this->user->repo_grade
-                    ($this->repo, $this->pset);
+            if ($this->repo) {
+                $result = $this->conf->qe("select rg.*, cn.hash, cn.notes, cn.notesversion
+                    from RepositoryGrade rg
+                    left join CommitNotes cn on (cn.hash=rg.gradehash and cn.pset=rg.pset)
+                    where rg.repoid=? and rg.pset=? and not rg.placeholder",
+                    $this->repo->repoid, $this->pset->psetid);
+                $this->repo_grade = $result ? $result->fetch_object() : null;
+                Dbl::free($result);
+                if ($this->repo_grade && $this->repo_grade->notes)
+                    $this->repo_grade->notes = json_decode($this->repo_grade->notes);
+            }
             $this->grade = $this->repo_grade;
             $this->grade_notes = get($this->grade, "notes");
             if ($this->grade_notes
                 && get($this->grade, "gradercid")
                 && !get($this->grade_notes, "gradercid"))
-                $this->grade_notes = Contact::update_commit_info
-                    ($this->grade->gradehash, $this->repo, $this->pset,
-                     array("gradercid" => $this->grade->gradercid));
+                $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
             if (get($this->grade, "gradehash"))
                 // NB don't check recent_commits association here
                 $this->commit = $this->grade->gradehash;
@@ -286,10 +410,10 @@ class PsetView {
     function grading_info($key = null) {
         if ($this->grade === false)
             $this->load_grade();
-        if (!$key)
-            return $this->grade_notes;
+        if ($key && $this->grade_notes)
+            return get($this->grade_notes, $key);
         else
-            return $this->grade_notes ? get($this->grade_notes, $key) : null;
+            return $this->grade_notes;
     }
 
     function commit_or_grading_info() {

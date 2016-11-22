@@ -1536,19 +1536,6 @@ class Contact {
         return $diff_files;
     }
 
-    static function repo_grade($repo, $pset) {
-        global $Conf;
-        $pset = is_object($pset) ? $pset->psetid : $pset;
-        $result = $Conf->qe("select rg.*, cn.notes
-                from RepositoryGrade rg
-                left join CommitNotes cn on (cn.hash=rg.gradehash and cn.pset=rg.pset)
-                where rg.repoid=? and rg.pset=? and not rg.placeholder",
-                $repo->repoid, $pset);
-        if (($rg = edb_orow($result)) && $rg->notes)
-            $rg->notes = json_decode($rg->notes);
-        return $rg;
-    }
-
     function can_view_repo_contents($repo, $cache_only = false) {
         if (!$this->conf->opt("restrictRepoView")
             || $this->isPC
@@ -1567,82 +1554,6 @@ class Contact {
                 $repo->viewable_by[$this->contactId] = $allowed;
         }
         return $allowed;
-    }
-
-    static function commit_info($commit, $pset) {
-        global $Conf;
-        $pset = is_object($pset) ? $pset->psetid : $pset;
-        $psetlim = $pset <= 0 ? "limit 1" : "and pset=$pset";
-        if (($result = $Conf->qe("select notes from CommitNotes where hash=? $psetlim", $commit))
-            && ($row = edb_row($result)))
-            return json_decode($row[0]);
-        else
-            return null;
-    }
-
-    static function commit_info_haslinenotes($info) {
-        $x = 0;
-        if ($info && isset($info->linenotes))
-            foreach ($info->linenotes as $fn => $fnn) {
-                foreach ($fnn as $ln => $n)
-                    $x |= (is_array($n) && $n[0] ? HASNOTES_COMMENT : HASNOTES_GRADE);
-            }
-        return $x;
-    }
-
-    static function save_commit_info($commit, $repo, $pset, $info) {
-        global $Conf;
-        $pset = is_object($pset) ? $pset->psetid : $pset;
-        $repo = is_object($repo) ? $repo->repoid : $repo;
-        if ($info) {
-            // if grade == autograde, do not save grade separately
-            if (is_object($info)
-                && isset($info->grades) && is_object($info->grades)
-                && isset($info->autogrades) && is_object($info->autogrades)) {
-                foreach ($info->autogrades as $k => $v) {
-                    if (get($info->grades, $k) === $v)
-                        unset($info->grades->$k);
-                }
-                if (!count(get_object_vars($info->grades)))
-                    unset($info->grades);
-            }
-
-            $Conf->qe("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, repoid=?
-                       on duplicate key update notes=values(notes), haslinenotes=values(haslinenotes)",
-                      $commit, $pset, json_encode($info),
-                      self::commit_info_haslinenotes($info), $repo ? $repo : 0);
-        } else
-            $Conf->qe("delete from CommitNotes where hash=? and pset=?", $commit, $pset);
-    }
-
-    static function update_commit_info($commit, $repo, $pset,
-                                       $updates, $reset_keys = false) {
-        global $Conf;
-        $Conf->qe("lock tables CommitNotes write");
-        $cinfo = self::commit_info($commit, $pset);
-        if ($reset_keys)
-            foreach ((array) $updates as $k => $v)
-                unset($cinfo->$k);
-        $cinfo = json_update($cinfo, $updates);
-        self::save_commit_info($commit, $repo, $pset, $cinfo);
-        $Conf->qe("unlock tables");
-        return $cinfo;
-    }
-
-    function save_contact_grade($pset, $info) {
-        global $Conf;
-        $pset = is_object($pset) ? $pset->psetid : $pset;
-        $Conf->qe("insert into ContactGrade set cid=?, pset=?, notes=? on duplicate key update notes=values(notes)",
-                  $this->contactId, $pset, $info ? json_encode($info) : null);
-    }
-
-    function update_contact_grade($pset, $updates) {
-        global $Conf;
-        $Conf->qe("lock tables ContactGrade write");
-        $cg = $pset->contact_grade_for($this);
-        $info = json_update($cg ? $cg->notes : null, $updates);
-        self::save_contact_grade($pset, $info);
-        $Conf->qe("unlock tables");
     }
 
     static function update_all_repo_lastpset() {

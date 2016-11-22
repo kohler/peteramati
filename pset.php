@@ -232,7 +232,7 @@ if ($Me->isPC && $Me != $User && check_post()
     $Conf->ajaxExit(false);
 
 // save grades
-function save_grades($user, $pset, $info, $values, $isauto) {
+function save_grades($pset, $info, $values, $isauto) {
     $grades = array();
     foreach ($pset->grades as $ge)
         if (isset($values[$ge->name])) {
@@ -245,16 +245,14 @@ function save_grades($user, $pset, $info, $values, $isauto) {
                 $grades[$ge->name] = floatval($g);
         }
     $key = $isauto ? "autogrades" : "grades";
-    if (count($grades) && $pset->gitless_grades)
-        $user->update_contact_grade($pset, array($key => $grades));
-    else if (count($grades))
-        $info->update_commit_info(array($key => $grades));
+    if (!empty($grades))
+        $info->update_grade_info([$key => $grades]);
     return count($grades);
 }
 
 if ($Me->isPC && $Me != $User && check_post()
     && isset($_REQUEST["setgrade"]) && $Info->can_have_grades()) {
-    $result = save_grades($User, $Pset, $Info, $_REQUEST, false);
+    $result = save_grades($Pset, $Info, $_REQUEST, false);
     if (isset($_REQUEST["ajax"]))
         $Conf->ajaxExit($result != 0);
     redirectSelf();
@@ -264,11 +262,7 @@ if ($Me->isPC && $Me != $User && check_post()
     && isset($_REQUEST["setlatehours"]) && $Info->can_have_grades()) {
     if (isset($_REQUEST["late_hours"])
         && preg_match('_\A(?:0|[1-9]\d*)\z_', $_REQUEST["late_hours"])) {
-        $lh = intval($_REQUEST["late_hours"]);
-        if ($Pset->gitless_grades)
-            $User->update_contact_grade($Pset, array("late_hours" => $lh));
-        else
-            $Info->update_commit_info(array("late_hours" => $lh));
+        $Info->update_grade_info(["late_hours" => intval($_REQUEST["late_hours"])]);
         $result = true;
     } else
         $result = false;

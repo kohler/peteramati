@@ -131,10 +131,10 @@ if (function_exists("iconv")) {
 }
 
 function json_update($j, $updates) {
-    if ($j && is_array($j))
-        $j = (object) $j;
-    else if (!$j || !is_object($j))
-        $j = (object) array();
+    if ($j && is_object($j))
+        $j = (array) $j;
+    else if (!is_array($j))
+        $j = [];
     foreach ($updates as $k => $v) {
         if ((string) $k === "") {
             global $Me;
@@ -142,23 +142,22 @@ function json_update($j, $updates) {
             continue;
         }
         if ($v === null)
-            unset($j->$k);
+            unset($j[$k]);
         else if (is_object($v) || is_array($v)) {
-            $v = json_update(isset($j->$k) ? $j->$k : null, $v);
+            $v = json_update(isset($j[$k]) ? $j[$k] : null, $v);
             if ($v !== null)
-                $j->$k = $v;
+                $j[$k] = $v;
             else
-                unset($j->$k);
+                unset($j[$k]);
         } else
-            $j->$k = $v;
+            $j[$k] = $v;
     }
-    $n = count(get_object_vars($j));
+    $n = count($j);
     if ($n == 0)
         return null;
     for ($i = 0; $i != $n; ++$i)
-        if (!property_exists($j, $i))
-            return $j;
-    $j = get_object_vars($j);
+        if (!array_key_exists($i, $j))
+            return (object) $j;
     ksort($j, SORT_NUMERIC);
     return array_values($j);
 }

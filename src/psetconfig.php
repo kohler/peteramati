@@ -258,6 +258,16 @@ class Pset {
         return $cg;
     }
 
+    function commit_notes($hash) {
+        assert(!$this->gitless);
+        $result = $this->conf->qe("select * from CommitNotes where hash=? and pset=?", $hash, $this->psetid);
+        $cn = edb_orow($result);
+        if ($cn && $cn->notes)
+            $cn->notes = json_decode($cn->notes);
+        Dbl::free($result);
+        return $cn;
+    }
+
 
     private static function ccheck($callable, $args) {
         $i = 0;

@@ -116,13 +116,14 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
                       "extension" => ($s->extension ? "Y" : "N"),
                       "sorter" => $s->sorter);
 
-        if ($pset->gitless_grades) {
+        $gi = null;
+        if ($pset->gitless_grades)
             $gi = $pset->contact_grade_for($s);
-            $gi = $gi ? $gi->notes : null;
-        } else if (get($s, "gradehash"))
-            $gi = Contact::commit_info($s->gradehash, $pset);
+        else if (get($s, "gradehash"))
+            $gi = $pset->commit_notes($s->gradehash);
         else
             continue;
+        $gi = $gi ? $gi->notes : null;
 
         $gd = ContactView::pset_grade($gi, $pset);
         if ($gd) {
@@ -669,13 +670,12 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
     }
 
     if (count($pset->grades)) {
-        if ($pset->gitless_grades) {
+        $gi = null;
+        if ($pset->gitless_grades)
             $gi = $pset->contact_grade_for($s);
-            $gi = $gi ? $gi->notes : null;
-        } else if ($s->gradehash && !$s->placeholder)
-            $gi = $Me->commit_info($s->gradehash, $pset);
-        else
-            $gi = null;
+        else if ($s->gradehash && !$s->placeholder)
+            $gi = $pset->commit_notes($s->gradehash);
+        $gi = $gi ? $gi->notes : null;
 
         if (!$pset->gitless_grades) {
             if ($gi && get($gi, "linenotes"))
