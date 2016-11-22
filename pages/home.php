@@ -663,7 +663,7 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
             Dbl::qe("insert into RepositoryGrade (repoid, pset, gradehash, placeholder, placeholder_at) values (?, ?, ?, 1, ?) on duplicate key update gradehash=(if(placeholder=1,values(gradehash),gradehash)), placeholder_at=values(placeholder_at)",
                     $s->repoid, $pset->id, $s->gradehash, $Now);
             if (!$s->repoviewable)
-                $s->repoviewable = $s->can_view_repo_contents($s);
+                $s->repoviewable = $s->can_view_repo_contents($info->repo);
         }
         if (!$s->gradehash || $s->dropped)
             $row->sortprefix = "~1 ";

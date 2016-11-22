@@ -295,7 +295,7 @@ function load_pset_info() {
                 $locp = is_array($locp) ? $locp[$component] : $locp->$component;
             }
             // - report error
-            if (is_object($locp) && @$locp->__LANDMARK__)
+            if (is_object($locp) && get($locp, "__LANDMARK__"))
                 $locp = $locp->__LANDMARK__;
             else if (!is_string($locp))
                 $locp = $locinfo->$pk->__LANDMARK__;
@@ -329,6 +329,10 @@ function load_pset_info() {
             while (($row = Dbl::fetch_first_row(Dbl::qe("select contactId from ContactInfo where anon_username is null limit 1"))))
                 Dbl::q("update ContactInfo set anon_username='[anon" . sprintf("%08u", mt_rand(1, 99999999)) . "]' where contactId=?", $row[0]);
         }
+
+    // update repository regrade requests
+    if ($Conf->sversion == 107)
+        updateSchema($Conf);
 }
 
 load_pset_info();

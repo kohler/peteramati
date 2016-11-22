@@ -246,7 +246,7 @@ function save_grades($pset, $info, $values, $isauto) {
         }
     $key = $isauto ? "autogrades" : "grades";
     if (!empty($grades))
-        $info->update_grade_info([$key => $grades]);
+        $info->update_current_info([$key => $grades]);
     return count($grades);
 }
 
@@ -262,7 +262,7 @@ if ($Me->isPC && $Me != $User && check_post()
     && isset($_REQUEST["setlatehours"]) && $Info->can_have_grades()) {
     if (isset($_REQUEST["late_hours"])
         && preg_match('_\A(?:0|[1-9]\d*)\z_', $_REQUEST["late_hours"])) {
-        $Info->update_grade_info(["late_hours" => intval($_REQUEST["late_hours"])]);
+        $Info->update_current_info(["late_hours" => intval($_REQUEST["late_hours"])]);
         $result = true;
     } else
         $result = false;
@@ -451,13 +451,13 @@ function echo_grade_cdf() {
 function echo_grade_entry($ge) {
     global $User, $Me, $Info;
     $key = $ge->name;
-    $grade = $Info->commit_or_grading_entry($key);
+    $grade = $Info->current_grade_entry($key);
     if (!$Info->can_see_grades
         || ($User == $Me && $grade === null && $ge->is_extra))
         return;
     $title = isset($ge->title) ? $ge->title : $key;
-    $autograde = $Info->commit_or_grading_entry($key, "autograde");
-    $Notes = $Info->commit_or_grading_info();
+    $autograde = $Info->current_grade_entry($key, "autograde");
+    $Notes = $Info->current_info();
 
     $class = "grader61" . ($ge->no_total ? "" : " gradepart");
     if ($User == $Me) {

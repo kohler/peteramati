@@ -1,6 +1,6 @@
 <?php
 // api.php -- HotCRP JSON API access page
-// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2016 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
@@ -17,23 +17,30 @@ if (!isset($_GET["fn"])) {
         $_GET["fn"] = "deadlines";
 }
 
-if (@$_GET["fn"] == "jserror") {
-    $url = defval($_REQUEST, "url", "");
+$qreq = make_qreq();
+if ($qreq->base !== null)
+    $Conf->set_siteurl($qreq->base);
+if ($qreq->fn === "jserror") {
+    $url = $qreq->url;
     if (preg_match(',[/=]((?:script|jquery)[^/&;]*[.]js),', $url, $m))
         $url = $m[1];
-    if (isset($_REQUEST["lineno"]) && $_REQUEST["lineno"] != "0")
-        $url .= ":" . $_REQUEST["lineno"];
-    if (isset($_REQUEST["colno"]) && $_REQUEST["colno"] != "0")
-        $url .= ":" . $_REQUEST["colno"];
-    if ($url != "")
+    if (($n = $qreq->lineno))
+        $url .= ":" . $n;
+    if (($n = $qreq->colno))
+        $url .= ":" . $n;
+    if ($url !== "")
         $url .= ": ";
-    $errormsg = trim((string) @$_REQUEST["error"]);
+    $errormsg = trim((string) $qreq->error);
     if ($errormsg) {
-        $suffix = ($Me->email ? ", user $Me->email" : "");
+        $suffix = "";
+        if ($Me->email)
+            $suffix .= ", user " . $Me->email;
+        if (isset($_SERVER["REMOTE_ADDR"]))
+            $suffix .= ", host " . $_SERVER["REMOTE_ADDR"];
         error_log("JS error: $url$errormsg$suffix");
-        if (isset($_REQUEST["stack"])) {
+        if (($stacktext = $qreq->stack)) {
             $stack = array();
-            foreach (explode("\n", $_REQUEST["stack"]) as $line) {
+            foreach (explode("\n", $stacktext) as $line) {
                 $line = trim($line);
                 if ($line === "" || $line === $errormsg || "Uncaught $line" === $errormsg)
                     continue;
@@ -48,7 +55,7 @@ if (@$_GET["fn"] == "jserror") {
             error_log("JS error: {$url}via " . join(" ", $stack));
         }
     }
-    $Conf->ajaxExit(array("ok" => true));
+    json_exit(["ok" => true]);
 }
 
-$Conf->ajaxExit(array("ok" => false));
+$Conf->ajaxExit(["ok" => false]);

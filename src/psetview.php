@@ -74,6 +74,13 @@ class PsetView {
         return $this->commit;
     }
 
+    function force_set_commit($reqcommit) {
+        if ($this->commit !== $reqcommit) {
+            $this->commit = $reqcommit;
+            $this->commit_notes = false;
+        }
+    }
+
     function has_commit_set() {
         return $this->commit !== null;
     }
@@ -201,6 +208,14 @@ class PsetView {
         return $x;
     }
 
+    static function notes_hasactiveflags($j) {
+        if ($j && isset($j->flags))
+            foreach ($j->flags as $f)
+                if (!get($f, "resolved"))
+                    return 1;
+        return 0;
+    }
+
     function update_commit_info_at($commit, $updates, $reset_keys = false) {
         // find original
         $this_commit_record = $this->commit === $commit
@@ -219,13 +234,16 @@ class PsetView {
             // update database
             $notes = json_encode($new_notes);
             $haslinenotes = self::notes_haslinenotes($new_notes);
+            $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record)
-                $result = $this->conf->qe("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, repoid=?",
-                                          $commit, $this->pset->psetid, $notes, $haslinenotes, $this->repo->repoid);
+                $result = $this->conf->qx("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, hasactiveflags=?, repoid=?",
+                                          $commit, $this->pset->psetid,
+                                          $notes, $haslinenotes, $hasactiveflags, $this->repo->repoid);
             else
-                $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, notesversion=? where hash=? and pset=? and notesversion=?",
-                                          $notes, $haslinenotes, $record->notesversion + 1, $commit, $this->pset->psetid, $record->notesversion);
-            if ($result->affected_rows)
+                $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasactiveflags=?, notesversion=? where hash=? and pset=? and notesversion=?",
+                                          $notes, $haslinenotes, $hasactiveflags, $record->notesversion + 1,
+                                          $commit, $this->pset->psetid, $record->notesversion);
+            if ($result && $result->affected_rows)
                 break;
 
             // reload record
@@ -236,6 +254,7 @@ class PsetView {
             $record = (object) ["hash" => $commit, "pset" => $this->pset->psetid, "repoid" => $this->repo->repoid, "notesversion" => 0];
         $record->notes = $new_notes;
         $record->haslinenotes = $haslinenotes;
+        $record->hasactiveflags = $hasactiveflags;
         $record->notesversion = $record->notesversion + 1;
         if ($this_commit_record) {
             $this->commit_record = $record;
@@ -244,6 +263,7 @@ class PsetView {
         if ($this->repo_grade && $this->repo_grade->gradehash === $commit) {
             $this->repo_grade->notes = $record->notes;
             $this->repo_grade->haslinenotes = $record->haslinenotes;
+            $this->repo_grade->hasactiveflags = $record->hasactiveflags;
             $this->repo_grade->notesversion = $record->notesversion;
             $this->grade_notes = $record->notes;
         }
@@ -267,13 +287,16 @@ class PsetView {
 
             // update database
             $notes = json_encode($new_notes);
+            $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record)
-                $result = $this->conf->qe("insert into ContactGrade set cid=?, pset=?, notes=?",
-                                          $this->user->contactId, $this->pset->psetid, $notes);
+                $result = $this->conf->qx("insert into ContactGrade set cid=?, pset=?, notes=?, hasactiveflags=?",
+                                          $this->user->contactId, $this->pset->psetid,
+                                          $notes, $hasactiveflags);
             else
-                $result = $this->conf->qe("update ContactGrade set notes=?, notesversion=? where cid=? and pset=? and notesversion=?",
-                                          $notes, $record->notesversion + 1, $this->user->contactId, $this->pset->psetid, $record->notesversion);
-            if ($result->affected_rows)
+                $result = $this->conf->qe("update ContactGrade set notes=?, hasactiveflags=?, notesversion=? where cid=? and pset=? and notesversion=?",
+                                          $notes, $hasactiveflags, $record->notesversion + 1,
+                                          $this->user->contactId, $this->pset->psetid, $record->notesversion);
+            if ($result && $result->affected_rows)
                 break;
 
             // reload record
@@ -283,12 +306,13 @@ class PsetView {
         if (!$record)
             $record = (object) ["cid" => $this->user->contactId, "pset" => $this->pset->psetid, "gradercid" => null, "hidegrade" => 0, "notesversion" => 0];
         $record->notes = $new_notes;
+        $record->hasactiveflags = $hasactiveflags;
         $record->notesversion = $record->notesversion + 1;
         $this->grade = $record;
         $this->grade_notes = $record->notes;
     }
 
-    function update_grade_info($updates, $reset_keys = false) {
+    function update_current_info($updates, $reset_keys = false) {
         if ($this->pset->gitless)
             $this->update_contact_grade_info($updates, $reset_keys);
         else
@@ -416,11 +440,11 @@ class PsetView {
             return $this->grade_notes;
     }
 
-    function commit_or_grading_info() {
+    function current_info($key = null) {
         if ($this->pset->gitless_grades || !$this->commit())
-            return $this->grading_info();
+            return $this->grading_info($key);
         else
-            return $this->commit_info();
+            return $this->commit_info($key);
     }
 
     function grading_info_empty() {
@@ -439,8 +463,8 @@ class PsetView {
         return $this->grade && $this->grade->hidegrade;
     }
 
-    function commit_or_grading_entry($k, $type = null) {
-        $gn = $this->commit_or_grading_info();
+    function current_grade_entry($k, $type = null) {
+        $gn = $this->current_info();
         $grade = null;
         if ((!$type || $type == "autograde") && isset($gn->autogrades) && property_exists($gn->autogrades, $k))
             $grade = $gn->autogrades->$k;
@@ -450,7 +474,7 @@ class PsetView {
     }
 
     function late_hours($no_auto = false) {
-        $cinfo = $this->commit_or_grading_info();
+        $cinfo = $this->current_info();
         if (!$no_auto && get($cinfo, "late_hours") !== null)
             return (object) array("hours" => $cinfo->late_hours,
                                   "override" => true);

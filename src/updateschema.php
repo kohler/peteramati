@@ -18,12 +18,28 @@ function _update_schema_haslinenotes($conf) {
     return true;
 }
 
-function _update_schema_pset_commitnotes($conf) {
+function _update_schema_pset_commitnotes(Conf $conf) {
     return $conf->ql("drop table if exists CommitInfo")
         && $conf->ql("alter table CommitNotes add `pset` int(11) NOT NULL DEFAULT '0'")
         && $conf->ql("alter table CommitNotes drop key `hash`")
         && $conf->ql("alter table CommitNotes add unique key `hashpset` (`hash`,`pset`)")
         && $conf->ql("update CommitNotes, RepositoryGrade set CommitNotes.pset=RepositoryGrade.pset where CommitNotes.hash=RepositoryGrade.gradehash");
+}
+
+function _update_schema_regrade_flags(Conf $conf) {
+    $result = $conf->ql("select rgr.*, u.cid from RepositoryGradeRequest rgr
+        left join (select link, pset, min(cid) cid
+                   from ContactLink where type=" . LINK_REPO . " group by link, pset) u on (u.link=rgr.repoid)");
+    while (($row = edb_orow($result)))
+        if ($row->cid && ($u = $conf->user_by_id($row->cid))
+            && ($pset = $conf->pset_by_id($row->pset))) {
+            $info = new PsetView($pset, $u, $u);
+            $info->force_set_commit($row->hash);
+            $update = ["flags" => ["t" . $row->requested_at => ["uid" => 0]]];
+            $info->update_current_info($update);
+        }
+    Dbl::free($result);
+    return true;
 }
 
 function update_schema_drop_keys_if_exist($conf, $table, $key) {
@@ -248,6 +264,14 @@ function updateSchema($conf) {
         && $conf->ql("alter table ContactGrade add `notesversion` int(11) NOT NULL DEFAULT 1")
         && $conf->ql("alter table CommitNotes add `notesversion` int(11) NOT NULL DEFAULT 1"))
         $conf->update_schema_version(106);
+    if ($conf->sversion == 106
+        && $conf->ql("alter table ContactGrade add `hasactiveflags` tinyint(1) NOT NULL DEFAULT 0")
+        && $conf->ql("alter table CommitNotes add `hasactiveflags` tinyint(1) NOT NULL DEFAULT 0"))
+        $conf->update_schema_version(107);
+    if ($conf->sversion == 107
+        && $conf->psets()
+        && _update_schema_regrade_flags($conf))
+        $conf->update_schema_version(108);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

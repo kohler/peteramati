@@ -36,6 +36,39 @@ assert($User == $Me || $Me->isPC);
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 $Psetid = $Pset->id;
 
+// XXX this should be under `api`
+if ($Qreq->flag && check_post($Qreq) && user_pset_info()) {
+    $flags = (array) $Info->current_info("flags");
+    if ($Qreq->flag_at && !isset($flags["t" . $Qreq->flag_at]))
+        json_exit(["ok" => false, "error" => "No such flag"]);
+    if (!$Qreq->flag_at)
+        $Qreq->flag_at = $Now;
+    $flag = get($flags, "t" . $Qreq->flag_at, []);
+    if (!get($flag, "uid"))
+        $flag["uid"] = $Me->contactId;
+    if (!get($flag, "started"))
+        $flag["started"] = $Now;
+    if (get($flag, "started", $Qreq->flag_at) != $Now)
+        $flag["updated"] = $Now;
+    if ($Qreq->conversation)
+        $flag["conversation"][] = [$Now, $Me->contactId, $Qreq->note];
+    $updates = ["flags" => ["t" . $Qreq->flag_at => $flag]];
+    $Info->update_current_info($updates);
+    json_exit(["ok" => true]);
+}
+
+// XXX this should be under `api`
+if ($Qreq->resolveflag && check_post($Qreq) && user_pset_info()) {
+    $flags = (array) $Info->current_info("flags");
+    if (!$Qreq->flag_at || !isset($flags["t" . $Qreq->flag_at]))
+        json_exit(["ok" => false, "error" => "No such flag"]);
+    if (get($flags[$Qreq->flag_at], "resolved"))
+        json_exit(["ok" => true]);
+    $updates = ["flags" => ["t" . $Qreq->flag_at => ["resolved" => [$Now, $Me->contactId]]]];
+    $Info->update_current_info($updates);
+    json_exit(["ok" => true]);
+}
+
 if (isset($_POST["reqregrade"]) && check_post() && user_pset_info()) {
     Dbl::qe("insert into RepositoryGradeRequest (repoid,pset,hash,requested_at) values (?, ?, ?, ?) on duplicate key update requested_at=values(requested_at)",
             $Info->repo->repoid, $Info->pset->psetid, $Info->commit_hash(), $Now);

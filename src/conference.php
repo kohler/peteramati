@@ -35,6 +35,7 @@ class Conf {
     private $_pc_members_and_admins_cache = null;
     private $_handout_repos = [];
     private $_handout_commits = [];
+    private $_api_map = null;
 
     static public $g = null;
 
@@ -94,7 +95,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 106) {
+        if ($this->sversion < 108) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -259,6 +260,7 @@ class Conf {
         if (!$this->sort_by_last != !$sort_by_last)
             $this->_pc_members_cache = $this->_pc_members_and_admins_cache = null;
         $this->sort_by_last = $sort_by_last;
+        $this->_api_map = null;
     }
 
     function has_setting($name) {

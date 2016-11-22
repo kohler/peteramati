@@ -112,7 +112,7 @@ function json_update($j, $updates) {
         }
         if ($v === null)
             unset($j[$k]);
-        else if (is_object($v) || is_array($v)) {
+        else if (is_object($v) || is_associative_array($v)) {
             $v = json_update(isset($j[$k]) ? $j[$k] : null, $v);
             if ($v !== null)
                 $j[$k] = $v;
