@@ -30,7 +30,7 @@ if [ "$#" = 1 -a "$1" = --refresh ]; then
     now=`date +%s`
     result=`echo "select r.repoid, r.cacheid, r.url from Repository r
 	where r.snapcheckat<$now - 900
-	order by r.lastpset desc, r.snapcheckat asc limit 1" |
+	order by r.snapcheckat asc limit 1" |
         ${LIBDIR}runsql.sh -N`
     repoid="`echo "$result" | awk '{ print $1 }'`"
     cacheid="`echo "$result" | awk '{ print $2 }'`"
@@ -44,7 +44,7 @@ elif [ "$#" = 1 -o "$#" = 2 ]; then
         join ContactInfo c
 	join ContactLink l on (c.contactId=l.cid and l.type=3 and l.link=r.repoid)
         where c.seascode_username='$quoted'$psetquoted
-	order by l.pset desc, r.snapcheckat asc limit 1" |
+	order by r.snapcheckat asc limit 1" |
         ${LIBDIR}runsql.sh -N`
     repoid="`echo "$result" | awk '{ print $1 }'`"
     cacheid="`echo "$result" | awk '{ print $2 }'`"
@@ -54,6 +54,10 @@ elif [ -z "$1" -o -z "$2" -o -z "$3" ]; then
     usage 1
 else
     repoid="$1"; cacheid="$2"; url="$3"
+fi
+
+if expr "$url" : "https://github.com/" >/dev/null 2>&1; then
+    url="`echo "$url" | sed 's,^https://github.com/,git@github.com:,'`"
 fi
 
 repo_dir="$GITSSH_REPOCACHE/repo$cacheid"
