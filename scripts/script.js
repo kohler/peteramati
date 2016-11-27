@@ -2225,7 +2225,7 @@ function run61(button, opt) {
                     glen += lsplit[j].length;
                 }
                 if (j + 1 < lsplit.length)
-                    curstyle = ansi_combine(curstyle, m[2]);
+                    curstyle = ansi_combine(curstyle, lsplit[j + 1]);
             }
             var rpos = 0;
             while (rpos < r.length && glen >= r[rpos + 1].length) {
