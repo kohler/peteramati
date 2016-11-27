@@ -1774,10 +1774,6 @@ function analyze(target) {
     return result;
 }
 
-function note_same(a, b) {
-    return a == b || a.replace(/\r\n?/g, "\n") == b;
-}
-
 function remove_tr(tr) {
     tr.setAttribute("deleting61", "1");
     $(tr).find(":focus").blur();
@@ -1788,7 +1784,7 @@ function unedit(tr) {
     var savednote;
     while (tr && (savednote = tr.getAttribute("data-pa-savednote")) === null)
         tr = tr.parentNode;
-    if (tr && note_same(savednote, $(tr).find("textarea").val())) {
+    if (tr && text_eq(savednote, $(tr).find("textarea").val())) {
         var $tr = $(tr);
         $tr.find(":focus").blur();
         if (savednote === "")
@@ -2218,11 +2214,11 @@ function run61(button, opt) {
 
     function clean_cr(line) {
         var curstyle = styles || "\x1b[0m",
-            lines = line.split(/\r/),
-            lineno, i, m, r = [];
-        for (lineno = 0; lineno < lines.length; ++lineno) {
+            parts = line.split(/\r/),
+            partno, i, m, r = [];
+        for (partno = 0; partno < parts.length; ++partno) {
             var g = [], glen = 0, j;
-            var lsplit = lines[lineno].split(/(\x1b\[[\d;]+m)/);
+            var lsplit = parts[partno].split(/(\x1b\[[\d;]+m)/);
             for (j = 0; j < lsplit.length; j += 2) {
                 if (lsplit[j] !== "") {
                     g.push(curstyle, lsplit[j]);
