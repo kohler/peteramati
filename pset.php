@@ -22,7 +22,6 @@ class Series {
     public $n;
     public $sum;
     public $sumsq;
-    public $byg;
     public $series;
     public $cdf;
     private $calculated;
@@ -35,7 +34,6 @@ class Series {
 
     public function add($g) {
         $this->series[] = $g;
-        $this->byg[$g] = get($this->byg, $g) + 1;
         $this->n += 1;
         $this->sum += $g;
         $this->sumsq += $g * $g;
@@ -44,13 +42,17 @@ class Series {
 
     private function calculate() {
         sort($this->series);
-        ksort($this->byg, SORT_NUMERIC);
         $this->cdf = array();
+        $last = false;
         $subtotal = 0;
-        foreach ($this->byg as $k => $v) {
-            $subtotal += $v;
-            $this->cdf[] = $k;
-            $this->cdf[] = $subtotal;
+        $cdfi = 0;
+        for ($i = 0; $i < count($this->series); ++$i) {
+            if ($this->series[$i] !== $last) {
+                $this->cdf[] = $last = $this->series[$i];
+                $this->cdf[] = $i + 1;
+                $cdfi += 2;
+            } else
+                $this->cdf[$cdfi - 1] = $i + 1;
         }
         $this->calculated = true;
     }
@@ -212,27 +214,31 @@ if (req("set_repo"))
     ContactView::set_repo_action($User);
 
 // save line notes
-if ($Me->isPC && $Me != $User && check_post()
-    && isset($_REQUEST["savelinenote"])
-    && isset($_REQUEST["file"]) && isset($_REQUEST["line"])) {
-    $lineid = $_REQUEST["line"];
+function save_linenote($info, $file, $lineid, $note, $iscomment) {
+    global $Me;
+    if ($info->is_handout_commit())
+        json_exit(["ok" => false, "error" => "This is a handout commit."]);
     if (ctype_digit($lineid))
         $lineid = "b" . $lineid;
-    $note = get($_REQUEST, "note", null);
     if ((string) $note !== "")
-        $note = [isset($_REQUEST["iscomment"]) && $_REQUEST["iscomment"], $note, $Me->contactId];
+        $note = [!!$iscomment, $note, $Me->contactId];
     else
         $note = null;
-    $Info->update_commit_info(array("linenotes" =>
-                                    array($_REQUEST["file"] => array($lineid => ($note ? $note : null)))));
-    if (isset($_REQUEST["ajax"]))
-        $Conf->ajaxExit(array("ok" => true, "savednote" => ($note ? $note[1] : ""), "iscomment" => ($note && $note[0])));
-    redirectSelf();
-} else if (isset($_REQUEST["savelinenote"]) && isset($_REQUEST["ajax"]))
-    $Conf->ajaxExit(false);
+    $info->update_commit_info(["linenotes" => [$file => [$lineid => $note ? : null]]]);
+    json_exit(["ok" => true, "savednote" => $note ? $note[1] : "", "iscomment" => $note && $note[0]]);
+}
+
+if ($Me->isPC && $Me != $User && check_post()
+    && isset($_REQUEST["savelinenote"])
+    && isset($_REQUEST["file"]) && isset($_REQUEST["line"]))
+    save_linenote($Info, $_REQUEST["file"], $_REQUEST["line"], get($_REQUEST, "note", null), get($_REQUEST, "iscomment"));
+else if (isset($_REQUEST["savelinenote"]))
+    json_exit(["ok" => false]);
 
 // save grades
 function save_grades($pset, $info, $values, $isauto) {
+    if ($info->is_handout_commit())
+        json_exit(["ok" => false, "error" => "This is a handout commit."]);
     $grades = array();
     foreach ($pset->grades as $ge)
         if (isset($values[$ge->name])) {
@@ -594,13 +600,14 @@ function echo_commit($Info) {
     }
     if (($Info->is_latest_commit() || $Me->isPC)
         && $Pset->handout_repo_url) {
-        $last_handout = $Pset->handout_commits();
+$Pset->latest_handout_commit();
+        $last_handout = $Pset->latest_handout_commit();
         $last_myhandout = $last_handout ? $Info->derived_handout_hash() : false;
-        if ($last_handout && $last_myhandout && $last_handout == $last_myhandout)
+        if ($last_handout && $last_myhandout && $last_handout->hash == $last_myhandout)
             /* this is ideal: they have the latest handout commit */;
         else if ($last_handout && $last_myhandout)
             // they don't have the latest updates
-            $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $last_handout)) . "\">see diff</a>)</span>. Run <code>git pull handout master</code> to merge these updates.");
+            $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>git pull handout master</code> to merge these updates.");
         else if ($last_handout)
             $remarks[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.");
         else if (!$last_handout && $Me->isPC) {
@@ -662,6 +669,9 @@ function echo_grade_cdf_here() {
 
 function echo_all_grades() {
     global $Me, $User, $Pset, $Info;
+    if ($Info->is_handout_commit())
+        return;
+
     $gj = ContactView::grade_json($Info);
     if (get($gj, "grades") || ($Info->can_see_grades && $Me != $User)) {
         echo_grade_total($gj);
@@ -759,9 +769,8 @@ if ($Pset->gitless) {
                          array("class" => "runner61",
                                "style" => "font-weight:bold",
                                "onclick" => "runsetting61.add()"));
-    if (($Me->isPC && $Me != $User)
-        || ($Info->grading_hash() && !$Info->is_grading_commit())
-        || (!$Info->grading_hash() && $Pset->grades_visible)) {
+    if ((($Me->isPC && $Me != $User) || $Me == $User)
+        && !$Info->is_handout_commit()) {
         $runnerbuttons[] = '<div class="g"></div>';
         $all_resolved = true;
         foreach ($Info->current_info("flags") ? : [] as $k => $v) {

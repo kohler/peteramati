@@ -29,6 +29,7 @@ class PsetView {
     private $recent_commits = null;
     private $recent_commits_truncated = null;
     private $latest_commit = null;
+    private $derived_handout_commit = null;
 
     function __construct(Pset $pset, Contact $user, Contact $viewer) {
         $this->conf = $pset->conf;
@@ -60,7 +61,7 @@ class PsetView {
     }
 
     function set_commit($reqcommit) {
-        $this->commit = $this->commit_notes = false;
+        $this->commit = $this->commit_notes = $this->derived_handout_commit = false;
         if (!$this->repo)
             return false;
         if ($this->recent_commits === null)
@@ -77,7 +78,7 @@ class PsetView {
     function force_set_commit($reqcommit) {
         if ($this->commit !== $reqcommit) {
             $this->commit = $reqcommit;
-            $this->commit_notes = false;
+            $this->commit_notes = $this->derived_handout_commit = false;
         }
     }
 
@@ -156,11 +157,20 @@ class PsetView {
     }
 
     function derived_handout_hash() {
-        $hbases = $this->pset->handout_commits();
-        foreach ($this->recent_commits() as $c)
-            if (isset($hbases[$c->hash]))
-                return $c->hash;
-        return false;
+        if ($this->derived_handout_commit === false) {
+            $this->derived_handout_commit = null;
+            $hbases = $this->pset->handout_commits();
+            foreach ($this->recent_commits() as $c)
+                if (isset($hbases[$c->hash])) {
+                    $this->derived_handout_commit = $c->hash;
+                    break;
+                }
+        }
+        return $this->derived_handout_commit ? : false;
+    }
+
+    function is_handout_commit() {
+        return $this->commit && $this->commit === $this->derived_handout_hash();
     }
 
     function commit_record() {
@@ -373,7 +383,7 @@ class PsetView {
                 && get($this->grade, "gradercid")
                 && !get($this->grade_notes, "gradercid"))
                 $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
-            if (get($this->grade, "gradehash"))
+            if (get($this->grade, "gradehash") && $this->commit === null)
                 // NB don't check recent_commits association here
                 $this->commit = $this->grade->gradehash;
         }

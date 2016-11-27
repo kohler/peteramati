@@ -35,6 +35,7 @@ class Conf {
     private $_pc_members_and_admins_cache = null;
     private $_handout_repos = [];
     private $_handout_commits = [];
+    private $_handout_latest_commit = [];
     private $_api_map = null;
 
     static public $g = null;
@@ -1336,6 +1337,14 @@ class Conf {
         foreach ($hset->commits as $c)
             $commits[$c[0]] = new RepositoryCommitInfo($c[1], $c[0], $c[2]);
         $this->_handout_commits[$pset->id] = $commits;
+        $latest = empty($commits) ? null : $commits[$hset->commits[0][0]];
+        $this->_handout_latest_commit[$pset->id] = $latest;
         return $commits;
+    }
+
+    function latest_handout_commit(Pset $pset) {
+        if (!array_key_exists($pset->id, $this->_handout_latest_commit))
+            $this->handout_commits($pset);
+        return get($this->_handout_latest_commit, $pset->id);
     }
 }
