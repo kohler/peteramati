@@ -1493,13 +1493,19 @@ class Contact {
             $file = null;
             $alineno = $blineno = null;
             $fdiff = null;
-            $lines = explode("\n", $result);
-            while (($line = current($lines)) !== null && $line !== false) {
-                next($lines);
+            $pos = 0;
+            $len = strlen($result);
+            while ($pos < $len) {
                 if (count($fdiff) > DiffInfo::MAXLINES) {
-                    while ($line && ($line[0] == " " || $line[0] == "+" || $line[0] == "-"))
-                        $line = next($lines);
+                    while ($pos < $len
+                           && (($ch = $line[$pos]) === " " || $ch === "+" || $ch === "-")) {
+                        $nlpos = strpos($result, "\n", $pos);
+                        $pos = $nlpos === false ? $len : $nlpos + 1;
+                    }
                 }
+                $nlpos = strpos($result, "\n", $pos);
+                $line = $nlpos === false ? substr($result, $pos) : substr($result, $pos, $nlpos - $pos);
+                $pos = $nlpos === false ? $len : $nlpos + 1;
                 if ($line == "")
                     /* do nothing */;
                 else if ($line[0] == " " && $file && $alineno) {
