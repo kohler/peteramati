@@ -1495,14 +1495,16 @@ class Contact {
             $fdiff = null;
             $pos = 0;
             $len = strlen($result);
-            while ($pos < $len) {
+            while (1) {
                 if (count($fdiff) > DiffInfo::MAXLINES) {
                     while ($pos < $len
-                           && (($ch = $line[$pos]) === " " || $ch === "+" || $ch === "-")) {
+                           && (($ch = $result[$pos]) === " " || $ch === "+" || $ch === "-")) {
                         $nlpos = strpos($result, "\n", $pos);
                         $pos = $nlpos === false ? $len : $nlpos + 1;
                     }
                 }
+                if ($pos >= $len)
+                    break;
                 $nlpos = strpos($result, "\n", $pos);
                 $line = $nlpos === false ? substr($result, $pos) : substr($result, $pos, $nlpos - $pos);
                 $pos = $nlpos === false ? $len : $nlpos + 1;
