@@ -784,10 +784,12 @@ function show_regrades($result) {
         } else
             echo "<td></td>";
 
+        echo "<td>";
+        if ($row->hash === $row->gradehash)
+            echo "✱";
         if ($row->haslinenotes)
-            echo "<td>♪</td>";
-        else
-            echo "<td></td>";
+            echo "♪";
+        echo "</td>";
 
         $total = "";
         if ($row->notes) {
@@ -994,7 +996,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $sep = "";
     $t0 = $Profile ? microtime(true) : 0;
 
-    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid
+    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradehash
         from CommitNotes cn
         left join RepositoryGrade rg on (rg.repoid=cn.repoid and rg.pset=cn.pset)
         where hasactiveflags=1");
