@@ -164,7 +164,7 @@ class RunnerState {
             $command .= " -i" . escapeshellarg($this->inputfifo);
         $command .= " " . escapeshellarg($homedir)
             . " " . escapeshellarg($this->username)
-            . " " . escapeshellarg($this->runner->command);
+            . " " . escapeshellarg($this->expand($this->runner->command));
         $this->lockfile = null; /* now owned by command */
         return $this->run_and_log($command);
     }
