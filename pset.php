@@ -242,18 +242,22 @@ function save_grades($pset, $info, $values, $isauto) {
     $grades = array();
     foreach ($pset->grades as $ge)
         if (isset($values[$ge->name])) {
-            if (isset($values["old;" . $ge->name])) {
-                $old_grade = $info->current_grade_entry($ge->name);
-                if ((string) $old_grade != trim($values["old;" . $ge->name]))
-                    json_exit(["ok" => false, "error" => "Someone else updated this grade concurrently—please reload."]);
-            }
             $g = trim($values[$ge->name]);
             if ($g === "")
-                $grades[$ge->name] = null;
+                $g = null;
             else if (preg_match('_\A(?:0|[1-9]\d*)\z_', $g))
-                $grades[$ge->name] = intval($g);
+                $g = intval($g);
             else if (preg_match('_\A(?:0||[1-9]\d*)(?:\.\d*)?\z_', $g))
-                $grades[$ge->name] = floatval($g);
+                $g = floatval($g);
+            else
+                continue;
+            if (isset($values["old;" . $ge->name])) {
+                $old_grade = $info->current_grade_entry($ge->name);
+                if ((string) $old_grade != trim($values["old;" . $ge->name])
+                    && $old_grade !== $g)
+                    json_exit(["ok" => false, "error" => "Someone else updated this grade concurrently—please reload."]);
+            }
+            $grades[$ge->name] = $g;
         }
     $key = $isauto ? "autogrades" : "grades";
     if (!empty($grades))

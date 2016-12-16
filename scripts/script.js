@@ -1909,7 +1909,7 @@ function ajaxsave61(form, success) {
                 form.find(".ajaxsave61").html("Saved");
                 success && success(data);
             } else
-                form.find(".ajaxsave61").html((data && data.error) || "Failed");
+                form.find(".ajaxsave61").html('<strong class="err">' + ((data && data.error) || "Failed") + '</strong>');
         },
         error: function () {
             form.find(".ajaxsave61").html("Failed!");
