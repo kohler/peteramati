@@ -1904,15 +1904,15 @@ function ajaxsave61(form, success) {
         type: "POST", cache: false,
         dataType: "json",
         success: function (data) {
+            form.prop("outstanding", false);
             if (data && data.ok) {
-                form.prop("outstanding", false);
                 form.find(".ajaxsave61").html("Saved");
                 success && success(data);
             } else
-                form.find(".ajaxsave61").html("Failed");
+                form.find(".ajaxsave61").html((data && data.error) || "Failed");
         },
         error: function () {
-            form.find(".ajaxsave61").html("Failed");
+            form.find(".ajaxsave61").html("Failed!");
         }
     });
     return false;
@@ -1926,7 +1926,7 @@ function savelinenote61(form) {
         });
 }
 
-function gradetotal61() {
+function gradetotal61(data) {
     var i, j = $(".grader61.gradepart"), total = 0, x;
     for (i = 0; i < j.length; ++i) {
         x = parseFloat(jQuery(j[i]).val());
@@ -1938,6 +1938,9 @@ function gradetotal61() {
         $gt.text(total);
         gradecdf61();
     }
+    if (data.grades)
+        for (i in data.grades)
+            $("input[name='old;" + i + "']").val(data.grades[i]);
 }
 
 function gradesubmit61(form) {

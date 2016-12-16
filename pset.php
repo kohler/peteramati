@@ -242,6 +242,11 @@ function save_grades($pset, $info, $values, $isauto) {
     $grades = array();
     foreach ($pset->grades as $ge)
         if (isset($values[$ge->name])) {
+            if (isset($values["old;" . $ge->name])) {
+                $old_grade = $info->current_grade_entry($ge->name);
+                if ((string) $old_grade != trim($values["old;" . $ge->name]))
+                    json_exit(["ok" => false, "error" => "Someone else updated this grade concurrently—please reload."]);
+            }
             $g = trim($values[$ge->name]);
             if ($g === "")
                 $grades[$ge->name] = null;
@@ -253,14 +258,14 @@ function save_grades($pset, $info, $values, $isauto) {
     $key = $isauto ? "autogrades" : "grades";
     if (!empty($grades))
         $info->update_current_info([$key => $grades]);
-    return count($grades);
+    return $grades;
 }
 
 if ($Me->isPC && $Me != $User && check_post()
     && isset($_REQUEST["setgrade"]) && $Info->can_have_grades()) {
-    $result = save_grades($Pset, $Info, $_REQUEST, false);
+    $grades = save_grades($Pset, $Info, make_qreq(), false);
     if (isset($_REQUEST["ajax"]))
-        $Conf->ajaxExit($result != 0);
+        json_exit(["ok" => true, "grades" => $grades]);
     redirectSelf();
 }
 
@@ -487,9 +492,10 @@ function echo_grade_entry($ge) {
         $remarks[] = array(true, "Grade is above max");
 
     if ($User != $Me)
-        echo Ht::form($Info->hoturl_post("pset", array("setgrade" => 1)),
+        echo Ht::form($Info->hoturl_post("pset", ["setgrade" => 1]),
                        array("onsubmit" => "return gradesubmit61(this)")),
-            "<div class=\"f-contain\">";
+            "<div class=\"f-contain\">",
+            Ht::hidden("old;" . $key, $grade);
     ContactView::echo_group($title, $value, $remarks, array("nowrap" => true));
     if ($User != $Me)
         echo "</div></form>";

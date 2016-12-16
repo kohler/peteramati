@@ -397,7 +397,8 @@ class GradeEntryConfig {
         if (!is_object($g))
             throw new PsetConfigException("grade entry format error", $loc);
         $this->name = isset($g->name) ? $g->name : $name;
-        if (!is_string($this->name) || $this->name === "")
+        if (!is_string($this->name)
+            || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->name))
             throw new PsetConfigException("grade entry name format error", $loc);
         $this->title = Pset::cstr($loc, $g, "title");
         $this->max = Pset::cnum($loc, $g, "max");
