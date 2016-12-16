@@ -350,7 +350,7 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
 
 function reconfig() {
     global $Conf, $Me, $PsetOverrides, $PsetInfo;
-    if (!($pset = $Conf->pset_by_key(req("pset"))))
+    if (!($pset = $Conf->pset_by_key(req("pset"))) || $pset->ui_disabled)
         return $Conf->errorMsg("No such pset");
     $psetkey = $pset->psetkey;
 
@@ -848,8 +848,10 @@ function show_pset_table($pset) {
     echo "<h3>", htmlspecialchars($pset->title), "</h3>";
     if ($Me->privChair)
         show_pset_actions($pset);
-    if ($pset->disabled)
+    if ($pset->disabled) {
+        echo "</div>\n";
         return;
+    }
 
     $t0 = $Profile ? microtime(true) : 0;
 

@@ -28,6 +28,7 @@ class Pset {
     public $group;
 
     public $disabled;
+    public $ui_disabled;
     public $visible;
     public $frozen;
     public $partner;
@@ -111,6 +112,8 @@ class Pset {
         $this->group = self::cstr($p, "group");
 
         $this->disabled = self::cbool($p, "disabled");
+        if (($this->ui_disabled = self::cbool($p, "ui_disabled")))
+            $this->disabled = true;
         $this->visible = self::cdate($p, "visible", "show_to_students");
         $this->frozen = self::cdate($p, "frozen", "freeze");
         $this->partner = self::cbool($p, "partner");

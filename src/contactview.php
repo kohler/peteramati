@@ -123,7 +123,7 @@ class ContactView {
         foreach ($Conf->psets() as $pset)
             if (Contact::student_can_see_pset($pset)
                 || (!$pset->disabled && $pset->gitless && $istf)
-                || $ischair)
+                || (!$pset->ui_disabled && $ischair))
                 $psets[$pset->id] = $pset;
         self::$_reverse_pset_compare = !!$reverse;
         uasort($psets, "ContactView::pset_compare");
