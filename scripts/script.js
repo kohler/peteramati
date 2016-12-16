@@ -2787,6 +2787,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
         a.push('<td class="s61username">' + render_username_td(s) + '</td>');
         a.push('<td class="s61nonanonymous">' + escape_entities(s.name || "") + '</td>');
+        a.push('<td class="s61extension">' + (s.x ? "X" : "") + '</td>');
         if (s.gradercid && peteramati_grader_map[s.gradercid])
             a.push('<td>' + escape_entities(peteramati_grader_map[s.gradercid]) + '</td>');
         else
@@ -2897,6 +2898,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         t = pconf.anonymous ? ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>' : '';
         a.push('<th class="l s61username plsortable plsortactive" data-pa-sort="username">Username' + t + '</th>');
         a.push('<th class="l s61nonanonymous plsortable" data-pa-sort="name">Name</th>');
+        a.push('<th class="l s61extension plsortable" data-pa-sort="extension">X?</th>');
         a.push('<th class="l plsortable" data-pa-sort="grader">Grader</th>');
         if (!pconf.gitless_grades)
             a.push('<th></th>');
@@ -2937,6 +2939,15 @@ function pa_render_pset_table(psetid, pconf, data) {
                     else
                         return user_compar(a, b);
                 }
+            });
+        else if (sorting_by == "extension")
+            data.sort(function (a, b) {
+                if (a.boring != b.boring)
+                    return a.boring ? 1 : -1;
+                else if (a.x != b.x)
+                    return a.x ? sort_reverse : -sort_reverse;
+                else
+                    return user_compar(a, b);
             });
         else if (sorting_by == "grader")
             data.sort(function (a, b) {
@@ -2986,7 +2997,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             sort_reverse = -sort_reverse;
         else {
             sorting_by = sort_by;
-            if (sort_by == "username" || sort_by == "name" || sort_by == "grader")
+            if (sort_by == "username" || sort_by == "name" || sort_by == "grader" || sort_by == "extension")
                 sort_reverse = 1;
             else
                 sort_reverse = -1;

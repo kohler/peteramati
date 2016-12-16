@@ -284,6 +284,8 @@ class ContactView {
 
         echo '<h2 class="homeemail"><a href="',
             hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
+        if ($user->extension)
+            echo " (X)";
         if ($Me->privChair)
             echo "&nbsp;", become_user_link($user);
         echo '</h2>';

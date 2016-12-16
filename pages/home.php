@@ -640,7 +640,9 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
     $j["sorter"] = $s->sorter;
     ++$ncol;
 
-    $j["name"] = Text::name_text($s) . ($s->extension ? " (X)" : "");
+    $j["name"] = Text::name_text($s);
+    if ($s->extension)
+        $j["x"] = true;
     if (!$anonymous)
         ++$ncol;
 
