@@ -2766,7 +2766,10 @@ function pa_anonymize_linkto(link, event) {
 }
 
 function pa_render_pset_table(psetid, pconf, data) {
-    var $j = $("#pa-pset" + psetid), dmap = {}, sorting_by = "username", sort_reverse = 1, anonymous = pconf.anonymous;
+    var $j = $("#pa-pset" + psetid), dmap = {}, sorting_by = "username",
+        sort_last_first = true, sorting_last_first = null,
+        sort_reverse = 1, displaying_last_first = null,
+        anonymous = pconf.anonymous;
     var username_key = anonymous ? "anon_username" : "username";
 
     function calculate_ncol() {
@@ -2775,6 +2778,26 @@ function pa_render_pset_table(psetid, pconf, data) {
     }
     function render_username_td(s) {
         return '<a href="' + pconf.urlpattern.replace(/%40/, encodeURIComponent(s[username_key])) + '">' + escape_entities(s[username_key]) + '</a>';
+    }
+    function render_name(s, last_first) {
+        if (s.first != null && s.last != null) {
+            if (last_first)
+                return s.last + ", " + s.first;
+            else
+                return s.first + " " + s.last;
+        } else if (s.first != null)
+            return s.first;
+        else if (s.last != null)
+            return s.last;
+        else
+            return "";
+    }
+    function set_name_sorters() {
+        if (sort_last_first !== sorting_last_first) {
+            sorting_last_first = sort_last_first;
+            for (var i = 0; i < data.length; ++i)
+                data[i]._sort_name = render_name(data[i], sorting_last_first).toLowerCase();
+        }
     }
     function render_tds(s, row_number) {
         var grades = pconf.grade_keys || [];
@@ -2789,7 +2812,8 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<td class="s61rownumber">' + row_number + '.</td>');
         }
         a.push('<td class="s61username">' + render_username_td(s) + '</td>');
-        a.push('<td class="s61nonanonymous">' + escape_entities(s.name || "") + '</td>');
+        a.push('<td class="s61name s61nonanonymous">' +
+               escape_entities(render_name(s, displaying_last_first)) + '</td>');
         a.push('<td class="s61extension">' + (s.x ? "X" : "") + '</td>');
         if (s.gradercid && peteramati_grader_map[s.gradercid])
             a.push('<td>' + escape_entities(peteramati_grader_map[s.gradercid]) + '</td>');
@@ -2836,6 +2860,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         var $b = $j.find("tbody");
         $b.html("");
         var i, s, a, trn = 0, was_boring = false;
+        displaying_last_first = sorting_by === "name" && sorting_last_first;
         for (i = 0; i < data.length; ++i) {
             s = data[i];
             dmap[s.username] = s;
@@ -2883,6 +2908,14 @@ function pa_render_pset_table(psetid, pconf, data) {
             }
             $(tr[0]).find(".s61rownumber").html(trn + ".");
         }
+        var display_last_first = sorting_by === "name" && sorting_last_first;
+        if (display_last_first !== displaying_last_first) {
+            displaying_last_first = display_last_first;
+            $b.find(".s61name").text(function () {
+                var student = this.parentNode.getAttribute("data-pa-student");
+                return render_name(dmap[student], displaying_last_first);
+            });
+        }
     }
     function switch_anon() {
         anonymous = !anonymous;
@@ -2924,6 +2957,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             return 0;
     }
     function sort_data() {
+        set_name_sorters();
         if (sorting_by == "username")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
@@ -2935,13 +2969,10 @@ function pa_render_pset_table(psetid, pconf, data) {
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
-                else {
-                    var an = a.name.toLowerCase(), bn = b.name.toLowerCase();
-                    if (an != bn)
-                        return an < bn ? -sort_reverse : sort_reverse;
-                    else
-                        return user_compar(a, b);
-                }
+                else if (a._sort_name != b._sort_name)
+                    return a._sort_name < b._sort_name ? -sort_reverse : sort_reverse;
+                else
+                    return user_compar(a, b);
             });
         else if (sorting_by == "extension")
             data.sort(function (a, b) {
@@ -2996,15 +3027,18 @@ function pa_render_pset_table(psetid, pconf, data) {
         if (!this.hasAttribute("data-pa-sort"))
             return;
         var sort_by = this.getAttribute("data-pa-sort"), m;
-        if (sorting_by == sort_by)
-            sort_reverse = -sort_reverse;
-        else {
+        if (sorting_by != sort_by) {
             sorting_by = sort_by;
             if (sort_by == "username" || sort_by == "name" || sort_by == "grader" || sort_by == "extension")
                 sort_reverse = 1;
             else
                 sort_reverse = -1;
-        }
+        } else if (sorting_by === "name") {
+            sort_last_first = !sort_last_first;
+            if (sort_last_first)
+                sort_reverse = -sort_reverse;
+        } else
+            sort_reverse = -sort_reverse;
         sort_data();
         resort();
         $j.find(".plsortable").removeClass("plsortactive plsortreverse");

@@ -637,10 +637,16 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
     $j["username"] = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
     if ($anonymous)
         $j["anon_username"] = $s->anon_username;
-    $j["sorter"] = $s->sorter;
     ++$ncol;
 
-    $j["name"] = Text::name_text($s);
+    if ((string) $s->firstName !== "" && (string) $s->lastName === "")
+        $j["last"] = $s->firstName;
+    else {
+        if ((string) $s->firstName !== "")
+            $j["first"] = $s->firstName;
+        if ((string) $s->lastName !== "")
+            $j["last"] = $s->lastName;
+    }
     if ($s->extension)
         $j["x"] = true;
     if (!$anonymous)
