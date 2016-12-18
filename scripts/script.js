@@ -2807,15 +2807,25 @@ function pa_anonymize_linkto(link, event) {
 }
 
 function pa_render_pset_table(psetid, pconf, data) {
-    var $j = $("#pa-pset" + psetid), dmap = {}, sorting_by = "username",
-        sort_last_first = true, sorting_last_first = null,
-        sort_reverse = 1, displaying_last_first = null,
-        anonymous = pconf.anonymous;
-    var username_key = anonymous ? "anon_username" : "username";
+    var $j = $("#pa-pset" + psetid), dmap = {},
+        sort = {f: "username", last: true, rev: 1}, sorting_last,
+        displaying_last_first = null,
+        anonymous = pconf.anonymous,
+        username_key = anonymous ? "anon_username" : "username";
 
+    function default_sorting() {
+        var x = wstorage(true, "pa-pset" + psetid + "-table");
+        x && (sort = JSON.parse(x));
+        if (!sort.f || !/^\w+$/.test(sort.f))
+            sort.f = "username";
+        if (sort.rev !== 1 && sort.rev !== -1)
+            sort.rev = 1;
+        sorting_last = !!sort.last;
+    }
     function calculate_ncol() {
         return (pconf.checkbox ? 1 : 0) + 4 + (pconf.gitless_grades ? 0 : 1) +
-            (pconf.need_total ? 1 : 0) + (pconf.grade_keys || []).length + (pconf.gitless ? 0 : 1);
+            (pconf.need_total ? 1 : 0) + (pconf.grade_keys || []).length +
+            (pconf.gitless ? 0 : 1);
     }
     function render_username_td(s) {
         return '<a href="' + pconf.urlpattern.replace(/%40/, encodeURIComponent(s[username_key])) + '">' + escape_entities(s[username_key]) + '</a>';
@@ -2834,10 +2844,10 @@ function pa_render_pset_table(psetid, pconf, data) {
             return "";
     }
     function set_name_sorters() {
-        if (sort_last_first !== sorting_last_first) {
-            sorting_last_first = sort_last_first;
+        if (sort.last !== sorting_last) {
+            sorting_last = sort.last;
             for (var i = 0; i < data.length; ++i)
-                data[i]._sort_name = render_name(data[i], sorting_last_first).toLowerCase();
+                data[i]._sort_name = render_name(data[i], sort.last).toLowerCase();
         }
     }
     function render_tds(s, row_number) {
@@ -2898,14 +2908,14 @@ function pa_render_pset_table(psetid, pconf, data) {
         return a.join('');
     }
     function set_hotlist($b, uids) {
-        var j = {"ids": uids.join(" "), "sort": sorting_by};
+        var j = {"ids": uids.join(" "), "sort": sort.f};
         $b.attr("data-hotlist", JSON.stringify(j));
     }
     function render_body() {
         var $b = $j.find("tbody");
         $b.html("");
         var i, s, a, trn = 0, was_boring = false, uids = [];
-        displaying_last_first = sorting_by === "name" && sorting_last_first;
+        displaying_last_first = sort.f === "name" && sort.last;
         for (i = 0; i < data.length; ++i) {
             s = data[i];
             dmap[s.username] = s;
@@ -2956,7 +2966,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             }
             $(tr[0]).find(".s61rownumber").html(trn + ".");
         }
-        var display_last_first = sorting_by === "name" && sorting_last_first;
+        var display_last_first = sort.f && sort.last;
         if (display_last_first !== displaying_last_first) {
             displaying_last_first = display_last_first;
             $b.find(".s61name").text(function () {
@@ -2981,7 +2991,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<th></th>');
         a.push('<th></th>');
         t = pconf.anonymous ? ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>' : '';
-        a.push('<th class="l s61username plsortable plsortactive" data-pa-sort="username">Username' + t + '</th>');
+        a.push('<th class="l s61username plsortable" data-pa-sort="username">Username' + t + '</th>');
         a.push('<th class="l s61nonanonymous plsortable" data-pa-sort="name">Name</th>');
         a.push('<th class="l s61extension plsortable" data-pa-sort="extension">X?</th>');
         a.push('<th class="l plsortable" data-pa-sort="grader">Grader</th>');
@@ -2995,44 +3005,40 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<th></th>');
         $j.find("thead").html('<tr>' + a.join('') + '</tr>');
         $j.find("thead .s61username a").click(switch_anon);
+        $j.find("th[data-pa-sort='" + sort.f + "']").addClass("plsortactive").
+            toggleClass("plsortreverse", sort.rev < 0);
     }
     function user_compar(a, b) {
         var au = a[username_key].toLowerCase(), bu = b[username_key].toLowerCase();
         if (au < bu)
-            return -sort_reverse;
+            return -sort.rev;
         else if (au > bu)
-            return sort_reverse;
+            return sort.rev;
         else
             return 0;
     }
     function sort_data() {
+        var f = sort.f, rev = sort.rev;
         set_name_sorters();
-        if (sorting_by == "username")
-            data.sort(function (a, b) {
-                if (a.boring != b.boring)
-                    return a.boring ? 1 : -1;
-                else
-                    return user_compar(a, b);
-            });
-        else if (sorting_by == "name")
+        if (f == "name")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
                 else if (a._sort_name != b._sort_name)
-                    return a._sort_name < b._sort_name ? -sort_reverse : sort_reverse;
+                    return a._sort_name < b._sort_name ? -rev : rev;
                 else
                     return user_compar(a, b);
             });
-        else if (sorting_by == "extension")
+        else if (f == "extension")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
                 else if (a.x != b.x)
-                    return a.x ? sort_reverse : -sort_reverse;
+                    return a.x ? rev : -rev;
                 else
                     return user_compar(a, b);
             });
-        else if (sorting_by == "grader")
+        else if (f == "grader")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
@@ -3040,21 +3046,21 @@ function pa_render_pset_table(psetid, pconf, data) {
                     var ag = (a.gradercid && peteramati_grader_map[a.gradercid]) || "~~~";
                     var bg = (b.gradercid && peteramati_grader_map[b.gradercid]) || "~~~";
                     if (ag != bg)
-                        return ag < bg ? -sort_reverse : sort_reverse;
+                        return ag < bg ? -rev : rev;
                     else
                         return user_compar(a, b);
                 }
             });
-        else if (sorting_by == "total")
+        else if (f == "total")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
                 else if (a.total != b.total)
-                    return a.total < b.total ? -sort_reverse : sort_reverse;
+                    return a.total < b.total ? -rev : rev;
                 else
                     return -user_compar(a, b);
             });
-        else if ((m = /^grade(\d+)$/.exec(sorting_by)))
+        else if ((m = /^grade(\d+)$/.exec(f)))
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
                     return a.boring ? 1 : -1;
@@ -3066,36 +3072,45 @@ function pa_render_pset_table(psetid, pconf, data) {
                     if (bg === "" || bg == null)
                         bg = -1000;
                     if (ag != bg)
-                        return ag < bg ? -sort_reverse : sort_reverse;
+                        return ag < bg ? -rev : rev;
                     else
                         return -user_compar(a, b);
                 }
+            });
+        else /* "username" */
+            data.sort(function (a, b) {
+                if (a.boring != b.boring)
+                    return a.boring ? 1 : -1;
+                else
+                    return user_compar(a, b);
             });
     }
     function head_click(event) {
         if (!this.hasAttribute("data-pa-sort"))
             return;
-        var sort_by = this.getAttribute("data-pa-sort"), m;
-        if (sorting_by != sort_by) {
-            sorting_by = sort_by;
-            if (sort_by == "username" || sort_by == "name" || sort_by == "grader" || sort_by == "extension")
-                sort_reverse = 1;
+        var sf = this.getAttribute("data-pa-sort");
+        if (sf != sort.f) {
+            sort.f = sf;
+            if (sf == "username" || sf == "name" || sf == "grader" || sf == "extension")
+                sort.rev = 1;
             else
-                sort_reverse = -1;
-        } else if (sorting_by === "name") {
-            sort_last_first = !sort_last_first;
-            if (sort_last_first)
-                sort_reverse = -sort_reverse;
+                sort.rev = -1;
+        } else if (sf === "name") {
+            sort.last = !sort.last;
+            if (sort.last)
+                sort.rev = -sort.rev;
         } else
-            sort_reverse = -sort_reverse;
+            sort.rev = -sort.rev;
         sort_data();
         resort();
         $j.find(".plsortable").removeClass("plsortactive plsortreverse");
-        $(this).addClass("plsortactive" + (sort_reverse < 0 ? " plsortreverse" : ""));
+        $(this).addClass("plsortactive" + (sort.rev < 0 ? " plsortreverse" : ""));
+        wstorage(true, "pa-pset" + psetid + "-table", JSON.stringify(sort));
     }
 
     $j.html("<thead></thead><tbody class='has-hotlist'></tbody>");
     $j.find("thead").on("click", "th", head_click);
+    default_sorting();
     render_head();
     sort_data();
     render_body();
