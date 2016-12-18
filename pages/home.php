@@ -581,9 +581,7 @@ function show_pset($pset, $user) {
         && !$pset->contact_grade_for($user))
         return;
     echo "<hr/>\n";
-    $pseturl = hoturl("pset", array("pset" => $pset->urlkey,
-                                    "u" => $Me->user_linkpart($user),
-                                    "sort" => req("sort")));
+    $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($user)]);
     echo "<h2><a href=\"", $pseturl, "\">",
         htmlspecialchars($pset->title), "</a>";
     $info = ContactView::user_pset_info($user, $pset);
@@ -627,12 +625,8 @@ if (!$Me->is_empty() && $User->is_student()) {
     }
 }
 
-function render_pset_row(Pset $pset, $students, Contact $s, $pcmembers, $anonymous) {
-    global $Conf, $Me, $Now, $Profile;
-    $t0 = $Profile ? microtime(true) : 0;
-    $j = [];
-
-    $j["uid"] = $s->contactId;
+function render_grading_student(Contact $s, $anonymous) {
+    $j = ["uid" => $s->contactId];
     $j["username"] = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
     if ($anonymous)
         $j["anon_username"] = $s->anon_username;
@@ -652,6 +646,13 @@ function render_pset_row(Pset $pset, $students, Contact $s, $pcmembers, $anonymo
 
     if ($s->gradercid)
         $j["gradercid"] = $s->gradercid;
+    return $j;
+}
+
+function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
+    global $Conf, $Me, $Now, $Profile;
+    $t0 = $Profile ? microtime(true) : 0;
+    $j = render_grading_student($s, $anonymous);
 
     // are any commits committed?
     if (!$pset->gitless_grades) {
@@ -767,10 +768,10 @@ function show_regrades($result) {
         echo '<td class="s61pset">', htmlspecialchars($pset->title), '</td>';
 
         echo '<td class="s61username">',
-            '<a href="', hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash, "sort" => $reqsort]),
+            '<a href="', hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash]),
             '">', htmlspecialchars($Me->user_linkpart($u)), '</a></td>',
 
-            '<td class="s61hash"><a href="', hoturl("pset", array("pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash, "sort" => $reqsort)), '">', substr($row->hash, 0, 7), '</a></td>';
+            '<td class="s61hash"><a href="', hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash]), '">', substr($row->hash, 0, 7), '</a></td>';
 
         if (get($row->notes, "gradercid") || $row->main_gradercid) {
             $gcid = get($row->notes, "gradercid") ? : $row->main_gradercid;
@@ -902,13 +903,13 @@ function show_pset_table($pset) {
     $jx = [];
     foreach ($students as $s)
         if (!$s->visited) {
-            $j = render_pset_row($pset, $students, $s, $pcmembers, $anonymous);
+            $j = render_pset_row($pset, $students, $s, $anonymous);
             $boring = !$pset->gitless_grades && ($s->gradehash === null || $s->dropped);
             if ($s->pcid) {
                 foreach (array_unique(explode(",", $s->pcid)) as $pcid)
                     if (isset($students[$pcid])) {
                         $ss = $students[$pcid];
-                        $jj = render_pset_row($pset, $students, $ss, $pcmembers, $anonymous);
+                        $jj = render_pset_row($pset, $students, $ss, $anonymous);
                         $j["partners"][] = $jj;
                         if ($boring && ($s->gradehash !== null && !$ss->dropped))
                             $boring = false;
@@ -937,16 +938,10 @@ function show_pset_table($pset) {
     if ($checkbox)
         echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
 
-    $sort_key = $anonymous ? "anon_username" : "username";
-    usort($jx, function ($a, $b) use ($sort_key) {
-        if (get($a, "boring") != get($b, "boring"))
-            return get($a, "boring") ? 1 : -1;
-        return strcmp($a[$sort_key], $b[$sort_key]);
-    });
     echo '<table class="s61', ($anonymous ? " s61anonymous" : ""), '" id="pa-pset' . $pset->id . '"></table>';
     $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous, "grade_keys" => array_keys($pset->grades),
            "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
-           "urlpattern" => hoturl("pset", ["pset" => $pset->urlkey, "u" => "@", "sort" => req("sort")])];
+           "urlpattern" => hoturl("pset", ["pset" => $pset->urlkey, "u" => "@"])];
     $i = $nintotal = $last_in_total = 0;
     foreach ($pset->grades as $ge) {
         if (!$ge->no_total) {
