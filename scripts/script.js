@@ -2822,7 +2822,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             sort.rev = 1;
     }
     function calculate_ncol() {
-        return (pconf.checkbox ? 1 : 0) + 4 + (pconf.gitless_grades ? 0 : 1) +
+        return (pconf.checkbox ? 1 : 0) + 5 + (pconf.gitless_grades ? 0 : 1) +
             (pconf.need_total ? 1 : 0) + (pconf.grade_keys || []).length +
             (pconf.gitless ? 0 : 1);
     }
