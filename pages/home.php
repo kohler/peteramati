@@ -558,7 +558,7 @@ function render_grades($pset, $gi, $s) {
         }
         if ($gv === "" && !$ge->is_extra && $s
             && $Me->contactId == $s->gradercid)
-            $s->incomplete = true;
+            $s->incomplete = "grade missing";
         $gvarr[] = $gv;
         if ($ggv && $agv && $ggv != $agv) {
             $different[$k] = true;
@@ -690,7 +690,7 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
             if ($gi && get($gi, "linenotes"))
                 $j["has_notes"] = true;
             else if ($Me->contactId == $s->gradercid)
-                $s->incomplete = true;
+                $s->incomplete = "no line notes";
             if ($gi && $s->gradercid != get($gi, "gradercid") && $Me->privChair)
                 $j["has_nongrader_notes"] = true;
             ++$ncol;
@@ -928,12 +928,15 @@ function show_pset_table($pset) {
             $max_ncol = max($max_ncol, $row->ncol);
             if ($s->incomplete) {
                 $u = $Me->user_linkpart($s);
-                $incomplete[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $u, "sort" => req("sort"))) . '">'
-                    . htmlspecialchars($u) . '</a>';
+                $t = '<a href="' . hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
+                    . htmlspecialchars($u);
+                if ($s->incomplete !== true)
+                    $t .= " (" . $s->incomplete . ")";
+                $incomplete[] = $t . '</a>';
             }
         }
 
-    if (count($incomplete)) {
+    if (!empty($incomplete)) {
         echo '<div id="incomplete_pset', $pset->id, '" style="display:none" class="merror">',
             '<strong>', htmlspecialchars($pset->title), '</strong>: ',
             'Your grading is incomplete. Missing grades: ', join(", ", $incomplete), '</div>',
