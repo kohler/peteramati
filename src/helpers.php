@@ -362,14 +362,14 @@ function self_href($extra = array(), $options = null) {
         $param .= "&ls=" . $CurrentList;
 
     $param = $param ? substr($param, 1) : "";
-    if (!$options || !@$options["site_relative"])
+    if (!$options || !get($options, "site_relative"))
         $uri = hoturl(Navigation::page(), $param);
     else
         $uri = hoturl_site_relative(Navigation::page(), $param);
     if (isset($extra["anchor"]))
         $uri .= "#" . $extra["anchor"];
     $uri = str_replace("&amp;", "&", $uri);
-    if (!$options || @$options["raw"])
+    if (!$options || get($options, "raw"))
         return $uri;
     else
         return htmlspecialchars($uri);
@@ -432,59 +432,6 @@ function decorateNumber($n) {
         return 0;
 }
 
-function allocateListNumber($listid) {
-    if (!isset($_SESSION["l"]))
-        $_SESSION["l"] = array();
-    $oldest = $empty = 0;
-    for ($i = 1; $i <= 8; ++$i)
-        if (($l = defval($_SESSION["l"], $i))) {
-            if (defval($l, "listid") == $listid)
-                return $i;
-            else if (!$oldest || defval($l, "timestamp", 0) < defval($_SESSION["l"][$oldest], "timestamp", 0))
-                $oldest = $i;
-        } else if (!$empty)
-            $empty = $i;
-    return $empty ? $empty : $oldest;
-}
-
-function _tryNewList($opt, $listtype) {
-    global $Conf, $ConfSiteSuffix, $Me;
-    if ($listtype == "u" && $Me->privChair) {
-        $searchtype = (defval($opt, "t") === "all" ? "all" : "pc");
-        $q = "select email from ContactInfo";
-        if ($searchtype == "pc")
-            $q .= " where (roles&" . Contact::ROLE_PC . ")!=0";
-        $result = $Conf->qx("$q order by lastName, firstName, email");
-        $a = array();
-        while (($row = edb_row($result)))
-            $a[] = $row[0];
-        $a["description"] = ($searchtype == "pc" ? "Program committee" : "Users");
-        $a["listid"] = "u:" . $searchtype . "::";
-        $a["url"] = "users$ConfSiteSuffix?t=" . $searchtype;
-        return $a;
-    } else {
-        require_once("search.inc");
-        $search = new PaperSearch($Me, $opt);
-        return $search->sessionList();
-    }
-}
-
-function goPaperForm($baseUrl = null, $args = array()) {
-    global $Conf, $Me, $CurrentList;
-    if ($Me->is_empty())
-            return "";
-    if ($baseUrl === null)
-            $baseUrl = ($Me->isPC && $Conf->setting("rev_open") ? "review" : "paper");
-    $x = "<form class='gopaper' action='" . hoturl($baseUrl) . "' method='get' accept-charset='UTF-8'><div class='inform'>";
-    $x .= "<input id='quicksearchq' class='textlite temptext' type='text' size='10' name='p' value='(All)' title='Enter paper numbers or search terms' />";
-    Ht::stash_script("mktemptext('quicksearchq','(All)')");
-    foreach ($args as $what => $val)
-        $x .= "<input type='hidden' name=\"" . htmlspecialchars($what) . "\" value=\"" . htmlspecialchars($val) . "\" />";
-    if (isset($CurrentList) && $CurrentList > 0)
-        $x .= "<input type='hidden' name='ls' value='$CurrentList' />";
-    $x .= "&nbsp; <input class='b' type='submit' value='Search' /></div></form>";
-    return $x;
-}
 
 function rm_rf_tempdir($tempdir) {
     assert(substr($tempdir, 0, 1) === "/");

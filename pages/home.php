@@ -634,6 +634,7 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
     $t0 = $Profile ? microtime(true) : 0;
     $j = [];
 
+    $j["uid"] = $s->contactId;
     $j["username"] = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
     if ($anonymous)
         $j["anon_username"] = $s->anon_username;

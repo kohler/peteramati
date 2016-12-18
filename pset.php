@@ -359,76 +359,33 @@ $xsep = " <span class='barsep'>&nbsp;·&nbsp;</span> ";
 
 
 // Top: user info
-function user_prev_next($user, $pset) {
-    global $Conf;
-
-    $result = $Conf->qe("select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.anon_username, c.github_username, c.seascode_username, c.extension, group_concat(pl.link) pcid
-	from ContactInfo c
-	left join ContactLink pl on (pl.cid=c.contactId and pl.type=" . LINK_PARTNER . " and pl.pset=$pset->id)
-	where (c.roles&" . Contact::ROLE_PCLIKE . ")=0 and not c.dropped
-	group by c.contactId");
-    $sort = req("sort");
-    $students = array();
-    while ($result && ($s = Contact::fetch($result))) {
-        $s->set_anonymous($user->is_anonymous);
-        Contact::set_sorter($s, $sort);
-        $students[$s->contactId] = $s;
-    }
-    uasort($students, "Contact::compare");
-
-    $links = array(null, null);
-    $pos = 0;
-    $uid = is_object($user) ? $user->contactId : $user;
-
-    // mark user's partners as visited
-    if (($s = get($students, $uid)) && $s->pcid) {
-        foreach (explode(",", $s->pcid) as $pcid)
-            if (($ss = get($students, $pcid)))
-                $ss->visited = true;
-    }
-
-    foreach ($students as $s) {
-        if ($s->contactId == $uid)
-            $pos = 1;
-        else if (!get($s, "visited")) {
-            $links[$pos] = $s;
-            if ($pos)
-                break;
-            $s->visited = true;
-            if ($s->pcid) {
-                foreach (explode(",", $s->pcid) as $pcid)
-                    if (($ss = get($students, $pcid)))
-                        $ss->visited = true;
-            }
-        }
-    }
-
-    if ($pos == 0)
-        $links[0] = null;
-    return $links;
-}
-
 echo "<div id='homeinfo'>";
 
-if ($User->username && $Me->isPC) {
-    // links to next/prev users
-    $links = user_prev_next($User, $Pset);
-    if ($links[0] || $links[1]) {
-        $sort = req("sort");
-        echo "<div style=\"color:gray;float:right\"><h3 style=\"margin-top:0\">";
-        if ($links[0]) {
-            $u = $Me->user_linkpart($links[0], $User->is_anonymous);
-            echo '<a href="', hoturl("pset", ["pset" => $Pset->urlkey, "u" => $u, "sort" => $sort]), '">« ', htmlspecialchars($u), '</a>';
-        }
-        if ($links[0] && $links[1])
-            echo ' · ';
-        if ($links[1]) {
-            $u = $Me->user_linkpart($links[1], $User->is_anonymous);
-            echo '<a href="', hoturl("pset", ["pset" => $Pset->urlkey, "u" => $u, "sort" => $sort]), '">', htmlspecialchars($u), ' »</a>';
-        }
-        echo "</h3></div>";
+if ($User->username && $Me->isPC
+    && ($sl = $Conf->session_list())
+    && ($p = array_search($User->contactId, $sl->ids)) !== false
+    && ($p > 0 || $p < count($sl->ids))) {
+    $result = $Conf->qe("select contactId, firstName, lastName, email,
+        huid, anon_username, github_username, seascode_username, extension
+        from ContactInfo where contactId?a",
+        [$p > 0 ? $sl->ids[$p - 1] : -1, $p < count($sl->ids) ? $sl->ids[$p + 1] : -1]);
+    $links = [null, null];
+    while ($result && ($s = Contact::fetch($result)))
+        $links[$p > 0 && $sl->ids[$p - 1] == $s->contactId ? 0 : 1] = $s;
+    echo "<div class=\"has-hotlist\" style=\"color:gray;float:right\"",
+        " data-hotlist=\"", htmlspecialchars(json_encode($sl)), "\">",
+        "<h3 style=\"margin-top:0\">";
+    if ($links[0]) {
+        $u = $Me->user_linkpart($links[0], $User->is_anonymous);
+        echo '<a href="', hoturl("pset", ["pset" => $Pset->urlkey, "u" => $u]), '">« ', htmlspecialchars($u), '</a>';
     }
+    if ($links[0] && $links[1])
+        echo ' · ';
+    if ($links[1]) {
+        $u = $Me->user_linkpart($links[1], $User->is_anonymous);
+        echo '<a href="', hoturl("pset", ["pset" => $Pset->urlkey, "u" => $u]), '">', htmlspecialchars($u), ' »</a>';
+    }
+    echo "</h3></div>";
 }
 
 ContactView::echo_heading($User);

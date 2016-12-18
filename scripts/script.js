@@ -1731,6 +1731,47 @@ return Miniajax;
 })();
 
 
+// list management, conflict management
+(function ($) {
+function set_cookie(info) {
+    var p = "", m;
+    if (siteurl && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
+        p = "; path=" + m[1];
+    if (info)
+        document.cookie = "hotlist-info=" + encodeURIComponent(info) + "; max-age=2" + p;
+    set_cookie = function () {};
+}
+function is_listable(href) {
+    return /(?:^|\/)pset(?:|\.php)(?:$|\/)/.test(href.substring(siteurl.length));
+}
+function add_list() {
+    var $self = $(this), $hl, ls,
+        href = this.getAttribute(this.tagName === "FORM" ? "action" : "href");
+    if (href && href.substring(0, siteurl.length) === siteurl
+        && is_listable(href)
+        && ($hl = $self.closest(".has-hotlist")).length)
+        set_cookie($hl.attr("data-hotlist"));
+    return true;
+}
+function unload_list() {
+    hotcrp_list && set_cookie(JSON.stringify(hotcrp_list));
+}
+function row_click(e) {
+    var j = $(e.target);
+    if (j.hasClass("pl_id") || j.hasClass("pl_title")
+        || j.closest("td").hasClass("pl_rowclick"))
+        $(this).find("a.pnum")[0].click();
+}
+function prepare() {
+    $(document.body).on("click", "a", add_list);
+    $(document.body).on("submit", "form", add_list);
+    //$(document.body).on("click", "tbody.pltable > tr.pl", row_click);
+    hotcrp_list && $(window).on("beforeunload", unload_list);
+}
+document.body ? prepare() : $(prepare);
+})(jQuery);
+
+
 // mail
 function setmailpsel(sel) {
     fold("psel", !!sel.value.match(/^(?:pc$|pc:|all$)/), 9);
@@ -2856,14 +2897,19 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
         return a.join('');
     }
+    function set_hotlist($b, uids) {
+        var j = {"ids": uids.join(" "), "sort": sorting_by};
+        $b.attr("data-hotlist", JSON.stringify(j));
+    }
     function render_body() {
         var $b = $j.find("tbody");
         $b.html("");
-        var i, s, a, trn = 0, was_boring = false;
+        var i, s, a, trn = 0, was_boring = false, uids = [];
         displaying_last_first = sorting_by === "name" && sorting_last_first;
         for (i = 0; i < data.length; ++i) {
             s = data[i];
             dmap[s.username] = s;
+            uids.push(s.uid);
             a = [];
             ++trn;
             if (s.boring && !was_boring && trn != 1)
@@ -2876,6 +2922,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             }
             $b.append(a.join(''));
         }
+        set_hotlist($b, uids);
     }
     function resort() {
         var $b = $j.find("tbody"), tb = $b[0];
@@ -2887,10 +2934,11 @@ function pa_render_pset_table(psetid, pconf, data) {
                 rmap[tr.getAttribute("data-pa-student")] = last = [tr];
             tr = tr.nextSibling;
         }
-        var i, j, trn = 0, was_boring = false;
+        var i, j, trn = 0, was_boring = false, uids = [];
         last = tb.firstChild;
         for (i = 0; i < data.length; ++i) {
             ++trn;
+            uids.push(data[i].uid);
             while ((j = last) && j.className === "s61boring") {
                 last = last.nextSibling;
                 tb.removeChild(j);
@@ -2916,6 +2964,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 return render_name(dmap[student], displaying_last_first);
             });
         }
+        set_hotlist($b, uids);
     }
     function switch_anon() {
         anonymous = !anonymous;
@@ -3045,7 +3094,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         $(this).addClass("plsortactive" + (sort_reverse < 0 ? " plsortreverse" : ""));
     }
 
-    $j.html("<thead></thead><tbody></tbody>");
+    $j.html("<thead></thead><tbody class='has-hotlist'></tbody>");
     $j.find("thead").on("click", "th", head_click);
     render_head();
     sort_data();

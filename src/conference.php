@@ -26,6 +26,7 @@ class Conf {
     private $_save_logs = false;
     private $_psets = [];
     private $_psets_by_urlkey = [];
+    private $_session_list = false;
 
     private $usertimeId = 1;
 
@@ -931,6 +932,27 @@ class Conf {
             $this->opt["scriptAssetsUrl"] = $base;
     }
 
+    function session_list() {
+        global $Now;
+        if ($this->_session_list === false) {
+            $this->_session_list = null;
+            if (isset($_COOKIE["hotlist-info"])) {
+                if (($j = json_decode($_COOKIE["hotlist-info"]))
+                    && is_object($j)
+                    && isset($j->ids)) {
+                    if (is_string($j->ids) && preg_match('/\A[\s\d]*\z/', $j->ids))
+                        $j->ids = array_map(function ($x) {
+                            return (int) $x;
+                        }, explode(" ", trim($j->ids)));
+                    if (is_array($j->ids))
+                        $this->_session_list = $j;
+                }
+                setcookie("hotlist-info", "", $Now - 86400, Navigation::site_path());
+            }
+        }
+        return $this->_session_list;
+    }
+
 
     function make_css_link($url, $media = null) {
         global $ConfSitePATH;
@@ -1021,9 +1043,8 @@ class Conf {
         Ht::stash_script("siteurl=" . json_encode(Navigation::siteurl()) . ";siteurl_suffix=\"" . Navigation::php_suffix() . "\"");
         if (session_id() !== "")
             Ht::stash_script("siteurl_postvalue=\"" . post_value() . "\"");
-        if (@$CurrentList
-            && ($list = SessionList::lookup($CurrentList)))
-            Ht::stash_script("hotcrp_list={num:$CurrentList,id:\"" . addcslashes($list->listid, "\n\r\\\"/") . "\"}");
+        if (($list = $this->session_list()))
+            Ht::stash_script("hotcrp_list=" . json_encode($list) . ";");
         if (($urldefaults = hoturl_defaults()))
             Ht::stash_script("siteurl_defaults=" . json_encode($urldefaults) . ";");
         Ht::stash_script("assetsurl=" . json_encode($this->opt["assetsUrl"]) . ";");
@@ -1057,6 +1078,7 @@ class Conf {
         if ($title === "Home")
             $title = "";
         $this->header_head($title);
+        $this->session_list(); // clear cookie if set
 
         // <body>
         echo "<body", ($id ? " id=\"$id\"" : ""), " onload=\"hotcrp_load()\">\n";
