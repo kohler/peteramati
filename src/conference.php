@@ -968,7 +968,7 @@ class Conf {
         return $t . '" />';
     }
 
-    function make_script_file($url, $no_strict = false) {
+    function make_script_file($url, $no_strict = false, $integrity = null) {
         global $ConfSitePATH;
         if (str_starts_with($url, "scripts/")) {
             $post = "";
@@ -982,7 +982,7 @@ class Conf {
             if ($this->opt["scriptAssetsUrl"] === Navigation::siteurl())
                 return Ht::script_file($url);
         }
-        return Ht::script_file($url, array("crossorigin" => "anonymous"));
+        return Ht::script_file($url, ["crossorigin" => "anonymous", "integrity" => $integrity]);
     }
 
     private function header_head($title) {
@@ -991,12 +991,8 @@ class Conf {
 <html lang=\"en\">
 <head>
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
-<meta http-equiv=\"Content-Style-Type\" content=\"text/css\" />
-<meta http-equiv=\"Content-Script-Type\" content=\"text/javascript\" />
 <meta http-equiv=\"Content-Language\" content=\"en\" />
 <meta name=\"google\" content=\"notranslate\" />\n";
-        if (strstr($title, "<") !== false)
-            $title = preg_replace("/<([^>\"']|'[^']*'|\"[^\"]*\")*>/", "", $title);
 
         echo $this->opt("fontScript", "");
 
@@ -1027,17 +1023,36 @@ class Conf {
                 echo "<link rel=\"icon\" href=\"$favicon\" />\n";
         }
 
+        // title
+        echo "<title>";
+        if ($title) {
+            $title = preg_replace("/<([^>\"']|'[^']*'|\"[^\"]*\")*>/", "", $title);
+            $title = preg_replace(",(?: |&nbsp;|\302\240)+,", " ", $title);
+            $title = str_replace("&#x2215;", "-", $title);
+        }
+        if ($title)
+            echo $title, " - ";
+        echo htmlspecialchars($this->short_name), "</title>\n";
+
         // jQuery
+        $stash = Ht::unstash();
+        $jqueryVersion = get($this->opt, "jqueryVersion", "1.12.4");
+        $integrity = null;
         if (isset($this->opt["jqueryUrl"]))
             $jquery = $this->opt["jqueryUrl"];
-        else if ($this->opt("jqueryCdn"))
-            $jquery = "//code.jquery.com/jquery-1.12.3.min.js";
-        else
-            $jquery = "scripts/jquery-1.12.3.min.js";
-        Ht::stash_html($this->make_script_file($jquery, true) . "\n");
+        else if ($this->opt("jqueryCdn")) {
+            $jquery = "//code.jquery.com/jquery-{$jqueryVersion}.min.js";
+            if ($jqueryVersion === "1.12.4")
+                $integrity = "sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=";
+            else if ($jqueryVersion === "3.1.1")
+                $integrity = "sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=";
+        } else
+            $jquery = "scripts/jquery-{$jqueryVersion}.min.js";
+        Ht::stash_html($this->make_script_file($jquery, true, $integrity) . "\n");
+        if ($this->opt("jqueryMigrate"))
+            Ht::stash_html($this->make_script_file("//code.jquery.com/jquery-migrate-3.0.0.min.js", true));
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/jquery.flot.min.js", true) . "\n");
-        //Ht::stash_html($this->make_script_file("scripts/ZeroClipboard.min.js", true) . "\n");
 
         // Javascript settings to set before script.js
         Ht::stash_script("siteurl=" . json_encode(Navigation::siteurl()) . ";siteurl_suffix=\"" . Navigation::php_suffix() . "\"");
@@ -1055,18 +1070,15 @@ class Conf {
             $huser->is_pclike = true;
         Ht::stash_script("hotcrp_user=" . json_encode($huser));
 
-        //Ht::stash_script("ZeroClipboard.setDefaults({moviePath:\"" . Navigation::siteurl() . "cacheable" . Navigation::php_suffix() . "?file=scripts/ZeroClipboard.swf&amp;mtime=" . filemtime("$ConfSitePATH/scripts/ZeroClipboard.swf") . "\"})");
-
         // script.js
         if (!$this->opt("noDefaultScript"))
             Ht::stash_html($this->make_script_file("scripts/script.js") . "\n");
 
-        echo Ht::unstash();
+        // other scripts
+        foreach ($this->opt("scripts", []) as $file)
+            Ht::stash_html($this->make_script_file($file) . "\n");
 
-        echo "<title>";
-        if ($title)
-            echo $title, " - ";
-        echo htmlspecialchars($this->short_name), "</title>\n</head>\n";
+        echo $stash, Ht::unstash(), "</head>\n";
     }
 
     function header($title, $id = "", $actionBar = null, $showTitle = true) {
