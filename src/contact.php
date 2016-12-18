@@ -1450,11 +1450,12 @@ class Contact {
             $hasha = self::_repo_prepare_truncated_handout($repo, $hasha, $pset);
 
         $ignore_diffinfo = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
+        $no_full = get($options, "no_full");
 
         // read "full" files
         $pset_diffs = self::pset_diffinfo($pset, $repo);
         foreach ($pset_diffs as $diffinfo)
-            if (!$ignore_diffinfo
+            if (!$ignore_diffinfo && !$no_full
                 && $diffinfo->full
                 && ($fname = self::unquote_filename_regex($diffinfo->regex)) !== false) {
                 $result = $repo->gitrun("git show $hashb:${repodir}$fname");

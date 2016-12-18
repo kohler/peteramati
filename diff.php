@@ -7,40 +7,43 @@ require_once("src/initweb.php");
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/@/p/h/h", "/p/h/h"));
 if ($Me->is_empty())
     $Me->escape();
-global $User, $Pset, $Info;
+global $User, $Pset, $Info, $Qreq;
+$Qreq = make_qreq();
 
 $User = $Me;
-if (isset($_REQUEST["u"])
-    && !($User = ContactView::prepare_user($_REQUEST["u"])))
+if (isset($Qreq->u)
+    && !($User = ContactView::prepare_user($Qreq->u)))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
 
-$Pset = ContactView::find_pset_redirect(@$_REQUEST["pset"]);
+$Pset = ContactView::find_pset_redirect($Qreq->pset);
 $Info = ContactView::user_pset_info($User, $Pset);
-if (!get($_GET, "commit") || !get($_GET, "commit1") || $Pset->gitless)
+if (!$Qreq->commit || !$Qreq->commit1 || $Pset->gitless)
     $Me->escape();
 $diff_options = ["wdiff" => false];
 
 $hasha = $hashb = $hasha_mine = $hashb_mine = null;
 $hrecent = $Pset->handout_commits();
-if (($hasha = git_commit_in_list($hrecent, $_GET["commit"])))
+if (($hasha = git_commit_in_list($hrecent, $Qreq->commit)))
     $diff_options["hasha_hrepo"] = true;
 else
-    $hasha = $hasha_mine = $Info->set_commit($_GET["commit"]);
-if (($hashb = git_commit_in_list($hrecent, $_GET["commit1"])))
+    $hasha = $hasha_mine = $Info->set_commit($Qreq->commit);
+if (($hashb = git_commit_in_list($hrecent, $Qreq->commit1)))
     $diff_options["hashb_hrepo"] = true;
 else
-    $hashb = $hashb_mine = $Info->set_commit($_GET["commit1"]);
+    $hashb = $hashb_mine = $Info->set_commit($Qreq->commit1);
 if (!$hasha || !$hashb) {
     if (!$hasha)
-        $Conf->errorMsg("Commit " . htmlspecialchars($_GET["commit"]) . " is not connected to your repository.");
+        $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->commit) . " is not connected to your repository.");
     if (!$hashb)
-        $Conf->errorMsg("Commit " . htmlspecialchars($_GET["commit1"]) . " is not connected to your repository.");
+        $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->commit1) . " is not connected to your repository.");
     $Me->escape();
 }
 
 $diff_options["hasha"] = $hasha;
+if (!get($diff_options, "hasha_hrepo") || get($diff_options, "hashb_hrepo"))
+    $diff_options["no_full"] = true;
 
 $Conf->header(htmlspecialchars($Pset->title), "home");
 echo "<div id='homeinfo'>";
