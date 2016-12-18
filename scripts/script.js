@@ -2820,7 +2820,6 @@ function pa_render_pset_table(psetid, pconf, data) {
             sort.f = "username";
         if (sort.rev !== 1 && sort.rev !== -1)
             sort.rev = 1;
-        sorting_last = !!sort.last;
     }
     function calculate_ncol() {
         return (pconf.checkbox ? 1 : 0) + 4 + (pconf.gitless_grades ? 0 : 1) +
@@ -2844,10 +2843,10 @@ function pa_render_pset_table(psetid, pconf, data) {
             return "";
     }
     function set_name_sorters() {
-        if (sort.last !== sorting_last) {
-            sorting_last = sort.last;
+        if (!!sort.last !== sorting_last) {
+            sorting_last = !!sort.last;
             for (var i = 0; i < data.length; ++i)
-                data[i]._sort_name = render_name(data[i], sort.last).toLowerCase();
+                data[i]._sort_name = render_name(data[i], sorting_last).toLowerCase();
         }
     }
     function render_tds(s, row_number) {
