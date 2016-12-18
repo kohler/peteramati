@@ -849,7 +849,7 @@ if ($Pset->gitless) {
         $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
     }
 
-    Ht::stash_script('jQuery(".diffnoteentry61").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
+    Ht::stash_script('$(".diffnoteentry61").autogrow();$(window).on("beforeunload",beforeunload61)');
     echo "<table id=\"diff61linenotetemplate\" style=\"display:none\"><tbody>";
     $Info->echo_linenote_entry_prototype();
     echo "</tbody></table>";

@@ -629,7 +629,6 @@ if (!$Me->is_empty() && $User->is_student()) {
 
 function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
-    $row->sortprefix = "";
     $ncol = 0;
     $t0 = $Profile ? microtime(true) : 0;
     $j = [];
@@ -674,11 +673,9 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
             if (!$s->repoviewable)
                 $s->repoviewable = $s->can_view_repo_contents($info->repo);
         }
-        if (!$s->gradehash || $s->dropped)
-            $row->sortprefix = "~1 ";
     }
 
-    if (count($pset->grades)) {
+    if (!empty($pset->grades)) {
         $gi = null;
         if ($pset->gitless_grades)
             $gi = $pset->contact_grade_for($s);
@@ -872,7 +869,7 @@ function show_pset_table($pset) {
         $view = "4 repoviewable";
         $viewjoin = "";
     }
-    $result = Dbl::qe("select c.contactId, c.firstName, c.lastName, c.email,
+    $q = "select c.contactId, c.firstName, c.lastName, c.email,
 	c.huid, c.github_username, c.seascode_username, c.anon_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
 	group_concat(pl.link) pcid, group_concat(rpl.link) rpcid,
 	r.repoid, r.cacheid, r.heads, r.url, r.open, r.working, r.lastpset, r.snapcheckat, $view,
@@ -886,7 +883,9 @@ function show_pset_table($pset) {
 	left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.pset=$pset->id)
 	where (c.roles&" . Contact::ROLE_PCLIKE . ")=0
 	and (rg.repoid is not null or not c.dropped)
-	group by c.contactId, r.repoid");
+	group by c.contactId, r.repoid";
+    //error_log(preg_replace('/\s+/', ' ', $q));
+    $result = $Conf->qe_raw($q);
     $t1 = $Profile ? microtime(true) : 0;
 
     $anonymous = $pset->anonymous;
@@ -915,16 +914,20 @@ function show_pset_table($pset) {
         if (!$s->visited) {
             $row = (object) ["student" => $s, "text" => "", "ptext" => []];
             $j = render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous);
+            $boring = !$pset->gitless_grades && ($s->gradehash === null || $s->dropped);
             if ($s->pcid) {
                 foreach (array_unique(explode(",", $s->pcid)) as $pcid)
                     if (isset($students[$pcid])) {
-                        $jj = render_pset_row($pset, $students, $students[$pcid], $row, $pcmembers, $anonymous);
+                        $ss = $students[$pcid];
+                        $jj = render_pset_row($pset, $students, $ss, $row, $pcmembers, $anonymous);
                         $j["partners"][] = $jj;
+                        if ($boring && ($s->gradehash !== null && !$ss->dropped))
+                            $boring = false;
                     }
             }
-            if ($row->sortprefix)
+            if ($boring)
                 $j["boring"] = true;
-            $jx[$row->sortprefix . $s->sorter] = $j;
+            $jx[$boring ? "~1 " . $s->sorter : $s->sorter] = $j;
             $max_ncol = max($max_ncol, $row->ncol);
             if ($s->incomplete) {
                 $u = $Me->user_linkpart($s);
@@ -940,7 +943,7 @@ function show_pset_table($pset) {
         echo '<div id="incomplete_pset', $pset->id, '" style="display:none" class="merror">',
             '<strong>', htmlspecialchars($pset->title), '</strong>: ',
             'Your grading is incomplete. Missing grades: ', join(", ", $incomplete), '</div>',
-            '<script>jQuery("#incomplete_pset', $pset->id, '").remove().show().appendTo("#incomplete_notices")</script>';
+            '<script>$("#incomplete_pset', $pset->id, '").remove().show().appendTo("#incomplete_notices")</script>';
     }
 
     if ($checkbox)
