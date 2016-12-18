@@ -36,6 +36,22 @@ CREATE TABLE `Capability` (
 
 
 --
+-- Table structure for table `CommitInfo`
+--
+
+DROP TABLE IF EXISTS `CommitInfo`;
+CREATE TABLE `CommitInfo` (
+  `commitid` int(11) NOT NULL AUTO_INCREMENT,
+  `repoid` int(11) NOT NULL,
+  `sha1` varbinary(20) NOT NULL,
+  `timestamp` int(11) NOT NULL,
+  PRIMARY KEY (`commitid`),
+  UNIQUE KEY `commitid` (`commitid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+
+
+--
 -- Table structure for table `CommitNotes`
 --
 
@@ -46,6 +62,8 @@ CREATE TABLE `CommitNotes` (
   `notes` varbinary(32767) DEFAULT NULL,
   `haslinenotes` tinyint(1) NOT NULL DEFAULT '0',
   `repoid` int(11) NOT NULL DEFAULT '0',
+  `notesversion` int(11) NOT NULL DEFAULT '1',
+  `hasactiveflags` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`hash`,`pset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -62,6 +80,8 @@ CREATE TABLE `ContactGrade` (
   `gradercid` int(11) DEFAULT NULL,
   `notes` varbinary(32767) DEFAULT NULL,
   `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
+  `notesversion` int(11) NOT NULL DEFAULT '1',
+  `hasactiveflags` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`cid`,`pset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -123,12 +143,7 @@ CREATE TABLE `ContactInfo` (
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `anon_username` (`anon_username`),
   KEY `fullName` (`lastName`,`firstName`,`email`),
-  KEY `seascode_username` (`seascode_username`),
-  FULLTEXT KEY `name` (`lastName`,`firstName`,`email`),
-  FULLTEXT KEY `affiliation` (`affiliation`),
-  FULLTEXT KEY `email_3` (`email`),
-  FULLTEXT KEY `firstName_2` (`firstName`),
-  FULLTEXT KEY `lastName` (`lastName`)
+  KEY `seascode_username` (`seascode_username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -351,7 +366,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 105);
+insert into Settings (name, value) values ('allowPaperOption', 108);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators
