@@ -2982,6 +2982,8 @@ function pa_render_pset_table(psetid, pconf, data) {
             var s = dmap[this.parentNode.getAttribute("data-pa-student")];
             $(this).html(render_username_td(s));
         });
+        sort_data();
+        resort();
         return false;
     }
     function render_head() {
