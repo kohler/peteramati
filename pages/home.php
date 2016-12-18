@@ -649,6 +649,8 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
     }
     if ($s->extension)
         $j["x"] = true;
+    if ($s->dropped)
+        $j["dropped"] = true;
     if (!$anonymous)
         ++$ncol;
 
@@ -754,9 +756,9 @@ function show_regrades($result) {
         $contacts[$c->contactId] = $c;
     Dbl::free($result);
 
-    echo '<div id="_regrades">';
+    echo '<div>';
     echo "<h3>flagged commits</h3>";
-    echo '<table class="s61"><tbody>';
+    echo '<table id="_regrades" class="s61"><tbody>';
     $trn = 0;
     $checkbox = false;
     $sprefix = "";

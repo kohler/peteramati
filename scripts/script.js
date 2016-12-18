@@ -2827,7 +2827,10 @@ function pa_render_pset_table(psetid, pconf, data) {
             (pconf.gitless ? 0 : 1);
     }
     function render_username_td(s) {
-        return '<a href="' + pconf.urlpattern.replace(/%40/, encodeURIComponent(s[username_key])) + '">' + escape_entities(s[username_key]) + '</a>';
+        var t = '<a href="' + pconf.urlpattern.replace(/%40/, encodeURIComponent(s[username_key]));
+        if (s.dropped)
+            t += '" style="text-decoration:line-through';
+        return t + '">' + escape_entities(s[username_key]) + '</a>';
     }
     function render_name(s, last_first) {
         if (s.first != null && s.last != null) {
