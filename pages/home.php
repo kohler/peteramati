@@ -627,9 +627,8 @@ if (!$Me->is_empty() && $User->is_student()) {
     }
 }
 
-function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $anonymous) {
+function render_pset_row(Pset $pset, $students, Contact $s, $pcmembers, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
-    $ncol = 0;
     $t0 = $Profile ? microtime(true) : 0;
     $j = [];
 
@@ -637,7 +636,6 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
     $j["username"] = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
     if ($anonymous)
         $j["anon_username"] = $s->anon_username;
-    ++$ncol;
 
     if ((string) $s->firstName !== "" && (string) $s->lastName === "")
         $j["last"] = $s->firstName;
@@ -651,12 +649,9 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
         $j["x"] = true;
     if ($s->dropped)
         $j["dropped"] = true;
-    if (!$anonymous)
-        ++$ncol;
 
     if ($s->gradercid)
         $j["gradercid"] = $s->gradercid;
-    ++$ncol;
 
     // are any commits committed?
     if (!$pset->gitless_grades) {
@@ -692,11 +687,9 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
                 $s->incomplete = "no line notes";
             if ($gi && $s->gradercid != get($gi, "gradercid") && $Me->privChair)
                 $j["has_nongrader_notes"] = true;
-            ++$ncol;
         }
 
         $garr = render_grades($pset, $gi, $s);
-        $ncol += count($garr->all);
         $j["grades"] = $garr->allv;
         $j["total"] = $garr->totalv;
         if ($garr->differentk)
@@ -719,10 +712,6 @@ function render_pset_row(Pset $pset, $students, Contact $s, $row, $pcmembers, $a
                              || $students[$s->pcid]->repoid != $s->repoid)))
             $j["repo_partner_error"] = true;
     }
-    ++$ncol;
-
-    if (!get($row, "ncol") || $ncol > $row->ncol)
-        $row->ncol = $ncol;
 
     $s->visited = true;
     return $j;
@@ -908,20 +897,18 @@ function show_pset_table($pset) {
         || (!$pset->gitless && $pset->runners);
 
     $rows = array();
-    $max_ncol = 0;
     $incomplete = array();
     $pcmembers = pcMembers();
     $jx = [];
     foreach ($students as $s)
         if (!$s->visited) {
-            $row = (object) ["student" => $s, "text" => "", "ptext" => []];
-            $j = render_pset_row($pset, $students, $s, $row, $pcmembers, $anonymous);
+            $j = render_pset_row($pset, $students, $s, $pcmembers, $anonymous);
             $boring = !$pset->gitless_grades && ($s->gradehash === null || $s->dropped);
             if ($s->pcid) {
                 foreach (array_unique(explode(",", $s->pcid)) as $pcid)
                     if (isset($students[$pcid])) {
                         $ss = $students[$pcid];
-                        $jj = render_pset_row($pset, $students, $ss, $row, $pcmembers, $anonymous);
+                        $jj = render_pset_row($pset, $students, $ss, $pcmembers, $anonymous);
                         $j["partners"][] = $jj;
                         if ($boring && ($s->gradehash !== null && !$ss->dropped))
                             $boring = false;
@@ -930,7 +917,6 @@ function show_pset_table($pset) {
             if ($boring)
                 $j["boring"] = true;
             $jx[$boring ? "~1 " . $s->sorter : $s->sorter] = $j;
-            $max_ncol = max($max_ncol, $row->ncol);
             if ($s->incomplete) {
                 $u = $Me->user_linkpart($s);
                 $t = '<a href="' . hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
