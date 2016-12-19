@@ -2852,7 +2852,7 @@ function pa_render_pset_table(psetid, pconf, data) {
     function escaped_href(s) {
         var psetkey = s.psetid ? peteramati_psets[s.psetid].urlkey : pconf.psetkey;
         var args = {pset: psetkey, u: ukey(s)};
-        if (s.hash && !s.isgrade)
+        if (s.hash && !s.is_grade)
             args.commit = s.hash;
         return escape_entities(hoturl("pset", args));
     }
@@ -2894,19 +2894,29 @@ function pa_render_pset_table(psetid, pconf, data) {
                 a.push('<td class="s61checkbox"><input type="checkbox" name="s61_' + encodeURIComponent(s.username).replace(/\./g, "%2E") + '" value="1" class="s61check" /></td>');
             a.push('<td class="s61rownumber">' + row_number + '.</td>');
         }
+        if (flagged) {
+            a.push('<td class="s61pset"><a href="' + escaped_href(s) + '">' +
+                   escape_entities(peteramati_psets[s.psetid].title) +
+                   (s.hash ? " @" + s.hash.substr(0, 7) : "") + '</a></td>');
+            a.push('<td class="s61at">' +
+                   (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>');
+        }
         a.push('<td class="s61username">' + render_username_td(s) + '</td>');
         a.push('<td class="s61name s61nonanonymous">' +
                escape_entities(render_name(s, displaying_last_first)) + '</td>');
         a.push('<td class="s61extension">' + (s.x ? "X" : "") + '</td>');
-        if (flagged)
-            a.push('<td class="s61pset"><a href="' + escaped_href(s) + '">' +
-                   escape_entities(peteramati_psets[s.psetid].title) +
-                   (s.hash ? " @" + s.hash.substr(0, 7) : "") + '</a></td>');
         if (s.gradercid && peteramati_grader_map[s.gradercid])
             a.push('<td>' + escape_entities(peteramati_grader_map[s.gradercid]) + '</td>');
         else
             a.push(s.gradercid ? '<td>???</td>' : '<td></td>');
-        if (!pconf.gitless_grades) {
+        if (flagged) {
+            txt = '';
+            if (s.is_grade)
+                txt += '✱';
+            if (s.has_notes)
+                txt += '♪';
+            a.push('<td>' + txt + '</td>');
+        } else if (!pconf.gitless_grades) {
             txt = '';
             if (s.has_notes)
                 txt += '♪';
@@ -3031,11 +3041,13 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<th></th>');
         a.push('<th></th>');
         t = pconf.anonymous ? ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>' : '';
+        if (flagged) {
+            a.push('<th class="l s61pset plsortable" data-pa-sort="pset">Pset</th>');
+            a.push('<th class="l s61at plsortable" data-pa-sort="at">Flagged</th>');
+        }
         a.push('<th class="l s61username plsortable" data-pa-sort="username">Username' + t + '</th>');
         a.push('<th class="l s61nonanonymous plsortable" data-pa-sort="name">Name</th>');
         a.push('<th class="l s61extension plsortable" data-pa-sort="extension">X?</th>');
-        if (flagged)
-            a.push('<th class="l s61pset plsortable" data-pa-sort="pset">Pset</th>');
         a.push('<th class="l plsortable" data-pa-sort="grader">Grader</th>');
         if (!pconf.gitless_grades)
             a.push('<th></th>');
@@ -3100,6 +3112,15 @@ function pa_render_pset_table(psetid, pconf, data) {
                 else
                     return a.pos < b.pos ? -rev : rev;
             });
+        else if (f === "at")
+            data.sort(function (a, b) {
+                if (a.boring != b.boring)
+                    return a.boring ? 1 : -1;
+                else if (a.at != b.at)
+                    return a.at < b.at ? -rev : rev;
+                else
+                    return a.pos < b.pos ? -rev : rev;
+            });
         else if (f === "total")
             data.sort(function (a, b) {
                 if (a.boring != b.boring)
@@ -3144,7 +3165,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         if (sf != sort.f) {
             sort.f = sf;
             if (sf === "username" || sf === "name" || sf === "grader"
-                || sf === "extension" || sf === "pset")
+                || sf === "extension" || sf === "pset" || sf === "at")
                 sort.rev = 1;
             else
                 sort.rev = -1;

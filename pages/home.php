@@ -719,7 +719,6 @@ function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
 
 function render_regrade_row(Pset $pset, Contact $s, $row, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
-    $t0 = $Profile ? microtime(true) : 0;
     $j = render_grading_student($s, $anonymous);
     if (($gcid = get($row->notes, "gradercid")))
         $j["gradercid"] = $gcid;
@@ -728,13 +727,25 @@ function render_regrade_row(Pset $pset, Contact $s, $row, $anonymous) {
     $j["psetid"] = $pset->id;
     $j["hash"] = $row->hash;
     if ($row->gradehash === $row->hash && $row->hash)
-        $j["isgrade"] = true;
+        $j["is_grade"] = true;
     if ($row->haslinenotes)
-        $j["haslinenotes"] = true;
+        $j["has_notes"] = true;
     if ($row->notes) {
         $garr = render_grades($pset, $row->notes, null);
         $j["total"] = $garr->totalv;
     }
+    $time = 0;
+    if ($row->notes && isset($row->notes->flags)) {
+        foreach ((array) $row->notes->flags as $k => $v) {
+            if ($k[0] === "t" && ctype_digit(substr($k, 1)))
+                $thistime = +substr($k, 1);
+            else
+                $thistime = get($v, "at", 0);
+            $time = max($time, $thistime);
+        }
+    }
+    if ($time)
+        $j["at"] = $time;
     return $j;
 }
 
@@ -768,17 +779,11 @@ function show_regrades($result) {
 
     echo '<div>';
     echo "<h3>flagged commits</h3>";
-    echo '<table id="_regrades" class="s61"><tbody>';
-    $trn = 0;
     $nintotal = 0;
-    $checkbox = false;
-    $sprefix = "";
     $anonymous = null;
     if (req("anonymous") !== null && $Me->privChair)
         $anonymous = !!req("anonymous");
-    $pcmembers = pcMembers();
     $jx = [];
-    $searchj = (object) ["ids" => [], "psets" => [], "commits" => []];
     foreach ($rows as $rowx) {
         $uid = $rowx[1];
         $row = $rowx[2];
@@ -790,51 +795,8 @@ function show_regrades($result) {
         $jx[] = $j;
         if (isset($j["total"]))
             ++$nintotal;
-
-
-
-        ++$trn;
-        echo '<tr class="k', ($trn % 2), '">';
-        if ($checkbox)
-            echo '<td class="s61checkbox">', Ht::checkbox("s61_" . urlencode($Me->user_idpart($u)), 1, array("class" => "s61check")), '</td>';
-        echo '<td class="s61rownumber">', $trn, '.</td>';
-        $pset = $Conf->pset_by_id($row->pset);
-        echo '<td class="s61pset">', htmlspecialchars($pset->title), '</td>';
-
-        echo '<td class="s61username">',
-            '<a href="', hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash]),
-            '">', htmlspecialchars($Me->user_linkpart($u)), '</a></td>',
-
-            '<td class="s61hash"><a href="', hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($u), "commit" => $row->hash]), '">', substr($row->hash, 0, 7), '</a></td>';
-
-        if (get($row->notes, "gradercid") || $row->main_gradercid) {
-            $gcid = get($row->notes, "gradercid") ? : $row->main_gradercid;
-            if (isset($pcmembers[$gcid]))
-                echo "<td>" . htmlspecialchars($pcmembers[$gcid]->firstName) . "</td>";
-            else
-                echo "<td>???</td>";
-        } else
-            echo "<td></td>";
-
-        echo "<td>";
-        if ($row->hash === $row->gradehash)
-            echo "✱";
-        if ($row->haslinenotes)
-            echo "♪";
-        echo "</td>";
-
-        $total = "";
-        if ($row->notes) {
-            $garr = render_grades($pset, $row->notes, null);
-            if ($garr->totalindex !== null)
-                $total = $garr->all[$garr->totalindex];
-        }
-        echo '<td class="r">' . $total . '</td>';
-
-        echo '</tr>';
     }
-    echo "</tbody></table></div>\n";
-    echo '<table class="s61" id="pa-pset-flagged"></table>';
+    echo '<table class="s61" id="pa-pset-flagged"></table></div>', "\n";
     $jd = ["flagged_commits" => true, "no_sort" => true, "anonymous" => true];
     if ($nintotal)
         $jd["need_total"] = 1;
