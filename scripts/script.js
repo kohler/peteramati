@@ -2831,7 +2831,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         flagged = pconf.flagged_commits,
         sort = {f: flagged ? "at" : "username", last: true, rev: 1},
         sorting_last, displaying_last_first = null,
-        anonymous = pconf.anonymous;
+        anonymous = pconf.anonymous, sorting_anonymous = null;
 
     function default_sorting() {
         var x = wstorage(true, "pa-pset" + psetid + "-table");
@@ -2847,7 +2847,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             (pconf.gitless ? 0 : 1);
     }
     function ukey(s) {
-        return (anonymous && s.anon_username) || s.username;
+        return (anonymous && s.anon_username) || s.username || "";
     }
     function escaped_href(s) {
         var psetkey = s.psetid ? peteramati_psets[s.psetid].urlkey : pconf.psetkey;
@@ -2875,11 +2875,23 @@ function pa_render_pset_table(psetid, pconf, data) {
         else
             return "";
     }
+    function render_display_name(s) {
+        var txt = escape_entities(render_name(s, displaying_last_first));
+        if (!s.anon_username || !pconf.has_nonanonymous)
+            return txt;
+        else
+            return '<span class="s61nonanonymous">' + txt + '</span>';
+    }
     function set_name_sorters() {
-        if (!!sort.last !== sorting_last) {
+        if (!!sort.last !== sorting_last
+            || (pconf.has_nonanonymous && sorting_anonymous !== anonymous)) {
             sorting_last = !!sort.last;
+            sorting_anonymous = anonymous;
             for (var i = 0; i < data.length; ++i)
-                data[i]._sort_name = render_name(data[i], sorting_last).toLowerCase();
+                if (!anonymous || !data[i].anon_username)
+                    data[i]._sort_name = render_name(data[i], sorting_last).toLowerCase();
+                else
+                    data[i]._sort_name = "~~~~";
         }
     }
     function render_tds(s, row_number) {
@@ -2902,37 +2914,36 @@ function pa_render_pset_table(psetid, pconf, data) {
                    (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>');
         }
         a.push('<td class="s61username">' + render_username_td(s) + '</td>');
-        a.push('<td class="s61name s61nonanonymous">' +
-               escape_entities(render_name(s, displaying_last_first)) + '</td>');
-        a.push('<td class="s61extension">' + (s.x ? "X" : "") + '</td>');
+        a.push('<td class="s61name' + (!s.anon_username || pconf.has_nonanonymous ? "" : " s61nonanonymous") + '">' + render_display_name(s) + '</td>');
         if (s.gradercid && peteramati_grader_map[s.gradercid])
-            a.push('<td>' + escape_entities(peteramati_grader_map[s.gradercid]) + '</td>');
+            txt = escape_entities(peteramati_grader_map[s.gradercid]);
         else
-            a.push(s.gradercid ? '<td>???</td>' : '<td></td>');
+            txt = s.gradercid ? "???" : "";
+        a.push('<td class="s61grader">' + txt + '</td>');
         if (flagged) {
             txt = '';
             if (s.is_grade)
                 txt += '✱';
             if (s.has_notes)
                 txt += '♪';
-            a.push('<td>' + txt + '</td>');
+            a.push('<td class="s61notes">' + txt + '</td>');
         } else if (!pconf.gitless_grades) {
             txt = '';
             if (s.has_notes)
                 txt += '♪';
             if (s.has_nongrader_notes)
                 txt += '<sup>*</sup>';
-            a.push('<td>' + txt + '</td>');
+            a.push('<td class="s61notes">' + txt + '</td>');
         }
         if (pconf.need_total)
-            a.push('<td class="r s61total">' + s.total + '</td>');
+            a.push('<td class="s61total r">' + s.total + '</td>');
         for (j = 0; j < grades.length; ++j) {
-            klass = "r";
+            klass = "s61grade";
             if (grades[j] == pconf.total_key && s.grades[j] != null && s.grades[j] != "")
-                klass += " s61total";
+                klass = "s61total";
             if (s.highlight_grades && s.highlight_grades[grades[j]])
                 klass += " s61highlight";
-            a.push('<td class="' + klass + '">' + (s.grades[j] == null ? '' : s.grades[j]) + '</td>');
+            a.push('<td class="' + klass + ' r">' + (s.grades[j] == null ? '' : s.grades[j]) + '</td>');
         }
         if (!pconf.gitless) {
             if (!s.repo)
@@ -2949,7 +2960,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 txt += ' <strong class="err">open</strong>';
             if (s.repo_partner_error)
                 txt += ' <strong class="err">partner</strong>';
-            a.push('<td>' + txt + '</td>');
+            a.push('<td class="s61repo">' + txt + '</td>');
         }
         return a.join('');
     }
@@ -2971,7 +2982,6 @@ function pa_render_pset_table(psetid, pconf, data) {
             j.psetids = p.join("'");
             j.hashes = l.join("'");
         }
-        console.log(j);
         $b.attr("data-hotlist", JSON.stringify(j));
     }
     function render_body() {
@@ -3033,15 +3043,16 @@ function pa_render_pset_table(psetid, pconf, data) {
         var display_last_first = sort.f && sort.last;
         if (display_last_first !== displaying_last_first) {
             displaying_last_first = display_last_first;
-            $b.find(".s61name").text(function () {
+            $b.find(".s61name").html(function () {
                 var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
-                return render_name(s, displaying_last_first);
+                return render_display_name(s);
             });
         }
         set_hotlist($b);
     }
     function switch_anon() {
         anonymous = !anonymous;
+        $j.toggleClass("s61anonymous", anonymous);
         $j.find("tbody td.s61username").each(function () {
             var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
             $(this).html(render_username_td(s));
@@ -3053,25 +3064,25 @@ function pa_render_pset_table(psetid, pconf, data) {
     function render_head() {
         var a = [], j, grades = pconf.grade_keys || [], t;
         if (pconf.checkbox)
-            a.push('<th></th>');
-        a.push('<th></th>');
+            a.push('<th class="s61checkbox"></th>');
+        a.push('<th class="s61rownumber"></th>');
         t = pconf.anonymous ? ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>' : '';
         if (flagged) {
-            a.push('<th class="l s61pset plsortable" data-pa-sort="pset">Pset</th>');
-            a.push('<th class="l s61at plsortable" data-pa-sort="at">Flagged</th>');
+            a.push('<th class="s61pset l plsortable" data-pa-sort="pset">Pset</th>');
+            a.push('<th class="s61at l plsortable" data-pa-sort="at">Flagged</th>');
         }
-        a.push('<th class="l s61username plsortable" data-pa-sort="username">Username' + t + '</th>');
-        a.push('<th class="l s61nonanonymous plsortable" data-pa-sort="name">Name</th>');
-        a.push('<th class="l s61extension plsortable" data-pa-sort="extension">X?</th>');
-        a.push('<th class="l plsortable" data-pa-sort="grader">Grader</th>');
+        a.push('<th class="s61username l plsortable" data-pa-sort="username">Username' + t + '</th>');
+        a.push('<th class="s61name l' + (pconf.has_nonanonymous ? "" : " s61nonanonymous") + ' plsortable" data-pa-sort="name">Name</th>');
+        a.push('<th class="s61extension l plsortable" data-pa-sort="extension">X?</th>');
+        a.push('<th class="s61grader l plsortable" data-pa-sort="grader">Grader</th>');
         if (!pconf.gitless_grades)
-            a.push('<th></th>');
+            a.push('<th class="s61notes"></th>');
         if (pconf.need_total)
-            a.push('<th class="r plsortable" data-pa-sort="total">Tot</th>');
+            a.push('<th class="s61total r plsortable" data-pa-sort="total">Tot</th>');
         for (j = 0; j < grades.length; ++j)
-            a.push('<th class="r plsortable" data-pa-sort="grade' + j + '">' + grades[j].substr(0, 3) + '</th>');
+            a.push('<th class="s61grade r plsortable" data-pa-sort="grade' + j + '">' + grades[j].substr(0, 3) + '</th>');
         if (!pconf.gitless)
-            a.push('<th></th>');
+            a.push('<th class="s61repo"></th>');
         $j.find("thead").html('<tr>' + a.join('') + '</tr>');
         $j.find("thead .s61username a").click(switch_anon);
     }
@@ -3196,6 +3207,7 @@ function pa_render_pset_table(psetid, pconf, data) {
     }
 
     $j.html("<thead></thead><tbody class='has-hotlist'></tbody>");
+    $j.toggleClass("s61anonymous", !!anonymous);
     $j.find("thead").on("click", "th", head_click);
     default_sorting();
     render_head();

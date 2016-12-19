@@ -425,16 +425,16 @@ if ($Me->privChair)
 
 // Sidebar
 echo "<div class='homeside'>";
-
 echo "<noscript><div class='homeinside'>",
     "<strong>HotCRP requires Javascript.</strong> ",
     "Many features will work without Javascript, but not all.<br />",
     "<a style='font-size:smaller' href='http://read.seas.harvard.edu/~kohler/hotcrp/'>Report bad compatibility problems</a></div></noscript>";
+echo "</div>\n";
 
 // Conference management
 if ($Me->privChair) {
-    echo "<div id='homemgmt' class='homeinside'>
-  <h4>Administration</h4>
+    echo "<div id='homeadmin'>
+  <h3>administration</h3>
   <ul>
     <!-- <li><a href='", hoturl("settings"), "'>Settings</a></li>
     <li><a href='", hoturl("users", "t=all"), "'>Users</a></li> -->
@@ -444,8 +444,6 @@ if ($Me->privChair) {
   </ul>
 </div>\n";
 }
-
-echo "</div>\n";
 
 // Home message
 if (($v = $Conf->setting_data("homemsg")))
@@ -717,9 +715,9 @@ function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
     return $j;
 }
 
-function render_regrade_row(Pset $pset, Contact $s, $row, $anonymous) {
+function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
-    $j = render_grading_student($s, $anonymous);
+    $j = $s ? render_grading_student($s, $anonymous) : [];
     if (($gcid = get($row->notes, "gradercid")))
         $j["gradercid"] = $gcid;
     else if ($row->main_gradercid)
@@ -783,13 +781,16 @@ function show_regrades($result) {
     $anonymous = null;
     if (req("anonymous") !== null && $Me->privChair)
         $anonymous = !!req("anonymous");
+    $any_anonymous = $any_nonanonymous = false;
     $jx = [];
     foreach ($rows as $rowx) {
         $uid = $rowx[1];
         $row = $rowx[2];
-        $u = $contacts[$uid];
+        $u = get($contacts, $uid);
         $pset = $Conf->pset_by_id($row->pset);
         $anon = $anonymous === null ? $pset->anonymous : $anonymous;
+        $any_anonymous = $any_anonymous || $anon;
+        $any_nonanonymous = $any_nonanonymous || !$anon;
         $j = render_regrade_row($pset, $u, $row, $anon);
         $j["pos"] = count($jx);
         $jx[] = $j;
@@ -797,7 +798,7 @@ function show_regrades($result) {
             ++$nintotal;
     }
     echo '<table class="s61" id="pa-pset-flagged"></table></div>', "\n";
-    $jd = ["flagged_commits" => true, "anonymous" => true];
+    $jd = ["flagged_commits" => true, "anonymous" => true, "has_nonanonymous" => $any_nonanonymous];
     if ($nintotal)
         $jd["need_total"] = 1;
     echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode($jd), ',', json_encode(array_values($jx)), ')</script>';
@@ -939,7 +940,7 @@ function show_pset_table($pset) {
     if ($checkbox)
         echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
 
-    echo '<table class="s61', ($anonymous ? " s61anonymous" : ""), '" id="pa-pset' . $pset->id . '"></table>';
+    echo '<table class="s61" id="pa-pset' . $pset->id . '"></table>';
     $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous, "grade_keys" => array_keys($pset->grades),
            "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
            "psetkey" => $pset->urlkey];

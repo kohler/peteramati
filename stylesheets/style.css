@@ -498,6 +498,13 @@ span.impending {
 span.impending a {
 	color: red;
 }
+#homeadmin {
+	margin: 0 -24px;
+	padding: 5px 24px;
+	background-color: #fffdf0;
+	border-top: 1px solid #b2a584;
+	border-bottom: 1px solid #b2a584;
+}
 
 /* buttons */
 /* All input styles starting with "hb" are treated specially by script. */
@@ -2329,10 +2336,10 @@ td.mhcb {
 	font-weight: bold;
 	white-space: nowrap;
 }
-table.s61 > tbody > tr > td:nth-child(n + 3),
+/*table.s61 > tbody > tr > td:nth-child(n + 3),
 table.s61 > thead > tr > th:nth-child(n + 3) {
 	padding-left: 12px;
-}
+}*/
 table.s61 > thead {
 	font-size: smaller;
 	color: #7777aa;
@@ -2340,6 +2347,10 @@ table.s61 > thead {
 .s61rownumber, .s61checkbox {
 	text-align: right;
 	padding: 0 5px;
+}
+.s61username, .s61name, .s61extension, .s61grader, .s61notes, .s61grade, .s61total, .s61repo,
+.s61pset, .s61at {
+	padding-left: 12px;
 }
 tr.s61partner > td.s61username {
 	padding-left: 1em;
