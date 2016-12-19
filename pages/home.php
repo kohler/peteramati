@@ -955,7 +955,7 @@ function show_pset_table($pset) {
         $jd["need_total"] = true;
     else if ($nintotal == 1)
         $jd["total_key"] = $last_in_total;
-    echo Ht::unstash(), '<script>$(function(){pa_render_pset_table(', $pset->id, ',', json_encode($jd), ',', json_encode(array_values($jx)), ')})</script>';
+    echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode($jd), ',', json_encode(array_values($jx)), ')</script>';
 
     if ($Me->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";

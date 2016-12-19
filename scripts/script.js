@@ -1788,7 +1788,7 @@ function prepare() {
     //$(document.body).on("click", "tbody.pltable > tr.pl", row_click);
     hotcrp_list && $(window).on("beforeunload", unload_list);
 }
-document.body ? prepare() : $(prepare);
+prepare();
 })(jQuery);
 
 
