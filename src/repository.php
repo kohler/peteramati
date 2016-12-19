@@ -330,9 +330,9 @@ class Repository {
         if (strlen($bcommit) == 20)
             $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and hash=?", $this->repoid, $bcommit);
         else
-            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and hash like '?ls%'", $this->repoid, $bcommit);
+            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and left(hash,?)=?", $this->repoid, strlen($bcommit), $bcommit);
         $match = null;
-        while (($row = $result->fetch_object())) {
+        while ($result && ($row = $result->fetch_object())) {
             $h = bin2hex($row->hash);
             if (str_starts_with($h, $commit)) {
                 if ($match) {
