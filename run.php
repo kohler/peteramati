@@ -23,7 +23,7 @@ function user_pset_info() {
     return $Info;
 }
 
-ContactView::set_path_request(array("/@", "/@/p", "/@/p/H", "/p", "/p/H", "/p/u", "/p/u/H"));
+ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"));
 $Qreq = make_qreq();
 
 // user, pset, runner

@@ -4,7 +4,7 @@
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
-ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/H", "/p/u", "/p/u/h"));
+ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"));
 if ($Me->is_empty())
     $Me->escape();
 global $User, $Pset, $Info, $Commit;
