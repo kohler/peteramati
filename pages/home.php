@@ -643,9 +643,6 @@ function render_grading_student(Contact $s, $anonymous) {
         $j["x"] = true;
     if ($s->dropped)
         $j["dropped"] = true;
-
-    if ($s->gradercid)
-        $j["gradercid"] = $s->gradercid;
     return $j;
 }
 
@@ -653,6 +650,8 @@ function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
     $t0 = $Profile ? microtime(true) : 0;
     $j = render_grading_student($s, $anonymous);
+    if ($s->gradercid)
+        $j["gradercid"] = $s->gradercid;
 
     // are any commits committed?
     if (!$pset->gitless_grades) {
@@ -718,6 +717,27 @@ function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
     return $j;
 }
 
+function render_regrade_row(Pset $pset, Contact $s, $row, $anonymous) {
+    global $Conf, $Me, $Now, $Profile;
+    $t0 = $Profile ? microtime(true) : 0;
+    $j = render_grading_student($s, $anonymous);
+    if (($gcid = get($row->notes, "gradercid")))
+        $j["gradercid"] = $gcid;
+    else if ($row->main_gradercid)
+        $j["gradercid"] = $row->main_gradercid;
+    $j["psetid"] = $pset->id;
+    $j["hash"] = $row->hash;
+    if ($row->gradehash === $row->hash && $row->hash)
+        $j["isgrade"] = true;
+    if ($row->haslinenotes)
+        $j["haslinenotes"] = true;
+    if ($row->notes) {
+        $garr = render_grades($pset, $row->notes, null);
+        $j["total"] = $garr->totalv;
+    }
+    return $j;
+}
+
 function show_regrades($result) {
     global $Conf, $Me, $Now, $LastPsetFix;
     $rows = $uids = [];
@@ -750,15 +770,29 @@ function show_regrades($result) {
     echo "<h3>flagged commits</h3>";
     echo '<table id="_regrades" class="s61"><tbody>';
     $trn = 0;
+    $nintotal = 0;
     $checkbox = false;
     $sprefix = "";
-    $reqsort = req("sort");
-    $reqanonymize = req("anonymize");
+    $anonymous = null;
+    if (req("anonymous") !== null && $Me->privChair)
+        $anonymous = !!req("anonymous");
     $pcmembers = pcMembers();
+    $jx = [];
+    $searchj = (object) ["ids" => [], "psets" => [], "commits" => []];
     foreach ($rows as $rowx) {
         $uid = $rowx[1];
         $row = $rowx[2];
         $u = $contacts[$uid];
+        $pset = $Conf->pset_by_id($row->pset);
+        $anon = $anonymous === null ? $pset->anonymous : $anonymous;
+        $j = render_regrade_row($pset, $u, $row, $anon);
+        $j["pos"] = count($jx);
+        $jx[] = $j;
+        if (isset($j["total"]))
+            ++$nintotal;
+
+
+
         ++$trn;
         echo '<tr class="k', ($trn % 2), '">';
         if ($checkbox)
@@ -800,6 +834,11 @@ function show_regrades($result) {
         echo '</tr>';
     }
     echo "</tbody></table></div>\n";
+    echo '<table class="s61" id="pa-pset-flagged"></table>';
+    $jd = ["flagged_commits" => true, "no_sort" => true, "anonymous" => true];
+    if ($nintotal)
+        $jd["need_total"] = 1;
+    echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode($jd), ',', json_encode(array_values($jx)), ')</script>';
 }
 
 function show_pset_actions($pset) {
@@ -995,6 +1034,14 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     echo '<div id="incomplete_notices"></div>', "\n";
     $sep = "";
     $t0 = $Profile ? microtime(true) : 0;
+
+    $psetj = [];
+    foreach (ContactView::pset_list($Me, false) as $pset) {
+        $pj = ["title" => $pset->title, "urlkey" => $pset->urlkey,
+               "pos" => count($psetj)];
+        $psetj[$pset->psetid] = $pj;
+    }
+    Ht::stash_script('peteramati_psets=' . json_encode($psetj) . ';');
 
     $pctable = [];
     foreach (pcMembers() as $pc)
