@@ -932,23 +932,30 @@ class Conf {
             $this->opt["scriptAssetsUrl"] = $base;
     }
 
-    function session_list() {
+    function encoded_session_list() {
         global $Now;
         if ($this->_session_list === false) {
             $this->_session_list = null;
             if (isset($_COOKIE["hotlist-info"])) {
                 if (($j = json_decode($_COOKIE["hotlist-info"]))
-                    && is_object($j)
-                    && isset($j->ids)) {
-                    if (is_string($j->ids) && preg_match('/\A[\s\d]*\z/', $j->ids))
-                        $j->ids = array_map(function ($x) {
-                            return (int) $x;
-                        }, explode(" ", trim($j->ids)));
-                    if (is_array($j->ids))
-                        $this->_session_list = $j;
-                }
+                    && is_object($j) && isset($j->ids))
+                    $this->_session_list = $j;
                 setcookie("hotlist-info", "", $Now - 86400, Navigation::site_path());
             }
+        }
+        return $this->_session_list;
+    }
+
+    function session_list() {
+        if (($j = $this->encoded_session_list())) {
+            if (is_string($j->ids) && preg_match('/\A[\s\d\']*\z/', $j->ids))
+                $j->ids = array_map(function ($x) { return (int) $x; },
+                                    preg_split('/[\s\']+/', $j->ids));
+            if (is_string($j->psetids) && preg_match('/\A[\s\d\']*\z/', $j->psetids))
+                $j->psetids = array_map(function ($x) { return (int) $x; },
+                                        preg_split('/[\s\']+/', $j->psetids));
+            if (is_string($j->hashes) && preg_match('/\A[\sA-Fa-fx\d\']*\z/', $j->hashes))
+                $j->hashes = preg_split('/[\s\']+/', $j->hashes);
         }
         return $this->_session_list;
     }
@@ -1058,7 +1065,7 @@ class Conf {
         Ht::stash_script("siteurl=" . json_encode(Navigation::siteurl()) . ";siteurl_suffix=\"" . Navigation::php_suffix() . "\"");
         if (session_id() !== "")
             Ht::stash_script("siteurl_postvalue=\"" . post_value() . "\"");
-        if (($list = $this->session_list()))
+        if (($list = $this->encoded_session_list()))
             Ht::stash_script("hotcrp_list=" . json_encode($list) . ";");
         if (($urldefaults = hoturl_defaults()))
             Ht::stash_script("siteurl_defaults=" . json_encode($urldefaults) . ";");
@@ -1090,7 +1097,7 @@ class Conf {
         if ($title === "Home")
             $title = "";
         $this->header_head($title);
-        $this->session_list(); // clear cookie if set
+        $this->encoded_session_list(); // clear cookie if set
 
         // <body>
         echo "<body", ($id ? " id=\"$id\"" : ""), " onload=\"hotcrp_load()\">\n";

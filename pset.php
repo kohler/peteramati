@@ -4,7 +4,7 @@
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
-ContactView::set_path_request(array("/@", "/@/p", "/@/p/H", "/p", "/p/H", "/p/u", "/p/u/H"));
+ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/H", "/p/u", "/p/u/h"));
 if ($Me->is_empty())
     $Me->escape();
 global $User, $Pset, $Info, $Commit;
@@ -361,9 +361,46 @@ $xsep = " <span class='barsep'>&nbsp;·&nbsp;</span> ";
 // Top: user info
 echo "<div id='homeinfo'>";
 
-if ($User->username && $Me->isPC
-    && ($sl = $Conf->session_list())
-    && ($p = array_search($User->contactId, $sl->ids)) !== false
+function session_list_position($sl, $info) {
+    $p = array_search($info->user->contactId, $sl->ids);
+    if ($p !== false && isset($sl->psetids)) {
+        $reqcommit = req("commit");
+        $x = $p;
+        while (isset($sl->ids[$x])
+               && ($sl->ids[$x] !== $info->user->contactId
+                   || $sl->psetids[$x] !== $info->pset->id
+                   || ($sl->hashes[$x] !== "x"
+                       ? $sl->hashes[$x] !== substr($reqcommit, 0, strlen($sl->hashes[$x]))
+                       : !$reqcommit || $info->is_grading_commit())))
+            ++$x;
+        if (isset($sl->ids[$x]))
+            $p = $x;
+    }
+    return $p;
+}
+
+function session_list_link($sl, $pos, $isprev, Contact $me, Contact $user) {
+    global $Conf, $Pset, $User;
+    $pset = $Pset;
+    if (isset($sl->psetids) && isset($sl->psetids[$pos])
+        && ($p = $Conf->pset_by_id($sl->psetids[$pos])))
+        $pset = $p;
+    $u = $me->user_linkpart($user, $p->anonymous && !!get($sl, "anon"));
+    $x = ["pset" => $pset->urlkey, "u" => $u];
+    if (isset($sl->hashes) && isset($sl->hashes[$pos])
+        && $sl->hashes[$pos] !== "x")
+        $x["commit"] = $sl->hashes[$pos];
+    $t = htmlspecialchars($x["u"]);
+    if (isset($sl->psetids))
+        $t .= " @" . htmlspecialchars($pset->title);
+    if (isset($x["commit"]))
+        $t .= "/" . $x["commit"];
+    return '<a href="' . hoturl("pset", $x) . '">'
+        . ($isprev ? "« " : "") . $t . ($isprev ? "" : " »") . '</a>';
+}
+
+if ($User->username && $Me->isPC && ($sl = $Conf->session_list())
+    && ($p = session_list_position($sl, $Info)) !== false
     && ($p > 0 || $p < count($sl->ids))) {
     $result = $Conf->qe("select contactId, firstName, lastName, email,
         huid, anon_username, github_username, seascode_username, extension
@@ -375,16 +412,12 @@ if ($User->username && $Me->isPC
     echo "<div class=\"has-hotlist\" style=\"color:gray;float:right\"",
         " data-hotlist=\"", htmlspecialchars(json_encode($sl)), "\">",
         "<h3 style=\"margin-top:0\">";
-    if ($links[0]) {
-        $u = $Me->user_linkpart($links[0], $User->is_anonymous);
-        echo '<a href="', hoturl("pset", ["pset" => $Pset->urlkey, "u" => $u]), '">« ', htmlspecialchars($u), '</a>';
-    }
+    if ($links[0])
+        echo session_list_link($sl, $p - 1, true, $Me, $links[0]);
     if ($links[0] && $links[1])
         echo ' · ';
-    if ($links[1]) {
-        $u = $Me->user_linkpart($links[1], $User->is_anonymous);
-        echo '<a href="', hoturl("pset", ["pset" => $Pset->urlkey, "u" => $u]), '">', htmlspecialchars($u), ' »</a>';
-    }
+    if ($links[1])
+        echo session_list_link($sl, $p + 1, false, $Me, $links[1]);
     echo "</h3></div>";
 }
 
@@ -567,7 +600,6 @@ function echo_commit($Info) {
     }
     if (($Info->is_latest_commit() || $Me->isPC)
         && $Pset->handout_repo_url) {
-$Pset->latest_handout_commit();
         $last_handout = $Pset->latest_handout_commit();
         $last_myhandout = $last_handout ? $Info->derived_handout_hash() : false;
         if ($last_handout && $last_myhandout && $last_handout->hash == $last_myhandout)

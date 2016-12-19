@@ -2828,9 +2828,9 @@ function pa_anonymize_linkto(link, event) {
 
 function pa_render_pset_table(psetid, pconf, data) {
     var $j = $("#pa-pset" + psetid), dmap = [],
-        sort = {f: "username", last: true, rev: 1}, sorting_last,
-        displaying_last_first = null,
         flagged = pconf.flagged_commits,
+        sort = {f: flagged ? "at" : "username", last: true, rev: 1},
+        sorting_last, displaying_last_first = null,
         anonymous = pconf.anonymous;
 
     function default_sorting() {
@@ -2897,7 +2897,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         if (flagged) {
             a.push('<td class="s61pset"><a href="' + escaped_href(s) + '">' +
                    escape_entities(peteramati_psets[s.psetid].title) +
-                   (s.hash ? " @" + s.hash.substr(0, 7) : "") + '</a></td>');
+                   (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>');
             a.push('<td class="s61at">' +
                    (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>');
         }
@@ -2953,20 +2953,36 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
         return a.join('');
     }
-    function set_hotlist($b, uids) {
-        var j = {"ids": uids.join(" "), "sort": sort.f};
+    function set_hotlist($b) {
+        var j = {sort: sort.f}, i, l, p;
+        if (anonymous)
+            j.anon = true;
+        l = [];
+        for (i = 0; i < data.length; ++i)
+            l.push(data[i].uid);
+        j.ids = l.join("'");
+        if (flagged) {
+            p = [];
+            l = [];
+            for (i = 0; i < data.length; ++i) {
+                p.push(data[i].psetid);
+                l.push(data[i].is_grade ? "x" : data[i].hash.substr(0, 7));
+            }
+            j.psetids = p.join("'");
+            j.hashes = l.join("'");
+        }
+        console.log(j);
         $b.attr("data-hotlist", JSON.stringify(j));
     }
     function render_body() {
         var $b = $j.find("tbody");
         $b.html("");
-        var i, spos, s, a, trn = 0, was_boring = false, uids = [];
+        var i, spos, s, a, trn = 0, was_boring = false;
         displaying_last_first = sort.f === "name" && sort.last;
         for (i = 0; i < data.length; ++i) {
             s = data[i];
             s._spos = dmap.length;
             dmap.push(s);
-            uids.push(s.uid);
             a = [];
             ++trn;
             if (s.boring && !was_boring && trn != 1)
@@ -2981,7 +2997,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             }
             $b.append(a.join(''));
         }
-        set_hotlist($b, uids);
+        set_hotlist($b);
     }
     function resort() {
         var $b = $j.find("tbody"), tb = $b[0];
@@ -2993,11 +3009,10 @@ function pa_render_pset_table(psetid, pconf, data) {
                 rmap[tr.getAttribute("data-pa-spos")] = last = [tr];
             tr = tr.nextSibling;
         }
-        var i, j, trn = 0, was_boring = false, uids = [];
+        var i, j, trn = 0, was_boring = false;
         last = tb.firstChild;
         for (i = 0; i < data.length; ++i) {
             ++trn;
-            uids.push(data[i].uid);
             while ((j = last) && j.className === "s61boring") {
                 last = last.nextSibling;
                 tb.removeChild(j);
@@ -3023,7 +3038,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 return render_name(s, displaying_last_first);
             });
         }
-        set_hotlist($b, uids);
+        set_hotlist($b);
     }
     function switch_anon() {
         anonymous = !anonymous;
