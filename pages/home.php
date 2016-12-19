@@ -941,7 +941,7 @@ function show_pset_table($pset) {
     echo '<table class="s61', ($anonymous ? " s61anonymous" : ""), '" id="pa-pset' . $pset->id . '"></table>';
     $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous, "grade_keys" => array_keys($pset->grades),
            "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
-           "urlpattern" => hoturl("pset", ["pset" => $pset->urlkey, "u" => "@"])];
+           "psetkey" => $pset->urlkey];
     $i = $nintotal = $last_in_total = 0;
     foreach ($pset->grades as $ge) {
         if (!$ge->no_total) {
@@ -996,6 +996,14 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $sep = "";
     $t0 = $Profile ? microtime(true) : 0;
 
+    $pctable = [];
+    foreach (pcMembers() as $pc)
+        if ($pc->firstName && !$pc->firstNameAmbiguous)
+            $pctable[$pc->contactId] = $pc->firstName;
+        else
+            $pctable[$pc->contactId] = Text::name_text($pc);
+    Ht::stash_script('peteramati_grader_map=' . json_encode($pctable) . ';');
+
     $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradehash
         from CommitNotes cn
         left join RepositoryGrade rg on (rg.repoid=cn.repoid and rg.pset=cn.pset)
@@ -1007,14 +1015,6 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             echo "<div>Δt ", sprintf("%.06f", microtime(true) - $t0), "</div>";
         $sep = "<hr />\n";
     }
-
-    $pctable = [];
-    foreach (pcMembers() as $pc)
-        if ($pc->firstName && !$pc->firstNameAmbiguous)
-            $pctable[$pc->contactId] = $pc->firstName;
-        else
-            $pctable[$pc->contactId] = Text::name_text($pc);
-    Ht::stash_script('peteramati_grader_map=' . json_encode($pctable) . ';');
 
     foreach (ContactView::pset_list($Me, true) as $pset) {
         echo $sep;

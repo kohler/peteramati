@@ -550,65 +550,85 @@ function hoturl_add(url, component) {
     return url + (url.indexOf("?") < 0 ? "?" : "&") + component;
 }
 
+function hoturl_clean_before(x, page_component, prefix) {
+    if (x.first !== false && x.v.length) {
+        for (var i = 0; i < x.v.length; ++i) {
+            var m = page_component.exec(x.v[i]);
+            if (m) {
+                x.pt += prefix + m[1] + "/";
+                x.v.splice(i, 1);
+                x.first = m[1];
+                return;
+            }
+        }
+        x.first = false;
+    }
+}
+
 function hoturl_clean(x, page_component) {
-    var m;
-    if (x.o && x.last !== false
-        && (m = x.o.match(new RegExp("^(.*)(?:^|&)" + page_component + "(?:&|$)(.*)$")))) {
-        x.t += "/" + m[2];
-        x.o = m[1] + (m[1] && m[3] ? "&" : "") + m[3];
-        x.last = m[2];
-    } else
+    if (x.last !== false && x.v.length) {
+        for (var i = 0; i < x.v.length; ++i) {
+            var m = page_component.exec(x.v[i]);
+            if (m) {
+                x.t += "/" + m[1];
+                x.v.splice(i, 1);
+                x.last = m[1];
+                return;
+            }
+        }
         x.last = false;
+    }
 }
 
 function hoturl(page, options) {
-    var k, t, a, m, x, anchor = "", want_forceShow;
+    var k, v, t, a, m, x, anchor = "", want_forceShow;
     if (siteurl == null || siteurl_suffix == null) {
         siteurl = siteurl_suffix = "";
         log_jserror("missing siteurl");
     }
-    x = {t: siteurl + page + siteurl_suffix, o: serialize_object(options)};
-    if ((m = x.o.match(/^(.*?)#(.*)()$/))
-        || (m = x.o.match(/^(.*?)(?:^|&)anchor=(.*?)(?:&|$)(.*)$/))) {
-        x.o = m[1] + (m[1] && m[3] ? "&" : "") + m[3];
-        anchor = "#" + m[2];
-    }
-    if (page === "paper") {
-        hoturl_clean(x, "p=(\\d+)");
-        hoturl_clean(x, "m=(\\w+)");
-        if (x.last === "api") {
-            hoturl_clean(x, "fn=(\\w+)");
-            want_forceShow = true;
+
+    x = {pt: "", t: page + siteurl_suffix};
+    if (typeof options === "string") {
+        if ((m = options.match(/^(.*?)(#.*)$/))) {
+            options = m[1];
+            anchor = m[2];
         }
-    } else if (page === "review")
-        hoturl_clean(x, "p=(\\d+)");
-    else if (page === "help")
-        hoturl_clean(x, "t=(\\w+)");
+        x.v = options.split(/&/);
+    } else {
+        x.v = [];
+        for (k in options) {
+            v = options[k];
+            if (v === null)
+                /* skip */;
+            else if (k === "anchor")
+                anchor = "#" + v;
+            else
+                x.v.push(encodeURIComponent(k) + "=" + encodeURIComponent(v));
+        }
+    }
+
+    if (page === "help")
+        hoturl_clean(x, /^t=(\w+)$/);
     else if (page === "api") {
-        hoturl_clean(x, "fn=(\\w+)");
+        hoturl_clean(x, /^fn=(\w+)$/);
         want_forceShow = true;
     } else if (page === "index")
-        hoturl_clean(x, "u=([^?&]+)");
+        hoturl_clean_before(x, /^u=([^?&]+)$/, "~");
     else if (page === "pset" || page === "run") {
-        hoturl_clean(x, "pset=([^?&]+)");
-        hoturl_clean(x, "u=([^?&]+)");
-        hoturl_clean(x, "commit=([0-9A-Fa-f]+)");
+        hoturl_clean_before(x, /^u=([^?&]+)$/, "~");
+        hoturl_clean(x, /^pset=([^?&]+)$/);
+        hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
     }
-    if (x.o && hotcrp_list
-        && (m = x.o.match(/^(.*(?:^|&)ls=)([^&]*)((?:&|$).*)$/))
-        && hotcrp_list.id == decodeURIComponent(m[2]))
-        x.o = m[1] + hotcrp_list.num + m[3];
+
     if (hotcrp_want_override_conflict && want_forceShow
-        && (!x.o || !/(?:^|&)forceShow=/.test(x.o)))
-        x.o = (x.o ? x.o + "&" : "") + "forceShow=1";
-    a = [];
+        && hoturl_clean_find(x.v, /^forceShow=/) < 0)
+        x.v.push("forceShow=1");
+
     if (siteurl_defaults)
-        a.push(serialize_object(siteurl_defaults));
-    if (x.o)
-        a.push(x.o);
-    if (a.length)
-        x.t += "?" + a.join("&");
-    return x.t + anchor;
+        x.v.push(serialize_object(siteurl_defaults));
+    if (x.v.length)
+        x.t += "?" + x.v.join("&");
+    return siteurl + x.pt + x.t + anchor;
 }
 
 function hoturl_post(page, options) {
@@ -2827,7 +2847,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             (pconf.gitless ? 0 : 1);
     }
     function render_username_td(s) {
-        var t = '<a href="' + pconf.urlpattern.replace(/%40/, encodeURIComponent(s[username_key]));
+        var t = '<a href="' + escape_entities(hoturl("pset", {pset: pconf.psetkey, u: s[username_key]}));
         if (s.dropped)
             t += '" style="text-decoration:line-through';
         return t + '">' + escape_entities(s[username_key]) + '</a>';
