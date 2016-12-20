@@ -3098,7 +3098,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         else if (a.psetid != b.psetid)
             return peteramati_psets[a.psetid].pos < peteramati_psets[b.psetid].pos ? -rev : rev;
         else if (a.at != b.at)
-            return a.at < b.at ? rev : -rev;
+            return a.at < b.at ? -rev : rev;
         else
             return 0;
     }
