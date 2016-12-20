@@ -2915,6 +2915,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
         a.push('<td class="s61username">' + render_username_td(s) + '</td>');
         a.push('<td class="s61name' + (!s.anon_username || pconf.has_nonanonymous ? "" : " s61nonanonymous") + '">' + render_display_name(s) + '</td>');
+        a.push('<td class="s61extension">' + (s.extension ? "X" : "") + '</td>');
         if (s.gradercid && peteramati_grader_map[s.gradercid])
             txt = escape_entities(peteramati_grader_map[s.gradercid]);
         else
@@ -3066,11 +3067,11 @@ function pa_render_pset_table(psetid, pconf, data) {
         if (pconf.checkbox)
             a.push('<th class="s61checkbox"></th>');
         a.push('<th class="s61rownumber"></th>');
-        t = pconf.anonymous ? ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>' : '';
         if (flagged) {
             a.push('<th class="s61pset l plsortable" data-pa-sort="pset">Pset</th>');
             a.push('<th class="s61at l plsortable" data-pa-sort="at">Flagged</th>');
         }
+        t = pconf.anonymous ? ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>' : '';
         a.push('<th class="s61username l plsortable" data-pa-sort="username">Username' + t + '</th>');
         a.push('<th class="s61name l' + (pconf.has_nonanonymous ? "" : " s61nonanonymous") + ' plsortable" data-pa-sort="name">Name</th>');
         a.push('<th class="s61extension l plsortable" data-pa-sort="extension">X?</th>');
@@ -3087,11 +3088,17 @@ function pa_render_pset_table(psetid, pconf, data) {
         $j.find("thead .s61username a").click(switch_anon);
     }
     function user_compar(a, b) {
-        var au = ukey(a).toLowerCase(), bu = ukey(b).toLowerCase();
+        var au = ukey(a).toLowerCase();
+        var bu = ukey(b).toLowerCase();
+        var rev = sort.rev;
         if (au < bu)
-            return -sort.rev;
+            return -rev;
         else if (au > bu)
-            return sort.rev;
+            return rev;
+        else if (a.psetid != b.psetid)
+            return peteramati_psets[a.psetid].pos < peteramati_psets[b.psetid].pos ? -rev : rev;
+        else if (a.at != b.at)
+            return a.at < b.at ? rev : -rev;
         else
             return 0;
     }
