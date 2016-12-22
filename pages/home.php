@@ -747,19 +747,22 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     return $j;
 }
 
-function show_regrades($result) {
+function show_regrades($result, $all) {
     global $Conf, $Me, $Now, $LastPsetFix;
     $rows = $uids = [];
+    $pcmembers = $Conf->pc_members_and_admins();
     while (($row = edb_orow($result))) {
         $row->notes = json_decode($row->notes);
         $latest = "";
-        $uid = 0;
-        foreach (get($row->notes, "flags", []) as $t => $v)
+        $uid = $row->repocid ? : 0;
+        $flags = (array) get($row->notes, "flags");
+        foreach ($flags as $t => $v)
             if (!get($v, "resolved") && $t > $latest) {
                 $latest = $t;
-                $uid = get($v, "uid");
+                if (get($v, "uid") && !isset($pcmembers[$v->uid]))
+                    $uid = $v->uid;
             }
-        if ($latest) {
+        if ($latest || (!empty($flags) && $all)) {
             $rows[] = [$latest, $uid, $row];
             $uids[$uid] = true;
         }
@@ -1014,13 +1017,16 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             $pctable[$pc->contactId] = Text::name_text($pc);
     Ht::stash_script('peteramati_grader_map=' . json_encode($pctable) . ';');
 
-    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradehash
+    $allflags = !!req("allflags");
+    $field = req("allflags") ? "hasflags" : "hasactiveflags";
+    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradehash, l.cid repocid
         from CommitNotes cn
         left join RepositoryGrade rg on (rg.repoid=cn.repoid and rg.pset=cn.pset)
-        where hasactiveflags=1");
+        left join ContactLink l on (l.pset=cn.pset and l.type=" . LINK_REPO . " and l.link=cn.repoid)
+        where $field=1");
     if (edb_nrows($result)) {
         echo $sep;
-        show_regrades($result);
+        show_regrades($result, !!req("allflags"));
         if ($Profile)
             echo "<div>Δt ", sprintf("%.06f", microtime(true) - $t0), "</div>";
         $sep = "<hr />\n";

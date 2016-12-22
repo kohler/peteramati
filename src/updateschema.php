@@ -42,6 +42,25 @@ function _update_schema_regrade_flags(Conf $conf) {
     return true;
 }
 
+function _update_schema_hasflags(Conf $conf) {
+    if (!$conf->ql("alter table CommitNotes add `hasflags` tinyint(1) NOT NULL DEFAULT '0'"))
+        return false;
+    $result = $conf->ql("select * from CommitNotes");
+    $queries = [];
+    $qv = [];
+    while (($row = edb_orow($result))) {
+        if ($row->notes && ($n = json_decode($row->notes)) && isset($n->flags) && count((array) $n->flags)) {
+            $queries[] = "update CommitNotes set hasflags=1 where hash=? and pset=?";
+            array_push($qv, $row->hash, $row->pset);
+        }
+    }
+    Dbl::free($result);
+    $mresult = Dbl::multi_ql_apply(join(";", $queries), $qv);
+    while ($mresult->next())
+        /* spin */;
+    return true;
+}
+
 function update_schema_drop_keys_if_exist($conf, $table, $key) {
     $indexes = Dbl::fetch_first_columns($conf->dblink, "select distinct index_name from information_schema.statistics where table_schema=database() and `table_name`='$table'");
     $drops = [];
@@ -272,6 +291,9 @@ function updateSchema($conf) {
         && $conf->psets()
         && _update_schema_regrade_flags($conf))
         $conf->update_schema_version(108);
+    if ($conf->sversion == 108
+        && _update_schema_hasflags($conf))
+        $conf->update_schema_version(109);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

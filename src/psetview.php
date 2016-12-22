@@ -218,6 +218,10 @@ class PsetView {
         return $x;
     }
 
+    static function notes_hasflags($j) {
+        return $j && isset($j->flags) && count((array) $j->flags) ? 1 : 0;
+    }
+
     static function notes_hasactiveflags($j) {
         if ($j && isset($j->flags))
             foreach ($j->flags as $f)
@@ -244,14 +248,15 @@ class PsetView {
             // update database
             $notes = json_encode($new_notes);
             $haslinenotes = self::notes_haslinenotes($new_notes);
+            $hasflags = self::notes_hasflags($new_notes);
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record)
-                $result = $this->conf->qx("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, hasactiveflags=?, repoid=?",
+                $result = $this->conf->qx("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, repoid=?",
                                           $commit, $this->pset->psetid,
-                                          $notes, $haslinenotes, $hasactiveflags, $this->repo->repoid);
+                                          $notes, $haslinenotes, $hasflags, $hasactiveflags, $this->repo->repoid);
             else
-                $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasactiveflags=?, notesversion=? where hash=? and pset=? and notesversion=?",
-                                          $notes, $haslinenotes, $hasactiveflags, $record->notesversion + 1,
+                $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, notesversion=? where hash=? and pset=? and notesversion=?",
+                                          $notes, $haslinenotes, $hasflags, $hasactiveflags, $record->notesversion + 1,
                                           $commit, $this->pset->psetid, $record->notesversion);
             if ($result && $result->affected_rows)
                 break;
@@ -264,6 +269,7 @@ class PsetView {
             $record = (object) ["hash" => $commit, "pset" => $this->pset->psetid, "repoid" => $this->repo->repoid, "notesversion" => 0];
         $record->notes = $new_notes;
         $record->haslinenotes = $haslinenotes;
+        $record->hasflags = $hasflags;
         $record->hasactiveflags = $hasactiveflags;
         $record->notesversion = $record->notesversion + 1;
         if ($this_commit_record) {
@@ -273,6 +279,7 @@ class PsetView {
         if ($this->repo_grade && $this->repo_grade->gradehash === $commit) {
             $this->repo_grade->notes = $record->notes;
             $this->repo_grade->haslinenotes = $record->haslinenotes;
+            $this->repo_grade->hasflags = $record->hasflags;
             $this->repo_grade->hasactiveflags = $record->hasactiveflags;
             $this->repo_grade->notesversion = $record->notesversion;
             $this->grade_notes = $record->notes;
