@@ -84,7 +84,7 @@ if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
 
 // download
 function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
-    global $Conf, $Me;
+    global $Conf, $Me, $Qreq;
     $result = $Conf->qe_raw("select c.contactId, c.firstName, c.lastName, c.email,
 	c.huid, c.anon_username, c.seascode_username, c.github_username, c.extension,
 	r.repoid, r.url, r.open, r.working, r.lastpset,
@@ -99,19 +99,20 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
     $sort = $Qreq->sort;
     while (($s = edb_orow($result))) {
         $s->is_anonymous = $pset->anonymous && !$nonanonymous;
-        $username = $s->is_anonymous ? $s->anon_username : ($s->github_username ? : $s->seascode_username);
+        $s->username = $s->is_anonymous ? $s->anon_username : ($s->github_username ? : $s->seascode_username);
         Contact::set_sorter($s, $sort);
-        $ss = get($students, $username);
+        $ss = get($students, $s->username);
         if (!$ss && $s->is_anonymous)
-            $students[$username] = $ss = (object)
-                array("username" => $username,
+            $students[$s->username] = $ss = (object)
+                array("username" => $s->username,
                       "extension" => ($s->extension ? "Y" : "N"),
-                      "sorter" => $username);
+                      "sorter" => $s->username);
         else if (!$ss)
-            $students[$username] = $ss = (object)
+            $students[$s->username] = $ss = (object)
                 array("name" => trim("$s->lastName, $s->firstName"),
                       "email" => $s->email,
-                      "username" => $username,
+                      "username" => $s->username,
+                      "anon_username" => $s->anon_username,
                       "huid" => $s->huid,
                       "extension" => ($s->extension ? "Y" : "N"),
                       "sorter" => $s->sorter);
@@ -199,7 +200,7 @@ function download_psets_report($request) {
     if (isset($request["fields"]))
         $selection = explode(",", $request["fields"]);
     else
-        $selection = array("name", "grade", "username", "huid", "extension");
+        $selection = array("name", "grade", "username", "anon_username", "huid", "extension");
     $maxbyg = array();
     $max = $max_noextra = 0;
     foreach ($Conf->psets() as $pset)
@@ -236,11 +237,11 @@ function download_psets_report($request) {
         $m_tests = $maxbyg["tests"];
 
         foreach ($students as $s) {
-            $s->performance = sprintf("%.1f", 100 * (0.9 * ($s->psets_noextra / $m_noextra)
-                                                     + 0.75 * ($s->psets / $m_psets)
-                                                     + 1.2 * ($s->tests / $m_tests)));
+            $s->performance_noextra = round(1000 * (1.65 * ($s->psets_noextra / $m_noextra) + 1.2 * ($s->tests / $m_tests))) / 10;
+            $s->performance = round(1000 * (0.9 * ($s->psets_noextra / $m_noextra) + 0.75 * ($s->psets / $m_psets) + 1.2 * ($s->tests / $m_tests))) / 10;
         }
         set_ranks($students, $selection, "performance");
+        set_ranks($students, $selection, "performance_noextra");
     }
 
     $csv = new CsvGenerator;
@@ -439,7 +440,7 @@ if ($Me->privChair) {
     <!-- <li><a href='", hoturl("settings"), "'>Settings</a></li>
     <li><a href='", hoturl("users", "t=all"), "'>Users</a></li> -->
     <li><a href='", hoturl("mail"), "'>Send mail</a></li>
-    <li><a href='", hoturl_post("index", "report=nonanonymous"), "'>Overall grade report</a></li>
+    <li><a href='", hoturl_post("index", "report=nonanonymous"), "'>Overall grade report</a> (<a href='", hoturl_post("index", "report=nonanonymous+college"), "'>college</a>, <a href='", hoturl_post("index", "report=nonanonymous+extension"), "'>extension</a>)</li>
     <!-- <li><a href='", hoturl("log"), "'>Action log</a></li> -->
   </ul>
 </div>\n";
