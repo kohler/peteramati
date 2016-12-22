@@ -272,7 +272,7 @@ class Contact {
             else
                 $c->sorter = "$c->lastName $first";
         } else
-            $c->sorter = "$first $c->last";
+            $c->sorter = "$first $c->lastName";
         $c->sorter = trim($c->sorter . " " . $c->username . " " . $c->email);
         if (preg_match('/[\x80-\xFF]/', $c->sorter))
             $c->sorter = UnicodeHelper::deaccent($c->sorter);
