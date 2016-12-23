@@ -1999,9 +1999,8 @@ function gradetotal61(data) {
         $gt.text(total);
         gradecdf61();
     }
-    if (data.grades)
-        for (i in data.grades)
-            $("input[name='old;" + i + "']").val(data.grades[i]);
+    for (i in data.grades || {})
+        $("input[name='old;" + i + "']").val(data.grades[i]);
 }
 
 function gradesubmit61(form) {
@@ -2105,7 +2104,7 @@ function loadgrade61() {
                         elt.find(".autograde61").append(document.createTextNode(d.autogrades[n]));
                     }
                 }
-                gradetotal61();
+                gradetotal61(d);
             });
         }
     });
