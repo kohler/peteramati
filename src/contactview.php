@@ -309,7 +309,7 @@ class ContactView {
         if ($notes)
             foreach ($notes as $v) {
                 $v = is_array($v) ? $v : array(false, $v);
-                echo "<div class=\"", ($v[0] ? "cs61einf" : "cs61inf"),
+                echo "<div class=\"", ($v[0] ? "pa-inf-error" : "pa-inf"),
                     "\">", $v[1], "</div>";
             }
         echo "</div></td></tr></table>\n";

@@ -2321,20 +2321,20 @@ td.mhcb {
 .cs61infgroup {
 	padding-left: 168px;
 }
-.cs61inf:first-child, .cs61einf:first-child {
+.pa-inf:first-child, .pa-inf-error:first-child {
 	padding-top: 4px;
 }
-.cs61einf {
+.pa-inf-error {
 	font-weight: bold;
 	color: red;
 }
-.cs61einf:before {
+.pa-inf-error:before {
 	content: "\26a0 ";
 }
-.cs61inf {
+.pa-inf {
 	font-size: smaller;
 }
-.cs61hienote {
+.pa-inf-alert {
 	color: white;
 	background: red;
 }

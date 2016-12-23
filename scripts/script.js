@@ -2727,7 +2727,7 @@ function checklatest61() {
 
     function checkdata(d) {
         if (d && d.hash && d.hash != hash && (!d.snaphash || d.snaphash != hash)) {
-            jQuery(".commitcontainer61 .cs61infgroup").first().append("<div class=\"cs61einf\"><span class=\"cs61hienote\">Newer commits are available.</span> <a href=\"#\" onclick=\"location.reload(true)\">Load them</a></div>");
+            jQuery(".commitcontainer61 .cs61infgroup").first().append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"#\" onclick=\"location.reload(true)\">Load them</a></div>");
             clearTimeout(timeout);
         }
     }
