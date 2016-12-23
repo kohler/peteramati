@@ -127,7 +127,7 @@ class PsetView {
     }
 
     function recent_commits($hash = null) {
-        if ($this->recent_commits === false)
+        if ($this->recent_commits === null)
             $this->load_recent_commits();
         if (!$hash)
             return $this->recent_commits;
@@ -139,13 +139,13 @@ class PsetView {
     }
 
     function latest_commit() {
-        if ($this->recent_commits === false)
+        if ($this->recent_commits === null)
             $this->load_recent_commits();
         return $this->latest_commit;
     }
 
     function latest_hash() {
-        if ($this->recent_commits === false)
+        if ($this->recent_commits === null)
             $this->load_recent_commits();
         return $this->latest_commit ? $this->latest_commit->hash : false;
     }
