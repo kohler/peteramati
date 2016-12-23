@@ -2574,7 +2574,7 @@ function runmany61() {
 var runsetting61 = (function ($) {
 
 function save() {
-    var $j = $("#runsettings61 .cs61grp"), j = {}, i, k, v;
+    var $j = $("#runsettings61 .pa-grp"), j = {}, i, k, v;
     for (i = 0; i != $j.length; ++i) {
         k = $.trim($($j[i]).find(".n").val());
         v = $.trim($($j[i]).find(".v").val());
@@ -2592,7 +2592,7 @@ function add(name, value) {
     var $j = $("#runsettings61"), num = $j.find(".n").length;
     while ($j.find("[runsetting61num=" + num + "]").length)
         ++num;
-    var $x = $("<table class=\"cs61grp\" runsetting61num=\"" + num + "\"><tr><td class=\"cs61key\"></td><td><input name=\"n" + num + "\" class=\"n\" size=\"30\" placeholder=\"Name\" /> &nbsp; <input name=\"v" + num + "\" class=\"v\" size=\"40\" placeholder=\"Value\" /></td></tr></table>");
+    var $x = $("<table class=\"pa-grp\" runsetting61num=\"" + num + "\"><tr><td class=\"cs61key\"></td><td><input name=\"n" + num + "\" class=\"n\" size=\"30\" placeholder=\"Name\" /> &nbsp; <input name=\"v" + num + "\" class=\"v\" size=\"40\" placeholder=\"Value\" /></td></tr></table>");
     if (name) {
         $x.find(".n").val(name);
         $x.find(".v").val(value);

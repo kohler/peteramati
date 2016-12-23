@@ -2302,8 +2302,17 @@ td.mhcb {
 
 
 /* cs61 */
-.cs61grp {
+.pa-grp {
 	margin-bottom: 7px;
+}
+.pa-grp-hidden {
+	background-color: #f3f3f3;
+	color: #888888;
+	margin: 0 -24px;
+	padding: 8px 24px;
+}
+.pa-grp-hidden > .pa-grp {
+	margin-bottom: 0;
 }
 .cs61key {
 	font-weight: bold;

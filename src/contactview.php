@@ -302,8 +302,7 @@ class ContactView {
     }
 
     static function echo_group($key, $value, $notes = null, $extra = null) {
-        echo "<table class=\"cs61grp\"><tr><td class=\"cs61key\">", $key, "</td>",
-            "<td";
+        echo "<table class=\"pa-grp\"><tr><td class=\"cs61key\">", $key, "</td><td";
         if ($extra && isset($extra["nowrap"]) && $extra["nowrap"])
             echo " class=\"nw\"";
         echo ">", $value, "</td></tr><tr><td colspan=\"2\"><div class=\"cs61infgroup\">";

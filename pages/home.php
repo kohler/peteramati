@@ -433,7 +433,7 @@ echo "<noscript><div class='homeinside'>",
 echo "</div>\n";
 
 // Conference management
-if ($Me->privChair) {
+if ($Me->privChair && (!$User || $User === $Me)) {
     echo "<div id='homeadmin'>
   <h3>administration</h3>
   <ul>
@@ -585,8 +585,8 @@ function show_pset($pset, $user) {
         htmlspecialchars($pset->title), "</a>";
     $info = ContactView::user_pset_info($user, $pset);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
-    $can_grade = $grade_check_user->can_see_grades($pset, $user, $info);
-    if ($can_grade && $info->has_grading())
+    $user_see_grade = $user->can_see_grades($pset, $user, $info);
+    if ($user_see_grade && $info->has_grading())
         echo ' <a class="gradesready" href="', $pseturl, '">(grade ready)</a>';
     echo "</a></h2>";
     ContactView::echo_partner_group($info);
@@ -595,11 +595,18 @@ function show_pset($pset, $user) {
         Contact::check_repo($info->repo, 30);
     if ($info->has_grading()) {
         ContactView::echo_repo_grade_commit_group($info);
-        if ($can_grade && ($gi = $info->grading_info())) {
+        if ($Me->can_see_grades($pset, $user, $info)
+            && ($gi = $info->grading_info())) {
             $garr = render_grades($pset, $gi, null);
             if ($garr->totalindex !== null) {
                 $t = $garr->all[$garr->totalindex] . " / " . $garr->maxtotal;
-                ContactView::echo_group("grade", $t);
+                if ($user_see_grade)
+                    ContactView::echo_group("grade", $t);
+                else {
+                    echo '<div class="pa-grp-hidden">';
+                    ContactView::echo_group("grade", $t);
+                    echo '</div>';
+                }
             }
         }
         ContactView::echo_repo_flags_group($info);
