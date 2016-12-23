@@ -613,7 +613,7 @@ class ContactView {
         self::echo_group("grading commit", $value, array(join(", ", $notes)));
     }
 
-    static function echo_repo_regrades_group($info) {
+    static function echo_repo_flags_group($info) {
         global $Me;
         list($user, $repo) = array($info->user, $info->repo);
         if (self::add_regrades($info)) {
@@ -624,7 +624,7 @@ class ContactView {
                     $t .= " " . htmlspecialchars($row->subject);
                 $value[] = $t;
             }
-            self::echo_group("regrade requests", join("<br/>", $value));
+            self::echo_group("flagged commits", join("<br/>", $value));
         }
     }
 

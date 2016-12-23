@@ -602,7 +602,7 @@ function show_pset($pset, $user) {
                 ContactView::echo_group("grade", $t);
             }
         }
-        ContactView::echo_repo_regrades_group($info);
+        ContactView::echo_repo_flags_group($info);
     } else
         ContactView::echo_repo_last_commit_group($info, true);
 }
