@@ -1988,10 +1988,44 @@ function savelinenote61(form) {
 }
 
 function gradetotal61(data) {
-    var i, j = $(".grader61.gradepart"), total = 0, x;
-    for (i = 0; i < j.length; ++i) {
-        x = parseFloat(jQuery(j[i]).val());
-        x == x && (total += x);
+    var $gp = $(".grader61.gradepart"), total = 0;
+    var grades = data.grades, autogrades = data.autogrades || {},
+        maxgrades = data.maxgrades || {};
+    // parse entries
+    for (var i = 0; i < $gp.length; ++i) {
+        var $cur = $($gp[i]);
+        var name = $cur.attr("name");
+        if (!(name in grades))
+            continue;
+        var $form = $cur.closest("form");
+        var $old = $form.find("input[name='old;" + name + "']");
+        //if ($old.val() !== $cur.val() && $cur.val() == grades[name])
+        //    console.log("saved " + name);
+        // “grade is above max” message
+        if (maxgrades[name]) {
+            if (grades[name] <= maxgrades[name])
+                $form.find(".pa-gradeentry-abovemax").remove();
+            else if (!$form.find(".pa-gradeentry-abovemax").length)
+                $form.find(".pa-gradeentry").after('<div class="pa-gradeentry-abovemax">Grade is above max</div>');
+        }
+        // “autograde differs” message
+        if (autogrades[name]) {
+            if (grades[name] == autogrades[name])
+                $form.find(".pa-autograde-differs").remove();
+            else {
+                var txt = "autograde is " + autogrades[name];
+                if (!$form.find(".pa-autograde-differs").length)
+                    $form.find(".pa-gradeentry").append('<span class="pa-autograde-differs"></span>');
+                var $ag = $form.find(".pa-autograde-differs");
+                if ($ag.text() !== txt)
+                    $ag.text(txt);
+            }
+        }
+        $old.val(grades[name]);
+        // add to total
+        var curval = parseFloat($cur.val());
+        if (curval == curval)
+            total += curval;
     }
     total = Math.floor(total * 100 + 0.5) / 100;
     var $gt = $(".gradetotal61");
@@ -1999,11 +2033,11 @@ function gradetotal61(data) {
         $gt.text(total);
         gradecdf61();
     }
-    for (i in data.grades || {})
-        $("input[name='old;" + i + "']").val(data.grades[i]);
 }
 
 function gradesubmit61(form) {
+    $(form).find(".pa-autograde-differs, .ajaxsave61").remove();
+    $(form).find(".pa-gradeentry").append('<span class="ajaxsave61">Saving…</span>');
     return ajaxsave61(form, gradetotal61);
 }
 

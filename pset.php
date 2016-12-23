@@ -239,7 +239,7 @@ else if (isset($_REQUEST["savelinenote"]))
 function save_grades($pset, $info, $values, $isauto) {
     if ($info->is_handout_commit())
         json_exit(["ok" => false, "error" => "This is a handout commit."]);
-    $grades = array();
+    $grades = $maxgrades = [];
     foreach ($pset->grades as $ge)
         if (isset($values[$ge->name])) {
             $g = trim($values[$ge->name]);
@@ -268,8 +268,11 @@ function save_grades($pset, $info, $values, $isauto) {
 if ($Me->isPC && $Me != $User && check_post()
     && isset($_REQUEST["setgrade"]) && $Info->can_have_grades()) {
     $grades = save_grades($Pset, $Info, make_qreq(), false);
-    if (isset($_REQUEST["ajax"]))
-        json_exit(["ok" => true, "grades" => $grades]);
+    if (isset($_REQUEST["ajax"])) {
+        $gj = ContactView::grade_json($Info);
+        $gj->ok = true;
+        json_exit($gj);
+    }
     redirectSelf();
 }
 
@@ -476,21 +479,19 @@ function echo_grade_entry($ge) {
         if ($ge->max)
             $value .= ' <span class="grademax61" style="display:inline-block;min-width:3.5em">of ' . htmlspecialchars($ge->max) . '</span>';
         $value .= " " . Ht::submit("Save", array("tabindex" => 1));
-        $value .= ' <span class="ajaxsave61"></span>';
         if ($autograde && $autograde !== $grade)
-            $value .= ' <span class="autograde61">autograde is ' . htmlspecialchars($autograde) . '</span>';
+            $value .= '<span class="pa-autograde-differs">autograde is ' . htmlspecialchars($autograde) . '</span>';
     }
-
-    $remarks = array();
-    if ($grade !== null && $ge->max && $grade > $ge->max && $User != $Me)
-        $remarks[] = array(true, "Grade is above max");
+    $value = '<div class="pa-gradeentry">' . $value . '</div>';
+    if ($User !== $Me && $grade !== null && $ge->max && $grade > $ge->max)
+        $value .= '<div class="pa-gradeentry-abovemax">Grade is above max</div>';
 
     if ($User != $Me)
         echo Ht::form($Info->hoturl_post("pset", ["setgrade" => 1]),
                        array("onsubmit" => "return gradesubmit61(this)")),
             "<div class=\"f-contain\">",
             Ht::hidden("old;" . $key, $grade);
-    ContactView::echo_group($title, $value, $remarks, array("nowrap" => true));
+    ContactView::echo_group($title, $value);
     if ($User != $Me)
         echo "</div></form>";
 }
