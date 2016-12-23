@@ -100,7 +100,7 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
     while (($s = edb_orow($result))) {
         $s->is_anonymous = $pset->anonymous && !$nonanonymous;
         $s->username = $s->is_anonymous ? $s->anon_username : ($s->github_username ? : $s->seascode_username);
-        Contact::set_sorter($s, $sort);
+        Contact::set_sorter($s, $Conf);
         $ss = get($students, $s->username);
         if (!$ss && $s->is_anonymous)
             $students[$s->username] = $ss = (object)
@@ -754,24 +754,20 @@ function show_regrades($result, $all) {
     $pcmembers = $Conf->pc_members_and_admins();
     while (($row = edb_orow($result))) {
         $row->notes = json_decode($row->notes);
-        $latest = "";
-        $uid = $row->repocid ? : 0;
         $flags = (array) get($row->notes, "flags");
+        $any = false;
         foreach ($flags as $t => $v)
-            if (!get($v, "resolved") && $t > $latest) {
-                $latest = $t;
-                if (get($v, "uid") && !isset($pcmembers[$v->uid]))
-                    $uid = $v->uid;
-            }
-        if ($latest || (!empty($flags) && $all)) {
-            $rows[] = [$latest, $uid, $row];
-            $uids[$uid] = true;
+            if ($all || !get($v, "resolved"))
+                $uids[get($v, "uid", 0)] = $any = true;
+        if ($any) {
+            $rows[] = $row;
+            foreach (explode(",", $row->repocids) as $uid)
+                $uids[$uid] = true;
         }
     }
     Dbl::free($result);
     if (empty($rows))
         return;
-    usort($rows, function ($a, $b) { return strcmp($a[0], $b[0]); });
 
     $contacts = [];
     $result = $Conf->qe("select * from ContactInfo where contactId?a", array_keys($uids));
@@ -787,15 +783,24 @@ function show_regrades($result, $all) {
         $anonymous = !!req("anonymous");
     $any_anonymous = $any_nonanonymous = false;
     $jx = [];
-    foreach ($rows as $rowx) {
-        $uid = $rowx[1];
-        $row = $rowx[2];
-        $u = get($contacts, $uid);
+    foreach ($rows as $row) {
         $pset = $Conf->pset_by_id($row->pset);
         $anon = $anonymous === null ? $pset->anonymous : $anonymous;
         $any_anonymous = $any_anonymous || $anon;
         $any_nonanonymous = $any_nonanonymous || !$anon;
-        $j = render_regrade_row($pset, $u, $row, $anon);
+
+        $partners = [];
+        foreach (explode(",", $row->repocids) as $uid) {
+            if (($c = get($contacts, $uid))) {
+                $c->set_anonymous($anon);
+                $partners[] = $c;
+            }
+        }
+        usort($partners, "Contact::compare");
+
+        $j = render_regrade_row($pset, $partners[0], $row, $anon);
+        for ($i = 1; $i < count($partners); ++$i)
+            $j["partners"][] = render_regrade_row($pset, $partners[$i], $row, $anon);
         $j["pos"] = count($jx);
         $jx[] = $j;
         if (isset($j["total"]))
@@ -892,7 +897,6 @@ function show_pset_table($pset) {
     $students = array();
     while ($result && ($s = Contact::fetch($result))) {
         $s->set_anonymous($anonymous);
-        Contact::set_sorter($s, req("sort"));
         $students[$s->contactId] = $s;
         // maybe lastpset links are out of order
         if ($s->lastpset < $pset)
@@ -1020,10 +1024,10 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
 
     $allflags = !!req("allflags");
     $field = req("allflags") ? "hasflags" : "hasactiveflags";
-    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradehash, l.cid repocid
+    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradehash,
+        (select group_concat(cid) from ContactLink where pset=cn.pset and type=" . LINK_REPO . " and link=cn.repoid) repocids
         from CommitNotes cn
         left join RepositoryGrade rg on (rg.repoid=cn.repoid and rg.pset=cn.pset)
-        left join ContactLink l on (l.pset=cn.pset and l.type=" . LINK_REPO . " and l.link=cn.repoid)
         where $field=1");
     if (edb_nrows($result)) {
         echo $sep;

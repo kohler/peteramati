@@ -157,7 +157,7 @@ class Contact {
                 if (($c = simplify_whitespace($c)) !== "")
                     $this->collaborators .= "$c\n";
         }
-        self::set_sorter($this);
+        self::set_sorter($this, $this->conf);
         if (isset($user->password))
             $this->password = (string) $user->password;
         if (isset($user->disabled))
@@ -207,7 +207,7 @@ class Contact {
         $this->contactDbId = (int) $this->contactDbId;
         if ($this->unaccentedName === "")
             $this->unaccentedName = Text::unaccented_name($this->firstName, $this->lastName);
-        self::set_sorter($this);
+        self::set_sorter($this, $this->conf);
         $this->password = (string) $this->password;
         if (isset($this->disabled))
             $this->disabled = !!$this->disabled;
@@ -253,11 +253,12 @@ class Contact {
                 $this->username = $this->anon_username;
             else
                 $this->username = $this->github_username ? : $this->seascode_username;
+            self::set_sorter($this, $this->conf);
         }
     }
 
-    static public function set_sorter($c, $sorttype = null) {
-        $sort_by_last = $sorttype === "last";
+    static function set_sorter($c, Conf $conf) {
+        $sort_by_last = true;
         if ($c->is_anonymous) {
             $c->sorter = $c->anon_username;
             return;
@@ -605,7 +606,7 @@ class Contact {
         foreach (array("email", "preferredEmail", "affiliation", "note") as $k)
             if ($this->$k)
                 $this->$k = trim($this->$k);
-        self::set_sorter($this);
+        self::set_sorter($this, $this->conf);
     }
 
     function escape() {
