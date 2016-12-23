@@ -110,14 +110,14 @@ class PsetView {
     }
 
     function load_recent_commits() {
-        list($user, $repo, $pset) = array($this->user, $this->repo, $this->pset);
-        if (!$repo)
+        list($user, $pset) = array($this->user, $this->pset);
+        if (!$this->repo)
             return;
-        $this->recent_commits = $repo->commits($pset, 100) ? : [];
+        $this->recent_commits = $this->repo->commits($pset, 100) ? : [];
         if (!$this->recent_commits && isset($pset->test_file)
-            && $repo->ls_files("REPO/master", $pset->test_file)) {
-            $repo->_truncated_psetdir[$pset->id] = true;
-            $this->recent_commits = $repo->commits(null, 100) ? : [];
+            && $this->repo->ls_files("REPO/master", $pset->test_file)) {
+            $this->repo->_truncated_psetdir[$pset->id] = true;
+            $this->recent_commits = $this->repo->commits(null, 100) ? : [];
         }
         $this->recent_commits_truncated = count($this->recent_commits) == 100;
         if (!empty($this->recent_commits))

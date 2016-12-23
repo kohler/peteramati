@@ -135,7 +135,7 @@ class ContactView {
         return new PsetView($pset, $user, $Me);
     }
 
-    static function add_regrades($info) {
+    static function add_regrades(PsetView $info) {
         list($user, $repo) = array($info->user, $info->repo);
         if (!isset($info->regrades) && !$info->pset->gitless_grades) {
             $info->regrades = array();
@@ -151,7 +151,7 @@ class ContactView {
         return isset($info->regrades) && count($info->regrades);
     }
 
-    static function runner_logfile($info, $checkt) {
+    static function runner_logfile(PsetView $info, $checkt) {
         global $ConfSitePATH;
         return $ConfSitePATH . "/log/run" . $info->repo->cacheid
             . ".pset" . $info->pset->id
@@ -160,7 +160,7 @@ class ContactView {
             . "." . $checkt . ".log";
     }
 
-    static function runner_status_json($info, $checkt, $json = null) {
+    static function runner_status_json(PsetView $info, $checkt, $json = null) {
         global $Now;
         if (!$json)
             $json = (object) array();
@@ -190,7 +190,7 @@ class ContactView {
         return $json;
     }
 
-    static function grade_json($info) {
+    static function grade_json(PsetView $info) {
         global $Me;
         if (!$Me->can_see_grades($info->pset, $info->user, $info))
             return null;
@@ -226,14 +226,14 @@ class ContactView {
         return $result;
     }
 
-    static function runner_generic_json($info, $checkt) {
+    static function runner_generic_json(PsetView $info, $checkt) {
         return (object) array("ok" => true,
                               "repoid" => $info->repo->repoid,
                               "pset" => $info->pset->urlkey,
                               "timestamp" => $checkt);
     }
 
-    static function runner_json($info, $checkt, $offset = -1) {
+    static function runner_json(PsetView $info, $checkt, $offset = -1) {
         if (ctype_digit($checkt))
             $logfn = self::runner_logfile($info, $checkt);
         else if (preg_match(',\.(\d+)\.log(?:\.lock|\.pid)?\z,', $checkt, $m)) {
@@ -261,7 +261,7 @@ class ContactView {
         return $json;
     }
 
-    static function runner_write($info, $checkt, $data) {
+    static function runner_write(PsetView $info, $checkt, $data) {
         global $ConfSitePATH;
         if (!ctype_digit($checkt))
             return false;
@@ -315,7 +315,7 @@ class ContactView {
         echo "</div></td></tr></table>\n";
     }
 
-    static function echo_partner_group($info) {
+    static function echo_partner_group(PsetView $info) {
         global $Conf, $Me;
         list($user, $pset, $partner) =
             array($info->user, $info->pset, $info->partner);
@@ -383,7 +383,7 @@ class ContactView {
             redirectSelf();
     }
 
-    static function echo_repo_group($info, $include_tarball = false) {
+    static function echo_repo_group(PsetView $info, $include_tarball = false) {
         global $Conf, $Me, $Now;
         if ($info->pset->gitless)
             return;
@@ -530,7 +530,7 @@ class ContactView {
             redirectSelf();
     }
 
-    static function echo_repo_last_commit_group($info, $commitgroup) {
+    static function echo_repo_last_commit_group(PsetView $info, $commitgroup) {
         global $Me, $Conf;
         list($user, $repo) = array($info->user, $info->repo);
         if ($info->pset->gitless)
@@ -587,7 +587,7 @@ class ContactView {
             echo "</div>";
     }
 
-    static function echo_repo_grade_commit_group($info) {
+    static function echo_repo_grade_commit_group(PsetView $info) {
         list($user, $repo) = array($info->user, $info->repo);
         if ($info->pset->gitless_grades)
             return;
