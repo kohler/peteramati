@@ -2963,7 +2963,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 txt += ' <strong class="err">partner</strong>';
             a.push('<td class="s61repo">' + txt + '</td>');
         }
-        return a.join('');
+        return a;
     }
     function set_hotlist($b) {
         var j = {sort: sort.f}, i, l, p;
@@ -2988,23 +2988,28 @@ function pa_render_pset_table(psetid, pconf, data) {
     function render_body() {
         var $b = $j.find("tbody");
         $b.html("");
-        var i, spos, s, a, trn = 0, was_boring = false;
+        var trn = 0, was_boring = false;
         displaying_last_first = sort.f === "name" && sort.last;
-        for (i = 0; i < data.length; ++i) {
-            s = data[i];
+        for (var i = 0; i < data.length; ++i) {
+            var s = data[i];
             s._spos = dmap.length;
             dmap.push(s);
-            a = [];
+            var a = [];
             ++trn;
             if (s.boring && !was_boring && trn != 1)
                 a.push('<tr class="s61boring"><td colspan="' + calculate_ncol() + '"><hr /></td></tr>');
             was_boring = s.boring;
-            a.push('<tr class="k' + (trn % 2) + '" data-pa-spos="' + s._spos + '">' + render_tds(s, trn) + '</tr>');
+            var stds = render_tds(s, trn);
+            a.push('<tr class="k' + (trn % 2) + '" data-pa-spos="' + s._spos + '">' + stds.join('') + '</tr>');
             for (var j = 0; s.partners && j < s.partners.length; ++j) {
                 var ss = s.partners[j];
                 ss._spos = dmap.length;
                 dmap.push(ss);
-                a.push('<tr class="k' + (trn % 2) + ' s61partner" data-pa-spos="' + ss._spos + '" data-pa-partner="1">' + render_tds(s.partners[j], "") + '</tr>');
+                var sstds = render_tds(s.partners[j], "");
+                for (var k = 0; k < sstds.length; ++k)
+                    if (sstds[k] === stds[k])
+                        sstds[k] = '<td></td>';
+                a.push('<tr class="k' + (trn % 2) + ' s61partner" data-pa-spos="' + ss._spos + '" data-pa-partner="1">' + sstds.join('') + '</tr>');
             }
             $b.append(a.join(''));
         }
