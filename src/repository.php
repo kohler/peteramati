@@ -322,19 +322,19 @@ class Repository {
             $this->conf->qe("update Repository set analyzedsnapat=greatest(analyzedsnapat,?) where repoid=?", $analyzed_snaptime, $this->repoid);
     }
 
-    function find_snapshot($commit) {
-        if (isset($this->_commitinfo[$commit]))
-            return $this->_commitinfo[$commit];
+    function find_snapshot($hash) {
+        if (isset($this->_commitinfo[$hash]))
+            return $this->_commitinfo[$hash];
         $this->analyze_snapshots();
-        $bcommit = hex2bin(substr($commit, 0, strlen($commit) & ~1));
-        if (strlen($bcommit) == 20)
-            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and hash=?", $this->repoid, $bcommit);
+        $bhash = hex2bin(substr($hash, 0, strlen($hash) & ~1));
+        if (strlen($bhash) == 20)
+            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and hash=?", $this->repoid, $bhash);
         else
-            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and left(hash,?)=?", $this->repoid, strlen($bcommit), $bcommit);
+            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and left(hash,?)=?", $this->repoid, strlen($bhash), $bhash);
         $match = null;
         while ($result && ($row = $result->fetch_object())) {
             $h = bin2hex($row->hash);
-            if (str_starts_with($h, $commit)) {
+            if (str_starts_with($h, $hash)) {
                 if ($match) {
                     $match = false;
                     break;
@@ -349,7 +349,7 @@ class Repository {
             $cinfo->fromhead = "snapshot of " . strftime("%Y-%m-%d %H:%M:%S", $match->snapshot);
         } else
             $cinfo = false;
-        $this->_commitinfo[$commit] = $cinfo;
+        $this->_commitinfo[$hash] = $cinfo;
         return $cinfo;
     }
 }

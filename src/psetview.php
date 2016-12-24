@@ -23,7 +23,7 @@ class PsetView {
     private $repo_grade = null;     // RepositoryGrade+CommitNotes
     private $grade_notes = null;
 
-    private $commit = null;
+    private $hash = null;
     private $commit_record = false; // CommitNotes (maybe +RepositoryGrade)
     private $commit_notes = false;
     private $recent_commits = null;
@@ -61,47 +61,47 @@ class PsetView {
     }
 
     function set_hash($reqhash) {
-        $this->commit = $this->commit_notes = $this->derived_handout_commit = false;
+        $this->hash = $this->commit_notes = $this->derived_handout_commit = false;
         if (!$this->repo)
             return false;
         if ($this->recent_commits === null)
             $this->load_recent_commits();
         if ($reqhash)
-            $this->commit = $this->connected_hash($reqhash);
+            $this->hash = $this->connected_hash($reqhash);
         else if ($this->repo_grade && ($c = $this->connected_hash($this->repo_grade->gradehash)))
-            $this->commit = $c;
+            $this->hash = $c;
         else if ($this->latest_commit)
-            $this->commit = $this->latest_commit->hash;
-        return $this->commit;
+            $this->hash = $this->latest_commit->hash;
+        return $this->hash;
     }
 
     function force_set_hash($reqhash) {
         assert(strlen($reqhash) === 40);
-        if ($this->commit !== $reqhash) {
-            $this->commit = $reqhash;
+        if ($this->hash !== $reqhash) {
+            $this->hash = $reqhash;
             $this->commit_notes = $this->derived_handout_commit = false;
         }
     }
 
     function has_commit_set() {
-        return $this->commit !== null;
+        return $this->hash !== null;
     }
 
     function commit_hash() {
-        assert($this->commit !== null);
-        return $this->commit;
+        assert($this->hash !== null);
+        return $this->hash;
     }
 
     function maybe_commit_hash() {
-        return $this->commit;
+        return $this->hash;
     }
 
     function commit() {
-        if ($this->commit === null)
+        if ($this->hash === null)
             error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $this->viewer->email);
-        assert($this->commit !== null);
-        if ($this->commit)
-            return $this->recent_commits($this->commit);
+        assert($this->hash !== null);
+        if ($this->hash)
+            return $this->recent_commits($this->hash);
         else
             return false;
     }
@@ -152,9 +152,9 @@ class PsetView {
     }
 
     function is_latest_commit() {
-        return $this->commit
+        return $this->hash
             && ($lc = $this->latest_commit())
-            && $this->commit == $lc->hash;
+            && $this->hash == $lc->hash;
     }
 
     function derived_handout_hash() {
@@ -171,17 +171,17 @@ class PsetView {
     }
 
     function is_handout_commit() {
-        return $this->commit && $this->commit === $this->derived_handout_hash();
+        return $this->hash && $this->hash === $this->derived_handout_hash();
     }
 
     function commit_record() {
         if ($this->commit_record === false) {
-            if (!$this->commit
-                || ($this->repo_grade && $this->repo_grade->gradehash == $this->commit)) {
+            if (!$this->hash
+                || ($this->repo_grade && $this->repo_grade->gradehash == $this->hash)) {
                 $this->commit_record = $this->repo_grade;
                 $this->commit_notes = $this->grade_notes;
             } else {
-                $this->commit_record = $this->pset->commit_notes($this->commit);
+                $this->commit_record = $this->pset->commit_notes($this->hash);
                 $this->commit_notes = $this->commit_record ? $this->commit_record->notes : null;
             }
         }
@@ -231,14 +231,14 @@ class PsetView {
         return 0;
     }
 
-    function update_commit_info_at($commit, $updates, $reset_keys = false) {
+    function update_commit_info_at($hash, $updates, $reset_keys = false) {
         // find original
-        $this_commit_record = $this->commit === $commit
-            || (!$this->commit && $this->repo_grade && $this->repo_grade->gradehash === $commit);
+        $this_commit_record = $this->hash === $hash
+            || (!$this->hash && $this->repo_grade && $this->repo_grade->gradehash === $hash);
         if ($this_commit_record)
             $record = $this->commit_record();
         else
-            $record = $this->pset->commit_notes($commit);
+            $record = $this->pset->commit_notes($hash);
 
         // compare-and-swap loop
         while (1) {
@@ -253,21 +253,21 @@ class PsetView {
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record)
                 $result = $this->conf->qx("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, repoid=?",
-                                          $commit, $this->pset->psetid,
+                                          $hash, $this->pset->psetid,
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $this->repo->repoid);
             else
                 $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, notesversion=? where hash=? and pset=? and notesversion=?",
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $record->notesversion + 1,
-                                          $commit, $this->pset->psetid, $record->notesversion);
+                                          $hash, $this->pset->psetid, $record->notesversion);
             if ($result && $result->affected_rows)
                 break;
 
             // reload record
-            $record = $this->pset->commit_notes($commit);
+            $record = $this->pset->commit_notes($hash);
         }
 
         if (!$record)
-            $record = (object) ["hash" => $commit, "pset" => $this->pset->psetid, "repoid" => $this->repo->repoid, "notesversion" => 0];
+            $record = (object) ["hash" => $hash, "pset" => $this->pset->psetid, "repoid" => $this->repo->repoid, "notesversion" => 0];
         $record->notes = $new_notes;
         $record->haslinenotes = $haslinenotes;
         $record->hasflags = $hasflags;
@@ -277,7 +277,7 @@ class PsetView {
             $this->commit_record = $record;
             $this->commit_notes = $new_notes;
         }
-        if ($this->repo_grade && $this->repo_grade->gradehash === $commit) {
+        if ($this->repo_grade && $this->repo_grade->gradehash === $hash) {
             $this->repo_grade->notes = $record->notes;
             $this->repo_grade->haslinenotes = $record->haslinenotes;
             $this->repo_grade->hasflags = $record->hasflags;
@@ -288,8 +288,8 @@ class PsetView {
     }
 
     function update_commit_info($updates, $reset_keys = false) {
-        assert(!!$this->commit);
-        $this->update_commit_info_at($this->commit, $updates, $reset_keys);
+        assert(!!$this->hash);
+        $this->update_commit_info_at($this->hash, $updates, $reset_keys);
     }
 
     function update_contact_grade_info($updates, $reset_keys = false) {
@@ -339,14 +339,14 @@ class PsetView {
 
 
     function tarball_url() {
-        if ($this->repo && $this->commit !== null
+        if ($this->repo && $this->hash !== null
             && $this->pset->repo_tarball_patterns) {
             for ($i = 0; $i + 1 < count($this->pset->repo_tarball_patterns); $i += 2) {
                 $x = preg_replace('`' . str_replace("`", "\\`", $this->pset->repo_tarball_patterns[$i]) . '`s',
                                   $this->pset->repo_tarball_patterns[$i + 1],
                                   $this->repo->ssh_url(), -1, $nreplace);
                 if ($x !== null && $nreplace)
-                    return str_replace('${HASH}', $this->commit, $x);
+                    return str_replace('${HASH}', $this->hash, $x);
             }
         }
         return null;
@@ -391,9 +391,9 @@ class PsetView {
                 && get($this->grade, "gradercid")
                 && !get($this->grade_notes, "gradercid"))
                 $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
-            if (get($this->grade, "gradehash") && $this->commit === null)
+            if (get($this->grade, "gradehash") && $this->hash === null)
                 // NB don't check recent_commits association here
-                $this->commit = $this->grade->gradehash;
+                $this->hash = $this->grade->gradehash;
         }
         $this->can_see_comments = $this->viewer->can_see_comments($this->pset, $this->user, $this);
         $this->can_see_grades = $this->viewer->can_see_grades($this->pset, $this->user, $this);
@@ -431,9 +431,9 @@ class PsetView {
             return true;
         if ($this->grade === false)
             $this->load_grade();
-        return $this->commit
+        return $this->hash
             && $this->repo_grade
-            && $this->commit == $this->repo_grade->gradehash;
+            && $this->hash == $this->repo_grade->gradehash;
     }
 
     function gradercid() {
@@ -442,7 +442,7 @@ class PsetView {
         if ($this->pset->gitless_grades)
             return $this->grade ? $this->grade->gradercid : 0;
         else if ($this->repo_grade
-                 && $this->commit == $this->repo_grade->gradehash)
+                 && $this->hash == $this->repo_grade->gradehash)
             return $this->repo_grade->gradercid;
         else
             return $this->commit_info("gradercid") ? : 0;
@@ -507,7 +507,7 @@ class PsetView {
 
         $timestamp = get($cinfo, "timestamp");
         if (!$timestamp
-            && ($h = $this->commit ? : $this->grading_hash())
+            && ($h = $this->hash ? : $this->grading_hash())
             && ($ls = $this->recent_commits($h)))
             $timestamp = $ls->commitat;
         if (!$timestamp)
@@ -530,16 +530,16 @@ class PsetView {
                 ("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=values(gradercid)",
                  $this->user->contactId, $this->pset->psetid, $grader);
         else {
-            assert(!!$this->commit);
+            assert(!!$this->hash);
             if (!$this->repo_grade || !$this->repo_grade->gradehash)
                 $q = Dbl::format_query
                     ("insert into RepositoryGrade set repoid=?, pset=?, gradehash=?, gradercid=?, placeholder=0 on duplicate key update gradehash=values(gradehash), gradercid=values(gradercid), placeholder=0",
                      $this->repo->repoid, $this->pset->psetid,
-                     $this->commit ? : null, $grader);
+                     $this->hash ? : null, $grader);
             else
                 $q = Dbl::format_query
                     ("update RepositoryGrade set gradehash=?, gradercid=?, placeholder=0 where repoid=? and pset=? and gradehash=?",
-                     $this->commit ? : $this->repo_grade->gradehash, $grader,
+                     $this->hash ? : $this->repo_grade->gradehash, $grader,
                      $this->repo->repoid, $this->pset->psetid, $this->repo_grade->gradehash);
             $this->update_commit_info(array("gradercid" => $grader));
         }
@@ -554,13 +554,13 @@ class PsetView {
                     $this->user->contactId, $this->pset->psetid,
                     $this->viewer->contactId);
         else {
-            assert(!!$this->commit);
+            assert(!!$this->hash);
             $grader = $this->commit_info("gradercid");
             if (!$grader)
                 $grader = $this->grading_info("gradercid");
             Dbl::qe("insert into RepositoryGrade (repoid,pset,gradehash,gradercid,placeholder) values (?, ?, ?, ?, 0) on duplicate key update gradehash=values(gradehash), gradercid=values(gradercid), placeholder=0",
                     $this->repo->repoid, $this->pset->psetid,
-                    $this->commit ? : null, $grader ? : null);
+                    $this->hash ? : null, $grader ? : null);
         }
         $this->grade = $this->repo_grade = false;
     }
@@ -569,7 +569,7 @@ class PsetView {
     function hoturl_args($args = null) {
         $xargs = array("pset" => $this->pset->urlkey,
                        "u" => $this->viewer->user_linkpart($this->user));
-        if ($this->commit)
+        if ($this->hash)
             $xargs["commit"] = $this->commit_hash();
         if ($args)
             foreach ((array) $args as $k => $v)
