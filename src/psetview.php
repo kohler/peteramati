@@ -48,36 +48,37 @@ class PsetView {
         $this->load_grade();
     }
 
-    function connected_commit($commit) {
+    function connected_hash($hash) {
         if ($this->recent_commits === null)
             $this->load_recent_commits();
-        if (($c = git_commit_in_list($this->recent_commits, $commit)))
+        if (($c = git_commit_in_list($this->recent_commits, $hash)))
             return $c;
-        else if (($c = $this->repo->find_snapshot($commit))) {
+        else if (($c = $this->repo->find_snapshot($hash))) {
             $this->recent_commits[$c->hash] = $c;
             return $c->hash;
         } else
             return false;
     }
 
-    function set_commit($reqcommit) {
+    function set_hash($reqhash) {
         $this->commit = $this->commit_notes = $this->derived_handout_commit = false;
         if (!$this->repo)
             return false;
         if ($this->recent_commits === null)
             $this->load_recent_commits();
-        if ($reqcommit)
-            $this->commit = $this->connected_commit($reqcommit);
-        else if ($this->repo_grade && ($c = $this->connected_commit($this->repo_grade->gradehash)))
+        if ($reqhash)
+            $this->commit = $this->connected_hash($reqhash);
+        else if ($this->repo_grade && ($c = $this->connected_hash($this->repo_grade->gradehash)))
             $this->commit = $c;
         else if ($this->latest_commit)
             $this->commit = $this->latest_commit->hash;
         return $this->commit;
     }
 
-    function force_set_commit($reqcommit) {
-        if ($this->commit !== $reqcommit) {
-            $this->commit = $reqcommit;
+    function force_set_hash($reqhash) {
+        assert(strlen($reqhash) === 40);
+        if ($this->commit !== $reqhash) {
+            $this->commit = $reqhash;
             $this->commit_notes = $this->derived_handout_commit = false;
         }
     }

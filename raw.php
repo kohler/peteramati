@@ -18,7 +18,7 @@ function user_pset_info() {
     $Info = ContactView::user_pset_info($User, $Pset);
     if (($Commit = $Qreq->newcommit) == null)
         $Commit = $Qreq->commit;
-    if (!$Info->set_commit($Commit))
+    if (!$Info->set_hash($Commit))
         $Conf->ajaxExit(array("ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."));
     return $Info;
 }

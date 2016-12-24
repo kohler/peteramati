@@ -159,7 +159,7 @@ if (isset($_REQUEST["gradecdf"])) {
 $Info = ContactView::user_pset_info($User, $Pset);
 if (($Commit = req("newcommit")) == null)
     $Commit = req("commit");
-if (!$Info->set_commit($Commit) && $Commit && $Info->repo) {
+if (!$Info->set_hash($Commit) && $Commit && $Info->repo) {
     $Conf->errorMsg("Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository.");
     redirectSelf(array("newcommit" => null, "commit" => null));
 }

@@ -28,11 +28,11 @@ $hrecent = $Pset->handout_commits();
 if (($hasha = git_commit_in_list($hrecent, $Qreq->commit)))
     $diff_options["hasha_hrepo"] = true;
 else
-    $hasha = $hasha_mine = $Info->set_commit($Qreq->commit);
+    $hasha = $hasha_mine = $Info->set_hash($Qreq->commit);
 if (($hashb = git_commit_in_list($hrecent, $Qreq->commit1)))
     $diff_options["hashb_hrepo"] = true;
 else
-    $hashb = $hashb_mine = $Info->set_commit($Qreq->commit1);
+    $hashb = $hashb_mine = $Info->set_hash($Qreq->commit1);
 if (!$hasha || !$hashb) {
     if (!$hasha)
         $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->commit) . " is not connected to your repository.");

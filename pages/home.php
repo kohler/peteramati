@@ -279,14 +279,14 @@ function set_grader($qreq) {
             $info = ContactView::user_pset_info($user, $pset);
             if ($info->repo)
                 Contact::check_repo($info->repo, 2700, true);
-            if ($info->set_commit(null)) {
+            if ($info->set_hash(null)) {
                 $which_grader = mt_rand(0, count($cur_graders) - 1);
                 $info->change_grader($cur_graders[$which_grader]->contactId);
                 array_splice($cur_graders, $which_grader, 1);
                 if (count($cur_graders) == 0)
                     $cur_graders = $graders;
             } else
-                error_log("cannot set_commit for $user->email");
+                error_log("cannot set_hash for $user->email");
         }
     redirectSelf();
 }
@@ -668,7 +668,7 @@ function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
             && (!$s->repoviewable || !$s->gradehash)) {
             // XXX this is slow given that most info is already loaded
             $info = ContactView::user_pset_info($s, $pset);
-            $info->set_commit(null);
+            $info->set_hash(null);
             $s->gradehash = $info->commit_hash() ? : null;
             $s->placeholder = 1;
             Dbl::qe("insert into RepositoryGrade (repoid, pset, gradehash, placeholder, placeholder_at) values (?, ?, ?, 1, ?) on duplicate key update gradehash=(if(placeholder=1,values(gradehash),gradehash)), placeholder_at=values(placeholder_at)",
