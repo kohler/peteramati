@@ -39,7 +39,8 @@ class Repository {
     public $is_handout = false;
     public $viewable_by = [];
     public $_truncated_psetdir = [];
-    private $_commitinfo = [];
+    private $_commits = [];
+    private $_commit_lists = [];
 
     function __construct(Conf $conf = null) {
         global $Conf;
@@ -230,34 +231,80 @@ class Repository {
         return shell_exec("cd $repodir && $command");
     }
 
-    function commits_from_head($head, $limit = null, $directory = null) {
+    private function load_commits_from_head(&$list, $head, $directory) {
         $dirarg = "";
         if ((string) $directory !== "")
             $dirarg = " -- " . escapeshellarg($directory);
-        $limitarg = $limit ? " -n$limit" : "";
+        //$limitarg = $limit ? " -n$limit" : "";
+        $limitarg = "";
         $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' $head$dirarg");
-        $list = [];
-        foreach (explode("\n", $result) as $line)
-            if (preg_match(',\A(\S+)\s+(\S+)\s+(.*)\z,', $line, $m)
-                && !isset($list[$m[2]]))
-                $list[$m[2]] = new RepositoryCommitInfo((int) $m[1], $m[2], $m[3], $head);
-        return $list;
+        preg_match_all(',^(\S+)\s+(\S+)\s+(.*)$,m', $result, $ms, PREG_SET_ORDER);
+        foreach ($ms as $m) {
+            if (!isset($this->_commits[$m[2]]))
+                $this->_commits[$m[2]] = new RepositoryCommitInfo((int) $m[1], $m[2], $m[3], $head);
+            if (!isset($list[$m[2]]))
+                $list[$m[2]] = $this->_commits[$m[2]];
+        }
     }
 
-    function commits($pset = null, $limit = null) {
-        $dir = null;
-        if (is_object($pset) && $pset->directory_noslash !== "")
+    function commits($pset = null) {
+        $dir = "";
+        if (is_object($pset) && $pset->directory_noslash !== ""
+            && !get($this->_truncated_psetdir, $pset->psetid))
             $dir = $pset->directory_noslash;
         else if (is_string($pset) && $pset !== "")
             $dir = $pset;
+
+        if (isset($this->_commit_lists[$dir]))
+            return $this->_commit_lists[$dir];
+
+        // XXX should gitrun once, not multiple times
         $list = [];
         $heads = explode(" ", $this->heads);
         $heads[0] = "REPO/master";
-        foreach ($heads as $h) {
-            $xlist = $this->commits_from_head($h, $limit, $dir);
-            $list = $list ? array_merge($list, $xlist) : $xlist;
+        foreach ($heads as $h)
+            $this->load_commits_from_head($list, $h, $dir);
+
+        if (!$list && $dir !== "" && is_object($pset) && isset($pset->test_file)
+            && !isset($this->_truncated_psetdir[$pset->psetid])) {
+            $this->_truncated_psetdir[$pset->psetid] =
+                !!$this->ls_files("REPO/master", $pset->test_file);
+            if ($this->_truncated_psetdir[$pset->psetid])
+                return $this->commits(null);
         }
+
+        $this->_commit_lists[$dir] = $list;
         return $list;
+    }
+
+    function connected_commit($hash, $pset = null) {
+        if (empty($this->_commits))
+            // load some commits first
+            $this->commits($pset);
+
+        if (strlen($hash) === 40) {
+            if (array_key_exists($hash, $this->_commits))
+                return $this->_commits[$hash];
+        } else {
+            $matches = [];
+            foreach ($this->_commits as $h => $cx)
+                if (str_starts_with($h, $hash))
+                    $matches[] = $cx;
+            if (count($matches) == 1)
+                return $matches[0];
+            else if (!empty($matches))
+                return null;
+        }
+
+        // not found yet
+        // check if all commits are loaded
+        if (!isset($this->_commit_lists[""])) {
+            $this->commits();
+            return $this->connected_commit($hash);
+        }
+
+        // check snapshots
+        return $this->find_snapshot($hash);
     }
 
     function author_emails($pset = null, $limit = null) {
@@ -310,7 +357,7 @@ class Repository {
             $snaptime = gmmktime($m[4], $m[5], $m[6], $m[2], $m[3], $m[1]);
             $analyzed_snaptime = max($snaptime, $analyzed_snaptime);
             $head = file_get_contents($snapfile);
-            $result = $this->gitrun("git log -n2000 --simplify-merges --format=%H $head");
+            $result = $this->gitrun("git log -n20000 --simplify-merges --format=%H $head");
             foreach (explode("\n", $result) as $line)
                 if (strlen($line) == 40
                     && (!isset($qv[$line]) || $qv[$line][2] > $snaptime))
@@ -323,8 +370,8 @@ class Repository {
     }
 
     function find_snapshot($hash) {
-        if (isset($this->_commitinfo[$hash]))
-            return $this->_commitinfo[$hash];
+        if (array_key_exists($hash, $this->_commits))
+            return $this->_commits[$hash];
         $this->analyze_snapshots();
         $bhash = hex2bin(substr($hash, 0, strlen($hash) & ~1));
         if (strlen($bhash) == 20)
@@ -344,12 +391,11 @@ class Repository {
         }
         Dbl::free($result);
         if ($match) {
-            $list = $this->commits_from_head("repo{$this->repoid}.snap" . gmstrftime("%Y%m%d.%H%M%S", $match->snapshot));
-            $cinfo = $list[bin2hex($match->hash)];
-            $cinfo->fromhead = "snapshot of " . strftime("%Y-%m-%d %H:%M:%S", $match->snapshot);
-        } else
-            $cinfo = false;
-        $this->_commitinfo[$hash] = $cinfo;
-        return $cinfo;
+            $list = [];
+            $this->load_commits_from_head($list, "repo{$this->repoid}.snap" . gmstrftime("%Y%m%d.%H%M%S", $match->snapshot), "");
+        }
+        if (!array_key_exists($hash, $this->_commits))
+            $this->_commits[$hash] = null;
+        return $this->_commits[$hash];
     }
 }
