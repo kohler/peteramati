@@ -26,9 +26,6 @@ class PsetView {
     private $hash = null;
     private $commit_record = false; // CommitNotes (maybe +RepositoryGrade)
     private $commit_notes = false;
-    private $recent_commits = null;
-    private $recent_commits_truncated = null;
-    private $latest_commit = null;
     private $derived_handout_commit = null;
 
     function __construct(Pset $pset, Contact $user, Contact $viewer) {
@@ -49,34 +46,29 @@ class PsetView {
     }
 
     function connected_hash($hash) {
-        if ($this->recent_commits === null)
-            $this->load_recent_commits();
-        if (($c = git_commit_in_list($this->recent_commits, $hash)))
-            return $c;
-        else if (($c = $this->repo->find_snapshot($hash))) {
-            $this->recent_commits[$c->hash] = $c;
-            return $c->hash;
-        } else
-            return false;
+        $c = $this->repo ? $this->repo->connected_commit($hash) : null;
+        return $c ? $c->hash : false;
     }
 
     function set_hash($reqhash) {
         $this->hash = $this->commit_notes = $this->derived_handout_commit = false;
         if (!$this->repo)
             return false;
-        if ($this->recent_commits === null)
-            $this->load_recent_commits();
         if ($reqhash)
-            $this->hash = $this->connected_hash($reqhash);
-        else if ($this->repo_grade && ($c = $this->connected_hash($this->repo_grade->gradehash)))
-            $this->hash = $c;
-        else if ($this->latest_commit)
-            $this->hash = $this->latest_commit->hash;
+            $c = $this->repo->connected_commit($reqhash);
+        else {
+            $c = null;
+            if ($this->repo_grade)
+                $c = $this->repo->connected_commit($this->repo_grade->gradehash);
+            if (!$c)
+                $c = $this->latest_commit();
+        }
+        $this->hash = $c ? $c->hash : false;
         return $this->hash;
     }
 
     function force_set_hash($reqhash) {
-        assert(strlen($reqhash) === 40);
+        assert($reqhash === false || strlen($reqhash) === 40);
         if ($this->hash !== $reqhash) {
             $this->hash = $reqhash;
             $this->commit_notes = $this->derived_handout_commit = false;
@@ -110,51 +102,28 @@ class PsetView {
         return $this->pset->gitless_grades || $this->commit();
     }
 
-    function load_recent_commits() {
-        list($user, $pset) = array($this->user, $this->pset);
-        if (!$this->repo)
-            return;
-        $this->recent_commits = $this->repo->commits($pset, 100) ? : [];
-        if (!$this->recent_commits && isset($pset->test_file)
-            && $this->repo->ls_files("REPO/master", $pset->test_file)) {
-            $this->repo->_truncated_psetdir[$pset->id] = true;
-            $this->recent_commits = $this->repo->commits(null, 100) ? : [];
-        }
-        $this->recent_commits_truncated = count($this->recent_commits) == 100;
-        if (!empty($this->recent_commits))
-            $this->latest_commit = current($this->recent_commits);
-        else
-            $this->latest_commit = false;
-    }
-
     function recent_commits($hash = null) {
-        if ($this->recent_commits === null)
-            $this->load_recent_commits();
-        if (!$hash)
-            return $this->recent_commits;
-        if (strlen($hash) != 40)
-            $hash = git_commit_in_list($this->recent_commits, $hash);
-        if (($c = get($this->recent_commits, $hash)))
-            return $c;
-        return false;
+        if (!$this->repo)
+            return [];
+        else if (!$hash)
+            return $this->repo->commits($this->pset);
+        else
+            return $this->repo->connected_commit($hash, $this->pset);
     }
 
     function latest_commit() {
-        if ($this->recent_commits === null)
-            $this->load_recent_commits();
-        return $this->latest_commit;
+        $cs = $this->repo ? $this->repo->commits($this->pset) : [];
+        reset($cs);
+        return current($cs);
     }
 
     function latest_hash() {
-        if ($this->recent_commits === null)
-            $this->load_recent_commits();
-        return $this->latest_commit ? $this->latest_commit->hash : false;
+        $lc = $this->latest_commit();
+        return $lc ? $lc->hash : false;
     }
 
     function is_latest_commit() {
-        return $this->hash
-            && ($lc = $this->latest_commit())
-            && $this->hash == $lc->hash;
+        return $this->hash && $this->hash === $this->latest_hash();
     }
 
     function derived_handout_hash() {
