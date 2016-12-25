@@ -2948,7 +2948,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
         a.push('<td class="s61username">' + render_username_td(s) + '</td>');
         a.push('<td class="s61name' + (!s.anon_username || pconf.has_nonanonymous ? "" : " s61nonanonymous") + '">' + render_display_name(s) + '</td>');
-        a.push('<td class="s61extension">' + (s.extension ? "X" : "") + '</td>');
+        a.push('<td class="s61extension">' + (s.x ? "X" : "") + '</td>');
         if (s.gradercid && peteramati_grader_map[s.gradercid])
             txt = escape_entities(peteramati_grader_map[s.gradercid]);
         else
