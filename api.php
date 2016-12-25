@@ -58,4 +58,4 @@ if ($qreq->fn === "jserror") {
     json_exit(["ok" => true]);
 }
 
-$Conf->ajaxExit(["ok" => false]);
+json_exit(["ok" => false]);

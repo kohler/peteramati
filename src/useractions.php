@@ -66,7 +66,7 @@ class UserActions {
         } else if (@$_REQUEST["clickthrough_decline"])
             $Conf->errorMsg("You can’t continue until you accept these terms.");
         if (@$_REQUEST["ajax"])
-            $Conf->ajaxExit(array("ok" => $confirmed));
+            json_exit(["ok" => $confirmed]);
         redirectSelf();
     }
 

@@ -612,9 +612,9 @@ class Contact {
     function escape() {
         if (req("ajax") || req("latestcommit")) {
             if ($this->is_empty())
-                $this->conf->ajaxExit(array("ok" => 0, "loggedout" => 1));
+                json_exit(["ok" => false, "loggedout" => true]);
             else
-                $this->conf->ajaxExit(array("ok" => 0, "error" => "You don’t have permission to access that page."));
+                json_exit(["ok" => false, "error" => "You don’t have permission to access that page."]);
         }
 
         if ($this->is_empty()) {

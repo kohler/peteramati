@@ -10,7 +10,7 @@ global $User, $Pset, $Psetid, $Info, $RecentCommits, $Qreq;
 
 function quit($err = null) {
     global $Conf;
-    $Conf->ajaxExit(array("ok" => false, "error" => $err));
+    json_exit(["ok" => false, "error" => $err]);
 }
 
 function user_pset_info() {
@@ -19,7 +19,7 @@ function user_pset_info() {
     if (($Commit = $Qreq->newcommit) == null)
         $Commit = $Qreq->commit;
     if (!$Info->set_hash($Commit))
-        $Conf->ajaxExit(array("ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."));
+        json_exit(["ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."]);
     return $Info;
 }
 
@@ -30,7 +30,7 @@ $Qreq = make_qreq();
 $User = $Me;
 if ($Qreq->u !== null
     && !($User = ContactView::prepare_user($Qreq->u)))
-    $Conf->ajaxExit(["ok" => false]);
+    json_exit(["ok" => false]);
 assert($User == $Me || $Me->isPC);
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
@@ -166,7 +166,7 @@ if ($checkt > 0
         && $Me->can_run($Pset, $Runner, $User)
         && $Runner->eval)
         runner_eval($Runner, $Info, $answer);
-    $Conf->ajaxExit($answer);
+    json_exit($answer);
 }
 
 
@@ -241,7 +241,7 @@ if (isset($Runner->queue)) {
         // error_log($User->seascode_username . ": $Queue->queueid, $nconcurrent, $Queue->nahead, $Queue->ahead_nconcurrent");
         if ($nconcurrent > 0 && $Queue->nahead >= $nconcurrent) {
             if ($tries)
-                $Conf->ajaxExit(array("onqueue" => true, "queueid" => $Queue->queueid, "nahead" => $Queue->nahead, "headage" => ($Queue->head_runat ? $Now - $Queue->head_runat : null)));
+                json_exit(["onqueue" => true, "queueid" => $Queue->queueid, "nahead" => $Queue->nahead, "headage" => ($Queue->head_runat ? $Now - $Queue->head_runat : null)]);
             clean_queue($Runner->queue, $qconf, $Queue->queueid);
             $Queue = load_queue($Queueid, $Info->repo);
         } else
@@ -261,7 +261,7 @@ if (!$Runner->command && $Runner->eval) {
     $json->done = true;
     $json->status = "done";
     runner_eval($Runner, $Info, $json);
-    $Conf->ajaxExit($json);
+    json_exit($json);
 }
 
 
@@ -271,7 +271,7 @@ try {
 
     // recent
     if ($Qreq->check == "recent" && count($rs->logged_checkts))
-        $Conf->ajaxExit(ContactView::runner_json($Info, $rs->logged_checkts[0], $Offset));
+        json_exit(ContactView::runner_json($Info, $rs->logged_checkts[0], $Offset));
     else if ($Qreq->check == "recent")
         quit("no logs yet");
 
@@ -284,12 +284,12 @@ try {
     // save information about execution
     $Info->update_commit_info(["run" => [$Runner->runclass => $rs->checkt]]);
 
-    $Conf->ajaxExit(array("ok" => true,
-                          "done" => false,
-                          "status" => "working",
-                          "repoid" => $Info->repo->repoid,
-                          "pset" => $Info->pset->id,
-                          "timestamp" => $rs->checkt));
+    json_exit(["ok" => true,
+               "done" => false,
+               "status" => "working",
+               "repoid" => $Info->repo->repoid,
+               "pset" => $Info->pset->id,
+               "timestamp" => $rs->checkt]);
 } catch (Exception $e) {
     quit($e->getMessage());
 }

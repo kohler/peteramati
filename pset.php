@@ -95,7 +95,7 @@ class Series {
 // get JSON grade series data
 if (isset($_REQUEST["gradecdf"])) {
     if (!$Me->isPC && !Contact::student_can_view_grade_cdf($Pset))
-        $Conf->ajaxExit(array("error" => "Grades are not visible now"));
+        json_exit(["error" => "Grades are not visible now"]);
 
     if ($Conf->setting("gradejson_pset$Pset->id", 0) < $Now - 30) {
         if (is_int($Pset->grades_visible))
@@ -152,7 +152,7 @@ if (isset($_REQUEST["gradecdf"])) {
         if (get($j, "extension"))
             Series::truncate_summary_below($j->extension, $Pset->grade_cdf_cutoff);
     }
-    $Conf->ajaxExit($j);
+    json_exit($j);
 }
 
 // load user repo and current commit
@@ -170,9 +170,9 @@ if (isset($_REQUEST["gradestatus"])) {
     $gj = ContactView::grade_json($Info);
     if ($gj) {
         $gj->ok = true;
-        $Conf->ajaxExit($gj);
+        json_exit($gj);
     } else
-        $Conf->ajaxExit(array("error" => "Grades are not visible now"));
+        json_exit(["error" => "Grades are not visible now"]);
 }
 
 // get commit data
@@ -186,7 +186,7 @@ if (isset($_REQUEST["latestcommit"])) {
         unset($j->fromhead);
         $j->snaphash = $Info->repo->snaphash;
     }
-    $Conf->ajaxExit($j);
+    json_exit($j);
 }
 
 // maybe set commit
@@ -197,9 +197,9 @@ if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
         if ($pcm->email === $_POST["grader"])
             $grader = $pcm->contactId;
     if (!$grader && $_POST["grader"] !== "none")
-        $Conf->ajaxExit(array("ok" => false, "error" => "No such grader"));
+        json_exit(["ok" => false, "error" => "No such grader"]);
     $Info->change_grader($grader);
-    $Conf->ajaxExit(array("ok" => null, "grader_email" => $_POST["grader"]));
+    json_exit(["ok" => null, "grader_email" => $_POST["grader"]]);
 }
 if (isset($_REQUEST["setcommit"]) && isset($_REQUEST["grade"]) && check_post()
     && $Info->can_have_grades() && $Me->isPC && $Me != $User)
@@ -285,7 +285,7 @@ if ($Me->isPC && $Me != $User && check_post()
     } else
         $result = false;
     if (isset($_REQUEST["ajax"]))
-        $Conf->ajaxExit($result);
+        json_exit($result);
     redirectSelf();
 }
 
@@ -350,7 +350,7 @@ if ($Me->isPC && $Me != $User && isset($_REQUEST["saverunsettings"])
         $x = null;
     $Info->update_commit_info(array("runsettings" => $x), true);
     if (isset($_REQUEST["ajax"]))
-        $Conf->ajaxExit(array("ok" => true, "runsettings" => $x));
+        json_exit(["ok" => true, "runsettings" => $x]);
 }
 
 // check for new commit
