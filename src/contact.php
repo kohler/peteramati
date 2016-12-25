@@ -1595,32 +1595,32 @@ class Contact {
         return $setting === true || (is_int($setting) && $setting >= $Now);
     }
 
-    static function student_can_see_pset($pset) {
+    static function student_can_view_pset($pset) {
         return isset($pset->visible)
             && self::show_setting_on($pset->visible)
             && !$pset->disabled;
     }
 
-    static function student_can_see_grades(Pset $pset, $extension = null) {
+    static function student_can_view_grades(Pset $pset, $extension = null) {
         if ($extension === null)
             $k = "grades_visible";
         else if ($extension)
             $k = "grades_visible_extension";
         else
             $k = "grades_visible_college";
-        return self::student_can_see_pset($pset)
+        return self::student_can_view_pset($pset)
             && isset($pset->$k)
             && self::show_setting_on($pset->$k);
     }
 
-    static function student_can_see_grade_cdf(Pset $pset) {
-        return self::student_can_see_pset($pset)
+    static function student_can_view_grade_cdf(Pset $pset) {
+        return self::student_can_view_pset($pset)
             && (isset($pset->grade_cdf_visible)
                 ? self::show_setting_on($pset->grade_cdf_visible)
-                : self::student_can_see_grades($pset));
+                : self::student_can_view_grades($pset));
     }
 
-    function can_see_grader(Pset $pset, Contact $user = null) {
+    function can_view_grader(Pset $pset, Contact $user = null) {
         return ($this->isPC && (!$user || $user != $this))
             || $this->privChair;
     }
@@ -1630,18 +1630,18 @@ class Contact {
             || $this->privChair;
     }
 
-    function can_see_comments(Pset $pset, Contact $user = null, $info = null) {
+    function can_view_comments(Pset $pset, Contact $user = null, $info = null) {
         return (!$pset || !$pset->disabled)
             && (($this->isPC && $user && $user != $this)
                 || $this->privChair
                 || (!$pset || !$pset->hide_comments));
     }
 
-    function can_see_grades(Pset $pset, Contact $user = null, $info = null) {
+    function can_view_grades(Pset $pset, Contact $user = null, $info = null) {
         return (!$pset || !$pset->disabled)
             && (($this->isPC && $user && $user != $this)
                 || $this->privChair
-                || ($pset && self::student_can_see_grades($pset, $this->extension)
+                || ($pset && self::student_can_view_grades($pset, $this->extension)
                     && (!$info || !$info->grades_hidden())));
     }
 
@@ -1653,7 +1653,7 @@ class Contact {
         $s2s = $runner->visible;
         return $s2s === true
             || (($s2s === "grades" || $s2s === "grade")
-                && $this->can_see_grades($pset));
+                && $this->can_view_grades($pset));
     }
 
     function can_view_run(Pset $pset, $runner, $user = null) {
@@ -1666,7 +1666,7 @@ class Contact {
         return ($s2s === true || $r2s === true)
             || (($s2s === "grades" || $s2s === "grade"
                  || $r2s === "grades" || $r2s === "grade")
-                && $this->can_see_grades($pset));
+                && $this->can_view_grades($pset));
     }
 
     function user_linkpart(Contact $user = null, $is_anonymous = false) {

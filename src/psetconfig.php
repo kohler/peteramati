@@ -227,8 +227,8 @@ class Pset {
         return $this->conf->handout_repo($this, $inrepo);
     }
 
-    function handout_commits() {
-        return $this->conf->handout_commits($this);
+    function handout_commits($hash = null) {
+        return $this->conf->handout_commits($this, $hash);
     }
 
     function latest_handout_commit() {

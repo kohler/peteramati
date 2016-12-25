@@ -94,7 +94,7 @@ class Series {
 
 // get JSON grade series data
 if (isset($_REQUEST["gradecdf"])) {
-    if (!$Me->isPC && !Contact::student_can_see_grade_cdf($Pset))
+    if (!$Me->isPC && !Contact::student_can_view_grade_cdf($Pset))
         $Conf->ajaxExit(array("error" => "Grades are not visible now"));
 
     if ($Conf->setting("gradejson_pset$Pset->id", 0) < $Now - 30) {
@@ -460,7 +460,7 @@ function echo_grade_entry($ge) {
     global $User, $Me, $Info;
     $key = $ge->name;
     $grade = $Info->current_grade_entry($key);
-    if (!$Info->can_see_grades
+    if (!$Info->can_view_grades
         || ($User == $Me && $grade === null && $ge->is_extra))
         return;
     $title = isset($ge->title) ? $ge->title : $key;
@@ -498,7 +498,7 @@ function echo_grade_entry($ge) {
 
 function echo_grade_total($gj) {
     global $User, $Me, $Pset, $Info;
-    if ($Info->can_see_grades && $gj && get($gj, "grades") && $gj->nentries > 1) {
+    if ($Info->can_view_grades && $gj && get($gj, "grades") && $gj->nentries > 1) {
         $value = '<span class="gradetotal61">' . $gj->grades->total . '</span>';
         if ($Me != $User)
             $value = '<span class="gradeholder61">' . $value . '</span>';
@@ -542,7 +542,7 @@ function echo_commit($Info) {
         $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
     }
     $result = $Conf->qe("select hash from CommitNotes where (haslinenotes & ?)!=0 and pset=? and hash ?a",
-                        $Me == $User && !$Info->can_see_grades ? HASNOTES_COMMENT : HASNOTES_ANY,
+                        $Me == $User && !$Info->can_view_grades ? HASNOTES_COMMENT : HASNOTES_ANY,
                         $Pset->psetid, array_keys($sel));
     while (($row = edb_row($result)))
         $sel[$row[0]] .= " &nbsp;♪";
@@ -629,7 +629,7 @@ function echo_commit($Info) {
 function echo_grader() {
     global $Me, $User, $Pset, $Info;
     $gradercid = $Info->gradercid();
-    if ($Info->is_grading_commit() && $Me->can_see_grader($Pset, $User)) {
+    if ($Info->is_grading_commit() && $Me->can_view_grader($Pset, $User)) {
         $pcm = pcMembers();
         $gpc = get($pcm, $gradercid);
         $value_post = "";
@@ -658,7 +658,7 @@ function echo_grader() {
 
 function echo_grade_cdf_here() {
     global $Me, $User, $Pset, $Info;
-    if ($Info->can_see_grades
+    if ($Info->can_view_grades
         && ($Me != $User || $Pset->grade_cdf_visible)
         && $Pset->grades) {
         $gj = ContactView::grade_json($Info);
@@ -673,14 +673,14 @@ function echo_all_grades() {
         return;
 
     $gj = ContactView::grade_json($Info);
-    if (get($gj, "grades") || ($Info->can_see_grades && $Me != $User)) {
+    if (get($gj, "grades") || ($Info->can_view_grades && $Me != $User)) {
         echo_grade_total($gj);
         foreach ($Pset->grades as $ge)
             echo_grade_entry($ge);
     }
 
     $lhg = $Info->late_hours();
-    if ($lhg && $User == $Me && $Info->can_see_grades) {
+    if ($lhg && $User == $Me && $Info->can_view_grades) {
         if ($lhg->hours || get($gj, "grades")) {
             echo '<div style="margin-top:1.5em">';
             ContactView::echo_group("late hours", '<span class="grader61" data-pa-grade="late_hours">' . htmlspecialchars($lhg->hours) . '</span>',
@@ -815,8 +815,8 @@ if ($Pset->gitless) {
     echo_all_grades();
 
     // collect diff and sort line notes
-    $all_linenotes = $Info->can_see_comments ? $Info->commit_info("linenotes") : null;
-    $lnorder = new LinenotesOrder($all_linenotes, $Info->can_see_grades);
+    $all_linenotes = $Info->can_view_comments ? $Info->commit_info("linenotes") : null;
+    $lnorder = new LinenotesOrder($all_linenotes, $Info->can_view_grades);
     $diff = $User->repo_diff($Info->repo, $Info->commit_hash(), $Pset, array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
     $lnorder->set_diff($diff);
 
@@ -826,7 +826,7 @@ if ($Pset->gitless) {
         $f = str_starts_with($fl[0], $Pset->directory_slash) ? substr($fl[0], strlen($Pset->directory_slash)) : $fl[0];
         $notelinks[] = '<a href="#L' . $fl[1] . '_' . html_id_encode($fl[0])
             . '" onclick="return gotoline61(this)" class="noteref61'
-            . (!$fl[2] && !$Info->user_can_see_grades ? " hiddennote61" : "")
+            . (!$fl[2] && !$Info->user_can_view_grades ? " hiddennote61" : "")
             .'">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
     }
     if (count($notelinks))
@@ -877,7 +877,7 @@ if ($Pset->gitless) {
         $linenotes = $lnorder->file($file);
         $open = $linenotes
             || (!$dinfo->boring
-                && ($Me != $Info->user || !$Info->can_see_grades
+                && ($Me != $Info->user || !$Info->can_view_grades
                     || !$Info->is_grading_commit() || !$has_any_linenotes));
         $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
     }

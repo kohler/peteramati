@@ -15,9 +15,9 @@ class PsetView {
     public $can_set_repo;
     public $can_view_repo_contents;
     public $user_can_view_repo_contents;
-    public $can_see_comments;
-    public $can_see_grades;
-    public $user_can_see_grades;
+    public $can_view_comments;
+    public $can_view_grades;
+    public $user_can_view_grades;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
     private $repo_grade = null;     // RepositoryGrade+CommitNotes
@@ -364,9 +364,9 @@ class PsetView {
                 // NB don't check recent_commits association here
                 $this->hash = $this->grade->gradehash;
         }
-        $this->can_see_comments = $this->viewer->can_see_comments($this->pset, $this->user, $this);
-        $this->can_see_grades = $this->viewer->can_see_grades($this->pset, $this->user, $this);
-        $this->user_can_see_grades = $this->user->can_see_grades($this->pset, $this->user, $this);
+        $this->can_view_comments = $this->viewer->can_view_comments($this->pset, $this->user, $this);
+        $this->can_view_grades = $this->viewer->can_view_grades($this->pset, $this->user, $this);
+        $this->user_can_view_grades = $this->user->can_view_grades($this->pset, $this->user, $this);
     }
 
     function has_grading() {
@@ -575,7 +575,7 @@ class PsetView {
         echo '<table id="', $tabid, '" class="code61 diff61 filediff61';
         if ($this->pc_view)
             echo " live";
-        if (!$this->user_can_see_grades)
+        if (!$this->user_can_view_grades)
             echo " hidegrade61";
         if (!$open)
             echo '" style="display:none';
@@ -628,7 +628,7 @@ class PsetView {
         }
         if (!is_array($note))
             $note = array(false, $note);
-        if ($this->can_see_grades || $note[0]) {
+        if ($this->can_view_grades || $note[0]) {
             echo '<tr class="diffl61 gw">', /* NB script depends on this class */
                 '<td colspan="2" class="difflnoteborder61"></td>',
                 '<td class="difflnote61">';
@@ -683,7 +683,7 @@ class PsetView {
             '<div class="aabut">',
             Ht::submit("Save comment"),
             '</div><div class="aabut">';
-        if ($this->user_can_see_grades)
+        if ($this->user_can_view_grades)
             echo Ht::hidden("iscomment", 1);
         else
             echo Ht::checkbox("iscomment", 1), '&nbsp;', Ht::label("Show immediately");

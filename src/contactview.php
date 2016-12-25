@@ -121,7 +121,7 @@ class ContactView {
         $istf = $contact && ($contact === true || $contact->isPC);
         $ischair = $contact instanceof Contact && $contact->privChair;
         foreach ($Conf->psets() as $pset)
-            if (Contact::student_can_see_pset($pset)
+            if (Contact::student_can_view_pset($pset)
                 || (!$pset->disabled && $pset->gitless && $istf)
                 || (!$pset->ui_disabled && $ischair))
                 $psets[$pset->id] = $pset;
@@ -192,7 +192,7 @@ class ContactView {
 
     static function grade_json(PsetView $info) {
         global $Me;
-        if (!$Me->can_see_grades($info->pset, $info->user, $info))
+        if (!$Me->can_view_grades($info->pset, $info->user, $info))
             return null;
         $pcview = $Me->isPC && $Me != $info->user;
         $notes = $info->current_info();
@@ -593,7 +593,7 @@ class ContactView {
             return;
         else if (!$info->has_grading() || !$info->can_view_repo_contents)
             return self::echo_repo_last_commit_group($info, false);
-        // XXX should check can_see_grades here
+        // XXX should check can_view_grades here
 
         $value = "";
         $ginfo = $info->grading_commit();

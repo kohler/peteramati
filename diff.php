@@ -75,7 +75,7 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
 // collect diff and sort line notes
 $diff = $User->repo_diff($Info->repo, $hashb, $Pset, $diff_options);
 $all_linenotes = $hashb_mine ? $Info->commit_info("linenotes") : array();
-$lnorder = new LinenotesOrder($all_linenotes, $Info->can_see_grades);
+$lnorder = new LinenotesOrder($all_linenotes, $Info->can_view_grades);
 $lnorder->set_diff($diff);
 
 // print line notes
@@ -84,7 +84,7 @@ foreach ($lnorder->seq() as $fl) {
     $f = str_starts_with($fl[0], $Pset->directory_slash) ? substr($fl[0], strlen($Pset->directory_slash)) : $fl[0];
     $notelinks[] = '<a href="#L' . $fl[1] . '_' . html_id_encode($fl[0])
         . '" onclick="return gotoline61(this)" class="noteref61'
-        . (!$fl[2] && !$Info->user_can_see_grades ? " hiddennote61" : "")
+        . (!$fl[2] && !$Info->user_can_view_grades ? " hiddennote61" : "")
             .'">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
 }
 if (count($notelinks))

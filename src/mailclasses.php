@@ -27,7 +27,7 @@ class MailRecipients {
     function selectors() {
         $sel = array("students" => "All students");
         foreach (ContactView::pset_list(true, false) as $pset)
-            if (Contact::student_can_see_pset($pset)) {
+            if (Contact::student_can_view_pset($pset)) {
                 if (!$pset->gitless || $pset->partner)
                     $sel[] = array("optgroup", $pset->title);
                 if (!$pset->gitless) {

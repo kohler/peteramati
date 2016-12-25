@@ -57,7 +57,7 @@ if (!$Me->isPC || !$User)
 // check problem set openness
 $max_pset = $Conf->setting("pset_forwarded");
 foreach ($Conf->psets() as $pset)
-    if (Contact::student_can_see_pset($pset) && $pset->id > $max_pset
+    if (Contact::student_can_view_pset($pset) && $pset->id > $max_pset
         && !$pset->gitless)
         Contact::forward_pset_links($pset->id);
 
@@ -585,7 +585,7 @@ function show_pset($pset, $user) {
         htmlspecialchars($pset->title), "</a>";
     $info = ContactView::user_pset_info($user, $pset);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
-    $user_see_grade = $user->can_see_grades($pset, $user, $info);
+    $user_see_grade = $user->can_view_grades($pset, $user, $info);
     if ($user_see_grade && $info->has_grading())
         echo ' <a class="gradesready" href="', $pseturl, '">(grade ready)</a>';
     echo "</a></h2>";
@@ -595,7 +595,7 @@ function show_pset($pset, $user) {
         Contact::check_repo($info->repo, 30);
     if ($info->has_grading()) {
         ContactView::echo_repo_grade_commit_group($info);
-        if ($Me->can_see_grades($pset, $user, $info)
+        if ($Me->can_view_grades($pset, $user, $info)
             && ($gi = $info->grading_info())) {
             $garr = render_grades($pset, $gi, null);
             if ($garr->totalindex !== null) {
