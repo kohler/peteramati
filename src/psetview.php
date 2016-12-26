@@ -51,7 +51,8 @@ class PsetView {
     }
 
     function set_hash($reqhash) {
-        $this->hash = $this->commit_notes = $this->derived_handout_commit = false;
+        $this->hash = false;
+        $this->commit_record = $this->commit_notes = $this->derived_handout_commit = false;
         if (!$this->repo)
             return false;
         if ($reqhash)
@@ -158,7 +159,8 @@ class PsetView {
     }
 
     function commit_info($key = null) {
-        $this->commit_record();
+        if ($this->commit_record === false)
+            $this->commit_record();
         if ($key && $this->commit_notes)
             return get($this->commit_notes, $key);
         else
@@ -262,7 +264,7 @@ class PsetView {
     }
 
     function update_contact_grade_info($updates, $reset_keys = false) {
-        assert($this->pset->gitless);
+        assert(!!$this->pset->gitless);
         // find original
         $record = $this->grade;
 
