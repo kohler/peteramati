@@ -4,9 +4,11 @@
 // See LICENSE for open-source distribution terms
 
 class HarvardSEAS_RepositorySite extends RepositorySite {
+    public $conf;
     public $base;
     public $siteclass = "harvardseas";
-    function __construct($url, $base) {
+    function __construct(Conf $conf, $url, $base) {
+        $this->conf = $conf;
         $this->url = $url;
         $this->base = $base;
     }
@@ -15,9 +17,9 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
     const MAINURL = "https://code.seas.harvard.edu/";
     static function make_url($url, Conf $conf) {
         if (preg_match('_\A(?:code\.seas(?:\.harvard(?:\.edu)?)?[:/])?/*((?:[^/:@]+/)?[^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m))
-            return new HarvardSEAS_RepositorySite("git@code.seas.harvard.edu:" . $m[1] . ".git", $m[1]);
+            return new HarvardSEAS_RepositorySite($conf, "git@code.seas.harvard.edu:" . $m[1] . ".git", $m[1]);
         if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)' . self::MAINHOST . '(?::/*|/+)(.*?)(?:\.git|)\z_i', $url, $m))
-            return new HarvardSEAS_RepositorySite($url, $m[1]);
+            return new HarvardSEAS_RepositorySite($conf, $url, $m[1]);
         return null;
     }
     static function sniff_url($url) {
@@ -115,10 +117,10 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
     }
 
     function validate_open(MessageSet $ms = null) {
-        return RepositorySite::run_ls_remote($this->git_url(), $output);
+        return RepositorySite::run_ls_remote($this->conf, $this->git_url(), $output);
     }
     function validate_working(MessageSet $ms = null) {
-        $status = RepositorySite::run_ls_remote($this->ssh_url(), $output);
+        $status = RepositorySite::run_ls_remote($this->conf, $this->ssh_url(), $output);
         $answer = join("\n", $output);
         if ($status == 0 && $ms)
             $ms->set_error_html("working", Messages::$main->expand_html("repo_unreadable", $this->message_defs($ms->user)));

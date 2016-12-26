@@ -49,12 +49,12 @@ class GitHub_RepositorySite extends RepositorySite {
 
     static function api(Conf $conf, $url, $post_data = null) {
         $token = $conf->opt("githubOAuthToken");
-        if (!$token)
+        if (!$token || $conf->opt("disableRemote"))
             return false;
         $header = "Accept: application/vnd.github.v3+json\r\n"
             . "Authorization: token $token\r\n"
             . "User-Agent: kohler/peteramati\r\n";
-        $htopt = array("timeout" => 5, "ignore_errors" => true, "header" => $header);
+        $htopt = ["timeout" => (float) $conf->validate_timeout, "ignore_errors" => true, "header" => $header];
         if ($post_data !== null) {
             $header .= "Content-Length: " . strlen($post_data) . "\r\n";
             $htopt["method"] = "POST";
@@ -211,7 +211,7 @@ class GitHub_RepositorySite extends RepositorySite {
         return -1;
     }
     function validate_working(MessageSet $ms = null) {
-        $status = RepositorySite::run_ls_remote($this->ssh_url(), $output);
+        $status = RepositorySite::run_ls_remote($this->conf, $this->ssh_url(), $output);
         $answer = join("\n", $output);
         if ($status == 0 && $ms)
             $ms->set_error_html("working", $this->expand_message("repo_unreadable", $ms->user));

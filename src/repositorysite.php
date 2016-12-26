@@ -66,10 +66,14 @@ class RepositorySite {
         return -1;
     }
 
-    static function run_ls_remote($url, &$output) {
+    static function run_ls_remote(Conf $conf, $url, &$output) {
         global $ConfSitePATH;
+        if ($conf->opt("disableRemote")) {
+            $output = [];
+            return -1;
+        }
         $command = "GIT_SSH=" . escapeshellarg("$ConfSitePATH/src/gitssh")
-            . " $ConfSitePATH/jail/pa-timeout " . Repository::VALIDATE_TIMEOUT
+            . " $ConfSitePATH/jail/pa-timeout " . $conf->validate_timeout
             . " git ls-remote " . escapeshellarg($url) . " 2>&1";
         exec($command, $output, $status);
         if ($status >= 124) // timeout or pa-timeout error

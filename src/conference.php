@@ -21,6 +21,9 @@ class Conf {
     public $opt;
     public $opt_override = null;
 
+    public $validate_timeout;
+    public $validate_overall_timeout;
+
     private $save_messages = true;
     var $headerPrinted = false;
     private $_save_logs = false;
@@ -257,6 +260,14 @@ class Conf {
             $this->opt["safePasswords"] = 1;
         if (!isset($this->opt["contactdb_safePasswords"]))
             $this->opt["contactdb_safePasswords"] = $this->opt["safePasswords"];
+
+        // set validate timeouts
+        $this->validate_timeout = (float) get($this->opt, "validateTimeout", 5);
+        if ($this->validate_timeout <= 0)
+            $this->validate_timeout = 5;
+        $this->validate_overall_timeout = (float) get($this->opt, "validateOverallTimeout", 15);
+        if ($this->validate_overall_timeout <= 0)
+            $this->validate_overall_timeout = 5;
 
         $sort_by_last = !!get($this->opt, "sortByLastName");
         if (!$this->sort_by_last != !$sort_by_last)
@@ -1340,9 +1351,11 @@ class Conf {
                 $save = $hset = (object) array();
             if (!($hme = get($hset, $hrepoid)))
                 $save = $hme = $hset->$hrepoid = (object) array();
-            if ((int) get($hme, $cacheid) + 300 < $Now) {
+            if ((int) get($hme, $cacheid) + 300 < $Now
+                && !$this->opt("disableGitfetch")
+                && !$this->opt("disableRemote")) {
                 $save = $hme->$cacheid = $Now;
-                shell_exec("$ConfSitePATH/src/gitfetch $hrepo->repoid $cacheid " . escapeshellarg($hrepo->ssh_url()) . " 1>&2 &");
+                shell_exec("$ConfSitePATH/src/gitfetch $hrepo->repoid $cacheid " . escapeshellarg($hrepo->ssh_url()) . " </dev/null 1>&2 &");
             }
             if ($save)
                 $this->save_setting("handoutrepos", 1, $hset);
