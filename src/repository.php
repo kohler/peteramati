@@ -292,6 +292,12 @@ class Repository {
         return $list;
     }
 
+    function latest_commit($pset = null) {
+        $c = $this->commits($pset);
+        reset($c);
+        return current($c);
+    }
+
     function connected_commit($hash, $pset = null) {
         if (empty($this->_commits))
             // load some commits first
