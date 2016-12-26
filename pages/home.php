@@ -278,7 +278,7 @@ function set_grader($qreq) {
             && ($user = ContactView::prepare_user($uname))) {
             $info = ContactView::user_pset_info($user, $pset);
             if ($info->repo)
-                Contact::check_repo($info->repo, 2700, true);
+                $info->repo->refresh(2700, true);
             if ($info->set_hash(null)) {
                 $which_grader = mt_rand(0, count($cur_graders) - 1);
                 $info->change_grader($cur_graders[$which_grader]->contactId);
@@ -592,7 +592,7 @@ function show_pset($pset, $user) {
     ContactView::echo_partner_group($info);
     ContactView::echo_repo_group($info);
     if ($info->repo)
-        Contact::check_repo($info->repo, 30);
+        $info->repo->refresh(30);
     if ($info->has_grading()) {
         ContactView::echo_repo_grade_commit_group($info);
         if ($Me->can_view_grades($pset, $user, $info)

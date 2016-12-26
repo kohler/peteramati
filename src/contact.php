@@ -1285,20 +1285,6 @@ class Contact {
                                    $pc->contactId, LINK_BACKPARTNER, $pset, $this->contactId);
     }
 
-    static function check_repo($repo, $delta, $foreground = false) {
-        global $ConfSitePATH, $Now;
-        assert(isset($repo->repoid) && isset($repo->cacheid) && isset($repo->url) && property_exists($repo, "snapcheckat"));
-        if ($repo->repoid && (!$repo->snapcheckat || $repo->snapcheckat + $delta <= $Now)) {
-            Dbl::qe("update Repository set snapcheckat=$Now where repoid=$repo->repoid");
-            $repo->snapcheckat = $Now;
-            if ($foreground)
-                set_time_limit(30);
-            // see also handout_repo
-            $command = "$ConfSitePATH/src/gitfetch $repo->repoid $repo->cacheid " . escapeshellarg($repo->ssh_url()) . " 1>&2" . ($foreground ? "" : " &");
-            shell_exec($command);
-        }
-    }
-
     static private function _file_glob_to_regex($x, $prefix) {
         $x = str_replace(array('\*', '\?', '\[', '\]', '\-', '_'),
                          array('[^/]*', '[^/]', '[', ']', '-', '\_'),

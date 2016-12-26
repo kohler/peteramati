@@ -126,6 +126,21 @@ class Repository {
     const VALIDATE_TOTAL_TIMEOUT = 15;
     static private $validate_time_used = 0;
 
+    function refresh($delta, $foreground = false) {
+        global $ConfSitePATH, $Now;
+        if ((!$this->snapcheckat || $this->snapcheckat + $delta <= $Now)
+            && !$this->conf->opt("disableGitfetch")
+            && !$this->conf->opt("disableRemote")) {
+            $this->conf->qe("update Repository set snapcheckat=? where repoid=?", $Now, $this->repoid);
+            $this->snapcheckat = $Now;
+            if ($foreground)
+                set_time_limit(30);
+            // see also handout_repo
+            $command = "$ConfSitePATH/src/gitfetch $this->repoid $this->cacheid " . escapeshellarg($this->ssh_url()) . " 1>&2" . ($foreground ? "" : " &");
+            shell_exec($command);
+        }
+    }
+
     static private $open_cache = [];
     function validate_open(MessageSet $ms = null) {
         if (isset(self::$open_cache[$this->url]))
