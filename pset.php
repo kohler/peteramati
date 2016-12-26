@@ -175,20 +175,6 @@ if (isset($_REQUEST["gradestatus"])) {
         json_exit(["error" => "Grades are not visible now"]);
 }
 
-// get commit data
-if (isset($_REQUEST["latestcommit"])) {
-    if (!$Info || $Pset->gitless_grades || !$Info->latest_commit())
-        $j = array("hash" => false);
-    else if (!$Info->can_view_repo_contents)
-        $j = array("hash" => false, "error" => "Unconfirmed repository");
-    else {
-        $j = clone $Info->latest_commit();
-        unset($j->fromhead);
-        $j->snaphash = $Info->repo->snaphash;
-    }
-    json_exit($j);
-}
-
 // maybe set commit
 if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
     && $Info->can_have_grades() && $Me->can_set_grader($Pset, $User)) {
