@@ -388,7 +388,7 @@ function session_list_link($sl, $pos, $isprev, Contact $me, Contact $user) {
     if (isset($sl->psetids) && isset($sl->psetids[$pos])
         && ($p = $Conf->pset_by_id($sl->psetids[$pos])))
         $pset = $p;
-    $u = $me->user_linkpart($user, $p->anonymous && !!get($sl, "anon"));
+    $u = $me->user_linkpart($user, $pset->anonymous && !!get($sl, "anon"));
     $x = ["pset" => $pset->urlkey, "u" => $u];
     if (isset($sl->hashes) && isset($sl->hashes[$pos])
         && $sl->hashes[$pos] !== "x")

@@ -1783,9 +1783,9 @@ function row_click(e) {
         $(this).find("a.pnum")[0].click();
 }
 function prepare() {
-    $(document.body).on("click", "a", add_list);
-    $(document.body).on("submit", "form", add_list);
-    //$(document.body).on("click", "tbody.pltable > tr.pl", row_click);
+    $(document).on("click", "a", add_list);
+    $(document).on("submit", "form", add_list);
+    //$(document).on("click", "tbody.pltable > tr.pl", row_click);
     hotcrp_list && $(window).on("beforeunload", unload_list);
 }
 prepare();

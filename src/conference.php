@@ -948,13 +948,16 @@ class Conf {
 
     function session_list() {
         if (($j = $this->encoded_session_list())) {
-            if (is_string($j->ids) && preg_match('/\A[\s\d\']*\z/', $j->ids))
+            if (isset($j->ids) && is_string($j->ids)
+                && preg_match('/\A[\s\d\']*\z/', $j->ids))
                 $j->ids = array_map(function ($x) { return (int) $x; },
                                     preg_split('/[\s\']+/', $j->ids));
-            if (is_string($j->psetids) && preg_match('/\A[\s\d\']*\z/', $j->psetids))
+            if (isset($j->psetids) && is_string($j->psetids)
+                && preg_match('/\A[\s\d\']*\z/', $j->psetids))
                 $j->psetids = array_map(function ($x) { return (int) $x; },
                                         preg_split('/[\s\']+/', $j->psetids));
-            if (is_string($j->hashes) && preg_match('/\A[\sA-Fa-fx\d\']*\z/', $j->hashes))
+            if (isset($j->hashes) && is_string($j->hashes)
+                && preg_match('/\A[\sA-Fa-fx\d\']*\z/', $j->hashes))
                 $j->hashes = preg_split('/[\s\']+/', $j->hashes);
         }
         return $this->_session_list;
