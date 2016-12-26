@@ -1363,12 +1363,12 @@ class Conf {
         return $hrepo;
     }
 
-    function handout_commits(Pset $pset) {
+    private function populate_handout_commits(Pset $pset) {
         global $Now;
-        if (($commits = get($this->_handout_commits, $pset->id)))
-            return $commits;
-        if (!($hrepo = $this->handout_repo($pset)))
-            return null;
+        if (!($hrepo = $this->handout_repo($pset))) {
+            $this->_handout_commits[$pset->id] = [];
+            return;
+        }
         $hrepoid = $hrepo->repoid;
         $key = "handoutcommits_{$hrepoid}_{$pset->id}";
         $hset = $this->setting_json($key);
@@ -1389,14 +1389,31 @@ class Conf {
         foreach ($hset->commits as $c)
             $commits[$c[0]] = new RepositoryCommitInfo($c[1], $c[0], $c[2]);
         $this->_handout_commits[$pset->id] = $commits;
-        $latest = empty($commits) ? null : $commits[$hset->commits[0][0]];
-        $this->_handout_latest_commit[$pset->id] = $latest;
-        return $commits;
+        reset($commits);
+        $this->_handout_latest_commit[$pset->id] = current($commits);
+    }
+
+    function handout_commits(Pset $pset, $hash = null) {
+        global $Now;
+        if (!array_key_exists($pset->id, $this->_handout_commits))
+            $this->populate_handout_commits($pset);
+        $commits = $this->_handout_commits[$pset->id];
+        if (!$hash)
+            return $commits;
+        else if (strlen($hash) === 40)
+            return get($commits, $hash);
+        else {
+            $matches = [];
+            foreach ($commits as $h => $c)
+                if (str_starts_with($h, $hash))
+                    $matches[] = $c;
+            return count($matches) === 1 ? $matches[0] : null;
+        }
     }
 
     function latest_handout_commit(Pset $pset) {
         if (!array_key_exists($pset->id, $this->_handout_latest_commit))
-            $this->handout_commits($pset);
+            $this->populate_handout_commits($pset);
         return get($this->_handout_latest_commit, $pset->id);
     }
 }
