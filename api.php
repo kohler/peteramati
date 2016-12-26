@@ -5,57 +5,50 @@
 
 require_once("src/initweb.php");
 
-// backward compatibility
-if (!isset($_GET["fn"])) {
-    if (Navigation::path_component(0))
-        $_GET["fn"] = Navigation::path_component(0);
-    else if (isset($_GET["jserror"]))
-        $_GET["fn"] = "jserror";
-    else if (isset($_GET["track"]))
-        $_GET["fn"] = "track";
-    else
-        $_GET["fn"] = "deadlines";
-}
-
+// parse request
 $qreq = make_qreq();
 if ($qreq->base !== null)
     $Conf->set_siteurl($qreq->base);
-if ($qreq->fn === "jserror") {
-    $url = $qreq->url;
-    if (preg_match(',[/=]((?:script|jquery)[^/&;]*[.]js),', $url, $m))
-        $url = $m[1];
-    if (($n = $qreq->lineno))
-        $url .= ":" . $n;
-    if (($n = $qreq->colno))
-        $url .= ":" . $n;
-    if ($url !== "")
-        $url .= ": ";
-    $errormsg = trim((string) $qreq->error);
-    if ($errormsg) {
-        $suffix = "";
-        if ($Me->email)
-            $suffix .= ", user " . $Me->email;
-        if (isset($_SERVER["REMOTE_ADDR"]))
-            $suffix .= ", host " . $_SERVER["REMOTE_ADDR"];
-        error_log("JS error: $url$errormsg$suffix");
-        if (($stacktext = $qreq->stack)) {
-            $stack = array();
-            foreach (explode("\n", $stacktext) as $line) {
-                $line = trim($line);
-                if ($line === "" || $line === $errormsg || "Uncaught $line" === $errormsg)
-                    continue;
-                if (preg_match('/\Aat (\S+) \((\S+)\)/', $line, $m))
-                    $line = $m[1] . "@" . $m[2];
-                else if (substr($line, 0, 1) === "@")
-                    $line = substr($line, 1);
-                else if (substr($line, 0, 3) === "at ")
-                    $line = substr($line, 3);
-                $stack[] = $line;
-            }
-            error_log("JS error: {$url}via " . join(" ", $stack));
-        }
+if ($qreq->path_front() && substr($qreq->path_front(), 0, 1) === "~")
+    $qreq->u = substr(urldecode($qreq->shift_path()), 1);
+if (($x = $qreq->shift_path()))
+    $qreq->fn = urldecode($x);
+if (($x = $qreq->shift_path())) {
+    if (!$qreq->pset)
+        $qreq->pset = urldecode($x);
+    if (($x = $qreq->shift_path())) {
+        if (!$qreq->commit)
+            $qreq->commit = urldecode($x);
     }
-    json_exit(["ok" => true]);
 }
 
-json_exit(["ok" => false]);
+// check user
+$api = new APIData($Me);
+if ($qreq->u && !($api->user = ContactView::prepare_user($qreq->u)))
+    json_exit(["ok" => false, "error" => "User permission error."]);
+
+// check pset
+if ($qreq->pset && !($api->pset = $Conf->pset_by_key($qreq->pset)))
+    json_exit(["ok" => false, "error" => "No such pset."]);
+if ($api->pset && $api->pset->disabled) {
+    if ($Me->isPC)
+        json_exit(["ok" => false, "error" => "Pset disabled."]);
+    else
+        json_exit(["ok" => false, "error" => "No such pset."]);
+}
+if ($api->pset && !$api->pset->visible && !$Me->isPC)
+    json_exit(["ok" => false, "error" => "No such pset."]);
+
+// check commit
+if ($api->pset && !$api->pset->gitless && !$Me->is_empty())
+    $api->repo = $api->user->repo($api->pset);
+if ($api->repo && $qreq->commit) {
+    $api->commit = $api->pset->handout_commits($qreq->commit);
+    if (!$api->commit)
+        $api->commit = $api->repo->connected_commit($qreq->commit);
+    if (!$api->commit)
+        json_exit(["ok" => false, "error" => "Commit not connected to the repository."]);
+}
+
+// call api
+$Conf->call_api_exit($qreq->fn, $Me, $qreq, $api);

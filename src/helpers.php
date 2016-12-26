@@ -381,16 +381,28 @@ function redirectSelf($extra = array()) {
 
 class JsonResultException extends Exception {
     public $result;
+    public $status;
     static public $capturing = false;
-    function __construct($j) {
+    function __construct($status, $j) {
+        $this->status = $status;
         $this->result = $j;
     }
 }
 
-function json_exit($json, $div = false) {
+function json_exit(/* [$status], $json, $div = false */) {
     global $Conf;
+    $args = func_get_args();
+    if (is_int($args[0])) {
+        $status = $args[0];
+        $json = $args[1];
+        $div = get($args, 2, false);
+    } else {
+        $status = 200;
+        $json = $args[0];
+        $div = get($args, 1, false);
+    }
     if (JsonResultException::$capturing)
-        throw new JsonResultException($json);
+        throw new JsonResultException($status, $json);
     else {
         $Conf->output_ajax($json, $div);
         exit;

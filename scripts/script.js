@@ -609,14 +609,21 @@ function hoturl(page, options) {
 
     if (page === "help")
         hoturl_clean(x, /^t=(\w+)$/);
-    else if (page === "api") {
+    else if (page.substr(0, 3) === "api") {
+        if (page.length > 3) {
+            x.t = "api" + siteurl_suffix;
+            x.v.push("fn=" + page.substr(4));
+        }
+        hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
         hoturl_clean(x, /^fn=(\w+)$/);
+        hoturl_clean(x, /^pset=([^?&#]+)$/);
+        hoturl_clean(x, /^commit=([9-9A-Fa-f]+)$/);
         want_forceShow = true;
     } else if (page === "index")
-        hoturl_clean_before(x, /^u=([^?&]+)$/, "~");
+        hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
     else if (page === "pset" || page === "run") {
-        hoturl_clean_before(x, /^u=([^?&]+)$/, "~");
-        hoturl_clean(x, /^pset=([^?&]+)$/);
+        hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
+        hoturl_clean(x, /^pset=([^?&#]+)$/);
         hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
     }
 
@@ -2776,11 +2783,9 @@ function checklatest61() {
             timeout = setTimeout(docheck, (now - start) * 1.25);
         else
             timeout = null;
-        jQuery.ajax(hoturl_post("pset", {u: peteramati_uservalue, pset: pset}),
-                    {
-                        type: "GET", cache: false, data: "latestcommit=1",
-                        dataType: "json", success: checkdata
-                    });
+        jQuery.ajax(hoturl_post("api/latestcommit", {u: peteramati_uservalue, pset: pset}), {
+                type: "GET", cache: false, dataType: "json", success: checkdata
+            });
     }
 
     pset = jQuery(".commitcontainer61").first().attr("data-pa-pset");

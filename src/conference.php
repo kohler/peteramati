@@ -3,6 +3,19 @@
 // HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
+class APIData {
+    public $user;
+    public $pset;
+    public $repo;
+    public $hash;
+    function __construct(Contact $user = null, Pset $pset = null, Repository $repo = null, $hash = null) {
+        $this->user = $user;
+        $this->pset = $pset;
+        $this->repo = $repo;
+        $this->hash = $hash;
+    }
+}
+
 class Conf {
     public $dblink = null;
 
@@ -1415,5 +1428,84 @@ class Conf {
         if (!array_key_exists($pset->id, $this->_handout_latest_commit))
             $this->populate_handout_commits($pset);
         return get($this->_handout_latest_commit, $pset->id);
+    }
+
+
+    // API
+
+    private function call_api($uf, Contact $user, Qrequest $qreq, APIData $api) {
+        if (!$uf)
+            return ["ok" => false, "error" => "API function not found."];
+        if (!get($uf, "get") && !check_post($qreq))
+            return ["ok" => false, "error" => "Missing credentials."];
+        if (!$api->pset && (get($uf, "pset") || get($uf, "hash")))
+            return ["ok" => false, "error" => "Missing pset."];
+        if (!$api->hash && get($uf, "hash"))
+            return ["ok" => false, "error" => "Missing commit."];
+        if (($req = get($uf, "require")))
+            foreach (expand_includes($req) as $f)
+                require_once $f;
+        return call_user_func($uf->callback, $user, $qreq, $api, $uf);
+    }
+    function _add_api_json($fj) {
+        if (is_string($fj->fn) && !isset($this->_api_map[$fj->fn])
+            && isset($fj->callback)) {
+            $this->_api_map[$fj->fn] = $fj;
+            return true;
+        } else
+            return false;
+    }
+    private function fill_api_map() {
+        $this->_api_map = [
+            "jserror" => "1 API_JSError::jserror",
+            "latestcommit" => "3 API_Repo::latestcommit"
+        ];
+        if (($olist = $this->opt("apiFunctions")))
+            expand_json_includes_callback($olist, [$this, "_add_api_json"]);
+    }
+    function has_api($fn) {
+        if ($this->_api_map === null)
+            $this->fill_api_map();
+        return isset($this->_api_map[$fn]);
+    }
+    function api($fn) {
+        if ($this->_api_map === null)
+            $this->fill_api_map();
+        $uf = get($this->_api_map, $fn);
+        if ($uf && is_string($uf)) {
+            $space = strpos($uf, " ");
+            $flags = (int) substr($uf, 0, $space);
+            $uf = $this->_api_map[$fn] = (object) ["callback" => substr($uf, $space + 1)];
+            if ($flags & 1)
+                $uf->get = true;
+            if ($flags & 2)
+                $uf->pset = true;
+            if ($flags & 4)
+                $uf->hash = true;
+        }
+        return $uf;
+    }
+    function call_api_exit($uf, Contact $user, Qrequest $qreq, APIData $info) {
+        if (is_string($uf))
+            $uf = $this->api($uf);
+        if ($uf && get($uf, "redirect") && $qreq->redirect
+            && preg_match('@\A(?![a-z]+:|/).+@', $qreq->redirect)) {
+            try {
+                JsonResultException::$capturing = true;
+                $j = $this->call_api($uf, $user, $qreq, $info);
+            } catch (JsonResultException $ex) {
+                $j = $ex->result;
+            }
+            if (!get($j, "ok") && !get($j, "error"))
+                Conf::msg_error("Internal error.");
+            else if (($x = get($j, "error")))
+                Conf::msg_error(htmlspecialchars($x));
+            else if (($x = get($j, "error_html")))
+                Conf::msg_error($x);
+            Navigation::redirect_site($qreq->redirect);
+        } else {
+            $j = $this->call_api($uf, $user, $qreq, $info);
+            json_exit($j);
+        }
     }
 }
