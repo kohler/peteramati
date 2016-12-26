@@ -167,7 +167,7 @@ $Commit = $Info->commit_hash();
 
 // get JSON grade data
 if (isset($_REQUEST["gradestatus"])) {
-    $gj = ContactView::grade_json($Info);
+    $gj = $Info->grade_json();
     if ($gj) {
         $gj->ok = true;
         json_exit($gj);
@@ -269,7 +269,7 @@ if ($Me->isPC && $Me != $User && check_post()
     && isset($_REQUEST["setgrade"]) && $Info->can_have_grades()) {
     $grades = save_grades($Pset, $Info, make_qreq(), false);
     if (isset($_REQUEST["ajax"])) {
-        $gj = ContactView::grade_json($Info);
+        $gj = $Info->grade_json();
         $gj->ok = true;
         json_exit($gj);
     }
@@ -661,7 +661,7 @@ function echo_grade_cdf_here() {
     if ($Info->can_view_grades
         && ($Me != $User || $Pset->grade_cdf_visible)
         && $Pset->grades) {
-        $gj = ContactView::grade_json($Info);
+        $gj = $Info->grade_json();
         if (get($gj, "grades"))
             echo_grade_cdf();
     }
@@ -672,7 +672,7 @@ function echo_all_grades() {
     if ($Info->is_handout_commit())
         return;
 
-    $gj = ContactView::grade_json($Info);
+    $gj = $Info->grade_json();
     if (get($gj, "grades") || ($Info->can_view_grades && $Me != $User)) {
         echo_grade_total($gj);
         foreach ($Pset->grades as $ge)

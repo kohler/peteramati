@@ -190,42 +190,6 @@ class ContactView {
         return $json;
     }
 
-    static function grade_json(PsetView $info) {
-        global $Me;
-        if (!$Me->can_view_grades($info->pset, $info->user, $info))
-            return null;
-        $pcview = $Me->isPC && $Me != $info->user;
-        $notes = $info->current_info();
-        $result = $info->pset->gradeinfo_json($pcview);
-        $agx = get($notes, "autogrades");
-        $gx = get($notes, "grades");
-        if ($agx || $gx || $info->is_grading_commit()) {
-            $g = $ag = array();
-            $total = $total_noextra = 0;
-            foreach ($info->pset->grades as $ge)
-                if (!$ge->hide || $pcview) {
-                    $key = $ge->name;
-                    $gv = 0;
-                    if ($agx && property_exists($agx, $key))
-                        $ag[$key] = $g[$key] = $gv = $agx->$key;
-                    if ($gx && property_exists($gx, $key))
-                        $g[$key] = $gv = $gx->$key;
-                    if (!$ge->no_total) {
-                        $total += $gv;
-                        if (!$ge->is_extra)
-                            $total_noextra += $gv;
-                    }
-                }
-            $g["total"] = $total;
-            if ($total != $total_noextra)
-                $g["total_noextra"] = $total_noextra;
-            $result->grades = (object) $g;
-            if ($pcview && count($ag))
-                $result->autogrades = (object) $ag;
-        }
-        return $result;
-    }
-
     static function runner_generic_json(PsetView $info, $checkt) {
         return (object) array("ok" => true,
                               "repoid" => $info->repo->repoid,
