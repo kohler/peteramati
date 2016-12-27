@@ -12,7 +12,6 @@ class PsetView {
     public $repo = null;
     public $partner;
     private $partner_same = null;
-    public $can_set_repo;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
     private $repo_grade = null;     // RepositoryGrade+CommitNotes
@@ -32,7 +31,6 @@ class PsetView {
         $this->viewer = $viewer;
         $this->pc_view = $viewer->isPC && $viewer !== $user;
         $this->partner = $user->partner($pset->id);
-        $this->can_set_repo = $viewer->can_set_repo($pset, $user);
         if (!$pset->gitless)
             $this->repo = $user->repo($pset->id);
         $this->load_grade();

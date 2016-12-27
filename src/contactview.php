@@ -257,7 +257,7 @@ class ContactView {
             $partner_email = $partner->anon_username;
         else if ($partner)
             $partner_email = $partner->email;
-        $editable = $info->can_set_repo && !$user->is_anonymous;
+        $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
 
         $title = "partner";
         if ($Me->isPC && $partner)
@@ -318,7 +318,7 @@ class ContactView {
             return;
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
-        $editable = $info->can_set_repo && !$user->is_anonymous;
+        $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
 
         $repo_url = $repo ? $repo->friendly_url() : "";
         $title = "repository";
