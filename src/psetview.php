@@ -361,17 +361,20 @@ class PsetView {
         $this->user_can_view_grades = $this->user->can_view_grades($this->pset, $this);
     }
 
-    function has_grading() {
+    private function ensure_grade() {
         if ($this->grade === false)
             $this->load_grade();
+    }
+
+    function has_grading() {
+        $this->ensure_grade();
         return !!$this->grade;
     }
 
     function grading_hash() {
         if ($this->pset->gitless_grades)
             return false;
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         if ($this->repo_grade)
             return $this->repo_grade->gradehash;
         return false;
@@ -380,8 +383,7 @@ class PsetView {
     function grading_commit() {
         if ($this->pset->gitless_grades)
             return false;
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         if ($this->repo_grade)
             return $this->recent_commits($this->repo_grade->gradehash);
         return false;
@@ -390,28 +392,24 @@ class PsetView {
     function is_grading_commit() {
         if ($this->pset->gitless_grades)
             return true;
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         return $this->hash
             && $this->repo_grade
             && $this->hash == $this->repo_grade->gradehash;
     }
 
     function can_view_grades() {
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         return $this->can_view_grades;
     }
 
     function user_can_view_grades() {
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         return $this->user_can_view_grades;
     }
 
     function gradercid() {
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         if ($this->pset->gitless_grades)
             return $this->grade ? $this->grade->gradercid : 0;
         else if ($this->repo_grade
@@ -423,8 +421,7 @@ class PsetView {
 
 
     function grading_info($key = null) {
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         if ($key && $this->grade_notes)
             return get($this->grade_notes, $key);
         else
@@ -439,8 +436,7 @@ class PsetView {
     }
 
     function grading_info_empty() {
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         if (!$this->grade_notes)
             return true;
         $gn = (array) $this->grade_notes;
@@ -449,8 +445,7 @@ class PsetView {
     }
 
     function grades_hidden() {
-        if ($this->grade === false)
-            $this->load_grade();
+        $this->ensure_grade();
         return $this->grade && $this->grade->hidegrade;
     }
 
@@ -560,7 +555,7 @@ class PsetView {
 
 
     function grade_json() {
-        global $Me;
+        $this->ensure_grade();
         if (!$this->can_view_grades)
             return null;
         $notes = $this->current_info();
