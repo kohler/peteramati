@@ -1603,6 +1603,13 @@ class Contact {
             && self::show_setting_on($pset->$k);
     }
 
+    function can_view_grades(Pset $pset, PsetView $info = null) {
+        return $this->can_view_pset($pset)
+            && ($this->isPC
+                || (self::student_can_view_grades($pset, $this->extension)
+                    && (!$info || !$info->grades_hidden())));
+    }
+
     static function student_can_view_grade_cdf(Pset $pset) {
         return self::student_can_view_pset($pset)
             && (isset($pset->grade_cdf_visible)
@@ -1620,19 +1627,9 @@ class Contact {
             || $this->privChair;
     }
 
-    function can_view_comments(Pset $pset, Contact $user = null, $info = null) {
-        return (!$pset || !$pset->disabled)
-            && (($this->isPC && $user && $user != $this)
-                || $this->privChair
-                || (!$pset || !$pset->hide_comments));
-    }
-
-    function can_view_grades(Pset $pset, Contact $user = null, $info = null) {
-        return (!$pset || !$pset->disabled)
-            && (($this->isPC && $user && $user != $this)
-                || $this->privChair
-                || ($pset && self::student_can_view_grades($pset, $this->extension)
-                    && (!$info || !$info->grades_hidden())));
+    function can_view_comments(Pset $pset, PsetView $info = null) {
+        return $this->can_view_pset($pset)
+            && (!$pset->hide_comments || $this->isPC);
     }
 
     function can_run(Pset $pset, $runner, $user = null) {

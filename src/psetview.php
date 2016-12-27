@@ -15,13 +15,12 @@ class PsetView {
     public $can_set_repo;
     public $can_view_repo_contents;
     public $user_can_view_repo_contents;
-    public $can_view_comments;
-    public $can_view_grades;
-    public $user_can_view_grades;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
     private $repo_grade = null;     // RepositoryGrade+CommitNotes
     private $grade_notes = null;
+    private $can_view_grades;
+    private $user_can_view_grades;
 
     private $hash = null;
     private $commit_record = false; // CommitNotes (maybe +RepositoryGrade)
@@ -339,7 +338,7 @@ class PsetView {
     }
 
 
-    function load_grade() {
+    private function load_grade() {
         if ($this->pset->gitless_grades) {
             $this->grade = $this->pset->contact_grade_for($this->user);
             $this->grade_notes = get($this->grade, "notes");
@@ -366,9 +365,8 @@ class PsetView {
                 // NB don't check recent_commits association here
                 $this->hash = $this->grade->gradehash;
         }
-        $this->can_view_comments = $this->viewer->can_view_comments($this->pset, $this->user, $this);
-        $this->can_view_grades = $this->viewer->can_view_grades($this->pset, $this->user, $this);
-        $this->user_can_view_grades = $this->user->can_view_grades($this->pset, $this->user, $this);
+        $this->can_view_grades = $this->viewer->can_view_grades($this->pset, $this);
+        $this->user_can_view_grades = $this->user->can_view_grades($this->pset, $this);
     }
 
     function has_grading() {
@@ -405,6 +403,18 @@ class PsetView {
         return $this->hash
             && $this->repo_grade
             && $this->hash == $this->repo_grade->gradehash;
+    }
+
+    function can_view_grades() {
+        if ($this->grade === false)
+            $this->load_grade();
+        return $this->can_view_grades;
+    }
+
+    function user_can_view_grades() {
+        if ($this->grade === false)
+            $this->load_grade();
+        return $this->user_can_view_grades;
     }
 
     function gradercid() {

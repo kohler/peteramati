@@ -588,7 +588,7 @@ function show_pset($pset, $user) {
         htmlspecialchars($pset->title), "</a>";
     $info = new PsetView($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
-    $user_see_grade = $user->can_view_grades($pset, $user, $info);
+    $user_see_grade = $user->can_view_grades($pset, $info);
     if ($user_see_grade && $info->has_grading())
         echo ' <a class="gradesready" href="', $pseturl, '">(grade ready)</a>';
     echo "</a></h2>";
@@ -598,7 +598,7 @@ function show_pset($pset, $user) {
         $info->repo->refresh(30);
     if ($info->has_grading()) {
         ContactView::echo_repo_grade_commit_group($info);
-        if ($Me->can_view_grades($pset, $user, $info)
+        if ($Me->can_view_grades($pset, $info)
             && ($gi = $info->grading_info())) {
             $garr = render_grades($pset, $gi, null);
             if ($garr->totalindex !== null) {

@@ -154,7 +154,7 @@ class CS61Mailer extends Mailer {
         }
         if ($what == "%GRADEENTRIES%") {
             $info = $this->get_pset_info();
-            if (!$info->can_view_grades)
+            if (!$info->can_view_grades())
                 return $isbool ? false : "";
             $t = "";
             $total = $maxtotal = 0; // XXX better computation
