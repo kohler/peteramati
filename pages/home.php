@@ -580,6 +580,9 @@ function show_pset($pset, $user) {
         && !$pset->contact_grade_for($user))
         return;
     echo "<hr/>\n";
+    $can_view = $user->can_view_pset($pset);
+    if (!$can_view)
+        echo '<div class="pa-pset-hidden">';
     $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($user)]);
     echo "<h2><a href=\"", $pseturl, "\">",
         htmlspecialchars($pset->title), "</a>";
@@ -612,6 +615,9 @@ function show_pset($pset, $user) {
         ContactView::echo_repo_flags_group($info);
     } else
         ContactView::echo_repo_last_commit_group($info, true);
+    if (!$can_view)
+        echo '</div>';
+    echo "\n";
 }
 
 if (!$Me->is_empty() && $User->is_student()) {

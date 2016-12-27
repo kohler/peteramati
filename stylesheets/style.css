@@ -2305,11 +2305,14 @@ td.mhcb {
 .pa-grp {
 	margin-bottom: 7px;
 }
-.pa-grp-hidden {
+.pa-grp-hidden, .pa-pset-hidden {
 	background-color: #f3f3f3;
 	color: #888888;
 	margin: 0 -24px;
 	padding: 8px 24px;
+}
+.pa-pset-hidden > .pa-grp-hidden {
+	padding: 0 24px;
 }
 .pa-grp-hidden > .pa-grp {
 	margin-bottom: 0;
