@@ -13,8 +13,6 @@ class PsetView {
     public $partner;
     private $partner_same = null;
     public $can_set_repo;
-    public $can_view_repo_contents;
-    public $user_can_view_repo_contents;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
     private $repo_grade = null;     // RepositoryGrade+CommitNotes
@@ -37,10 +35,6 @@ class PsetView {
         $this->can_set_repo = $viewer->can_set_repo($pset, $user);
         if (!$pset->gitless)
             $this->repo = $user->repo($pset->id);
-        $this->can_view_repo_contents = $this->repo
-            && $viewer->can_view_repo_contents($this->repo);
-        $this->user_can_view_repo_contents = $this->repo
-            && $user->can_view_repo_contents($this->repo);
         $this->load_grade();
     }
 

@@ -721,7 +721,7 @@ if ($Pset->gitless) {
     echo_grader();
     echo_all_grades();
 
-} else if ($Info->repo && !$Info->can_view_repo_contents) {
+} else if ($Info->repo && !$Me->can_view_repo_contents($Info->repo)) {
     echo_grade_cdf_here();
     echo_grader();
     echo_all_grades();
