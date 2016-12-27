@@ -241,7 +241,7 @@ function save_grades($pset, $info, $values, $isauto) {
                 $old_grade = $info->current_grade_entry($ge->name);
                 if ((string) $old_grade != trim($values["old;" . $ge->name])
                     && $old_grade !== $g)
-                    json_exit(["ok" => false, "error" => "Someone else updated this grade concurrently—please reload."]);
+                    json_exit(["ok" => false, "error" => "This grade has been updated—please reload."]);
             }
             $grades[$ge->name] = $g;
         }
@@ -453,33 +453,29 @@ function echo_grade_entry($ge) {
     $autograde = $Info->current_grade_entry($key, "autograde");
     $Notes = $Info->current_info();
 
-    $class = "grader61" . ($ge->no_total ? "" : " gradepart");
-    if ($User == $Me) {
+    $class = "pa-grade" . ($ge->no_total ? "" : " pa-intotal");
+    if ($User === $Me) {
         $value = '<span class="' . $class . '" data-pa-grade="' . $ge->name . '">' . htmlspecialchars(+$grade) . '</span>';
         if ($ge->max && !$ge->hide_max)
             $value .= ' <span class="grademax61">of ' . htmlspecialchars($ge->max) . '</span>';
+        $value = '<div class="pa-gradeentry">' . $value . '</div>';
     } else {
-        $value = '<span class="gradeholder61">'
-            . Ht::entry($key, $grade, array("onchange" => "jQuery(this).closest('form').submit()", "class" => $class))
+        $value = '<form onsubmit="return gradesubmit61(this)"><div class="pa-gradeentry">'
+            . '<span class="gradeholder61">'
+            . Ht::entry($key, $grade, array("onchange" => "$(this).closest('form').submit()", "class" => $class, "data-pa-oldgrade" => $grade))
             . '</span>';
         if ($ge->max)
             $value .= ' <span class="grademax61" style="display:inline-block;min-width:3.5em">of ' . htmlspecialchars($ge->max) . '</span>';
         $value .= " " . Ht::submit("Save", array("tabindex" => 1));
         if ($autograde && $autograde !== $grade)
             $value .= '<span class="pa-autograde-differs">autograde is ' . htmlspecialchars($autograde) . '</span>';
+        $value .= '</div>';
+        if ($grade !== null && $ge->max && $grade > $ge->max)
+            $value .= '<div class="pa-gradeentry-abovemax">Grade is above max</div>';
+        $value .= '</form>';
     }
-    $value = '<div class="pa-gradeentry">' . $value . '</div>';
-    if ($User !== $Me && $grade !== null && $ge->max && $grade > $ge->max)
-        $value .= '<div class="pa-gradeentry-abovemax">Grade is above max</div>';
 
-    if ($User != $Me)
-        echo Ht::form($Info->hoturl_post("pset", ["setgrade" => 1]),
-                       array("onsubmit" => "return gradesubmit61(this)")),
-            "<div class=\"f-contain\">",
-            Ht::hidden("old;" . $key, $grade);
     ContactView::echo_group($title, $value);
-    if ($User != $Me)
-        echo "</div></form>";
 }
 
 function echo_grade_total($gj) {
@@ -669,14 +665,14 @@ function echo_all_grades() {
     if ($lhg && $User == $Me && $Info->can_view_grades()) {
         if ($lhg->hours || get($gj, "grades")) {
             echo '<div style="margin-top:1.5em">';
-            ContactView::echo_group("late hours", '<span class="grader61" data-pa-grade="late_hours">' . htmlspecialchars($lhg->hours) . '</span>',
+            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhg->hours) . '</span>',
                                     array(), array("nowrap" => true));
             echo '</div>';
         }
     } else if ($User != $Me) {
         $lhag = $Info->late_hours(true);
         $value = '<span class="gradeholder61">'
-            . Ht::entry("late_hours", $lhg ? $lhg->hours : "", array("onchange" => "jQuery(this).closest('form').submit()", "class" => "grader61"))
+            . Ht::entry("late_hours", $lhg ? $lhg->hours : "", array("onchange" => "jQuery(this).closest('form').submit()", "class" => "pa-grade"))
             . '</span>';
         $value .= " " . Ht::submit("Save", array("tabindex" => 1));
         $value .= ' <span class="ajaxsave61"></span>';
@@ -715,6 +711,10 @@ if ($Me->isPC) {
 }
 
 echo "<hr>\n";
+echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey);
+if (!$Pset->gitless && $Info->maybe_commit_hash())
+    echo '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
+echo '">';
 
 if ($Pset->gitless) {
     echo_grade_cdf_here();
@@ -885,6 +885,8 @@ if ($Pset->gitless) {
         echo_all_grades();
     }
 }
+
+echo "</div>\n";
 
 
 Ht::stash_script('window.psetpost61="' . self_href(array("post" => post_value())) . '"');

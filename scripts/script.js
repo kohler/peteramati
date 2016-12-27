@@ -1650,114 +1650,6 @@ function popup(anchor, which, dofold, populate) {
 }
 
 
-// Thank you David Flanagan
-var Miniajax = (function () {
-var Miniajax = {}, outstanding = {}, jsonp = 0,
-    _factories = [
-        function () { return new XMLHttpRequest(); },
-        function () { return new ActiveXObject("Msxml2.XMLHTTP"); },
-        function () { return new ActiveXObject("Microsoft.XMLHTTP"); }
-    ];
-function newRequest() {
-    while (_factories.length) {
-        try {
-            var req = _factories[0]();
-            if (req != null)
-                return req;
-        } catch (err) {
-        }
-        _factories.shift();
-    }
-    return null;
-}
-Miniajax.onload = function (formname) {
-    var req = newRequest();
-    if (req)
-        fold($$(formname), 1, 7);
-};
-Miniajax.submit = function (formname, callback, timeout) {
-    var form, req = newRequest(), resultname, myoutstanding;
-    if (typeof formname !== "string") {
-        resultname = formname[1];
-        formname = formname[0];
-    } else
-        resultname = formname;
-    outstanding[formname] = myoutstanding = [];
-
-    form = $$(formname);
-    if (!form || !req || form.method != "post") {
-        fold(form, 0, 7);
-        return true;
-    }
-    var resultelt = $$(resultname + "result") || {};
-    if (!callback)
-        callback = function (rv) {
-            resultelt.innerHTML = ("response" in rv ? rv.response : "");
-        };
-    if (!timeout)
-        timeout = 4000;
-
-    // set request
-    var timer = setTimeout(function () {
-                               req.abort();
-                               resultelt.innerHTML = "<span class='merror'>Network timeout. Please try again.</span>";
-                               form.onsubmit = "";
-                               fold(form, 0, 7);
-                           }, timeout);
-
-    req.onreadystatechange = function () {
-        var i, j;
-        if (req.readyState != 4)
-            return;
-        clearTimeout(timer);
-        if (req.status == 200)
-            try {
-                j = jQuery.parseJSON(req.responseText);
-            } catch (err) {
-                err.message += " [" + form.action + "]";
-                log_jserror(err);
-            }
-        if (j) {
-            resultelt.innerHTML = "";
-            callback(j);
-            if (j.ok)
-                hiliter(form, true);
-        } else {
-            resultelt.innerHTML = "<span class='merror'>Network error. Please try again.</span>";
-            form.onsubmit = "";
-            fold(form, 0, 7);
-        }
-        delete outstanding[formname];
-        for (i = 0; i < myoutstanding.length; ++i)
-            myoutstanding[i]();
-    };
-
-    // collect form value
-    var pairs = [];
-    for (var i = 0; i < form.elements.length; i++) {
-        var elt = form.elements[i];
-        if (elt.name && elt.type != "submit" && elt.type != "cancel"
-            && (elt.type != "checkbox" || elt.checked))
-            pairs.push(encodeURIComponent(elt.name) + "="
-                       + encodeURIComponent(elt.value));
-    }
-    pairs.push("ajax=1");
-
-    // send
-    req.open("POST", form.action);
-    req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-    req.send(pairs.join("&").replace(/%20/g, "+"));
-    return false;
-};
-Miniajax.isoutstanding = function (formname, callback) {
-    var myoutstanding = outstanding[formname];
-    myoutstanding && callback && myoutstanding.push(callback);
-    return !!myoutstanding;
-};
-return Miniajax;
-})();
-
-
 // list management, conflict management
 (function ($) {
 function set_cookie(info) {
@@ -1995,7 +1887,7 @@ function savelinenote61(form) {
 }
 
 function gradetotal61(data) {
-    var $gp = $(".grader61.gradepart"), total = 0;
+    var $gp = $(".pa-grade.pa-intotal"), total = 0;
     var grades = data.grades, autogrades = data.autogrades || {},
         maxgrades = data.maxgrades || {};
     // parse entries
@@ -2004,31 +1896,30 @@ function gradetotal61(data) {
         var name = $cur.attr("name");
         if (!(name in grades))
             continue;
-        var $form = $cur.closest("form");
-        var $old = $form.find("input[name='old;" + name + "']");
+        var $f = $cur.closest("form");
         //if ($old.val() !== $cur.val() && $cur.val() == grades[name])
         //    console.log("saved " + name);
         // “grade is above max” message
         if (maxgrades[name]) {
             if (grades[name] <= maxgrades[name])
-                $form.find(".pa-gradeentry-abovemax").remove();
-            else if (!$form.find(".pa-gradeentry-abovemax").length)
-                $form.find(".pa-gradeentry").after('<div class="pa-gradeentry-abovemax">Grade is above max</div>');
+                $f.find(".pa-gradeentry-abovemax").remove();
+            else if (!$f.find(".pa-gradeentry-abovemax").length)
+                $f.find(".pa-gradeentry").after('<div class="pa-gradeentry-abovemax">Grade is above max</div>');
         }
         // “autograde differs” message
         if (autogrades[name]) {
             if (grades[name] == autogrades[name])
-                $form.find(".pa-autograde-differs").remove();
+                $f.find(".pa-autograde-differs").remove();
             else {
                 var txt = "autograde is " + autogrades[name];
-                if (!$form.find(".pa-autograde-differs").length)
-                    $form.find(".pa-gradeentry").append('<span class="pa-autograde-differs"></span>');
-                var $ag = $form.find(".pa-autograde-differs");
+                if (!$f.find(".pa-autograde-differs").length)
+                    $f.find(".pa-gradeentry").append('<span class="pa-autograde-differs"></span>');
+                var $ag = $f.find(".pa-autograde-differs");
                 if ($ag.text() !== txt)
                     $ag.text(txt);
             }
         }
-        $old.val(grades[name]);
+        $cur.attr("data-pa-oldgrade", grades[name]);
         // add to total
         var curval = parseFloat($cur.val());
         if (curval == curval)
@@ -2042,10 +1933,44 @@ function gradetotal61(data) {
     }
 }
 
+function hoturl_gradeparts($j) {
+    var $x = $j.closest(".pa-psetinfo");
+    var args = {u: peteramati_uservalue};
+    if ($x.attr("data-pa-pset"))
+        args.pset = $x.attr("data-pa-pset");
+    if ($x.attr("data-pa-hash"))
+        args.commit = $x.attr("data-pa-hash");
+    return args;
+}
+
 function gradesubmit61(form) {
-    $(form).find(".pa-autograde-differs, .ajaxsave61").remove();
-    $(form).find(".pa-gradeentry").append('<span class="ajaxsave61">Saving…</span>');
-    return ajaxsave61(form, gradetotal61);
+    var $f = $(form);
+    if ($f.prop("outstanding"))
+        return;
+    $f.prop("outstanding", true);
+    $f.find(".pa-autograde-differs, .ajaxsave61").remove();
+    $f.find(".pa-gradeentry").append('<span class="ajaxsave61">Saving…</span>');
+    $f.find(".ajaxsave61").html("Saving…");
+    var g = {}, og = {};
+    $f.find("input.pa-grade").each(function () {
+        if (this.hasAttribute("data-pa-oldgrade"))
+            og[this.name] = this.getAttribute("data-pa-oldgrade");
+        g[this.name] = this.value;
+    });
+    $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f)), {
+        type: "POST", cache: false, data: {grades: g, oldgrades: og},
+        success: function (data) {
+            $f.prop("outstanding", false);
+            if (data && data.ok)
+                $f.find(".ajaxsave61").html("Saved");
+            else
+                $f.find(".ajaxsave61").html('<strong class="err">' + ((data && data.error) || "Failed") + '</strong>');
+            gradetotal61(data);
+        }, error: function () {
+            $f.find(".ajaxsave61").html("Failed!");
+        }
+    });
+    return false;
 }
 
 function fold61(sel, arrowholder, direction) {
@@ -2128,7 +2053,7 @@ function loadgrade61() {
     jQuery.ajax(psetpost61, {
         type: "GET", cache: false, data: "gradestatus=1",
         dataType: "json", success: function (d) {
-            jQuery(".grader61").each(function (i, elt) {
+            jQuery(".pa-grade").each(function (i, elt) {
                 elt = jQuery(elt);
                 var n = elt.attr("data-pa-grade") || elt.attr("name");
                 if (n in d.grades) {
@@ -2688,7 +2613,7 @@ function gradecdf61(url) {
             if (d.cdf) {
                 // load user grade
                 total = 0;
-                j = jQuery(".grader61.gradepart");
+                j = jQuery(".pa-grade.pa-intotal");
                 for (i = 0; i < j.length; ++i) {
                     jentry = jQuery(j[i]);
                     x = (jentry.is("input") ? jentry.val() : jentry.text());

@@ -1449,10 +1449,21 @@ class Conf {
             return ["ok" => false, "error" => "API function not found."];
         if (!get($uf, "get") && !check_post($qreq))
             return ["ok" => false, "error" => "Missing credentials."];
-        if (!$api->pset && (get($uf, "pset") || get($uf, "hash")))
+        $need_repo = !!get($uf, "repo");
+        $need_hash = !!get($uf, "hash");
+        $need_pset = $need_repo || $need_hash || !!get($uf, "pset");
+        if ($need_pset && !$api->pset)
             return ["ok" => false, "error" => "Missing pset."];
-        if (!$api->hash && get($uf, "hash"))
-            return ["ok" => false, "error" => "Missing commit."];
+        if ($need_repo && !$api->repo)
+            return ["ok" => false, "error" => "Missing repository for this pset."];
+        if (get($uf, "hash") && !$api->pset->gitless) {
+            if (!$api->hash)
+                return ["ok" => false, "error" => "Missing commit."];
+            $c = $api->repo->connected_commit($api->hash, $api->pset);
+            if (!$c)
+                return ["ok" => false, "error" => "Commit not part of repository."];
+            $qreq->commit = $c->hash;
+        }
         if (($req = get($uf, "require")))
             foreach (expand_includes($req) as $f)
                 require_once $f;
@@ -1468,6 +1479,7 @@ class Conf {
     }
     private function fill_api_map() {
         $this->_api_map = [
+            "grade" => "3 API_Grade::grade",
             "jserror" => "1 API_JSError::jserror",
             "latestcommit" => "3 API_Repo::latestcommit"
         ];
@@ -1492,6 +1504,8 @@ class Conf {
             if ($flags & 2)
                 $uf->pset = true;
             if ($flags & 4)
+                $uf->repo = true;
+            if ($flags & 8)
                 $uf->hash = true;
         }
         return $uf;

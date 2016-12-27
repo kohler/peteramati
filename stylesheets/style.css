@@ -2558,10 +2558,10 @@ span.foldarrow {
 	display: inline-block;
 	margin-left: 2em;
 }
-input.grader61 {
+input.pa-grade {
 	width: 90%;
 }
-span.grader61, span.gradetotal61 {
+span.pa-grade, span.gradetotal61 {
 	display: inline-block;
 	min-width: 3em;
 }

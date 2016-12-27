@@ -24,7 +24,7 @@ class PsetView {
     private $commit_notes = false;
     private $derived_handout_commit = null;
 
-    function __construct(Pset $pset, Contact $user, Contact $viewer) {
+    function __construct(Pset $pset, Contact $user, Contact $viewer, $hash = null) {
         $this->conf = $pset->conf;
         $this->pset = $pset;
         $this->user = $user;
@@ -33,7 +33,7 @@ class PsetView {
         $this->partner = $user->partner($pset->id);
         if (!$pset->gitless)
             $this->repo = $user->repo($pset->id);
-        $this->load_grade();
+        $this->hash = $hash;
     }
 
     function connected_hash($hash) {
@@ -586,6 +586,8 @@ class PsetView {
             if ($this->pc_view && !empty($ag))
                 $result->autogrades = (object) $ag;
         }
+        if (!$this->pset->gitless_grades && !$this->is_grading_commit())
+            $result->grading_hash = $this->grading_hash();
         return $result;
     }
 
