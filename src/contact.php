@@ -1581,10 +1581,14 @@ class Contact {
         return $setting === true || (is_int($setting) && $setting >= $Now);
     }
 
-    static function student_can_view_pset($pset) {
-        return isset($pset->visible)
-            && self::show_setting_on($pset->visible)
-            && !$pset->disabled;
+    static function student_can_view_pset(Pset $pset) {
+        return self::show_setting_on($pset->visible) && !$pset->disabled;
+    }
+
+    function can_view_pset(Pset $pset) {
+        return (!$pset->disabled && $pset->gitless && $this->isPC)
+            || (!$pset->ui_disabled && $this->privChair)
+            || self::student_can_view_pset($pset);
     }
 
     static function student_can_view_grades(Pset $pset, $extension = null) {

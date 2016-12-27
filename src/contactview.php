@@ -4,8 +4,6 @@
 // See LICENSE for open-source distribution terms
 
 class ContactView {
-    static private $_reverse_pset_compare = false;
-
     static function set_path_request($paths) {
         global $Conf;
         $path = Navigation::path();
@@ -100,34 +98,6 @@ class ContactView {
         if ($pset)
             $pset->urlkey = $psetkey;
         return $pset;
-    }
-
-    static function pset_compare($a, $b) {
-        $adl = defval($a, "deadline_college", defval($a, "deadline", 0));
-        $bdl = defval($b, "deadline_college", defval($b, "deadline", 0));
-        if (!$adl != !$bdl)
-            return $adl ? 1 : -1;
-        if ($adl != $bdl)
-            return ($adl < $bdl) == self::$_reverse_pset_compare ? 1 : -1;
-        if (($cmp = strcasecmp(defval($a, "title", $a->id),
-                               defval($b, "title", $b->id))) != 0)
-            return $cmp;
-        return $a->id < $b->id ? -1 : ($a->id == $b->id ? 0 : 1);
-    }
-
-    static function pset_list($contact, $reverse) {
-        global $Conf;
-        $psets = array();
-        $istf = $contact && ($contact === true || $contact->isPC);
-        $ischair = $contact instanceof Contact && $contact->privChair;
-        foreach ($Conf->psets() as $pset)
-            if (Contact::student_can_view_pset($pset)
-                || (!$pset->disabled && $pset->gitless && $istf)
-                || (!$pset->ui_disabled && $ischair))
-                $psets[$pset->id] = $pset;
-        self::$_reverse_pset_compare = !!$reverse;
-        uasort($psets, "ContactView::pset_compare");
-        return $psets;
     }
 
     static function user_pset_info(Contact $user, Pset $pset) {

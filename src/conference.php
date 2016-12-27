@@ -40,11 +40,13 @@ class Conf {
     private $save_messages = true;
     var $headerPrinted = false;
     private $_save_logs = false;
-    private $_psets = [];
-    private $_psets_by_urlkey = [];
     private $_session_list = false;
 
     private $usertimeId = 1;
+
+    private $_psets = [];
+    private $_psets_by_urlkey = [];
+    private $_psets_sorted = false;
 
     private $_date_format_initialized = false;
     private $_pc_members_cache = null;
@@ -1325,10 +1327,19 @@ class Conf {
         if (isset($this->_psets_by_urlkey[$pset->urlkey]))
             throw new Exception("pset urlkey `{$pset->urlkey}` reused");
         $this->_psets_by_urlkey[$pset->urlkey] = $pset;
+        $this->_psets_sorted = false;
     }
 
     function psets() {
+        if (!$this->_psets_sorted) {
+            uasort($this->_psets, "Pset::compare");
+            $this->_psets_sorted = true;
+        }
         return $this->_psets;
+    }
+
+    function psets_newest_first() {
+        return array_reverse($this->psets(), true);
     }
 
     function pset_by_id($id) {

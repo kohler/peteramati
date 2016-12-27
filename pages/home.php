@@ -616,8 +616,9 @@ function show_pset($pset, $user) {
 
 if (!$Me->is_empty() && $User->is_student()) {
     Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
-    foreach (ContactView::pset_list(false, true) as $pset)
-        show_pset($pset, $User);
+    foreach ($Conf->psets_newest_first() as $pset)
+        if ($Me->can_view_pset($pset) && !$pset->disabled)
+            show_pset($pset, $User);
     if ($Me->isPC) {
         echo "<div style='margin-top:5em'></div>\n";
         if ($User->dropped)
@@ -1014,11 +1015,12 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $t0 = $Profile ? microtime(true) : 0;
 
     $psetj = [];
-    foreach (ContactView::pset_list($Me, false) as $pset) {
-        $pj = ["title" => $pset->title, "urlkey" => $pset->urlkey,
-               "pos" => count($psetj)];
-        $psetj[$pset->psetid] = $pj;
-    }
+    foreach ($Conf->psets() as $pset)
+        if ($Me->can_view_pset($pset)) {
+            $pj = ["title" => $pset->title, "urlkey" => $pset->urlkey,
+                   "pos" => count($psetj)];
+            $psetj[$pset->psetid] = $pj;
+        }
     Ht::stash_script('peteramati_psets=' . json_encode($psetj) . ';');
 
     $pctable = [];
@@ -1044,11 +1046,12 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
         $sep = "<hr />\n";
     }
 
-    foreach (ContactView::pset_list($Me, true) as $pset) {
-        echo $sep;
-        show_pset_table($pset, $Me);
-        $sep = "<hr />\n";
-    }
+    foreach ($Conf->psets_newest_first() as $pset)
+        if ($Me->can_view_pset($pset)) {
+            echo $sep;
+            show_pset_table($pset, $Me);
+            $sep = "<hr />\n";
+        }
     Ht::stash_script("$('.s61check').click(click_s61check)");
 
     if ($LastPsetFix) {

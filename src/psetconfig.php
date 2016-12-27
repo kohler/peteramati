@@ -6,7 +6,7 @@
 class PsetConfigException extends Exception {
     public $path;
 
-    public function __construct($msg, $path) {
+    function __construct($msg, $path) {
         $this->path = array();
         foreach (func_get_args() as $i => $x)
             if ($i && is_array($x))
@@ -222,6 +222,19 @@ class Pset {
             $this->ignore = self::cstr($p, "ignore");
     }
 
+    static function compare(Pset $a, Pset $b) {
+        $adl = $a->deadline_college ? : $a->deadline;
+        $bdl = $b->deadline_college ? : $b->deadline;
+        if (!$adl != !$bdl)
+            return $adl ? -1 : 1;
+        else if ($adl != $bdl)
+            return $adl < $bdl ? -1 : 1;
+        else if (($cmp = strcasecmp($a->title, $b->title)))
+            return $cmp;
+        else
+            return $a->id < $b->id ? -1 : 1;
+    }
+
 
     function handout_repo(Repository $inrepo = null) {
         return $this->conf->handout_repo($this, $inrepo);
@@ -301,35 +314,35 @@ class Pset {
         return null;
     }
 
-    public static function cbool(/* ... */) {
+    static function cbool(/* ... */) {
         return self::ccheck("is_bool", func_get_args());
     }
 
-    public static function cint(/* ... */) {
+    static function cint(/* ... */) {
         return self::ccheck("is_int", func_get_args());
     }
 
-    public static function cnum(/* ... */) {
+    static function cnum(/* ... */) {
         return self::ccheck("is_number", func_get_args());
     }
 
-    public static function cstr(/* ... */) {
+    static function cstr(/* ... */) {
         return self::ccheck("is_string", func_get_args());
     }
 
-    public static function cstr_array(/* ... */) {
+    static function cstr_array(/* ... */) {
         return self::ccheck("is_string_array", func_get_args());
     }
 
-    public static function cdate(/* ... */) {
+    static function cdate(/* ... */) {
         return self::ccheck("check_date", func_get_args());
     }
 
-    public static function cdate_or_grades(/* ... */) {
+    static function cdate_or_grades(/* ... */) {
         return self::ccheck("check_date_or_grades", func_get_args());
     }
 
-    public static function cinterval(/* ... */) {
+    static function cinterval(/* ... */) {
         return self::ccheck("check_interval", func_get_args());
     }
 
@@ -392,7 +405,7 @@ class GradeEntryConfig {
     public $is_extra;
     public $priority;
 
-    public function __construct($name, $g) {
+    function __construct($name, $g) {
         $loc = array("grades", $name);
         if (!is_object($g))
             throw new PsetConfigException("grade entry format error", $loc);
@@ -425,7 +438,7 @@ class RunnerConfig {
     public $nconcurrent;
     public $priority;
 
-    public function __construct($name, $r) {
+    function __construct($name, $r) {
         $loc = array("runners", $name);
         if (!is_object($r))
             throw new PsetConfigException("runner format error", $loc);
@@ -466,7 +479,7 @@ class DiffConfig {
     public $ignore;
     public $boring;
 
-    public function __construct($regex, $d) {
+    function __construct($regex, $d) {
         $loc = array("diffs", $regex);
         if (!is_object($d))
             throw new PsetConfigException("diff format error", $loc);
@@ -480,7 +493,7 @@ class DiffConfig {
         $this->boring = Pset::cbool($loc, $d, "boring");
     }
 
-    static public function combine($a, $b) {
+    static function combine($a, $b) {
         if (!$a && !$b)
             return false;
         if (!$a || !$b)
