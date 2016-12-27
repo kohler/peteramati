@@ -14,8 +14,8 @@ function quit($err = null) {
 }
 
 function user_pset_info() {
-    global $Conf, $User, $Pset, $Info, $Qreq;
-    $Info = ContactView::user_pset_info($User, $Pset);
+    global $Conf, $User, $Me, $Pset, $Info, $Qreq;
+    $Info = new PsetView($Pset, $User, $Me);
     if (($Commit = $Qreq->newcommit) == null)
         $Commit = $Qreq->commit;
     if (!$Info->set_hash($Commit))

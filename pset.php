@@ -156,7 +156,7 @@ if (isset($_REQUEST["gradecdf"])) {
 }
 
 // load user repo and current commit
-$Info = ContactView::user_pset_info($User, $Pset);
+$Info = new PsetView($Pset, $User, $Me);
 if (($Commit = req("newcommit")) == null)
     $Commit = req("commit");
 if (!$Info->set_hash($Commit) && $Commit && $Info->repo) {

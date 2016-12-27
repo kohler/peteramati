@@ -276,7 +276,7 @@ function set_grader($qreq) {
             && $v
             && ($uname = urldecode(substr($k, 4)))
             && ($user = ContactView::prepare_user($uname))) {
-            $info = ContactView::user_pset_info($user, $pset);
+            $info = new PsetView($pset, $user, $Me);
             if ($info->repo)
                 $info->repo->refresh(2700, true);
             if ($info->set_hash(null)) {
@@ -586,7 +586,7 @@ function show_pset($pset, $user) {
     $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($user)]);
     echo "<h2><a href=\"", $pseturl, "\">",
         htmlspecialchars($pset->title), "</a>";
-    $info = ContactView::user_pset_info($user, $pset);
+    $info = new PsetView($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
     $user_see_grade = $user->can_view_grades($pset, $user, $info);
     if ($user_see_grade && $info->has_grading())
@@ -674,7 +674,7 @@ function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
                 || ($s->placeholder_at < $Now - 600 && rand(0, 10) == 0))
             && (!$s->repoviewable || !$s->gradehash)) {
             // XXX this is slow given that most info is already loaded
-            $info = ContactView::user_pset_info($s, $pset);
+            $info = new PsetView($pset, $s, $Me);
             $info->set_hash(null);
             $s->gradehash = $info->commit_hash() ? : null;
             $s->placeholder = 1;

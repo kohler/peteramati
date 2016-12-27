@@ -100,11 +100,6 @@ class ContactView {
         return $pset;
     }
 
-    static function user_pset_info(Contact $user, Pset $pset) {
-        global $Me;
-        return new PsetView($pset, $user, $Me);
-    }
-
     static function add_regrades(PsetView $info) {
         list($user, $repo) = array($info->user, $info->repo);
         if (!isset($info->regrades) && !$info->pset->gitless_grades) {

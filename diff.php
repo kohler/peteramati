@@ -18,7 +18,7 @@ assert($User == $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
-$Info = ContactView::user_pset_info($User, $Pset);
+$Info = new PsetView($Pset, $User, $Me);
 if (!$Qreq->commit || !$Qreq->commit1 || $Pset->gitless)
     $Me->escape();
 $diff_options = ["wdiff" => false];
