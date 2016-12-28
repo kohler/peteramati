@@ -1888,7 +1888,7 @@ function savelinenote61(form) {
 
 function gradetotal61(data) {
     var $gp = $(".pa-grade.pa-intotal"), total = 0;
-    var grades = data.grades, autogrades = data.autogrades || {},
+    var grades = data.grades || {}, autogrades = data.autogrades || {},
         maxgrades = data.maxgrades || {};
     // parse entries
     for (var i = 0; i < $gp.length; ++i) {
@@ -1948,9 +1948,9 @@ function gradesubmit61(form) {
     if ($f.prop("outstanding"))
         return;
     $f.prop("outstanding", true);
+    $f.find("input[type=submit]").prop("disabled", true);
     $f.find(".pa-autograde-differs, .ajaxsave61").remove();
     $f.find(".pa-gradeentry").append('<span class="ajaxsave61">Saving…</span>');
-    $f.find(".ajaxsave61").html("Saving…");
     var g = {}, og = {};
     $f.find("input.pa-grade").each(function () {
         if (this.hasAttribute("data-pa-oldgrade"))
@@ -1961,6 +1961,7 @@ function gradesubmit61(form) {
         type: "POST", cache: false, data: {grades: g, oldgrades: og},
         success: function (data) {
             $f.prop("outstanding", false);
+            $f.find("input[type=submit]").prop("disabled", false);
             if (data && data.ok)
                 $f.find(".ajaxsave61").html("Saved");
             else
