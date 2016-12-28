@@ -532,16 +532,10 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
 // Per-pset
 function render_grades($pset, $gi, $s) {
     global $Me;
-    $total = $nintotal = $max = 0;
-    $lastintotal = null;
+    $total = 0;
     $garr = $gvarr = $different = [];
     foreach ($pset->grades as $ge) {
         $k = $ge->name;
-        if (!$ge->no_total) {
-            ++$nintotal;
-            if ($ge->max && !$ge->hide_max && !$ge->is_extra)
-                $max += $ge->max;
-        }
         $gv = $ggv = $agv = "";
         if ($gi && isset($gi->grades))
             $ggv = get($gi->grades, $k);
@@ -551,27 +545,16 @@ function render_grades($pset, $gi, $s) {
             $gv = $ggv;
         else if ($agv !== null && $agv !== "")
             $gv = $agv;
-        if ($gv != "" && !$ge->no_total) {
+        if ($gv != "" && !$ge->no_total)
             $total += $gv;
-            $lastintotal = count($garr);
-        }
         if ($gv === "" && !$ge->is_extra && $s
             && $Me->contactId == $s->gradercid)
             $s->incomplete = "grade missing";
         $gvarr[] = $gv;
-        if ($ggv && $agv && $ggv != $agv) {
+        if ($ggv && $agv && $ggv != $agv)
             $different[$k] = true;
-            $gv = '<span style="color:red">' . $gv . '</span>';
-        }
-        $garr[] = $gv;
     }
-    if ($nintotal > 1) {
-        array_unshift($garr, '<strong>' . $total . '</strong>');
-        $lastintotal = 0;
-    } else if ($nintotal == 1 && $lastintotal !== null)
-        $garr[$lastintotal] = '<strong>' . $garr[$lastintotal] . '</strong>';
-    return (object) array("all" => $garr, "allv" => $gvarr,  "totalv" => $total, "differentk" => $different,
-                          "totalindex" => $lastintotal, "maxtotal" => $max);
+    return (object) ["allv" => $gvarr,  "totalv" => $total, "differentk" => $different];
 }
 
 function show_pset($pset, $user) {
@@ -580,8 +563,8 @@ function show_pset($pset, $user) {
         && !$pset->contact_grade_for($user))
         return;
     echo "<hr/>\n";
-    $can_view = $user->can_view_pset($pset);
-    if (!$can_view)
+    $user_can_view = $user->can_view_pset($pset);
+    if (!$user_can_view)
         echo '<div class="pa-pset-hidden">';
     $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($user)]);
     echo "<h2><a href=\"", $pseturl, "\">",
@@ -589,33 +572,28 @@ function show_pset($pset, $user) {
     $info = new PsetView($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
     $user_see_grade = $user->can_view_grades($pset, $info);
-    if ($user_see_grade && $info->has_grading())
+    if ($user_see_grade && $info->has_assigned_grades())
         echo ' <a class="gradesready" href="', $pseturl, '">(grade ready)</a>';
     echo "</a></h2>";
     ContactView::echo_partner_group($info);
     ContactView::echo_repo_group($info);
     if ($info->repo)
         $info->repo->refresh(30);
-    if ($info->has_grading()) {
+    if ($info->grading_hash())
         ContactView::echo_repo_grade_commit_group($info);
-        if ($Me->can_view_grades($pset, $info)
-            && ($gi = $info->grading_info())) {
-            $garr = render_grades($pset, $gi, null);
-            if ($garr->totalindex !== null) {
-                $t = $garr->all[$garr->totalindex] . " / " . $garr->maxtotal;
-                if ($user_see_grade)
-                    ContactView::echo_group("grade", $t);
-                else {
-                    echo '<div class="pa-grp-hidden">';
-                    ContactView::echo_group("grade", $t);
-                    echo '</div>';
-                }
-            }
-        }
-        ContactView::echo_repo_flags_group($info);
-    } else
+    else
         ContactView::echo_repo_last_commit_group($info, true);
-    if (!$can_view)
+    if ($info->can_view_grades() && $info->has_assigned_grades()) {
+        $tm = $info->grade_total();
+        $t = "<strong>" . $tm[0] . "</strong> / " . $tm[1];
+        if (!$user_see_grade)
+            echo '<div class="pa-grp-hidden">';
+        ContactView::echo_group("grade", $t);
+        if (!$user_see_grade)
+            echo '</div>';
+    }
+    ContactView::echo_repo_flags_group($info);
+    if (!$user_can_view)
         echo '</div>';
     echo "\n";
 }

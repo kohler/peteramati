@@ -520,7 +520,8 @@ class ContactView {
         list($user, $repo) = array($info->user, $info->repo);
         if ($info->pset->gitless_grades)
             return;
-        else if (!$info->has_grading() || !$user->can_view_repo_contents($repo))
+        else if (!$user->can_view_repo_contents($repo)
+                 || !$info->grading_hash())
             return self::echo_repo_last_commit_group($info, false);
         // XXX should check can_view_grades here
 

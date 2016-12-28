@@ -165,16 +165,6 @@ if (!$Info->set_hash($Commit) && $Commit && $Info->repo) {
 }
 $Commit = $Info->commit_hash();
 
-// get JSON grade data
-if (isset($_REQUEST["gradestatus"])) {
-    $gj = $Info->grade_json();
-    if ($gj) {
-        $gj->ok = true;
-        json_exit($gj);
-    } else
-        json_exit(["error" => "Grades are not visible now"]);
-}
-
 // maybe set commit
 if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
     && $Info->can_have_grades() && $Me->can_set_grader($Pset, $User)) {
@@ -478,16 +468,17 @@ function echo_grade_entry($ge) {
     ContactView::echo_group($title, $value);
 }
 
-function echo_grade_total($gj) {
+function echo_grade_total() {
     global $User, $Me, $Pset, $Info;
-    if ($Info->can_view_grades() && $gj && get($gj, "grades") && $gj->nentries > 1) {
-        $value = '<span class="gradetotal61">' . $gj->grades->total . '</span>';
+    if ($Info->can_view_grades() && $Info->has_assigned_grades() && $Info->needs_total()) {
+        $tm = $Info->grade_total();
+        $value = '<span class="gradetotal61">' . $tm[0] . '</span>';
         if ($Me != $User)
             $value = '<span class="gradeholder61">' . $value . '</span>';
-        if (isset($gj->maxgrades) && get($gj->maxgrades, "total")) {
-            $value .= ' <span class="grademax61">of ' . $gj->maxgrades->total . '</span>';
-            if ($gj->maxgrades->total != 100 && $gj->maxgrades->total > 50 && false)
-                $value .= ' <span class="gradepercent61" data-pa-maxtotal="' . $gj->maxgrades->total . '" style="display:inline-block;padding-left:1em">' . sprintf("(%.0f%%)", 100 * $gj->grades->total / $gj->maxgrades->total) . '</span>';
+        if ($tm[1]) {
+            $value .= ' <span class="grademax61">of ' . $tm[1] . '</span>';
+            if ($tm[1] != 100 && $tm[1] > 50 && false)
+                $value .= ' <span class="gradepercent61" data-pa-maxtotal="' . $tm[1] . '" style="display:inline-block;padding-left:1em">' . sprintf("(%.0f%%)", 100 * $tm[0] / $tm[1]) . '</span>';
         }
         ContactView::echo_group("total", $value, null, array("nowrap" => true));
     }
@@ -642,11 +633,8 @@ function echo_grade_cdf_here() {
     global $Me, $User, $Pset, $Info;
     if ($Info->can_view_grades()
         && ($Me != $User || $Pset->grade_cdf_visible)
-        && $Pset->grades) {
-        $gj = $Info->grade_json();
-        if (get($gj, "grades"))
-            echo_grade_cdf();
-    }
+        && $Info->has_assigned_grades())
+        echo_grade_cdf();
 }
 
 function echo_all_grades() {
@@ -654,16 +642,16 @@ function echo_all_grades() {
     if ($Info->is_handout_commit())
         return;
 
-    $gj = $Info->grade_json();
-    if (get($gj, "grades") || ($Info->can_view_grades() && $Me != $User)) {
-        echo_grade_total($gj);
+    $has_grades = $Info->has_assigned_grades();
+    if ($Info->can_view_grades() && ($Me !== $User || $has_grades)) {
+        echo_grade_total();
         foreach ($Pset->grades as $ge)
             echo_grade_entry($ge);
     }
 
     $lhg = $Info->late_hours();
     if ($lhg && $User == $Me && $Info->can_view_grades()) {
-        if ($lhg->hours || get($gj, "grades")) {
+        if ($lhg->hours || $has_grades) {
             echo '<div style="margin-top:1.5em">';
             ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhg->hours) . '</span>',
                                     array(), array("nowrap" => true));

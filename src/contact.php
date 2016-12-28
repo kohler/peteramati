@@ -1603,6 +1603,12 @@ class Contact {
             && self::show_setting_on($pset->$k);
     }
 
+    function can_view_pset_grades(Pset $pset) {
+        return $this->isPC
+            ? $this->can_view_pset($pset)
+            : self::student_can_view_grades($pset, $this->extension);
+    }
+
     function can_view_grades(Pset $pset, PsetView $info = null) {
         return $this->can_view_pset($pset)
             && ($this->isPC

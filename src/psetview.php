@@ -16,13 +16,16 @@ class PsetView {
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
     private $repo_grade = null;     // RepositoryGrade+CommitNotes
     private $grade_notes = null;
-    private $can_view_grades;
-    private $user_can_view_grades;
+    private $can_view_grades = null;
+    private $user_can_view_grades = null;
 
     private $hash = null;
     private $commit_record = false; // CommitNotes (maybe +RepositoryGrade)
     private $commit_notes = false;
     private $derived_handout_commit = null;
+    private $n_visible_grades = null;
+    private $n_visible_in_total;
+    private $n_set_grades;
 
     function __construct(Pset $pset, Contact $user, Contact $viewer, $hash = null) {
         $this->conf = $pset->conf;
@@ -44,6 +47,7 @@ class PsetView {
     function set_hash($reqhash) {
         $this->hash = false;
         $this->commit_record = $this->commit_notes = $this->derived_handout_commit = false;
+        $this->n_visible_grades = null;
         if (!$this->repo)
             return false;
         if ($reqhash)
@@ -290,6 +294,7 @@ class PsetView {
         $record->notesversion = $record->notesversion + 1;
         $this->grade = $record;
         $this->grade_notes = $record->notes;
+        $this->can_view_grades = $this->user_can_view_grades = null;
     }
 
     function update_current_info($updates, $reset_keys = false) {
@@ -357,18 +362,12 @@ class PsetView {
                 // NB don't check recent_commits association here
                 $this->hash = $this->grade->gradehash;
         }
-        $this->can_view_grades = $this->viewer->can_view_grades($this->pset, $this);
-        $this->user_can_view_grades = $this->user->can_view_grades($this->pset, $this);
+        $this->n_visible_grades = null;
     }
 
     private function ensure_grade() {
         if ($this->grade === false)
             $this->load_grade();
-    }
-
-    function has_grading() {
-        $this->ensure_grade();
-        return !!$this->grade;
     }
 
     function grading_hash() {
@@ -399,13 +398,65 @@ class PsetView {
     }
 
     function can_view_grades() {
-        $this->ensure_grade();
+        if ($this->can_view_grades === null)
+            $this->can_view_grades = $this->viewer->can_view_pset_grades($this->pset)
+                && ($this->pc_view || !$this->grades_hidden());
         return $this->can_view_grades;
     }
 
     function user_can_view_grades() {
-        $this->ensure_grade();
+        if ($this->user_can_view_grades === null)
+            $this->user_can_view_grades = $this->user->can_view_pset_grades($this->pset)
+                && !$this->grades_hidden();
         return $this->user_can_view_grades;
+    }
+
+    private function ensure_n_visible_grades() {
+        if ($this->n_visible_grades === null) {
+            $this->n_visible_grades = $this->n_set_grades = $this->n_visible_in_total = 0;
+            if ($this->can_view_grades()) {
+                $notes = $this->current_info();
+                $ag = get($notes, "autogrades");
+                $g = get($notes, "grades");
+                foreach ($this->pset->grades as $ge)
+                    if (!$ge->hide || $this->pc_view) {
+                        ++$this->n_visible_grades;
+                        if (($ag && get($ag, $ge->name) !== null)
+                            || ($g && get($g, $ge->name) !== null))
+                            ++$this->n_set_grades;
+                        if (!$ge->no_total)
+                            ++$this->n_visible_in_total;
+                    }
+            }
+        }
+    }
+
+    function has_assigned_grades() {
+        $this->ensure_n_visible_grades();
+        return $this->n_set_grades > 0;
+    }
+
+    function needs_total() {
+        $this->ensure_n_visible_grades();
+        return $this->n_visible_in_total > 1;
+    }
+
+    function grade_total() {
+        $total = $maxtotal = 0;
+        $notes = $this->current_info();
+        $ag = get($notes, "autogrades");
+        $g = get($notes, "grades");
+        foreach ($this->pset->grades as $ge)
+            if ((!$ge->hide || $this->pc_view) && !$ge->no_total) {
+                $gv = $g ? get($g, $ge->name) : null;
+                if ($gv === null && $ag)
+                    $gv = get($ag, $ge->name);
+                if ($gv)
+                    $total += $gv;
+                if (!$ge->is_extra && !$ge->no_total && $ge->max && !$ge->hide_max)
+                    $maxtotal += $ge->max;
+            }
+        return [$total, $maxtotal];
     }
 
     function gradercid() {
@@ -435,15 +486,6 @@ class PsetView {
             return $this->commit_info($key);
     }
 
-    function grading_info_empty() {
-        $this->ensure_grade();
-        if (!$this->grade_notes)
-            return true;
-        $gn = (array) $this->grade_notes;
-        return !$gn || empty($gn)
-            || (count($gn) == 1 && isset($gn["gradercid"]));
-    }
-
     function grades_hidden() {
         $this->ensure_grade();
         return $this->grade && $this->grade->hidegrade;
@@ -452,9 +494,11 @@ class PsetView {
     function current_grade_entry($k, $type = null) {
         $gn = $this->current_info();
         $grade = null;
-        if ((!$type || $type == "autograde") && isset($gn->autogrades) && property_exists($gn->autogrades, $k))
+        if ((!$type || $type == "autograde") && isset($gn->autogrades)
+            && property_exists($gn->autogrades, $k))
             $grade = $gn->autogrades->$k;
-        if ((!$type || $type == "grade") && isset($gn->grades) && property_exists($gn->grades, $k))
+        if ((!$type || $type == "grade") && isset($gn->grades)
+            && property_exists($gn->grades, $k))
             $grade = $gn->grades->$k;
         return $grade;
     }
@@ -514,6 +558,7 @@ class PsetView {
         if ($q)
             Dbl::qe_raw($q);
         $this->grade = $this->repo_grade = false;
+        $this->can_view_grades = $this->user_can_view_grades = null;
     }
 
     function mark_grading_commit() {
@@ -531,6 +576,7 @@ class PsetView {
                     $this->hash ? : null, $grader ? : null);
         }
         $this->grade = $this->repo_grade = false;
+        $this->can_view_grades = $this->user_can_view_grades = null;
     }
 
 
@@ -556,7 +602,7 @@ class PsetView {
 
     function grade_json() {
         $this->ensure_grade();
-        if (!$this->can_view_grades)
+        if (!$this->can_view_grades())
             return null;
         $notes = $this->current_info();
         $result = $this->pset->gradeinfo_json($this->pc_view);
@@ -612,7 +658,7 @@ class PsetView {
         echo '<table id="', $tabid, '" class="code61 diff61 filediff61';
         if ($this->pc_view)
             echo " live";
-        if (!$this->user_can_view_grades)
+        if (!$this->user_can_view_grades())
             echo " hidegrade61";
         if (!$open)
             echo '" style="display:none';
@@ -665,7 +711,7 @@ class PsetView {
         }
         if (!is_array($note))
             $note = array(false, $note);
-        if ($this->can_view_grades || $note[0]) {
+        if ($this->can_view_grades() || $note[0]) {
             echo '<tr class="diffl61 gw">', /* NB script depends on this class */
                 '<td colspan="2" class="difflnoteborder61"></td>',
                 '<td class="difflnote61">';
@@ -720,7 +766,7 @@ class PsetView {
             '<div class="aabut">',
             Ht::submit("Save comment"),
             '</div><div class="aabut">';
-        if ($this->user_can_view_grades)
+        if ($this->user_can_view_grades())
             echo Ht::hidden("iscomment", 1);
         else
             echo Ht::checkbox("iscomment", 1), '&nbsp;', Ht::label("Show immediately");
