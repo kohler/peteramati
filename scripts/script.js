@@ -2050,29 +2050,30 @@ function beforeunload61(evt) {
         }
 }
 
-function loadgrade61() {
-    jQuery.ajax(psetpost61, {
-        type: "GET", cache: false, data: "gradestatus=1",
-        dataType: "json", success: function (d) {
-            jQuery(".pa-grade").each(function (i, elt) {
-                elt = jQuery(elt);
+function loadgrade61($b) {
+    var $p = $b.closest(".pa-psetinfo");
+    $.ajax(hoturl("api/grade", hoturl_gradeparts($p)), {
+        type: "GET", cache: false, dataType: "json",
+        success: function (data) {
+            $p.find(".pa-grade").each(function (i, elt) {
+                elt = $(elt);
                 var n = elt.attr("data-pa-grade") || elt.attr("name");
-                if (n in d.grades) {
+                if (n in data.grades) {
                     if (elt.is("input"))
-                        elt.val(d.grades[n]);
+                        elt.val(data.grades[n]);
                     else
-                        elt.text(d.grades[n]);
+                        elt.text(data.grades[n]);
                 }
-                if (n in d.grades && d.autogrades && n in d.autogrades) {
+                if (n in data.grades && data.autogrades && n in data.autogrades) {
                     elt = elt.closest("td");
                     elt.find(".autograde61").remove();
-                    if (d.grades[n] != d.autogrades[n]) {
+                    if (data.grades[n] != data.autogrades[n]) {
                         elt.append(" <span class=\"autograde61\">autograde is </span>");
-                        elt.find(".autograde61").append(document.createTextNode(d.autogrades[n]));
+                        elt.find(".autograde61").append(document.createTextNode(data.autogrades[n]));
                     }
                 }
-                gradetotal61(d);
             });
+            gradetotal61(data);
         }
     });
 }
@@ -2133,7 +2134,7 @@ function flag61(button) {
 }
 
 function run61(button, opt) {
-    var form = $(button).closest("form"),
+    var $f = $(button).closest("form"),
         runclass = button.getAttribute("data-pa-runclass") || button.value,
         therun = $("#run61_" + runclass), thepre = therun.find("pre"), checkt;
 
@@ -2142,10 +2143,10 @@ function run61(button, opt) {
     if (opt.unfold && therun.attr("data-pa-timestamp"))
         checkt = +therun.attr("data-pa-timestamp");
     else {
-        if (form.prop("outstanding"))
+        if ($f.prop("outstanding"))
             return true;
-        form.find("button").prop("disabled", true);
-        form.prop("outstanding", true);
+        $f.find("button").prop("disabled", true);
+        $f.prop("outstanding", true);
     }
     therun.removeAttr("data-pa-timestamp");
 
@@ -2172,11 +2173,11 @@ function run61(button, opt) {
     animate();
 
     function done() {
-        form.find("button").prop("disabled", false);
-        form.prop("outstanding", false);
-        jQuery(thecursor).finish().remove();
-        if (jQuery(button).attr("data-pa-loadgrade"))
-            loadgrade61();
+        $f.find("button").prop("disabled", false);
+        $f.prop("outstanding", false);
+        $(thecursor).finish().remove();
+        if ($(button).attr("data-pa-loadgrade"))
+            loadgrade61($(button));
     }
 
     function addlinepart(node, text) {
@@ -2477,14 +2478,14 @@ function run61(button, opt) {
         checkt && (a.check = checkt);
         queueid && (a.queueid = queueid);
         args && $.extend(a, args);
-        jQuery.ajax(form.attr("action"), {
-            data: form.serializeWith(a),
+        jQuery.ajax($f.attr("action"), {
+            data: $f.serializeWith(a),
             type: "POST", cache: false,
             dataType: "json",
             success: succeed,
             error: function () {
-                form.find(".ajaxsave61").html("Failed");
-                form.prop("outstanding", false);
+                $f.find(".ajaxsave61").html("Failed");
+                $f.prop("outstanding", false);
             }
         });
     }
