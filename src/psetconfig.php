@@ -266,6 +266,31 @@ class Pset {
         return (object) ["nentries" => $count, "maxgrades" => $max];
     }
 
+    function gradeentry_json($can_edit) {
+        $ej = $order = [];
+        $count = $maxtotal = 0;
+        foreach ($this->grades as $ge)
+            if (!$ge->hide || $can_edit) {
+                $gej = ["title" => $ge->title, "pos" => $count];
+                if ($ge->max && ($can_edit || !$ge->hide_max)) {
+                    $gej["max"] = $ge->max;
+                    if (!$ge->is_extra && !$ge->no_total) {
+                        $maxtotal += $ge->max;
+                        $gej["in_total"] = true;
+                    }
+                    if ($ge->is_extra)
+                        $gej["is_extra"] = true;
+                }
+                $ej[$ge->name] = $gej;
+                $order[] = $ge->name;
+                ++$count;
+            }
+        $j = ["entries" => $ej, "order" => $order];
+        if ($maxtotal)
+            $j["maxtotal"] = $maxtotal;
+        return $j;
+    }
+
 
     function contact_grade_for($student) {
         assert(!!$this->gitless_grades);
@@ -411,7 +436,9 @@ class GradeEntryConfig {
             throw new PsetConfigException("grade entry format error", $loc);
         $this->name = isset($g->name) ? $g->name : $name;
         if (!is_string($this->name)
-            || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->name))
+            || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->name)
+            || $this->name[0] === "_"
+            || $this->name === "total")
             throw new PsetConfigException("grade entry name format error", $loc);
         $this->title = Pset::cstr($loc, $g, "title");
         $this->max = Pset::cnum($loc, $g, "max");
