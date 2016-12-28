@@ -10,6 +10,7 @@ class API_Repo {
             $j = clone $c;
             unset($j->fromhead);
             $j->snaphash = $api->repo->snaphash;
+            $j->snapcheckat = $api->repo->snapcheckat;
         }
         return $j;
     }
