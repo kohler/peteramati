@@ -242,17 +242,6 @@ function save_grades($pset, $info, $values, $isauto) {
 }
 
 if ($Me->isPC && $Me != $User && check_post()
-    && isset($_REQUEST["setgrade"]) && $Info->can_have_grades()) {
-    $grades = save_grades($Pset, $Info, make_qreq(), false);
-    if (isset($_REQUEST["ajax"])) {
-        $gj = $Info->grade_json();
-        $gj->ok = true;
-        json_exit($gj);
-    }
-    redirectSelf();
-}
-
-if ($Me->isPC && $Me != $User && check_post()
     && isset($_REQUEST["setlatehours"]) && $Info->can_have_grades()) {
     if (isset($_REQUEST["late_hours"])
         && preg_match('_\A(?:0|[1-9]\d*)\z_', $_REQUEST["late_hours"])) {
@@ -432,55 +421,6 @@ function echo_grade_cdf() {
     Ht::stash_script("pa_gradecdf(\$(\"#pa-gradecdf\"))");
 }
 
-function echo_grade_total() {
-    global $User, $Me, $Pset, $Info;
-    if ($Info->can_view_grades() && $Info->has_assigned_grades() && $Info->needs_total()) {
-        $tm = $Info->grade_total();
-        echo '<table class="pa-total pa-grp"><tbody><tr>',
-            '<td class="cs61key">total</td>',
-            '<td class="nw">',
-            '<span class="pa-gradevalue',
-            ($Me !== $User ? " pa-gradeholder" : ""),
-            '">', $tm[0], '</span>';
-        if ($tm[1])
-            echo ' <span class="pa-grademax">of ', $tm[1], '</span>';
-        echo "</td></tr></tbody></table>\n";
-    }
-}
-
-function echo_grade_entry($ge) {
-    global $User, $Me, $Info;
-    if (!$Info->can_view_grades())
-        return;
-    $grade = $Info->current_grade_entry($ge->name);
-    if ($User == $Me && $grade === null && $ge->is_extra)
-        return;
-    echo '<table class="pa-grade pa-grp" data-pa-grade="', htmlspecialchars($ge->name), '"><tbody><tr>',
-        '<td class="cs61key">', htmlspecialchars($ge->title ? : $ge->key), '</td>',
-        '<td>';
-    if ($Info->pc_view) {
-        echo '<form onsubmit="return pa_savegrades(this)"><div class="pa-gradeentry">'
-            . '<span class="pa-gradeholder">'
-            . Ht::entry($ge->name, $grade, ["onchange" => "$(this).closest('form').submit()", "class" => "pa-gradevalue"])
-            . '</span>';
-        if ($ge->max)
-            echo ' <span class="pa-grademax" style="display:inline-block;min-width:3.5em">of ', $ge->max, '</span>';
-        echo ' ', Ht::submit("Save", ["tabindex" => 1]);
-        $autograde = $Info->current_grade_entry($ge->name, "autograde");
-        if ($autograde && $autograde !== $grade)
-            echo '<span class="pa-gradediffers">autograde is ', htmlspecialchars($autograde), '</span>';
-        echo '</div>';
-        if ($grade !== null && $ge->max && $grade > $ge->max)
-            echo '<div class="pa-gradeabovemax">Grade is above max</div>';
-        echo '</form>';
-    } else {
-        echo '<span class="pa-gradevalue">', $grade, '</span>';
-        if ($ge->max && !$ge->hide_max)
-            echo ' <span class="pa-grademax">of ', $ge->max, '</span>';
-    }
-    echo "</td></tr></tbody></table>\n";
-}
-
 function echo_commit($Info) {
     global $Conf, $Me, $User, $Pset;
     global $TABWIDTH, $WDIFF;
@@ -641,11 +581,10 @@ function echo_all_grades() {
 
     $has_grades = $Info->has_assigned_grades();
     if ($Info->can_view_grades() && ($Me !== $User || $has_grades)) {
-        echo '<div class="pa-gradelist">';
-        echo_grade_total();
-        foreach ($Pset->grades as $ge)
-            echo_grade_entry($ge);
-        echo '</div>';
+        echo '<div class="pa-gradelist',
+            ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
+        Ht::stash_script('pa_loadgrades.call($(".pa-psetinfo")[0], ' . json_encode($Info->grade_json()) . ')');
+        echo Ht::unstash();
     }
 
     $lhg = $Info->late_hours();
@@ -703,7 +642,7 @@ if (!$Pset->gitless && $Info->maybe_commit_hash())
     echo '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
 if ($Me->can_set_grades($Pset, $Info))
     echo '" data-pa-gradeeditable="yes';
-echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode($Info->grade_json2())), '">';
+echo '">';
 
 if ($Pset->gitless) {
     echo_grade_cdf_here();

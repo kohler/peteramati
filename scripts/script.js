@@ -1894,7 +1894,7 @@ function pa_makegrade(name, ge, editable) {
     if (editable) {
         t += '<form onsubmit="return pa_savegrades(this)">' +
             '<div class="pa-gradeentry"><span class="pa-gradeholder">' +
-            '<input class="pa-gradevalue" name="' + name +
+            '<input type="text" class="pa-gradevalue" name="' + name +
             '" onchange="$(this).closest(\'form\').submit()" /></span>';
         if (ge.max)
             t += ' <span class="pa-grademax" style="display:inline-block;min-width:3.5em">of ' + ge.max + '</span>';
@@ -1904,7 +1904,8 @@ function pa_makegrade(name, ge, editable) {
         if (ge.max)
             t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
     }
-    return t + '</td></tr></tbody></table>';
+    t += '</td></tr></tbody></table>';
+    return t;
 }
 
 function hoturl_gradeparts($j, args) {

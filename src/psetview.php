@@ -605,43 +605,6 @@ class PsetView {
         if (!$this->can_view_grades())
             return null;
         $notes = $this->current_info();
-        $result = $this->pset->gradeinfo_json($this->pc_view);
-        $agx = get($notes, "autogrades");
-        $gx = get($notes, "grades");
-        if ($agx || $gx || $this->is_grading_commit()) {
-            $g = $ag = array();
-            $total = $total_noextra = 0;
-            foreach ($this->pset->grades as $ge)
-                if (!$ge->hide || $this->pc_view) {
-                    $key = $ge->name;
-                    $gv = 0;
-                    if ($agx && property_exists($agx, $key))
-                        $ag[$key] = $g[$key] = $gv = $agx->$key;
-                    if ($gx && property_exists($gx, $key))
-                        $g[$key] = $gv = $gx->$key;
-                    if (!$ge->no_total) {
-                        $total += $gv;
-                        if (!$ge->is_extra)
-                            $total_noextra += $gv;
-                    }
-                }
-            $g["total"] = $total;
-            if ($total != $total_noextra)
-                $g["total_noextra"] = $total_noextra;
-            $result->grades = (object) $g;
-            if ($this->pc_view && !empty($ag))
-                $result->autogrades = (object) $ag;
-        }
-        if (!$this->pset->gitless_grades && !$this->is_grading_commit())
-            $result->grading_hash = $this->grading_hash();
-        return $result;
-    }
-
-    function grade_json2() {
-        $this->ensure_grade();
-        if (!$this->can_view_grades())
-            return null;
-        $notes = $this->current_info();
         $result = $this->pset->gradeentry_json($this->pc_view);
         $agx = get($notes, "autogrades");
         $gx = get($notes, "grades");
