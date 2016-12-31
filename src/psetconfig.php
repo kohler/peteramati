@@ -271,16 +271,16 @@ class Pset {
         $count = $maxtotal = 0;
         foreach ($this->grades as $ge)
             if (!$ge->hide || $can_edit) {
-                $gej = ["title" => $ge->title, "pos" => $count];
+                $gej = ["title" => $ge->title ? : $ge->key, "pos" => $count];
                 if ($ge->max && ($can_edit || !$ge->hide_max)) {
                     $gej["max"] = $ge->max;
-                    if (!$ge->is_extra && !$ge->no_total) {
+                    if (!$ge->is_extra && !$ge->no_total)
                         $maxtotal += $ge->max;
-                        $gej["in_total"] = true;
-                    }
-                    if ($ge->is_extra)
-                        $gej["is_extra"] = true;
                 }
+                if (!$ge->no_total)
+                    $gej["in_total"] = true;
+                if ($ge->is_extra)
+                    $gej["is_extra"] = true;
                 $ej[$ge->name] = $gej;
                 $order[] = $ge->name;
                 ++$count;

@@ -637,6 +637,46 @@ class PsetView {
         return $result;
     }
 
+    function grade_json2() {
+        $this->ensure_grade();
+        if (!$this->can_view_grades())
+            return null;
+        $notes = $this->current_info();
+        $result = $this->pset->gradeentry_json($this->pc_view);
+        $agx = get($notes, "autogrades");
+        $gx = get($notes, "grades");
+        if ($agx || $gx || $this->is_grading_commit()) {
+            $g = $ag = [];
+            $total = $total_noextra = 0;
+            foreach ($this->pset->grades as $ge)
+                if (!$ge->hide || $this->pc_view) {
+                    $key = $ge->name;
+                    $gv = null;
+                    if ($agx) {
+                        $gv = property_exists($agx, $key) ? $agx->$key : null;
+                        $ag[] = $gv;
+                    }
+                    if ($gx)
+                        $gv = property_exists($gx, $key) ? $gx->$key : $gv;
+                    $g[] = $gv;
+                    if (!$ge->no_total && $gv) {
+                        $total += $gv;
+                        if (!$ge->is_extra)
+                            $total_noextra += $gv;
+                    }
+                }
+            $result["grades"] = $g;
+            if ($this->pc_view && !empty($ag))
+                $result["autogrades"] = $ag;
+            $result["total"] = $total;
+            if ($total != $total_noextra)
+                $g["total_noextra"] = $total_noextra;
+        }
+        if (!$this->pset->gitless_grades && !$this->is_grading_commit())
+            $result["grading_hash"] = $this->grading_hash();
+        return $result;
+    }
+
 
     function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open) {
         $fileid = html_id_encode($file);

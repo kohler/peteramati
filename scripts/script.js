@@ -1886,51 +1886,25 @@ function savelinenote61(form) {
         });
 }
 
-function gradetotal61(data) {
-    var $gp = $(".pa-grade.pa-intotal"), total = 0;
-    var grades = data.grades || {}, autogrades = data.autogrades || {},
-        maxgrades = data.maxgrades || {};
-    // parse entries
-    for (var i = 0; i < $gp.length; ++i) {
-        var $cur = $($gp[i]);
-        var name = $cur.attr("name");
-        if (!(name in grades))
-            continue;
-        var $f = $cur.closest("form");
-        //if ($old.val() !== $cur.val() && $cur.val() == grades[name])
-        //    console.log("saved " + name);
-        // “grade is above max” message
-        if (maxgrades[name]) {
-            if (grades[name] <= maxgrades[name])
-                $f.find(".pa-gradeentry-abovemax").remove();
-            else if (!$f.find(".pa-gradeentry-abovemax").length)
-                $f.find(".pa-gradeentry").after('<div class="pa-gradeentry-abovemax">Grade is above max</div>');
-        }
-        // “autograde differs” message
-        if (autogrades[name]) {
-            if (grades[name] == autogrades[name])
-                $f.find(".pa-autograde-differs").remove();
-            else {
-                var txt = "autograde is " + autogrades[name];
-                if (!$f.find(".pa-autograde-differs").length)
-                    $f.find(".pa-gradeentry").append('<span class="pa-autograde-differs"></span>');
-                var $ag = $f.find(".pa-autograde-differs");
-                if ($ag.text() !== txt)
-                    $ag.text(txt);
-            }
-        }
-        $cur.attr("data-pa-oldgrade", grades[name]);
-        // add to total
-        var curval = parseFloat($cur.val());
-        if (curval == curval)
-            total += curval;
+function pa_makegrade(name, ge, editable) {
+    var name = escape_entities(name);
+    var t = '<table class="pa-grade pa-grp" data-pa-grade="' + name +
+        '"><tbody><tr><td class="cs61key">' +
+        escape_entities(ge.title || ge.key) + '</td><td>';
+    if (editable) {
+        t += '<form onsubmit="return pa_savegrades(this)">' +
+            '<div class="pa-gradeentry"><span class="pa-gradeholder">' +
+            '<input class="pa-gradevalue" name="' + name +
+            '" onchange="$(this).closest(\'form\').submit()" /></span>';
+        if (ge.max)
+            t += ' <span class="pa-grademax" style="display:inline-block;min-width:3.5em">of ' + ge.max + '</span>';
+        t += ' <input type="submit" value="Save" tabindex="1" /></div></form>';
+    } else {
+        t += '<span class="pa-gradevalue"></span>';
+        if (ge.max)
+            t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
     }
-    total = Math.floor(total * 100 + 0.5) / 100;
-    var $gt = $(".gradetotal61");
-    if ($gt.text() != total) {
-        $gt.text(total);
-        gradecdf61();
-    }
+    return t + '</td></tr></tbody></table>';
 }
 
 function hoturl_gradeparts($j) {
@@ -1943,20 +1917,39 @@ function hoturl_gradeparts($j) {
     return args;
 }
 
-function gradesubmit61(form) {
+function pa_gradeinfo_total(gi) {
+    var total = 0, maxtotal = 0;
+    for (var i = 0; i < gi.order.length; ++i) {
+        var ge = gi.entries[gi.order[i]];
+        if (ge.in_total) {
+            total += (gi.grades && gi.grades[i]) || 0;
+            if (!ge.is_extra)
+                maxtotal += ge.max || 0;
+        }
+    }
+    return [Math.round(total * 1000) / 1000,
+            Math.round(maxtotal * 1000) / 1000];
+}
+
+function pa_savegrades(form) {
     var $f = $(form);
     if ($f.prop("outstanding"))
         return;
+
     $f.prop("outstanding", true);
     $f.find("input[type=submit]").prop("disabled", true);
-    $f.find(".pa-autograde-differs, .ajaxsave61").remove();
+    $f.find(".pa-gradediffers, .ajaxsave61").remove();
     $f.find(".pa-gradeentry").append('<span class="ajaxsave61">Saving…</span>');
+
+    var gi = JSON.parse($f.closest(".pa-psetinfo").attr("data-pa-gradeinfo"));
     var g = {}, og = {};
-    $f.find("input.pa-grade").each(function () {
-        if (this.hasAttribute("data-pa-oldgrade"))
-            og[this.name] = this.getAttribute("data-pa-oldgrade");
+    $f.find("input.pa-gradevalue").each(function () {
+        var ge = gi.entries[this.name];
+        if (gi.grades && gi.grades[ge.pos] != null)
+            og[this.name] = gi.grades[ge.pos];
         g[this.name] = this.value;
     });
+
     $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f)), {
         type: "POST", cache: false, data: {grades: g, oldgrades: og},
         success: function (data) {
@@ -1966,12 +1959,82 @@ function gradesubmit61(form) {
                 $f.find(".ajaxsave61").html("Saved");
             else
                 $f.find(".ajaxsave61").html('<strong class="err">' + ((data && data.error) || "Failed") + '</strong>');
-            gradetotal61(data);
+            pa_loadgrades.call(form, data);
         }, error: function () {
             $f.find(".ajaxsave61").html("Failed!");
         }
     });
     return false;
+}
+
+function pa_loadgrades(gi) {
+    var $pi = $(this).closest(".pa-psetinfo"), $pg = {};
+    var editable = $pi[0].hasAttribute("data-pa-gradeeditable");
+    $pi.find(".pa-grade").each(function () {
+        $pg[this.getAttribute("data-pa-grade")] = $(this, editable);
+    });
+
+    // handle grade entries
+    for (var i = 0; i < gi.order.length; ++i) {
+        var k = gi.order[i];
+        var ge = gi.entries[k];
+        var $g = $pg[k];
+        if (!$g) {
+            $g = $pg[k] = $(pa_makegrade(k, ge, editable));
+            if (i)
+                $g.insertAfter($pg[gi.order[i-1]]);
+            else
+                $g.appendTo($pi.find(".pa-gradelist"));
+        }
+
+        var g = gi.grades ? gi.grades[i] : null;
+        var ag = gi.autogrades ? gi.autogrades[i] : null;
+        // “grade is above max” message
+        if (ge.max && editable) {
+            if (!g || g <= ge.max)
+                $g.find(".pa-gradeabovemax").remove();
+            else if (!$g.find(".pa-gradeabovemax").length)
+                $g.find(".pa-gradeentry").after('<div class="pa-gradeabovemax">Grade is above max</div>');
+        }
+        // “autograde differs” message
+        if (ag !== null && editable) {
+            if (g === ag)
+                $g.find(".pa-gradediffers").remove();
+            else {
+                var txt = "autograde is " + ag;
+                if (!$g.find(".pa-gradediffers").length)
+                    $g.find(".pa-gradeentry").append('<span class="pa-gradediffers"></span>');
+                var $ag = $g.find(".pa-gradediffers");
+                if ($ag.text() !== txt)
+                    $ag.text(txt);
+            }
+        }
+        // actual grade value
+        var $v = $g.find(".pa-gradevalue");
+        g = g === null ? "" : "" + g;
+        if (editable && $v.val() !== g && !$v.is(":focus"))
+            $v.val(g);
+        else if (!editable && $v.text() !== g)
+            $v.text(g);
+    }
+
+    // print totals
+    var tm = pa_psetinfo_total(gi);
+    $g = $pi.find(".pa-total");
+    if (tm[0] && !$g.length) {
+        $g = $('<table class="pa-total pa-grp"><tbody><tr>' +
+            '<td class="cs61key">total</td><td class="nw">' +
+            '<span class="pa-gradevalue' + (editable ? " pa-gradeholder" : "") +
+            '"></span> <span class="pa-grademax">of ' + tm[1] +
+            '</span></td></tr></tbody></table>');
+        $g.prependTo($pi.find(".pa-gradelist"));
+    }
+    $v = $g.find(".pa-gradevalue");
+    g = "" + tm[0];
+    if ($v.text() !== g)
+        $v.text(g);
+
+    $pi.attr("data-pa-gradeinfo", JSON.stringify(gi));
 }
 
 function fold61(sel, arrowholder, direction) {
@@ -2054,27 +2117,7 @@ function loadgrade61($b) {
     var $p = $b.closest(".pa-psetinfo");
     $.ajax(hoturl("api/grade", hoturl_gradeparts($p)), {
         type: "GET", cache: false, dataType: "json",
-        success: function (data) {
-            $p.find(".pa-grade").each(function (i, elt) {
-                elt = $(elt);
-                var n = elt.attr("data-pa-grade") || elt.attr("name");
-                if (n in data.grades) {
-                    if (elt.is("input"))
-                        elt.val(data.grades[n]);
-                    else
-                        elt.text(data.grades[n]);
-                }
-                if (n in data.grades && data.autogrades && n in data.autogrades) {
-                    elt = elt.closest("td");
-                    elt.find(".autograde61").remove();
-                    if (data.grades[n] != data.autogrades[n]) {
-                        elt.append(" <span class=\"autograde61\">autograde is </span>");
-                        elt.find(".autograde61").append(document.createTextNode(data.autogrades[n]));
-                    }
-                }
-            });
-            gradetotal61(data);
-        }
+        success: function (data) { pa_loadgrades.call($p[0], data); }
     });
 }
 

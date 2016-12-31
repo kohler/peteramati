@@ -2325,14 +2325,14 @@ td.mhcb {
 .cs61infgroup {
 	padding-left: 168px;
 }
-.pa-inf:first-child, .pa-inf-error:first-child, .pa-gradeentry-abovemax {
+.pa-inf:first-child, .pa-inf-error:first-child, .pa-gradeabovemax {
 	padding-top: 4px;
 }
-.pa-inf-error, .pa-gradeentry-abovemax {
+.pa-inf-error, .pa-gradeabovemax {
 	font-weight: bold;
 	color: red;
 }
-.pa-inf-error:before, .pa-gradeentry-abovemax:before {
+.pa-inf-error:before, .pa-gradeabovemax:before {
 	content: "\26a0 ";
 }
 .pa-inf {
@@ -2454,7 +2454,7 @@ table.hidegrade61 .note61.gradenote {
 	font-size: smaller;
 	font-style: italic;
 }
-.pa-autograde-differs {
+.pa-gradediffers {
 	padding-left: 1em;
 	font-size: smaller;
 	color: red;
@@ -2558,22 +2558,22 @@ span.foldarrow {
 	display: inline-block;
 	margin-left: 2em;
 }
-input.pa-grade {
+input.pa-grade, input.pa-gradevalue {
 	width: 90%;
 }
-span.pa-grade, span.gradetotal61 {
+.pa-total span.pa-gradevalue {
+	font-weight: bold;
+}
+span.pa-grade, span.pa-gradevalue {
 	display: inline-block;
 	min-width: 3em;
 }
-span.gradetotal61 {
-	font-weight: bold;
-}
-span.gradeholder61 {
+span.gradeholder61, span.pa-gradeholder {
 	display: inline-block;
 	position: relative;
 	width: 8em;
 }
-span.grademax61 {
+span.pa-grademax {
 	font-size: smaller;
 	color: #999999;
 }
