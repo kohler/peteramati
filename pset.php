@@ -417,7 +417,7 @@ function echo_grade_cdf() {
     global $Conf, $Info, $Pset, $User, $Me;
     $sepx = $User->extension && $Pset->separate_extension_grades;
     $xmark = $sepx ? "extension " : "";
-    echo '<div id="gradecdf61" style="float:right;position:relative">',
+    echo '<div id="pa-gradecdf" class="pa-gradecdf" style="float:right;position:relative">',
         '<table class="gradecdf61table"><tbody><tr>',
         '<td class="yaxislabelcontainer"></td>',
         '<td class="plot"><div style="width:300px;height:200px"></div></td>',
@@ -429,7 +429,7 @@ function echo_grade_cdf() {
         '<tr class="gradecdf61stddev"><td class="cap">', $xmark, ' stddev</td><td class="val"></td></tr>',
         '</tbody></table>',
         '</div>';
-    Ht::stash_script("gradecdf61(" . json_encode($Info->hoturl("pset", ["gradecdf" => 1])) . ")");
+    Ht::stash_script("pa_gradecdf(\$(\"#pa-gradecdf\"))");
 }
 
 function echo_grade_total() {

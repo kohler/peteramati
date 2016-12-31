@@ -1907,28 +1907,15 @@ function pa_makegrade(name, ge, editable) {
     return t + '</td></tr></tbody></table>';
 }
 
-function hoturl_gradeparts($j) {
+function hoturl_gradeparts($j, args) {
     var $x = $j.closest(".pa-psetinfo");
-    var args = {u: peteramati_uservalue};
+    args = args || {};
+    args.u = peteramati_uservalue;
     if ($x.attr("data-pa-pset"))
         args.pset = $x.attr("data-pa-pset");
     if ($x.attr("data-pa-hash"))
         args.commit = $x.attr("data-pa-hash");
     return args;
-}
-
-function pa_gradeinfo_total(gi) {
-    var total = 0, maxtotal = 0;
-    for (var i = 0; i < gi.order.length; ++i) {
-        var ge = gi.entries[gi.order[i]];
-        if (ge.in_total) {
-            total += (gi.grades && gi.grades[i]) || 0;
-            if (!ge.is_extra)
-                maxtotal += ge.max || 0;
-        }
-    }
-    return [Math.round(total * 1000) / 1000,
-            Math.round(maxtotal * 1000) / 1000];
 }
 
 function pa_savegrades(form) {
@@ -1941,7 +1928,9 @@ function pa_savegrades(form) {
     $f.find(".pa-gradediffers, .ajaxsave61").remove();
     $f.find(".pa-gradeentry").append('<span class="ajaxsave61">Saving…</span>');
 
-    var gi = JSON.parse($f.closest(".pa-psetinfo").attr("data-pa-gradeinfo"));
+    var gi = $f.closest(".pa-psetinfo").data("pa-gradeinfo");
+    if (typeof gi === "string")
+        gi = JSON.parse(gi);
     var g = {}, og = {};
     $f.find("input.pa-gradevalue").each(function () {
         var ge = gi.entries[this.name];
@@ -1968,8 +1957,11 @@ function pa_savegrades(form) {
 }
 
 function pa_loadgrades(gi) {
-    var $pi = $(this).closest(".pa-psetinfo"), $pg = {};
+    var $pi = $(this).closest(".pa-psetinfo");
+    $pi.data("pa-gradeinfo", gi);
     var editable = $pi[0].hasAttribute("data-pa-gradeeditable");
+
+    var $pg = {};
     $pi.find(".pa-grade").each(function () {
         $pg[this.getAttribute("data-pa-grade")] = $(this, editable);
     });
@@ -2019,7 +2011,7 @@ function pa_loadgrades(gi) {
     }
 
     // print totals
-    var tm = pa_psetinfo_total(gi);
+    var tm = pa_gradeinfo_total(gi);
     $g = $pi.find(".pa-total");
     if (tm[0] && !$g.length) {
         $g = $('<table class="pa-total pa-grp"><tbody><tr>' +
@@ -2031,10 +2023,10 @@ function pa_loadgrades(gi) {
     }
     $v = $g.find(".pa-gradevalue");
     g = "" + tm[0];
-    if ($v.text() !== g)
+    if ($v.text() !== g) {
         $v.text(g);
-
-    $pi.attr("data-pa-gradeinfo", JSON.stringify(gi));
+        pa_draw_gradecdf($pi.find(".pa-gradecdf"));
+    }
 }
 
 function fold61(sel, arrowholder, direction) {
@@ -2633,101 +2625,116 @@ function load(j) {
 return {add: add, load: load};
 })(jQuery);
 
-function gradecdf61_series(d, total) {
+function pa_gradecdf_series(d, total) {
     var i, data = [];
     for (i = 0; i < d.cdf.length; i += 2) {
         if (i != 0 || !d.cutoff)
-            data.push([d.cdf[i], i > 0 ? d.cdf[i-1]/d.n : 0]);
+            data.push([d.cdf[i], i > 0 ? d.cdf[i-1] / d.n : 0]);
         else
             data.push([d.cdf[0], d.cutoff]);
         data.push([d.cdf[i], d.cdf[i+1]/d.n]);
         if (data.totalx == null && d.cdf[i] >= total)
-            data.totalx = d.cdf[i+1]/d.n;
+            data.totalx = d.cdf[i+1] / d.n;
     }
     return data;
 }
 
-function gradecdf61(url) {
-    if (!url && !(url = jQuery(".gradecdf61table").prop("gradecdf61url")))
+function pa_gradeinfo_total(gi) {
+    if (typeof gi === "string")
+        gi = JSON.parse(gi);
+    var total = 0, maxtotal = 0;
+    for (var i = 0; i < gi.order.length; ++i) {
+        var ge = gi.entries[gi.order[i]];
+        if (ge.in_total) {
+            total += (gi.grades && gi.grades[i]) || 0;
+            if (!ge.is_extra)
+                maxtotal += ge.max || 0;
+        }
+    }
+    return [Math.round(total * 1000) / 1000,
+            Math.round(maxtotal * 1000) / 1000];
+}
+
+function pa_draw_gradecdf($graph) {
+    var d = $graph.data("pa-gradecdfinfo");
+    if (!d)
         return;
-    jQuery.ajax(url, {
+
+    // load user grade
+    var gi = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
+    var tm = pa_gradeinfo_total(gi);
+
+    // series
+    var dx = d.extension;
+    var series;
+    if (dx)
+        series = [{data: pa_gradecdf_series(dx, tm[0]), color: "#ee6666", label: "extension"},
+                  {data: pa_gradecdf_series(d, tm[0]), color: "#ffaaaa", lines: {lineWidth: 0.8}, label: "all"}];
+    else if (d.noextra)
+        series = [{data: pa_gradecdf_series(d, tm[0]), color: "#ee6666", label: "all"},
+                  {data: pa_gradecdf_series(d.noextra, tm[0]), color: "#ffaaaa", lines: {lineWidth: 0.8}, label: "noextra"}];
+    else
+        series = [{data: pa_gradecdf_series(d, tm[0]), color: "#ee6666"}];
+    series.push({data: [[tm[0], series[0].data.totalx]], color: "#222266", points: {show: true, radius: 5, fillColor: "#ffff00"}});
+
+    // check max-x
+    var xaxis = {min: 0};
+    var datamax = d.cdf[d.cdf.length - 2];
+    if (dx && dx.cdf)
+        datamax = Math.max(datamax, dx.cdf[dx.cdf.length - 2]);
+    var grid = {markings: []};
+    if (d.maxtotal) {
+        if (d.maxtotal > datamax)
+            xaxis.max = d.maxtotal;
+        else
+            grid.markings.push({
+                    xaxis: {from: d.maxtotal, to: d.maxtotal},
+                    color: "rgba(0,0,255,0.2)"
+                });
+    }
+
+    // check grid
+    if (d.cutoff)
+        grid.markings.push({
+                xaxis: {from: 0, to: xaxis.max || datamax},
+                yaxis: {from: 0, to: d.cutoff},
+                color: "rgba(255,0,0,0.1)"
+            });
+
+    // plot
+    var $table = $graph.find(".gradecdf61table");
+    $table.find(".plot > div").plot(series, {
+        xaxis: xaxis,
+        yaxis: {min: 0, max: 1},
+        grid: grid,
+        legend: {position: "nw", labelBoxBorderColor: "transparent"}
+    });
+    $table.find(".yaxislabelcontainer").html('<div class="yaxislabel">fraction of results</div>');
+    $table.find(".yaxislabel").css("left", -0.5 * $table.find(".yaxislabel").width());
+    $table.find(".xaxislabelcontainer").html('<div class="xaxislabel">grade</div>');
+
+    // summary
+    for (var i in {"all": 1, "extension": 1}) {
+        var $sum = $graph.find(".gradecdf61summary." + i);
+        var dd = (i == "all" ? d : dx) || {};
+        for (var x in {"mean":1, "median":1, "stddev":1}) {
+            var $v = $sum.find(".gradecdf61" + x);
+            if (x in dd)
+                $v.show().find(".val").text(dd[x].toFixed(1));
+            else
+                $v.hide();
+        }
+    }
+}
+
+function pa_gradecdf($graph) {
+    jQuery.ajax(hoturl_post("pset", hoturl_gradeparts($graph, {gradecdf:1})), {
         type: "GET", cache: false,
         dataType: "json",
         success: function (d) {
-            var dx, i, $all, j, jentry, series, x, total, totalx, grid;
             if (d.cdf) {
-                // load user grade
-                total = 0;
-                j = jQuery(".pa-grade.pa-intotal");
-                for (i = 0; i < j.length; ++i) {
-                    jentry = jQuery(j[i]);
-                    x = (jentry.is("input") ? jentry.val() : jentry.text());
-                    x = parseFloat(x);
-                    x == x && (total += x);
-                }
-
-                // load cdf
-                dx = d.extension || null;
-                if (dx)
-                    series = [{data: gradecdf61_series(dx, total), color: "#ee6666", label: "extension"},
-                              {data: gradecdf61_series(d, total), color: "#ffaaaa", lines: {lineWidth: 0.8}, label: "all"}];
-                else if (d.noextra)
-                    series = [{data: gradecdf61_series(d, total), color: "#ee6666", label: "all"},
-                              {data: gradecdf61_series(d.noextra, total), color: "#ffaaaa", lines: {lineWidth: 0.8}, label: "noextra"}];
-                else
-                    series = [{data: gradecdf61_series(d, total), color: "#ee6666"}];
-                series.push({data: [[total, series[0].data.totalx]], color: "#222266", points: {show: true, radius: 5, fillColor: "#ffff00"}});
-
-                // check max-x
-                var xaxis = {min: 0};
-                var datamax = d.cdf[d.cdf.length - 2];
-                if (dx && dx.cdf)
-                    datamax = Math.max(datamax, dx.cdf[dx.cdf.length - 2]);
-                grid = {markings: []};
-                if (d.maxtotal) {
-                    if (d.maxtotal > datamax)
-                        xaxis.max = d.maxtotal;
-                    else
-                        grid.markings.push({
-                                xaxis: {from: d.maxtotal, to: d.maxtotal},
-                                color: "rgba(0,0,255,0.2)"
-                            });
-                }
-
-                // check grid
-                if (d.cutoff)
-                    grid.markings.push({
-                            xaxis: {from: 0, to: xaxis.max || datamax},
-                            yaxis: {from: 0, to: d.cutoff},
-                            color: "rgba(255,0,0,0.1)"
-                        });
-
-                // plot
-                $all = jQuery("#gradecdf61");
-                j = $all.find(".gradecdf61table");
-                j.prop("gradecdf61url", url);
-                j.find(".plot > div").plot(series, {
-                    xaxis: xaxis,
-                    yaxis: {min: 0, max: 1},
-                    grid: grid,
-                    legend: {position: "nw", labelBoxBorderColor: "transparent"}
-                });
-                j.find(".yaxislabelcontainer").html('<div class="yaxislabel">fraction of results</div>');
-                j.find(".yaxislabel").css("left", -0.5*j.find(".yaxislabel").width());
-                j.find(".xaxislabelcontainer").html('<div class="xaxislabel">grade</div>');
-
-                // summary
-                for (i in {"all": 1, "extension": 1}) {
-                    var $sum = $all.find(".gradecdf61summary." + i);
-                    var dd = (i == "all" ? d : dx) || {};
-                    for (x in {"mean":1, "median":1, "stddev":1}) {
-                        j = $sum.find(".gradecdf61" + x);
-                        if (x in dd)
-                            j.show().find(".val").text(dd[x].toFixed(1));
-                        else
-                            j.hide();
-                    }
-                }
+                $graph.data("pa-gradecdfinfo", d);
+                pa_draw_gradecdf($graph);
             }
         }
     });
