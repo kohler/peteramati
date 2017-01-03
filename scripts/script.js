@@ -1231,31 +1231,6 @@ try {
 
 
 // initialization
-function e_value(id, value) {
-    var elt = $$(id);
-    if (value == null)
-        return elt ? elt.value : undefined;
-    else if (elt)
-        elt.value = value;
-}
-
-function eltPos(e) {
-    if (typeof e == "string")
-        e = $$(e);
-    var pos = {
-        top: 0, left: 0, width: e.offsetWidth, height: e.offsetHeight,
-        right: e.offsetWidth, bottom: e.offsetHeight
-    };
-    while (e) {
-        pos.left += e.offsetLeft;
-        pos.top += e.offsetTop;
-        pos.right += e.offsetLeft;
-        pos.bottom += e.offsetTop;
-        e = e.offsetParent;
-    }
-    return pos;
-}
-
 function event_stop(evt) {
     if (evt.stopPropagation)
         evt.stopPropagation();
