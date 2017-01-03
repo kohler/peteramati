@@ -2396,10 +2396,11 @@ tr.s61partner {
 .diff61 {
 	width: 100%;
 }
-table.live > tbody > tr.diffl61.gi:hover > td {
+table.live > tbody > tr.pa-dl.gi:hover > td,
+tr.pa-dl.gi.hover > td {
 	background-color: #f8eec7;
 }
-code, .difflna61, .difflnb61, .difflc61, .difflctx61,
+code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .difflnote61, .diffnotetext61, .diffnoteentry61,
 .noteref61 {
 	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;
@@ -2420,25 +2421,25 @@ table.hidegrade61 .note61.gradenote {
 .noteref61.hiddennote61 {
 	font-style: italic;
 }
-.difflna61, .difflnb61 {
+.pa-da, .pa-db {
 	text-align: right;
 	color: rgba(0, 0, 0, 0.3);
 	padding: 0 0.5em;
 	width: 1%;
 }
-.difflc61, .difflctx61 {
+.pa-dd, .pa-dcx {
 	padding-left: 0.5em;
 }
-.difflctx61 {
+.pa-dcx {
 	color: rgba(0, 0, 0, 0.5);
 }
-.diffl61.gx {
+.pa-dl.gx {
 	background-color: #f3f3ff;
 }
-.diffl61.gd {
+.pa-dl.gd {
 	background-color: #ffdddd;
 }
-.diffl61.gi {
+.pa-dl.gi {
 	background-color: #ddffdd;
 }
 .diffnoteentry61 {

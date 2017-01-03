@@ -670,13 +670,13 @@ class PsetView {
             Ht::stash_script("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
         foreach ($dinfo->diff as $l) {
             if ($l[0] == "@")
-                $x = array(" gx", "difflctx61", "", "", $l[3]);
+                $x = array(" gx", "pa-dcx", "", "", $l[3]);
             else if ($l[0] == " ")
-                $x = array(" gc", "difflc61", $l[1], $l[2], $l[3]);
+                $x = array(" gc", "pa-dd", $l[1], $l[2], $l[3]);
             else if ($l[0] == "-")
-                $x = array(" gd", "difflc61", $l[1], "", $l[3]);
+                $x = array(" gd", "pa-dd", $l[1], "", $l[3]);
             else
-                $x = array(" gi", "difflc61", "", $l[2], $l[3]);
+                $x = array(" gi", "pa-dd", "", $l[2], $l[3]);
 
             $aln = $x[2] ? "a" . $x[2] : "";
             $bln = $x[3] ? "b" . $x[3] : "";
@@ -690,9 +690,9 @@ class PsetView {
             if (!$x[2] && !$x[3])
                 $x[2] = $x[3] = "...";
 
-            echo '<tr class="diffl61', $x[0], '">',
-                '<td class="difflna61"', $ak, '>', $x[2], '</td>',
-                '<td class="difflnb61"', $bk, '>', $x[3], '</td>',
+            echo '<tr class="pa-dl', $x[0], '">',
+                '<td class="pa-da"', $ak, '>', $x[2], '</td>',
+                '<td class="pa-db"', $bk, '>', $x[3], '</td>',
                 '<td class="', $x[1], '">', diff_line_code($x[4]), "</td></tr>\n";
 
             if ($linenotes && $bln && isset($linenotes->$bln))
@@ -715,7 +715,7 @@ class PsetView {
         if (!is_array($note))
             $note = array(false, $note);
         if ($this->can_view_grades() || $note[0]) {
-            echo '<tr class="diffl61 gw">', /* NB script depends on this class */
+            echo '<tr class="pa-dl gw">', /* NB script depends on this class */
                 '<td colspan="2" class="difflnoteborder61"></td>',
                 '<td class="difflnote61">';
             if ($lnorder) {
@@ -754,7 +754,7 @@ class PsetView {
     }
 
     function echo_linenote_entry_prototype() {
-        echo '<tr class="diffl61 gw iscomment61"',
+        echo '<tr class="pa-dl gw iscomment61"',
             ' data-pa-savednote="">', /* NB script depends on this class */
             '<td colspan="2" class="difflnoteborder61"></td>',
             '<td class="difflnote61"><div class="diffnoteholder61" style="display:none">',

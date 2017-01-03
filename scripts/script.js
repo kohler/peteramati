@@ -1676,34 +1676,34 @@ function setmailpsel(sel) {
 window.linenote61 = (function ($) {
 function analyze(target) {
     var table, linetype, linenumber, tr, result, x;
-    if (!target || target.tagName == "TEXTAREA" || target.tagName == "A")
+    if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
         return null;
-    while (target && target.tagName != "TR") {
-        if (target.tagName == "FORM")
+    while (target && target.tagName !== "TR") {
+        if (target.tagName === "FORM")
             return null;
         target = target.parentNode;
     }
     tr = target;
-    while (tr && (tr.nodeType != Node.ELEMENT_NODE
-                  || /\bdiffl61\b.*\bgw\b/.test(tr.className)))
+    while (tr && (tr.nodeType !== Node.ELEMENT_NODE
+                  || /\bpa-dl\b.*\bgw\b/.test(tr.className)))
         tr = tr.previousSibling;
     table = tr;
     while (table && !table.getAttribute("data-pa-file"))
         table = table.parentNode;
-    if (!tr || !table || !/\bdiffl61\b.*\bg[idc]\b/.test(tr.className))
+    if (!tr || !table || !/\bpa-dl\b.*\bg[idc]\b/.test(tr.className))
         return null;
 
     result = {filename: table.getAttribute("data-pa-file"), tr: tr};
-    if ((x = $(tr).find("td.difflnb61").text()))
+    if ((x = $(tr).find("td.pa-db").text()))
         result.lineid = "b" + x;
     else
-        result.lineid = "a" + $(tr).find("td.difflna61").text();
+        result.lineid = "a" + $(tr).find("td.pa-da").text();
 
     if (tr == target)
         do {
             target = target.nextSibling;
         } while (target && target.nodeType != Node.ELEMENT_NODE);
-    if (target && /\bdiffl61\b.*\bgw\b/.test(target.className)
+    if (target && /\bpa-dl\b.*\bgw\b/.test(target.className)
         && !target.getAttribute("deleting61"))
         result.notetr = target;
     return result;
@@ -1739,12 +1739,13 @@ function unedit(tr) {
         return false;
 }
 
-function keyup(evt) {
-    if (!(evt.ctrlKey || evt.altKey || evt.shiftKey)
-        && evt.keyCode == 27
-        && unedit(this))
+function keydown(evt) {
+    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(this))
         return false;
-    else
+    else if (event_key(evt) === "Enter" && event_modkey(evt) === event_modkey.META) {
+        $(evt.target).closest("form").submit();
+        return false;
+    } else
         return true;
 }
 
@@ -1801,7 +1802,7 @@ function linenote61(event) {
         j.text(text);
         j[0].setSelectionRange && j[0].setSelectionRange(text.length, text.length);
     }
-    j.autogrow().keyup(keyup);
+    j.autogrow().keydown(keydown);
     $tr.find("input[name=file]").val(anal.filename);
     $tr.find("input[name=line]").val(anal.lineid);
     $tr.find("input[name=iscomment]").prop("checked", iscomment);
