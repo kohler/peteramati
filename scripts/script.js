@@ -1715,11 +1715,11 @@ function remove_tr(tr) {
     $(tr).children().slideUp(80).queue(function () { $(tr).remove(); });
 }
 
-function unedit(tr) {
+function unedit(tr, always) {
     var savednote;
     while (tr && (savednote = tr.getAttribute("data-pa-savednote")) === null)
         tr = tr.parentNode;
-    if (tr && text_eq(savednote, $(tr).find("textarea").val())) {
+    if (tr && (always || text_eq(savednote, $(tr).find("textarea").val()))) {
         var $tr = $(tr);
         $tr.find(":focus").blur();
         if (savednote === "")
@@ -1739,11 +1739,16 @@ function unedit(tr) {
         return false;
 }
 
+function cancel(evt) {
+    unedit(this, true);
+    return true;
+}
+
 function keydown(evt) {
-    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(this))
+    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(this, false))
         return false;
     else if (event_key(evt) === "Enter" && event_modkey(evt) === event_modkey.META) {
-        $(evt.target).closest("form").submit();
+        $(this).closest("form").submit();
         return false;
     } else
         return true;
@@ -1806,6 +1811,7 @@ function linenote61(event) {
     $tr.find("input[name=file]").val(anal.filename);
     $tr.find("input[name=line]").val(anal.lineid);
     $tr.find("input[name=iscomment]").prop("checked", iscomment);
+    $tr.find("button[name=cancel]").click(cancel);
     $tr.children().hide().slideDown(100);
     return false;
 }

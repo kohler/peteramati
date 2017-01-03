@@ -768,6 +768,8 @@ class PsetView {
             '<div class="aab aabr difflnoteaa61">',
             '<div class="aabut">',
             Ht::submit("Save comment"),
+            '</div><div class="aabut">',
+            Ht::button("cancel", "Cancel"),
             '</div><div class="aabut">';
         if ($this->user_can_view_grades())
             echo Ht::hidden("iscomment", 1);
