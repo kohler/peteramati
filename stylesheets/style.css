@@ -2401,24 +2401,23 @@ tr.pa-dl.gi.hover > td {
 	background-color: #f8eec7;
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
-.difflnote61, .diffnotetext61, .diffnoteentry61,
-.noteref61 {
+.pa-notebox, .pa-note-entry, .pa-noteref {
 	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 18px;
 }
-.note61 {
+.pa-note {
 	white-space: pre-wrap;
 }
-table.hidegrade61 .note61.gradenote {
+table.hidegrade61 .pa-note.gradenote {
 	color: #880000;
 }
 .iscomment61 .hideifcomment61, .isgrade61 .hideifgrade61 {
 	display: none;
 }
-.noteref61 {
+.pa-noteref {
 	font-size: smaller;
 }
-.noteref61.hiddennote61 {
+.pa-noteref.hiddennote61 {
 	font-style: italic;
 }
 .pa-da, .pa-db {
@@ -2442,11 +2441,12 @@ table.hidegrade61 .note61.gradenote {
 .pa-dl.gi {
 	background-color: #ddffdd;
 }
-.diffnoteentry61 {
+.pa-note-entry {
 	width: 99%;
 	height: 5em;
 }
-.diffnoteholder61 {
+.pa-notebox > form {
+	display: block;
 	padding: 1ex 0;
 	position: relative;
 }
@@ -2475,7 +2475,7 @@ span.foldarrow {
 	color: #009900;
 	text-decoration: none;
 }
-.difflnote61 {
+.pa-notebox {
 	background: #f3d1fc;
 	background:
 	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
@@ -2490,7 +2490,7 @@ span.foldarrow {
 	font-style: italic;
 	padding: 0.8em 1em 0.8em 0.5em;
 }
-.difflnoteborder61 {
+.pa-note-edge {
 	background: #f3d1fc;
 	background:
 	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
@@ -2505,25 +2505,25 @@ span.foldarrow {
 	    linear-gradient(55deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center;
 	background-size: 100% 7px, 100% 5px, 25px 100%, 10px 20px, 10px 20px;
 }
-.difflnoteptr61, .difflnoteaa61, .difflnoteauthor61 {
+.pa-note-links, .pa-note-aa, .pa-note-author {
 	font-family: Helvetica, sans-serif;
 	font-style: normal;
 }
-.difflnoteptr61 {
+.pa-note-links {
 	float: right;
 	font-size: smaller;
 	text-transform: uppercase;
 	font-weight: bold;
 	padding-left: 1em;
 }
-.difflnoteptr61 > a {
+.pa-note-links > a {
 	color: #7777aa;
 	text-decoration: none;
 }
-.difflnoteptr61 > a:hover {
+.pa-note-links > a:hover {
 	text-decoration: underline;
 }
-.difflnoteauthor61 {
+.pa-note-author {
 	float: right;
 	font-size: smaller;
 	padding-left: 1em;

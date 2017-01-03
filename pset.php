@@ -641,7 +641,9 @@ echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->ur
 if (!$Pset->gitless && $Info->maybe_commit_hash())
     echo '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
 if ($Me->can_set_grades($Pset, $Info))
-    echo '" data-pa-gradeeditable="yes';
+    echo '" data-pa-can-set-grades="yes';
+if ($Info->user_can_view_grades())
+    echo '" data-pa-user-can-view-grades="yes';
 echo '">';
 
 if ($Pset->gitless) {
@@ -739,7 +741,7 @@ if ($Pset->gitless) {
     foreach ($lnorder->seq() as $fl) {
         $f = str_starts_with($fl[0], $Pset->directory_slash) ? substr($fl[0], strlen($Pset->directory_slash)) : $fl[0];
         $notelinks[] = '<a href="#L' . $fl[1] . '_' . html_id_encode($fl[0])
-            . '" onclick="return gotoline61(this)" class="noteref61'
+            . '" onclick="return gotoline61(this)" class="pa-noteref'
             . (!$fl[2] && !$Info->user_can_view_grades() ? " hiddennote61" : "")
             .'">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
     }
@@ -796,10 +798,7 @@ if ($Pset->gitless) {
         $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
     }
 
-    Ht::stash_script('$(".diffnoteentry61").autogrow();$(window).on("beforeunload",beforeunload61)');
-    echo "<table id=\"diff61linenotetemplate\" style=\"display:none\"><tbody>";
-    $Info->echo_linenote_entry_prototype();
-    echo "</tbody></table>";
+    Ht::stash_script('$(".pa-note-entry").autogrow();$(window).on("beforeunload",beforeunload61)');
 } else {
     if ($Pset->gitless_grades)
         echo_grade_cdf_here();

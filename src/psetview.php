@@ -667,7 +667,7 @@ class PsetView {
             echo '" style="display:none';
         echo '" data-pa-file="', htmlspecialchars($file), '" data-pa-fileid="', $fileid, "\"><tbody>\n";
         if ($this->pc_view)
-            Ht::stash_script("jQuery('#$tabid').mousedown(linenote61).mouseup(linenote61)");
+            Ht::stash_script('pa_linenote.bind("#' . $tabid . '")');
         foreach ($dinfo->diff as $l) {
             if ($l[0] == "@")
                 $x = array(" gx", "pa-dcx", "", "", $l[3]);
@@ -716,8 +716,8 @@ class PsetView {
             $note = array(false, $note);
         if ($this->can_view_grades() || $note[0]) {
             echo '<tr class="pa-dl gw">', /* NB script depends on this class */
-                '<td colspan="2" class="difflnoteborder61"></td>',
-                '<td class="difflnote61">';
+                '<td colspan="2" class="pa-note-edge"></td>',
+                '<td class="pa-notebox">';
             if ($lnorder) {
                 $links = array();
                 //list($pfile, $plineid) = $lnorder->get_prev($file, $lineid);
@@ -731,7 +731,7 @@ class PsetView {
                 else
                     $links[] = '<a href="#">Top</a>';
                 if (!empty($links))
-                    echo '<div class="difflnoteptr61">',
+                    echo '<div class="pa-note-links">',
                         join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
             }
             if ($this->pc_view && get($note, 2)) {
@@ -739,42 +739,17 @@ class PsetView {
                 $pcmembers = $Conf->pc_members_and_admins();
                 if (isset($pcmembers[$note[2]])) {
                     $p = $pcmembers[$note[2]];
-                    echo '<div class="difflnoteauthor61">[',
+                    echo '<div class="pa-note-author">[',
                         htmlspecialchars($p->firstNameAmbiguous ? Text::name_text($p) : $p->firstName),
                         ']</div>';
                 }
             }
             if (!is_string($note[1]))
                 error_log("fudge {$this->user->github_username} error: " . json_encode($note));
-            echo '<div class="note61',
+            echo '<div class="pa-note',
                 ($note[0] ? ' commentnote' : ' gradenote'),
                 '">', htmlspecialchars($note[1]), '</div>',
                 '<div class="clear"></div></td></tr>';
         }
-    }
-
-    function echo_linenote_entry_prototype() {
-        echo '<tr class="pa-dl gw iscomment61"',
-            ' data-pa-savednote="">', /* NB script depends on this class */
-            '<td colspan="2" class="difflnoteborder61"></td>',
-            '<td class="difflnote61"><div class="diffnoteholder61" style="display:none">',
-            Ht::form($this->hoturl_post("pset", array("savelinenote" => 1)),
-                     array("onsubmit" => "return savelinenote61(this)")),
-            '<div class="f-contain">',
-            Ht::hidden("file", ""),
-            Ht::hidden("line", ""),
-            Ht::hidden("iscomment", "", array("class" => "iscomment")),
-            '<textarea class="diffnoteentry61" name="note"></textarea>',
-            '<div class="aab aabr difflnoteaa61">',
-            '<div class="aabut">',
-            Ht::submit("Save comment"),
-            '</div><div class="aabut">',
-            Ht::button("cancel", "Cancel"),
-            '</div><div class="aabut">';
-        if ($this->user_can_view_grades())
-            echo Ht::hidden("iscomment", 1);
-        else
-            echo Ht::checkbox("iscomment", 1), '&nbsp;', Ht::label("Show immediately");
-        echo '</div></div></div></form></div></td></tr>';
     }
 }

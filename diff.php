@@ -83,7 +83,7 @@ $notelinks = array();
 foreach ($lnorder->seq() as $fl) {
     $f = str_starts_with($fl[0], $Pset->directory_slash) ? substr($fl[0], strlen($Pset->directory_slash)) : $fl[0];
     $notelinks[] = '<a href="#L' . $fl[1] . '_' . html_id_encode($fl[0])
-        . '" onclick="return gotoline61(this)" class="noteref61'
+        . '" onclick="return gotoline61(this)" class="pa-noteref'
         . (!$fl[2] && !$Info->user_can_view_grades() ? " hiddennote61" : "")
             .'">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
 }
@@ -105,10 +105,6 @@ foreach ($diff as $file => $dinfo) {
     $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
 }
 
-Ht::stash_script('jQuery(".diffnoteentry61").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
-echo "<table id=\"diff61linenotetemplate\" style=\"display:none\"><tbody>";
-$Info->echo_linenote_entry_prototype();
-echo "</tbody></table>";
-
+Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
 echo "<div class='clear'></div>\n";
 $Conf->footer();

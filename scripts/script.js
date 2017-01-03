@@ -1673,7 +1673,9 @@ function setmailpsel(sel) {
 }
 
 
-window.linenote61 = (function ($) {
+window.pa_linenote = (function ($) {
+var labelctr = 0;
+
 function analyze(target) {
     var table, linetype, linenumber, tr, result, x;
     if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
@@ -1726,9 +1728,9 @@ function unedit(tr, always) {
             remove_tr(tr);
         else {
             var iscomment = !!tr.getAttribute("data-pa-iscomment"),
-                $td = $tr.find("td.difflnote61"),
-                $note = $('<div class="note61' + (iscomment ? " commentnote" : " gradenote") + '" style="display:none"></div>'),
-                $edit = $td.find(".diffnoteholder61");
+                $td = $tr.find("td.pa-notebox"),
+                $note = $('<div class="pa-note' + (iscomment ? " commentnote" : " gradenote") + '" style="display:none"></div>'),
+                $edit = $td.children("form");
             $note.text(savednote);
             $td.append($note);
             $edit.slideUp(80).queue(function () { $edit.remove(); });
@@ -1739,13 +1741,22 @@ function unedit(tr, always) {
         return false;
 }
 
+function submit(evt) {
+    var that = this;
+    return ajaxsave61(that, function (data) {
+            jQuery(that).closest("tr").attr("data-pa-savednote", data.savednote)
+                .attr("data-pa-iscomment", data.iscomment ? "1" : null);
+            unedit(that);
+        });
+}
+
 function cancel(evt) {
     unedit(this, true);
     return true;
 }
 
 function keydown(evt) {
-    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(this, false))
+    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(this))
         return false;
     else if (event_key(evt) === "Enter" && event_modkey(evt) === event_modkey.META) {
         $(this).closest("form").submit();
@@ -1766,7 +1777,27 @@ function selection_string() {
         return "";
 }
 
-function linenote61(event) {
+function makeform(e) {
+    var $pi = $(e).closest(".pa-psetinfo");
+    var t = '<tr class="pa-dl gw">' +
+        '<td colspan="2" class="pa-note-edge"></td>' +
+        '<td class="pa-notebox">' +
+        '<form method="post" action="' +
+        escape_entities(hoturl_post("pset", hoturl_gradeparts($pi, {savelinenote: 1}))) +
+        '" enctype="multipart/form-data" accept-charset="UTF-8">' +
+        '<div class="f-contain"><input type="hidden" name="file" /><input type="hidden" name="line" />' +
+        '<textarea class="pa-note-entry" name="note"></textarea>' +
+        '<div class="aab aabr pa-note-aa">' +
+        '<div class="aabut"><input type="submit" value="Save comment" /></div>' +
+        '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
+    if (!$pi[0].hasAttribute("data-pa-user-can-view-grades")) {
+        ++labelctr;
+        t += '<div class="aabut"><input type="checkbox" id="pa-linenotecb' + labelctr + '" name="iscomment" value="1" /> <label for="pa-linenotecb' + labelctr + '">Show immediately</label></div>';
+    }
+    return t + '</div></div></div></form></td></tr>';
+}
+
+function pa_linenote(event) {
     var anal = analyze(event.target);
     if (anal && event.type == "mousedown") {
         mousedown_tr = anal.tr;
@@ -1785,8 +1816,8 @@ function linenote61(event) {
 
     var $tr = anal.notetr && $(anal.notetr), j, text = null, iscomment = false;
     if ($tr && !$tr.find("textarea").length) {
-        text = $tr.find("div.note61").text();
-        iscomment = $tr.find("div.note61").is(".commentnote");
+        text = $tr.find("div.pa-note").text();
+        iscomment = $tr.find("div.pa-note").is(".commentnote");
         remove_tr($tr[0]);
         $tr = anal.notetr = null;
     } else if ($tr) {
@@ -1797,13 +1828,12 @@ function linenote61(event) {
         return false;
     }
 
-    $tr = $($("#diff61linenotetemplate > tbody").html());
+    $tr = $(makeform(anal.tr));
     $tr.insertAfter(anal.tr);
     $tr.attr("data-pa-savednote", text === null ? "" : text).attr("data-pa-iscomment", iscomment ? "1" : null);
-    $tr.find(".diffnoteholder61").show();
     j = $tr.find("textarea").focus();
+    $tr.addClass(iscomment ? "iscomment61" : "isgrade61");
     if (text !== null) {
-        $tr.removeClass("iscomment61 isgrade61").addClass(iscomment ? "iscomment61" : "isgrade61");
         j.text(text);
         j[0].setSelectionRange && j[0].setSelectionRange(text.length, text.length);
     }
@@ -1812,12 +1842,16 @@ function linenote61(event) {
     $tr.find("input[name=line]").val(anal.lineid);
     $tr.find("input[name=iscomment]").prop("checked", iscomment);
     $tr.find("button[name=cancel]").click(cancel);
+    $tr.find("form").on("submit", submit);
     $tr.children().hide().slideDown(100);
     return false;
 }
 
-linenote61.unedit = unedit;
-return linenote61;
+pa_linenote.unedit = unedit;
+pa_linenote.bind = function (selector) {
+    $(selector).on("mouseup mousedown", pa_linenote);
+};
+return pa_linenote;
 })(jQuery);
 
 jQuery.fn.extend({
@@ -1858,14 +1892,6 @@ function ajaxsave61(form, success) {
         }
     });
     return false;
-}
-
-function savelinenote61(form) {
-    return ajaxsave61(form, function (data) {
-            jQuery(form).closest("tr").attr("data-pa-savednote", data.savednote)
-                .attr("data-pa-iscomment", data.iscomment ? "1" : null);
-            linenote61.unedit(form);
-        });
 }
 
 function pa_makegrade(name, ge, editable) {
@@ -1942,7 +1968,7 @@ function pa_savegrades(form) {
 function pa_loadgrades(gi) {
     var $pi = $(this).closest(".pa-psetinfo");
     $pi.data("pa-gradeinfo", gi);
-    var editable = $pi[0].hasAttribute("data-pa-gradeeditable");
+    var editable = $pi[0].hasAttribute("data-pa-can-set-grades");
 
     var $pg = {};
     $pi.find(".pa-grade").each(function () {
