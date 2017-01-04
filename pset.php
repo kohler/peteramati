@@ -399,7 +399,7 @@ function diff_line_code($t) {
     global $TABWIDTH;
     while (($p = strpos($t, "\t")) !== false)
         $t = substr($t, 0, $p) . str_repeat(" ", $TABWIDTH - ($p % $TABWIDTH)) . substr($t, $p + 1);
-    return str_replace("  ", " &nbsp;", htmlspecialchars($t));
+    return htmlspecialchars($t);
 }
 
 function echo_grade_cdf() {

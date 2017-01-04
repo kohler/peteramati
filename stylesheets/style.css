@@ -2405,7 +2405,7 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 18px;
 }
-.pa-note {
+.pa-dd, .pa-note {
 	white-space: pre-wrap;
 }
 table.hidegrade61 .pa-note.gradenote {
