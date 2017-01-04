@@ -201,7 +201,7 @@ function save_grades($pset, $info, $values, $isauto) {
                 $g = null;
             else if (preg_match('_\A(?:0|[1-9]\d*)\z_', $g))
                 $g = intval($g);
-            else if (preg_match('_\A(?:0||[1-9]\d*)(?:\.\d*)?\z_', $g))
+            else if (preg_match('_\A(?:0\.|\.\d|[1-9]\d*\.)\d*\z_', $g))
                 $g = floatval($g);
             else
                 continue;
