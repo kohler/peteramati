@@ -38,12 +38,10 @@ class API_Grade {
         if (!$api->pset->gitless_grades) {
             if (!$api->repo)
                 return ["ok" => false, "error" => "Missing repository."];
-            if (!$qreq->commit)
-                return ["ok" => false, "error" => "Missing commit."];
-            $c = $api->repo->connected_commit($qreq->commit);
-            if (!$c)
-                return ["ok" => false, "error" => "Disconnected commit."];
-            $info->force_set_hash($c->hash);
+            $api->commit = $api->conf->check_api_hash($api->hash, $api);
+            if (!$api->commit)
+                return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
+            $info->force_set_hash($api->commit->hash);
         }
         if (!$user->can_view_grades($api->pset, $info))
             return ["ok" => false, "error" => "Permission error."];
@@ -93,7 +91,7 @@ class API_Grade {
                         : $curgv === null || abs($curgv - $og[$ge->name]) >= 0.0001) {
                         $j = (array) $info->grade_json();
                         $j["ok"] = false;
-                        $j["error"] = "Grades have been updated, please reload.";
+                        $j["error"] = "Grades have been updated.";
                         return $j;
                     }
                 }
@@ -113,5 +111,43 @@ class API_Grade {
         $j = (array) $info->grade_json();
         $j["ok"] = true;
         return $j;
+    }
+
+    static function linenote(Contact $user, Qrequest $qreq, APIData $api) {
+        $info = new PsetView($api->pset, $api->user, $user);
+        $info->set_commit($api->commit);
+        if ($qreq->line && ctype_digit($qreq->line))
+            $qreq->line = "b" . $qreq->line;
+        if ($qreq->method() === "POST") {
+            if (!$qreq->file || !$qreq->line
+                || !preg_match('/\A[ab]\d+\z/', $qreq->line))
+                return ["ok" => false, "error" => "Invalid request."];
+            if ($info->is_handout_commit())
+                return ["ok" => false, "error" => "This is a handout commit."];
+            if (!$info->can_edit_line_note($qreq->file, $qreq->line))
+                return ["ok" => false, "error" => "Permission error."];
+            $note = null;
+            if ((string) $qreq->note !== "")
+                $note = [!!$qreq->iscomment, $qreq->note, $user->contactId];
+            $lnotes = ["linenotes" => [$qreq->file => [$qreq->line => $note]]];
+            $info->update_current_info($lnotes);
+        }
+
+        if (!$user->can_view_comments($api->pset, $info))
+            return ["ok" => false, "error" => "Permission error."];
+        $can_view_grades = $info->can_view_grades();
+        $notes = [];
+        foreach ((array) $info->current_info("linenotes") as $file => $linemap) {
+            if ($qreq->file && $file !== $qreq->file)
+                continue;
+            $filenotes = [];
+            foreach ((array) $linemap as $lineid => $note)
+                if (($can_view_grades || $note[0])
+                    && (!$qreq->line || $qreq->line === $lineid))
+                    $filenotes[$lineid] = $note;
+            if (!empty($filenotes))
+                $notes[$file] = $filenotes;
+        }
+        return ["ok" => true, "linenotes" => $notes];
     }
 }

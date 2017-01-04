@@ -42,13 +42,8 @@ if ($api->pset && !$api->pset->visible && !$Me->isPC)
 // check commit
 if ($api->pset && !$api->pset->gitless && !$Me->is_empty())
     $api->repo = $api->user->repo($api->pset);
-if ($api->repo && $qreq->commit) {
-    $api->commit = $api->pset->handout_commits($qreq->commit);
-    if (!$api->commit)
-        $api->commit = $api->repo->connected_commit($qreq->commit);
-    if (!$api->commit)
-        json_exit(["ok" => false, "error" => "Commit not connected to the repository."]);
-}
+if ($api->repo && $qreq->commit)
+    $api->hash = $qreq->commit;
 
 // call api
 $Conf->call_api_exit($qreq->fn, $Me, $qreq, $api);

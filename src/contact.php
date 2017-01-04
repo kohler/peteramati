@@ -1640,7 +1640,8 @@ class Contact {
 
     function can_view_comments(Pset $pset, PsetView $info = null) {
         return $this->can_view_pset($pset)
-            && (!$pset->hide_comments || $this->isPC);
+            && (!$pset->hide_comments || $this->isPC)
+            && (!$info || $info->pc_view || $this === $info->user);
     }
 
     function can_run(Pset $pset, $runner, $user = null) {

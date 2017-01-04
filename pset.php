@@ -189,28 +189,6 @@ if (req("set_partner"))
 if (req("set_repo"))
     ContactView::set_repo_action($User);
 
-// save line notes
-function save_linenote($info, $file, $lineid, $note, $iscomment) {
-    global $Me;
-    if ($info->is_handout_commit())
-        json_exit(["ok" => false, "error" => "This is a handout commit."]);
-    if (ctype_digit($lineid))
-        $lineid = "b" . $lineid;
-    if ((string) $note !== "")
-        $note = [!!$iscomment, $note, $Me->contactId];
-    else
-        $note = null;
-    $info->update_commit_info(["linenotes" => [$file => [$lineid => $note ? : null]]]);
-    json_exit(["ok" => true, "savednote" => $note ? $note[1] : "", "iscomment" => $note && $note[0]]);
-}
-
-if ($Me->isPC && $Me != $User && check_post()
-    && isset($_REQUEST["savelinenote"])
-    && isset($_REQUEST["file"]) && isset($_REQUEST["line"]))
-    save_linenote($Info, $_REQUEST["file"], $_REQUEST["line"], get($_REQUEST, "note", null), get($_REQUEST, "iscomment"));
-else if (isset($_REQUEST["savelinenote"]))
-    json_exit(["ok" => false]);
-
 // save grades
 function save_grades($pset, $info, $values, $isauto) {
     if ($info->is_handout_commit())

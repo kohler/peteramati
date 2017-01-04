@@ -1690,7 +1690,7 @@ function setmailpsel(sel) {
 
 window.pa_linenote = (function ($) {
 var labelctr = 0;
-var mousedown_anal, mousedown_selection;
+var curanal, mousedown_selection;
 var scrolled_at;
 
 function analyze(target) {
@@ -1719,7 +1719,7 @@ function analyze(target) {
     else
         lineid = "a" + $(tr).find("td.pa-da").text();
 
-    var result = {filename: file, lineid: lineid, tr: tr};
+    var result = {file: file, lineid: lineid, tr: tr};
 
     var next_tr = tr.nextSibling;
     while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE
@@ -1758,8 +1758,8 @@ function traverse(tr, down) {
 }
 
 function anal_tr() {
-    if (mousedown_anal) {
-        var $e = pa_ensureline(mousedown_anal.filename, mousedown_anal.lineid);
+    if (curanal) {
+        var $e = pa_ensureline(curanal.file, curanal.lineid);
         return $e.closest("tr")[0];
     } else
         return null;
@@ -1775,7 +1775,7 @@ function arrowcapture(evt) {
             && key !== "ArrowLeft" && key !== "ArrowRight"
             && key !== "Enter" && !event_key.modifier(key))
         || event_modkey(evt)
-        || !mousedown_anal)
+        || !curanal)
         return uncapture();
     if (key === "ArrowLeft" || key === "ArrowRight")
         return;
@@ -1790,10 +1790,10 @@ function arrowcapture(evt) {
             return;
     }
 
-    mousedown_anal = analyze(tr);
+    curanal = analyze(tr);
     evt.preventDefault();
     if (key === "Enter") {
-        make_linenote(mousedown_anal);
+        make_linenote(curanal);
         uncapture();
     } else {
         scrolled_at = evt.timeStamp;
@@ -1811,7 +1811,7 @@ function uncapture() {
 function unedit(tr, always) {
     var savednote;
     while (tr && (savednote = tr.getAttribute("data-pa-savednote")) === null)
-        tr = tr.parentNode;
+        tr = tr.parentElement;
     if (tr && (always || text_eq(savednote, $(tr).find("textarea").val()))) {
         var $tr = $(tr);
         $tr.find(":focus").blur();
@@ -1842,10 +1842,14 @@ function unedit(tr, always) {
 function submit(evt) {
     var that = this;
     return ajaxsave61(that, function (data) {
-            jQuery(that).closest("tr").attr("data-pa-savednote", data.savednote)
-                .attr("data-pa-iscomment", data.iscomment ? "1" : null);
+        if (data.ok) {
+            var note = data.linenotes[curanal.file];
+            note = note && note[curanal.lineid];
+            $(that).closest("tr").attr("data-pa-savednote", note ? note[1] : "")
+                .attr("data-pa-iscomment", note && note[0] ? "1" : null);
             unedit(that);
-        });
+        }
+    });
 }
 
 function cancel(evt) {
@@ -1873,16 +1877,15 @@ function selection_string() {
         return "";
 }
 
-function makeform(e) {
-    var $pi = $(e).closest(".pa-psetinfo");
+function makeform() {
+    var $pi = $(curanal.tr).closest(".pa-psetinfo");
     var t = '<tr class="pa-dl gw">' +
         '<td colspan="2" class="pa-note-edge"></td>' +
         '<td class="pa-notebox">' +
         '<form method="post" action="' +
-        escape_entities(hoturl_post("pset", hoturl_gradeparts($pi, {savelinenote: 1}))) +
+        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi, {file: curanal.file, line: curanal.lineid}))) +
         '" enctype="multipart/form-data" accept-charset="UTF-8">' +
-        '<div class="f-contain"><input type="hidden" name="file" /><input type="hidden" name="line" />' +
-        '<textarea class="pa-note-entry" name="note"></textarea>' +
+        '<div class="f-contain"><textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
         '<div class="aabut"><input type="submit" value="Save comment" /></div>' +
         '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
@@ -1896,28 +1899,29 @@ function makeform(e) {
 function pa_linenote(event) {
     var anal = analyze(event.target);
     if (anal && event.type == "mousedown") {
-        mousedown_anal = anal;
+        curanal = anal;
         mousedown_selection = selection_string();
         return true;
     } else if (anal
                && ((event.type === "mouseup"
-                    && mousedown_anal && mousedown_anal.tr == anal.tr
+                    && curanal && curanal.tr == anal.tr
                     && mousedown_selection == selection_string())
-                   || event.type === "click"))
-        return make_linenote(anal, event);
-    else {
-        mousedown_anal = mousedown_selection = null;
+                   || event.type === "click")) {
+        curanal = anal;
+        return make_linenote(event);
+    } else {
+        curanal = mousedown_selection = null;
         return true;
     }
 }
 
-function make_linenote(anal, event) {
-    var $tr = anal.notetr && $(anal.notetr), j, text = null, iscomment = false;
+function make_linenote(event) {
+    var $tr = curanal.notetr && $(curanal.notetr), j, text = null, iscomment = false;
     if ($tr && !$tr.find("textarea").length) {
         text = $tr.find("div.pa-note").text();
         iscomment = $tr.find("div.pa-note").is(".commentnote");
         remove_tr($tr[0]);
-        $tr = anal.notetr = null;
+        $tr = curanal.notetr = null;
     } else if ($tr) {
         if (unedit($tr[0])) {
             event && event.stopPropagation();
@@ -1929,8 +1933,8 @@ function make_linenote(anal, event) {
         }
     }
 
-    $tr = $(makeform(anal.tr));
-    $tr.insertAfter(anal.tr);
+    $tr = $(makeform());
+    $tr.insertAfter(curanal.tr);
     $tr.attr("data-pa-savednote", text === null ? "" : text).attr("data-pa-iscomment", iscomment ? "1" : null);
     j = $tr.find("textarea").focus();
     if (text !== null) {
@@ -1938,8 +1942,6 @@ function make_linenote(anal, event) {
         j[0].setSelectionRange && j[0].setSelectionRange(text.length, text.length);
     }
     j.autogrow().keydown(keydown);
-    $tr.find("input[name=file]").val(anal.filename);
-    $tr.find("input[name=line]").val(anal.lineid);
     $tr.find("input[name=iscomment]").prop("checked", iscomment);
     $tr.find("button[name=cancel]").click(cancel);
     $tr.find("form").on("submit", submit);

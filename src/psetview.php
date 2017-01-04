@@ -71,6 +71,10 @@ class PsetView {
         }
     }
 
+    function set_commit(RepositoryCommitInfo $commit) {
+        $this->force_set_hash($commit->hash);
+    }
+
     function has_commit_set() {
         return $this->hash !== null;
     }
@@ -468,6 +472,10 @@ class PsetView {
             return $this->repo_grade->gradercid;
         else
             return $this->commit_info("gradercid") ? : 0;
+    }
+
+    function can_edit_line_note($file, $lineid) {
+        return $this->pc_view;
     }
 
 

@@ -4,15 +4,17 @@
 // See LICENSE for open-source distribution terms
 
 class APIData {
+    public $conf;
     public $user;
     public $pset;
     public $repo;
     public $hash;
-    function __construct(Contact $user = null, Pset $pset = null, Repository $repo = null, $hash = null) {
+    public $commit;
+    function __construct(Contact $user, Pset $pset = null, Repository $repo = null) {
+        $this->conf = $user->conf;
         $this->user = $user;
         $this->pset = $pset;
         $this->repo = $repo;
-        $this->hash = $hash;
     }
 }
 
@@ -1455,19 +1457,24 @@ class Conf {
         if ($need_pset && !$api->pset)
             return ["ok" => false, "error" => "Missing pset."];
         if ($need_repo && !$api->repo)
-            return ["ok" => false, "error" => "Missing repository for this pset."];
+            return ["ok" => false, "error" => "Missing repository."];
         if (get($uf, "hash") && !$api->pset->gitless) {
-            if (!$api->hash)
-                return ["ok" => false, "error" => "Missing commit."];
-            $c = $api->repo->connected_commit($api->hash, $api->pset);
-            if (!$c)
-                return ["ok" => false, "error" => "Commit not part of repository."];
-            $qreq->commit = $c->hash;
+            $api->commit = $this->check_api_hash($api->hash, $api);
+            if (!$api->commit)
+                return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
         }
         if (($req = get($uf, "require")))
             foreach (expand_includes($req) as $f)
                 require_once $f;
         return call_user_func($uf->callback, $user, $qreq, $api, $uf);
+    }
+    function check_api_hash($input_hash, APIData $api) {
+        if (!$input_hash)
+            return null;
+        $commit = $api->pset->handout_commits($input_hash);
+        if (!$commit)
+            $commit = $api->repo->connected_commit($input_hash);
+        return $commit;
     }
     function _add_api_json($fj) {
         if (is_string($fj->fn) && !isset($this->_api_map[$fj->fn])
@@ -1481,7 +1488,8 @@ class Conf {
         $this->_api_map = [
             "grade" => "3 API_Grade::grade",
             "jserror" => "1 API_JSError::jserror",
-            "latestcommit" => "3 API_Repo::latestcommit"
+            "latestcommit" => "3 API_Repo::latestcommit",
+            "linenote" => "15 API_Grade::linenote"
         ];
         if (($olist = $this->opt("apiFunctions")))
             expand_json_includes_callback($olist, [$this, "_add_api_json"]);
