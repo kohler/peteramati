@@ -658,14 +658,14 @@ class PsetView {
             echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $this->hoturl("raw", ["file" => $rawfile]), '">[Raw]</a>';
         }
         echo '</h3>';
-        echo '<table id="', $tabid, '" class="code61 diff61 filediff61';
+        echo '<table id="', $tabid, '" class="code61 diff61 pa-filediff';
         if ($this->pc_view)
             echo " live";
         if (!$this->user_can_view_grades())
             echo " hidegrade61";
         if (!$open)
             echo '" style="display:none';
-        echo '" data-pa-file="', htmlspecialchars($file), '" data-pa-fileid="', $fileid, "\"><tbody>\n";
+        echo '" data-pa-file="', htmlspecialchars($file), "\"><tbody>\n";
         if ($this->pc_view)
             Ht::stash_script('pa_linenote.bind("#' . $tabid . '")');
         foreach ($dinfo->diff as $l) {

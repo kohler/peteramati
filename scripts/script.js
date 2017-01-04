@@ -467,26 +467,28 @@ var key_map = {"Spacebar": " ", "Esc": "Escape"},
         "224": "OSLeft", "225": "AltRight"
     },
     nonprintable_map = {
-        "AltLeft": true,
-        "AltRight": true,
-        "CapsLock": true,
-        "ControlLeft": true,
-        "ControlRight": true,
-        "OSLeft": true,
-        "OSRight": true,
-        "ShiftLeft": true,
-        "ShiftRight": true,
-        "ArrowLeft": true,
-        "ArrowRight": true,
-        "ArrowUp": true,
-        "ArrowDown": true,
-        "PageUp": true,
-        "PageDown": true,
-        "Escape": true,
-        "Enter": true
+        "AltLeft": 2,
+        "AltRight": 2,
+        "CapsLock": 2,
+        "ControlLeft": 2,
+        "ControlRight": 2,
+        "OSLeft": 2,
+        "OSRight": 2,
+        "ShiftLeft": 2,
+        "ShiftRight": 2,
+        "ArrowLeft": 1,
+        "ArrowRight": 1,
+        "ArrowUp": 1,
+        "ArrowDown": 1,
+        "PageUp": 1,
+        "PageDown": 1,
+        "Escape": 1,
+        "Enter": 1
     };
 function event_key(evt) {
     var x;
+    if (typeof evt === "string")
+        return evt;
     if ((x = evt.key) != null)
         return key_map[x] || x;
     if ((x = evt.charCode))
@@ -501,6 +503,9 @@ function event_key(evt) {
 }
 event_key.printable = function (evt) {
     return !nonprintable_map[event_key(evt)];
+};
+event_key.modifier = function (evt) {
+    return nonprintable_map[event_key(evt)] > 1;
 };
 return event_key;
 })();
@@ -1685,9 +1690,10 @@ function setmailpsel(sel) {
 
 window.pa_linenote = (function ($) {
 var labelctr = 0;
+var mousedown_anal, mousedown_selection;
+var scrolled_at;
 
 function analyze(target) {
-    var table, linetype, linenumber, tr, result, x;
     if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
         return null;
     while (target && target.tagName !== "TR") {
@@ -1695,36 +1701,111 @@ function analyze(target) {
             return null;
         target = target.parentNode;
     }
-    tr = target;
+
+    var tr = target;
     while (tr && (tr.nodeType !== Node.ELEMENT_NODE
                   || /\bpa-dl\b.*\bgw\b/.test(tr.className)))
         tr = tr.previousSibling;
-    table = tr;
-    while (table && !table.getAttribute("data-pa-file"))
+
+    var table = tr, file;
+    while (table && !(file = table.getAttribute("data-pa-file")))
         table = table.parentNode;
     if (!tr || !table || !/\bpa-dl\b.*\bg[idc]\b/.test(tr.className))
         return null;
 
-    result = {filename: table.getAttribute("data-pa-file"), tr: tr};
-    if ((x = $(tr).find("td.pa-db").text()))
-        result.lineid = "b" + x;
+    var lineid = $(tr).find("td.pa-db").text();
+    if (lineid)
+        lineid = "b" + lineid;
     else
-        result.lineid = "a" + $(tr).find("td.pa-da").text();
+        lineid = "a" + $(tr).find("td.pa-da").text();
 
-    if (tr == target)
-        do {
-            target = target.nextSibling;
-        } while (target && target.nodeType != Node.ELEMENT_NODE);
-    if (target && /\bpa-dl\b.*\bgw\b/.test(target.className)
-        && !target.getAttribute("deleting61"))
-        result.notetr = target;
+    var result = {filename: file, lineid: lineid, tr: tr};
+
+    var next_tr = tr.nextSibling;
+    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE
+                       || next_tr.hasAttribute("data-pa-deleting")))
+        next_tr = next_tr.nextSibling;
+    if (next_tr && /\bpa-dl\b.*\bgw\b/.test(next_tr.className))
+        result.notetr = next_tr;
+
     return result;
 }
 
 function remove_tr(tr) {
-    tr.setAttribute("deleting61", "1");
+    tr.setAttribute("data-pa-deleting", "1");
     $(tr).find(":focus").blur();
     $(tr).children().slideUp(80).queue(function () { $(tr).remove(); });
+}
+
+function traverse(tr, down) {
+    var direction = down ? "nextSibling" : "previousSibling";
+    var table = tr.parentElement.parentElement;
+    tr = tr[direction];
+    while (1) {
+        while (tr && !/\bpa-dl\b.*\bg[idc]\b/.test(tr.className))
+            tr = tr[direction];
+        if (tr)
+            return tr;
+        table = table[direction];
+        while (table && (table.nodeType !== Node.ELEMENT_NODE
+                         || table.tagName !== "TABLE"
+                         || !table.hasAttribute("data-pa-file")))
+            table = table[direction];
+        if (!table)
+            return null;
+        tr = table.firstChild[down ? "firstChild" : "lastChild"];
+    }
+}
+
+function anal_tr() {
+    if (mousedown_anal) {
+        var $e = pa_ensureline(mousedown_anal.filename, mousedown_anal.lineid);
+        return $e.closest("tr")[0];
+    } else
+        return null;
+}
+
+function arrowcapture(evt) {
+    var key;
+    if (evt.type === "mousemove" && scrolled_at
+        && evt.timeStamp - scrolled_at <= 200)
+        return;
+    if (evt.type !== "keydown"
+        || ((key = event_key(evt)) !== "ArrowUp" && key !== "ArrowDown"
+            && key !== "ArrowLeft" && key !== "ArrowRight"
+            && key !== "Enter" && !event_key.modifier(key))
+        || event_modkey(evt)
+        || !mousedown_anal)
+        return uncapture();
+    if (key === "ArrowLeft" || key === "ArrowRight")
+        return;
+
+    var tr = anal_tr();
+    if (!tr)
+        return uncapture();
+    if (key === "ArrowDown" || key === "ArrowUp") {
+        $(tr).removeClass("live");
+        tr = traverse(tr, key === "ArrowDown");
+        if (!tr)
+            return;
+    }
+
+    mousedown_anal = analyze(tr);
+    evt.preventDefault();
+    if (key === "Enter") {
+        make_linenote(mousedown_anal);
+        uncapture();
+    } else {
+        scrolled_at = evt.timeStamp;
+        $(tr).addClass("live").scrollIntoView();
+    }
+    return true;
+}
+
+function uncapture() {
+    $("tr.live").removeClass("live");
+    $(".pa-filediff").addClass("live");
+    $(document).off(".pa-linenote");
 }
 
 function unedit(tr, always) {
@@ -1745,6 +1826,13 @@ function unedit(tr, always) {
             $td.append($note);
             $edit.slideUp(80).queue(function () { $edit.remove(); });
             $note.slideDown(80);
+        }
+
+        var click_tr = anal_tr();
+        if (click_tr) {
+            $(document).on("keydown.pa-linenote mousemove.pa-linenote mousedown.pa-linenote", arrowcapture);
+            $(click_tr).addClass("live");
+            $(".pa-filediff").removeClass("live");
         }
         return true;
     } else
@@ -1774,8 +1862,6 @@ function keydown(evt) {
     } else
         return true;
 }
-
-var mousedown_tr, mousedown_selection;
 
 function selection_string() {
     var s;
@@ -1810,20 +1896,22 @@ function makeform(e) {
 function pa_linenote(event) {
     var anal = analyze(event.target);
     if (anal && event.type == "mousedown") {
-        mousedown_tr = anal.tr;
+        mousedown_anal = anal;
         mousedown_selection = selection_string();
         return true;
-    } else if (anal && event.type == "mouseup"
-               && mousedown_tr == anal.tr
-               && mousedown_selection == selection_string())
-        /* this is a click */;
-    else if (anal && event.type == "click")
-        /* this is an old-style click */;
+    } else if (anal
+               && ((event.type === "mouseup"
+                    && mousedown_anal && mousedown_anal.tr == anal.tr
+                    && mousedown_selection == selection_string())
+                   || event.type === "click"))
+        return make_linenote(anal, event);
     else {
-        mousedown_tr = mousedown_selection = null;
+        mousedown_anal = mousedown_selection = null;
         return true;
     }
+}
 
+function make_linenote(anal, event) {
     var $tr = anal.notetr && $(anal.notetr), j, text = null, iscomment = false;
     if ($tr && !$tr.find("textarea").length) {
         text = $tr.find("div.pa-note").text();
@@ -1831,18 +1919,20 @@ function pa_linenote(event) {
         remove_tr($tr[0]);
         $tr = anal.notetr = null;
     } else if ($tr) {
-        if (!unedit($tr[0])) {
+        if (unedit($tr[0])) {
+            event && event.stopPropagation();
+            return true;
+        } else {
             j = $tr.find("textarea").focus();
             j[0].setSelectionRange && j[0].setSelectionRange(0, j.val().length);
+            return false;
         }
-        return false;
     }
 
     $tr = $(makeform(anal.tr));
     $tr.insertAfter(anal.tr);
     $tr.attr("data-pa-savednote", text === null ? "" : text).attr("data-pa-iscomment", iscomment ? "1" : null);
     j = $tr.find("textarea").focus();
-    $tr.addClass(iscomment ? "iscomment61" : "isgrade61");
     if (text !== null) {
         j.text(text);
         j[0].setSelectionRange && j[0].setSelectionRange(text.length, text.length);
@@ -1862,7 +1952,7 @@ pa_linenote.bind = function (selector) {
     $(selector).on("mouseup mousedown", pa_linenote);
 };
 return pa_linenote;
-})(jQuery);
+})($);
 
 jQuery.fn.extend({
     serializeWith: function(data) {
@@ -2361,18 +2451,22 @@ function run61(button, opt) {
         return r.join("");
     }
 
+    function find_filediff(file) {
+        var fm = $(".pa-filediff").filter(function () {
+            return this.getAttribute("data-pa-file") === file;
+        });
+    }
+
     function add_file_link(node, file, line, link) {
-        var filematch = $(".filediff61[data-pa-file='" + file + "']"), dir;
+        var filematch = find_filediff(file), dir;
         if (!filematch.length && (dir = therun.attr("data-pa-directory")))
-            filematch = $(".filediff61[data-pa-file='" + dir + "/" + file + "']");
+            filematch = find_filediff(dir + "/" + file);
         if (filematch.length) {
-            var anchor = "Lb" + line + "_" + filematch.attr("data-pa-fileid");
-            if (document.getElementById(anchor)) {
-                var a = $("<a href=\"#" + anchor + "\" onclick=\"return pa_gotoline(this)\"></a>");
-                a.text(link);
-                addlinepart(node, a);
-                return true;
-            }
+            var anchor = "Lb" + line + "_" + html_id_encode(file);
+            var a = $("<a href=\"#" + anchor + "\" onclick=\"return pa_gotoline(this)\"></a>");
+            a.text(link);
+            addlinepart(node, a);
+            return true;
         }
         return false;
     }
@@ -3341,7 +3435,7 @@ function do_autogrow_textarea($self) {
         $self.height(Math.min(wh, Math.max(shadow.height(), minHeight)));
     }
 
-    $self.on("change keyup keydown", update).data("autogrowing", update);
+    $self.on("change input", update).data("autogrowing", update);
     $(window).resize(update);
     $self.val() && update();
 }

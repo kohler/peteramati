@@ -2397,7 +2397,7 @@ tr.s61partner {
 	width: 100%;
 }
 table.live > tbody > tr.pa-dl.gi:hover > td,
-tr.pa-dl.gi.hover > td {
+tr.pa-dl.live > td {
 	background-color: #f8eec7;
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
@@ -2410,9 +2410,6 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 }
 table.hidegrade61 .pa-note.gradenote {
 	color: #880000;
-}
-.iscomment61 .hideifcomment61, .isgrade61 .hideifgrade61 {
-	display: none;
 }
 .pa-noteref {
 	font-size: smaller;
