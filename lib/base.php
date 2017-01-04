@@ -177,7 +177,7 @@ function rfc2822_words_quote($words) {
 function html_id_encode($text) {
     $x = preg_split('_([^-a-zA-Z0-9])_', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
     for ($i = 1; $i < count($x); $i += 2)
-        $x[$i] = "_" . dechex(ord($x[$i]));
+        $x[$i] = "_" . strtoupper(dechex(ord($x[$i])));
     return join("", $x);
 }
 

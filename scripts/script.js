@@ -268,6 +268,16 @@ function regexp_quote(s) {
     return String(s).replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1').replace(/\x08/g, '\\x08');
 }
 
+function html_id_encode(s) {
+    return encodeURIComponent(s).replace(/[^-A-Za-z0-9%]/g, function (s) {
+        return "_" + s.charCodeAt(0).toString(16).toUpperCase();
+    }).replace(/%/g, "_");
+}
+
+function html_id_decode(s) {
+    return decodeURIComponent(s.replace(/_/g, "%"));
+}
+
 function plural_noun(n, what) {
     if (jQuery.isArray(n))
         n = n.length;
@@ -617,7 +627,7 @@ function hoturl(page, options) {
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
         hoturl_clean(x, /^fn=(\w+)$/);
         hoturl_clean(x, /^pset=([^?&#]+)$/);
-        hoturl_clean(x, /^commit=([9-9A-Fa-f]+)$/);
+        hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
         want_forceShow = true;
     } else if (page === "index")
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
@@ -2075,24 +2085,57 @@ function runfold61(name) {
     return false;
 }
 
-function gotoline61(x) {
-    var m, e, color;
+function pa_ensureline(filename, lineid) {
+    // decode arguments: either (lineref) or (filename, lineid)
+    if (lineid == null) {
+        if (filename instanceof Node)
+            filename = filename.hash;
+        var m = filename.match(/^#?L([ab]\d+)_(.*)$/);
+        if (!m)
+            return $(null);
+        filename = m[2];
+        lineid = m[1];
+    } else
+        filename = html_id_encode(filename);
+
+    // check lineref
+    var lineref = "L" + lineid + "_" + filename;
+    var e = document.getElementById(lineref);
+    if (e)
+        return $(e);
+
+    // create link
+    var file = document.getElementById("pa-file-" + filename);
+    if (!file)
+        return $(null);
+    var $tds = $(file).find("td.pa-d" + lineid.charAt(0));
+    var lineno = lineid.substr(1);
+    for (var i = 0; i < $tds.length; ++i)
+        if ($tds[i].textContent === lineno) {
+            $tds[i].id = lineref;
+            return $($tds[i]);
+        }
+    return $(null);
+}
+
+function pa_gotoline(x, lineid) {
+    var $e;
     function flasher() {
-        e.css("backgroundColor", "#ffff00");
-        jQuery(this).dequeue();
+        $e.css("backgroundColor", "#ffff00");
+        $(this).dequeue();
     }
     function restorer() {
-        e.css("backgroundColor", "");
-        jQuery(this).dequeue();
+        $e.css("backgroundColor", "");
+        $(this).dequeue();
     }
-    if (x instanceof Node)
-        x = x.hash;
-    if ((m = x.match(/^#?(L[ab]\d+_(.*))$/))) {
-        jQuery(".anchorhighlight").removeClass("anchorhighlight").finish();
-        jQuery("#file61_" + m[2]).show();
-        e = jQuery("#" + m[1]).closest("tr");
-        color = e.css("backgroundColor");
-        e.addClass("anchorhighlight")
+
+    var $ref = pa_ensureline(x, lineid);
+    if ($ref.length) {
+        $(".anchorhighlight").removeClass("anchorhighlight").finish();
+        $ref.closest("table").show();
+        $e = $ref.closest("tr");
+        var color = $e.css("backgroundColor");
+        $e.addClass("anchorhighlight")
             .queue(flasher)
             .delay(100).queue(restorer)
             .delay(100).queue(flasher)
@@ -2325,7 +2368,7 @@ function run61(button, opt) {
         if (filematch.length) {
             var anchor = "Lb" + line + "_" + filematch.attr("data-pa-fileid");
             if (document.getElementById(anchor)) {
-                var a = $("<a href=\"#" + anchor + "\" onclick=\"return gotoline61(this)\"></a>");
+                var a = $("<a href=\"#" + anchor + "\" onclick=\"return pa_gotoline(this)\"></a>");
                 a.text(link);
                 addlinepart(node, a);
                 return true;

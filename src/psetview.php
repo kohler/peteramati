@@ -643,7 +643,7 @@ class PsetView {
 
     function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open) {
         $fileid = html_id_encode($file);
-        $tabid = "file61_" . $fileid;
+        $tabid = "pa-file-" . $fileid;
         $linenotes = $lnorder->file($file);
 
         echo '<h3><a class="fold61" href="#" onclick="return fold61(',
@@ -684,7 +684,7 @@ class PsetView {
             $ak = $bk = "";
             if ($linenotes && $aln && isset($linenotes->$aln))
                 $ak = ' id="L' . $aln . '_' . $fileid . '"';
-            if ($bln)
+            if ($linenotes && $bln && isset($linenotes->$bln))
                 $bk = ' id="L' . $bln . '_' . $fileid . '"';
 
             if (!$x[2] && !$x[3])

@@ -198,6 +198,8 @@ class GitHub_RepositorySite extends RepositorySite {
 
     function validate_open(MessageSet $ms = null) {
         $response = self::api($this->conf, "https://api.github.com/repos/" . $this->base);
+        if (!$response)
+            return -1;
         if ($response->status == 200 && $response->j && $response->j->private)
             return 0;
         if ($response->status == 200 && $response->j && !$response->j->private) {
