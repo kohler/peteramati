@@ -10,11 +10,14 @@ class APIData {
     public $repo;
     public $hash;
     public $commit;
+    public $at;
     function __construct(Contact $user, Pset $pset = null, Repository $repo = null) {
+        global $Now;
         $this->conf = $user->conf;
         $this->user = $user;
         $this->pset = $pset;
         $this->repo = $repo;
+        $this->at = $Now;
     }
 }
 
@@ -117,7 +120,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 109) {
+        if ($this->sversion < 110) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);

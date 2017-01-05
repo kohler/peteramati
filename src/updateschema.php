@@ -61,6 +61,27 @@ function _update_schema_hasflags(Conf $conf) {
     return true;
 }
 
+function _update_schema_linenotes(Conf $conf) {
+    $result = $conf->ql("select * from CommitNotes where notes like '%linenotes%'");
+    $queries = [];
+    $qv = [];
+    while (($row = edb_orow($result)))
+        if (($n = json_decode($row->notes)) && isset($n->linenotes)) {
+            foreach ($n->linenotes as $file => $linemap) {
+                foreach ($linemap as $lineid => &$note)
+                    $note = LineNote::make_json($file, $lineid, $note);
+                unset($note);
+            }
+            $queries[] = "update CommitNotes set notes=? where hash=? and pset=?";
+            array_push($qv, json_encode($n), $row->hash, $row->pset);
+        }
+    Dbl::free($result);
+    $mresult = Dbl::multi_ql_apply(join(";", $queries), $qv);
+    while ($mresult->next())
+        /* spin */;
+    return true;
+}
+
 function update_schema_drop_keys_if_exist($conf, $table, $key) {
     $indexes = Dbl::fetch_first_columns($conf->dblink, "select distinct index_name from information_schema.statistics where table_schema=database() and `table_name`='$table'");
     $drops = [];
@@ -294,6 +315,9 @@ function updateSchema($conf) {
     if ($conf->sversion == 108
         && _update_schema_hasflags($conf))
         $conf->update_schema_version(109);
+    if ($conf->sversion == 109
+        && _update_schema_linenotes($conf))
+        $conf->update_schema_version(110);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

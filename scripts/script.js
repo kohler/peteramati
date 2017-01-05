@@ -147,9 +147,9 @@ function jqxhr_error_message(jqxhr, status, errormsg) {
     else if (status == "timeout")
         return "Connection timed out.";
     else if (status)
-        return "Error [" + status + "].";
+        return "Failed [" + status + "].";
     else
-        return "Error.";
+        return "Failed.";
 }
 
 $(document).ajaxError(function (event, jqxhr, settings, httperror) {
@@ -467,13 +467,17 @@ var key_map = {"Spacebar": " ", "Esc": "Escape"},
         "224": "OSLeft", "225": "AltRight"
     },
     nonprintable_map = {
+        "Alt": 2,
         "AltLeft": 2,
         "AltRight": 2,
         "CapsLock": 2,
+        "Control": 2,
         "ControlLeft": 2,
         "ControlRight": 2,
+        "Meta": 2,
         "OSLeft": 2,
         "OSRight": 2,
+        "Shift": 2,
         "ShiftLeft": 2,
         "ShiftRight": 2,
         "ArrowLeft": 1,
@@ -1688,6 +1692,15 @@ function setmailpsel(sel) {
 }
 
 
+function pa_notedata($j) {
+    var note = $j.data("pa-note");
+    if (typeof note === "string")
+        note = JSON.parse(note);
+    if (typeof note === "number")
+        note = [false, "", 0, note];
+    return note || [false, ""];
+}
+
 window.pa_linenote = (function ($) {
 var labelctr = 0;
 var curanal, mousedown_selection;
@@ -1731,10 +1744,15 @@ function analyze(target) {
     return result;
 }
 
-function remove_tr(tr) {
-    tr.setAttribute("data-pa-deleting", "1");
-    $(tr).find(":focus").blur();
-    $(tr).children().slideUp(80).queue(function () { $(tr).remove(); });
+function remove_tr($tr) {
+    $tr.find(":focus").blur();
+    var $children = $tr.children().slideUp(80);
+    if ($tr.data("pa-note"))
+        $children.queue(function () { $tr.find("form").remove(); });
+    else {
+        $children.queue(function () { $tr.remove(); });
+        $tr.attr("data-pa-deleting", true);
+    }
 }
 
 function traverse(tr, down) {
@@ -1770,10 +1788,12 @@ function arrowcapture(evt) {
     if (evt.type === "mousemove" && scrolled_at
         && evt.timeStamp - scrolled_at <= 200)
         return;
+    if (evt.type === "keydown" && event_key.modifier(evt))
+        return;
     if (evt.type !== "keydown"
         || ((key = event_key(evt)) !== "ArrowUp" && key !== "ArrowDown"
             && key !== "ArrowLeft" && key !== "ArrowRight"
-            && key !== "Enter" && !event_key.modifier(key))
+            && key !== "Enter")
         || event_modkey(evt)
         || !curanal)
         return uncapture();
@@ -1793,8 +1813,8 @@ function arrowcapture(evt) {
     curanal = analyze(tr);
     evt.preventDefault();
     if (key === "Enter") {
-        make_linenote(curanal);
-        uncapture();
+        make_linenote();
+        $(document).off("keypress.pa-linenote");
     } else {
         scrolled_at = evt.timeStamp;
         $(tr).addClass("live").scrollIntoView();
@@ -1809,23 +1829,23 @@ function uncapture() {
 }
 
 function unedit(tr, always) {
-    var savednote;
-    while (tr && (savednote = tr.getAttribute("data-pa-savednote")) === null)
-        tr = tr.parentElement;
-    if (tr && (always || text_eq(savednote, $(tr).find("textarea").val()))) {
-        var $tr = $(tr);
+    var $tr = $(tr).closest("tr");
+    var note = pa_notedata($tr);
+    if ($tr.length && (always || text_eq(note[1], $tr.find("textarea").val()))) {
         $tr.find(":focus").blur();
-        if (savednote === "")
-            remove_tr(tr);
+        if (note[1] === "")
+            remove_tr($tr);
         else {
-            var iscomment = !!tr.getAttribute("data-pa-iscomment"),
-                $td = $tr.find("td.pa-notebox"),
-                $note = $('<div class="pa-note' + (iscomment ? " commentnote" : " gradenote") + '" style="display:none"></div>'),
+            var $td = $tr.find("td.pa-notebox"),
+                $note = $('<div class="pa-note' +
+                    (note[0] ? " commentnote" : " gradenote") +
+                    '" style="display:none"></div>'),
                 $edit = $td.children("form");
-            $note.text(savednote);
+            $note.text(note[1]);
             $td.append($note);
             $edit.slideUp(80).queue(function () { $edit.remove(); });
-            $note.slideDown(80);
+            if (note[1] !== "")
+                $note.slideDown(80);
         }
 
         var click_tr = anal_tr();
@@ -1839,17 +1859,34 @@ function unedit(tr, always) {
         return false;
 }
 
-function submit(evt) {
-    var that = this;
-    return ajaxsave61(that, function (data) {
-        if (data.ok) {
-            var note = data.linenotes[curanal.file];
-            note = note && note[curanal.lineid];
-            $(that).closest("tr").attr("data-pa-savednote", note ? note[1] : "")
-                .attr("data-pa-iscomment", note && note[0] ? "1" : null);
-            unedit(that);
-        }
-    });
+function make_submit(anal) {
+    return function () {
+        var $f = $(this);
+        if ($f.prop("outstanding"))
+            return false;
+        $f.prop("outstanding", true);
+        var $tr = $f.closest("tr");
+        $f.find(".ajaxsave61").remove();
+        $f.find(".aab").append('<div class="aabut ajaxsave61">Saving…</div>');
+        $.ajax($f.attr("action"), {
+            data: $f.serialize(), method: "POST", cache: false, dataType: "json",
+            success: function (data) {
+                $f.prop("outstanding", false);
+                if (data && data.ok) {
+                    $f.find(".ajaxsave61").html("Saved");
+                    var note = data.linenotes[anal.file];
+                    note = note && note[anal.lineid];
+                    $tr.data("pa-note", note);
+                    unedit($tr[0]);
+                    $tr.data("pa-savefailed", null);
+                } else {
+                    $f.find(".ajaxsave61").html('<strong class="err">' + escape_entities(data.error || "Failed") + '</strong>');
+                    $tr.data("pa-savefailed", true);
+                }
+            }
+        });
+        return false;
+    };
 }
 
 function cancel(evt) {
@@ -1877,13 +1914,13 @@ function selection_string() {
         return "";
 }
 
-function makeform() {
+function makeform(note) {
     var $pi = $(curanal.tr).closest(".pa-psetinfo");
     var t = '<tr class="pa-dl gw">' +
         '<td colspan="2" class="pa-note-edge"></td>' +
         '<td class="pa-notebox">' +
         '<form method="post" action="' +
-        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi, {file: curanal.file, line: curanal.lineid}))) +
+        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi, {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0}))) +
         '" enctype="multipart/form-data" accept-charset="UTF-8">' +
         '<div class="f-contain"><textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
@@ -1916,11 +1953,11 @@ function pa_linenote(event) {
 }
 
 function make_linenote(event) {
-    var $tr = curanal.notetr && $(curanal.notetr), j, text = null, iscomment = false;
+    var $tr = curanal.notetr && $(curanal.notetr), j;
+    var note = null;
     if ($tr && !$tr.find("textarea").length) {
-        text = $tr.find("div.pa-note").text();
-        iscomment = $tr.find("div.pa-note").is(".commentnote");
-        remove_tr($tr[0]);
+        note = pa_notedata($tr);
+        remove_tr($tr);
         $tr = curanal.notetr = null;
     } else if ($tr) {
         if (unedit($tr[0])) {
@@ -1933,19 +1970,21 @@ function make_linenote(event) {
         }
     }
 
-    $tr = $(makeform());
+    $tr = $(makeform(note));
     $tr.insertAfter(curanal.tr);
-    $tr.attr("data-pa-savednote", text === null ? "" : text).attr("data-pa-iscomment", iscomment ? "1" : null);
+    $tr.data("pa-note", note);
     j = $tr.find("textarea").focus();
-    if (text !== null) {
-        j.text(text);
-        j[0].setSelectionRange && j[0].setSelectionRange(text.length, text.length);
+    if (note && note[1] !== null) {
+        j.text(note[1]);
+        j[0].setSelectionRange && j[0].setSelectionRange(note[1].length, note[1].length);
     }
     j.autogrow().keydown(keydown);
-    $tr.find("input[name=iscomment]").prop("checked", iscomment);
+    $tr.find("input[name=iscomment]").prop("checked", !!(note && note[0]));
     $tr.find("button[name=cancel]").click(cancel);
-    $tr.find("form").on("submit", submit);
+    $tr.find("form").on("submit", make_submit(curanal));
     $tr.children().hide().slideDown(100);
+    $(curanal.tr).addClass("live");
+    $(".pa-filediff").removeClass("live");
     return false;
 }
 
@@ -2055,13 +2094,11 @@ function pa_savegrades(form) {
         success: function (data) {
             $f.prop("outstanding", false);
             $f.find("input[type=submit]").prop("disabled", false);
-            if (data && data.ok)
+            if (data.ok)
                 $f.find(".ajaxsave61").html("Saved");
             else
-                $f.find(".ajaxsave61").html('<strong class="err">' + ((data && data.error) || "Failed") + '</strong>');
+                $f.find(".ajaxsave61").html('<strong class="err">' + data.error + '</strong>');
             pa_loadgrades.call(form, data);
-        }, error: function () {
-            $f.find(".ajaxsave61").html("Failed!");
         }
     });
     return false;
@@ -2239,14 +2276,16 @@ function pa_gotoline(x, lineid) {
     return true;
 }
 
-function beforeunload61(evt) {
-    var x = jQuery("tr.gw"), i, j, textarea, note;
-    for (i = 0; i < x.length; ++i)
-        if ((note = x[i].getAttribute("data-pa-savednote")) !== null) {
-            textarea = jQuery(x[i]).find("textarea");
-            if (textarea.length && textarea.val() != note)
-                return (event.returnValue = "You have unsaved notes. You will lose them if you leave the page now.");
-        }
+function pa_beforeunload(evt) {
+    var ok = true;
+    $("tr.gw textarea").each(function () {
+        var $tr = $(this).closest("tr");
+        var note = pa_notedata($tr);
+        if (note && !text_eq(this.value, note[1]) && !$tr.data("pa-savefailed"))
+            ok = false;
+    });
+    if (!ok)
+        return (event.returnValue = "You have unsaved notes. You will lose them if you leave the page now.");
 }
 
 function loadgrade61($b) {

@@ -15,9 +15,12 @@ class LinenotesOrder {
         foreach ($this->ln as $file => $notelist) {
             if (!isset($this->fileorder[$file]))
                 $this->fileorder[$file] = count($this->fileorder);
-            foreach ($notelist as $line => $note)
-                if ($seegradenotes || (is_array($note) && $note[0]))
+            foreach ($notelist as $line => $note) {
+                if ((is_string($note) && $note !== "")
+                    || (is_array($note) && ($note[0] || $seegradenotes)
+                        && (string) $note[1] !== ""))
                     $this->lnseq[] = array($file, $line, is_array($note) && $note[0]);
+            }
         }
     }
     function note_files() {

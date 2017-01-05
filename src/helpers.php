@@ -99,38 +99,6 @@ function rcvtint(&$value, $default = -1) {
     return (isset($value) ? cvtint($value, $default) : $default);
 }
 
-function json_update($j, $updates) {
-    if ($j && is_object($j))
-        $j = (array) $j;
-    else if (!is_array($j))
-        $j = [];
-    foreach ($updates as $k => $v) {
-        if ((string) $k === "") {
-            global $Me;
-            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . ", user $Me->email");
-            continue;
-        }
-        if ($v === null)
-            unset($j[$k]);
-        else if (is_object($v) || is_associative_array($v)) {
-            $v = json_update(isset($j[$k]) ? $j[$k] : null, $v);
-            if ($v !== null)
-                $j[$k] = $v;
-            else
-                unset($j[$k]);
-        } else
-            $j[$k] = $v;
-    }
-    $n = count($j);
-    if ($n == 0)
-        return null;
-    for ($i = 0; $i != $n; ++$i)
-        if (!array_key_exists($i, $j))
-            return (object) $j;
-    ksort($j, SORT_NUMERIC);
-    return array_values($j);
-}
-
 if (!function_exists("json_encode") || !function_exists("json_decode"))
     require_once("$ConfSitePATH/lib/json.php");
 
@@ -138,6 +106,48 @@ if (!function_exists("json_last_error_msg")) {
     function json_last_error_msg() {
         return "unknown JSON error";
     }
+}
+
+interface JsonUpdatable extends JsonSerializable {
+    public function jsonIsReplacement();
+}
+
+function json_update($j, $updates) {
+    if (is_object($j))
+        $j = get_object_vars($j);
+    else if (!is_array($j))
+        $j = [];
+    if (is_object($updates)) {
+        $is_replacement = $updates instanceof JsonUpdatable
+            && $updates->jsonIsReplacement();
+        if ($updates instanceof JsonSerializable)
+            $updates = $updates->jsonSerialize();
+        if ($is_replacement)
+            return $updates;
+        if (is_object($updates))
+            $updates = get_object_vars($updates);
+    }
+    foreach ($updates as $k => $v) {
+        if ($k === "") {
+            global $Me;
+            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . ", user $Me->email");
+            continue;
+        }
+        if (is_object($v) || is_associative_array($v))
+            $v = json_update(isset($j[$k]) ? $j[$k] : null, $v);
+        if ($v === null)
+            unset($j[$k]);
+        else
+            $j[$k] = $v;
+    }
+    $n = count($j);
+    if ($n == 0)
+        return null;
+    for ($i = 0; $i !== $n; ++$i)
+        if (!isset($j[$i]) && !array_key_exists($i, $j))
+            return (object) $j;
+    ksort($j, SORT_NUMERIC);
+    return array_values($j);
 }
 
 

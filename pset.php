@@ -776,7 +776,7 @@ if ($Pset->gitless) {
         $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
     }
 
-    Ht::stash_script('$(".pa-note-entry").autogrow();$(window).on("beforeunload",beforeunload61)');
+    Ht::stash_script('$(".pa-note-entry").autogrow();$(window).on("beforeunload",pa_beforeunload)');
 } else {
     if ($Pset->gitless_grades)
         echo_grade_cdf_here();

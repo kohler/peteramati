@@ -105,6 +105,6 @@ foreach ($diff as $file => $dinfo) {
     $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
 }
 
-Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",beforeunload61)');
+Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",pa_beforeunload)');
 echo "<div class='clear'></div>\n";
 $Conf->footer();

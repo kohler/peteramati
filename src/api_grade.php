@@ -91,7 +91,7 @@ class API_Grade {
                         : $curgv === null || abs($curgv - $og[$ge->name]) >= 0.0001) {
                         $j = (array) $info->grade_json();
                         $j["ok"] = false;
-                        $j["error"] = "Grades have been updated.";
+                        $j["error"] = "Grade edit conflict, your update was ignored.";
                         return $j;
                     }
                 }
@@ -118,6 +118,7 @@ class API_Grade {
         $info->set_commit($api->commit);
         if ($qreq->line && ctype_digit($qreq->line))
             $qreq->line = "b" . $qreq->line;
+
         if ($qreq->method() === "POST") {
             if (!$qreq->file || !$qreq->line
                 || !preg_match('/\A[ab]\d+\z/', $qreq->line))
@@ -126,9 +127,17 @@ class API_Grade {
                 return ["ok" => false, "error" => "This is a handout commit."];
             if (!$info->can_edit_line_note($qreq->file, $qreq->line))
                 return ["ok" => false, "error" => "Permission error."];
-            $note = null;
-            if ((string) $qreq->note !== "")
-                $note = [!!$qreq->iscomment, $qreq->note, $user->contactId];
+
+            $note = $info->current_line_note($qreq->file, $qreq->line);
+            if (isset($qreq->oldversion) && $qreq->oldversion != +$note->version)
+                return ["ok" => false, "error" => "Edit conflict, you need to reload."];
+
+            if (array_search($user->contactId, $note->users) === false)
+                $note->users[] = $user->contactId;
+            $note->iscomment = !!$qreq->iscomment;
+            $note->note = (string) $qreq->note;
+            $note->version = +$note->version + 1;
+
             $lnotes = ["linenotes" => [$qreq->file => [$qreq->line => $note]]];
             $info->update_current_info($lnotes);
         }
@@ -136,15 +145,18 @@ class API_Grade {
         if (!$user->can_view_comments($api->pset, $info))
             return ["ok" => false, "error" => "Permission error."];
         $can_view_grades = $info->can_view_grades();
+        $can_view_note_authors = $info->can_view_note_authors();
         $notes = [];
         foreach ((array) $info->current_info("linenotes") as $file => $linemap) {
             if ($qreq->file && $file !== $qreq->file)
                 continue;
             $filenotes = [];
-            foreach ((array) $linemap as $lineid => $note)
-                if (($can_view_grades || $note[0])
+            foreach ((array) $linemap as $lineid => $note) {
+                $note = LineNote::make_json($file, $lineid, $note);
+                if (($can_view_grades || $note->iscomment)
                     && (!$qreq->line || $qreq->line === $lineid))
-                    $filenotes[$lineid] = $note;
+                    $filenotes[$lineid] = $note->render_json($can_view_note_authors);
+            }
             if (!empty($filenotes))
                 $notes[$file] = $filenotes;
         }
