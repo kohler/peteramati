@@ -1735,8 +1735,7 @@ function analyze(target) {
     var result = {file: file, lineid: lineid, tr: tr};
 
     var next_tr = tr.nextSibling;
-    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE
-                       || next_tr.hasAttribute("data-pa-deleting")))
+    while (next_tr && next_tr.nodeType !== Node.ELEMENT_NODE)
         next_tr = next_tr.nextSibling;
     if (next_tr && /\bpa-dl\b.*\bgw\b/.test(next_tr.className))
         result.notetr = next_tr;
@@ -1744,15 +1743,130 @@ function analyze(target) {
     return result;
 }
 
-function remove_tr($tr) {
-    $tr.find(":focus").blur();
-    var $children = $tr.children().slideUp(80);
-    if ($tr.data("pa-note"))
-        $children.queue(function () { $tr.find("form").remove(); });
-    else {
-        $children.queue(function () { $tr.remove(); });
-        $tr.attr("data-pa-deleting", true);
+function add_notetr($linetr) {
+    return $('<tr class="pa-dl gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter($linetr);
+}
+
+function render_note($tr, note, transition) {
+    $tr.data("pa-note", note);
+    var $td = $tr.find(".pa-notebox");
+    if (transition) {
+        var $content = $td.children();
+        $content.slideUp(80).queue(function () { $content.remove(); });
     }
+    if (note[1] === "") {
+        fix_notelinks($tr);
+        transition ? $tr.children().slideUp(80) : $tr.children().hide();
+        return;
+    }
+
+    var t = '<div class="pa-notediv">';
+    if (note[2]) {
+        var authorids = $.isArray(note[2]) ? note[2] : [note[2]];
+        var authors = [];
+        for (var i in authorids) {
+            var p = hotcrp_pc[authorids[i]];
+            if (p && (p.firstalen || p.lastpos))
+                authors.push(p.name.substr(0, p.firstalen || p.lastpos - 1));
+            else if (p)
+                authors.push(p.name);
+        }
+        if (authors.length)
+            t += '<div class="pa-note-author">[' + authors.join(', ') + ']</div>';
+    }
+    t += '<div class="pa-note pa-' + (note[0] ? 'comment' : 'grade') + 'note"></div></div>';
+    $td.append(t);
+    $td.find(".pa-note").text(note[1]);
+    fix_notelinks($tr);
+
+    if (transition)
+        $td.find(".pa-notediv").hide().slideDown(80);
+}
+
+function render_form($tr, note, transition) {
+    $tr.addClass("editing");
+    note && $tr.data("pa-note", note);
+    var $td = $tr.find(".pa-notebox");
+    if (transition) {
+        $tr.css("display", "").children().css("display", "");
+        var $content = $td.children();
+        $content.slideUp(80).queue(function () { $content.remove(); });
+    }
+
+    var $pi = $(curanal.tr).closest(".pa-psetinfo");
+    var t = '<form method="post" action="' +
+        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi, {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0}))) +
+        '" enctype="multipart/form-data" accept-charset="UTF-8">' +
+        '<div class="f-contain"><textarea class="pa-note-entry" name="note"></textarea>' +
+        '<div class="aab aabr pa-note-aa">' +
+        '<div class="aabut"><input type="submit" value="Save comment" /></div>' +
+        '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
+    if (!$pi[0].hasAttribute("data-pa-user-can-view-grades")) {
+        ++labelctr;
+        t += '<div class="aabut"><input type="checkbox" id="pa-linenotecb' + labelctr + '" name="iscomment" value="1" /> <label for="pa-linenotecb' + labelctr + '">Show immediately</label></div>';
+    }
+    var $form = $(t).appendTo($td);
+
+    var $ta = $form.find("textarea");
+    if (note && note[1] !== null) {
+        $ta.text(note[1]);
+        $ta[0].setSelectionRange && $ta[0].setSelectionRange(note[1].length, note[1].length);
+    }
+    $ta.autogrow().keydown(keydown);
+    $form.find("input[name=iscomment]").prop("checked", !!(note && note[0]));
+    $form.find("button[name=cancel]").click(cancel);
+    $form.on("submit", make_submit(curanal));
+    if (transition) {
+        $ta.focus();
+        $form.hide().slideDown(100);
+    }
+}
+
+function fix_notelinks($tr) {
+    function note_skippable(tr) {
+        return pa_notedata($(tr))[1] === "";
+    }
+
+    function note_anchor(tr) {
+        var anal = analyze(tr);
+        if (anal) {
+            var $td = pa_ensureline(anal.file, anal.lineid);
+            return "#" + $td[0].id;
+        } else
+            return "#";
+    }
+
+    function set_link(tr, next_tr) {
+        var $a = $(tr).find(".pa-note-links a");
+        if (!$a.length) {
+            $a = $('<a onclick="pa_gotoline(this)"></a>');
+            $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notediv"));
+        }
+
+        $a.attr("href", note_anchor(next_tr));
+        var t = next_tr ? "NEXT >" : "TOP";
+        if ($a.text() !== t)
+            $a.text(t);
+    }
+
+    var notes = $(".pa-dl.gw");
+    var notepos = 0;
+    while (notepos < notes.length && notes[notepos] !== $tr[0])
+        ++notepos;
+    if (notepos >= notes.length)
+        return;
+
+    var prevpos = notepos - 1;
+    while (prevpos >= 0 && note_skippable(notes[prevpos]))
+        --prevpos;
+
+    var nextpos = notepos + 1;
+    while (nextpos < notes.length && note_skippable(notes[nextpos]))
+        ++nextpos;
+
+    if (prevpos >= 0)
+        set_link(notes[prevpos], note_skippable($tr[0]) ? notes[nextpos] : $tr[0]);
+    set_link($tr[0], notes[nextpos]);
 }
 
 function traverse(tr, down) {
@@ -1812,14 +1926,20 @@ function arrowcapture(evt) {
 
     curanal = analyze(tr);
     evt.preventDefault();
-    if (key === "Enter") {
+    if (key === "Enter")
         make_linenote();
-        $(document).off("keypress.pa-linenote");
-    } else {
+    else {
         scrolled_at = evt.timeStamp;
         $(tr).addClass("live").scrollIntoView();
     }
     return true;
+}
+
+function capture(tr, keydown) {
+    $(tr).addClass("live");
+    $(".pa-filediff").removeClass("live");
+    $(document).off(".pa-linenote");
+    $(document).on((keydown ? "keydown.pa-linenote " : "") + "mousemove.pa-linenote mousedown.pa-linenote", arrowcapture);
 }
 
 function uncapture() {
@@ -1831,32 +1951,16 @@ function uncapture() {
 function unedit(tr, always) {
     var $tr = $(tr).closest("tr");
     var note = pa_notedata($tr);
-    if ($tr.length && (always || text_eq(note[1], $tr.find("textarea").val()))) {
-        $tr.find(":focus").blur();
-        if (note[1] === "")
-            remove_tr($tr);
-        else {
-            var $td = $tr.find("td.pa-notebox"),
-                $note = $('<div class="pa-note' +
-                    (note[0] ? " commentnote" : " gradenote") +
-                    '" style="display:none"></div>'),
-                $edit = $td.children("form");
-            $note.text(note[1]);
-            $td.append($note);
-            $edit.slideUp(80).queue(function () { $edit.remove(); });
-            if (note[1] !== "")
-                $note.slideDown(80);
-        }
-
-        var click_tr = anal_tr();
-        if (click_tr) {
-            $(document).on("keydown.pa-linenote mousemove.pa-linenote mousedown.pa-linenote", arrowcapture);
-            $(click_tr).addClass("live");
-            $(".pa-filediff").removeClass("live");
-        }
-        return true;
-    } else
+    if (!$tr.length || (!always && !text_eq(note[1], $tr.find("textarea").val())))
         return false;
+    $tr.removeClass("editing");
+    $tr.find(":focus").blur();
+    render_note($tr, note, true);
+
+    var click_tr = anal_tr();
+    if (click_tr)
+        capture(click_tr, true);
+    return true;
 }
 
 function make_submit(anal) {
@@ -1914,25 +2018,6 @@ function selection_string() {
         return "";
 }
 
-function makeform(note) {
-    var $pi = $(curanal.tr).closest(".pa-psetinfo");
-    var t = '<tr class="pa-dl gw">' +
-        '<td colspan="2" class="pa-note-edge"></td>' +
-        '<td class="pa-notebox">' +
-        '<form method="post" action="' +
-        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi, {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0}))) +
-        '" enctype="multipart/form-data" accept-charset="UTF-8">' +
-        '<div class="f-contain"><textarea class="pa-note-entry" name="note"></textarea>' +
-        '<div class="aab aabr pa-note-aa">' +
-        '<div class="aabut"><input type="submit" value="Save comment" /></div>' +
-        '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
-    if (!$pi[0].hasAttribute("data-pa-user-can-view-grades")) {
-        ++labelctr;
-        t += '<div class="aabut"><input type="checkbox" id="pa-linenotecb' + labelctr + '" name="iscomment" value="1" /> <label for="pa-linenotecb' + labelctr + '">Show immediately</label></div>';
-    }
-    return t + '</div></div></div></form></td></tr>';
-}
-
 function pa_linenote(event) {
     var anal = analyze(event.target);
     if (anal && event.type == "mousedown") {
@@ -1953,42 +2038,23 @@ function pa_linenote(event) {
 }
 
 function make_linenote(event) {
-    var $tr = curanal.notetr && $(curanal.notetr), j;
-    var note = null;
-    if ($tr && !$tr.find("textarea").length) {
-        note = pa_notedata($tr);
-        remove_tr($tr);
-        $tr = curanal.notetr = null;
-    } else if ($tr) {
+    var $tr = curanal.notetr ? $(curanal.notetr) : add_notetr(curanal.tr);
+    if ($tr.hasClass("editing")) {
         if (unedit($tr[0])) {
             event && event.stopPropagation();
             return true;
         } else {
-            j = $tr.find("textarea").focus();
-            j[0].setSelectionRange && j[0].setSelectionRange(0, j.val().length);
+            var $ta = $tr.find("textarea").focus();
+            $ta[0].setSelectionRange && $ta[0].setSelectionRange(0, $ta.val().length);
             return false;
         }
+    } else {
+        render_form($tr, pa_notedata($tr), true);
+        capture(curanal.tr, false);
+        return false;
     }
-
-    $tr = $(makeform(note));
-    $tr.insertAfter(curanal.tr);
-    $tr.data("pa-note", note);
-    j = $tr.find("textarea").focus();
-    if (note && note[1] !== null) {
-        j.text(note[1]);
-        j[0].setSelectionRange && j[0].setSelectionRange(note[1].length, note[1].length);
-    }
-    j.autogrow().keydown(keydown);
-    $tr.find("input[name=iscomment]").prop("checked", !!(note && note[0]));
-    $tr.find("button[name=cancel]").click(cancel);
-    $tr.find("form").on("submit", make_submit(curanal));
-    $tr.children().hide().slideDown(100);
-    $(curanal.tr).addClass("live");
-    $(".pa-filediff").removeClass("live");
-    return false;
 }
 
-pa_linenote.unedit = unedit;
 pa_linenote.bind = function (selector) {
     $(selector).on("mouseup mousedown", pa_linenote);
 };

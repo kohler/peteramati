@@ -129,7 +129,7 @@ span.nb {
 	clear: both;
 }
 .clearfix:after, .pst:after, .pavt:after, .papet:after, .submission_modes:after,
-.revet:after, .cmteditinfo:after, .aa:after, .aab:after {
+.revet:after, .cmteditinfo:after, .aa:after, .aab:after, .pa-notediv:after {
 	clear: both;
 	content: "";
 	display: block;
@@ -2393,7 +2393,7 @@ tr.s61partner {
 .gradecdf61summary .val {
 	text-align: right;
 }
-.diff61 {
+.pa-filediff {
 	width: 100%;
 }
 table.live > tbody > tr.pa-dl.gi:hover > td,
@@ -2408,7 +2408,7 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-dd, .pa-note {
 	white-space: pre-wrap;
 }
-table.hidegrade61 .pa-note.gradenote {
+table.hidegrades .pa-gradenote {
 	color: #880000;
 }
 .pa-noteref {

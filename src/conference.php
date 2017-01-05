@@ -1227,6 +1227,31 @@ class Conf {
         echo Ht::take_stash(), "</body>\n</html>\n";
     }
 
+    function stash_hotcrp_pc(Contact $user) {
+        if (!Ht::mark_stash("hotcrp_pc"))
+            return;
+        $hpcj = $list = [];
+        foreach ($this->pc_members_and_admins() as $pcm) {
+            $hpcj[$pcm->contactId] = $j = (object) ["name" => Text::name_html($pcm), "email" => $pcm->email];
+            if ($pcm->lastName) {
+                $r = Text::analyze_name($pcm);
+                if (strlen($r->lastName) !== strlen($r->name))
+                    $j->lastpos = strlen(htmlspecialchars($r->firstName)) + 1;
+                if ($r->nameAmbiguous && $r->name && $r->email)
+                    $j->emailpos = strlen(htmlspecialchars($r->name)) + 1;
+                if ($pcm->firstNameAmbiguous)
+                    $j->firstalen = strlen(htmlspecialchars($r->name));
+            }
+            if (!($pcm->roles & Contact::ROLE_PC))
+                $j->admin_only = true;
+            $list[] = $pcm->contactId;
+        }
+        $hpcj["__order__"] = $list;
+        if ($this->sort_by_last)
+            $hpcj["__sort__"] = "last";
+        Ht::stash_script("hotcrp_pc=" . json_encode($hpcj) . ";");
+    }
+
     function output_ajax($values = null, $div = false) {
         if ($values === false || $values === true)
             $values = array("ok" => $values);

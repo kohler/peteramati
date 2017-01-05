@@ -669,6 +669,8 @@ class PsetView {
         $fileid = html_id_encode($file);
         $tabid = "pa-file-" . $fileid;
         $linenotes = $lnorder->file($file);
+        if ($this->can_view_note_authors())
+            $this->conf->stash_hotcrp_pc($this->viewer);
 
         echo '<h3><a class="fold61" href="#" onclick="return fold61(',
             "'#$tabid'", ',this)"><span class="foldarrow">',
@@ -682,11 +684,11 @@ class PsetView {
             echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $this->hoturl("raw", ["file" => $rawfile]), '">[Raw]</a>';
         }
         echo '</h3>';
-        echo '<table id="', $tabid, '" class="code61 diff61 pa-filediff';
+        echo '<table id="', $tabid, '" class="pa-filediff';
         if ($this->pc_view)
             echo " live";
         if (!$this->user_can_view_grades())
-            echo " hidegrade61";
+            echo " hidegrades";
         if (!$open)
             echo '" style="display:none';
         echo '" data-pa-file="', htmlspecialchars($file), "\"><tbody>\n";
@@ -745,8 +747,12 @@ class PsetView {
                 ' data-pa-note="', htmlspecialchars(json_encode($note->render_json($this->can_view_note_authors()))), '"';
             if ((string) $note->note === "")
                 echo ' style="display:none"';
-            echo '><td colspan="2" class="pa-note-edge"></td>',
-                '<td class="pa-notebox">';
+            echo '><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox">';
+            if ((string) $note->note === "") {
+                echo '</td></tr>';
+                return;
+            }
+            echo '<div class="pa-notediv">';
             if ($lnorder) {
                 $links = array();
                 //list($pfile, $plineid) = $lnorder->get_prev($note->file, $note->lineid);
@@ -776,9 +782,9 @@ class PsetView {
                 if (!empty($autext))
                     echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
             }
-            echo '<div class="pa-note', ($note->iscomment ? ' commentnote' : ' gradenote'),
+            echo '<div class="pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote'),
                 '">', htmlspecialchars($note->note), '</div>',
-                '<div class="clear"></div></td></tr>';
+                '</div></td></tr>';
         }
     }
 }
