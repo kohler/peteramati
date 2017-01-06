@@ -237,7 +237,7 @@ class Repository {
 
     function gitrun($command) {
         global $ConfSitePATH;
-        $command = str_replace("REPO", "repo" . $this->repoid, $command);
+        $command = str_replace("%REPO%", "repo" . $this->repoid, $command);
         $repodir = "$ConfSitePATH/repo/repo$this->cacheid";
         if (!file_exists("$repodir/.git/config")) {
             is_dir($repodir) || mkdir($repodir, 0770);
@@ -262,31 +262,33 @@ class Repository {
         }
     }
 
-    function commits(Pset $pset = null) {
+    function commits(Pset $pset = null, $branch = null) {
         $dir = "";
         if ($pset && $pset->directory_noslash !== ""
             && !get($this->_truncated_psetdir, $pset->psetid))
             $dir = $pset->directory_noslash;
+        $branch = $branch ? : "master";
 
-        if (isset($this->_commit_lists[$dir]))
-            return $this->_commit_lists[$dir];
+        $key = "$dir/$branch";
+        if (isset($this->_commit_lists[$key]))
+            return $this->_commit_lists[$key];
 
         // XXX should gitrun once, not multiple times
         $list = [];
         $heads = explode(" ", $this->heads);
-        $heads[0] = "REPO/master";
+        $heads[0] = "%REPO%/$branch";
         foreach ($heads as $h)
             $this->load_commits_from_head($list, $h, $dir);
 
-        if (!$list && $dir !== "" && is_object($pset) && isset($pset->test_file)
+        if (!$list && $dir !== "" && $pset && isset($pset->test_file)
             && !isset($this->_truncated_psetdir[$pset->psetid])) {
             $this->_truncated_psetdir[$pset->psetid] =
-                !!$this->ls_files("REPO/master", $pset->test_file);
+                !!$this->ls_files("%REPO%/$branch", $pset->test_file);
             if ($this->_truncated_psetdir[$pset->psetid])
-                return $this->commits(null);
+                return $this->commits(null, $branch);
         }
 
-        $this->_commit_lists[$dir] = $list;
+        $this->_commit_lists[$key] = $list;
         return $list;
     }
 
@@ -335,7 +337,7 @@ class Repository {
         $limit = $limit ? " -n$limit" : "";
         $users = [];
         $heads = explode(" ", $this->heads);
-        $heads[0] = "REPO/master";
+        $heads[0] = "%REPO%/master";
         foreach ($heads as $h) {
             $result = $this->gitrun("git log$limit --simplify-merges --format=%ae $h$dir");
             foreach (explode("\n", $result) as $line)

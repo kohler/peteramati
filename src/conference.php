@@ -1434,7 +1434,7 @@ class Conf {
             $hset->snaphash = $hrepo->snaphash;
             $hset->snaphash_at = $Now;
             $hset->commits = [];
-            foreach ($hrepo->commits($pset) as $c)
+            foreach ($hrepo->commits($pset, $pset->handout_repo_branch) as $c)
                 $hset->commits[] = [$c->hash, $c->commitat, $c->subject];
             $this->save_setting($key, 1, $hset);
             $this->qe("delete from Settings where name!=? and name like 'handoutcommits_%_?s'", $key, $pset->id);
@@ -1486,7 +1486,7 @@ class Conf {
             return ["ok" => false, "error" => "Missing pset."];
         if ($need_repo && !$api->repo)
             return ["ok" => false, "error" => "Missing repository."];
-        if (get($uf, "hash") && !$api->pset->gitless) {
+        if ($need_hash && !$api->pset->gitless) {
             $api->commit = $this->check_api_hash($api->hash, $api);
             if (!$api->commit)
                 return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
