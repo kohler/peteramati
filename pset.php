@@ -416,7 +416,7 @@ function echo_commit($Info) {
         // visually separate older heads
         if ($curhead === null)
             $curhead = $k->fromhead;
-        if ($curhead != $k->fromhead) {
+        if ($curhead !== $k->fromhead && !$k->from_handout()) {
             if (!$grouphead)
                 $sel["from.$k->fromhead"] = (object)
                     array("type" => "optgroup",

@@ -8,11 +8,15 @@ class RepositoryCommitInfo {
     public $hash;
     public $subject;
     public $fromhead;
+    const HANDOUTHEAD = "*handout*";
     function __construct($commitat, $hash, $subject, $fromhead = null) {
         $this->commitat = $commitat;
         $this->hash = $hash;
         $this->subject = $subject;
         $this->fromhead = $fromhead;
+    }
+    function from_handout() {
+        return $this->fromhead === self::HANDOUTHEAD;
     }
 }
 
@@ -235,7 +239,7 @@ class Repository {
     }
 
 
-    function gitrun($command) {
+    function gitrun($command, $want_stderr = false) {
         global $ConfSitePATH;
         $command = str_replace("%REPO%", "repo" . $this->repoid, $command);
         $repodir = "$ConfSitePATH/repo/repo$this->cacheid";
@@ -243,7 +247,16 @@ class Repository {
             is_dir($repodir) || mkdir($repodir, 0770);
             shell_exec("cd $repodir && git init --shared");
         }
-        return shell_exec("cd $repodir && $command");
+        if (!$want_stderr)
+            return shell_exec("cd $repodir && $command");
+        else {
+            $descriptors = [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]];
+            $proc = proc_open($command, $descriptors, $pipes, $repodir);
+            $stdout = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            $status = proc_close($proc);
+            return (object) ["stdout" => $stdout, "stderr" => $stderr, "status" => $status];
+        }
     }
 
     private function load_commits_from_head(&$list, $head, $directory) {

@@ -123,10 +123,10 @@ class API_Grade {
             if (!$qreq->file || !$qreq->line
                 || !preg_match('/\A[ab]\d+\z/', $qreq->line))
                 return ["ok" => false, "error" => "Invalid request."];
-            if ($info->is_handout_commit())
-                return ["ok" => false, "error" => "This is a handout commit."];
             if (!$info->can_edit_line_note($qreq->file, $qreq->line))
                 return ["ok" => false, "error" => "Permission error."];
+            if ($info->is_handout_commit())
+                return ["ok" => false, "error" => "This is a handout commit."];
 
             $note = $info->current_line_note($qreq->file, $qreq->line);
             if (isset($qreq->oldversion) && $qreq->oldversion != +$note->version)

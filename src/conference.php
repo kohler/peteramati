@@ -1389,6 +1389,8 @@ class Conf {
     function handout_repo(Pset $pset, Repository $inrepo = null) {
         global $Now, $ConfSitePATH;
         $url = $pset->handout_repo_url;
+        if (!$url)
+            return null;
         if ($this->opt("noGitTransport") && substr($url, 0, 6) === "git://")
             $url = "ssh://git@" . substr($url, 6);
         $hrepo = get($this->_handout_repos, $url);
@@ -1441,7 +1443,8 @@ class Conf {
         }
         $commits = [];
         foreach ($hset->commits as $c)
-            $commits[$c[0]] = new RepositoryCommitInfo($c[1], $c[0], $c[2]);
+            $commits[$c[0]] = new RepositoryCommitInfo($c[1], $c[0], $c[2],
+                                        RepositoryCommitInfo::HANDOUTHEAD);
         $this->_handout_commits[$pset->id] = $commits;
         reset($commits);
         $this->_handout_latest_commit[$pset->id] = current($commits);
@@ -1479,14 +1482,14 @@ class Conf {
             return ["ok" => false, "error" => "API function not found."];
         if (!get($uf, "get") && !check_post($qreq))
             return ["ok" => false, "error" => "Missing credentials."];
-        $need_repo = !!get($uf, "repo");
         $need_hash = !!get($uf, "hash");
+        $need_repo = !!get($uf, "repo");
         $need_pset = $need_repo || $need_hash || !!get($uf, "pset");
         if ($need_pset && !$api->pset)
             return ["ok" => false, "error" => "Missing pset."];
         if ($need_repo && !$api->repo)
             return ["ok" => false, "error" => "Missing repository."];
-        if ($need_hash && !$api->pset->gitless) {
+        if ($need_hash) {
             $api->commit = $this->check_api_hash($api->hash, $api);
             if (!$api->commit)
                 return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
@@ -1500,7 +1503,7 @@ class Conf {
         if (!$input_hash)
             return null;
         $commit = $api->pset->handout_commits($input_hash);
-        if (!$commit)
+        if (!$commit && $api->repo)
             $commit = $api->repo->connected_commit($input_hash, $api->pset);
         return $commit;
     }
@@ -1514,6 +1517,7 @@ class Conf {
     }
     private function fill_api_map() {
         $this->_api_map = [
+            "blob" => "15 API_Repo::blob",
             "grade" => "3 API_Grade::grade",
             "jserror" => "1 API_JSError::jserror",
             "latestcommit" => "3 API_Repo::latestcommit",
