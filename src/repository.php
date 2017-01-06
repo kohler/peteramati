@@ -262,13 +262,11 @@ class Repository {
         }
     }
 
-    function commits($pset = null) {
+    function commits(Pset $pset = null) {
         $dir = "";
-        if (is_object($pset) && $pset->directory_noslash !== ""
+        if ($pset && $pset->directory_noslash !== ""
             && !get($this->_truncated_psetdir, $pset->psetid))
             $dir = $pset->directory_noslash;
-        else if (is_string($pset) && $pset !== "")
-            $dir = $pset;
 
         if (isset($this->_commit_lists[$dir]))
             return $this->_commit_lists[$dir];
@@ -292,13 +290,13 @@ class Repository {
         return $list;
     }
 
-    function latest_commit($pset = null) {
+    function latest_commit(Pset $pset = null) {
         $c = $this->commits($pset);
         reset($c);
         return current($c);
     }
 
-    function connected_commit($hash, $pset = null) {
+    function connected_commit($hash, Pset $pset = null) {
         if (empty($this->_commits))
             // load some commits first
             $this->commits($pset);
