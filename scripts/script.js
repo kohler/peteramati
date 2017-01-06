@@ -2149,7 +2149,7 @@ function pa_makegrade(name, ge, editable) {
     var name = escape_entities(name);
     var t = '<table class="pa-grade pa-grp" data-pa-grade="' + name +
         '"><tbody><tr><td class="cs61key">' +
-        escape_entities(ge.title || ge.key) + '</td><td>';
+        (ge.title ? escape_entities(ge.title) : name) + '</td><td>';
     if (editable) {
         t += '<form onsubmit="return pa_savegrades(this)">' +
             '<div class="pa-gradeentry"><span class="pa-gradeholder">' +
