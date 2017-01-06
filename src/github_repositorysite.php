@@ -232,9 +232,9 @@ class GitHub_RepositorySite extends RepositorySite {
         if (!$user->github_username)
             return -1;
         $response = self::api($this->conf, "https://api.github.com/repos/" . $this->base . "/collaborators/" . urlencode($user->github_username));
-        if ($response->status == 204)
+        if ($response && $response->status == 204)
             return 1;
-        if ($response->status == 404)
+        if ($response && $response->status == 404)
             return 0;
         return -1;
     }
