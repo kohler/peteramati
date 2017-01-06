@@ -1692,6 +1692,49 @@ function setmailpsel(sel) {
 }
 
 
+function pa_diff_locate(target, direction) {
+    if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
+        return null;
+    while (target && target.tagName !== "TR") {
+        if (target.tagName === "FORM")
+            return null;
+        target = target.parentNode;
+    }
+
+    var tr;
+    if (direction)
+        tr = target[direction];
+    else {
+        tr = target;
+        direction = "previousSibling";
+    }
+    while (tr && (tr.nodeType !== Node.ELEMENT_NODE
+                  || /\bpa-dl\b.*\bgw\b/.test(tr.className)))
+        tr = tr[direction];
+
+    var table = tr, file;
+    while (table && !(file = table.getAttribute("data-pa-file")))
+        table = table.parentNode;
+    if (!tr || !table || !/\bpa-dl\b.*\bg[idc]\b/.test(tr.className))
+        return null;
+
+    var aline = +tr.firstChild.textContent;
+    var bline = +tr.firstChild.nextSibling.textContent;
+    var result = {
+        file: file, aline: aline, bline: bline,
+        lineid: bline ? "b" + bline : "a" + aline,
+        tr: tr
+    };
+
+    var next_tr = tr.nextSibling;
+    while (next_tr && next_tr.nodeType !== Node.ELEMENT_NODE)
+        next_tr = next_tr.nextSibling;
+    if (next_tr && /\bpa-dl\b.*\bgw\b/.test(next_tr.className))
+        result.notetr = next_tr;
+
+    return result;
+}
+
 function pa_notedata($j) {
     var note = $j.data("pa-note");
     if (typeof note === "string")
@@ -1705,43 +1748,6 @@ window.pa_linenote = (function ($) {
 var labelctr = 0;
 var curanal, mousedown_selection;
 var scrolled_at;
-
-function analyze(target) {
-    if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
-        return null;
-    while (target && target.tagName !== "TR") {
-        if (target.tagName === "FORM")
-            return null;
-        target = target.parentNode;
-    }
-
-    var tr = target;
-    while (tr && (tr.nodeType !== Node.ELEMENT_NODE
-                  || /\bpa-dl\b.*\bgw\b/.test(tr.className)))
-        tr = tr.previousSibling;
-
-    var table = tr, file;
-    while (table && !(file = table.getAttribute("data-pa-file")))
-        table = table.parentNode;
-    if (!tr || !table || !/\bpa-dl\b.*\bg[idc]\b/.test(tr.className))
-        return null;
-
-    var lineid = $(tr).find("td.pa-db").text();
-    if (lineid)
-        lineid = "b" + lineid;
-    else
-        lineid = "a" + $(tr).find("td.pa-da").text();
-
-    var result = {file: file, lineid: lineid, tr: tr};
-
-    var next_tr = tr.nextSibling;
-    while (next_tr && next_tr.nodeType !== Node.ELEMENT_NODE)
-        next_tr = next_tr.nextSibling;
-    if (next_tr && /\bpa-dl\b.*\bgw\b/.test(next_tr.className))
-        result.notetr = next_tr;
-
-    return result;
-}
 
 function add_notetr($linetr) {
     return $('<tr class="pa-dl gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter($linetr);
@@ -1828,7 +1834,7 @@ function fix_notelinks($tr) {
     }
 
     function note_anchor(tr) {
-        var anal = analyze(tr);
+        var anal = pa_diff_locate(tr);
         if (anal) {
             var $td = pa_ensureline(anal.file, anal.lineid);
             return "#" + $td[0].id;
@@ -1924,7 +1930,7 @@ function arrowcapture(evt) {
             return;
     }
 
-    curanal = analyze(tr);
+    curanal = pa_diff_locate(tr);
     evt.preventDefault();
     if (key === "Enter")
         make_linenote();
@@ -2019,7 +2025,7 @@ function selection_string() {
 }
 
 function pa_linenote(event) {
-    var anal = analyze(event.target);
+    var anal = pa_diff_locate(event.target);
     if (anal && event.type == "mousedown") {
         curanal = anal;
         mousedown_selection = selection_string();
@@ -2059,6 +2065,44 @@ pa_linenote.bind = function (selector) {
     $(selector).on("mouseup mousedown", pa_linenote);
 };
 return pa_linenote;
+})($);
+
+window.pa_expandcontext = (function ($) {
+
+function expand(evt) {
+    var contextrow = evt.currentTarget;
+    var panal = pa_diff_locate(contextrow, "previousSibling");
+    var nanal = pa_diff_locate(contextrow, "nextSibling");
+    if (!panal && !nanal)
+        return false;
+    var paline = panal ? panal.aline + 1 : 1;
+    var pbline = panal ? panal.bline + 1 : 1;
+    var lbline = nanal ? nanal.bline : 0;
+    var args = {file: (panal || nanal).file, fromline: pbline};
+    if (pbline && lbline)
+        args.linecount = lbline - pbline;
+    $.ajax(hoturl("api/blob", hoturl_gradeparts($(this), args)), {
+        success: function (data) {
+            if (data.ok && data.data) {
+                var lines = data.data.replace(/\n$/, "").split("\n");
+                for (var i = lines.length - 1; i >= 0; --i) {
+                    var t = '<tr class="pa-dl gc"><td class="pa-da">' +
+                        (paline + i) + '</td><td class="pa-db">' +
+                        (pbline + i) + '</td><td class="pa-dd"></td></tr>';
+                    $(t).insertAfter(contextrow).find(".pa-dd").text(lines[i]);
+                }
+                $(contextrow).remove();
+            }
+        }
+    });
+    return true;
+}
+
+return {
+    bind: function (selector) {
+        $(selector).on("click", "tr.pa-dl.gx", expand);
+    }
+};
 })($);
 
 jQuery.fn.extend({

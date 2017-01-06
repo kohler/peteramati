@@ -2400,6 +2400,9 @@ table.live > tbody > tr.pa-dl.gi:hover > td,
 tr.pa-dl.live > td {
 	background-color: #f8eec7;
 }
+tr.pa-dl.gx:hover > td {
+	background-color: #e8e8f8;
+}
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-notebox, .pa-note-entry, .pa-noteref {
 	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;

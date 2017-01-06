@@ -692,6 +692,7 @@ class PsetView {
         echo '" data-pa-file="', htmlspecialchars($file), "\"><tbody>\n";
         if ($this->pc_view)
             Ht::stash_script('pa_linenote.bind("#' . $tabid . '")');
+        Ht::stash_script('pa_expandcontext.bind("#' . $tabid . '")');
         foreach ($dinfo->diff as $l) {
             if ($l[0] == "@")
                 $x = array(" gx", "pa-dcx", "", "", $l[3]);
