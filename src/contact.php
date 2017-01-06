@@ -1532,7 +1532,7 @@ class Contact {
         return $diff_files;
     }
 
-    function can_view_repo_contents($repo, $cache_only = false) {
+    function can_view_repo_contents(Repository $repo, $cache_only = false) {
         if (!$this->conf->opt("restrictRepoView")
             || $this->isPC
             || $repo->is_handout)
@@ -1591,7 +1591,7 @@ class Contact {
             || self::student_can_view_pset($pset);
     }
 
-    static function student_can_view_grades(Pset $pset, $extension = null) {
+    static private function student_can_view_grades(Pset $pset, $extension = null) {
         if ($extension === null)
             $k = "grades_visible";
         else if ($extension)

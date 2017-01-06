@@ -1501,7 +1501,7 @@ class Conf {
             return null;
         $commit = $api->pset->handout_commits($input_hash);
         if (!$commit)
-            $commit = $api->repo->connected_commit($input_hash);
+            $commit = $api->repo->connected_commit($input_hash, $api->pset);
         return $commit;
     }
     function _add_api_json($fj) {

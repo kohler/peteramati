@@ -40,7 +40,7 @@ class PsetView {
     }
 
     function connected_hash($hash) {
-        $c = $this->repo ? $this->repo->connected_commit($hash) : null;
+        $c = $this->repo ? $this->repo->connected_commit($hash, $this->pset) : null;
         return $c ? $c->hash : false;
     }
 
@@ -51,11 +51,11 @@ class PsetView {
         if (!$this->repo)
             return false;
         if ($reqhash)
-            $c = $this->repo->connected_commit($reqhash);
+            $c = $this->repo->connected_commit($reqhash, $this->pset);
         else {
             $c = null;
             if ($this->repo_grade)
-                $c = $this->repo->connected_commit($this->repo_grade->gradehash);
+                $c = $this->repo->connected_commit($this->repo_grade->gradehash, $this->pset);
             if (!$c)
                 $c = $this->latest_commit();
         }
