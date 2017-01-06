@@ -403,15 +403,13 @@ class PsetView {
 
     function can_view_grades() {
         if ($this->can_view_grades === null)
-            $this->can_view_grades = $this->viewer->can_view_pset_grades($this->pset)
-                && ($this->pc_view || !$this->grades_hidden());
+            $this->can_view_grades = $this->viewer->can_view_pset_grades($this->pset, $this);
         return $this->can_view_grades;
     }
 
     function user_can_view_grades() {
         if ($this->user_can_view_grades === null)
-            $this->user_can_view_grades = $this->user->can_view_pset_grades($this->pset)
-                && !$this->grades_hidden();
+            $this->user_can_view_grades = $this->user->can_view_pset_grades($this->pset, $this);
         return $this->user_can_view_grades;
     }
 

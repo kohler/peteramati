@@ -1611,9 +1611,13 @@ class Contact {
 
     function can_view_grades(Pset $pset, PsetView $info = null) {
         return $this->can_view_pset($pset)
-            && ($this->isPC
-                || (self::student_can_view_grades($pset, $this->extension)
-                    && (!$info || !$info->grades_hidden())));
+            && ($this->isPC || self::student_can_view_grades($pset, $this->extension))
+            && (!$info
+                || ($this->isPC && $info->pc_view)
+                || (!$info->grades_hidden()
+                    && $this === $info->user
+                    && ($pset->gitless_grades
+                        || ($info->repo && $this->can_view_repo_contents($info->repo)))));
     }
 
     static function student_can_view_grade_cdf(Pset $pset) {
@@ -1640,8 +1644,12 @@ class Contact {
 
     function can_view_comments(Pset $pset, PsetView $info = null) {
         return $this->can_view_pset($pset)
-            && (!$pset->hide_comments || $this->isPC)
-            && (!$info || $info->pc_view || $this === $info->user);
+            && ($this->isPC || !$pset->hide_comments)
+            && (!$info
+                || ($this->isPC && $info->pc_view)
+                || ($this === $info->user
+                    && ($pset->gitless
+                        || ($info->repo && $this->can_view_repo_contents($info->repo)))));
     }
 
     function can_run(Pset $pset, $runner, $user = null) {
