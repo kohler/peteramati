@@ -84,7 +84,7 @@ class Series {
         $cx = $cutoff * $r->n;
         for ($i = 0; $i < count($r->cdf) && $r->cdf[$i+1] < $cx; $i += 2)
             /* nada */;
-        if ($i != 0) {
+        if ($i !== 0) {
             $r->cdf = array_slice($r->cdf, $i);
             $r->cutoff = $cutoff;
         }
@@ -151,6 +151,8 @@ if (isset($_REQUEST["gradecdf"])) {
         Series::truncate_summary_below($j, $Pset->grade_cdf_cutoff);
         if (get($j, "extension"))
             Series::truncate_summary_below($j->extension, $Pset->grade_cdf_cutoff);
+        if (get($j, "noextra"))
+            Series::truncate_summary_below($j->noextra, $Pset->grade_cdf_cutoff);
     }
     json_exit($j);
 }
