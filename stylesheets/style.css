@@ -2408,6 +2408,9 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 18px;
 }
+.pa-da, .pa-db {
+	user-select: none;
+}
 .pa-dd, .pa-note {
 	white-space: pre-wrap;
 }
