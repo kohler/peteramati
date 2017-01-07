@@ -139,7 +139,7 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
             }
             if ($entries)
                 foreach ($pset->grades as $ge) {
-                    $k = $ge->name;
+                    $k = $ge->key;
                     if (get($gd, $k) !== null)
                         $ss->{$k} = $gd->{$k};
                 }
@@ -225,7 +225,7 @@ function download_psets_report($request) {
                 set_ranks($students, $selection, $pset->psetkey . "_noextra");
             if ($sel_pset)
                 foreach ($pset->grades as $ge)
-                    $selection[] = $ge->name;
+                    $selection[] = $ge->key;
         }
 
     if (!$sel_pset) {
@@ -535,7 +535,7 @@ function render_grades($pset, $gi, $s) {
     $total = 0;
     $garr = $gvarr = $different = [];
     foreach ($pset->grades as $ge) {
-        $k = $ge->name;
+        $k = $ge->key;
         $gv = $ggv = $agv = "";
         if ($gi && isset($gi->grades))
             $ggv = get($gi->grades, $k);
@@ -948,7 +948,7 @@ function show_pset_table($pset) {
     foreach ($pset->grades as $ge) {
         if (!$ge->no_total) {
             ++$nintotal;
-            $last_in_total = $ge->name;
+            $last_in_total = $ge->key;
         }
         ++$i;
     }

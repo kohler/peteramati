@@ -427,8 +427,8 @@ class PsetView {
                 foreach ($this->pset->grades as $ge)
                     if (!$ge->hide || $this->pc_view) {
                         ++$this->n_visible_grades;
-                        if (($ag && get($ag, $ge->name) !== null)
-                            || ($g && get($g, $ge->name) !== null))
+                        if (($ag && get($ag, $ge->key) !== null)
+                            || ($g && get($g, $ge->key) !== null))
                             ++$this->n_set_grades;
                         if (!$ge->no_total)
                             ++$this->n_visible_in_total;
@@ -454,9 +454,9 @@ class PsetView {
         $g = get($notes, "grades");
         foreach ($this->pset->grades as $ge)
             if ((!$ge->hide || $this->pc_view) && !$ge->no_total) {
-                $gv = $g ? get($g, $ge->name) : null;
+                $gv = $g ? get($g, $ge->key) : null;
                 if ($gv === null && $ag)
-                    $gv = get($ag, $ge->name);
+                    $gv = get($ag, $ge->key);
                 if ($gv)
                     $total += $gv;
                 if (!$ge->is_extra && !$ge->no_total && $ge->max && !$ge->hide_max)
@@ -635,7 +635,7 @@ class PsetView {
             $total = $total_noextra = 0;
             foreach ($this->pset->grades as $ge)
                 if (!$ge->hide || $this->pc_view) {
-                    $key = $ge->name;
+                    $key = $ge->key;
                     $gv = null;
                     if ($agx) {
                         $gv = property_exists($agx, $key) ? $agx->$key : null;

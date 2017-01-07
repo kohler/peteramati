@@ -155,9 +155,9 @@ class Pset {
         if (is_array($grades) || is_object($grades)) {
             foreach ((array) $p->grades as $k => $v) {
                 $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v);
-                if (get($this->all_grades, $g->name))
-                    throw new PsetConfigException("grade `$g->name` reused", "grades", $k);
-                $this->all_grades[$g->name] = $g;
+                if (get($this->all_grades, $g->key))
+                    throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
+                $this->all_grades[$g->key] = $g;
             }
         } else if ($grades)
             throw new PsetConfigException("`grades` format error`", "grades");
@@ -249,21 +249,20 @@ class Pset {
     }
 
     function gradeinfo_json($pcview) {
-        $max = (object) [];
+        $max = [];
         $count = $maxtotal = 0;
         foreach ($this->grades as $ge)
             if (!$ge->hide || $pcview) {
-                $key = $ge->name;
                 ++$count;
                 if ($ge->max && ($pcview || !$ge->hide_max)) {
-                    $max->$key = $ge->max;
+                    $max[$ge->key] = $ge->max;
                     if (!$ge->is_extra && !$ge->no_total)
                         $maxtotal += $ge->max;
                 }
             }
         if ($maxtotal)
-            $max->total = $maxtotal;
-        return (object) ["nentries" => $count, "maxgrades" => $max];
+            $max["total"] = $maxtotal;
+        return (object) ["nentries" => $count, "maxgrades" => (object) $max];
     }
 
     function gradeentry_json($can_edit) {
@@ -271,7 +270,7 @@ class Pset {
         $count = $maxtotal = 0;
         foreach ($this->grades as $ge)
             if (!$ge->hide || $can_edit) {
-                $gej = ["title" => $ge->title ? : $ge->key, "pos" => $count];
+                $gej = ["title" => $ge->title, "pos" => $count];
                 if ($ge->max && ($can_edit || !$ge->hide_max)) {
                     $gej["max"] = $ge->max;
                     if (!$ge->is_extra && !$ge->no_total)
@@ -281,8 +280,8 @@ class Pset {
                     $gej["in_total"] = true;
                 if ($ge->is_extra)
                     $gej["is_extra"] = true;
-                $ej[$ge->name] = $gej;
-                $order[] = $ge->name;
+                $ej[$ge->key] = $gej;
+                $order[] = $ge->key;
                 ++$count;
             }
         $j = ["entries" => $ej, "order" => $order];
@@ -421,6 +420,7 @@ class Pset {
 
 
 class GradeEntryConfig {
+    public $key;
     public $name;
     public $title;
     public $max;
@@ -434,13 +434,20 @@ class GradeEntryConfig {
         $loc = array("grades", $name);
         if (!is_object($g))
             throw new PsetConfigException("grade entry format error", $loc);
-        $this->name = isset($g->name) ? $g->name : $name;
-        if (!is_string($this->name)
-            || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->name)
-            || $this->name[0] === "_"
-            || $this->name === "total")
-            throw new PsetConfigException("grade entry name format error", $loc);
+        $this->key = $name;
+        if (isset($g->key))
+            $this->key = $g->key;
+        else if (isset($g->name))
+            $this->key = $g->name;
+        if (!is_string($this->key)
+            || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->key)
+            || $this->key[0] === "_"
+            || $this->key === "total")
+            throw new PsetConfigException("grade entry key format error", $loc);
+        $this->name = $this->key;
         $this->title = Pset::cstr($loc, $g, "title");
+        if ((string) $this->title === "")
+            $this->title = $this->key;
         $this->max = Pset::cnum($loc, $g, "max");
         $this->hide = Pset::cbool($loc, $g, "hide");
         $this->hide_max = Pset::cbool($loc, $g, "hide_max");

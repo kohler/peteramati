@@ -74,9 +74,9 @@ class API_Grade {
             // check grade entries
             $errors = false;
             foreach ($info->pset->grades as $ge) {
-                self::check_grade_entry($g, $ge->name, $errors);
-                self::check_grade_entry($ag, $ge->name, $errors);
-                self::check_grade_entry($og, $ge->name, $errors);
+                self::check_grade_entry($g, $ge->key, $errors);
+                self::check_grade_entry($ag, $ge->key, $errors);
+                self::check_grade_entry($og, $ge->key, $errors);
             }
             if ($errors)
                 return ["ok" => false, "error" => "Invalid request."];
@@ -84,21 +84,21 @@ class API_Grade {
             // assign grades
             $gv = $agv = [];
             foreach ($api->pset->grades as $ge) {
-                if (array_key_exists($ge->name, $og)) {
-                    $curgv = $info->current_grade_entry($ge->name);
-                    if ($og[$ge->name] === null
+                if (array_key_exists($ge->key, $og)) {
+                    $curgv = $info->current_grade_entry($ge->key);
+                    if ($og[$ge->key] === null
                         ? $curgv !== null
-                        : $curgv === null || abs($curgv - $og[$ge->name]) >= 0.0001) {
+                        : $curgv === null || abs($curgv - $og[$ge->key]) >= 0.0001) {
                         $j = (array) $info->grade_json();
                         $j["ok"] = false;
                         $j["error"] = "Grade edit conflict, your update was ignored.";
                         return $j;
                     }
                 }
-                if (array_key_exists($ge->name, $g))
-                    $gv[$ge->name] = $g[$ge->name];
-                if (array_key_exists($ge->name, $ag))
-                    $agv[$ge->name] = $ag[$ge->name];
+                if (array_key_exists($ge->key, $g))
+                    $gv[$ge->key] = $g[$ge->key];
+                if (array_key_exists($ge->key, $ag))
+                    $agv[$ge->key] = $ag[$ge->key];
             }
             $v = [];
             if (!empty($gv))

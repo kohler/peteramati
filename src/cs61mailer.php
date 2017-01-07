@@ -159,9 +159,9 @@ class CS61Mailer extends Mailer {
             $t = "";
             $total = $maxtotal = 0; // XXX better computation
             foreach ($this->pset->grades as $ge) {
-                $g = $info->current_grade_entry($ge->name);
+                $g = $info->current_grade_entry($ge->key);
                 if ($ge->is_extra ? $g : $g !== null) {
-                    $t .= (isset($ge->title) ? $ge->title : $ge->name) . ": " . ($g ? : 0);
+                    $t .= $ge->title . ": " . ($g ? : 0);
                     if ($ge->max && !$ge->hide_max)
                         $t .= " / " . $ge->max;
                     $t .= "\n";

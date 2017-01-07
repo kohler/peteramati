@@ -567,7 +567,7 @@ class ContactView {
         $ag = get($notesj, "autogrades");
         $rag = array();
         foreach ($pset->grades as $ge) {
-            $key = $ge->name;
+            $key = $ge->key;
             $gv = null;
             if ($ag && isset($ag->$key))
                 $gv = $rag[$key] = $ag->$key;

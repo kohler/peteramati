@@ -197,8 +197,8 @@ function save_grades($pset, $info, $values, $isauto) {
         json_exit(["ok" => false, "error" => "This is a handout commit."]);
     $grades = $maxgrades = [];
     foreach ($pset->grades as $ge)
-        if (isset($values[$ge->name])) {
-            $g = trim($values[$ge->name]);
+        if (isset($values[$ge->key])) {
+            $g = trim($values[$ge->key]);
             if ($g === "")
                 $g = null;
             else if (preg_match('_\A(?:0|[1-9]\d*)\z_', $g))
@@ -207,13 +207,13 @@ function save_grades($pset, $info, $values, $isauto) {
                 $g = floatval($g);
             else
                 continue;
-            if (isset($values["old;" . $ge->name])) {
-                $old_grade = $info->current_grade_entry($ge->name);
-                if ((string) $old_grade != trim($values["old;" . $ge->name])
+            if (isset($values["old;" . $ge->key])) {
+                $old_grade = $info->current_grade_entry($ge->key);
+                if ((string) $old_grade != trim($values["old;" . $ge->key])
                     && $old_grade !== $g)
                     json_exit(["ok" => false, "error" => "This grade has been updated—please reload."]);
             }
-            $grades[$ge->name] = $g;
+            $grades[$ge->key] = $g;
         }
     $key = $isauto ? "autogrades" : "grades";
     if (!empty($grades))
