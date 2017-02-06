@@ -446,7 +446,7 @@ class ContactView {
 
         // if !working, complain
         if (!$working && !$ms->has_problems())
-            return Conf::msg_error("Invalid repository URL “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
+            return Conf::msg_error("Can’t access the repository “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
         else if (!$working) {
             $msgs = join("<br />", $ms->messages()) ? : "Repository unreachable at the moment.";
             return Conf::msg_error($msgs);

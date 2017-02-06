@@ -6,6 +6,7 @@
 class RepositorySite {
     public $url;
     static public $sitemap = ["github" => "GitHub_RepositorySite", "harvardseas" => "HarvardSEAS_RepositorySite"];
+    static private $gitssh_config_checked = 0;
 
     static function is_primary(Repository $repo = null) {
         return $repo === null || $repo->reposite->siteclass === get($repo->conf->opt("repositorySites", ["harvardseas"]), 0);
@@ -67,10 +68,23 @@ class RepositorySite {
     }
 
     static function run_ls_remote(Conf $conf, $url, &$output) {
-        global $ConfSitePATH;
-        if ($conf->opt("disableRemote")) {
-            $output = [];
+        global $ConfSitePATH, $Me;
+        $output = [];
+        if ($conf->opt("disableRemote") || self::$gitssh_config_checked < 0)
             return -1;
+        if (self::$gitssh_config_checked == 0) {
+            $config = getenv("GITSSH_CONFIG");
+            if (!$config || !is_readable($config)) {
+                if ($Me && $Me->privChair)
+                    $conf->errorMsg("The <code>gitssh_config</code> file isn’t configured, so I can’t access remote repositories.");
+                return (self::$gitssh_config_checked = -1);
+            }
+            if (!is_executable("$ConfSitePATH/jail/pa-timeout")) {
+                if ($Me && $Me->privChair)
+                    $conf->errorMsg("The <code>jail/pa-timeout</code> program hasn’t been built, so I can’t access remote repositories. Run <code>cd DIR/jail; make</code>.");
+                return (self::$gitssh_config_checked = -1);
+            }
+            self::$gitssh_config_checked = 1;
         }
         $command = "GIT_SSH=" . escapeshellarg("$ConfSitePATH/src/gitssh")
             . " $ConfSitePATH/jail/pa-timeout " . $conf->validate_timeout
