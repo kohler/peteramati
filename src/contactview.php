@@ -102,7 +102,7 @@ class ContactView {
 
     static function add_regrades(PsetView $info) {
         list($user, $repo) = array($info->user, $info->repo);
-        if (!isset($info->regrades) && !$info->pset->gitless_grades) {
+        if (!isset($info->regrades) && !$info->pset->gitless_grades && $repo) {
             $info->regrades = array();
             $result = Dbl::qe("select * from RepositoryGradeRequest where repoid=? and pset=? order by requested_at desc", $repo->repoid, $info->pset->psetid);
             while (($row = edb_orow($result))) {
