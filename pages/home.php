@@ -398,19 +398,26 @@ if ($Me->privChair)
 
 
 // Enable users
-if ($Me->privChair && check_post() && isset($_GET["enable_user"])) {
-    if ($_GET["enable_user"] == "college")
+if ($Me->privChair && check_post()
+    && (isset($_GET["enable_user"]) || isset($_GET["send_account_info"]) || isset($_GET["reset_password"]))) {
+    $who = get($_GET, "enable_user", get($_GET, "send_account_info", get($_GET, "reset_password", null)));
+    if ($who == "college")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension"));
-    else if ($_GET["enable_user"] == "extension")
+    else if ($who == "extension")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension"));
-    else if ($_GET["enable_user"] == "pc")
+    else if ($who == "pc")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PC . ")!=0"));
     else
-        $users = edb_first_columns(Dbl::qe("select contactId from ContactInfo where email like ?", $_GET["enable_user"]));
-    if (!count($users))
-        $Conf->warnMsg("No users match.");
+        $users = edb_first_columns(Dbl::qe("select contactId from ContactInfo where email like ?", $who));
+    if (empty($users))
+        $Conf->warnMsg("No users match “" . htmlspecialchars($who) . "”.");
     else {
-        UserActions::enable($users, $Me);
+        if (isset($_GET["enable_user"]))
+            UserActions::enable($users, $Me);
+        else if (isset($_GET["reset_password"]))
+            UserActions::reset_password($users, $Me);
+        else
+            UserActions::send_account_info($users, $Me);
         redirectSelf();
     }
 }
