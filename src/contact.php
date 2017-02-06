@@ -678,6 +678,10 @@ class Contact {
         return $result;
     }
 
+    static function contactdb_find_by_email($email) {
+        return null;
+    }
+
     private function load_links() {
         $result = $this->conf->qe("select type, pset, link from ContactLink where cid=?", $this->contactId);
         $this->links = [1 => [], 2 => [], 3 => [], 4 => []];
