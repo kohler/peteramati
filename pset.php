@@ -349,11 +349,11 @@ function session_list_link($sl, $pos, $isprev, Contact $me, Contact $user) {
 
 if ($User->username && $Me->isPC && ($sl = $Conf->session_list())
     && ($p = session_list_position($sl, $Info)) !== false
-    && ($p > 0 || $p < count($sl->ids))) {
+    && ($p > 0 || $p < count($sl->ids) - 1)) {
     $result = $Conf->qe("select contactId, firstName, lastName, email,
         huid, anon_username, github_username, seascode_username, extension
         from ContactInfo where contactId?a",
-        [$p > 0 ? $sl->ids[$p - 1] : -1, $p < count($sl->ids) ? $sl->ids[$p + 1] : -1]);
+        [$p > 0 ? $sl->ids[$p - 1] : -1, $p < count($sl->ids) - 1 ? $sl->ids[$p + 1] : -1]);
     $links = [null, null];
     while ($result && ($s = Contact::fetch($result)))
         $links[$p > 0 && $sl->ids[$p - 1] == $s->contactId ? 0 : 1] = $s;
