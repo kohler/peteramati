@@ -714,6 +714,10 @@ class PsetView {
 
             if (!$x[2] && !$x[3])
                 $x[2] = $x[3] = "...";
+            if ($x[2])
+                $ak .= ' data-landmark="' . $x[2] . '"';
+            if ($x[3])
+                $bk .= ' data-landmark="' . $x[3] . '"';
 
             $nx = $nj = null;
             if ($linenotes) {
@@ -730,8 +734,8 @@ class PsetView {
             }
 
             echo '<tr class="pa-dl', $x[0], '">',
-                '<td class="pa-da"', $ak, '>', $x[2], '</td>',
-                '<td class="pa-db"', $bk, '>', $x[3], '</td>',
+                '<td class="pa-da"', $ak, '></td>',
+                '<td class="pa-db"', $bk, '></td>',
                 '<td class="', $x[1], '">', diff_line_code($x[4]), "</td></tr>\n";
 
             if ($nx)
