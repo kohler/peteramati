@@ -192,7 +192,7 @@ if (req("set_repo"))
     ContactView::set_repo_action($User);
 
 // save grades
-function save_grades($pset, $info, $values, $isauto) {
+function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
     if ($info->is_handout_commit())
         json_exit(["ok" => false, "error" => "This is a handout commit."]);
     $grades = $maxgrades = [];
@@ -235,7 +235,7 @@ if ($Me->isPC && $Me != $User && check_post()
 }
 
 function upload_grades($pset, $text, $fname) {
-    global $Conf;
+    global $Conf, $Me;
     assert($pset->gitless_grades);
     $csv = new CsvParser($text);
     $csv->set_header($csv->next());
@@ -259,7 +259,8 @@ function upload_grades($pset, $text, $fname) {
         } else
             continue;
         if ($user) {
-            if (!save_grades($user, $pset, null, $line, true))
+            $info = new PsetView($pset, $user, $Me);
+            if (!save_grades($pset, $info, $line, true))
                 $Conf->errorMsg("no grades set for “" . htmlspecialchars($who) . "”");
         } else
             $Conf->errorMsg(htmlspecialchars($fname) . ":" . $csv->lineno() . ": unknown user “" . htmlspecialchars($who) . "”");
