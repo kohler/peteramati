@@ -783,6 +783,8 @@ function show_regrades($result, $all) {
     $any_anonymous = $any_nonanonymous = false;
     $jx = [];
     foreach ($rows as $row) {
+        if (!$row->repocids)
+            continue;
         $pset = $Conf->pset_by_id($row->pset);
         $anon = $anonymous === null ? $pset->anonymous : $anonymous;
         $any_anonymous = $any_anonymous || $anon;
@@ -865,27 +867,24 @@ function show_pset_table($pset) {
 
     // load students
     if ($Conf->opt("restrictRepoView")) {
-        $view = "l2.link repoviewable";
-        $viewjoin = "left join ContactLink l2 on (l2.cid=c.contactId and l2.type=" . LINK_REPOVIEW . " and l2.link=l.link)\n";
+        $view = "exists (select * from ContactLink where cid=c.contactId and type=" . LINK_REPOVIEW . " and link=l.link)";
     } else {
-        $view = "4 repoviewable";
-        $viewjoin = "";
+        $view = "1";
     }
     $q = "select c.contactId, c.firstName, c.lastName, c.email,
 	c.huid, c.github_username, c.seascode_username, c.anon_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
 	group_concat(pl.link) pcid, group_concat(rpl.link) rpcid,
-	r.repoid, r.cacheid, r.heads, r.url, r.open, r.working, r.lastpset, r.snapcheckat, $view,
+	r.repoid, r.cacheid, r.heads, r.url, r.open, r.working, r.lastpset, r.snapcheckat, $view repoviewable,
 	rg.gradehash, rg.gradercid, rg.placeholder, rg.placeholder_at
 	from ContactInfo c
 	left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$pset->id)
-	$viewjoin
 	left join Repository r on (r.repoid=l.link)
 	left join ContactLink pl on (pl.cid=c.contactId and pl.type=" . LINK_PARTNER . " and pl.pset=$pset->id)
 	left join ContactLink rpl on (rpl.cid=c.contactId and rpl.type=" . LINK_BACKPARTNER . " and rpl.pset=$pset->id)
 	left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.pset=$pset->id)
 	where (c.roles&" . Contact::ROLE_PCLIKE . ")=0
 	and (rg.repoid is not null or not c.dropped)
-	group by c.contactId, r.repoid";
+	group by c.contactId, l.link";
     //error_log(preg_replace('/\s+/', ' ', $q));
     $result = $Conf->qe_raw($q);
     $t1 = $Profile ? microtime(true) : 0;
