@@ -1,6 +1,6 @@
 #! /bin/sh
 ## backupdb.sh -- HotCRP database backup to stdout
-## HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+## HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
 ## See LICENSE for open-source distribution terms
 
 export LC_ALL=C LC_CTYPE=C LC_COLLATE=C CONFNAME=
@@ -54,6 +54,8 @@ while [ $# -gt 0 ]; do
     -c|--co|--con|--conf|--confi|--config|-c*|--co=*|--con=*|--conf=*|--confi=*|--config=*)
         parse_common_argument "$@";;
     -n|--n|--na|--nam|--name|-n*|--n=*|--na=*|--nam=*|--name=*)
+        parse_common_argument "$@";;
+    --no-password-f|--no-password-fi|--no-password-fil|--no-password-file)
         parse_common_argument "$@";;
     --max_allowed_packet=*)
         max_allowed_packet="`echo "$1" | sed 's/^[^=]*=//'`";;

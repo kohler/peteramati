@@ -1,6 +1,6 @@
 <?php
 // navigation.php -- HotCRP navigation helper functions
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 class NavigationState {
@@ -70,16 +70,24 @@ class NavigationState {
 
         // separate $page, $path, $query
         $uri_suffix = substr($uri, $uri_slash);
-        preg_match(',\A(/[^/\?\#]*|)([^\?\#]*)(.*)\z,',
-                   substr($uri, $uri_slash), $m);
+        // Semi-URL-decode $uri_suffix, only decoding safe characters.
+        // (This is generally already done for us but just to be safe.)
+        $uri_suffix = preg_replace_callback('/%[2-7][0-9a-f]/i', function ($m) {
+            $x = urldecode($m[0]);
+            if (ctype_alnum($x) || strpos("._,-=@~", $x) !== false)
+                return $x;
+            else
+                return $m[0];
+        }, $uri_suffix);
+        preg_match(',\A(/[^/\?\#]*|)([^\?\#]*)(.*)\z,', $uri_suffix, $m);
         if ($m[1] !== "" && $m[1] !== "/")
-            $this->page = urldecode(substr($m[1], 1));
+            $this->page = substr($m[1], 1);
         else
             $this->page = $index_name;
         if (($pagelen = strlen($this->page)) > 4
             && substr($this->page, $pagelen - 4) === ".php")
             $this->page = substr($this->page, 0, $pagelen - 4);
-        $this->path = urldecode($m[2]);
+        $this->path = $m[2];
         $this->query = $m[3];
 
         // detect $site_path_relative
@@ -182,6 +190,10 @@ class Navigation {
             self::$s = new NavigationState($_SERVER, $index_name);
         else
             self::$s = new NavigationState(null);
+    }
+
+    static function get() {
+        return self::$s;
     }
 
     static function self() {

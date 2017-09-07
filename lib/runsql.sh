@@ -1,6 +1,6 @@
 #! /bin/sh
 ## runsql.sh -- HotCRP database shell
-## HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+## HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
 ## See LICENSE for open-source distribution terms
 
 export LC_ALL=C LC_CTYPE=C LC_COLLATE=C CONFNAME=
@@ -37,11 +37,10 @@ while [ $# -gt 0 ]; do
         pwuser="`echo "+$1" | sed 's/^[^=]*=//'`"; mode=showpw;;
     --show-password|--show-p|--show-pa|--show-pas|--show-pass|--show-passw|--show-passwo|--show-passwor)
         test "$#" -gt 1 -a -z "$mode" || usage
-        pwuser="$2"; mode=showpw; shift=2;;
-    --set-password)
+        pwuser="$2"; shift; mode=showpw;;
+    --set-password|--set-p|--set-pa|--set-pas|--set-pass|--set-passw|--set-passwo|--set-passwor)
         test "$#" -gt 1 -a -z "$mode" || usage
-        pwuser="$2"; pwvalue="$3"; mode=setpw
-        if test "$#" -gt 2; then shift=3; else shift=2; fi;;
+        pwuser="$2"; pwvalue="$3"; shift; shift; mode=setpw;;
     --create-user)
         test "$#" -gt 1 -a -z "$mode" || usage
         makeuser="$2"; mode=makeuser; shift;;
@@ -50,10 +49,12 @@ while [ $# -gt 0 ]; do
         optname="`echo "+$1" | sed 's/^[^=]*=//'`"; mode=showopt;;
     --show-opt|--show-option)
         test "$#" -gt 1 -a -z "$mode" || usage
-        optname="$2"; mode=showopt; shift=2;;
+        optname="$2"; shift; mode=showopt;;
     -c|--co|--con|--conf|--confi|--config|-c*|--co=*|--con=*|--conf=*|--confi=*|--config=*)
         parse_common_argument "$@";;
     -n|--n|--na|--nam|--name|-n*|--n=*|--na=*|--nam=*|--name=*)
+        parse_common_argument "$@";;
+    --no-password-f|--no-password-fi|--no-password-fil|--no-password-file)
         parse_common_argument "$@";;
     --help) usage 0;;
     -*)
@@ -103,7 +104,7 @@ if test -n "$pwuser"; then
             showpwvalue=y
         fi
         pwvalue="`echo "+$pwvalue" | sed -e 's,^.,,' | sql_quote`"
-        query="update ContactInfo set password='$pwvalue' where email='$pwuser'; select row_count()"
+        query="update ContactInfo set password='$pwvalue', passwordTime=UNIX_TIMESTAMP(CURRENT_TIMESTAMP()) where email='$pwuser'; select row_count()"
         nupdates="`echo "$query" | eval "$MYSQL $myargs -N $FLAGS $dbname"`"
         if [ $nupdates = 0 ]; then
             echo "no such user" 1>&2; exitval=1

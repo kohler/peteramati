@@ -1,6 +1,6 @@
 <?php
 // mimetype.php -- HotCRP helper file for MIME types
-// HotCRP is Copyright (c) 2006-2015 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 class Mimetype {

@@ -1,4 +1,7 @@
 <?php
+// messageset.php -- HotCRP sets of messages by fields
+// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
+// See LICENSE for open-source distribution terms
 
 class MessageSet {
     public $user;

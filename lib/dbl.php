@@ -1,6 +1,6 @@
 <?php
 // dbl.php -- database interface layer
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 class Dbl_Result {
@@ -39,6 +39,10 @@ class Dbl_MultiResult {
         } else
             $result = false;
         return Dbl::do_result($this->dblink, $this->flags, $this->qstr, $result);
+    }
+    function free_all() {
+        while (($result = $this->next()))
+            Dbl::free($result);
     }
 }
 
@@ -441,11 +445,11 @@ class Dbl {
     }
 
     static function multi_ql_raw(/* [$dblink,] $qstr */) {
-        return self::do_multi_query(func_get_args(), self::F_MULTI | self::F_LOG | self::F_RAW);
+        return self::do_multi_query(func_get_args(), self::F_MULTI | self::F_RAW | self::F_LOG);
     }
 
     static function multi_ql_apply(/* [$dblink,] $qstr, [$argv] */) {
-        return self::do_multi_query(func_get_args(), self::F_MULTI | self::F_LOG | self::F_APPLY);
+        return self::do_multi_query(func_get_args(), self::F_MULTI | self::F_APPLY | self::F_LOG);
     }
 
     static function multi_qe(/* [$dblink,] $qstr, ... */) {
@@ -458,6 +462,24 @@ class Dbl {
 
     static function multi_qe_apply(/* [$dblink,] $qstr, [$argv] */) {
         return self::do_multi_query(func_get_args(), self::F_MULTI | self::F_APPLY | self::F_ERROR);
+    }
+
+    static function make_multi_query_stager($dblink, $flags) {
+        return function (&$q, &$qv, $finish = false) use ($dblink, $flags) {
+            if (($finish && !empty($q)) || count($q) >= 50) {
+                $mresult = Dbl::do_multi_query([$dblink, join("; ", $q), $qv], self::F_MULTI | self::F_APPLY | $flags);
+                $mresult->free_all();
+                $q = $qv = [];
+            }
+        };
+    }
+
+    static function make_multi_ql_stager($dblink = null) {
+        return self::make_multi_query_stager($dblink ? : self::$defualt_dblink, self::F_LOG);
+    }
+
+    static function make_multi_qe_stager($dblink = null) {
+        return self::make_multi_query_stager($dblink ? : self::$defualt_dblink, self::F_ERROR);
     }
 
     static function free($result) {

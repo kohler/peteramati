@@ -1,6 +1,6 @@
 <?php
 // text.php -- HotCRP text helper functions
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 class NameInfo {
@@ -14,6 +14,11 @@ class NameInfo {
     public $name = null;
     public $affiliation = null;
     public $unaccentedName = null;
+    static function make_last_first() {
+        $ni = new NameInfo;
+        $ni->lastFirst = true;
+        return $ni;
+    }
 }
 
 class Text {
@@ -45,10 +50,13 @@ class Text {
     static private $boolkeys = array("withMiddle" => true,
                                      "lastFirst" => true,
                                      "nameAmbiguous" => true);
-    static private $boring_words = array("a" => true, "an" => true, "as" => true,
-                                         "by" => true, "in" => true, "on" => true,
-                                         "the" => true, "through" => true,
-                                         "with" => true, "is" => true);
+    static private $boring_words = [
+        "a" => true, "an" => true, "as" => true, "be" => true,
+        "by" => true, "did" => true, "do" => true, "for" => true,
+        "in" => true, "is" => true, "of" => true, "on" => true,
+        "the" => true, "this" => true, "through" => true, "to" => true,
+        "with" => true
+    ];
 
     static function analyze_von($lastName) {
         // see also split_name
@@ -232,6 +240,8 @@ class Text {
             if (preg_match('%^\s*\"?(.*?)\"?\s*<([^<>]+)>\s*$%', $name, $m)
                 || preg_match('%^\s*\"(.*)\"\s+(\S+)\s*$%', $name, $m))
                 list($name, $ret[2]) = array($m[1], $m[2]);
+            else if (strpos($name, "@") === false)
+                /* skip */;
             else if (!preg_match('%^\s*(.*?)\s+(\S+)\s*$%', $name, $m))
                 return array("", "", trim($name));
             else if (strpos($m[2], "@") !== false)
@@ -290,34 +300,87 @@ class Text {
             return [$last, ""];
     }
 
-    public static function unaccented_name(/* ... */) {
+    static function unaccented_name(/* ... */) {
         $x = self::analyze_name_args(func_get_args());
         return $x->unaccentedName;
     }
 
-    public static function word_regex($word) {
+    static function word_regex($word) {
         if ($word === "")
             return "";
         list($aw, $zw) = array(ctype_alnum($word[0]),
                                ctype_alnum($word[strlen($word) - 1]));
         return ($aw ? '\b' : '')
-            . str_replace(" ", '\s+', $word)
+            . str_replace(" ", '\s+', preg_quote($word))
             . ($zw ? '\b' : '');
     }
 
-    const UTF8_INITIAL_NONLETTER = '(?:\A|(?!\pL|\pN)\X)';
+    const UTF8_INITIAL_NONLETTERDIGIT = '(?:\A|(?!\pL|\pN)\X)';
+    const UTF8_INITIAL_NONLETTER = '(?:\A|(?!\pL)\X)';
+    const UTF8_FINAL_NONLETTERDIGIT = '(?:\z|(?!\pL|\pN)(?=\PM))';
+    const UTF8_FINAL_NONLETTER = '(?:\z|(?!\pL)(?=\PM))';
 
-    public static function utf8_word_regex($word) {
+    static function utf8_word_regex($word) {
         if ($word === "")
             return "";
         list($aw, $zw) = array(preg_match('{\A(?:\pL|\pN)}u', $word),
                                preg_match('{(?:\pL|\pN)\z}u', $word));
-        return ($aw ? self::UTF8_INITIAL_NONLETTER : '')
-            . str_replace(" ", '(?:\s|\p{Zs})+', $word)
-            . ($zw ? '(?:\z|(?!\pL|\pN)(?=\PM))' : '');
+        // Maybe `$word` is not valid UTF-8. Avoid warnings later.
+        if (!$aw && !$zw && !is_valid_utf8($word))
+            return self::utf8_word_regex(convert_to_utf8($word));
+        return ($aw ? self::UTF8_INITIAL_NONLETTERDIGIT : '')
+            . str_replace(" ", '(?:\s|\p{Zs})+', preg_quote($word))
+            . ($zw ? self::UTF8_FINAL_NONLETTERDIGIT : '');
     }
 
-    public static function highlight($text, $match, &$n = null) {
+    static function star_text_pregexes($word) {
+        if (is_object($word))
+            $reg = $word;
+        else
+            $reg = (object) ["value" => $word];
+
+        $word = preg_replace('/\s+/', " ", $reg->value);
+        if (!preg_match("/[\x80-\xFF]/", $word))
+            $reg->preg_raw = Text::word_regex($word);
+        $reg->preg_utf8 = Text::utf8_word_regex($word);
+
+        if (strpos($word, "*") !== false) {
+            if ($reg->preg_raw)
+                $reg->preg_raw = str_replace('\\\\\S*', '\*', str_replace('\*', '\S*', $reg->preg_raw));
+            $reg->preg_utf8 = str_replace('\\\\\S*', '\*', str_replace('\*', '\S*', $reg->preg_utf8));
+        }
+
+        return $reg;
+    }
+
+    static function merge_pregexes($regex) {
+        if (empty($regex))
+            return false;
+        $a = $b = [];
+        foreach ($regex as $x) {
+            $a[] = $x->preg_utf8;
+            if (isset($x->preg_raw))
+                $b[] = $x->preg_raw;
+        }
+        $x = (object) ["preg_utf8" => join("|", $a)];
+        if (count($a) == count($b))
+            $x->preg_raw = join("|", $b);
+        return $x;
+    }
+
+    static function match_pregexes($reg, $text, $deaccented_text) {
+        if (!$reg)
+            return false;
+        else if (!isset($reg->preg_raw))
+            return !!preg_match('{' . $reg->preg_utf8 . '}ui', $text);
+        else if ($deaccented_text && $deaccented_text !== $text)
+            return !!preg_match('{' . $reg->preg_utf8 . '}ui', $deaccented_text);
+        else
+            return !!preg_match('{' . $reg->preg_raw . '}i', $text);
+    }
+
+
+    static function highlight($text, $match, &$n = null) {
         $n = 0;
         if ($match === null || $match === false || $match === "" || $text == "")
             return htmlspecialchars($text);
@@ -339,7 +402,7 @@ class Text {
 
         $s = $clean_initial_nonletter = false;
         if ($match !== null && $match !== "") {
-            if (str_starts_with($match, self::UTF8_INITIAL_NONLETTER))
+            if (str_starts_with($match, self::UTF8_INITIAL_NONLETTERDIGIT))
                 $clean_initial_nonletter = true;
             if ($match[0] !== "{")
                 $match = "{(" . $match . ")}is" . $flags;
@@ -376,7 +439,7 @@ class Text {
     const SEARCH_UNPRIVILEGE_EXACT = 2;
     const SEARCH_ONLY_EXACT = 4;
 
-    public static function simple_search($needle, $haystacks, $flags = 0) {
+    static function simple_search($needle, $haystacks, $flags = 0) {
         $reflags = $flags & self::SEARCH_CASE_SENSITIVE ? "" : "i";
         $rewords = array();
         foreach (preg_split('/[^A-Za-z_0-9*]+/', $needle) as $word)
@@ -397,11 +460,11 @@ class Text {
         return $matches;
     }
 
-    public static function is_boring_word($word) {
+    static function is_boring_word($word) {
         return isset(self::$boring_words[strtolower($word)]);
     }
 
-    public static function single_line_paragraphs($text) {
+    static function single_line_paragraphs($text) {
         preg_match_all('/.*?(?:\r\n?|\n|\z)/', $text, $m);
         $out = "";
         $last = false;
@@ -413,5 +476,18 @@ class Text {
             $last = strlen($line) > 50;
         }
         return $out;
+    }
+
+    static function html_to_text($x) {
+        if (strpos($x, "<") !== false) {
+            $x = preg_replace('{\s*<\s*p\s*>\s*(.*?)\s*<\s*/\s*p\s*>}si', "\n\n\$1\n\n", $x);
+            $x = preg_replace('{\s*<\s*br\s*/?\s*>\s*(?:<\s*/\s*br\s*>\s*)?}si', "\n", $x);
+            $x = preg_replace('{\s*<\s*li\s*>}si', "\n* ", $x);
+            $x = preg_replace('{<\s*(b|strong)\s*>\s*(.*?)\s*<\s*/\s*\1\s*>}si', '**$2**', $x);
+            $x = preg_replace('{<\s*(i|em)\s*>\s*(.*?)\s*<\s*/\s*\1\s*>}si', '*$2*', $x);
+            $x = preg_replace('{<(?:[^"\'>]|".*?"|\'.*?\')*>}s', "", $x);
+            $x = preg_replace('{\n\n\n+}s', "\n\n", $x);
+        }
+        return html_entity_decode(trim($x), ENT_QUOTES, "UTF-8");
     }
 }

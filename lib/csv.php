@@ -1,6 +1,6 @@
 <?php
 // csv.php -- HotCRP CSV parsing functions
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and others
+// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class CsvParser {
@@ -251,6 +251,10 @@ class CsvGenerator {
             return self::always_quote($text);
     }
 
+    function is_empty() {
+        return empty($this->lines);
+    }
+
     function is_csv() {
         return $this->type == self::TYPE_COMMA;
     }
@@ -273,7 +277,7 @@ class CsvGenerator {
             }
             ++$i;
         }
-        if (!count($selected) && is_array($row) && count($row))
+        if (empty($selected) && is_array($row) && !empty($row))
             for ($i = 0;
                  array_key_exists($i, $row) && $i != count($this->selection);
                  ++$i)
@@ -286,18 +290,30 @@ class CsvGenerator {
         $this->lines_length += strlen($text);
     }
 
+    function add_comment($text) {
+        preg_match_all('/([^\r\n]*)(?:\r\n?|\n|\z)/', $text, $m);
+        if ($m[1][count($m[1]) - 1] === "")
+            array_pop($m[1]);
+        foreach ($m[1] as $x)
+            $this->add_string($this->comment . $x . $this->lf);
+    }
+
     function add($row) {
         if (is_string($row)) {
             error_log("unexpected CsvGenerator::add(string): " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
             $this->add_string($row);
             return;
-        }
+        } else if ($row === null)
+            return;
         reset($row);
-        if (count($row)
-            && (is_array(current($row)) || is_object(current($row)))) {
+        if (!empty($row) && (is_array(current($row)) || is_object(current($row)))) {
             foreach ($row as $x)
                 $this->add($x);
         } else {
+            if ($this->comment && $this->selection
+                && ($cmt = get($row, "__precomment__")) !== null
+                && (string) $cmt !== "")
+                $this->add_comment($cmt);
             $srow = $this->selection ? $this->select($row) : $row;
             if ($this->type == self::TYPE_COMMA) {
                 if ($this->flags & self::FLAG_ALWAYS_QUOTE) {
@@ -312,19 +328,17 @@ class CsvGenerator {
                 $this->add_string(join("\t", $srow) . $this->lf);
             else
                 $this->add_string(join("|", $srow) . $this->lf);
-            if ($this->comment && $this->selection && ($cmt = get($row, "__postcomment__"))) {
-                preg_match_all('/([^\r\n]*)(?:\r\n?|\n|\z)/', $cmt, $m);
-                if ($m[1][count($m[1]) - 1] === "")
-                    array_pop($m[1]);
-                foreach ($m[1] as $x)
-                    $this->add_string($this->comment . $x . $this->lf);
+            if ($this->comment && $this->selection
+                && ($cmt = get($row, "__postcomment__")) !== null
+                && (string) $cmt !== "") {
+                $this->add_comment($cmt);
                 $this->add_string($this->lf);
             }
         }
     }
 
     function set_header($header, $comment = false) {
-        assert(!count($this->lines) && $this->headerline === "");
+        assert(empty($this->lines) && $this->headerline === "");
         $this->add($header);
         if ($this->type == self::TYPE_TAB && $comment)
             $this->lines[0] = "#" . $this->lines[0];
