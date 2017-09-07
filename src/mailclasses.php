@@ -44,9 +44,9 @@ class MailRecipients {
             }
         $sel[] = array("optgroup");
         $sel["pc"] = "TFs";
-        foreach (pcTags() as $t)
+        /*foreach (pcTags() as $t)
             if ($t != "pc")
-                $sel["pc:$t"] = "#{$t} TFs";
+                $sel["pc:$t"] = "#{$t} TFs";*/
         $sel["all"] = "All users";
 
         $usersel = array("all" => "All", "college" => "College", "extension" => "Extension");

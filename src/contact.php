@@ -114,7 +114,7 @@ class Contact {
             $this->disabled = true;
     }
 
-    public static function fetch($result, Conf $conf = null) {
+    static function fetch($result, Conf $conf = null) {
         global $Conf;
         $conf = $conf ? : $Conf;
         $user = $result ? $result->fetch_object("Contact", [null, $conf]) : null;
@@ -229,14 +229,14 @@ class Contact {
     }
 
     // begin changing contactId to cid
-    public function __get($name) {
+    function __get($name) {
         if ($name === "cid")
             return $this->contactId;
         else
             return null;
     }
 
-    public function __set($name, $value) {
+    function __set($name, $value) {
         if ($name === "cid")
             $this->contactId = $this->cid = $value;
         else {
@@ -279,11 +279,11 @@ class Contact {
             $c->sorter = UnicodeHelper::deaccent($c->sorter);
     }
 
-    static public function compare($a, $b) {
+    static function compare($a, $b) {
         return strnatcasecmp($a->sorter, $b->sorter);
     }
 
-    static public function site_contact() {
+    static function site_contact() {
         global $Opt;
         if (!get($Opt, "contactEmail") || $Opt["contactEmail"] == "you@example.com") {
             $result = Dbl::ql("select firstName, lastName, email from ContactInfo where (roles&" . (self::ROLE_CHAIR | self::ROLE_ADMIN) . ")!=0 order by (roles&" . self::ROLE_CHAIR . ") desc limit 1");
@@ -310,7 +310,7 @@ class Contact {
 
     // initialization
 
-    public function activate() {
+    function activate() {
         global $Now;
         $this->activated_ = true;
         $trueuser = get($_SESSION, "trueuser");
@@ -384,7 +384,7 @@ class Contact {
         return $this;
     }
 
-    public function set_forceShow($on) {
+    function set_forceShow($on) {
         global $Me;
         if ($this->contactId == $Me->contactId) {
             self::$active_forceShow = $this->privChair && $on;
@@ -395,7 +395,7 @@ class Contact {
         }
     }
 
-    public function activate_database_account() {
+    function activate_database_account() {
         assert($this->has_email());
         if (!$this->has_database_account()) {
             $reg = clone $_SESSION["trueuser"];
@@ -410,15 +410,15 @@ class Contact {
         return $this;
     }
 
-    static public function contactdb() {
+    static function contactdb() {
         return null;
     }
 
-    public function contactdb_user() {
+    function contactdb_user() {
         return null;
     }
 
-    public function update_trueuser($always) {
+    function update_trueuser($always) {
         if (($trueuser = get($_SESSION, "trueuser"))
             && strcasecmp($trueuser->email, $this->email) == 0) {
             foreach (array("firstName", "lastName", "affiliation", "country") as $k)
@@ -954,20 +954,20 @@ class Contact {
     // } else
     //     change local password and update time;
 
-    public static function valid_password($input) {
+    static function valid_password($input) {
         return $input !== "" && $input !== "0" && $input !== "*"
             && trim($input) === $input;
     }
 
-    public static function random_password($length = 14) {
+    static function random_password($length = 14) {
         return hotcrp_random_password($length);
     }
 
-    public static function password_storage_cleartext() {
+    static function password_storage_cleartext() {
         return opt("safePasswords") < 1;
     }
 
-    public function allow_contactdb_password() {
+    function allow_contactdb_password() {
         $cdbu = $this->contactdb_user();
         return $cdbu && $cdbu->password;
     }
@@ -978,7 +978,7 @@ class Contact {
             && (!$this->has_database_account() || $this->password === "");
     }
 
-    public function plaintext_password() {
+    function plaintext_password() {
         // Return the currently active plaintext password. This might not
         // equal $this->password because of the cdb.
         if ($this->password === "") {
@@ -1084,7 +1084,7 @@ class Contact {
         }
     }
 
-    public function check_password($input) {
+    function check_password($input) {
         global $Now;
         assert(!$this->conf->external_login());
         if (($this->contactId && $this->disabled)
@@ -1129,7 +1129,7 @@ class Contact {
     const CHANGE_PASSWORD_PLAINTEXT = 1;
     const CHANGE_PASSWORD_NO_CDB = 2;
 
-    public function change_password($old, $new, $flags) {
+    function change_password($old, $new, $flags) {
         global $Now;
         assert(!$this->conf->external_login());
         if ($new === null)
@@ -1202,7 +1202,7 @@ class Contact {
     }
 
 
-    public function mark_login() {
+    function mark_login() {
         global $Now;
         // at least one login every 90 days is marked as activity
         if (!$this->activity_at || $this->activity_at <= $Now - 7776000
@@ -1211,7 +1211,7 @@ class Contact {
             $this->mark_activity();
     }
 
-    public function mark_activity() {
+    function mark_activity() {
         global $Now;
         if (!$this->activity_at || $this->activity_at < $Now) {
             $this->activity_at = $Now;
