@@ -672,7 +672,7 @@ class Contact {
                 && !$cdb_user->password
                 && !$cdb_user->disable_shared_password
                 && !$this->conf->opt("contactdb_noPasswords"))
-                $cdb_user->change_password($this->password_plaintext, true);
+                $cdb_user->change_password($this->password_plaintext, true, 0);
         }
 
         return $result;
