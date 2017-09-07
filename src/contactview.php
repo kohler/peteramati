@@ -330,10 +330,15 @@ class ContactView {
         if ($repo && $repo->url)
             $title = $user->link_repo($title, $repo->web_url());
 
-        if ($editable)
-            $value = Ht::entry("repo", $repo_url, array("style" => "width:32em"))
-                . " " . Ht::submit("Save");
-        else if ($user->is_anonymous)
+        if ($editable) {
+            $xvalue = $repo_url;
+            $js = ["style" => "width:32em"];
+            if ($repo_url === "" && isset($_GET["set_repo"]) && $_GET["pset"] === $pset->urlkey && isset($_POST["repo"])) {
+                $xvalue = htmlspecialchars($_POST["repo"]);
+                $js["class"] = "error";
+            }
+            $value = Ht::entry("repo", $xvalue, $js) . " " . Ht::submit("Save");
+        } else if ($user->is_anonymous)
             $value = $repo_url ? "[anonymous]" : "(none)";
         else
             $value = htmlspecialchars($repo_url ? $repo_url : "(none)");
