@@ -11,7 +11,7 @@ class UserActions {
         $result = $Conf->qe_raw("select * from ContactInfo where $where and contactId" . sql_in_numeric_set($ids));
         while (($Acct = Contact::fetch($result, $Conf))) {
             if ($dopassword)
-                $Acct->change_password(null, true);
+                $Acct->change_password(null, true, Contact::CHANGE_PASSWORD_PLAINTEXT);
             if ($sendtype && $Acct->password != "" && !$Acct->disabled)
                 $Acct->sendAccountInfo($sendtype, false);
             else if ($sendtype)
