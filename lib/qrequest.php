@@ -128,6 +128,8 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
         else if ($path !== "") {
             $slash = $path[0] === "/";
             $this->____path = explode("/", $slash ? substr($path, 1) : $path);
+            foreach ($this->____path as &$p)
+                $p = urldecode($p);
         } else
             $this->____path = [];
     }

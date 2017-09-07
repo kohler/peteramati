@@ -12,6 +12,9 @@ class ContactView {
         $x = explode("/", $path);
         if (count($x) && $x[count($x) - 1] == "")
             array_pop($x);
+        foreach ($x as &$xp)
+            $xp = urldecode($xp);
+        unset($xp);
         foreach ($paths as $p) {
             $ppos = $xpos = 0;
             $commitsuf = "";

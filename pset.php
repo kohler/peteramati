@@ -647,8 +647,9 @@ if ($Pset->gitless) {
     foreach ($Pset->runners as $r)
         if ($Me->can_view_run($Pset, $r, $User)) {
             if ($Me->can_run($Pset, $r, $User)) {
-                $b = Ht::button("run", htmlspecialchars($r->title),
-                                array("value" => $r->name,
+                $b = Ht::button(htmlspecialchars($r->title),
+                                array("name" => "run",
+                                      "value" => $r->name,
                                       "class" => "runner61",
                                       "style" => "font-weight:bold",
                                       "onclick" => "run61(this)",
@@ -662,9 +663,10 @@ if ($Pset->gitless) {
         }
     if (count($runnerbuttons) && $Me->isPC && $Me != $User && $last_run)
         $runnerbuttons[] = " &nbsp;"
-            . Ht::button("define", "+",
+            . Ht::button("+",
                          array("class" => "runner61",
                                "style" => "font-weight:bold",
+                               "name" => "define",
                                "onclick" => "runsetting61.add()"));
     if ((($Me->isPC && $Me != $User) || $Me == $User)
         && !$Info->is_handout_commit()) {
@@ -683,12 +685,12 @@ if ($Pset->gitless) {
                 $x .= " (" . $conversation . ")";
             if (!$resolved)
                 $x .= '<span style="display:inline-block;margin-left:1em">'
-                    . Ht::button("resolveflag", "Resolve", ["onclick" => "flag61(this)", "data-flagid" => $k])
+                    . Ht::button("Resolve", ["name" => "resolveflag", "onclick" => "flag61(this)", "data-flagid" => $k])
                     . '</span>';
             $runnerbuttons[] = $x . "<br />";
         }
         if ($all_resolved)
-            $runnerbuttons[] = Ht::button("flag", "Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "onclick" => "flag61(this)"]);
+            $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "onclick" => "flag61(this)", "name" => "flag"]);
     }
     if (!empty($runnerbuttons)) {
         echo Ht::form($Info->hoturl_post("run")),
