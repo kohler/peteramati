@@ -1,6 +1,6 @@
 <?php
 // helpers.php -- HotCRP non-class helper functions
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 function defappend(&$var, $str) {
@@ -521,19 +521,39 @@ function prefix_commajoin($what, $prefix, $joinword = "and") {
 }
 
 function numrangejoin($range) {
-    $i = 0;
-    $a = array();
-    while ($i < count($range)) {
-        for ($j = $i + 1;
-             $j < count($range) && $range[$j-1] == $range[$j] - 1;
-             $j++)
-            /* nada */;
-        if ($j == $i + 1)
-            $a[] = $range[$i];
-        else
-            $a[] = $range[$i] . "&ndash;" . $range[$j - 1];
-        $i = $j;
+    $a = [];
+    $format = null;
+    foreach ($range as $current) {
+        if ($format !== null
+            && sprintf($format, $intval + 1) === (string) $current) {
+            ++$intval;
+            $last = $current;
+            continue;
+        } else {
+            if ($format !== null && $first === $last)
+                $a[] = $first;
+            else if ($format !== null)
+                $a[] = $first . "–" . substr($last, $plen);
+            if ($current !== "" && ctype_digit($current)) {
+                $format = "%0" . strlen($current) . "d";
+                $plen = 0;
+                $first = $last = $current;
+                $intval = intval($current);
+            } else if (preg_match('/\A(\D*)(\d+)\z/', $current, $m)) {
+                $format = str_replace("%", "%%", $m[1]) . "%0" . strlen($m[2]) . "d";
+                $plen = strlen($m[1]);
+                $first = $last = $current;
+                $intval = intval($m[2]);
+            } else {
+                $format = null;
+                $a[] = $current;
+            }
+        }
     }
+    if ($format !== null && $first === $last)
+        $a[] = $first;
+    else if ($format !== null)
+        $a[] = $first . "–" . substr($last, $plen);
     return commajoin($a);
 }
 
@@ -552,7 +572,7 @@ function pluralize($what) {
         return "are";
     else if (str_ends_with($what, ")") && preg_match('/\A(.*?)(\s*\([^)]*\))\z/', $what, $m))
         return pluralize($m[1]) . $m[2];
-    else if (preg_match('/\A.*?(?:s|sh|ch|[bcdfgjklmnpqrstvxz][oy])\z/', $what)) {
+    else if (preg_match('/\A.*?(?:s|sh|ch|[bcdfgjklmnpqrstvxz]y)\z/', $what)) {
         if (substr($what, -1) == "y")
             return substr($what, 0, -1) . "ies";
         else
@@ -591,7 +611,7 @@ function tabLength($text, $all) {
 function ini_get_bytes($varname, $value = null) {
     $val = trim($value !== null ? $value : ini_get($varname));
     $last = strlen($val) ? strtolower($val[strlen($val) - 1]) : ".";
-    return $val * (1 << (+strpos(".kmg", $last) * 10));
+    return (int) ceil(floatval($val) * (1 << (+strpos(".kmg", $last) * 10)));
 }
 
 function whyNotText($whyNot, $action) {
@@ -698,139 +718,6 @@ function whyNotText($whyNot, $action) {
     if ($text && $action == "view")
         $text .= "Enter a paper number above, or <a href='" . hoturl("search", "q=") . "'>list the papers you can view</a>. ";
     return rtrim($text);
-}
-
-function parseReviewOrdinal($text) {
-    $text = strtoupper($text);
-    if (ctype_alpha($text)) {
-        if (strlen($text) == 1)
-            return ord($text) - 64;
-        else if (strlen($text) == 2)
-            return (ord($text[0]) - 64) * 26 + ord($text[1]) - 64;
-    }
-    return -1;
-}
-
-function unparseReviewOrdinal($ord) {
-    if ($ord === null)
-        return "x";
-    else if (is_object($ord)) {
-        if ($ord->reviewOrdinal)
-            return $ord->paperId . unparseReviewOrdinal($ord->reviewOrdinal);
-        else
-            return $ord->reviewId;
-    } else if ($ord <= 26)
-        return chr($ord + 64);
-    else
-        return chr(intval(($ord - 1) / 26) + 64) . chr((($ord - 1) % 26) + 65);
-}
-
-function _sort_pcMember($a, $b) {
-    return strcasecmp($a->sorter, $b->sorter);
-}
-
-function pcMembers() {
-    global $Conf;
-    return $Conf->pc_members();
-}
-
-function pcTags() {
-    global $Conf;
-    return $Conf->pc_tags();
-}
-
-function pcByEmail($email) {
-    $pc = pcMembers();
-    foreach ($pc as $id => $row)
-        if ($row->email == $email)
-            return $row;
-    return null;
-}
-
-function matchContact($pcm, $firstName, $lastName, $email) {
-    $lastmax = $firstmax = false;
-    if (!$lastName) {
-        $lastName = $email;
-        $lastmax = true;
-    }
-    if (!$firstName) {
-        $firstName = $lastName;
-        $firstmax = true;
-    }
-    assert(is_string($email) && is_string($firstName) && is_string($lastName));
-
-    $cid = -2;
-    $matchprio = 0;
-    foreach ($pcm as $pcid => $pc) {
-        // Match full email => definite match.
-        // Otherwise, sum priorities as follows:
-        //   Entire front of email, or entire first or last name => +10 each
-        //   Part of word in email, first, or last name          => +1 each
-        // If a string is used for more than one of email, first, and last,
-        // don't count a match more than once.  Pick closest match.
-
-        $emailprio = $firstprio = $lastprio = 0;
-        if ($email !== "") {
-            if ($pc->email === $email)
-                return $pcid;
-            if (($pos = stripos($pc->email, $email)) !== false) {
-                if ($pos === 0 && $pc->email[strlen($email)] == "@")
-                    $emailprio = 10;
-                else if ($pos === 0 || !ctype_alnum($pc->email[$pos - 1]))
-                    $emailprio = 1;
-            }
-        }
-        if ($firstName != "") {
-            if (($pos = stripos($pc->firstName, $firstName)) !== false) {
-                if ($pos === 0 && strlen($pc->firstName) == strlen($firstName))
-                    $firstprio = 10;
-                else if ($pos === 0 || !ctype_alnum($pc->firstName[$pos - 1]))
-                    $firstprio = 1;
-            }
-        }
-        if ($lastName != "") {
-            if (($pos = stripos($pc->lastName, $lastName)) !== false) {
-                if ($pos === 0 && strlen($pc->lastName) == strlen($lastName))
-                    $lastprio = 10;
-                else if ($pos === 0 || !ctype_alnum($pc->firstName[$pos - 1]))
-                    $lastprio = 1;
-            }
-        }
-        if ($lastmax && $firstmax)
-            $thisprio = max($emailprio, $firstprio, $lastprio);
-        else if ($lastmax)
-            $thisprio = max($emailprio, $lastprio) + $firstprio;
-        else if ($firstmax)
-            $thisprio = $emailprio + max($firstprio, $lastprio);
-        else
-            $thisprio = $emailprio + $firstprio + $lastprio;
-
-        if ($thisprio && $matchprio <= $thisprio) {
-            $cid = ($matchprio < $thisprio ? $pcid : -1);
-            $matchprio = $thisprio;
-        }
-    }
-    return $cid;
-}
-
-function matchValue($a, $word, $allowKey = false) {
-    $outa = array();
-    $outb = array();
-    $outc = array();
-    foreach ($a as $k => $v)
-        if (strcmp($word, $v) == 0
-            || ($allowKey && strcmp($word, $k) == 0))
-            $outa[] = $k;
-        else if (strcasecmp($word, $v) == 0)
-            $outb[] = $k;
-        else if (stripos($v, $word) !== false)
-            $outc[] = $k;
-    if (count($outa) > 0)
-        return $outa;
-    else if (count($outb) > 0)
-        return $outb;
-    else
-        return $outc;
 }
 
 

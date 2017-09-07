@@ -1,6 +1,6 @@
 <?php
 // base.php -- HotCRP base helper functions
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 // string helpers
@@ -81,7 +81,7 @@ function convert_to_utf8($str) {
 
 function simplify_whitespace($x) {
     // Replace ALL invisible Unicode space-type characters with true spaces
-    return trim(preg_replace('/(?:\s|\xC2\xA0|\xE2\x80[\x80-\x8A\xAF]|\xE2\x81\x9F|\xE3\x80\x80)+/', " ", $x));
+    return trim(preg_replace('/(?:\s|\xC2\xA0|\xE2\x80[\x80-\x8A\xA8\xA9\xAF]|\xE2\x81\x9F|\xE3\x80\x80)+/', " ", $x));
 }
 
 function prefix_word_wrap($prefix, $text, $indent = 18, $totWidth = 75) {
@@ -140,6 +140,10 @@ function friendly_boolean($x) {
         return null;
 }
 
+interface Abbreviator {
+    public function abbreviations_for($name, $data);
+}
+
 
 // email and MIME helpers
 
@@ -177,7 +181,7 @@ function rfc2822_words_quote($words) {
 function html_id_encode($text) {
     $x = preg_split('_([^-a-zA-Z0-9])_', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
     for ($i = 1; $i < count($x); $i += 2)
-        $x[$i] = "_" . strtoupper(dechex(ord($x[$i])));
+        $x[$i] = "_" . dechex(ord($x[$i]));
     return join("", $x);
 }
 
@@ -206,10 +210,20 @@ if (!function_exists("json_last_error_msg")) {
         return false;
     }
 }
-if (!defined("JSON_PRETTY_PRINT"))
-    define("JSON_PRETTY_PRINT", 0);
-if (!defined("JSON_UNESCAPED_UNICODE"))
-    define("JSON_UNESCAPED_UNICODE", 0);
+if (defined("JSON_UNESCAPED_LINE_TERMINATORS")) {
+    // JSON_UNESCAPED_UNICODE is only safe to send to the browser if
+    // JSON_UNESCAPED_LINE_TERMINATORS is defined.
+    function json_encode_browser($x, $flags = 0) {
+        return json_encode($x, $flags | JSON_UNESCAPED_UNICODE);
+    }
+} else {
+    function json_encode_browser($x, $flags = 0) {
+        return json_encode($x, $flags);
+    }
+}
+function json_encode_db($x, $flags = 0) {
+    return json_encode($x, $flags | JSON_UNESCAPED_UNICODE);
+}
 
 
 // array and object helpers
@@ -384,6 +398,11 @@ function caller_landmark($position = 1, $skipfunction_re = null) {
         $t .= ($t ? ":" : "") . $fname;
     return $t ? : "<unknown>";
 }
+
+function assert_callback() {
+    trigger_error("Assertion backtrace: " . json_encode(array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), 2)), E_USER_WARNING);
+}
+//assert_options(ASSERT_CALLBACK, "assert_callback");
 
 
 // pcntl helpers

@@ -171,7 +171,7 @@ $Commit = $Info->commit_hash();
 if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
     && $Info->can_have_grades() && $Me->can_set_grader($Pset, $User)) {
     $grader = 0;
-    foreach (pcMembers() as $pcm)
+    foreach ($Conf->pc_members() as $pcm)
         if ($pcm->email === $_POST["grader"])
             $grader = $pcm->contactId;
     if (!$grader && $_POST["grader"] !== "none")
@@ -518,10 +518,10 @@ function echo_commit($Info) {
 }
 
 function echo_grader() {
-    global $Me, $User, $Pset, $Info;
+    global $Conf, $Me, $User, $Pset, $Info;
     $gradercid = $Info->gradercid();
     if ($Info->is_grading_commit() && $Me->can_view_grader($Pset, $User)) {
-        $pcm = pcMembers();
+        $pcm = $Conf->pc_members();
         $gpc = get($pcm, $gradercid);
         $value_post = "";
         if ($Me->can_set_grader($Pset, $User)) {
@@ -530,7 +530,7 @@ function echo_grader() {
                 $sel["none"] = "(None)";
                 $sel[] = null;
             }
-            foreach (pcMembers() as $pcm)
+            foreach ($Conf->pc_members() as $pcm)
                 $sel[$pcm->email] = Text::name_html($pcm);
             $value = Ht::form($Info->hoturl_post("pset", array("setgrader" => 1)))
                 . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", array("onchange" => "setgrader61(this)"));

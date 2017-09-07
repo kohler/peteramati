@@ -264,7 +264,7 @@ function set_grader($qreq) {
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
     $graders = array();
-    foreach (pcMembers() as $pcm)
+    foreach ($Conf->pc_members() as $pcm)
         if ($pcm->email == $qreq->grader
             || (!$pcm->privChair && $qreq->grader == "__random__"))
             $graders[] = $pcm;
@@ -908,7 +908,7 @@ function show_pset_table($pset) {
 
     $rows = array();
     $incomplete = array();
-    $pcmembers = pcMembers();
+    $pcmembers = $Conf->pc_members();
     $jx = [];
     foreach ($students as $s)
         if (!$s->visited) {
@@ -968,7 +968,7 @@ function show_pset_table($pset) {
     if ($Me->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";
         $sel = array("none" => "N/A");
-        foreach (pcMembers() as $pcm)
+        foreach ($Conf->pc_members() as $pcm)
             $sel[$pcm->email] = Text::name_html($pcm);
         $sel["__random__"] = "Random";
         echo '<span class="nb" style="padding-right:2em">',
@@ -1015,7 +1015,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     Ht::stash_script('peteramati_psets=' . json_encode($psetj) . ';');
 
     $pctable = [];
-    foreach (pcMembers() as $pc)
+    foreach ($Conf->pc_members() as $pc)
         if ($pc->firstName && !$pc->firstNameAmbiguous)
             $pctable[$pc->contactId] = $pc->firstName;
         else
