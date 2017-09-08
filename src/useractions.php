@@ -43,10 +43,11 @@ class UserActions {
             return (object) array("error" => true);
     }
 
-    static function reset_password($ids, $contact) {
+    static function reset_password($ids, $contact, $ifempty) {
         global $Conf;
-        return self::modify_password_mail("contactId!=" . $contact->contactId, true, false, $ids);
-        $Conf->confirmMsg("Passwords reset. To send mail with the new passwords, <a href='" . hoturl_post("users", "modifygo=1&amp;modifytype=sendaccount&amp;pap[]=" . (is_array($ids) ? join("+", $ids) : $ids)) . "'>click here</a>.");
+        $result = self::modify_password_mail("contactId!=" . $contact->contactId . ($ifempty ? " and password=''" : ""), true, false, $ids);
+        $Conf->confirmMsg("Passwords reset.");
+        return $result;
     }
 
     static function send_account_info($ids, $contact) {
