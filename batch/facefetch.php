@@ -1,6 +1,6 @@
 <?php
 // facefetch.php -- Peteramati script for fetching & storing faces
-// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2017 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 $ConfSitePATH = preg_replace(',/batch/[^/]+,', '', __FILE__);
