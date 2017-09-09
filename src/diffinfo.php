@@ -8,6 +8,7 @@ class DiffInfo {
     public $binary = false;
     public $truncated = false;
     public $boring = false;
+    public $hide_if_anonymous = false;
     public $priority = 0;
     public $removed = false;
     public $diff;
@@ -31,6 +32,8 @@ class DiffInfo {
             $this->boring = true;
         if ($diffinfo && $diffinfo->priority)
             $this->priority = $diffinfo->priority;
+        if ($diffinfo && $diffinfo->hide_if_anonymous)
+            $this->hide_if_anonymous = $diffinfo->hide_if_anonymous;
         if ($blineno === 0
             || ($this->binary
                 && preg_match('_ and /dev/null differ$_', $diff[0][3])))

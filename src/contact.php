@@ -1446,7 +1446,8 @@ class Contact {
         // read "full" files
         $pset_diffs = self::pset_diffinfo($pset, $repo);
         foreach ($pset_diffs as $diffinfo)
-            if (!$ignore_diffinfo && !$no_full
+            if (!$ignore_diffinfo
+                && !$no_full
                 && $diffinfo->full
                 && ($fname = self::unquote_filename_regex($diffinfo->regex)) !== false) {
                 $result = $repo->gitrun("git show $hashb:${repodir}$fname");

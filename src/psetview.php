@@ -664,6 +664,10 @@ class PsetView {
 
 
     function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open) {
+        if ($dinfo->hide_if_anonymous
+            && $this->user->is_anonymous)
+            return;
+
         $fileid = html_id_encode($file);
         $tabid = "pa-file-" . $fileid;
         $linenotes = $lnorder->file($file);

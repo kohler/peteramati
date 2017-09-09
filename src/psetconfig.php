@@ -512,6 +512,7 @@ class DiffConfig {
     public $full;
     public $ignore;
     public $boring;
+    public $hide_if_anonymous;
 
     function __construct($regex, $d) {
         $loc = array("diffs", $regex);
@@ -525,6 +526,7 @@ class DiffConfig {
         $this->full = Pset::cbool($loc, $d, "full");
         $this->ignore = Pset::cbool($loc, $d, "ignore");
         $this->boring = Pset::cbool($loc, $d, "boring");
+        $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
     }
 
     static function combine($a, $b) {
