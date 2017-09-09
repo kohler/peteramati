@@ -1718,8 +1718,8 @@ function pa_diff_locate(target, direction) {
     if (!tr || !table || !/\bpa-dl\b.*\bg[idc]\b/.test(tr.className))
         return null;
 
-    var aline = +tr.firstChild.textContent;
-    var bline = +tr.firstChild.nextSibling.textContent;
+    var aline = +tr.firstChild.getAttribute("data-landmark");
+    var bline = +tr.firstChild.nextSibling.getAttribute("data-landmark");
     var result = {
         file: file, aline: aline, bline: bline,
         lineid: bline ? "b" + bline : "a" + aline,
