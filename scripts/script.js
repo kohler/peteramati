@@ -270,8 +270,8 @@ function regexp_quote(s) {
 
 function html_id_encode(s) {
     return encodeURIComponent(s).replace(/[^-A-Za-z0-9%]/g, function (s) {
-        return "_" + s.charCodeAt(0).toString(16).toUpperCase();
-    }).replace(/%/g, "_");
+        return "_" + s.charCodeAt(0).toString(16);
+    }).replace(/%../g, function (m) { return "_" + m.substr(1).toLowerCase(); });
 }
 
 function html_id_decode(s) {
@@ -2350,7 +2350,7 @@ function pa_ensureline(filename, lineid) {
     var $tds = $(file).find("td.pa-d" + lineid.charAt(0));
     var lineno = lineid.substr(1);
     for (var i = 0; i < $tds.length; ++i)
-        if ($tds[i].textContent === lineno) {
+        if ($tds[i].getAttribute("data-landmark") === lineno) {
             $tds[i].id = lineref;
             return $($tds[i]);
         }
@@ -2603,15 +2603,17 @@ function run61(button, opt) {
     }
 
     function find_filediff(file) {
-        var fm = $(".pa-filediff").filter(function () {
+        return $(".pa-filediff").filter(function () {
             return this.getAttribute("data-pa-file") === file;
         });
     }
 
     function add_file_link(node, file, line, link) {
         var filematch = find_filediff(file), dir;
-        if (!filematch.length && (dir = therun.attr("data-pa-directory")))
-            filematch = find_filediff(dir + "/" + file);
+        if (!filematch.length && (dir = therun.attr("data-pa-directory"))) {
+            file = dir + "/" + file;
+            filematch = find_filediff(file);
+        }
         if (filematch.length) {
             var anchor = "Lb" + line + "_" + html_id_encode(file);
             var a = $("<a href=\"#" + anchor + "\" onclick=\"return pa_gotoline(this)\"></a>");
