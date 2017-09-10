@@ -47,7 +47,7 @@ CREATE TABLE `CommitInfo` (
   `timestamp` int(11) NOT NULL,
   PRIMARY KEY (`commitid`),
   UNIQUE KEY `commitid` (`commitid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
@@ -64,6 +64,7 @@ CREATE TABLE `CommitNotes` (
   `repoid` int(11) NOT NULL DEFAULT '0',
   `notesversion` int(11) NOT NULL DEFAULT '1',
   `hasactiveflags` tinyint(1) NOT NULL DEFAULT '0',
+  `hasflags` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`hash`,`pset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -164,21 +165,6 @@ CREATE TABLE `ContactLink` (
 
 
 --
--- Table structure for table `ContactUlink`
---
-
-DROP TABLE IF EXISTS `ContactUlink`;
-CREATE TABLE `ContactUlink` (
-  `cid` int(11) NOT NULL,
-  `type` int(1) NOT NULL,
-  `pset` int(1) NOT NULL,
-  `link` int(11) NOT NULL,
-  PRIMARY KEY (`cid`,`type`,`pset`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
 -- Table structure for table `ExecutionQueue`
 --
 
@@ -205,26 +191,6 @@ CREATE TABLE `ExecutionQueue` (
 
 
 --
--- Table structure for table `Formula`
---
-
-DROP TABLE IF EXISTS `Formula`;
-CREATE TABLE `Formula` (
-  `formulaId` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(200) NOT NULL,
-  `heading` varchar(200) NOT NULL DEFAULT '',
-  `headingTitle` text NOT NULL,
-  `expression` text NOT NULL,
-  `authorView` tinyint(1) NOT NULL DEFAULT '1',
-  `createdBy` int(11) NOT NULL DEFAULT '0',
-  `timeModified` int(11) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`formulaId`),
-  UNIQUE KEY `formulaId` (`formulaId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
 -- Table structure for table `MailLog`
 --
 
@@ -238,40 +204,6 @@ CREATE TABLE `MailLog` (
   `subject` text,
   `emailBody` text,
   PRIMARY KEY (`mailId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
--- Table structure for table `OptionType`
---
-
-DROP TABLE IF EXISTS `OptionType`;
-CREATE TABLE `OptionType` (
-  `optionId` int(11) NOT NULL AUTO_INCREMENT,
-  `optionName` varchar(200) NOT NULL,
-  `description` text,
-  `type` tinyint(1) NOT NULL DEFAULT '0',
-  `pcView` tinyint(1) NOT NULL DEFAULT '1',
-  `optionValues` text NOT NULL,
-  `sortOrder` tinyint(1) NOT NULL DEFAULT '0',
-  `displayType` tinyint(1) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`optionId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
--- Table structure for table `PaperConflict`
---
-
-DROP TABLE IF EXISTS `PaperConflict`;
-CREATE TABLE `PaperConflict` (
-  `paperId` int(11) NOT NULL,
-  `contactId` int(11) NOT NULL,
-  `conflictType` tinyint(1) NOT NULL DEFAULT '0',
-  UNIQUE KEY `contactPaper` (`contactId`,`paperId`),
-  UNIQUE KEY `contactPaperConflict` (`contactId`,`paperId`,`conflictType`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -366,7 +298,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 108);
+insert into Settings (name, value) values ('allowPaperOption', 112);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

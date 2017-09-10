@@ -318,6 +318,14 @@ function updateSchema($conf) {
     if ($conf->sversion == 109
         && _update_schema_linenotes($conf))
         $conf->update_schema_version(110);
+    if ($conf->sversion == 110
+        && $conf->ql("alter table CommitInfo ENGINE=InnoDB"))
+        $conf->update_schema_version(111);
+    if ($conf->sversion == 111
+        && $conf->ql("drop table if exists `Formula`")
+        && $conf->ql("drop table if exists `OptionType`")
+        && $conf->ql("drop table if exists `PaperConflict`"))
+        $conf->update_schema_version(112);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }
