@@ -305,16 +305,16 @@ class Repository {
         return $list;
     }
 
-    function latest_commit(Pset $pset = null) {
-        $c = $this->commits($pset);
+    function latest_commit(Pset $pset = null, $branch = null) {
+        $c = $this->commits($pset, $branch);
         reset($c);
         return current($c);
     }
 
-    function connected_commit($hash, Pset $pset = null) {
+    function connected_commit($hash, Pset $pset = null, $branch = null) {
         if (empty($this->_commits))
             // load some commits first
-            $this->commits($pset);
+            $this->commits($pset, $branch);
 
         if (strlen($hash) === 40) {
             if (array_key_exists($hash, $this->_commits))

@@ -32,6 +32,7 @@ class Pset {
     public $visible;
     public $frozen;
     public $partner;
+    public $want_branch;
     public $anonymous;
     public $gitless;
     public $gitless_grades;
@@ -117,6 +118,7 @@ class Pset {
         $this->visible = self::cdate($p, "visible", "show_to_students");
         $this->frozen = self::cdate($p, "frozen", "freeze");
         $this->partner = self::cbool($p, "partner");
+        $this->want_branch = self::cbool($p, "want_branch");
         $this->anonymous = self::cbool($p, "anonymous");
         $this->gitless = self::cbool($p, "gitless");
         $this->gitless_grades = self::cbool($p, "gitless_grades");

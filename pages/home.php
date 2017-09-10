@@ -70,7 +70,8 @@ if (!$Me->is_empty() && ($Me === $User || $Me->isPC) && $Qreq->set_username && c
 
 if (!$Me->is_empty() && $Qreq->set_repo !== null)
     ContactView::set_repo_action($User);
-
+if (!$Me->is_empty() && $Qreq->set_branch !== null)
+    ContactView::set_branch_action($User);
 if ($Qreq->set_partner !== null)
     ContactView::set_partner_action($User);
 

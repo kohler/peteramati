@@ -683,10 +683,14 @@ class Contact {
     }
 
     private function load_links() {
-        $result = $this->conf->qe("select type, pset, link from ContactLink where cid=?", $this->contactId);
-        $this->links = [1 => [], 2 => [], 3 => [], 4 => []];
-        while (($row = edb_row($result)))
-            $this->links[(int) $row[0]][(int) $row[1]][] = (int)$row[2];
+        $result = $this->conf->qe("select type, pset, link, data from ContactLink where cid=?", $this->contactId);
+        $this->links = [1 => [], 2 => [], 3 => [], 4 => [], 5 => []];
+        while (($row = edb_row($result))) {
+            $type = (int) $row[0];
+            $value = $type === 5 ? $row[3] : (int) $row[2];
+            $this->links[$type][(int) $row[1]][] = $value;
+        }
+        Dbl::free($result);
     }
 
     function link($type, $pset = 0) {
@@ -721,12 +725,20 @@ class Contact {
             return false;
     }
 
+    static private function link_data($type, $value) {
+        if ($type == 5)
+            return [1, $value];
+        else
+            return [$value, null];
+    }
+
     function set_link($type, $pset, $value) {
         if ($this->links === null)
             $this->load_links();
         $this->clear_links($type, $pset, false);
         $this->links[$type][$pset] = array($value);
-        if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $pset, $value)) {
+        list($link, $data) = self::link_data($type, $value);
+        if ($this->conf->qe("insert into ContactLink (cid,type,pset,link,data) values (?,?,?,?,?)", $this->contactId, $type, $pset, $link, $data)) {
             $this->conf->log("Set links [$type,$pset,$value]", $this);
             return true;
         } else
@@ -739,8 +751,9 @@ class Contact {
         if (!isset($this->links[$type][$pset]))
             $this->links[$type][$pset] = array();
         if (!in_array($value, $this->links[$type][$pset])) {
-            $this->links[$type][$pset][] = array($value);
-            if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $pset, $value)) {
+            $this->links[$type][$pset][] = $value;
+            list($link, $data) = self::link_data($type, $value);
+            if ($this->conf->qe("insert into ContactLink (cid,type,pset,link,data) values (?,?,?,?,?)", $this->contactId, $type, $pset, $link, $data)) {
                 $this->conf->log("Add link [$type,$pset,$value]", $this);
                 return true;
             } else

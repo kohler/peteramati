@@ -326,6 +326,9 @@ function updateSchema($conf) {
         && $conf->ql("drop table if exists `OptionType`")
         && $conf->ql("drop table if exists `PaperConflict`"))
         $conf->update_schema_version(112);
+    if ($conf->sversion == 112
+        && $conf->ql("alter table ContactLink add `data` varbinary(8192) DEFAULT NULL"))
+        $conf->update_schema_version(113);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

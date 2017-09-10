@@ -14,6 +14,7 @@ define("LINK_PARTNER", 1);
 define("LINK_BACKPARTNER", 2);
 define("LINK_REPO", 3);         // see also gitfetch
 define("LINK_REPOVIEW", 4);
+define("LINK_BRANCH", 5);
 
 define("HASNOTES_GRADE", 1);
 define("HASNOTES_COMMENT", 2);

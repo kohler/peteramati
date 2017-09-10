@@ -190,6 +190,8 @@ if (req("set_partner"))
     ContactView::set_partner_action($User);
 if (req("set_repo"))
     ContactView::set_repo_action($User);
+if (req("set_branch"))
+    ContactView::set_branch_action($User);
 
 // save grades
 function save_grades(Pset $pset, PsetView $info, $values, $isauto) {

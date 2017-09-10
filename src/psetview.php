@@ -11,6 +11,7 @@ class PsetView {
     public $pc_view;
     public $repo = null;
     public $partner;
+    public $branch;
     private $partner_same = null;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
@@ -34,13 +35,16 @@ class PsetView {
         $this->viewer = $viewer;
         $this->pc_view = $viewer->isPC && $viewer !== $user;
         $this->partner = $user->partner($pset->id);
-        if (!$pset->gitless)
+        if (!$pset->gitless) {
             $this->repo = $user->repo($pset->id);
+            if ($pset->want_branch)
+                $this->branch = $user->link(LINK_BRANCH, $pset->id) ? : null;
+        }
         $this->hash = $hash;
     }
 
     function connected_hash($hash) {
-        $c = $this->repo ? $this->repo->connected_commit($hash, $this->pset) : null;
+        $c = $this->repo ? $this->repo->connected_commit($hash, $this->pset, $this->branch) : null;
         return $c ? $c->hash : false;
     }
 
@@ -51,11 +55,11 @@ class PsetView {
         if (!$this->repo)
             return false;
         if ($reqhash)
-            $c = $this->repo->connected_commit($reqhash, $this->pset);
+            $c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch);
         else {
             $c = null;
             if ($this->repo_grade)
-                $c = $this->repo->connected_commit($this->repo_grade->gradehash, $this->pset);
+                $c = $this->repo->connected_commit($this->repo_grade->gradehash, $this->pset, $this->branch);
             if (!$c)
                 $c = $this->latest_commit();
         }
@@ -106,13 +110,13 @@ class PsetView {
         if (!$this->repo)
             return [];
         else if (!$hash)
-            return $this->repo->commits($this->pset);
+            return $this->repo->commits($this->pset, $this->branch);
         else
-            return $this->repo->connected_commit($hash, $this->pset);
+            return $this->repo->connected_commit($hash, $this->pset, $this->branch);
     }
 
     function latest_commit() {
-        $cs = $this->repo ? $this->repo->commits($this->pset) : [];
+        $cs = $this->repo ? $this->repo->commits($this->pset, $this->branch) : [];
         reset($cs);
         return current($cs);
     }

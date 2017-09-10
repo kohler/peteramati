@@ -400,7 +400,39 @@ class ContactView {
         if ($editable)
             echo "</div></form>\n";
 
+        if ($pset->want_branch)
+            self::echo_branch_group($info);
+
         return $repo;
+    }
+
+    static function echo_branch_group(PsetView $info) {
+        global $Conf, $Me, $Now;
+        list($user, $pset, $partner, $repo) =
+            array($info->user, $info->pset, $info->partner, $info->repo);
+        $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
+        $branch = $user->link(LINK_BRANCH, $pset->id);
+
+        if ($editable) {
+            $xvalue = $branch;
+            $js = ["style" => "width:32em", "placeholder" => "master"];
+            if (isset($_GET["set_branch"]) && $_GET["pset"] === $pset->urlkey && isset($_POST["branch"])) {
+                $xvalue = htmlspecialchars($_POST["branch"]);
+                $js["class"] = "error";
+            }
+            $value = Ht::entry("branch", $xvalue, $js) . " " . Ht::submit("Save");
+        } else if ($user->is_anonymous)
+            $value = $branch && $branch !== "master" ? "[anonymous]" : "master";
+        else
+            $value = htmlspecialchars($branch ? : "master");
+
+        // edit
+        if ($editable)
+            echo Ht::form(self_href(array("post" => post_value(), "set_branch" => 1, "pset" => $pset->urlkey))),
+                '<div class="f-contain">';
+        self::echo_group("branch", $value, []);
+        if ($editable)
+            echo "</div></form>\n";
     }
 
     static function set_repo_action($user) {
@@ -467,26 +499,62 @@ class ContactView {
             redirectSelf();
     }
 
+    static function set_branch_action($user) {
+        global $Conf, $Me, $ConfSitePATH;
+        if (!($Me->has_database_account() && check_post()
+              && ($pset = $Conf->pset_by_key(req("pset")))
+              && $pset->want_branch))
+            return;
+        if (!$Me->can_set_repo($pset, $user))
+            return Conf::msg_error("You can’t edit repository information for that problem set now.");
+
+        $branch = trim(req("branch"));
+        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $repo_url))
+            return Conf::msg_error("That branch contains funny characters. Remove them.");
+
+        if ($branch === "" || $branch === "master")
+            $user->clear_link(LINK_BRANCH, $pset->id);
+        else
+            $user->set_link(LINK_BRANCH, $pset->id, $branch);
+        redirectSelf();
+    }
+
     static function echo_repo_last_commit_group(PsetView $info, $commitgroup) {
         global $Me, $Conf;
         list($user, $repo) = array($info->user, $info->repo);
         if ($info->pset->gitless)
             return;
+        $branch = $info->pset->want_branch ? $user->link(LINK_BRANCH, $info->pset->id) : null;
+        $branch = $branch ? : "master";
 
+        $snaphash = $snapcommitline = $snapcommitat = null;
         if ($repo && !$user->can_view_repo_contents($repo))
             $value = "(unconfirmed repository)";
-        else if ($repo && $repo->snaphash)
-            $value = substr($repo->snaphash, 0, 7) . " " . htmlspecialchars($repo->snapcommitline);
-        else if ($repo)
+        else if ($repo && $repo->snaphash && $branch === "master") {
+            $snaphash = $repo->snaphash;
+            $snapcommitline = $repo->snapcommitline;
+            $snapcommitat = $repo->snapcommitat;
+        } else if ($repo && $repo->snapat) {
+            $c = $repo->latest_commit($info->pset, $branch);
+            if ($c) {
+                $snaphash = $c->hash;
+                $snapcommitline = $c->subject;
+                $snapcommitat = $c->commitat;
+            } else
+                $value = "(no such branch)";
+        } else if ($repo)
             $value = "(checking)";
         else
             $value = "(no repo yet)";
+        if ($snaphash)
+            $value = substr($snaphash, 0, 7) . " " . htmlspecialchars($snapcommitline);
 
         $notes = array();
-        if ($repo && $repo->snapat && $Me->can_view_repo_contents($repo)) {
-            $n = "committed " . ago($repo->snapcommitat)
-                . ", fetched " . ago($repo->snapat)
-                . ", last checked " . ago($repo->snapcheckat);
+        if ($repo && $Me->can_view_repo_contents($repo) && $repo->snapat) {
+            $n = "";
+            if ($snapcommitat)
+                $n = "committed " . ago($snapcommitat) . ", ";
+            $n .= "fetched " . ago($repo->snapat) . ", last checked " . ago($repo->snapcheckat);
             if ($Me->privChair)
                 $n .= " <small style=\"padding-left:1em;font-size:70%\">group " . $repo->cacheid . ", repo" . $repo->repoid . "</small>";
             $notes[] = $n;

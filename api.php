@@ -40,8 +40,11 @@ if ($api->pset && !$api->pset->visible && !$Me->isPC)
     json_exit(["ok" => false, "error" => "No such pset."]);
 
 // check commit
-if ($api->pset && !$api->pset->gitless && !$Me->is_empty())
+if ($api->pset && !$api->pset->gitless && !$Me->is_empty()) {
     $api->repo = $api->user->repo($api->pset);
+    if ($api->pset->want_branch)
+        $api->branch = $api->user->link(LINK_BRANCH, $api->pset->id);
+}
 if ($api->repo && $qreq->commit)
     $api->hash = $qreq->commit;
 

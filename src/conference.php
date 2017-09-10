@@ -8,6 +8,7 @@ class APIData {
     public $user;
     public $pset;
     public $repo;
+    public $branch;
     public $hash;
     public $commit;
     public $at;
@@ -120,7 +121,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 112) {
+        if ($this->sversion < 113) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -1504,7 +1505,7 @@ class Conf {
             return null;
         $commit = $api->pset->handout_commits($input_hash);
         if (!$commit && $api->repo)
-            $commit = $api->repo->connected_commit($input_hash, $api->pset);
+            $commit = $api->repo->connected_commit($input_hash, $api->pset, $api->branch);
         return $commit;
     }
     function _add_api_json($fj) {
