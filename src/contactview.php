@@ -509,7 +509,7 @@ class ContactView {
             return Conf::msg_error("You can’t edit repository information for that problem set now.");
 
         $branch = trim(req("branch"));
-        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $repo_url))
+        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $branch))
             return Conf::msg_error("That branch contains funny characters. Remove them.");
 
         if ($branch === "" || $branch === "master")
