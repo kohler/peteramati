@@ -513,7 +513,7 @@ class ContactView {
             return Conf::msg_error("That branch contains funny characters. Remove them.");
 
         if ($branch === "" || $branch === "master")
-            $user->clear_link(LINK_BRANCH, $pset->id);
+            $user->clear_links(LINK_BRANCH, $pset->id);
         else
             $user->set_link(LINK_BRANCH, $pset->id, $branch);
         redirectSelf();
