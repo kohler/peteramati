@@ -265,7 +265,7 @@ class Repository {
             $dirarg = " -- " . escapeshellarg($directory);
         //$limitarg = $limit ? " -n$limit" : "";
         $limitarg = "";
-        $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' $head$dirarg");
+        $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
         preg_match_all(',^(\S+)\s+(\S+)\s+(.*)$,m', $result, $ms, PREG_SET_ORDER);
         foreach ($ms as $m) {
             if (!isset($this->_commits[$m[2]]))
@@ -352,7 +352,7 @@ class Repository {
         $heads = explode(" ", $this->heads);
         $heads[0] = "%REPO%/" . ($branch ? : "master");
         foreach ($heads as $h) {
-            $result = $this->gitrun("git log$limit --simplify-merges --format=%ae $h$dir");
+            $result = $this->gitrun("git log$limit --simplify-merges --format=%ae " . escapeshellarg($h) . $dir);
             foreach (explode("\n", $result) as $line)
                 if ($line !== "")
                     $users[strtolower($line)] = $line;
@@ -366,7 +366,7 @@ class Repository {
             $files = array($files);
         foreach ($files as $f)
             $suffix .= " " . escapeshellarg(preg_replace(',/+\z,', '', $f));
-        $result = $this->gitrun("git ls-tree -r --name-only $tree" . $suffix);
+        $result = $this->gitrun("git ls-tree -r --name-only " . escapeshellarg($tree) . $suffix);
         $x = explode("\n", $result);
         if (!empty($x) && $x[count($x) - 1] == "")
             array_pop($x);
@@ -391,7 +391,7 @@ class Repository {
             $snaptime = gmmktime($m[4], $m[5], $m[6], $m[2], $m[3], $m[1]);
             $analyzed_snaptime = max($snaptime, $analyzed_snaptime);
             $head = file_get_contents($snapfile);
-            $result = $this->gitrun("git log -n20000 --simplify-merges --format=%H $head");
+            $result = $this->gitrun("git log -n20000 --simplify-merges --format=%H " . escapeshellarg($head));
             foreach (explode("\n", $result) as $line)
                 if (strlen($line) == 40
                     && (!isset($qv[$line]) || $qv[$line][2] > $snaptime))
