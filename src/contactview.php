@@ -528,7 +528,7 @@ class ContactView {
         $branch = $branch ? : "master";
 
         $snaphash = $snapcommitline = $snapcommitat = null;
-        if ($repo && !$user->can_view_repo_contents($repo))
+        if ($repo && !$info->user_can_view_repo_contents())
             $value = "(unconfirmed repository)";
         else if ($repo && $repo->snaphash && $branch === "master") {
             $snaphash = $repo->snaphash;
@@ -550,7 +550,7 @@ class ContactView {
             $value = substr($snaphash, 0, 7) . " " . htmlspecialchars($snapcommitline);
 
         $notes = array();
-        if ($repo && $Me->can_view_repo_contents($repo) && $repo->snapat) {
+        if ($repo && $info->can_view_repo_contents() && $repo->snapat) {
             $n = "";
             if ($snapcommitat)
                 $n = "committed " . ago($snapcommitat) . ", ";
@@ -559,7 +559,7 @@ class ContactView {
                 $n .= " <small style=\"padding-left:1em;font-size:70%\">group " . $repo->cacheid . ", repo" . $repo->repoid . "</small>";
             $notes[] = $n;
         }
-        if ($repo && !$user->can_view_repo_contents($repo)) {
+        if ($repo && !$info->user_can_view_repo_contents()) {
             if ($user->is_anonymous)
                 $notes[] = array(true, "ERROR: The user hasn’t confirmed that they can view this repository.");
             else {
@@ -582,7 +582,7 @@ class ContactView {
 
         if ($commitgroup) {
             echo "<div class=\"commitcontainer61\" data-pa-pset=\"", htmlspecialchars($info->pset->urlkey);
-            if ($repo && $repo->snaphash && $Me->can_view_repo_contents($repo))
+            if ($repo && $repo->snaphash && $info->can_view_repo_contents())
                 echo "\" data-pa-commit=\"", $repo->snaphash;
             echo "\">";
             Ht::stash_script("checklatest61()", "checklatest61");
@@ -596,7 +596,7 @@ class ContactView {
         list($user, $repo) = array($info->user, $info->repo);
         if ($info->pset->gitless_grades)
             return;
-        else if (!$user->can_view_repo_contents($repo)
+        else if (!$info->user_can_view_repo_contents()
                  || !$info->grading_hash())
             return self::echo_repo_last_commit_group($info, false);
         // XXX should check can_view_grades here

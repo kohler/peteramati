@@ -341,7 +341,7 @@ class Repository {
         return $this->find_snapshot($hash);
     }
 
-    function author_emails($pset = null, $limit = null) {
+    function author_emails($pset = null, $branch = null, $limit = null) {
         $dir = "";
         if (is_object($pset) && $pset->directory_noslash !== "")
             $dir = " -- " . escapeshellarg($pset->directory_noslash);
@@ -350,7 +350,7 @@ class Repository {
         $limit = $limit ? " -n$limit" : "";
         $users = [];
         $heads = explode(" ", $this->heads);
-        $heads[0] = "%REPO%/master";
+        $heads[0] = "%REPO%/" . ($branch ? : "master");
         foreach ($heads as $h) {
             $result = $this->gitrun("git log$limit --simplify-merges --format=%ae $h$dir");
             foreach (explode("\n", $result) as $line)

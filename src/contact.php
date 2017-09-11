@@ -1550,7 +1550,7 @@ class Contact {
         return $diff_files;
     }
 
-    function can_view_repo_contents(Repository $repo, $cache_only = false) {
+    function can_view_repo_contents(Repository $repo, $branch = null) {
         if (!$this->conf->opt("restrictRepoView")
             || $this->isPC
             || $repo->is_handout)
@@ -1558,14 +1558,17 @@ class Contact {
         $allowed = get($repo->viewable_by, $this->contactId);
         if ($allowed === null) {
             $allowed = in_array($this->contactId, $this->links(LINK_REPOVIEW));
-            if (!$allowed && !$cache_only) {
+            if (!$allowed) {
                 $users = $repo->author_emails();
                 $allowed = isset($users[strtolower($this->email)]);
+                if (!$allowed && $branch && $branch !== "master") {
+                    $users = $repo->author_emails(null, $branch);
+                    $allowed = isset($users[strtolower($this->email)]);
+                }
                 if ($allowed)
                     $this->add_link(LINK_REPOVIEW, 0, $repo->repoid);
             }
-            if ($allowed || !$cache_only)
-                $repo->viewable_by[$this->contactId] = $allowed;
+            $repo->viewable_by[$this->contactId] = $allowed;
         }
         return $allowed;
     }
@@ -1635,7 +1638,7 @@ class Contact {
                 || (!$info->grades_hidden()
                     && $this === $info->user
                     && ($pset->gitless_grades
-                        || ($info->repo && $this->can_view_repo_contents($info->repo)))));
+                        || ($info->repo && $info->user_can_view_repo_contents()))));
     }
 
     static function student_can_view_grade_cdf(Pset $pset) {
@@ -1667,7 +1670,7 @@ class Contact {
                 || ($this->isPC && $info->pc_view)
                 || ($this === $info->user
                     && ($pset->gitless
-                        || ($info->repo && $this->can_view_repo_contents($info->repo)))));
+                        || ($info->repo && $info->user_can_view_repo_contents()))));
     }
 
     function can_run(Pset $pset, $runner, $user = null) {

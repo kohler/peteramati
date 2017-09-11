@@ -2,9 +2,10 @@
 
 class API_Repo {
     static function latestcommit(Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$api->repo || !($c = $api->repo->latest_commit($api->pset, $api->branch)))
+        if (!$api->repo
+            || !($c = $api->repo->latest_commit($api->pset, $api->branch)))
             return ["hash" => false];
-        else if (!$user->can_view_repo_contents($api->repo))
+        else if (!$user->can_view_repo_contents($api->repo, $api->branch))
             return ["hash" => false, "error" => "Unconfirmed repository."];
         else {
             $j = clone $c;
@@ -16,7 +17,7 @@ class API_Repo {
     }
 
     static function blob(Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$user->can_view_repo_contents($api->repo))
+        if (!$user->can_view_repo_contents($api->repo, $api->branch))
             return ["ok" => false, "error" => "Permission error."];
         if (!$qreq->file
             || (isset($qreq->fromline) && !ctype_digit($qreq->fromline))

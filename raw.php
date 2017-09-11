@@ -42,7 +42,7 @@ $Info = user_pset_info();
 $Repo = $Info->repo;
 $Commit = $Info->commit_hash();
 $RecentCommits = $Info->recent_commits();
-if (!$Repo || !$Commit || !$Me->can_view_repo_contents($Repo) || !$Qreq->file)
+if (!$Repo || !$Commit || !$Info->can_view_repo_contents() || !$Qreq->file)
     exit;
 
 // file

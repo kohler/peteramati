@@ -417,6 +417,14 @@ class PsetView {
         return $this->user_can_view_grades;
     }
 
+    function can_view_repo_contents() {
+        return $this->viewer->can_view_repo_contents($this->repo, $this->branch);
+    }
+
+    function user_can_view_repo_contents() {
+        return $this->user->can_view_repo_contents($this->repo, $this->branch);
+    }
+
     function can_view_note_authors() {
         return $this->pc_view;
     }
