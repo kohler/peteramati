@@ -55,8 +55,8 @@ function output($User) {
 
 $Conf->header("Thefacebook", "face");
 
-$u = Dbl::qe("select contactId, email, firstName, lastName, seascode_username, contactImageId from ContactInfo where roles=0");
-while (($user = edb_orow($u)))
+$result = Dbl::qe("select contactId, email, firstName, lastName, seascode_username, contactImageId from ContactInfo where roles=0");
+while (($user = Contact::fetch($result, $Conf)))
     output($user);
 
 echo "<div class='clear'></div>\n";
