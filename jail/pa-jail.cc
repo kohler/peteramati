@@ -2069,7 +2069,7 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
         fprintf(stderr, "  -f, --contents-file FILE  populate jail with contents of FILE\n");
         fprintf(stderr, "  -F, --contents DATA       populate jail with DATA\n");
         fprintf(stderr, "  -h, --chown-home          change ownership of USER homedir\n");
-        fprintf(stderr, "  -S, --skeleton SKELDIR    use SKELDIR to populate jail\n");
+        fprintf(stderr, "  -S, --skeleton SKELDIR    populate jail from SKELDIR\n");
         if (action == do_run) {
             fprintf(stderr, "  -p, --pid-file PIDFILE    write jail process PID to PIDFILE\n\
   -i, --input INPUTSOCKET   use TTY, read input from INPUTSOCKET\n\
