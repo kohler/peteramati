@@ -128,7 +128,7 @@ class RunnerState {
 
         // create jail
         $this->remove_old_jails();
-        if ($this->run_and_log("jail/pa-jail init " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username)))
+        if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username)))
             throw new RunnerException("can't initialize jail");
 
         // check out code
