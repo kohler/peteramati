@@ -654,16 +654,24 @@ static void handle_symlink_dst(std::string dst, std::string src,
         handle_copy(src, dst.substr(root.length()), 0, jaildev);
 }
 
-static int x_cp_p(const std::string& src, const std::string& dst) {
+static int x_rm_f(const std::string &dst) {
     if (verbose)
-        fprintf(verbosefile, "rm -f %s\ncp -p %s %s\n",
-                dst.c_str(), src.c_str(), dst.c_str());
+        fprintf(verbosefile, "rm -f %s\n", dst.c_str());
     if (dryrun)
         return 0;
-
     int r = unlink(dst.c_str());
     if (r == -1 && errno != ENOENT)
         return perror_fail("rm %s: %s\n", dst.c_str());
+    return 0;
+}
+
+static int x_cp_p(const std::string& src, const std::string& dst) {
+    if (x_rm_f(dst))
+        return 1;
+    if (verbose)
+        fprintf(verbosefile, "cp -p %s %s\n", src.c_str(), dst.c_str());
+    if (dryrun)
+        return 0;
 
     pid_t child = fork();
     if (child == 0) {
@@ -726,16 +734,19 @@ static int do_copy(const std::string& dst, const std::string& src,
         }
         if (v_mkdir(dst.c_str(), perm) != 0)
             return 1;
-        return x_lchown(dst.c_str(), ss.st_uid, ss.st_gid);
     } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
         // XXX special handling for /dev/ptmx; there is probably a
         // cleaner way
+        if (x_rm_f(dst))
+            return 1;
         if (src.length() == 9 && src == "/dev/ptmx")
             return x_symlink("pts/ptmx", dst.c_str());
         mode_t mode = ss.st_mode & (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
         if (x_mknod(dst.c_str(), mode, ss.st_rdev))
             return 1;
     } else if (S_ISLNK(ss.st_mode)) {
+        if (x_rm_f(dst))
+            return 1;
         char lnkbuf[4096];
         ssize_t r = readlink(src.c_str(), lnkbuf, sizeof(lnkbuf));
         if (r == -1)
