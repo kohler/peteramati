@@ -143,6 +143,8 @@ class RunnerState {
             . " -p" . escapeshellarg($this->lockfile);
         $skeletondir = $this->pset->run_skeletondir ? : $Conf->opt("run_skeletondir");
         $binddir = $this->pset->run_binddir ? : $Conf->opt("run_binddir");
+        if ($skeletondir && $binddir && !is_dir("$skeletondir/proc"))
+            $binddir = false;
         if ($skeletondir && $binddir) {
             $binddir = preg_replace(',/+\z,', '', $binddir);
             $contents = "/ <- " . $skeletondir . " [bind-ro]\n"
