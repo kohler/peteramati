@@ -318,9 +318,25 @@ static bool x_symlink_eexist_ok(const char* oldpath, const char* newpath) {
 static int x_symlink(const char* oldpath, const char* newpath) {
     if (verbose)
         fprintf(verbosefile, "ln -s %s %s\n", oldpath, newpath);
-    if (!dryrun && symlink(oldpath, newpath) != 0
+    if (!dryrun
+        && symlink(oldpath, newpath) != 0
         && (errno != EEXIST || !x_symlink_eexist_ok(oldpath, newpath)))
         return perror_fail("symlink %s: %s\n", (std::string(oldpath) + " " + newpath).c_str());
+    return 0;
+}
+
+static int x_copy_utimes(const char* path, const struct stat& st) {
+#if __linux__
+    if (verbose)
+        fprintf(verbosefile, "touch -m -d @%ld %s\n", st.st_mtime, path);
+    if (!dryrun) {
+        struct timespec ts[2];
+        ts[0].tv_nsec = UTIME_OMIT;
+        ts[1] = st.st_mtim;
+        if (utimensat(-1, path, ts, AT_SYMLINK_NOFOLLOW) != 0)
+            return perror_fail("utimensat %s: %s\n", path);
+    }
+#endif
     return 0;
 }
 
@@ -692,6 +708,14 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
         return perror_fail("/bin/cp %s: Did not exit\n", dst.c_str());
 }
 
+static inline int stat_mtimes_same(const struct stat& st1, const struct stat& st2) {
+#if __linux__
+    return st1.st_mtim.tv_sec == st2.st_mtim.tv_sec && st1.st_mtim.tv_nsec == st2.st_mtim.tv_nsec;
+#else
+    return st1.st_mtime == st2.st_mtime;
+#endif
+}
+
 static int do_copy(const std::string& dst, const std::string& src,
                    const struct stat& ss, bool reuse_link, dev_t jaildev) {
     struct stat ds;
@@ -704,8 +728,8 @@ static int do_copy(const std::string& dst, const std::string& src,
             || ss.st_size == ds.st_size)
         && ((!S_ISBLK(ss.st_mode) && !S_ISCHR(ss.st_mode))
             || ss.st_rdev == ds.st_rdev)
-        && (!S_ISREG(ss.st_mode)
-            || ss.st_mtime == ds.st_mtime)) {
+        && ((!S_ISREG(ss.st_mode) && !S_ISLNK(ss.st_mode))
+            || stat_mtimes_same(ss, ds))) {
         if (S_ISREG(ss.st_mode)) {
             auto di = std::make_pair(ss.st_dev, ss.st_ino);
             devino_table.insert(std::make_pair(di, dst));
@@ -752,6 +776,8 @@ static int do_copy(const std::string& dst, const std::string& src,
             return perror_fail("%s: Symbolic link too long\n", src.c_str());
         lnkbuf[r] = 0;
         if (x_symlink(lnkbuf, dst.c_str()))
+            return 1;
+        if (x_copy_utimes(dst.c_str(), ss))
             return 1;
         handle_symlink_dst(dst, src, std::string(lnkbuf), jaildev);
     } else
