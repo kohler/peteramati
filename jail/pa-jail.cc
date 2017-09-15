@@ -692,11 +692,8 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
         return perror_fail("/bin/cp %s: Did not exit\n", dst.c_str());
 }
 
-#define DO_COPY_SKELETON 1
-#define DO_COPY_LINK 2
-
 static int do_copy(const std::string& dst, const std::string& src,
-                   const struct stat& ss, int flags, dev_t jaildev) {
+                   const struct stat& ss, bool reuse_link, dev_t jaildev) {
     struct stat ds;
     int r = lstat(dst.c_str(), &ds);
     if (r == 0
@@ -718,7 +715,7 @@ static int do_copy(const std::string& dst, const std::string& src,
 
     // check for hard link to already-created file
     if (S_ISREG(ss.st_mode)) {
-        if (flags & DO_COPY_LINK) {
+        if (reuse_link) {
             auto di = std::make_pair(ss.st_dev, ss.st_ino);
             auto it = devino_table.find(di);
             if (it != devino_table.end())
@@ -807,9 +804,9 @@ static int handle_copy(std::string src, std::string subdst,
 
     // set up skeleton directory version
     if (!linkdir.empty())
-        do_copy(linkdir + subdst, src, ss, DO_COPY_SKELETON | DO_COPY_LINK, jaildev);
+        do_copy(linkdir + subdst, src, ss, true, jaildev);
 
-    if (do_copy(dst, src, ss, flags & FLAG_CP ? 0 : DO_COPY_LINK, jaildev))
+    if (do_copy(dst, src, ss, !(flags & FLAG_CP), jaildev))
         return 1;
 
     if (S_ISDIR(ss.st_mode))
