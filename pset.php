@@ -652,8 +652,7 @@ if ($Pset->gitless) {
                 $b = Ht::button(htmlspecialchars($r->title),
                                 array("name" => "run",
                                       "value" => $r->name,
-                                      "class" => "runner61",
-                                      "style" => "font-weight:bold",
+                                      "class" => "btn runner61",
                                       "onclick" => "run61(this)",
                                       "data-pa-runclass" => $r->runclass_argument(),
                                       "data-pa-loadgrade" => isset($r->eval) ? "true" : null));

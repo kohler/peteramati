@@ -90,3 +90,6 @@ if (isset($_SESSION["redirect_error"])) {
     $Error = $_SESSION["redirect_error"];
     unset($_SESSION["redirect_error"]);
 }
+
+
+Ht::$default_button_class = "btn";

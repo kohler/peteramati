@@ -581,7 +581,7 @@ function show_pset($pset, $user) {
     if (!$user_can_view)
         echo '<div class="pa-pset-hidden">';
     $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($user)]);
-    echo "<h2><a href=\"", $pseturl, "\">",
+    echo "<h2><a class=\"btn\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
         htmlspecialchars($pset->title), "</a>";
     $info = new PsetView($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
@@ -607,6 +607,8 @@ function show_pset($pset, $user) {
             echo '</div>';
     }
     ContactView::echo_repo_flags_group($info);
+    if ($info->repo && $user_can_view)
+        ContactView::echo_group("", '<strong><a href="' . $pseturl . '">view code</a></strong>');
     if (!$user_can_view)
         echo '</div>';
     echo "\n";
