@@ -653,7 +653,7 @@ function render_grading_student(Contact $s, $anonymous) {
     return $j;
 }
 
-function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
+function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
     $t0 = $Profile ? microtime(true) : 0;
     $j = render_grading_student($s, $anonymous);
@@ -718,6 +718,13 @@ function render_pset_row(Pset $pset, $students, Contact $s, $anonymous) {
             || ($s->pcid && (!isset($students[$s->pcid])
                              || $students[$s->pcid]->repoid != $s->repoid)))
             $j["repo_partner_error"] = true;
+        else if ($s->repoid) {
+            $expected_cids = [$s->contactId];
+            if ($s->pcid)
+                $expected_cids[] = $s->pcid;
+            if (count(array_intersect($expected_cids, $repos[$s->repoid])) != count($expected_cids))
+                $j["repo_sharing"] = true;
+        }
     }
 
     $s->visited = true;
@@ -901,10 +908,12 @@ function show_pset_table($pset) {
     $anonymous = $pset->anonymous;
     if (req("anonymous") !== null && $Me->privChair)
         $anonymous = !!req("anonymous");
-    $students = array();
+    $students = $repos = array();
     while ($result && ($s = Contact::fetch($result))) {
         $s->set_anonymous($anonymous);
         $students[$s->contactId] = $s;
+        if (!$pset->gitless && $s->repoid)
+            $repos[$s->repoid][] = $s->contactId;
         // maybe lastpset links are out of order
         if ($s->lastpset < $pset)
             $LastPsetFix = true;
@@ -920,13 +929,13 @@ function show_pset_table($pset) {
     $jx = [];
     foreach ($students as $s)
         if (!$s->visited) {
-            $j = render_pset_row($pset, $students, $s, $anonymous);
+            $j = render_pset_row($pset, $students, $repos, $s, $anonymous);
             $boring = !$pset->gitless_grades && ($s->gradehash === null || $s->dropped);
             if ($s->pcid) {
                 foreach (array_unique(explode(",", $s->pcid)) as $pcid)
                     if (isset($students[$pcid])) {
                         $ss = $students[$pcid];
-                        $jj = render_pset_row($pset, $students, $ss, $anonymous);
+                        $jj = render_pset_row($pset, $students, $repos, $ss, $anonymous);
                         $j["partners"][] = $jj;
                         if ($boring && ($s->gradehash !== null && !$ss->dropped))
                             $boring = false;

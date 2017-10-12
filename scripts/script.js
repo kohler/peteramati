@@ -3282,6 +3282,8 @@ function pa_render_pset_table(psetid, pconf, data) {
                 txt += ' <strong class="err">open</strong>';
             if (s.repo_partner_error)
                 txt += ' <strong class="err">partner</strong>';
+            if (s.repo_sharing)
+                txt += ' <strong class="err">sharing</strong>';
             a.push('<td class="s61repo">' + txt + '</td>');
         }
         return a;
