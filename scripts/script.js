@@ -2222,6 +2222,9 @@ function pa_savegrades(form) {
 }
 
 function pa_loadgrades(gi) {
+    if (!gi.order)
+        return;
+
     var $pi = $(this).closest(".pa-psetinfo");
     $pi.data("pa-gradeinfo", gi);
     var editable = $pi[0].hasAttribute("data-pa-can-set-grades");
