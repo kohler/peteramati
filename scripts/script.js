@@ -3081,29 +3081,6 @@ function checklatest61() {
     }
 }
 
-function click_s61check(evt) {
-    var $form = $(this).closest("form"), $checks = $form.find(".s61check");
-    var pos, i, j;
-    for (pos = 0; pos != $checks.length && $checks[pos] != this; ++pos)
-        /* skip */;
-    if (i != $checks.length) {
-        var last = $form.attr("check_s61_last");
-        if (evt.shiftKey && last != null) {
-            if (last <= pos) {
-                i = last;
-                j = pos - 1;
-            } else {
-                i = pos + 1;
-                j = last;
-            }
-            for (; i <= j; ++i)
-                $checks[i].checked = this.checked;
-        }
-        $form.attr("check_s61_last", pos);
-    }
-    return true;
-}
-
 function repoclip() {
     var node = document.createTextNode(this.getAttribute("data-pa-repo"));
     var bub = make_bubble(node, {color: "tooltip", dir: "t"});
@@ -3193,10 +3170,16 @@ function pa_render_pset_table(psetid, pconf, data) {
         return escape_entities(hoturl("pset", args));
     }
     function render_username_td(s) {
-        var t = '<a href="' + escaped_href(s);
+        var t = '<a href="' + escaped_href(s), un;
         if (s.dropped)
             t += '" style="text-decoration:line-through';
-        return t + '">' + escape_entities(ukey(s)) + '</a>';
+        if (anonymous && s.anon_username)
+            un = s.anon_username;
+        else if (sort.email && s.email)
+            un = s.email;
+        else
+            un = s.username || "";
+        return t + '">' + escape_entities(un) + '</a>';
     }
     function render_name(s, last_first) {
         if (s.first != null && s.last != null) {
@@ -3216,7 +3199,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         if (!s.anon_username || !pconf.can_override_nonanonymous)
             return txt;
         else
-            return '<span class="s61nonanonymous">' + txt + '</span>';
+            return '<span class="pap-nonanonymous">' + txt + '</span>';
     }
     function render_tds(s, row_number) {
         var grades = pconf.grade_keys || [];
@@ -3227,48 +3210,48 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<td></td>');
         } else {
             if (pconf.checkbox)
-                a.push('<td class="s61checkbox"><input type="checkbox" name="s61_' + encodeURIComponent(s.username).replace(/\./g, "%2E") + '" value="1" class="s61check" /></td>');
-            a.push('<td class="s61rownumber">' + row_number + '.</td>');
+                a.push('<td class="pap-checkbox"><input type="checkbox" name="s61_' + encodeURIComponent(s.username).replace(/\./g, "%2E") + '" value="1" class="pap-check" /></td>');
+            a.push('<td class="pap-rownumber">' + row_number + '.</td>');
         }
         if (flagged) {
-            a.push('<td class="s61pset"><a href="' + escaped_href(s) + '">' +
+            a.push('<td class="pap-pset"><a href="' + escaped_href(s) + '">' +
                    escape_entities(peteramati_psets[s.psetid].title) +
                    (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>');
-            a.push('<td class="s61at">' +
+            a.push('<td class="pap-at">' +
                    (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>');
         }
-        a.push('<td class="s61username">' + render_username_td(s) + '</td>');
+        a.push('<td class="pap-username">' + render_username_td(s) + '</td>');
         // a.push('<td>' + (s.gradehash || "") + '</td>');
-        a.push('<td class="s61name' + (!s.anon_username || pconf.has_nonanonymous ? "" : " s61nonanonymous") + '">' + render_display_name(s) + '</td>');
-        a.push('<td class="s61extension">' + (s.x ? "X" : "") + '</td>');
+        a.push('<td class="pap-name' + (!s.anon_username || pconf.has_nonanonymous ? "" : " pap-nonanonymous") + '">' + render_display_name(s) + '</td>');
+        a.push('<td class="pap-extension">' + (s.x ? "X" : "") + '</td>');
         if (s.gradercid && peteramati_grader_map[s.gradercid])
             txt = escape_entities(peteramati_grader_map[s.gradercid]);
         else
             txt = s.gradercid ? "???" : "";
-        a.push('<td class="s61grader">' + txt + '</td>');
+        a.push('<td class="pap-grader">' + txt + '</td>');
         if (flagged) {
             txt = '';
             if (s.is_grade)
                 txt += '✱';
             if (s.has_notes)
                 txt += '♪';
-            a.push('<td class="s61notes">' + txt + '</td>');
+            a.push('<td class="pap-notes">' + txt + '</td>');
         } else if (!pconf.gitless_grades) {
             txt = '';
             if (s.has_notes)
                 txt += '♪';
             if (s.has_nongrader_notes)
                 txt += '<sup>*</sup>';
-            a.push('<td class="s61notes">' + txt + '</td>');
+            a.push('<td class="pap-notes">' + txt + '</td>');
         }
         if (pconf.need_total)
-            a.push('<td class="s61total r">' + s.total + '</td>');
+            a.push('<td class="pap-total r">' + s.total + '</td>');
         for (j = 0; j < grades.length; ++j) {
-            klass = "s61grade";
+            klass = "pap-grade";
             if (grades[j] == pconf.total_key && s.grades[j] != null && s.grades[j] != "")
-                klass = "s61total";
+                klass = "pap-total";
             if (s.highlight_grades && s.highlight_grades[grades[j]])
-                klass += " s61highlight";
+                klass += " pap-highlight";
             a.push('<td class="' + klass + ' r">' + (s.grades[j] == null ? '' : s.grades[j]) + '</td>');
         }
         if (!pconf.gitless) {
@@ -3288,7 +3271,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 txt += ' <strong class="err">partner</strong>';
             if (s.repo_sharing)
                 txt += ' <strong class="err">sharing</strong>';
-            a.push('<td class="s61repo">' + txt + '</td>');
+            a.push('<td class="pap-repo">' + txt + '</td>');
         }
         return a;
     }
@@ -3324,7 +3307,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             var a = [];
             ++trn;
             if (s.boringness !== was_boringness && trn != 1)
-                a.push('<tr class="s61boring"><td colspan="' + calculate_ncol() + '"><hr /></td></tr>');
+                a.push('<tr class="pap-boring"><td colspan="' + calculate_ncol() + '"><hr /></td></tr>');
             was_boringness = s.boringness;
             var stds = render_tds(s, trn);
             a.push('<tr class="k' + (trn % 2) + '" data-pa-spos="' + s._spos + '">' + stds.join('') + '</tr>');
@@ -3336,11 +3319,12 @@ function pa_render_pset_table(psetid, pconf, data) {
                 for (var k = 0; k < sstds.length; ++k)
                     if (sstds[k] === stds[k])
                         sstds[k] = '<td></td>';
-                a.push('<tr class="k' + (trn % 2) + ' s61partner" data-pa-spos="' + ss._spos + '" data-pa-partner="1">' + sstds.join('') + '</tr>');
+                a.push('<tr class="k' + (trn % 2) + ' papr-partner" data-pa-spos="' + ss._spos + '" data-pa-partner="1">' + sstds.join('') + '</tr>');
             }
             $b.append(a.join(''));
         }
         set_hotlist($b);
+        $b.on("click", ".pap-check", checkbox_click);
     }
     function resort() {
         var $b = $j.find("tbody"), tb = $b[0];
@@ -3356,12 +3340,12 @@ function pa_render_pset_table(psetid, pconf, data) {
         last = tb.firstChild;
         for (i = 0; i < data.length; ++i) {
             ++trn;
-            while ((j = last) && j.className === "s61boring") {
+            while ((j = last) && j.className === "pap-boring") {
                 last = last.nextSibling;
                 tb.removeChild(j);
             }
             if (data[i].boringness !== was_boringness && trn != 1)
-                tb.insertBefore($('<tr class="s61boring"><td colspan="' + calculate_ncol() + '"><hr /></td></tr>')[0], last);
+                tb.insertBefore($('<tr class="pap-boring"><td colspan="' + calculate_ncol() + '"><hr /></td></tr>')[0], last);
             was_boringness = data[i].boringness;
             tr = rmap[data[i]._spos];
             for (j = 0; j < tr.length; ++j) {
@@ -3371,12 +3355,12 @@ function pa_render_pset_table(psetid, pconf, data) {
                     last = last.nextSibling;
                 tr[j].className = "k" + (trn % 2) + " " + tr[j].className.replace(/\bk[01]\s*/, "");
             }
-            $(tr[0]).find(".s61rownumber").html(trn + ".");
+            $(tr[0]).find(".pap-rownumber").html(trn + ".");
         }
         var display_last_first = sort.f && sort.last;
         if (display_last_first !== displaying_last_first) {
             displaying_last_first = display_last_first;
-            $b.find(".s61name").html(function () {
+            $b.find(".pap-name").html(function () {
                 var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
                 return render_display_name(s);
             });
@@ -3384,15 +3368,19 @@ function pa_render_pset_table(psetid, pconf, data) {
         set_hotlist($b);
         wstorage(true, "pa-pset" + psetid + "-table", JSON.stringify(sort));
     }
+    function rerender_usernames() {
+        $j.find("tbody td.pap-username").each(function () {
+            var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
+            $(this).html(render_username_td(s));
+        });
+        $j.find("thead > tr > th.pap-username > span.heading").html(anonymous || !sort.email ? "Username" : "Email");
+    }
     function switch_anon() {
         anonymous = !anonymous;
         if (!anonymous)
             sort.override_anonymous = true;
-        $j.toggleClass("s61anonymous", anonymous);
-        $j.find("tbody td.s61username").each(function () {
-            var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
-            $(this).html(render_username_td(s));
-        });
+        $j.toggleClass("pap-anonymous", anonymous);
+        rerender_usernames();
         sort_data();
         resort();
         return false;
@@ -3400,33 +3388,33 @@ function pa_render_pset_table(psetid, pconf, data) {
     function render_head() {
         var a = [], j, grades = pconf.grade_keys || [], t;
         if (pconf.checkbox)
-            a.push('<th class="s61checkbox"></th>');
-        a.push('<th class="s61rownumber"></th>');
+            a.push('<th class="pap-checkbox"></th>');
+        a.push('<th class="pap-rownumber"></th>');
         if (flagged) {
-            a.push('<th class="s61pset l plsortable" data-pa-sort="pset">Pset</th>');
-            a.push('<th class="s61at l plsortable" data-pa-sort="at">Flagged</th>');
+            a.push('<th class="pap-pset l plsortable" data-pa-sort="pset">Pset</th>');
+            a.push('<th class="pap-at l plsortable" data-pa-sort="at">Flagged</th>');
         }
-        t = "";
+        t = '<span class="heading">' + (anonymous || !sort.email ? "Username" : "Email") + '</span>';
         if (pconf.anonymous && pconf.can_override_anonymous)
-            t = ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>';
+            t += ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>';
         else if (pconf.anonymous)
-            t = ' <span style="font-weight:normal">[anon]</span>';
-        a.push('<th class="s61username l plsortable" data-pa-sort="username">Username' + t + '</th>');
-        a.push('<th class="s61name l' + (pconf.has_nonanonymous ? "" : " s61nonanonymous") + ' plsortable" data-pa-sort="name">Name</th>');
-        a.push('<th class="s61extension l plsortable" data-pa-sort="extension">X?</th>');
-        a.push('<th class="s61grader l plsortable" data-pa-sort="grader">Grader</th>');
+            t += ' <span style="font-weight:normal">[anon]</span>';
+        a.push('<th class="pap-username l plsortable" data-pa-sort="username">' + t + '</th>');
+        a.push('<th class="pap-name l' + (pconf.has_nonanonymous ? "" : " pap-nonanonymous") + ' plsortable" data-pa-sort="name">Name</th>');
+        a.push('<th class="pap-extension l plsortable" data-pa-sort="extension">X?</th>');
+        a.push('<th class="pap-grader l plsortable" data-pa-sort="grader">Grader</th>');
         if (!pconf.gitless_grades)
-            a.push('<th class="s61notes"></th>');
+            a.push('<th class="pap-notes"></th>');
         if (pconf.need_total)
-            a.push('<th class="s61total r plsortable" data-pa-sort="total">Tot</th>');
+            a.push('<th class="pap-total r plsortable" data-pa-sort="total">Tot</th>');
         for (j = 0; j < grades.length; ++j)
-            a.push('<th class="s61grade r plsortable" data-pa-sort="grade' + j + '">' + grades[j].substr(0, 3) + '</th>');
+            a.push('<th class="pap-grade r plsortable" data-pa-sort="grade' + j + '">' + grades[j].substr(0, 3) + '</th>');
         if (!pconf.gitless)
-            a.push('<th class="s61repo"></th>');
+            a.push('<th class="pap-repo"></th>');
         $j.find("thead").html('<tr>' + a.join('') + '</tr>');
-        $j.find("thead .s61username a").click(switch_anon);
+        $j.find("thead .pap-username a").click(switch_anon);
     }
-    function user_compar(a, b) {
+    function user_compare(a, b) {
         var au = ukey(a).toLowerCase();
         var bu = ukey(b).toLowerCase();
         var rev = sort.rev;
@@ -3458,7 +3446,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 else if (a._sort_name != b._sort_name)
                     return a._sort_name < b._sort_name ? -rev : rev;
                 else
-                    return user_compar(a, b);
+                    return user_compare(a, b);
             });
         } else if (f === "extension") {
             data.sort(function (a, b) {
@@ -3467,7 +3455,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 else if (a.x != b.x)
                     return a.x ? rev : -rev;
                 else
-                    return user_compar(a, b);
+                    return user_compare(a, b);
             });
         } else if (f === "grader") {
             data.sort(function (a, b) {
@@ -3479,7 +3467,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                     if (ag != bg)
                         return ag < bg ? -rev : rev;
                     else
-                        return user_compar(a, b);
+                        return user_compare(a, b);
                 }
             });
         } else if (f === "pset") {
@@ -3507,7 +3495,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 else if (a.total != b.total)
                     return a.total < b.total ? -rev : rev;
                 else
-                    return -user_compar(a, b);
+                    return -user_compare(a, b);
             });
         } else if ((m = /^grade(\d+)$/.exec(f))) {
             data.sort(function (a, b) {
@@ -3523,7 +3511,23 @@ function pa_render_pset_table(psetid, pconf, data) {
                     if (ag != bg)
                         return ag < bg ? -rev : rev;
                     else
-                        return -user_compar(a, b);
+                        return -user_compare(a, b);
+                }
+            });
+        } else if (sort.email && !anonymous) {
+            f = "username";
+            data.sort(function (a, b) {
+                if (a.boringness !== b.boringness)
+                    return a.boringness - b.boringness;
+                else {
+                    var ae = (a.email || "").toLowerCase(), be = (b.email || "").toLowerCase();
+                    if (ae !== be) {
+                        if (ae === "" || be === "")
+                            return ae === "" ? rev : -rev;
+                        else
+                            return ae < be ? -rev : rev;
+                    } else
+                        return user_compare(a, b);
                 }
             });
         } else { /* "username" */
@@ -3532,7 +3536,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
                 else
-                    return user_compar(a, b);
+                    return user_compare(a, b);
             });
         }
         $j.find(".plsortable").removeClass("plsortactive plsortreverse");
@@ -3554,15 +3558,44 @@ function pa_render_pset_table(psetid, pconf, data) {
             sort.last = !sort.last;
             if (sort.last)
                 sort.rev = -sort.rev;
-        } else
+        } else if (sf === "username") {
+            if (sort.rev === -1 && !anonymous) {
+                sort.email = !sort.email;
+                rerender_usernames();
+            }
             sort.rev = -sort.rev;
+        } else {
+            sort.rev = -sort.rev;
+        }
         sort_data();
         resort();
+    }
+    function checkbox_click(event) {
+        var $checks = $j.find(".pap-check"), pos, i, j;
+        for (pos = 0; pos != $checks.length && $checks[pos] != this; ++pos)
+            /* skip */;
+        if (i != $checks.length) {
+            var last = $j.data("pap-check-lastclick");
+            if (event.shiftKey && last != null) {
+                if (last <= pos) {
+                    i = last;
+                    j = pos - 1;
+                } else {
+                    i = pos + 1;
+                    j = last;
+                }
+                for (; i <= j; ++i)
+                    $checks[i].checked = this.checked;
+            }
+            $j.data("pap-check-lastclick", pos);
+        }
+        return true;
     }
 
     initialize();
     $j.html("<thead></thead><tbody class='has-hotlist'></tbody>");
-    $j.toggleClass("s61anonymous", !!anonymous);
+    $j.toggleClass("pap-anonymous", !!anonymous);
+    $j.toggleClass("pap-useemail", !!sort.email);
     $j.find("thead").on("click", "th", head_click);
     render_head();
     if (!pconf.no_sort)

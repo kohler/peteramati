@@ -635,6 +635,8 @@ if (!$Me->is_empty() && $User->is_student()) {
 function render_grading_student(Contact $s, $anonymous) {
     $j = ["uid" => $s->contactId];
     $j["username"] = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
+    if ($s->email)
+        $j["email"] = $s->email;
     if ($anonymous)
         $j["anon_username"] = $s->anon_username;
 
@@ -745,7 +747,7 @@ function show_regrades($result, $all) {
         if (isset($j["total"]))
             ++$nintotal;
     }
-    echo '<table class="s61" id="pa-pset-flagged"></table></div>', "\n";
+    echo '<table class="pap" id="pa-pset-flagged"></table></div>', "\n";
     $jd = ["flagged_commits" => true, "anonymous" => true, "has_nonanonymous" => $any_nonanonymous];
     if ($nintotal)
         $jd["need_total"] = 1;
@@ -984,7 +986,7 @@ function show_pset_table($pset) {
     if ($checkbox)
         echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
 
-    echo '<table class="s61" id="pa-pset' . $pset->id . '"></table>';
+    echo '<table class="pap" id="pa-pset' . $pset->id . '"></table>';
     $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous, "grade_keys" => array_keys($pset->grades),
            "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
            "psetkey" => $pset->urlkey];
@@ -1086,7 +1088,6 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             show_pset_table($pset, $Me);
             $sep = "<hr />\n";
         }
-    Ht::stash_script("$('.s61check').click(click_s61check)");
 
     if ($LastPsetFix) {
         $Conf->log("Repository.lastpset links are bogus", $Me);

@@ -2348,39 +2348,35 @@ td.mhcb {
 #runsettings61 input {
 	font-size: 10px;
 }
-.s61username {
+.pap-username {
 	font-weight: bold;
 	white-space: nowrap;
 }
-/*table.s61 > tbody > tr > td:nth-child(n + 3),
-table.s61 > thead > tr > th:nth-child(n + 3) {
-	padding-left: 12px;
-}*/
-table.s61 > thead {
+table.pap > thead {
 	font-size: smaller;
 	color: #7777aa;
 }
-.s61rownumber, .s61checkbox {
+.pap-rownumber, .pap-checkbox {
 	text-align: right;
 	padding: 0 5px;
 }
-.s61username, .s61name, .s61extension, .s61grader, .s61notes, .s61grade, .s61total, .s61repo,
-.s61pset, .s61at {
+.pap-username, .pap-name, .pap-extension, .pap-grader, .pap-notes, .pap-grade, .pap-total, .pap-repo,
+.pap-pset, .pap-at {
 	padding-left: 12px;
 }
-tr.s61partner > td.s61username {
+tr.papr-partner > td.pap-username {
 	padding-left: 1em;
 }
-tr.s61partner {
+tr.papr-partner {
 	font-size: smaller;
 }
-.s61total {
+.pap-total {
 	font-weight: bold;
 }
-.s61highlight {
+.pap-highlight {
 	color: red;
 }
-.s61anonymous .s61nonanonymous {
+.pap-anonymous .pap-nonanonymous {
 	display: none;
 }
 .gradecdf61summary {
