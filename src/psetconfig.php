@@ -285,6 +285,8 @@ class Pset {
                     $gej["in_total"] = true;
                 if ($ge->is_extra)
                     $gej["is_extra"] = true;
+                if ($ge->landmark_file)
+                    $gej["landmark"] = $ge->landmark_file . ":" . $ge->landmark_line;
                 $ej[$ge->key] = $gej;
                 $order[] = $ge->key;
                 ++$count;

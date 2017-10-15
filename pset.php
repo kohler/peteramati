@@ -625,6 +625,8 @@ echo "<hr>\n";
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey);
 if (!$Pset->gitless && $Info->maybe_commit_hash())
     echo '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
+if (!$Pset->gitless && $Pset->directory)
+    echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
 if ($Me->can_set_grades($Pset, $Info))
     echo '" data-pa-can-set-grades="yes';
 if ($Info->user_can_view_grades())

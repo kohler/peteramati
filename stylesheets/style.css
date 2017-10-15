@@ -2400,9 +2400,15 @@ tr.pa-dl.gx:hover > td {
 	background-color: #e8e8f8;
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
-.pa-notebox, .pa-note-entry, .pa-noteref {
+.pa-notebox, .pa-note-entry, .pa-noteref, .pa-gradeboxref {
 	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 18px;
+}
+.pa-gradeboxref {
+	line-height: inherit;
+}
+.pa-gradeboxref > a {
+	color: #777777;
 }
 .pa-da::before, .pa-db::before {
 	content: attr(data-landmark);
@@ -2462,6 +2468,10 @@ table.hidegrades .pa-gradenote {
 	padding-left: 1em;
 	font-size: smaller;
 	color: red;
+}
+.pa-gradeboxref {
+	padding-left: 1em;
+	font-size: smaller;
 }
 a.fold61 {
 	color: inherit;

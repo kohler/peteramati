@@ -2241,6 +2241,7 @@ function pa_loadgrades(gi) {
 
     $pi.data("pa-gradeinfo", gi);
     var editable = $pi[0].hasAttribute("data-pa-can-set-grades");
+    var directory = $pi[0].getAttribute("data-pa-directory") || "";
 
     $pi.find(".pa-need-grade").each(function () {
         var k = this.getAttribute("data-pa-grade");
@@ -2259,15 +2260,14 @@ function pa_loadgrades(gi) {
         var $g = [], in_gradelist = null, $pg;
         for (var j = 0; j < $pge.length; ++j) {
             if ($pge[j].getAttribute("data-pa-grade") == k) {
-                $pg = $($pge[j]);
-                $g.push($pg);
-                if ($pg.parent().hasClass("pa-gradelist"))
-                    in_gradelist = $pg[0];
+                $g.push($pge[j]);
+                if (has_class($pge[j].parentElement, "pa-gradelist"))
+                    in_gradelist = $pge[j];
             }
         }
         if (!in_gradelist) {
             $pg = $(pa_makegrade(k, ge, editable));
-            $g.push($pg);
+            $g.push($pg[0]);
             if (last_in_gradelist)
                 $pg.insertAfter(last_in_gradelist);
             else
@@ -2302,11 +2302,22 @@ function pa_loadgrades(gi) {
         // actual grade value
         g = g === null ? "" : "" + g;
         for (j = 0; j < $g.length; ++j) {
-            var $v = $($g[j]).find(".pa-gradevalue");
+            var $gj = $($g[j]);
+            var $v = $gj.find(".pa-gradevalue");
             if (editable && $v.val() !== g && !$v.is(":focus"))
                 $v.val(g);
             else if (!editable && $v.text() !== g)
                 $v.text(g);
+            if (ge.landmark && has_class($g[j].parentElement, "pa-gradelist")) {
+                var m = /^(.*):(\d+)$/.exec(ge.landmark);
+                var $line = pa_ensureline(m[1], "a" + m[2]);
+                if ($line.length) {
+                    if (directory && m[1].substr(0, directory.length) === directory)
+                        m[1] = m[1].substr(directory.length);
+                    $gj.find(".pa-gradeentry").append('<span class="pa-gradeboxref">@<a href="#' + $line[0].id + '" onclick="return pa_gotoline(this)">' + escape_entities(m[1] + ":" + m[2]) + '</a></span>');
+                } else
+                    $gj.find(".pa-gradeboxref").remove();
+            }
         }
     }
 
