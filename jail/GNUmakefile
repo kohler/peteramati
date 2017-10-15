@@ -1,7 +1,7 @@
 PREFIX ?= /usr/local
 BINDIR = $(DESTDIR)$(PREFIX)/bin
 
-all: pa-jail pa-timeout pa-writefifo pa-jail-owner
+all: pa-timeout pa-writefifo pa-jail pa-jail-owner
 
 pa-jail: pa-jail.cc
 	$(CXX) -std=gnu++0x -W -Wall -g -O2 -o $@ $@.cc
