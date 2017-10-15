@@ -17,9 +17,9 @@ class API_Grade {
         else if (is_string($g)) {
             if ($g === "")
                 $g = null;
-            else if (preg_match('_\A(?:0|[1-9]\d*)\z_', $g))
+            else if (preg_match('_\A\+?\d+\z_', $g))
                 $g = intval($g);
-            else if (preg_match('_\A(?:0\.|\.\d|[1-9]\d*\.)\d*\z_', $g))
+            else if (preg_match('_\A\+?(?:\d+\.|\.\d)\d*\z_', $g))
                 $g = floatval($g);
             else {
                 $g = false;
