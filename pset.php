@@ -567,6 +567,8 @@ function echo_all_grades() {
         echo '<div class="pa-gradelist',
             ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
         Ht::stash_script('pa_loadgrades.call($(".pa-psetinfo")[0], ' . json_encode($Info->grade_json()) . ')');
+        if ($Pset->has_grade_landmark)
+            Ht::stash_script('$(function(){pa_loadgrades.call($(".pa-psetinfo")[0], true)})');
         echo Ht::unstash();
     }
 
@@ -580,7 +582,7 @@ function echo_all_grades() {
         }
     } else if ($User != $Me) {
         $lhag = $Info->late_hours(true);
-        $value = '<span class="gradeholder61">'
+        $value = '<span class="pa-gradeholder">'
             . Ht::entry("late_hours", $lhg ? $lhg->hours : "", array("onchange" => "jQuery(this).closest('form').submit()", "class" => "pa-grade"))
             . '</span>';
         $value .= " " . Ht::submit("Save", array("tabindex" => 1));

@@ -685,6 +685,12 @@ class PsetView {
         $linenotes = $lnorder->file($file);
         if ($this->can_view_note_authors())
             $this->conf->stash_hotcrp_pc($this->viewer);
+        $gentries = null;
+        if ($this->pset->has_grade_landmark && $this->pc_view) {
+            foreach ($this->pset->grades as $g)
+                if ($g->landmark_file === $file)
+                    $gentries["a" . $g->landmark_line][] = $g;
+        }
 
         echo '<h3><a class="fold61" href="#" onclick="return fold61(',
             "'#$tabid'", ',this)"><span class="foldarrow">',
@@ -753,6 +759,11 @@ class PsetView {
                 '<td class="pa-da"', $ak, '></td>',
                 '<td class="pa-db"', $bk, '></td>',
                 '<td class="', $x[1], '">', diff_line_code($x[4]), "</td></tr>\n";
+
+            if ($gentries !== null && $aln && isset($gentries[$aln])) {
+                foreach ($gentries[$aln] as $g)
+                    echo '<tr class="pa-dl gg"><td colspan="4" class="pa-graderow"><div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"></div></td></tr>';
+            }
 
             if ($nx)
                 $this->echo_linenote($nx, $lnorder);

@@ -2155,7 +2155,7 @@ function ajaxsave61(form, success) {
 function pa_makegrade(name, ge, editable) {
     var name = escape_entities(name);
     var t = '<table class="pa-grade pa-grp" data-pa-grade="' + name +
-        '"><tbody><tr><td class="cs61key">' +
+        '"><tbody><tr><td class="pa-grp-title">' +
         (ge.title ? escape_entities(ge.title) : name) + '</td><td>';
     if (editable) {
         t += '<form onsubmit="return pa_savegrades(this)">' +
@@ -2164,7 +2164,7 @@ function pa_makegrade(name, ge, editable) {
             '" onchange="$(this).closest(\'form\').submit()" /></span>';
         if (ge.max)
             t += ' <span class="pa-grademax" style="display:inline-block;min-width:3.5em">of ' + ge.max + '</span>';
-        t += ' <input type="submit" value="Save" tabindex="1" /></div></form>';
+        t += ' <input type="submit" value="Save" tabindex="1" style="display:none" /></div></form>';
     } else {
         t += '<span class="pa-gradevalue"></span>';
         if (ge.max)
@@ -2222,30 +2222,49 @@ function pa_savegrades(form) {
 }
 
 function pa_loadgrades(gi) {
-    if (!gi.order)
+    var $pi = $(this).closest(".pa-psetinfo");
+    if (gi === true)
+        gi = $pi.data("pa-gradeinfo");
+    if (!gi || !gi.order)
         return;
 
-    var $pi = $(this).closest(".pa-psetinfo");
     $pi.data("pa-gradeinfo", gi);
     var editable = $pi[0].hasAttribute("data-pa-can-set-grades");
 
-    var $pg = {};
-    $pi.find(".pa-grade").each(function () {
-        $pg[this.getAttribute("data-pa-grade")] = $(this, editable);
+    $pi.find(".pa-need-grade").each(function () {
+        var k = this.getAttribute("data-pa-grade");
+        var ge = gi.entries[k];
+        if (ge)
+            $(this).html(pa_makegrade(k, ge, editable)).removeClass("pa-need-grade");
     });
+
+    var $pge = $pi.find(".pa-grade");
+    var last_in_gradelist = null;
 
     // handle grade entries
     for (var i = 0; i < gi.order.length; ++i) {
         var k = gi.order[i];
         var ge = gi.entries[k];
-        var $g = $pg[k];
-        if (!$g) {
-            $g = $pg[k] = $(pa_makegrade(k, ge, editable));
-            if (i)
-                $g.insertAfter($pg[gi.order[i-1]]);
-            else
-                $g.appendTo($pi.find(".pa-gradelist"));
+        var $g = [], in_gradelist = null, $pg;
+        for (var j = 0; j < $pge.length; ++j) {
+            if ($pge[j].getAttribute("data-pa-grade") == k) {
+                $pg = $($pge[j]);
+                $g.push($pg);
+                if ($pg.parent().hasClass("pa-gradelist"))
+                    in_gradelist = $pg[0];
+            }
         }
+        if (!in_gradelist) {
+            $pg = $(pa_makegrade(k, ge, editable));
+            $g.push($pg);
+            if (last_in_gradelist)
+                $pg.insertAfter(last_in_gradelist);
+            else
+                $pg.appendTo($pi.find(".pa-gradelist"));
+            in_gradelist = $pg[0];
+        }
+        last_in_gradelist = in_gradelist;
+        $g = $($g);
 
         var g = gi.grades ? gi.grades[i] : null;
         var ag = gi.autogrades ? gi.autogrades[i] : null;
@@ -2270,12 +2289,14 @@ function pa_loadgrades(gi) {
             }
         }
         // actual grade value
-        var $v = $g.find(".pa-gradevalue");
         g = g === null ? "" : "" + g;
-        if (editable && $v.val() !== g && !$v.is(":focus"))
-            $v.val(g);
-        else if (!editable && $v.text() !== g)
-            $v.text(g);
+        for (j = 0; j < $g.length; ++j) {
+            var $v = $($g[j]).find(".pa-gradevalue");
+            if (editable && $v.val() !== g && !$v.is(":focus"))
+                $v.val(g);
+            else if (!editable && $v.text() !== g)
+                $v.text(g);
+        }
     }
 
     // print totals
@@ -2283,7 +2304,7 @@ function pa_loadgrades(gi) {
     $g = $pi.find(".pa-total");
     if (tm[0] && !$g.length) {
         $g = $('<table class="pa-total pa-grp"><tbody><tr>' +
-            '<td class="cs61key">total</td><td class="nw">' +
+            '<td class="pa-grp-title">total</td><td class="nw">' +
             '<span class="pa-gradevalue' + (editable ? " pa-gradeholder" : "") +
             '"></span> <span class="pa-grademax">of ' + tm[1] +
             '</span></td></tr></tbody></table>');
@@ -2903,7 +2924,7 @@ function add(name, value) {
     var $j = $("#runsettings61"), num = $j.find(".n").length;
     while ($j.find("[runsetting61num=" + num + "]").length)
         ++num;
-    var $x = $("<table class=\"pa-grp\" runsetting61num=\"" + num + "\"><tr><td class=\"cs61key\"></td><td><input name=\"n" + num + "\" class=\"n\" size=\"30\" placeholder=\"Name\" /> &nbsp; <input name=\"v" + num + "\" class=\"v\" size=\"40\" placeholder=\"Value\" /></td></tr></table>");
+    var $x = $("<table class=\"pa-grp\" runsetting61num=\"" + num + "\"><tr><td class=\"pa-grp-title\"></td><td><input name=\"n" + num + "\" class=\"n\" size=\"30\" placeholder=\"Name\" /> &nbsp; <input name=\"v" + num + "\" class=\"v\" size=\"40\" placeholder=\"Value\" /></td></tr></table>");
     if (name) {
         $x.find(".n").val(name);
         $x.find(".v").val(value);

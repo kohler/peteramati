@@ -51,6 +51,7 @@ class Pset {
     public $deadline_college;
     public $deadline_extension;
 
+    public $has_grade_landmark = false;
     public $all_grades = array();
     public $grades;
     public $grades_visible;
@@ -160,6 +161,8 @@ class Pset {
                 if (get($this->all_grades, $g->key))
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
                 $this->all_grades[$g->key] = $g;
+                if ($g->landmark_file)
+                    $this->has_grade_landmark = true;
             }
         } else if ($grades)
             throw new PsetConfigException("`grades` format error`", "grades");
@@ -431,6 +434,8 @@ class GradeEntryConfig {
     public $no_total;
     public $is_extra;
     public $priority;
+    public $landmark_file;
+    public $landmark_line;
 
     function __construct($name, $g) {
         $loc = array("grades", $name);
@@ -456,6 +461,14 @@ class GradeEntryConfig {
         $this->no_total = Pset::cbool($loc, $g, "no_total");
         $this->is_extra = Pset::cbool($loc, $g, "is_extra");
         $this->priority = Pset::cnum($loc, $g, "priority");
+        if (isset($g->landmark)) {
+            if (is_string($g->landmark)
+                && preg_match('/\A(.*):(\d+)\z/', $g->landmark, $m)) {
+                $this->landmark_file = $m[1];
+                $this->landmark_line = intval($m[2]);
+            } else
+                throw new PsetConfigException("grade entry `landmark` format error", $loc);
+        }
     }
 }
 

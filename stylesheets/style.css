@@ -2317,7 +2317,7 @@ td.mhcb {
 .pa-grp-hidden > .pa-grp {
 	margin-bottom: 0;
 }
-.cs61key {
+.pa-grp-title {
 	font-weight: bold;
 	width: 162px;
 	padding-right: 6px;
@@ -2425,11 +2425,12 @@ table.hidegrades .pa-gradenote {
 .pa-da, .pa-db {
 	text-align: right;
 	color: rgba(0, 0, 0, 0.3);
-	padding: 0 0.5em;
+	padding-left: 0.5em;
+	padding-right: 0.5em;
 	width: 1%;
 }
-.pa-dd, .pa-dcx {
-	padding-left: 0.5em;
+.pa-db {
+	padding-right: 1em;
 }
 .pa-dcx {
 	color: rgba(0, 0, 0, 0.5);
@@ -2490,7 +2491,7 @@ span.foldarrow {
 	    #f3d1fc;
 	background-size: 100% 7px, 100% 5px, 100% 100%;
 	font-style: italic;
-	padding: 0.8em 1em 0.8em 0.5em;
+	padding: 0.8em 1em 0.8em 0;
 }
 .pa-note-edge {
 	background: #f3d1fc;
@@ -2530,6 +2531,29 @@ span.foldarrow {
 	font-size: smaller;
 	padding-left: 1em;
 	color: #7777aa;
+}
+.pa-gradebox {
+	display: table-cell;
+	background: #f3f3f3;
+	background:
+	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
+	    -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    #f3f3f3;
+	-webkit-background-size: 100% 7px, 100% 5px, 100% 100%;
+	background:
+	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
+	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    #f3f3f3;
+	background-size: 100% 7px, 100% 5px, 100% 100%;
+	padding: 0.8em 1em 0.8em 0.8em;
+}
+.pa-gradebox > .pa-grp {
+	margin-bottom: 0;
+}
+.pa-gradebox > .pa-grp > tbody > tr > .pa-grp-title {
+	width: auto;
+	max-width: 162px;
+	padding-right: 2em;
 }
 .runner61 {
 	font-size: 9pt;
@@ -2575,12 +2599,12 @@ span.pa-grade, span.pa-gradevalue {
 	display: inline-block;
 	min-width: 3em;
 }
-span.gradeholder61, span.pa-gradeholder {
+.pa-gradeholder {
 	display: inline-block;
 	position: relative;
 	width: 8em;
 }
-span.pa-grademax {
+.pa-grademax {
 	font-size: smaller;
 	color: #999999;
 }
