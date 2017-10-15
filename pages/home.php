@@ -653,84 +653,6 @@ function render_grading_student(Contact $s, $anonymous) {
     return $j;
 }
 
-function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) {
-    global $Conf, $Me, $Now, $Profile;
-    $t0 = $Profile ? microtime(true) : 0;
-    $j = render_grading_student($s, $anonymous);
-    if ($s->gradercid)
-        $j["gradercid"] = $s->gradercid;
-
-    // are any commits committed?
-    if (!$pset->gitless_grades) {
-        if (($s->placeholder || $s->gradehash === null)
-            && $s->repoid
-            && ($s->placeholder_at < $Now - 3600 && rand(0, 2) == 0
-                || ($s->placeholder_at < $Now - 600 && rand(0, 10) == 0))
-            && (!$s->repoviewable || !$s->gradehash)) {
-            // XXX this is slow given that most info is already loaded
-            $info = new PsetView($pset, $s, $Me);
-            $info->set_hash(null);
-            $s->gradehash = $info->commit_hash() ? : null;
-            $s->placeholder = 1;
-            Dbl::qe("insert into RepositoryGrade (repoid, pset, gradehash, placeholder, placeholder_at) values (?, ?, ?, 1, ?) on duplicate key update gradehash=(if(placeholder=1,values(gradehash),gradehash)), placeholder_at=values(placeholder_at)",
-                    $s->repoid, $pset->id, $s->gradehash, $Now);
-            if (!$s->repoviewable)
-                $s->repoviewable = $info->user_can_view_repo_contents();
-        }
-    }
-
-    if (!empty($pset->grades)) {
-        $gi = null;
-        if ($pset->gitless_grades)
-            $gi = $pset->contact_grade_for($s);
-        else if ($s->gradehash && !$s->placeholder)
-            $gi = $pset->commit_notes($s->gradehash);
-        $gi = $gi ? $gi->notes : null;
-
-        if (!$pset->gitless_grades) {
-            if ($gi && get($gi, "linenotes"))
-                $j["has_notes"] = true;
-            else if ($Me->contactId == $s->gradercid)
-                $s->incomplete = "no line notes";
-            if ($gi && $s->gradercid != get($gi, "gradercid") && $Me->privChair)
-                $j["has_nongrader_notes"] = true;
-        }
-
-        $garr = render_grades($pset, $gi, $s);
-        $j["grades"] = $garr->allv;
-        $j["total"] = $garr->totalv;
-        if ($garr->differentk)
-            $j["highlight_grades"] = $garr->differentk;
-    }
-
-    //echo "<td><a href=\"mailto:", htmlspecialchars($s->email), "\">",
-    //htmlspecialchars($s->email), "</a></td>";
-
-    if (!$pset->gitless && $s->url) {
-        $j["repo"] = RepositorySite::make_web_url($s->url, $Conf);
-        if (!$s->working)
-            $j["repo_broken"] = true;
-        else if (!$s->repoviewable)
-            $j["repo_unconfirmed"] = true;
-        if ($s->open)
-            $j["repo_too_open"] = true;
-        if ($s->pcid != $s->rpcid
-            || ($s->pcid && (!isset($students[$s->pcid])
-                             || $students[$s->pcid]->repoid != $s->repoid)))
-            $j["repo_partner_error"] = true;
-        else if ($s->repoid) {
-            $expected_cids = [$s->contactId];
-            if ($s->pcid)
-                $expected_cids[] = $s->pcid;
-            if (count(array_intersect($expected_cids, $repos[$s->repoid])) != count($expected_cids))
-                $j["repo_sharing"] = true;
-        }
-    }
-
-    $s->visited = true;
-    return $j;
-}
-
 function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
     $j = $s ? render_grading_student($s, $anonymous) : [];
@@ -827,7 +749,15 @@ function show_regrades($result, $all) {
     $jd = ["flagged_commits" => true, "anonymous" => true, "has_nonanonymous" => $any_nonanonymous];
     if ($nintotal)
         $jd["need_total"] = 1;
-    echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode($jd), ',', json_encode(array_values($jx)), ')</script>';
+    echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode($jd), ',', json_encode($jx), ')</script>';
+}
+
+class ContactLink {
+    public $cid;
+    public $pset;
+    public $type;
+    public $link;
+    public $data;
 }
 
 function show_pset_actions($pset) {
@@ -867,6 +797,86 @@ function show_pset_actions($pset) {
     echo Ht::unstash_script("$('.need-pa-pset-actions').each(pa_pset_actions)");
 }
 
+function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) {
+    global $Conf, $Me, $Now, $Profile;
+    $t0 = $Profile ? microtime(true) : 0;
+    $j = render_grading_student($s, $anonymous);
+    if ($s->gradercid)
+        $j["gradercid"] = $s->gradercid;
+
+    // are any commits committed?
+    if (!$pset->gitless_grades) {
+        if (($s->placeholder || $s->gradehash === null)
+            && $s->repoid
+            && ($s->placeholder_at < $Now - 3600 && rand(0, 2) == 0
+                || ($s->placeholder_at < $Now - 600 && rand(0, 10) == 0))
+            && (!$s->repoviewable || !$s->gradehash)) {
+            // XXX this is slow given that most info is already loaded
+            $info = new PsetView($pset, $s, $Me);
+            $info->set_hash(null);
+            $s->gradehash = $info->commit_hash() ? : null;
+            $s->placeholder = 1;
+            Dbl::qe("insert into RepositoryGrade (repoid, pset, gradehash, placeholder, placeholder_at) values (?, ?, ?, 1, ?) on duplicate key update gradehash=(if(placeholder=1,values(gradehash),gradehash)), placeholder_at=values(placeholder_at)",
+                    $s->repoid, $pset->id, $s->gradehash, $Now);
+            if (!$s->repoviewable)
+                $s->repoviewable = $info->user_can_view_repo_contents();
+        }
+        if ($s->gradehash)
+            $j["gradehash"] = $s->gradehash;
+    }
+
+    if (!empty($pset->grades)) {
+        $gi = null;
+        if ($pset->gitless_grades)
+            $gi = $pset->contact_grade_for($s);
+        else if ($s->gradehash && !$s->placeholder)
+            $gi = $pset->commit_notes($s->gradehash);
+        $gi = $gi ? $gi->notes : null;
+
+        if (!$pset->gitless_grades) {
+            if ($gi && get($gi, "linenotes"))
+                $j["has_notes"] = true;
+            else if ($Me->contactId == $s->gradercid)
+                $s->incomplete = "no line notes";
+            if ($gi && $s->gradercid != get($gi, "gradercid") && $Me->privChair)
+                $j["has_nongrader_notes"] = true;
+        }
+
+        $garr = render_grades($pset, $gi, $s);
+        $j["grades"] = $garr->allv;
+        $j["total"] = $garr->totalv;
+        if ($garr->differentk)
+            $j["highlight_grades"] = $garr->differentk;
+    }
+
+    //echo "<td><a href=\"mailto:", htmlspecialchars($s->email), "\">",
+    //htmlspecialchars($s->email), "</a></td>";
+
+    if (!$pset->gitless && $s->url) {
+        $j["repo"] = RepositorySite::make_web_url($s->url, $Conf);
+        if (!$s->working)
+            $j["repo_broken"] = true;
+        else if (!$s->repoviewable)
+            $j["repo_unconfirmed"] = true;
+        if ($s->open)
+            $j["repo_too_open"] = true;
+        if ($s->pcid != $s->rpcid
+            || ($s->pcid && (!isset($students[$s->pcid])
+                             || $students[$s->pcid]->repoid != $s->repoid)))
+            $j["repo_partner_error"] = true;
+        else if ($s->repoid) {
+            $expected_cids = [$s->contactId];
+            if ($s->pcid)
+                $expected_cids[] = $s->pcid;
+            if (count(array_intersect($expected_cids, $repos[$s->repoid])) != count($expected_cids))
+                $j["repo_sharing"] = true;
+        }
+    }
+
+    $s->visited = true;
+    return $j;
+}
+
 function show_pset_table($pset) {
     global $Conf, $Me, $Now, $Profile, $LastPsetFix;
 
@@ -880,6 +890,21 @@ function show_pset_table($pset) {
     }
 
     $t0 = $Profile ? microtime(true) : 0;
+
+/*
+    // load links
+    $restrict_repo_view = $Conf->opt("restrictRepoView");
+    $result = $Conf->qe("select * from ContactLink where pset=$pset->id"
+        . ($restrict_repo_view ? " or type=" . LINK_REPOVIEW : ""));
+    $links = [];
+    while (($link = $result->fetch_object("ContactLink"))) {
+        if (!isset($links[$link->type]))
+            $links[$link->type] = [];
+        if (!isset($links[$link->type][$link->cid]))
+            $links[$link->type][$link->cid] = [];
+        $links[$link->type][$link->cid][] = $link;
+    }
+*/
 
     // load students
     if ($Conf->opt("restrictRepoView")) {
@@ -930,7 +955,7 @@ function show_pset_table($pset) {
     foreach ($students as $s)
         if (!$s->visited) {
             $j = render_pset_row($pset, $students, $repos, $s, $anonymous);
-            $boring = !$pset->gitless_grades && ($s->gradehash === null || $s->dropped);
+            $nogrades = !$pset->gitless_grades && ($s->gradehash === null || $s->dropped);
             if ($s->pcid) {
                 foreach (array_unique(explode(",", $s->pcid)) as $pcid)
                     if (isset($students[$pcid])) {
@@ -943,7 +968,7 @@ function show_pset_table($pset) {
             }
             if ($boring)
                 $j["boring"] = true;
-            $jx[$boring ? "~1 " . $s->sorter : $s->sorter] = $j;
+            $jx[] = $j;
             if ($s->incomplete) {
                 $u = $Me->user_linkpart($s);
                 $t = '<a href="' . hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
@@ -968,6 +993,8 @@ function show_pset_table($pset) {
     $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous, "grade_keys" => array_keys($pset->grades),
            "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
            "psetkey" => $pset->urlkey];
+    if ($anonymous)
+        $jd["can_override_anonymous"] = true;
     $i = $nintotal = $last_in_total = 0;
     foreach ($pset->grades as $ge) {
         if (!$ge->no_total) {
@@ -980,7 +1007,7 @@ function show_pset_table($pset) {
         $jd["need_total"] = true;
     else if ($nintotal == 1)
         $jd["total_key"] = $last_in_total;
-    echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode($jd), ',', json_encode(array_values($jx)), ')</script>';
+    echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode($jd), ',', json_encode($jx), ')</script>';
 
     if ($Me->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";
@@ -1027,6 +1054,10 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
         if ($Me->can_view_pset($pset)) {
             $pj = ["title" => $pset->title, "urlkey" => $pset->urlkey,
                    "pos" => count($psetj)];
+            if ($pset->gitless)
+                $pj["gitless"] = true;
+            if ($pset->gitless || $pset->gitless_grades)
+                $pj["gitless_grades"] = true;
             $psetj[$pset->psetid] = $pj;
         }
     Ht::stash_script('peteramati_psets=' . json_encode($psetj) . ';');
