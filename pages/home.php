@@ -955,19 +955,14 @@ function show_pset_table($pset) {
     foreach ($students as $s)
         if (!$s->visited) {
             $j = render_pset_row($pset, $students, $repos, $s, $anonymous);
-            $nogrades = !$pset->gitless_grades && ($s->gradehash === null || $s->dropped);
             if ($s->pcid) {
                 foreach (array_unique(explode(",", $s->pcid)) as $pcid)
                     if (isset($students[$pcid])) {
                         $ss = $students[$pcid];
                         $jj = render_pset_row($pset, $students, $repos, $ss, $anonymous);
                         $j["partners"][] = $jj;
-                        if ($boring && ($s->gradehash !== null && !$ss->dropped))
-                            $boring = false;
                     }
             }
-            if ($boring)
-                $j["boring"] = true;
             $jx[] = $j;
             if ($s->incomplete) {
                 $u = $Me->user_linkpart($s);
