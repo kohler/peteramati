@@ -773,7 +773,7 @@ class PsetView {
 
     private function echo_linenote(LineNote $note, LinenotesOrder $lnorder = null) {
         if ($this->can_view_grades() || $note->iscomment) {
-            echo '<tr class="pa-dl gw"', /* NB script depends on this class */
+            echo '<tr class="pa-dl gw"', /* NB script depends on this class exactly */
                 ' data-pa-note="', htmlspecialchars(json_encode($note->render_json($this->can_view_note_authors()))), '"';
             if ((string) $note->note === "")
                 echo ' style="display:none"';

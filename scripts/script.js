@@ -1698,6 +1698,15 @@ function setmailpsel(sel) {
     fold("psel", !sel.value.match(/^new.*rev$/), 10);
 }
 
+if (window.DOMTokenList && "contains" in window.DOMTokenList.prototype) {
+    window.has_class = function (elt, className) {
+        return elt.classList.contains(className);
+    };
+} else {
+    window.has_class = function (elt, className) {
+        return $(elt).hasClass(className);
+    };
+}
 
 function pa_diff_locate(target, direction) {
     if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
@@ -1715,8 +1724,7 @@ function pa_diff_locate(target, direction) {
         tr = target;
         direction = "previousSibling";
     }
-    while (tr && (tr.nodeType !== Node.ELEMENT_NODE
-                  || /\bpa-dl\b.*\bgw\b/.test(tr.className)))
+    while (tr && (tr.nodeType !== Node.ELEMENT_NODE || has_class(tr, "gw") || has_class(tr, "gg")))
         tr = tr[direction];
 
     var table = tr, file;
@@ -1734,9 +1742,9 @@ function pa_diff_locate(target, direction) {
     };
 
     var next_tr = tr.nextSibling;
-    while (next_tr && next_tr.nodeType !== Node.ELEMENT_NODE)
+    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || has_class(next_tr, "gg")))
         next_tr = next_tr.nextSibling;
-    if (next_tr && /\bpa-dl\b.*\bgw\b/.test(next_tr.className))
+    if (next_tr && has_class(next_tr, "gw"))
         result.notetr = next_tr;
 
     return result;
@@ -1756,8 +1764,11 @@ var labelctr = 0;
 var curanal, mousedown_selection;
 var scrolled_at;
 
-function add_notetr($linetr) {
-    return $('<tr class="pa-dl gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter($linetr);
+function add_notetr(linetr) {
+    var next_tr = linetr.nextSibling;
+    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || has_class(next_tr, "gg")))
+        next_tr = next_tr.nextSibling;
+    return $('<tr class="pa-dl gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter(next_tr ? next_tr.previousSibling : linetr);
 }
 
 function render_note($tr, note, transition) {
