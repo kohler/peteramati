@@ -7,8 +7,9 @@ LIBDIR="$PROGDIR/../lib/"
 . ${LIBDIR}dbhelper.sh
 
 usage () {
-    echo "Usage: gitfetch [-f] REPOID CACHEID URL" 1>&2
-    echo "       gitfetch [-f] SEASCODE_USERNAME [PSET]" 1>&2
+    echo "Usage: gitfetch [-f] [--repo] REPOID [CACHEID] URL" 1>&2
+    echo "       gitfetch [-f] [-u|--user] USERNAME [PSET]" 1>&2
+    echo "       gitfetch [-f] [--url] URL [CACHEID]" 1>&2
     echo "       gitfetch [-f] --refresh" 1>&2
     exit $1
 }
@@ -21,39 +22,89 @@ if [ ! -r "$GITSSH_CONFIG" -o ! -d "$GITSSH_REPOCACHE" ]; then
     usage 1
 fi
 
-force=
-if [ "$1" = -f -o "$1" = --force ]; then
-    force=y; shift
+force= refresh= username= url= repo= types=
+while true; do
+    case "$1" in
+    -f|--f|--fo|--for|--forc|--force)
+        force=y; shift;;
+    --ref|--refr|--refre|--refres|--refresh)
+        refresh=y; types="1$types"; shift;;
+    -u|--us|--use|--user|--usern|--userna|--usernam|--username)
+        username=y; types="1$types"; shift;;
+    --rep|--repo|--repos|--reposi|--reposit|--reposito|--repositor|--repository)
+        repo=y; types="1$types"; shift;;
+    --url)
+        url=y; types="1$types"; shift;;
+    -*)
+        usage 1;;
+    *)
+        break;;
+    esac
+done
+
+if [ -z "$types" ]; then
+    if expr "$1" : "[0-9][0-9]*\$" >/dev/null 2>&1; then
+        repo=y
+    elif ( expr "$1" : "git:" || expr "$1" : ".*@" ) >/dev/null 2>&1; then
+        url=y
+    else
+        username=y
+    fi
+elif [ "$types" != 1 ]; then
+    usage 1
 fi
 
-if [ "$#" = 1 -a "$1" = --refresh ]; then
+if [ -n "$refresh" ]; then
+    test "$#" = 0 || usage 1
     now=`date +%s`
     result=`echo "select r.repoid, r.cacheid, r.url from Repository r
+        join ContactLink l on (l.type=3 and l.link=r.repoid)
 	where r.snapcheckat<$now - 900
+    group by r.repoid
 	order by r.snapcheckat asc limit 1" |
         ${LIBDIR}runsql.sh -N`
     repoid="`echo "$result" | awk '{ print $1 }'`"
     cacheid="`echo "$result" | awk '{ print $2 }'`"
     url="`echo "$result" | awk '{ print $3 }'`"
     test -z "$url" && exit 0
-elif [ "$#" = 1 -o "$#" = 2 ]; then
+elif [ -n "$username" ]; then
+    test "$#" -gt 0 -a "$#" -lt 3 || usage 1
     quoted="`echo "$1" | sql_quote`"
     psetquoted="`echo "$2" | sql_quote`"
     if [ -n "$psetquoted" ]; then psetquoted="and l.pset='$psetquoted'"; fi
     result=`echo "select r.repoid, r.cacheid, r.url from Repository r
         join ContactInfo c
-	join ContactLink l on (c.contactId=l.cid and l.type=3 and l.link=r.repoid)
-        where c.seascode_username='$quoted'$psetquoted
+        join ContactLink l on (c.contactId=l.cid and l.type=3 and l.link=r.repoid)
+    where (c.seascode_username='$quoted' or c.github_username='$quoted')$psetquoted
 	order by r.snapcheckat asc limit 1" |
         ${LIBDIR}runsql.sh -N`
     repoid="`echo "$result" | awk '{ print $1 }'`"
     cacheid="`echo "$result" | awk '{ print $2 }'`"
     url="`echo "$result" | awk '{ print $3 }'`"
-    test -z "$url" && exit 0
-elif [ -z "$1" -o -z "$2" -o -z "$3" ]; then
-    usage 1
+    if test -z "$url"; then echo "No such user" 1>&2; exit 0; fi
+elif [ -n "$url" ]; then
+    test "$#" -gt 0 -a "$#" -lt 3 || usage 1
+    urlquoted="`echo "$1" | sql_quote`"
+    cacheid="$2"
+    result=`echo "select r.repoid, r.cacheid, r.url from Repository r
+    where r.url='$urlquoted'
+    order by r.snapcheckat asc limit 1" |
+        ${LIBDIR}runsql.sh -N`
+    repoid="`echo "$result" | awk '{ print $1 }'`"
+    if [ -z "$cacheid" ]; then cacheid="`echo "$result" | awk '{ print $2 }'`"; fi
+    expr "$cacheid" : "[0-9a-f]\$" >/dev/null 2>&1 || usage 1
+    url="`echo "$result" | awk '{ print $3 }'`"
+    if test -z "$url"; then echo "No such repository" 1>&2; exit 0; fi
 else
+    test "$#" -gt 0 -a "$#" -lt 4 || usage 1
     repoid="$1"; cacheid="$2"; url="$3"
+    expr "$repoid" : "[0-9][0-9]*\$" >/dev/null 2>&1 || usage 1
+    expr "$cacheid" : "[0-9a-f]\$" >/dev/null 2>&1 || usage 1
+    if [ -z "$cacheid" -o -z "$url" ]; then
+        result=`echo "select r.repoid, r.cacheid, r.url from Repository r where r.repoid=$repoid" | ${LIBDIR}runsql.sh -N`
+        test -z "$cacheid" && cacheid="`echo "$result" | awk '{ print $2 }'`"
+        test -z "$url" && url="`echo "$result" | awk '{ print $3 }'`"
+    fi
 fi
 
 if expr "$url" : "https://github.com/" >/dev/null 2>&1; then
