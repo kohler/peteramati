@@ -744,7 +744,7 @@ class PsetView {
         if ($this->pc_view)
             Ht::stash_script('pa_linenote.bind("#' . $tabid . '")');
         Ht::stash_script('pa_expandcontext.bind("#' . $tabid . '")');
-        foreach ($dinfo->diff as $l) {
+        foreach ($dinfo as $l) {
             if ($l[0] == "@")
                 $x = array(" gx", "pa-dcx", "", "", $l[3]);
             else if ($l[0] == " ")

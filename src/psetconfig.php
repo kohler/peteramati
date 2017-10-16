@@ -401,10 +401,10 @@ class Pset {
         return $this->_all_diffs;
     }
 
-    function find_diffinfo($filename) {
+    function find_diffconfig($filename) {
         if (array_key_exists($filename, $this->_file_diffinfo))
             return $this->_file_diffinfo[$filename];
-        $diffinfo = false;
+        $diffinfo = null;
         foreach ($this->all_diffs() as $d) {
             if (preg_match('{(?:\A|/)(?:' . $d->regex . ')(?:/|\z)}', $filename))
                 $diffinfo = DiffConfig::combine($diffinfo, $d);
@@ -639,7 +639,7 @@ class DiffConfig {
         $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
     }
 
-    static function combine($a, $b) {
+    static function combine(DiffConfig $a = null, DiffConfig $b = null) {
         if (!$a && !$b)
             return false;
         if (!$a || !$b)
@@ -664,8 +664,8 @@ class DiffConfig {
 
 
     function exact_filename() {
-        $unquoted = preg_replace(",\\\\(.),", '$1', $regex);
-        if (preg_quote($unquoted) == $regex)
+        $unquoted = preg_replace(",\\\\(.),", '$1', $this->regex);
+        if (preg_quote($unquoted) == $this->regex)
             return $unquoted;
         else
             return false;

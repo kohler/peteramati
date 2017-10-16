@@ -491,18 +491,6 @@ class Repository {
     }
 
 
-    static private function save_repo_diff(&$diff_files, $fname, &$diff, $diffinfo, $blineno) {
-        $x = new DiffInfo($fname, $diff, $diffinfo, $blineno);
-        $diff_files[$fname] = $x;
-    }
-
-    static function repo_diff_compare($a, $b) {
-        list($ap, $bp) = array((float) $a->priority, (float) $b->priority);
-        if ($ap != $bp)
-            return $ap < $bp ? 1 : -1;
-        return strcmp($a->filename, $b->filename);
-    }
-
     function diff(Pset $pset, $hasha, $hashb, $options = null) {
         $options = $options ? : array();
         $diff_files = array();
@@ -531,20 +519,21 @@ class Repository {
         $hasha_arg = escapeshellarg($hasha);
         $hashb_arg = escapeshellarg($hashb);
 
-        $ignore_diffinfo = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
+        $ignore_diffconfig = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
         $no_full = get($options, "no_full");
 
         // read "full" files
-        foreach ($pset->all_diffs() as $diffinfo) {
-            if (!$ignore_diffinfo
+        foreach ($pset->all_diffs() as $diffconfig) {
+            if (!$ignore_diffconfig
                 && !$no_full
-                && $diffinfo->full
-                && ($fname = $diffinfo->exact_filename()) !== false) {
+                && $diffconfig->full
+                && ($fname = $diffconfig->exact_filename()) !== false) {
                 $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg($fname));
-                $fdiff = array();
+                $di = new DiffInfo("{$pset->directory_slash}{$fname}", $diffconfig);
+                $diff_files[$di->filename] = $di;
                 foreach (explode("\n", $result) as $idx => $line)
-                    $fdiff[] = array("+", 0, $idx + 1, $line);
-                self::save_repo_diff($diff_files, "{$pset->directory_slash}$fname", $fdiff, $diffinfo, count($fdiff) ? 1 : 0);
+                    $di->add("+", 0, $idx + 1, $line);
+                $di->finish();
             }
         }
 
@@ -556,12 +545,12 @@ class Repository {
         $files_arg = array();
         foreach (explode("\n", $result) as $line)
             if ($line != "") {
-                $diffinfo = $pset->find_diffinfo($truncpfx . $line);
+                $diffconfig = $pset->find_diffconfig($truncpfx . $line);
                 // skip files presented in their entirety
-                if ($diffinfo && !$ignore_diffinfo && get($diffinfo, "full"))
+                if ($diffconfig && !$ignore_diffconfig && get($diffconfig, "full"))
                     continue;
                 // skip ignored files, unless user requested them
-                if ($diffinfo && !$ignore_diffinfo && get($diffinfo, "ignore")
+                if ($diffconfig && !$ignore_diffconfig && get($diffconfig, "ignore")
                     && (!get($options, "needfiles")
                         || !get($options["needfiles"], $truncpfx . $line)))
                     continue;
@@ -574,13 +563,12 @@ class Repository {
                 $command .= " -w";
             $command .= " {$hasha_arg} {$hashb_arg} -- " . join(" ", $files_arg);
             $result = $this->gitrun($command);
-            $file = null;
             $alineno = $blineno = null;
-            $fdiff = null;
+            $di = null;
             $pos = 0;
             $len = strlen($result);
             while (1) {
-                if (count($fdiff) > DiffInfo::MAXLINES) {
+                if ($di && $di->truncated) {
                     while ($pos < $len
                            && (($ch = $result[$pos]) === " " || $ch === "+" || $ch === "-")) {
                         $nlpos = strpos($result, "\n", $pos);
@@ -594,37 +582,37 @@ class Repository {
                 $pos = $nlpos === false ? $len : $nlpos + 1;
                 if ($line == "")
                     /* do nothing */;
-                else if ($line[0] == " " && $file && $alineno) {
-                    $fdiff[] = array(" ", $alineno, $blineno, substr($line, 1));
+                else if ($line[0] == " " && $di && $alineno) {
+                    $di->add(" ", $alineno, $blineno, substr($line, 1));
                     ++$alineno;
                     ++$blineno;
-                } else if ($line[0] == "-" && $file && $alineno) {
-                    $fdiff[] = array("-", $alineno, $blineno, substr($line, 1));
+                } else if ($line[0] == "-" && $di && $alineno) {
+                    $di->add("-", $alineno, $blineno, substr($line, 1));
                     ++$alineno;
-                } else if ($line[0] == "+" && $file && $blineno) {
-                    $fdiff[] = array("+", $alineno, $blineno, substr($line, 1));
+                } else if ($line[0] == "+" && $di && $blineno) {
+                    $di->add("+", $alineno, $blineno, substr($line, 1));
                     ++$blineno;
-                } else if ($line[0] == "@" && $file && preg_match('_\A@@ -(\d+),\d+ \+(\d+),\d+ @@_', $line, $m)) {
-                    $fdiff[] = array("@", null, null, $line);
+                } else if ($line[0] == "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+),\d+ @@_', $line, $m)) {
+                    $di->add("@", null, null, $line);
                     $alineno = +$m[1];
                     $blineno = +$m[2];
                 } else if ($line[0] == "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
-                    if ($fdiff)
-                        self::save_repo_diff($diff_files, $file, $fdiff, $diffinfo, $blineno);
+                    if ($di)
+                        $di->finish();
                     $file = $truncpfx . $m[1];
-                    $diffinfo = $pset->find_diffinfo($file);
-                    $fdiff = array();
+                    $diffconfig = $pset->find_diffconfig($file);
+                    $di = $diff_files[$file] = new DiffInfo($file, $diffconfig);
                     $alineno = $blineno = null;
-                } else if ($line[0] == "B" && $file && preg_match('_\ABinary files_', $line)) {
-                    $fdiff[] = array("@", null, null, $line);
+                } else if ($line[0] == "B" && $di && preg_match('_\ABinary files_', $line)) {
+                    $di->add("@", null, null, $line);
                 } else
                     $alineno = $blineno = null;
             }
-            if ($fdiff)
-                self::save_repo_diff($diff_files, $file, $fdiff, $diffinfo, $blineno);
+            if ($di)
+                $di->finish();
         }
 
-        uasort($diff_files, "Repository::repo_diff_compare");
+        uasort($diff_files, "DiffInfo::compare");
         return $diff_files;
     }
 }

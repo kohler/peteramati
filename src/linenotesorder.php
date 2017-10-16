@@ -82,10 +82,10 @@ class LinenotesOrder {
         if (!$to) {
             $to = array();
             $n = 0;
-            foreach ($this->diff[$a[0]]->diff as $l) {
-                if ($l[0] == "+" || $l[0] == " ")
+            foreach ($this->diff[$a[0]] as $l) {
+                if ($l[0] === "+" || $l[0] === " ")
                     $to["b" . $l[2]] = ++$n;
-                if ($l[0] == "-" || $l[0] == " ")
+                if ($l[0] === "-" || $l[0] === " ")
                     $to["a" . $l[1]] = ++$n;
             }
             $this->totalorder[$a[0]] = $to;
