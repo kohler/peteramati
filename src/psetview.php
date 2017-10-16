@@ -717,8 +717,10 @@ class PsetView {
         $gentries = null;
         if ($this->pset->has_grade_landmark && $this->pc_view) {
             foreach ($this->pset->grades as $g)
-                if ($g->landmark_file === $file)
+                if ($g->landmark_file === $file) {
                     $gentries["a" . $g->landmark_line][] = $g;
+                    $dinfo->expand_linea($g->landmark_line);
+                }
         }
 
         echo '<h3><a class="fold61" href="#" onclick="return fold61(',

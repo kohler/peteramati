@@ -43,7 +43,7 @@ class LinenotesOrder {
     private function ensure_lnorder() {
         if ($this->lnorder === null) {
             $this->totalorder = [];
-            usort($this->lnseq, array($this, "compar"));
+            usort($this->lnseq, [$this, "compare"]);
             foreach ($this->lnseq as $i => $fl)
                 $this->lnorder[$fl[1] . "_" . $fl[0]] = $i;
         }
@@ -71,7 +71,7 @@ class LinenotesOrder {
         else
             return $this->lnseq[$seq - 1];
     }
-    function compar($a, $b) {
+    function compare($a, $b) {
         if ($a[0] != $b[0])
             return $this->fileorder[$a[0]] - $this->fileorder[$b[0]];
         if (!$this->diff || !get($this->diff, $a[0]))

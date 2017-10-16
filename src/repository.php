@@ -47,6 +47,8 @@ class Repository {
     private $_commits = [];
     private $_commit_lists = [];
 
+    static private $_file_contents = [];
+
     function __construct(Conf $conf = null) {
         global $Conf;
         $conf = $conf ? : $Conf;
@@ -593,15 +595,16 @@ class Repository {
                     $di->add("+", $alineno, $blineno, substr($line, 1));
                     ++$blineno;
                 } else if ($line[0] == "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+),\d+ @@_', $line, $m)) {
-                    $di->add("@", null, null, $line);
                     $alineno = +$m[1];
                     $blineno = +$m[2];
+                    $di->add("@", null, null, $line);
                 } else if ($line[0] == "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
                     if ($di)
                         $di->finish();
                     $file = $truncpfx . $m[1];
                     $diffconfig = $pset->find_diffconfig($file);
                     $di = $diff_files[$file] = new DiffInfo($file, $diffconfig);
+                    $di->set_repoa($this, $pset, $hasha, $m[1]);
                     $alineno = $blineno = null;
                 } else if ($line[0] == "B" && $di && preg_match('_\ABinary files_', $line)) {
                     $di->add("@", null, null, $line);
@@ -614,5 +617,28 @@ class Repository {
 
         uasort($diff_files, "DiffInfo::compare");
         return $diff_files;
+    }
+
+
+    function content_lines($hash, $filename) {
+        foreach (self::$_file_contents as $x) {
+            if ($x[0] === $hash && $x[1] === $filename) {
+                ++$x[3];
+                return $x[2];
+            }
+        }
+
+        $n = count(self::$_file_contents);
+        if ($n === 8) {
+            $n = 0;
+            for ($i = 1; $i < 8; ++$i) {
+                if (self::$_file_contents[$i][3] < self::$_file_contents[$n][3])
+                    $n = $i;
+            }
+        }
+
+        $result = $this->gitrun("git show " . escapeshellarg("{$hash}:{$filename}"));
+        self::$_file_contents[$n] = [$hash, $filename, explode("\n", $result), 1];
+        return self::$_file_contents[$n][2];
     }
 }
