@@ -2311,12 +2311,19 @@ function pa_loadgrades(gi) {
             if (ge.landmark && has_class($g[j].parentElement, "pa-gradelist")) {
                 var m = /^(.*):(\d+)$/.exec(ge.landmark);
                 var $line = pa_ensureline(m[1], "a" + m[2]);
+                var want_gbr = "";
                 if ($line.length) {
                     if (directory && m[1].substr(0, directory.length) === directory)
                         m[1] = m[1].substr(directory.length);
-                    $gj.find(".pa-gradeentry").append('<span class="pa-gradeboxref">@<a href="#' + $line[0].id + '" onclick="return pa_gotoline(this)">' + escape_entities(m[1] + ":" + m[2]) + '</a></span>');
-                } else
-                    $gj.find(".pa-gradeboxref").remove();
+                    want_gbr = '@<a href="#' + $line[0].id + '" onclick="return pa_gotoline(this)">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
+                }
+                var $pgbr = $gj.find(".pa-gradeboxref");
+                if (!$line.length)
+                    $pgbr.remove();
+                else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
+                    $pgbr.remove();
+                    $gj.find(".pa-gradeentry").append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
+                }
             }
         }
     }
