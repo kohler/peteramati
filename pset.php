@@ -721,7 +721,7 @@ if ($Pset->gitless) {
     // collect diff and sort line notes
     $all_linenotes = $Me->can_view_comments($Pset) ? $Info->commit_info("linenotes") : null;
     $lnorder = new LinenotesOrder($all_linenotes, $Info->can_view_grades());
-    $diff = $User->repo_diff($Info->repo, $Info->commit_hash(), $Pset, array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
+    $diff = $Info->repo->diff($Pset, null, $Info->commit_hash(), array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
     $lnorder->set_diff($diff);
 
     // print line notes

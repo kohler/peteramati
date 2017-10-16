@@ -73,8 +73,11 @@ class Pset {
     public $run_binddir;
     public $run_timeout;
 
-    public $diffs = array();
+    public $diffs = [];
     public $ignore;
+    private $_file_ignore_regex;
+    private $_all_diffs;
+    private $_file_diffinfo = [];
 
     const URLKEY_REGEX = '/\A[0-9A-Za-z][-0-9A-Za-z_.]*\z/';
 
@@ -338,6 +341,78 @@ class Pset {
     }
 
 
+    static function basic_file_ignore_regex() {
+        return '.*\.swp|.*~|#.*#|.*\.core|.*\.dSYM|.*\.o|core.*\z|.*\.backup|tags|tags\..*|typescript';
+    }
+
+    static private function _file_glob_to_regex($x, $prefix) {
+        $x = str_replace(array('\*', '\?', '\[', '\]', '\-', '_'),
+                         array('[^/]*', '[^/]', '[', ']', '-', '\_'),
+                         preg_quote($x));
+        if ($x === "")
+            return "";
+        else if (strpos($x, "/") === false) {
+            if ($prefix)
+                return '|\A' . preg_quote($prefix) . '/' . $x;
+            else
+                return '|' . $x;
+        } else {
+            if ($prefix)
+                return '|\A' . preg_quote($prefix) . '/' . $x . '\z';
+            else
+                return '|\A' . $x . '\z';
+        }
+    }
+
+    function file_ignore_regex() {
+        global $Now;
+        if (isset($this->_file_ignore_regex))
+            return $this->_file_ignore_regex;
+        $regex = self::basic_file_ignore_regex();
+        if ($this->conf->setting("__gitignore_pset{$this->id}_at", 0) < $Now - 900) {
+            $hrepo = $this->handout_repo();
+            $result = "";
+            if ($this->directory_slash !== "")
+                $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/master:" . escapeshellarg($this->directory_slash) . ".gitignore 2>/dev/null");
+            $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/master:.gitignore 2>/dev/null");
+            $this->conf->save_setting("__gitignore_pset{$this->id}_at", $Now);
+            $this->conf->save_setting("gitignore_pset{$this->id}", 1, $result);
+        }
+        if (($result = $this->conf->setting_data("gitignore_pset{$this->id}"))) {
+            foreach (preg_split('/\s+/', $result) as $x)
+                $regex .= self::_file_glob_to_regex($x, $this->directory_noslash);
+        }
+        if (($xarr = $this->ignore)) {
+            if (!is_array($xarr))
+                $xarr = preg_split('/\s+/', $xarr);
+            foreach ($xarr as $x)
+                $regex .= self::_file_glob_to_regex($x, false);
+        }
+        return ($this->_file_ignore_regex = $regex);
+    }
+
+
+    function all_diffs() {
+        if ($this->_all_diffs === null) {
+            $this->_all_diffs = $this->diffs;
+            if (($regex = $this->file_ignore_regex()))
+                $this->_all_diffs[] = new DiffConfig($regex, (object) array("ignore" => true, "match_priority" => -10));
+        }
+        return $this->_all_diffs;
+    }
+
+    function find_diffinfo($filename) {
+        if (array_key_exists($filename, $this->_file_diffinfo))
+            return $this->_file_diffinfo[$filename];
+        $diffinfo = false;
+        foreach ($this->all_diffs() as $d) {
+            if (preg_match('{(?:\A|/)(?:' . $d->regex . ')(?:/|\z)}', $filename))
+                $diffinfo = DiffConfig::combine($diffinfo, $d);
+        }
+        return ($this->_file_diffinfo[$filename] = $diffinfo);
+    }
+
+
     private static function ccheck($callable, $args) {
         $i = 0;
         $format = false;
@@ -585,6 +660,15 @@ class DiffConfig {
         if ($x->boring === null)
             $x->boring = $y->boring;
         return $x;
+    }
+
+
+    function exact_filename() {
+        $unquoted = preg_replace(",\\\\(.),", '$1', $regex);
+        if (preg_quote($unquoted) == $regex)
+            return $unquoted;
+        else
+            return false;
     }
 }
 

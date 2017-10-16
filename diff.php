@@ -73,7 +73,7 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
     "</td></tr></table><hr>\n";
 
 // collect diff and sort line notes
-$diff = $User->repo_diff($Info->repo, $hashb, $Pset, $diff_options);
+$diff = $Info->repo->diff($Pset, $hasha, $hashb, $diff_options);
 $all_linenotes = $hashb_mine ? $Info->commit_info("linenotes") : array();
 $lnorder = new LinenotesOrder($all_linenotes, $Info->can_view_grades());
 $lnorder->set_diff($diff);

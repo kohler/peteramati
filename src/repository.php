@@ -482,12 +482,151 @@ class Repository {
             $hash = $this->rev_parse($hash);
         if ($hash === false)
             return false;
-        if (!array_key_exists($hash, $this->_truncated_hashes)) {
-            $truncated_hash = $this->rev_parse("truncated_{$hash}");
-            if (!$truncated_hash)
-                $truncated_hash = $this->prepare_truncated_hash($pset, $hash);
-            $this->_truncated_hashes[$hash] = $truncated_hash;
+        if (array_key_exists($hash, $this->_truncated_hashes))
+            return $this->_truncated_hashes[$hash];
+        $truncated_hash = $this->rev_parse("truncated_{$hash}");
+        if (!$truncated_hash)
+            $truncated_hash = $this->prepare_truncated_hash($pset, $hash);
+        return ($this->_truncated_hashes[$hash] = $truncated_hash);
+    }
+
+
+    static private function save_repo_diff(&$diff_files, $fname, &$diff, $diffinfo, $blineno) {
+        $x = new DiffInfo($fname, $diff, $diffinfo, $blineno);
+        $diff_files[$fname] = $x;
+    }
+
+    static function repo_diff_compare($a, $b) {
+        list($ap, $bp) = array((float) $a->priority, (float) $b->priority);
+        if ($ap != $bp)
+            return $ap < $bp ? 1 : -1;
+        return strcmp($a->filename, $b->filename);
+    }
+
+    function diff(Pset $pset, $hasha, $hashb, $options = null) {
+        $options = $options ? : array();
+        $diff_files = array();
+        assert($pset); // code remains for `!$pset`; maybe revive it?
+
+        $psetdir = $pset ? escapeshellarg($pset->directory_noslash) : null;
+        if ($pset && $this->truncated_psetdir($pset)) {
+            $repodir = "";
+            $truncpfx = $pset->directory_noslash . "/";
+        } else {
+            $repodir = $psetdir . "/"; // Some gits don't do `git show HASH:./FILE`!
+            $truncpfx = "";
         }
-        return $this->_truncated_hashes[$hash];
+
+        if (!$hasha) {
+            $hrepo = $pset->handout_repo($this);
+            if ($pset && isset($pset->gradebranch))
+                $hasha = "repo{$hrepo->repoid}/" . $pset->gradebranch;
+            else if ($pset && isset($pset->handout_repo_branch))
+                $hasha = "repo{$hrepo->repoid}/" . $pset->handout_repo_branch;
+            else
+                $hasha = "repo{$hrepo->repoid}/master";
+            $options["hasha_hrepo"] = true;
+        }
+        if ($truncpfx && get($options, "hasha_hrepo") && !get($options, "hashb_hrepo"))
+            $hasha = $this->truncated_hash($pset, $hasha);
+
+        $hasha_arg = escapeshellarg($hasha);
+        $hashb_arg = escapeshellarg($hashb);
+
+        $ignore_diffinfo = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
+        $no_full = get($options, "no_full");
+
+        // read "full" files
+        foreach ($pset->all_diffs() as $diffinfo) {
+            if (!$ignore_diffinfo
+                && !$no_full
+                && $diffinfo->full
+                && ($fname = $diffinfo->exact_filename()) !== false) {
+                $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg($fname));
+                $fdiff = array();
+                foreach (explode("\n", $result) as $idx => $line)
+                    $fdiff[] = array("+", 0, $idx + 1, $line);
+                self::save_repo_diff($diff_files, "{$pset->directory_slash}$fname", $fdiff, $diffinfo, count($fdiff) ? 1 : 0);
+            }
+        }
+
+        $command = "git diff --name-only {$hasha_arg} {$hashb_arg}";
+        if ($pset && !$truncpfx)
+            $command .= " -- " . escapeshellarg($pset->directory_noslash);
+        $result = $this->gitrun($command);
+
+        $files_arg = array();
+        foreach (explode("\n", $result) as $line)
+            if ($line != "") {
+                $diffinfo = $pset->find_diffinfo($truncpfx . $line);
+                // skip files presented in their entirety
+                if ($diffinfo && !$ignore_diffinfo && get($diffinfo, "full"))
+                    continue;
+                // skip ignored files, unless user requested them
+                if ($diffinfo && !$ignore_diffinfo && get($diffinfo, "ignore")
+                    && (!get($options, "needfiles")
+                        || !get($options["needfiles"], $truncpfx . $line)))
+                    continue;
+                $files_arg[] = escapeshellarg(quotemeta($line));
+            }
+
+        if (!empty($files_arg)) {
+            $command = "git diff";
+            if (get($options, "wdiff"))
+                $command .= " -w";
+            $command .= " {$hasha_arg} {$hashb_arg} -- " . join(" ", $files_arg);
+            $result = $this->gitrun($command);
+            $file = null;
+            $alineno = $blineno = null;
+            $fdiff = null;
+            $pos = 0;
+            $len = strlen($result);
+            while (1) {
+                if (count($fdiff) > DiffInfo::MAXLINES) {
+                    while ($pos < $len
+                           && (($ch = $result[$pos]) === " " || $ch === "+" || $ch === "-")) {
+                        $nlpos = strpos($result, "\n", $pos);
+                        $pos = $nlpos === false ? $len : $nlpos + 1;
+                    }
+                }
+                if ($pos >= $len)
+                    break;
+                $nlpos = strpos($result, "\n", $pos);
+                $line = $nlpos === false ? substr($result, $pos) : substr($result, $pos, $nlpos - $pos);
+                $pos = $nlpos === false ? $len : $nlpos + 1;
+                if ($line == "")
+                    /* do nothing */;
+                else if ($line[0] == " " && $file && $alineno) {
+                    $fdiff[] = array(" ", $alineno, $blineno, substr($line, 1));
+                    ++$alineno;
+                    ++$blineno;
+                } else if ($line[0] == "-" && $file && $alineno) {
+                    $fdiff[] = array("-", $alineno, $blineno, substr($line, 1));
+                    ++$alineno;
+                } else if ($line[0] == "+" && $file && $blineno) {
+                    $fdiff[] = array("+", $alineno, $blineno, substr($line, 1));
+                    ++$blineno;
+                } else if ($line[0] == "@" && $file && preg_match('_\A@@ -(\d+),\d+ \+(\d+),\d+ @@_', $line, $m)) {
+                    $fdiff[] = array("@", null, null, $line);
+                    $alineno = +$m[1];
+                    $blineno = +$m[2];
+                } else if ($line[0] == "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
+                    if ($fdiff)
+                        self::save_repo_diff($diff_files, $file, $fdiff, $diffinfo, $blineno);
+                    $file = $truncpfx . $m[1];
+                    $diffinfo = $pset->find_diffinfo($file);
+                    $fdiff = array();
+                    $alineno = $blineno = null;
+                } else if ($line[0] == "B" && $file && preg_match('_\ABinary files_', $line)) {
+                    $fdiff[] = array("@", null, null, $line);
+                } else
+                    $alineno = $blineno = null;
+            }
+            if ($fdiff)
+                self::save_repo_diff($diff_files, $file, $fdiff, $diffinfo, $blineno);
+        }
+
+        uasort($diff_files, "Repository::repo_diff_compare");
+        return $diff_files;
     }
 }
