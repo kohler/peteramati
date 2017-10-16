@@ -1,6 +1,6 @@
 <?php
 // diffinfo.php -- Peteramati class encapsulating diffs for a file
-// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2017 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class DiffInfo {
@@ -15,7 +15,7 @@ class DiffInfo {
 
     const MAXLINES = 16384;
 
-    public function __construct($fname, &$diff, $diffinfo, $blineno) {
+    function __construct($fname, &$diff, $diffinfo, $blineno) {
         $this->filename = $fname;
         if (count($diff) > self::MAXLINES) {
             $diff[self::MAXLINES][0] = "+";
