@@ -432,6 +432,16 @@ class PsetView {
         return $this->user_can_view_grades;
     }
 
+    function user_can_view_grade_cdf() {
+        global $Now;
+        return $this->pset->grade_cdf_visible
+            && $this->user_can_view_grades()
+            && ($this->pset->grade_cdf_visible === "grades"
+                || $this->pset->grade_cdf_visible === true
+                || $this->pset->grade_cdf_visible <= $Now);
+    }
+
+
     function can_view_repo_contents() {
         return $this->viewer->can_view_repo_contents($this->repo, $this->branch);
     }

@@ -1619,13 +1619,6 @@ class Contact {
             && ($this->isPC || $pset->student_can_view_grades($this->extension));
     }
 
-    static function student_can_view_grade_cdf(Pset $pset) {
-        return $pset->student_can_view()
-            && (isset($pset->grade_cdf_visible)
-                ? self::show_setting_on($pset->grade_cdf_visible)
-                : $pset->student_can_view_grades());
-    }
-
     function can_set_grades(Pset $pset, PsetView $info = null) {
         return ($this->isPC && (!$info || $info->user !== $this))
             || $this->privChair;

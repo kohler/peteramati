@@ -92,9 +92,19 @@ class Series {
 
 }
 
+// load user repo and current commit
+$Info = new PsetView($Pset, $User, $Me);
+if (($Commit = req("newcommit")) == null)
+    $Commit = req("commit");
+if (!$Info->set_hash($Commit) && $Commit && $Info->repo) {
+    $Conf->errorMsg("Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository.");
+    redirectSelf(array("newcommit" => null, "commit" => null));
+}
+$Commit = $Info->commit_hash();
+
 // get JSON grade series data
 if (isset($_REQUEST["gradecdf"])) {
-    if (!$Me->isPC && !Contact::student_can_view_grade_cdf($Pset))
+    if (!$Me->isPC && !$Info->user_can_view_grade_cdf())
         json_exit(["error" => "Grades are not visible now"]);
 
     if ($Conf->setting("gradejson_pset$Pset->id", 0) < $Now - 30) {
@@ -156,16 +166,6 @@ if (isset($_REQUEST["gradecdf"])) {
     }
     json_exit($j);
 }
-
-// load user repo and current commit
-$Info = new PsetView($Pset, $User, $Me);
-if (($Commit = req("newcommit")) == null)
-    $Commit = req("commit");
-if (!$Info->set_hash($Commit) && $Commit && $Info->repo) {
-    $Conf->errorMsg("Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository.");
-    redirectSelf(array("newcommit" => null, "commit" => null));
-}
-$Commit = $Info->commit_hash();
 
 // maybe set commit
 if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
@@ -552,7 +552,7 @@ function echo_grader() {
 function echo_grade_cdf_here() {
     global $Me, $User, $Pset, $Info;
     if ($Info->can_view_grades()
-        && ($Me != $User || $Pset->grade_cdf_visible)
+        && ($Me != $User || $Info->user_can_view_grade_cdf())
         && $Info->has_assigned_grades())
         echo_grade_cdf();
 }
