@@ -42,6 +42,7 @@ class Repository {
 
     public $is_handout = false;
     public $viewable_by = [];
+    public $_truncated_hashes = [];
     public $_truncated_psetdir = [];
     private $_commits = [];
     private $_commit_lists = [];
@@ -259,6 +260,14 @@ class Repository {
         }
     }
 
+    function rev_parse($arg) {
+        $x = $this->gitrun("git rev-parse --verify " . escapeshellarg($arg), true);
+        if ($x->status == 0 && $x->stdout)
+            return trim($x->stdout);
+        else
+            return false;
+    }
+
     private function load_commits_from_head(&$list, $head, $directory) {
         $dirarg = "";
         if ((string) $directory !== "")
@@ -431,5 +440,54 @@ class Repository {
         if (!array_key_exists($hash, $this->_commits))
             $this->_commits[$hash] = null;
         return $this->_commits[$hash];
+    }
+
+
+    private function _temp_repo_clone() {
+        global $Now, $ConfSitePATH;
+        assert(isset($this->repoid) && isset($this->cacheid));
+        $suffix = "";
+        while (1) {
+            $d = "$ConfSitePATH/repo/tmprepo.$Now$suffix";
+            if (mkdir($d, 0770))
+                break;
+            $suffix = $suffix ? "_" . substr($suffix, 1) + 1 : "_1";
+        }
+        $answer = shell_exec("cd $d && git init >/dev/null && git remote add origin $ConfSitePATH/repo/repo{$this->cacheid} >/dev/null && echo yes");
+        return ($answer == "yes\n" ? $d : null);
+    }
+
+    private function prepare_truncated_hash(Pset $pset, $hash) {
+        $pset_files = $this->ls_files($hash, $pset->directory_noslash);
+        foreach ($pset_files as &$f)
+            $f = escapeshellarg(substr($f, strlen($pset->directory_slash)));
+        unset($f);
+
+        if (!($trepo = $this->_temp_repo_clone()))
+            return false;
+        $psetdir_arg = escapeshellarg($pset->directory_slash);
+        $trepo_arg = escapeshellarg($trepo);
+        foreach ($pset_files as $f)
+            $this->gitrun("mkdir -p \"`dirname {$trepo_arg}/{$f}`\" && git show {$hash}:{$psetdir_arg}{$f} > {$trepo_arg}/{$f}");
+
+        shell_exec("cd $trepo_arg && git add " . join(" ", $pset_files) . " && git commit -m 'Truncated version of $hash'");
+        shell_exec("cd $trepo_arg && git push -f origin master:refs/tags/truncated_$hash");
+        shell_exec("rm -rf $trepo");
+        return $this->rev_parse("truncated_{$hash}");
+    }
+
+    function truncated_hash(Pset $pset, $refname) {
+        $hash = $refname;
+        if (!git_refname_is_full_hash($hash))
+            $hash = $this->rev_parse($hash);
+        if ($hash === false)
+            return false;
+        if (!array_key_exists($hash, $this->_truncated_hashes)) {
+            $truncated_hash = $this->rev_parse("truncated_{$hash}");
+            if (!$truncated_hash)
+                $truncated_hash = $this->prepare_truncated_hash($pset, $hash);
+            $this->_truncated_hashes[$hash] = $truncated_hash;
+        }
+        return $this->_truncated_hashes[$hash];
     }
 }

@@ -813,8 +813,15 @@ function decode_token($x, $format = "") {
         return $t;
 }
 
+function git_refname_is_full_hash($refname) {
+    return strlen($refname) === 40
+        && ctype_xdigit($refname)
+        && strtolower($refname) === $refname;
+}
+
 function git_commit_in_list($list, $commit) {
-    if ($commit == "")
+    // XXX strtolower
+    if ((string) $commit === "")
         return false;
     if (strlen($commit) == 40)
         return isset($list[$commit]) ? $commit : false;

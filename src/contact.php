@@ -1347,45 +1347,6 @@ class Contact {
         return $regex;
     }
 
-    static private function _temp_repo_clone($repo) {
-        global $Now, $ConfSitePATH;
-        assert(isset($repo->repoid) && isset($repo->cacheid));
-        $suffix = "";
-        while (1) {
-            $d = "$ConfSitePATH/repo/tmprepo.$Now$suffix";
-            if (mkdir($d, 0770))
-                break;
-            $suffix = $suffix ? "_" . substr($suffix, 1) + 1 : "_1";
-        }
-        $answer = shell_exec("cd $d && git init >/dev/null && git remote add origin $ConfSitePATH/repo/repo$repo->cacheid >/dev/null && echo yes");
-        return ($answer == "yes\n" ? $d : null);
-    }
-
-    static private function _repo_prepare_truncated_handout($repo, $base, $pset) {
-        $commit = trim($repo->gitrun("git log --format=%H -n1 $base"));
-        $check_tag = trim($repo->gitrun("test -f .git/refs/heads/truncated_$commit && echo yes"));
-        if ($check_tag == "yes")
-            return "truncated_$commit";
-
-        $pset_files = $repo->ls_files($commit, $pset->directory_noslash);
-        foreach ($pset_files as &$f)
-            $f = substr($f, strlen($pset->directory_slash));
-        unset($f);
-
-        if (!($trepo = self::_temp_repo_clone($repo)))
-            return false;
-        foreach ($pset_files as $f)
-            $repo->gitrun("mkdir -p \"`dirname $trepo/$f`\" && git show $commit:$pset->directory_slash$f > $trepo/$f");
-
-        foreach ($pset_files as &$f)
-            $f = escapeshellarg($f);
-        unset($f);
-        shell_exec("cd $trepo && git add " . join(" ", $pset_files) . " && git commit -m 'Truncated version of $commit'");
-        shell_exec("cd $trepo && git push -f origin master:truncated_$commit");
-        shell_exec("rm -rf $trepo");
-        return "truncated_$commit";
-    }
-
     static private function save_repo_diff(&$diff_files, $fname, &$diff, $diffinfo, $blineno) {
         $x = new DiffInfo($fname, $diff, $diffinfo, $blineno);
         $diff_files[$fname] = $x;
@@ -1451,7 +1412,7 @@ class Contact {
             $options["hasha_hrepo"] = true;
         }
         if ($truncpfx && get($options, "hasha_hrepo") && !get($options, "hashb_hrepo"))
-            $hasha = self::_repo_prepare_truncated_handout($repo, $hasha, $pset);
+            $hasha = $repo->truncated_hash($pset, $hasha);
 
         $ignore_diffinfo = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
         $no_full = get($options, "no_full");
