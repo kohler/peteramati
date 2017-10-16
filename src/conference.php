@@ -497,6 +497,7 @@ class Conf {
                      order by ContactInfo.github_username=? desc, ContactInfo.seascode_username=? desc limit 1",
                     [$whatever, $whatever, $whatever, $whatever, $whatever]];
         else {
+            // XXX harvard
             if (preg_match('_.*@(?:fas|college|seas)\z_', $whatever))
                 $whatever .= ".harvard.edu";
             else if (preg_match('_.*@.*?\.harvard\z_', $whatever))

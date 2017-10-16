@@ -1614,7 +1614,7 @@ class Contact {
             : $pset->student_can_view_grades($this->extension);
     }
 
-    function can_view_grades(Pset $pset, PsetView $info = null) {
+    function xxx_can_view_grades(Pset $pset, PsetView $info = null) {
         return $this->can_view_pset($pset)
             && ($this->isPC || $pset->student_can_view_grades($this->extension))
             && (!$info
@@ -1665,7 +1665,7 @@ class Contact {
         $s2s = $runner->visible;
         return $s2s === true
             || (($s2s === "grades" || $s2s === "grade")
-                && $this->can_view_grades($pset));
+                && $this->xxx_can_view_grades($pset));
     }
 
     function can_view_run(Pset $pset, $runner, $user = null) {
@@ -1678,7 +1678,7 @@ class Contact {
         return ($s2s === true || $r2s === true)
             || (($s2s === "grades" || $s2s === "grade"
                  || $r2s === "grades" || $r2s === "grade")
-                && $this->can_view_grades($pset));
+                && $this->xxx_can_view_grades($pset));
     }
 
     function user_linkpart(Contact $user = null, $is_anonymous = false) {

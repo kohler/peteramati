@@ -376,6 +376,7 @@ class PsetView {
     private function ensure_grade() {
         if ($this->grade === false)
             $this->load_grade();
+        return $this->grade;
     }
 
     function grading_hash() {
@@ -405,15 +406,29 @@ class PsetView {
             && $this->hash == $this->repo_grade->gradehash;
     }
 
+    private function contact_can_view_grades(Contact $user) {
+        if ($user->isPC && $user !== $this->user)
+            return $user->can_view_pset($this->pset);
+        if (!$this->pset->student_can_view() || $user !== $this->user)
+            return false;
+        $this->ensure_grade();
+        return $this->grade
+            && $this->grade->hidegrade <= 0
+            && ($this->grade->hidegrade < 0
+                || $this->pset->student_can_view_grades($user->extension))
+            && ($this->pset->gitless_grades
+                || ($this->repo && $this->user_can_view_repo_contents()));
+    }
+
     function can_view_grades() {
         if ($this->can_view_grades === null)
-            $this->can_view_grades = $this->viewer->can_view_pset_grades($this->pset, $this);
+            $this->can_view_grades = $this->contact_can_view_grades($this->viewer);
         return $this->can_view_grades;
     }
 
     function user_can_view_grades() {
         if ($this->user_can_view_grades === null)
-            $this->user_can_view_grades = $this->user->can_view_pset_grades($this->pset, $this);
+            $this->user_can_view_grades = $this->contact_can_view_grades($this->user);
         return $this->user_can_view_grades;
     }
 
@@ -432,7 +447,7 @@ class PsetView {
     private function ensure_n_visible_grades() {
         if ($this->n_visible_grades === null) {
             $this->n_visible_grades = $this->n_set_grades = $this->n_visible_in_total = 0;
-            if ($this->can_view_grades()) {
+            if ($this->can_view_grades() && $this->ensure_grade()) {
                 $notes = $this->current_info();
                 $ag = get($notes, "autogrades");
                 $g = get($notes, "grades");
