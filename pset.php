@@ -1,6 +1,6 @@
 <?php
 // pset.php -- Peteramati problem set page
-// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2017 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
@@ -719,8 +719,7 @@ if ($Pset->gitless) {
     echo_all_grades();
 
     // collect diff and sort line notes
-    $all_linenotes = $Me->can_view_comments($Pset) ? $Info->commit_info("linenotes") : null;
-    $lnorder = new LinenotesOrder($all_linenotes, $Info->can_view_grades());
+    $lnorder = $Info->viewable_line_notes();
     $diff = $Info->repo->diff($Pset, null, $Info->commit_hash(), array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
     $lnorder->set_diff($diff);
 
@@ -743,7 +742,7 @@ if ($Pset->gitless) {
         if (!$Me->can_view_run($Pset, $r, $User) || isset($runclasses[$r->runclass]))
             continue;
 
-        $checkt = defval($crunners, $r->runclass);
+        $checkt = get($crunners, $r->runclass);
         $rj = $checkt ? ContactView::runner_json($Info, $checkt) : null;
         if (!$rj && !$Me->can_run($Pset, $r, $User))
             continue;
@@ -804,7 +803,6 @@ if ($Pset->gitless) {
 echo "</div>\n";
 
 
-Ht::stash_script('window.psetpost61="' . self_href(array("post" => post_value())) . '"');
 if (!$Pset->gitless)
     Ht::stash_script("checklatest61()", "checklatest61");
 

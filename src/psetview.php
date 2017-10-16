@@ -704,6 +704,17 @@ class PsetView {
     }
 
 
+    function viewable_line_notes() {
+        if ($this->viewer->can_view_comments($this->pset))
+            return new LinenotesOrder($this->commit_info("linenotes"), $this->can_view_grades());
+        else
+            return $this->empty_line_notes();
+    }
+
+    function empty_line_notes() {
+        return new LinenotesOrder(null, $this->can_view_grades());
+    }
+
     function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open) {
         if ($dinfo->hide_if_anonymous
             && $this->user->is_anonymous)
@@ -719,7 +730,8 @@ class PsetView {
             foreach ($this->pset->grades as $g)
                 if ($g->landmark_file === $file) {
                     $gentries["a" . $g->landmark_line][] = $g;
-                    $dinfo->expand_linea($g->landmark_line);
+                    if (!$dinfo->contains_linea($g->landmark_line))
+                        $dinfo->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
                 }
         }
 

@@ -73,11 +73,7 @@ class DiffInfo implements Iterator {
             return false;
     }
 
-    function expand_linea($linea) {
-        if (!$this->_repoa)
-            return false;
-
-        // binary search to find insertion position
+    private function linea_lower_bound($linea) {
         $l = 0;
         $r = $this->_diffsz;
         while ($l < $r) {
@@ -85,24 +81,43 @@ class DiffInfo implements Iterator {
             while ($m + 4 < $r && $this->_diff[$m + 1] === null)
                 $m += 4;
             $ln = $this->_diff[$m + 1];
-            if ($ln === null || $ln > $linea)
+            if ($ln === null || $ln >= $linea)
                 $r = $m;
-            else if ($ln === $linea) {
-                if ($this->_diff[$m] !== "@")
-                    return true;
-                $r = $m;
-            } else
+            else
                 $l = $m + 4;
+        }
+        return $l;
+    }
+
+    function contains_linea($linea) {
+        $l = $this->linea_lower_bound($linea);
+        return $l < $this->_diffsz && $this->_diff[$l] !== "@";
+    }
+
+    function expand_linea($linea_lx, $linea_rx) {
+        // look for left-hand edge of desired region
+        $linea_lx = max(1, $linea_lx);
+        $l = $this->linea_lower_bound($linea_lx);
+
+        // advance to hole
+        while ($l < $this->_diffsz && $this->_diff[$l] !== "@") {
+            if ($this->_diff[$l + 1] === $linea_lx) {
+                ++$linea_lx;
+                if ($linea_lx === $linea_rx)
+                    return true;
+            }
+            $l += 4;
         }
 
         // perform insert
         assert($l === $this->_diffsz || $this->_diff[$l] === "@");
         assert($l === 0 || $this->_diff[$l - 3] !== null);
-        $lines = $this->_repoa->content_lines($this->_hasha, $this->_filenamea);
-        if ($linea > count($lines))
+        if (!$this->_repoa)
             return false;
-        $linea_lx = max(1, $linea - 2);
-        $linea_rx = min(count($lines), $linea + 3);
+        $lines = $this->_repoa->content_lines($this->_hasha, $this->_filenamea);
+        if ($linea_lx > count($lines))
+            return true;
+        $linea_rx = min(count($lines), $linea_rx);
 
         $lx = $l;
         while ($lx >= 0 && $this->_diff[$lx + 1] === null)
@@ -116,18 +131,18 @@ class DiffInfo implements Iterator {
             $deltab = $this->_diff[$lx + 2] - $this->_diff[$lx + 1];
 
         $splice = [];
-        if ($lx >= 0 && $this->_diff[$lx + 1] >= $linea_lx
-            && $rx < $this->_diffsz && $this->_diff[$rx + 1] < $linea_rx) {
+        if ($lx >= 0 && $this->_diff[$lx + 1] >= $linea_lx - 1
+            && $rx < $this->_diffsz && $this->_diff[$rx + 1] <= $linea_rx) {
             for ($i = $this->_diff[$lx + 1] + 1; $i < $this->_diff[$rx + 1]; ++$i)
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             array_splice($this->_diff, $lx + 4, $rx - $lx - 4, $splice);
             $fix = $lx;
-        } else if ($lx >= 0 && $this->_diff[$lx + 1] >= $linea_lx) {
-            for ($i = $this->_diff[$lx + 1] + 1; $i < $linea_rx; ++$i)
+        } else if ($lx >= 0 && $this->_diff[$lx + 1] >= $linea_lx - 1) {
+            for ($i = $this->_diff[$lx + 1] + 1; $i <= $linea_rx; ++$i)
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             array_splice($this->_diff, $lx + 4, 0, $splice);
             $fix = $lx;
-        } else if ($rx < $this->_diffsz && $this->_diff[$rx + 1] < $linea_rx) {
+        } else if ($rx < $this->_diffsz && $this->_diff[$rx + 1] <= $linea_rx) {
             for ($i = $linea_lx; $i < $this->_diff[$rx + 1]; ++$i)
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             array_splice($this->_diff, $rx, 0, $splice);

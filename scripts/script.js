@@ -2186,13 +2186,14 @@ function pa_makegrade(name, ge, editable) {
 }
 
 function hoturl_gradeparts($j, args) {
-    var $x = $j.closest(".pa-psetinfo");
+    var $x = $j.closest(".pa-psetinfo"), v;
     args = args || {};
-    args.u = peteramati_uservalue;
-    if ($x.attr("data-pa-pset"))
-        args.pset = $x.attr("data-pa-pset");
-    if ($x.attr("data-pa-hash"))
-        args.commit = $x.attr("data-pa-hash");
+    v = $x.attr("data-pa-user");
+    args.u = v || peteramati_uservalue;
+    if ((v = $x.attr("data-pa-pset")))
+        args.pset = v;
+    if ((v = $x.attr("data-pa-hash")))
+        args.commit = v;
     return args;
 }
 
