@@ -259,7 +259,21 @@ function download_psets_report($request) {
 if ($Me->isPC && check_post() && $Qreq->report)
     download_psets_report($Qreq);
 
-function set_grader($qreq) {
+
+function qreq_users(Qrequest $qreq) {
+    global $Conf;
+    $users = [];
+    foreach ($qreq as $k => $v) {
+        if (substr($k, 0, 4) === "s61_"
+            && $v
+            && ($uname = urldecode(substr($k, 4)))
+            && ($user = $Conf->user_by_whatever($uname)))
+            $users[] = $user;
+    }
+    return $users;
+}
+
+function set_grader(Qrequest $qreq) {
     global $Conf, $Me;
     if (!($pset = $Conf->pset_by_key($qreq->pset)))
         return $Conf->errorMsg("No such pset");
@@ -273,23 +287,20 @@ function set_grader($qreq) {
     if (!$qreq->grader || !count($graders))
         return $Conf->errorMsg("No grader");
     $cur_graders = $graders;
-    foreach ($qreq as $k => $v)
-        if (substr($k, 0, 4) == "s61_"
-            && $v
-            && ($uname = urldecode(substr($k, 4)))
-            && ($user = ContactView::prepare_user($uname))) {
-            $info = new PsetView($pset, $user, $Me);
-            if ($info->repo)
-                $info->repo->refresh(2700, true);
-            if ($info->set_hash(null)) {
-                $which_grader = mt_rand(0, count($cur_graders) - 1);
-                $info->change_grader($cur_graders[$which_grader]->contactId);
-                array_splice($cur_graders, $which_grader, 1);
-                if (count($cur_graders) == 0)
-                    $cur_graders = $graders;
-            } else
-                error_log("cannot set_hash for $user->email");
-        }
+    foreach (qreq_users($qreq) as $user) {
+        // XXX check if can_set_grader
+        $info = new PsetView($pset, $user, $Me);
+        if ($info->repo)
+            $info->repo->refresh(2700, true);
+        if ($info->set_hash(null)) {
+            $which_grader = mt_rand(0, count($cur_graders) - 1);
+            $info->change_grader($cur_graders[$which_grader]->contactId);
+            array_splice($cur_graders, $which_grader, 1);
+            if (count($cur_graders) == 0)
+                $cur_graders = $graders;
+        } else
+            error_log("cannot set_hash for $user->email");
+    }
     redirectSelf();
 }
 
@@ -303,13 +314,9 @@ function runmany($qreq) {
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
-    $users = array();
-    foreach ($qreq as $k => $v)
-        if (substr($k, 0, 4) == "s61_"
-            && $v
-            && ($uname = urldecode(substr($k, 4)))
-            && ($user = ContactView::prepare_user($uname, $pset)))
-            $users[] = $Me->user_linkpart($user);
+    $users = [];
+    foreach (qreq_users($qreq) as $user)
+        $users[] = $Me->user_linkpart($user);
     if (empty($users))
         return $Conf->errorMsg("No users selected.");
     go(hoturl_post("run", array("pset" => $pset->urlkey,
@@ -320,6 +327,29 @@ function runmany($qreq) {
 
 if ($Me->isPC && check_post() && $Qreq->runmany)
     runmany($Qreq);
+
+
+function doaction(Qrequest $qreq) {
+    global $Conf, $Me;
+    if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled)
+        return $Conf->errorMsg("No such pset");
+    $hiddengrades = null;
+    if ($qreq->action === "showgrades")
+        $hiddengrades = -1;
+    else if ($qreq->action === "hidegrades")
+        $hiddengrades = 1;
+    else if ($qreq->action === "defaultgrades")
+        $hiddengrades = 0;
+    foreach (qreq_users($qreq) as $user) {
+        $info = new PsetView($pset, $user, $Me);
+        if ($info->grading_hash() && $hiddengrades !== null)
+            $info->set_hidden_grades($hiddengrades);
+    }
+    redirectSelf();
+}
+
+if ($Me->isPC && check_post() && $Qreq->doaction)
+    doaction($Qreq);
 
 
 function psets_json_diff_from($original, $update) {
@@ -1015,9 +1045,14 @@ function show_pset_table($pset) {
         $sel["__random__"] = "Random";
         echo '<span class="nb" style="padding-right:2em">',
             Ht::select("grader", $sel, "none"),
-            Ht::submit("setgrader", "Set grader"),
+            ' &nbsp;', Ht::submit("setgrader", "Set grader"),
             '</span>';
     }
+
+    echo '<span class="nb" style="padding-right:2em">',
+        Ht::select("action", ["showgrades" => "Show grades", "hidegrades" => "Hide grades", "defaultgrades" => "Default grades"]),
+        ' &nbsp;', Ht::submit("doaction", "Go"),
+        '</span>';
 
     if (!$pset->gitless) {
         $sel = array();
@@ -1027,7 +1062,7 @@ function show_pset_table($pset) {
         if (count($sel))
             echo '<span class="nb" style="padding-right:2em">',
                 Ht::select("runner", $sel),
-                Ht::submit("runmany", "Run all"),
+                ' &nbsp;', Ht::submit("runmany", "Run all"),
                 '</span>';
     }
 

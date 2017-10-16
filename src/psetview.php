@@ -535,11 +535,6 @@ class PsetView {
             return new LineNote($file, $lineid);
     }
 
-    function grades_hidden() {
-        $this->ensure_grade();
-        return $this->grade && $this->grade->hidegrade;
-    }
-
     function current_grade_entry($k, $type = null) {
         $gn = $this->current_info();
         $grade = null;
@@ -605,14 +600,14 @@ class PsetView {
             $this->update_commit_info(array("gradercid" => $grader));
         }
         if ($q)
-            Dbl::qe_raw($q);
+            $this->conf->qe_raw($q);
         $this->grade = $this->repo_grade = false;
         $this->can_view_grades = $this->user_can_view_grades = null;
     }
 
     function mark_grading_commit() {
         if ($this->pset->gitless_grades)
-            Dbl::qe("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=gradercid",
+            $this->conf->qe("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=gradercid",
                     $this->user->contactId, $this->pset->psetid,
                     $this->viewer->contactId);
         else {
@@ -620,10 +615,19 @@ class PsetView {
             $grader = $this->commit_info("gradercid");
             if (!$grader)
                 $grader = $this->grading_info("gradercid");
-            Dbl::qe("insert into RepositoryGrade (repoid,pset,gradehash,gradercid,placeholder) values (?, ?, ?, ?, 0) on duplicate key update gradehash=values(gradehash), gradercid=values(gradercid), placeholder=0",
+            $this->conf->qe("insert into RepositoryGrade (repoid,pset,gradehash,gradercid,placeholder) values (?, ?, ?, ?, 0) on duplicate key update gradehash=values(gradehash), gradercid=values(gradercid), placeholder=0",
                     $this->repo->repoid, $this->pset->psetid,
                     $this->hash ? : null, $grader ? : null);
         }
+        $this->grade = $this->repo_grade = false;
+        $this->can_view_grades = $this->user_can_view_grades = null;
+    }
+
+    function set_hidden_grades($hidegrade) {
+        if ($this->pset->gitless_grades)
+            $this->conf->qe("update ContactGrade set hidegrade=? where cid=? and pset=?", $hidegrade, $this->user->contactId, $this->pset->psetid);
+        else
+            $this->conf->qe("update RepositoryGrade set hidegrade=? where repoid=? and pset=?", $hidegrade, $this->repo->repoid, $this->pset->psetid);
         $this->grade = $this->repo_grade = false;
         $this->can_view_grades = $this->user_can_view_grades = null;
     }

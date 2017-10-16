@@ -1614,15 +1614,9 @@ class Contact {
             : $pset->student_can_view_grades($this->extension);
     }
 
-    function xxx_can_view_grades(Pset $pset, PsetView $info = null) {
+    function xxx_can_view_grades(Pset $pset) {
         return $this->can_view_pset($pset)
-            && ($this->isPC || $pset->student_can_view_grades($this->extension))
-            && (!$info
-                || ($this->isPC && $info->pc_view)
-                || (!$info->grades_hidden()
-                    && $this === $info->user
-                    && ($pset->gitless_grades
-                        || ($info->repo && $info->user_can_view_repo_contents()))));
+            && ($this->isPC || $pset->student_can_view_grades($this->extension));
     }
 
     static function student_can_view_grade_cdf(Pset $pset) {

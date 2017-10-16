@@ -508,7 +508,10 @@ class Conf {
 
     function user_by_whatever($whatever) {
         list($qpart, $args) = $this->user_by_whatever_query($whatever);
-        return $this->user_by_query($qpart, $args);
+        $user = $this->user_by_query($qpart, $args);
+        if ($user && str_starts_with(ltrim($whatever), "[anon"))
+            $user->set_anonymous(true);
+        return $user;
     }
 
     function user_id_by_email($email) {

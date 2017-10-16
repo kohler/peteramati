@@ -90,6 +90,8 @@ class LinenotesOrder {
             }
             $this->totalorder[$a[0]] = $to;
         }
+        if (!isset($to[$a[1]]) || !isset($to[$b[1]]))
+            error_log(json_encode($a) . " / " . json_encode($b) . " / " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
         return $to[$a[1]] - $to[$b[1]];
     }
 }
