@@ -181,10 +181,6 @@ class Pset {
         if ($this->grades_visible_extension === null)
             $this->grades_visible_extension = $this->grades_visible;
         $this->grade_cdf_visible = self::cdate($p, "grade_cdf_visible", "show_grade_cdf_to_students");
-        if ($this->grade_cdf_visible === null)
-            $this->grade_cdf_visible = $this->grades_visible;
-        if (!$this->grades_visible_college && !$this->grades_visible_extension)
-            $this->grade_cdf_visible = false;
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
 
