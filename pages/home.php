@@ -57,7 +57,8 @@ if (!$Me->isPC || !$User)
 // check problem set openness
 $max_pset = $Conf->setting("pset_forwarded");
 foreach ($Conf->psets() as $pset)
-    if (Contact::student_can_view_pset($pset) && $pset->id > $max_pset
+    if ($pset->student_can_view()
+        && $pset->id > $max_pset
         && !$pset->gitless)
         Contact::forward_pset_links($pset->id);
 
@@ -585,7 +586,7 @@ function show_pset($pset, $user) {
         htmlspecialchars($pset->title), "</a>";
     $info = new PsetView($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
-    $user_see_grade = $user->can_view_grades($pset, $info);
+    $user_see_grade = $info->user_can_view_grades();
     if ($user_see_grade && $info->has_assigned_grades())
         echo ' <a class="gradesready" href="', $pseturl, '">(grade ready)</a>';
     echo "</a></h2>";

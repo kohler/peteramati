@@ -43,7 +43,7 @@ class API_Grade {
                 return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
             $info->force_set_hash($api->commit->hash);
         }
-        if (!$user->can_view_grades($api->pset, $info))
+        if (!$info->can_view_grades())
             return ["ok" => false, "error" => "Permission error."];
         if ($qreq->method() === "POST") {
             if (!check_post($qreq))

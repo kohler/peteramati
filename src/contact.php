@@ -1602,37 +1602,21 @@ class Contact {
         return $setting === true || (is_int($setting) && $setting >= $Now);
     }
 
-    static function student_can_view_pset(Pset $pset) {
-        return self::show_setting_on($pset->visible) && !$pset->disabled;
-    }
-
     function can_view_pset(Pset $pset) {
         return (!$pset->disabled && $pset->gitless && $this->isPC)
             || (!$pset->ui_disabled && $this->privChair)
-            || self::student_can_view_pset($pset);
-    }
-
-    static private function student_can_view_grades(Pset $pset, $extension = null) {
-        if ($extension === null)
-            $k = "grades_visible";
-        else if ($extension)
-            $k = "grades_visible_extension";
-        else
-            $k = "grades_visible_college";
-        return self::student_can_view_pset($pset)
-            && isset($pset->$k)
-            && self::show_setting_on($pset->$k);
+            || $pset->student_can_view();
     }
 
     function can_view_pset_grades(Pset $pset) {
         return $this->isPC
             ? $this->can_view_pset($pset)
-            : self::student_can_view_grades($pset, $this->extension);
+            : $pset->student_can_view_grades($this->extension);
     }
 
     function can_view_grades(Pset $pset, PsetView $info = null) {
         return $this->can_view_pset($pset)
-            && ($this->isPC || self::student_can_view_grades($pset, $this->extension))
+            && ($this->isPC || $pset->student_can_view_grades($this->extension))
             && (!$info
                 || ($this->isPC && $info->pc_view)
                 || (!$info->grades_hidden()
@@ -1642,10 +1626,10 @@ class Contact {
     }
 
     static function student_can_view_grade_cdf(Pset $pset) {
-        return self::student_can_view_pset($pset)
+        return $pset->student_can_view()
             && (isset($pset->grade_cdf_visible)
                 ? self::show_setting_on($pset->grade_cdf_visible)
-                : self::student_can_view_grades($pset));
+                : $pset->student_can_view_grades());
     }
 
     function can_set_grades(Pset $pset, PsetView $info = null) {

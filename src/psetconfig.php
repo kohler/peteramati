@@ -175,10 +175,10 @@ class Pset {
                 $this->has_extra = true;
         $this->grades_visible = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible_college = self::cdate($p, "grades_visible_college", "show_grades_to_college");
-        if ($this->grades_visible && $this->grades_visible_college === null)
+        if ($this->grades_visible_college === null)
             $this->grades_visible_college = $this->grades_visible;
         $this->grades_visible_extension = self::cdate($p, "grades_visible_extension", "show_grades_to_extension");
-        if ($this->grades_visible && $this->grades_visible_extension === null)
+        if ($this->grades_visible_extension === null)
             $this->grades_visible_extension = $this->grades_visible;
         $this->grade_cdf_visible = self::cdate($p, "grade_cdf_visible", "show_grade_cdf_to_students");
         if ($this->grade_cdf_visible === null)
@@ -239,6 +239,25 @@ class Pset {
         else
             return $a->id < $b->id ? -1 : 1;
     }
+
+
+    function student_can_view() {
+        global $Now;
+        $dl = $this->visible;
+        return !$this->disabled && $dl && ($dl === true || $dl <= $Now);
+    }
+
+    function student_can_view_grades($extension = null) {
+        global $Now;
+        if ($extension === null)
+            $dl = $this->grades_visible;
+        else if ($extension)
+            $dl = $this->grades_visible_extension;
+        else
+            $dl = $this->grades_visible_college;
+        return $this->student_can_view() && $dl && ($dl === true || $dl <= $Now);
+    }
+
 
 
     function handout_repo(Repository $inrepo = null) {

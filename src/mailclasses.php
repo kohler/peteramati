@@ -30,7 +30,7 @@ class MailRecipients {
         global $Conf;
         $sel = array("students" => "All students");
         foreach ($Conf->psets() as $pset)
-            if (Contact::student_can_view_pset($pset)) {
+            if ($pset->student_can_view()) {
                 if (!$pset->gitless || $pset->partner)
                     $sel[] = array("optgroup", $pset->title);
                 if (!$pset->gitless) {
