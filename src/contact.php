@@ -1608,12 +1608,6 @@ class Contact {
             || $pset->student_can_view();
     }
 
-    function can_view_pset_grades(Pset $pset) {
-        return $this->isPC
-            ? $this->can_view_pset($pset)
-            : $pset->student_can_view_grades($this->extension);
-    }
-
     function xxx_can_view_grades(Pset $pset) {
         return $this->can_view_pset($pset)
             && ($this->isPC || $pset->student_can_view_grades($this->extension));
