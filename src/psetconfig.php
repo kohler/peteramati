@@ -164,7 +164,7 @@ class Pset {
                 if (get($this->all_grades, $g->key))
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
                 $this->all_grades[$g->key] = $g;
-                if ($g->landmark_file)
+                if ($g->landmark_file || $g->landmark_range_file)
                     $this->has_grade_landmark = true;
             }
         } else if ($grades)
@@ -392,7 +392,7 @@ class Pset {
     }
 
 
-    function all_diffs() {
+    function all_diffconfig() {
         if ($this->_all_diffs === null) {
             $this->_all_diffs = $this->diffs;
             if (($regex = $this->file_ignore_regex()))
@@ -405,7 +405,7 @@ class Pset {
         if (array_key_exists($filename, $this->_file_diffinfo))
             return $this->_file_diffinfo[$filename];
         $diffinfo = null;
-        foreach ($this->all_diffs() as $d) {
+        foreach ($this->all_diffconfig() as $d) {
             if (preg_match('{(?:\A|/)(?:' . $d->regex . ')(?:/|\z)}', $filename))
                 $diffinfo = DiffConfig::combine($diffinfo, $d);
         }
@@ -531,6 +531,9 @@ class GradeEntryConfig {
     public $priority;
     public $landmark_file;
     public $landmark_line;
+    public $landmark_range_file;
+    public $landmark_range_first;
+    public $landmark_range_last;
 
     function __construct($name, $g) {
         $loc = array("grades", $name);
@@ -561,8 +564,33 @@ class GradeEntryConfig {
                 && preg_match('/\A(.*):(\d+)\z/', $g->landmark, $m)) {
                 $this->landmark_file = $m[1];
                 $this->landmark_line = intval($m[2]);
+            } else if (is_array($g->landmark)
+                       && count($g->landmark) === 2
+                       && is_string($g->landmark[0])
+                       && is_int($g->landmark[1])) {
+                $this->landmark_file = $g->landmark[0];
+                $this->landmark_line = $g->landmark[1];
             } else
                 throw new PsetConfigException("grade entry `landmark` format error", $loc);
+        }
+        if (isset($g->landmark_range)) {
+            if (is_string($g->landmark_range)
+                && preg_match('/\A(.*):(\d+):(\d+)\z/', $g->landmark, $m)) {
+                $this->landmark_range_file = $m[1];
+                $this->landmark_range_first = intval($m[2]);
+                $this->landmark_range_last = intval($m[3]);
+            } else if (is_array($g->landmark_range)
+                       && count($g->landmark_range) === 3
+                       && is_string($g->landmark_range[0])
+                       && is_int($g->landmark_range[1])
+                       && is_int($g->landmark_range[2])) {
+                $this->landmark_range_file = $g->landmark_range[0];
+                $this->landmark_range_first = $g->landmark_range[1];
+                $this->landmark_range_last = $g->landmark_range[2];
+            }
+            if ($this->landmark_range_file === null
+                || $this->landmark_range_first > $this->landmark_range_last)
+                throw new PsetConfigException("grade entry `landmark_range` format error", $loc);
         }
     }
 }
@@ -622,6 +650,7 @@ class DiffConfig {
     public $full;
     public $ignore;
     public $boring;
+    public $gradable;
     public $hide_if_anonymous;
 
     function __construct($regex, $d) {
@@ -636,6 +665,7 @@ class DiffConfig {
         $this->full = Pset::cbool($loc, $d, "full");
         $this->ignore = Pset::cbool($loc, $d, "ignore");
         $this->boring = Pset::cbool($loc, $d, "boring");
+        $this->gradable = Pset::cbool($loc, $d, "gradable", "gradeable");
         $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
     }
 

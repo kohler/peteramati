@@ -260,14 +260,22 @@ if ($Me->isPC && check_post() && $Qreq->report)
     download_psets_report($Qreq);
 
 
-function qreq_users(Qrequest $qreq) {
-    global $Conf;
+function qreq_usernames(Qrequest $qreq) {
     $users = [];
     foreach ($qreq as $k => $v) {
         if (substr($k, 0, 4) === "s61_"
             && $v
-            && ($uname = urldecode(substr($k, 4)))
-            && ($user = $Conf->user_by_whatever($uname)))
+            && ($uname = urldecode(substr($k, 4))))
+            $users[] = $uname;
+    }
+    return $users;
+}
+
+function qreq_users(Qrequest $qreq) {
+    global $Conf;
+    $users = [];
+    foreach (qreq_usernames($qreq) as $uname) {
+        if (($user = $Conf->user_by_whatever($uname)))
             $users[] = $user;
     }
     return $users;
@@ -321,7 +329,8 @@ function runmany($qreq) {
         return $Conf->errorMsg("No users selected.");
     go(hoturl_post("run", array("pset" => $pset->urlkey,
                                 "run" => $qreq->runner,
-                                "runmany" => join(" ", $users))));
+                                "runmany" => 1,
+                                "users" => join(" ", $users))));
     redirectSelf();
 }
 
@@ -340,6 +349,13 @@ function doaction(Qrequest $qreq) {
         $hiddengrades = 1;
     else if ($qreq->action === "defaultgrades")
         $hiddengrades = 0;
+    else if (str_starts_with($qreq->action, "grademany_")) {
+        $g = $pset->all_grades[substr($qreq->action, 10)];
+        assert($g && !!$g->landmark_range_file);
+        go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
+    } else if (str_starts_with($qreq->action, "diffmany_")) {
+        go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
+    }
     foreach (qreq_users($qreq) as $user) {
         $info = new PsetView($pset, $user, $Me);
         if ($info->grading_hash() && $hiddengrades !== null)
@@ -1049,10 +1065,41 @@ function show_pset_table($pset) {
             '</span>';
     }
 
-    echo '<span class="nb" style="padding-right:2em">',
-        Ht::select("action", ["showgrades" => "Show grades", "hidegrades" => "Hide grades", "defaultgrades" => "Default grades"]),
-        ' &nbsp;', Ht::submit("doaction", "Go"),
-        '</span>';
+    $actions = [];
+    if ($Me->isPC) {
+        $stage = -1;
+        if (!$pset->gitless_grades) {
+            foreach ($pset->all_diffconfig() as $dc) {
+                if (($dc->full || $dc->gradable) && ($f = $dc->exact_filename())) {
+                    if ($stage !== -1 && $stage !== 0)
+                        $actions[] = null;
+                    $stage = 0;
+                    $actions["diffmany_$f"] = "$f diffs";
+                }
+            }
+            if ($pset->has_grade_landmark) {
+                foreach ($pset->grades as $g)
+                    if ($g->landmark_range_file) {
+                        if ($stage !== -1 && $stage !== 1)
+                            $actions[] = null;
+                        $stage = 1;
+                        $actions["grademany_{$g->key}"] = "Grade {$g->title}";
+                    }
+            }
+        }
+        if ($stage !== -1 && $stage !== 2)
+            $actions[] = null;
+        $stage = 2;
+        $actions["showgrades"] = "Show grades";
+        $actions["hidegrades"] = "Hide grades";
+        $actions["defaultgrades"] = "Default grades";
+    }
+    if (!empty($actions)) {
+        echo '<span class="nb" style="padding-right:2em">',
+            Ht::select("action", $actions),
+            ' &nbsp;', Ht::submit("doaction", "Go"),
+            '</span>';
+    }
 
     if (!$pset->gitless) {
         $sel = array();

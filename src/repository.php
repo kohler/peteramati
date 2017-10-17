@@ -493,6 +493,21 @@ class Repository {
     }
 
 
+    static private function fix_diff_files($files) {
+        if ($files === null || empty($files))
+            return null;
+        else if (is_associative_array($files))
+            return $files;
+        else if (is_string($files))
+            return [$files => true];
+        else {
+            $xfiles = [];
+            foreach ($files as $f)
+                $xfiles[$f] = true;
+            return $xfiles;
+        }
+    }
+
     function diff(Pset $pset, $hasha, $hashb, $options = null) {
         $options = $options ? : array();
         $diff_files = array();
@@ -523,13 +538,16 @@ class Repository {
 
         $ignore_diffconfig = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
         $no_full = get($options, "no_full");
+        $needfiles = self::fix_diff_files(get($options, "needfiles"));
+        $allowfiles = self::fix_diff_files(get($options, "allowfiles"));
 
         // read "full" files
-        foreach ($pset->all_diffs() as $diffconfig) {
+        foreach ($pset->all_diffconfig() as $diffconfig) {
             if (!$ignore_diffconfig
                 && !$no_full
                 && $diffconfig->full
-                && ($fname = $diffconfig->exact_filename()) !== false) {
+                && ($fname = $diffconfig->exact_filename()) !== false
+                && (!$allowfiles || get($allowfiles, $pset->directory_slash . $fname))) {
                 $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg($fname));
                 $di = new DiffInfo("{$pset->directory_slash}{$fname}", $diffconfig);
                 $diff_files[$di->filename] = $di;
@@ -545,7 +563,7 @@ class Repository {
         $result = $this->gitrun($command);
 
         $files_arg = array();
-        foreach (explode("\n", $result) as $line)
+        foreach (explode("\n", $result) as $line) {
             if ($line != "") {
                 $diffconfig = $pset->find_diffconfig($truncpfx . $line);
                 // skip files presented in their entirety
@@ -553,11 +571,14 @@ class Repository {
                     continue;
                 // skip ignored files, unless user requested them
                 if ($diffconfig && !$ignore_diffconfig && get($diffconfig, "ignore")
-                    && (!get($options, "needfiles")
-                        || !get($options["needfiles"], $truncpfx . $line)))
+                    && (!$needfiles || !get($needfiles, $truncpfx . $line)))
+                    continue;
+                // skip files that aren't allowed
+                if ($allowfiles && !get($allowfiles, $truncpfx . $line))
                     continue;
                 $files_arg[] = escapeshellarg(quotemeta($line));
             }
+        }
 
         if (!empty($files_arg)) {
             $command = "git diff";
@@ -613,6 +634,18 @@ class Repository {
             }
             if ($di)
                 $di->finish();
+        }
+
+        // ensure a diff for every landmarked file, even if empty
+        if ($pset->has_grade_landmark) {
+            foreach ($pset->grades as $g) {
+                $file = $g->landmark_file;
+                if ($file && !isset($diff_files[$file])) {
+                    $diff_files[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
+                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)));
+                    $di->finish();
+                }
+            }
         }
 
         uasort($diff_files, "DiffInfo::compare");

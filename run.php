@@ -108,7 +108,7 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
         '</div>';
 
     echo '<div id="runmany61_users">',
-        htmlspecialchars($_GET["runmany"]),
+        htmlspecialchars($_GET["users"]),
         '</div>';
 
     Ht::stash_script('runmany61()');

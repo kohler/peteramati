@@ -50,15 +50,6 @@ echo "<div id='homeinfo'>";
 ContactView::echo_heading($User);
 
 
-// Per-pset
-function diff_line_code($t) {
-    global $TABWIDTH;
-    while (($p = strpos($t, "\t")) !== false)
-        $t = substr($t, 0, $p) . str_repeat(" ", $TABWIDTH - ($p % $TABWIDTH)) . substr($t, $p + 1);
-    return str_replace("  ", " &nbsp;", htmlspecialchars($t));
-}
-
-
 $commita = $hasha_mine ? $Info->recent_commits($hasha) : $hrecent[$hasha];
 $commitb = $hashb_mine ? $Info->recent_commits($hashb) : $hrecent[$hashb];
 if ($commita->hash === $Info->grading_hash())
@@ -74,6 +65,7 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
 
 // collect diff and sort line notes
 $diff = $Info->repo->diff($Pset, $hasha, $hashb, $diff_options);
+$Info->expand_diff_for_grades($diff);
 $lnorder = $hashb_mine ? $Info->viewable_line_notes() : $Info->empty_line_notes();
 $lnorder->set_diff($diff);
 

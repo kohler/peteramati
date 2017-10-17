@@ -378,13 +378,6 @@ $u = $Me->user_linkpart($User);
 
 // Per-pset
 
-function diff_line_code($t) {
-    global $TABWIDTH;
-    while (($p = strpos($t, "\t")) !== false)
-        $t = substr($t, 0, $p) . str_repeat(" ", $TABWIDTH - ($p % $TABWIDTH)) . substr($t, $p + 1);
-    return htmlspecialchars($t);
-}
-
 function echo_grade_cdf() {
     global $Conf, $Info, $Pset, $User, $Me;
     $sepx = $User->extension && $Pset->separate_extension_grades;
@@ -409,7 +402,7 @@ function echo_commit($Info) {
     global $TABWIDTH, $WDIFF;
 
     $Notes = $Info->commit_info();
-    $TABWIDTH = $Info->commit_info("tabwidth") ? : 4;
+    $TABWIDTH = $Info->tabwidth();
     $WDIFF = isset($Notes->wdiff) ? $Notes->wdiff : false;
 
     // current commit and commit selector
@@ -721,7 +714,8 @@ if ($Pset->gitless) {
     // collect diff and sort line notes
     $lnorder = $Info->viewable_line_notes();
     $diff = $Info->repo->diff($Pset, null, $Info->commit_hash(), array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
-    $lnorder->set_diff($diff);
+    $Info->expand_diff_for_grades($diff);
+    $lnorder->set_diff($diff, $Me == $Info->user && $Info->can_view_grades() && $Info->is_grading_commit());
 
     // print line notes
     $notelinks = array();
@@ -765,14 +759,6 @@ if ($Pset->gitless) {
         echo '</pre></div></div></h3></div>', "\n";
     }
 
-    // check for any linenotes
-    $has_any_linenotes = false;
-    foreach ($diff as $file => $dinfo)
-        if ($lnorder->file($file)) {
-            $has_any_linenotes = true;
-            break;
-        }
-
     // line notes
     if (!empty($diff))
         echo "<hr style=\"clear:both\" />\n";
@@ -781,11 +767,11 @@ if ($Pset->gitless) {
         $open = $linenotes
             || (!$dinfo->boring
                 && ($Me != $Info->user || !$Info->can_view_grades()
-                    || !$Info->is_grading_commit() || !$has_any_linenotes));
+                    || !$Info->is_grading_commit() || !$linenotes->has_linenotes_in_diff));
         $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
     }
 
-    Ht::stash_script('$(".pa-note-entry").autogrow();$(window).on("beforeunload",pa_beforeunload)');
+    Ht::stash_script('$(window).on("beforeunload",pa_beforeunload)');
 } else {
     if ($Pset->gitless_grades)
         echo_grade_cdf_here();

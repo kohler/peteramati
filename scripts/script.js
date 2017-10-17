@@ -1700,11 +1700,11 @@ function setmailpsel(sel) {
 
 if (window.DOMTokenList && "contains" in window.DOMTokenList.prototype) {
     window.has_class = function (elt, className) {
-        return elt.classList.contains(className);
+        return elt && elt.classList.contains(className);
     };
 } else {
     window.has_class = function (elt, className) {
-        return $(elt).hasClass(className);
+        return elt && $(elt).hasClass(className);
     };
 }
 
@@ -2080,7 +2080,7 @@ function make_linenote(event) {
 }
 
 pa_linenote.bind = function (selector) {
-    $(selector).on("mouseup mousedown", pa_linenote);
+    $(selector).on("mouseup mousedown", ".pa-editablenotes", pa_linenote);
 };
 return pa_linenote;
 })($);
@@ -2349,10 +2349,10 @@ function pa_loadgrades(gi) {
 }
 
 function fold61(sel, arrowholder, direction) {
-    var j = sel instanceof jQuery ? sel : jQuery(sel);
+    var j = $(sel);
     j.toggle(direction);
     if (arrowholder)
-        jQuery(arrowholder).find("span.foldarrow").html(
+        $(arrowholder).find("span.foldarrow").html(
             j.is(":visible") ? "&#x25BC;" : "&#x25B6;"
         );
     return false;
@@ -3252,6 +3252,10 @@ function pa_render_pset_table(psetid, pconf, data) {
         else
             return '<span class="pap-nonanonymous">' + txt + '</span>';
     }
+    function render_checkbox_name(s) {
+        var u = anonymous ? s.anon_username || s.username : s.username;
+        return "s61_" + encodeURIComponent(u).replace(/\./g, "%2E");
+    }
     function render_tds(s, row_number) {
         var grades = pconf.grade_keys || [];
         var a = [], txt, j, klass;
@@ -3261,7 +3265,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<td></td>');
         } else {
             if (pconf.checkbox)
-                a.push('<td class="pap-checkbox"><input type="checkbox" name="s61_' + encodeURIComponent(s.username).replace(/\./g, "%2E") + '" value="1" class="pap-check" /></td>');
+                a.push('<td class="pap-checkbox"><input type="checkbox" name="' + render_checkbox_name(s) + '" value="1" class="pap-check" /></td>');
             a.push('<td class="pap-rownumber">' + row_number + '.</td>');
         }
         if (flagged) {
@@ -3432,6 +3436,10 @@ function pa_render_pset_table(psetid, pconf, data) {
             sort.override_anonymous = true;
         $j.toggleClass("pap-anonymous", anonymous);
         rerender_usernames();
+        $j.find("tbody input.pap-check").each(function () {
+            var s = dmap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
+            this.setAttribute("name", render_checkbox_name(s));
+        });
         sort_data();
         resort();
         return false;

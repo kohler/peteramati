@@ -66,6 +66,10 @@ class DiffInfo implements Iterator {
     }
 
 
+    function is_empty() {
+        return $this->_diffsz === 0;
+    }
+
     function entry($i) {
         if ($i >= 0 && $i < ($this->_diffsz >> 2))
             return array_slice($this->_diff, $i << 2, 4);
@@ -94,6 +98,23 @@ class DiffInfo implements Iterator {
         return $l < $this->_diffsz && $this->_diff[$l] !== "@";
     }
 
+    private function fix_context($pos) {
+        $lx = $rx = $pos;
+        while ($lx >= 0 && $this->_diff[$lx] !== "@")
+            $lx -= 4;
+        $rx = max($rx, $lx + 4);
+        while ($rx < $this->_diffsz && $this->_diff[$rx] !== "@")
+            $rx += 4;
+        if ($lx >= 0 && $rx < $this->_diffsz) {
+            $lnal = $this->_diff[$lx + 5];
+            $lnbl = $this->_diff[$lx + 6];
+            $ch = $this->_diff[$rx - 4];
+            $lnar = $this->_diff[$rx - 3] + ($ch === " " || $ch === "-" ? 1 : 0);
+            $lnbr = $this->_diff[$rx - 2] + ($ch === " " || $ch === "+" ? 1 : 0);
+            $this->_diff[$lx + 3] = preg_replace('/^@@[-+,\d ]*@@.*/', "@@ -{$lnal}," . ($lnar - $lnal) . " +{$lnbl}," . ($lnbr - $lnbl) . " @@", $this->_diff[$lx + 3]);
+        }
+    }
+
     function expand_linea($linea_lx, $linea_rx) {
         // look for left-hand edge of desired region
         $linea_lx = max(1, $linea_lx);
@@ -120,60 +141,62 @@ class DiffInfo implements Iterator {
         $linea_rx = min(count($lines), $linea_rx);
 
         $lx = $l;
-        while ($lx >= 0 && $this->_diff[$lx + 1] === null)
+        while ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] === null)
             $lx -= 4;
         $rx = $l;
         while ($rx < $this->_diffsz && $this->_diff[$rx + 1] === null)
             $rx += 4;
 
         $deltab = 0;
-        if ($lx >= 0)
+        if ($lx >= 0 && $lx < $this->_diffsz)
             $deltab = $this->_diff[$lx + 2] - $this->_diff[$lx + 1];
 
         $splice = [];
-        if ($lx >= 0 && $this->_diff[$lx + 1] >= $linea_lx - 1
+        if ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] >= $linea_lx - 1
             && $rx < $this->_diffsz && $this->_diff[$rx + 1] <= $linea_rx) {
             for ($i = $this->_diff[$lx + 1] + 1; $i < $this->_diff[$rx + 1]; ++$i)
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             array_splice($this->_diff, $lx + 4, $rx - $lx - 4, $splice);
-            $fix = $lx;
-        } else if ($lx >= 0 && $this->_diff[$lx + 1] >= $linea_lx - 1) {
-            for ($i = $this->_diff[$lx + 1] + 1; $i <= $linea_rx; ++$i)
+            $this->fix_context($lx);
+        } else if ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] >= $linea_lx - 1) {
+            for ($i = $this->_diff[$lx + 1] + 1; $i < $linea_rx; ++$i)
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             array_splice($this->_diff, $lx + 4, 0, $splice);
-            $fix = $lx;
+            $this->fix_context($lx);
         } else if ($rx < $this->_diffsz && $this->_diff[$rx + 1] <= $linea_rx) {
             for ($i = $linea_lx; $i < $this->_diff[$rx + 1]; ++$i)
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             array_splice($this->_diff, $rx, 0, $splice);
-            $fix = $rx;
+            $this->fix_context($rx);
         } else {
             $linecount = $linea_rx - $linea_lx;
             array_push($splice, "@", null, null, "@@ -{$linea_lx},{$linecount} +" . ($linea_lx + $deltab) . ",{$linecount} @@");
             for ($i = $linea_lx; $i < $linea_rx; ++$i)
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             array_splice($this->_diff, $l, 0, $splice);
-            $fix = null;
         }
         $this->_diffsz = count($this->_diff);
-
-        if ($fix) {
-            $lx = $rx = $fix;
-            while ($lx >= 0 && $this->_diff[$lx] !== "@")
-                $lx -= 4;
-            while ($rx < $this->_diffsz && $this->_diff[$rx] !== "@")
-                $rx += 4;
-            if ($lx >= 0 && $rx < $this->_diffsz) {
-                $lnal = $this->_diff[$lx + 5];
-                $lnbl = $this->_diff[$lx + 6];
-                $ch = $this->_diff[$rx - 4];
-                $lnar = $this->_diff[$rx - 3] + ($ch === " " || $ch === "-" ? 1 : 0);
-                $lnbr = $this->_diff[$rx - 2] + ($ch === " " || $ch === "+" ? 1 : 0);
-                $this->_diff[$lx + 3] = preg_replace('/^@@[-+,\d ]*@@/', "@@ -{$lnal}," . ($lnar - $lnal) . " +{$lnbl}," . ($lnbr - $lnbl) . " @@", $this->_diff[$lx + 3]);
-            }
-        }
-
         return true;
+    }
+
+    function restrict_linea($linea_lx, $linea_rx) {
+        $l = $this->linea_lower_bound($linea_lx);
+        $r = $this->linea_lower_bound($linea_rx);
+        while ($r < $this->_diffsz && $this->_diff[$r] === "+")
+            $r += 4;
+        $c = clone $this;
+        if ($l < $this->_diffsz && $this->_diff[$l] !== "@") {
+            $c->_diff = array_slice($this->_diff, $l - 4, $r - $l + 4);
+            $c->_diffsz = $r - $l + 4;
+            $c->_diff[0] = "@";
+            $c->_diff[1] = $c->_diff[2] = null;
+            $c->_diff[2] = "@@ @@";
+            $c->fix_context(0);
+        } else {
+            $c->_diff = array_slice($this->_diff, $l, $r - $l);
+            $c->_diffsz = $r - $l;
+        }
+        return $c;
     }
 
 

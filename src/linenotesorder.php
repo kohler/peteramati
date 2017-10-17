@@ -10,6 +10,8 @@ class LinenotesOrder {
     private $lnseq = [];
     private $lnorder = null;
     private $totalorder = null;
+    public $has_linenotes_in_diff = false;
+
     function __construct($linenotes, $seegradenotes) {
         $this->ln = $linenotes ? : [];
         foreach ($this->ln as $file => $notelist) {
@@ -28,16 +30,25 @@ class LinenotesOrder {
     }
     function set_diff($diff) {
         $this->diff = $diff;
+        $this->has_linenotes_in_diff = false;
+        foreach ($this->diff as $file => $di) {
+            if (get($this->ln, $file)) {
+                $this->has_linenotes_in_diff = true;
+                break;
+            }
+        }
+
         $old_fileorder = $this->fileorder;
-        $this->fileorder = array();
-        foreach ($this->diff as $file => $x)
+        $this->fileorder = [];
+        foreach ($this->diff as $file => $di)
             $this->fileorder[$file] = count($this->fileorder);
-        foreach ($old_fileorder as $file => $x)
+        foreach ($old_fileorder as $file => $x) {
             // Normally every file with notes will be present
             // already, but just in case---for example, the
             // handout repo got corrupted...
             if (!isset($this->fileorder[$file]))
                 $this->fileorder[$file] = count($this->fileorder);
+        }
         $this->lnorder = null;
     }
     private function ensure_lnorder() {

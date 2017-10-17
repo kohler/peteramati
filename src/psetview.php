@@ -23,6 +23,7 @@ class PsetView {
     private $hash = null;
     private $commit_record = false; // CommitNotes (maybe +RepositoryGrade)
     private $commit_notes = false;
+    private $tabwidth = false;
     private $derived_handout_commit = null;
     private $n_visible_grades = null;
     private $n_visible_in_total;
@@ -50,7 +51,7 @@ class PsetView {
 
     function set_hash($reqhash) {
         $this->hash = false;
-        $this->commit_record = $this->commit_notes = $this->derived_handout_commit = false;
+        $this->commit_record = $this->commit_notes = $this->derived_handout_commit = $this->tabwidth = false;
         $this->n_visible_grades = null;
         if (!$this->repo)
             return false;
@@ -71,7 +72,7 @@ class PsetView {
         assert($reqhash === false || strlen($reqhash) === 40);
         if ($this->hash !== $reqhash) {
             $this->hash = $reqhash;
-            $this->commit_notes = $this->derived_handout_commit = false;
+            $this->commit_notes = $this->derived_handout_commit = $this->tabwidth = false;
         }
     }
 
@@ -168,6 +169,12 @@ class PsetView {
             return get($this->commit_notes, $key);
         else
             return $this->commit_notes;
+    }
+
+    function tabwidth() {
+        if ($this->tabwidth === false)
+            $this->tabwidth = $this->commit_info("tabwidth") ? : 4;
+        return $this->tabwidth;
     }
 
     static private function clean_notes($j) {
@@ -715,9 +722,26 @@ class PsetView {
         return new LinenotesOrder(null, $this->can_view_grades());
     }
 
-    function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open) {
-        if ($dinfo->hide_if_anonymous
-            && $this->user->is_anonymous)
+    function expand_diff_for_grades($diffs) {
+        if ($this->pset->has_grade_landmark && $this->pc_view) {
+            foreach ($this->pset->grades as $g) {
+                if ($g->landmark_file
+                    && ($di = get($diffs, $g->landmark_file))
+                    && !$di->contains_linea($g->landmark_line))
+                    $di->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
+            }
+        }
+    }
+
+    private function diff_line_code($t) {
+        while (($p = strpos($t, "\t")) !== false)
+            $t = substr($t, 0, $p) . str_repeat(" ", $this->tabwidth - ($p % $this->tabwidth)) . substr($t, $p + 1);
+        return htmlspecialchars($t);
+    }
+
+    function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open, $nofold = false) {
+        if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
+            || $dinfo->is_empty())
             return;
 
         $fileid = html_id_encode($file);
@@ -728,36 +752,35 @@ class PsetView {
         $gentries = null;
         if ($this->pset->has_grade_landmark && $this->pc_view) {
             foreach ($this->pset->grades as $g)
-                if ($g->landmark_file === $file) {
+                if ($g->landmark_file === $file)
                     $gentries["a" . $g->landmark_line][] = $g;
-                    if (!$dinfo->contains_linea($g->landmark_line))
-                        $dinfo->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
-                }
         }
+        $this->tabwidth();
 
-        echo '<h3><a class="fold61" href="#" onclick="return fold61(',
-            "'#$tabid'", ',this)"><span class="foldarrow">',
-            ($open ? "&#x25BC;" : "&#x25B6;"),
-            "</span>&nbsp;", htmlspecialchars($file), "</a>";
-        if (!$dinfo->removed) {
-            $rawfile = $file;
-            if ($this->repo->truncated_psetdir($this->pset)
-                && str_starts_with($rawfile, $this->pset->directory_slash))
-                $rawfile = substr($rawfile, strlen($this->pset->directory_slash));
-            echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $this->hoturl("raw", ["file" => $rawfile]), '">[Raw]</a>';
+        if (!$nofold) {
+            echo '<h3><a class="fold61" href="#" onclick="return fold61(this.parentElement.nextSibling,this)"><span class="foldarrow">',
+                ($open ? "&#x25BC;" : "&#x25B6;"),
+                "</span>&nbsp;", htmlspecialchars($file), "</a>";
+            if (!$dinfo->removed) {
+                $rawfile = $file;
+                if ($this->repo->truncated_psetdir($this->pset)
+                    && str_starts_with($rawfile, $this->pset->directory_slash))
+                    $rawfile = substr($rawfile, strlen($this->pset->directory_slash));
+                echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $this->hoturl("raw", ["file" => $rawfile]), '">[Raw]</a>';
+            }
+            echo '</h3>';
         }
-        echo '</h3>';
         echo '<table id="', $tabid, '" class="pa-filediff';
-        if ($this->pc_view)
-            echo " live";
+        if ($this->pc_view) {
+            echo " pa-editablenotes live";
+            Ht::stash_script('pa_linenote.bind(document.body)', "pa_linenote");
+        }
         if (!$this->user_can_view_grades())
             echo " hidegrades";
         if (!$open)
             echo '" style="display:none';
         echo '" data-pa-file="', htmlspecialchars($file), "\"><tbody>\n";
-        if ($this->pc_view)
-            Ht::stash_script('pa_linenote.bind("#' . $tabid . '")');
-        Ht::stash_script('pa_expandcontext.bind("#' . $tabid . '")');
+        Ht::stash_script('pa_expandcontext.bind(document.body)', "pa_expandcontext");
         foreach ($dinfo as $l) {
             if ($l[0] == "@")
                 $x = array(" gx", "pa-dcx", "", "", $l[3]);
@@ -801,7 +824,7 @@ class PsetView {
             echo '<tr class="pa-dl', $x[0], '">',
                 '<td class="pa-da"', $ak, '></td>',
                 '<td class="pa-db"', $bk, '></td>',
-                '<td class="', $x[1], '">', diff_line_code($x[4]), "</td></tr>\n";
+                '<td class="', $x[1], '">', $this->diff_line_code($x[4]), "</td></tr>\n";
 
             if ($gentries !== null && $aln && isset($gentries[$aln])) {
                 foreach ($gentries[$aln] as $g)
