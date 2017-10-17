@@ -257,11 +257,11 @@ A grade entry object defines a line in the grading rubric.
 
     If true, then this grade is not included in the total.
 
-* `priority`: number
+* `position`: number
 
     Determines display order. Grade entries are sorted first by
-    descending `priority`, and second by the order they appear in
-    `psets.json`.
+    increasing `position`, and second by the order they appear in
+    `psets.json`. Negative `position` entries appear first.
 
 ### Code display
 
@@ -270,14 +270,14 @@ regular expression. For example, this setting says:
 
 ```json
 "diffs": {
-    "README\\.txt": {"full": true, "priority": 1},
+    "README\\.txt": {"full": true, "position": -1},
     "\\.gitignore|check\\.pl": {"boring": true},
     "out": {"ignore": true}
 }
 ```
 
 * Files named `README.txt` will be displayed in full (not as a diff), before
-  other files (files by default have priority 0).
+  other files (files by default have position 0).
 
 * Files named `.gitignore` and `check.pl` are “boring.” This means that any
   diffs in these files will not be displayed by default.

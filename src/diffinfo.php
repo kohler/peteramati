@@ -10,7 +10,7 @@ class DiffInfo implements Iterator {
     public $boring = false;
     private $_boring_set = false;
     public $hide_if_anonymous = false;
-    public $priority = 0.0;
+    public $position = 0.0;
     public $removed = false;
     public $_diff = [];
     public $_diffsz = 0;
@@ -30,7 +30,7 @@ class DiffInfo implements Iterator {
             $this->boring = !!$diffconfig->boring;
             $this->_boring_set = $diffconfig->boring !== null;
             $this->hide_if_anonymous = !!$diffconfig->hide_if_anonymous;
-            $this->priority = (float) $diffconfig->priority;
+            $this->position = (float) $diffconfig->position;
         }
     }
 
@@ -201,8 +201,8 @@ class DiffInfo implements Iterator {
 
 
     static function compare($a, $b) {
-        if ($a->priority != $b->priority)
-            return $a->priority < $b->priority ? 1 : -1;
+        if ($a->position != $b->position)
+            return $a->position < $b->position ? -1 : 1;
         else
             return strcmp($a->filename, $b->filename);
     }

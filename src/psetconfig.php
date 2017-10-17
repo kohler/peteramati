@@ -172,7 +172,7 @@ class Pset {
         if (get($p, "grade_order"))
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         else
-            $this->grades = self::priority_sort("grades", $this->all_grades);
+            $this->grades = self::position_sort("grades", $this->all_grades);
         foreach ($this->grades as $g)
             if ($g->is_extra)
                 $this->has_extra = true;
@@ -204,7 +204,7 @@ class Pset {
         if (get($p, "runner_order"))
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
         else
-            $this->runners = self::priority_sort("runners", $this->all_runners);
+            $this->runners = self::position_sort("runners", $this->all_runners);
         $this->run_username = self::cstr($p, "run_username");
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
         $this->run_overlay = self::cstr($p, "run_overlay");
@@ -497,16 +497,16 @@ class Pset {
         return $b;
     }
 
-    private static function priority_sort($what, $a) {
+    private static function position_sort($what, $a) {
         $i = 0;
         $b = array();
         foreach ($a as $k => $v) {
-            $b[$k] = array($v->priority, $i);
+            $b[$k] = array($v->position, $i);
             ++$i;
         }
         uasort($b, function ($a, $b) {
                 if ($a[0] != $b[0])
-                    return $a[0] > $b[0] ? -1 : 1;
+                    return $a[0] < $b[0] ? -1 : 1;
                 else if ($a[1] != $b[1])
                     return $a[1] < $b[1] ? -1 : 1;
                 else
@@ -528,7 +528,7 @@ class GradeEntryConfig {
     public $hide_max;
     public $no_total;
     public $is_extra;
-    public $priority;
+    public $position;
     public $landmark_file;
     public $landmark_line;
     public $landmark_range_file;
@@ -558,7 +558,9 @@ class GradeEntryConfig {
         $this->hide_max = Pset::cbool($loc, $g, "hide_max");
         $this->no_total = Pset::cbool($loc, $g, "no_total");
         $this->is_extra = Pset::cbool($loc, $g, "is_extra");
-        $this->priority = Pset::cnum($loc, $g, "priority");
+        $this->position = Pset::cnum($loc, $g, "position");
+        if ($this->position === null && isset($g->priority))
+            $this->position = -Pset::cnum($loc, $g, "priority");
         if (isset($g->landmark)) {
             if (is_string($g->landmark)
                 && preg_match('/\A(.*):(\d+)\z/', $g->landmark, $m)) {
@@ -608,7 +610,7 @@ class RunnerConfig {
     public $eval;
     public $queue;
     public $nconcurrent;
-    public $priority;
+    public $position;
 
     function __construct($name, $r) {
         $loc = array("runners", $name);
@@ -636,7 +638,9 @@ class RunnerConfig {
         $this->eval = Pset::cstr($loc, $r, "eval");
         $this->queue = Pset::cstr($loc, $r, "queue");
         $this->nconcurrent = Pset::cint($loc, $r, "nconcurrent");
-        $this->priority = Pset::cnum($loc, $r, "priority");
+        $this->position = Pset::cnum($loc, $r, "position");
+        if ($this->position === null && isset($r->position))
+            $this->position = -Pset::cnum($loc, $r, "priority");
     }
     function runclass_argument() {
         return $this->runclass === $this->name ? null : $this->runclass;
@@ -646,7 +650,7 @@ class RunnerConfig {
 class DiffConfig {
     public $regex;
     public $match_priority;
-    public $priority;
+    public $position;
     public $full;
     public $ignore;
     public $boring;
@@ -661,7 +665,9 @@ class DiffConfig {
         if (!is_string($this->regex) || $this->regex === "")
             throw new PsetConfigException("`regex` diff format error", $loc);
         $this->match_priority = (float) Pset::cint($loc, $d, "match_priority");
-        $this->priority = Pset::cnum($loc, $d, "priority");
+        $this->position = Pset::cnum($loc, $d, "position");
+        if ($this->position === null && isset($d->priority))
+            $this->position = -Pset::cnum($loc, $d, "priority");
         $this->full = Pset::cbool($loc, $d, "full");
         $this->ignore = Pset::cbool($loc, $d, "ignore");
         $this->boring = Pset::cbool($loc, $d, "boring");
@@ -681,8 +687,8 @@ class DiffConfig {
             $x = clone $b;
             $y = $a;
         }
-        if ($x->priority === null)
-            $x->priority = $y->priority;
+        if ($x->position === null)
+            $x->position = $y->position;
         if ($x->full === null)
             $x->full = $y->full;
         if ($x->ignore === null)
