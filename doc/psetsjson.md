@@ -263,6 +263,16 @@ A grade entry object defines a line in the grading rubric.
     increasing `position`, and second by the order they appear in
     `psets.json`. Negative `position` entries appear first.
 
+* `landmark`: string, like "FILENAME:LINE"
+
+    If set, then in diff display, a text box for grade entry will be placed
+    underneath line FILENAME:LINE from the handout code.
+
+* `landmark_range`: string, like "FILENAME:LINE1-LINE2"
+
+    If set, then provide a link to grade all submissions for this entry on a
+    single page.
+
 ### Code display
 
 Code display is controlled by the `diffs` setting, which is an object keyed by
