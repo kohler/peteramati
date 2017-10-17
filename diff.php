@@ -59,8 +59,8 @@ if ($commitb->hash === $Info->grading_hash())
 $TABWIDTH = $Info->commit_info("tabwidth") ? : 4;
 
 echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height:110%\">",
-    "<div class=\"pa-dl gd\" style=\"padding:2px 5px\"><big><code>", substr($hasha, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</big></div>",
-    "<div class=\"pa-dl gi\" style=\"padding:2px 5px\"><big><code>", substr($hashb, 0, 7), "</code> ", htmlspecialchars($commitb->subject), "</big></div>",
+    "<div class=\"pa-dl pa-gd\" style=\"padding:2px 5px\"><big><code>", substr($hasha, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</big></div>",
+    "<div class=\"pa-dl pa-gi\" style=\"padding:2px 5px\"><big><code>", substr($hashb, 0, 7), "</code> ", htmlspecialchars($commitb->subject), "</big></div>",
     "</td></tr></table><hr>\n";
 
 // collect diff and sort line notes

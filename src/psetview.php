@@ -783,13 +783,13 @@ class PsetView {
         Ht::stash_script('pa_expandcontext.bind(document.body)', "pa_expandcontext");
         foreach ($dinfo as $l) {
             if ($l[0] == "@")
-                $x = array(" gx", "pa-dcx", "", "", $l[3]);
+                $x = array(" pa-gx", "pa-dcx", "", "", $l[3]);
             else if ($l[0] == " ")
-                $x = array(" gc", "pa-dd", $l[1], $l[2], $l[3]);
+                $x = array(" pa-gc", "pa-dd", $l[1], $l[2], $l[3]);
             else if ($l[0] == "-")
-                $x = array(" gd", "pa-dd", $l[1], "", $l[3]);
+                $x = array(" pa-gd", "pa-dd", $l[1], "", $l[3]);
             else
-                $x = array(" gi", "pa-dd", "", $l[2], $l[3]);
+                $x = array(" pa-gi", "pa-dd", "", $l[2], $l[3]);
 
             $aln = $x[2] ? "a" . $x[2] : "";
             $bln = $x[3] ? "b" . $x[3] : "";
@@ -828,7 +828,7 @@ class PsetView {
 
             if ($gentries !== null && $aln && isset($gentries[$aln])) {
                 foreach ($gentries[$aln] as $g)
-                    echo '<tr class="pa-dl gg"><td colspan="4" class="pa-graderow"><div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"></div></td></tr>';
+                    echo '<tr class="pa-dl pa-gg"><td colspan="4" class="pa-graderow"><div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"></div></td></tr>';
             }
 
             if ($nx)
@@ -839,7 +839,7 @@ class PsetView {
 
     private function echo_linenote(LineNote $note, LinenotesOrder $lnorder = null) {
         if ($this->can_view_grades() || $note->iscomment) {
-            echo '<tr class="pa-dl gw"', /* NB script depends on this class exactly */
+            echo '<tr class="pa-dl pa-gw"', /* NB script depends on this class exactly */
                 ' data-pa-note="', htmlspecialchars(json_encode($note->render_json($this->can_view_note_authors()))), '"';
             if ((string) $note->note === "")
                 echo ' style="display:none"';

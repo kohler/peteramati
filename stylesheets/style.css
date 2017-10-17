@@ -2389,14 +2389,21 @@ tr.papr-partner {
 .gradecdf61summary .val {
 	text-align: right;
 }
+@media screen and (min-width: 640px) {
 .pa-filediff {
-	width: 100%;
+	margin-left: 2rem;
+	width: calc(100% - 2rem);
 }
-table.live > tbody > tr.pa-dl.gi:hover > td,
+.pa-gradebox {
+	position: relative;
+	left: -1rem;
+}
+}
+table.live > tbody > tr.pa-gi:hover > td,
 tr.pa-dl.live > td {
 	background-color: #f8eec7;
 }
-tr.pa-dl.gx:hover > td {
+tr.pa-gx:hover > td {
 	background-color: #e8e8f8;
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
@@ -2441,13 +2448,13 @@ table.hidegrades .pa-gradenote {
 .pa-dcx {
 	color: rgba(0, 0, 0, 0.5);
 }
-.pa-dl.gx {
+.pa-gx {
 	background-color: #f3f3ff;
 }
-.pa-dl.gd {
+.pa-gd {
 	background-color: #ffdddd;
 }
-.pa-dl.gi {
+.pa-gi {
 	background-color: #ddffdd;
 }
 .pa-note-entry {
@@ -2511,12 +2518,12 @@ span.foldarrow {
 	    -webkit-linear-gradient(right, #f3d1fc 20%, #e3a3e3 100%, transparent 100%) repeat-y right top;
 	-webkit-background-size: 100% 7px, 100% 5px, 25px 100%;
 	background:
-	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) no-repeat right top,
+	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) no-repeat right bottom,
 	    linear-gradient(270deg, #f3d1fc 20%, #e3a3e3 100%, transparent 100%) repeat-y right top,
 	    linear-gradient(125deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center,
 	    linear-gradient(55deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center;
-	background-size: 100% 7px, 100% 5px, 25px 100%, 10px 20px, 10px 20px;
+	background-size: 25px 7px, 25px 5px, 25px 100%, 10px 20px, 10px 20px;
 }
 .pa-note-links, .pa-note-aa, .pa-note-author {
 	font-family: Helvetica, sans-serif;

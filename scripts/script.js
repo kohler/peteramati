@@ -1724,13 +1724,13 @@ function pa_diff_locate(target, direction) {
         tr = target;
         direction = "previousSibling";
     }
-    while (tr && (tr.nodeType !== Node.ELEMENT_NODE || has_class(tr, "gw") || has_class(tr, "gg")))
+    while (tr && (tr.nodeType !== Node.ELEMENT_NODE || has_class(tr, "pa-gw") || has_class(tr, "pa-gg")))
         tr = tr[direction];
 
     var table = tr, file;
     while (table && !(file = table.getAttribute("data-pa-file")))
         table = table.parentNode;
-    if (!tr || !table || !/\bpa-dl\b.*\bg[idc]\b/.test(tr.className))
+    if (!tr || !table || !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className))
         return null;
 
     var aline = +tr.firstChild.getAttribute("data-landmark");
@@ -1742,9 +1742,9 @@ function pa_diff_locate(target, direction) {
     };
 
     var next_tr = tr.nextSibling;
-    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || has_class(next_tr, "gg")))
+    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || has_class(next_tr, "pa-gg")))
         next_tr = next_tr.nextSibling;
-    if (next_tr && has_class(next_tr, "gw"))
+    if (next_tr && has_class(next_tr, "pa-gw"))
         result.notetr = next_tr;
 
     return result;
@@ -1766,9 +1766,11 @@ var scrolled_at;
 
 function add_notetr(linetr) {
     var next_tr = linetr.nextSibling;
-    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || has_class(next_tr, "gg")))
+    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || has_class(next_tr, "pa-gg"))) {
+        linetr = next_tr;
         next_tr = next_tr.nextSibling;
-    return $('<tr class="pa-dl gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter(next_tr ? next_tr.previousSibling : linetr);
+    }
+    return $('<tr class="pa-dl pa-gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter(linetr);
 }
 
 function render_note($tr, note, transition) {
@@ -1873,7 +1875,7 @@ function fix_notelinks($tr) {
             $a.text(t);
     }
 
-    var notes = $(".pa-dl.gw");
+    var notes = $(".pa-gw");
     var notepos = 0;
     while (notepos < notes.length && notes[notepos] !== $tr[0])
         ++notepos;
@@ -1898,7 +1900,7 @@ function traverse(tr, down) {
     var table = tr.parentElement.parentElement;
     tr = tr[direction];
     while (1) {
-        while (tr && !/\bpa-dl\b.*\bg[idc]\b/.test(tr.className))
+        while (tr && !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className))
             tr = tr[direction];
         if (tr)
             return tr;
@@ -2096,6 +2098,8 @@ function expand(evt) {
     var paline = panal ? panal.aline + 1 : 1;
     var pbline = panal ? panal.bline + 1 : 1;
     var lbline = nanal ? nanal.bline : 0;
+    if (nanal && nanal.aline <= 1)
+        return false;
     var args = {file: (panal || nanal).file, fromline: pbline};
     if (pbline && lbline)
         args.linecount = lbline - pbline;
@@ -2104,7 +2108,7 @@ function expand(evt) {
             if (data.ok && data.data) {
                 var lines = data.data.replace(/\n$/, "").split("\n");
                 for (var i = lines.length - 1; i >= 0; --i) {
-                    var t = '<tr class="pa-dl gc"><td class="pa-da">' +
+                    var t = '<tr class="pa-dl pa-gc"><td class="pa-da">' +
                         (paline + i) + '</td><td class="pa-db">' +
                         (pbline + i) + '</td><td class="pa-dd"></td></tr>';
                     $(t).insertAfter(contextrow).find(".pa-dd").text(lines[i]);
@@ -2118,7 +2122,7 @@ function expand(evt) {
 
 return {
     bind: function (selector) {
-        $(selector).on("click", "tr.pa-dl.gx", expand);
+        $(selector).on("click", ".pa-gx", expand);
     }
 };
 })($);
@@ -2449,7 +2453,7 @@ function pa_gotoline(x, lineid) {
 
 function pa_beforeunload(evt) {
     var ok = true;
-    $("tr.gw textarea").each(function () {
+    $(".pa-gw textarea").each(function () {
         var $tr = $(this).closest("tr");
         var note = pa_notedata($tr);
         if (note && !text_eq(this.value, note[1]) && !$tr.data("pa-savefailed"))
@@ -3662,6 +3666,18 @@ function pa_render_pset_table(psetid, pconf, data) {
     render_body();
 }
 
+function pa_diff_toggle_hide_left() {
+    var $x = $("head .style-hide-left");
+    if ($x.length)
+        $x.remove();
+    else {
+        var styles = $('<style class="style-hide-left"></style>').appendTo("head")[0].sheet;
+        styles.insertRule('.pa-gd { display: none; }');
+        styles.insertRule('.pa-gi { background-color: inherit; }');
+    }
+    if (this.tagName === "BUTTON")
+        $(this).html($x.length ? "Hide left" : "Show left");
+}
 
 // autogrowing text areas; based on https://github.com/jaz303/jquery-grab-bag
 function textarea_shadow($self) {

@@ -74,6 +74,9 @@ function echo_diff_one(Contact $user, Pset $pset, Qrequest $qreq) {
 
 $Conf->header(htmlspecialchars($Pset->title . " > " . join(" ", $Qreq->files)), "home");
 
+echo Ht::js_button("Hide left", "pa_diff_toggle_hide_left.call(this)");
+echo "<hr />\n";
+
 foreach (explode(" ", $Qreq->users) as $user) {
     if ($user !== "" && ($user = $Conf->user_by_whatever($user))) {
         echo_diff_one($user, $Pset, $Qreq);
