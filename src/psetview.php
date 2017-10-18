@@ -750,7 +750,9 @@ class PsetView {
         if ($this->can_view_note_authors())
             $this->conf->stash_hotcrp_pc($this->viewer);
         $gentries = null;
-        if ($this->pset->has_grade_landmark && $this->pc_view) {
+        if ($this->pset->has_grade_landmark
+            && $this->pc_view
+            && !$this->is_handout_commit()) {
             foreach ($this->pset->grades as $g)
                 if ($g->landmark_file === $file)
                     $gentries["a" . $g->landmark_line][] = $g;
