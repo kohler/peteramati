@@ -2360,8 +2360,7 @@ table.pap > thead {
 	text-align: right;
 	padding: 0 5px;
 }
-.pap-username, .pap-name, .pap-extension, .pap-grader, .pap-notes, .pap-grade, .pap-total, .pap-repo,
-.pap-pset, .pap-at {
+.pap-username, .pap-name, .pap-extension, .pap-grader, .pap-notes, .pap-grade, .pap-ngrades, .pap-total, .pap-repo, .pap-pset, .pap-at {
 	padding-left: 12px;
 }
 tr.papr-partner > td.pap-username {
@@ -2370,7 +2369,7 @@ tr.papr-partner > td.pap-username {
 tr.papr-partner {
 	font-size: smaller;
 }
-.pap-total {
+.pap-total, .pap-ngrades {
 	font-weight: bold;
 }
 .pap-highlight {

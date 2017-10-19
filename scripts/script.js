@@ -3185,6 +3185,7 @@ function pa_anonymize_linkto(link, event) {
 function pa_render_pset_table(psetid, pconf, data) {
     var $j = $("#pa-pset" + psetid), dmap = [],
         flagged = pconf.flagged_commits,
+        grade_keys = pconf.grade_keys || [], need_ngrades,
         sort = {f: flagged ? "at" : "username", last: true, rev: 1},
         sorting_last, displaying_last_first = null,
         anonymous = pconf.anonymous;
@@ -3200,18 +3201,31 @@ function pa_render_pset_table(psetid, pconf, data) {
             delete sort.override_anonymous;
         if (anonymous && sort.override_anonymous)
             anonymous = false;
+        var ngrades_expected = -1, ngrades;
         for (var i = 0; i < data.length; ++i) {
-            if (data[i].dropped)
-                data[i].boringness = 2;
-            else if (!data[i].gradehash && !pconf.gitless_grades)
-                data[i].boringness = 1;
+            var s = data[i];
+            if (s.dropped)
+                s.boringness = 2;
+            else if (!s.gradehash && !pconf.gitless_grades)
+                s.boringness = 1;
             else
-                data[i].boringness = 0;
+                s.boringness = 0;
+            ngrades = 0;
+            for (var j = 0; j < grade_keys.length; ++j) {
+                if (grade_keys[j] != pconf.total_key && s.grades[j] != null && s.grades[j] != "")
+                    ++ngrades;
+            }
+            s.ngrades_nonempty = ngrades;
+            if (ngrades_expected === -1)
+                ngrades_expected = ngrades;
+            else if (ngrades_expected !== ngrades)
+                ngrades_expected = -2;
         }
+        need_ngrades = ngrades_expected === -2;
     }
     function calculate_ncol() {
         return (pconf.checkbox ? 1 : 0) + 5 + (pconf.gitless_grades ? 0 : 1) +
-            (pconf.need_total ? 1 : 0) + (pconf.grade_keys || []).length +
+            (pconf.need_total ? 1 : 0) + grade_keys.length + (need_ngrades ? 1 : 0) +
             (pconf.gitless ? 0 : 1);
     }
     function ukey(s) {
@@ -3261,8 +3275,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         return "s61_" + encodeURIComponent(u).replace(/\./g, "%2E");
     }
     function render_tds(s, row_number) {
-        var grades = pconf.grade_keys || [];
-        var a = [], txt, j, klass;
+        var a = [], txt, j, klass, ngrades;
         if (row_number == "") {
             if (pconf.checkbox)
                 a.push('<td></td>');
@@ -3305,14 +3318,17 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
         if (pconf.need_total)
             a.push('<td class="pap-total r">' + s.total + '</td>');
-        for (j = 0; j < grades.length; ++j) {
+        for (j = 0; j < grade_keys.length; ++j) {
+            var grade_empty = s.grades[j] == null || s.grades[j] == "";
             klass = "pap-grade";
-            if (grades[j] == pconf.total_key && s.grades[j] != null && s.grades[j] != "")
+            if (grade_keys[j] == pconf.total_key && !grade_empty)
                 klass = "pap-total";
-            if (s.highlight_grades && s.highlight_grades[grades[j]])
+            if (s.highlight_grades && s.highlight_grades[grade_keys[j]])
                 klass += " pap-highlight";
-            a.push('<td class="' + klass + ' r">' + (s.grades[j] == null ? '' : s.grades[j]) + '</td>');
+            a.push('<td class="' + klass + ' r">' + (grade_empty ? "" : s.grades[j]) + '</td>');
         }
+        if (need_ngrades)
+            a.push('<td class="pap-ngrades r">' + s.ngrades_nonempty + '</td>');
         if (!pconf.gitless) {
             if (!s.repo)
                 txt = '';
@@ -3449,7 +3465,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         return false;
     }
     function render_head() {
-        var a = [], j, grades = pconf.grade_keys || [], t;
+        var a = [], j, t;
         if (pconf.checkbox)
             a.push('<th class="pap-checkbox"></th>');
         a.push('<th class="pap-rownumber"></th>');
@@ -3470,8 +3486,10 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<th class="pap-notes"></th>');
         if (pconf.need_total)
             a.push('<th class="pap-total r plsortable" data-pa-sort="total">Tot</th>');
-        for (j = 0; j < grades.length; ++j)
-            a.push('<th class="pap-grade r plsortable" data-pa-sort="grade' + j + '">' + grades[j].substr(0, 3) + '</th>');
+        for (j = 0; j < grade_keys.length; ++j)
+            a.push('<th class="pap-grade r plsortable" data-pa-sort="grade' + j + '">' + grade_keys[j].substr(0, 3) + '</th>');
+        if (need_ngrades)
+            a.push('<th class="pap-ngrades r plsortable" data-pa-sort="ngrades">#G</th>');
         if (!pconf.gitless)
             a.push('<th class="pap-repo"></th>');
         $j.find("thead").html('<tr>' + a.join('') + '</tr>');
@@ -3576,6 +3594,15 @@ function pa_render_pset_table(psetid, pconf, data) {
                     else
                         return -user_compare(a, b);
                 }
+            });
+        } else if (f === "ngrades" && need_ngrades) {
+            data.sort(function (a, b) {
+                if (a.boringness !== b.boringness)
+                    return a.boringness - b.boringness;
+                else if (a.ngrades_nonempty !== b.ngrades_nonempty)
+                    return a.ngrades_nonempty < b.ngrades_nonempty ? -rev : rev;
+                else
+                    return -user_compare(a, b);
             });
         } else if (sort.email && !anonymous) {
             f = "username";
