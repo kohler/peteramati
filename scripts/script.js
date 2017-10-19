@@ -3212,7 +3212,7 @@ function pa_render_pset_table(psetid, pconf, data) {
                 s.boringness = 0;
             ngrades = 0;
             for (var j = 0; j < grade_keys.length; ++j) {
-                if (grade_keys[j] != pconf.total_key && s.grades[j] != null && s.grades[j] != "")
+                if (grade_keys[j] != pconf.total_key && s.grades[j] != null && s.grades[j] !== "")
                     ++ngrades;
             }
             s.ngrades_nonempty = ngrades;
@@ -3319,7 +3319,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         if (pconf.need_total)
             a.push('<td class="pap-total r">' + s.total + '</td>');
         for (j = 0; j < grade_keys.length; ++j) {
-            var grade_empty = s.grades[j] == null || s.grades[j] == "";
+            var grade_empty = s.grades[j] == null || s.grades[j] === "";
             klass = "pap-grade";
             if (grade_keys[j] == pconf.total_key && !grade_empty)
                 klass = "pap-total";
