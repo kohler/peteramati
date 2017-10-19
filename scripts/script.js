@@ -3218,7 +3218,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             s.ngrades_nonempty = ngrades;
             if (ngrades_expected === -1)
                 ngrades_expected = ngrades;
-            else if (ngrades_expected !== ngrades)
+            else if (ngrades_expected !== ngrades && (!s.boringness || ngrades > 0))
                 ngrades_expected = -2;
         }
         need_ngrades = ngrades_expected === -2;
