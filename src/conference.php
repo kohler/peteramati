@@ -525,7 +525,7 @@ class Conf {
             $user_type = 2;
         } else {
             if (str_ends_with($whatever, "@*")) {
-                $q[] = "email like '" . sql_for_like(substr($whatever, 0, -1)) . "%'";
+                $q[] = "email like '" . sqlq_for_like(substr($whatever, 0, -1)) . "%'";
             } else {
                 $q[] = "email=?";
                 $qv[] = $whatever;
