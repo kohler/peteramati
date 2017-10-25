@@ -873,6 +873,13 @@ class Conf {
         return $t === null || $t <= 0 || $t >= $Now;
     }
 
+    function repository_site_classes() {
+        if (isset($this->opt["repositorySites"]) && is_array($this->opt["repositorySites"]))
+            return $this->opt["repositorySites"];
+        else
+            return ["github"];
+    }
+
 
     function cacheableImage($name, $alt, $title = null, $class = null, $style = null) {
         global $ConfSitePATH;

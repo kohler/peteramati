@@ -9,11 +9,13 @@ class RepositorySite {
     static private $gitssh_config_checked = 0;
 
     static function is_primary(Repository $repo = null) {
-        return $repo === null || $repo->reposite->siteclass === get($repo->conf->opt("repositorySites", ["harvardseas"]), 0);
+        return $repo === null
+            || $repo->reposite->siteclass === $repo->conf->repository_site_classes()[0];
     }
     static function site_classes(Conf $conf) {
-        $sites = $conf->opt("repositorySites", ["harvardseas"]);
-        return array_map(function ($abbr) { return RepositorySite::$sitemap[$abbr]; }, $sites);
+        return array_map(function ($abbr) {
+            return RepositorySite::$sitemap[$abbr];
+        }, $conf->repository_site_classes());
     }
     static function make($url, Conf $conf) {
         foreach (self::site_classes($conf) as $k) {
