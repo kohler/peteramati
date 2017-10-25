@@ -511,7 +511,7 @@ class Conf {
             $user_type = 1;
         } else if (strpos($whatever, "@") === false) {
             if ($this->_username_classes & 1) {
-                $q[] = "github_username=?";
+                $q[] = "github_username=" . Dbl::utf8ci("?");
                 $qv[] = $whatever;
             }
             if ($this->_username_classes & 2) {
