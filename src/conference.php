@@ -62,6 +62,8 @@ class Conf {
     private $_handout_commits = [];
     private $_handout_latest_commit = [];
     private $_api_map = null;
+    private $_repository_site_classes = null;
+    private $_username_classes = 0;
 
     static public $g = null;
 
@@ -290,6 +292,19 @@ class Conf {
         if ($this->validate_overall_timeout <= 0)
             $this->validate_overall_timeout = 5;
 
+        // repository site classes
+        $this->_repository_site_classes = ["github"];
+        if (isset($this->opt["repositorySites"])) {
+            $x = $this->opt["repositorySites"];
+            if (is_array($x) || (is_string($x) && ($x = json_decode($x)) && is_array($x)))
+                $this->_repository_site_classes = $x;
+        }
+        $this->_username_classes = 0;
+        if (in_array("github", $this->_repository_site_classes))
+            $this->_username_classes |= 1;
+        if (in_array("harvardseas", $this->_repository_site_classes))
+            $this->_username_classes |= 2;
+
         $sort_by_last = !!get($this->opt, "sortByLastName");
         if (!$this->sort_by_last != !$sort_by_last)
             $this->_pc_members_cache = $this->_pc_members_and_admins_cache = null;
@@ -484,34 +499,59 @@ class Conf {
         return $acct && $acct->contactId ? $acct : null;
     }
 
-    private function user_by_whatever_query($whatever) {
-        $whatever = trim($whatever);
-        if (preg_match('/\A\d{8}\z/', $whatever))
-            return ["ContactInfo.seascode_username=? or ContactInfo.huid=? order by ContactInfo.seascode_username=? desc limit 1",
-                    [$whatever, $whatever, $whatever]];
-        else if (preg_match('/\A\[anon\w+\]\z/', $whatever))
-            return ["ContactInfo.anon_username=?", [$whatever]];
-        else if (strpos($whatever, "@") === false)
-            return ["ContactInfo.github_username=? or ContactInfo.seascode_username=?
-                     or (coalesce(ContactInfo.github_username,ContactInfo.seascode_username,'')='' and email like ?l)
-                     order by ContactInfo.github_username=? desc, ContactInfo.seascode_username=? desc limit 1",
-                    [$whatever, $whatever, $whatever, $whatever, $whatever]];
-        else {
-            // XXX harvard
-            if (preg_match('_.*@(?:fas|college|seas)\z_', $whatever))
-                $whatever .= ".harvard.edu";
-            else if (preg_match('_.*@.*?\.harvard\z_', $whatever))
-                $whatever .= ".edu";
-            return ["ContactInfo.email=?", [$whatever]];
-        }
-    }
-
     function user_by_whatever($whatever) {
-        list($qpart, $args) = $this->user_by_whatever_query($whatever);
-        $user = $this->user_by_query($qpart, $args);
-        if ($user && str_starts_with(ltrim($whatever), "[anon"))
-            $user->set_anonymous(true);
-        return $user;
+        $q = $qv = [];
+        $whatever = trim($whatever);
+        $user_type = 0;
+        if ($whatever === "") {
+            return null;
+        } else if (str_starts_with($whatever, "[anon")) {
+            $q[] = "anon_username=?";
+            $qv[] = $whatever;
+            $user_type = 1;
+        } else if (strpos($whatever, "@") === false) {
+            if ($this->_username_classes & 1) {
+                $q[] = "github_username=?";
+                $qv[] = $whatever;
+            }
+            if ($this->_username_classes & 2) {
+                $q[] = "seascode_username=?";
+                $qv[] = $whatever;
+            }
+            if (ctype_digit($whatever)) {
+                $q[] = "huid=?";
+                $qv[] = $whatever;
+            }
+            $user_type = 2;
+        } else {
+            if (str_ends_with($whatever, "@*")) {
+                $q[] = "email like '" . sql_for_like(substr($whatever, 0, -1)) . "%'";
+            } else {
+                $q[] = "email=?";
+                $qv[] = $whatever;
+            }
+        }
+        $result = $this->qe_apply("select * from ContactInfo where " . join(" or ", $q), $qv);
+        $users = [];
+        while (($user = Contact::fetch($result))) {
+            $users[] = $user;
+        }
+        Dbl::free($result);
+        if (empty($users) && $user_type === 2) {
+            return $this->user_by_whatever($whatever . "@*");
+        } else if (count($users) > 1 && $user_type === 2) {
+            $users = array_filter($users, function ($u) use ($whatever) {
+                return $u->github_username === $whatever || $u->seascode_username === $whatever;
+            });
+        }
+        if (count($users) === 1) {
+            if ($user_type === 1) {
+                $users[0]->set_anonymous(true);
+            }
+            return $users[0];
+        } else {
+            return null;
+        }
     }
 
     function user_id_by_email($email) {
