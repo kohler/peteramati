@@ -63,6 +63,11 @@ class Conf {
     private $_handout_latest_commit = [];
     private $_api_map = null;
     private $_repository_site_classes = null;
+    const USERNAME_GITHUB = 1;
+    const USERNAME_HARVARDSEAS = 2;
+    const USERNAME_EMAIL = 4;
+    const USERNAME_HUID = 8;
+    const USERNAME_USERNAME = 16;
     private $_username_classes = 0;
 
     static public $g = null;
@@ -301,9 +306,9 @@ class Conf {
         }
         $this->_username_classes = 0;
         if (in_array("github", $this->_repository_site_classes))
-            $this->_username_classes |= 1;
+            $this->_username_classes |= self::USERNAME_GITHUB;
         if (in_array("harvardseas", $this->_repository_site_classes))
-            $this->_username_classes |= 2;
+            $this->_username_classes |= self::USERNAME_HARVARDSEAS;
 
         $sort_by_last = !!get($this->opt, "sortByLastName");
         if (!$this->sort_by_last != !$sort_by_last)
@@ -499,7 +504,12 @@ class Conf {
         return $acct && $acct->contactId ? $acct : null;
     }
 
-    function user_by_whatever($whatever) {
+    function user_by_whatever($whatever, $types = 0) {
+        if ($types === 0) {
+            $types = $this->_username_classes | self::USERNAME_HUID | self::USERNAME_EMAIL;
+        } else if ($types & self::USERNAME_USERNAME) {
+            $types |= $this->_username_classes;
+        }
         $q = $qv = [];
         $whatever = trim($whatever);
         $user_type = 0;
@@ -510,20 +520,20 @@ class Conf {
             $qv[] = $whatever;
             $user_type = 1;
         } else if (strpos($whatever, "@") === false) {
-            if ($this->_username_classes & 1) {
+            if ($types & self::USERNAME_GITHUB) {
                 $q[] = "github_username=" . Dbl::utf8ci("?");
                 $qv[] = $whatever;
             }
-            if ($this->_username_classes & 2) {
+            if ($types & self::USERNAME_HARVARDSEAS) {
                 $q[] = "seascode_username=?";
                 $qv[] = $whatever;
             }
-            if (ctype_digit($whatever)) {
+            if (($types & self::USERNAME_HUID) && ctype_digit($whatever)) {
                 $q[] = "huid=?";
                 $qv[] = $whatever;
             }
             $user_type = 2;
-        } else {
+        } else if ($types & self::USERNAME_EMAIL) {
             if (str_ends_with($whatever, "@*")) {
                 $q[] = "email like '" . sqlq_for_like(substr($whatever, 0, -1)) . "%'";
             } else {
@@ -531,17 +541,20 @@ class Conf {
                 $qv[] = $whatever;
             }
         }
+        if (empty($q)) {
+            return null;
+        }
         $result = $this->qe_apply("select * from ContactInfo where " . join(" or ", $q), $qv);
         $users = [];
         while (($user = Contact::fetch($result))) {
             $users[] = $user;
         }
         Dbl::free($result);
-        if (empty($users) && $user_type === 2) {
-            return $this->user_by_whatever($whatever . "@*");
+        if (empty($users) && $user_type === 2 && ($types & self::USERNAME_EMAIL)) {
+            return $this->user_by_whatever($whatever . "@*", self::USERNAME_EMAIL);
         } else if (count($users) > 1 && $user_type === 2) {
             $users = array_filter($users, function ($u) use ($whatever) {
-                return $u->github_username === $whatever || $u->seascode_username === $whatever;
+                return $u->huid !== $whatever;
             });
         }
         if (count($users) === 1) {

@@ -243,14 +243,14 @@ function upload_grades($pset, $text, $fname) {
     $csv->set_header($csv->next());
     while (($line = $csv->next())) {
         if (($who = get($line, "github_username")) && $who !== "-")
-            $user = $Conf->user_by_query("github_username=?", [$who]);
+            $user = $Conf->user_by_whatever($who, Conf::USERNAME_GITHUB);
         else if (($who = get($line, "seascode_username")) && $who !== "-")
-            $user = $Conf->user_by_query("seascode_username=?", [$who]);
+            $user = $Conf->user_by_whatever($who, Conf::USERNAME_HARVARDSEAS);
         else if (($who = get($line, "huid")) && $who !== "-")
-            $user = $Conf->user_by_query("huid=?", [$who]);
-        else if (($who = get($line, "username")) && $who !== "-")
-            $user = $Conf->user_by_query("github_username=? or seascode_username=? order by github_username=? desc limit 1", [$who, $who, $who]);
-        else if (($who = get($line, "email")) && $who !== "-")
+            $user = $Conf->user_by_whatever($who, Conf::USERNAME_HUID);
+        else if (($who = get($line, "username")) && $who !== "-") {
+            $user = $Conf->user_by_whatever($who, Conf::USERNAME_USERNAME);
+        } else if (($who = get($line, "email")) && $who !== "-")
             $user = $Conf->user_by_email($who);
         else if (($who = get($line, "name"))) {
             list($first, $last) = Text::split_name($who);
