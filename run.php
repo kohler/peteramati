@@ -136,7 +136,7 @@ else if (!$Info->can_view_repo_contents())
 // extract request info
 $Queueid = cvtint($Qreq->get("queueid", -1));
 $checkt = cvtint($Qreq->get("check"));
-$Offset = cvtint($Qreq->get("offset", -1));
+$Offset = cvtint($Qreq->get("offset", 0));
 
 
 // maybe eval

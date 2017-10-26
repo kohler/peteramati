@@ -165,7 +165,7 @@ class ContactView {
                               "timestamp" => $checkt);
     }
 
-    static function runner_json(PsetView $info, $checkt, $offset = -1) {
+    static function runner_json(PsetView $info, $checkt, $offset = null) {
         if (ctype_digit($checkt))
             $logfn = self::runner_logfile($info, $checkt);
         else if (preg_match(',\.(\d+)\.log(?:\.lock|\.pid)?\z,', $checkt, $m)) {
@@ -174,22 +174,24 @@ class ContactView {
         } else
             return false;
 
-        $data = @file_get_contents($logfn, false, null, $offset);
-        if ($data === false)
-            return (object) array("error" => true, "message" => "No such log");
+        $json = self::runner_generic_json($info, $checkt);
+        self::runner_status_json($info, $checkt, $json);
 
-        // Fix up $data if it is not valid UTF-8.
-        if (!is_valid_utf8($data)) {
-            $data = UnicodeHelper::utf8_truncate_invalid($data);
-            if (!is_valid_utf8($data))
-                $data = UnicodeHelper::utf8_replace_invalid($data);
+        if ($offset !== null) {
+            $data = @file_get_contents($logfn, false, null, max($offset, 0));
+            if ($data === false)
+                return (object) array("error" => true, "message" => "No such log");
+            // Fix up $data if it is not valid UTF-8.
+            if (!is_valid_utf8($data)) {
+                $data = UnicodeHelper::utf8_truncate_invalid($data);
+                if (!is_valid_utf8($data))
+                    $data = UnicodeHelper::utf8_replace_invalid($data);
+            }
+            $json->data = $data;
+            $json->offset = max($offset, 0);
+            $json->lastoffset = $json->offset + strlen($data);
         }
 
-        $json = self::runner_generic_json($info, $checkt);
-        $json->data = $data;
-        $json->offset = max($offset, 0);
-        $json->lastoffset = $json->offset + strlen($data);
-        self::runner_status_json($info, $checkt, $json);
         return $json;
     }
 
