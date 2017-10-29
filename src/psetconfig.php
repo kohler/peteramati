@@ -416,7 +416,7 @@ class Pset {
         if (is_string($files)) {
             $files = $this->maybe_prefix_directory([$files]);
             return $files[0];
-        } else if (!$this->directory_slash)) {
+        } else if (!$this->directory_slash) {
             return $files;
         } else {
             $pfiles = [];
