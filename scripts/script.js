@@ -3328,7 +3328,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             a.push('<td class="' + klass + ' r">' + (grade_empty ? "" : s.grades[j]) + '</td>');
         }
         if (need_ngrades)
-            a.push('<td class="pap-ngrades r">' + s.ngrades_nonempty + '</td>');
+            a.push('<td class="pap-ngrades r">' + (s.ngrades_nonempty || "") + '</td>');
         if (!pconf.gitless) {
             if (!s.repo)
                 txt = '';
