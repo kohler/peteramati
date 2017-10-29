@@ -412,6 +412,26 @@ class Pset {
         return ($this->_file_diffinfo[$filename] = $diffinfo);
     }
 
+    function maybe_prefix_directory($files) {
+        if (is_string($files)) {
+            $files = $this->maybe_prefix_directory([$files]);
+            return $files[0];
+        } else if (!$this->directory_slash)) {
+            return $files;
+        } else {
+            $pfiles = [];
+            foreach ($files as $f) {
+                if (str_starts_with($f, $this->directory_slash)
+                    || str_starts_with($f, "./")
+                    || str_starts_with($f, "../"))
+                    return $files;
+                else
+                    $pfiles[] = $this->directory_slash . $f;
+            }
+            return $pfiles;
+        }
+    }
+
 
     private static function ccheck($callable, $args) {
         $i = 0;

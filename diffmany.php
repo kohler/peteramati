@@ -10,10 +10,17 @@ if ($Me->is_empty() || !$Me->isPC)
 global $Pset, $Qreq, $psetinfo_idx;
 $Qreq = make_qreq();
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
-if ($Qreq->file)
+
+if ($Qreq->files) {
+    $f = simplify_whitespace($Qreq->files);
+    $Qreq->files = $f === "" ? [] : explode(" ", $f);
+} else if ($Qreq->file) {
     $Qreq->files = [$Qreq->file];
-else if ($Qreq->files && ($f = simplify_whitespace($Qreq->file)) !== "")
-    $Qreq->files = explode(" ", $f);
+} else {
+    $Qreq->files = [];
+}
+$Qreq->files = $Pset->maybe_prefix_directory($Qreq->files);
+
 $psetinfo_idx = 0;
 
 function echo_diff_one(Contact $user, Pset $pset, Qrequest $qreq) {
