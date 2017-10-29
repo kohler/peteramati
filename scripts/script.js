@@ -2380,12 +2380,12 @@ function sb() {
 }
 
 function runfold61(name) {
-    var therun = jQuery("#run61_" + name), thebutton;
+    var therun = jQuery("#pa-run-" + name), thebutton;
     if (therun.attr("data-pa-timestamp") && !therun.is(":visible")) {
-        thebutton = jQuery(".runner61[value='" + name + "']")[0];
-        run61(thebutton, {unfold: true});
+        thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
+        pa_run(thebutton, {unfold: true});
     } else
-        fold61(therun, jQuery("#run61out_" + name));
+        fold61(therun, jQuery("#pa-runout-" + name));
     return false;
 }
 
@@ -2526,10 +2526,10 @@ function flag61(button) {
     }
 }
 
-function run61(button, opt) {
+function pa_run(button, opt) {
     var $f = $(button).closest("form"),
         runclass = button.getAttribute("data-pa-runclass") || button.value,
-        therun = $("#run61_" + runclass), thepre = therun.find("pre"), checkt;
+        therun = $("#pa-run-" + runclass), thepre = therun.find("pre"), checkt;
 
     if (typeof opt !== "object")
         opt = {};
@@ -2543,12 +2543,12 @@ function run61(button, opt) {
     }
     therun.removeAttr("data-pa-timestamp");
 
-    fold61(therun, jQuery("#run61out_" + runclass).show(), true);
+    fold61(therun, jQuery("#pa-runout-" + runclass).show(), true);
     if (!checkt && !opt.noclear)
         thepre.html("");
     else
-        therun.find("span.run61cursor").remove();
-    thepre.append("<span class='run61cursor'>_</span>");
+        therun.find("span.pa-runcursor").remove();
+    thepre.append("<span class='pa-runcursor'>_</span>");
 
     if (checkt && !therun.prop("openedbefore")) {
         therun.scrollTop(therun.children().height() - therun.height());
@@ -2558,7 +2558,7 @@ function run61(button, opt) {
     var ibuffer = "", // initial buffer; holds data before any results arrive
         styles = null,
         offset = -1, backoff = 50, queueid = null,
-        thecursor = therun.find("span.run61cursor")[0];
+        thecursor = therun.find("span.pa-runcursor")[0];
 
     function animate() {
         jQuery(thecursor).dequeue().animate({opacity: 0.1}, 200).delay(100).animate({opacity: 1}, 200).delay(400).queue(animate);
@@ -2802,7 +2802,7 @@ function run61(button, opt) {
 
             if (data && data.timestamp) {
                 var d = new Date(data.timestamp * 1000);
-                append_html("<span class='run61timestamp'>...started "
+                append_html("<span class='pa-runtime'>...started "
                             + strftime("%l:%M:%S%P %e %b %Y", d) + "</span>");
             }
         }
@@ -2814,7 +2814,7 @@ function run61(button, opt) {
         var x, t;
 
         if (queueid)
-            thepre.find("span.run61queue").remove();
+            thepre.find("span.pa-runqueue").remove();
         if (data && data.onqueue) {
             queueid = data.queueid;
             t = "On queue, " + data.nahead + (data.nahead == 1 ? " job" : " jobs") + " ahead";
@@ -2825,17 +2825,17 @@ function run61(button, opt) {
                     x = Math.round(data.headage / 5 + 0.5) * 5;
                 t += ", oldest began about " + x + (x == 1 ? " second" : " seconds") + " ago";
             }
-            thepre[0].insertBefore(($("<span class='run61queue'>" + t + "</span>"))[0], thepre[0].lastChild);
+            thepre[0].insertBefore(($("<span class='pa-runqueue'>" + t + "</span>"))[0], thepre[0].lastChild);
             setTimeout(send, 10000);
             return;
         }
 
         if (data && data.status == "working") {
-            if (!$("#run61stop_" + runclass).length)
-                $("<button id=\"run61stop_" + runclass + "\" class=\"run61stop\" type=\"button\">Stop</button>")
-                    .click(stop).appendTo("#run61out_" + runclass + " > h3");
+            if (!$("#pa-runstop-" + runclass).length)
+                $("<button id=\"pa-runstop-" + runclass + "\" class=\"pa-runstop\" type=\"button\">Stop</button>")
+                    .click(stop).appendTo("#pa-runout-" + runclass + " > h3");
         } else
-            $("#run61stop_" + runclass).remove();
+            $("#pa-runstop-" + runclass).remove();
 
         if (!data || !data.ok) {
             if (data && data.loggedout)
@@ -2932,7 +2932,7 @@ function runmany61() {
         jQuery("#runmany61_users").text(users.join(" "));
         var $x = jQuery("<a href=\"" + siteurl + "~" + encodeURIComponent(user) + "/pset/" + $f.find("[name='pset']").val() + "\" class=\"q ansib ansifg7\"></a>");
         $x.text(user);
-        run61($manybutton[0], {noclear: true, headline: $x[0]});
+        pa_run($manybutton[0], {noclear: true, headline: $x[0]});
     }
     setTimeout(runmany61, 10);
 }

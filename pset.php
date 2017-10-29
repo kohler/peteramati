@@ -649,20 +649,20 @@ if ($Pset->gitless) {
                 $b = Ht::button(htmlspecialchars($r->title),
                                 array("name" => "run",
                                       "value" => $r->name,
-                                      "class" => "btn runner61",
-                                      "onclick" => "run61(this)",
+                                      "class" => "btn pa-runner",
+                                      "onclick" => "pa_run(this)",
                                       "data-pa-runclass" => $r->runclass_argument(),
                                       "data-pa-loadgrade" => isset($r->eval) ? "true" : null));
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
                 $last_run = true;
             } else
                 $runnerbuttons[] = Ht::hidden("run", $r->name,
-                                              array("class" => "runner61"));
+                                              array("class" => "pa-runner"));
         }
     if (count($runnerbuttons) && $Me->isPC && $Me != $User && $last_run)
         $runnerbuttons[] = " &nbsp;"
             . Ht::button("+",
-                         array("class" => "runner61",
+                         array("class" => "pa-runner",
                                "style" => "font-weight:bold",
                                "name" => "define",
                                "onclick" => "runsetting61.add()"));
@@ -702,7 +702,7 @@ if ($Pset->gitless) {
             if (($runsettings = $Info->commit_info("runsettings")))
                 echo '<script>runsetting61.load(', json_encode($runsettings), ')</script>';
         }
-        Ht::stash_script("jQuery('button.runner61').prop('disabled',false)");
+        Ht::stash_script("jQuery('button.pa-runner').prop('disabled',false)");
     }
 
     // print current grader
@@ -741,21 +741,21 @@ if ($Pset->gitless) {
         if (!$rj && !$Me->can_run($Pset, $r, $User))
             continue;
 
-        echo '<div id="run61out_' . $r->runclass . '"';
+        echo '<div id="pa-runout-' . $r->runclass . '"';
         if (!$rj || !isset($rj->timestamp))
             echo ' style="display:none"';
         echo '><h3><a class="fold61" href="#" onclick="',
             "return runfold61('$r->runclass')", '">',
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
             htmlspecialchars($r->output_title), '</a></h3>',
-            '<div class="run61" id="run61_', $r->runclass, '" style="display:none"';
+            '<div class="pa-run" id="pa-run-', $r->runclass, '" style="display:none"';
         if ($Pset->directory_noslash !== "")
             echo ' data-pa-directory="', htmlspecialchars($Pset->directory_noslash), '"';
         if ($rj && isset($rj->timestamp))
             echo ' data-pa-timestamp="', $rj->timestamp, '"';
         if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n")))
             echo ' data-pa-content="', htmlspecialchars(substr($rj->data, $pos + 2)), '"';
-        echo '><div class="run61in"><pre class="run61pre">';
+        echo '><div class="pa-runin"><pre class="pa-runpre">';
         echo '</pre></div></div></h3></div>', "\n";
     }
 

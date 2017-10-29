@@ -528,7 +528,7 @@ input.bsm, button.bsm, select.bsm, a.bsm {
 	background-color: white;
 	white-space: nowrap;
 }
-button.run61stop {
+button.pa-runstop {
 	display: inline-block;
 	margin-left: 12px;
 	padding: 4px 8px;
@@ -2571,32 +2571,32 @@ span.foldarrow {
 	max-width: 162px;
 	padding-right: 2em;
 }
-.runner61 {
+.pa-runner {
 	font-size: 9pt;
 	font-weight: 500;
 }
-.run61, .run61 a {
+.pa-run, .pa-run a {
 	color: #e5f8e5;
 }
-.run61 a:hover {
+.pa-run a:hover {
 	color: #228822;
 }
-.run61 {
+.pa-run {
 	background-color: #000022;
 	color: #d5e8d5;
 	font-size: 85%;
 	overflow: auto;
 	max-height: 32em;
 }
-.run61timestamp {
+.pa-runtime {
 	color: #88aa88;
 	font-style: italic;
 }
-.run61pre {
+.pa-runpre {
 	padding: 1.5em 1em 1.5em 2em;
 	margin: 0;
 }
-.run61cursor {
+.pa-runcursor {
 	color: #66ee66;
 	background-color: #66ee66;
 	display: inline-block;

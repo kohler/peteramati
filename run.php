@@ -101,9 +101,9 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
         Ht::hidden("run", $Runner->name, ["id" => "runmany61", "data-pa-runclass" => $Runner->runclass_argument()]),
         '</div></form>';
 
-    echo '<div id="run61out_' . $Runner->runclass . '">',
-        '<div class="run61" id="run61_' . $Runner->runclass . '">',
-        '<div class="run61in"><pre class="run61pre"></pre></div>',
+    echo '<div id="pa-runout-' . $Runner->runclass . '">',
+        '<div class="pa-run" id="pa-run-' . $Runner->runclass . '">',
+        '<div class="pa-runin"><pre class="pa-runpre"></pre></div>',
         '</div>',
         '</div>';
 
