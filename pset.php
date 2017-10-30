@@ -777,7 +777,7 @@ echo "</div>\n";
 
 
 if (!$Pset->gitless)
-    Ht::stash_script("checklatest61()", "checklatest61");
+    Ht::stash_script("pa_checklatest()", "pa_checklatest");
 
 echo "<div class='clear'></div>\n";
 $Conf->footer();

@@ -587,7 +587,7 @@ class ContactView {
             if ($repo && $repo->snaphash && $info->can_view_repo_contents())
                 echo "\" data-pa-commit=\"", $repo->snaphash;
             echo "\">";
-            Ht::stash_script("checklatest61()", "checklatest61");
+            Ht::stash_script("pa_checklatest()", "pa_checklatest");
         }
         self::echo_group("last commit", $value, $notes);
         if ($commitgroup)
