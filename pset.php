@@ -584,7 +584,7 @@ function echo_all_grades() {
         if ($lhag && $lhag->hours !== $lhg->hours)
             $value .= ' <span class="autograde61">auto-late hours is ' . htmlspecialchars($lhag->hours) . '</span>';
         echo Ht::form($Info->hoturl_post("pset", array("setlatehours" => 1)),
-                      array("onsubmit" => "return gradesubmit61(this)")),
+                      array("onsubmit" => "return pa_savegrades(this)")),
             '<div class="f-contain" style="margin-top:1.5em">';
         ContactView::echo_group("late hours", $value,
                                 array(), array("nowrap" => true));
