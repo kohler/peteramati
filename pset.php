@@ -297,7 +297,6 @@ $xsep = " <span class='barsep'>&nbsp;·&nbsp;</span> ";
 
 
 // Top: user info
-echo "<div id='homeinfo'>";
 
 function session_list_position($sl, $info) {
     $p = array_search($info->user->contactId, $sl->ids);
@@ -744,7 +743,7 @@ if ($Pset->gitless) {
         if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n")))
             echo ' data-pa-content="', htmlspecialchars(substr($rj->data, $pos + 2)), '"';
         echo '><div class="pa-runin"><pre class="pa-runpre">';
-        echo '</pre></div></div></h3></div>', "\n";
+        echo '</pre></div></div></div>', "\n";
     }
 
     // line notes

@@ -68,7 +68,6 @@ if (!get($diff_options, "hasha_hrepo") || get($diff_options, "hashb_hrepo"))
     $diff_options["no_full"] = true;
 
 $Conf->header(htmlspecialchars($Pset->title), "home");
-echo "<div id='homeinfo'>";
 ContactView::echo_heading($User);
 
 
@@ -119,5 +118,5 @@ foreach ($diff as $file => $dinfo) {
 }
 
 Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",pa_beforeunload)');
-echo "<div class='clear'></div>\n";
+echo "<hr class=\"c\" />\n";
 $Conf->footer();

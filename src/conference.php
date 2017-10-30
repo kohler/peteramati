@@ -1097,7 +1097,6 @@ class Conf {
 <html lang=\"en\">
 <head>
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
-<meta http-equiv=\"Content-Language\" content=\"en\" />
 <meta name=\"google\" content=\"notranslate\" />\n";
 
         echo $this->opt("fontScript", "");
@@ -1208,9 +1207,9 @@ class Conf {
 
         echo "<div id='header'>\n<div id='header_left_conf'><h1>";
         if ($title && $showTitle && ($title == "Home" || $title == "Sign in"))
-            echo "<a name='' class='qq' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
+            echo "<a class='qq' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
         else
-            echo "<a name='' class='uu' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
+            echo "<a class='uu' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
         echo "</h1></div><div id='header_right'>";
         if ($Me && !$Me->is_empty()) {
             // profile link
