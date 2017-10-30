@@ -5,7 +5,7 @@
 var siteurl, siteurl_postvalue, siteurl_suffix, siteurl_defaults,
     siteurl_absolute_base,
     hotcrp_paperid, hotcrp_list, hotcrp_status, hotcrp_user,
-    peteramati_uservalue, peteramati_grader_map, peteramati_psets,
+    peteramati_uservalue, peteramati_psets,
     hotcrp_want_override_conflict;
 
 function $$(id) {
@@ -1792,10 +1792,14 @@ function render_note($tr, note, transition) {
         var authors = [];
         for (var i in authorids) {
             var p = hotcrp_pc[authorids[i]];
-            if (p && (p.firstalen || p.lastpos))
-                authors.push(p.name.substr(0, p.firstalen || p.lastpos - 1));
-            else if (p)
-                authors.push(p.name);
+            if (p) {
+                if (p.nick)
+                    authors.push(p.nick);
+                else if (p.nicklen || p.lastpos)
+                    authors.push(p.name.substr(0, p.nicklen || p.lastpos - 1));
+                else
+                    authors.push(p.name);
+            }
         }
         if (authors.length)
             t += '<div class="pa-note-author">[' + authors.join(', ') + ']</div>';
@@ -3308,6 +3312,17 @@ function pa_render_pset_table(psetid, pconf, data) {
         var u = anonymous ? s.anon_username || s.username : s.username;
         return "s61_" + encodeURIComponent(u).replace(/\./g, "%2E");
     }
+    function grader_name(p) {
+        if (!p.__nickname) {
+            if (p.nick)
+                p.__nickname = p.nick;
+            else if (p.nicklen || p.lastpos)
+                p.__nickname = p.name.substr(0, p.nicklen || p.lastpos - 1);
+            else
+                p.__nickname = p.name;
+        }
+        return p.__nickname;
+    }
     function render_tds(s, row_number) {
         var a = [], txt, j, klass, ngrades;
         if (row_number == "") {
@@ -3330,8 +3345,8 @@ function pa_render_pset_table(psetid, pconf, data) {
         // a.push('<td>' + (s.gradehash || "") + '</td>');
         a.push('<td class="pap-name' + (!s.anon_username || pconf.has_nonanonymous ? "" : " pap-nonanonymous") + '">' + render_display_name(s) + '</td>');
         a.push('<td class="pap-extension">' + (s.x ? "X" : "") + '</td>');
-        if (s.gradercid && peteramati_grader_map[s.gradercid])
-            txt = escape_entities(peteramati_grader_map[s.gradercid]);
+        if (s.gradercid && hotcrp_pc[s.gradercid])
+            txt = grader_name(hotcrp_pc[s.gradercid]);
         else
             txt = s.gradercid ? "???" : "";
         a.push('<td class="pap-grader">' + txt + '</td>');
@@ -3577,8 +3592,10 @@ function pa_render_pset_table(psetid, pconf, data) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
                 else {
-                    var ag = (a.gradercid && peteramati_grader_map[a.gradercid]) || "~~~";
-                    var bg = (b.gradercid && peteramati_grader_map[b.gradercid]) || "~~~";
+                    var ap = a.gradercid ? hotcrp_pc[a.gradercid] : null;
+                    var bp = b.gradercid ? hotcrp_pc[b.gradercid] : null;
+                    var ag = (ap && grader_name(ap)) || "~~~";
+                    var bg = (bp && grader_name(bp)) || "~~~";
                     if (ag != bg)
                         return ag < bg ? -rev : rev;
                     else

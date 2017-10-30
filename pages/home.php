@@ -1145,12 +1145,13 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     Ht::stash_script('peteramati_psets=' . json_encode($psetj) . ';');
 
     $pctable = [];
-    foreach ($Conf->pc_members() as $pc)
-        if ($pc->firstName && !$pc->firstNameAmbiguous)
-            $pctable[$pc->contactId] = $pc->firstName;
+    foreach ($Conf->pc_members() as $pc) {
+        if (($pc->nickname || $pc->firstName) && !$pc->nicknameAmbiguous)
+            $pctable[$pc->contactId] = $pc->nickname ? : $pc->firstName;
         else
             $pctable[$pc->contactId] = Text::name_text($pc);
-    Ht::stash_script('peteramati_grader_map=' . json_encode($pctable) . ';');
+    }
+    $Conf->stash_hotcrp_pc($Me);
 
     $allflags = !!req("allflags");
     $field = req("allflags") ? "hasflags" : "hasactiveflags";

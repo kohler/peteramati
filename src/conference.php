@@ -128,7 +128,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 113) {
+        if ($this->sversion < 114) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -577,8 +577,8 @@ class Conf {
     function pc_members() {
         if ($this->_pc_members_cache === null) {
             $pc = $pca = array();
-            $result = $this->q("select firstName, lastName, affiliation, email, contactId, roles, contactTags, disabled from ContactInfo where roles!=0 and (roles&" . Contact::ROLE_PCLIKE . ")!=0");
-            $by_name_text = $by_first_text = [];
+            $result = $this->q("select firstName, lastName, nickname, affiliation, email, contactId, roles, contactTags, disabled from ContactInfo where roles!=0 and (roles&" . Contact::ROLE_PCLIKE . ")!=0");
+            $by_name_text = $by_nick_text = [];
             $this->_pc_tags_cache = ["pc" => "pc"];
             while ($result && ($row = Contact::fetch($result, $this))) {
                 $pca[$row->contactId] = $row;
@@ -586,14 +586,17 @@ class Conf {
                     $pc[$row->contactId] = $row;
                 if ($row->firstName || $row->lastName) {
                     $name_text = Text::name_text($row);
-                    if (isset($by_name_text[$name_text]))
-                        $row->nameAmbiguous = $by_name_text[$name_text]->nameAmbiguous = true;
-                    $by_name_text[$name_text] = $row;
+                    $lname_text = strtolower($name_text);
+                    if (isset($by_name_text[$lname_text]))
+                        $row->nameAmbiguous = $by_name_text[$lname_text]->nameAmbiguous = true;
+                    $by_name_text[$lname_text] = $row;
                 }
-                if ($row->firstName) {
-                    if (isset($by_first_text[$row->firstName]))
-                        $row->firstNameAmbiguous = $by_first_text[$row->firstName]->firstNameAmbiguous = true;
-                    $by_first_text[$row->firstName] = $row;
+                $nickname = $row->nickname ? : $row->firstName;
+                if ($nickname) {
+                    $lnick = strtolower($nickname);
+                    if (isset($by_nick_text[$lnick]))
+                        $row->nicknameAmbiguous = $by_nick_text[$lnick]->nicknameAmbiguous = true;
+                    $by_nick_text[$lnick] = $row;
                 }
                 if ($row->contactTags)
                     foreach (explode(" ", $row->contactTags) as $t) {
@@ -1303,8 +1306,17 @@ class Conf {
                     $j->lastpos = strlen(htmlspecialchars($r->firstName)) + 1;
                 if ($r->nameAmbiguous && $r->name && $r->email)
                     $j->emailpos = strlen(htmlspecialchars($r->name)) + 1;
-                if ($pcm->firstNameAmbiguous)
-                    $j->firstalen = strlen(htmlspecialchars($r->name));
+            }
+            if (!$pcm->nameAmbiguous && ($pcm->nickname || $pcm->firstName)) {
+                if ($pcm->nicknameAmbiguous)
+                    $j->nicklen = strlen(htmlspecialchars($r->name));
+                else {
+                    $nick = htmlspecialchars($pcm->nickname ? : $pcm->firstName);
+                    if (str_starts_with($j->name, $nick))
+                        $j->nicklen = strlen($nick);
+                    else
+                        $j->nick = $nick;
+                }
             }
             if (!($pcm->roles & Contact::ROLE_PC))
                 $j->admin_only = true;

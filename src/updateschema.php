@@ -329,6 +329,9 @@ function updateSchema($conf) {
     if ($conf->sversion == 112
         && $conf->ql("alter table ContactLink add `data` varbinary(8192) DEFAULT NULL"))
         $conf->update_schema_version(113);
+    if ($conf->sversion == 113
+        && $conf->ql("alter table ContactInfo add `nickname` varchar(60) DEFAULT NULL"))
+        $conf->update_schema_version(114);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

@@ -26,9 +26,10 @@ class Contact {
 
     public $firstName = "";
     public $lastName = "";
+    public $nickname = "";
     public $unaccentedName = "";
     public $nameAmbiguous = null;
-    public $firstNameAmbiguous = null;
+    public $nicknameAmbiguous = null;
     public $email = "";
     public $preferredEmail = "";
     public $sorter = "";
@@ -142,6 +143,7 @@ class Contact {
             $name = Text::analyze_name($user);
         $this->firstName = get_s($name, "firstName");
         $this->lastName = get_s($name, "lastName");
+        $this->nickname = get_s($name, "nickname");
         if (isset($user->unaccentedName))
             $this->unaccentedName = $user->unaccentedName;
         else if (isset($name->unaccentedName))
@@ -286,7 +288,7 @@ class Contact {
     static function site_contact() {
         global $Opt;
         if (!get($Opt, "contactEmail") || $Opt["contactEmail"] == "you@example.com") {
-            $result = Dbl::ql("select firstName, lastName, email from ContactInfo where (roles&" . (self::ROLE_CHAIR | self::ROLE_ADMIN) . ")!=0 order by (roles&" . self::ROLE_CHAIR . ") desc limit 1");
+            $result = Dbl::ql("select firstName, lastName, nickname, email from ContactInfo where (roles&" . (self::ROLE_CHAIR | self::ROLE_ADMIN) . ")!=0 order by (roles&" . self::ROLE_CHAIR . ") desc limit 1");
             if ($result && ($row = $result->fetch_object())) {
                 $Opt["defaultSiteContact"] = true;
                 $Opt["contactName"] = Text::name_text($row);

@@ -911,10 +911,10 @@ class PsetView {
                 $autext = [];
                 foreach ($note->users as $au)
                     if (($p = get($pcmembers, $au))) {
-                        if ($p->firstNameAmbiguous)
+                        if ($p->nicknameAmbiguous)
                             $autext[] = Text::name_html($p);
                         else
-                            $autext[] = htmlspecialchars($p->firstName);
+                            $autext[] = htmlspecialchars($p->nickname ? : $p->firstName);
                     }
                 if (!empty($autext))
                     echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
