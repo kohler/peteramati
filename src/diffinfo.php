@@ -54,8 +54,8 @@ class DiffInfo implements Iterator {
         }
     }
 
-    function ends_without_newline($is_lineb) {
-        assert($this->_diffsz > 0 && $this->_diff[$this->_diffsz - 4] === ($is_lineb ? "+" : "-"));
+    function ends_without_newline() {
+        assert($this->_diffsz > 0 && ($this->_diff[$this->_diffsz - 4] === "-" || $this->_diff[$this->_diffsz - 4] === "+"));
         $this->_diff[$this->_diffsz - 1] .= "⏎̸";
     }
 

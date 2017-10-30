@@ -630,9 +630,7 @@ class Repository {
                 } else if ($line[0] === "B" && $di && preg_match('_\ABinary files_', $line)) {
                     $di->add("@", null, null, $line);
                 } else if ($line[0] === "\\" && strpos($line, "No newline") !== false) {
-                    $di->ends_without_newline(false);
-                } else if ($line[0] === "/" && strpos($line, "No newline") !== false) {
-                    $di->ends_without_newline(true);
+                    $di->ends_without_newline();
                 } else
                     $alineno = $blineno = null;
             }
