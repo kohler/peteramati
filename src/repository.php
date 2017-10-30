@@ -551,8 +551,9 @@ class Repository {
                 $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg($fname));
                 $di = new DiffInfo("{$pset->directory_slash}{$fname}", $diffconfig);
                 $diff_files[$di->filename] = $di;
-                foreach (explode("\n", $result) as $idx => $line)
+                foreach (explode("\n", $result) as $idx => $line) {
                     $di->add("+", 0, $idx + 1, $line);
+                }
                 $di->finish();
             }
         }
@@ -598,14 +599,15 @@ class Repository {
                         $pos = $nlpos === false ? $len : $nlpos + 1;
                     }
                 }
-                if ($pos >= $len)
+                if ($pos >= $len) {
                     break;
+                }
                 $nlpos = strpos($result, "\n", $pos);
                 $line = $nlpos === false ? substr($result, $pos) : substr($result, $pos, $nlpos - $pos);
                 $pos = $nlpos === false ? $len : $nlpos + 1;
-                if ($line == "")
+                if ($line == "") {
                     /* do nothing */;
-                else if ($line[0] === " " && $di && $alineno) {
+                } else if ($line[0] === " " && $di && $alineno) {
                     $di->add(" ", $alineno, $blineno, substr($line, 1));
                     ++$alineno;
                     ++$blineno;
@@ -615,13 +617,14 @@ class Repository {
                 } else if ($line[0] === "+" && $di && $blineno) {
                     $di->add("+", $alineno, $blineno, substr($line, 1));
                     ++$blineno;
-                } else if ($line[0] === "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+),\d+ @@_', $line, $m)) {
+                } else if ($line[0] === "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+)(?:|,\d+) @@_', $line, $m)) {
                     $alineno = +$m[1];
                     $blineno = +$m[2];
                     $di->add("@", null, null, $line);
                 } else if ($line[0] === "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
-                    if ($di)
+                    if ($di) {
                         $di->finish();
+                    }
                     $file = $truncpfx . $m[1];
                     $diffconfig = $pset->find_diffconfig($file);
                     $di = $diff_files[$file] = new DiffInfo($file, $diffconfig);
@@ -631,8 +634,9 @@ class Repository {
                     $di->add("@", null, null, $line);
                 } else if ($line[0] === "\\" && strpos($line, "No newline") !== false) {
                     $di->ends_without_newline();
-                } else
+                } else {
                     $alineno = $blineno = null;
+                }
             }
             if ($di)
                 $di->finish();
