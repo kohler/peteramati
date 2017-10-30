@@ -18,9 +18,31 @@ assert($User == $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
+if ($Pset->gitless) {
+    $Conf->errorMsg("That problem set does not use git.");
+    $Me->escape(); // XXX stay on this page
+}
 $Info = new PsetView($Pset, $User, $Me);
-if (!$Qreq->commit || !$Qreq->commit1 || $Pset->gitless)
-    $Me->escape();
+if (!$Info->repo) {
+    $Conf->errorMsg("No repository.");
+    $Me->escape(); // XXX stay on this page
+}
+if (!$Qreq->commit || !$Qreq->commit1) {
+    if (!$Qreq->commit1) {
+        if (!$Info->set_hash(null)) {
+            $Me->escape();
+        }
+        $Qreq->commit1 = $Info->commit_hash();
+    }
+    if (!$Qreq->commit) {
+        $Qreq->commit = $Info->derived_handout_hash();
+    }
+    if ($Qreq->commit && $Qreq->commit1) {
+        redirectSelf(["commit" => $Qreq->commit, "commit1" => $Qreq->commit1]);
+    } else {
+        $Me->escape();
+    }
+}
 $diff_options = ["wdiff" => false];
 
 $hasha = $hashb = $hasha_mine = $hashb_mine = null;
