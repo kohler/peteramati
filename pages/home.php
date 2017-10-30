@@ -796,6 +796,8 @@ function show_regrades($result, $all) {
     }
     echo '<table class="pap" id="pa-pset-flagged"></table></div>', "\n";
     $jd = ["flagged_commits" => true, "anonymous" => true, "has_nonanonymous" => $any_nonanonymous];
+    if ($Me->privChair)
+        $jd["can_override_anonymous"] = true;
     if ($nintotal)
         $jd["need_total"] = 1;
     echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode($jd), ',', json_encode($jx), ')</script>';

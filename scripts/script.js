@@ -3265,7 +3265,7 @@ function pa_render_pset_table(psetid, pconf, data) {
     }
     function render_display_name(s) {
         var txt = escape_entities(render_name(s, displaying_last_first));
-        if (!s.anon_username || !pconf.can_override_nonanonymous)
+        if (!s.anon_username || !pconf.can_override_anonymous)
             return txt;
         else
             return '<span class="pap-nonanonymous">' + txt + '</span>';
