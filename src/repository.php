@@ -605,21 +605,21 @@ class Repository {
                 $pos = $nlpos === false ? $len : $nlpos + 1;
                 if ($line == "")
                     /* do nothing */;
-                else if ($line[0] == " " && $di && $alineno) {
+                else if ($line[0] === " " && $di && $alineno) {
                     $di->add(" ", $alineno, $blineno, substr($line, 1));
                     ++$alineno;
                     ++$blineno;
-                } else if ($line[0] == "-" && $di && $alineno) {
+                } else if ($line[0] === "-" && $di && $alineno) {
                     $di->add("-", $alineno, $blineno, substr($line, 1));
                     ++$alineno;
-                } else if ($line[0] == "+" && $di && $blineno) {
+                } else if ($line[0] === "+" && $di && $blineno) {
                     $di->add("+", $alineno, $blineno, substr($line, 1));
                     ++$blineno;
-                } else if ($line[0] == "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+),\d+ @@_', $line, $m)) {
+                } else if ($line[0] === "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+),\d+ @@_', $line, $m)) {
                     $alineno = +$m[1];
                     $blineno = +$m[2];
                     $di->add("@", null, null, $line);
-                } else if ($line[0] == "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
+                } else if ($line[0] === "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
                     if ($di)
                         $di->finish();
                     $file = $truncpfx . $m[1];
@@ -627,8 +627,12 @@ class Repository {
                     $di = $diff_files[$file] = new DiffInfo($file, $diffconfig);
                     $di->set_repoa($this, $pset, $hasha, $m[1]);
                     $alineno = $blineno = null;
-                } else if ($line[0] == "B" && $di && preg_match('_\ABinary files_', $line)) {
+                } else if ($line[0] === "B" && $di && preg_match('_\ABinary files_', $line)) {
                     $di->add("@", null, null, $line);
+                } else if ($line[0] === "\\" && strpos($line, "No newline") !== false) {
+                    $di->ends_without_newline(false);
+                } else if ($line[0] === "/" && strpos($line, "No newline") !== false) {
+                    $di->ends_without_newline(true);
                 } else
                     $alineno = $blineno = null;
             }

@@ -12,8 +12,8 @@ class DiffInfo implements Iterator {
     public $hide_if_anonymous = false;
     public $position = 0.0;
     public $removed = false;
-    public $_diff = [];
-    public $_diffsz = 0;
+    private $_diff = [];
+    private $_diffsz = 0;
     private $_itpos;
 
     private $_repoa;
@@ -52,6 +52,11 @@ class DiffInfo implements Iterator {
             array_push($this->_diff, $ch, $linea, $lineb, $text);
             $this->_diffsz += 4;
         }
+    }
+
+    function ends_without_newline($is_lineb) {
+        assert($this->_diffsz > 0 && $this->_diff[$this->_diffsz - 4] === ($is_lineb ? "+" : "-"));
+        $this->_diff[$this->_diffsz - 1] .= "⏎̸";
     }
 
     function finish() {
