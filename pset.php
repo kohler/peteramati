@@ -432,8 +432,9 @@ function echo_commit($Info) {
                         $Pset->psetid, array_keys($sel));
     while (($row = edb_row($result)))
         $sel[$row[0]] .= " &nbsp;♪";
-    if (($h = $Info->grading_hash()) && isset($sel[$h]))
-        $sel[$h] = preg_replace('_(.*?)(?: &nbsp;)?(♪?)\z_', '$1 &nbsp;✱$2', $sel[$h]);
+    if (($h = $Info->grading_hash()) && isset($sel[$h])) {
+        $sel[$h] = preg_replace('_\A(.*?)(?: &nbsp;|)((?:|♪))\z_', '$1 &nbsp;✱$2', $sel[$h]);
+    }
     if ($Info->is_grading_commit())
         $key = "grading commit";
     else
