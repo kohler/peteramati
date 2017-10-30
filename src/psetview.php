@@ -564,34 +564,60 @@ class PsetView {
         return $grade;
     }
 
-    function late_hours($no_auto = false) {
+    function late_hours_data() {
         $cinfo = $this->current_info();
-        if (!$no_auto && get($cinfo, "late_hours") !== null)
-            return (object) array("hours" => $cinfo->late_hours,
-                                  "override" => true);
 
         $deadline = $this->pset->deadline;
-        if (!$this->user->extension && $this->pset->deadline_college)
+        if (!$this->user->extension && $this->pset->deadline_college) {
             $deadline = $this->pset->deadline_college;
-        else if ($this->user->extension && $this->pset->deadline_extension)
+        } else if ($this->user->extension && $this->pset->deadline_extension) {
             $deadline = $this->pset->deadline_extension;
-        if (!$deadline)
-            return null;
+        }
 
         $timestamp = get($cinfo, "timestamp");
         if (!$timestamp
+            && !$this->pset->gitless
             && ($h = $this->hash ? : $this->grading_hash())
-            && ($ls = $this->recent_commits($h)))
+            && ($ls = $this->recent_commits($h))) {
             $timestamp = $ls->commitat;
-        if (!$timestamp)
-            return null;
+        }
 
-        $lh = 0;
-        if ($timestamp > $deadline)
-            $lh = (int) ceil(($timestamp - $deadline) / 3600);
-        return (object) array("hours" => $lh,
-                              "commitat" => $timestamp,
-                              "deadline" => $deadline);
+        if ($deadline && $timestamp) {
+            if ($deadline < $timestamp) {
+                $autohours = (int) ceil(($timestamp - $deadline) / 3600);
+            } else {
+                $autohours = 0;
+            }
+        } else {
+            $autohours = null;
+        }
+
+        $ld = [];
+        if (isset($cinfo->late_hours)) {
+            $ld["hours"] = $cinfo->late_hours;
+            if ($autohours !== null && $cinfo->late_hours !== $autohours) {
+                $ld["autohours"] = $autohours;
+            }
+        } else if (isset($autohours)) {
+            $ld["hours"] = $autohours;
+        }
+        if ($timestamp) {
+            $ld["timestamp"] = $timestamp;
+        }
+        if ($deadline) {
+            $ld["deadline"] = $deadline;
+        }
+        return empty($ld) ? null : (object) $ld;
+    }
+
+    function late_hours() {
+        if (($lh = $this->current_info("late_hours")) !== null) {
+            return $lh;
+        } else if (($lhd = $this->late_hours_data()) && isset($lhd->hours)) {
+            return $lhd->hours;
+        } else {
+            return null;
+        }
     }
 
 
@@ -672,8 +698,9 @@ class PsetView {
 
     function grade_json() {
         $this->ensure_grade();
-        if (!$this->can_view_grades())
+        if (!$this->can_view_grades()) {
             return null;
+        }
         $notes = $this->current_info();
         $result = $this->pset->gradeentry_json($this->pc_view);
         $agx = get($notes, "autogrades");
@@ -681,7 +708,7 @@ class PsetView {
         if ($agx || $gx || $this->is_grading_commit()) {
             $g = $ag = [];
             $total = $total_noextra = 0;
-            foreach ($this->pset->grades as $ge)
+            foreach ($this->pset->grades as $ge) {
                 if (!$ge->hide || $this->pc_view) {
                     $key = $ge->key;
                     $gv = null;
@@ -689,15 +716,18 @@ class PsetView {
                         $gv = property_exists($agx, $key) ? $agx->$key : null;
                         $ag[] = $gv;
                     }
-                    if ($gx)
+                    if ($gx) {
                         $gv = property_exists($gx, $key) ? $gx->$key : $gv;
+                    }
                     $g[] = $gv;
                     if (!$ge->no_total && $gv) {
                         $total += $gv;
-                        if (!$ge->is_extra)
+                        if (!$ge->is_extra) {
                             $total_noextra += $gv;
+                        }
                     }
                 }
+            }
             $result["grades"] = $g;
             if ($this->pc_view && !empty($ag))
                 $result["autogrades"] = $ag;
@@ -705,8 +735,17 @@ class PsetView {
             if ($total != $total_noextra)
                 $g["total_noextra"] = $total_noextra;
         }
-        if (!$this->pset->gitless_grades && !$this->is_grading_commit())
+        if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
             $result["grading_hash"] = $this->grading_hash();
+        }
+        if (($lhd = $this->late_hours_data())) {
+            if (isset($lhd->hours)) {
+                $result["late_hours"] = $lhd->hours;
+            }
+            if (isset($lhd->autohours) && $lhd->autohours !== $lhd->hours) {
+                $result["auto_late_hours"] = $lhd->autohours;
+            }
+        }
         return $result;
     }
 

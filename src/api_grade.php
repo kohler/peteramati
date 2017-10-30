@@ -12,16 +12,16 @@ class API_Grade {
 
     static function check_grade_entry(&$gv, $name, &$errors) {
         $g = get($gv, $name);
-        if ($g === null || is_int($g) || is_float($g))
+        if ($g === null || is_int($g) || is_float($g)) {
             return $g;
-        else if (is_string($g)) {
-            if ($g === "")
+        } else if (is_string($g)) {
+            if ($g === "") {
                 $g = null;
-            else if (preg_match('_\A\+?\d+\z_', $g))
+            } else if (preg_match('_\A\+?\d+\z_', $g)) {
                 $g = intval($g);
-            else if (preg_match('_\A\+?(?:\d+\.|\.\d)\d*\z_', $g))
+            } else if (preg_match('_\A\+?(?:\d+\.|\.\d)\d*\z_', $g)) {
                 $g = floatval($g);
-            else {
+            } else {
                 $g = false;
                 $errors = true;
             }
@@ -43,33 +43,38 @@ class API_Grade {
                 return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
             $info->force_set_hash($api->commit->hash);
         }
-        if (!$info->can_view_grades())
+        if (!$info->can_view_grades()) {
             return ["ok" => false, "error" => "Permission error."];
+        }
         if ($qreq->method() === "POST") {
-            if (!check_post($qreq))
+            if (!check_post($qreq)) {
                 return ["ok" => false, "error" => "Missing credentials."];
-            if ($info->is_handout_commit())
+            } else if ($info->is_handout_commit()) {
                 return ["ok" => false, "error" => "This is a handout commit."];
-            if (!$user->can_set_grades($info->pset, $info))
+            } else if (!$user->can_set_grades($info->pset, $info)) {
                 return ["ok" => false, "error" => "Permission error."];
+            }
 
             // parse full grades
             $g = self::parse_full_grades($qreq->grades);
             $ag = self::parse_full_grades($qreq->autogrades);
             $og = self::parse_full_grades($qreq->oldgrades);
-            if ($g === false || $ag === false || $og === false)
+            if ($g === false || $ag === false || $og === false) {
                 return ["ok" => false, "error" => "Invalid request."];
+            }
 
             // add grade elements
-            foreach ($qreq as $k => $v)
+            foreach ($qreq as $k => $v) {
                 if (preg_match('_\A(auto|old|)grades\[(.*)\]\z_', $k, $m)) {
-                    if ($m[1] === "")
+                    if ($m[1] === "") {
                         $g[$m[2]] = $v;
-                    else if ($m[1] === "auto")
+                    } else if ($m[1] === "auto") {
                         $ag[$m[2]] = $v;
-                    else
+                    } else {
                         $og[$m[2]] = $v;
+                    }
                 }
+            }
 
             // check grade entries
             $errors = false;
@@ -78,8 +83,11 @@ class API_Grade {
                 self::check_grade_entry($ag, $ge->key, $errors);
                 self::check_grade_entry($og, $ge->key, $errors);
             }
-            if ($errors)
+            self::check_grade_entry($g, "late_hours", $errors);
+            self::check_grade_entry($og, "late_hours", $errors);
+            if ($errors) {
                 return ["ok" => false, "error" => "Invalid request."];
+            }
 
             // assign grades
             $gv = $agv = [];
@@ -95,18 +103,41 @@ class API_Grade {
                         return $j;
                     }
                 }
-                if (array_key_exists($ge->key, $g))
+                if (array_key_exists($ge->key, $g)) {
                     $gv[$ge->key] = $g[$ge->key];
-                if (array_key_exists($ge->key, $ag))
+                }
+                if (array_key_exists($ge->key, $ag)) {
                     $agv[$ge->key] = $ag[$ge->key];
+                }
             }
             $v = [];
-            if (!empty($gv))
+            if (!empty($gv)) {
                 $v["grades"] = $gv;
-            if (!empty($agv))
+            }
+            if (!empty($agv)) {
                 $v["autogrades"] = $agv;
-            if (!empty($v))
+            }
+            if (array_key_exists("late_hours", $g)) { // XXX separate permission check?
+                $curlhd = $info->late_hours_data() ? : (object) [];
+                $lh = get($curlhd, "hours", 0);
+                $alh = get($curlhd, "autohours", $lh);
+                if ($og["late_hours"] !== null
+                    && abs($og["late_hours"] - $lh) >= 0.0001) {
+                    $j = (array) $info->grade_json();
+                    $j["ok"] = false;
+                    $j["error"] = "Grade edit conflict, your update was ignored. " . $og["late_hours"];
+                    return $j;
+                }
+                if ($g["late_hours"] === null
+                    || abs($g["late_hours"] - $alh) < 0.0001) {
+                    $v["late_hours"] = null;
+                } else {
+                    $v["late_hours"] = $g["late_hours"];
+                }
+            }
+            if (!empty($v)) {
                 $info->update_current_info($v);
+            }
         }
         $j = (array) $info->grade_json();
         $j["ok"] = true;

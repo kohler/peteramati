@@ -2212,13 +2212,16 @@ function pa_savegrades(form) {
     $f.find(".pa-gradeentry").append('<span class="ajaxsave61">Saving…</span>');
 
     var gi = $f.closest(".pa-psetinfo").data("pa-gradeinfo");
-    if (typeof gi === "string")
+    if (typeof gi === "string") {
         gi = JSON.parse(gi);
+    }
     var g = {}, og = {};
     $f.find("input.pa-gradevalue").each(function () {
         var ge = gi.entries[this.name];
-        if (gi.grades && gi.grades[ge.pos] != null)
+        if (gi.grades && ge && gi.grades[ge.pos] != null)
             og[this.name] = gi.grades[ge.pos];
+        else if (this.name === "late_hours" && gi.late_hours != null)
+            og[this.name] = gi.late_hours;
         g[this.name] = this.value;
     });
 
@@ -2309,10 +2312,11 @@ function pa_loadgrades(gi) {
         for (j = 0; j < $g.length; ++j) {
             var $gj = $($g[j]);
             var $v = $gj.find(".pa-gradevalue");
-            if (editable && $v.val() !== g && !$v.is(":focus"))
+            if (editable && $v.val() !== g && !$v.is(":focus")) {
                 $v.val(g);
-            else if (!editable && $v.text() !== g)
+            } else if (!editable && $v.text() !== g) {
                 $v.text(g);
+            }
             if (ge.landmark && has_class($g[j].parentElement, "pa-gradelist")) {
                 var m = /^(.*):(\d+)$/.exec(ge.landmark);
                 var $line = pa_ensureline(m[1], "a" + m[2]);
@@ -2329,6 +2333,36 @@ function pa_loadgrades(gi) {
                     $pgbr.remove();
                     $gj.find(".pa-gradeentry").append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
                 }
+            }
+        }
+    }
+
+    // handle late hours
+    for (var j = 0; j < $pge.length; ++j) {
+        if ($pge[j].getAttribute("data-pa-grade") === "late_hours") {
+            var $g = $($pge[j]);
+            var g = gi.late_hours;
+            var ag = gi.auto_late_hours;
+            var $v = $g.find(".pa-gradevalue");
+            var lh_editable = $v.is("input");
+            // “auto-late hours differs” message
+            if (ag !== null && lh_editable) {
+                if (g === ag || ag == null)
+                    $g.find(".pa-gradediffers").remove();
+                else {
+                    var txt = "auto-late hours is " + ag;
+                    if (!$g.find(".pa-gradediffers").length)
+                        $g.find(".pa-gradeentry").append('<span class="pa-gradediffers"></span>');
+                    var $ag = $g.find(".pa-gradediffers");
+                    if ($ag.text() !== txt)
+                        $ag.text(txt);
+                }
+            }
+            // late hours value
+            if (lh_editable && $v.val() !== g && !$v.is(":focus")) {
+                $v.val(g);
+            } else if (!lh_editable && $v.text() !== g) {
+                $v.text(g);
             }
         }
     }

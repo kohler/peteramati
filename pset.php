@@ -223,19 +223,6 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
     return $grades;
 }
 
-if ($Me->isPC && $Me != $User && check_post()
-    && isset($_REQUEST["setlatehours"]) && $Info->can_have_grades()) {
-    if (isset($_REQUEST["late_hours"])
-        && preg_match('_\A(?:0|[1-9]\d*)\z_', $_REQUEST["late_hours"])) {
-        $Info->update_current_info(["late_hours" => intval($_REQUEST["late_hours"])]);
-        $result = true;
-    } else
-        $result = false;
-    if (isset($_REQUEST["ajax"]))
-        json_exit($result);
-    redirectSelf();
-}
-
 function upload_grades($pset, $text, $fname) {
     global $Conf, $Me;
     assert($pset->gitless_grades);
@@ -477,14 +464,17 @@ function echo_commit($Info) {
         $remarks[] = array(true, "This is not "
                            . "<a class=\"uu\" href=\"" . $Info->hoturl("pset", array("commit" => $Info->latest_hash())) . "\">the latest commit</a>"
                            . " <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit1" => $Info->latest_hash())) . "\">see diff</a>)</span>.");
-    if (($lh = $Info->late_hours()) && $lh->hours > 0) {
+    $lhd = $Info->late_hours_data();
+    if ($lhd && isset($lhd->hours) && $lhd->hours > 0) {
         $extra = array();
-        if (get($lh, "commitat"))
-            $extra[] = "commit at " . $Conf->printableTimestamp($lh->commitat);
-        if (get($lh, "deadline"))
-            $extra[] = "deadline " . $Conf->printableTimestamp($lh->deadline);
+        if (isset($lhd->timestamp)) {
+            $extra[] = "commit at " . $Conf->printableTimestamp($lhd->timestamp);
+        }
+        if (isset($lhd->deadline)) {
+            $extra[] = "deadline " . $Conf->printableTimestamp($lhd->deadline);
+        }
         $extra = count($extra) ? ' <span style="font-weight:normal">(' . join(", ", $extra) . ')</span>' : "";
-        $remarks[] = array(true, "This commit uses " . plural($lh->hours, "late hour") . $extra . ".");
+        $remarks[] = array(true, "This commit uses " . plural($lhd->hours, "late hour") . $extra . ".");
     }
     if (($Info->is_latest_commit() || $Me->isPC)
         && $Pset->handout_repo_url) {
@@ -566,29 +556,26 @@ function echo_all_grades() {
         echo Ht::unstash();
     }
 
-    $lhg = $Info->late_hours();
-    if ($lhg && $User == $Me && $Info->can_view_grades()) {
-        if ($lhg->hours || $has_grades) {
+    $lhd = $Info->late_hours_data();
+    if ($lhd && $User === $Me && $Info->can_view_grades()) {
+        if ((isset($lhd->hours) && $lhd->hours > 0) || $has_grades) {
             echo '<div style="margin-top:1.5em">';
-            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhg->hours) . '</span>',
+            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>',
                                     array(), array("nowrap" => true));
             echo '</div>';
         }
-    } else if ($User != $Me) {
-        $lhag = $Info->late_hours(true);
-        $value = '<span class="pa-gradeholder">'
-            . Ht::entry("late_hours", $lhg ? $lhg->hours : "", array("onchange" => "jQuery(this).closest('form').submit()", "class" => "pa-grade"))
-            . '</span>';
-        $value .= " " . Ht::submit("Save", array("tabindex" => 1));
-        $value .= ' <span class="ajaxsave61"></span>';
-        if ($lhag && $lhag->hours !== $lhg->hours)
-            $value .= ' <span class="autograde61">auto-late hours is ' . htmlspecialchars($lhag->hours) . '</span>';
-        echo Ht::form($Info->hoturl_post("pset", array("setlatehours" => 1)),
-                      array("onsubmit" => "return pa_savegrades(this)")),
-            '<div class="f-contain" style="margin-top:1.5em">';
-        ContactView::echo_group("late hours", $value,
-                                array(), array("nowrap" => true));
-        echo '</div></form>';
+    } else if ($User !== $Me) {
+        echo '<table class="pa-grade pa-grp" data-pa-grade="late_hours" style="margin-top:1em"><tbody>',
+            '<tr><td class="pa-grp-title">late hours</td>',
+            '<td><form onsubmit="return pa_savegrades(this)"><div class="pa-gradeentry">',
+            '<span class="pa-gradeholder">',
+            Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
+                      ["onchange" => "$(this).closest('form').submit()", "class" => "pa-gradevalue"]),
+            '</span>',
+            Ht::submit("Submit", ["style" => "display:none"]);
+        if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours)
+            echo '<span class="pa-gradediffers">auto-late hours is ', htmlspecialchars($lhd->autohours), '</span>';
+        echo '</div></form></td></tr></tbody></table>';
     }
 }
 

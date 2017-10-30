@@ -614,8 +614,8 @@ class ContactView {
         $notes = array();
         if ($ginfo && $ginfo->commitat)
             $notes[] = "committed " . ago($ginfo->commitat);
-        if (($lh = $info->late_hours()) && $lh->hours > 0)
-            $notes[] = '<strong class="overdue">' . plural($lh->hours, "late hour") . ' used</strong>';
+        if (($lh = $info->late_hours()) && $lh > 0)
+            $notes[] = '<strong class="overdue">' . plural($lh, "late hour") . ' used</strong>';
 
         self::echo_group("grading commit", $value, array(join(", ", $notes)));
     }

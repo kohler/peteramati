@@ -567,7 +567,9 @@ class GradeEntryConfig {
         if (!is_string($this->key)
             || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->key)
             || $this->key[0] === "_"
-            || $this->key === "total")
+            || $this->key === "total"
+            || $this->key === "late_hours"
+            || $this->key === "auto_late_hours")
             throw new PsetConfigException("grade entry key format error", $loc);
         $this->name = $this->key;
         $this->title = Pset::cstr($loc, $g, "title");
