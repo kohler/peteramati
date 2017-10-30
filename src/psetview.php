@@ -55,16 +55,20 @@ class PsetView {
         $this->n_visible_grades = null;
         if (!$this->repo)
             return false;
-        if ($reqhash)
+        if ($reqhash) {
             $c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch);
-        else {
-            $c = null;
-            if ($this->repo_grade)
-                $c = $this->repo->connected_commit($this->repo_grade->gradehash, $this->pset, $this->branch);
-            if (!$c)
+        } else {
+            $gh = $this->grading_hash();
+            if ($gh) {
+                $this->hash = $gh;
+                return $this->hash;
+            } else {
                 $c = $this->latest_commit();
+            }
         }
-        $this->hash = $c ? $c->hash : false;
+        if ($c) {
+            $this->hash = $c->hash;
+        }
         return $this->hash;
     }
 
