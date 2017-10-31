@@ -198,7 +198,7 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
     if ($info->is_handout_commit())
         json_exit(["ok" => false, "error" => "This is a handout commit."]);
     $grades = $maxgrades = [];
-    foreach ($pset->grades as $ge)
+    foreach ($pset->grades as $ge) {
         if (isset($values[$ge->key])) {
             $g = trim($values[$ge->key]);
             if ($g === "")
@@ -217,9 +217,19 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
             }
             $grades[$ge->key] = $g;
         }
-    $key = $isauto ? "autogrades" : "grades";
+    }
+    $updates = [];
     if (!empty($grades))
-        $info->update_current_info([$key => $grades]);
+        $updates[$isauto ? "autogrades" : "grades"] = $grades;
+    if (isset($values["timestamp"]) && is_numeric($values["timestamp"])) {
+        $timestamp = intval($values["timestamp"]);
+        if ($timestamp >= 1400000000)
+            $updates["timestamp"] = $timestamp;
+        else if ($timestamp <= 0)
+            $updates["timestamp"] = null;
+    }
+    if (!empty($updates))
+        $info->update_grade_info($updates);
     return $grades;
 }
 
@@ -228,32 +238,36 @@ function upload_grades($pset, $text, $fname) {
     assert($pset->gitless_grades);
     $csv = new CsvParser($text);
     $csv->set_header($csv->next());
+    $errors = [];
     while (($line = $csv->next())) {
-        if (($who = get($line, "github_username")) && $who !== "-")
-            $user = $Conf->user_by_whatever($who, Conf::USERNAME_GITHUB);
-        else if (($who = get($line, "seascode_username")) && $who !== "-")
-            $user = $Conf->user_by_whatever($who, Conf::USERNAME_HARVARDSEAS);
-        else if (($who = get($line, "huid")) && $who !== "-")
-            $user = $Conf->user_by_whatever($who, Conf::USERNAME_HUID);
-        else if (($who = get($line, "username")) && $who !== "-") {
-            $user = $Conf->user_by_whatever($who, Conf::USERNAME_USERNAME);
-        } else if (($who = get($line, "email")) && $who !== "-")
+        if (($who = get($line, "email")) && $who !== "-") {
             $user = $Conf->user_by_email($who);
-        else if (($who = get($line, "name"))) {
+        } else if (($who = get($line, "github_username")) && $who !== "-") {
+            $user = $Conf->user_by_whatever($who, Conf::USERNAME_GITHUB);
+        } else if (($who = get($line, "seascode_username")) && $who !== "-") {
+            $user = $Conf->user_by_whatever($who, Conf::USERNAME_HARVARDSEAS);
+        } else if (($who = get($line, "huid")) && $who !== "-") {
+            $user = $Conf->user_by_whatever($who, Conf::USERNAME_HUID);
+        } else if (($who = get($line, "username")) && $who !== "-") {
+            $user = $Conf->user_by_whatever($who, Conf::USERNAME_USERNAME);
+        } else if (($who = get($line, "name"))) {
             list($first, $last) = Text::split_name($who);
             $user = $Conf->user_by_query("firstName like '?s%' and lastName=?", [$first, $last]);
             if ($user && $user->firstName != $first
                 && !str_starts_with($user->firstName, "$first "))
                 $user = null;
-        } else
+        } else {
             continue;
+        }
         if ($user) {
             $info = new PsetView($pset, $user, $Me);
             if (!save_grades($pset, $info, $line, true))
-                $Conf->errorMsg("no grades set for “" . htmlspecialchars($who) . "”");
+                $errors[] = htmlspecialchars($fname) . ":" . $csv->lineno() . ": no grades set";
         } else
-            $Conf->errorMsg(htmlspecialchars($fname) . ":" . $csv->lineno() . ": unknown user “" . htmlspecialchars($who) . "”");
+            $errors[] = htmlspecialchars($fname) . ":" . $csv->lineno() . ": unknown user " . htmlspecialchars($who);
     }
+    if (!empty($errors))
+        $Conf->errorMsg(join("<br />\n", $errors));
     return true;
 }
 

@@ -278,7 +278,7 @@ class PsetView {
     }
 
     function update_contact_grade_info($updates, $reset_keys = false) {
-        assert(!!$this->pset->gitless);
+        assert(!!$this->pset->gitless_grades);
         // find original
         $record = $this->grade;
 
@@ -318,6 +318,13 @@ class PsetView {
 
     function update_current_info($updates, $reset_keys = false) {
         if ($this->pset->gitless)
+            $this->update_contact_grade_info($updates, $reset_keys);
+        else
+            $this->update_commit_info($updates, $reset_keys);
+    }
+
+    function update_grade_info($updates, $reset_keys = false) {
+        if ($this->pset->gitless || $this->pset->gitless_grades)
             $this->update_contact_grade_info($updates, $reset_keys);
         else
             $this->update_commit_info($updates, $reset_keys);
