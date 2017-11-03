@@ -2508,11 +2508,6 @@ span.foldarrow {
 .pa-notebox {
 	background: #f3d1fc;
 	background:
-	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-	    -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-	    #f3d1fc;
-	-webkit-background-size: 100% 7px, 100% 5px, 100% 100%;
-	background:
 	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
 	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
 	    #f3d1fc;
@@ -2522,11 +2517,6 @@ span.foldarrow {
 }
 .pa-note-edge {
 	background: #f3d1fc;
-	background:
-	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-	    -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-	    -webkit-linear-gradient(right, #f3d1fc 20%, #e3a3e3 100%, transparent 100%) repeat-y right top;
-	-webkit-background-size: 100% 7px, 100% 5px, 25px 100%;
 	background:
 	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) no-repeat right top,
 	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) no-repeat right bottom,
@@ -2563,11 +2553,6 @@ span.foldarrow {
 	display: table-cell;
 	background: #f3f3f3;
 	background:
-	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-	    -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-	    #f3f3f3;
-	-webkit-background-size: 100% 7px, 100% 5px, 100% 100%;
-	background:
 	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
 	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
 	    #f3f3f3;
@@ -2583,20 +2568,27 @@ span.foldarrow {
 	padding-right: 2em;
 }
 .pa-warnbox {
-	background: #b8c1d1;
+	background: #efe8ec;
 	background:
-	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-	    -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-	    #c5cedd;
-	-webkit-background-size: 100% 7px, 100% 5px, 100% 100%;
-	background:
-	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-	    #c5cedd;
+	    linear-gradient(180deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) repeat-x top center,
+	    linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) repeat-x bottom center,
+	    #efe8ec;
 	background-size: 100% 7px, 100% 5px, 100% 100%;
-	font-style: italic;
+	font-weight: bold;
+	font-size: smaller;
 	padding: 0.8em 1em 0.8em 0;
 	white-space: pre-wrap;
+	color: #cc0000;
+}
+.pa-warn-edge {
+	background: #efe8ec;
+	background:
+	    linear-gradient(180deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) no-repeat right top,
+	    linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) no-repeat right bottom,
+	    linear-gradient(270deg, #efe8ec 20%, #bfb8bc 100%, transparent 100%) repeat-y right top,
+	    linear-gradient(125deg, transparent 70%, #bfb8bc 70%) repeat-y right 24px center,
+	    linear-gradient(55deg, transparent 70%, #bfb8bc 70%) repeat-y right 24px center;
+	background-size: 25px 7px, 25px 5px, 25px 100%, 10px 20px, 10px 20px;
 }
 .pa-runner {
 	font-size: 9pt;

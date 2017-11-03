@@ -964,7 +964,7 @@ class PsetView {
                 '<td class="', $x[1], '">', $this->diff_line_code($x[4]), "</td></tr>\n";
 
             if ($wentries !== null && $bln && isset($wentries[$bln])) {
-                echo '<tr class="pa-dl pa-gg"><td colspan="2"></td><td class="pa-warnbox">', htmlspecialchars($wentries[$bln]), '</td></tr>';
+                echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox">', htmlspecialchars($wentries[$bln]), '</td></tr>';
             }
 
             if ($gentries !== null && $aln && isset($gentries[$aln])) {
