@@ -68,6 +68,7 @@ static bool verbose = false;
 static bool dryrun = false;
 static bool quiet = false;
 static bool doforce = false;
+static bool no_onlcr = false;
 static FILE* verbosefile = stdout;
 static std::string linkdir;
 static std::string dstroot;
@@ -1763,7 +1764,12 @@ int jailownerinfo::exec_go() {
             if (inputfd > 0 && !stdout_tty) {
                 struct termios tty;
                 if (tcgetattr(ptyslave, &tty) >= 0) {
-                    tty.c_oflag = 0; // no NL->NLCR xlation, no other proc.
+                    // very little output processing;
+                    // if --no-onlcr, don't even xlate \n->\r\n
+                    if (no_onlcr)
+                        tty.c_oflag = 0;
+                    else
+                        tty.c_oflag = ONLCR;
                     tcsetattr(ptyslave, TCSANOW, &tty);
                 }
             }
@@ -2090,6 +2096,7 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
         if (action == do_run) {
             fprintf(stderr, "  -p, --pid-file PIDFILE    write jail process PID to PIDFILE\n\
   -i, --input INPUTSOCKET   use TTY, read input from INPUTSOCKET\n\
+      --no-onlcr            if TTY, don't translate \\n -> \\r\\n\n\
   -T, --timeout TIMEOUT     kill the jail after TIMEOUT\n\
       --fg          run in the foreground\n");
         }
@@ -2106,6 +2113,8 @@ static struct option longoptions_before[] = {
     { NULL, 0, NULL, 0 }
 };
 
+#define ARG_ONLCR 1000
+#define ARG_NO_ONLCR 1001
 static struct option longoptions_run[] = {
     { "verbose", no_argument, NULL, 'V' },
     { "dry-run", no_argument, NULL, 'n' },
@@ -2119,6 +2128,8 @@ static struct option longoptions_run[] = {
     { "input", required_argument, NULL, 'i' },
     { "chown-home", no_argument, NULL, 'h' },
     { "chown-user", required_argument, NULL, 'u' },
+    { "onlcr", no_argument, NULL, ARG_ONLCR },
+    { "no-onlcr", no_argument, NULL, ARG_NO_ONLCR },
     { NULL, 0, NULL, 0 }
 };
 
@@ -2187,6 +2198,10 @@ int main(int argc, char** argv) {
                 pidfilename = optarg;
             else if (ch == 'i')
                 inputarg = optarg;
+            else if (ch == ARG_ONLCR)
+                no_onlcr = false;
+            else if (ch == ARG_NO_ONLCR)
+                no_onlcr = true;
             else if (ch == 'g')
                 foreground = true;
             else if (ch == 'h')
