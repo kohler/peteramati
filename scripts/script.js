@@ -2567,7 +2567,9 @@ function flag61(button) {
 function pa_run(button, opt) {
     var $f = $(button).closest("form"),
         runclass = button.getAttribute("data-pa-runclass") || button.value,
-        therun = $("#pa-run-" + runclass), thepre = therun.find("pre"), checkt;
+        therun = $("#pa-run-" + runclass),
+        thepre = therun.find("pre"),
+        checkt;
 
     if (typeof opt !== "object")
         opt = {};

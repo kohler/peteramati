@@ -735,11 +735,12 @@ if ($Pset->gitless) {
     $runclasses = [];
     foreach ($Pset->runners as $r) {
         if (!$Me->can_view_run($Pset, $r, $User)
-            || isset($runclasses[$r->runclass])
-            || !($checkt = get($crunners, $r->runclass)))
+            || isset($runclasses[$r->runclass]))
             continue;
 
-        $rj = (new RunnerState($Info, $r, $checkt))->full_json();
+        $rj = null;
+        if (($checkt = get($crunners, $r->runclass)))
+            $rj = (new RunnerState($Info, $r, $checkt))->full_json();
         if (!$rj && !$Me->can_run($Pset, $r, $User))
             continue;
 
