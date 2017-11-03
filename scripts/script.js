@@ -2634,8 +2634,10 @@ function pa_render_terminal(container, string, options) {
     }
 
     function clean_cr(line) {
+        var lineend = /\n$/.test(line);
+        if (lineend && line.indexOf("\r") === line.length - 1)
+            return line.substring(0, line.length - 2) + "\n";
         var curstyle = styles || "\x1b[0m",
-            lineend = /\n$/.test(line),
             parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/),
             partno, i, m, r = [];
         for (partno = 0; partno < parts.length; ++partno) {
@@ -2666,6 +2668,7 @@ function pa_render_terminal(container, string, options) {
             }
             r = g;
         }
+        r.push(curstyle);
         lineend && r.push("\n");
         return r.join("");
     }
@@ -2812,9 +2815,10 @@ function pa_run(button, opt) {
     delete therun[0].dataset.paTimestamp;
 
     fold61(therun, jQuery("#pa-runout-" + runclass).show(), true);
-    if (!checkt && !opt.noclear)
+    if (!checkt && !opt.noclear) {
         thepre.html("");
-    else
+        delete thepre[0].dataset.paTerminalStyle;
+    } else
         therun.find("span.pa-runcursor").remove();
 
     if (therun[0].dataset.paXtermJs
@@ -2848,7 +2852,6 @@ function pa_run(button, opt) {
     }
 
     function append(str) {
-        console.log(JSON.stringify(str));
         if (thexterm)
             thexterm.write(str);
         else {
