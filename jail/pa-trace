@@ -6,12 +6,13 @@ use Getopt::Long qw(:config bundling no_ignore_case require_order);
 my $DTRUSS = -x "/usr/bin/dtruss";
 
 sub usage (;$) {
-    print STDERR "Usage: jail/pa-trace [-o OUTFILE] COMMAND ARG...\n";
+    print STDERR "Usage: jail/pa-trace [-o OUTFILE] [-r] COMMAND ARG...\n";
     print STDERR "       jail/pa-trace [-o OUTFILE] < STRACERESULT\n";
     print STDERR "Options are:\n";
     print STDERR "  -n, --no-defaults     Do not include default programs.\n";
     print STDERR "  -o, --output=OUTFILE  Add to files listed in OUTFILE.\n";
     print STDERR "  -u, --user=USER       Don't exclude USER dotfiles.\n";
+    print STDERR "  -r, --raw             Don't redirect standard output/error.\n";
     print STDERR "  -f, --file=FILE       Include files in FILE (one per line).\n";
     print STDERR "  -x, --exclude=PATTERN Exclude files matching PATTERN.\n";
     print STDERR "  -V, --verbose         Be verbose.\n";
@@ -20,17 +21,16 @@ sub usage (;$) {
     exit (@_ ? $_[0] : 1);
 }
 
-sub run_trace (@) {
+sub run_trace ($@) {
+    my($raw) = shift @_;
     pipe IN, OUT;
-    pipe ERRIN, ERROUT;
+    pipe ERRIN, ERROUT if !$raw;
 
     my($pid) = fork();
     if ($pid == 0) {
         close(IN);
-        close(ERRIN);
         fcntl(OUT, F_GETFD, $buffer) or die;
-        fcntl(OUT, F_SETFD, $BUFFER & ~FD_CLOEXEC) or die;
-        open(STDOUT, ">&ERROUT");
+        fcntl(OUT, F_SETFD, $buffer & ~FD_CLOEXEC) or die;
         my(@args);
         if ($DTRUSS) {
             my($dir) = dirname($0);
@@ -40,31 +40,38 @@ sub run_trace (@) {
                      "-q", "-f", "-o", "/dev/fd/" . fileno(OUT));
         }
         print STDERR join(" ", @args, @_), "\n" if $verbose;
-        open(STDERR, $DTRUSS ? ">&OUT" : ">&ERROUT");
+        if (!$raw) {
+            close(ERRIN);
+            open(STDOUT, ">&ERROUT");
+            open(STDERR, $DTRUSS ? ">&OUT" : ">&ERROUT");
+        }
         exec @args, @_ or die;
     }
     close(OUT);
-    close(ERROUT);
     open(STDIN, "<&IN");
 
-    $pid = fork();
-    if ($pid == 0) {
-        close(STDIN);
-        while (<ERRIN>) {
-            print STDERR if !m,^\[ Process PID=\d+ runs in \d+ bit mode\. \]\s*$, || $verbose;
+    if (!$raw) {
+        close(ERROUT);
+        $pid = fork();
+        if ($pid == 0) {
+            close(STDIN);
+            while (<ERRIN>) {
+                print STDERR if !m,^\[ Process PID=\d+ runs in \d+ bit mode\. \]\s*$, || $verbose;
+            }
+            exit(0);
         }
-        exit(0);
+        close(ERRIN);
     }
-    close(ERRIN);
 }
 
-my($jailfile, $defaults, $nodefaults, $help) = (undef, undef, 0, 0);
+my($jailfile, $defaults, $nodefaults, $help, $raw) = (undef, undef, 0, 0, 0);
 my($user) = undef;
 my(@extras, @excludes);
 GetOptions("output|o=s" => \$jailfile,
            "defaults" => \$defaults,
            "n" => \$nodefaults,
            "help" => \$help,
+           "raw|r" => \$raw,
            "user|u=s" => \$user,
            "file|f=s" => \@extras,
            "exclude|x=s" => \@excludes,
@@ -225,7 +232,7 @@ foreach my $fn (@extras) {
 }
 
 if (@ARGV) {
-    run_trace(@ARGV);
+    run_trace($raw, @ARGV);
     my($program) = `which "$ARGV[0]"`;
     chomp $program;
     addfile($program, "exec", 0) if $program;
