@@ -32,6 +32,7 @@ class PsetView {
     const ERROR_NOTRUN = 1;
     const ERROR_LOGMISSING = 2;
     public $last_runner_error;
+    private $transferred_warnings;
 
     function __construct(Pset $pset, Contact $user, Contact $viewer, $hash = null) {
         $this->conf = $pset->conf;
@@ -716,6 +717,54 @@ class PsetView {
         }
     }
 
+    private function transfer_one_warning($file, $line, $text) {
+        if ($file !== null && $text !== "") {
+            if (!isset($this->transferred_warnings[$file]))
+                $this->transferred_warnings[$file] = [];
+            if (!isset($this->transferred_warnings[$file][$line]))
+                $this->transferred_warnings[$file][$line] = "";
+            $this->transferred_warnings[$file][$line] .= $text;
+        }
+    }
+
+    private function transfer_warnings() {
+        $this->transferred_warnings = [];
+        foreach ($this->pset->runners as $runner) {
+            if ($runner->transfer_warnings
+                && $this->viewer->can_view_run($this->pset, $runner, $this->user)
+                && ($output = $this->runner_output_for($runner))) {
+                $file = $line = null;
+                $text = "";
+                foreach (explode("\n", $output) as $s) {
+                    if (preg_match('/\A(\S[^:]*):(\d+):/', $s, $m)) {
+                        $this->transfer_one_warning($file, $line, $text);
+                        $file = $m[1];
+                        $line = $m[2];
+                        $text = $s . "\n";
+                    } else if (preg_match('/\A(?:\S|\s+[A-Z]+\s)/', $s)) {
+                        $this->transfer_one_warning($file, $line, $text);
+                        $file = $line = $text = "";
+                    } else if ($file !== null) {
+                        $text .= $s . "\n";
+                    }
+                }
+                $this->transfer_one_warning($file, $line, $text);
+            }
+        }
+    }
+
+    function transferred_warnings_for($file) {
+        if ($this->transferred_warnings === null)
+            $this->transfer_warnings();
+        if (isset($this->transferred_warnings[$file]))
+            return $this->transferred_warnings[$file];
+        $slash = strrpos($file, "/");
+        if ($slash !== false
+            && isset($this->transferred_warnings[substr($file, $slash + 1)]))
+            return $this->transferred_warnings[substr($file, $slash + 1)];
+        return [];
+    }
+
 
     function hoturl_args($args = null) {
         $xargs = array("pset" => $this->pset->urlkey,
@@ -837,6 +886,12 @@ class PsetView {
                 if ($g->landmark_file === $file)
                     $gentries["a" . $g->landmark_line][] = $g;
         }
+        $wentries = null;
+        if ($this->pset->has_transfer_warnings
+            && !$this->is_handout_commit()) {
+            foreach ($this->transferred_warnings_for($file) as $lineno => $w)
+                $wentries["b" . $lineno] = $w;
+        }
         $this->tabwidth();
 
         if (!$nofold) {
@@ -908,9 +963,13 @@ class PsetView {
                 '<td class="pa-db"', $bk, '></td>',
                 '<td class="', $x[1], '">', $this->diff_line_code($x[4]), "</td></tr>\n";
 
+            if ($wentries !== null && $bln && isset($wentries[$bln])) {
+                echo '<tr class="pa-dl pa-gg"><td colspan="2"></td><td class="pa-warnbox">', htmlspecialchars($wentries[$bln]), '</td></tr>';
+            }
+
             if ($gentries !== null && $aln && isset($gentries[$aln])) {
                 foreach ($gentries[$aln] as $g)
-                    echo '<tr class="pa-dl pa-gg"><td colspan="4" class="pa-graderow"><div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"></div></td></tr>';
+                    echo '<tr class="pa-dl pa-gg"><td colspan="3" class="pa-graderow"><div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"></div></td></tr>';
             }
 
             if ($nx)

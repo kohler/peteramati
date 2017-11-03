@@ -2416,7 +2416,7 @@ tr.pa-gx:hover > td {
 	background-color: #e8e8f8;
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
-.pa-notebox, .pa-note-entry, .pa-noteref, .pa-gradeboxref {
+.pa-notebox, .pa-note-entry, .pa-noteref, .pa-gradeboxref, .pa-warnbox {
 	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 18px;
 }
@@ -2432,7 +2432,7 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-da, .pa-db {
 	user-select: none;
 }
-.pa-dd, .pa-note {
+.pa-dd, .pa-note, .pa-dy {
 	overflow-wrap: break-word;
 	white-space: pre-wrap;
 }
@@ -2581,6 +2581,22 @@ span.foldarrow {
 	width: auto;
 	max-width: 162px;
 	padding-right: 2em;
+}
+.pa-warnbox {
+	background: #b8c1d1;
+	background:
+	    -webkit-linear-gradient(top, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
+	    -webkit-linear-gradient(bottom, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    #c5cedd;
+	-webkit-background-size: 100% 7px, 100% 5px, 100% 100%;
+	background:
+	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
+	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
+	    #c5cedd;
+	background-size: 100% 7px, 100% 5px, 100% 100%;
+	font-style: italic;
+	padding: 0.8em 1em 0.8em 0;
+	white-space: pre-wrap;
 }
 .pa-runner {
 	font-size: 9pt;
