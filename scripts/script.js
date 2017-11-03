@@ -2678,32 +2678,38 @@ function pa_run(button, opt) {
 
     function clean_cr(line) {
         var curstyle = styles || "\x1b[0m",
-            parts = line.split(/\r/),
+            lineend = /\n$/.test(line),
+            parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/),
             partno, i, m, r = [];
         for (partno = 0; partno < parts.length; ++partno) {
-            var g = [], glen = 0, j;
-            var lsplit = parts[partno].split(/(\x1b\[[\d;]*m)/);
-            for (j = 0; j < lsplit.length; j += 2) {
+            var g = [], glen = 0, clearafter = null;
+            var lsplit = parts[partno].split(/(\x1b\[[\d;]*m|\x1b\[0?K)/);
+            for (var j = 0; j < lsplit.length; j += 2) {
                 if (lsplit[j] !== "") {
                     g.push(curstyle, lsplit[j]);
                     glen += lsplit[j].length;
                 }
-                if (j + 1 < lsplit.length)
-                    curstyle = ansi_combine(curstyle, lsplit[j + 1]);
+                if (j + 1 < lsplit.length) {
+                    if (/K$/.test(lsplit[j + 1]))
+                        clearafter = glen;
+                    else
+                        curstyle = ansi_combine(curstyle, lsplit[j + 1]);
+                }
             }
+            // glen: number of characters to overwrite
             var rpos = 0;
             while (rpos < r.length && glen >= r[rpos + 1].length) {
                 glen -= r[rpos + 1].length;
                 rpos += 2;
             }
-            if (g.length && !/\n$|\x1b\[0?K/.test(g[g.length - 1]))
-                while (rpos < r.length) {
-                    g.push(r[rpos], r[rpos + 1].substr(glen));
-                    glen = 0;
-                    rpos += 2;
-                }
+            while (rpos < r.length && glen < r[rpos + 1].length && clearafter === null) {
+                g.push(r[rpos], r[rpos + 1].substr(glen));
+                glen = 0;
+                rpos += 2;
+            }
             r = g;
         }
+        lineend && r.push("\n");
         return r.join("");
     }
 
