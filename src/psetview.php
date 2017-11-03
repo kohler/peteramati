@@ -29,6 +29,10 @@ class PsetView {
     private $n_visible_in_total;
     private $n_set_grades;
 
+    const ERROR_NOTRUN = 1;
+    const ERROR_LOGMISSING = 2;
+    public $last_runner_error;
+
     function __construct(Pset $pset, Contact $user, Contact $viewer, $hash = null) {
         $this->conf = $pset->conf;
         $this->pset = $pset;
@@ -684,6 +688,32 @@ class PsetView {
             $this->conf->qe("update RepositoryGrade set hidegrade=? where repoid=? and pset=?", $hidegrade, $this->repo->repoid, $this->pset->psetid);
         $this->grade = $this->repo_grade = false;
         $this->can_view_grades = $this->user_can_view_grades = null;
+    }
+
+
+    function runner_logfile($checkt) {
+        global $ConfSitePATH;
+        return $ConfSitePATH . "/log/run" . $this->repo->cacheid
+            . ".pset" . $this->pset->id . "/repo" . $this->repo->repoid
+            . ".pset" . $this->pset->id . "." . $checkt . ".log";
+    }
+
+    function runner_output($checkt) {
+        return file_get_contents($this->runner_logfile($checkt));
+    }
+
+    function runner_output_for($runner) {
+        if (is_string($runner))
+            $runner = $this->pset->all_runners[$runner];
+        $cnotes = $this->commit_info();
+        if ($cnotes && isset($cnotes->run) && isset($cnotes->run->{$runner->name})) {
+            $f = $this->runner_output($cnotes->run->{$runner->name});
+            $this->last_runner_error = $f === false ? self::ERROR_LOGMISSING : 0;
+            return $f;
+        } else {
+            $this->last_runner_error = self::ERROR_NOTRUN;
+            return false;
+        }
     }
 
 

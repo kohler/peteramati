@@ -24,9 +24,8 @@ class RunnerState {
     private $_logged_checkts;
     private $_running_checkts;
 
-    function __construct(PsetView $info, RunnerConfig $runner) {
+    function __construct(PsetView $info, RunnerConfig $runner, $checkt = null) {
         global $ConfSitePATH;
-
         $this->info = $info;
         $this->repo = $info->repo;
         $this->pset = $info->pset;
@@ -40,6 +39,9 @@ class RunnerState {
                 throw new RunnerException("cannot create log directory");
             umask($old_umask);
         }
+
+        if ($checkt)
+            $this->set_checkt($checkt);
     }
 
     function running_checkts() {
@@ -95,16 +97,92 @@ class RunnerState {
 
 
     function set_checkt($checkt) {
-        $this->checkt = $checkt;
+        if (is_int($checkt) && $checkt > 0)
+            $this->checkt = $checkt;
+        else if (ctype_digit($checkt))
+            $this->checkt = intval($checkt);
+        else if (preg_match(',\.(\d+)\.log(?:\.lock|\.pid)?\z,', $checkt, $m))
+            $this->checkt = intval($m[1]);
+        else
+            $this->checkt = null;
+        return $this->checkt !== null;
     }
 
-    function is_recent_job_running() {
-        foreach ($this->running_checkts() as $checkt) {
-            if (($lstatus = ContactView::runner_status_json($this->info, $checkt))
-                && $lstatus->status == "working")
-                return true;
+    function generic_json() {
+        return (object) [
+            "ok" => true, "repoid" => $this->repo->repoid,
+            "pset" => $this->pset->urlkey, "timestamp" => $this->checkt
+        ];
+    }
+
+    function status_json($json = null) {
+        global $Now;
+        if (!$json)
+            $json = (object) [];
+        $logfn = $this->info->runner_logfile($this->checkt);
+        $lockfn = $logfn . ".pid";
+        $pid_data = @file_get_contents($lockfn);
+        if (ctype_digit(trim($pid_data))
+            && !posix_kill(trim($pid_data), 0)
+            && posix_get_last_error() == 3 /* ESRCH */)
+            $pid_data = "dead\n";
+        if ($pid_data === false || $pid_data === "0\n") {
+            $json->done = true;
+            $json->status = "done";
+        } else if ($pid_data === "" || ctype_digit(trim($pid_data))) {
+            $json->done = false;
+            $json->status = "working";
+            if ($Now - $this->checkt > 600)
+                $json->status = "old";
+        } else {
+            $json->done = true;
+            $json->status = "dead";
         }
-        return false;
+        if ($json->done && $pid_data !== false) {
+            unlink($lockfn);
+            unlink($logfn . ".in");
+        }
+        return $json;
+    }
+
+    function full_json($offset = null) {
+        if (!$this->checkt)
+            return false;
+        $json = $info->generic_json();
+        $this->status_json($json);
+        if ($offset !== null) {
+            $logfn = $this->info->runner_logfile($this->checkt);
+            $data = @file_get_contents($logfn, false, null, max($offset, 0));
+            if ($data === false)
+                return (object) ["error" => true, "message" => "No such log"];
+            // Fix up $data if it is not valid UTF-8.
+            if (!is_valid_utf8($data)) {
+                $data = UnicodeHelper::utf8_truncate_invalid($data);
+                if (!is_valid_utf8($data))
+                    $data = UnicodeHelper::utf8_replace_invalid($data);
+            }
+            $json->data = $data;
+            $json->offset = max($offset, 0);
+            $json->lastoffset = $json->offset + strlen($data);
+        }
+        return $json;
+    }
+
+
+
+    function is_recent_job_running() {
+        $save_checkt = $this->checkt;
+        $answer = false;
+        foreach ($this->running_checkts() as $checkt) {
+            $this->checkt = $checkt;
+            $lstatus = $this->status_json();
+            if ($lstatus && $lstatus->status === "working") {
+                $answer = true;
+                break;
+            }
+        }
+        $this->checkt = $save_checkt;
+        return $answer;
     }
 
     function start($queue) {
@@ -137,7 +215,7 @@ class RunnerState {
 
         // create logfile and lockfile
         $this->checkt = time();
-        $this->logfile = ContactView::runner_logfile($this->info, $this->checkt);
+        $this->logfile = $this->info->runner_logfile($this->checkt);
         $this->lockfile = $this->logfile . ".pid";
         file_put_contents($this->lockfile, "");
         $this->inputfifo = $this->logfile . ".in";

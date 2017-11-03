@@ -119,87 +119,11 @@ class ContactView {
         return isset($info->regrades) && count($info->regrades);
     }
 
-    static function runner_logfile(PsetView $info, $checkt) {
-        global $ConfSitePATH;
-        return $ConfSitePATH . "/log/run" . $info->repo->cacheid
-            . ".pset" . $info->pset->id
-            . "/repo" . $info->repo->repoid
-            . ".pset" . $info->pset->id
-            . "." . $checkt . ".log";
-    }
-
-    static function runner_status_json(PsetView $info, $checkt, $json = null) {
-        global $Now;
-        if (!$json)
-            $json = (object) array();
-        $logfn = self::runner_logfile($info, $checkt);
-        $lockfn = $logfn . ".pid";
-        $pid_data = @file_get_contents($lockfn);
-        if (ctype_digit(trim($pid_data))
-            && !posix_kill(trim($pid_data), 0)
-            && posix_get_last_error() == 3 /* ESRCH */)
-            $pid_data = "dead\n";
-        if ($pid_data === false || $pid_data === "0\n") {
-            $json->done = true;
-            $json->status = "done";
-        } else if ($pid_data === "" || ctype_digit(trim($pid_data))) {
-            $json->done = false;
-            $json->status = "working";
-            if ($Now - $checkt > 600)
-                $json->status = "old";
-        } else {
-            $json->done = true;
-            $json->status = "dead";
-        }
-        if ($json->done && $pid_data !== false) {
-            unlink($lockfn);
-            unlink($logfn . ".in");
-        }
-        return $json;
-    }
-
-    static function runner_generic_json(PsetView $info, $checkt) {
-        return (object) array("ok" => true,
-                              "repoid" => $info->repo->repoid,
-                              "pset" => $info->pset->urlkey,
-                              "timestamp" => $checkt);
-    }
-
-    static function runner_json(PsetView $info, $checkt, $offset = null) {
-        if (ctype_digit($checkt))
-            $logfn = self::runner_logfile($info, $checkt);
-        else if (preg_match(',\.(\d+)\.log(?:\.lock|\.pid)?\z,', $checkt, $m)) {
-            $logfn = $checkt;
-            $checkt = $m[1];
-        } else
-            return false;
-
-        $json = self::runner_generic_json($info, $checkt);
-        self::runner_status_json($info, $checkt, $json);
-
-        if ($offset !== null) {
-            $data = @file_get_contents($logfn, false, null, max($offset, 0));
-            if ($data === false)
-                return (object) array("error" => true, "message" => "No such log");
-            // Fix up $data if it is not valid UTF-8.
-            if (!is_valid_utf8($data)) {
-                $data = UnicodeHelper::utf8_truncate_invalid($data);
-                if (!is_valid_utf8($data))
-                    $data = UnicodeHelper::utf8_replace_invalid($data);
-            }
-            $json->data = $data;
-            $json->offset = max($offset, 0);
-            $json->lastoffset = $json->offset + strlen($data);
-        }
-
-        return $json;
-    }
-
     static function runner_write(PsetView $info, $checkt, $data) {
         global $ConfSitePATH;
         if (!ctype_digit($checkt))
             return false;
-        $logfn = self::runner_logfile($info, $checkt);
+        $logfn = $info->runner_logfile($checkt);
         $proc = proc_open("$ConfSitePATH/jail/pa-writefifo " . escapeshellarg($logfn . ".in"),
                           array(array("pipe", "r")), $pipes);
         if ($pipes[0]) {

@@ -734,11 +734,12 @@ if ($Pset->gitless) {
     $crunners = $Info->commit_info("run");
     $runclasses = [];
     foreach ($Pset->runners as $r) {
-        if (!$Me->can_view_run($Pset, $r, $User) || isset($runclasses[$r->runclass]))
+        if (!$Me->can_view_run($Pset, $r, $User)
+            || isset($runclasses[$r->runclass])
+            || !($checkt = get($crunners, $r->runclass)))
             continue;
 
-        $checkt = get($crunners, $r->runclass);
-        $rj = $checkt ? ContactView::runner_json($Info, $checkt) : null;
+        $rj = (new RunnerState($Info, $r, $checkt))->full_json();
         if (!$rj && !$Me->can_run($Pset, $r, $User))
             continue;
 

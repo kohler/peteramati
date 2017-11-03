@@ -158,12 +158,12 @@ if ($Qreq->check) {
     $Rstate->set_checkt($checkt);
 
     $offset = cvtint($Qreq->offset, 0);
-    $answer = ContactView::runner_json($Info, $checkt, $offset);
+    $answer = $Rstate->full_json($offset);
     if ($answer->status == "working" && $Qreq->stop) {
         ContactView::runner_write($Info, $checkt, "\x1b\x03");
         $now = microtime(true);
         do {
-            $answer = ContactView::runner_json($Info, $checkt, $offset);
+            $answer = $Rstate->full_json($offset);
         } while ($answer->status == "working" && microtime(true) - $now < 0.1);
     }
     if ($answer->status != "working" && $Queueid > 0)
@@ -262,7 +262,8 @@ if (isset($Runner->queue)) {
 
 // maybe eval
 if (!$Runner->command && $Runner->eval) {
-    $json = ContactView::runner_generic_json($Info, time());
+    $Rstate->set_checkt(time());
+    $json = $Rstate->generic_json();
     $json->done = true;
     $json->status = "done";
     runner_eval($Runner, $Info, $json);
