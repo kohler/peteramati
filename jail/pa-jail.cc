@@ -1415,7 +1415,7 @@ class jailownerinfo {
     int exec_go();
 
   private:
-    const char* newenv[6];
+    std::vector<const char*> newenv;
     char** argv;
     jaildirinfo* jaildir;
     int inputfd;
@@ -1546,19 +1546,36 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
             else if (strncmp(*eptr, "LD_LIBRARY_PATH=", 16) == 0)
                 ld_library_path = *eptr;
     }
-    int newenvpos = 0;
-    newenv[newenvpos++] = path;
-    newenv[newenvpos++] = lang;
+    newenv.push_back(path);
+    newenv.push_back(lang);
     if (term)
-        newenv[newenvpos++] = term;
+        newenv.push_back(term);
     if (ld_library_path)
-        newenv[newenvpos++] = ld_library_path;
-    newenv[newenvpos++] = homebuf;
-    newenv[newenvpos++] = NULL;
+        newenv.push_back(ld_library_path);
+    newenv.push_back(homebuf);
+    while (argc > 0) {
+        const char* arg = argv[0];
+        const char* argpos = arg;
+        while (*argpos && (isalnum((unsigned char) *argpos) || *argpos == '_'))
+            ++argpos;
+        if (arg == argpos || *argpos != '=')
+            break;
+        std::vector<const char*>::size_type i = 0;
+        while (i < newenv.size() && strncmp(newenv[i], arg, argpos - arg) != 0)
+            ++i;
+        if (i < newenv.size())
+            newenv[i] = arg;
+        else
+            newenv.push_back(arg);
+        --argc, ++argv;
+    }
+    newenv.push_back(NULL);
 
     // create command
+    if (!argc)
+        die("Nothing to run\n");
     delete[] this->argv;
-    this->argv = new char*[5 + argc - (optind + 2)];
+    this->argv = new char*[5 + argc];
     if (!this->argv)
         die("Out of memory\n");
     int newargvpos = 0;
@@ -1566,11 +1583,11 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     this->argv[newargvpos++] = (char*) owner_sh.c_str();
     this->argv[newargvpos++] = (char*) "-l";
     this->argv[newargvpos++] = (char*) "-c";
-    if (optind + 3 == argc)
-        command = argv[optind + 2];
+    if (argc == 1)
+        command = argv[0];
     else {
-        command = shell_quote(argv[optind + 2]);
-        for (int i = optind + 3; i < argc; ++i)
+        command = shell_quote(argv[0]);
+        for (int i = 0; i < argc; ++i)
             command += std::string(" ") + shell_quote(argv[i]);
     }
     this->argv[newargvpos++] = const_cast<char*>(command.c_str());
@@ -1764,7 +1781,7 @@ int jailownerinfo::exec_go() {
                 signal(sig, SIG_DFL);
 
             if (execve(this->argv[0], (char* const*) this->argv,
-                       (char* const*) newenv) != 0) {
+                       (char* const*) newenv.data()) != 0) {
                 fprintf(stderr, "exec %s: %s\n", owner_sh.c_str(), strerror(errno));
                 exit(126);
             }
@@ -2063,7 +2080,7 @@ JAILDIR must be allowed by /etc/pa-jail.conf.\n\
             fprintf(stderr, "Usage: pa-jail add [OPTIONS...] JAILDIR [USER]\n\
 Create or augment a jail. JAILDIR must be allowed by /etc/pa-jail.conf.\n\n");
         else
-            fprintf(stderr, "Usage: pa-jail run [OPTIONS...] JAILDIR USER COMMAND...\n\
+            fprintf(stderr, "Usage: pa-jail run [OPTIONS...] JAILDIR USER [NAME=VALUE...] COMMAND...\n\
 Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
 /etc/pa-jail.conf.\n\n");
         fprintf(stderr, "  -f, --contents-file FILE  populate jail with contents of FILE\n");
@@ -2367,7 +2384,7 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc)
-        jailuser.exec(argc, argv, jaildir, inputfd, timeout, foreground);
+        jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, inputfd, timeout, foreground);
 
     exit(0);
 }
