@@ -8,7 +8,6 @@ class RunnerState {
     public $repo;
     public $pset;
     public $runner;
-    public $queue;
 
     public $logdir;
 
@@ -22,17 +21,16 @@ class RunnerState {
     private $jaildir;
     private $jailhomedir;
 
-    public $logged_checkts = array();
-    public $running_checkts = array();
+    private $_logged_checkts;
+    private $_running_checkts;
 
-    public function __construct($info, $runner, $queue) {
+    function __construct(PsetView $info, RunnerConfig $runner) {
         global $ConfSitePATH;
 
         $this->info = $info;
         $this->repo = $info->repo;
         $this->pset = $info->pset;
         $this->runner = $runner;
-        $this->queue = $queue;
 
         $this->logdir = $ConfSitePATH . "/log/run" . $this->repo->cacheid
             . ".pset" . $this->pset->id;
@@ -42,20 +40,40 @@ class RunnerState {
                 throw new RunnerException("cannot create log directory");
             umask($old_umask);
         }
+    }
 
-        $logfs = glob($this->logdir . "/repo" . $this->repo->repoid . ".pset" . $this->pset->id . ".*.log*");
-        rsort($logfs);
-        foreach ($logfs as $logf)
-            if (preg_match(',\.(\d+)\.log((?:\.pid)?)\z,', $logf, $m)) {
-                if ($m[2])
-                    $this->running_checkts[] = intval($m[1]);
-                else
-                    $this->logged_checkts[] = intval($m[1]);
+    function running_checkts() {
+        if ($this->_running_checkts === null) {
+            $logfs = glob($this->logdir . "/repo" . $this->repo->repoid
+                          . ".pset" . $this->pset->id . ".*.log.pid");
+            $this->_running_checkts = [];
+            foreach ($logfs as $f) {
+                $rp = strlen($f);
+                $lp = strrpos($f, ".", -9);
+                $this->_running_checkts[] = intval(substr($f, $lp, $rp - $lp));
             }
+            rsort($this->_running_checkts);
+        }
+        return $this->_running_checkts;
+    }
+
+    function logged_checkts() {
+        if ($this->_logged_checkts === null) {
+            $logfs = glob($this->logdir . "/repo" . $this->repo->repoid
+                          . ".pset" . $this->pset->id . ".*.log");
+            $this->_logged_checkts = [];
+            foreach ($logfs as $f) {
+                $rp = strlen($f);
+                $lp = strrpos($f, ".", -5);
+                $this->_logged_checkts[] = intval(substr($f, $lp, $rp - $lp));
+            }
+            rsort($this->_logged_checkts);
+        }
+        return $this->_logged_checkts;
     }
 
 
-    public function expand($x) {
+    function expand($x) {
         global $Conf;
         if (strpos($x, '${') !== false) {
             $x = str_replace('${REPOID}', $this->repo->repoid, $x);
@@ -76,15 +94,20 @@ class RunnerState {
     }
 
 
-    public function is_recent_job_running() {
-        foreach ($this->running_checkts as $checkt)
+    function set_checkt($checkt) {
+        $this->checkt = $checkt;
+    }
+
+    function is_recent_job_running() {
+        foreach ($this->running_checkts() as $checkt) {
             if (($lstatus = ContactView::runner_status_json($this->info, $checkt))
                 && $lstatus->status == "working")
                 return true;
+        }
         return false;
     }
 
-    public function start() {
+    function start($queue) {
         global $ConfSitePATH, $Conf;
         assert($this->checkt === null && $this->logfile === null);
 
@@ -121,9 +144,9 @@ class RunnerState {
         if (!posix_mkfifo($this->inputfifo, 0660))
             $this->inputfifo = null;
         $this->logstream = fopen($this->logfile, "a");
-        if ($this->queue)
+        if ($queue)
             Dbl::qe("update ExecutionQueue set runat=?, status=1, lockfile=?, inputfifo=? where queueid=?",
-                    $this->checkt, $this->lockfile, $this->inputfifo, $this->queue->queueid);
+                    $this->checkt, $this->lockfile, $this->inputfifo, $queue->queueid);
         register_shutdown_function(array($this, "cleanup"));
 
         // create jail
@@ -222,7 +245,7 @@ class RunnerState {
             $this->checkout_overlay($checkoutdir, $this->pset->run_overlay);
     }
 
-    public function checkout_overlay($checkoutdir, $overlayfile) {
+    function checkout_overlay($checkoutdir, $overlayfile) {
         global $ConfSitePATH;
 
         if ($overlayfile[0] != "/")
@@ -246,7 +269,7 @@ class RunnerState {
     }
 
 
-    public function cleanup() {
+    function cleanup() {
         if ($this->lockfile)
             unlink($this->lockfile);
         if ($this->lockfile && $this->inputfifo)

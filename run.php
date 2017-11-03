@@ -69,10 +69,6 @@ if ($Qreq->resolveflag && check_post($Qreq) && user_pset_info()) {
     json_exit(["ok" => true]);
 }
 
-if (!$Pset->run_dirpattern)
-    quit("Configuration error (run_dirpattern)");
-else if (!$Pset->run_jailfiles)
-    quit("Configuration error (run_jailfiles)");
 $Runner = null;
 foreach ($Pset->runners as $r)
     if ($r->name == $Qreq->run)
@@ -133,12 +129,6 @@ else if (!$Info->can_view_repo_contents())
     quit("Unconfirmed repository");
 
 
-// extract request info
-$Queueid = cvtint($Qreq->get("queueid", -1));
-$checkt = cvtint($Qreq->get("check"));
-$Offset = cvtint($Qreq->get("offset", 0));
-
-
 // maybe eval
 function runner_eval($runner, $info, $answer) {
     global $ConfSitePATH;
@@ -150,14 +140,30 @@ function runner_eval($runner, $info, $answer) {
 }
 
 
-// checkup
-if ($checkt > 0
-    && $answer = ContactView::runner_json($Info, $checkt, $Offset)) {
-    if ($answer->status == "working" && get($_POST, "stop")) {
+// extract request info
+$Queueid = cvtint($Qreq->get("queueid", -1));
+$Rstate = new RunnerState($Info, $Runner);
+
+// recent or checkup
+if ($Qreq->check) {
+    if ($Qreq->check === "recent") {
+        $checkt = get($Rstate->logged_checkts(), 0);
+        if (!$check)
+            quit("no logs yet");
+    } else {
+        $checkt = cvtint($Qreq->check);
+        if ($checkt <= 0)
+            quit("invalid “check” argument");
+    }
+    $Rstate->set_checkt($checkt);
+
+    $offset = cvtint($Qreq->offset, 0);
+    $answer = ContactView::runner_json($Info, $checkt, $offset);
+    if ($answer->status == "working" && $Qreq->stop) {
         ContactView::runner_write($Info, $checkt, "\x1b\x03");
         $now = microtime(true);
         do {
-            $answer = ContactView::runner_json($Info, $checkt, $Offset);
+            $answer = ContactView::runner_json($Info, $checkt, $offset);
         } while ($answer->status == "working" && microtime(true) - $now < 0.1);
     }
     if ($answer->status != "working" && $Queueid > 0)
@@ -173,6 +179,10 @@ if ($checkt > 0
 // if not checkup, then we’re gonna run it; check permission
 if (!$Me->can_run($Pset, $Runner, $User))
     quit("You can’t run that command");
+if (!$Pset->run_dirpattern)
+    quit("Configuration error (run_dirpattern)");
+if (!$Pset->run_jailfiles)
+    quit("Configuration error (run_jailfiles)");
 
 
 // queue
@@ -215,8 +225,6 @@ function clean_queue($qname, $qconf, $qid) {
 
 $Queue = null;
 if (isset($Runner->queue)) {
-    if ($Queueid < 0 && $checkt > 0)
-        quit("No such job");
     if ($Queueid < 0) {
         $Conf->qe("insert into ExecutionQueue set queueclass=?, insertat=?, updateat=?, repoid=?, runat=0, status=0, psetid=?, hash=?, nconcurrent=?",
                   $Runner->queue, $Now, $Now, $Info->repo->repoid,
@@ -252,12 +260,9 @@ if (isset($Runner->queue)) {
 }
 
 
-$checkt = time();
-
-
 // maybe eval
 if (!$Runner->command && $Runner->eval) {
-    $json = ContactView::runner_generic_json($Info, $checkt);
+    $json = ContactView::runner_generic_json($Info, time());
     $json->done = true;
     $json->status = "done";
     runner_eval($Runner, $Info, $json);
@@ -267,29 +272,21 @@ if (!$Runner->command && $Runner->eval) {
 
 // otherwise run
 try {
-    $rs = new RunnerState($Info, $Runner, $Queue);
-
-    // recent
-    if ($Qreq->check == "recent" && count($rs->logged_checkts))
-        json_exit(ContactView::runner_json($Info, $rs->logged_checkts[0], $Offset));
-    else if ($Qreq->check == "recent")
-        quit("no logs yet");
-
-    if ($rs->is_recent_job_running())
+    if ($Rstate->is_recent_job_running())
         quit("recent job still running");
 
     // run
-    $rs->start();
+    $Rstate->start($Queue);
 
     // save information about execution
-    $Info->update_commit_info(["run" => [$Runner->runclass => $rs->checkt]]);
+    $Info->update_commit_info(["run" => [$Runner->runclass => $Rstate->checkt]]);
 
     json_exit(["ok" => true,
                "done" => false,
                "status" => "working",
                "repoid" => $Info->repo->repoid,
                "pset" => $Info->pset->id,
-               "timestamp" => $rs->checkt]);
+               "timestamp" => $Rstate->checkt]);
 } catch (Exception $e) {
     quit($e->getMessage());
 }

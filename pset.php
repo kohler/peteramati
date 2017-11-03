@@ -663,7 +663,7 @@ if ($Pset->gitless) {
     if (count($runnerbuttons) && $Me->isPC && $Me != $User && $last_run)
         $runnerbuttons[] = " &nbsp;"
             . Ht::button("+",
-                         array("class" => "pa-runner",
+                         array("class" => "btn pa-runner",
                                "style" => "font-weight:bold",
                                "name" => "define",
                                "onclick" => "runsetting61.add()"));
