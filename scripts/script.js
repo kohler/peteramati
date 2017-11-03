@@ -2720,6 +2720,11 @@ function pa_run(button, opt) {
     }
 
     function add_file_link(node, file, line, link) {
+        var m;
+        while ((m = file.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
+            styles = ansi_combine(styles, m[1]);
+            file = m[2];
+        }
         var filematch = find_filediff(file), dir;
         if (!filematch.length && (dir = therun.attr("data-pa-directory"))) {
             file = dir + "/" + file;
@@ -2728,7 +2733,7 @@ function pa_run(button, opt) {
         if (filematch.length) {
             var anchor = "Lb" + line + "_" + html_id_encode(file);
             var a = $("<a href=\"#" + anchor + "\" onclick=\"return pa_gotoline(this)\"></a>");
-            a.text(link);
+            a.text(link.replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;
         }

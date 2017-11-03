@@ -736,12 +736,13 @@ class PsetView {
                 $file = $line = null;
                 $text = "";
                 foreach (explode("\n", $output) as $s) {
-                    if (preg_match('/\A(\S[^:]*):(\d+):/', $s, $m)) {
+                    $sda = preg_replace('/\x1b\[[\d;]*m|\x1b\[\d*K/', '', $s);
+                    if (preg_match('/\A(\S[^:]*):(\d+):/', $sda, $m)) {
                         $this->transfer_one_warning($file, $line, $text);
                         $file = $m[1];
                         $line = $m[2];
                         $text = $s . "\n";
-                    } else if (preg_match('/\A(?:\S|\s+[A-Z]+\s)/', $s)) {
+                    } else if (preg_match('/\A(?:\S|\s+[A-Z]+\s)/', $sda)) {
                         $this->transfer_one_warning($file, $line, $text);
                         $file = $line = $text = "";
                     } else if ($file !== null) {
