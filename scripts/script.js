@@ -2564,54 +2564,11 @@ function flag61(button) {
     }
 }
 
-function pa_run(button, opt) {
-    var $f = $(button).closest("form"),
-        runclass = button.getAttribute("data-pa-runclass") || button.value,
-        therun = $("#pa-run-" + runclass),
-        thepre = therun.find("pre"),
-        checkt;
-
-    if (typeof opt !== "object")
-        opt = {};
-    if (opt.unfold && therun.attr("data-pa-timestamp"))
-        checkt = +therun.attr("data-pa-timestamp");
-    else {
-        if ($f.prop("outstanding"))
-            return true;
-        $f.find("button").prop("disabled", true);
-        $f.prop("outstanding", true);
-    }
-    therun.removeAttr("data-pa-timestamp");
-
-    fold61(therun, jQuery("#pa-runout-" + runclass).show(), true);
-    if (!checkt && !opt.noclear)
-        thepre.html("");
-    else
-        therun.find("span.pa-runcursor").remove();
-    thepre.append("<span class='pa-runcursor'>_</span>");
-
-    if (checkt && !therun.prop("openedbefore")) {
-        therun.scrollTop(therun.children().height() - therun.height());
-        therun.prop("openedbefore", true);
-    }
-
-    var ibuffer = "", // initial buffer; holds data before any results arrive
-        styles = null,
-        offset = -1, backoff = 50, queueid = null,
-        thecursor = therun.find("span.pa-runcursor")[0];
-
-    function animate() {
-        jQuery(thecursor).dequeue().animate({opacity: 0.1}, 200).delay(100).animate({opacity: 1}, 200).delay(400).queue(animate);
-    }
-    animate();
-
-    function done() {
-        $f.find("button").prop("disabled", false);
-        $f.prop("outstanding", false);
-        $(thecursor).finish().remove();
-        if ($(button).attr("data-pa-loadgrade"))
-            loadgrade61($(button));
-    }
+function pa_render_terminal(container, string, options) {
+    var styles = container.dataset.paTerminalStyle;
+    var cursor = null;
+    if (options && options.cursor === true)
+        cursor = container.lastChild;
 
     function addlinepart(node, text) {
         if (typeof text === "string")
@@ -2672,8 +2629,8 @@ function pa_run(button, opt) {
         return a1;
     }
 
-    function ends_with_newline(str) {
-        return str !== "" && str.charAt(str.length - 1) === "\n";
+    function ends_with(str, chr) {
+        return str !== "" && str.charAt(str.length - 1) === chr;
     }
 
     function clean_cr(line) {
@@ -2690,7 +2647,7 @@ function pa_run(button, opt) {
                     glen += lsplit[j].length;
                 }
                 if (j + 1 < lsplit.length) {
-                    if (/K$/.test(lsplit[j + 1]))
+                    if (ends_with(lsplit[j + 1], "K"))
                         clearafter = glen;
                     else
                         curstyle = ansi_combine(curstyle, lsplit[j + 1]);
@@ -2715,7 +2672,7 @@ function pa_run(button, opt) {
 
     function find_filediff(file) {
         return $(".pa-filediff").filter(function () {
-            return this.getAttribute("data-pa-file") === file;
+            return this.dataset.paFile === file;
         });
     }
 
@@ -2725,9 +2682,9 @@ function pa_run(button, opt) {
             styles = ansi_combine(styles, m[1]);
             file = m[2];
         }
-        var filematch = find_filediff(file), dir;
-        if (!filematch.length && (dir = therun.attr("data-pa-directory"))) {
-            file = dir + "/" + file;
+        var filematch = find_filediff(file);
+        if (!filematch.length && options && options.directory) {
+            file = options.directory + "/" + file;
             filematch = find_filediff(file);
         }
         if (filematch.length) {
@@ -2741,7 +2698,7 @@ function pa_run(button, opt) {
     }
 
     function render_line(line, node) {
-        var m, filematch, dir, a, i, x, isnew = !node, displaylen = 0;
+        var m, filematch, a, i, x, isnew = !node, displaylen = 0;
         node = node || document.createElement("span");
 
         if (/\r/.test(line))
@@ -2769,7 +2726,7 @@ function pa_run(button, opt) {
                 || (displaylen + render.length == 133 && render.charAt(132) !== "\n")) {
                 render = render.substr(0, 132 - displaylen);
                 addlinepart(node, render + "…\n");
-                isnew && thepre[0].insertBefore(node, thepre[0].lastChild);
+                isnew && container.insertBefore(node, cursor);
                 node = document.createElement("span");
                 isnew = true;
                 displaylen = 0;
@@ -2779,47 +2736,106 @@ function pa_run(button, opt) {
             }
             line = line.substr(render.length);
         }
-        isnew && thepre[0].insertBefore(node, thepre[0].lastChild);
+        isnew && container.insertBefore(node, cursor);
+    }
+
+    // hide newline on last line
+    var lines = string.split(/^/m);
+    if (lines[lines.length - 1] === "")
+        lines.pop();
+    var lastfull = ends_with(lines[lines.length - 1], "\n");
+
+    var node = cursor ? cursor.previousSibling : container.lastChild;
+    if (node
+        && (string = node.getAttribute("data-pa-outputpart")) !== null
+        && string !== ""
+        && lines.length) {
+        while (node.firstChild)
+            node.removeChild(node.firstChild);
+        lines[0] = string + lines[0];
+        node.removeAttribute("data-pa-outputpart");
+    } else {
+        if (node && lines.length)
+            node.appendChild(document.createTextNode("\n"));
+        node = null;
+    }
+
+    var laststyles = styles, i, j, last;
+    for (i = 0; i < lines.length; i = j) {
+        laststyles = styles;
+        last = lines[i];
+        for (j = i + 1; !ends_with(last, "\n") && j < lines.length; ++j)
+            last += lines[j];
+        if (j == lines.length && lastfull)
+            last = last.substring(0, last.length - 1);
+        render_line(last, i ? null : node);
+    }
+
+    if (!lastfull) {
+        styles = laststyles;
+        node = cursor ? cursor.previousSibling : container.lastChild;
+        if (node)
+            node.setAttribute("data-pa-outputpart", last);
+    }
+
+    container.dataset.paTerminalStyle = styles;
+}
+
+function pa_run(button, opt) {
+    var $f = $(button).closest("form"),
+        runclass = button.getAttribute("data-pa-runclass") || button.value,
+        therun = $("#pa-run-" + runclass),
+        thepre = therun.find("pre"),
+        checkt;
+
+    if (typeof opt !== "object")
+        opt = {};
+    if (opt.unfold && therun.attr("data-pa-timestamp"))
+        checkt = +therun.attr("data-pa-timestamp");
+    else {
+        if ($f.prop("outstanding"))
+            return true;
+        $f.find("button").prop("disabled", true);
+        $f.prop("outstanding", true);
+    }
+    therun.removeAttr("data-pa-timestamp");
+
+    fold61(therun, jQuery("#pa-runout-" + runclass).show(), true);
+    if (!checkt && !opt.noclear)
+        thepre.html("");
+    else
+        therun.find("span.pa-runcursor").remove();
+    thepre.append("<span class='pa-runcursor'>_</span>");
+
+    if (checkt && !therun.prop("openedbefore")) {
+        therun.scrollTop(therun.children().height() - therun.height());
+        therun.prop("openedbefore", true);
+    }
+
+    var ibuffer = "", // initial buffer; holds data before any results arrive
+        offset = -1, backoff = 50, queueid = null,
+        thecursor = therun.find("span.pa-runcursor")[0];
+
+    function animate() {
+        jQuery(thecursor).dequeue().animate({opacity: 0.1}, 200).delay(100).animate({opacity: 1}, 200).delay(400).queue(animate);
+    }
+    animate();
+
+    function done() {
+        $f.find("button").prop("disabled", false);
+        $f.prop("outstanding", false);
+        $(thecursor).finish().remove();
+        if ($(button).attr("data-pa-loadgrade"))
+            loadgrade61($(button));
     }
 
     function append(str) {
         var atbottom = therun.scrollTop() >= therun.children().height() - therun.height() - 10;
-
-        // hide newline on last line
-        var lines = str.split(/^/m);
-        if (lines[lines.length - 1] === "")
-            lines.pop();
-        var lastfull = ends_with_newline(lines[lines.length - 1]);
-
-        var node = thepre[0].lastChild.previousSibling, str;
-        if (node && (str = node.getAttribute("data-pa-outputpart")) !== null
-            && str !== "" && lines.length) {
-            while (node.firstChild)
-                node.removeChild(node.firstChild);
-            lines[0] = str + lines[0];
-            node.removeAttribute("data-pa-outputpart");
-        } else {
-            if (node && lines.length)
-                node.appendChild(document.createTextNode("\n"));
-            node = null;
-        }
-
-        var laststyles = styles, i, j, last;
-        for (i = 0; i < lines.length; i = j) {
-            laststyles = styles;
-            last = lines[i];
-            for (j = i + 1; !ends_with_newline(last) && j < lines.length; ++j)
-                last += lines[j];
-            if (j == lines.length && lastfull)
-                last = last.substring(0, last.length - 1);
-            render_line(last, i ? null : node);
-        }
-
-        if (!lastfull) {
-            styles = laststyles;
-            if ((node = thepre[0].lastChild.previousSibling))
-                node.setAttribute("data-pa-outputpart", last);
-        }
+        var options = {cursor: true};
+        var dir = therun.attr("data-pa-directory");
+        if (dir)
+            options.directory = dir;
+        pa_render_terminal(thepre[0], str, options);
         if (atbottom)
             therun.scrollTop(Math.max(Math.ceil(therun.children().height() - therun.height()), 0));
     }
