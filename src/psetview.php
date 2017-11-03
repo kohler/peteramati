@@ -734,19 +734,41 @@ class PsetView {
                 && $this->viewer->can_view_run($this->pset, $runner, $this->user)
                 && ($output = $this->runner_output_for($runner))) {
                 $file = $line = null;
+                $expect_context = false;
                 $text = "";
-                foreach (explode("\n", $output) as $s) {
+                $lines = explode("\n", $output);
+                $nlines = count($lines);
+                for ($i = 0; $i < $nlines; ++$i) {
+                    $s = $lines[$i];
                     $sda = preg_replace('/\x1b\[[\d;]*m|\x1b\[\d*K/', '', $s);
-                    if (preg_match('/\A(\S[^:]*):(\d+):/', $sda, $m)) {
-                        $this->transfer_one_warning($file, $line, $text);
-                        $file = $m[1];
-                        $line = $m[2];
-                        $text = $s . "\n";
+                    if (preg_match('/\A([^\s:]*):(\d+):(?:\d+:)?\s*(\S*)/', $sda, $m)) {
+                        if ($m[3] !== "note:" || !$file) {
+                            $this->transfer_one_warning($file, $line, $text);
+                            $file = $m[1];
+                            $line = $m[2];
+                            $text = "";
+                        }
+                        $text .= $s . "\n";
+                        $expect_context = true;
                     } else if (preg_match('/\A(?:\S|\s+[A-Z]+\s)/', $sda)) {
-                        $this->transfer_one_warning($file, $line, $text);
-                        $file = $line = $text = "";
+                        if (str_starts_with($sda, "In file included")
+                            && $i + 1 < $nlines) {
+                            $text .= $s . "\n" . $lines[$i + 1] . "\n";
+                            ++$i;
+                        } else if ($expect_context
+                                   && $i + 1 < $nlines
+                                   && strpos($lines[$i + 1], "^") !== false) {
+                            $text .= $s . "\n" . $lines[$i + 1] . "\n";
+                            ++$i;
+                        } else {
+                            $this->transfer_one_warning($file, $line, $text);
+                            $file = $line = null;
+                            $text = "";
+                        }
+                        $expect_context = false;
                     } else if ($file !== null) {
                         $text .= $s . "\n";
+                        $expect_context = false;
                     }
                 }
                 $this->transfer_one_warning($file, $line, $text);
