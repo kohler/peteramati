@@ -2684,7 +2684,7 @@ function pa_render_terminal(container, string, options) {
         }
         var filematch = find_filediff(file);
         if (!filematch.length && options && options.directory) {
-            file = options.directory + "/" + file;
+            file = options.directory + file;
             filematch = find_filediff(file);
         }
         if (filematch.length) {
@@ -2781,9 +2781,19 @@ function pa_render_terminal(container, string, options) {
     container.dataset.paTerminalStyle = styles;
 }
 
+function pa_render_need_terminal() {
+    $(".need-pa-terminal").each(function () {
+        $(this).removeClass("need-pa-terminal");
+        pa_render_terminal(this, this.dataset.paTerminalOutput);
+        delete this.dataset.paTerminalOutput;
+    });
+}
+$(pa_render_need_terminal);
+
 function pa_run(button, opt) {
     var $f = $(button).closest("form"),
         runclass = button.getAttribute("data-pa-runclass") || button.value,
+        directory = $(button).closest(".pa-psetinfo").attr("data-pa-directory"),
         therun = $("#pa-run-" + runclass),
         thepre = therun.find("pre"),
         checkt;
@@ -2831,11 +2841,7 @@ function pa_run(button, opt) {
 
     function append(str) {
         var atbottom = therun.scrollTop() >= therun.children().height() - therun.height() - 10;
-        var options = {cursor: true};
-        var dir = therun.attr("data-pa-directory");
-        if (dir)
-            options.directory = dir;
-        pa_render_terminal(thepre[0], str, options);
+        pa_render_terminal(thepre[0], str, {cursor: true, directory: directory});
         if (atbottom)
             therun.scrollTop(Math.max(Math.ceil(therun.children().height() - therun.height()), 0));
     }

@@ -752,8 +752,6 @@ if ($Pset->gitless) {
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
             htmlspecialchars($r->output_title), '</a></h3>',
             '<div class="pa-run" id="pa-run-', $r->runclass, '" style="display:none"';
-        if ($Pset->directory_noslash !== "")
-            echo ' data-pa-directory="', htmlspecialchars($Pset->directory_noslash), '"';
         if ($rj && isset($rj->timestamp))
             echo ' data-pa-timestamp="', $rj->timestamp, '"';
         if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n")))
