@@ -1005,7 +1005,7 @@ class PsetView {
         }
         echo "</tbody></table>\n";
         if ($wentries)
-            Ht::unstash_script("pa_render_need_terminal()");
+            echo "<script>pa_render_need_terminal()</script>\n";
     }
 
     private function echo_linenote(LineNote $note, LinenotesOrder $lnorder = null) {
