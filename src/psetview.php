@@ -742,7 +742,12 @@ class PsetView {
                     $s = $lines[$i];
                     $sda = preg_replace('/\x1b\[[\d;]*m|\x1b\[\d*K/', '', $s);
                     if (preg_match('/\A([^\s:]*):(\d+):(?:\d+:)?\s*(\S*)/', $sda, $m)) {
-                        if ($m[3] !== "note:" || !$file) {
+                        if ($m[3] === "note:" && $file) {
+                            if (strpos($sda, "in expansion of macro") !== false) {
+                                $file = $m[1];
+                                $line = $m[2];
+                            }
+                        } else {
                             $this->transfer_one_warning($file, $line, $text);
                             $file = $m[1];
                             $line = $m[2];
