@@ -138,6 +138,7 @@ CREATE TABLE `ContactInfo` (
   `updateTime` int(11) NOT NULL DEFAULT '0',
   `data` varbinary(32767) DEFAULT NULL,
   `studentYear` varbinary(4) DEFAULT NULL,
+  `nickname` varchar(60) DEFAULT NULL,
   PRIMARY KEY (`contactId`),
   UNIQUE KEY `contactId` (`contactId`),
   UNIQUE KEY `contactIdRoles` (`contactId`,`roles`),
@@ -159,6 +160,7 @@ CREATE TABLE `ContactLink` (
   `type` int(1) NOT NULL,
   `pset` int(1) NOT NULL DEFAULT '0',
   `link` int(11) NOT NULL,
+  `data` varbinary(8192) DEFAULT NULL,
   KEY `cid_type` (`cid`,`type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -298,7 +300,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 112);
+insert into Settings (name, value) values ('allowPaperOption', 114);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

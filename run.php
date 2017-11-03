@@ -19,7 +19,7 @@ function user_pset_info() {
     if (($Commit = $Qreq->newcommit) == null)
         $Commit = $Qreq->commit;
     if (!$Info->set_hash($Commit))
-        json_exit(["ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."]);
+        json_exit(["ok" => false, "error" => !$Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."]);
     return $Info;
 }
 
