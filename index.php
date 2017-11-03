@@ -21,7 +21,7 @@ function choose_page($page) {
         && strpos($page, "/") === false)
         return $page . ".php";
     else if (preg_match(',\A(?:images|scripts|stylesheets)\z,', $page)) {
-        $_REQUEST["file"] = $page . Navigation::path();
+        $_GET["file"] = $page . Navigation::path();
         return "cacheable.php";
     } else
         Navigation::redirect_site("index");
