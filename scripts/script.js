@@ -2850,7 +2850,7 @@ function pa_run(button, opt) {
     function append(str) {
         console.log(JSON.stringify(str));
         if (thexterm)
-            thexterm.write(str.replace(/\n/g, "\r\n"));
+            thexterm.write(str);
         else {
             var atbottom = therun.scrollTop() >= therun.children().height() - therun.height() - 10;
             pa_render_terminal(thepre[0], str, {cursor: true, directory: directory});
