@@ -2652,9 +2652,9 @@ function pa_run(button, opt) {
 
     function ansi_combine(a1, a2) {
         var m, i, a;
-        if ((m = a2.match(/^\x1b\[([\d;]+)m$/))) {
+        if ((m = a2.match(/^\x1b\[([\d;]*)m$/))) {
             a1 = a1 ? a1.substring(2, a1.length - 1) + ";" : "0;";
-            a = m[1].split(/;/);
+            a = (m[1] || "0").split(/;/);
             for (i = 0; i < a.length; ++i) {
                 if (a[i] == "")
                     /* do nothing */;
@@ -2682,7 +2682,7 @@ function pa_run(button, opt) {
             partno, i, m, r = [];
         for (partno = 0; partno < parts.length; ++partno) {
             var g = [], glen = 0, j;
-            var lsplit = parts[partno].split(/(\x1b\[[\d;]+m)/);
+            var lsplit = parts[partno].split(/(\x1b\[[\d;]*m)/);
             for (j = 0; j < lsplit.length; j += 2) {
                 if (lsplit[j] !== "") {
                     g.push(curstyle, lsplit[j]);
@@ -2746,7 +2746,7 @@ function pa_run(button, opt) {
         var render;
         while (line !== "") {
             render = line;
-            if ((m = line.match(/^(.*?)(\x1b\[[\d;]+m|\x1b\[\d*K)([^]*)$/))) {
+            if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
                 if (m[1] === "") {
                     styles = ansi_combine(styles, m[2]);
                     line = m[3];
