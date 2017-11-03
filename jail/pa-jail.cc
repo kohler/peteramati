@@ -1745,6 +1745,11 @@ int jailownerinfo::exec_go() {
             int ptyslave = open(ptyslavename, O_RDWR);
             if (ptyslave == -1)
                 perror_die(ptyslavename);
+            close(ptymaster);
+#ifdef TIOCSCTTY
+            ioctl(ptyslave, TIOCSCTTY, 0);
+#endif
+            tcsetpgrp(ptyslave, child);
 #ifdef TIOCGWINSZ
             {
                 struct winsize ws;
@@ -1754,30 +1759,20 @@ int jailownerinfo::exec_go() {
                 ioctl(ptyslave, TIOCSWINSZ, &ws);
             }
 #endif
-#ifdef TIOCSCTTY
-            ioctl(ptyslave, TIOCSCTTY, 0);
-#endif
-            tcsetpgrp(ptyslave, child);
-
-            if (inputfd > 0 || stdin_tty)
-                dup2(ptyslave, STDIN_FILENO);
-            if (inputfd > 0 && !stdout_tty) {
+            if (no_onlcr) {
                 struct termios tty;
                 if (tcgetattr(ptyslave, &tty) >= 0) {
-                    // very little output processing;
-                    // if --no-onlcr, don't even xlate \n->\r\n
-                    if (no_onlcr)
-                        tty.c_oflag = 0;
-                    else
-                        tty.c_oflag = ONLCR;
+                    tty.c_oflag &= ~ONLCR;
                     tcsetattr(ptyslave, TCSANOW, &tty);
                 }
             }
+
+            if (inputfd > 0 || stdin_tty)
+                dup2(ptyslave, STDIN_FILENO);
             if (inputfd > 0 || stdout_tty)
                 dup2(ptyslave, STDOUT_FILENO);
             if (inputfd > 0 || stderr_tty)
                 dup2(ptyslave, STDERR_FILENO);
-            close(ptymaster);
             close(ptyslave);
 
             // restore all signals to their default actions
@@ -1989,9 +1984,8 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     }
 
     // if input is a tty, put it in raw mode with short blocking
-    struct termios tty;
     if (ttyfd >= 0) {
-        tty = ttyfd_termios;
+        struct termios tty = ttyfd_termios;
         cfmakeraw(&tty);
         tty.c_cc[VMIN] = 1;
         tty.c_cc[VTIME] = 1;
@@ -2019,7 +2013,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 
         // if child has not died, and read produced error, report it
         if (from_slave.input_closed && from_slave.rerrno != EIO) {
-            fprintf(stderr, "read: %s%s", strerror(from_slave.rerrno), stderr_tty ? "\r\n" : "\n");
+            fprintf(stderr, "read: %s%s", strerror(from_slave.rerrno), no_onlcr ? "\n" : "\r\n");
             exec_done(child, 125);
         }
 
@@ -2044,7 +2038,7 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
     if (exit_status == 128 + SIGTERM && !quiet)
         xmsg = "...terminated";
     if (xmsg) {
-        const char* nl = stderr_tty ? "\r\n" : "\n";
+        const char* nl = no_onlcr ? "\n" : "\r\n";
         fprintf(stderr, inputfd > 0 || stderr_tty ? "%s\x1b[3;7;31m%s\x1b[0m%s" : "%s%s%s", nl, xmsg, nl);
     }
 #if __linux__
@@ -2096,7 +2090,7 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
         if (action == do_run) {
             fprintf(stderr, "  -p, --pid-file PIDFILE    write jail process PID to PIDFILE\n\
   -i, --input INPUTSOCKET   use TTY, read input from INPUTSOCKET\n\
-      --no-onlcr            if TTY, don't translate \\n -> \\r\\n\n\
+      --no-onlcr            don't translate \\n -> \\r\\n in output\n\
   -T, --timeout TIMEOUT     kill the jail after TIMEOUT\n\
       --fg          run in the foreground\n");
         }
