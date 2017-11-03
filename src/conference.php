@@ -1094,6 +1094,16 @@ class Conf {
         return Ht::script_file($url, ["crossorigin" => "anonymous", "integrity" => $integrity]);
     }
 
+    function add_stylesheet($file) {
+        $this->opt["stylesheets"] = mkarray($this->opt("stylesheets", []));
+        $this->opt["stylesheets"][] = $file;
+    }
+
+    function add_javascript($file) {
+        $this->opt["javascripts"] = mkarray($this->opt("javascripts", []));
+        $this->opt["javascripts"][] = $file;
+    }
+
     private function header_head($title) {
         global $Me, $ConfSitePATH, $CurrentList;
         echo "<!DOCTYPE html>
@@ -1161,6 +1171,8 @@ class Conf {
             Ht::stash_html($this->make_script_file("//code.jquery.com/jquery-migrate-3.0.0.min.js", true));
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/jquery.flot.min.js", true) . "\n");
+        foreach (mkarray($this->opt("javascripts", [])) as $scriptfile)
+            Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
 
         // Javascript settings to set before script.js
         Ht::stash_script("siteurl=" . json_encode(Navigation::siteurl()) . ";siteurl_suffix=\"" . Navigation::php_suffix() . "\"");

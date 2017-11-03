@@ -2419,7 +2419,7 @@ function sb() {
 
 function runfold61(name) {
     var therun = jQuery("#pa-run-" + name), thebutton;
-    if (therun.attr("data-pa-timestamp") && !therun.is(":visible")) {
+    if (therun[0].dataset.paTimestamp && !therun.is(":visible")) {
         thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
         pa_run(thebutton, {unfold: true});
     } else
@@ -2796,26 +2796,34 @@ function pa_run(button, opt) {
         directory = $(button).closest(".pa-psetinfo").attr("data-pa-directory"),
         therun = $("#pa-run-" + runclass),
         thepre = therun.find("pre"),
+        thexterm,
         checkt;
 
     if (typeof opt !== "object")
         opt = {};
-    if (opt.unfold && therun.attr("data-pa-timestamp"))
-        checkt = +therun.attr("data-pa-timestamp");
+    if (opt.unfold && therun[0].dataset.paTimestamp)
+        checkt = +therun[0].dataset.paTimestamp;
     else {
         if ($f.prop("outstanding"))
             return true;
         $f.find("button").prop("disabled", true);
         $f.prop("outstanding", true);
     }
-    therun.removeAttr("data-pa-timestamp");
+    delete therun[0].dataset.paTimestamp;
 
     fold61(therun, jQuery("#pa-runout-" + runclass).show(), true);
     if (!checkt && !opt.noclear)
         thepre.html("");
     else
         therun.find("span.pa-runcursor").remove();
-    thepre.append("<span class='pa-runcursor'>_</span>");
+
+    if (therun[0].dataset.paXtermJs
+        && therun[0].dataset.paXtermJs !== "false"
+        && window.Terminal) {
+        thexterm = new Terminal({cols: 132, rows: 25});
+        thexterm.open(thepre[0], false);
+    } else
+        thepre.append("<span class='pa-runcursor'>_</span>");
 
     if (checkt && !therun.prop("openedbefore")) {
         therun.scrollTop(therun.children().height() - therun.height());
@@ -2829,7 +2837,7 @@ function pa_run(button, opt) {
     function animate() {
         jQuery(thecursor).dequeue().animate({opacity: 0.1}, 200).delay(100).animate({opacity: 1}, 200).delay(400).queue(animate);
     }
-    animate();
+    thecursor && animate();
 
     function done() {
         $f.find("button").prop("disabled", false);
@@ -2840,10 +2848,15 @@ function pa_run(button, opt) {
     }
 
     function append(str) {
-        var atbottom = therun.scrollTop() >= therun.children().height() - therun.height() - 10;
-        pa_render_terminal(thepre[0], str, {cursor: true, directory: directory});
-        if (atbottom)
-            therun.scrollTop(Math.max(Math.ceil(therun.children().height() - therun.height()), 0));
+        console.log(JSON.stringify(str));
+        if (thexterm)
+            thexterm.write(str.replace(/\n/g, "\r\n"));
+        else {
+            var atbottom = therun.scrollTop() >= therun.children().height() - therun.height() - 10;
+            pa_render_terminal(thepre[0], str, {cursor: true, directory: directory});
+            if (atbottom)
+                therun.scrollTop(Math.max(Math.ceil(therun.children().height() - therun.height()), 0));
+        }
     }
 
     function append_html(html) {
@@ -2868,12 +2881,14 @@ function pa_run(button, opt) {
             str = ibuffer.substr(pos + 2);
             ibuffer = null;
 
-            var j = jQuery(thecursor).detach();
-            if (!opt.noclear)
-                thepre.html("");
-            thepre.append(j);
+            if (thecursor) {
+                var j = $(thecursor).detach();
+                if (!opt.noclear)
+                    thepre.html("");
+                thepre.append(j);
+            }
 
-            if (data && data.timestamp) {
+            if (data && data.timestamp && !thexterm) {
                 var d = new Date(data.timestamp * 1000);
                 append_html("<span class='pa-runtime'>...started "
                             + strftime("%l:%M:%S%P %e %b %Y", d) + "</span>");

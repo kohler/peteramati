@@ -73,6 +73,7 @@ class Pset {
     public $run_binddir;
     public $run_timeout;
     public $has_transfer_warnings;
+    public $has_xterm_js;
 
     public $diffs = [];
     public $ignore;
@@ -193,7 +194,7 @@ class Pset {
 
         // runners
         $runners = get($p, "runners");
-        $this->has_transfer_warnings = false;
+        $this->has_transfer_warnings = $this->has_xterm_js = false;
         if (is_array($runners) || is_object($runners)) {
             foreach ((array) $p->runners as $k => $v) {
                 $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v);
@@ -202,6 +203,8 @@ class Pset {
                 $this->all_runners[$r->name] = $r;
                 if ($r->transfer_warnings)
                     $this->has_transfer_warnings = true;
+                if ($r->xterm_js)
+                    $this->has_xterm_js = true;
             }
         } else if ($runners)
             throw new PsetConfigException("`runners` format error", "runners");
@@ -630,6 +633,7 @@ class RunnerConfig {
     public $disabled;
     public $visible;
     public $output_visible;
+    public $xterm_js;
     public $transfer_warnings;
     public $command;
     public $username;
@@ -658,6 +662,7 @@ class RunnerConfig {
         $this->disabled = Pset::cbool($loc, $r, "disabled");
         $this->visible = Pset::cbool($loc, $r, "visible", "show_to_students");
         $this->output_visible = Pset::cdate_or_grades($loc, $r, "output_visible", "show_output_to_students", "show_results_to_students");
+        $this->xterm_js = Pset::cbool($loc, $r, "xterm_js");
         $this->transfer_warnings = Pset::cbool($loc, $r, "transfer_warnings");
         $this->command = Pset::cstr($loc, $r, "command");
         $this->username = Pset::cstr($loc, $r, "username", "run_username");

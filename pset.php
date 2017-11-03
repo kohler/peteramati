@@ -306,6 +306,10 @@ if ($Me->isPC && $Me != $User && isset($_REQUEST["saverunsettings"])
 if ($User && $Info->repo)
     $Info->repo->refresh(30);
 
+if ($Pset->has_xterm_js) {
+    $Conf->add_stylesheet("stylesheets/xterm.css");
+    $Conf->add_javascript("scripts/xterm.js");
+}
 $Conf->header(htmlspecialchars($Pset->title), "home");
 $xsep = " <span class='barsep'>&nbsp;·&nbsp;</span> ";
 
@@ -752,6 +756,8 @@ if ($Pset->gitless) {
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
             htmlspecialchars($r->output_title), '</a></h3>',
             '<div class="pa-run" id="pa-run-', $r->runclass, '" style="display:none"';
+        if ($r->xterm_js)
+            echo ' data-pa-xterm-js="true"';
         if ($rj && isset($rj->timestamp))
             echo ' data-pa-timestamp="', $rj->timestamp, '"';
         if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n")))
