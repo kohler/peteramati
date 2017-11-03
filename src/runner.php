@@ -148,7 +148,7 @@ class RunnerState {
     function full_json($offset = null) {
         if (!$this->checkt)
             return false;
-        $json = $info->generic_json();
+        $json = $this->generic_json();
         $this->status_json($json);
         if ($offset !== null) {
             $logfn = $this->info->runner_logfile($this->checkt);
