@@ -36,7 +36,7 @@ class RunnerState {
         if (!is_dir($this->logdir)) {
             $old_umask = umask(0);
             if (!mkdir($this->logdir, 02770, true))
-                throw new RunnerException("cannot create log directory");
+                throw new RunnerException("Cannot create log directory");
             umask($old_umask);
         }
 
@@ -196,7 +196,7 @@ class RunnerState {
         else if ($this->pset->run_username)
             $this->username = $this->pset->run_username;
         if (!preg_match('/\A\w+\z/', $this->username))
-            throw new RunnerException("bad run_username");
+            throw new RunnerException("Bad run_username");
 
         $info = posix_getpwnam($this->username);
         $this->userhome = $info ? $info["dir"] : "/home/jail61";
@@ -204,14 +204,14 @@ class RunnerState {
 
         $this->jaildir = preg_replace(',/+\z,', '', $this->expand($this->pset->run_dirpattern));
         if (!$this->jaildir)
-            throw new RunnerException("bad run_dirpattern");
+            throw new RunnerException("Bad run_dirpattern");
 
         $this->jailhomedir = $this->jaildir . "/" . preg_replace(',\A/+,', '', $this->userhome);
 
         if (!chdir($ConfSitePATH))
-            throw new RunnerException("can't cd to main directory");
+            throw new RunnerException("Can’t cd to main directory");
         if (!is_executable("jail/pa-jail"))
-            throw new RunnerException("the pa-jail program has not been compiled");
+            throw new RunnerException("The pa-jail program has not been compiled");
 
         // create logfile and lockfile
         $this->checkt = time();
@@ -230,7 +230,7 @@ class RunnerState {
         // create jail
         $this->remove_old_jails();
         if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username)))
-            throw new RunnerException("can't initialize jail");
+            throw new RunnerException("Can’t initialize jail");
 
         // check out code
         $this->checkout_code();
@@ -279,7 +279,7 @@ class RunnerState {
             $Now = time();
             $newdir = $this->jaildir . "~." . gmstrftime("%Y%m%dT%H%M%S", $Now);
             if ($this->run_and_log("jail/pa-jail mv " . escapeshellarg($this->jaildir) . " " . escapeshellarg($newdir)))
-                throw new RunnerException("can't remove old jail");
+                throw new RunnerException("Can’t remove old jail");
 
             $this->run_and_log("jail/pa-jail rm " . escapeshellarg($newdir), true);
             clearstatcache(false, $this->jaildir);
@@ -296,14 +296,14 @@ class RunnerState {
 
         fwrite($this->logstream, "++ mkdir $checkoutdir\n");
         if (!mkdir($clonedir, 0777, true))
-            throw new RunnerException("can't initialize user repo in jail");
+            throw new RunnerException("Can’t initialize user repo in jail");
 
         $repodir = $ConfSitePATH . "/repo/repo" . $this->repo->cacheid;
 
         // need a branch to check out a specific commit
         $branch = "jailcheckout_$Now";
         if ($this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch $branch " . $this->info->commit_hash()))
-            throw new RunnerException("can't create branch for checkout");
+            throw new RunnerException("Can’t create branch for checkout");
 
         // make the checkout
         $status = $this->run_and_log("cd " . escapeshellarg($clonedir) . " && "
@@ -314,10 +314,10 @@ class RunnerState {
         $this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch -D $branch");
 
         if ($status)
-            throw new RunnerException("can't check out code into jail");
+            throw new RunnerException("Can’t check out code into jail");
 
         if ($this->run_and_log("cd " . escapeshellarg($clonedir) . " && rm -rf .git .gitcheckout"))
-            throw new RunnerException("can't clean up checkout in jail");
+            throw new RunnerException("Can’t clean up checkout in jail");
 
         // create overlay
         if (isset($this->pset->run_overlay) && $this->pset->run_overlay != "")
@@ -331,7 +331,7 @@ class RunnerState {
             $overlayfile = $ConfSitePATH . "/" . $overlayfile;
         $overlayfile = $this->expand($overlayfile);
         if ($this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($overlayfile)))
-            throw new RunnerException("can't unpack overlay");
+            throw new RunnerException("Can’t unpack overlay");
 
         $checkout_instructions = @file_get_contents($checkoutdir . "/.gitcheckout");
         if ($checkout_instructions)

@@ -10,7 +10,7 @@ global $User, $Pset, $Psetid, $Info, $RecentCommits, $Qreq;
 
 function quit($err = null) {
     global $Conf;
-    json_exit(["ok" => false, "error" => $err]);
+    json_exit(["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err]);
 }
 
 function user_pset_info() {
@@ -19,7 +19,7 @@ function user_pset_info() {
     if (($Commit = $Qreq->newcommit) == null)
         $Commit = $Qreq->commit;
     if (!$Info->set_hash($Commit))
-        json_exit(["ok" => false, "error" => !$Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."]);
+        quit(!$Info->repo ? "No repository" : "Commit $Commit isn’t connected to this repository");
     return $Info;
 }
 
@@ -149,11 +149,11 @@ if ($Qreq->check) {
     if ($Qreq->check === "recent") {
         $checkt = get($Rstate->logged_checkts(), 0);
         if (!$check)
-            quit("no logs yet");
+            quit("No logs yet");
     } else {
         $checkt = cvtint($Qreq->check);
         if ($checkt <= 0)
-            quit("invalid “check” argument");
+            quit("Invalid “check” argument");
     }
     $Rstate->set_checkt($checkt);
 
@@ -274,7 +274,7 @@ if (!$Runner->command && $Runner->eval) {
 // otherwise run
 try {
     if ($Rstate->is_recent_job_running())
-        quit("recent job still running");
+        quit("Recent job still running");
 
     // run
     $Rstate->start($Queue);

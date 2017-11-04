@@ -2575,8 +2575,10 @@ function pa_render_terminal(container, string, options) {
             text = document.createTextNode(text);
         else if (text instanceof jQuery)
             text = text[0];
-        if (styles && styles !== "\x1b[0m") {
+        if (styles && styles !== "\x1b[m" && styles !== "\x1b[0m") {
             var sclass = [], col = [], rv = 0, m;
+            // XXX progress through character by character
+            // so as to better support 38;5 and 38;2 escapes
             if ((m = styles.match(/;3\d[;m]/)))
                 col[0] = m[0].charAt(2);
             if ((m = styles.match(/;4\d[;m]/)))
@@ -2846,7 +2848,10 @@ function pa_run(button, opt) {
     function done() {
         $f.find("button").prop("disabled", false);
         $f.prop("outstanding", false);
-        $(thecursor).finish().remove();
+        if (thexterm)
+            thexterm.write("\x1b[?25l"); // “hide cursor” escape
+        else
+            $(thecursor).finish().remove();
         if ($(button).attr("data-pa-loadgrade"))
             loadgrade61($(button));
     }
@@ -2891,10 +2896,13 @@ function pa_run(button, opt) {
                 thepre.append(j);
             }
 
-            if (data && data.timestamp && !thexterm) {
+            if (data && data.timestamp) {
                 var d = new Date(data.timestamp * 1000);
-                append_html("<span class='pa-runtime'>...started "
-                            + strftime("%l:%M:%S%P %e %b %Y", d) + "</span>");
+                var msg = "...started " + strftime("%l:%M:%S%P %e %b %Y", d);
+                if (thexterm)
+                    append("\x1b[3;1;38;5;86m" + msg + "\x1b[m\r\n");
+                else
+                    append_html("<span class=\"pa-runtime\">" + msg + "</span>");
             }
         }
         if (str !== "")
@@ -2931,11 +2939,11 @@ function pa_run(button, opt) {
         if (!data || !data.ok) {
             if (data && data.loggedout)
                 x = "You have been logged out (perhaps due to inactivity). Please reload this page.";
-            else if (data && (data.message || typeof(data.error) === "string"))
-                x = data.message || data.error;
+            else if (data)
+                x = data.error_text || data.error || "Unknown";
             else
                 x = "Unknown";
-            append_html("<i><strong>Error: " + x + "</strong></i>");
+            append("\x1b[1;3;31m" + x + "\x1b[m\r\n");
             return done();
         }
 
@@ -2984,12 +2992,12 @@ function pa_run(button, opt) {
         send({stop: 1});
     }
 
-    if (opt.headline && opt.noclear && thepre[0].firstChild != thecursor)
+    if (opt.headline && opt.noclear && !thexterm && thepre[0].firstChild != thecursor)
         append("\n\n");
     if (opt.headline && opt.headline instanceof Node)
         append_html(opt.headline);
     else if (opt.headline)
-        append("\x1b[01;37m" + opt.headline + "\x1b[0m\n");
+        append("\x1b[1;37m" + opt.headline + "\x1b[m\n");
     if (opt.unfold && therun.attr("data-pa-content"))
         append(therun.attr("data-pa-content"));
     therun.removeAttr("data-pa-content");
