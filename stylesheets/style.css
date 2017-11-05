@@ -2417,7 +2417,7 @@ tr.pa-gx:hover > td {
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-notebox, .pa-note-entry, .pa-noteref, .pa-gradeboxref, .pa-warnbox {
-	font-family: "Andale Mono", Menlo, "Liberation Mono", Consolas, Courier, monospace;
+	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 18px;
 }
 .pa-gradeboxref {
