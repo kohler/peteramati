@@ -2574,7 +2574,6 @@ span.foldarrow {
 	    linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) repeat-x bottom center,
 	    #f2ecef;
 	background-size: 100% 7px, 100% 5px, 100% 100%;
-	font-weight: bold;
 	font-size: smaller;
 	padding: 0.8em 1em 0.8em 0;
 	white-space: pre-wrap;
