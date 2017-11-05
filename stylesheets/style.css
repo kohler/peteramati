@@ -2568,20 +2568,20 @@ span.foldarrow {
 	padding-right: 2em;
 }
 .pa-warnbox {
-	background: #efe8ec;
+	background: #f2ecef;
 	background:
 	    linear-gradient(180deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) repeat-x top center,
 	    linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) repeat-x bottom center,
-	    #efe8ec;
+	    #f2ecef;
 	background-size: 100% 7px, 100% 5px, 100% 100%;
 	font-weight: bold;
 	font-size: smaller;
 	padding: 0.8em 1em 0.8em 0;
 	white-space: pre-wrap;
-	color: #cc0000;
+	color: #440000;
 }
 .pa-warn-edge {
-	background: #efe8ec;
+	background: #f2ecef;
 	background:
 	    linear-gradient(180deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) no-repeat right top,
 	    linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) no-repeat right bottom,
