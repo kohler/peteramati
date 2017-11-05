@@ -2564,71 +2564,150 @@ function flag61(button) {
     }
 }
 
-function pa_render_terminal(container, string, options) {
+window.pa_render_terminal = (function () {
+var styleset = {
+    "0": false, "1": {b: true}, "2": {f: true}, "3": {i: true},
+    "4": {u: true}, "5": {bl: true}, "7": {rv: true}, "8": {x: true},
+    "9": {s: true}, "21": {du: true}, "22": {b: false, f: false},
+    "23": {i: false}, "24": {u: false}, "25": {bl: false}, "27": {rv: false},
+    "28": {x: false}, "29": {s: false}, "30": {fg: 0}, "31": {fg: 1},
+    "32": {fg: 2}, "33": {fg: 3}, "34": {fg: 4}, "35": {fg: 5},
+    "36": {fg: 6}, "37": {fg: 7}, "38": "fg", "39": {fg: false},
+    "40": {bg: 0}, "41": {bg: 1}, "42": {bg: 2}, "43": {bg: 3},
+    "44": {bg: 4}, "45": {bg: 5}, "46": {bg: 6}, "47": {bg: 7},
+    "48": "bg", "49": {bg: false}, "90": {fg: 8}, "91": {fg: 9},
+    "92": {fg: 10}, "93": {fg: 11}, "94": {fg: 12}, "95": {fg: 13},
+    "96": {fg: 14}, "97": {fg: 15},
+    "100": {bg: 8}, "101": {bg: 9}, "102": {bg: 10}, "103": {bg: 11},
+    "104": {bg: 12}, "105": {bg: 13}, "106": {bg: 14}, "107": {bg: 15}
+};
+var styleback = {
+    "b": 1, "f": 2, "i": 3, "u": 4, "bl": 5, "rv": 7, "x": 8, "s": 9,
+    "du": 21
+};
+
+function parse_styles(dst, style) {
+    var a;
+    if (arguments.length === 1) {
+        style = dst;
+        dst = null;
+    }
+    if (!style || style === "\x1b[m" || style === "\x1b[0m")
+        return null;
+    if (style.charAt(0) === "\x1b")
+        a = style.substring(2, style.length - 1).split(";");
+    else
+        a = style.split(";");
+    for (var i = 0; i < a.length; ++i) {
+        var cmp = styleset[parseInt(a[i])];
+        if (cmp === false)
+            dst = null;
+        else if (!cmp)
+            /* do nothing */;
+        else if (typeof cmp === "object") {
+            for (var j in cmp) {
+                if (cmp[j] !== false) {
+                    dst = dst || {};
+                    dst[j] = cmp[j];
+                } else if (dst)
+                    delete dst[j];
+            }
+        } else if (cmp === "fg" || cmp === "bg") {
+            var r, g, b;
+            dst = dst || {};
+            if (i + 4 < a.length && parseInt(a[i+1]) === 2) {
+                r = parseInt(a[i+2]);
+                g = parseInt(a[i+3]);
+                b = parseInt(a[i+4]);
+                if (r <= 255 && g <= 255 && b <= 255)
+                    dst[cmp] = [r, g, b];
+            } else if (i + 2 < a.length && parseInt(a[i+1]) === 5) {
+                var c = parseInt(a[i+1]);
+                if (c <= 15)
+                    dst[cmp] = c;
+                else if (c <= 0xe7) {
+                    b = (c - 16) % 6;
+                    g = ((c - 16 - b) / 6) % 6;
+                    r = (c - 16 - b - 6 * g) / 36;
+                    dst[cmp] = [r * 51, g * 51, b * 51];
+                } else if (c <= 255) {
+                    b = Math.round((c - 0xe8) * 255 / 23);
+                    dst[cmp] = [b, b, b];
+                }
+            }
+        }
+    }
+    return dst && $.isEmptyObject(dst) ? null : dst;
+}
+
+function unparse_styles(dst) {
+    if (!dst)
+        return "\x1b[m";
+    var a = [];
+    for (var key in styleback)
+        if (dst[key])
+            a.push(styleback[key]);
+    if (dst.fg) {
+        if (typeof dst.fg === "number")
+            a.push(dst.fg < 8 ? 30 + dst.fg : 90 + dst.fg - 8);
+        else
+            a.push(38, 2, dst.fg[0], dst.fg[1], dst.fg[2]);
+    }
+    if (dst.bg) {
+        if (typeof dst.bg === "number")
+            a.push(dst.bg < 8 ? 40 + dst.bg : 100 + dst.bg - 8);
+        else
+            a.push(48, 2, dst.bg[0], dst.bg[1], dst.bg[2]);
+    }
+    return "\x1b[" + a.join(";") + "m";
+}
+
+function style_text(text, style) {
+    if (typeof text === "string")
+        text = document.createTextNode(text);
+    else if (text instanceof jQuery)
+        text = text[0];
+    if (!style || style === "\x1b[m"
+        || (typeof style === "string" && !(style = parse_styles(style))))
+        return text;
+    var node = document.createElement("span");
+    var cl = [];
+    for (var key in styleback)
+        if (style[key])
+            cl.push("ansi" + key);
+    if (style.fg) {
+        if (typeof style.fg === "number")
+            cl.push("ansifg" + style.fg);
+        else
+            node.styles.foregroundColor = sprintf("#%02x%02x%02x", style.fg[0], style.fg[1], style.fg[2]);
+    }
+    if (style.bg) {
+        if (typeof style.bg === "number")
+            cl.push("ansibg" + style.bg);
+        else
+            node.styles.backgroundColor = sprintf("#%02x%02x%02x", style.bg[0], style.bg[1], style.bg[2]);
+    }
+    if (cl.length)
+        node.className = cl.join(" ");
+    node.appendChild(text);
+    return node;
+}
+
+return function (container, string, options) {
     var styles = container.dataset.paTerminalStyle;
     var cursor = null;
     if (options && options.cursor === true)
         cursor = container.lastChild;
 
     function addlinepart(node, text) {
-        if (typeof text === "string")
-            text = document.createTextNode(text);
-        else if (text instanceof jQuery)
-            text = text[0];
-        if (styles && styles !== "\x1b[m" && styles !== "\x1b[0m") {
-            var sclass = [], col = [], rv = 0, m;
-            // XXX progress through character by character
-            // so as to better support 38;5 and 38;2 escapes
-            if ((m = styles.match(/;3\d[;m]/)))
-                col[0] = m[0].charAt(2);
-            if ((m = styles.match(/;4\d[;m]/)))
-                col[1] = m[0].charAt(2);
-            if (/;1[;m]/.test(styles))
-                sclass.push("ansib");
-            if (/;3[;m]/.test(styles))
-                sclass.push("ansii");
-            if (/;4[;m]/.test(styles))
-                sclass.push("ansiu");
-            if (/;7[;m]/.test(styles)) {
-                sclass.push("ansirv");
-                rv = 1;
-            }
-            if (/;9[;m]/.test(styles))
-                sclass.push("ansis");
-            if (col[rv] != null)
-                sclass.push("ansifg" + col[rv]);
-            if (col[1-rv] != null)
-                sclass.push("ansibg" + col[1-rv]);
-            if (sclass.length) {
-                var decor = document.createElement("span");
-                decor.className = sclass.join(" ");
-                decor.appendChild(text);
-                text = decor;
-            }
-        }
-        node.appendChild(text);
+        node.appendChild(style_text(text, styles));
     }
 
     function ansi_combine(a1, a2) {
-        var m, i, a;
-        if ((m = a2.match(/^\x1b\[([\d;]*)m$/))) {
-            a1 = a1 ? a1.substring(2, a1.length - 1) + ";" : "0;";
-            a = (m[1] || "0").split(/;/);
-            for (i = 0; i < a.length; ++i) {
-                if (a[i] == "")
-                    /* do nothing */;
-                else if (+a[i] == 0)
-                    a1 = "0;";
-                else if (+a[i] <= 9)
-                    a1 = a1.replace(";" + a[i] + ";", ";") + a[i] + ";";
-                else if (+a[i] <= 29)
-                    a1 = a1.replace(";" + (a[i] - 20) + ";", ";");
-                else
-                    a1 = a1.replace(new RegExp(";" + a[i].charAt(0) + "\\d;"), ";") + a[i] + ";";
-            }
-            a1 = "\x1b[" + a1.substring(0, a1.length - 1) + "m";
-        }
-        return a1;
+        if (/^\x1b\[[\d;]*m$/.test(a2))
+            return unparse_styles(parse_styles(parse_styles(null, a1), a2));
+        else
+            return a1;
     }
 
     function ends_with(str, chr) {
@@ -2639,7 +2718,7 @@ function pa_render_terminal(container, string, options) {
         var lineend = /\n$/.test(line);
         if (lineend && line.indexOf("\r") === line.length - 1)
             return line.substring(0, line.length - 2) + "\n";
-        var curstyle = styles || "\x1b[0m",
+        var curstyle = styles || "\x1b[m",
             parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/),
             partno, i, m, r = [];
         for (partno = 0; partno < parts.length; ++partno) {
@@ -2784,7 +2863,8 @@ function pa_render_terminal(container, string, options) {
     }
 
     container.dataset.paTerminalStyle = styles;
-}
+};
+})();
 
 function pa_render_need_terminal() {
     $(".need-pa-terminal").each(function () {

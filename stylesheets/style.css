@@ -2683,28 +2683,28 @@ span.pa-grade, span.pa-gradevalue {
 	color: #cbcccd;
 }
 
-.ansifg0.ansib {
+.ansifg0.ansib, .ansifg8 {
 	color: #818383;
 }
-.ansifg1.ansib {
+.ansifg1.ansib, .ansifg9 {
 	color: #fc391f;
 }
-.ansifg2.ansib {
+.ansifg2.ansib, .ansifg10 {
 	color: #31e722;
 }
-.ansifg3.ansib {
+.ansifg3.ansib, .ansifg11 {
 	color: #eaec23;
 }
-.ansifg4.ansib {
+.ansifg4.ansib, .ansifg12 {
 	color: #5833ff;
 }
-.ansifg5.ansib {
+.ansifg5.ansib, .ansifg13 {
 	color: #f935f8;
 }
-.ansifg6.ansib {
+.ansifg6.ansib, .ansifg14 {
 	color: #14f0f0;
 }
-.ansifg7.ansib {
+.ansifg7.ansib, .ansifg15 {
 	color: #e9ebeb;
 }
 
@@ -2733,28 +2733,28 @@ span.pa-grade, span.pa-gradevalue {
 	background-color: #cbcccd;
 }
 
-.ansibg0.ansib {
+.ansibg0.ansib, .ansibg8 {
 	background-color: #818383;
 }
-.ansibg1.ansib {
+.ansibg1.ansib, .ansibg9 {
 	background-color: #fc391f;
 }
-.ansibg2.ansib {
+.ansibg2.ansib, .ansibg10 {
 	background-color: #31e722;
 }
-.ansibg3.ansib {
+.ansibg3.ansib, .ansibg11 {
 	background-color: #eaec23;
 }
-.ansibg4.ansib {
+.ansibg4.ansib, .ansibg12 {
 	background-color: #5833ff;
 }
-.ansibg5.ansib {
+.ansibg5.ansib, .ansibg13 {
 	background-color: #f935f8;
 }
-.ansibg6.ansib {
+.ansibg6.ansib, .ansibg14 {
 	background-color: #14f0f0;
 }
-.ansibg7.ansib {
+.ansibg7.ansib, .ansibg15 {
 	background-color: #e9ebeb;
 }
 
