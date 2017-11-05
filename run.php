@@ -160,7 +160,7 @@ if ($Qreq->check) {
     $offset = cvtint($Qreq->offset, 0);
     $answer = $Rstate->full_json($offset);
     if ($answer->status == "working" && $Qreq->stop) {
-        ContactView::runner_write($Info, $checkt, "\x1b\x03");
+        $Rstate->write("\x1b\x03"); // "ESC Ctrl-C" is captured by pa-jail
         $now = microtime(true);
         do {
             $answer = $Rstate->full_json($offset);

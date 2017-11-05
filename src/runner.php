@@ -168,6 +168,21 @@ class RunnerState {
         return $json;
     }
 
+    function write($data) {
+        global $ConfSitePATH;
+        if (!$this->checkt)
+            return false;
+        $logfn = $this->info->runner_logfile($this->checkt);
+        $proc = proc_open("$ConfSitePATH/jail/pa-writefifo " . escapeshellarg($logfn . ".in"),
+                          [["pipe", "r"]], $pipes);
+        if ($pipes[0]) {
+            fwrite($pipes[0], $data);
+            fclose($pipes[0]);
+        }
+        if ($proc)
+            proc_close($proc);
+        return true;
+    }
 
 
     function is_recent_job_running() {
