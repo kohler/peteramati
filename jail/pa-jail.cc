@@ -70,9 +70,11 @@ static bool quiet = false;
 static bool doforce = false;
 static bool no_onlcr = false;
 static FILE* verbosefile = stdout;
+static FILE *timingfile = NULL;
 static std::string linkdir;
 static std::string dstroot;
 static std::string pidfilename;
+static std::string timingfilename;
 static int pidfd = -1;
 static volatile sig_atomic_t got_sigterm = 0;
 #if __linux__
@@ -1420,6 +1422,7 @@ class jailownerinfo {
     char** argv;
     jaildirinfo* jaildir;
     int inputfd;
+    struct timeval start_time;
     struct timeval expiry;
     struct buffer {
         char buf[8192];
@@ -1444,6 +1447,7 @@ class jailownerinfo {
     int ttyfd;
     struct termios ttyfd_termios;
     int child_status;
+    bool has_blocked;
 
     void start_sigpipe();
     void block(int ptymaster);
@@ -1598,11 +1602,11 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     this->jaildir = &jaildir;
     this->inputfd = inputfd;
     if (timeout > 0) {
-        struct timeval now, delta;
-        gettimeofday(&now, 0);
+        gettimeofday(&this->start_time, 0);
+        struct timeval delta;
         delta.tv_sec = (long) timeout;
         delta.tv_usec = (long) ((timeout - delta.tv_sec) * 1000000);
-        timeradd(&now, &delta, &this->expiry);
+        timeradd(&this->start_time, &delta, &this->expiry);
     } else
         timerclear(&this->expiry);
 
@@ -1925,7 +1929,10 @@ void jailownerinfo::block(int ptymaster) {
             timeout_ms = 0;
     }
 
-    poll(p, nfd, timeout_ms);
+    if (poll(p, nfd, 0) == 0) {
+        has_blocked = true;
+        poll(p, nfd, timeout_ms);
+    }
 
     if (p[0].revents & POLLIN) {
 #if __linux__
@@ -2027,6 +2034,15 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
             exec_done(child, 128 + SIGTERM);
         to_slave.transfer_out(ptymaster);
         from_slave.transfer_in(ptymaster);
+        off_t out_offset = lseek(STDOUT_FILENO, 0, SEEK_CUR);
+        if (has_blocked && timingfile != NULL) {
+            struct timeval now, delta;
+            gettimeofday(&now, 0);
+            timersub(&now, &this->start_time, &delta);
+            unsigned long long deltausecs = delta.tv_sec * 1000000 + delta.tv_usec;
+            fprintf(timingfile, "%llu %llu\n", deltausecs, (unsigned long long) out_offset);
+            has_blocked = false;
+        }
         from_slave.transfer_out(STDOUT_FILENO);
     }
 }
@@ -2124,6 +2140,7 @@ static struct option longoptions_run[] = {
     { "chown-user", required_argument, NULL, 'u' },
     { "onlcr", no_argument, NULL, ARG_ONLCR },
     { "no-onlcr", no_argument, NULL, ARG_NO_ONLCR },
+    { "timing-file", required_argument, NULL, 't' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -2139,7 +2156,7 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:f:F:p:T:qi:hu:", "VnS:f:F:p:T:qi:hu:", "Vnf", "Vn"
+    "+Vn", "VnS:f:F:p:T:qi:hu:t:", "VnS:f:F:p:T:qi:hu:t:", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
@@ -2209,6 +2226,8 @@ int main(int argc, char** argv) {
                 timeout = strtod(optarg, &end);
                 if (end == optarg || *end != 0)
                     usage();
+            } else if(ch == 't' && action == do_run) {
+                timingfilename = optarg;
             } else /* if (ch == 'H') */
                 usage(action);
         }
@@ -2273,6 +2292,14 @@ int main(int argc, char** argv) {
         if (pidfd == -1)
             perror_die(pidfilename);
         atexit(cleanup_pidfd);
+    }
+
+    // create timing file as current user
+    if (!timingfilename.empty()) {
+        timingfile = fopen(timingfilename.c_str(), "w");
+
+        if (timingfile == NULL)
+            perror_die(timingfilename);
     }
 
     // escalate so that the real (not just effective) UID/GID is root. this is
@@ -2394,6 +2421,11 @@ int main(int argc, char** argv) {
     // maybe execute a command in the jail
     if (optind + 2 < argc)
         jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, inputfd, timeout, foreground);
+
+    // close timing file if appropriate
+    if (timingfile != NULL) {
+        fclose(timingfile);
+    }
 
     exit(0);
 }

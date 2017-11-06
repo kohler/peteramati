@@ -13,6 +13,7 @@ class RunnerState {
 
     public $checkt = null;
     private $logfile = null;
+    private $timingfile = null;
     private $lockfile = null;
     private $inputfifo = null;
     private $logstream;
@@ -145,6 +146,19 @@ class RunnerState {
         return $json;
     }
 
+    function parse_timevals($time) {
+        $elems = explode("\n", $time);
+        function parse_elem($elem) {
+            $parts = explode(" ", $elem);
+            return array(
+                "time" => intval($parts[0]),
+                "offset" => intval($parts[1])
+            );
+        }
+
+        return array_map("parse_elem", $elems);
+    }
+
     function full_json($offset = null) {
         if (!$this->checkt)
             return false;
@@ -152,6 +166,7 @@ class RunnerState {
         $this->status_json($json);
         if ($offset !== null) {
             $logfn = $this->info->runner_logfile($this->checkt);
+            $timefn = $logfn . ".time";
             $data = @file_get_contents($logfn, false, null, max($offset, 0));
             if ($data === false)
                 return (object) ["error" => true, "message" => "No such log"];
@@ -160,6 +175,12 @@ class RunnerState {
                 $data = UnicodeHelper::utf8_truncate_invalid($data);
                 if (!is_valid_utf8($data))
                     $data = UnicodeHelper::utf8_replace_invalid($data);
+            }
+            if ($json->done) {
+                // Get time data, if it exists
+                $time = @file_get_contents($timefn);
+                if ($time !== false)
+                    $json->time_data = $this->parse_timevals($time);
             }
             $json->data = $data;
             $json->offset = max($offset, 0);
@@ -231,6 +252,7 @@ class RunnerState {
         // create logfile and lockfile
         $this->checkt = time();
         $this->logfile = $this->info->runner_logfile($this->checkt);
+        $this->timingfile = $this->logfile . ".time";
         $this->lockfile = $this->logfile . ".pid";
         file_put_contents($this->lockfile, "");
         $this->inputfifo = $this->logfile . ".in";
@@ -256,6 +278,7 @@ class RunnerState {
 
         // actually run
         $command = "echo; jail/pa-jail run"
+            . " -t" . escapeshellarg($this->timingfile)
             . " -p" . escapeshellarg($this->lockfile);
         $skeletondir = $this->pset->run_skeletondir ? : $Conf->opt("run_skeletondir");
         $binddir = $this->pset->run_binddir ? : $Conf->opt("run_binddir");

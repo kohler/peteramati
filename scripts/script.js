@@ -2908,8 +2908,10 @@ function pa_run(button, opt) {
         && window.Terminal) {
         thexterm = new Terminal({cols: 132, rows: 25});
         thexterm.open(thepre[0], false);
-        thexterm.on('key', function(key) {
-            write(key);
+        thexterm.attachCustomKeyEventHandler(function(e) {
+            write(e.key);
+
+            return false;
         });
     } else
         thepre.append("<span class='pa-runcursor'>_</span>");
@@ -3035,6 +3037,27 @@ function pa_run(button, opt) {
             data.data = data.data.substring(offset - data.offset);
         if (data.data) {
             offset = data.lastoffset;
+            if(data.done) {
+                // Replay with timing
+                var cancelled = false;
+                function processRemaining(data, times, pos) {
+                    var offset = times[0].offset;
+                    var time = times[0].time;
+
+                    append_data(data.substring(pos, offset));
+
+                    if (times.length > 1) {
+                        setTimeout(function() {
+                            times.shift();
+                            processRemaining(data, times, offset);
+                        }, (times[1].time - time) / 1000);
+                    }
+                }
+
+                processRemaining(data.data, data.time_data, 0);
+                return;
+            }
+
             append_data(data.data, data);
             backoff = 100;
         }
