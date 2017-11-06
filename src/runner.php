@@ -276,7 +276,7 @@ class RunnerState {
         }
         if ($this->runner->timeout > 0)
             $command .= " -T" . $this->runner->timeout;
-        else if ($this->pset->run_timeout > 0)
+        else if ($this->runner->timeout == null && $this->pset->run_timeout > 0)
             $command .= " -T" . $this->pset->run_timeout;
         if ($this->inputfifo)
             $command .= " -i" . escapeshellarg($this->inputfifo);

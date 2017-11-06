@@ -633,6 +633,7 @@ class RunnerConfig {
     public $disabled;
     public $visible;
     public $output_visible;
+    public $timeout;
     public $xterm_js;
     public $transfer_warnings;
     public $command;
@@ -662,11 +663,11 @@ class RunnerConfig {
         $this->disabled = Pset::cbool($loc, $r, "disabled");
         $this->visible = Pset::cbool($loc, $r, "visible", "show_to_students");
         $this->output_visible = Pset::cdate_or_grades($loc, $r, "output_visible", "show_output_to_students", "show_results_to_students");
+        $this->timeout = Pset::cinterval($loc, $r, "timeout", "run_timeout");
         $this->xterm_js = Pset::cbool($loc, $r, "xterm_js");
         $this->transfer_warnings = Pset::cbool($loc, $r, "transfer_warnings");
         $this->command = Pset::cstr($loc, $r, "command");
         $this->username = Pset::cstr($loc, $r, "username", "run_username");
-        $this->timeout = Pset::cinterval($loc, $r, "timeout", "run_timeout");
         $this->load = Pset::cstr($loc, $r, "load");
         $this->eval = Pset::cstr($loc, $r, "eval");
         $this->queue = Pset::cstr($loc, $r, "queue");
