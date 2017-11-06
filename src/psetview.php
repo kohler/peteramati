@@ -43,7 +43,7 @@ class PsetView {
         $this->partner = $user->partner($pset->id);
         if (!$pset->gitless) {
             $this->repo = $user->repo($pset->id);
-            if ($pset->want_branch)
+            if (!$pset->no_branch)
                 $this->branch = $user->link(LINK_BRANCH, $pset->id) ? : null;
         }
         $this->hash = $hash;

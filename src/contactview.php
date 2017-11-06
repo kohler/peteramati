@@ -311,7 +311,7 @@ class ContactView {
         if ($editable)
             echo "</div></form>\n";
 
-        if ($pset->want_branch)
+        if (!$pset->no_branch)
             self::echo_branch_group($info);
 
         return $repo;
@@ -414,7 +414,7 @@ class ContactView {
         global $Conf, $Me, $ConfSitePATH;
         if (!($Me->has_database_account() && check_post()
               && ($pset = $Conf->pset_by_key(req("pset")))
-              && $pset->want_branch))
+              && !$pset->no_branch))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return Conf::msg_error("You can’t edit repository information for that problem set now.");
@@ -435,7 +435,7 @@ class ContactView {
         list($user, $repo) = array($info->user, $info->repo);
         if ($info->pset->gitless)
             return;
-        $branch = $info->pset->want_branch ? $user->link(LINK_BRANCH, $info->pset->id) : null;
+        $branch = !$info->pset->no_branch ? $user->link(LINK_BRANCH, $info->pset->id) : null;
         $branch = $branch ? : "master";
 
         $snaphash = $snapcommitline = $snapcommitat = null;
