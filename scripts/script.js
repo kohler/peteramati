@@ -3371,7 +3371,9 @@ function pa_anonymize_linkto(link, event) {
 function pa_render_pset_table(psetid, pconf, data) {
     var $j = $("#pa-pset" + psetid), dmap = [],
         flagged = pconf.flagged_commits,
-        grade_keys = pconf.grade_keys || [], need_ngrades,
+        grade_keys = pconf.grade_keys || [],
+        grade_abbr,
+        need_ngrades,
         sort = {f: flagged ? "at" : "username", last: true, rev: 1},
         sorting_last, displaying_last_first = null,
         anonymous = pconf.anonymous;
@@ -3408,6 +3410,23 @@ function pa_render_pset_table(psetid, pconf, data) {
                 ngrades_expected = -2;
         }
         need_ngrades = ngrades_expected === -2;
+        grade_abbr = [];
+        var grade_abbr_count = {}, m, grade_titles = pconf.grade_titles || [];
+        for (i = 0; i < grade_keys.length; ++i) {
+            grade_titles[i] = grade_titles[i] || grade_keys[i];
+            m = grade_titles[i].match(/^(p)(?:art\s*|(?=\d))([.a-z\d]+)(?:[\s:]|$)/i);
+            m = m || grade_titles[i].match(/^(q)(?:uestion\s*|(?=\d))([.a-z\d]+)(?:[\s:]|$)/i);
+            m = m || grade_titles[i].match(/^()(\S{1,3})/);
+            x = m ? m[1] + m[2] : ":" + i + ":";
+            grade_abbr.push(x);
+            grade_abbr_count[x] = (grade_abbr_count[x] || 0) + 1;
+        }
+        for (i = 0; i < grade_keys.length; ++i) {
+            if (grade_abbr_count[grade_abbr[i]] > 1
+                && (m = grade_titles[i].match(/\s+(\S{1,3})/))) {
+                grade_abbr[i] += m[1];
+            }
+        }
     }
     function calculate_ncol() {
         return (pconf.checkbox ? 1 : 0) + 5 + (pconf.gitless_grades ? 0 : 1) +
@@ -3684,7 +3703,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         if (pconf.need_total)
             a.push('<th class="pap-total r plsortable" data-pa-sort="total">Tot</th>');
         for (j = 0; j < grade_keys.length; ++j)
-            a.push('<th class="pap-grade r plsortable" data-pa-sort="grade' + j + '">' + grade_keys[j].substr(0, 3) + '</th>');
+            a.push('<th class="pap-grade r plsortable" data-pa-sort="grade' + j + '">' + grade_abbr[j] + '</th>');
         if (need_ngrades)
             a.push('<th class="pap-ngrades r plsortable" data-pa-sort="ngrades">#G</th>');
         if (!pconf.gitless)

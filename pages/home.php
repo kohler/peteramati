@@ -1036,7 +1036,9 @@ function show_pset_table($pset) {
         echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
 
     echo '<table class="pap" id="pa-pset' . $pset->id . '"></table>';
-    $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous, "grade_keys" => array_keys($pset->grades),
+    $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous,
+           "grade_keys" => array_keys($pset->grades),
+           "grade_titles" => array_values(array_map(function ($ge) { return $ge->title; }, $pset->grades)),
            "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
            "psetkey" => $pset->urlkey];
     if ($anonymous)
