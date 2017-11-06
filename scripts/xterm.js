@@ -1098,7 +1098,7 @@ var InputHandler = (function () {
                 case 1049:
                 case 47:
                 case 1047:
-                    this._terminal.buffers.activateAltBuffer();
+                    // this._terminal.buffers.activateAltBuffer();
                     this._terminal.viewport.syncScrollArea();
                     this._terminal.showCursor();
                     break;
