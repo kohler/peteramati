@@ -2908,6 +2908,9 @@ function pa_run(button, opt) {
         && window.Terminal) {
         thexterm = new Terminal({cols: 132, rows: 25});
         thexterm.open(thepre[0], false);
+        thexterm.on('key', function(key) {
+            write(key);
+        });
     } else
         thepre.append("<span class='pa-runcursor'>_</span>");
 
@@ -3070,6 +3073,10 @@ function pa_run(button, opt) {
 
     function stop() {
         send({stop: 1});
+    }
+
+    function write(value) {
+        send({write: value});
     }
 
     if (opt.headline && opt.noclear && !thexterm && thepre[0].firstChild != thecursor)

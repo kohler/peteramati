@@ -159,12 +159,16 @@ if ($Qreq->check) {
 
     $offset = cvtint($Qreq->offset, 0);
     $answer = $Rstate->full_json($offset);
-    if ($answer->status == "working" && $Qreq->stop) {
-        $Rstate->write("\x1b\x03"); // "ESC Ctrl-C" is captured by pa-jail
-        $now = microtime(true);
-        do {
-            $answer = $Rstate->full_json($offset);
-        } while ($answer->status == "working" && microtime(true) - $now < 0.1);
+    if ($answer->status == "working") {
+        if ($Qreq->stop) {
+            $Rstate->write("\x1b\x03"); // "ESC Ctrl-C" is captured by pa-jail
+            $now = microtime(true);
+            do {
+                $answer = $Rstate->full_json($offset);
+            } while ($answer->status == "working" && microtime(true) - $now < 0.1);
+        } else if ($Qreq->write) {
+            $Rstate->write($Qreq->write);
+        }
     }
     if ($answer->status != "working" && $Queueid > 0)
         $Conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $Queueid, $Info->repo->repoid);
