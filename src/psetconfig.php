@@ -74,6 +74,7 @@ class Pset {
     public $run_timeout;
     public $has_transfer_warnings;
     public $has_xterm_js;
+    public $timed_replay;
 
     public $diffs = [];
     public $ignore;
@@ -221,6 +222,9 @@ class Pset {
         if ($this->run_timeout === null) // default run_timeout is 10m
             $this->run_timeout = 600;
         $this->run_binddir = self::cstr($p, "run_binddir");
+        $this->timed_replay = self::cbool($p, "timed_replay");
+        if ($this->timed_replay === null)
+            $this->timed_replay = false;
 
         // diffs
         $diffs = get($p, "diffs");

@@ -3037,7 +3037,7 @@ function pa_run(button, opt) {
             data.data = data.data.substring(offset - data.offset);
         if (data.data) {
             offset = data.lastoffset;
-            if(data.done) {
+            if(data.done && data.time_data != null) {
                 // Replay with timing
                 var cancelled = false;
                 function processRemaining(data, times, pos) {

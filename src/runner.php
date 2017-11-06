@@ -278,8 +278,10 @@ class RunnerState {
 
         // actually run
         $command = "echo; jail/pa-jail run"
-            . " -t" . escapeshellarg($this->timingfile)
             . " -p" . escapeshellarg($this->lockfile);
+        if ($this->pset->timed_replay) {
+            $command .= " -t" . escapeshellarg($this->timingfile);
+        }
         $skeletondir = $this->pset->run_skeletondir ? : $Conf->opt("run_skeletondir");
         $binddir = $this->pset->run_binddir ? : $Conf->opt("run_binddir");
         if ($skeletondir && $binddir && !is_dir("$skeletondir/proc"))
