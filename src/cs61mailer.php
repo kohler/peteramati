@@ -162,13 +162,13 @@ class CS61Mailer extends Mailer {
                 $g = $info->current_grade_entry($ge->key);
                 if ($ge->is_extra ? $g : $g !== null) {
                     $t .= $ge->title . ": " . ($g ? : 0);
-                    if ($ge->max && !$ge->hide_max)
+                    if ($ge->max && $ge->max_visible !== false)
                         $t .= " / " . $ge->max;
                     $t .= "\n";
                 }
                 if ($g && !$ge->no_total)
                     $total += $g;
-                if (!$ge->is_extra && !$ge->no_total && !$ge->hide_max)
+                if (!$ge->is_extra && !$ge->no_total && $ge->max_visible !== false)
                     $maxtotal += $ge->max;
             }
             if ($total || $maxtotal) {

@@ -484,15 +484,14 @@ class PsetView {
                 $notes = $this->current_info();
                 $ag = get($notes, "autogrades");
                 $g = get($notes, "grades");
-                foreach ($this->pset->grades as $ge)
-                    if (!$ge->hide || $this->pc_view) {
-                        ++$this->n_visible_grades;
-                        if (($ag && get($ag, $ge->key) !== null)
-                            || ($g && get($g, $ge->key) !== null))
-                            ++$this->n_set_grades;
-                        if (!$ge->no_total)
-                            ++$this->n_visible_in_total;
-                    }
+                foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
+                    ++$this->n_visible_grades;
+                    if (($ag && get($ag, $ge->key) !== null)
+                        || ($g && get($g, $ge->key) !== null))
+                        ++$this->n_set_grades;
+                    if (!$ge->no_total)
+                        ++$this->n_visible_in_total;
+                }
             }
         }
     }
@@ -512,16 +511,15 @@ class PsetView {
         $notes = $this->current_info();
         $ag = get($notes, "autogrades");
         $g = get($notes, "grades");
-        foreach ($this->pset->grades as $ge)
-            if ((!$ge->hide || $this->pc_view) && !$ge->no_total) {
-                $gv = $g ? get($g, $ge->key) : null;
-                if ($gv === null && $ag)
-                    $gv = get($ag, $ge->key);
-                if ($gv)
-                    $total += $gv;
-                if (!$ge->is_extra && !$ge->no_total && $ge->max && !$ge->hide_max)
-                    $maxtotal += $ge->max;
-            }
+        foreach ($this->pset->visible_grades_in_total($this->pc_view) as $ge) {
+            $gv = $g ? get($g, $ge->key) : null;
+            if ($gv === null && $ag)
+                $gv = get($ag, $ge->key);
+            if ($gv)
+                $total += $gv;
+            if (!$ge->is_extra && $ge->max && $ge->max_visible)
+                $maxtotal += $ge->max;
+        }
         return [$total, $maxtotal];
     }
 
@@ -826,23 +824,21 @@ class PsetView {
         if ($agx || $gx || $this->is_grading_commit()) {
             $g = $ag = [];
             $total = $total_noextra = 0;
-            foreach ($this->pset->grades as $ge) {
-                if (!$ge->hide || $this->pc_view) {
-                    $key = $ge->key;
-                    $gv = null;
-                    if ($agx) {
-                        $gv = property_exists($agx, $key) ? $agx->$key : null;
-                        $ag[] = $gv;
-                    }
-                    if ($gx) {
-                        $gv = property_exists($gx, $key) ? $gx->$key : $gv;
-                    }
-                    $g[] = $gv;
-                    if (!$ge->no_total && $gv) {
-                        $total += $gv;
-                        if (!$ge->is_extra) {
-                            $total_noextra += $gv;
-                        }
+            foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
+                $key = $ge->key;
+                $gv = null;
+                if ($agx) {
+                    $gv = property_exists($agx, $key) ? $agx->$key : null;
+                    $ag[] = $gv;
+                }
+                if ($gx) {
+                    $gv = property_exists($gx, $key) ? $gx->$key : $gv;
+                }
+                $g[] = $gv;
+                if (!$ge->no_total && $gv) {
+                    $total += $gv;
+                    if (!$ge->is_extra) {
+                        $total_noextra += $gv;
                     }
                 }
             }

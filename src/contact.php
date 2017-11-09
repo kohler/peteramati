@@ -1279,7 +1279,7 @@ class Contact {
                 || (is_int($pset->repo_edit_deadline)
                     && $pset->repo_edit_deadline >= $Now))
             && (!$user || $user == $this || $is_pc)
-            && ($is_pc || !$pset->frozen || !self::show_setting_on($pset->frozen));
+            && ($is_pc || !$pset->frozen || !$this->show_setting_on($pset->frozen, $pset));
     }
 
     function set_partner($pset, $partner) {
@@ -1396,9 +1396,11 @@ class Contact {
         $Conf->qe("insert into Settings (name,value) values ('pset_forwarded',$pset) on duplicate key update value=greatest(value,values(value))");
     }
 
-    static function show_setting_on($setting) {
+    private function show_setting_on($setting, Pset $pset) {
         global $Now;
-        return $setting === true || (is_int($setting) && $setting >= $Now);
+        return $setting === true
+            || (is_int($setting) && $setting >= $Now)
+            || ($setting === "grades" && $this->xxx_can_view_grades($pset));
     }
 
     function can_view_pset(Pset $pset) {
@@ -1442,10 +1444,7 @@ class Contact {
             return false;
         if ($this->isPC && (!$user || $user != $this))
             return true;
-        $s2s = $runner->visible;
-        return $s2s === true
-            || (($s2s === "grades" || $s2s === "grade")
-                && $this->xxx_can_view_grades($pset));
+        return $runner->visible && $this->show_setting_on($runner->visible, $pset);
     }
 
     function can_view_run(Pset $pset, $runner, $user = null) {
@@ -1453,12 +1452,8 @@ class Contact {
             return false;
         if ($this->isPC && (!$user || $user != $this))
             return true;
-        $s2s = $runner->visible;
-        $r2s = $runner->output_visible;
-        return ($s2s === true || $r2s === true)
-            || (($s2s === "grades" || $s2s === "grade"
-                 || $r2s === "grades" || $r2s === "grade")
-                && $this->xxx_can_view_grades($pset));
+        return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
+            || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset));
     }
 
     function user_linkpart(Contact $user = null, $is_anonymous = false) {

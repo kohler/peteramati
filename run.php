@@ -94,11 +94,11 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
         '<div class="f-contain">',
         Ht::hidden("u", ""),
         Ht::hidden("pset", $Pset->urlkey),
-        Ht::hidden("run", $Runner->name, ["id" => "runmany61", "data-pa-runclass" => $Runner->runclass_argument()]),
+        Ht::hidden("run", $Runner->name, ["id" => "runmany61", "data-pa-run-category" => $Runner->category_argument()]),
         '</div></form>';
 
-    echo '<div id="pa-runout-' . $Runner->runclass . '">',
-        '<div class="pa-run" id="pa-run-' . $Runner->runclass . '">',
+    echo '<div id="pa-runout-' . $Runner->category . '">',
+        '<div class="pa-run" id="pa-run-' . $Runner->category . '">',
         '<div class="pa-runin"><pre class="pa-runpre"></pre></div>',
         '</div>',
         '</div>';
@@ -284,7 +284,7 @@ try {
     $Rstate->start($Queue);
 
     // save information about execution
-    $Info->update_commit_info(["run" => [$Runner->runclass => $Rstate->checkt]]);
+    $Info->update_commit_info(["run" => [$Runner->category => $Rstate->checkt]]);
 
     json_exit(["ok" => true,
                "done" => false,

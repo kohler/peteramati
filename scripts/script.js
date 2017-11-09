@@ -2877,9 +2877,9 @@ $(pa_render_need_terminal);
 
 function pa_run(button, opt) {
     var $f = $(button).closest("form"),
-        runclass = button.getAttribute("data-pa-runclass") || button.value,
+        category = button.getAttribute("data-pa-run-category") || button.value,
         directory = $(button).closest(".pa-psetinfo").attr("data-pa-directory"),
-        therun = $("#pa-run-" + runclass),
+        therun = $("#pa-run-" + category),
         thepre = therun.find("pre"),
         thexterm,
         checkt;
@@ -2896,7 +2896,7 @@ function pa_run(button, opt) {
     }
     delete therun[0].dataset.paTimestamp;
 
-    fold61(therun, jQuery("#pa-runout-" + runclass).show(), true);
+    fold61(therun, jQuery("#pa-runout-" + category).show(), true);
     if (!checkt && !opt.noclear) {
         thepre.html("");
         delete thepre[0].dataset.paTerminalStyle;
@@ -3013,11 +3013,11 @@ function pa_run(button, opt) {
         }
 
         if (data && data.status == "working") {
-            if (!$("#pa-runstop-" + runclass).length)
-                $("<button id=\"pa-runstop-" + runclass + "\" class=\"pa-runstop\" type=\"button\">Stop</button>")
-                    .click(stop).appendTo("#pa-runout-" + runclass + " > h3");
+            if (!$("#pa-runstop-" + category).length)
+                $("<button id=\"pa-runstop-" + category + "\" class=\"pa-runstop\" type=\"button\">Stop</button>")
+                    .click(stop).appendTo("#pa-runout-" + category + " > h3");
         } else
-            $("#pa-runstop-" + runclass).remove();
+            $("#pa-runstop-" + category).remove();
 
         if (!data || !data.ok) {
             if (data && data.loggedout)
@@ -3055,7 +3055,7 @@ function pa_run(button, opt) {
     }
 
     function send(args) {
-        var a = {run: runclass, offset: offset};
+        var a = {run: category, offset: offset};
         checkt && (a.check = checkt);
         queueid && (a.queueid = queueid);
         args && $.extend(a, args);

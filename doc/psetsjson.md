@@ -197,41 +197,23 @@ others are shown to users in different contexts.
 
     The time at which the problem set is due.
 
-### Grades
+Grades
+------
 
-* `grades`: object or array of grade entries (see below)
-
-* `grades_visible`: boolean or date
-
-    Set to true to make grades visible to students. Implies `visible: true`.
-
-* `grade_cdf_visible`: boolean
-
-    Set to true to make the CDF of all grades visible to students, or false to
-    hide it. Defaults to the value of `grade_visible`.
-
-* `grade_cdf_cutoff`: number between 0 and 1
-
-    The CDF graph of grades is cut off below this number. The idea is to avoid
-    unnecessary student distress. For example, if `grade_cdf_cutoff` is 0.25,
-    then students in the bottom quarter of the grade distribution will not be
-    shown their exact standing within that quarter.
-
-* `separate_extension_grades`: boolean
-
-    If true, then extension students are shown their performance relative to
-    other extension students (as well as all students); for instance, grade
-    CDFs will have a separate extension-only line.
+Peteramati collects grades from teachers and displays them to students. The
+`grades` setting, which is either a keyed object or an array, defines the
+lines in the grading rubric.
 
 ### Grade entries
 
-A grade entry object defines a line in the grading rubric.
+The `grades` setting comprises a collection of entries. Each entry follows
+this format.
 
 * `name`: string (REQUIRED but defaults to the key in `grades`)
 
-    The internal name for the grade entry. This name is used inside the
-    database, so don’t change it after grades are assigned. Every entry for a
-    problem set must have a unique name.
+    The internal name for the grade entry. This name is used in the database,
+    so don’t change it after grades are assigned. Every entry for a problem
+    set must have a unique name.
 
 * `title`: string
 
@@ -241,13 +223,15 @@ A grade entry object defines a line in the grading rubric.
 
     The maximum number of points for this entry.
 
-* `hide`: boolean
+* `visible`: boolean
 
-    If true, then students cannot see this grade (graders can).
+    If set explicitly to false, then students cannot see this grade (graders
+    can). Defaults to true.
 
-* `hide_max`: boolean
+* `max_visible`: boolean
 
-    If true, then students cannot see the value of `max` (graders can).
+    If set explicitly to false, then students cannot see the value of `max`
+    (graders can). Defaults to true.
 
 * `is_extra`: boolean
 
@@ -273,10 +257,37 @@ A grade entry object defines a line in the grading rubric.
     If set, then provide a link to grade all submissions for this entry on a
     single page.
 
-### Code display
+### More problem set components
 
-Code display is controlled by the `diffs` setting, which is an object keyed by
-regular expression. For example, this setting says:
+These other problem set components relate to grade display.
+
+* `grades_visible`: boolean or date
+
+    Set to true to make grades visible to students. Implies `visible: true`.
+
+* `grade_cdf_visible`: boolean
+
+    Set to true to make the CDF of all grades visible to students, or false to
+    hide it. Defaults to the value of `grade_visible`.
+
+* `grade_cdf_cutoff`: number between 0 and 1
+
+    The CDF graph of grades is cut off below this number. The idea is to avoid
+    unnecessary student distress. For example, if `grade_cdf_cutoff` is 0.25,
+    then students in the bottom quarter of the grade distribution will not be
+    shown their exact standing within that quarter.
+
+* `separate_extension_grades`: boolean
+
+    If true, then extension students are shown their performance relative to
+    other extension students (as well as all students); for instance, grade
+    CDFs will have a separate extension-only line.
+
+Code display
+------------
+
+Code display is controlled by the `diffs` problem set setting, which is an
+object keyed by regular expression. For example:
 
 ```json
 "diffs": {
@@ -285,6 +296,8 @@ regular expression. For example, this setting says:
     "out": {"ignore": true}
 }
 ```
+
+This setting says:
 
 * Files named `README.txt` will be displayed in full (not as a diff), before
   other files (files by default have position 0).
@@ -305,6 +318,112 @@ ignore; the setting `"ignore": "*.txt"` means the same as
 "diffs": {".*\\.txt": {"ignore": true}}
 ```
 
-### Running code
+Code execution
+--------------
 
-See [runners.md](runners.md).
+Peteramati can run student code in a Linux container and log and display the
+results. This is controlled by the `runners` problem set setting, which is a
+keyed object of run entries.
+
+Code running requires significant additional configuration; see
+[runners.md](runners.md).
+
+### Run entries
+
+A run entry is an object following this format.
+
+* `name`: string (REQUIRED but defaults to the key in `runners`)
+
+    The internal name for the runner. This name is used in the database, so
+    don’t change it or information will be lost. Every runner in a problem set
+    must have a unique name. The name should consist only of letters, digits,
+    and underscores, and must start with a letter.
+
+* `title`: string
+
+    The display title for the runner. Defaults to `name`.
+
+* `output_title`: string
+
+    The display title for the runner’s output. Defaults to “`name` output”.
+
+* `disabled`: boolean
+
+    If true, then the runner is hidden from users.
+
+* `visible`: boolean, date, or `grades`
+
+    If true, then the runner is displayed to, and executable by, students as
+    well as teachers. If set to `grades`, then the runner is displayed to
+    students iff grades are visible to students.
+
+* `output_visible`: boolean, date, or `grades`
+
+    If true, then the _output_ of the runner is displayed to students. This
+    can be set even if the runner itself is not visible.
+
+* `position`: number
+
+    Determines display order. Runners are sorted first by increasing
+    `position`, and second by the order they appear in `psets.json`. Negative
+    `position` entries appear first.
+
+### Run commands
+
+A runner can optionally run code inside a container on the peteramati host.
+This depends on the suid-root `pa-jail` program in the `jail` subdirectory.
+
+* `username`: string
+
+    The username under which the command runs. Defaults to the problem set’s
+    `run_username` key, or `jail61user` if that is not set.
+
+* `command`: string
+
+    The command to run.
+
+* `overlay`: string
+
+    Optional tarball to extract over student code. This can be used to, for
+    example, replace files with pristine versions or add grading code.
+
+* `timeout`: interval (number or string like `10m` or `20s`)
+
+    Timeout after which the container will shut down. Defaults to 10 minutes.
+    If set to ≤0, there is no timeout.
+
+* `queue`: string
+
+    Optional run queue. If set, …
+
+* `nconcurrent`: integer
+
+    Optional limit on number of concurrent runners. Requires `queue` to be
+    set.
+
+* `transfer_warnings`: boolean
+
+    If true, then search runner output for text that looks like compiler
+    warnings, and display any such warnings in the problem set diffs.
+
+* `xterm_js`: boolean
+
+    If true, use `xterm.js` instead of peteramati’s built-in terminal.
+
+XXX how is code unpacked
+
+XXX `.gitcheckout`
+
+XXX run queue configuration
+
+### Evaluation
+
+* `require`: string
+
+    XXX
+
+* `eval`: string
+
+    PHP callback. XXX
+
+XXX arguments to PHP callback

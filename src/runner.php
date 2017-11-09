@@ -335,8 +335,11 @@ class RunnerState {
             throw new RunnerException("Can’t clean up checkout in jail");
 
         // create overlay
-        if (isset($this->pset->run_overlay) && $this->pset->run_overlay != "")
-            $this->checkout_overlay($checkoutdir, $this->pset->run_overlay);
+        $overlay = $this->runner->overlay;
+        if (!isset($overlay))
+            $overlay = $this->pset->run_overlay;
+        if ((string) $overlay !== "")
+            $this->checkout_overlay($checkoutdir, $overlay);
     }
 
     function checkout_overlay($checkoutdir, $overlayfile) {

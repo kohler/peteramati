@@ -656,7 +656,7 @@ if ($Pset->gitless) {
                                       "value" => $r->name,
                                       "class" => "btn pa-runner",
                                       "onclick" => "pa_run(this)",
-                                      "data-pa-runclass" => $r->runclass_argument(),
+                                      "data-pa-run-category" => $r->category_argument(),
                                       "data-pa-loadgrade" => isset($r->eval) ? "true" : null));
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
                 $last_run = true;
@@ -736,26 +736,27 @@ if ($Pset->gitless) {
 
     // print runners
     $crunners = $Info->commit_info("run");
-    $runclasses = [];
+    $runcategories = [];
     foreach ($Pset->runners as $r) {
         if (!$Me->can_view_run($Pset, $r, $User)
-            || isset($runclasses[$r->runclass]))
+            || isset($runcategories[$r->category]))
             continue;
 
         $rj = null;
-        if (($checkt = get($crunners, $r->runclass)))
+        if (($checkt = get($crunners, $r->category)))
             $rj = (new RunnerState($Info, $r, $checkt))->full_json();
         if (!$rj && !$Me->can_run($Pset, $r, $User))
             continue;
 
-        echo '<div id="pa-runout-' . $r->runclass . '"';
+        $runcategories[$r->category] = true;
+        echo '<div id="pa-runout-' . $r->category . '"';
         if (!$rj || !isset($rj->timestamp))
             echo ' style="display:none"';
         echo '><h3><a class="fold61" href="#" onclick="',
-            "return runfold61('$r->runclass')", '">',
+            "return runfold61('{$r->category}')", '">',
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
             htmlspecialchars($r->output_title), '</a></h3>',
-            '<div class="pa-run" id="pa-run-', $r->runclass, '" style="display:none"';
+            '<div class="pa-run" id="pa-run-', $r->category, '" style="display:none"';
         if ($r->xterm_js)
             echo ' data-pa-xterm-js="true"';
         if ($rj && isset($rj->timestamp))

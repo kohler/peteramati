@@ -281,44 +281,54 @@ class Pset {
         return $this->conf->latest_handout_commit($this);
     }
 
+    function visible_grades($pcview) {
+        return $pcview ? $this->grades : array_filter($this->grades, function ($ge) {
+            return $ge->visible;
+        });
+    }
+
+    function visible_grades_in_total($pcview) {
+        return array_filter($this->grades, function ($ge) use ($pcview) {
+            return ($pcview || $ge->visible) && !$ge->no_total;
+        });
+    }
+
     function gradeinfo_json($pcview) {
         $max = [];
         $count = $maxtotal = 0;
-        foreach ($this->grades as $ge)
-            if (!$ge->hide || $pcview) {
-                ++$count;
-                if ($ge->max && ($pcview || !$ge->hide_max)) {
-                    $max[$ge->key] = $ge->max;
-                    if (!$ge->is_extra && !$ge->no_total)
-                        $maxtotal += $ge->max;
-                }
+        foreach ($this->visible_grades($pcview) as $ge) {
+            ++$count;
+            if ($ge->max && ($pcview || $ge->max_visible)) {
+                $max[$ge->key] = $ge->max;
+                if (!$ge->is_extra && !$ge->no_total)
+                    $maxtotal += $ge->max;
             }
+        }
         if ($maxtotal)
             $max["total"] = $maxtotal;
         return (object) ["nentries" => $count, "maxgrades" => (object) $max];
     }
 
-    function gradeentry_json($can_edit) {
+    function gradeentry_json($pcview) {
         $ej = $order = [];
         $count = $maxtotal = 0;
-        foreach ($this->grades as $ge)
-            if (!$ge->hide || $can_edit) {
-                $gej = ["title" => $ge->title, "pos" => $count];
-                if ($ge->max && ($can_edit || !$ge->hide_max)) {
-                    $gej["max"] = $ge->max;
-                    if (!$ge->is_extra && !$ge->no_total)
-                        $maxtotal += $ge->max;
-                }
-                if (!$ge->no_total)
-                    $gej["in_total"] = true;
-                if ($ge->is_extra)
-                    $gej["is_extra"] = true;
-                if ($ge->landmark_file)
-                    $gej["landmark"] = $ge->landmark_file . ":" . $ge->landmark_line;
-                $ej[$ge->key] = $gej;
-                $order[] = $ge->key;
-                ++$count;
+        foreach ($this->visible_grades($pcview) as $ge) {
+            $gej = ["title" => $ge->title, "pos" => $count];
+            if ($ge->max && ($pcview || $ge->max_visible)) {
+                $gej["max"] = $ge->max;
+                if (!$ge->is_extra && !$ge->no_total)
+                    $maxtotal += $ge->max;
             }
+            if (!$ge->no_total)
+                $gej["in_total"] = true;
+            if ($ge->is_extra)
+                $gej["is_extra"] = true;
+            if ($ge->landmark_file)
+                $gej["landmark"] = $ge->landmark_file . ":" . $ge->landmark_line;
+            $ej[$ge->key] = $gej;
+            $order[] = $ge->key;
+            ++$count;
+        }
         $j = ["entries" => $ej, "order" => $order];
         if ($maxtotal)
             $j["maxtotal"] = $maxtotal;
@@ -551,8 +561,10 @@ class GradeEntryConfig {
     public $name;
     public $title;
     public $max;
-    public $hide;
-    public $hide_max;
+    public $visible;
+    private $_visible_defaulted = false;
+    public $max_visible;
+    private $_max_visible_defaulted = false;
     public $no_total;
     public $is_extra;
     public $position;
@@ -583,8 +595,18 @@ class GradeEntryConfig {
         if ((string) $this->title === "")
             $this->title = $this->key;
         $this->max = Pset::cnum($loc, $g, "max");
-        $this->hide = Pset::cbool($loc, $g, "hide");
-        $this->hide_max = Pset::cbool($loc, $g, "hide_max");
+        if (isset($g->visible))
+            $this->visible = Pset::cbool($loc, $g, "visible");
+        else if (isset($g->hide))
+            $this->visible = !Pset::cbool($loc, $g, "hide");
+        else
+            $this->visible = $this->_visible_defaulted = true;
+        if (isset($g->max_visible))
+            $this->max_visible = Pset::cbool($loc, $g, "max_visible");
+        else if (isset($g->hide_max))
+            $this->max_visible = !Pset::cbool($loc, $g, "hide_max");
+        else
+            $this->max_visible = $this->_max_visible_defaulted = true;
         $this->no_total = Pset::cbool($loc, $g, "no_total");
         $this->is_extra = Pset::cbool($loc, $g, "is_extra");
         $this->position = Pset::cnum($loc, $g, "position");
@@ -628,32 +650,34 @@ class GradeEntryConfig {
 
 class RunnerConfig {
     public $name;
-    public $runclass;
+    public $category;
     public $title;
+    public $output_title;
     public $disabled;
     public $visible;
     public $output_visible;
-    public $timeout;
-    public $xterm_js;
-    public $transfer_warnings;
+    public $position;
     public $command;
     public $username;
-    public $load;
-    public $eval;
+    public $overlay;
+    public $timeout;
     public $queue;
     public $nconcurrent;
-    public $position;
+    public $xterm_js;
+    public $transfer_warnings;
+    public $require;
+    public $eval;
 
     function __construct($name, $r) {
         $loc = array("runners", $name);
         if (!is_object($r))
             throw new PsetConfigException("runner format error", $loc);
         $this->name = isset($r->name) ? $r->name : $name;
-        if (!is_string($this->name) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->name))
+        if (!is_string($this->name) || !preg_match(',\A[A-Za-z][0-9A-Za-z_]*\z,', $this->name))
             throw new PsetConfigException("runner name format error", $loc);
-        $this->runclass = isset($r->runclass) ? $r->runclass : $this->name;
-        if (!is_string($this->runclass) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->runclass))
-            throw new PsetConfigException("runner runclass format error", $loc);
+        $this->category = isset($r->category) ? $r->category : $this->name;
+        if (!is_string($this->category) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->category))
+            throw new PsetConfigException("runner category format error", $loc);
         $this->title = Pset::cstr($loc, $r, "title", "text");
         if ($this->title === null)
             $this->title = $this->name;
@@ -668,16 +692,17 @@ class RunnerConfig {
         $this->transfer_warnings = Pset::cbool($loc, $r, "transfer_warnings");
         $this->command = Pset::cstr($loc, $r, "command");
         $this->username = Pset::cstr($loc, $r, "username", "run_username");
-        $this->load = Pset::cstr($loc, $r, "load");
+        $this->require = Pset::cstr($loc, $r, "require", "load");
         $this->eval = Pset::cstr($loc, $r, "eval");
         $this->queue = Pset::cstr($loc, $r, "queue");
         $this->nconcurrent = Pset::cint($loc, $r, "nconcurrent");
         $this->position = Pset::cnum($loc, $r, "position");
         if ($this->position === null && isset($r->position))
             $this->position = -Pset::cnum($loc, $r, "priority");
+        $this->overlay = Pset::cstr($loc, $r, "overlay");
     }
-    function runclass_argument() {
-        return $this->runclass === $this->name ? null : $this->runclass;
+    function category_argument() {
+        return $this->category === $this->name ? null : $this->category;
     }
 }
 
