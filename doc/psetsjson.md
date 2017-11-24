@@ -401,10 +401,12 @@ This depends on the suid-root `pa-jail` program in the `jail` subdirectory.
     Optional limit on number of concurrent runners. Requires `queue` to be
     set.
 
-* `transfer_warnings`: boolean
+* `transfer_warnings`: boolean or `"grades"`
 
     If true, then search runner output for text that looks like compiler
-    warnings, and display any such warnings in the problem set diffs.
+    warnings, and display any such warnings in the problem set diffs. If
+    `"grades"`, then students can see these warnings when grades are
+    visible, even if they cannot see the runner output.
 
 * `xterm_js`: boolean
 

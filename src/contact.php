@@ -1439,21 +1439,31 @@ class Contact {
                         || ($info->repo && $info->user_can_view_repo_contents()))));
     }
 
-    function can_run(Pset $pset, $runner, $user = null) {
+    function can_run(Pset $pset, RunnerConfig $runner = null, $user = null) {
         if (!$runner || $runner->disabled)
             return false;
-        if ($this->isPC && (!$user || $user != $this))
+        if ($this->isPC && (!$user || $user !== $this))
             return true;
         return $runner->visible && $this->show_setting_on($runner->visible, $pset);
     }
 
-    function can_view_run(Pset $pset, $runner, $user = null) {
-        if (!$runner || $runner->disabled)
+    function can_view_run(Pset $pset, RunnerConfig $runner, $user = null) {
+        if ($runner->disabled)
             return false;
-        if ($this->isPC && (!$user || $user != $this))
+        if ($this->isPC && (!$user || $user !== $this))
             return true;
         return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
             || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset));
+    }
+
+    function can_view_transferred_warnings(Pset $pset, RunnerConfig $runner, $user = null) {
+        if ($runner->disabled)
+            return false;
+        if ($this->isPC && (!$user || $user !== $this))
+            return true;
+        return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
+            || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset))
+            || ($runner->transfer_warnings === "grades" && $this->show_setting_on($runner->transfer_warnings, $pset));
     }
 
     function user_linkpart(Contact $user = null, $is_anonymous = false) {

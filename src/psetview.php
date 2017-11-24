@@ -729,7 +729,7 @@ class PsetView {
         $this->transferred_warnings = [];
         foreach ($this->pset->runners as $runner) {
             if ($runner->transfer_warnings
-                && $this->viewer->can_view_run($this->pset, $runner, $this->user)
+                && $this->viewer->can_view_transferred_warnings($this->pset, $runner, $this->user)
                 && ($output = $this->runner_output_for($runner))) {
                 $file = $line = null;
                 $expect_context = false;
