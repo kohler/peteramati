@@ -727,7 +727,7 @@ class PsetView {
                 $this->transferred_warnings[$file][$line] = "";
                 $this->transferred_warnings_priority[$loc] = $priority;
             }
-            if ($this->transferred_warnings_priority[$loc] == $prority)
+            if ($this->transferred_warnings_priority[$loc] == $priority)
                 $this->transferred_warnings[$file][$line] .= $text;
         }
     }
