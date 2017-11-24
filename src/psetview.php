@@ -33,6 +33,7 @@ class PsetView {
     const ERROR_LOGMISSING = 2;
     public $last_runner_error;
     private $transferred_warnings;
+    private $transferred_warnings_priority;
 
     function __construct(Pset $pset, Contact $user, Contact $viewer, $hash = null) {
         $this->conf = $pset->conf;
@@ -715,13 +716,19 @@ class PsetView {
         }
     }
 
-    private function transfer_one_warning($file, $line, $text) {
+    private function transfer_one_warning($file, $line, $text, $priority) {
         if ($file !== null && $text !== "") {
+            $loc = "$file:$line";
             if (!isset($this->transferred_warnings[$file]))
                 $this->transferred_warnings[$file] = [];
-            if (!isset($this->transferred_warnings[$file][$line]))
+            if (!isset($this->transferred_warnings_priority[$loc]))
+                $this->transferred_warnings_priority[$loc] = $priority - 1;
+            if ($this->transferred_warnings_priority[$loc] < $priority) {
                 $this->transferred_warnings[$file][$line] = "";
-            $this->transferred_warnings[$file][$line] .= $text;
+                $this->transferred_warnings_priority[$loc] = $priority;
+            }
+            if ($this->transferred_warnings_priority[$loc] == $prority)
+                $this->transferred_warnings[$file][$line] .= $text;
         }
     }
 
@@ -731,6 +738,7 @@ class PsetView {
             if ($runner->transfer_warnings
                 && $this->viewer->can_view_transferred_warnings($this->pset, $runner, $this->user)
                 && ($output = $this->runner_output_for($runner))) {
+                $prio = $runner->transfer_warnings_priority ? : 0;
                 $file = $line = null;
                 $expect_context = false;
                 $text = "";
@@ -746,7 +754,7 @@ class PsetView {
                                 $line = $m[2];
                             }
                         } else {
-                            $this->transfer_one_warning($file, $line, $text);
+                            $this->transfer_one_warning($file, $line, $text, $prio);
                             $file = $m[1];
                             $line = $m[2];
                             $text = "";
@@ -764,7 +772,7 @@ class PsetView {
                             $text .= $s . "\n" . $lines[$i + 1] . "\n";
                             ++$i;
                         } else {
-                            $this->transfer_one_warning($file, $line, $text);
+                            $this->transfer_one_warning($file, $line, $text, $prio);
                             $file = $line = null;
                             $text = "";
                         }
@@ -774,7 +782,7 @@ class PsetView {
                         $expect_context = false;
                     }
                 }
-                $this->transfer_one_warning($file, $line, $text);
+                $this->transfer_one_warning($file, $line, $text, $prio);
             }
         }
     }

@@ -408,6 +408,8 @@ This depends on the suid-root `pa-jail` program in the `jail` subdirectory.
     `"grades"`, then students can see these warnings when grades are
     visible, even if they cannot see the runner output.
 
+* `transfer_warnings_priority`
+
 * `xterm_js`: boolean
 
     If true, use `xterm.js` instead of peteramati’s built-in terminal.

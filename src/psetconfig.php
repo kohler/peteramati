@@ -665,6 +665,7 @@ class RunnerConfig {
     public $nconcurrent;
     public $xterm_js;
     public $transfer_warnings;
+    public $transfer_warnings_priority;
     public $require;
     public $eval;
 
@@ -693,6 +694,7 @@ class RunnerConfig {
             $this->transfer_warnings = "grades";
         else
             $this->transfer_warnings = Pset::cbool($loc, $r, "transfer_warnings");
+        $this->transfer_warnings_priority = Pset::cnum($loc, $r, "transfer_warnings_priority");
         $this->command = Pset::cstr($loc, $r, "command");
         $this->username = Pset::cstr($loc, $r, "username", "run_username");
         $this->require = Pset::cstr($loc, $r, "require", "load");
