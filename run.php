@@ -132,10 +132,10 @@ else if (!$Info->can_view_repo_contents())
 // maybe eval
 function runner_eval($runner, $info, $answer) {
     global $ConfSitePATH;
-    if (isset($runner->load) && $runner->load[0] == "/")
-        require_once($runner->load);
-    else if (isset($runner->load))
-        require_once($ConfSitePATH . "/" . $runner->load);
+    if (isset($runner->require) && $runner->require[0] == "/")
+        require_once($runner->require);
+    else if (isset($runner->require))
+        require_once($ConfSitePATH . "/" . $runner->require);
     $answer->result = call_user_func($runner->eval, $info);
 }
 
