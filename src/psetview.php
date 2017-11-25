@@ -853,9 +853,9 @@ class PsetView {
             $result["grades"] = $g;
             if ($this->pc_view && !empty($ag))
                 $result["autogrades"] = $ag;
-            $result["total"] = $total;
+            $result["total"] = round_grade($total);
             if ($total != $total_noextra)
-                $g["total_noextra"] = $total_noextra;
+                $g["total_noextra"] = round_grade($total_noextra);
         }
         if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
             $result["grading_hash"] = $this->grading_hash();

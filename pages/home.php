@@ -615,7 +615,7 @@ function render_grades($pset, $gi, $s) {
         if ($ggv && $agv && $ggv != $agv)
             $different[$k] = true;
     }
-    return (object) ["allv" => $gvarr,  "totalv" => $total, "differentk" => $different];
+    return (object) ["allv" => $gvarr,  "totalv" => round_grade($total), "differentk" => $different];
 }
 
 function show_pset($pset, $user) {

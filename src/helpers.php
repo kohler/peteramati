@@ -834,3 +834,7 @@ function git_commit_in_list($list, $commit) {
         }
     return $cx;
 }
+
+function round_grade($g) {
+    return round($g * 1000) / 1000;
+}
