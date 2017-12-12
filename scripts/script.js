@@ -753,7 +753,7 @@ function to_rgba(c) {
 }
 
 function make_model(color) {
-    return $('<div style="display:none" class="bubble' + color + '"><div class="bubtail bubtail0' + color + '"></div></div>').appendTo(document.body);
+    return $('<div class="bubble hidden' + color + '"><div class="bubtail bubtail0' + color + '"></div></div>').appendTo(document.body);
 }
 
 function calculate_sizes(color) {
@@ -1003,7 +1003,7 @@ return function (content, bubopt) {
             if (typeof epos === "string" || epos.tagName || epos.jquery) {
                 epos = $(epos);
                 if (dirspec == null)
-                    dirspec = epos.attr("data-tooltip-dir");
+                    dirspec = $(epos).data("tooltipDir");
                 epos = epos.geometry(true);
             }
             for (i = 0; i < 4; ++i)
@@ -1040,13 +1040,19 @@ return function (content, bubopt) {
             var n = bubch[1];
             if (content === undefined)
                 return n.innerHTML;
+            if (typeof content === "string"
+                && content === n.innerHTML
+                && bubdiv.style.visibility === "visible")
+                return bubble;
             nearpos && $(bubdiv).css({maxWidth: "", left: "", top: ""});
-            if (typeof content == "string")
+            if (typeof content === "string")
                 n.innerHTML = content;
             else {
                 while (n.childNodes.length)
                     n.removeChild(n.childNodes[0]);
-                if (content)
+                if (content && content.jquery)
+                    content.appendTo(n);
+                else
                     n.appendChild(content);
             }
             nearpos && show();
@@ -1059,15 +1065,21 @@ return function (content, bubopt) {
                 return bubble.html(text ? text_to_html(text) : text);
         },
         hover: function (enter, leave) {
-            jQuery(bubdiv).hover(enter, leave);
+            $(bubdiv).hover(enter, leave);
             return bubble;
         },
         removeOn: function (jq, event) {
-            jQuery(jq).on(event, remove);
+            if (arguments.length > 1)
+                $(jq).on(event, remove);
+            else if (bubdiv)
+                $(bubdiv).on(jq, remove);
             return bubble;
         },
         self: function () {
-            return bubdiv ? jQuery(bubdiv) : null;
+            return bubdiv ? $(bubdiv) : null;
+        },
+        outerHTML: function () {
+            return bubdiv ? bubdiv.outerHTML : null;
         }
     };
 
@@ -1077,35 +1089,50 @@ return function (content, bubopt) {
 })();
 
 
-function tooltip(info) {
+var tooltip = (function ($) {
+var builders = {};
+
+function prepare_info($self, info) {
+    var xinfo = $self.data("tooltipInfo");
+    if (xinfo) {
+        if (typeof xinfo === "string" && xinfo.charAt(0) === "{")
+            xinfo = JSON.parse(xinfo);
+        else if (typeof xinfo === "string")
+            xinfo = {builder: xinfo};
+        info = $.extend(xinfo, info);
+    }
+    if (info.builder && builders[info.builder])
+        info = builders[info.builder].call($self[0], info) || info;
+    if (info.dir == null)
+        info.dir = $self.data("tooltipDir") || "v";
+    if (info.type == null)
+        info.type = $self.data("tooltipType");
+    if (info.className == null)
+        info.className = $self.data("tooltipClass") || "dark";
+    if (info.content == null)
+        info.content = $self.data("tooltip");
+    return info;
+}
+
+function show_tooltip(info) {
     if (window.disable_tooltip)
         return null;
 
-    var j;
-    if (info.tagName)
-        info = {element: info};
-    j = $(info.element);
+    var $self = $(this);
+    info = prepare_info($self, $.extend({}, info || {}));
+    info.element = this;
 
-    function jqnear(x) {
-        if (x && x.charAt(0) == ">")
-            return j.find(x.substr(1));
-        else if (x)
-            return $(x);
-        else
-            return $();
-    }
-
-    var tt = null, content = info.content, bub = null, to = null, refcount = 0;
+    var tt, bub = null, to = null, refcount = 0, content = info.content;
     function erase() {
         to = clearTimeout(to);
         bub && bub.remove();
-        j.removeData("hotcrp_tooltip");
+        $self.removeData("tooltipState");
         if (window.global_tooltip === tt)
             window.global_tooltip = null;
     }
     function show_bub() {
         if (content && !bub) {
-            bub = make_bubble(content, {color: "tooltip dark", dir: info.dir});
+            bub = make_bubble(content, {color: "tooltip " + info.className, dir: info.dir});
             bub.near(info.near || info.element).hover(tt.enter, tt.exit);
         } else if (content)
             bub.html(content);
@@ -1121,14 +1148,14 @@ function tooltip(info) {
             return tt;
         },
         exit: function () {
-            var delay = info.type == "focus" ? 0 : 200;
+            var delay = info.type === "focus" ? 0 : 200;
             to = clearTimeout(to);
-            if (--refcount == 0)
+            if (--refcount == 0 && info.type !== "sticky")
                 to = setTimeout(erase, delay);
             return tt;
         },
         erase: erase,
-        elt: info.element,
+        _element: $self[0],
         html: function (new_content) {
             if (new_content === undefined)
                 return content;
@@ -1143,65 +1170,58 @@ function tooltip(info) {
         }
     };
 
-    if (info.dir == null)
-        info.dir = j.attr("data-tooltip-dir") || "v";
-    if (info.type == null)
-        info.type = j.attr("data-tooltip-type");
-    if (info.near == null)
-        info.near = j.attr("data-tooltip-near");
-    if (info.near)
-        info.near = jqnear(info.near)[0];
-
     function complete(new_content) {
-        var tx = window.global_tooltip;
-        content = new_content;
-        if (tx && tx.elt == info.element && tx.html() == content && !info.done)
-            tt = tx;
+        if (new_content instanceof HPromise)
+            new_content.then(complete);
         else {
-            tx && tx.erase();
-            j.data("hotcrp_tooltip", tt);
-            show_bub();
-            window.global_tooltip = tt;
+            var tx = window.global_tooltip;
+            content = new_content;
+            if (tx && tx._element === info.element
+                && tx.html() === content
+                && !info.done)
+                tt = tx;
+            else {
+                tx && tx.erase();
+                $self.data("tooltipState", tt);
+                show_bub();
+                window.global_tooltip = tt;
+            }
         }
     }
 
-    if (content == null && j[0].hasAttribute("data-tooltip"))
-        content = j.attr("data-tooltip");
-    if (content == null && j[0].hasAttribute("data-tooltip-content-selector"))
-        content = jqnear(j.attr("data-tooltip-content-selector")).html();
-    if (content == null && j[0].hasAttribute("data-tooltip-content-promise"))
-        geval.call(this, j[0].getAttribute("data-tooltip-content-promise")).then(complete);
-    else
-        complete(content);
+    complete(content);
     info.done = true;
     return tt;
 }
 
-function tooltip_enter() {
-    var tt = $(this).data("hotcrp_tooltip") || tooltip(this);
+function ttenter() {
+    var tt = $(this).data("tooltipState") || show_tooltip.call(this);
     tt && tt.enter();
 }
 
-function tooltip_leave() {
-    var tt = $(this).data("hotcrp_tooltip");
+function ttleave() {
+    var tt = $(this).data("tooltipState");
     tt && tt.exit();
 }
 
-function tooltip_erase() {
-    var tt = $(this).data("hotcrp_tooltip");
-    tt && tt.erase();
-}
-
-function add_tooltip() {
-    var j = jQuery(this);
-    if (j.attr("data-tooltip-type") == "focus")
-        j.on("focus", tooltip_enter).on("blur", tooltip_leave);
+function tooltip() {
+    var $self = $(this).removeClass("need-tooltip");
+    if ($self.data("tooltipType") === "focus")
+        $self.on("focus", ttenter).on("blur", ttleave);
     else
-        j.hover(tooltip_enter, tooltip_leave);
-    j.removeClass("need-tooltip");
+        $self.hover(ttenter, ttleave);
 }
+tooltip.erase = function () {
+    var tt = $(this).data("tooltipState");
+    tt && tt.erase();
+};
+tooltip.add_builder = function (name, f) {
+    builders[name] = f;
+};
 
-$(function () { $(".need-tooltip").each(add_tooltip); });
+$(function () { $(".need-tooltip").each(tooltip); });
+return tooltip;
+})($);
 
 
 // temporary text
@@ -1218,22 +1238,19 @@ if (Object.prototype.toString.call(window.operamini) === '[object OperaMini]'
         $e.toggleClass("temptext", event.type != "focus" && (v === "" || v === p));
     }
 
-    return function (e) {
-        e = typeof e === "number" ? this : e;
-        $(e).on("focus blur change input", ttaction);
-        ttaction.call(e, {type: "blur"});
+    return function ($base) {
+        $base.find("input[placeholder], textarea[placeholder]").each(function () {
+            if (!hasClass(this, "has-mktemptext")) {
+                $(this).on("focus blur change input", ttaction).addClass("has-mktemptext");
+                ttaction.call(this, {type: "blur"});
+            }
+        });
     };
     })();
+
+    $(function () { mktemptext($(document)); });
 } else {
-    window.mktemptext = function (e) {
-        e = typeof e === "number" ? this : e;
-        var p = e.getAttribute("placeholder");
-        if (e.getAttribute("value") == p)
-            e.setAttribute("value", "");
-        if (e.value == p)
-            e.value = "";
-        $(e).removeClass("temptext");
-    };
+    window.mktemptext = $.noop;
 }
 
 
@@ -1434,9 +1451,6 @@ hotcrp_load.time = function (servzone, hr24) {
 hotcrp_load.opencomment = function () {
     if (location.hash.match(/^\#?commentnew$/))
         open_new_comment();
-};
-hotcrp_load.temptext = function () {
-    jQuery("input[placeholder], textarea[placeholder]").each(mktemptext);
 };
 
 
