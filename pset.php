@@ -354,7 +354,7 @@ function session_list_link($sl, $pos, $isprev, Contact $me, Contact $user) {
         . ($isprev ? "« " : "") . $t . ($isprev ? "" : " »") . '</a>';
 }
 
-if ($User->username && $Me->isPC && ($sl = $Conf->session_list())
+if ($Me->isPC && ($sl = $Conf->session_list())
     && ($p = session_list_position($sl, $Info)) !== false
     && ($p > 0 || $p < count($sl->ids) - 1)) {
     $result = $Conf->qe("select contactId, firstName, lastName, email,
