@@ -1668,11 +1668,28 @@ function popup(anchor, which, dofold, populate) {
 // list management, conflict management
 (function ($) {
 function set_cookie(info) {
-    var p = "", m;
+    var p = ";max-age=2", m;
     if (siteurl && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
-        p = "; path=" + m[1];
-    if (info)
-        document.cookie = "hotlist-info=" + encodeURIComponent(info) + "; max-age=2" + p;
+        p += ";path=" + m[1];
+    if (info) {
+        if (typeof info === "object")
+            info = JSON.stringify(info);
+        if (info.indexOf("'") < 0)
+            info = info.replace(/,/g, "'");
+        info = encodeURIComponent(info);
+        var pos = 0, suffix = 0;
+        while (pos + 3000 < info.length) {
+            var epos = pos + 3000;
+            if (info.charAt(epos - 1) === "%")
+                --epos;
+            else if (info.charAt(epos - 2) === "%")
+                epos -= 2;
+            document.cookie = "hotlist-info" + (suffix ? "_" + suffix : "") + "=" + info.substring(pos, epos) + p;
+            pos = epos;
+            ++suffix;
+        }
+        document.cookie = "hotlist-info" + (suffix ? "_" + suffix : "") + "=" + info.substring(pos) + p;
+    }
     set_cookie = function () {};
 }
 function is_listable(href) {
@@ -1685,10 +1702,9 @@ function add_list() {
         && is_listable(href)
         && ($hl = $self.closest(".has-hotlist")).length)
         set_cookie($hl.attr("data-hotlist"));
-    return true;
 }
 function unload_list() {
-    hotcrp_list && set_cookie(JSON.stringify(hotcrp_list));
+    hotcrp_list && set_cookie(hotcrp_list);
 }
 function row_click(e) {
     var j = $(e.target);

@@ -1036,10 +1036,17 @@ class Conf {
         if ($this->_session_list === false) {
             $this->_session_list = null;
             if (isset($_COOKIE["hotlist-info"])) {
-                if (($j = json_decode($_COOKIE["hotlist-info"]))
-                    && is_object($j) && isset($j->ids))
-                    $this->_session_list = $j;
+                $x = $_COOKIE["hotlist-info"];
                 setcookie("hotlist-info", "", $Now - 86400, Navigation::site_path());
+                for ($i = 1; isset($_COOKIE["hotlist-info_$i"]); ++$i) {
+                    $x .= $_COOKIE["hotlist-info_$i"];
+                    setcookie("hotlist-info_$i", "", $Now - 86400, Navigation::site_path());
+                }
+                $j = json_decode($x);
+                if ($j === null)
+                    $j = json_decode(str_replace("'", ",", $x));
+                if (is_object($j) && isset($j->ids))
+                    $this->_session_list = $j;
             }
         }
         return $this->_session_list;
@@ -1059,7 +1066,7 @@ class Conf {
                 && preg_match('/\A[\sA-Fa-fx\d\']*\z/', $j->hashes))
                 $j->hashes = preg_split('/[\s\']+/', $j->hashes);
         }
-        return $this->_session_list;
+        return $j;
     }
 
 
