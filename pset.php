@@ -118,7 +118,7 @@ if (isset($_REQUEST["gradecdf"])) {
         else
             $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$Pset->id)
 		join RepositoryGrade rg on (rg.repoid=l.link and rg.pset=$Pset->id and not rg.placeholder)
-		join CommitNotes cn on (cn.hash=rg.gradehash and cn.pset=rg.pset)\n";
+		join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=unhex(rg.gradehash))\n";
         $result = $Conf->qe_raw($q . " where $notdropped");
 
         $series = new Series;
@@ -431,11 +431,13 @@ function echo_commit($Info) {
             $x .= "...";
         $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
     }
-    $result = $Conf->qe("select hash from CommitNotes where (haslinenotes & ?)!=0 and pset=? and hash ?a",
+    $result = $Conf->qe("select bhash from CommitNotes where (haslinenotes & ?)!=0 and pset=? and bhash ?a",
                         $Me == $User && !$Info->can_view_grades() ? HASNOTES_COMMENT : HASNOTES_ANY,
-                        $Pset->psetid, array_keys($sel));
+                        $Pset->psetid,
+                        array_map("hex2bin", array_keys($sel)));
     while (($row = edb_row($result)))
-        $sel[$row[0]] .= " &nbsp;♪";
+        $sel[bin2hex($row[0])] .= " &nbsp;♪";
+    Dbl::free($result);
     if (($h = $Info->grading_hash()) && isset($sel[$h])) {
         $sel[$h] = preg_replace('_\A(.*?)(?: &nbsp;|)((?:|♪))\z_', '$1 &nbsp;✱$2', $sel[$h]);
     }

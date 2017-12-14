@@ -243,13 +243,13 @@ class PsetView {
             $hasflags = self::notes_hasflags($new_notes);
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record)
-                $result = $this->conf->qx("insert into CommitNotes set hash=?, pset=?, notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, repoid=?",
-                                          $hash, $this->pset->psetid,
+                $result = $this->conf->qx("insert into CommitNotes set pset=?, bhash=?, hash=?, notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, repoid=?",
+                                          $this->pset->psetid, hex2bin($hash), $hash,
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $this->repo->repoid);
             else
-                $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, notesversion=? where hash=? and pset=? and notesversion=?",
+                $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, notesversion=? where pset=? and bhash=? and notesversion=?",
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $record->notesversion + 1,
-                                          $hash, $this->pset->psetid, $record->notesversion);
+                                          $this->pset->psetid, hex2bin($hash), $record->notesversion);
             if ($result && $result->affected_rows)
                 break;
 
@@ -374,15 +374,18 @@ class PsetView {
         } else {
             $this->repo_grade = null;
             if ($this->repo) {
-                $result = $this->conf->qe("select rg.*, cn.hash, cn.notes, cn.notesversion
+                $result = $this->conf->qe("select rg.*, cn.bhash, cn.notes, cn.notesversion
                     from RepositoryGrade rg
-                    left join CommitNotes cn on (cn.hash=rg.gradehash and cn.pset=rg.pset)
+                    left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=unhex(rg.gradehash))
                     where rg.repoid=? and rg.pset=? and not rg.placeholder",
                     $this->repo->repoid, $this->pset->psetid);
                 $this->repo_grade = $result ? $result->fetch_object() : null;
                 Dbl::free($result);
-                if ($this->repo_grade && $this->repo_grade->notes)
-                    $this->repo_grade->notes = json_decode($this->repo_grade->notes);
+                if ($this->repo_grade) {
+                    if ($this->repo_grade->notes)
+                        $this->repo_grade->notes = json_decode($this->repo_grade->notes);
+                    $this->repo_grade->hash = bin2hex($this->repo_grade->bhash);
+                }
             }
             $this->grade = $this->repo_grade;
             $this->grade_notes = get($this->grade, "notes");

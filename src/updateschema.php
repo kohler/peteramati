@@ -332,6 +332,21 @@ function updateSchema($conf) {
     if ($conf->sversion == 113
         && $conf->ql("alter table ContactInfo add `nickname` varchar(60) DEFAULT NULL"))
         $conf->update_schema_version(114);
+    if ($conf->sversion == 114
+        && $conf->ql("alter table CommitInfo change `sha1` `bhash` varbinary(32) NOT NULL")
+        && $conf->ql("alter table CommitNotes add `bhash` varbinary(32) DEFAULT NULL")
+        && $conf->ql("update CommitNotes set bhash=unhex(hash)")
+        && $conf->ql("alter table CommitNotes change `bhash` `bhash` varbinary(32) NOT NULL"))
+        $conf->update_schema_version(115);
+    if ($conf->sversion == 115
+        && $conf->ql("drop table if exists CommitInfo")
+        && $conf->ql("alter table RepositoryCommitSnapshot change `hash` `bhash` varbinary(32) NOT NULL"))
+        $conf->update_schema_version(116);
+    if ($conf->sversion == 116
+        && update_schema_drop_keys_if_exist($conf, "CommitNotes", ["PRIMARY"])
+        && $conf->ql("alter table CommitNotes add primary key (`pset`,`bhash`)")
+        && $conf->ql("alter table CommitNotes drop `hash`"))
+        $conf->update_schema_version(117);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

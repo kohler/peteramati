@@ -409,7 +409,7 @@ class Repository {
                     $qv[$line] = [$this->repoid, hex2bin($line), $snaptime];
         }
         if (!empty($qv))
-            $this->conf->qe("insert into RepositoryCommitSnapshot (repoid, hash, snapshot) values ?v on duplicate key update snapshot=least(snapshot,values(snapshot))", $qv);
+            $this->conf->qe("insert into RepositoryCommitSnapshot (repoid, bhash, snapshot) values ?v on duplicate key update snapshot=least(snapshot,values(snapshot))", $qv);
         if ($analyzed_snaptime)
             $this->conf->qe("update Repository set analyzedsnapat=greatest(analyzedsnapat,?) where repoid=?", $analyzed_snaptime, $this->repoid);
     }
@@ -420,12 +420,12 @@ class Repository {
         $this->analyze_snapshots();
         $bhash = hex2bin(substr($hash, 0, strlen($hash) & ~1));
         if (strlen($bhash) == 20)
-            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and hash=?", $this->repoid, $bhash);
+            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and bhash=?", $this->repoid, $bhash);
         else
-            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and left(hash,?)=?", $this->repoid, strlen($bhash), $bhash);
+            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and left(bhash,?)=?", $this->repoid, strlen($bhash), $bhash);
         $match = null;
         while ($result && ($row = $result->fetch_object())) {
-            $h = bin2hex($row->hash);
+            $h = bin2hex($row->bhash);
             if (str_starts_with($h, $hash)) {
                 if ($match) {
                     $match = false;

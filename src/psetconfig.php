@@ -349,7 +349,7 @@ class Pset {
 
     function commit_notes($hash) {
         assert(!$this->gitless);
-        $result = $this->conf->qe("select * from CommitNotes where hash=? and pset=?", $hash, $this->psetid);
+        $result = $this->conf->qe("select * from CommitNotes where pset=? and bhash=?", $this->psetid, hex2bin($hash));
         $cn = edb_orow($result);
         if ($cn && $cn->notes)
             $cn->notes = json_decode($cn->notes);
