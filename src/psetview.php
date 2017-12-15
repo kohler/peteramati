@@ -28,6 +28,7 @@ class PsetView {
     private $n_visible_grades = null;
     private $n_visible_in_total;
     private $n_set_grades;
+    private $need_format = false;
 
     const ERROR_NOTRUN = 1;
     const ERROR_LOGMISSING = 2;
@@ -951,7 +952,10 @@ class PsetView {
             echo " hidegrades";
         if (!$open)
             echo '" style="display:none';
-        echo '" data-pa-file="', htmlspecialchars($file), "\"><tbody>\n";
+        echo '" data-pa-file="', htmlspecialchars($file), "\"";
+        if ($this->conf->default_format)
+            echo ' data-default-format="', $this->conf->default_format, '"';
+        echo "><tbody>\n";
         Ht::stash_script('pa_expandcontext.bind(document.body)', "pa_expandcontext");
         foreach ($dinfo as $l) {
             if ($l[0] == "@")
@@ -1011,6 +1015,10 @@ class PsetView {
                 $this->echo_linenote($nx, $lnorder);
         }
         echo "</tbody></table>\n";
+        if ($this->need_format) {
+            echo "<script>render_text.on_page()</script>\n";
+            $this->need_format = false;
+        }
         if ($wentries)
             echo "<script>pa_render_need_terminal()</script>\n";
     }
@@ -1056,9 +1064,16 @@ class PsetView {
                 if (!empty($autext))
                     echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
             }
-            echo '<div class="pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote'),
-                '">', htmlspecialchars($note->note), '</div>',
-                '</div></td></tr>';
+            echo '<div class="pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
+            $format = $note->format;
+            if ($format === null)
+                $format = $this->conf->default_format;
+            if ($format) {
+                echo ' need-format" data-format="', $format;
+                $this->need_format = true;
+            }
+            echo '">', htmlspecialchars($note->note), '</div>';
+            echo '</div></td></tr>';
         }
     }
 }

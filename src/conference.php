@@ -42,6 +42,7 @@ class Conf {
 
     public $validate_timeout;
     public $validate_overall_timeout;
+    public $default_format;
 
     private $save_messages = true;
     var $headerPrinted = false;
@@ -314,6 +315,7 @@ class Conf {
         if (!$this->sort_by_last != !$sort_by_last)
             $this->_pc_members_cache = $this->_pc_members_and_admins_cache = null;
         $this->sort_by_last = $sort_by_last;
+        $this->default_format = (int) get($this->opt, "defaultFormat");
         $this->_api_map = null;
     }
 
@@ -1178,6 +1180,7 @@ class Conf {
             Ht::stash_html($this->make_script_file("//code.jquery.com/jquery-migrate-3.0.0.min.js", true));
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/jquery.flot.min.js", true) . "\n");
+        Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
         foreach (mkarray($this->opt("javascripts", [])) as $scriptfile)
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
 

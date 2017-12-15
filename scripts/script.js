@@ -12,10 +12,6 @@ function $$(id) {
     return document.getElementById(id);
 }
 
-function geval(__str) {
-    return eval(__str);
-}
-
 function serialize_object(x) {
     if (typeof x === "string")
         return x;
@@ -1603,6 +1599,182 @@ function setajaxcheck(elt, rv) {
     }
 }
 
+function link_urls(t) {
+    var re = /((?:https?|ftp):\/\/(?:[^\s<>\"&]|&amp;)*[^\s<>\"().,:;&])([\"().,:;]*)(?=[\s<>&]|$)/g;
+    return t.replace(re, function (m, a, b) {
+        return '<a href="' + a + '" rel="noreferrer">' + a + '</a>' + b;
+    });
+}
+
+function HtmlCollector() {
+    this.clear();
+}
+HtmlCollector.prototype.push = function (open, close) {
+    if (open && close) {
+        this.open.push(this.html + open);
+        this.close.push(close);
+        this.html = "";
+        return this.open.length - 1;
+    } else
+        this.html += open;
+    return this;
+};
+HtmlCollector.prototype.pop = function (pos) {
+    if (pos == null)
+        pos = Math.max(0, this.open.length - 1);
+    while (this.open.length > pos) {
+        this.html = this.open[this.open.length - 1] + this.html +
+            this.close[this.open.length - 1];
+        this.open.pop();
+        this.close.pop();
+    }
+    return this;
+};
+HtmlCollector.prototype.pop_n = function (n) {
+    this.pop(Math.max(0, this.open.length - n));
+    return this;
+};
+HtmlCollector.prototype.push_pop = function (text) {
+    this.html += text;
+    return this.pop();
+};
+HtmlCollector.prototype.pop_push = function (open, close) {
+    this.pop();
+    return this.push(open, close);
+};
+HtmlCollector.prototype.pop_collapse = function (pos) {
+    if (pos == null)
+        pos = this.open.length ? this.open.length - 1 : 0;
+    while (this.open.length > pos) {
+        if (this.html !== "")
+            this.html = this.open[this.open.length - 1] + this.html +
+                this.close[this.open.length - 1];
+        this.open.pop();
+        this.close.pop();
+    }
+    return this;
+};
+HtmlCollector.prototype.render = function () {
+    this.pop(0);
+    return this.html;
+};
+HtmlCollector.prototype.clear = function () {
+    this.open = [];
+    this.close = [];
+    this.html = "";
+    return this;
+};
+HtmlCollector.prototype.next_htctl_id = (function () {
+var id = 1;
+return function () {
+    while (document.getElementById("htctl" + id))
+        ++id;
+    ++id;
+    return "htctl" + (id - 1);
+};
+})();
+
+
+// text rendering
+window.render_text = (function () {
+function render0(text) {
+    return link_urls(escape_entities(text));
+}
+
+var default_format = 0, renderers = {"0": {format: 0, render: render0}};
+
+function lookup(format) {
+    var r, p;
+    if (format && (r = renderers[format]))
+        return r;
+    if (format
+        && typeof format === "string"
+        && (p = format.indexOf(".")) > 0
+        && (r = renderers[format.substring(0, p)]))
+        return r;
+    if (format == null)
+        format = default_format;
+    return renderers[format] || renderers[0];
+}
+
+function do_render(format, is_inline, a) {
+    var r = lookup(format);
+    if (r.format)
+        try {
+            var f = (is_inline && r.render_inline) || r.render;
+            console.log(f.apply(this, a));
+            return {
+                format: r.formatClass || r.format,
+                content: f.apply(this, a)
+            };
+        } catch (e) {
+            log_jserror("do_render format " + r.format + ": " + e.toString(), e);
+        }
+    return {format: 0, content: render0(a[0])};
+}
+
+function render_text(format, text /* arguments... */) {
+    var a = [text], i;
+    for (i = 2; i < arguments.length; ++i)
+        a.push(arguments[i]);
+    return do_render.call(this, format, false, a);
+}
+
+function render_inline(format, text /* arguments... */) {
+    var a = [text], i;
+    for (i = 2; i < arguments.length; ++i)
+        a.push(arguments[i]);
+    return do_render.call(this, format, true, a);
+}
+
+function on() {
+    var $j = $(this), format = this.getAttribute("data-format"),
+        content = this.getAttribute("data-content") || $j.text(), args = null, f, i;
+    if ((i = format.indexOf(".")) > 0) {
+        var a = format.split(/\./);
+        format = a[0];
+        args = {};
+        for (i = 1; i < a.length; ++i)
+            args[a[i]] = true;
+    }
+    if (this.tagName == "DIV")
+        f = render_text.call(this, format, content, args);
+    else
+        f = render_inline.call(this, format, content, args);
+    if (f.format)
+        $j.html(f.content);
+    var s = $.trim(this.className.replace(/(?:^| )(?:need-format|format\d+)(?= |$)/g, " "));
+    this.className = s + (s ? " format" : "format") + (f.format || 0);
+    if (f.format)
+        $j.trigger("renderText", f);
+}
+
+$.extend(render_text, {
+    add_format: function (x) {
+        x.format && (renderers[x.format] = x);
+    },
+    format: function (format) {
+        return lookup(format);
+    },
+    set_default_format: function (format) {
+        default_format = format;
+    },
+    inline: render_inline,
+    on: on,
+    on_page: function () { $(".need-format").each(on); }
+});
+return render_text;
+})();
+
+(function (md) {
+render_text.add_format({
+    format: 1,
+    render: function (text) {
+        return md.render(text);
+    }
+});
+})(window.markdownit());
+
 
 // popup dialogs
 function popup_near(elt, anchor) {
@@ -1834,9 +2006,19 @@ function render_note($tr, note, transition) {
         if (authors.length)
             t += '<div class="pa-note-author">[' + authors.join(', ') + ']</div>';
     }
-    t += '<div class="pa-note pa-' + (note[0] ? 'comment' : 'grade') + 'note"></div></div>';
+    t += '<div class="pa-note pa-' + (note[0] ? 'comment' : 'grade') + 'note';
+    if (note[4] && typeof note[4] === "number")
+        t += '" data-format="' + note[4];
+    t += '"></div></div>';
     $td.append(t);
-    $td.find(".pa-note").text(note[1]);
+
+    if (!note[4])
+        $td.find(".pa-note").text(note[1]);
+    else {
+        var r = render_text(note[4], note[1]);
+        $td.find(".pa-note").addClass("format" + (r.format || 0)).html(r.content);
+    }
+
     fix_notelinks($tr);
 
     if (transition)
@@ -1854,8 +2036,11 @@ function render_form($tr, note, transition) {
     }
 
     var $pi = $(curanal.tr).closest(".pa-psetinfo");
+    var format = note ? note[4] : null;
+    if (format == null)
+        format = $tr.closest(".pa-filediff").attr("data-default-format");
     var t = '<form method="post" action="' +
-        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi, {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0}))) +
+        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi, {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0, format: format}))) +
         '" enctype="multipart/form-data" accept-charset="UTF-8">' +
         '<div class="f-contain"><textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +

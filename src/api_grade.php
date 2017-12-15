@@ -167,7 +167,9 @@ class API_Grade {
                 $note->users[] = $user->contactId;
             $note->iscomment = !!$qreq->iscomment;
             $note->note = (string) $qreq->note;
-            $note->version = +$note->version + 1;
+            $note->version = intval($note->version) + 1;
+            if ($qreq->format && ctype_digit($qreq->format))
+                $note->format = intval($qreq->format);
 
             $lnotes = ["linenotes" => [$qreq->file => [$qreq->line => $note]]];
             $info->update_current_info($lnotes);

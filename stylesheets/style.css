@@ -2419,7 +2419,7 @@ tr.pa-gx:hover > td {
 	background-color: #e8e8f8;
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
-.pa-notebox, .pa-note-entry, .pa-noteref, .pa-gradeboxref, .pa-warnbox {
+.pa-noteref, .pa-gradeboxref, .pa-warnbox {
 	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 1.5;
 }
@@ -2435,9 +2435,22 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-da, .pa-db {
 	user-select: none;
 }
-.pa-dd, .pa-note, .pa-dy {
+.pa-dd, .pa-dy {
 	overflow-wrap: break-word;
 	white-space: pre-wrap;
+}
+.pa-note {
+	overflow-wrap: break-word;
+	line-height: 1.35;
+}
+.pa-note.format1 {
+	font-family: Georgia, serif;
+}
+.pa-note > *:first-child {
+	margin-top: 0;
+}
+.pa-note > *:last-child {
+	margin-bottom: 0;
 }
 table.hidegrades .pa-gradenote {
 	color: #880000;
@@ -2445,7 +2458,7 @@ table.hidegrades .pa-gradenote {
 .pa-noteref {
 	font-size: smaller;
 }
-.pa-noteref.hiddennote61 {
+.pa-noteref.pa-notehidden {
 	font-style: italic;
 }
 .pa-da, .pa-db {
@@ -2515,7 +2528,6 @@ span.foldarrow {
 	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
 	    #f3d1fc;
 	background-size: 100% 7px, 100% 5px, 100% 100%;
-	font-style: italic;
 	padding: 0.8em 1em 0.8em 0;
 }
 .pa-note-edge {
