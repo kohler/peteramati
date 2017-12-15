@@ -2352,6 +2352,9 @@ td.mhcb {
 	font-weight: bold;
 	white-space: nowrap;
 }
+table.pap {
+	line-height: 1.35;
+}
 table.pap > thead {
 	font-size: smaller;
 	color: #7777aa;
