@@ -244,8 +244,8 @@ class PsetView {
             $hasflags = self::notes_hasflags($new_notes);
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record)
-                $result = $this->conf->qx("insert into CommitNotes set pset=?, bhash=?, hash=?, notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, repoid=?",
-                                          $this->pset->psetid, hex2bin($hash), $hash,
+                $result = $this->conf->qe("insert into CommitNotes set pset=?, bhash=?, notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, repoid=?",
+                                          $this->pset->psetid, hex2bin($hash),
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $this->repo->repoid);
             else
                 $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, notesversion=? where pset=? and bhash=? and notesversion=?",
