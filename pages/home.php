@@ -710,8 +710,8 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     else if ($row->main_gradercid)
         $j["gradercid"] = $row->main_gradercid;
     $j["psetid"] = $pset->id;
-    $j["hash"] = $row->hash;
-    if ($row->gradehash === $row->hash && $row->hash)
+    $j["hash"] = $row_hash = bin2hex($row->bhash);
+    if ($row->gradehash === $row_hash && $row_hash)
         $j["is_grade"] = true;
     if ($row->haslinenotes)
         $j["has_notes"] = true;

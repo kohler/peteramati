@@ -3609,7 +3609,13 @@ function pa_render_pset_table(psetid, pconf, data) {
             l = [];
             for (i = 0; i < data.length; ++i) {
                 p.push(data[i].psetid);
-                l.push(data[i].is_grade ? "x" : data[i].hash.substr(0, 7));
+                if (data[i].is_grade) {
+                    l.push("x");
+                } else if (data[i].hash) {
+                    l.push(data[i].hash.substr(0, 7));
+                } else {
+                    l.push("");
+                }
             }
             j.psetids = p.join("'");
             j.hashes = l.join("'");
