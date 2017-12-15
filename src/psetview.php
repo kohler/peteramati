@@ -1065,13 +1065,11 @@ class PsetView {
                     echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
             }
             echo '<div class="pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
-            $format = $note->format;
-            if ($format === null)
-                $format = $this->conf->default_format;
-            if ($format) {
-                echo ' need-format" data-format="', $format;
+            if ($note->format) {
+                echo ' need-format" data-format="', $note->format;
                 $this->need_format = true;
-            }
+            } else
+                echo ' format0';
             echo '">', htmlspecialchars($note->note), '</div>';
             echo '</div></td></tr>';
         }

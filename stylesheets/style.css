@@ -2442,9 +2442,10 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-note {
 	overflow-wrap: break-word;
 	line-height: 1.35;
-}
-.pa-note.format1 {
 	font-family: Georgia, serif;
+}
+.pa-note.format0 {
+	white-space: pre-wrap;
 }
 .pa-note > *:first-child {
 	margin-top: 0;

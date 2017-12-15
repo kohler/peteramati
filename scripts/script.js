@@ -1702,7 +1702,6 @@ function do_render(format, is_inline, a) {
     if (r.format)
         try {
             var f = (is_inline && r.render_inline) || r.render;
-            console.log(f.apply(this, a));
             return {
                 format: r.formatClass || r.format,
                 content: f.apply(this, a)
@@ -2013,7 +2012,7 @@ function render_note($tr, note, transition) {
     $td.append(t);
 
     if (!note[4])
-        $td.find(".pa-note").text(note[1]);
+        $td.find(".pa-note").addClass("format0").text(note[1]);
     else {
         var r = render_text(note[4], note[1]);
         $td.find(".pa-note").addClass("format" + (r.format || 0)).html(r.content);
