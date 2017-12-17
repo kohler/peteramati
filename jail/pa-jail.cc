@@ -70,7 +70,7 @@ static bool quiet = false;
 static bool doforce = false;
 static bool no_onlcr = false;
 static FILE* verbosefile = stdout;
-static FILE *timingfile = NULL;
+static int timingfd = -1;
 static std::string linkdir;
 static std::string dstroot;
 static std::string pidfilename;
@@ -2034,13 +2034,23 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
             exec_done(child, 128 + SIGTERM);
         to_slave.transfer_out(ptymaster);
         from_slave.transfer_in(ptymaster);
-        off_t out_offset = lseek(STDOUT_FILENO, 0, SEEK_CUR);
-        if (has_blocked && timingfile != NULL) {
+        if (has_blocked && timingfd != -1) {
+            off_t out_offset = lseek(STDOUT_FILENO, 0, SEEK_CUR);
             struct timeval now, delta;
             gettimeofday(&now, 0);
             timersub(&now, &this->start_time, &delta);
-            unsigned long long deltausecs = delta.tv_sec * 1000000 + delta.tv_usec;
-            fprintf(timingfile, "%llu %llu\n", deltausecs, (unsigned long long) out_offset);
+            unsigned long long deltamsecs = (delta.tv_sec * 1000000 + delta.tv_usec) / 1000;
+
+            char timingstr[256];
+            int written = 0;
+            int len = snprintf(timingstr, sizeof(timingstr), "%llu,%llu\n", deltamsecs, (unsigned long long) out_offset);
+            assert(len < 256);
+            while (written < len) {
+                int r = write(timingfd, timingstr, len);
+                if (r < 0)
+                    perror_die("Timing file");
+                written += r;
+            }
             has_blocked = false;
         }
         from_slave.transfer_out(STDOUT_FILENO);
@@ -2296,9 +2306,9 @@ int main(int argc, char** argv) {
 
     // create timing file as current user
     if (!timingfilename.empty()) {
-        timingfile = fopen(timingfilename.c_str(), "w");
+        timingfd = open(timingfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
 
-        if (timingfile == NULL)
+        if (timingfd < 0)
             perror_die(timingfilename);
     }
 
@@ -2423,8 +2433,8 @@ int main(int argc, char** argv) {
         jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, inputfd, timeout, foreground);
 
     // close timing file if appropriate
-    if (timingfile != NULL) {
-        fclose(timingfile);
+    if (timingfd != -1) {
+        close(timingfd);
     }
 
     exit(0);

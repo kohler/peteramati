@@ -146,19 +146,6 @@ class RunnerState {
         return $json;
     }
 
-    function parse_timevals($time) {
-        $elems = explode("\n", $time);
-        function parse_elem($elem) {
-            $parts = explode(" ", $elem);
-            return array(
-                "time" => intval($parts[0]),
-                "offset" => intval($parts[1])
-            );
-        }
-
-        return array_map("parse_elem", $elems);
-    }
-
     function full_json($offset = null) {
         if (!$this->checkt)
             return false;
@@ -180,7 +167,7 @@ class RunnerState {
                 // Get time data, if it exists
                 $time = @file_get_contents($timefn);
                 if ($time !== false)
-                    $json->time_data = $this->parse_timevals($time);
+                    $json->time_data = $time;
             }
             $json->data = $data;
             $json->offset = max($offset, 0);
@@ -258,6 +245,8 @@ class RunnerState {
         $this->inputfifo = $this->logfile . ".in";
         if (!posix_mkfifo($this->inputfifo, 0660))
             $this->inputfifo = null;
+        if ($this->runner->timed_replay)
+            touch($this->timingfile);
         $this->logstream = fopen($this->logfile, "a");
         if ($queue)
             Dbl::qe("update ExecutionQueue set runat=?, status=1, lockfile=?, inputfifo=? where queueid=?",
@@ -279,7 +268,7 @@ class RunnerState {
         // actually run
         $command = "echo; jail/pa-jail run"
             . " -p" . escapeshellarg($this->lockfile);
-        if ($this->pset->timed_replay) {
+        if ($this->runner->timed_replay) {
             $command .= " -t" . escapeshellarg($this->timingfile);
         }
         $skeletondir = $this->pset->run_skeletondir ? : $Conf->opt("run_skeletondir");

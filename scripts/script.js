@@ -3038,6 +3038,15 @@ function pa_run(button, opt) {
         if (data.data) {
             offset = data.lastoffset;
             if(data.done && data.time_data != null) {
+                // Parse timing data
+                var parsed_data = data.time_data.trimRight().split("\n").map(function(line) {
+                    var entries = line.split(",");
+                    return {
+                        time: parseInt(entries[0]),
+                        offset: parseInt(entries[1])
+                    }
+                });
+
                 // Replay with timing
                 var cancelled = false;
                 function processRemaining(data, times, pos) {
@@ -3050,11 +3059,11 @@ function pa_run(button, opt) {
                         setTimeout(function() {
                             times.shift();
                             processRemaining(data, times, offset);
-                        }, (times[1].time - time) / 1000);
+                        }, times[1].time - time);
                     }
                 }
 
-                processRemaining(data.data, data.time_data, 0);
+                processRemaining(data.data, parsed_data, 0);
                 return;
             }
 
