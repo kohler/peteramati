@@ -997,7 +997,8 @@ function show_pset_table($pset) {
     uasort($students, "Contact::compare");
 
     $checkbox = $Me->privChair
-        || (!$pset->gitless && $pset->runners);
+        || (!$pset->gitless && $pset->runners)
+        || $Me->isPC;
 
     $rows = array();
     $incomplete = array();
