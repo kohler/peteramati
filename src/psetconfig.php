@@ -668,6 +668,7 @@ class RunnerConfig {
     public $transfer_warnings_priority;
     public $require;
     public $eval;
+    public $timed_replay;
 
     function __construct($name, $r) {
         $loc = array("runners", $name);
@@ -705,6 +706,9 @@ class RunnerConfig {
         if ($this->position === null && isset($r->priority))
             $this->position = -Pset::cnum($loc, $r, "priority");
         $this->overlay = Pset::cstr($loc, $r, "overlay");
+        $this->timed_replay = Pset::cbool($loc, $r, "timed_replay");
+        if ($this->timed_replay === null)
+            $this->timed_replay = false;
     }
     function category_argument() {
         return $this->category === $this->name ? null : $this->category;

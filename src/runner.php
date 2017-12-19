@@ -13,6 +13,7 @@ class RunnerState {
 
     public $checkt = null;
     private $logfile = null;
+    private $timingfile = null;
     private $lockfile = null;
     private $inputfifo = null;
     private $logstream;
@@ -152,6 +153,7 @@ class RunnerState {
         $this->status_json($json);
         if ($offset !== null) {
             $logfn = $this->info->runner_logfile($this->checkt);
+            $timefn = $logfn . ".time";
             $data = @file_get_contents($logfn, false, null, max($offset, 0));
             if ($data === false)
                 return (object) ["error" => true, "message" => "No such log"];
@@ -160,6 +162,12 @@ class RunnerState {
                 $data = UnicodeHelper::utf8_truncate_invalid($data);
                 if (!is_valid_utf8($data))
                     $data = UnicodeHelper::utf8_replace_invalid($data);
+            }
+            if ($json->done) {
+                // Get time data, if it exists
+                $time = @file_get_contents($timefn);
+                if ($time !== false)
+                    $json->time_data = $time;
             }
             $json->data = $data;
             $json->offset = max($offset, 0);
@@ -231,11 +239,14 @@ class RunnerState {
         // create logfile and lockfile
         $this->checkt = time();
         $this->logfile = $this->info->runner_logfile($this->checkt);
+        $this->timingfile = $this->logfile . ".time";
         $this->lockfile = $this->logfile . ".pid";
         file_put_contents($this->lockfile, "");
         $this->inputfifo = $this->logfile . ".in";
         if (!posix_mkfifo($this->inputfifo, 0660))
             $this->inputfifo = null;
+        if ($this->runner->timed_replay)
+            touch($this->timingfile);
         $this->logstream = fopen($this->logfile, "a");
         if ($queue)
             Dbl::qe("update ExecutionQueue set runat=?, status=1, lockfile=?, inputfifo=? where queueid=?",
@@ -257,6 +268,9 @@ class RunnerState {
         // actually run
         $command = "echo; jail/pa-jail run"
             . " -p" . escapeshellarg($this->lockfile);
+        if ($this->runner->timed_replay) {
+            $command .= " -t" . escapeshellarg($this->timingfile);
+        }
         $skeletondir = $this->pset->run_skeletondir ? : $Conf->opt("run_skeletondir");
         $binddir = $this->pset->run_binddir ? : $Conf->opt("run_binddir");
         if ($skeletondir && $binddir && !is_dir("$skeletondir/proc"))
