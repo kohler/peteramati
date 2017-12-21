@@ -227,10 +227,11 @@ class PsetView {
         // find original
         $this_commit_record = $this->hash === $hash
             || (!$this->hash && $this->repo_grade && $this->repo_grade->gradehash === $hash);
-        if ($this_commit_record)
+        if ($this_commit_record) {
             $record = $this->commit_record();
-        else
+        } else {
             $record = $this->pset->commit_notes($hash);
+        }
 
         // compare-and-swap loop
         while (1) {
@@ -243,23 +244,26 @@ class PsetView {
             $haslinenotes = self::notes_haslinenotes($new_notes);
             $hasflags = self::notes_hasflags($new_notes);
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
-            if (!$record)
+            if (!$record) {
                 $result = $this->conf->qe("insert into CommitNotes set pset=?, bhash=?, notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, repoid=?",
                                           $this->pset->psetid, hex2bin($hash),
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $this->repo->repoid);
-            else
+            } else {
                 $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, notesversion=? where pset=? and bhash=? and notesversion=?",
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $record->notesversion + 1,
                                           $this->pset->psetid, hex2bin($hash), $record->notesversion);
-            if ($result && $result->affected_rows)
+            }
+            if ($result && $result->affected_rows) {
                 break;
+            }
 
             // reload record
             $record = $this->pset->commit_notes($hash);
         }
 
-        if (!$record)
+        if (!$record) {
             $record = (object) ["hash" => $hash, "pset" => $this->pset->psetid, "repoid" => $this->repo->repoid, "notesversion" => 0];
+        }
         $record->notes = $new_notes;
         $record->haslinenotes = $haslinenotes;
         $record->hasflags = $hasflags;
