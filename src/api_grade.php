@@ -136,7 +136,7 @@ class API_Grade {
                 }
             }
             if (!empty($v)) {
-                $info->update_current_info($v);
+                $info->update_grade_info($v);
             }
         }
         $j = (array) $info->grade_json();
