@@ -10,26 +10,11 @@ class API_Grade {
         return is_array($x) ? $x : [];
     }
 
-    static function check_grade_entry(&$gv, $name, &$errors) {
-        $g = get($gv, $name);
-        if ($g === null || is_int($g) || is_float($g)) {
-            return $g;
-        } else if (is_string($g)) {
-            if ($g === "") {
-                $g = null;
-            } else if (preg_match('_\A\+?\d+\z_', $g)) {
-                $g = intval($g);
-            } else if (preg_match('_\A\+?(?:\d+\.|\.\d)\d*\z_', $g)) {
-                $g = floatval($g);
-            } else {
-                $g = false;
-                $errors = true;
-            }
-        } else {
+    static private function check_grade_entry(&$gv, GradeEntryConfig $ge, &$errors) {
+        if (isset($gv[$ge->key])
+            && ($gv[$ge->key] = $ge->parse_value($gv[$ge->key])) === false) {
             $errors = true;
-            $g = false;
         }
-        return $gv[$name] = $g;
     }
 
     static function grade(Contact $user, Qrequest $qreq, APIData $api) {
@@ -78,25 +63,25 @@ class API_Grade {
 
             // check grade entries
             $errors = false;
-            foreach ($info->pset->grades as $ge) {
-                self::check_grade_entry($g, $ge->key, $errors);
-                self::check_grade_entry($ag, $ge->key, $errors);
-                self::check_grade_entry($og, $ge->key, $errors);
+            foreach ($info->pset->grades() as $ge) {
+                self::check_grade_entry($g, $ge, $errors);
+                self::check_grade_entry($ag, $ge, $errors);
+                self::check_grade_entry($og, $ge, $errors);
             }
-            self::check_grade_entry($g, "late_hours", $errors);
-            self::check_grade_entry($og, "late_hours", $errors);
+            if (($ge = $info->pset->late_hours_entry())) {
+                self::check_grade_entry($g, $ge, $errors);
+                self::check_grade_entry($og, $ge, $errors);
+            }
             if ($errors) {
                 return ["ok" => false, "error" => "Invalid request."];
             }
 
             // assign grades
             $gv = $agv = [];
-            foreach ($api->pset->grades as $ge) {
+            foreach ($api->pset->grades() as $ge) {
                 if (array_key_exists($ge->key, $og)) {
                     $curgv = $info->current_grade_entry($ge->key);
-                    if ($og[$ge->key] === null
-                        ? $curgv !== null
-                        : $curgv === null || abs($curgv - $og[$ge->key]) >= 0.0001) {
+                    if ($ge->value_differs($curgv, $og[$ge->key])) {
                         $j = (array) $info->grade_json();
                         $j["ok"] = false;
                         $j["error"] = "Grade edit conflict, your update was ignored.";

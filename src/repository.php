@@ -644,7 +644,7 @@ class Repository {
 
         // ensure a diff for every landmarked file, even if empty
         if ($pset->has_grade_landmark) {
-            foreach ($pset->grades as $g) {
+            foreach ($pset->grades() as $g) {
                 $file = $g->landmark_file;
                 if ($file && !isset($diff_files[$file])) {
                     $diff_files[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));

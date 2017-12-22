@@ -198,21 +198,12 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
     if ($info->is_handout_commit())
         json_exit(["ok" => false, "error" => "This is a handout commit."]);
     $grades = $maxgrades = [];
-    foreach ($pset->grades as $ge) {
-        if (isset($values[$ge->key])) {
-            $g = trim($values[$ge->key]);
-            if ($g === "")
-                $g = null;
-            else if (preg_match('_\A(?:0|[1-9]\d*)\z_', $g))
-                $g = intval($g);
-            else if (preg_match('_\A(?:0\.|\.\d|[1-9]\d*\.)\d*\z_', $g))
-                $g = floatval($g);
-            else
-                continue;
+    foreach ($pset->grades() as $ge) {
+        if (isset($values[$ge->key])
+            && ($g = $ge->parse_value($values[$ge->key])) !== false) {
             if (isset($values["old;" . $ge->key])) {
                 $old_grade = $info->current_grade_entry($ge->key);
-                if ((string) $old_grade != trim($values["old;" . $ge->key])
-                    && $old_grade !== $g)
+                if ($ge->values_differ($g, $old_grade))
                     json_exit(["ok" => false, "error" => "This grade has been updated—please reload."]);
             }
             $grades[$ge->key] = $g;
@@ -583,7 +574,7 @@ function echo_all_grades() {
                                     array(), array("nowrap" => true));
             echo '</div>';
         }
-    } else if ($User !== $Me) {
+    } else if ($User !== $Me && $Info->pset->late_hours_entry()) {
         echo '<table class="pa-grade pa-grp" data-pa-grade="late_hours" style="margin-top:1em"><tbody>',
             '<tr><td class="pa-grp-title">late hours</td>',
             '<td><form onsubmit="return pa_savegrades(this)"><div class="pa-gradeentry">',

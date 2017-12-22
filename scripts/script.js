@@ -2391,15 +2391,23 @@ function pa_makegrade(name, ge, editable) {
         '"><tbody><tr><td class="pa-grp-title">' +
         (ge.title ? escape_entities(ge.title) : name) + '</td><td>';
     if (editable) {
-        t += '<form onsubmit="return pa_savegrades(this)">' +
-            '<div class="pa-gradeentry"><span class="pa-gradeholder">' +
-            '<input type="text" class="pa-gradevalue" name="' + name +
-            '" onchange="$(this).closest(\'form\').submit()" /></span>';
-        if (ge.max)
-            t += ' <span class="pa-grademax" style="display:inline-block;min-width:3.5em">of ' + ge.max + '</span>';
+        t += '<form onsubmit="return pa_savegrades(this)">';
+        if (ge.type === "text") {
+            t += '<div><textarea class="pa-gradevalue" name="' + name +
+                '" onchange="$(this).closest(\'form\').submit()"></textarea>';
+        } else {
+            t += '<div class="pa-gradeentry"><span class="pa-gradeholder">' +
+                '<input type="text" class="pa-gradevalue" name="' + name +
+                '" onchange="$(this).closest(\'form\').submit()" /></span>';
+            if (ge.max)
+                t += ' <span class="pa-grademax" style="display:inline-block;min-width:3.5em">of ' + ge.max + '</span>';
+        }
         t += ' <input type="submit" value="Save" tabindex="1" style="display:none" /></div></form>';
     } else {
-        t += '<span class="pa-gradevalue"></span>';
+        if (ge.type === "text")
+            t += '<div class="pa-gradevalue"></div>';
+        else
+            t += '<span class="pa-gradevalue"></span>';
         if (ge.max)
             t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
     }
@@ -2434,7 +2442,7 @@ function pa_savegrades(form) {
         gi = JSON.parse(gi);
     }
     var g = {}, og = {};
-    $f.find("input.pa-gradevalue").each(function () {
+    $f.find("input.pa-gradevalue, textarea.pa-gradevalue").each(function () {
         var ge = gi.entries[this.name];
         if (gi.grades && ge && gi.grades[ge.pos] != null)
             og[this.name] = gi.grades[ge.pos];
@@ -3646,7 +3654,9 @@ function pa_render_pset_table(psetid, pconf, data) {
                 s.boringness = 0;
             ngrades = 0;
             for (var j = 0; j < grade_keys.length; ++j) {
-                if (grade_keys[j] != pconf.total_key && s.grades[j] != null && s.grades[j] !== "")
+                if (grade_keys[j] != pconf.total_key
+                    && s.grades[j] != null
+                    && s.grades[j] !== "")
                     ++ngrades;
             }
             s.ngrades_nonempty = ngrades;

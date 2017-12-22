@@ -302,14 +302,15 @@ class PsetView {
             // update database
             $notes = json_encode($new_notes);
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
-            if (!$record)
+            if (!$record) {
                 $result = $this->conf->qx("insert into ContactGrade set cid=?, pset=?, notes=?, hasactiveflags=?",
                                           $this->user->contactId, $this->pset->psetid,
                                           $notes, $hasactiveflags);
-            else
+            } else {
                 $result = $this->conf->qe("update ContactGrade set notes=?, hasactiveflags=?, notesversion=? where cid=? and pset=? and notesversion=?",
                                           $notes, $hasactiveflags, $record->notesversion + 1,
                                           $this->user->contactId, $this->pset->psetid, $record->notesversion);
+            }
             if ($result && $result->affected_rows)
                 break;
 
@@ -601,6 +602,8 @@ class PsetView {
         } else if ($this->user->extension && $this->pset->deadline_extension) {
             $deadline = $this->pset->deadline_extension;
         }
+        if (!$deadline)
+            return null;
 
         $timestamp = get($cinfo, "timestamp");
         if (!$timestamp
@@ -898,7 +901,7 @@ class PsetView {
 
     function expand_diff_for_grades($diffs) {
         if ($this->pset->has_grade_landmark && $this->pc_view) {
-            foreach ($this->pset->grades as $g) {
+            foreach ($this->pset->grades() as $g) {
                 if ($g->landmark_file
                     && ($di = get($diffs, $g->landmark_file))
                     && !$di->contains_linea($g->landmark_line))
@@ -927,7 +930,7 @@ class PsetView {
         if ($this->pset->has_grade_landmark
             && $this->pc_view
             && !$this->is_handout_commit()) {
-            foreach ($this->pset->grades as $g)
+            foreach ($this->pset->grades() as $g)
                 if ($g->landmark_file === $file)
                     $gentries["a" . $g->landmark_line][] = $g;
         }

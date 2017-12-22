@@ -545,7 +545,7 @@ class ContactView {
     }
 
     static function pset_grade($notesj, $pset) {
-        if (!$pset->grades)
+        if (!$pset->grades())
             return null;
 
         $total = $nonextra = 0;
@@ -553,7 +553,7 @@ class ContactView {
         $g = get($notesj, "grades");
         $ag = get($notesj, "autogrades");
         $rag = array();
-        foreach ($pset->grades as $ge) {
+        foreach ($pset->grades() as $ge) {
             $key = $ge->key;
             $gv = null;
             if ($ag && isset($ag->$key))

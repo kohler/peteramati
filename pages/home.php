@@ -139,7 +139,7 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
                 $ss->{$k} = get_f($ss, $k) + $gd->total_noextra;
             }
             if ($entries)
-                foreach ($pset->grades as $ge) {
+                foreach ($pset->numeric_grades() as $ge) {
                     $k = $ge->key;
                     if (get($gd, $k) !== null)
                         $ss->{$k} = $gd->{$k};
@@ -210,7 +210,7 @@ function download_psets_report($request) {
             if (($g = $pset->group)) {
                 if (!isset($maxbyg[$g]))
                     $maxbyg[$g] = $maxbyg["${g}_noextra"] = 0;
-                foreach ($pset->grades as $ge)
+                foreach ($pset->grades() as $ge)
                     if ($ge->max && !$ge->no_total) {
                         $maxbyg[$g] += $ge->max;
                         if (!$ge->is_extra)
@@ -225,7 +225,7 @@ function download_psets_report($request) {
             if ($pset->has_extra)
                 set_ranks($students, $selection, $pset->psetkey . "_noextra");
             if ($sel_pset)
-                foreach ($pset->grades as $ge)
+                foreach ($pset->grades() as $ge)
                     $selection[] = $ge->key;
         }
 
@@ -594,7 +594,7 @@ function render_grades($pset, $gi, $s) {
     global $Me;
     $total = 0;
     $garr = $gvarr = $different = [];
-    foreach ($pset->grades as $ge) {
+    foreach ($pset->numeric_grades() as $ge) {
         $k = $ge->key;
         $gv = $ggv = $agv = "";
         if ($gi && isset($gi->grades))
@@ -875,7 +875,7 @@ function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) 
             $j["gradehash"] = $s->gradehash;
     }
 
-    if (!empty($pset->grades)) {
+    if ($pset->grades()) {
         $gi = null;
         if ($pset->gitless_grades)
             $gi = $pset->contact_grade_for($s);
@@ -1012,15 +1012,16 @@ function show_pset_table($pset) {
         echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
 
     echo '<table class="pap" id="pa-pset' . $pset->id . '"></table>';
+    $grades = $pset->numeric_grades();
     $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous,
-           "grade_keys" => array_keys($pset->grades),
-           "grade_titles" => array_values(array_map(function ($ge) { return $ge->title; }, $pset->grades)),
+           "grade_keys" => array_keys($grades),
+           "grade_titles" => array_values(array_map(function ($ge) { return $ge->title; }, $grades)),
            "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
            "psetkey" => $pset->urlkey];
     if ($anonymous)
         $jd["can_override_anonymous"] = true;
     $i = $nintotal = $last_in_total = 0;
-    foreach ($pset->grades as $ge) {
+    foreach ($grades as $ge) {
         if (!$ge->no_total) {
             ++$nintotal;
             $last_in_total = $ge->key;
@@ -1058,12 +1059,12 @@ function show_pset_table($pset) {
                 }
             }
             if ($pset->has_grade_landmark) {
-                foreach ($pset->grades as $g)
-                    if ($g->landmark_range_file) {
+                foreach ($pset->grades() as $ge)
+                    if ($ge->landmark_range_file) {
                         if ($stage !== -1 && $stage !== 1)
                             $actions[] = null;
                         $stage = 1;
-                        $actions["grademany_{$g->key}"] = "Grade {$g->title}";
+                        $actions["grademany_{$ge->key}"] = "Grade {$ge->title}";
                     }
             }
         }

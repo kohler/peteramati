@@ -62,6 +62,7 @@ class Pset {
     public $separate_extension_grades;
     public $has_extra = false;
     public $max_total;
+    private $_late_hours;
 
     public $all_runners = array();
     public $runners;
@@ -192,6 +193,10 @@ class Pset {
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
 
+        if (($this->deadline || $this->deadline_college || $this->deadline_extension)
+            && !self::cbool($p, "no_late_hours"))
+            $this->_late_hours = GradeEntryConfig::make_late_hours();
+
         // runners
         $runners = get($p, "runners");
         $this->has_transfer_warnings = $this->has_xterm_js = false;
@@ -316,6 +321,16 @@ class Pset {
         return $this->conf->latest_handout_commit($this);
     }
 
+    function grades() {
+        return $this->grades;
+    }
+
+    function numeric_grades() {
+        return array_filter($this->grades, function ($ge) {
+            return $ge->type === null;
+        });
+    }
+
     function visible_grades($pcview) {
         return $pcview ? $this->grades : array_filter($this->grades, function ($ge) {
             return $ge->visible;
@@ -326,6 +341,10 @@ class Pset {
         return array_filter($this->grades, function ($ge) use ($pcview) {
             return ($pcview || $ge->visible) && !$ge->no_total;
         });
+    }
+
+    function late_hours_entry() {
+        return $this->_late_hours;
     }
 
     function gradeinfo_json($pcview) {
@@ -349,6 +368,8 @@ class Pset {
         $count = $maxtotal = 0;
         foreach ($this->visible_grades($pcview) as $ge) {
             $gej = ["title" => $ge->title, "pos" => $count];
+            if ($ge->type !== null)
+                $gej["type"] = $ge->type;
             if ($ge->max && ($pcview || $ge->max_visible)) {
                 $gej["max"] = $ge->max;
                 if (!$ge->is_extra && !$ge->no_total)
@@ -595,6 +616,7 @@ class GradeEntryConfig {
     public $key;
     public $name;
     public $title;
+    public $type;
     public $max;
     public $visible;
     private $_visible_defaulted = false;
@@ -629,21 +651,37 @@ class GradeEntryConfig {
         $this->title = Pset::cstr($loc, $g, "title");
         if ((string) $this->title === "")
             $this->title = $this->key;
-        $this->max = Pset::cnum($loc, $g, "max");
-        if (isset($g->visible))
-            $this->visible = Pset::cbool($loc, $g, "visible");
-        else if (isset($g->hide))
-            $this->visible = !Pset::cbool($loc, $g, "hide");
-        else
-            $this->visible = $this->_visible_defaulted = true;
-        if (isset($g->max_visible))
-            $this->max_visible = Pset::cbool($loc, $g, "max_visible");
-        else if (isset($g->hide_max))
-            $this->max_visible = !Pset::cbool($loc, $g, "hide_max");
-        else
-            $this->max_visible = $this->_max_visible_defaulted = true;
-        $this->no_total = Pset::cbool($loc, $g, "no_total");
-        $this->is_extra = Pset::cbool($loc, $g, "is_extra");
+
+        $type = null;
+        if (isset($g->type)) {
+            $type = Pset::cstr($loc, $g, "type");
+            if ($type !== "number" && $type !== "text")
+                throw new PsetConfigException("unknown grade entry type", $loc);
+            if ($type === "number")
+                $type = null;
+        }
+        $this->type = $type;
+
+        if ($this->type === "text") {
+            $this->no_total = true;
+        } else {
+            $this->max = Pset::cnum($loc, $g, "max");
+            if (isset($g->visible))
+                $this->visible = Pset::cbool($loc, $g, "visible");
+            else if (isset($g->hide))
+                $this->visible = !Pset::cbool($loc, $g, "hide");
+            else
+                $this->visible = $this->_visible_defaulted = true;
+            if (isset($g->max_visible))
+                $this->max_visible = Pset::cbool($loc, $g, "max_visible");
+            else if (isset($g->hide_max))
+                $this->max_visible = !Pset::cbool($loc, $g, "hide_max");
+            else
+                $this->max_visible = $this->_max_visible_defaulted = true;
+            $this->no_total = Pset::cbool($loc, $g, "no_total");
+            $this->is_extra = Pset::cbool($loc, $g, "is_extra");
+        }
+
         $this->position = Pset::cnum($loc, $g, "position");
         if ($this->position === null && isset($g->priority))
             $this->position = -Pset::cnum($loc, $g, "priority");
@@ -680,6 +718,39 @@ class GradeEntryConfig {
                 || $this->landmark_range_first > $this->landmark_range_last)
                 throw new PsetConfigException("grade entry `landmark_range` format error", $loc);
         }
+    }
+
+    static function make_late_hours() {
+        $ge = new GradeEntryConfig("x_late_hours", (object) ["no_total" => true, "position" => PHP_INT_MAX, "title" => "late hours"]);
+        $ge->key = "late_hours";
+        return $ge;
+    }
+
+
+    function parse_value($v) {
+        if ($v === null || is_int($v) || is_float($v)) {
+            return $v;
+        } else if (is_string($v)) {
+            if ($this->type === "text") {
+                return rtrim($v);
+            }
+            $v = trim($v);
+            if ($v === "") {
+                return null;
+            } else if (preg_match('_\A\+?\d+\z_', $v)) {
+                return intval($v);
+            } else if (preg_match('_\A\+?(?:\d+\.|\.\d)\d*\z_', $v)) {
+                return floatval($v);
+            }
+        }
+        return false;
+    }
+
+    function value_differs($v1, $v2) {
+        if ($v1 === null || $v2 === null || $this->type === "text")
+            return $v1 !== $v2;
+        else
+            return abs($v1 - $v2) >= 0.0001;
     }
 }
 

@@ -2642,6 +2642,10 @@ span.foldarrow {
 input.pa-grade, input.pa-gradevalue {
 	width: 90%;
 }
+textarea.pa-gradevalue {
+	vertical-align: top;
+	width: 40rem;
+}
 .pa-total span.pa-gradevalue {
 	font-weight: bold;
 }
