@@ -23,7 +23,7 @@ $Qreq->files = $Pset->maybe_prefix_directory($Qreq->files);
 
 $psetinfo_idx = 0;
 
-function echo_diff_one(Contact $user, Pset $pset, Qrequest $qreq) {
+function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     global $Me, $psetinfo_idx;
     ++$psetinfo_idx;
     $info = new PsetView($pset, $user, $Me);
@@ -38,7 +38,7 @@ function echo_diff_one(Contact $user, Pset $pset, Qrequest $qreq) {
         echo '" data-pa-can-set-grades="yes';
     if ($info->user_can_view_grades())
         echo '" data-pa-user-can-view-grades="yes';
-    if ($info->can_view_grades())
+    if ($info->can_view_grades() && $info->has_assignable_grades())
         echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode($info->grade_json()));
     echo '">';
 
@@ -60,22 +60,30 @@ function echo_diff_one(Contact $user, Pset $pset, Qrequest $qreq) {
         echo '<h3>', Text::user_html($user), '</h3>';
     echo '<hr class="c" />';
 
-    $lnorder = $info->viewable_line_notes();
-    $allowfiles = $qreq->files;
-    $diff = $info->repo->diff($pset, null, $info->grading_hash(), array("needfiles" => $lnorder->note_files(), "allowfiles" => $allowfiles));
-    $info->expand_diff_for_grades($diff);
-    if (count($allowfiles) == 1
-        && isset($diff[$allowfiles[0]])
-        && $qreq->lines
-        && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m))
-        $diff[$allowfiles[0]] = $diff[$allowfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
+    if ($qreq->files) {
+        $lnorder = $info->viewable_line_notes();
+        $allowfiles = $qreq->files;
+        $diff = $info->repo->diff($pset, null, $info->grading_hash(), array("needfiles" => $lnorder->note_files(), "allowfiles" => $allowfiles));
+        $info->expand_diff_for_grades($diff);
+        if (count($allowfiles) == 1
+            && isset($diff[$allowfiles[0]])
+            && $qreq->lines
+            && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m))
+            $diff[$allowfiles[0]] = $diff[$allowfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
 
-    foreach ($diff as $file => $dinfo)
-        $info->echo_file_diff($file, $dinfo, $lnorder, true, count($qreq->files) == 1);
+        foreach ($diff as $file => $dinfo)
+            $info->echo_file_diff($file, $dinfo, $lnorder, true, count($qreq->files) == 1);
 
-    if ($pset->has_grade_landmark)
-        echo Ht::unstash_script('pa_loadgrades.call($("#pa-psetinfo' . $psetinfo_idx . '")[0], true)');
+        $want_grades = $pset->has_grade_landmark;
+    } else {
+        echo '<div class="pa-gradelist',
+            ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
+        $want_grades = true;
+    }
+
     echo "</div>\n";
+    if ($want_grades)
+        echo Ht::unstash_script('pa_loadgrades.call($("#pa-psetinfo' . $psetinfo_idx . '")[0], true)');
     echo "<hr />\n";
 }
 
@@ -84,9 +92,25 @@ $Conf->header(htmlspecialchars($Pset->title . " > " . join(" ", $Qreq->files)), 
 echo Ht::js_button("Hide left", "pa_diff_toggle_hide_left.call(this)");
 echo "<hr />\n";
 
+if (trim((string) $Qreq->users) === "") {
+    $want = $visited = [];
+    foreach ($Pset->students() as $s) {
+        if (!isset($visited[$s->contactId])) {
+            $want[] = $s->email;
+            $visited[$s->contactId] = true;
+            if ($s->pcid) {
+                foreach (array_unique(explode(",", $s->pcid)) as $pcid) {
+                    $visited[$pcid] = true;
+                }
+            }
+        }
+    }
+    $Qreq->users = join(" ", $want);
+}
+
 foreach (explode(" ", $Qreq->users) as $user) {
     if ($user !== "" && ($user = $Conf->user_by_whatever($user))) {
-        echo_diff_one($user, $Pset, $Qreq);
+        echo_one($user, $Pset, $Qreq);
     } else if ($user !== "") {
         echo "<p>no such user ", htmlspecialchars($user), "</p>\n";
     }

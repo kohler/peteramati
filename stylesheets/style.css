@@ -2801,15 +2801,15 @@ span.pa-grade, span.pa-gradevalue {
 	float: left;
 	margin-right: 12px;
 	margin-bottom: 8px;
-	max-width: 128px;
-	max-height: 128px;
+	max-width: 160px;
+	max-height: 160px;
 }
 .pa-smallface {
 	float: left;
 	margin-right: 12px;
 	margin-bottom: 8px;
-	max-width: 64px;
-	max-height: 64px;
+	max-width: 96px;
+	max-height: 96px;
 }
 .facebook61 {
 	float: left;

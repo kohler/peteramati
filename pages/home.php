@@ -15,7 +15,6 @@ $Qreq = make_qreq();
 
 $email_class = "";
 $password_class = "";
-$LastPsetFix = false;
 $Profile = $Me && $Me->privChair && $Qreq->profile;
 
 // signin links
@@ -735,7 +734,7 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
 }
 
 function show_regrades($result, $all) {
-    global $Conf, $Me, $Now, $LastPsetFix;
+    global $Conf, $Me, $Now;
     $rows = $uids = [];
     $pcmembers = $Conf->pc_members_and_admins();
     while (($row = edb_orow($result))) {
@@ -929,7 +928,7 @@ function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) 
 }
 
 function show_pset_table($pset) {
-    global $Conf, $Me, $Now, $Profile, $LastPsetFix;
+    global $Conf, $Me, $Now, $Profile;
 
     echo '<div id="', $pset->urlkey, '">';
     echo "<h3>", htmlspecialchars($pset->title), "</h3>";
@@ -958,43 +957,18 @@ function show_pset_table($pset) {
 */
 
     // load students
-    if ($Conf->opt("restrictRepoView")) {
-        $view = "exists (select * from ContactLink where cid=c.contactId and type=" . LINK_REPOVIEW . " and link=l.link)";
-    } else {
-        $view = "1";
-    }
-    $q = "select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.github_username, c.seascode_username, c.anon_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
-	group_concat(pl.link) pcid, group_concat(rpl.link) rpcid,
-	r.repoid, r.cacheid, r.heads, r.url, r.open, r.working, r.lastpset, r.snapcheckat, $view repoviewable,
-	rg.gradehash, rg.gradercid, rg.placeholder, rg.placeholder_at
-	from ContactInfo c
-	left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$pset->id)
-	left join Repository r on (r.repoid=l.link)
-	left join ContactLink pl on (pl.cid=c.contactId and pl.type=" . LINK_PARTNER . " and pl.pset=$pset->id)
-	left join ContactLink rpl on (rpl.cid=c.contactId and rpl.type=" . LINK_BACKPARTNER . " and rpl.pset=$pset->id)
-	left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.pset=$pset->id)
-	where (c.roles&" . Contact::ROLE_PCLIKE . ")=0
-	and (rg.repoid is not null or not c.dropped)
-	group by c.contactId, l.link";
-    //error_log(preg_replace('/\s+/', ' ', $q));
-    $result = $Conf->qe_raw($q);
-    $t1 = $Profile ? microtime(true) : 0;
-
     $anonymous = $pset->anonymous;
     if (req("anonymous") !== null && $Me->privChair)
         $anonymous = !!req("anonymous");
-    $students = $repos = array();
-    while ($result && ($s = Contact::fetch($result))) {
-        $s->set_anonymous($anonymous);
-        $students[$s->contactId] = $s;
-        if (!$pset->gitless && $s->repoid)
-            $repos[$s->repoid][] = $s->contactId;
-        // maybe lastpset links are out of order
-        if ($s->lastpset < $pset)
-            $LastPsetFix = true;
+    $students = $pset->students($anonymous);
+
+    $repos = [];
+    if (!$pset->gitless) {
+        foreach ($students as $s) {
+            if ($s->repoid)
+                $repos[$s->repoid][] = $s->contactId;
+        }
     }
-    uasort($students, "Contact::compare");
 
     $checkbox = $Me->privChair
         || (!$pset->gitless && $pset->runners)
@@ -1004,7 +978,7 @@ function show_pset_table($pset) {
     $incomplete = array();
     $pcmembers = $Conf->pc_members();
     $jx = [];
-    foreach ($students as $s)
+    foreach ($students as $s) {
         if (!$s->visited) {
             $j = render_pset_row($pset, $students, $repos, $s, $anonymous);
             if ($s->pcid) {
@@ -1025,6 +999,7 @@ function show_pset_table($pset) {
                 $incomplete[] = $t . '</a>';
             }
         }
+    }
 
     if (!empty($incomplete)) {
         echo '<div id="incomplete_pset', $pset->id, '" style="display:none" class="merror">',
@@ -1177,11 +1152,6 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             show_pset_table($pset, $Me);
             $sep = "<hr />\n";
         }
-
-    if ($LastPsetFix) {
-        $Conf->log("Repository.lastpset links are bogus", $Me);
-        Contact::update_all_repo_lastpset();
-    }
 }
 
 echo "<div class='clear'></div>\n";

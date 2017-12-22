@@ -392,15 +392,16 @@ class PsetView {
                     $this->repo_grade->hash = bin2hex($this->repo_grade->bhash);
                 }
             }
-            $this->grade = $this->repo_grade;
-            $this->grade_notes = get($this->grade, "notes");
-            if ($this->grade_notes
-                && get($this->grade, "gradercid")
-                && !get($this->grade_notes, "gradercid"))
-                $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
-            if (get($this->grade, "gradehash") && $this->hash === null)
-                // NB don't check recent_commits association here
-                $this->hash = $this->grade->gradehash;
+            if (($this->grade = $this->repo_grade)) {
+                $this->grade_notes = get($this->grade, "notes");
+                if ($this->grade_notes
+                    && get($this->grade, "gradercid")
+                    && !get($this->grade_notes, "gradercid"))
+                    $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
+                if (get($this->grade, "gradehash") && $this->hash === null)
+                    // NB don't check recent_commits association here
+                    $this->hash = $this->grade->gradehash;
+            }
         }
         $this->n_visible_grades = null;
     }
@@ -409,6 +410,10 @@ class PsetView {
         if ($this->grade === false)
             $this->load_grade();
         return $this->grade;
+    }
+
+    function has_assignable_grades() {
+        return $this->pset->gitless_grades || $this->grading_commit();
     }
 
     function grading_hash() {
