@@ -87,9 +87,13 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     echo "<hr />\n";
 }
 
-$Conf->header(htmlspecialchars($Pset->title . " > " . join(" ", $Qreq->files)), "home");
+$title = $Pset->title;
+if ($Qreq->files)
+    $title .= " > " . join(" ", $Qreq->files);
+$Conf->header(htmlspecialchars($title), "home");
 
-echo Ht::js_button("Hide left", "pa_diff_toggle_hide_left.call(this)");
+if ($Qreq->files)
+    echo Ht::js_button("Hide left", "pa_diff_toggle_hide_left.call(this)");
 echo "<hr />\n";
 
 if (trim((string) $Qreq->users) === "") {
