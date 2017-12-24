@@ -930,15 +930,18 @@ class PsetView {
         if ($this->pset->has_grade_landmark
             && $this->pc_view
             && !$this->is_handout_commit()) {
-            foreach ($this->pset->grades() as $g)
-                if ($g->landmark_file === $file)
+            foreach ($this->pset->grades() as $g) {
+                if ($g->landmark_file === $file) {
                     $gentries["a" . $g->landmark_line][] = $g;
+                }
+            }
         }
         $wentries = null;
         if ($this->pset->has_transfer_warnings
             && !$this->is_handout_commit()) {
-            foreach ($this->transferred_warnings_for($file) as $lineno => $w)
+            foreach ($this->transferred_warnings_for($file) as $lineno => $w) {
                 $wentries["b" . $lineno] = $w;
+            }
         }
         $this->tabwidth();
 
@@ -1019,8 +1022,13 @@ class PsetView {
             }
 
             if ($gentries !== null && $aln && isset($gentries[$aln])) {
-                foreach ($gentries[$aln] as $g)
-                    echo '<tr class="pa-dl pa-gg"><td colspan="3" class="pa-graderow"><div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"></div></td></tr>';
+                foreach ($gentries[$aln] as $g) {
+                    echo '<tr class="pa-dl pa-gg"><td colspan="3" class="pa-graderow">',
+                        '<div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"';
+                    if ($g->landmark_file === $g->landmark_range_file)
+                        echo ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
+                    echo '></div></td></tr>';
+                }
             }
 
             if ($nx)
