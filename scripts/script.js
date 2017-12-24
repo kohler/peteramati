@@ -2660,7 +2660,7 @@ function pa_compute_note_grades(event) {
         } else if (hasClass(tr, "pa-gw") && lna >= lnfirst && lna < lnlast) {
             var note = pa_notedata($(tr));
             if (note && note[1]
-                && ((m = /(?:^|\s)(\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*\/])\S*)/.exec(note[1]))
+                && ((m = /(?:^|\s)(\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
                     || (m = /((?:^|[\s(]))(\d+(?:\.\d*)?|\.\d+)(\/[\d.]+(?!\.\d|[\w%$*\/])\S*)/.exec(note[1])))) {
                 sum += parseFloat(m[2]);
                 noteparts.push("@" + (lnb || lna) + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]));
