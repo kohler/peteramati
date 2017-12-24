@@ -2657,7 +2657,7 @@ function pa_compute_note_grades(event) {
     var lna = -1, lnb = -1, sum = 0, noteparts = [];
     for (; tr; tr = tr.nextSibling) {
         if (tr.nodeType !== Node.ELEMENT_NODE) {
-        } else if (hasClass(tr, "pa-gw") && lna >= lnfirst && lna < lnlast) {
+        } else if (hasClass(tr, "pa-gw") && lna >= lnfirst && lna <= lnlast) {
             var note = pa_notedata($(tr));
             if (note && note[1]
                 && ((m = /(?:^|\s)(\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
