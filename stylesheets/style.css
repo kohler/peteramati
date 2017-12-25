@@ -2432,11 +2432,6 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-da::before, .pa-db::before {
 	content: attr(data-landmark);
 }
-.pa-da, .pa-db {
-	user-select: none;
-	width: 1%;
-	min-width: 2rem;
-}
 .pa-dd, .pa-dy {
 	overflow-wrap: break-word;
 	white-space: pre-wrap;
@@ -2469,10 +2464,15 @@ table.hidegrades .pa-gradenote {
 	color: rgba(0, 0, 0, 0.3);
 	padding-left: 0.5em;
 	padding-right: 0.5em;
+	user-select: none;
 	width: 1%;
+	min-width: 2rem;
 }
 .pa-db {
 	padding-right: 1em;
+}
+.pa-dd {
+	width: 99%;
 }
 .pa-dcx {
 	color: rgba(0, 0, 0, 0.5);
