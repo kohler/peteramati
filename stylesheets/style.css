@@ -2434,6 +2434,8 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 }
 .pa-da, .pa-db {
 	user-select: none;
+	width: 1%;
+	min-width: 2rem;
 }
 .pa-dd, .pa-dy {
 	overflow-wrap: break-word;
