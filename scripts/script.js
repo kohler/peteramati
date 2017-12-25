@@ -2103,12 +2103,13 @@ function fix_notelinks($tr) {
     }
 
     function note_anchor(tr) {
-        var anal = pa_diff_locate(tr);
-        if (anal) {
-            var $td = pa_ensureline(anal.file, anal.lineid);
+        var anal = pa_diff_locate(tr), $td = null;
+        if (anal)
+            $td = pa_ensureline(anal.file, anal.lineid);
+        if ($td && $td.length)
             return "#" + $td[0].id;
-        } else
-            return "#";
+        else
+            return "";
     }
 
     function set_link(tr, next_tr) {
