@@ -354,11 +354,15 @@ function doaction(Qrequest $qreq) {
         go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
     } else if (str_starts_with($qreq->action, "diffmany_")) {
         go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
+    } else if ($qreq->action === "diffmany") {
+        go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
     }
-    foreach (qreq_users($qreq) as $user) {
-        $info = new PsetView($pset, $user, $Me);
-        if ($info->grading_hash() && $hiddengrades !== null)
-            $info->set_hidden_grades($hiddengrades);
+    if ($hiddengrades !== null) {
+        foreach (qreq_users($qreq) as $user) {
+            $info = new PsetView($pset, $user, $Me);
+            if ($info->grading_hash())
+                $info->set_hidden_grades($hiddengrades);
+        }
     }
     redirectSelf();
 }
@@ -1049,6 +1053,7 @@ function show_pset_table($pset) {
     $actions = [];
     if ($Me->isPC) {
         $stage = -1;
+        $actions["diffmany"] = $pset->gitless ? "Diffs" : "Grades";
         if (!$pset->gitless_grades) {
             foreach ($pset->all_diffconfig() as $dc) {
                 if (($dc->full || $dc->gradable) && ($f = $dc->exact_filename())) {
