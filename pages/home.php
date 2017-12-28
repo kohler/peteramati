@@ -88,10 +88,11 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
     global $Conf, $Me, $Qreq;
     $result = $Conf->qe_raw("select c.contactId, c.firstName, c.lastName, c.email,
 	c.huid, c.anon_username, c.seascode_username, c.github_username, c.extension,
-	r.repoid, r.url, r.open, r.working, r.lastpset,
+	r.repoid, r.url, r.open, r.working, r.lastpset, min(pl.link) as partnercid,
 	rg.gradehash, rg.gradercid
 	from ContactInfo c
 	left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$pset->id)
+    left join ContactLink pl on (l.cid=c.contactId and l.type=" . LINK_PARTNER . " and l.pset=$pset->id)
 	left join Repository r on (r.repoid=l.link)
 	left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.pset=$pset->id and not rg.placeholder)
 	where ($where)
@@ -107,7 +108,8 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
             $students[$s->username] = $ss = (object)
                 array("username" => $s->username,
                       "extension" => ($s->extension ? "Y" : "N"),
-                      "sorter" => $s->username);
+                      "sorter" => $s->username,
+                      "npartners" => 0);
         else if (!$ss)
             $students[$s->username] = $ss = (object)
                 array("name" => trim("$s->lastName, $s->firstName"),
@@ -116,7 +118,8 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
                       "anon_username" => $s->anon_username,
                       "huid" => $s->huid,
                       "extension" => ($s->extension ? "Y" : "N"),
-                      "sorter" => $s->sorter);
+                      "sorter" => $s->sorter,
+                      "npartners" => 0);
 
         $gi = null;
         if ($pset->gitless_grades)
@@ -145,6 +148,9 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
                         $ss->{$k} = $gd->{$k};
                 }
         }
+
+        if ($s->partnercid)
+            ++$ss->npartners;
     }
     Dbl::free($result);
 }
@@ -201,7 +207,7 @@ function download_psets_report($request) {
     if (isset($request["fields"]))
         $selection = explode(",", $request["fields"]);
     else
-        $selection = array("name", "grade", "username", "anon_username", "huid", "extension");
+        $selection = array("name", "username", "anon_username", "huid", "extension");
     $maxbyg = array();
     $max = $max_noextra = 0;
     foreach ($Conf->psets() as $pset)
@@ -244,6 +250,8 @@ function download_psets_report($request) {
         set_ranks($students, $selection, "performance");
         set_ranks($students, $selection, "performance_noextra");
     }
+
+    $selection[] = "npartners";
 
     $csv = new CsvGenerator;
     $csv->set_header($selection);
