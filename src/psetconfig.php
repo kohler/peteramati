@@ -36,6 +36,7 @@ class Pset {
     public $anonymous;
     public $gitless;
     public $gitless_grades;
+    public $partner_repo;
     public $hide_comments = false;
 
     public $handout_repo_url;
@@ -133,6 +134,11 @@ class Pset {
             $this->gitless_grades = $this->gitless;
         if (!$this->gitless_grades && $this->gitless)
             throw new PsetConfigException("`gitless` requires `gitless_grades`", "gitless_grades");
+        $this->partner_repo = self::cstr($p, "partner_repo");
+        if ((string) $this->partner_repo === "" || $this->partner_repo === "same")
+            $this->partner_repo = null;
+        else if ($this->partner_repo !== "different")
+            throw new PsetConfigException("`partner_repo` should be \"same\" or \"different\"");
         $this->hide_comments = self::cbool($p, "hide_comments");
 
         // directory

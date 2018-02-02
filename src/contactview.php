@@ -272,7 +272,7 @@ class ContactView {
             $repo->check_working($ms);
             $repo->check_open($ms);
         }
-        if ($partner && $info->partner_same()) {
+        if ($partner && $info->partner_same() && !$pset->partner_repo) {
             $prepo = $partner->repo($pset->id);
             if ((!$repo && $prepo) || ($repo && !$prepo)
                 || ($repo && $prepo && $repo->repoid != $prepo->repoid)) {

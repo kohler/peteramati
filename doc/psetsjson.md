@@ -154,6 +154,11 @@ others are shown to users in different contexts.
     some grading history.) With `gitless_grades`, grades are stored once per
     student.
 
+* `partner_repo`: string
+
+    If `"same"` (the default), partners should have the same repository. If
+    `"different"`, partners should have different repositories.
+
 * `handout_repo_url`: string
 
     Git URL for handout code.

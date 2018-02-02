@@ -923,10 +923,13 @@ function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) 
         if ($s->open)
             $j["repo_too_open"] = true;
         if ($s->pcid != $s->rpcid
-            || ($s->pcid && (!isset($students[$s->pcid])
-                             || $students[$s->pcid]->repoid != $s->repoid)))
+            || ($s->pcid && !isset($students[$s->pcid])))
             $j["repo_partner_error"] = true;
-        else if ($s->repoid) {
+        else if ($s->pcid
+                 && $students[$s->pcid]->repoid != $s->repoid) {
+            if (!$pset->partner_repo)
+                $j["repo_partner_error"] = true;
+        } else if ($s->repoid) {
             $expected_cids = [$s->contactId];
             if ($s->pcid)
                 $expected_cids[] = $s->pcid;
