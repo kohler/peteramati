@@ -996,7 +996,7 @@ function show_pset_table($pset) {
     foreach ($students as $s) {
         if (!$s->visited) {
             $j = render_pset_row($pset, $students, $repos, $s, $anonymous);
-            if ($s->pcid) {
+            if ($s->pcid && !$pset->partner_repo) {
                 foreach (array_unique(explode(",", $s->pcid)) as $pcid)
                     if (isset($students[$pcid])) {
                         $ss = $students[$pcid];
