@@ -492,10 +492,17 @@ function echo_commit($Info) {
         $last_myhandout = $last_handout ? $Info->derived_handout_hash() : false;
         if ($last_handout && $last_myhandout && $last_handout->hash == $last_myhandout)
             /* this is ideal: they have the latest handout commit */;
-        else if ($last_handout && $last_myhandout)
+        else if ($last_handout && $last_myhandout) {
             // they don't have the latest updates
-            $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>git pull handout master</code> to merge these updates.");
-        else if ($last_handout)
+            $cmd = "git pull handout";
+            if ($Pset->handout_hash)
+                $cmd .= " " . htmlspecialchars($Pset->handout_hash);
+            else if ($Pset->handout_repo_branch)
+                $cmd .= " " . htmlspecialchars($Pset->handout_repo_branch);
+            else
+                $cmd .= " master";
+            $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
+        } else if ($last_handout)
             $remarks[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.");
         else if (!$last_handout && $Me->isPC) {
             $handout_files = $Pset->handout_repo()->ls_files("master");

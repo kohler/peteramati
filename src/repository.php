@@ -524,7 +524,9 @@ class Repository {
 
         if (!$hasha) {
             $hrepo = $pset->handout_repo($this);
-            if (isset($pset->handout_repo_branch))
+            if ($pset->handout_hash && ($hc = $pset->latest_handout_commit()))
+                $hasha = $hc->hash;
+            else if (isset($pset->handout_repo_branch))
                 $hasha = "repo{$hrepo->repoid}/" . $pset->handout_repo_branch;
             else
                 $hasha = "repo{$hrepo->repoid}/master";

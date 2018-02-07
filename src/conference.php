@@ -1546,7 +1546,7 @@ class Conf {
         $this->_handout_commits[$pset->id] = $commits;
         if ($pset->handout_hash
             && ($cx = git_commit_in_list($commits, $pset->handout_hash)))
-            $this->_handout_latest_commit[$pset->id] = $cx;
+            $this->_handout_latest_commit[$pset->id] = $commits[$cx];
         else {
             reset($commits);
             $this->_handout_latest_commit[$pset->id] = current($commits);
