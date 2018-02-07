@@ -1544,8 +1544,13 @@ class Conf {
             $commits[$c[0]] = new RepositoryCommitInfo($c[1], $c[0], $c[2],
                                         RepositoryCommitInfo::HANDOUTHEAD);
         $this->_handout_commits[$pset->id] = $commits;
-        reset($commits);
-        $this->_handout_latest_commit[$pset->id] = current($commits);
+        if ($pset->handout_hash
+            && ($cx = git_commit_in_list($commits, $pset->handout_hash)))
+            $this->_handout_latest_commit[$pset->id] = $cx;
+        else {
+            reset($commits);
+            $this->_handout_latest_commit[$pset->id] = current($commits);
+        }
     }
 
     function handout_commits(Pset $pset, $hash = null) {

@@ -163,6 +163,10 @@ others are shown to users in different contexts.
 
     Git URL for handout code.
 
+* `handout_hash`: string
+
+    Commit hash of handout code.
+
 * `directory`: string
 
     Subdirectory containing the problem set code. Use this when a user's

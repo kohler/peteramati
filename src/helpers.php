@@ -823,7 +823,7 @@ function git_commit_in_list($list, $commit) {
     // XXX strtolower
     if ((string) $commit === "")
         return false;
-    if (strlen($commit) == 40)
+    if (strlen($commit) === 40 || strlen($commit) === 64)
         return isset($list[$commit]) ? $commit : false;
     $cx = false;
     foreach ($list as $hash => $v)
