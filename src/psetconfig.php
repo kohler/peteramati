@@ -325,6 +325,10 @@ class Pset {
         return $this->conf->handout_commits($this, $hash);
     }
 
+    function handout_commits_from($hash) {
+        return $this->conf->handout_commits_from($this, $hash);
+    }
+
     function latest_handout_commit() {
         return $this->conf->latest_handout_commit($this);
     }

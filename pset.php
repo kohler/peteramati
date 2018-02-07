@@ -493,15 +493,21 @@ function echo_commit($Info) {
         if ($last_handout && $last_myhandout && $last_handout->hash == $last_myhandout)
             /* this is ideal: they have the latest handout commit */;
         else if ($last_handout && $last_myhandout) {
-            // they don't have the latest updates
-            $cmd = "git pull handout";
-            if ($Pset->handout_hash)
-                $cmd .= " " . htmlspecialchars($Pset->handout_hash);
-            else if ($Pset->handout_repo_branch)
-                $cmd .= " " . htmlspecialchars($Pset->handout_repo_branch);
-            else
-                $cmd .= " master";
-            $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
+            if ($Pset->handout_hash
+                && ($hcf = $Pset->handout_commits_from($last_myhandout))
+                && isset($hcf[$last_handout->hash])) {
+                // also fine
+            } else {
+                // they don't have the latest updates
+                $cmd = "git pull handout";
+                if ($Pset->handout_hash)
+                    $cmd .= " " . htmlspecialchars($Pset->handout_hash);
+                else if ($Pset->handout_repo_branch)
+                    $cmd .= " " . htmlspecialchars($Pset->handout_repo_branch);
+                else
+                    $cmd .= " master";
+                $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
+            }
         } else if ($last_handout)
             $remarks[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.");
         else if (!$last_handout && $Me->isPC) {

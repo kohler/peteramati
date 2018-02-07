@@ -1560,7 +1560,7 @@ class Conf {
         $commits = $this->_handout_commits[$pset->id];
         if (!$hash)
             return $commits;
-        else if (strlen($hash) === 40)
+        else if (strlen($hash) === 40 || strlen($hash) === 64)
             return get($commits, $hash);
         else {
             $matches = [];
@@ -1569,6 +1569,21 @@ class Conf {
                     $matches[] = $c;
             return count($matches) === 1 ? $matches[0] : null;
         }
+    }
+
+    function handout_commits_from(Pset $pset, $hash) {
+        global $Now;
+        if (!array_key_exists($pset->id, $this->_handout_commits))
+            $this->populate_handout_commits($pset);
+        $commits = $this->_handout_commits[$pset->id];
+        $matches = $list = [];
+        foreach ($commits as $h => $c) {
+            if (str_starts_with($h, $hash))
+                $matches[] = $c;
+            if (!empty($matches))
+                $list[$h] = $c;
+        }
+        return count($matches) === 1 ? $list : null;
     }
 
     function latest_handout_commit(Pset $pset) {
