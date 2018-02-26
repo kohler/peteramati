@@ -166,6 +166,9 @@ class Pset {
         $this->deadline = self::cdate($p, "deadline");
         $this->deadline_college = self::cdate($p, "deadline_college", "college_deadline");
         $this->deadline_extension = self::cdate($p, "deadline_extension", "college_extension");
+        if (!$this->deadline) {
+            $this->deadline = $this->deadline_college ? : $this->deadline_extension;
+        }
 
         // grades
         $grades = get($p, "grades");

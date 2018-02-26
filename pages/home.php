@@ -347,16 +347,28 @@ if ($Me->isPC && check_post() && $Qreq->runmany)
 
 function doaction(Qrequest $qreq) {
     global $Conf, $Me;
-    if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled)
+    if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled) {
         return $Conf->errorMsg("No such pset");
+    }
     $hiddengrades = null;
-    if ($qreq->action === "showgrades")
+    if ($qreq->action === "showgrades") {
         $hiddengrades = -1;
-    else if ($qreq->action === "hidegrades")
+    } else if ($qreq->action === "hidegrades") {
         $hiddengrades = 1;
-    else if ($qreq->action === "defaultgrades")
+    } else if ($qreq->action === "defaultgrades") {
         $hiddengrades = 0;
-    else if (str_starts_with($qreq->action, "grademany_")) {
+    } else if ($qreq->action === "copyrepo") {
+        $older_pset = null;
+        foreach ($Conf->psets() as $p) {
+            if (!$p->disabled && $p !== $pset && $p->deadline < $pset->deadline && !$p->gitless && $p->handout_repo_url === $pset->handout_repo_url) {
+                $older_pset = $p;
+            }
+        }
+        foreach (qreq_users($qreq) as $user) {
+            if (!$user->repo($pset) && ($r = $user->repo($older_pset)))
+                $user->set_repo($pset, $r);
+        }
+    } else if (str_starts_with($qreq->action, "grademany_")) {
         $g = $pset->all_grades[substr($qreq->action, 10)];
         assert($g && !!$g->landmark_range_file);
         go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
@@ -1090,6 +1102,12 @@ function show_pset_table($pset) {
         $actions["showgrades"] = "Show grades";
         $actions["hidegrades"] = "Hide grades";
         $actions["defaultgrades"] = "Default grades";
+        foreach ($Conf->psets() as $p) {
+            if (!$p->disabled && $p->deadline < $pset->deadline && !$p->gitless && !$pset->gitless && $p->handout_repo_url === $pset->handout_repo_url) {
+                $actions["copyrepo"] = "Adopt previous repo";
+                break;
+            }
+        }
     }
     if (!empty($actions)) {
         echo '<span class="nb" style="padding-right:2em">',
