@@ -1631,6 +1631,7 @@ class Conf {
     private function fill_api_map() {
         $this->_api_map = [
             "blob" => "15 API_Repo::blob",
+            "filediff" => "15 API_Repo::filediff",
             "grade" => "3 API_Grade::grade",
             "jserror" => "1 API_JSError::jserror",
             "latestcommit" => "3 API_Repo::latestcommit",

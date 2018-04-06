@@ -2678,7 +2678,7 @@ function pa_compute_note_grades(event) {
 
 function fold61(sel, arrowholder, direction) {
     var j = $(sel);
-    j.toggle(direction);
+    j.toggleClass("hidden", direction);
     if (arrowholder)
         $(arrowholder).find("span.foldarrow").html(
             j.is(":visible") ? "&#x25BC;" : "&#x25B6;"
@@ -2713,7 +2713,37 @@ function runfold61(name) {
     return false;
 }
 
-function pa_ensureline(filename, lineid) {
+function pa_loadfilediff(filee, callback) {
+    if (hasClass(filee, "need-load")) {
+        var $p = $(filee).closest(".pa-psetinfo");
+        $.ajax(hoturl("api/filediff", hoturl_gradeparts($(filee))), {
+            type: "GET", cache: false, dataType: "json",
+            data: {"file": html_id_decode(filee.id.substr(8)),
+                "base_hash": $p[0].getAttribute("data-pa-base-hash"),
+                "hash": $p[0].getAttribute("data-pa-hash")},
+            success: function (data) {
+                if (data.ok && data.table_html) {
+                    var $h = $(data.table_html);
+                    $(filee).html($h.html());
+                }
+                removeClass(filee, "need-load");
+                callback();
+            }
+        });
+    } else {
+        callback();
+    }
+}
+
+function pa_unfoldfilediff() {
+    var self = this, filee = this.parentElement.nextSibling;
+    pa_loadfilediff(filee, function () {
+        fold61(filee, self);
+    });
+    return false;
+}
+
+function pa_ensureline_callback(filename, lineid, callback) {
     // decode arguments: either (lineref) or (filename, lineid)
     if (lineid == null) {
         if (filename instanceof Node)
@@ -2729,21 +2759,41 @@ function pa_ensureline(filename, lineid) {
     // check lineref
     var lineref = "L" + lineid + "_" + filename;
     var e = document.getElementById(lineref);
-    if (e)
-        return $(e);
+    if (e) {
+        callback(e);
+        return;
+    }
 
     // create link
-    var file = document.getElementById("pa-file-" + filename);
-    if (!file)
-        return $(null);
-    var $tds = $(file).find("td.pa-d" + lineid.charAt(0));
-    var lineno = lineid.substr(1);
-    for (var i = 0; i < $tds.length; ++i)
-        if ($tds[i].getAttribute("data-landmark") === lineno) {
-            $tds[i].id = lineref;
-            return $($tds[i]);
+    var filee = document.getElementById("pa-file-" + filename);
+    if (!filee) {
+        callback(false);
+        return;
+    }
+
+    function try_file() {
+        var $tds = $(filee).find("td.pa-d" + lineid.charAt(0));
+        var lineno = lineid.substr(1);
+        // XXX expand
+        for (var i = 0; i < $tds.length; ++i) {
+            if ($tds[i].getAttribute("data-landmark") === lineno) {
+                $tds[i].id = lineref;
+                callback($tds[i]);
+                return;
+            }
         }
-    return $(null);
+        callback(false);
+    }
+
+    pa_loadfilediff(filee, try_file);
+}
+
+function pa_ensureline(filename, lineid) {
+    var e = null;
+    pa_ensureline_callback(filename, lineid, function (ee) {
+        ee && (e = ee);
+    });
+    return $(e);
 }
 
 function pa_gotoline(x, lineid) {
@@ -2756,22 +2806,22 @@ function pa_gotoline(x, lineid) {
         $e.css("backgroundColor", "");
         $(this).dequeue();
     }
-
-    var $ref = pa_ensureline(x, lineid);
-    if ($ref.length) {
-        $(".anchorhighlight").removeClass("anchorhighlight").finish();
-        $ref.closest("table").show();
-        $e = $ref.closest("tr");
-        var color = $e.css("backgroundColor");
-        $e.addClass("anchorhighlight")
-            .queue(flasher)
-            .delay(100).queue(restorer)
-            .delay(100).queue(flasher)
-            .delay(100).queue(restorer)
-            .delay(100).queue(flasher)
-            .animate({backgroundColor: color}, 1200)
-            .queue(restorer);
-    }
+    pa_ensureline_callback(x, lineid, function (ref) {
+        if (ref) {
+            $(".anchorhighlight").removeClass("anchorhighlight").finish();
+            $(ref).closest("table").removeClass("hidden");
+            $e = $(ref).closest("tr");
+            var color = $e.css("backgroundColor");
+            $e.addClass("anchorhighlight")
+                .queue(flasher)
+                .delay(100).queue(restorer)
+                .delay(100).queue(flasher)
+                .delay(100).queue(restorer)
+                .delay(100).queue(flasher)
+                .animate({backgroundColor: color}, 1200)
+                .queue(restorer);
+        }
+    });
     return true;
 }
 
@@ -3182,7 +3232,7 @@ function pa_run(button, opt) {
     }
     delete therun[0].dataset.paTimestamp;
 
-    fold61(therun, jQuery("#pa-runout-" + category).show(), true);
+    fold61(therun, jQuery("#pa-runout-" + category).removeClass("hidden"), true);
     if (!checkt && !opt.noclear) {
         thepre.html("");
         delete thepre[0].dataset.paTerminalStyle;
@@ -3588,9 +3638,9 @@ function pa_draw_gradecdf($graph) {
         for (var x in {"mean":1, "median":1, "stddev":1}) {
             var $v = $sum.find(".gradecdf61" + x);
             if (x in dd)
-                $v.show().find(".val").text(dd[x].toFixed(1));
+                $v.removeClass("hidden").find(".val").text(dd[x].toFixed(1));
             else
-                $v.hide();
+                $v.addClass("hidden");
         }
     }
 }
@@ -3667,8 +3717,8 @@ function pa_pset_actions() {
     var $f = $(this);
     function update() {
         var st = $f.find("select[name='state']").val();
-        $f.find(".pa-if-enabled").toggle(st !== "disabled");
-        $f.find(".pa-if-visible").toggle(st !== "disabled" && st !== "invisible");
+        $f.find(".pa-if-enabled").toggleClass("hidden", st !== "disabled");
+        $f.find(".pa-if-visible").toggleClass("hidden", st !== "disabled" && st !== "invisible");
     }
     update();
     $f.find("select[name='state']").on("change", update);

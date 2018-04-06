@@ -45,4 +45,27 @@ class API_Repo {
             return ["ok" => false, "error" => "Problem."];
         }
     }
+
+    static function filediff(Contact $user, Qrequest $qreq, APIData $api) {
+        if (!$user->can_view_repo_contents($api->repo, $api->branch))
+            return ["ok" => false, "error" => "Permission error."];
+        if (!$qreq->file)
+            return ["ok" => false, "error" => "Invalid request."];
+        $base_hash = $qreq->base_hash;
+        if ($base_hash && !($base_commit = $user->conf->check_api_hash($base_hash, $api)))
+            return ["ok" => false, "error" => "Disconnected commit."];
+        $info = new PsetView($api->pset, $api->user, $user);
+        $info->set_commit($api->commit);
+        $lnorder = $info->viewable_line_notes();
+        $diff = $info->repo->diff($api->pset, $base_hash, $info->commit_hash(), array("needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file]));
+        if (empty($diff))
+            return ["ok" => false, "error" => "No diff."];
+        ob_start();
+        foreach ($diff as $file => $dinfo) {
+            $info->echo_file_diff($file, $dinfo, $lnorder, true, ["only_table" => true]);
+        }
+        $content = ob_get_contents();
+        ob_end_clean();
+        return ["ok" => true, "table_html" => $content];
+    }
 }

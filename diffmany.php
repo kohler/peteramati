@@ -62,18 +62,20 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
 
     if ($qreq->files) {
         $lnorder = $info->viewable_line_notes();
-        $allowfiles = $qreq->files;
+        $onlyfiles = $qreq->files;
         $hasha = $pset->handout_hash ? : $info->derived_handout_hash();
-        $diff = $info->repo->diff($pset, $hasha, $info->grading_hash(), array("needfiles" => $lnorder->note_files(), "allowfiles" => $allowfiles));
+        $diff = $info->repo->diff($pset, $hasha, $info->grading_hash(), array("needfiles" => $lnorder->note_files(), "onlyfiles" => $onlyfiles));
         $info->expand_diff_for_grades($diff);
-        if (count($allowfiles) == 1
-            && isset($diff[$allowfiles[0]])
+        if (count($onlyfiles) == 1
+            && isset($diff[$onlyfiles[0]])
             && $qreq->lines
             && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m))
-            $diff[$allowfiles[0]] = $diff[$allowfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
+            $diff[$onlyfiles[0]] = $diff[$onlyfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
 
-        foreach ($diff as $file => $dinfo)
-            $info->echo_file_diff($file, $dinfo, $lnorder, true, count($qreq->files) == 1);
+        foreach ($diff as $file => $dinfo) {
+            $info->echo_file_diff($file, $dinfo, $lnorder, true,
+                ["no_heading" => count($qreq->files) == 1]);
+        }
 
         $want_grades = $pset->has_grade_landmark;
     } else {

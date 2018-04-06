@@ -302,7 +302,7 @@ if ($Pset->has_xterm_js) {
     $Conf->add_javascript("scripts/xterm.js");
 }
 $Conf->header(htmlspecialchars($Pset->title), "home");
-$xsep = " <span class='barsep'>&nbsp;·&nbsp;</span> ";
+$xsep = ' <span class="barsep">&nbsp;·&nbsp;</span> ';
 
 
 // Top: user info

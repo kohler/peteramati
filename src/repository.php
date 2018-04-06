@@ -542,7 +542,7 @@ class Repository {
         $ignore_diffconfig = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
         $no_full = get($options, "no_full");
         $needfiles = self::fix_diff_files(get($options, "needfiles"));
-        $allowfiles = self::fix_diff_files(get($options, "allowfiles"));
+        $onlyfiles = self::fix_diff_files(get($options, "onlyfiles"));
 
         // read "full" files
         foreach ($pset->all_diffconfig() as $diffconfig) {
@@ -550,7 +550,7 @@ class Repository {
                 && !$no_full
                 && $diffconfig->full
                 && ($fname = $diffconfig->exact_filename()) !== false
-                && (!$allowfiles || get($allowfiles, $pset->directory_slash . $fname))) {
+                && (!$onlyfiles || get($onlyfiles, $pset->directory_slash . $fname))) {
                 $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg($fname));
                 $di = new DiffInfo("{$pset->directory_slash}{$fname}", $diffconfig);
                 $diff_files[$di->filename] = $di;
@@ -566,20 +566,25 @@ class Repository {
             $command .= " -- " . escapeshellarg($pset->directory_noslash);
         $result = $this->gitrun($command);
 
-        $files_arg = array();
+        $files_arg = $boring_files = [];
         foreach (explode("\n", $result) as $line) {
             if ($line != "") {
                 $diffconfig = $pset->find_diffconfig($truncpfx . $line);
                 // skip files presented in their entirety
                 if ($diffconfig && !$ignore_diffconfig && get($diffconfig, "full"))
                     continue;
-                // skip ignored files, unless user requested them
-                if ($diffconfig && !$ignore_diffconfig && get($diffconfig, "ignore")
-                    && (!$needfiles || !get($needfiles, $truncpfx . $line)))
-                    continue;
                 // skip files that aren't allowed
-                if ($allowfiles && !get($allowfiles, $truncpfx . $line))
+                if ($onlyfiles && !get($onlyfiles, $truncpfx . $line))
                     continue;
+                // skip ignored files, unless user requested them
+                if ($diffconfig && !$ignore_diffconfig
+                    && (get($diffconfig, "ignore") || get($diffconfig, "boring"))
+                    && (!$needfiles || !get($needfiles, $truncpfx . $line))) {
+                    if (!get($diffconfig, "ignore"))
+                        $boring_files[] = $truncpfx . $line;
+                    error_log($truncpfx . $line);
+                    continue;
+                }
                 $files_arg[] = escapeshellarg(quotemeta($line));
             }
         }
@@ -655,6 +660,14 @@ class Repository {
                     $di->finish();
                 }
             }
+        }
+
+        // ensure non-loaded diffs for boring files
+        foreach ($boring_files as $file) {
+            $diff_files[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
+            $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)));
+            $di->finish();
+            $di->loaded = false;
         }
 
         uasort($diff_files, "DiffInfo::compare");

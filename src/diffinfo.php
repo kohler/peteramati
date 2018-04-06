@@ -12,6 +12,7 @@ class DiffInfo implements Iterator {
     public $hide_if_anonymous = false;
     public $position = 0.0;
     public $removed = false;
+    public $loaded = true;
     private $_diff = [];
     private $_diffsz = 0;
     private $_itpos;

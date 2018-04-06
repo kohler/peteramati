@@ -910,15 +910,15 @@ class PsetView {
         }
     }
 
-    private function diff_line_code($t) {
+    private function diff_line_code($t, $tw) {
         while (($p = strpos($t, "\t")) !== false)
-            $t = substr($t, 0, $p) . str_repeat(" ", $this->tabwidth - ($p % $this->tabwidth)) . substr($t, $p + 1);
+            $t = substr($t, 0, $p) . str_repeat(" ", $tw - ($p % $tw)) . substr($t, $p + 1);
         return htmlspecialchars($t);
     }
 
-    function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open, $nofold = false) {
+    function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open, $args = []) {
         if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
-            || $dinfo->is_empty())
+            || ($dinfo->is_empty() && $dinfo->loaded))
             return;
 
         $fileid = html_id_encode($file);
@@ -943,10 +943,13 @@ class PsetView {
                 $wentries["b" . $lineno] = $w;
             }
         }
-        $this->tabwidth();
 
-        if (!$nofold) {
-            echo '<h3><a class="fold61" href="#" onclick="return fold61(this.parentElement.nextSibling,this)"><span class="foldarrow">',
+        $tw = get($args, "tabwidth", $this->tabwidth());
+        $only_table = get($args, "only_table");
+        $no_heading = get($args, "no_heading") || $only_table;
+
+        if (!$no_heading) {
+            echo '<h3><a class="fold61" href="#" onclick="return pa_unfoldfilediff.call(this)"><span class="foldarrow">',
                 ($open ? "&#x25BC;" : "&#x25B6;"),
                 "</span>&nbsp;", htmlspecialchars($file), "</a>";
             if (!$dinfo->removed) {
@@ -966,12 +969,17 @@ class PsetView {
         if (!$this->user_can_view_grades())
             echo " hidegrades";
         if (!$open)
-            echo '" style="display:none';
+            echo " hidden";
+        if (!$dinfo->loaded)
+            echo " need-load";
         echo '" data-pa-file="', htmlspecialchars($file), "\"";
         if ($this->conf->default_format)
             echo ' data-default-format="', $this->conf->default_format, '"';
-        echo "><tbody>\n";
-        Ht::stash_script('pa_expandcontext.bind(document.body)', "pa_expandcontext");
+        echo ">";
+        if ($dinfo->loaded)
+            echo "<tbody>\n";
+        if (!$only_table)
+            Ht::stash_script('pa_expandcontext.bind(document.body)', "pa_expandcontext");
         foreach ($dinfo as $l) {
             if ($l[0] == "@")
                 $x = array(" pa-gx", "pa-dcx", "", "", $l[3]);
@@ -1015,7 +1023,8 @@ class PsetView {
             echo '<tr class="pa-dl', $x[0], '">',
                 '<td class="pa-da"', $ak, '></td>',
                 '<td class="pa-db"', $bk, '></td>',
-                '<td class="', $x[1], '">', $this->diff_line_code($x[4]), "</td></tr>\n";
+                '<td class="', $x[1], '">', $this->diff_line_code($x[4], $tw),
+                "</td></tr>\n";
 
             if ($wentries !== null && $bln && isset($wentries[$bln])) {
                 echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox need-pa-terminal" data-pa-terminal-output="', htmlspecialchars($wentries[$bln]), '"></td></tr>';
@@ -1034,22 +1043,24 @@ class PsetView {
             if ($nx)
                 $this->echo_linenote($nx, $lnorder);
         }
-        echo "</tbody></table>\n";
-        if ($this->need_format) {
+        if ($dinfo->loaded)
+            echo "</tbody>";
+        echo "</table>\n";
+        if ($this->need_format && !$only_table) {
             echo "<script>render_text.on_page()</script>\n";
             $this->need_format = false;
         }
-        if ($wentries)
+        if ($wentries && !$only_table)
             echo "<script>pa_render_need_terminal()</script>\n";
     }
 
     private function echo_linenote(LineNote $note, LinenotesOrder $lnorder = null) {
         if ($this->can_view_grades() || $note->iscomment) {
-            echo '<tr class="pa-dl pa-gw"', /* NB script depends on this class exactly */
-                ' data-pa-note="', htmlspecialchars(json_encode($note->render_json($this->can_view_note_authors()))), '"';
+            echo '<tr class="pa-dl pa-gw'; /* NB script depends on this class exactly */
             if ((string) $note->note === "")
-                echo ' style="display:none"';
-            echo '><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox">';
+                echo ' hidden';
+            echo '" data-pa-note="', htmlspecialchars(json_encode($note->render_json($this->can_view_note_authors()))),
+                '"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox">';
             if ((string) $note->note === "") {
                 echo '</td></tr>';
                 return;
