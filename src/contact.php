@@ -699,7 +699,7 @@ class Contact {
         if ($this->links === null)
             $this->load_links();
         $l = get($this->links[$type], $pset);
-        return count($l) == 1 ? $l[0] : null;
+        return $l !== null && count($l) == 1 ? $l[0] : null;
     }
 
     function links($type, $pset = 0) {
