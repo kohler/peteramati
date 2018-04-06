@@ -490,12 +490,15 @@ function echo_commit($Info) {
         && $Pset->handout_repo_url) {
         $last_handout = $Pset->latest_handout_commit();
         $last_myhandout = $last_handout ? $Info->derived_handout_hash() : false;
-        if ($last_handout && $last_myhandout && $last_handout->hash == $last_myhandout)
-            /* this is ideal: they have the latest handout commit */;
-        else if ($last_handout && $last_myhandout) {
-            if ($Pset->handout_hash
-                && ($hcf = $Pset->handout_commits_from($last_myhandout))
-                && isset($hcf[$last_handout->hash])) {
+        if ($last_handout
+            && $last_myhandout
+            && $last_handout->hash == $last_myhandout) {
+            /* this is ideal: they have the latest handout commit */
+        } else if ($last_handout && $last_myhandout) {
+            $need_handout_hash = $Pset->handout_hash ? : $Pset->handout_warn_hash;
+            if ($need_handout_hash
+                && ($hcf = $Pset->handout_commits_from($need_handout_hash))
+                && isset($hcf[$last_myhandout])) {
                 // also fine
             } else {
                 // they don't have the latest updates
@@ -506,7 +509,7 @@ function echo_commit($Info) {
                     $cmd .= " " . htmlspecialchars($Pset->handout_repo_branch);
                 else
                     $cmd .= " master";
-                $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
+                $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
             }
         } else if ($last_handout)
             $remarks[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.");
@@ -724,7 +727,8 @@ if ($Pset->gitless) {
 
     // collect diff and sort line notes
     $lnorder = $Info->viewable_line_notes();
-    $diff = $Info->repo->diff($Pset, null, $Info->commit_hash(), array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
+    $hasha = $Pset->handout_hash ? : $Info->derived_handout_hash();
+    $diff = $Info->repo->diff($Pset, $hasha, $Info->commit_hash(), array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
     $Info->expand_diff_for_grades($diff);
     $lnorder->set_diff($diff, $Me == $Info->user && $Info->can_view_grades() && $Info->is_grading_commit());
 

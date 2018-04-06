@@ -165,7 +165,15 @@ others are shown to users in different contexts.
 
 * `handout_hash`: string
 
-    Commit hash of handout code.
+    Commit hash to use for handout code and diffs. If not set, diffs are shown
+    relative to derived handout hash (the latest handout hash in the current
+    commit’s history).
+
+* `handout_warn_hash`: string
+
+    Warn user if their handout code is before this hash. If not set,
+    `handout_hash` is used; if that’s not set, the latest handout commit is
+    used.
 
 * `directory`: string
 
