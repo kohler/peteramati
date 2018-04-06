@@ -1930,16 +1930,6 @@ function setmailpsel(sel) {
     fold("psel", !sel.value.match(/^new.*rev$/), 10);
 }
 
-if (window.DOMTokenList && "contains" in window.DOMTokenList.prototype) {
-    window.has_class = function (elt, className) {
-        return elt && elt.classList.contains(className);
-    };
-} else {
-    window.has_class = function (elt, className) {
-        return elt && $(elt).hasClass(className);
-    };
-}
-
 function pa_diff_locate(target, direction) {
     if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
         return null;
@@ -1956,7 +1946,7 @@ function pa_diff_locate(target, direction) {
         tr = target;
         direction = "previousSibling";
     }
-    while (tr && (tr.nodeType !== Node.ELEMENT_NODE || has_class(tr, "pa-gw") || has_class(tr, "pa-gg")))
+    while (tr && (tr.nodeType !== Node.ELEMENT_NODE || hasClass(tr, "pa-gw") || hasClass(tr, "pa-gg")))
         tr = tr[direction];
 
     var table = tr, file;
@@ -1974,9 +1964,9 @@ function pa_diff_locate(target, direction) {
     };
 
     var next_tr = tr.nextSibling;
-    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || has_class(next_tr, "pa-gg")))
+    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gg")))
         next_tr = next_tr.nextSibling;
-    if (next_tr && has_class(next_tr, "pa-gw"))
+    if (next_tr && hasClass(next_tr, "pa-gw"))
         result.notetr = next_tr;
 
     return result;
@@ -1998,7 +1988,7 @@ var scrolled_at;
 
 function add_notetr(linetr) {
     var next_tr = linetr.nextSibling;
-    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || has_class(next_tr, "pa-gg"))) {
+    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gg"))) {
         linetr = next_tr;
         next_tr = next_tr.nextSibling;
     }
@@ -2532,7 +2522,7 @@ function pa_loadgrades(gi) {
         for (var j = 0; j < $pge.length; ++j) {
             if ($pge[j].getAttribute("data-pa-grade") == k) {
                 $g.push($pge[j]);
-                if (has_class($pge[j].parentElement, "pa-gradelist"))
+                if (hasClass($pge[j].parentElement, "pa-gradelist"))
                     in_gradelist = $pge[j];
             }
         }
@@ -2580,7 +2570,7 @@ function pa_loadgrades(gi) {
             } else if (!editable && $v.text() !== g) {
                 $v.text(g);
             }
-            if (ge.landmark && has_class($g[j].parentElement, "pa-gradelist")) {
+            if (ge.landmark && hasClass($g[j].parentElement, "pa-gradelist")) {
                 var m = /^(.*):(\d+)$/.exec(ge.landmark);
                 var $line = pa_ensureline(m[1], "a" + m[2]);
                 var want_gbr = "";
