@@ -357,6 +357,10 @@ function doaction(Qrequest $qreq) {
         $hiddengrades = 1;
     } else if ($qreq->action === "defaultgrades") {
         $hiddengrades = 0;
+    } else if ($qreq->action === "clearrepo") {
+        foreach (qreq_users($qreq) as $user) {
+            $user->set_repo($pset, null);
+        }
     } else if ($qreq->action === "copyrepo") {
         $older_pset = null;
         foreach ($Conf->psets() as $p) {
@@ -1102,6 +1106,8 @@ function show_pset_table($pset) {
         $actions["showgrades"] = "Show grades";
         $actions["hidegrades"] = "Hide grades";
         $actions["defaultgrades"] = "Default grades";
+        if (!$pset->gitless)
+            $actions["clearrepo"] = "Clear repo";
         foreach ($Conf->psets() as $p) {
             if (!$p->disabled && $p->deadline < $pset->deadline && !$p->gitless && !$pset->gitless && $p->handout_repo_url === $pset->handout_repo_url) {
                 $actions["copyrepo"] = "Adopt previous repo";
