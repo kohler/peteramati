@@ -513,14 +513,15 @@ class Repository {
         $diff_files = array();
         assert($pset); // code remains for `!$pset`; maybe revive it?
 
-        $psetdir = $pset ? escapeshellarg($pset->directory_noslash) : null;
-        if ($pset && $this->truncated_psetdir($pset)) {
-            $repodir = "";
-            $truncpfx = $pset->directory_noslash . "/";
-        } else {
-            $repodir = $psetdir . "/"; // Some gits don't do `git show HASH:./FILE`!
-            $truncpfx = "";
-        }
+        $repodir = $truncpfx = "";
+        if ($pset && $pset->directory_noslash !== "" && $pset->directory_noslash !== ".") {
+            $psetdir = escapeshellarg($pset->directory_noslash);
+            if ($this->truncated_psetdir($pset))
+                $truncpfx = $pset->directory_noslash . "/";
+            else
+                $repodir = $psetdir . "/";
+        } else
+            $psetdir = null;
 
         if (!$hasha) {
             $hrepo = $pset->handout_repo($this);
