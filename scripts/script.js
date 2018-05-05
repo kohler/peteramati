@@ -3717,8 +3717,8 @@ function pa_pset_actions() {
     var $f = $(this);
     function update() {
         var st = $f.find("select[name='state']").val();
-        $f.find(".pa-if-enabled").toggleClass("hidden", st !== "disabled");
-        $f.find(".pa-if-visible").toggleClass("hidden", st !== "disabled" && st !== "invisible");
+        $f.find(".pa-if-enabled").toggleClass("hidden", st === "disabled");
+        $f.find(".pa-if-visible").toggleClass("hidden", st === "disabled" || st === "invisible");
     }
     update();
     $f.find("select[name='state']").on("change", update);
