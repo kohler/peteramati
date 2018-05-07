@@ -155,12 +155,16 @@ class Pset {
         if (!property_exists($p, "repo_tarball_patterns"))
             $this->repo_tarball_patterns = array("^git@(.*?):(.*)\.git$",
                 "https://\$1/\$2/archive-tarball/\${HASH}");
-        $this->directory = "";
+        $this->directory = $this->directory_slash = "";
         if (isset($p->directory) && is_string($p->directory))
             $this->directory = $p->directory;
         else if (isset($p->directory) && $p->directory !== false)
             throw new PsetConfigException("`directory` format error", "directory");
         $this->directory_slash = preg_replace(',([^/])/*\z,', '$1/', $this->directory);
+        while (str_starts_with($this->directory_slash, "./"))
+            $this->directory_slash = substr($this->directory_slash, 2);
+        if (str_starts_with($this->directory_slash, "/"))
+            $this->directory_slash = substr($this->directory_slash, 1);
         $this->directory_noslash = preg_replace(',/+\z,', '', $this->directory_slash);
         $this->test_file = self::cstr($p, "test_file");
 

@@ -64,7 +64,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         $lnorder = $info->viewable_line_notes();
         $onlyfiles = $qreq->files;
         $hasha = $pset->handout_hash ? : $info->derived_handout_hash();
-        $diff = $info->repo->diff($pset, $hasha, $info->grading_hash(), array("needfiles" => $lnorder->note_files(), "onlyfiles" => $onlyfiles));
+        $diff = $info->repo->diff($pset, $hasha, $info->grading_hash(), array("needfiles" => $lnorder->note_files(), "onlyfiles" => $onlyfiles, "no_full" => true));
         $info->expand_diff_for_grades($diff);
         if (count($onlyfiles) == 1
             && isset($diff[$onlyfiles[0]])

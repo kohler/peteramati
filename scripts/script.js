@@ -2570,7 +2570,9 @@ function pa_loadgrades(gi) {
             } else if (!editable && $v.text() !== g) {
                 $v.text(g);
             }
-            if (ge.landmark && hasClass($g[j].parentElement, "pa-gradelist")) {
+            if (ge.landmark
+                && $g[j].parentElement
+                && hasClass($g[j].parentElement, "pa-gradelist")) {
                 var m = /^(.*):(\d+)$/.exec(ge.landmark);
                 var $line = pa_ensureline(m[1], "a" + m[2]);
                 var want_gbr = "";

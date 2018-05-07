@@ -514,7 +514,7 @@ class Repository {
         assert($pset); // code remains for `!$pset`; maybe revive it?
 
         $repodir = $truncpfx = "";
-        if ($pset && $pset->directory_noslash !== "" && $pset->directory_noslash !== ".") {
+        if ($pset && $pset->directory_noslash !== "") {
             $psetdir = escapeshellarg($pset->directory_noslash);
             if ($this->truncated_psetdir($pset))
                 $truncpfx = $pset->directory_noslash . "/";
@@ -563,7 +563,7 @@ class Repository {
         }
 
         $command = "git diff --name-only {$hasha_arg} {$hashb_arg}";
-        if ($pset && !$truncpfx)
+        if ($pset && !$truncpfx && $pset->directory_noslash)
             $command .= " -- " . escapeshellarg($pset->directory_noslash);
         $result = $this->gitrun($command);
 
@@ -572,13 +572,18 @@ class Repository {
             if ($line != "") {
                 $diffconfig = $pset->find_diffconfig($truncpfx . $line);
                 // skip files presented in their entirety
-                if ($diffconfig && !$ignore_diffconfig && get($diffconfig, "full"))
+                if ($diffconfig
+                    && !$ignore_diffconfig
+                    && !$no_full
+                    && get($diffconfig, "full"))
                     continue;
                 // skip files that aren't allowed
-                if ($onlyfiles && !get($onlyfiles, $truncpfx . $line))
+                if ($onlyfiles
+                    && !get($onlyfiles, $truncpfx . $line))
                     continue;
                 // skip ignored files, unless user requested them
-                if ($diffconfig && !$ignore_diffconfig
+                if ($diffconfig
+                    && !$ignore_diffconfig
                     && (get($diffconfig, "ignore") || get($diffconfig, "boring"))
                     && (!$needfiles || !get($needfiles, $truncpfx . $line))) {
                     if (!get($diffconfig, "ignore"))
