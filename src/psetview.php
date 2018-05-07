@@ -900,11 +900,13 @@ class PsetView {
     }
 
     function expand_diff_for_grades($diffs) {
-        if ($this->pset->has_grade_landmark && $this->pc_view) {
+        if ($this->pset->has_grade_landmark
+            && $this->pc_view) {
             foreach ($this->pset->grades() as $g) {
                 if ($g->landmark_file
                     && ($di = get($diffs, $g->landmark_file))
-                    && !$di->contains_linea($g->landmark_line))
+                    && !$di->contains_linea($g->landmark_line)
+                    && $di->is_handout_commit_a())
                     $di->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
             }
         }
@@ -929,7 +931,8 @@ class PsetView {
         $gentries = null;
         if ($this->pset->has_grade_landmark
             && $this->pc_view
-            && !$this->is_handout_commit()) {
+            && !$this->is_handout_commit()
+            && $dinfo->is_handout_commit_a()) {
             foreach ($this->pset->grades() as $g) {
                 if ($g->landmark_file === $file) {
                     $gentries["a" . $g->landmark_line][] = $g;

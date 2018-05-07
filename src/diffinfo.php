@@ -21,6 +21,7 @@ class DiffInfo implements Iterator {
     private $_pset;
     private $_hasha;
     private $_filenamea;
+    private $_is_handout_a;
 
     const MAXLINES = 16384;
     const MAXDIFFSZ = self::MAXLINES << 2;
@@ -74,6 +75,13 @@ class DiffInfo implements Iterator {
 
     function is_empty() {
         return $this->_diffsz === 0;
+    }
+
+    function is_handout_commit_a() {
+        if ($this->_is_handout_a === null) {
+            $this->_is_handout_a = $this->_pset && $this->_pset->handout_commits($this->_hasha);
+        }
+        return $this->_is_handout_a;
     }
 
     function entry($i) {
