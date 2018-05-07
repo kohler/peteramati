@@ -21,7 +21,7 @@ class DiffInfo implements Iterator {
     private $_pset;
     private $_hasha;
     private $_filenamea;
-    private $_is_handout_a;
+    private $_hasha_hrepo;
 
     const MAXLINES = 16384;
     const MAXDIFFSZ = self::MAXLINES << 2;
@@ -36,11 +36,13 @@ class DiffInfo implements Iterator {
         }
     }
 
-    function set_repoa(Repository $repoa, Pset $pset = null, $hasha, $filenamea) {
+    function set_repoa(Repository $repoa, Pset $pset = null, $hasha, $filenamea,
+                       $hasha_hrepo = null) {
         $this->_repoa = $repoa;
         $this->_pset = $pset;
         $this->_hasha = $hasha;
         $this->_filenamea = $filenamea;
+        $this->_hasha_hrepo = $hasha_hrepo;
     }
 
     function add($ch, $linea, $lineb, $text) {
@@ -78,10 +80,10 @@ class DiffInfo implements Iterator {
     }
 
     function is_handout_commit_a() {
-        if ($this->_is_handout_a === null) {
-            $this->_is_handout_a = $this->_pset && $this->_pset->handout_commits($this->_hasha);
+        if ($this->_hasha_hrepo === null) {
+            $this->_hasha_hrepo = $this->_pset && $this->_pset->handout_commits($this->_hasha);
         }
-        return $this->_is_handout_a;
+        return $this->_hasha_hrepo;
     }
 
     function entry($i) {

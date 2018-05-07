@@ -540,7 +540,8 @@ class Repository {
         $hasha_arg = escapeshellarg($hasha);
         $hashb_arg = escapeshellarg($hashb);
 
-        $ignore_diffconfig = get($options, "hasha_hrepo") && get($options, "hashb_hrepo");
+        $hasha_hrepo = get($options, "hasha_hrepo");
+        $ignore_diffconfig = $hasha_hrepo && get($options, "hashb_hrepo");
         $no_full = get($options, "no_full");
         $needfiles = self::fix_diff_files(get($options, "needfiles"));
         $onlyfiles = self::fix_diff_files(get($options, "onlyfiles"));
@@ -642,7 +643,7 @@ class Repository {
                     $file = $truncpfx . $m[1];
                     $diffconfig = $pset->find_diffconfig($file);
                     $di = $diff_files[$file] = new DiffInfo($file, $diffconfig);
-                    $di->set_repoa($this, $pset, $hasha, $m[1]);
+                    $di->set_repoa($this, $pset, $hasha, $m[1], $hasha_hrepo);
                     $alineno = $blineno = null;
                 } else if ($line[0] === "B" && $di && preg_match('_\ABinary files_', $line)) {
                     $di->add("@", null, null, $line);
@@ -662,7 +663,7 @@ class Repository {
                 $file = $g->landmark_file;
                 if ($file && !isset($diff_files[$file])) {
                     $diff_files[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
-                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)));
+                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $hasha_hrepo);
                     $di->finish();
                 }
             }
@@ -671,7 +672,7 @@ class Repository {
         // ensure non-loaded diffs for boring files
         foreach ($boring_files as $file) {
             $diff_files[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
-            $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)));
+            $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $hasha_hrepo);
             $di->finish();
             $di->loaded = false;
         }
