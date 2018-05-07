@@ -589,7 +589,6 @@ class Repository {
                     && (!$needfiles || !get($needfiles, $truncpfx . $line))) {
                     if (!get($diffconfig, "ignore"))
                         $boring_files[] = $truncpfx . $line;
-                    error_log($truncpfx . $line);
                     continue;
                 }
                 $files_arg[] = escapeshellarg(quotemeta($line));
