@@ -981,7 +981,8 @@ class PsetView {
         if (!$only_table)
             Ht::stash_script('pa_expandcontext.bind(document.body)', "pa_expandcontext");
         foreach ($dinfo as $l)
-            $this->echo_line_diff($l, $file, $fileid, $linenotes, $wentries, $gentries, $tw);
+            $this->echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
+                                  $wentries, $gentries, $tw);
         if ($dinfo->loaded)
             echo "</tbody>";
         echo "</table>\n";
@@ -993,7 +994,8 @@ class PsetView {
             echo "<script>pa_render_need_terminal()</script>\n";
     }
 
-    private function echo_line_diff($l, $file, $fileid, $linenotes, $wentries, $gentries, $tw) {
+    private function echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
+                                    $wentries, $gentries, $tw) {
         if ($l[0] === "@")
             $x = array(" pa-gx", "pa-dcx", "", "", $l[3]);
         else if ($l[0] === " ")
