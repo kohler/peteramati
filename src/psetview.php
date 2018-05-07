@@ -980,69 +980,8 @@ class PsetView {
             echo "<tbody>\n";
         if (!$only_table)
             Ht::stash_script('pa_expandcontext.bind(document.body)', "pa_expandcontext");
-        foreach ($dinfo as $l) {
-            if ($l[0] == "@")
-                $x = array(" pa-gx", "pa-dcx", "", "", $l[3]);
-            else if ($l[0] == " ")
-                $x = array(" pa-gc", "pa-dd", $l[1], $l[2], $l[3]);
-            else if ($l[0] == "-")
-                $x = array(" pa-gd", "pa-dd", $l[1], "", $l[3]);
-            else
-                $x = array(" pa-gi", "pa-dd", "", $l[2], $l[3]);
-
-            $aln = $x[2] ? "a" . $x[2] : "";
-            $bln = $x[3] ? "b" . $x[3] : "";
-
-            $ak = $bk = "";
-            if ($linenotes && $aln && isset($linenotes->$aln))
-                $ak = ' id="L' . $aln . '_' . $fileid . '"';
-            if ($linenotes && $bln && isset($linenotes->$bln))
-                $bk = ' id="L' . $bln . '_' . $fileid . '"';
-
-            if (!$x[2] && !$x[3])
-                $x[2] = $x[3] = "...";
-            if ($x[2])
-                $ak .= ' data-landmark="' . $x[2] . '"';
-            if ($x[3])
-                $bk .= ' data-landmark="' . $x[3] . '"';
-
-            $nx = $nj = null;
-            if ($linenotes) {
-                if ($bln && isset($linenotes->$bln)) {
-                    $n = LineNote::make_json($file, $bln, $linenotes->$bln);
-                    if ($this->can_view_grades() || $n->iscomment)
-                        $nx = $n;
-                }
-                if (!$nx && $aln && isset($linenotes->$aln)) {
-                    $n = LineNote::make_json($file, $aln, $linenotes->$aln);
-                    if ($this->can_view_grades() || $n->iscomment)
-                        $nx = $n;
-                }
-            }
-
-            echo '<tr class="pa-dl', $x[0], '">',
-                '<td class="pa-da"', $ak, '></td>',
-                '<td class="pa-db"', $bk, '></td>',
-                '<td class="', $x[1], '">', $this->diff_line_code($x[4], $tw),
-                "</td></tr>\n";
-
-            if ($wentries !== null && $bln && isset($wentries[$bln])) {
-                echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox need-pa-terminal" data-pa-terminal-output="', htmlspecialchars($wentries[$bln]), '"></td></tr>';
-            }
-
-            if ($gentries !== null && $aln && isset($gentries[$aln])) {
-                foreach ($gentries[$aln] as $g) {
-                    echo '<tr class="pa-dl pa-gg"><td colspan="3" class="pa-graderow">',
-                        '<div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"';
-                    if ($g->landmark_file === $g->landmark_range_file)
-                        echo ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
-                    echo '></div></td></tr>';
-                }
-            }
-
-            if ($nx)
-                $this->echo_linenote($nx, $lnorder);
-        }
+        foreach ($dinfo as $l)
+            $this->echo_line_diff($l, $file, $fileid, $linenotes, $wentries, $gentries, $tw);
         if ($dinfo->loaded)
             echo "</tbody>";
         echo "</table>\n";
@@ -1052,6 +991,70 @@ class PsetView {
         }
         if ($wentries && !$only_table)
             echo "<script>pa_render_need_terminal()</script>\n";
+    }
+
+    private function echo_line_diff($l, $file, $fileid, $linenotes, $wentries, $gentries, $tw) {
+        if ($l[0] === "@")
+            $x = array(" pa-gx", "pa-dcx", "", "", $l[3]);
+        else if ($l[0] === " ")
+            $x = array(" pa-gc", "pa-dd", $l[1], $l[2], $l[3]);
+        else if ($l[0] === "-")
+            $x = array(" pa-gd", "pa-dd", $l[1], "", $l[3]);
+        else
+            $x = array(" pa-gi", "pa-dd", "", $l[2], $l[3]);
+
+        $aln = $x[2] ? "a" . $x[2] : "";
+        $bln = $x[3] ? "b" . $x[3] : "";
+
+        $ak = $bk = "";
+        if ($linenotes && $aln && isset($linenotes->$aln))
+            $ak = ' id="L' . $aln . '_' . $fileid . '"';
+        if ($linenotes && $bln && isset($linenotes->$bln))
+            $bk = ' id="L' . $bln . '_' . $fileid . '"';
+
+        if (!$x[2] && !$x[3])
+            $x[2] = $x[3] = "...";
+        if ($x[2])
+            $ak .= ' data-landmark="' . $x[2] . '"';
+        if ($x[3])
+            $bk .= ' data-landmark="' . $x[3] . '"';
+
+        $nx = $nj = null;
+        if ($linenotes) {
+            if ($bln && isset($linenotes->$bln)) {
+                $n = LineNote::make_json($file, $bln, $linenotes->$bln);
+                if ($this->can_view_grades() || $n->iscomment)
+                    $nx = $n;
+            }
+            if (!$nx && $aln && isset($linenotes->$aln)) {
+                $n = LineNote::make_json($file, $aln, $linenotes->$aln);
+                if ($this->can_view_grades() || $n->iscomment)
+                    $nx = $n;
+            }
+        }
+
+        echo '<tr class="pa-dl', $x[0], '">',
+            '<td class="pa-da"', $ak, '></td>',
+            '<td class="pa-db"', $bk, '></td>',
+            '<td class="', $x[1], '">', $this->diff_line_code($x[4], $tw),
+            "</td></tr>\n";
+
+        if ($wentries !== null && $bln && isset($wentries[$bln])) {
+            echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox need-pa-terminal" data-pa-terminal-output="', htmlspecialchars($wentries[$bln]), '"></td></tr>';
+        }
+
+        if ($gentries !== null && $aln && isset($gentries[$aln])) {
+            foreach ($gentries[$aln] as $g) {
+                echo '<tr class="pa-dl pa-gg"><td colspan="3" class="pa-graderow">',
+                    '<div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"';
+                if ($g->landmark_file === $g->landmark_range_file)
+                    echo ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
+                echo '></div></td></tr>';
+            }
+        }
+
+        if ($nx)
+            $this->echo_linenote($nx, $lnorder);
     }
 
     private function echo_linenote(LineNote $note, LinenotesOrder $lnorder = null) {

@@ -202,6 +202,11 @@ class DiffInfo implements Iterator {
             $c->_diff = array_slice($this->_diff, $l, $r - $l);
             $c->_diffsz = $r - $l;
         }
+        if ($r < $this->_diffsz) {
+            array_push($c->_diff, "@", null, null, "");
+            $c->_diffsz += 4;
+            $c->fix_context($c->_diffsz - 4);
+        }
         return $c;
     }
 
