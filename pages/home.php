@@ -480,14 +480,20 @@ if ($Me->privChair && check_post()
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension"));
     else if ($who == "college-empty")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension and password=''"));
+    else if ($who == "college-nologin")
+        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension and lastLogin=0"));
     else if ($who == "extension")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension"));
     else if ($who == "extension-empty")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension and password=''"));
+    else if ($who == "extension-nologin")
+        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension and lastLogin=0"));
     else if ($who == "ta")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0"));
     else if ($who == "ta-empty")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0 and password=''"));
+    else if ($who == "ta-nologin")
+        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0 and lastLogin=0"));
     else
         $users = edb_first_columns(Dbl::qe("select contactId from ContactInfo where email like ?", $who));
     if (empty($users))
@@ -529,15 +535,30 @@ if ($Me->privChair && (!$User || $User === $Me)) {
     <li><a href='", hoturl("users", "t=all"), "'>Users</a></li> -->
     <li><a href='", hoturl("mail"), "'>Send mail</a></li>\n";
 
-    $result = $Conf->qe("select exists (select * from ContactInfo where password='' and roles=0 and college=1), exists (select * from ContactInfo where password='' and roles=0 and extension=1), exists (select * from ContactInfo where password='' and roles!=0 and (roles&" . Contact::ROLE_PCLIKE . ")!=0)");
+    $pclike = Contact::ROLE_PCLIKE;
+    $result = $Conf->qe("select exists (select * from ContactInfo where password='' and disabled=0 and (roles=0 or (roles&$pclike)=0) and college=1), exists (select * from ContactInfo where password='' and disabled=0 and (roles=0 or (roles&$pclike)=0) and extension=1), exists (select * from ContactInfo where password='' and disabled=0 and roles!=0 and (roles&$pclike)!=0), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and (roles=0 or (roles&$pclike)=0) and lastLogin=0 and college=1), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and (roles=0 or (roles&$pclike)=0) and lastLogin=0 and extension=1), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and roles!=0 and (roles&$pclike)!=0 and lastLogin=0)");
     $row = $result->fetch_row();
     Dbl::free($result);
+
+    $m = [];
     if ($row[0])
-        echo '    <li><a href="', hoturl_post("index", "enable_user=college-empty"), '">Enable college users</a></li>', "\n";
+        $m[] = '<a href="' . hoturl_post("index", "enable_user=college-empty") . '">college users</a>';
     if ($row[1])
-        echo '    <li><a href="', hoturl_post("index", "enable_user=extension-empty"), '">Enable extension users</a></li>', "\n";
+        $m[] = '<a href="' . hoturl_post("index", "enable_user=extension-empty") . '">extension users</a>';
     if ($row[2])
-        echo '    <li><a href="', hoturl_post("index", "enable_user=ta-empty"), '">Enable TF users</a></li>', "\n";
+        $m[] = '<a href="' . hoturl_post("index", "enable_user=ta-empty") . '">TAs</a>';
+    if (!empty($m))
+        echo '    <li>Enable ', join(", ", $m), "</li>\n";
+
+    $m = [];
+    if ($row[3])
+        $m[] = '<a href="' . hoturl_post("index", "send_account_info=college-nologin") . '">college users</a>';
+    if ($row[4])
+        $m[] = '<a href="' . hoturl_post("index", "send_account_info=extension-nologin") . '">extension users</a>';
+    if ($row[5])
+        $m[] = '<a href="' . hoturl_post("index", "send_account_info=ta-nologin") . '">TAs</a>';
+    if (!empty($m))
+        echo '    <li>Send account info to ', join(", ", $m), "</li>\n";
 
     echo "    <li><a href='", hoturl_post("index", "report=nonanonymous"), "'>Overall grade report</a> (<a href='", hoturl_post("index", "report=nonanonymous+college"), "'>college</a>, <a href='", hoturl_post("index", "report=nonanonymous+extension"), "'>extension</a>)</li>
     <!-- <li><a href='", hoturl("log"), "'>Action log</a></li> -->
