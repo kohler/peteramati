@@ -761,12 +761,12 @@ if ($Pset->gitless) {
         $runcategories[$r->category] = true;
         echo '<div id="pa-runout-' . $r->category . '"';
         if (!$rj || !isset($rj->timestamp))
-            echo ' style="display:none"';
+            echo ' class="hidden"';
         echo '><h3><a class="fold61" href="#" onclick="',
             "return runfold61('{$r->category}')", '">',
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
             htmlspecialchars($r->output_title), '</a></h3>',
-            '<div class="pa-run" id="pa-run-', $r->category, '" style="display:none"';
+            '<div class="pa-run hidden" id="pa-run-', $r->category, '"';
         if ($r->xterm_js)
             echo ' data-pa-xterm-js="true"';
         if ($rj && isset($rj->timestamp))

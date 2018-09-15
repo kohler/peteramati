@@ -2680,7 +2680,7 @@ function pa_compute_note_grades(event) {
 
 function fold61(sel, arrowholder, direction) {
     var j = $(sel);
-    j.toggleClass("hidden", direction);
+    j.toggleClass("hidden", !direction);
     if (arrowholder)
         $(arrowholder).find("span.foldarrow").html(
             j.is(":visible") ? "&#x25BC;" : "&#x25B6;"
@@ -3248,7 +3248,6 @@ function pa_run(button, opt) {
         thexterm.open(thepre[0], false);
         thexterm.attachCustomKeyEventHandler(function(e) {
             write(e.key);
-
             return false;
         });
     } else
