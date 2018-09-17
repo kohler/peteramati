@@ -757,6 +757,7 @@ class PsetView {
                 $prio = $runner->transfer_warnings_priority ? : 0;
                 $file = $line = null;
                 $expect_context = false;
+                $in_instantiation = false;
                 $text = "";
                 $lines = explode("\n", $output);
                 $nlines = count($lines);
@@ -764,12 +765,14 @@ class PsetView {
                     $s = $lines[$i];
                     $sda = preg_replace('/\x1b\[[\d;]*m|\x1b\[\d*K/', '', $s);
                     if (preg_match('/\A([^\s:]*):(\d+):(?:\d+:)?\s*(\S*)/', $sda, $m)) {
-                        if ($m[3] === "note:" && $file) {
-                            if (strpos($sda, "in expansion of macro") !== false) {
+                        $this_in_instantiation = $m[3] && strpos($sda, "In instantiation") !== false;
+                        if ($file && ($m[3] === "note:" || $this_in_instantiation)) {
+                            if ($this_in_instantiation
+                                || strpos($sda, "in expansion of macro") !== false) {
                                 $file = $m[1];
                                 $line = $m[2];
                             }
-                        } else {
+                        } else if (!$in_instantiation) {
                             $this->transfer_one_warning($file, $line, $text, $prio);
                             $file = $m[1];
                             $line = $m[2];
@@ -777,6 +780,7 @@ class PsetView {
                         }
                         $text .= $s . "\n";
                         $expect_context = true;
+                        $in_instantiation = $this_in_instantiation;
                     } else if (preg_match('/\A(?:\S|\s+[A-Z]+\s)/', $sda)) {
                         if (str_starts_with($sda, "In file included")
                             && $i + 1 < $nlines) {
