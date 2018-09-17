@@ -757,7 +757,7 @@ class PsetView {
                 $prio = $runner->transfer_warnings_priority ? : 0;
                 $file = $line = null;
                 $expect_context = false;
-                $in_instantiation = false;
+                $in_instantiation = 0;
                 $text = "";
                 $lines = explode("\n", $output);
                 $nlines = count($lines);
@@ -765,36 +765,55 @@ class PsetView {
                     $s = $lines[$i];
                     $sda = preg_replace('/\x1b\[[\d;]*m|\x1b\[\d*K/', '', $s);
                     if (preg_match('/\A([^\s:]*):(\d+):(?:\d+:)?\s*(\S*)/', $sda, $m)) {
-                        $this_in_instantiation = $m[3] && strpos($sda, "In instantiation") !== false;
-                        if ($file && ($m[3] === "note:" || $this_in_instantiation)) {
-                            if ($this_in_instantiation
-                                || strpos($sda, "in expansion of macro") !== false) {
+		        $this_instantiation = strpos($sda, "required from") !== false;
+                        if ($file && $m[3] === "note:") {
+                            if (strpos($sda, "in expansion of macro") !== false) {
                                 $file = $m[1];
                                 $line = $m[2];
                             }
-                        } else if (!$in_instantiation) {
-                            $this->transfer_one_warning($file, $line, $text, $prio);
-                            $file = $m[1];
-                            $line = $m[2];
-                            $text = "";
+                        } else {
+			    if (!$in_instantiation) {
+                                $this->transfer_one_warning($file, $line, $text, $prio);
+                                $text = "";
+			    }
+			    if ($in_instantiation !== 2 || $this_instantiation) {
+                                $file = $m[1];
+                                $line = $m[2];
+			    }
                         }
                         $text .= $s . "\n";
                         $expect_context = true;
-                        $in_instantiation = $this_in_instantiation;
+			if ($in_instantiation !== 0 && $this_instantiation)
+			    $in_instantiation = 2;
+			else
+			    $in_instantiation = 0;
                     } else if (preg_match('/\A(?:\S|\s+[A-Z]+\s)/', $sda)) {
-                        if (str_starts_with($sda, "In file included")
-                            && $i + 1 < $nlines) {
-                            $text .= $s . "\n" . $lines[$i + 1] . "\n";
-                            ++$i;
+                        if (str_starts_with($sda, "In file included")) {
+			    $text .= $s . "\n";
+			    while ($i + 1 < $nlines && str_starts_with($lines[$i + 1], " ")) {
+			        ++$i;
+				$text .= $lines[$i] . "\n";
+		            }
+			    $in_instantiation = 1;
+			} else if (strpos($sda, "In instantiation of")) {
+			    if (!$in_instantiation) {
+			        $this->transfer_one_warning($file, $line, $text, $prio);
+				$file = $line = null;
+				$text = "";
+			    }
+			    $text .= $s . "\n";
+			    $in_instantiation = 1;
                         } else if ($expect_context
                                    && $i + 1 < $nlines
                                    && strpos($lines[$i + 1], "^") !== false) {
                             $text .= $s . "\n" . $lines[$i + 1] . "\n";
                             ++$i;
+			    $in_instantiation = 0;
                         } else {
                             $this->transfer_one_warning($file, $line, $text, $prio);
                             $file = $line = null;
                             $text = "";
+			    $in_instantiation = 0;
                         }
                         $expect_context = false;
                     } else if ($file !== null) {
