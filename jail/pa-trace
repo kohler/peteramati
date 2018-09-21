@@ -93,6 +93,11 @@ if (@ARGV > 0 && $ARGV[0] =~ /\A-/) {
 @excludes = map {
         my(@x) = split(//);
         my($y, $i, $bs, $state) = "";
+        if (@x && $x[$i] ne "/") {
+            $y .= "(?:\\A|/)";
+        } else {
+            $y .= "\\A";
+        }
         for ($i = $bs = $state = 0; $i < @x; ++$i) {
             if ($bs && $x[$i] =~ /\A[\[\]\\\*\?\{\}\,]\z/) {
                 $y .= "\\" . $x[$i];
@@ -101,19 +106,27 @@ if (@ARGV > 0 && $ARGV[0] =~ /\A-/) {
             } elsif ($bs) {
                 $y .= "\\\\";
                 $bs = 0;
+            } elsif ($x[i] eq "\\") {
+                $bs = 1;
+                next;
             }
             if ($state == 1 && $x[$i] eq ']') {
                 $y .= "]";
                 $state = 0;
+            } elsif ($state == 1) {
+                $y .= $x[$i];
             } elsif ($state == 2 && $x[$i] eq '}') {
                 $y .= ")";
                 $state = 0;
             } elsif ($state == 2 && $x[$i] eq ',') {
                 $y .= "|";
-            } elsif ($x[$i] eq '*') {
+            } elsif ($x[$i] eq '*' && $i + 1 < @x && $x[$i + 1] eq '*') {
                 $y .= ".*";
+                $i += 1;
+            } elsif ($x[$i] eq '*') {
+                $y .= "[^/]*";
             } elsif ($x[$i] eq '?') {
-                $y .= ".";
+                $y .= "[^/]";
             } elsif ($state == 0 && $x[$i] eq '[') {
                 $y .= "[";
                 $state = 1;
@@ -124,9 +137,10 @@ if (@ARGV > 0 && $ARGV[0] =~ /\A-/) {
                 $y .= quotemeta($x[$i]);
             }
         }
+        $y .= "\\\\" if $bs;
         $y .= "]" if $state == 1;
         $y .= ")" if $state == 2;
-        "\\A" . $y . "\\z";
+        $y . "(?:/|\\z)";
     } @excludes;
 
 my(%files, %allfiles, %execfiles);
