@@ -857,23 +857,24 @@ inline bool opt_eq(const char* opt, const char* endopt,
     return endopt - opt == len && memcmp(opt, def, len) == 0;
 }
 
-static std::string file_get_contents_error(std::string msg, bool error_die) {
-    fprintf(stderr, "%s\n", msg.c_str());
-    if (error_die)
+static std::string file_get_contents_error(std::string msg, int errorness) {
+    if (errorness > 0)
+        fprintf(stderr, "%s\n", msg.c_str());
+    if (errorness > 1)
         exit(1);
     return "";
 }
 
-static std::string file_get_contents(std::string fname, bool die) {
+static std::string file_get_contents(std::string fname, int errorness) {
     FILE* f;
     if (fname == "-") {
         f = stdin;
         if (isatty(STDIN_FILENO))
-            return file_get_contents_error("stdin: Is a tty", die);
+            return file_get_contents_error("stdin: Is a tty", errorness);
     } else {
         f = fopen(fname.c_str(), "r");
         if (!f)
-            return file_get_contents_error(fname + ": " + strerror(errno), die);
+            return file_get_contents_error(fname + ": " + strerror(errno), errorness);
     }
     std::string contents;
     while (!feof(f) && !ferror(f)) {
@@ -883,7 +884,7 @@ static std::string file_get_contents(std::string fname, bool die) {
             contents.append(buf, n);
     }
     if (ferror(f))
-        return file_get_contents_error(fname + ": " + strerror(errno), die);
+        return file_get_contents_error(fname + ": " + strerror(errno), errorness);
     fclose(f);
     return contents;
 }
@@ -894,11 +895,11 @@ static void fix_jail_bind_src(dev_t jaildev,
     std::string srcx = path_endslash(src) + ".pa-jail-bindtag";
     if (verbose)
         fprintf(verbosefile, "test %s = `cat %s`\n", shell_quote(want_tag).c_str(), shell_quote(srcx).c_str());
-    std::string got_tag = file_get_contents(srcx, false);
+    std::string got_tag = file_get_contents(srcx, 0);
     while (!got_tag.empty() && isspace((unsigned char) got_tag.back()))
         got_tag.pop_back();
     if (got_tag != want_tag) {
-        std::string contents = file_get_contents(want_files, true);
+        std::string contents = file_get_contents(want_files, 2);
         std::string old_dstroot = dstroot;
         dstroot = path_noendslash(src);
         construct_jail(jaildev, contents);
@@ -906,11 +907,12 @@ static void fix_jail_bind_src(dev_t jaildev,
         if (verbose)
             fprintf(verbosefile, "echo %s > %s\n", shell_quote(want_tag).c_str(), srcx.c_str());
         if (!dryrun) {
-            FILE* f = fopen(srcx.c_str(), "w");
-            if (!f)
+            want_tag += "\n";
+            int fd = open(srcx.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW);
+            if (fd == -1
+                || (size_t) write(fd, want_tag.data(), want_tag.length()) != want_tag.length())
                 perror_die(srcx.c_str());
-            fprintf(f, "%s\n", want_tag.c_str());
-            fclose(f);
+            close(fd);
         }
     }
 }
@@ -2290,7 +2292,7 @@ int main(int argc, char** argv) {
             else if (ch == 'f' && action == do_rm)
                 doforce = true;
             else if (ch == 'f') {
-                contents += file_get_contents(optarg, true);
+                contents += file_get_contents(optarg, 2);
                 if (!contents.empty() && contents.back() != '\n')
                     contents.push_back('\n');
             } else if (ch == 'F') {
