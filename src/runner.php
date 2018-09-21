@@ -271,23 +271,34 @@ class RunnerState {
         if ($this->runner->timed_replay) {
             $command .= " -t" . escapeshellarg($this->timingfile);
         }
+
         $skeletondir = $this->pset->run_skeletondir ? : $Conf->opt("run_skeletondir");
         $binddir = $this->pset->run_binddir ? : $Conf->opt("run_binddir");
         if ($skeletondir && $binddir && !is_dir("$skeletondir/proc"))
             $binddir = false;
+        if (($jfiles = $this->pset->run_jailfiles ? : $Conf->opt("run_jailfiles")))
+            $jfiles = $this->expand($jfiles);
+
         if ($skeletondir && $binddir) {
             $binddir = preg_replace(',/+\z,', '', $binddir);
-            $contents = "/ <- " . $skeletondir . " [bind-ro]\n"
+            $contents = "/ <- " . $skeletondir . " [bind-ro";
+            if ($jfiles
+                && !preg_match('/[\s\];]/', $jfiles)
+                && ($jhash = hash_file("sha256", $jfiles)) !== false)
+                $contents .= " $jhash $jfiles";
+            $contents .= "]\n"
                 . $this->userhome . " <- " . $this->jailhomedir . " [bind]\n";
             $command .= " -u" . escapeshellarg($this->jailhomedir)
                 . " -F" . escapeshellarg($contents);
             $homedir = $binddir;
-        } else {
-            $command .= " -h -f" . escapeshellarg($this->expand($this->pset->run_jailfiles));
+        } else if ($jfiles) {
+            $command .= " -h -f" . escapeshellarg($jfiles);
             if ($skeletondir)
                 $command .= " -S" . escapeshellarg($skeletondir);
             $homedir = $this->jaildir;
-        }
+        } else
+            throw new RunnerException("Missing jail population configuration");
+
         if ($this->runner->timeout > 0)
             $command .= " -T" . $this->runner->timeout;
         else if ($this->runner->timeout == null && $this->pset->run_timeout > 0)

@@ -391,7 +391,9 @@ static const mountarg mountargs[] = {
 #if __linux__ && defined(MS_RELATIME)
     { "relatime", MS_RELATIME, true },
 #endif
+#if __linux__
     { "remount", MS_REMOUNT, true },
+#endif
     { "ro", MFLAG(RDONLY), true },
     { "rw", 0, true },
 #if __linux__
@@ -843,6 +845,73 @@ static int handle_copy(std::string src, std::string subdst,
     return 0;
 }
 
+inline const char* opt_wordskip(const char* s) {
+    while (*s != ']' && *s != ';' && !isspace((unsigned char) *s))
+        ++s;
+    return s;
+}
+
+inline bool opt_eq(const char* opt, const char* endopt,
+                   const char* def, unsigned len) {
+    return endopt - opt == len && memcmp(opt, def, len) == 0;
+}
+
+static std::string file_get_contents_error(std::string msg, bool error_die) {
+    fprintf(stderr, "%s\n", msg.c_str());
+    if (error_die)
+        exit(1);
+    return "";
+}
+
+static std::string file_get_contents(std::string fname, bool die) {
+    FILE* f;
+    if (fname == "-") {
+        f = stdin;
+        if (isatty(STDIN_FILENO))
+            return file_get_contents_error("stdin: Is a tty", die);
+    } else {
+        f = fopen(fname.c_str(), "r");
+        if (!f)
+            return file_get_contents_error(fname + ": " + strerror(errno), die);
+    }
+    std::string contents;
+    while (!feof(f) && !ferror(f)) {
+        char buf[BUFSIZ];
+        size_t n = fread(buf, 1, BUFSIZ, f);
+        if (n > 0)
+            contents.append(buf, n);
+    }
+    if (ferror(f))
+        return file_get_contents_error(fname + ": " + strerror(errno), die);
+    fclose(f);
+    return contents;
+}
+
+static void fix_jail_bind_src(dev_t jaildev,
+                              std::string src, std::string want_tag,
+                              std::string want_files) {
+    std::string srcx = path_endslash(src) + ".pa-jail-bindtag";
+    std::string got_tag = file_get_contents(srcx, false);
+    while (!got_tag.empty() && isspace((unsigned char) got_tag.back()))
+        got_tag.pop_back();
+    if (got_tag != want_tag) {
+        std::string contents = file_get_contents(want_files, true);
+        std::string old_dstroot = dstroot;
+        dstroot = path_endslash(src);
+        construct_jail(jaildev, contents);
+        dstroot = old_dstroot;
+        if (verbose)
+            fprintf(verbosefile, "echo %s > %s\n", shell_quote(want_tag).c_str(), srcx.c_str());
+        if (!dryrun) {
+            FILE* f = fopen(srcx.c_str(), "w");
+            if (!f)
+                perror_die(srcx.c_str());
+            fprintf(f, "%s\n", want_tag.c_str());
+            fclose(f);
+        }
+    }
+}
+
 static int construct_jail(dev_t jaildev, std::string& str) {
     // prepare root
     if (x_chmod(dstroot.c_str(), 0755)
@@ -855,6 +924,7 @@ static int construct_jail(dev_t jaildev, std::string& str) {
 
     // Read a line at a time
     std::string cursrcdir("/"), curdstsubdir("/");
+    std::string bind_tag, bind_files;
     int base_flags = 0;
 
     const char* pos = str.data(), *endpos = pos + str.length();
@@ -903,21 +973,40 @@ static int construct_jail(dev_t jaildev, std::string& str) {
             } while (line < endline && isspace((unsigned char) endline[-1]));
             // parse flags
             while (1) {
-                while (isspace((unsigned char) *opts) || *opts == ',')
+                while (isspace((unsigned char) *opts) || *opts == ';')
                     ++opts;
                 if (*opts == ']')
                     break;
+                // read first option word
                 const char* optstart = opts;
-                ++opts;
-                while (*opts != ']' && *opts != ','
-                       && !isspace((unsigned char) *opts))
-                    ++opts;
-                if (opts - optstart == 2 && memcmp(optstart, "cp", 2) == 0)
+                opts = opt_wordskip(opts + 1);
+                // process option
+                bool want_bind = false;
+                if (opt_eq(optstart, opts, "cp", 2))
                     flags |= FLAG_CP;
-                if (opts - optstart == 4 && memcmp(optstart, "bind", 4) == 0)
+                else if (opt_eq(optstart, opts, "bind", 4)) {
                     flags |= FLAG_BIND;
-                if (opts - optstart == 7 && memcmp(optstart, "bind-ro", 7) == 0)
+                    want_bind = true;
+                } else if (opt_eq(optstart, opts, "bind-ro", 7)) {
                     flags |= FLAG_BIND_RO;
+                    want_bind = true;
+                }
+                if (want_bind) {
+                    while (isspace((unsigned char) *opts))
+                        ++opts;
+                    const char* tagstart = opts;
+                    opts = opt_wordskip(opts);
+                    bind_tag = std::string(tagstart, opts);
+
+                    while (isspace((unsigned char) *opts))
+                        ++opts;
+                    tagstart = opts;
+                    opts = opt_wordskip(opts);
+                    bind_files = std::string(tagstart, opts);
+                }
+                // skip to next option word
+                while (*opts != ']' && *opts != ';')
+                    ++opts;
             }
         }
 
@@ -934,6 +1023,8 @@ static int construct_jail(dev_t jaildev, std::string& str) {
         dst = curdstsubdir + std::string(line + (line[0] == '/'), arrow);
 
         // act on flags
+        if ((flags & FLAG_BIND) && !bind_tag.empty() && !bind_files.empty())
+            fix_jail_bind_src(jaildev, src, bind_tag, bind_files);
         if (flags & (FLAG_BIND | FLAG_BIND_RO)) {
             mountslot ms(src.c_str(), "none",
                          flags & FLAG_BIND_RO ? "bind,rec,ro" : "bind,rec");
@@ -947,6 +1038,12 @@ static int construct_jail(dev_t jaildev, std::string& str) {
     }
 
     return exit_value;
+}
+
+static int construct_jail(dev_t jaildev, std::string& str) {
+
+    // Contents
+    return construct_jail_contents(jaildev, str);
 }
 
 
@@ -2190,25 +2287,7 @@ int main(int argc, char** argv) {
             else if (ch == 'f' && action == do_rm)
                 doforce = true;
             else if (ch == 'f') {
-                FILE* f;
-                if (strcmp(optarg, "-") == 0) {
-                    f = stdin;
-                    if (isatty(STDIN_FILENO))
-                        die("stdin: Is a tty\n");
-                } else {
-                    f = fopen(optarg, "r");
-                    if (!f)
-                        perror_die(optarg);
-                }
-                while (!feof(f) && !ferror(f)) {
-                    char buf[BUFSIZ];
-                    size_t n = fread(buf, 1, BUFSIZ, f);
-                    if (n > 0)
-                        contents.append(buf, n);
-                }
-                if (ferror(f))
-                    perror_die(optarg);
-                fclose(f);
+                contents += file_get_contents(fname, true);
                 if (!contents.empty() && contents.back() != '\n')
                     contents.push_back('\n');
             } else if (ch == 'F') {
