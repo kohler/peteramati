@@ -908,7 +908,7 @@ static void fix_jail_bind_src(dev_t jaildev,
             fprintf(verbosefile, "echo %s > %s\n", shell_quote(want_tag).c_str(), srcx.c_str());
         if (!dryrun) {
             want_tag += "\n";
-            int fd = open(srcx.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW);
+            int fd = open(srcx.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0600);
             if (fd == -1
                 || (size_t) write(fd, want_tag.data(), want_tag.length()) != want_tag.length())
                 perror_die(srcx.c_str());
