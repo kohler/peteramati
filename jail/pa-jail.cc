@@ -636,6 +636,7 @@ static int handle_umount(const mount_table_type::iterator& it) {
 
 static int handle_copy(std::string src, std::string subdst,
                        int flags, dev_t jaildev);
+static int construct_jail(dev_t jaildev, std::string& str);
 
 static void handle_symlink_dst(std::string dst, std::string src,
                                std::string lnk, dev_t jaildev)
@@ -891,13 +892,15 @@ static void fix_jail_bind_src(dev_t jaildev,
                               std::string src, std::string want_tag,
                               std::string want_files) {
     std::string srcx = path_endslash(src) + ".pa-jail-bindtag";
+    if (verbose)
+        fprintf(verbosefile, "test %s = `cat %s`\n", shell_quote(want_tag).c_str(), shell_quote(srcx).c_str());
     std::string got_tag = file_get_contents(srcx, false);
     while (!got_tag.empty() && isspace((unsigned char) got_tag.back()))
         got_tag.pop_back();
     if (got_tag != want_tag) {
         std::string contents = file_get_contents(want_files, true);
         std::string old_dstroot = dstroot;
-        dstroot = path_endslash(src);
+        dstroot = path_noendslash(src);
         construct_jail(jaildev, contents);
         dstroot = old_dstroot;
         if (verbose)
@@ -1023,9 +1026,9 @@ static int construct_jail(dev_t jaildev, std::string& str) {
         dst = curdstsubdir + std::string(line + (line[0] == '/'), arrow);
 
         // act on flags
-        if ((flags & FLAG_BIND) && !bind_tag.empty() && !bind_files.empty())
-            fix_jail_bind_src(jaildev, src, bind_tag, bind_files);
         if (flags & (FLAG_BIND | FLAG_BIND_RO)) {
+            if (!bind_tag.empty() && !bind_files.empty())
+                fix_jail_bind_src(jaildev, src, bind_tag, bind_files);
             mountslot ms(src.c_str(), "none",
                          flags & FLAG_BIND_RO ? "bind,rec,ro" : "bind,rec");
             ms.wanted = true;
@@ -1038,12 +1041,6 @@ static int construct_jail(dev_t jaildev, std::string& str) {
     }
 
     return exit_value;
-}
-
-static int construct_jail(dev_t jaildev, std::string& str) {
-
-    // Contents
-    return construct_jail_contents(jaildev, str);
 }
 
 
@@ -1713,9 +1710,15 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     if (!new_stack)
         die("Out of memory\n");
     if (verbose)
-        fprintf(stderr, "-clone-\n");
-    int child = clone(exec_clone_function, new_stack + 256 * 1024,
+        fprintf(verbosefile, "-clone-\n");
+    int child;
+    if (!dryrun)
+        child = clone(exec_clone_function, new_stack + 256 * 1024,
                       CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID, this);
+    else {
+        exec_clone_function(this);
+        exit(0);
+    }
     if (child == -1)
         perror_die("clone");
     int child_waitflags = __WALL;
@@ -2287,7 +2290,7 @@ int main(int argc, char** argv) {
             else if (ch == 'f' && action == do_rm)
                 doforce = true;
             else if (ch == 'f') {
-                contents += file_get_contents(fname, true);
+                contents += file_get_contents(optarg, true);
                 if (!contents.empty() && contents.back() != '\n')
                     contents.push_back('\n');
             } else if (ch == 'F') {
@@ -2384,10 +2387,11 @@ int main(int argc, char** argv) {
     }
 
     // create timing file as current user
-    if (!timingfilename.empty()) {
+    if (!timingfilename.empty() && verbose)
+        fprintf(verbosefile, "touch %s\n", timingfilename.c_str());
+    if (!timingfilename.empty() && !dryrun) {
         timingfd = open(timingfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
-
-        if (timingfd < 0)
+        if (timingfd == -1)
             perror_die(timingfilename);
     }
 
