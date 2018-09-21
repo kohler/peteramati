@@ -2211,8 +2211,8 @@ Create or augment a jail. JAILDIR must be allowed by /etc/pa-jail.conf.\n\n");
             fprintf(stderr, "Usage: pa-jail run [OPTIONS...] JAILDIR USER [NAME=VALUE...] COMMAND...\n\
 Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
 /etc/pa-jail.conf.\n\n");
-        fprintf(stderr, "  -f, --contents-file FILE  populate jail with contents of FILE\n");
-        fprintf(stderr, "  -F, --contents DATA       populate jail with DATA\n");
+        fprintf(stderr, "  -f, --manifest-file FILE  populate jail with manifest from FILE\n");
+        fprintf(stderr, "  -F, --manifest MANIFEST   populate jail with MANIFEST\n");
         fprintf(stderr, "  -h, --chown-home          change ownership of USER homedir\n");
         fprintf(stderr, "  -S, --skeleton SKELDIR    populate jail from SKELDIR\n");
         if (action == do_run) {
@@ -2245,6 +2245,8 @@ static struct option longoptions_run[] = {
     { "pid-file", required_argument, NULL, 'p' },
     { "contents-file", required_argument, NULL, 'f' },
     { "contents", required_argument, NULL, 'F' },
+    { "manifest-file", required_argument, NULL, 'f' },
+    { "manifest", required_argument, NULL, 'F' },
     { "fg", no_argument, NULL, 'g' },
     { "timeout", required_argument, NULL, 'T' },
     { "input", required_argument, NULL, 'i' },
@@ -2276,7 +2278,7 @@ int main(int argc, char** argv) {
     jailaction action = do_start;
     bool chown_home = false, foreground = false;
     double timeout = -1;
-    std::string inputarg, linkarg, contents;
+    std::string inputarg, linkarg, manifest;
     std::vector<std::string> chown_user_args;
 
     int ch;
@@ -2292,13 +2294,13 @@ int main(int argc, char** argv) {
             else if (ch == 'f' && action == do_rm)
                 doforce = true;
             else if (ch == 'f') {
-                contents += file_get_contents(optarg, 2);
-                if (!contents.empty() && contents.back() != '\n')
-                    contents.push_back('\n');
+                manifest += file_get_contents(optarg, 2);
+                if (!manifest.empty() && manifest.back() != '\n')
+                    manifest.push_back('\n');
             } else if (ch == 'F') {
-                contents += optarg;
-                if (!contents.empty() && contents.back() != '\n')
-                    contents.push_back('\n');
+                manifest += optarg;
+                if (!manifest.empty() && manifest.back() != '\n')
+                    manifest.push_back('\n');
             } else if (ch == 'p')
                 pidfilename = optarg;
             else if (ch == 'i')
@@ -2352,8 +2354,8 @@ int main(int argc, char** argv) {
         || (action == do_mv && optind + 2 != argc)
         || (action == do_add && optind != argc - 1 && optind + 2 != argc)
         || (action == do_run && optind + 3 > argc)
-        || (action == do_rm && (!linkarg.empty() || !contents.empty() || !inputarg.empty()))
-        || (action == do_mv && (!linkarg.empty() || !contents.empty() || !inputarg.empty()))
+        || (action == do_rm && (!linkarg.empty() || !manifest.empty() || !inputarg.empty()))
+        || (action == do_mv && (!linkarg.empty() || !manifest.empty() || !inputarg.empty()))
         || !argv[optind][0]
         || (action == do_mv && !argv[optind+1][0]))
         usage();
@@ -2502,9 +2504,9 @@ int main(int argc, char** argv) {
     mount_status = optind + 2 < argc;
     dstroot = path_noendslash(jaildir.dir);
     assert(dstroot != "/");
-    if (!contents.empty()) {
+    if (!manifest.empty()) {
         mode_t old_umask = umask(0);
-        if (construct_jail(jaildir.dev, contents) != 0)
+        if (construct_jail(jaildir.dev, manifest) != 0)
             exit(1);
         umask(old_umask);
     }
