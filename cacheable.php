@@ -1,6 +1,6 @@
 <?php
 // cacheable.php -- HotCRP cacheability helper
-// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2018 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 session_cache_limiter("");
@@ -16,10 +16,11 @@ if ($zlib_output_compression) {
     header("Vary: Accept-Encoding", false);
 }
 
-function fail($file) {
+function fail($reason, $file) {
     global $zlib_output_compression;
+    header("HTTP/1.0 $reason");
     header("Content-Type: text/plain; charset=utf-8");
-    $result = "Go away ($file).\r\n";
+    $result = "$file\r\n";
     if (!$zlib_output_compression)
         header("Content-Length: " . strlen($result));
     echo $result;
@@ -27,10 +28,10 @@ function fail($file) {
 }
 
 $file = isset($_GET["file"]) ? $_GET["file"] : null;
-if (!$file)
-    fail("no file");
+if (!$file) {
+    fail("400 Bad Request", "File missing");
+}
 
-$mtime = @filemtime($file);
 $prefix = "";
 if (preg_match(',\A(?:images|scripts|stylesheets)(?:/[^./][^/]+)+\z,', $file)
     && preg_match(',.*(\.[a-z0-9]*)\z,', $file, $m)) {
@@ -64,11 +65,14 @@ if (preg_match(',\A(?:images|scripts|stylesheets)(?:/[^./][^/]+)+\z,', $file)
     else if ($s === ".eot")
         header("Content-Type: application/vnd.ms-fontobject");
     else
-        fail($file);
+        fail("403 Forbidden", "File cannot be served");
     header("Access-Control-Allow-Origin: *");
 } else
-    fail($file);
+    fail("403 Forbidden", "File cannot be served");
 
+$mtime = @filemtime($file);
+if ($mtime === false)
+    fail("404 Not Found", "File not found");
 $last_modified = gmdate("D, d M Y H:i:s", $mtime) . " GMT";
 $etag = '"' . md5("$file $last_modified") . '"';
 header("Last-Modified: $last_modified");

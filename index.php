@@ -1,6 +1,6 @@
 <?php
 // index.php -- Peteramati home page
-// HotCRP and Peteramati are Copyright (c) 2006-2015 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2018 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("lib/navigation.php");
@@ -20,11 +20,13 @@ function choose_page($page) {
         /* The following is paranoia (currently can't happen): */
         && strpos($page, "/") === false)
         return $page . ".php";
-    else if (preg_match(',\A(?:images|scripts|stylesheets)\z,', $page)) {
+    else if ($page === "images" || $page === "scripts" || $page === "stylesheets") {
         $_GET["file"] = $page . Navigation::path();
         return "cacheable.php";
-    } else
-        Navigation::redirect_site("index");
+    } else {
+        header("HTTP/1.0 404 Not Found");
+        exit;
+    }
 }
 
 if (($page = choose_page(Navigation::page())))
