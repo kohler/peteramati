@@ -27,11 +27,14 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     global $Me, $psetinfo_idx;
     ++$psetinfo_idx;
     $info = new PsetView($pset, $user, $Me);
+    if (!$info->repo)
+        return;
+    $info->set_hash(false);
     echo '<div id="pa-psetinfo', $psetinfo_idx, '" class="pa-psetinfo"',
         ' data-pa-pset="', htmlspecialchars($pset->urlkey),
         '" data-pa-user="', htmlspecialchars($Me->user_linkpart($user));
-    if (!$pset->gitless && $info->grading_hash())
-        echo '" data-pa-hash="', htmlspecialchars($info->grading_hash());
+    if (!$pset->gitless && $info->commit_hash())
+        echo '" data-pa-hash="', htmlspecialchars($info->commit_hash());
     if (!$pset->gitless && $pset->directory)
         echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);
     if ($Me->can_set_grades($pset, $info))
@@ -64,7 +67,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         $lnorder = $info->viewable_line_notes();
         $onlyfiles = $qreq->files;
         $hasha = $pset->handout_hash ? : $info->derived_handout_hash();
-        $diff = $info->repo->diff($pset, $hasha, $info->grading_hash(), array("needfiles" => $lnorder->note_files(), "onlyfiles" => $onlyfiles, "no_full" => true));
+        $diff = $info->repo->diff($pset, $hasha, $info->commit_hash(), array("needfiles" => $lnorder->note_files(), "onlyfiles" => $onlyfiles, "no_full" => true));
         $info->expand_diff_for_grades($diff);
         if (count($onlyfiles) == 1
             && isset($diff[$onlyfiles[0]])
