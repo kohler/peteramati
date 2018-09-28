@@ -2680,7 +2680,9 @@ function pa_compute_note_grades(event) {
 
 function fold61(sel, arrowholder, direction) {
     var j = $(sel);
-    j.toggleClass("hidden", !direction);
+    if (direction != null)
+        direction = !direction;
+    j.toggleClass("hidden", direction);
     if (arrowholder)
         $(arrowholder).find("span.foldarrow").html(
             j.is(":visible") ? "&#x25BC;" : "&#x25B6;"

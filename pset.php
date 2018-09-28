@@ -449,8 +449,8 @@ function echo_commit($Info) {
         . '<a class="q" href="#" onclick="return fold61(this.nextSibling,this.parentNode)">'
         . '<span class="foldarrow">'
         . ($fold_viewoptions ? '&#x25B6;' : '&#x25BC;')
-        . '</span>&nbsp;options</a><span style="padding-left:1em'
-        . ($fold_viewoptions ? ';display:none' : '') . '">tab width:';
+        . '</span>&nbsp;options</a><span style="padding-left:1em"'
+        . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
     foreach (array(2, 4, 8) as $i)
         $value .= '&nbsp;<a href="' . self_href(array("tab" => $i)) . '"'
             . ($TABWIDTH == $i ? " class=\"q\"><strong>$i</strong>" : '>' . $i)
