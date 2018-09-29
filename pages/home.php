@@ -1157,11 +1157,12 @@ function show_pset_table($pset) {
     }
 
     if (!$pset->gitless) {
-        $sel = $esel = [];
+        $sel = ["__run_group" => ["optgroup", "Run"]];
+        $esel = ["__ensure_group" => ["optgroup", "Ensure"]];
         foreach ($pset->runners as $r)
             if ($Me->can_run($pset, $r)) {
                 $sel[$r->name] = htmlspecialchars($r->title);
-                $esel[$r->name . ".ensure"] = "Ensure " . htmlspecialchars($r->title);
+                $esel[$r->name . ".ensure"] = htmlspecialchars($r->title);
             }
         if (!empty($sel))
             echo '<span class="nb" style="padding-right:2em">',
