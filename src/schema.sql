@@ -41,7 +41,7 @@ CREATE TABLE `Capability` (
 
 DROP TABLE IF EXISTS `CommitNotes`;
 CREATE TABLE `CommitNotes` (
-  `hash` binary(40) NOT NULL,
+  `bhash` varbinary(32) NOT NULL,
   `pset` int(11) NOT NULL DEFAULT '0',
   `notes` varbinary(32767) DEFAULT NULL,
   `haslinenotes` tinyint(1) NOT NULL DEFAULT '0',
@@ -49,7 +49,7 @@ CREATE TABLE `CommitNotes` (
   `notesversion` int(11) NOT NULL DEFAULT '1',
   `hasactiveflags` tinyint(1) NOT NULL DEFAULT '0',
   `hasflags` tinyint(1) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`hash`,`pset`)
+  PRIMARY KEY (`pset`,`bhash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -105,7 +105,7 @@ CREATE TABLE `ContactInfo` (
   `affiliation` varchar(2048) NOT NULL DEFAULT '',
   `password` varbinary(2048) NOT NULL,
   `note` mediumtext,
-  `creationtime` bigint(11) NOT NULL DEFAULT '0',
+  `creationTime` bigint(11) NOT NULL DEFAULT '0',
   `lastLogin` bigint(11) NOT NULL DEFAULT '0',
   `defaultWatch` int(11) NOT NULL DEFAULT '2',
   `roles` tinyint(1) NOT NULL DEFAULT '0',
@@ -168,7 +168,7 @@ CREATE TABLE `ExecutionQueue` (
   `autorun` tinyint(1) NOT NULL DEFAULT '0',
   `psetid` int(11) DEFAULT NULL,
   `runnername` varbinary(128) DEFAULT NULL,
-  `bhash` varbinary(32) DEFAULT NULL,
+  `bhash` varbinary(32) NOT NULL,
   `inputfifo` varchar(1024) DEFAULT NULL,
   PRIMARY KEY (`queueid`),
   KEY `queueclass` (`queueclass`)
@@ -284,7 +284,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 118);
+insert into Settings (name, value) values ('allowPaperOption', 120);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

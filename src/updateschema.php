@@ -367,6 +367,9 @@ function updateSchema($conf) {
     if ($conf->sversion == 118
         && $conf->ql("alter table ExecutionQueue change `hash` `bhash` varbinary(32) NOT NULL"))
         $conf->update_schema_version(119);
+    if ($conf->sversion == 119
+        && $conf->ql("alter table ContactInfo change `creationtime` `creationTime` bigint(11) NOT NULL DEFAULT '0'"))
+        $conf->update_schema_version(120);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }
