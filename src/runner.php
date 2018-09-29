@@ -500,6 +500,59 @@ class RunnerState {
     }
 
 
+    function evaluate($answer) {
+        global $ConfSitePATH;
+        if (isset($this->runner->require)
+            && $this->runner->require[0] === "/")
+            require_once($this->runner->require);
+        else if (isset($this->runner->require))
+            require_once($ConfSitePATH . "/" . $this->runner->require);
+        $answer->result = call_user_func($this->runner->eval, $this->info);
+    }
+
+
+    function check($qreq) {
+        // recent or checkup
+        if ($qreq->check === "recent") {
+            $checkt = get($this->logged_checkts(), 0);
+            if (!$checkt)
+                return (object) ["ok" => false, "error" => "No logs yet", "error_html" => "No logs yet"];
+        } else {
+            $checkt = cvtint($qreq->check);
+            if ($checkt <= 0)
+                return (object) ["ok" => false, "error" => "Invalid “check” argument", "error_html" => "Invalid “check” argument"];
+        }
+        $this->set_checkt($checkt);
+
+        $offset = cvtint($qreq->offset, 0);
+        $answer = $this->full_json($offset);
+        if ($answer->status === "working") {
+            if ($qreq->stop) {
+                // "ESC Ctrl-C" is captured by pa-jail
+                $this->write("\x1b\x03");
+                $now = microtime(true);
+                do {
+                    $answer = $this->full_json($offset);
+                } while ($answer->status == "working"
+                         && microtime(true) - $now < 0.1);
+            } else if ($qreq->write) {
+                $this->write($qreq->write);
+            }
+        }
+
+        if ($answer->status !== "working" && $this->queueid > 0)
+            $this->info->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repo->repoid);
+        if ($answer->status === "done") {
+            $user = $this->info->user;
+            if ($user->can_run($this->pset, $this->runner, $user)
+                && $this->runner->eval)
+                $this->evaluate($answer);
+        }
+
+        return $answer;
+    }
+
+
     function cleanup() {
         if ($this->lockfile)
             unlink($this->lockfile);

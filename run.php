@@ -129,55 +129,13 @@ else if (!$Info->can_view_repo_contents())
     quit("Unconfirmed repository");
 
 
-// maybe eval
-function runner_eval($runner, $info, $answer) {
-    global $ConfSitePATH;
-    if (isset($runner->require) && $runner->require[0] == "/")
-        require_once($runner->require);
-    else if (isset($runner->require))
-        require_once($ConfSitePATH . "/" . $runner->require);
-    $answer->result = call_user_func($runner->eval, $info);
-}
-
-
 // extract request info
 $Rstate = new RunnerState($Info, $Runner);
 $Rstate->set_queueid($Qreq->get("queueid"));
 
 // recent or checkup
-if ($Qreq->check) {
-    if ($Qreq->check === "recent") {
-        $checkt = get($Rstate->logged_checkts(), 0);
-        if (!$check)
-            quit("No logs yet");
-    } else {
-        $checkt = cvtint($Qreq->check);
-        if ($checkt <= 0)
-            quit("Invalid “check” argument");
-    }
-    $Rstate->set_checkt($checkt);
-
-    $offset = cvtint($Qreq->offset, 0);
-    $answer = $Rstate->full_json($offset);
-    if ($answer->status == "working") {
-        if ($Qreq->stop) {
-            $Rstate->write("\x1b\x03"); // "ESC Ctrl-C" is captured by pa-jail
-            $now = microtime(true);
-            do {
-                $answer = $Rstate->full_json($offset);
-            } while ($answer->status == "working" && microtime(true) - $now < 0.1);
-        } else if ($Qreq->write) {
-            $Rstate->write($Qreq->write);
-        }
-    }
-    if ($answer->status != "working" && $Rstate->queueid > 0)
-        $Conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $Rstate->queueid, $Info->repo->repoid);
-    if ($answer->status == "done"
-        && $Me->can_run($Pset, $Runner, $User)
-        && $Runner->eval)
-        runner_eval($Runner, $Info, $answer);
-    json_exit($answer);
-}
+if ($Qreq->check)
+    json_exit($Rstate->check($Qreq));
 
 
 // if not checkup, then we’re gonna run it; check permission
@@ -201,7 +159,7 @@ if (!$Runner->command && $Runner->eval) {
     $json = $Rstate->generic_json();
     $json->done = true;
     $json->status = "done";
-    runner_eval($Runner, $Info, $json);
+    $Rstate->evaluate($json);
     json_exit($json);
 }
 
