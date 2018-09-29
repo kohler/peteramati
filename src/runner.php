@@ -69,7 +69,7 @@ class RunnerState {
             foreach ($logfs as $f) {
                 $rp = strlen($f);
                 $lp = strrpos($f, ".", -5);
-                $this->_logged_checkts[] = intval(substr($f, $lp, $rp - $lp));
+                $this->_logged_checkts[] = intval(substr($f, $lp + 1, $rp - $lp - 1));
             }
             rsort($this->_logged_checkts);
         }
