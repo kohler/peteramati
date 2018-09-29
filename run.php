@@ -131,12 +131,7 @@ else if (!$Info->can_view_repo_contents())
 $Rstate = new RunnerState($Info, $Runner);
 $Rstate->set_queueid($Qreq->get("queueid"));
 
-// recent or checkup
-if ($Qreq->check)
-    json_exit($Rstate->check($Qreq));
-
-
-// if not checkup, then we’re gonna run it; check permission
+// we’re gonna run it; check permission
 if (!$Me->can_run($Pset, $Runner, $User))
     quit("You can’t run that command");
 if (!$Pset->run_dirpattern)
@@ -144,6 +139,16 @@ if (!$Pset->run_dirpattern)
 if (!$Pset->run_jailfiles)
     quit("Configuration error (run_jailfiles)");
 
+// recent or checkup
+if ($Qreq->check)
+    json_exit($Rstate->check($Qreq));
+
+// ensure
+if ($Qreq->ensure) {
+    $answer = $Rstate->check(new Qrequest("GET", ["check" => "recent"]));
+    if ($answer->ok || !get($answer, "run_empty"))
+        json_exit($answer);
+}
 
 // queue
 $Queue = $Rstate->make_queue();

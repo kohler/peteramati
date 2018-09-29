@@ -335,10 +335,12 @@ function runmany($qreq) {
         $users[] = $Me->user_linkpart($user);
     if (empty($users))
         return $Conf->errorMsg("No users selected.");
-    go(hoturl_post("run", array("pset" => $pset->urlkey,
-                                "run" => $qreq->runner,
-                                "runmany" => 1,
-                                "users" => join(" ", $users))));
+    $args = ["pset" => $pset->urlkey, "run" => $qreq->runner, "runmany" => 1, "users" => join(" ", $users)];
+    if (str_ends_with($qreq->runner, ".ensure")) {
+        $args["run"] = substr($qreq->runner, 0, -7);
+        $args["ensure"] = 1;
+    }
+    go(hoturl_post("run", $args));
     redirectSelf();
 }
 
@@ -1155,13 +1157,15 @@ function show_pset_table($pset) {
     }
 
     if (!$pset->gitless) {
-        $sel = array();
+        $sel = $esel = [];
         foreach ($pset->runners as $r)
-            if ($Me->can_run($pset, $r))
+            if ($Me->can_run($pset, $r)) {
                 $sel[$r->name] = htmlspecialchars($r->title);
-        if (count($sel))
+                $esel[$r->name . ".ensure"] = "Ensure " . htmlspecialchars($r->title);
+            }
+        if (!empty($sel))
             echo '<span class="nb" style="padding-right:2em">',
-                Ht::select("runner", $sel),
+                Ht::select("runner", $sel + $esel),
                 ' &nbsp;', Ht::submit("runmany", "Run all"),
                 '</span>';
     }

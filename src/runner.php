@@ -517,7 +517,7 @@ class RunnerState {
         if ($qreq->check === "recent") {
             $checkt = get($this->logged_checkts(), 0);
             if (!$checkt)
-                return (object) ["ok" => false, "error" => "No logs yet", "error_html" => "No logs yet"];
+                return (object) ["ok" => false, "run_empty" => true, "error" => "No logs yet", "error_html" => "No logs yet"];
         } else {
             $checkt = cvtint($qreq->check);
             if ($checkt <= 0)
