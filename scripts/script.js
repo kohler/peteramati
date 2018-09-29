@@ -3426,7 +3426,10 @@ function pa_run(button, opt) {
     }
 
     function send(args) {
-        var a = {run: category, offset: offset};
+        var a = {};
+        if (!$f[0].run)
+            a.run = category;
+        a.offset = offset;
         checkt && (a.check = checkt);
         queueid && (a.queueid = queueid);
         args && $.extend(a, args);
