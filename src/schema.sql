@@ -168,7 +168,7 @@ CREATE TABLE `ExecutionQueue` (
   `autorun` tinyint(1) NOT NULL DEFAULT '0',
   `psetid` int(11) DEFAULT NULL,
   `runnername` varbinary(128) DEFAULT NULL,
-  `hash` binary(40) DEFAULT NULL,
+  `bhash` varbinary(32) DEFAULT NULL,
   `inputfifo` varchar(1024) DEFAULT NULL,
   PRIMARY KEY (`queueid`),
   KEY `queueclass` (`queueclass`)

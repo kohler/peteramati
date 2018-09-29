@@ -364,6 +364,9 @@ function updateSchema($conf) {
         && $conf->ql("alter table RepositoryGrade change `placeholder_at` `placeholder_at` bigint(11) DEFAULT NULL")
         && $conf->ql("alter table RepositoryGradeRequest change `requested_at` `requested_at` bigint(11) NOT NULL"))
         $conf->update_schema_version(118);
+    if ($conf->sversion == 118
+        && $conf->ql("alter table ExecutionQueue change `hash` `bhash` varbinary(32) NOT NULL"))
+        $conf->update_schema_version(119);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }
