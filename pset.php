@@ -661,8 +661,7 @@ if ($Pset->gitless) {
         if ($Me->can_view_run($Pset, $r, $User)) {
             if ($Me->can_run($Pset, $r, $User)) {
                 $b = Ht::button(htmlspecialchars($r->title),
-                                array("name" => "run",
-                                      "value" => $r->name,
+                                array("value" => $r->name,
                                       "class" => "btn pa-runner",
                                       "onclick" => "pa_run(this)",
                                       "data-pa-run-category" => $r->category_argument(),
