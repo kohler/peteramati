@@ -461,10 +461,11 @@ class RunnerState {
             if (isset($this->runner->nconcurrent)
                 && $this->runner->nconcurrent > 0)
                 $nconcurrent = $this->runner->nconcurrent;
-            $conf->qe("insert into ExecutionQueue set queueclass=?, insertat=?, updateat=?, repoid=?, runat=0, status=0, psetid=?, bhash=?, nconcurrent=?",
-                  $this->runner->queue, $Now, $Now, $this->repo->repoid,
-                  $this->pset->id, hex2bin($this->info->commit_hash()),
-                  $nconcurrent);
+            $conf->qe("insert into ExecutionQueue set queueclass=?, repoid=?, insertat=?, updateat=?, runat=0, status=0, nconcurrent=?, psetid=?, runnername=?, bhash=?",
+                  $this->runner->queue, $this->repo->repoid,
+                  $Now, $Now, $nconcurrent,
+                  $this->pset->id, $this->runner->name,
+                  hex2bin($this->info->commit_hash()));
             $this->queueid = $conf->dblink->insert_id;
         } else
             $conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $this->queueid);
