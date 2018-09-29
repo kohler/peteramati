@@ -92,8 +92,10 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
         Ht::form(hoturl_post("run")),
         '<div class="f-contain">',
         Ht::hidden("u", ""),
-        Ht::hidden("pset", $Pset->urlkey),
-        Ht::hidden("run", $Runner->name, ["id" => "runmany61", "data-pa-run-category" => $Runner->category_argument()]),
+        Ht::hidden("pset", $Pset->urlkey);
+    if (get($_GET, "ensure"))
+        echo Ht::hidden("ensure", 1);
+    echo Ht::hidden("run", $Runner->name, ["id" => "runmany61", "data-pa-run-category" => $Runner->category_argument()]),
         '</div></form>';
 
     echo '<div id="pa-runout-' . $Runner->category . '">',
