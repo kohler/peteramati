@@ -27,26 +27,10 @@ CREATE TABLE `Capability` (
   `capabilityType` int(11) NOT NULL,
   `contactId` int(11) NOT NULL,
   `paperId` int(11) NOT NULL,
-  `timeExpires` int(11) NOT NULL,
+  `timeExpires` bigint(11) NOT NULL,
   `salt` varbinary(255) NOT NULL,
   `data` blob,
   PRIMARY KEY (`salt`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
--- Table structure for table `CommitInfo`
---
-
-DROP TABLE IF EXISTS `CommitInfo`;
-CREATE TABLE `CommitInfo` (
-  `commitid` int(11) NOT NULL AUTO_INCREMENT,
-  `repoid` int(11) NOT NULL,
-  `sha1` varbinary(20) NOT NULL,
-  `timestamp` int(11) NOT NULL,
-  PRIMARY KEY (`commitid`),
-  UNIQUE KEY `commitid` (`commitid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -121,8 +105,8 @@ CREATE TABLE `ContactInfo` (
   `affiliation` varchar(2048) NOT NULL DEFAULT '',
   `password` varbinary(2048) NOT NULL,
   `note` mediumtext,
-  `creationTime` int(11) NOT NULL DEFAULT '0',
-  `lastLogin` int(11) NOT NULL DEFAULT '0',
+  `creationtime` bigint(11) NOT NULL DEFAULT '0',
+  `lastLogin` bigint(11) NOT NULL DEFAULT '0',
   `defaultWatch` int(11) NOT NULL DEFAULT '2',
   `roles` tinyint(1) NOT NULL DEFAULT '0',
   `disabled` tinyint(1) NOT NULL DEFAULT '0',
@@ -130,12 +114,12 @@ CREATE TABLE `ContactInfo` (
   `college` tinyint(1) NOT NULL DEFAULT '0',
   `extension` tinyint(1) NOT NULL DEFAULT '0',
   `dropped` int(11) NOT NULL DEFAULT '0',
-  `passwordTime` int(11) NOT NULL DEFAULT '0',
+  `passwordTime` bigint(11) NOT NULL DEFAULT '0',
   `anon_username` varbinary(40) DEFAULT NULL,
   `contactImageId` int(11) DEFAULT NULL,
   `github_username` varbinary(120) DEFAULT NULL,
-  `passwordUseTime` int(11) NOT NULL DEFAULT '0',
-  `updateTime` int(11) NOT NULL DEFAULT '0',
+  `passwordUseTime` bigint(11) NOT NULL DEFAULT '0',
+  `updateTime` bigint(11) NOT NULL DEFAULT '0',
   `data` varbinary(32767) DEFAULT NULL,
   `studentYear` varbinary(4) DEFAULT NULL,
   `nickname` varchar(60) DEFAULT NULL,
@@ -175,9 +159,9 @@ CREATE TABLE `ExecutionQueue` (
   `queueid` int(11) NOT NULL AUTO_INCREMENT,
   `queueclass` varchar(20) NOT NULL,
   `repoid` int(11) NOT NULL,
-  `insertat` int(11) NOT NULL,
-  `updateat` int(11) NOT NULL,
-  `runat` int(11) NOT NULL,
+  `insertat` bigint(11) NOT NULL,
+  `updateat` bigint(11) NOT NULL,
+  `runat` bigint(11) NOT NULL,
   `status` int(1) NOT NULL,
   `lockfile` varchar(1024) DEFAULT NULL,
   `nconcurrent` int(11) DEFAULT NULL,
@@ -220,13 +204,13 @@ CREATE TABLE `Repository` (
   `url` varchar(255) NOT NULL,
   `cacheid` varchar(20) NOT NULL,
   `open` int(11) NOT NULL,
-  `opencheckat` int(11) NOT NULL DEFAULT '0',
+  `opencheckat` bigint(11) NOT NULL DEFAULT '0',
   `snaphash` binary(40) DEFAULT NULL,
-  `snapat` int(11) DEFAULT NULL,
-  `snapcheckat` int(11) NOT NULL DEFAULT '0',
+  `snapat` bigint(11) DEFAULT NULL,
+  `snapcheckat` bigint(11) NOT NULL DEFAULT '0',
   `lastpset` int(11) NOT NULL DEFAULT '0',
   `working` int(1) NOT NULL DEFAULT '1',
-  `snapcommitat` int(11) NOT NULL DEFAULT '0',
+  `snapcommitat` bigint(11) NOT NULL DEFAULT '0',
   `snapcommitline` varchar(100) DEFAULT NULL,
   `notes` varbinary(32767) DEFAULT NULL,
   `heads` varbinary(8192) DEFAULT NULL,
@@ -245,9 +229,9 @@ CREATE TABLE `Repository` (
 DROP TABLE IF EXISTS `RepositoryCommitSnapshot`;
 CREATE TABLE `RepositoryCommitSnapshot` (
   `repoid` int(11) NOT NULL,
-  `hash` varbinary(32) NOT NULL,
+  `bhash` varbinary(32) NOT NULL,
   `snapshot` bigint(11) NOT NULL,
-  PRIMARY KEY (`repoid`,`hash`)
+  PRIMARY KEY (`repoid`,`bhash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -264,7 +248,7 @@ CREATE TABLE `RepositoryGrade` (
   `gradercid` int(11) DEFAULT NULL,
   `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder` tinyint(1) NOT NULL DEFAULT '0',
-  `placeholder_at` int(11) DEFAULT NULL,
+  `placeholder_at` bigint(11) DEFAULT NULL,
   PRIMARY KEY (`repoid`,`pset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -279,7 +263,7 @@ CREATE TABLE `RepositoryGradeRequest` (
   `repoid` int(11) NOT NULL,
   `pset` int(11) NOT NULL,
   `hash` binary(40) DEFAULT NULL,
-  `requested_at` int(11) NOT NULL,
+  `requested_at` bigint(11) NOT NULL,
   UNIQUE KEY `repopsethash` (`repoid`,`pset`,`hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -300,7 +284,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 114);
+insert into Settings (name, value) values ('allowPaperOption', 118);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

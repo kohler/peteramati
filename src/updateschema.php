@@ -347,6 +347,23 @@ function updateSchema($conf) {
         && $conf->ql("alter table CommitNotes add primary key (`pset`,`bhash`)")
         && $conf->ql("alter table CommitNotes drop `hash`"))
         $conf->update_schema_version(117);
+    if ($conf->sversion == 117
+        && $conf->ql("alter table Capability change `timeExpires` `timeExpires` bigint(11) NOT NULL")
+        && $conf->ql("alter table ContactInfo change `creationTime` `creationtime` bigint(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table ContactInfo change `lastLogin` `lastLogin` bigint(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table ContactInfo change `passwordTime` `passwordTime` bigint(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table ContactInfo change `passwordUseTime` `passwordUseTime` bigint(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table ContactInfo change `updateTime` `updateTime` bigint(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table ExecutionQueue change `insertat` `insertat` bigint(11) NOT NULL")
+        && $conf->ql("alter table ExecutionQueue change `updateat` `updateat` bigint(11) NOT NULL")
+        && $conf->ql("alter table ExecutionQueue change `runat` `runat` bigint(11) NOT NULL")
+        && $conf->ql("alter table Repository change `opencheckat` `opencheckat` bigint(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table Repository change `snapat` `snapat` bigint(11) DEFAULT NULL")
+        && $conf->ql("alter table Repository change `snapcheckat` `snapcheckat` bigint(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table Repository change `snapcommitat` `snapcommitat` bigint(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table RepositoryGrade change `placeholder_at` `placeholder_at` bigint(11) DEFAULT NULL")
+        && $conf->ql("alter table RepositoryGradeRequest change `requested_at` `requested_at` bigint(11) NOT NULL"))
+        $conf->update_schema_version(118);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }
