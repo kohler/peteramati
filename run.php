@@ -6,7 +6,7 @@
 require_once("src/initweb.php");
 if ($Me->is_empty())
     $Me->escape();
-global $User, $Pset, $Psetid, $Info, $RecentCommits, $Qreq;
+global $User, $Pset, $Info, $Qreq;
 
 function quit($err = null) {
     global $Conf;
@@ -34,7 +34,6 @@ if ($Qreq->u !== null
 assert($User == $Me || $Me->isPC);
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
-$Psetid = $Pset->id;
 
 // XXX this should be under `api`
 if ($Qreq->flag && check_post($Qreq) && user_pset_info()) {
@@ -116,7 +115,6 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
 // repo
 $Info = user_pset_info();
 $Repo = $Info->repo;
-$RecentCommits = $Info->recent_commits();
 
 // can we run this?
 if (!$Repo)

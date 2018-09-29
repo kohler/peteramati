@@ -6,7 +6,7 @@
 require_once("src/initweb.php");
 if ($Me->is_empty())
     $Me->escape();
-global $User, $Pset, $Psetid, $Info, $Commit, $RecentCommits, $Qreq;
+global $User, $Pset, $Info, $Commit, $Qreq;
 
 function quit($err = null) {
     global $Conf;
@@ -35,13 +35,11 @@ if (isset($Qreq->u)
 assert($User == $Me || $Me->isPC);
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
-$Psetid = $Pset->id;
 
 // repo
 $Info = user_pset_info();
 $Repo = $Info->repo;
 $Commit = $Info->commit_hash();
-$RecentCommits = $Info->recent_commits();
 if (!$Repo || !$Commit || !$Info->can_view_repo_contents() || !$Qreq->file)
     exit;
 
