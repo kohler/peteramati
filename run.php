@@ -141,8 +141,8 @@ function runner_eval($runner, $info, $answer) {
 
 
 // extract request info
-$Queueid = cvtint($Qreq->get("queueid", -1));
 $Rstate = new RunnerState($Info, $Runner);
+$Rstate->set_queueid($Qreq->get("queueid"));
 
 // recent or checkup
 if ($Qreq->check) {
@@ -170,8 +170,8 @@ if ($Qreq->check) {
             $Rstate->write($Qreq->write);
         }
     }
-    if ($answer->status != "working" && $Queueid > 0)
-        $Conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $Queueid, $Info->repo->repoid);
+    if ($answer->status != "working" && $Rstate->queueid > 0)
+        $Conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $Rstate->queueid, $Info->repo->repoid);
     if ($answer->status == "done"
         && $Me->can_run($Pset, $Runner, $User)
         && $Runner->eval)
@@ -190,78 +190,9 @@ if (!$Pset->run_jailfiles)
 
 
 // queue
-function load_queue($queueid, $repo) {
-    global $Conf, $Now;
-    $result = $Conf->qe("select q.*,
-            count(fq.queueid) nahead,
-            min(if(fq.runat>0,fq.runat,$Now)) as head_runat,
-            min(fq.nconcurrent) as ahead_nconcurrent
-        from ExecutionQueue q
-        left join ExecutionQueue fq on (fq.queueclass=q.queueclass and fq.queueid<q.queueid)
-        where q.queueid=$queueid group by q.queueid");
-    if (!($queue = edb_orow($result)))
-        quit("Queued job was cancelled, try again");
-    else if ($queue->repoid != $repo->repoid)
-        quit("Queued job belongs to a different repository");
-    return $queue;
-}
-
-function clean_queue($qname, $qconf, $qid) {
-    global $Conf, $Now;
-    $runtimeout = isset($qconf->runtimeout) ? $qconf->runtimeout : 300;
-    $result = $Conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $qname, $qid);
-    while (($row = edb_orow($result))) {
-        // remove dead items from queue
-        // - lockfile contains "0\n": child has exited, remove it
-        // - lockfile specified but not there
-        // - no lockfile & last update < 30sec ago
-        // - running for more than 5min (configurable)
-        if ($row->lockfile && @file_get_contents($row->lockfile) === "0\n") {
-            unlink($row->lockfile);
-            $row->inputfifo && unlink($row->inputfifo);
-        }
-        if (($row->lockfile && !file_exists($row->lockfile))
-            || ($row->runat <= 0 && $row->updateat < $Now - 30)
-            || ($runtimeout && $row->runat > 0 && $row->runat < $Now - $runtimeout))
-            $Conf->qe("delete from ExecutionQueue where queueid=?", $row->queueid);
-    }
-}
-
-$Queue = null;
-if (isset($Runner->queue)) {
-    if ($Queueid < 0) {
-        $Conf->qe("insert into ExecutionQueue set queueclass=?, insertat=?, updateat=?, repoid=?, runat=0, status=0, psetid=?, hash=?, nconcurrent=?",
-                  $Runner->queue, $Now, $Now, $Info->repo->repoid,
-                  $Pset->id, $Info->commit_hash(),
-                  isset($Runner->nconcurrent) && $Runner->nconcurrent ? $Runner->nconcurrent : null);
-        $Queueid = $Conf->dblink->insert_id;
-    } else
-        $Conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $Queueid);
-    $Queue = load_queue($Queueid, $Info->repo);
-
-    $qconf = defval(defval($PsetInfo, "_queues", array()), $Runner->queue);
-    if (!$qconf)
-        $qconf = (object) array("nconcurrent" => 1);
-
-    $nconcurrent = defval($qconf, "nconcurrent", 1000);
-    if ($Runner->nconcurrent > 0 && $Runner->nconcurrent < $nconcurrent)
-        $nconcurrent = $Runner->nconcurrent;
-    if (get($Queue, "ahead_nconcurrent") > 0 && $Queue->ahead_nconcurrent < $nconcurrent)
-        $nconcurrent = $Queue->ahead_nconcurrent;
-
-    for ($tries = 0; $tries < 2; ++$tries) {
-        // error_log($User->seascode_username . ": $Queue->queueid, $nconcurrent, $Queue->nahead, $Queue->ahead_nconcurrent");
-        if ($nconcurrent > 0 && $Queue->nahead >= $nconcurrent) {
-            if ($tries)
-                json_exit(["onqueue" => true, "queueid" => $Queue->queueid, "nahead" => $Queue->nahead, "headage" => ($Queue->head_runat ? $Now - $Queue->head_runat : null)]);
-            clean_queue($Runner->queue, $qconf, $Queue->queueid);
-            $Queue = load_queue($Queueid, $Info->repo);
-        } else
-            break;
-    }
-
-    // if we get here we can actually run
-}
+$Queue = $Rstate->make_queue();
+if ($Queue && !$Queue->runnable)
+    json_exit(["onqueue" => true, "queueid" => $Queue->queueid, "nahead" => $Queue->nahead, "headage" => ($Queue->head_runat ? $Now - $Queue->head_runat : null)]);
 
 
 // maybe eval

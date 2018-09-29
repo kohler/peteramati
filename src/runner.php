@@ -11,11 +11,12 @@ class RunnerState {
 
     public $logdir;
 
-    public $checkt = null;
-    private $logfile = null;
-    private $timingfile = null;
-    private $lockfile = null;
-    private $inputfifo = null;
+    public $checkt;
+    public $queueid;
+    private $logfile;
+    private $timingfile;
+    private $lockfile;
+    private $inputfifo;
     private $logstream;
     private $username;
     private $userhome;
@@ -107,6 +108,16 @@ class RunnerState {
         else
             $this->checkt = null;
         return $this->checkt !== null;
+    }
+
+    function set_queueid($queueid) {
+        if (is_int($queueid) && $queueid > 0)
+            $this->queueid = $queueid;
+        else if (ctype_digit($queueid))
+            $this->queueid = intval($queueid);
+        else
+            $this->queueid = null;
+        return $this->queueid !== null;
     }
 
     function generic_json() {
@@ -388,6 +399,104 @@ class RunnerState {
         foreach ((array) $s as $k => $v)
             $x[] = "$k = $v\n";
         file_put_contents($this->jailhomedir . "/config.mk", join("", $x), true);
+    }
+
+
+    private function load_queue() {
+        global $Now;
+        if ($this->queueid === null)
+            return null;
+        $result = $this->info->conf->qe("select q.*,
+                count(fq.queueid) nahead,
+                min(if(fq.runat>0,fq.runat,$Now)) as head_runat,
+                min(fq.nconcurrent) as ahead_nconcurrent
+            from ExecutionQueue q
+            left join ExecutionQueue fq on (fq.queueclass=q.queueclass and fq.queueid<q.queueid)
+            where q.queueid={$this->queueid} group by q.queueid");
+        $queue = $result->fetch_object();
+        Dbl::free($result);
+        if ($queue && $queue->repoid == $this->repo->repoid)
+            return $queue;
+        else
+            return null;
+    }
+
+    private function clean_queue($qconf) {
+        global $Now;
+        assert($this->queueid !== null);
+        $runtimeout = isset($qconf->runtimeout) ? $qconf->runtimeout : 300;
+        $result = $this->info->conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $this->runner->queue, $this->queueid);
+        while (($row = $result->fetch_object())) {
+            // remove dead items from queue
+            // - lockfile contains "0\n": child has exited, remove it
+            // - lockfile specified but not there
+            // - no lockfile & last update < 30sec ago
+            // - running for more than 5min (configurable)
+            if ($row->lockfile
+                && @file_get_contents($row->lockfile) === "0\n") {
+                unlink($row->lockfile);
+                if ($row->inputfifo)
+                    unlink($row->inputfifo);
+            }
+            if (($row->lockfile
+                 && !file_exists($row->lockfile))
+                || ($row->runat <= 0
+                    && $row->updateat < $Now - 30)
+                || ($runtimeout
+                    && $row->runat > 0
+                    && $row->runat < $Now - $runtimeout))
+                $this->info->conf->qe("delete from ExecutionQueue where queueid=?", $row->queueid);
+        }
+        Dbl::free($result);
+    }
+
+    function make_queue() {
+        global $Now, $PsetInfo;
+        if (!isset($this->runner->queue))
+            return null;
+        $conf = $this->info->conf;
+
+        if ($this->queueid === null) {
+            $nconcurrent = null;
+            if (isset($this->runner->nconcurrent)
+                && $this->runner->nconcurrent > 0)
+                $nconcurrent = $this->runner->nconcurrent;
+            $conf->qe("insert into ExecutionQueue set queueclass=?, insertat=?, updateat=?, repoid=?, runat=0, status=0, psetid=?, hash=?, nconcurrent=?",
+                  $this->runner->queue, $Now, $Now, $this->repo->repoid,
+                  $this->pset->id, $this->info->commit_hash(),
+                  $nconcurrent);
+            $this->queueid = $conf->dblink->insert_id;
+        } else
+            $conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $this->queueid);
+        $queue = $this->load_queue();
+
+        $qconf = get(get($PsetInfo, "_queues", []), $this->runner->queue);
+        if (!$qconf)
+            $qconf = (object) ["nconcurrent" => 1];
+        $nconcurrent = get($qconf, "nconcurrent", 1000);
+        if ($this->runner->nconcurrent > 0
+            && $this->runner->nconcurrent < $nconcurrent)
+            $nconcurrent = $this->runner->nconcurrent;
+        if (get($queue, "ahead_nconcurrent") > 0
+            && $queue->ahead_nconcurrent < $nconcurrent)
+            $nconcurrent = $queue->ahead_nconcurrent;
+
+        for ($tries = 0; $tries < 2; ++$tries) {
+            // error_log($User->seascode_username . ": $Queue->queueid, $nconcurrent, $Queue->nahead, $Queue->ahead_nconcurrent");
+            if ($nconcurrent > 0 && $queue->nahead >= $nconcurrent) {
+                if ($tries) {
+                    $queue->runnable = false;
+                    return $queue;
+                }
+                $this->clean_queue($qconf);
+                $queue = $this->load_queue();
+            } else
+                break;
+        }
+
+        // if we get here we can actually run
+        $queue->runnable = true;
+        return $queue;
     }
 
 
