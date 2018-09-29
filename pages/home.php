@@ -295,11 +295,12 @@ function set_grader(Qrequest $qreq) {
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
     $graders = array();
-    foreach ($Conf->pc_members() as $pcm)
-        if ($pcm->email == $qreq->grader
-            || (!$pcm->privChair && $qreq->grader == "__random__"))
+    foreach ($Conf->pc_members_and_admins() as $pcm)
+        if (strcasecmp($pcm->email, $qreq->grader) == 0
+            || $qreq->grader === "__random__"
+            || ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC)))
             $graders[] = $pcm;
-    if (!$qreq->grader || !count($graders))
+    if (!$qreq->grader || empty($graders))
         return $Conf->errorMsg("No grader");
     $cur_graders = $graders;
     foreach (qreq_users($qreq) as $user) {
@@ -796,7 +797,6 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
 function show_regrades($result, $all) {
     global $Conf, $Me, $Now;
     $rows = $uids = [];
-    $pcmembers = $Conf->pc_members_and_admins();
     while (($row = edb_orow($result))) {
         $row->notes = json_decode($row->notes);
         $flags = (array) get($row->notes, "flags");
@@ -1039,7 +1039,6 @@ function show_pset_table($pset) {
 
     $rows = array();
     $incomplete = array();
-    $pcmembers = $Conf->pc_members();
     $jx = [];
     foreach ($students as $s) {
         if (!$s->visited) {
@@ -1100,9 +1099,10 @@ function show_pset_table($pset) {
     if ($Me->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";
         $sel = array("none" => "N/A");
-        foreach ($Conf->pc_members() as $pcm)
+        foreach ($Conf->pc_members_and_admins() as $pcm)
             $sel[$pcm->email] = Text::name_html($pcm);
         $sel["__random__"] = "Random";
+        $sel["__random_tf__"] = "Random TF";
         echo '<span class="nb" style="padding-right:2em">',
             Ht::select("grader", $sel, "none"),
             ' &nbsp;', Ht::submit("setgrader", "Set grader"),
@@ -1196,7 +1196,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     Ht::stash_script('peteramati_psets=' . json_encode($psetj) . ';');
 
     $pctable = [];
-    foreach ($Conf->pc_members() as $pc) {
+    foreach ($Conf->pc_members_and_admins() as $pc) {
         if (($pc->nickname || $pc->firstName) && !$pc->nicknameAmbiguous)
             $pctable[$pc->contactId] = $pc->nickname ? : $pc->firstName;
         else
