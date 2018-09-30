@@ -86,7 +86,11 @@ else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
 
 // magic multi-runner
 if ($Me->isPC && get($_GET, "runmany") && check_post()) {
-    $Conf->header(htmlspecialchars($Pset->title . " " . $Runner->title), "home");
+    $t = $Pset->title;
+    if (get($_GET, "ensure"))
+        $t .= " Ensure";
+    $t .= " " . $Runner->title;
+    $Conf->header(htmlspecialchars($t), "home");
 
     echo '<h2 id="runmany61_who"></h2>',
         Ht::form(hoturl_post("run")),

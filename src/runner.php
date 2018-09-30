@@ -313,7 +313,7 @@ class RunnerState {
         $runsettings = $this->info->commit_info("runsettings");
         $json = (object) [
             "repoid" => $this->repo->repoid, "pset" => $this->pset->urlkey,
-            "timestamp" => $this->checkt, "hash" => $this->commit_hash(),
+            "timestamp" => $this->checkt, "hash" => $this->info->commit_hash(),
             "runner" => $this->runner->name
         ];
         if ($runsettings) {
