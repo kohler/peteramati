@@ -1,6 +1,6 @@
 <?php
 // qrequest.php -- HotCRP helper class for request objects (no warnings)
-// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2018 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSerializable {

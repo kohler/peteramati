@@ -1,6 +1,6 @@
 <?php
 // contactview.php -- HotCRP helper class for user related printouts
-// Peteramati is Copyright (c) 2006-2016 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2018 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class ContactView {

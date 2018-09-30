@@ -1,6 +1,6 @@
 <?php
 // base.php -- HotCRP base helper functions
-// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2018 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 // string helpers

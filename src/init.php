@@ -1,6 +1,6 @@
 <?php
 // init.php -- HotCRP initialization (test or site)
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2018 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 define("TAG_REGEX", '~?~?[a-zA-Z!@*_:.][-a-zA-Z0-9!@*_:.\/]*');

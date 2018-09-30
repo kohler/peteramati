@@ -1,6 +1,6 @@
 <?php
 // harvardseas_repositorysite.php -- Peteramati code.seas.harvard.edu repositories
-// Peteramati is Copyright (c) 2013-2016 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2018 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class HarvardSEAS_RepositorySite extends RepositorySite {

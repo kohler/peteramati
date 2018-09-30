@@ -1,6 +1,6 @@
 <?php
 // mailtemplate.php -- HotCRP mail templates
-// HotCRP is Copyright (c) 2006-2012 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2018 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 global $mailTemplates;

@@ -1,6 +1,6 @@
 <?php
 // redirect.php -- HotCRP redirection helper functions
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2018 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 function go($url = false) {

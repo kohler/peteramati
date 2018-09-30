@@ -1,6 +1,6 @@
 <?php
 // mailer.php -- HotCRP mail template manager
-// HotCRP is Copyright (c) 2006-2016 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2018 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 class MailPreparation {

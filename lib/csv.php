@@ -1,6 +1,6 @@
 <?php
 // csv.php -- HotCRP CSV parsing functions
-// HotCRP is Copyright (c) 2006-2017 Eddie Kohler and others
+// HotCRP is Copyright (c) 2006-2018 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class CsvParser {
