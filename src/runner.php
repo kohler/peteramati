@@ -4,6 +4,7 @@ class RunnerException extends Exception {
 }
 
 class RunnerState {
+    public $conf;
     public $info;
     public $repo;
     public $pset;
@@ -28,6 +29,7 @@ class RunnerState {
 
     function __construct(PsetView $info, RunnerConfig $runner, $checkt = null) {
         global $ConfSitePATH;
+        $this->conf = $info->conf;
         $this->info = $info;
         $this->repo = $info->repo;
         $this->pset = $info->pset;
@@ -45,6 +47,20 @@ class RunnerState {
         if ($checkt)
             $this->set_checkt($checkt);
     }
+
+    function expand($x) {
+        if (strpos($x, '${') !== false) {
+            $x = str_replace('${REPOID}', $this->repo->repoid, $x);
+            $x = str_replace('${PSET}', $this->pset->id, $x);
+            $x = str_replace('${CONFDIR}', "conf/", $x);
+            $x = str_replace('${SRCDIR}', "src/", $x);
+            $x = str_replace('${HOSTTYPE}', $this->conf->opt("hostType", ""), $x);
+            $x = str_replace('${COMMIT}', $this->info->commit_hash(), $x);
+            $x = str_replace('${HASH}', $this->info->commit_hash(), $x);
+        }
+        return $x;
+    }
+
 
     function running_checkts() {
         if ($this->_running_checkts === null) {
@@ -76,20 +92,89 @@ class RunnerState {
         return $this->_logged_checkts;
     }
 
-
-    function expand($x) {
-        global $Conf;
-        if (strpos($x, '${') !== false) {
-            $x = str_replace('${REPOID}', $this->repo->repoid, $x);
-            $x = str_replace('${PSET}', $this->pset->id, $x);
-            $x = str_replace('${CONFDIR}', "conf/", $x);
-            $x = str_replace('${SRCDIR}', "src/", $x);
-            $x = str_replace('${HOSTTYPE}', $Conf->opt("hostType", ""), $x);
-            $x = str_replace('${COMMIT}', $this->info->commit_hash(), $x);
-            $x = str_replace('${HASH}', $this->info->commit_hash(), $x);
-        }
-        return $x;
+    function job_commit($checkt) {
+        $logfn = $this->info->runner_logfile($this->checkt);
+        $t = @file_get_contents($logfn, false, null, 0, 4096);
+        if ($t === false)
+            return false;
+        $pos = strpos($t, "\n\n");
+        if ($pos !== false)
+            $t = substr($t, 0, $pos + 2);
+        $substr = "git branch jailcheckout_$checkt ";
+        $pos = strpos($t, $substr);
+        if ($pos !== false
+            && preg_match('{\G([0-9a-f]+)\s}', $t, $m, 0, $pos))
+            return $m[1];
+        else
+            return false;
     }
+
+    function job_status($checkt, $answer = null) {
+        global $Now;
+        if (!$answer)
+            $answer = (object) [];
+        $logfn = $this->info->runner_logfile($checkt);
+        $lockfn = $logfn . ".pid";
+        $pid_data = @file_get_contents($lockfn);
+        if (ctype_digit(trim($pid_data))
+            && !posix_kill(trim($pid_data), 0)
+            && posix_get_last_error() == 3 /* ESRCH */)
+            $pid_data = "dead\n";
+        if ($pid_data === false || $pid_data === "0\n") {
+            $answer->done = true;
+            $answer->status = "done";
+        } else if ($pid_data === "" || ctype_digit(trim($pid_data))) {
+            $answer->done = false;
+            $answer->status = "working";
+            if ($Now - $checkt > 600)
+                $answer->status = "old";
+        } else {
+            $answer->done = true;
+            $answer->status = "dead";
+        }
+        if ($answer->done && $pid_data !== false) {
+            unlink($lockfn);
+            unlink($logfn . ".in");
+        }
+        return $answer;
+    }
+
+    function is_recent_job_running() {
+        foreach ($this->running_checkts() as $checkt) {
+            $lstatus = $this->job_status($checkt);
+            if ($lstatus && $lstatus->status === "working")
+                return true;
+        }
+        return false;
+    }
+
+    private function jailfiles() {
+        $f = $this->pset->run_jailfiles ? : $this->conf->opt("run_jailfiles");
+        return $f ? $this->expand($f) : false;
+    }
+
+    private function overlayfile() {
+        global $ConfSitePATH;
+        $f = $this->runner->overlay;
+        if (!isset($f))
+            $f = $this->pset->run_overlay;
+        if ((string) $f !== "") {
+            if ($f[0] !== "/")
+                $f = $ConfSitePATH . "/" . $f;
+            return $this->expand($f);
+        } else
+            return false;
+    }
+
+    function environment_timestamp() {
+        $t = 0;
+        if (($f = $this->jailfiles()))
+            $t = max($t, (int) @filemtime($f));
+        if (($f = $this->overlayfile()))
+            $t = max($t, (int) @filemtime($f));
+        return $t;
+    }
+
 
     private function run_and_log($command, $bg = false) {
         fwrite($this->logstream, "++ $command\n");
@@ -127,34 +212,8 @@ class RunnerState {
         ];
     }
 
-    function status_json($json = null) {
-        global $Now;
-        if (!$json)
-            $json = (object) [];
-        $logfn = $this->info->runner_logfile($this->checkt);
-        $lockfn = $logfn . ".pid";
-        $pid_data = @file_get_contents($lockfn);
-        if (ctype_digit(trim($pid_data))
-            && !posix_kill(trim($pid_data), 0)
-            && posix_get_last_error() == 3 /* ESRCH */)
-            $pid_data = "dead\n";
-        if ($pid_data === false || $pid_data === "0\n") {
-            $json->done = true;
-            $json->status = "done";
-        } else if ($pid_data === "" || ctype_digit(trim($pid_data))) {
-            $json->done = false;
-            $json->status = "working";
-            if ($Now - $this->checkt > 600)
-                $json->status = "old";
-        } else {
-            $json->done = true;
-            $json->status = "dead";
-        }
-        if ($json->done && $pid_data !== false) {
-            unlink($lockfn);
-            unlink($logfn . ".in");
-        }
-        return $json;
+    function status_json($answer = null) {
+        return $this->job_status($this->checkt, $answer);
     }
 
     function full_json($offset = null) {
@@ -204,23 +263,8 @@ class RunnerState {
     }
 
 
-    function is_recent_job_running() {
-        $save_checkt = $this->checkt;
-        $answer = false;
-        foreach ($this->running_checkts() as $checkt) {
-            $this->checkt = $checkt;
-            $lstatus = $this->status_json();
-            if ($lstatus && $lstatus->status === "working") {
-                $answer = true;
-                break;
-            }
-        }
-        $this->checkt = $save_checkt;
-        return $answer;
-    }
-
     function start($queue) {
-        global $ConfSitePATH, $Conf;
+        global $ConfSitePATH;
         assert($this->checkt === null && $this->logfile === null);
 
         // collect user information
@@ -283,12 +327,11 @@ class RunnerState {
             $command .= " -t" . escapeshellarg($this->timingfile);
         }
 
-        $skeletondir = $this->pset->run_skeletondir ? : $Conf->opt("run_skeletondir");
-        $binddir = $this->pset->run_binddir ? : $Conf->opt("run_binddir");
+        $skeletondir = $this->pset->run_skeletondir ? : $this->conf->opt("run_skeletondir");
+        $binddir = $this->pset->run_binddir ? : $this->conf->opt("run_binddir");
         if ($skeletondir && $binddir && !is_dir("$skeletondir/proc"))
             $binddir = false;
-        if (($jfiles = $this->pset->run_jailfiles ? : $Conf->opt("run_jailfiles")))
-            $jfiles = $this->expand($jfiles);
+        $jfiles = $this->jailfiles();
 
         if ($skeletondir && $binddir) {
             $binddir = preg_replace(',/+\z,', '', $binddir);
@@ -352,6 +395,8 @@ class RunnerState {
         $repodir = $ConfSitePATH . "/repo/repo" . $this->repo->cacheid;
 
         // need a branch to check out a specific commit
+        // NB this branch name is semantically important, as is the logged
+        //    command (job_commit).
         $branch = "jailcheckout_$Now";
         if ($this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch $branch " . $this->info->commit_hash()))
             throw new RunnerException("Can’t create branch for checkout");
@@ -371,19 +416,11 @@ class RunnerState {
             throw new RunnerException("Can’t clean up checkout in jail");
 
         // create overlay
-        $overlay = $this->runner->overlay;
-        if (!isset($overlay))
-            $overlay = $this->pset->run_overlay;
-        if ((string) $overlay !== "")
+        if (($overlay = $this->overlayfile()))
             $this->checkout_overlay($checkoutdir, $overlay);
     }
 
     function checkout_overlay($checkoutdir, $overlayfile) {
-        global $ConfSitePATH;
-
-        if ($overlayfile[0] != "/")
-            $overlayfile = $ConfSitePATH . "/" . $overlayfile;
-        $overlayfile = $this->expand($overlayfile);
         if ($this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($overlayfile)))
             throw new RunnerException("Can’t unpack overlay");
 
@@ -406,7 +443,7 @@ class RunnerState {
         global $Now;
         if ($this->queueid === null)
             return null;
-        $result = $this->info->conf->qe("select q.*,
+        $result = $this->conf->qe("select q.*,
                 count(fq.queueid) nahead,
                 min(if(fq.runat>0,fq.runat,$Now)) as head_runat,
                 min(fq.nconcurrent) as ahead_nconcurrent
@@ -425,7 +462,7 @@ class RunnerState {
         global $Now;
         assert($this->queueid !== null);
         $runtimeout = isset($qconf->runtimeout) ? $qconf->runtimeout : 300;
-        $result = $this->info->conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $this->runner->queue, $this->queueid);
+        $result = $this->conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $this->runner->queue, $this->queueid);
         while (($row = $result->fetch_object())) {
             // remove dead items from queue
             // - lockfile contains "0\n": child has exited, remove it
@@ -445,7 +482,7 @@ class RunnerState {
                 || ($runtimeout
                     && $row->runat > 0
                     && $row->runat < $Now - $runtimeout))
-                $this->info->conf->qe("delete from ExecutionQueue where queueid=?", $row->queueid);
+                $this->conf->qe("delete from ExecutionQueue where queueid=?", $row->queueid);
         }
         Dbl::free($result);
     }
@@ -454,21 +491,20 @@ class RunnerState {
         global $Now, $PsetInfo;
         if (!isset($this->runner->queue))
             return null;
-        $conf = $this->info->conf;
 
         if ($this->queueid === null) {
             $nconcurrent = null;
             if (isset($this->runner->nconcurrent)
                 && $this->runner->nconcurrent > 0)
                 $nconcurrent = $this->runner->nconcurrent;
-            $conf->qe("insert into ExecutionQueue set queueclass=?, repoid=?, insertat=?, updateat=?, runat=0, status=0, nconcurrent=?, psetid=?, runnername=?, bhash=?",
+            $this->conf->qe("insert into ExecutionQueue set queueclass=?, repoid=?, insertat=?, updateat=?, runat=0, status=0, nconcurrent=?, psetid=?, runnername=?, bhash=?",
                   $this->runner->queue, $this->repo->repoid,
                   $Now, $Now, $nconcurrent,
                   $this->pset->id, $this->runner->name,
                   hex2bin($this->info->commit_hash()));
-            $this->queueid = $conf->dblink->insert_id;
+            $this->queueid = $this->conf->dblink->insert_id;
         } else
-            $conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $this->queueid);
+            $this->conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $this->queueid);
         $queue = $this->load_queue();
 
         $qconf = get(get($PsetInfo, "_queues", []), $this->runner->queue);
@@ -515,7 +551,18 @@ class RunnerState {
     function check($qreq) {
         // recent or checkup
         if ($qreq->check === "recent") {
-            $checkt = get($this->logged_checkts(), 0);
+            $checkt = 0;
+            $n = 0;
+            $envts = $this->environment_timestamp();
+            foreach ($this->logged_checkts() as $t) {
+                if ($t > $envts
+                    && $this->job_commit($t) === $this->info->commit_hash()) {
+                    $checkt = $t;
+                    break;
+                } else if ($n >= 12)
+                    break;
+                ++$n;
+            }
             if (!$checkt)
                 return (object) ["ok" => false, "run_empty" => true, "error" => "No logs yet", "error_html" => "No logs yet"];
         } else {
@@ -542,7 +589,7 @@ class RunnerState {
         }
 
         if ($answer->status !== "working" && $this->queueid > 0)
-            $this->info->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repo->repoid);
+            $this->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repo->repoid);
         if ($answer->status === "done") {
             $user = $this->info->user;
             if ($user->can_run($this->pset, $this->runner, $user)
