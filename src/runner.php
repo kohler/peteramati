@@ -92,25 +92,10 @@ class RunnerState {
         return $this->_logged_checkts;
     }
 
-    function job_commit($checkt) {
-        $logfn = $this->info->runner_logfile($this->checkt);
-        $t = @file_get_contents($logfn, false, null, 0, 4096);
-        if ($t === false)
-            return false;
-        $pos = strpos($t, "\n\n");
-        if ($pos !== false)
-            $t = substr($t, 0, $pos + 2);
-        $substr = "git branch jailcheckout_$checkt ";
-        $pos = strpos($t, $substr);
-        if ($pos !== false
-            && preg_match('{\G([0-9a-f]+)\s}', $t, $m, 0, $pos))
-            return $m[1];
-        else
-            return false;
-    }
-
     function job_status($checkt, $answer = null) {
         global $Now;
+        if (!$checkt)
+            return false;
         if (!$answer)
             $answer = (object) [];
         $logfn = $this->info->runner_logfile($checkt);
@@ -135,6 +120,22 @@ class RunnerState {
         if ($answer->done && $pid_data !== false) {
             unlink($lockfn);
             unlink($logfn . ".in");
+        }
+        return $answer;
+    }
+
+    function job_info($checkt, $answer = null) {
+        if (($answer = $this->job_status($checkt, $answer))) {
+            $logfn = $this->info->runner_logfile($checkt);
+            $t = @file_get_contents($logfn, false, null, 0, 4096);
+            if ($t
+                && str_starts_with($t, "++ {")
+                && ($pos = strpos($t, "\n"))
+                && ($j = json_decode(substr($t, 3, $pos - 3)))) {
+                foreach ((array) $j as $k => $v)
+                    if (!isset($answer->$k))
+                        $answer->$k = $v;
+            }
         }
         return $answer;
     }
@@ -308,6 +309,20 @@ class RunnerState {
                     $this->checkt, $this->lockfile, $this->inputfifo, $queue->queueid);
         register_shutdown_function(array($this, "cleanup"));
 
+        // print json to first line
+        $runsettings = $this->info->commit_info("runsettings");
+        $json = (object) [
+            "repoid" => $this->repo->repoid, "pset" => $this->pset->urlkey,
+            "timestamp" => $this->checkt, "hash" => $this->commit_hash(),
+            "runner" => $this->runner->name
+        ];
+        if ($runsettings) {
+            $json->settings = [];
+            foreach ($runsettings as $k => $v)
+                $json->settings[$k] = $v;
+        }
+        fwrite($this->logstream, "++ " . json_encode($json) . "\n");
+
         // create jail
         $this->remove_old_jails();
         if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username)))
@@ -395,8 +410,6 @@ class RunnerState {
         $repodir = $ConfSitePATH . "/repo/repo" . $this->repo->cacheid;
 
         // need a branch to check out a specific commit
-        // NB this branch name is semantically important, as is the logged
-        //    command (job_commit).
         $branch = "jailcheckout_$Now";
         if ($this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch $branch " . $this->info->commit_hash()))
             throw new RunnerException("Can’t create branch for checkout");
@@ -556,10 +569,13 @@ class RunnerState {
             $envts = $this->environment_timestamp();
             foreach ($this->logged_checkts() as $t) {
                 if ($t > $envts
-                    && $this->job_commit($t) === $this->info->commit_hash()) {
+                    && ($s = $this->job_info($t))
+                    && $s->done
+                    && $s->runner === $this->runner->name
+                    && $s->hash === $this->info->commit_hash()) {
                     $checkt = $t;
                     break;
-                } else if ($n >= 12)
+                } else if ($n >= 200)
                     break;
                 ++$n;
             }
