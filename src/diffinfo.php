@@ -15,6 +15,7 @@ class DiffInfo implements Iterator {
     public $loaded = true;
     private $_diff = [];
     private $_diffsz = 0;
+    private $_dflags;
     private $_itpos;
 
     private $_repoa;
@@ -25,6 +26,8 @@ class DiffInfo implements Iterator {
 
     const MAXLINES = 16384;
     const MAXDIFFSZ = self::MAXLINES << 2;
+
+    const LINE_NONL = 1;
 
     function __construct($filename, DiffConfig $diffconfig = null) {
         $this->filename = $filename;
@@ -59,8 +62,13 @@ class DiffInfo implements Iterator {
     }
 
     function ends_without_newline() {
-        assert($this->_diffsz > 0 && ($this->_diff[$this->_diffsz - 4] === "-" || $this->_diff[$this->_diffsz - 4] === "+"));
-        $this->_diff[$this->_diffsz - 1] .= "⏎̸";
+        $di = $this->_diffsz - 4;
+        assert($di >= 0 && ($this->_diff[$di] === "-" || $this->_diff[$di] === "+"));
+        if ($this->_dflags === null)
+            $this->_dflags = [];
+        if (!isset($this->_dflags[$di]))
+            $this->_dflags[$di] = 0;
+        $this->_dflags[$di] |= self::LINE_NONL;
     }
 
     function finish() {
@@ -230,7 +238,10 @@ class DiffInfo implements Iterator {
 
 
     function current() {
-        return array_slice($this->_diff, $this->_itpos, 4);
+        $x = array_slice($this->_diff, $this->_itpos, 4);
+        if ($this->_dflags !== null && isset($this->_dflags[$this->_itpos]))
+            $x[] = $this->_dflags[$this->_itpos];
+        return $x;
     }
     function key() {
         return $this->_itpos >> 2;

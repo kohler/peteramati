@@ -1064,8 +1064,10 @@ class PsetView {
         echo '<tr class="pa-dl', $x[0], '">',
             '<td class="pa-da"', $ak, '></td>',
             '<td class="pa-db"', $bk, '></td>',
-            '<td class="', $x[1], '">', $this->diff_line_code($x[4], $tw),
-            "</td></tr>\n";
+            '<td class="', $x[1];
+        if (isset($l[4]) && ($l[4] & DiffInfo::LINE_NONL))
+            echo ' pa-dnonl';
+        echo '">', $this->diff_line_code($x[4], $tw), "</td></tr>\n";
 
         if ($wentries !== null && $bln && isset($wentries[$bln])) {
             echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox need-pa-terminal" data-pa-terminal-output="', htmlspecialchars($wentries[$bln]), '"></td></tr>';

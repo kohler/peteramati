@@ -2474,6 +2474,9 @@ table.hidegrades .pa-gradenote {
 .pa-dd {
 	width: 99%;
 }
+.pa-dnonl:after {
+	content: "⏎̸";
+}
 .pa-dcx {
 	color: rgba(0, 0, 0, 0.5);
 }
