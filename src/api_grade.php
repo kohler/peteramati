@@ -151,7 +151,7 @@ class API_Grade {
             if (array_search($user->contactId, $note->users) === false)
                 $note->users[] = $user->contactId;
             $note->iscomment = !!$qreq->iscomment;
-            $note->note = (string) $qreq->note;
+            $note->note = (string) rtrim(cleannl($qreq->note));
             $note->version = intval($note->version) + 1;
             if ($qreq->format && ctype_digit($qreq->format))
                 $note->format = intval($qreq->format);

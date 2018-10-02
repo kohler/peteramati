@@ -59,6 +59,9 @@ class LinenotesOrder {
                 $this->lnorder[$fl[1] . "_" . $fl[0]] = $i;
         }
     }
+    function is_empty() {
+        return empty($this->lnseq);
+    }
     function file($file) {
         return get($this->ln, $file);
     }

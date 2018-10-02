@@ -783,8 +783,10 @@ if ($Pset->gitless) {
         $linenotes = $lnorder->file($file);
         $open = $linenotes
             || (!$dinfo->boring
-                && ($Me != $Info->user || !$Info->can_view_grades()
-                    || !$Info->is_grading_commit() || !$linenotes->has_linenotes_in_diff));
+                && ($Me != $Info->user
+                    || !$Info->can_view_grades()
+                    || !$Info->is_grading_commit()
+                    || !$linenotes->has_linenotes_in_diff));
         $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
     }
 
