@@ -67,8 +67,7 @@ other configuration information. Here's a small example:
 ```
 
 This defines two problem sets, "1" and "2". The `_defaults` entry defines
-entries common to the problem sets. (All keys that start with an underscore
-provide non-problem-set configuration.)
+entries common to the problem sets.
 
 Problem sets
 ------------

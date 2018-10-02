@@ -40,8 +40,8 @@ CREATE TABLE `Capability` (
 
 DROP TABLE IF EXISTS `CommitNotes`;
 CREATE TABLE `CommitNotes` (
-  `bhash` varbinary(32) NOT NULL,
   `pset` int(11) NOT NULL DEFAULT '0',
+  `bhash` varbinary(32) NOT NULL,
   `notes` varbinary(32767) DEFAULT NULL,
   `haslinenotes` tinyint(1) NOT NULL DEFAULT '0',
   `repoid` int(11) NOT NULL DEFAULT '0',
