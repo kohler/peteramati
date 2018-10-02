@@ -370,6 +370,14 @@ function updateSchema($conf) {
     if ($conf->sversion == 119
         && $conf->ql("alter table ContactInfo change `creationtime` `creationTime` bigint(11) NOT NULL DEFAULT '0'"))
         $conf->update_schema_version(120);
+    if ($conf->sversion == 120
+        && $conf->ql("alter table ActionLog drop key `logId`")
+        && $conf->ql("alter table ContactInfo drop key `contactId`")
+        && $conf->ql("alter table ContactInfo drop key `contactIdRoles`")
+        && $conf->ql("alter table ContactInfo add key `roles` (`roles`)")
+        && $conf->ql("alter table ContactInfo drop key `fullName`")
+        && $conf->ql("alter table Repository drop key `repoid`"))
+        $conf->update_schema_version(121);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

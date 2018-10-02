@@ -61,9 +61,12 @@ foreach ($Conf->psets() as $pset)
         && !$pset->gitless)
         Contact::forward_pset_links($pset->id);
 
-if (!$Me->is_empty() && ($Me === $User || $Me->isPC) && $Qreq->set_username && check_post()
+if (!$Me->is_empty()
+    && ($Me === $User || $Me->isPC)
+    && $Qreq->set_username
+    && check_post()
     && ($repoclass = RepositorySite::$sitemap[$Qreq->reposite])
-    && in_array($repoclass, RepositorySite::site_classes($Conf))) {
+    && in_array($repoclass, RepositorySite::site_classes($Conf), true)) {
     if ($repoclass::save_username($User, $Qreq->username))
         redirectSelf();
 }

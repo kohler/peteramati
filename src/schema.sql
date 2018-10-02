@@ -11,7 +11,6 @@ CREATE TABLE `ActionLog` (
   `ipaddr` varchar(16) DEFAULT NULL,
   `action` text NOT NULL,
   PRIMARY KEY (`logId`),
-  UNIQUE KEY `logId` (`logId`),
   KEY `contactId` (`contactId`),
   KEY `paperId` (`paperId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -78,8 +77,8 @@ CREATE TABLE `ContactGrade` (
 
 DROP TABLE IF EXISTS `ContactImage`;
 CREATE TABLE `ContactImage` (
-  `contactImageId` int(11) NOT NULL AUTO_INCREMENT,
   `contactId` int(11) NOT NULL,
+  `contactImageId` int(11) NOT NULL AUTO_INCREMENT,
   `mimetype` varbinary(128) DEFAULT NULL,
   `data` mediumblob,
   PRIMARY KEY (`contactId`,`contactImageId`),
@@ -124,11 +123,9 @@ CREATE TABLE `ContactInfo` (
   `studentYear` varbinary(4) DEFAULT NULL,
   `nickname` varchar(60) DEFAULT NULL,
   PRIMARY KEY (`contactId`),
-  UNIQUE KEY `contactId` (`contactId`),
-  UNIQUE KEY `contactIdRoles` (`contactId`,`roles`),
   UNIQUE KEY `email` (`email`),
+  KEY `roles` (`roles`),
   UNIQUE KEY `anon_username` (`anon_username`),
-  KEY `fullName` (`lastName`,`firstName`,`email`),
   KEY `seascode_username` (`seascode_username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -216,7 +213,6 @@ CREATE TABLE `Repository` (
   `heads` varbinary(8192) DEFAULT NULL,
   `analyzedsnapat` bigint(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`repoid`),
-  UNIQUE KEY `repoid` (`repoid`),
   UNIQUE KEY `url` (`url`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -284,7 +280,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 120);
+insert into Settings (name, value) values ('allowPaperOption', 121);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators
