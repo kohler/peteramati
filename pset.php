@@ -778,13 +778,12 @@ if ($Pset->gitless) {
     if (!empty($diff))
         echo "<hr class=\"c\" />\n";
     foreach ($diff as $file => $dinfo) {
-        $linenotes = $lnorder->file($file);
-        $open = $linenotes
+        $open = $lnorder->file_has_notes($file)
             || (!$dinfo->boring
                 && ($Me != $Info->user
                     || !$Info->can_view_grades()
                     || !$Info->is_grading_commit()
-                    || !$linenotes->has_linenotes_in_diff));
+                    || !$lnorder->has_linenotes_in_diff));
         $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
     }
 

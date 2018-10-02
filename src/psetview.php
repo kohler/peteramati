@@ -925,7 +925,7 @@ class PsetView {
     function diff($hasha, $hashb, LinenotesOrder $lnorder = null, $args = []) {
         assert(!isset($args["needfiles"]));
         if ($lnorder)
-            $args["needfiles"] = $lnorder->note_files();
+            $args["needfiles"] = $lnorder->fileorder();
         $diff = $this->repo->diff($this->pset, $hasha, $hashb, $args);
 
         if ($this->pset->has_grade_landmark
@@ -1056,18 +1056,12 @@ class PsetView {
         if ($x[3])
             $bk .= ' data-landmark="' . $x[3] . '"';
 
-        $nx = $nj = null;
+        $nx = null;
         if ($linenotes) {
-            if ($bln && isset($linenotes->$bln)) {
-                $n = LineNote::make_json($file, $bln, $linenotes->$bln);
-                if ($this->can_view_grades() || $n->iscomment)
-                    $nx = $n;
-            }
-            if (!$nx && $aln && isset($linenotes->$aln)) {
-                $n = LineNote::make_json($file, $aln, $linenotes->$aln);
-                if ($this->can_view_grades() || $n->iscomment)
-                    $nx = $n;
-            }
+            if ($bln && isset($linenotes->$bln))
+                $nx = LineNote::make_json($file, $bln, $linenotes->$bln);
+            if (!$nx && $aln && isset($linenotes->$aln))
+                $nx = LineNote::make_json($file, $aln, $linenotes->$aln);
         }
 
         echo '<tr class="pa-dl', $x[0], '">',
@@ -1097,54 +1091,52 @@ class PsetView {
     }
 
     private function echo_linenote(LineNote $note, LinenotesOrder $lnorder = null) {
-        if ($this->can_view_grades() || $note->iscomment) {
-            echo '<tr class="pa-dl pa-gw'; /* NB script depends on this class exactly */
-            if ((string) $note->note === "")
-                echo ' hidden';
-            echo '" data-pa-note="', htmlspecialchars(json_encode($note->render_json($this->can_view_note_authors()))),
-                '"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox">';
-            if ((string) $note->note === "") {
-                echo '</td></tr>';
-                return;
-            }
-            echo '<div class="pa-notediv">';
-            if ($lnorder) {
-                $links = array();
-                //list($pfile, $plineid) = $lnorder->get_prev($note->file, $note->lineid);
-                //if ($pfile)
-                //    $links[] = '<a href="#L' . $plineid . '_'
-                //        . html_id_encode($pfile) . '" onclick="return pa_gotoline(this)">&larr; Prev</a>';
-                list($nfile, $nlineid) = $lnorder->get_next($note->file, $note->lineid);
-                if ($nfile)
-                    $links[] = '<a href="#L' . $nlineid . '_'
-                        . html_id_encode($nfile) . '" onclick="return pa_gotoline(this)">Next &gt;</a>';
-                else
-                    $links[] = '<a href="#">Top</a>';
-                if (!empty($links))
-                    echo '<div class="pa-note-links">',
-                        join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
-            }
-            if ($this->can_view_note_authors() && !empty($note->users)) {
-                $pcmembers = $this->conf->pc_members_and_admins();
-                $autext = [];
-                foreach ($note->users as $au)
-                    if (($p = get($pcmembers, $au))) {
-                        if ($p->nicknameAmbiguous)
-                            $autext[] = Text::name_html($p);
-                        else
-                            $autext[] = htmlspecialchars($p->nickname ? : $p->firstName);
-                    }
-                if (!empty($autext))
-                    echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
-            }
-            echo '<div class="pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
-            if ($note->format) {
-                echo ' need-format" data-format="', $note->format;
-                $this->need_format = true;
-            } else
-                echo ' format0';
-            echo '">', htmlspecialchars($note->note), '</div>';
-            echo '</div></td></tr>';
+        echo '<tr class="pa-dl pa-gw'; /* NB script depends on this class exactly */
+        if ((string) $note->note === "")
+            echo ' hidden';
+        echo '" data-pa-note="', htmlspecialchars(json_encode($note->render_json($this->can_view_note_authors()))),
+            '"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox">';
+        if ((string) $note->note === "") {
+            echo '</td></tr>';
+            return;
         }
+        echo '<div class="pa-notediv">';
+        if ($lnorder) {
+            $links = array();
+            //list($pfile, $plineid) = $lnorder->get_prev($note->file, $note->lineid);
+            //if ($pfile)
+            //    $links[] = '<a href="#L' . $plineid . '_'
+            //        . html_id_encode($pfile) . '" onclick="return pa_gotoline(this)">&larr; Prev</a>';
+            list($nfile, $nlineid) = $lnorder->get_next($note->file, $note->lineid);
+            if ($nfile)
+                $links[] = '<a href="#L' . $nlineid . '_'
+                    . html_id_encode($nfile) . '" onclick="return pa_gotoline(this)">Next &gt;</a>';
+            else
+                $links[] = '<a href="#">Top</a>';
+            if (!empty($links))
+                echo '<div class="pa-note-links">',
+                    join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
+        }
+        if ($this->can_view_note_authors() && !empty($note->users)) {
+            $pcmembers = $this->conf->pc_members_and_admins();
+            $autext = [];
+            foreach ($note->users as $au)
+                if (($p = get($pcmembers, $au))) {
+                    if ($p->nicknameAmbiguous)
+                        $autext[] = Text::name_html($p);
+                    else
+                        $autext[] = htmlspecialchars($p->nickname ? : $p->firstName);
+                }
+            if (!empty($autext))
+                echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
+        }
+        echo '<div class="pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
+        if ($note->format) {
+            echo ' need-format" data-format="', $note->format;
+            $this->need_format = true;
+        } else
+            echo ' format0';
+        echo '">', htmlspecialchars($note->note), '</div>';
+        echo '</div></td></tr>';
     }
 }

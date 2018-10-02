@@ -13,21 +13,38 @@ class LinenotesOrder {
     public $has_linenotes_in_diff = false;
 
     function __construct($linenotes, $seegradenotes) {
-        $this->ln = $linenotes ? : [];
-        foreach ($this->ln as $file => $notelist) {
-            if (!isset($this->fileorder[$file]))
-                $this->fileorder[$file] = count($this->fileorder);
+        $this->ln = [];
+        foreach ($linenotes ? : [] as $file => $notelist) {
+            $fln = [];
             foreach ($notelist as $line => $note) {
                 if ((is_string($note) && $note !== "")
-                    || (is_array($note) && ($note[0] || $seegradenotes)
-                        && (string) $note[1] !== ""))
-                    $this->lnseq[] = array($file, $line, is_array($note) && $note[0]);
+                    || (is_array($note)
+                        && ($note[0] || $seegradenotes)
+                        && (string) $note[1] !== "")) {
+                    $fln[$line] = $note;
+                    $this->lnseq[] = [$file, $line, is_array($note) && $note[0]];
+                }
+            }
+            if (!empty($fln)) {
+                $this->ln[$file] = (object) $fln;
+                $this->fileorder[$file] = count($this->fileorder) + 1;
             }
         }
     }
-    function note_files() {
+
+    function is_empty() {
+        return empty($this->lnseq);
+    }
+    function fileorder() {
         return $this->fileorder;
     }
+    function file_has_notes($file) {
+        return isset($this->ln[$file]);
+    }
+    function file($file) {
+        return get($this->ln, $file, []);
+    }
+
     function set_diff($diff) {
         $this->diff = $diff;
         $this->has_linenotes_in_diff = false;
@@ -58,12 +75,6 @@ class LinenotesOrder {
             foreach ($this->lnseq as $i => $fl)
                 $this->lnorder[$fl[1] . "_" . $fl[0]] = $i;
         }
-    }
-    function is_empty() {
-        return empty($this->lnseq);
-    }
-    function file($file) {
-        return get($this->ln, $file);
     }
     function seq() {
         $this->ensure_lnorder();

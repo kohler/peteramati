@@ -100,18 +100,9 @@ foreach ($lnorder->seq() as $fl) {
 if (count($notelinks))
     ContactView::echo_group("notes", join(", ", $notelinks));
 
-// check for any linenotes
-$has_any_linenotes = false;
-foreach ($diff as $file => $dinfo)
-    if ($lnorder->file($file)) {
-        $has_any_linenotes = true;
-        break;
-    }
-
-// line notes
+// diff and line notes
 foreach ($diff as $file => $dinfo) {
-    $linenotes = $lnorder->file($file);
-    $open = $linenotes || !$dinfo->boring || (!$hasha_mine && !$hashb_mine);
+    $open = $lnorder->file_has_notes($file) || !$dinfo->boring || (!$hasha_mine && !$hashb_mine);
     $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
 }
 
