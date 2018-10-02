@@ -845,7 +845,9 @@ class RunnerConfig {
 class DiffConfig {
     public $regex;
     public $match_priority;
+    public $title;
     public $position;
+    public $fileless;
     public $full;
     public $ignore;
     public $boring;
@@ -859,10 +861,12 @@ class DiffConfig {
         $this->regex = isset($d->regex) ? $d->regex : $regex;
         if (!is_string($this->regex) || $this->regex === "")
             throw new PsetConfigException("`regex` diff format error", $loc);
+        $this->title = Pset::cstr($loc, $d, "title");
         $this->match_priority = (float) Pset::cint($loc, $d, "match_priority");
         $this->position = Pset::cnum($loc, $d, "position");
         if ($this->position === null && isset($d->priority))
             $this->position = -Pset::cnum($loc, $d, "priority");
+        $this->fileless = Pset::cbool($loc, $d, "fileless");
         $this->full = Pset::cbool($loc, $d, "full");
         $this->ignore = Pset::cbool($loc, $d, "ignore");
         $this->boring = Pset::cbool($loc, $d, "boring");
@@ -882,8 +886,12 @@ class DiffConfig {
             $x = clone $b;
             $y = $a;
         }
+        if ($x->title === null)
+            $x->title = $y->title;
         if ($x->position === null)
             $x->position = $y->position;
+        if ($x->fileless === null)
+            $x->fileless = $y->fileless;
         if ($x->full === null)
             $x->full = $y->full;
         if ($x->ignore === null)

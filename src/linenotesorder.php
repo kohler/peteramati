@@ -47,9 +47,11 @@ class LinenotesOrder {
 
     function set_diff($diff) {
         $this->diff = $diff;
+        $this->lnorder = null;
+
         $this->has_linenotes_in_diff = false;
         foreach ($this->diff as $file => $di) {
-            if (get($this->ln, $file)) {
+            if ($this->file_has_notes($file)) {
                 $this->has_linenotes_in_diff = true;
                 break;
             }
@@ -58,15 +60,14 @@ class LinenotesOrder {
         $old_fileorder = $this->fileorder;
         $this->fileorder = [];
         foreach ($this->diff as $file => $di)
-            $this->fileorder[$file] = count($this->fileorder);
+            $this->fileorder[$file] = count($this->fileorder) + 1;
         foreach ($old_fileorder as $file => $x) {
             // Normally every file with notes will be present
             // already, but just in case---for example, the
             // handout repo got corrupted...
             if (!isset($this->fileorder[$file]))
-                $this->fileorder[$file] = count($this->fileorder);
+                $this->fileorder[$file] = count($this->fileorder) + 1;
         }
-        $this->lnorder = null;
     }
     private function ensure_lnorder() {
         if ($this->lnorder === null) {

@@ -928,6 +928,7 @@ class PsetView {
             $args["needfiles"] = $lnorder->fileorder();
         $diff = $this->repo->diff($this->pset, $hasha, $hashb, $args);
 
+        // expand diff to include all grade landmarks
         if ($this->pset->has_grade_landmark
             && $this->pc_view) {
             foreach ($this->pset->grades() as $g) {
@@ -939,8 +940,23 @@ class PsetView {
             }
         }
 
-        if ($lnorder)
+        if ($lnorder) {
+            // expand diff to include fake files
+            foreach ($lnorder->fileorder() as $fn => $order) {
+                if (isset($diff[$fn])
+                    || !($diffc = $this->pset->find_diffconfig($fn))
+                    || !$diffc->fileless)
+                    continue;
+                $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
+                foreach ((array) $lnorder->file($fn) as $ln => $note)
+                    $diffi->add("Z", "", (int) substr($ln, 1), "");
+                uasort($diff, "DiffInfo::compare");
+            }
+
+            // add diff to linenotes
             $lnorder->set_diff($diff);
+        }
+
         return $diff;
     }
 
@@ -984,10 +1000,10 @@ class PsetView {
         $no_heading = get($args, "no_heading") || $only_table;
 
         if (!$no_heading) {
-            echo '<h3><a class="fold61" href="#" onclick="return pa_unfoldfilediff.call(this)"><span class="foldarrow">',
+            echo '<h3><a class="fold61" href="" onclick="return pa_unfoldfilediff.call(this)"><span class="foldarrow">',
                 ($open ? "&#x25BC;" : "&#x25B6;"),
-                "</span>&nbsp;", htmlspecialchars($file), "</a>";
-            if (!$dinfo->removed) {
+                "</span>&nbsp;", htmlspecialchars($dinfo->title ? : $file), "</a>";
+            if (!$dinfo->fileless && !$dinfo->removed) {
                 $rawfile = $file;
                 if ($this->repo->truncated_psetdir($this->pset)
                     && str_starts_with($rawfile, $this->pset->directory_slash))
@@ -1032,13 +1048,15 @@ class PsetView {
     private function echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
                                     $wentries, $gentries, $tw) {
         if ($l[0] === "@")
-            $x = array(" pa-gx", "pa-dcx", "", "", $l[3]);
+            $x = [" pa-gx", "pa-dcx", "", "", $l[3]];
         else if ($l[0] === " ")
-            $x = array(" pa-gc", "pa-dd", $l[1], $l[2], $l[3]);
+            $x = [" pa-gc", "pa-dd", $l[1], $l[2], $l[3]];
         else if ($l[0] === "-")
-            $x = array(" pa-gd", "pa-dd", $l[1], "", $l[3]);
+            $x = [" pa-gd", "pa-dd", $l[1], "", $l[3]];
+        else if ($l[0] === "+")
+            $x = [" pa-gi", "pa-dd", "", $l[2], $l[3]];
         else
-            $x = array(" pa-gi", "pa-dd", "", $l[2], $l[3]);
+            $x = [null, null, "", $l[2], $l[3]];
 
         $aln = $x[2] ? "a" . $x[2] : "";
         $bln = $x[3] ? "b" . $x[3] : "";
@@ -1064,13 +1082,15 @@ class PsetView {
                 $nx = LineNote::make_json($file, $aln, $linenotes->$aln);
         }
 
-        echo '<tr class="pa-dl', $x[0], '">',
-            '<td class="pa-da"', $ak, '></td>',
-            '<td class="pa-db"', $bk, '></td>',
-            '<td class="', $x[1];
-        if (isset($l[4]) && ($l[4] & DiffInfo::LINE_NONL))
-            echo ' pa-dnonl';
-        echo '">', $this->diff_line_code($x[4], $tw), "</td></tr>\n";
+        if ($x[0]) {
+            echo '<tr class="pa-dl', $x[0], '">',
+                '<td class="pa-da"', $ak, '></td>',
+                '<td class="pa-db"', $bk, '></td>',
+                '<td class="', $x[1];
+            if (isset($l[4]) && ($l[4] & DiffInfo::LINE_NONL))
+                echo ' pa-dnonl';
+            echo '">', $this->diff_line_code($x[4], $tw), "</td></tr>\n";
+        }
 
         if ($wentries !== null && $bln && isset($wentries[$bln])) {
             echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox need-pa-terminal" data-pa-terminal-output="', htmlspecialchars($wentries[$bln]), '"></td></tr>';

@@ -7,6 +7,8 @@ class DiffInfo implements Iterator {
     public $filename;
     public $binary = false;
     public $truncated = false;
+    public $title;
+    public $fileless = false;
     public $boring = false;
     private $_boring_set = false;
     public $hide_if_anonymous = false;
@@ -32,6 +34,8 @@ class DiffInfo implements Iterator {
     function __construct($filename, DiffConfig $diffconfig = null) {
         $this->filename = $filename;
         if ($diffconfig) {
+            $this->title = $diffconfig->title;
+            $this->fileless = !!$diffconfig->fileless;
             $this->boring = !!$diffconfig->boring;
             $this->_boring_set = $diffconfig->boring !== null;
             $this->hide_if_anonymous = !!$diffconfig->hide_if_anonymous;
