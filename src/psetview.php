@@ -543,7 +543,7 @@ class PsetView {
         if ($this->pset->gitless_grades)
             return $this->grade ? $this->grade->gradercid : 0;
         else if ($this->repo_grade
-                 && $this->hash == $this->repo_grade->gradehash)
+                 && $this->hash === $this->repo_grade->gradehash)
             return $this->repo_grade->gradercid;
         else
             return $this->commit_info("gradercid") ? : 0;
@@ -922,7 +922,12 @@ class PsetView {
         return new LinenotesOrder(null, $this->can_view_grades());
     }
 
-    function expand_diff_for_grades($diffs) {
+    function diff($hasha, $hashb, LinenotesOrder $lnorder = null, $args = []) {
+        assert(!isset($args["needfiles"]));
+        if ($lnorder)
+            $args["needfiles"] = $lnorder->note_files();
+        $diff = $this->repo->diff($this->pset, $hasha, $hashb, $args);
+
         if ($this->pset->has_grade_landmark
             && $this->pc_view) {
             foreach ($this->pset->grades() as $g) {
@@ -933,6 +938,10 @@ class PsetView {
                     $di->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
             }
         }
+
+        if ($lnorder)
+            $lnorder->set_diff($diff);
+        return $diff;
     }
 
     private function diff_line_code($t, $tw) {

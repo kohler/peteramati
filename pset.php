@@ -727,9 +727,7 @@ if ($Pset->gitless) {
     // collect diff and sort line notes
     $lnorder = $Info->viewable_line_notes();
     $hasha = $Pset->handout_hash ? : $Info->derived_handout_hash();
-    $diff = $Info->repo->diff($Pset, $hasha, $Info->commit_hash(), array("wdiff" => $WDIFF, "needfiles" => $lnorder->note_files()));
-    $Info->expand_diff_for_grades($diff);
-    $lnorder->set_diff($diff, $Me == $Info->user && $Info->can_view_grades() && $Info->is_grading_commit());
+    $diff = $Info->diff($hasha, $Info->commit_hash(), $lnorder, ["wdiff" => $WDIFF]);
 
     // print line notes
     $notelinks = array();
@@ -740,7 +738,7 @@ if ($Pset->gitless) {
             . (!$fl[2] && !$Info->user_can_view_grades() ? " pa-notehidden" : "")
             .'">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
     }
-    if (count($notelinks))
+    if (!empty($notelinks))
         ContactView::echo_group("notes", join(", ", $notelinks));
 
     // print runners
@@ -778,7 +776,7 @@ if ($Pset->gitless) {
 
     // line notes
     if (!empty($diff))
-        echo "<hr style=\"clear:both\" />\n";
+        echo "<hr class=\"c\" />\n";
     foreach ($diff as $file => $dinfo) {
         $linenotes = $lnorder->file($file);
         $open = $linenotes

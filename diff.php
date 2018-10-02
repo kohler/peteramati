@@ -85,10 +85,8 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
     "</td></tr></table><hr>\n";
 
 // collect diff and sort line notes
-$diff = $Info->repo->diff($Pset, $hasha, $hashb, $diff_options);
-$Info->expand_diff_for_grades($diff);
 $lnorder = $hashb_mine ? $Info->viewable_line_notes() : $Info->empty_line_notes();
-$lnorder->set_diff($diff);
+$diff = $Info->diff($hasha, $hashb, $lnorder, $diff_options);
 
 // print line notes
 $notelinks = array();
