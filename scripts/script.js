@@ -1811,6 +1811,8 @@ render_text.add_format({
 })
 })(window.markdownit());
 
+$(render_text.on_page);
+
 
 // popup dialogs
 function popup_near(elt, anchor) {
@@ -3222,15 +3224,6 @@ return function (container, string, options) {
         return container.innerHTML;
 };
 })();
-
-function pa_render_need_terminal() {
-    $(".need-pa-terminal").each(function () {
-        $(this).removeClass("need-pa-terminal");
-        pa_render_terminal(this, this.dataset.paTerminalOutput);
-        delete this.dataset.paTerminalOutput;
-    });
-}
-$(pa_render_need_terminal);
 
 function pa_run(button, opt) {
     var $f = $(button).closest("form"),

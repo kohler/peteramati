@@ -1037,12 +1037,10 @@ class PsetView {
         if ($dinfo->loaded)
             echo "</tbody>";
         echo "</table>\n";
-        if ($this->need_format && !$only_table) {
+        if (($this->need_format || $wentries) && !$only_table) {
             echo "<script>render_text.on_page()</script>\n";
             $this->need_format = false;
         }
-        if ($wentries && !$only_table)
-            echo "<script>pa_render_need_terminal()</script>\n";
     }
 
     private function echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
