@@ -1803,6 +1803,12 @@ render_text.add_format({
         return md.render(text);
     }
 });
+render_text.add_format({
+    format: 2,
+    render: function (text) {
+        return pa_render_terminal(text);
+    }
+})
 })(window.markdownit());
 
 
@@ -3034,7 +3040,15 @@ function style_text(text, style) {
 }
 
 return function (container, string, options) {
-    var styles = container.dataset.paTerminalStyle;
+    var return_html = false;
+    if (typeof container === "string") {
+        options = string;
+        string = container;
+        container = document.createElement("div");
+        return_html = true;
+    }
+
+    var styles = container.getAttribute("data-pa-terminal-style");
     var cursor = null;
     if (options && options.cursor === true)
         cursor = container.lastChild;
@@ -3096,7 +3110,7 @@ return function (container, string, options) {
 
     function find_filediff(file) {
         return $(".pa-filediff").filter(function () {
-            return this.dataset.paFile === file;
+            return this.getAttribute("data-pa-file") === file;
         });
     }
 
@@ -3202,7 +3216,10 @@ return function (container, string, options) {
             node.setAttribute("data-pa-outputpart", last);
     }
 
-    container.dataset.paTerminalStyle = styles;
+    container.setAttribute("data-pa-terminal-style", styles);
+
+    if (return_html)
+        return container.innerHTML;
 };
 })();
 

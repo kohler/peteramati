@@ -1093,7 +1093,7 @@ class PsetView {
         }
 
         if ($wentries !== null && $bln && isset($wentries[$bln])) {
-            echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox need-pa-terminal" data-pa-terminal-output="', htmlspecialchars($wentries[$bln]), '"></td></tr>';
+            echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox need-format" data-format="2">', htmlspecialchars($wentries[$bln]), '</td></tr>';
         }
 
         if ($gentries !== null && $aln && isset($gentries[$aln])) {
