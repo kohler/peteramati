@@ -26,7 +26,7 @@ class DiffInfo implements Iterator {
     private $_filenamea;
     private $_hasha_hrepo;
 
-    const MAXLINES = 16384;
+    const MAXLINES = 8000;
     const MAXDIFFSZ = self::MAXLINES << 2;
 
     const LINE_NONL = 1;
