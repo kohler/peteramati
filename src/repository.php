@@ -508,8 +508,69 @@ class Repository {
         }
     }
 
+    private function add_diff(&$diff_files, $files_arg, Pset $pset, $options) {
+        $command = "git diff";
+        if (get($options, "wdiff"))
+            $command .= " -w";
+        $command .= " {$options["hasha_arg"]} {$options["hashb_arg"]} -- " . join(" ", $files_arg);
+        $result = $this->gitrun($command);
+        $alineno = $blineno = null;
+        $di = null;
+        $pos = 0;
+        $len = strlen($result);
+        while (1) {
+            if ($di && $di->truncated) {
+                while ($pos < $len
+                       && (($ch = $result[$pos]) === " " || $ch === "+" || $ch === "-")) {
+                    $nlpos = strpos($result, "\n", $pos);
+                    $pos = $nlpos === false ? $len : $nlpos + 1;
+                }
+            }
+            if ($pos >= $len) {
+                break;
+            }
+            $nlpos = strpos($result, "\n", $pos);
+            $line = $nlpos === false ? substr($result, $pos) : substr($result, $pos, $nlpos - $pos);
+            $pos = $nlpos === false ? $len : $nlpos + 1;
+            if ($line == "") {
+                /* do nothing */;
+            } else if ($line[0] === " " && $di && $alineno) {
+                $di->add(" ", $alineno, $blineno, substr($line, 1));
+                ++$alineno;
+                ++$blineno;
+            } else if ($line[0] === "-" && $di && $alineno) {
+                $di->add("-", $alineno, $blineno, substr($line, 1));
+                ++$alineno;
+            } else if ($line[0] === "+" && $di && $blineno) {
+                $di->add("+", $alineno, $blineno, substr($line, 1));
+                ++$blineno;
+            } else if ($line[0] === "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+)(?:|,\d+) @@_', $line, $m)) {
+                $alineno = +$m[1];
+                $blineno = +$m[2];
+                $di->add("@", null, null, $line);
+            } else if ($line[0] === "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
+                if ($di) {
+                    $di->finish();
+                }
+                $file = $options["truncpfx"] . $m[1];
+                $diffconfig = $pset->find_diffconfig($file);
+                $di = $diff_files[$file] = new DiffInfo($file, $diffconfig);
+                $di->set_repoa($this, $pset, $options["hasha"], $m[1], $options["hasha_hrepo"]);
+                $alineno = $blineno = null;
+            } else if ($line[0] === "B" && $di && preg_match('_\ABinary files_', $line)) {
+                $di->add("@", null, null, $line);
+            } else if ($line[0] === "\\" && strpos($line, "No newline") !== false) {
+                $di->ends_without_newline();
+            } else {
+                $alineno = $blineno = null;
+            }
+        }
+        if ($di)
+            $di->finish();
+    }
+
     function diff(Pset $pset, $hasha, $hashb, $options = null) {
-        $options = $options ? : array();
+        $options = (array) $options;
         $diff_files = array();
         assert($pset); // code remains for `!$pset`; maybe revive it?
 
@@ -596,64 +657,15 @@ class Repository {
         }
 
         if (!empty($files_arg)) {
-            $command = "git diff";
-            if (get($options, "wdiff"))
-                $command .= " -w";
-            $command .= " {$hasha_arg} {$hashb_arg} -- " . join(" ", $files_arg);
-            $result = $this->gitrun($command);
-            $alineno = $blineno = null;
-            $di = null;
-            $pos = 0;
-            $len = strlen($result);
-            while (1) {
-                if ($di && $di->truncated) {
-                    while ($pos < $len
-                           && (($ch = $result[$pos]) === " " || $ch === "+" || $ch === "-")) {
-                        $nlpos = strpos($result, "\n", $pos);
-                        $pos = $nlpos === false ? $len : $nlpos + 1;
-                    }
-                }
-                if ($pos >= $len) {
-                    break;
-                }
-                $nlpos = strpos($result, "\n", $pos);
-                $line = $nlpos === false ? substr($result, $pos) : substr($result, $pos, $nlpos - $pos);
-                $pos = $nlpos === false ? $len : $nlpos + 1;
-                if ($line == "") {
-                    /* do nothing */;
-                } else if ($line[0] === " " && $di && $alineno) {
-                    $di->add(" ", $alineno, $blineno, substr($line, 1));
-                    ++$alineno;
-                    ++$blineno;
-                } else if ($line[0] === "-" && $di && $alineno) {
-                    $di->add("-", $alineno, $blineno, substr($line, 1));
-                    ++$alineno;
-                } else if ($line[0] === "+" && $di && $blineno) {
-                    $di->add("+", $alineno, $blineno, substr($line, 1));
-                    ++$blineno;
-                } else if ($line[0] === "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+)(?:|,\d+) @@_', $line, $m)) {
-                    $alineno = +$m[1];
-                    $blineno = +$m[2];
-                    $di->add("@", null, null, $line);
-                } else if ($line[0] === "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
-                    if ($di) {
-                        $di->finish();
-                    }
-                    $file = $truncpfx . $m[1];
-                    $diffconfig = $pset->find_diffconfig($file);
-                    $di = $diff_files[$file] = new DiffInfo($file, $diffconfig);
-                    $di->set_repoa($this, $pset, $hasha, $m[1], $hasha_hrepo);
-                    $alineno = $blineno = null;
-                } else if ($line[0] === "B" && $di && preg_match('_\ABinary files_', $line)) {
-                    $di->add("@", null, null, $line);
-                } else if ($line[0] === "\\" && strpos($line, "No newline") !== false) {
-                    $di->ends_without_newline();
-                } else {
-                    $alineno = $blineno = null;
-                }
-            }
-            if ($di)
-                $di->finish();
+            $xoptions = $options;
+            $xoptions["hasha"] = $hasha;
+            $xoptions["hasha_arg"] = $hasha_arg;
+            $xoptions["hasha_hrepo"] = $hasha_hrepo;
+            $xoptions["hashb"] = $hashb;
+            $xoptions["hashb_arg"] = $hashb_arg;
+            $xoptions["truncpfx"] = $truncpfx;
+            for ($i = 0; $i < count($files_arg); $i += 200)
+                $this->add_diff($diff_files, array_slice($files_arg, $i, 200), $pset, $xoptions);
         }
 
         // ensure a diff for every landmarked file, even if empty
