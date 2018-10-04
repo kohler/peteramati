@@ -508,11 +508,13 @@ class Repository {
         }
     }
 
-    private function add_diff(&$diff_files, $files_arg, Pset $pset, $options) {
+    private function parse_diff($diffargs, Pset $pset, $hasha_arg, $hashb_arg, $options) {
         $command = "git diff";
         if (get($options, "wdiff"))
             $command .= " -w";
-        $command .= " {$options["hasha_arg"]} {$options["hashb_arg"]} -- " . join(" ", $files_arg);
+        $command .= " {$hasha_arg} {$hashb_arg} --";
+        foreach ($diffargs as $fn => $di)
+            $command .= " " . escapeshellarg(quotemeta($fn));
         $result = $this->gitrun($command);
         $alineno = $blineno = null;
         $di = null;
@@ -552,10 +554,7 @@ class Repository {
                 if ($di) {
                     $di->finish();
                 }
-                $file = $options["truncpfx"] . $m[1];
-                $diffconfig = $pset->find_diffconfig($file);
-                $di = $diff_files[$file] = new DiffInfo($file, $diffconfig);
-                $di->set_repoa($this, $pset, $options["hasha"], $m[1], $options["hasha_hrepo"]);
+                $di = $diffargs[$m[1]];
                 $alineno = $blineno = null;
             } else if ($line[0] === "B" && $di && preg_match('_\ABinary files_', $line)) {
                 $di->add("@", null, null, $line);
@@ -571,8 +570,8 @@ class Repository {
 
     function diff(Pset $pset, $hasha, $hashb, $options = null) {
         $options = (array) $options;
-        $diff_files = array();
         assert($pset); // code remains for `!$pset`; maybe revive it?
+        $diffs = [];
 
         $repodir = $truncpfx = "";
         if ($pset && $pset->directory_noslash !== "") {
@@ -616,7 +615,7 @@ class Repository {
                 && (!$onlyfiles || get($onlyfiles, $pset->directory_slash . $fname))) {
                 $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg($fname));
                 $di = new DiffInfo("{$pset->directory_slash}{$fname}", $diffconfig);
-                $diff_files[$di->filename] = $di;
+                $diffs[$di->filename] = $di;
                 foreach (explode("\n", $result) as $idx => $line) {
                     $di->add("+", 0, $idx + 1, $line);
                 }
@@ -629,67 +628,78 @@ class Repository {
             $command .= " -- " . escapeshellarg($pset->directory_noslash);
         $result = $this->gitrun($command);
 
-        $files_arg = $boring_files = [];
+        $xdiffs = [];
         foreach (explode("\n", $result) as $line) {
             if ($line != "") {
-                $diffconfig = $pset->find_diffconfig($truncpfx . $line);
+                $file = $truncpfx . $line;
+                $diffconfig = $pset->find_diffconfig($file);
                 // skip files presented in their entirety
                 if ($diffconfig
                     && !$ignore_diffconfig
                     && !$no_full
-                    && get($diffconfig, "full"))
+                    && $diffconfig->full
+                    && get($diffs, $file))
                     continue;
                 // skip files that aren't allowed
                 if ($onlyfiles
                     && !get($onlyfiles, $truncpfx . $line))
                     continue;
                 // skip ignored files, unless user requested them
+                $di = new DiffInfo($file, $diffconfig);
+                $di->set_repoa($this, $pset, $hasha, $line, $hasha_hrepo);
                 if ($diffconfig
                     && !$ignore_diffconfig
-                    && (get($diffconfig, "ignore") || get($diffconfig, "boring"))
-                    && (!$needfiles || !get($needfiles, $truncpfx . $line))) {
-                    if (!get($diffconfig, "ignore"))
-                        $boring_files[] = $truncpfx . $line;
-                    continue;
-                }
-                $files_arg[] = escapeshellarg(quotemeta($line));
+                    && ($diffconfig->ignore || $diffconfig->boring)
+                    && (!$needfiles || !get($needfiles, $file))) {
+                    if (!$diffconfig->ignore) {
+                        $di->finish_unloaded();
+                        $diffs[$file] = $di;
+                    }
+                } else
+                    $xdiffs[] = $di;
             }
         }
 
-        if (!empty($files_arg)) {
-            $xoptions = $options;
-            $xoptions["hasha"] = $hasha;
-            $xoptions["hasha_arg"] = $hasha_arg;
-            $xoptions["hasha_hrepo"] = $hasha_hrepo;
-            $xoptions["hashb"] = $hashb;
-            $xoptions["hashb_arg"] = $hashb_arg;
-            $xoptions["truncpfx"] = $truncpfx;
-            for ($i = 0; $i < count($files_arg); $i += 200)
-                $this->add_diff($diff_files, array_slice($files_arg, $i, 200), $pset, $xoptions);
+        // only handle 300 files, mark the rest boring
+        usort($xdiffs, "DiffInfo::compare");
+        if (count($xdiffs) > 300) {
+            for ($i = 300; $i < count($xdiffs); ++$i) {
+                $xdiffs[$i]->finish_unloaded();
+                $diffs[$xdiffs[$i]->filename] = $xdiffs[$i];
+            }
+            $xdiffs = array_slice($xdiffs, 0, 300);
+        }
+
+        // actually read diffs
+        if (!empty($xdiffs)) {
+            $nd = count($xdiffs);
+            $darg = [];
+            for ($i = 0; $i < $nd; ++$i) {
+                $darg[substr($xdiffs[$i]->filename, strlen($truncpfx))] = $xdiffs[$i];
+                if (count($xdiffs) >= 200 || $i == $nd - 1) {
+                    $this->parse_diff($darg, $pset, $hasha_arg, $hashb_arg, $options);
+                    $darg = [];
+                }
+            }
+            foreach ($xdiffs as $di)
+                if (!$di->is_empty())
+                    $diffs[$di->filename] = $di;
         }
 
         // ensure a diff for every landmarked file, even if empty
         if ($pset->has_grade_landmark) {
             foreach ($pset->grades() as $g) {
                 $file = $g->landmark_file;
-                if ($file && !isset($diff_files[$file])) {
-                    $diff_files[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
+                if ($file && !isset($diffs[$file])) {
+                    $diffs[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
                     $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $hasha_hrepo);
                     $di->finish();
                 }
             }
         }
 
-        // ensure non-loaded diffs for boring files
-        foreach ($boring_files as $file) {
-            $diff_files[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
-            $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $hasha_hrepo);
-            $di->finish();
-            $di->loaded = false;
-        }
-
-        uasort($diff_files, "DiffInfo::compare");
-        return $diff_files;
+        uasort($diffs, "DiffInfo::compare");
+        return $diffs;
     }
 
 

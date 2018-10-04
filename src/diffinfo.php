@@ -86,6 +86,11 @@ class DiffInfo implements Iterator {
             $this->removed = true;
     }
 
+    function finish_unloaded() {
+        $this->finish();
+        $this->loaded = false;
+    }
+
 
     function is_empty() {
         return $this->_diffsz === 0;
