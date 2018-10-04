@@ -82,6 +82,7 @@ class Pset {
     public $diffs = [];
     public $ignore;
     private $_file_ignore_regex;
+    private $_extra_diffs;
     private $_all_diffs;
     private $_file_diffinfo = [];
 
@@ -491,6 +492,8 @@ class Pset {
             $this->_all_diffs = $this->diffs;
             if (($regex = $this->file_ignore_regex()))
                 $this->_all_diffs[] = new DiffConfig($regex, (object) array("ignore" => true, "match_priority" => -10));
+            foreach ((array) $this->_extra_diffs as $d)
+                $this->_all_diffs[] = $d;
         }
         return $this->_all_diffs;
     }
@@ -524,6 +527,12 @@ class Pset {
             }
             return $pfiles;
         }
+    }
+
+    function add_diffconfig(DiffConfig $dc) {
+        $this->_all_diffs = null;
+        $this->_file_diffinfo = [];
+        $this->_extra_diffs[] = $dc;
     }
 
 

@@ -29,6 +29,7 @@ class PsetView {
     private $n_visible_in_total;
     private $n_set_grades;
     private $need_format = false;
+    private $added_diffinfo = false;
 
     const ERROR_NOTRUN = 1;
     const ERROR_LOGMISSING = 2;
@@ -923,6 +924,13 @@ class PsetView {
     }
 
     function diff($hasha, $hashb, LinenotesOrder $lnorder = null, $args = []) {
+        if (!$this->added_diffinfo) {
+            if (($rs = $this->commit_info("runsettings"))
+                && ($id = get($rs, "IGNOREDIFF")))
+                $this->pset->add_diffconfig(new DiffConfig($id, (object) ["ignore" => true]));
+            $this->added_diffinfo = true;
+        }
+
         assert(!isset($args["needfiles"]));
         if ($lnorder)
             $args["needfiles"] = $lnorder->fileorder();
