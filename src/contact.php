@@ -85,6 +85,7 @@ class Contact {
     private $links = null;
     private $repos = array();
     private $partners = array();
+    // $contactLinks -- property_exists() is meaningful
 
     // Roles
     const ROLE_PC = 1;
@@ -685,13 +686,16 @@ class Contact {
     }
 
     private function load_links() {
-        $result = $this->conf->qe("select type, pset, link from ContactLink where cid=?", $this->contactId);
         $this->links = [1 => [], 2 => [], 3 => [], 4 => [], 5 => []];
-        while (($row = edb_row($result))) {
-            $type = (int) $row[0];
-            $this->links[$type][(int) $row[1]][] = (int) $row[2];
+        if (!property_exists($this, "contactLinks"))
+            $this->contactLinks = $this->conf->fetch_value("select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=?", $this->contactId);
+        foreach (explode(",", (string) $this->contactLinks) as $l) {
+            if ($l !== "") {
+                $a = explode(" ", $l);
+                $this->links[(int) $a[0]][(int) $a[1]][] = (int) $a[2];
+            }
         }
-        Dbl::free($result);
+        unset($this->contactLinks);
     }
 
     function link($type, $pset = 0) {
