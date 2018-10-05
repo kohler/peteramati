@@ -2641,7 +2641,7 @@ span.foldarrow {
 	display: inline-block;
 }
 .pa-line-continues:after {
-	content: "…\n";
+	content: "…\A";
 }
 .viewoptions61 {
 	display: inline-block;
