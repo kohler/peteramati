@@ -677,7 +677,7 @@ class Repository {
             $darg = [];
             for ($i = 0; $i < $nd; ++$i) {
                 $darg[substr($xdiffs[$i]->filename, strlen($truncpfx))] = $xdiffs[$i];
-                if (count($xdiffs) >= 200 || $i == $nd - 1) {
+                if (count($darg) >= 200 || $i == $nd - 1) {
                     $this->parse_diff($darg, $pset, $hasha_arg, $hashb_arg, $options);
                     $darg = [];
                 }
