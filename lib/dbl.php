@@ -53,12 +53,15 @@ class Dbl {
     const F_ERROR = 8;
     const F_ALLOWERROR = 16;
     const F_MULTI = 32;
+    const F_ECHO = 64;
+    const F_NOEXEC = 128;
 
     static public $nerrors = 0;
     static public $default_dblink;
     static private $error_handler = "Dbl::default_error_handler";
     static private $query_log = false;
     static private $query_log_key = false;
+    static private $query_log_file = null;
     static public $check_warnings = true;
     static public $landmark_sanitizer = "/^Dbl::/";
 
@@ -188,7 +191,8 @@ class Dbl {
     static private function format_query_args($dblink, $qstr, $argv) {
         $original_qstr = $qstr;
         $strpos = $argpos = 0;
-        $usedargs = array();
+        $usedargs = [];
+        $simpleargs = true;
         while (($strpos = strpos($qstr, "?", $strpos)) !== false) {
             // argument name
             $nextpos = $strpos + 1;
@@ -204,10 +208,12 @@ class Dbl {
                     --$thisarg;
                 $nextpos = $rbracepos + 1;
                 $nextch = substr($qstr, $nextpos, 1);
+                $simpleargs = false;
             } else {
-                while (get($usedargs, $argpos))
+                do {
+                    $thisarg = $argpos;
                     ++$argpos;
-                $thisarg = $argpos;
+                } while (isset($usedargs[$thisarg]));
             }
             if (!array_key_exists($thisarg, $argv))
                 trigger_error(self::landmark() . ": query '$original_qstr' argument " . (is_int($thisarg) ? $thisarg + 1 : $thisarg) . " not set");
@@ -297,6 +303,8 @@ class Dbl {
             $qstr = substr($qstr, 0, $strpos) . $arg . $suffix;
             $strpos = strlen($qstr) - strlen($suffix);
         }
+        if ($simpleargs && $argpos !== count($argv))
+            trigger_error(self::landmark() . ": query '$original_qstr' unused arguments");
         return $qstr;
     }
 
@@ -310,7 +318,11 @@ class Dbl {
         return self::format_query_args($dblink, $qstr, $argv);
     }
 
-    static private function call_query($dblink, $qfunc, $qstr) {
+    static private function call_query($dblink, $flags, $qfunc, $qstr) {
+        if ($flags & self::F_ECHO)
+            error_log($qstr);
+        if ($flags & self::F_NOEXEC)
+            return null;
         if (self::$query_log_key) {
             $time = microtime(true);
             $result = $dblink->$qfunc($qstr);
@@ -328,7 +340,7 @@ class Dbl {
             error_log(self::landmark() . ": empty query");
             return false;
         }
-        return self::do_result($dblink, $flags, $qstr, self::call_query($dblink, "query", $qstr));
+        return self::do_result($dblink, $flags, $qstr, self::call_query($dblink, $flags, "query", $qstr));
     }
 
     static private function do_query($args, $flags) {
@@ -365,7 +377,7 @@ class Dbl {
         list($dblink, $qstr, $argv) = self::query_args($args, $flags, true);
         if (!($flags & self::F_RAW))
             $qstr = self::format_query_args($dblink, $qstr, $argv);
-        return new Dbl_MultiResult($dblink, $flags, $qstr, self::call_query($dblink, "multi_query", $qstr));
+        return new Dbl_MultiResult($dblink, $flags, $qstr, self::call_query($dblink, $flags, "multi_query", $qstr));
     }
 
     static function query(/* [$dblink,] $qstr, ... */) {
@@ -465,21 +477,27 @@ class Dbl {
     }
 
     static function make_multi_query_stager($dblink, $flags) {
-        return function (&$q, &$qv, $finish = false) use ($dblink, $flags) {
-            if (($finish && !empty($q)) || count($q) >= 50) {
-                $mresult = Dbl::do_multi_query([$dblink, join("; ", $q), $qv], self::F_MULTI | self::F_APPLY | $flags);
+        $qs = $qvs = [];
+        return function ($q, $qv = []) use ($dblink, $flags, &$qs, &$qvs) {
+            if ($q && $q !== true) {
+                $qs[] = $q;
+                $qvs = array_merge($qvs, $qv);
+            }
+            if ((!$q || $q === true || count($qs) >= 50 || count($qv) >= 1000)
+                && !empty($qs)) {
+                $mresult = Dbl::do_multi_query([$dblink, join("; ", $qs), $qvs], self::F_MULTI | self::F_APPLY | $flags);
                 $mresult->free_all();
-                $q = $qv = [];
+                $qs = $qvs = [];
             }
         };
     }
 
     static function make_multi_ql_stager($dblink = null) {
-        return self::make_multi_query_stager($dblink ? : self::$defualt_dblink, self::F_LOG);
+        return self::make_multi_query_stager($dblink ? : self::$default_dblink, self::F_LOG);
     }
 
     static function make_multi_qe_stager($dblink = null) {
-        return self::make_multi_query_stager($dblink ? : self::$defualt_dblink, self::F_ERROR);
+        return self::make_multi_query_stager($dblink ? : self::$default_dblink, self::F_ERROR);
     }
 
     static function free($result) {
@@ -586,14 +604,15 @@ class Dbl {
         }
     }
 
-    static function log_queries($limit) {
+    static function log_queries($limit, $file = false) {
         if (is_float($limit))
             $limit = $limit >= 1 || ($limit > 0 && mt_rand() < $limit * mt_getrandmax());
         if (!$limit)
             self::$query_log = false;
         else if (self::$query_log === false) {
             register_shutdown_function("Dbl::shutdown");
-            self::$query_log = array();
+            self::$query_log = [];
+            self::$query_log_file = $file;
         }
     }
 
@@ -605,11 +624,20 @@ class Dbl {
             $self = Navigation::self();
             $i = 1;
             $n = count(self::$query_log);
+            $t = [0, 0];
+            $qlog = "";
             foreach (self::$query_log as $where => $what) {
                 $a = [$what[0], $what[1], $what[2], $where];
-                error_log("query_log: $self #$i/$n: " . json_encode($a));
+                $qlog .= "query_log: $self #$i/$n: " . json_encode($a) . "\n";
                 ++$i;
+                $t[0] += $what[0];
+                $t[1] += $what[1];
             }
+            $qlog .= "query_log: total: " . json_encode($t) . "\n";
+            if (self::$query_log_file)
+                @file_put_contents(self::$query_log_file, $qlog, FILE_APPEND);
+            else
+                error_log($qlog);
         }
         self::$query_log = false;
     }
@@ -692,7 +720,7 @@ function sqlq_for_like($value) {
 }
 
 function sql_in_numeric_set($set) {
-    if (count($set) == 0)
+    if (empty($set))
         return "=-1";
     else if (count($set) == 1)
         return "=" . $set[0];

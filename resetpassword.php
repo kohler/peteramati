@@ -23,7 +23,7 @@ if (!$capdata || $capdata->capabilityType != CAPTYPE_RESETPASSWORD)
 if ($iscdb)
     $Acct = Contact::contactdb_find_by_id($capdata->contactId);
 else
-    $Acct = Contact::find_by_id($capdata->contactId);
+    $Acct = $Conf->user_by_id($capdata->contactId);
 if (!$Acct)
     error_go(false, "That password reset code refers to a user who no longer exists. Either create a new account or contact the conference administrator.");
 

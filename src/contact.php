@@ -65,27 +65,12 @@ class Contact {
 
     public $visited = false;
     public $incomplete = false;
-    public $pcid;
-    public $rpcid;
-    public $repoid;
-    public $cacheid;
-    public $heads;
-    public $url;
-    public $open;
-    public $working;
-    public $lastpset;
-    public $snapcheckat;
-    public $repoviewable;
-    public $gradebhash;
-    public $gradercid;
-    public $placeholder;
-    public $placeholder_at;
     public $viewable_by;
 
-    private $links = null;
-    private $repos = array();
-    private $partners = array();
+    private $links;
     // $contactLinks -- property_exists() is meaningful
+    private $repos = [];
+    private $partners = [];
 
     // Roles
     const ROLE_PC = 1;
@@ -243,7 +228,7 @@ class Contact {
         if ($name === "cid")
             $this->contactId = $this->cid = $value;
         else {
-            if (!self::$allow_nonexistent_properties)
+            if (!self::$allow_nonexistent_properties && $name !== "contactLinks")
                 error_log(caller_landmark(1) . ": writing nonexistent property $name");
             $this->$name = $value;
         }
@@ -712,16 +697,15 @@ class Contact {
         return get($this->links[$type], $pset, []);
     }
 
-    function branch_link($psetid) {
-        assert(!is_object($psetid));
+    function branchid(Pset $pset) {
         if ($this->links === null)
             $this->load_links();
-        $l = get($this->links[LINK_BRANCH], $psetid);
-        return $l !== null && count($l) == 1 ? $l[0] : 0;
+        $l = get($this->links[LINK_BRANCH], $pset->id);
+        return $l !== null && count($l) == 1 && !$pset->no_branch ? $l[0] : 0;
     }
 
-    function branch_name($psetid) {
-        $branchid = $this->branch_link($psetid);
+    function branch_name(Pset $pset) {
+        $branchid = $this->branchid($pset);
         return $branchid ? $this->conf->branch($branchid) : null;
     }
 
@@ -772,12 +756,15 @@ class Contact {
         return true;
     }
 
-    function repo($pset) {
+    function repo($pset, Repository $repo = null) {
         $pset = is_object($pset) ? $pset->id : $pset;
         if (!array_key_exists($pset, $this->repos)) {
             $this->repos[$pset] = null;
-            if (($link = $this->link(LINK_REPO, $pset)))
-                $this->repos[$pset] = Repository::find_id($link, $this->conf);
+            $repoid = $this->link(LINK_REPO, $pset);
+            if ($repoid && (!$repo || $repo->repoid != $repoid))
+                $repo = Repository::find_id($repoid, $this->conf);
+            if ($repoid && $repo)
+                $this->repos[$pset] = $repo;
         }
         return $this->repos[$pset];
     }
@@ -804,19 +791,17 @@ class Contact {
         return true;
     }
 
-    function pcid($pset) {
-        return $this->link(LINK_PARTNER, $pset);
-    }
-
-    function partner($pset) {
+    function partner($pset, Contact $partner = null) {
         $pset = is_object($pset) ? $pset->id : $pset;
         if (!array_key_exists($pset, $this->partners)) {
             $this->partners[$pset] = null;
-            if (($pcid = $this->pcid($pset))
-                && ($pc = self::find_by_id($pcid))) {
+            $pcid = $this->link(LINK_PARTNER, $pset);
+            if ($pcid && (!$partner || $partner->contactId != $pcid))
+                $partner = $this->conf->user_by_id($pcid);
+            if ($pcid && $partner) {
                 if ($this->is_anonymous)
-                    $pc->set_anonymous(true);
-                $this->partners[$pset] = $pc;
+                    $partner->set_anonymous(true);
+                $this->partners[$pset] = $partner;
             }
         }
         return $this->partners[$pset];
@@ -853,11 +838,6 @@ class Contact {
             $this->merge($row);
         Dbl::free($result);
         return !!$row;
-    }
-
-    static function find_by_id($cid) {
-        $result = Dbl::q("select ContactInfo.* from ContactInfo where contactId=" . (int) $cid);
-        return self::fetch($result);
     }
 
     static function safe_registration($reg) {
@@ -1357,14 +1337,16 @@ class Contact {
         return $regex;
     }
 
-    function can_view_repo_contents(Repository $repo, $branch = null) {
+    function can_view_repo_contents(Repository $repo, $branch = null, $cached = false) {
         if (!$this->conf->opt("restrictRepoView")
             || $this->isPC
             || $repo->is_handout)
             return true;
         $allowed = get($repo->viewable_by, $this->contactId);
         if ($allowed === null) {
-            $allowed = in_array($this->contactId, $this->links(LINK_REPOVIEW));
+            $allowed = in_array($repo->repoid, $this->links(LINK_REPOVIEW));
+            if (!$allowed && $cached)
+                return false;
             if (!$allowed) {
                 $users = $repo->author_emails();
                 $allowed = isset($users[strtolower($this->email)]);

@@ -9,10 +9,11 @@ class PsetView {
     public $user;
     public $viewer;
     public $pc_view;
-    public $repo = null;
+    public $repo;
     public $partner;
     public $branch;
-    private $partner_same = null;
+    public $branchid;
+    private $partner_same;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
     private $repo_grade;            // RepositoryGrade+CommitNotes
@@ -20,12 +21,12 @@ class PsetView {
     private $can_view_grades;
     private $user_can_view_grades;
 
-    private $hash = null;
+    private $hash;
     private $commit_record = false; // CommitNotes (maybe +RepositoryGrade)
     private $commit_notes = false;
     private $tabwidth = false;
-    private $derived_handout_commit = null;
-    private $n_visible_grades = null;
+    private $derived_handout_commit;
+    private $n_visible_grades;
     private $n_visible_in_total;
     private $n_set_grades;
     private $need_format = false;
@@ -50,9 +51,28 @@ class PsetView {
         $info->partner = $user->partner($pset->id);
         if (!$pset->gitless) {
             $info->repo = $user->repo($pset->id);
-            if (!$pset->no_branch)
-                $info->branch = $user->branch_name($pset->id);
+            $info->branchid = $user->branchid($pset);
+            $info->branch = $info->branchid ? $info->conf->branch($info->branchid) : null;
         }
+        $info->set_hash(null);
+        return $info;
+    }
+
+    static function make_from_set(StudentSet $sset, Contact $user) {
+        $info = new PsetView($sset->pset, $user, $sset->viewer);
+        if (($pcid = $user->link(LINK_PARTNER, $info->pset->id)))
+            $info->partner = $user->partner($info->pset->id, $sset->user($pcid));
+        if (!$info->pset->gitless) {
+            $info->repo = $user->repo($info->pset->id, $sset->repo($user));
+            $info->branchid = $user->branchid($info->pset);
+            $info->branch = $info->branchid ? $info->conf->branch($info->branchid) : null;
+        }
+
+        if ($info->pset->gitless_grades)
+            $info->grade = $sset->contact_grade($user);
+        else if ($info->repo)
+            $info->repo_grade = $sset->repo_grade_with_notes($user);
+        $info->analyze_grade();
         return $info;
     }
 
@@ -78,9 +98,8 @@ class PsetView {
                 $c = $this->latest_commit();
             }
         }
-        if ($c) {
+        if ($c)
             $this->hash = $c->hash;
-        }
         return $this->hash;
     }
 
@@ -368,21 +387,43 @@ class PsetView {
     }
 
     function partner_same() {
-        if ($this->partner_same === null && $this->partner) {
-            $backpartners = $this->backpartners();
-            $this->partner_same = count($backpartners) == 1
-                && $this->partner->contactId == $backpartners[0];
-        } else if ($this->partner_same === null)
-            $this->partner_same = false;
+        if ($this->partner_same === null) {
+            $bp = $this->backpartners();
+            if ($this->partner)
+                $this->partner_same = count($bp) == 1 && $this->partner->contactId == $bp[0];
+            else
+                $this->partner_same = empty($bp);
+        }
         return $this->partner_same;
     }
 
 
+    private function analyze_grade() {
+        if ($this->repo_grade && $this->repo_grade->placeholder)
+            $this->repo_grade = null;
+        if ($this->repo_grade) {
+            if ($this->repo_grade->gradebhash !== null)
+                $this->repo_grade->gradehash = bin2hex($this->repo_grade->gradebhash);
+            if ($this->repo_grade->bhash !== null)
+                $this->repo_grade->hash = bin2hex($this->repo_grade->bhash);
+        }
+        if (!$this->pset->gitless_grades)
+            $this->grade = $this->repo_grade;
+        if ($this->grade && $this->grade->notes && is_string($this->grade->notes))
+            $this->grade->notes = json_decode($this->grade->notes);
+        $this->grade_notes = $this->grade ? $this->grade->notes : null;
+        if ($this->grade_notes
+            && $this->repo_grade
+            && $this->grade->gradercid
+            && !get($this->grade_notes, "gradercid"))
+            $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
+        $this->n_visible_grades = null;
+    }
+
     private function load_grade() {
-        if ($this->pset->gitless_grades) {
+        if ($this->pset->gitless_grades)
             $this->grade = $this->pset->contact_grade_for($this->user);
-            $this->grade_notes = get($this->grade, "notes");
-        } else {
+        else {
             $this->repo_grade = null;
             if ($this->repo) {
                 $result = $this->conf->qe("select rg.*, null gradehash, null hash, cn.bhash, cn.notes, cn.notesversion
@@ -392,32 +433,19 @@ class PsetView {
                     $this->repo->repoid, $this->pset->psetid);
                 $this->repo_grade = $result ? $result->fetch_object() : null;
                 Dbl::free($result);
-                if ($this->repo_grade) {
-                    if ($this->repo_grade->notes)
-                        $this->repo_grade->notes = json_decode($this->repo_grade->notes);
-                    if ($this->repo_grade->gradebhash !== null)
-                        $this->repo_grade->gradehash = bin2hex($this->repo_grade->gradebhash);
-                    if ($this->repo_grade->bhash !== null)
-                        $this->repo_grade->hash = bin2hex($this->repo_grade->bhash);
-                }
-            }
-            if (($this->grade = $this->repo_grade)) {
-                $this->grade_notes = get($this->grade, "notes");
-                if ($this->grade_notes
-                    && get($this->grade, "gradercid")
-                    && !get($this->grade_notes, "gradercid"))
-                    $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
-                if (get($this->grade, "gradebhash") && $this->hash === null)
-                    // NB don't check recent_commits association here
-                    $this->hash = bin2hex($this->grade->gradebhash);
             }
         }
-        $this->n_visible_grades = null;
+        $this->analyze_grade();
     }
 
     private function ensure_grade() {
-        if ($this->grade === false)
+        if ($this->grade === false) {
             $this->load_grade();
+            if ($this->repo_grade
+                && $this->repo_grade->gradebhash !== null
+                && $this->hash === null)
+                $this->hash = bin2hex($this->repo_grade->gradebhash);
+        }
         return $this->grade;
     }
 
@@ -441,6 +469,13 @@ class PsetView {
         if ($this->repo_grade)
             return $this->recent_commits($this->repo_grade->gradehash);
         return false;
+    }
+
+    function repo_grade() {
+        if ($this->pset->gitless_grades)
+            return false;
+        else
+            return $this->repo_grade;
     }
 
     function is_grading_commit() {
@@ -488,12 +523,12 @@ class PsetView {
     }
 
 
-    function can_view_repo_contents() {
-        return $this->viewer->can_view_repo_contents($this->repo, $this->branch);
+    function can_view_repo_contents($cached = false) {
+        return $this->viewer->can_view_repo_contents($this->repo, $this->branch, $cached);
     }
 
-    function user_can_view_repo_contents() {
-        return $this->user->can_view_repo_contents($this->repo, $this->branch);
+    function user_can_view_repo_contents($cached = false) {
+        return $this->user->can_view_repo_contents($this->repo, $this->branch, $cached);
     }
 
     function can_view_note_authors() {
@@ -571,7 +606,7 @@ class PsetView {
     }
 
     function current_info($key = null) {
-        if ($this->pset->gitless_grades || !$this->commit())
+        if ($this->pset->gitless_grades || $this->hash === null)
             return $this->grading_info($key);
         else
             return $this->commit_info($key);
@@ -660,6 +695,11 @@ class PsetView {
     }
 
 
+    function clear_grade() {
+        $this->grade = $this->repo_grade = false;
+        $this->can_view_grades = $this->user_can_view_grades = null;
+    }
+
     function change_grader($grader) {
         if (is_object($grader))
             $grader = $grader->contactId;
@@ -671,20 +711,19 @@ class PsetView {
             assert(!!$this->hash);
             if (!$this->repo_grade || !$this->repo_grade->gradehash)
                 $q = Dbl::format_query
-                    ("insert into RepositoryGrade set repoid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
-                     $this->repo->repoid, $this->pset->psetid,
+                    ("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
+                     $this->repo->repoid, $this->branchid, $this->pset->psetid,
                      $this->hash ? hex2bin($this->hash) : null, $grader);
             else
                 $q = Dbl::format_query
-                    ("update RepositoryGrade set gradebhash=?, gradercid=?, placeholder=0 where repoid=? and pset=? and gradebhash=?",
+                    ("update RepositoryGrade set gradebhash=?, gradercid=?, placeholder=0 where repoid=? and branchid=? and pset=? and gradebhash=?",
                      $this->hash ? hex2bin($this->hash) : $this->repo_grade->gradebhash, $grader,
-                     $this->repo->repoid, $this->pset->psetid, $this->repo_grade->gradebhash);
+                     $this->repo->repoid, $this->branchid, $this->pset->psetid, $this->repo_grade->gradebhash);
             $this->update_commit_info(array("gradercid" => $grader));
         }
         if ($q)
             $this->conf->qe_raw($q);
-        $this->grade = $this->repo_grade = false;
-        $this->can_view_grades = $this->user_can_view_grades = null;
+        $this->clear_grade();
     }
 
     function mark_grading_commit() {
@@ -697,21 +736,30 @@ class PsetView {
             $grader = $this->commit_info("gradercid");
             if (!$grader)
                 $grader = $this->grading_info("gradercid");
-            $this->conf->qe("insert into RepositoryGrade (repoid,pset,gradebhash,gradercid,placeholder) values (?, ?, ?, ?, 0) on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
-                    $this->repo->repoid, $this->pset->psetid,
+            $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
+                    $this->repo->repoid, $this->branchid, $this->pset->psetid,
                     $this->hash ? hex2bin($this->hash) : null, $grader ? : null);
         }
-        $this->grade = $this->repo_grade = false;
-        $this->can_view_grades = $this->user_can_view_grades = null;
+        $this->clear_grade();
+    }
+
+    function update_placeholder_repo_grade() {
+        global $Now;
+        assert(!$this->pset->gitless_grades
+               && (!$this->repo_grade || $this->repo_grade->gradebhash === null));
+        $this->set_hash(null);
+        $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, placeholder=1, placeholder_at=? on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
+                $this->repo->repoid, $this->branchid, $this->pset->psetid,
+                $this->hash ? hex2bin($this->hash) : null, $Now);
+        $this->clear_grade();
     }
 
     function set_hidden_grades($hidegrade) {
         if ($this->pset->gitless_grades)
             $this->conf->qe("update ContactGrade set hidegrade=? where cid=? and pset=?", $hidegrade, $this->user->contactId, $this->pset->psetid);
         else
-            $this->conf->qe("update RepositoryGrade set hidegrade=? where repoid=? and pset=?", $hidegrade, $this->repo->repoid, $this->pset->psetid);
-        $this->grade = $this->repo_grade = false;
-        $this->can_view_grades = $this->user_can_view_grades = null;
+            $this->conf->qe("update RepositoryGrade set hidegrade=? where repoid=? and branchid=? and pset=?", $hidegrade, $this->repo->repoid, $this->branchid, $this->pset->psetid);
+        $this->clear_grade();
     }
 
 

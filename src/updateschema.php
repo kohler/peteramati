@@ -103,6 +103,33 @@ function update_schema_branches($conf) {
     return true;
 }
 
+function update_schema_branched_repo_grade($conf) {
+    // branches
+    $result = $conf->ql("select branchid, branch from Branch");
+    $branches = [];
+    while ($result && ($row = $result->fetch_row()))
+        $branches[(int) $row[0]] = $row[1];
+    Dbl::free($result);
+
+    // people with branches
+    $result = $conf->ql("select c1.pset, c1.link, c2.link from ContactLink c1 join ContactLink c2 on (c1.cid=c2.cid and c1.pset=c2.pset) where c1.type=" . LINK_REPO . " and c2.type=" . LINK_BRANCH);
+    $qstager = Dbl::make_multi_ql_stager($conf->dblink);
+    $repos = [];
+    while ($result && ($row = $result->fetch_row())) {
+        list($pset, $repoid, $branchid) = $row;
+        $branch = $branchid ? $branches[$branchid] : "master";
+        if (!isset($repos["$pset,$repoid"])) {
+            $qstager("update RepositoryGrade set branchid=? where repoid=? and pset=?", [$branchid, $repoid, $pset]);
+            $repos["$pset,$repoid"] = $branch;
+        } else {
+            error_log("RepositoryGrade[$pset,$repoid] conflict: branch " . $branch . " vs. " . $repos["$pset,$repoid"]);
+        }
+    }
+    $qstager(true);
+    Dbl::free($result);
+    return true;
+}
+
 function update_schema_drop_keys_if_exist($conf, $table, $key) {
     $indexes = Dbl::fetch_first_columns($conf->dblink, "select distinct index_name from information_schema.statistics where table_schema=database() and `table_name`='$table'");
     $drops = [];
@@ -422,6 +449,10 @@ function updateSchema($conf) {
         && $conf->ql("alter table RepositoryGrade add `gradebhash` varbinary(32) DEFAULT NULL")
         && $conf->ql("update RepositoryGrade set gradebhash=unhex(gradehash)"))
         $conf->update_schema_version(127);
+    if ($conf->sversion == 127
+        && $conf->ql("alter table RepositoryGrade drop `gradehash`")
+        && update_schema_branched_repo_grade($conf))
+        $conf->update_schema_version(128);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

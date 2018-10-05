@@ -63,7 +63,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         echo '<h3>', Text::user_html($user), '</h3>';
     echo '<hr class="c" />';
 
-    if ($qreq->files) {
+    if (!$pset->gitless) {
         $lnorder = $info->viewable_line_notes();
         $onlyfiles = $qreq->files;
         $hasha = $pset->handout_hash ? : $info->derived_handout_hash();
@@ -102,16 +102,15 @@ if ($Qreq->files)
 echo "<hr />\n";
 
 if (trim((string) $Qreq->users) === "") {
-    $want = $visited = [];
-    foreach ($Pset->students() as $s) {
-        if (!isset($visited[$s->contactId])) {
-            $want[] = $s->email;
-            $visited[$s->contactId] = true;
-            if ($s->pcid) {
-                foreach (array_unique(explode(",", $s->pcid)) as $pcid) {
-                    $visited[$pcid] = true;
-                }
-            }
+    $want = [];
+    $sset = new StudentSet($Me);
+    $sset->set_pset($Pset);
+    foreach ($sset as $info) {
+        if (!$info->user->visited) {
+            $want[] = $info->user->email;
+            foreach ($info->user->links(LINK_PARTNER, $Pset->id) as $pcid)
+                if (($u = $sset->user($pcid)))
+                    $u->visited = true;
         }
     }
     $Qreq->users = join(" ", $want);

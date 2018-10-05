@@ -273,42 +273,6 @@ class Pset {
     }
 
 
-    function students($anonymous = null) {
-        if ($anonymous === null)
-            $anonymous = $this->anonymous;
-
-        if ($this->conf->opt("restrictRepoView")) {
-            $view = "exists (select * from ContactLink where cid=c.contactId and type=" . LINK_REPOVIEW . " and link=l.link)";
-        } else {
-            $view = "1";
-        }
-        $q = "select c.contactId, c.firstName, c.lastName, c.email,
-    c.huid, c.github_username, c.seascode_username, c.anon_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
-    group_concat(pl.link) pcid, group_concat(rpl.link) rpcid,
-    r.repoid, r.cacheid, r.heads, r.url, r.open, r.working, r.lastpset, r.snapcheckat, $view repoviewable,
-    rg.gradebhash, rg.gradercid, rg.placeholder, rg.placeholder_at
-    from ContactInfo c
-    left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset={$this->id})
-    left join Repository r on (r.repoid=l.link)
-    left join ContactLink pl on (pl.cid=c.contactId and pl.type=" . LINK_PARTNER . " and pl.pset={$this->id})
-    left join ContactLink rpl on (rpl.cid=c.contactId and rpl.type=" . LINK_BACKPARTNER . " and rpl.pset={$this->id})
-    left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.branchid=0 and rg.pset={$this->id})
-    where (c.roles&" . Contact::ROLE_PCLIKE . ")=0
-    and (rg.repoid is not null or not c.dropped)
-    group by c.contactId, l.link";
-
-        $result = $this->conf->qe_raw($q);
-        $students = array();
-        while ($result && ($s = Contact::fetch($result))) {
-            $s->set_anonymous($anonymous);
-            $students[$s->contactId] = $s;
-        }
-        uasort($students, "Contact::compare");
-        Dbl::free($result);
-        return $students;
-    }
-
-
     function student_can_view() {
         global $Now;
         $dl = $this->visible;

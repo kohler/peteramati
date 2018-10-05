@@ -42,8 +42,7 @@ if ($api->pset && !$api->pset->visible && !$Me->isPC)
 // check commit
 if ($api->pset && !$api->pset->gitless && !$Me->is_empty()) {
     $api->repo = $api->user->repo($api->pset);
-    if (!$api->pset->no_branch)
-        $api->branch = $api->user->branch_name($api->pset->id);
+    $api->branch = $api->user->branch_name($api->pset);
 }
 if ($api->repo && $qreq->commit)
     $api->hash = $qreq->commit;

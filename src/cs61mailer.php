@@ -290,8 +290,10 @@ class CS61Mailer extends Mailer {
     }
 
     static function send_manager($template, $row, $rest = array()) {
-        if ($row && $row->managerContactId
-            && ($c = Contact::find_by_id($row->managerContactId)))
+        global $Conf;
+        if ($row
+            && $row->managerContactId
+            && ($c = $Conf->user_by_id($row->managerContactId)))
             self::send_to($c, $template, $row, $rest);
         else
             self::send_to(Contact::site_contact(), $template, $row, $rest);

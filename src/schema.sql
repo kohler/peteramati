@@ -18,6 +18,20 @@ CREATE TABLE `ActionLog` (
 
 
 --
+-- Table structure for table `Branch`
+--
+
+DROP TABLE IF EXISTS `Branch`;
+CREATE TABLE `Branch` (
+  `branchid` int(11) NOT NULL AUTO_INCREMENT,
+  `branch` varbinary(255) NOT NULL,
+  PRIMARY KEY (`branchid`),
+  UNIQUE KEY `branch` (`branch`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
+--
 -- Table structure for table `Capability`
 --
 
@@ -240,7 +254,7 @@ CREATE TABLE `RepositoryGrade` (
   `repoid` int(11) NOT NULL,
   `branchid` int(11) NOT NULL DEFAULT '0',
   `pset` int(11) NOT NULL,
-  `gradehash` binary(40) DEFAULT NULL,
+  `gradebhash` varbinary(32) DEFAULT NULL,
   `gradercid` int(11) DEFAULT NULL,
   `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder` tinyint(1) NOT NULL DEFAULT '0',
@@ -265,7 +279,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 125);
+insert into Settings (name, value) values ('allowPaperOption', 128);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

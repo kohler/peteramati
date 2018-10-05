@@ -903,55 +903,41 @@ function show_pset_actions($pset) {
     echo Ht::unstash_script("$('.need-pa-pset-actions').each(pa_pset_actions)");
 }
 
-function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) {
-    global $Conf, $Me, $Now, $Profile;
+function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
+    global $Now, $Profile;
     $t0 = $Profile ? microtime(true) : 0;
-    $j = render_grading_student($s, $anonymous);
-    if ($s->gradercid)
-        $j["gradercid"] = $s->gradercid;
+    $j = render_grading_student($info->user, $anonymous);
+    if (($gcid = $info->gradercid()))
+        $j["gradercid"] = $gcid;
 
     // are any commits committed?
-    if (!$pset->gitless_grades) {
-        if (($s->placeholder || $s->gradebhash === null)
-            && $s->repoid
-            && ($s->placeholder_at < $Now - 3600 && rand(0, 2) == 0
-                || ($s->placeholder_at < $Now - 600 && rand(0, 10) == 0))
-            && (!$s->repoviewable || $s->gradebhash === null)) {
-            // XXX this is slow given that most info is already loaded
-            $info = PsetView::make($pset, $s, $Me);
-            $info->set_hash(null);
-            if (($hash = $info->commit_hash()))
-                $s->gradebhash = hex2bin($hash);
-            else
-                $s->gradebhash = null;
-            $s->placeholder = 1;
-            Dbl::qe("insert into RepositoryGrade (repoid, pset, gradebhash, placeholder, placeholder_at) values (?, ?, ?, 1, ?) on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
-                    $s->repoid, $pset->id, $s->gradebhash, $Now);
-            if (!$s->repoviewable)
-                $s->repoviewable = $info->user_can_view_repo_contents();
+    if (!$pset->gitless_grades && $info->repo) {
+        $rg = $info->repo_grade();
+        if (!$rg
+            || $rg->gradebhash === null
+            || !$info->can_view_repo_contents(true)) {
+            $t = $rg ? $rg->placeholder_at : $Now - 601;
+            if ($t < $Now - 3600 ? rand(0, 2) == 0 : ($t < $Now - 600 && rand(0, 10) == 0))
+                $info->update_placeholder_repo_grade();
         }
-        if ($s->gradebhash !== null)
-            $j["gradehash"] = bin2hex($s->gradebhash);
+        if (($gh = $info->grading_hash()) !== null)
+            $j["gradehash"] = $gh;
     }
 
     if ($pset->grades()) {
-        $gi = null;
-        if ($pset->gitless_grades)
-            $gi = $pset->contact_grade_for($s);
-        else if ($s->gradebhash !== null && !$s->placeholder)
-            $gi = $pset->commit_notes($s->gradebhash);
-        $gi = $gi ? $gi->notes : null;
+        $gi = $info->current_info();
 
         if (!$pset->gitless_grades) {
+            $gradercid = $info->gradercid();
             if ($gi && get($gi, "linenotes"))
                 $j["has_notes"] = true;
-            else if ($Me->contactId == $s->gradercid)
-                $s->incomplete = "no line notes";
-            if ($gi && $s->gradercid != get($gi, "gradercid") && $Me->privChair)
+            else if ($info->viewer->contactId == $gradercid)
+                $info->user->incomplete = "no line notes";
+            if ($gi && $gradercid != get($gi, "gradercid") && $info->viewer->privChair)
                 $j["has_nongrader_notes"] = true;
         }
 
-        $garr = render_grades($pset, $gi, $s);
+        $garr = render_grades($pset, $gi, $info->user);
         $j["grades"] = $garr->allv;
         $j["total"] = $garr->totalv;
         if ($garr->differentk)
@@ -961,40 +947,36 @@ function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) 
     //echo "<td><a href=\"mailto:", htmlspecialchars($s->email), "\">",
     //htmlspecialchars($s->email), "</a></td>";
 
-    if (!$pset->gitless && $s->url) {
-        $j["repo"] = RepositorySite::make_web_url($s->url, $Conf);
-        if (!$s->working)
+    if (!$pset->gitless && $info->repo) {
+        $j["repo"] = RepositorySite::make_web_url($info->repo->url, $info->conf);
+        if (!$info->repo->working)
             $j["repo_broken"] = true;
-        else if (!$s->repoviewable)
+        else if (!$info->user_can_view_repo_contents(true))
             $j["repo_unconfirmed"] = true;
-        if ($s->open)
+        if ($info->repo->open)
             $j["repo_too_open"] = true;
-        if ($s->pcid != $s->rpcid
-            || ($s->pcid && !isset($students[$s->pcid])))
+        if (!$info->partner_same())
             $j["repo_partner_error"] = true;
-        else if ($s->pcid
-                 && $students[$s->pcid]->repoid != $s->repoid) {
-            if (!$pset->partner_repo)
-                $j["repo_partner_error"] = true;
-        } else if ($s->repoid) {
-            $expected_cids = [$s->contactId];
-            if ($s->pcid)
-                $expected_cids[] = $s->pcid;
-            if (count(array_intersect($expected_cids, $repos[$s->repoid])) != count($expected_cids))
-                $j["repo_sharing"] = true;
-        }
+        else if ($pset->partner_repo
+                 && $info->partner
+                 && $info->repo
+                 && $info->repo->repoid != $info->partner->link(LINK_REPO, $pset->id))
+            $j["repo_partner_error"] = true;
+        else if ($sset->repo_sharing($info->user))
+            $j["repo_sharing"] = true;
     }
 
-    $s->visited = true;
+    $info->user->visited = true;
     return $j;
 }
 
-function show_pset_table($pset) {
-    global $Conf, $Me, $Now, $Profile;
+function show_pset_table($sset) {
+    global $Now, $Profile;
 
+    $pset = $sset->pset;
     echo '<div id="', $pset->urlkey, '">';
     echo "<h3>", htmlspecialchars($pset->title), "</h3>";
-    if ($Me->privChair)
+    if ($sset->viewer->privChair)
         show_pset_actions($pset);
     if ($pset->disabled) {
         echo "</div>\n";
@@ -1020,39 +1002,28 @@ function show_pset_table($pset) {
 
     // load students
     $anonymous = $pset->anonymous;
-    if (req("anonymous") !== null && $Me->privChair)
+    if (req("anonymous") !== null && $sset->viewer->privChair)
         $anonymous = !!req("anonymous");
-    $students = $pset->students($anonymous);
 
-    $repos = [];
-    if (!$pset->gitless) {
-        foreach ($students as $s) {
-            if ($s->repoid)
-                $repos[$s->repoid][] = $s->contactId;
-        }
-    }
-
-    $checkbox = $Me->privChair
+    $checkbox = $sset->viewer->privChair
         || (!$pset->gitless && $pset->runners)
-        || $Me->isPC;
+        || $sset->viewer->isPC;
 
     $rows = array();
     $incomplete = array();
     $jx = [];
-    foreach ($students as $s) {
-        if (!$s->visited) {
-            $j = render_pset_row($pset, $students, $repos, $s, $anonymous);
-            if ($s->pcid && !$pset->partner_repo) {
-                foreach (array_unique(explode(",", $s->pcid)) as $pcid)
-                    if (isset($students[$pcid])) {
-                        $ss = $students[$pcid];
-                        $jj = render_pset_row($pset, $students, $repos, $ss, $anonymous);
-                        $j["partners"][] = $jj;
-                    }
+    foreach ($sset as $s) {
+        if (!$s->user->visited) {
+            $j = render_pset_row($pset, $sset, $s, $anonymous);
+            if (!$pset->partner_repo) {
+                foreach ($s->user->links(LINK_PARTNER, $pset->id) as $pcid) {
+                    if (($ss = $sset->info($pcid)))
+                        $j["partners"][] = render_pset_row($pset, $sset, $ss, $anonymous);
+                }
             }
             $jx[] = $j;
-            if ($s->incomplete) {
-                $u = $Me->user_linkpart($s);
+            if ($s->user->incomplete) {
+                $u = $sset->viewer->user_linkpart($s);
                 $t = '<a href="' . hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
                     . htmlspecialchars($u);
                 if ($s->incomplete !== true)
@@ -1095,10 +1066,10 @@ function show_pset_table($pset) {
         $jd["total_key"] = $last_in_total;
     echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode($jd), ',', json_encode($jx), ')</script>';
 
-    if ($Me->privChair && !$pset->gitless_grades) {
+    if ($sset->viewer->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";
         $sel = array("none" => "N/A");
-        foreach ($Conf->pc_members_and_admins() as $pcm)
+        foreach ($sset->conf->pc_members_and_admins() as $pcm)
             $sel[$pcm->email] = Text::name_html($pcm);
         $sel["__random__"] = "Random";
         $sel["__random_tf__"] = "Random TF";
@@ -1109,7 +1080,7 @@ function show_pset_table($pset) {
     }
 
     $actions = [];
-    if ($Me->isPC) {
+    if ($sset->viewer->isPC) {
         $stage = -1;
         $actions["diffmany"] = $pset->gitless ? "Diffs" : "Grades";
         if (!$pset->gitless_grades) {
@@ -1139,8 +1110,12 @@ function show_pset_table($pset) {
         $actions["defaultgrades"] = "Default grades";
         if (!$pset->gitless)
             $actions["clearrepo"] = "Clear repo";
-        foreach ($Conf->psets() as $p) {
-            if (!$p->disabled && $p->deadline < $pset->deadline && !$p->gitless && !$pset->gitless && $p->handout_repo_url === $pset->handout_repo_url) {
+        foreach ($sset->conf->psets() as $p) {
+            if (!$p->disabled
+                && $p->deadline < $pset->deadline
+                && !$p->gitless
+                && !$pset->gitless
+                && $p->handout_repo_url === $pset->handout_repo_url) {
                 $actions["copyrepo"] = "Adopt previous repo";
                 break;
             }
@@ -1157,7 +1132,7 @@ function show_pset_table($pset) {
         $sel = ["__run_group" => ["optgroup", "Run"]];
         $esel = ["__ensure_group" => ["optgroup", "Ensure"]];
         foreach ($pset->runners as $r)
-            if ($Me->can_run($pset, $r)) {
+            if ($sset->viewer->can_run($pset, $r)) {
                 $sel[$r->name] = htmlspecialchars($r->title);
                 $esel[$r->name . ".ensure"] = htmlspecialchars($r->title);
             }
@@ -1221,10 +1196,14 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
         $sep = "<hr />\n";
     }
 
+    $sset = null;
     foreach ($Conf->psets_newest_first() as $pset)
         if ($Me->can_view_pset($pset)) {
+            if (!$sset)
+                $sset = new StudentSet($Me);
+            $sset->set_pset($pset);
             echo $sep;
-            show_pset_table($pset, $Me);
+            show_pset_table($sset);
             $sep = "<hr />\n";
         }
 }
