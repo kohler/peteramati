@@ -251,21 +251,6 @@ CREATE TABLE `RepositoryGrade` (
 
 
 --
--- Table structure for table `RepositoryGradeRequest`
---
-
-DROP TABLE IF EXISTS `RepositoryGradeRequest`;
-CREATE TABLE `RepositoryGradeRequest` (
-  `repoid` int(11) NOT NULL,
-  `pset` int(11) NOT NULL,
-  `hash` binary(40) DEFAULT NULL,
-  `requested_at` bigint(11) NOT NULL,
-  UNIQUE KEY `repopsethash` (`repoid`,`pset`,`hash`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-
---
 -- Table structure for table `Settings`
 --
 
@@ -280,7 +265,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 121);
+insert into Settings (name, value) values ('allowPaperOption', 122);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

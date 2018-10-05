@@ -718,7 +718,6 @@ function show_pset($pset, $user) {
         if (!$user_see_grade)
             echo '</div>';
     }
-    ContactView::echo_repo_flags_group($info);
     if ($info->repo && $user_can_view)
         ContactView::echo_group("", '<strong><a href="' . $pseturl . '">view code</a></strong>');
     if (!$user_can_view)

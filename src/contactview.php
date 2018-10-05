@@ -110,22 +110,6 @@ class ContactView {
         return $pset;
     }
 
-    static function add_regrades(PsetView $info) {
-        list($user, $repo) = array($info->user, $info->repo);
-        if (!isset($info->regrades) && !$info->pset->gitless_grades && $repo) {
-            $info->regrades = array();
-            $result = Dbl::qe("select * from RepositoryGradeRequest where repoid=? and pset=? order by requested_at desc", $repo->repoid, $info->pset->psetid);
-            while (($row = edb_orow($result))) {
-                if (($rc = @$info->recent_commits($row->hash))) {
-                    $row->subject = $rc->subject;
-                    $row->commitat = $rc->commitat;
-                }
-                $info->regrades[$row->hash] = $row;
-            }
-        }
-        return isset($info->regrades) && count($info->regrades);
-    }
-
     static function echo_heading($user) {
         global $Me;
         $u = $Me->user_linkpart($user);
@@ -534,21 +518,6 @@ class ContactView {
             $notes[] = '<strong class="overdue">' . plural($lh, "late hour") . ' used</strong>';
 
         self::echo_group("grading commit", $value, array(join(", ", $notes)));
-    }
-
-    static function echo_repo_flags_group($info) {
-        global $Me;
-        list($user, $repo) = array($info->user, $info->repo);
-        if (self::add_regrades($info)) {
-            foreach ($info->regrades as $row) {
-                $t = "<a href=\"" . hoturl("pset", array("pset" => $info->pset->urlkey, "u" => $Me->user_linkpart($user), "commit" => $row->hash))
-                    . "\">" . substr($row->hash, 0, 7) . "</a>";
-                if (isset($row->subject))
-                    $t .= " " . htmlspecialchars($row->subject);
-                $value[] = $t;
-            }
-            self::echo_group("flagged commits", join("<br/>", $value));
-        }
     }
 
     static function pset_grade($notesj, $pset) {

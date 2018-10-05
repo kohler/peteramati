@@ -378,6 +378,9 @@ function updateSchema($conf) {
         && $conf->ql("alter table ContactInfo drop key `fullName`")
         && $conf->ql("alter table Repository drop key `repoid`"))
         $conf->update_schema_version(121);
+    if ($conf->sversion == 121
+        && $conf->ql("drop table if exists RepositoryGradeRequest"))
+        $conf->update_schema_version(122);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }
