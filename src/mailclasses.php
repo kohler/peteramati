@@ -113,7 +113,7 @@ class MailRecipients {
             $repojoin[] = "left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=" . $this->pset->id . ")
 	left join Repository r on (r.repoid=l.link)
 	left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.pset=" . $this->pset->id . " and not rg.placeholder)\n";
-            $columns[] = "r.repoid repoid, rg.gradehash gradehash";
+            $columns[] = "r.repoid repoid, rg.gradebhash gradebhash";
 
             if ($this->type == "openrepo")
                 $where[] = "r.open";

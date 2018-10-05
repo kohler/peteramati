@@ -167,7 +167,7 @@ class PsetView {
     function commit_record() {
         if ($this->commit_record === false) {
             if (!$this->hash
-                || ($this->repo_grade && $this->repo_grade->gradehash == $this->hash)) {
+                || ($this->repo_grade && $this->repo_grade->gradehash === $this->hash)) {
                 $this->commit_record = $this->repo_grade;
                 $this->commit_notes = $this->grade_notes;
             } else {
@@ -385,9 +385,9 @@ class PsetView {
         } else {
             $this->repo_grade = null;
             if ($this->repo) {
-                $result = $this->conf->qe("select rg.*, cn.bhash, cn.notes, cn.notesversion
+                $result = $this->conf->qe("select rg.*, null gradehash, null hash, cn.bhash, cn.notes, cn.notesversion
                     from RepositoryGrade rg
-                    left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=unhex(rg.gradehash))
+                    left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)
                     where rg.repoid=? and rg.pset=? and not rg.placeholder",
                     $this->repo->repoid, $this->pset->psetid);
                 $this->repo_grade = $result ? $result->fetch_object() : null;
@@ -395,7 +395,10 @@ class PsetView {
                 if ($this->repo_grade) {
                     if ($this->repo_grade->notes)
                         $this->repo_grade->notes = json_decode($this->repo_grade->notes);
-                    $this->repo_grade->hash = bin2hex($this->repo_grade->bhash);
+                    if ($this->repo_grade->gradebhash !== null)
+                        $this->repo_grade->gradehash = bin2hex($this->repo_grade->gradebhash);
+                    if ($this->repo_grade->bhash !== null)
+                        $this->repo_grade->hash = bin2hex($this->repo_grade->bhash);
                 }
             }
             if (($this->grade = $this->repo_grade)) {
@@ -404,9 +407,9 @@ class PsetView {
                     && get($this->grade, "gradercid")
                     && !get($this->grade_notes, "gradercid"))
                     $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
-                if (get($this->grade, "gradehash") && $this->hash === null)
+                if (get($this->grade, "gradebhash") && $this->hash === null)
                     // NB don't check recent_commits association here
-                    $this->hash = $this->grade->gradehash;
+                    $this->hash = bin2hex($this->grade->gradebhash);
             }
         }
         $this->n_visible_grades = null;
@@ -446,7 +449,7 @@ class PsetView {
         $this->ensure_grade();
         return $this->hash
             && $this->repo_grade
-            && $this->hash == $this->repo_grade->gradehash;
+            && $this->hash === $this->repo_grade->gradehash;
     }
 
     private function contact_can_view_grades(Contact $user) {
@@ -668,14 +671,14 @@ class PsetView {
             assert(!!$this->hash);
             if (!$this->repo_grade || !$this->repo_grade->gradehash)
                 $q = Dbl::format_query
-                    ("insert into RepositoryGrade set repoid=?, pset=?, gradehash=?, gradercid=?, placeholder=0 on duplicate key update gradehash=values(gradehash), gradercid=values(gradercid), placeholder=0",
+                    ("insert into RepositoryGrade set repoid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
                      $this->repo->repoid, $this->pset->psetid,
-                     $this->hash ? : null, $grader);
+                     $this->hash ? hex2bin($this->hash) : null, $grader);
             else
                 $q = Dbl::format_query
-                    ("update RepositoryGrade set gradehash=?, gradercid=?, placeholder=0 where repoid=? and pset=? and gradehash=?",
-                     $this->hash ? : $this->repo_grade->gradehash, $grader,
-                     $this->repo->repoid, $this->pset->psetid, $this->repo_grade->gradehash);
+                    ("update RepositoryGrade set gradebhash=?, gradercid=?, placeholder=0 where repoid=? and pset=? and gradebhash=?",
+                     $this->hash ? hex2bin($this->hash) : $this->repo_grade->gradebhash, $grader,
+                     $this->repo->repoid, $this->pset->psetid, $this->repo_grade->gradebhash);
             $this->update_commit_info(array("gradercid" => $grader));
         }
         if ($q)
@@ -694,9 +697,9 @@ class PsetView {
             $grader = $this->commit_info("gradercid");
             if (!$grader)
                 $grader = $this->grading_info("gradercid");
-            $this->conf->qe("insert into RepositoryGrade (repoid,pset,gradehash,gradercid,placeholder) values (?, ?, ?, ?, 0) on duplicate key update gradehash=values(gradehash), gradercid=values(gradercid), placeholder=0",
+            $this->conf->qe("insert into RepositoryGrade (repoid,pset,gradebhash,gradercid,placeholder) values (?, ?, ?, ?, 0) on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
                     $this->repo->repoid, $this->pset->psetid,
-                    $this->hash ? : null, $grader ? : null);
+                    $this->hash ? hex2bin($this->hash) : null, $grader ? : null);
         }
         $this->grade = $this->repo_grade = false;
         $this->can_view_grades = $this->user_can_view_grades = null;

@@ -92,7 +92,7 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
     $result = $Conf->qe_raw("select c.contactId, c.firstName, c.lastName, c.email,
 	c.huid, c.anon_username, c.seascode_username, c.github_username, c.extension,
 	r.repoid, r.url, r.open, r.working, r.lastpset, min(pl.link) as partnercid,
-	rg.gradehash, rg.gradercid
+	rg.gradebhash, rg.gradercid
 	from ContactInfo c
 	left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$pset->id)
     left join ContactLink pl on (l.cid=c.contactId and l.type=" . LINK_PARTNER . " and l.pset=$pset->id)
@@ -127,8 +127,8 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
         $gi = null;
         if ($pset->gitless_grades)
             $gi = $pset->contact_grade_for($s);
-        else if (get($s, "gradehash"))
-            $gi = $pset->commit_notes($s->gradehash);
+        else if ($s->gradebhash)
+            $gi = $pset->commit_notes($s->gradebhash);
         else
             continue;
         $gi = $gi ? $gi->notes : null;
@@ -774,8 +774,8 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     else if ($row->main_gradercid)
         $j["gradercid"] = $row->main_gradercid;
     $j["psetid"] = $pset->id;
-    $j["hash"] = $row_hash = bin2hex($row->bhash);
-    if ($row->gradehash === $row_hash && $row_hash)
+    $j["hash"] = bin2hex($row->bhash);
+    if ($row->gradebhash === $row->bhash && $row->bhash !== null)
         $j["is_grade"] = true;
     if ($row->haslinenotes)
         $j["has_notes"] = true;
@@ -912,31 +912,34 @@ function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) 
 
     // are any commits committed?
     if (!$pset->gitless_grades) {
-        if (($s->placeholder || $s->gradehash === null)
+        if (($s->placeholder || $s->gradebhash === null)
             && $s->repoid
             && ($s->placeholder_at < $Now - 3600 && rand(0, 2) == 0
                 || ($s->placeholder_at < $Now - 600 && rand(0, 10) == 0))
-            && (!$s->repoviewable || !$s->gradehash)) {
+            && (!$s->repoviewable || $s->gradebhash === null)) {
             // XXX this is slow given that most info is already loaded
             $info = PsetView::make($pset, $s, $Me);
             $info->set_hash(null);
-            $s->gradehash = $info->commit_hash() ? : null;
+            if (($hash = $info->commit_hash()))
+                $s->gradebhash = hex2bin($hash);
+            else
+                $s->gradebhash = null;
             $s->placeholder = 1;
-            Dbl::qe("insert into RepositoryGrade (repoid, pset, gradehash, placeholder, placeholder_at) values (?, ?, ?, 1, ?) on duplicate key update gradehash=(if(placeholder=1,values(gradehash),gradehash)), placeholder_at=values(placeholder_at)",
-                    $s->repoid, $pset->id, $s->gradehash, $Now);
+            Dbl::qe("insert into RepositoryGrade (repoid, pset, gradebhash, placeholder, placeholder_at) values (?, ?, ?, 1, ?) on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
+                    $s->repoid, $pset->id, $s->gradebhash, $Now);
             if (!$s->repoviewable)
                 $s->repoviewable = $info->user_can_view_repo_contents();
         }
-        if ($s->gradehash)
-            $j["gradehash"] = $s->gradehash;
+        if ($s->gradebhash !== null)
+            $j["gradehash"] = bin2hex($s->gradebhash);
     }
 
     if ($pset->grades()) {
         $gi = null;
         if ($pset->gitless_grades)
             $gi = $pset->contact_grade_for($s);
-        else if ($s->gradehash && !$s->placeholder)
-            $gi = $pset->commit_notes($s->gradehash);
+        else if ($s->gradebhash !== null && !$s->placeholder)
+            $gi = $pset->commit_notes($s->gradebhash);
         $gi = $gi ? $gi->notes : null;
 
         if (!$pset->gitless_grades) {
@@ -1205,7 +1208,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
 
     $allflags = !!req("allflags");
     $field = req("allflags") ? "hasflags" : "hasactiveflags";
-    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradehash,
+    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradebhash,
         (select group_concat(cid) from ContactLink where pset=cn.pset and type=" . LINK_REPO . " and link=cn.repoid) repocids
         from CommitNotes cn
         left join RepositoryGrade rg on (rg.repoid=cn.repoid and rg.pset=cn.pset)

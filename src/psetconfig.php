@@ -286,7 +286,7 @@ class Pset {
     c.huid, c.github_username, c.seascode_username, c.anon_username, c.extension, c.disabled, c.dropped, c.roles, c.contactTags,
     group_concat(pl.link) pcid, group_concat(rpl.link) rpcid,
     r.repoid, r.cacheid, r.heads, r.url, r.open, r.working, r.lastpset, r.snapcheckat, $view repoviewable,
-    rg.gradehash, rg.gradercid, rg.placeholder, rg.placeholder_at
+    rg.gradebhash, rg.gradercid, rg.placeholder, rg.placeholder_at
     from ContactInfo c
     left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset={$this->id})
     left join Repository r on (r.repoid=l.link)
@@ -425,9 +425,9 @@ class Pset {
         return $cg;
     }
 
-    function commit_notes($hash) {
+    function commit_notes($bhash) {
         assert(!$this->gitless);
-        $result = $this->conf->qe("select * from CommitNotes where pset=? and bhash=?", $this->psetid, hex2bin($hash));
+        $result = $this->conf->qe("select * from CommitNotes where pset=? and bhash=?", $this->psetid, strlen($bhash) === 40 ? hex2bin($bhash) : $bhash);
         $cn = edb_orow($result);
         if ($cn && $cn->notes)
             $cn->notes = json_decode($cn->notes);

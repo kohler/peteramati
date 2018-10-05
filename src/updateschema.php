@@ -418,6 +418,10 @@ function updateSchema($conf) {
         && $conf->ql("alter table ContactLink add primary key (`cid`,`type`,`pset`,`link`)")
         && $conf->ql("alter table ContactLink drop key `cid_type`"))
         $conf->update_schema_version(126);
+    if ($conf->sversion == 126
+        && $conf->ql("alter table RepositoryGrade add `gradebhash` varbinary(32) DEFAULT NULL")
+        && $conf->ql("update RepositoryGrade set gradebhash=unhex(gradehash)"))
+        $conf->update_schema_version(127);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

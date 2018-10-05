@@ -118,7 +118,7 @@ if (isset($_REQUEST["gradecdf"])) {
         else
             $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$Pset->id)
 		join RepositoryGrade rg on (rg.repoid=l.link and rg.pset=$Pset->id and not rg.placeholder)
-		join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=unhex(rg.gradehash))\n";
+		join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)\n";
         $result = $Conf->qe_raw($q . " where $notdropped");
 
         $series = new Series;

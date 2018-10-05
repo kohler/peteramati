@@ -76,7 +76,7 @@ class Contact {
     public $lastpset;
     public $snapcheckat;
     public $repoviewable;
-    public $gradehash;
+    public $gradebhash;
     public $gradercid;
     public $placeholder;
     public $placeholder_at;
