@@ -327,6 +327,7 @@ class Repository {
             // load some commits first
             $this->commits($pset, $branch);
 
+        $hash = strtolower($hash);
         if (strlen($hash) === 40) {
             if (array_key_exists($hash, $this->_commits))
                 return $this->_commits[$hash];
