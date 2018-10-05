@@ -3165,7 +3165,8 @@ return function (container, string, options) {
             if (displaylen + render.length > 133
                 || (displaylen + render.length == 133 && render.charAt(132) !== "\n")) {
                 render = render.substr(0, 132 - displaylen);
-                addlinepart(node, render + "…\n");
+                addlinepart(node, render);
+                node.className = "pa-line-continues";
                 isnew && container.insertBefore(node, cursor);
                 node = document.createElement("span");
                 isnew = true;
