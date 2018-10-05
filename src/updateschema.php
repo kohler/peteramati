@@ -430,6 +430,8 @@ function updateSchema($conf) {
         && $conf->ql("drop table if exists RepositoryGradeRequest"))
         $conf->update_schema_version(122);
     if ($conf->sversion == 122
+        && $conf->ql("drop table if exists Branch")
+        && $conf->ql("drop table if exists ContactUlink")
         && $conf->ql("create table `Branch` ( `branchid` int(11) NOT NULL AUTO_INCREMENT, `branch` varbinary(255) NOT NULL, PRIMARY KEY (`branchid`), UNIQUE KEY `branch` (`branch`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8")
         && $conf->ql("alter table RepositoryGrade add `branchid` int(11) NOT NULL DEFAULT '0'")
         && $conf->ql("alter table RepositoryGrade drop primary key")
