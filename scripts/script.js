@@ -3756,6 +3756,7 @@ function pa_anonymize_linkto(link, event) {
 function pa_render_pset_table(psetid, pconf, data) {
     var $j = $("#pa-pset" + psetid), dmap = [],
         flagged = pconf.flagged_commits,
+        visible = pconf.grades_visible,
         grade_keys = pconf.grade_keys || [],
         grade_abbr,
         need_ngrades,
@@ -3816,7 +3817,8 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
     }
     function calculate_ncol() {
-        return (pconf.checkbox ? 1 : 0) + 5 + (pconf.gitless_grades ? 0 : 1) +
+        return (pconf.checkbox ? 1 : 0) + 5 +
+            (pconf.gitless_grades && !visible ? 0 : 1) +
             (pconf.need_total ? 1 : 0) + grade_keys.length + (need_ngrades ? 1 : 0) +
             (pconf.gitless ? 0 : 1);
     }
@@ -3906,13 +3908,17 @@ function pa_render_pset_table(psetid, pconf, data) {
         a.push('<td class="pap-grader">' + txt + '</td>');
         if (flagged) {
             txt = '';
+            if (s.grades_visible)
+                txt += '⎚';
             if (s.is_grade)
                 txt += '✱';
             if (s.has_notes)
                 txt += '♪';
             a.push('<td class="pap-notes">' + txt + '</td>');
-        } else if (!pconf.gitless_grades) {
+        } else if (!pconf.gitless_grades || visible) {
             txt = '';
+            if (s.grades_visible)
+                txt += '⎚';
             if (s.has_notes)
                 txt += '♪';
             if (s.has_nongrader_notes)
@@ -4091,8 +4097,8 @@ function pa_render_pset_table(psetid, pconf, data) {
         a.push('<th class="pap-name l' + (pconf.has_nonanonymous ? "" : " pap-nonanonymous") + ' plsortable" data-pa-sort="name">Name</th>');
         a.push('<th class="pap-extension l plsortable" data-pa-sort="extension">X?</th>');
         a.push('<th class="pap-grader l plsortable" data-pa-sort="grader">Grader</th>');
-        if (!pconf.gitless_grades)
-            a.push('<th class="pap-notes"></th>');
+        if (!pconf.gitless_grades || visible)
+            a.push('<th class="pap-notes l plsortable" data-pa-sort="gradestatus">⎚</th>');
         if (pconf.need_total)
             a.push('<th class="pap-total r plsortable" data-pa-sort="total">Tot</th>');
         for (j = 0; j < grade_keys.length; ++j)
@@ -4116,6 +4122,16 @@ function pa_render_pset_table(psetid, pconf, data) {
             return peteramati_psets[a.psetid].pos < peteramati_psets[b.psetid].pos ? -rev : rev;
         else if (a.at != b.at)
             return a.at < b.at ? -rev : rev;
+        else
+            return 0;
+    }
+    function grader_compare(a, b) {
+        var ap = a.gradercid ? hotcrp_pc[a.gradercid] : null;
+        var bp = b.gradercid ? hotcrp_pc[b.gradercid] : null;
+        var ag = (ap && grader_name(ap)) || "~~~";
+        var bg = (bp && grader_name(bp)) || "~~~";
+        if (ag != bg)
+            return ag < bg ? -sort.rev : sort.rev;
         else
             return 0;
     }
@@ -4151,16 +4167,19 @@ function pa_render_pset_table(psetid, pconf, data) {
             data.sort(function (a, b) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
-                else {
-                    var ap = a.gradercid ? hotcrp_pc[a.gradercid] : null;
-                    var bp = b.gradercid ? hotcrp_pc[b.gradercid] : null;
-                    var ag = (ap && grader_name(ap)) || "~~~";
-                    var bg = (bp && grader_name(bp)) || "~~~";
-                    if (ag != bg)
-                        return ag < bg ? -rev : rev;
-                    else
-                        return user_compare(a, b);
-                }
+                else
+                    return grader_compare(a, b) || user_compare(a, b);
+            });
+        } else if (f === "gradestatus") {
+            data.sort(function (a, b) {
+                if (a.boringness !== b.boringness)
+                    return a.boringness - b.boringness;
+                else if (a.grades_visible != b.grades_visible)
+                    return a.grades_visible ? -1 : 1;
+                else if (a.has_notes != b.has_notes)
+                    return a.has_notes ? -1 : 1;
+                else
+                    return grader_compare(a, b) || user_compare(a, b);
             });
         } else if (f === "pset") {
             data.sort(function (a, b) {

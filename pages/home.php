@@ -942,6 +942,8 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         $j["total"] = $garr->totalv;
         if ($garr->differentk)
             $j["highlight_grades"] = $garr->differentk;
+        if ($info->user_can_view_grades())
+            $j["grades_visible"] = true;
     }
 
     //echo "<td><a href=\"mailto:", htmlspecialchars($s->email), "\">",
@@ -1011,6 +1013,7 @@ function show_pset_table($sset) {
 
     $rows = array();
     $incomplete = array();
+    $grades_visible = false;
     $jx = [];
     foreach ($sset as $s) {
         if (!$s->user->visited) {
@@ -1030,6 +1033,8 @@ function show_pset_table($sset) {
                     $t .= " (" . $s->user->incomplete . ")";
                 $incomplete[] = $t . '</a>';
             }
+            if ($s->user_can_view_grades())
+                $grades_visible = true;
         }
     }
 
@@ -1048,7 +1053,8 @@ function show_pset_table($sset) {
     $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous,
            "grade_keys" => array_keys($grades),
            "grade_titles" => array_values(array_map(function ($ge) { return $ge->title; }, $grades)),
-           "gitless" => $pset->gitless, "gitless_grades" => $pset->gitless_grades,
+           "gitless" => $pset->gitless,
+           "gitless_grades" => $pset->gitless_grades,
            "psetkey" => $pset->urlkey];
     if ($anonymous)
         $jd["can_override_anonymous"] = true;
@@ -1064,6 +1070,8 @@ function show_pset_table($sset) {
         $jd["need_total"] = true;
     else if ($nintotal == 1)
         $jd["total_key"] = $last_in_total;
+    if ($grades_visible)
+        $jd["grades_visible"] = true;
     echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode($jd), ',', json_encode($jx), ')</script>';
 
     if ($sset->viewer->privChair && !$pset->gitless_grades) {
