@@ -93,7 +93,7 @@ class Series {
 }
 
 // load user repo and current commit
-$Info = new PsetView($Pset, $User, $Me);
+$Info = PsetView::make($Pset, $User, $Me);
 if (($Commit = req("newcommit")) == null)
     $Commit = req("commit");
 if (!$Info->set_hash($Commit) && $Commit && $Info->repo) {
@@ -251,7 +251,7 @@ function upload_grades($pset, $text, $fname) {
             continue;
         }
         if ($user) {
-            $info = new PsetView($pset, $user, $Me);
+            $info = PsetView::make($pset, $user, $Me);
             if (!save_grades($pset, $info, $line, true))
                 $errors[] = htmlspecialchars($fname) . ":" . $csv->lineno() . ": no grades set";
         } else

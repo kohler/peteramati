@@ -54,7 +54,7 @@ class API_Repo {
         $base_hash = $qreq->base_hash;
         if ($base_hash && !($base_commit = $user->conf->check_api_hash($base_hash, $api)))
             return ["ok" => false, "error" => "Disconnected commit."];
-        $info = new PsetView($api->pset, $api->user, $user);
+        $info = PsetView::make($api->pset, $api->user, $user);
         $info->set_commit($api->commit);
         $lnorder = $info->viewable_line_notes();
         $diff = $info->repo->diff($api->pset, $base_hash, $info->commit_hash(), array("needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file]));

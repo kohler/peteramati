@@ -22,7 +22,7 @@ if ($Pset->gitless) {
     $Conf->errorMsg("That problem set does not use git.");
     $Me->escape(); // XXX stay on this page
 }
-$Info = new PsetView($Pset, $User, $Me);
+$Info = PsetView::make($Pset, $User, $Me);
 if (!$Info->repo) {
     $Conf->errorMsg("No repository.");
     $Me->escape(); // XXX stay on this page

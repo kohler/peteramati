@@ -28,12 +28,12 @@ class Contact {
     public $lastName = "";
     public $nickname = "";
     public $unaccentedName = "";
-    public $nameAmbiguous = null;
-    public $nicknameAmbiguous = null;
+    public $nameAmbiguous;
+    public $nicknameAmbiguous;
     public $email = "";
     public $preferredEmail = "";
     public $sorter = "";
-    public $sort_position = null;
+    public $sort_position;
 
     public $affiliation = "";
 
@@ -708,15 +708,17 @@ class Contact {
         return get($this->links[$type], $pset, []);
     }
 
-    function branch_link($pset) {
+    function branch_link($psetid) {
+        assert(!is_object($psetid));
         if ($this->links === null)
             $this->load_links();
-        $pset = is_object($pset) ? $pset->psetid : $pset;
-        $l = get($this->links[LINK_BRANCH], $pset);
-        if ($l !== null && count($l) == 1 && $l[0])
-            return $this->conf->branch($l[0]);
-        else
-            return null;
+        $l = get($this->links[LINK_BRANCH], $psetid);
+        return $l !== null && count($l) == 1 ? $l[0] : 0;
+    }
+
+    function branch_name($psetid) {
+        $branchid = $this->branch_link($psetid);
+        return $branchid ? $this->conf->branch($branchid) : null;
     }
 
     private function adjust_links($type, $pset) {

@@ -52,7 +52,7 @@ class CS61Mailer extends Mailer {
 
     private function get_pset_info() {
         if (!$this->_info && $this->pset) {
-            $this->_info = new PsetView($this->pset, $this->recipient, $this->permissionContact);
+            $this->_info = PsetView::make($this->pset, $this->recipient, $this->permissionContact);
             $this->_info->set_hash(null);
         }
         return $this->_info;

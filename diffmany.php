@@ -26,7 +26,7 @@ $psetinfo_idx = 0;
 function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     global $Me, $psetinfo_idx;
     ++$psetinfo_idx;
-    $info = new PsetView($pset, $user, $Me);
+    $info = PsetView::make($pset, $user, $Me);
     if (!$info->repo)
         return;
     $info->set_hash(false);

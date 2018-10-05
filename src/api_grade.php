@@ -18,7 +18,7 @@ class API_Grade {
     }
 
     static function grade(Contact $user, Qrequest $qreq, APIData $api) {
-        $info = new PsetView($api->pset, $api->user, $user);
+        $info = PsetView::make($api->pset, $api->user, $user);
         $hash = null;
         if (!$api->pset->gitless_grades) {
             if (!$api->repo)
@@ -130,7 +130,7 @@ class API_Grade {
     }
 
     static function linenote(Contact $user, Qrequest $qreq, APIData $api) {
-        $info = new PsetView($api->pset, $api->user, $user);
+        $info = PsetView::make($api->pset, $api->user, $user);
         $info->set_commit($api->commit);
         if ($qreq->line && ctype_digit($qreq->line))
             $qreq->line = "b" . $qreq->line;

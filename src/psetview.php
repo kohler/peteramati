@@ -15,10 +15,10 @@ class PsetView {
     private $partner_same = null;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
-    private $repo_grade = null;     // RepositoryGrade+CommitNotes
-    private $grade_notes = null;
-    private $can_view_grades = null;
-    private $user_can_view_grades = null;
+    private $repo_grade;            // RepositoryGrade+CommitNotes
+    private $grade_notes;
+    private $can_view_grades;
+    private $user_can_view_grades;
 
     private $hash = null;
     private $commit_record = false; // CommitNotes (maybe +RepositoryGrade)
@@ -37,19 +37,23 @@ class PsetView {
     private $transferred_warnings;
     private $transferred_warnings_priority;
 
-    function __construct(Pset $pset, Contact $user, Contact $viewer, $hash = null) {
+    function __construct(Pset $pset, Contact $user, Contact $viewer) {
         $this->conf = $pset->conf;
         $this->pset = $pset;
         $this->user = $user;
         $this->viewer = $viewer;
         $this->pc_view = $viewer->isPC && $viewer !== $user;
-        $this->partner = $user->partner($pset->id);
+    }
+
+    static function make(Pset $pset, Contact $user, Contact $viewer) {
+        $info = new PsetView($pset, $user, $viewer);
+        $info->partner = $user->partner($pset->id);
         if (!$pset->gitless) {
-            $this->repo = $user->repo($pset->id);
+            $info->repo = $user->repo($pset->id);
             if (!$pset->no_branch)
-                $this->branch = $user->branch_link($pset->id);
+                $info->branch = $user->branch_name($pset->id);
         }
-        $this->hash = $hash;
+        return $info;
     }
 
     function connected_hash($hash) {

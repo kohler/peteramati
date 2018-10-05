@@ -15,7 +15,7 @@ function quit($err = null) {
 
 function user_pset_info() {
     global $Conf, $User, $Me, $Pset, $Info, $Qreq;
-    $Info = new PsetView($Pset, $User, $Me);
+    $Info = PsetView::make($Pset, $User, $Me);
     if (($Commit = $Qreq->newcommit) == null)
         $Commit = $Qreq->commit;
     if (!$Info->set_hash($Commit))

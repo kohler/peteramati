@@ -74,7 +74,7 @@ class Repository {
     }
 
     static function fetch($result, Conf $conf) {
-        $repo = $result ? $result->fetch_object("Repository", []) : null;
+        $repo = $result ? $result->fetch_object("Repository", [$conf]) : null;
         if ($repo && !is_int($repo->repoid)) {
             $repo->conf = $conf;
             $repo->db_load();

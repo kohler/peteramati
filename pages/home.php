@@ -308,7 +308,7 @@ function set_grader(Qrequest $qreq) {
     $cur_graders = $graders;
     foreach (qreq_users($qreq) as $user) {
         // XXX check if can_set_grader
-        $info = new PsetView($pset, $user, $Me);
+        $info = PsetView::make($pset, $user, $Me);
         if ($info->repo)
             $info->repo->refresh(2700, true);
         if ($info->set_hash(null)) {
@@ -389,7 +389,7 @@ function doaction(Qrequest $qreq) {
     }
     if ($hiddengrades !== null) {
         foreach (qreq_users($qreq) as $user) {
-            $info = new PsetView($pset, $user, $Me);
+            $info = PsetView::make($pset, $user, $Me);
             if ($info->grading_hash())
                 $info->set_hidden_grades($hiddengrades);
         }
@@ -695,7 +695,7 @@ function show_pset($pset, $user) {
     $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($user)]);
     echo "<h2><a class=\"btn\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
         htmlspecialchars($pset->title), "</a>";
-    $info = new PsetView($pset, $user, $Me);
+    $info = PsetView::make($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
     $user_see_grade = $info->user_can_view_grades();
     if ($user_see_grade && $info->has_assigned_grades())
@@ -918,7 +918,7 @@ function render_pset_row(Pset $pset, $students, $repos, Contact $s, $anonymous) 
                 || ($s->placeholder_at < $Now - 600 && rand(0, 10) == 0))
             && (!$s->repoviewable || !$s->gradehash)) {
             // XXX this is slow given that most info is already loaded
-            $info = new PsetView($pset, $s, $Me);
+            $info = PsetView::make($pset, $s, $Me);
             $info->set_hash(null);
             $s->gradehash = $info->commit_hash() ? : null;
             $s->placeholder = 1;

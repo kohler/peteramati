@@ -33,7 +33,7 @@ function _update_schema_regrade_flags(Conf $conf) {
     while (($row = edb_orow($result)))
         if ($row->cid && ($u = $conf->user_by_id($row->cid))
             && ($pset = $conf->pset_by_id($row->pset))) {
-            $info = new PsetView($pset, $u, $u);
+            $info = PsetView::make($pset, $u, $u);
             $info->force_set_hash($row->hash);
             $update = ["flags" => ["t" . $row->requested_at => ["uid" => $u->contactId]]];
             $info->update_current_info($update);
