@@ -7,6 +7,7 @@ class Ht {
 
     public static $img_base = "";
     public static $default_button_class = "";
+    private static $_script_open = "<script";
     private static $_controlid = 0;
     private static $_lastcontrolid = 0;
     private static $_stash = "";
@@ -18,12 +19,18 @@ class Ht {
     const ATTR_NOEMPTY = 4;
     private static $_attr_type = array("accept-charset" => self::ATTR_SKIP,
                                        "action" => self::ATTR_SKIP,
+                                       "autofocus" => self::ATTR_BOOL,
+                                       "checked" => self::ATTR_BOOL,
                                        "class" => self::ATTR_NOEMPTY,
                                        "disabled" => self::ATTR_BOOL,
                                        "enctype" => self::ATTR_SKIP,
+                                       "formnovalidate" => self::ATTR_BOOL,
                                        "method" => self::ATTR_SKIP,
+                                       "multiple" => self::ATTR_BOOL,
+                                       "novalidate" => self::ATTR_BOOL,
                                        "optionstyles" => self::ATTR_SKIP,
                                        "spellcheck" => self::ATTR_BOOLTEXT,
+                                       "readonly" => self::ATTR_BOOL,
                                        "type" => self::ATTR_SKIP);
 
     static function extra($js) {
@@ -37,7 +44,7 @@ class Ht {
                     || ($v === "" && $t === self::ATTR_NOEMPTY))
                     /* nothing */;
                 else if ($t === self::ATTR_BOOL)
-                    $x .= ($v ? " $k=\"$k\"" : "");
+                    $x .= ($v ? " $k" : "");
                 else if ($t === self::ATTR_BOOLTEXT && is_bool($v))
                     $x .= " $k=\"" . ($v ? "true" : "false") . "\"";
                 else
@@ -46,10 +53,21 @@ class Ht {
         return $x;
     }
 
+    static function set_script_nonce($nonce) {
+        if ((string) $nonce === "")
+            self::$_script_open = '<script';
+        else
+            self::$_script_open = '<script nonce="' . htmlspecialchars($nonce) . '"';
+    }
+
+    static function script($script) {
+        return self::$_script_open . '>' . $script . '</script>';
+    }
+
     static function script_file($src, $js = null) {
         if ($js && get($js, "crossorigin") && !preg_match(',\A([a-z]+:)?//,', $src))
             unset($js["crossorigin"]);
-        return '<script src="' . htmlspecialchars($src) . '"' . self::extra($js) . '></script>';
+        return self::$_script_open . ' src="' . htmlspecialchars($src) . '"' . self::extra($js) . '></script>';
     }
 
     static function stylesheet_file($src) {
@@ -58,16 +76,39 @@ class Ht {
     }
 
     static function form($action, $extra = null) {
+        if (is_array($action)) {
+            $extra = $action;
+            $action = get($extra, "action", "");
+        }
+
+        // GET method requires special handling: extract params from URL
+        // and render as hidden inputs
+        $suffix = ">";
         $method = get($extra, "method") ? : "post";
-        if ($method === "get" && strpos($action, "?") !== false)
-            error_log(caller_landmark() . ": GET form action $action params will be ignored");
+        if ($method === "get"
+            && ($qpos = strpos($action, "?")) !== false) {
+            $pos = $qpos + 1;
+            while ($pos < strlen($action)
+                   && preg_match('{\G([^#=&;]*)=([^#&;]*)([#&;]|\z)}', $action, $m, 0, $pos)) {
+                $suffix .= self::hidden(urldecode($m[1]), urldecode($m[2]));
+                $pos += strlen($m[0]);
+                if ($m[3] === "#") {
+                    --$pos;
+                    break;
+                }
+            }
+            $action = substr($action, 0, $qpos) . (string) substr($action, $pos);
+        }
+
+        $x = '<form';
+        if ((string) $action !== "")
+            $x .= ' method="' . $method . '" action="' . $action . '"';
         $enctype = get($extra, "enctype");
         if (!$enctype && $method !== "get")
             $enctype = "multipart/form-data";
-        $x = '<form method="' . $method . '" action="' . $action . '"';
         if ($enctype)
             $x .= ' enctype="' . $enctype . '"';
-        return $x . ' accept-charset="UTF-8"' . self::extra($extra) . '>';
+        return $x . ' accept-charset="UTF-8"' . self::extra($extra) . $suffix;
     }
 
     static function form_div($action, $extra = null) {
@@ -105,14 +146,10 @@ class Ht {
         $disabled = get($js, "disabled");
         if (is_array($disabled))
             unset($js["disabled"]);
-        if ($selected === null || !isset($opt[$selected]))
-            $selected = key($opt);
-        $x = '<select name="' . $name . '"' . self::extra($js);
-        if (!isset($js["data-default-value"]))
-            $x .= ' data-default-value="' . htmlspecialchars($selected) . '"';
-        $x .= '>';
+
         $optionstyles = get($js, "optionstyles", null);
-        $optgroup = "";
+        $x = $optgroup = "";
+        $first_value = $has_selected = false;
         foreach ($opt as $value => $info) {
             if (is_array($info) && isset($info[0]) && $info[0] === "optgroup")
                 $info = (object) array("type" => "optgroup", "label" => get($info, 1));
@@ -129,7 +166,7 @@ class Ht {
                 $value = $info->value;
 
             if ($info === null)
-                $x .= '<option label=" " disabled="disabled"></option>';
+                $x .= '<option label=" " disabled></option>';
             else if (isset($info->type) && $info->type === "optgroup") {
                 $x .= $optgroup;
                 if ($info->label) {
@@ -138,19 +175,32 @@ class Ht {
                 } else
                     $optgroup = "";
             } else {
-                $x .= '<option value="' . htmlspecialchars($value) . '"';
-                if (strcmp($value, $selected) == 0)
-                    $x .= ' selected="selected"';
-                if (get($info, "disabled"))
-                    $x .= ' disabled="disabled"';
-                if (get($info, "style"))
-                    $x .= ' style="' . $info->style . '"';
+                $x .= '<option';
                 if (get($info, "id"))
                     $x .= ' id="' . $info->id . '"';
+                $x .= ' value="' . htmlspecialchars($value) . '"';
+                if ($first_value === false)
+                    $first_value = $value;
+                if (!strcmp($value, $selected) && !$has_selected) {
+                    $x .= ' selected';
+                    $has_selected = true;
+                }
+                if (get($info, "disabled"))
+                    $x .= ' disabled';
+                if (get($info, "class"))
+                    $x .= ' class="' . $info->class . '"';
+                if (get($info, "style"))
+                    $x .= ' style="' . htmlspecialchars($info->style) . '"';
                 $x .= '>' . $info->label . '</option>';
             }
         }
-        return $x . $optgroup . "</select>";
+
+        if ($selected === null || !isset($opt[$selected]))
+            $selected = key($opt);
+        $t = '<select name="' . $name . '"' . self::extra($js);
+        if (!isset($js["data-default-value"]))
+            $t .= ' data-default-value="' . htmlspecialchars($has_selected ? $selected : $first_value) . '"';
+        return $t . '>' . $x . $optgroup . "</select>";
     }
 
     static function checkbox($name, $value = 1, $checked = false, $js = null) {
@@ -162,14 +212,10 @@ class Ht {
             $checked = false;
         }
         $js = $js ? : array();
-        if (!get($js, "id"))
+        if (!array_key_exists("id", $js) || $js["id"] === true)
             $js["id"] = "htctl" . ++self::$_controlid;
-        self::$_lastcontrolid = $js["id"];
-        if (!isset($js["class"]))
-            $js["class"] = "cb";
-        assert($checked !== null);
-        if ($checked === null)
-            $checked = isset($_REQUEST[$name]) && $_REQUEST[$name] === $value;
+        if ($js["id"])
+            self::$_lastcontrolid = $js["id"];
         if (isset($js["data-default-checked"]) || isset($js["data-default-value"])) {
             $dc = get($js, "data-default-checked");
             if ($dc === null)
@@ -183,7 +229,7 @@ class Ht {
         if ($name)
             $t .= " name=\"$name\" value=\"" . htmlspecialchars($value) . "\"";
         if ($checked)
-            $t .= " checked=\"checked\"";
+            $t .= " checked";
         return $t . self::extra($js) . " />";
     }
 
@@ -193,9 +239,13 @@ class Ht {
     }
 
     static function label($html, $id = null, $js = null) {
-        if (!$id || $id === true)
+        if ($js && isset($js["for"])) {
+            $id = $js["for"];
+            unset($js["for"]);
+        } else if ($id === null || $id === true)
             $id = self::$_lastcontrolid;
-        return '<label for="' . $id . '"' . self::extra($js) . '>' . $html . "</label>";
+        return '<label' . ($id ? ' for="' . $id . '"' : '')
+            . self::extra($js) . '>' . $html . "</label>";
     }
 
     static function button($html, $js = null) {
@@ -232,17 +282,6 @@ class Ht {
         return self::button($html, $js);
     }
 
-    static function js_button($html, $onclick, $js = null) {
-        if ($js === null && is_array($onclick)) {
-            $js = $onclick;
-            $onclick = null;
-        } else if ($js === null)
-            $js = array();
-        if ($onclick)
-            $js["onclick"] = $onclick;
-        return self::button($html, $js);
-    }
-
     static function hidden_default_submit($name, $value = null, $js = null) {
         if ($js === null && is_array($value)) {
             $js = $value;
@@ -254,13 +293,8 @@ class Ht {
     }
 
     private static function apply_placeholder(&$value, &$js) {
-        if ($value === null)
+        if ($value === null || $value === get($js, "placeholder"))
             $value = "";
-        if (($temp = get($js, "placeholder"))) {
-            if ($value === "" || $value === $temp)
-                $js["class"] = trim(get_s($js, "class") . " temptext");
-            self::stash_script("jQuery(hotcrp_load.temptext)", "temptext");
-        }
         if (($default = get($js, "data-default-value")) !== null
             && $value === $default)
             unset($js["data-default-value"]);
@@ -305,7 +339,7 @@ class Ht {
             if (is_array($a)) {
                 $t .= $a[0];
                 if (count($a) > 1)
-                    $t .= '<br /><span class="hint">' . $a[1] . '</span>';
+                    $t .= '<div class="hint">' . $a[1] . '</div>';
             } else
                 $t .= $a;
             $t .= '</div>';
@@ -350,41 +384,24 @@ class Ht {
             . self::extra($js) . " />";
     }
 
-    static private function make_link($html, $href, $onclick, $js) {
+    static private function make_link($html, $href, $js) {
         if ($js === null)
             $js = [];
-        if ($href && !isset($js["href"]))
-            $js["href"] = $href;
-        if ($onclick && !isset($js["onclick"]))
-            $js["onclick"] = $onclick;
+        if (!isset($js["href"]))
+            $js["href"] = isset($href) ? $href : "";
         if (isset($js["onclick"]) && !preg_match('/(?:^return|;)/', $js["onclick"]))
             $js["onclick"] = "return " . $js["onclick"];
-        if (!get($js, "href"))
-            $js["href"] = "#";
+        if (isset($js["onclick"])
+            && (!isset($js["class"]) || !preg_match('/(?:\A|\s)(?:ui|btn|tla)(?=\s|\z)/', $js["class"])))
+            error_log(caller_landmark(2) . ": JS Ht::link lacks class");
         return "<a" . self::extra($js) . ">" . $html . "</a>";
     }
 
     static function link($html, $href, $js = null) {
         if ($js === null && is_array($href))
-            return self::make_link($html, null, null, $href);
+            return self::make_link($html, null, $href);
         else
-            return self::make_link($html, $href, null, $js);
-    }
-
-    static function js_link($html, $onclick, $js = null) {
-        if ($js === null && is_array($onclick))
-            return self::make_link($html, null, null, $onclick);
-        else
-            return self::make_link($html, null, $onclick, $js);
-    }
-
-    static function auto_link($html, $dest, $js = null) {
-        if ($js === null && is_array($dest))
-            return self::make_link($html, null, null, $dest);
-        else if ($dest && strcspn($dest, " ({") < strlen($dest))
-            return self::make_link($html, null, $dest, $js);
-        else
-            return self::make_link($html, $dest, null, $js);
+            return self::make_link($html, $href, $js);
     }
 
     static function link_urls($html) {
@@ -394,7 +411,7 @@ class Ht {
 
     static function format0($html_text) {
         $html_text = self::link_urls(Text::single_line_paragraphs($html_text));
-        return preg_replace('/(?:\r\n?){2,}|\n{2,}/', "</p>\n<p>", "<p>$html_text</p>");
+        return preg_replace('/(?:\r\n?){2,}|\n{2,}/', "</p><p>", "<p>$html_text</p>");
     }
 
     static function check_stash($uniqueid) {
@@ -421,7 +438,7 @@ class Ht {
         if ($js !== null && $js !== false && $js !== ""
             && (!$uniqueid || self::mark_stash($uniqueid))) {
             if (!self::$_stash_inscript)
-                self::$_stash .= "<script>";
+                self::$_stash .= self::$_script_open . ">";
             else if (($c = self::$_stash[strlen(self::$_stash) - 1]) !== "}"
                      && $c !== "{" && $c !== ";")
                 self::$_stash .= ";";

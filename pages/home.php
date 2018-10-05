@@ -904,7 +904,7 @@ function show_pset_actions($pset) {
 
     if (!$pset->disabled) {
         echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
-        echo Ht::js_button("Grade report", "window.location=\"" . hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]) . "\"");
+        echo Ht::button("Grade report", ["onclick" => "window.location=\"" . hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]) . "\""]);
     }
 
     echo "</div></form>";

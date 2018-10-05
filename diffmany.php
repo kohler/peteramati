@@ -98,7 +98,7 @@ if ($Qreq->files)
 $Conf->header(htmlspecialchars($title), "home");
 
 if ($Qreq->files)
-    echo Ht::js_button("Hide left", "pa_diff_toggle_hide_left.call(this)");
+    echo Ht::button("Hide left", ["onclick" => "pa_diff_toggle_hide_left.call(this)"]);
 echo "<hr />\n";
 
 if (trim((string) $Qreq->users) === "") {
