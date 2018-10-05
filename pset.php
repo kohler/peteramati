@@ -179,8 +179,12 @@ if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
     $Info->change_grader($grader);
     json_exit(["ok" => null, "grader_email" => $_POST["grader"]]);
 }
-if (isset($_REQUEST["setcommit"]) && isset($_REQUEST["grade"]) && check_post()
-    && $Info->can_have_grades() && $Me->isPC && $Me != $User)
+if (isset($_REQUEST["setcommit"])
+    && isset($_REQUEST["grade"])
+    && check_post()
+    && $Info->can_have_grades()
+    && $Me->isPC
+    && $Me != $User)
     $Info->mark_grading_commit();
 if (isset($_REQUEST["setcommit"]))
     go($Info->hoturl("pset"));
@@ -401,7 +405,7 @@ function echo_commit($Info) {
     $WDIFF = isset($Notes->wdiff) ? $Notes->wdiff : false;
 
     // current commit and commit selector
-    $sel = array();
+    $sel = $bhashes = [];
     $curhead = $grouphead = null;
     foreach ($Info->recent_commits() as $k) {
         // visually separate older heads
@@ -421,11 +425,11 @@ function echo_commit($Info) {
         if (strlen($x) != strlen($k->subject))
             $x .= "...";
         $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
+        $bhashes[] = hex2bin($k->hash);
     }
     $result = $Conf->qe("select bhash from CommitNotes where (haslinenotes & ?)!=0 and pset=? and bhash ?a",
                         $Me == $User && !$Info->can_view_grades() ? HASNOTES_COMMENT : HASNOTES_ANY,
-                        $Pset->psetid,
-                        array_map("hex2bin", array_keys($sel)));
+                        $Pset->psetid, $bhashes);
     while (($row = edb_row($result)))
         $sel[bin2hex($row[0])] .= " &nbsp;♪";
     Dbl::free($result);

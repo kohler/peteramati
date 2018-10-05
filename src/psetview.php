@@ -426,11 +426,11 @@ class PsetView {
         else {
             $this->repo_grade = null;
             if ($this->repo) {
-                $result = $this->conf->qe("select rg.*, null gradehash, null hash, cn.bhash, cn.notes, cn.notesversion
+                $result = $this->conf->qe("select rg.*, cn.bhash, cn.notes, cn.notesversion
                     from RepositoryGrade rg
                     left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)
-                    where rg.repoid=? and rg.pset=? and not rg.placeholder",
-                    $this->repo->repoid, $this->pset->psetid);
+                    where rg.repoid=? and rg.branchid=? and rg.pset=? and not rg.placeholder",
+                    $this->repo->repoid, $this->branchid, $this->pset->psetid);
                 $this->repo_grade = $result ? $result->fetch_object() : null;
                 Dbl::free($result);
             }
