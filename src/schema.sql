@@ -141,7 +141,6 @@ CREATE TABLE `ContactLink` (
   `type` int(1) NOT NULL,
   `pset` int(1) NOT NULL DEFAULT '0',
   `link` int(11) NOT NULL,
-  `data` varbinary(8192) DEFAULT NULL,
   KEY `cid_type` (`cid`,`type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -239,13 +238,14 @@ CREATE TABLE `RepositoryCommitSnapshot` (
 DROP TABLE IF EXISTS `RepositoryGrade`;
 CREATE TABLE `RepositoryGrade` (
   `repoid` int(11) NOT NULL,
+  `branchid` int(11) NOT NULL DEFAULT '0',
   `pset` int(11) NOT NULL,
   `gradehash` binary(40) DEFAULT NULL,
   `gradercid` int(11) DEFAULT NULL,
   `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder_at` bigint(11) DEFAULT NULL,
-  PRIMARY KEY (`repoid`,`pset`)
+  PRIMARY KEY (`repoid`,`branchid`,`pset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -265,7 +265,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 122);
+insert into Settings (name, value) values ('allowPaperOption', 125);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

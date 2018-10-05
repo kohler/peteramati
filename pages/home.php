@@ -866,14 +866,6 @@ function show_regrades($result, $all) {
     echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode($jd), ',', json_encode($jx), ')</script>';
 }
 
-class ContactLink {
-    public $cid;
-    public $pset;
-    public $type;
-    public $link;
-    public $data;
-}
-
 function show_pset_actions($pset) {
     global $Conf;
 

@@ -685,12 +685,11 @@ class Contact {
     }
 
     private function load_links() {
-        $result = $this->conf->qe("select type, pset, link, data from ContactLink where cid=?", $this->contactId);
+        $result = $this->conf->qe("select type, pset, link from ContactLink where cid=?", $this->contactId);
         $this->links = [1 => [], 2 => [], 3 => [], 4 => [], 5 => []];
         while (($row = edb_row($result))) {
             $type = (int) $row[0];
-            $value = $type === 5 ? $row[3] : (int) $row[2];
-            $this->links[$type][(int) $row[1]][] = $value;
+            $this->links[$type][(int) $row[1]][] = (int) $row[2];
         }
         Dbl::free($result);
     }
@@ -707,6 +706,17 @@ class Contact {
             $this->load_links();
         $pset = is_object($pset) ? $pset->psetid : $pset;
         return get($this->links[$type], $pset, []);
+    }
+
+    function branch_link($pset) {
+        if ($this->links === null)
+            $this->load_links();
+        $pset = is_object($pset) ? $pset->psetid : $pset;
+        $l = get($this->links[LINK_BRANCH], $pset);
+        if ($l !== null && count($l) == 1 && $l[0])
+            return $this->conf->branch($l[0]);
+        else
+            return null;
     }
 
     private function adjust_links($type, $pset) {
@@ -727,35 +737,27 @@ class Contact {
             return false;
     }
 
-    static private function link_data($type, $value) {
-        if ($type == 5)
-            return [1, $value];
-        else
-            return [$value, null];
-    }
-
-    function set_link($type, $pset, $value) {
+    function set_link($type, $pset, $link, $data = null) {
         if ($this->links === null)
             $this->load_links();
         $this->clear_links($type, $pset, false);
-        $this->links[$type][$pset] = array($value);
-        list($link, $data) = self::link_data($type, $value);
-        if ($this->conf->qe("insert into ContactLink (cid,type,pset,link,data) values (?,?,?,?,?)", $this->contactId, $type, $pset, $link, $data)) {
-            $this->conf->log("Set links [$type,$pset,$value]", $this);
+        $this->links[$type][$pset] = [$link];
+        if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $pset, $link)) {
+            $this->conf->log("Set links [$type,$pset,$link]", $this);
             return true;
         } else
             return false;
     }
 
     function add_link($type, $pset, $value) {
+        assert($type !== LINK_BRANCH);
         if ($this->links === null)
             $this->load_links();
         if (!isset($this->links[$type][$pset]))
             $this->links[$type][$pset] = array();
         if (!in_array($value, $this->links[$type][$pset])) {
             $this->links[$type][$pset][] = $value;
-            list($link, $data) = self::link_data($type, $value);
-            if ($this->conf->qe("insert into ContactLink (cid,type,pset,link,data) values (?,?,?,?,?)", $this->contactId, $type, $pset, $link, $data)) {
+            if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $pset, $value)) {
                 $this->conf->log("Add link [$type,$pset,$value]", $this);
                 return true;
             } else

@@ -313,7 +313,7 @@ class ContactView {
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
         $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
-        $branch = $user->link(LINK_BRANCH, $pset->id);
+        $branch = $user->branch_link($pset->id);
 
         if ($editable) {
             $xvalue = $branch;
@@ -417,7 +417,7 @@ class ContactView {
         if ($branch === "" || $branch === "master")
             $user->clear_links(LINK_BRANCH, $pset->id);
         else
-            $user->set_link(LINK_BRANCH, $pset->id, $branch);
+            $user->set_link(LINK_BRANCH, $pset->id, $Conf->ensure_branch($branch), $branch);
         redirectSelf();
     }
 
@@ -426,7 +426,7 @@ class ContactView {
         list($user, $repo) = array($info->user, $info->repo);
         if ($info->pset->gitless)
             return;
-        $branch = !$info->pset->no_branch ? $user->link(LINK_BRANCH, $info->pset->id) : null;
+        $branch = !$info->pset->no_branch ? $user->branch_link($info->pset->id) : null;
         $branch = $branch ? : "master";
 
         $snaphash = $snapcommitline = $snapcommitat = null;

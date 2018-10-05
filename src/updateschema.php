@@ -82,6 +82,27 @@ function _update_schema_linenotes(Conf $conf) {
     return true;
 }
 
+function update_schema_branches($conf) {
+    $result = $conf->ql("select distinct data from ContactLink where type=" . LINK_BRANCH);
+    while (($row = $result->fetch_row())) {
+        if ($row[0] !== "master")
+            $conf->ql("insert into Branch set branch=? on duplicate key update branch=branch", $row[0]);
+    }
+    Dbl::free($result);
+
+    $result = $conf->ql("select * from Branch");
+    $map = ["master" => 0];
+    while (($row = $result->fetch_object()))
+        $map[$row->branch] = $row->branchid;
+    Dbl::free($result);
+
+    foreach ($map as $b => $n) {
+        $conf->ql("update ContactLink set link=? where type=" . LINK_BRANCH . " and data=?", $n, $b);
+    }
+    $conf->ql("update ContactLink set link=0 where type=" . LINK_BRANCH . " and data is null");
+    return true;
+}
+
 function update_schema_drop_keys_if_exist($conf, $table, $key) {
     $indexes = Dbl::fetch_first_columns($conf->dblink, "select distinct index_name from information_schema.statistics where table_schema=database() and `table_name`='$table'");
     $drops = [];
@@ -381,6 +402,22 @@ function updateSchema($conf) {
     if ($conf->sversion == 121
         && $conf->ql("drop table if exists RepositoryGradeRequest"))
         $conf->update_schema_version(122);
+    if ($conf->sversion == 122
+        && $conf->ql("create table `Branch` ( `branchid` int(11) NOT NULL AUTO_INCREMENT, `branch` varbinary(255) NOT NULL, PRIMARY KEY (`branchid`), UNIQUE KEY `branch` (`branch`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8")
+        && $conf->ql("alter table RepositoryGrade add `branchid` int(11) NOT NULL DEFAULT '0'")
+        && $conf->ql("alter table RepositoryGrade drop primary key")
+        && $conf->ql("alter table RepositoryGrade add primary key (`repoid`,`branchid`,`pset`)"))
+        $conf->update_schema_version(123);
+    if ($conf->sversion == 123
+        && update_schema_branches($conf))
+        $conf->update_schema_version(124);
+    if ($conf->sversion == 124
+        && $conf->ql("alter table ContactLink drop `data`"))
+        $conf->update_schema_version(125);
+    if ($conf->sversion == 125
+        && $conf->ql("alter table ContactLink add primary key (`cid`,`type`,`pset`,`link`)")
+        && $conf->ql("alter table ContactLink drop key `cid_type`"))
+        $conf->update_schema_version(126);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

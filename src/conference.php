@@ -64,6 +64,7 @@ class Conf {
     private $_handout_latest_commit = [];
     private $_api_map = null;
     private $_repository_site_classes = null;
+    private $_branch_map;
     const USERNAME_GITHUB = 1;
     const USERNAME_HARVARDSEAS = 2;
     const USERNAME_EMAIL = 4;
@@ -129,7 +130,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 122) {
+        if ($this->sversion < 126) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -1585,6 +1586,38 @@ class Conf {
         if (!array_key_exists($pset->id, $this->_handout_latest_commit))
             $this->populate_handout_commits($pset);
         return get($this->_handout_latest_commit, $pset->id);
+    }
+
+
+    private function branch_map() {
+        if ($this->_branch_map === null) {
+            $this->_branch_map = [];
+            $result = $this->qe("select branchid, branch from Branch");
+            while (($row = $result->fetch_row()))
+                $this->_branch_map[+$row[0]] = $row[1];
+            Dbl::free($result);
+        }
+        return $this->_branch_map;
+    }
+
+    function branch($branchid) {
+        return get($this->branch_map(), $branchid);
+    }
+
+    function ensure_branch($branch) {
+        if ((string) $branch === "" || $branch === "master")
+            return null;
+        $key = array_search($branch, $this->branch_map(), true);
+        if ($key === false) {
+            $this->qe("insert into Branch set branch=?", $branch);
+            if (!$this->dblink->insert_id) {
+                $this->_branch_map = null;
+                return $this->ensure_branch($branch);
+            }
+            $key = $this->dblink->insert_id;
+            $this->_branch_map[$key] = $branch;
+        }
+        return $key;
     }
 
 

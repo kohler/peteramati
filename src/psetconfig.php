@@ -292,7 +292,7 @@ class Pset {
     left join Repository r on (r.repoid=l.link)
     left join ContactLink pl on (pl.cid=c.contactId and pl.type=" . LINK_PARTNER . " and pl.pset={$this->id})
     left join ContactLink rpl on (rpl.cid=c.contactId and rpl.type=" . LINK_BACKPARTNER . " and rpl.pset={$this->id})
-    left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.pset={$this->id})
+    left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.branchid=0 and rg.pset={$this->id})
     where (c.roles&" . Contact::ROLE_PCLIKE . ")=0
     and (rg.repoid is not null or not c.dropped)
     group by c.contactId, l.link";
