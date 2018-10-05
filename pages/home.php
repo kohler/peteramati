@@ -1026,8 +1026,8 @@ function show_pset_table($sset) {
                 $u = $sset->viewer->user_linkpart($s->user);
                 $t = '<a href="' . hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
                     . htmlspecialchars($u);
-                if ($s->incomplete !== true)
-                    $t .= " (" . $s->incomplete . ")";
+                if ($s->user->incomplete !== true)
+                    $t .= " (" . $s->user->incomplete . ")";
                 $incomplete[] = $t . '</a>';
             }
         }
