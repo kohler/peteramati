@@ -768,7 +768,7 @@ if ($Pset->gitless) {
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
             htmlspecialchars($r->output_title), '</a></h3>',
             '<div class="pa-run hidden" id="pa-run-', $r->category, '"';
-        if ($r->xterm_js)
+        if ($r->xterm_js || ($r->xterm_js === null && $Pset->run_xterm_js))
             echo ' data-pa-xterm-js="true"';
         if ($rj && isset($rj->timestamp))
             echo ' data-pa-timestamp="', $rj->timestamp, '"';

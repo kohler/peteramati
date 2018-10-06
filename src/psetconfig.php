@@ -76,6 +76,7 @@ class Pset {
     public $run_jailfiles;
     public $run_binddir;
     public $run_timeout;
+    public $run_xterm_js;
     public $has_transfer_warnings;
     public $has_xterm_js;
 
@@ -243,6 +244,7 @@ class Pset {
         $this->run_timeout = self::cinterval($p, "run_timeout");
         if ($this->run_timeout === null) // default run_timeout is 10m
             $this->run_timeout = 600;
+        $this->run_xterm_js = self::cbool($p, "run_xterm_js");
         $this->run_binddir = self::cstr($p, "run_binddir");
 
         // diffs
