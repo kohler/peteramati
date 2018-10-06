@@ -2438,10 +2438,15 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 }
 .pa-note {
 	overflow-wrap: break-word;
-	line-height: 1.35;
 	font-family: Georgia, serif;
+	line-height: 1.35;
 }
 .pa-note.format0 {
+	white-space: pre-wrap;
+}
+.pa-note.format2 {
+	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
+	line-height: 1.5;
 	white-space: pre-wrap;
 }
 .pa-note > *:first-child {
