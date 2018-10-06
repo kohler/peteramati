@@ -387,7 +387,7 @@ function echo_grade_cdf() {
             '<td class="yaxislabelcontainer"></td>',
             '<td class="plot"><div style="width:300px;height:200px"></div></td>',
             '</tr><tr><td></td><td class="xaxislabelcontainer"></td></tr>',
-            '</tbody></table>',
+            '</tbody></table>';
     echo '<table class="pa-stat-text', ($sepx ? " extension" : " all"), '"><tbody>',
         '<tr class="mean"><td class="cap">', $xmark, ' mean</td><td class="val"></td></tr>',
         '<tr class="median"><td class="cap">', $xmark, ' median</td><td class="val"></td></tr>',

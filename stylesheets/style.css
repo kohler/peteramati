@@ -2381,14 +2381,14 @@ tr.papr-partner {
 .pap-anonymous .pap-nonanonymous {
 	display: none;
 }
-.pa-stat-table {
+.pa-stat-text {
 	font-size: 90%;
 	margin: 0.5em auto;
 }
-.pa-stat-table .cap {
+.pa-stat-text .cap {
 	padding-right: 1em;
 }
-.pa-stat-table .val {
+.pa-stat-text .val {
 	text-align: right;
 }
 .pa-filediff {
