@@ -513,13 +513,12 @@ class PsetView {
         return $this->user_can_view_grades;
     }
 
-    function user_can_view_grade_cdf() {
+    function user_can_view_grade_statistics() {
         global $Now;
-        return $this->pset->grade_cdf_visible
-            && $this->user_can_view_grades()
-            && ($this->pset->grade_cdf_visible === "grades"
-                || $this->pset->grade_cdf_visible === true
-                || $this->pset->grade_cdf_visible <= $Now);
+        $gsv = $this->pset->grade_statistics_visible;
+        return $gsv === true
+            || (is_int($gsv) && $gsv <= $Now)
+            || ($gsv !== false && $this->user_can_view_grades());
     }
 
 

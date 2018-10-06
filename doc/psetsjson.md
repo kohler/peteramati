@@ -281,10 +281,11 @@ These other problem set components relate to grade display.
 
     Set to true to make grades visible to students. Implies `visible: true`.
 
-* `grade_cdf_visible`: boolean
+* `grade_statistics_visible`: boolean, date, or `"grades"`
 
-    Set to true to make the CDF of all grades visible to students, or false to
-    hide it. Defaults to the value of `grade_visible`.
+    Set to true to make statistics of all grades visible to students, or false
+    to hide it. Defaults to `"grades"`, which means visible when grades are
+    visible.
 
 * `grade_cdf_cutoff`: number between 0 and 1
 

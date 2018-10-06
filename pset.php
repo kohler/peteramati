@@ -104,7 +104,7 @@ $Commit = $Info->commit_hash();
 
 // get JSON grade series data
 if (isset($_REQUEST["gradecdf"])) {
-    if (!$Me->isPC && !$Info->user_can_view_grade_cdf())
+    if (!$Me->isPC && !$Info->user_can_view_grade_statistics())
         json_exit(["error" => "Grades are not visible now"]);
 
     if ($Conf->setting("gradejson_pset$Pset->id", 0) < $Now - 30) {
@@ -381,19 +381,20 @@ function echo_grade_cdf() {
     global $Conf, $Info, $Pset, $User, $Me;
     $sepx = $User->extension && $Pset->separate_extension_grades;
     $xmark = $sepx ? "extension " : "";
-    echo '<div id="pa-gradecdf" class="pa-gradecdf" style="float:right;position:relative">',
-        '<table class="gradecdf61table"><tbody><tr>',
-        '<td class="yaxislabelcontainer"></td>',
-        '<td class="plot"><div style="width:300px;height:200px"></div></td>',
-        '</tr><tr><td></td><td class="xaxislabelcontainer"></td></tr>',
-        '</tbody></table>',
-        '<table class="gradecdf61summary', ($sepx ? " extension" : " all"), '"><tbody>',
-        '<tr class="gradecdf61mean"><td class="cap">', $xmark, ' mean</td><td class="val"></td></tr>',
-        '<tr class="gradecdf61median"><td class="cap">', $xmark, ' median</td><td class="val"></td></tr>',
-        '<tr class="gradecdf61stddev"><td class="cap">', $xmark, ' stddev</td><td class="val"></td></tr>',
+    echo '<div id="pa-grade-statistics" class="pa-grade-statistics" style="float:right;position:relative">';
+    if ($Pset->grade_cdf_cutoff < 1)
+        echo '<table class="pa-stat-cdf"><tbody><tr>',
+            '<td class="yaxislabelcontainer"></td>',
+            '<td class="plot"><div style="width:300px;height:200px"></div></td>',
+            '</tr><tr><td></td><td class="xaxislabelcontainer"></td></tr>',
+            '</tbody></table>',
+    echo '<table class="pa-stat-text', ($sepx ? " extension" : " all"), '"><tbody>',
+        '<tr class="mean"><td class="cap">', $xmark, ' mean</td><td class="val"></td></tr>',
+        '<tr class="median"><td class="cap">', $xmark, ' median</td><td class="val"></td></tr>',
+        '<tr class="stddev"><td class="cap">', $xmark, ' stddev</td><td class="val"></td></tr>',
         '</tbody></table>',
         '</div>';
-    Ht::stash_script("pa_gradecdf(\$(\"#pa-gradecdf\"))");
+    Ht::stash_script("pa_gradecdf(\$(\"#pa-grade-statistics\"))");
 }
 
 function echo_commit($Info) {
@@ -566,7 +567,7 @@ function echo_grader() {
 function echo_grade_cdf_here() {
     global $Me, $User, $Pset, $Info;
     if ($Info->can_view_grades()
-        && ($Me != $User || $Info->user_can_view_grade_cdf())
+        && ($Me != $User || $Info->user_can_view_grade_statistics())
         && $Info->has_assigned_grades())
         echo_grade_cdf();
 }

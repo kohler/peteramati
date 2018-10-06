@@ -3637,7 +3637,7 @@ function pa_draw_gradecdf($graph) {
             });
 
     // plot
-    var $table = $graph.find(".gradecdf61table");
+    var $table = $graph.find(".pa-stat-cdf");
     $table.find(".plot > div").plot(series, {
         xaxis: xaxis,
         yaxis: {min: 0, max: 1},
@@ -3650,10 +3650,10 @@ function pa_draw_gradecdf($graph) {
 
     // summary
     for (var i in {"all": 1, "extension": 1}) {
-        var $sum = $graph.find(".gradecdf61summary." + i);
+        var $sum = $graph.find(".pa-stat-text." + i);
         var dd = (i == "all" ? d : dx) || {};
         for (var x in {"mean":1, "median":1, "stddev":1}) {
-            var $v = $sum.find(".gradecdf61" + x);
+            var $v = $sum.find("." + x);
             if (x in dd)
                 $v.removeClass("hidden").find(".val").text(dd[x].toFixed(1));
             else

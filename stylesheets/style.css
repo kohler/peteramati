@@ -2381,14 +2381,14 @@ tr.papr-partner {
 .pap-anonymous .pap-nonanonymous {
 	display: none;
 }
-.gradecdf61summary {
+.pa-stat-table {
 	font-size: 90%;
 	margin: 0.5em auto;
 }
-.gradecdf61summary .cap {
+.pa-stat-table .cap {
 	padding-right: 1em;
 }
-.gradecdf61summary .val {
+.pa-stat-table .val {
 	text-align: right;
 }
 .pa-filediff {
