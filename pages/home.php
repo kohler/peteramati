@@ -1144,7 +1144,7 @@ function show_pset_table($sset) {
                 $sel[$r->name] = htmlspecialchars($r->title);
                 $esel[$r->name . ".ensure"] = htmlspecialchars($r->title);
             }
-        if (!empty($sel))
+        if (count($sel) > 1)
             echo '<span class="nb" style="padding-right:2em">',
                 Ht::select("runner", $sel + $esel),
                 ' &nbsp;', Ht::submit("runmany", "Run all"),
