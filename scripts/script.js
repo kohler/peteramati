@@ -1954,7 +1954,10 @@ function pa_diff_locate(target, direction) {
         tr = target;
         direction = "previousSibling";
     }
-    while (tr && (tr.nodeType !== Node.ELEMENT_NODE || hasClass(tr, "pa-gw") || hasClass(tr, "pa-gg")))
+    while (tr
+           && (tr.nodeType !== Node.ELEMENT_NODE
+               || hasClass(tr, "pa-gw")
+               || hasClass(tr, "pa-gg")))
         tr = tr[direction];
 
     var table = tr, file;
@@ -2340,6 +2343,8 @@ window.pa_expandcontext = (function ($) {
 function expand(evt) {
     var contextrow = evt.currentTarget;
     var panal = pa_diff_locate(contextrow, "previousSibling");
+    while (panal && !panal.bline)
+        panal = pa_diff_locate(panal.tr, "previousSibling");
     var nanal = pa_diff_locate(contextrow, "nextSibling");
     if (!panal && !nanal)
         return false;
@@ -2349,7 +2354,7 @@ function expand(evt) {
     if (nanal && nanal.aline <= 1)
         return false;
     var args = {file: (panal || nanal).file, fromline: pbline};
-    if (pbline && lbline)
+    if (lbline)
         args.linecount = lbline - pbline;
     $.ajax(hoturl("api/blob", hoturl_gradeparts($(this), args)), {
         success: function (data) {
