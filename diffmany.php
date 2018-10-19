@@ -106,7 +106,9 @@ if (trim((string) $Qreq->users) === "") {
     $sset = new StudentSet($Me);
     $sset->set_pset($Pset);
     foreach ($sset as $info) {
-        if (!$info->user->visited) {
+        if (!$info->user->visited
+            && $info->grading_hash()
+            && !$info->user->dropped) {
             $want[] = $info->user->email;
             foreach ($info->user->links(LINK_PARTNER, $Pset->id) as $pcid)
                 if (($u = $sset->user($pcid)))
