@@ -995,7 +995,7 @@ class PsetView {
             && $this->pc_view) {
             foreach ($this->pset->grades() as $g) {
                 if ($g->landmark_file
-                    && ($di = get($diffs, $g->landmark_file))
+                    && ($di = get($diff, $g->landmark_file))
                     && !$di->contains_linea($g->landmark_line)
                     && $di->is_handout_commit_a())
                     $di->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
