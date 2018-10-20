@@ -1631,6 +1631,9 @@ class Conf {
         $need_hash = !!get($uf, "hash");
         $need_repo = !!get($uf, "repo");
         $need_pset = $need_repo || $need_hash || !!get($uf, "pset");
+        $need_user = !!get($uf, "user");
+        if ($need_user && !$api->user)
+            return ["ok" => false, "error" => "Missing user."];
         if ($need_pset && !$api->pset)
             return ["ok" => false, "error" => "Missing pset."];
         if ($need_repo && !$api->repo)
@@ -1668,7 +1671,8 @@ class Conf {
             "grade" => "3 API_Grade::grade",
             "jserror" => "1 API_JSError::jserror",
             "latestcommit" => "3 API_Repo::latestcommit",
-            "linenote" => "15 API_Grade::linenote"
+            "linenote" => "15 API_Grade::linenote",
+            "repositories" => "17 API_Repo::user_repositories"
         ];
         if (($olist = $this->opt("apiFunctions")))
             expand_json_includes_callback($olist, [$this, "_add_api_json"]);
@@ -1694,6 +1698,8 @@ class Conf {
                 $uf->repo = true;
             if ($flags & 8)
                 $uf->hash = true;
+            if ($flags & 16)
+                $uf->user = true;
         }
         return $uf;
     }

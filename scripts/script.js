@@ -4341,6 +4341,27 @@ function pa_diff_toggle_hide_left() {
         $(this).html($x.length ? "Hide left" : "Show left");
 }
 
+function pa_list_repositories(event) {
+    var self = this;
+    $.ajax(hoturl("api", {fn: "repositories", u: this.getAttribute("data-pa-user")}), {
+        method: "POST", cache: false,
+        success: function (data) {
+            var t = "Error loading repositories";
+            if (data.repositories && data.repositories.length) {
+                t = "Repositories: ";
+                for (var i = 0; i < data.repositories.length; ++i) {
+                    var r = data.repositories[i];
+                    i && (t += ", ");
+                    t += "<a href=\"" + escape_entities(r.url) + "\">" + escape_entities(r.name) + "</a>";
+                }
+            } else if (data.repositories)
+                t = "No repositories";
+            $("<div style=\"font-size:medium;font-weight:normal\"></div>").html(t).insertAfter(self);
+        }
+    });
+    event.preventDefault();
+}
+
 // autogrowing text areas; based on https://github.com/jaz303/jquery-grab-bag
 function textarea_shadow($self) {
     return jQuery("<div></div>").css({

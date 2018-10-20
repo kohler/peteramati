@@ -124,6 +124,12 @@ class ContactView {
             echo " ",*/
         if ($Me->privChair)
             echo "&nbsp;", become_user_link($user);
+        if ($Me->isPC
+            && $user->github_username
+            && $Me->conf->opt("githubOrganization")) {
+            echo ' <a class="q small ui js-repositories need-tooltip" href="" data-tooltip="List repositories" data-pa-user="' . htmlspecialchars($user->github_username) . '">®</a>';
+            Ht::stash_script('$(".js-repositories").on("click", pa_list_repositories)', "pa_list_repositories");
+        }
         echo '</h2>';
 
         if ($user !== $Me && !$user->is_anonymous)
@@ -217,7 +223,7 @@ class ContactView {
             redirectSelf();
     }
 
-    static function echo_repo_group(PsetView $info, $include_tarball = false) {
+    static function echo_repo_group(PsetView $info, $full = false) {
         global $Conf, $Me, $Now;
         if ($info->pset->gitless)
             return;
@@ -252,7 +258,8 @@ class ContactView {
                 $value .= ' data-tooltip="' . htmlspecialchars($repo->ssh_url()) . '"';
             $value .= ' type="button" onclick="false">Copy URL to clipboard</button>';
             Ht::stash_script('$(".repoclip").each(pa_init_repoclip)', "repoclip");
-            if ($include_tarball && $info->commit_hash()
+            if ($full
+                && $info->commit_hash()
                 && ($tarball_url = $info->tarball_url()))
                 $value .= ' <a class="bsm q" href="' . htmlspecialchars($tarball_url) . '">Download tarball for ' . substr($info->commit_hash(), 0, 7) . '</a>';
         }
