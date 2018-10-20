@@ -215,6 +215,8 @@ class DiffInfo implements Iterator {
     function restrict_linea($linea_lx, $linea_rx) {
         $l = $this->linea_lower_bound($linea_lx);
         $r = $this->linea_lower_bound($linea_rx);
+        while ($l < $r && $this->_diff[$l] === "+")
+            $l += 4;
         while ($r < $this->_diffsz
                && ($this->_diff[$r] === "+"
                    || ($this->_diff[$r] === "-" && $this->_diff[$r + 1] <= $linea_rx))) {
