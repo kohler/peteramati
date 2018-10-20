@@ -1107,9 +1107,10 @@ class PsetView {
 
     private function echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
                                     $wentries, $gentries, $tw) {
-        if ($l[0] === "@")
-            $x = [" pa-gx", "pa-dcx", "", "", $l[3]];
-        else if ($l[0] === " ")
+        if ($l[0] === "@") {
+            $cx = strlen($l[3]) > 76 ? substr($l[3], 0, 76) . "..." : $l[3];
+            $x = [" pa-gx", "pa-dcx", "", "", $cx];
+        } else if ($l[0] === " ")
             $x = [" pa-gc", "pa-dd", $l[1], $l[2], $l[3]];
         else if ($l[0] === "-")
             $x = [" pa-gd", "pa-dd", $l[1], "", $l[3]];
