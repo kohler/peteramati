@@ -110,6 +110,9 @@ span.nb {
 .childfold {
 	cursor: pointer;
 }
+.n {
+	font-weight: normal;
+}
 
 
 /* generic vertical styles */

@@ -1038,16 +1038,30 @@ class Conf {
         global $Now;
         if ($this->_session_list === false) {
             $this->_session_list = null;
-            if (isset($_COOKIE["hotlist-info"])) {
-                $x = $_COOKIE["hotlist-info"];
-                setcookie("hotlist-info", "", $Now - 86400, Navigation::site_path());
-                for ($i = 1; isset($_COOKIE["hotlist-info_$i"]); ++$i) {
-                    $x .= $_COOKIE["hotlist-info_$i"];
-                    setcookie("hotlist-info_$i", "", $Now - 86400, Navigation::site_path());
+
+            $found = null;
+            foreach ($_COOKIE as $k => $v) {
+                if (($k === "hotlist-info" && $found === null)
+                    || (str_starts_with($k, "hotlist-info-")
+                        && strpos($k, "_") === false
+                        && ($found === null || strnatcmp($k, $found) > 0)))
+                    $found = $k;
+            }
+
+            $found_text = null;
+            if ($found) {
+                $found_text = $_COOKIE[$found];
+                setcookie($found, "", $Now - 86400, Navigation::site_path());
+                for ($i = 1; isset($_COOKIE["{$found}_{$i}"]); ++$i) {
+                    $found_text .= $_COOKIE["{$found}_{$i}"];
+                    setcookie("{$found}_{$i}", "", $Now - 86400, Navigation::site_path());
                 }
-                $j = json_decode($x);
+            }
+
+            if ($found_text) {
+                $j = json_decode($found_text);
                 if ($j === null)
-                    $j = json_decode(str_replace("'", ",", $x));
+                    $j = json_decode(str_replace("'", ",", $found_text));
                 if (is_object($j) && isset($j->ids))
                     $this->_session_list = $j;
             }
@@ -1057,15 +1071,18 @@ class Conf {
 
     function session_list() {
         if (($j = $this->encoded_session_list())) {
-            if (isset($j->ids) && is_string($j->ids)
+            if (isset($j->ids)
+                && is_string($j->ids)
                 && preg_match('/\A[\s\d\']*\z/', $j->ids))
                 $j->ids = array_map(function ($x) { return (int) $x; },
                                     preg_split('/[\s\']+/', $j->ids));
-            if (isset($j->psetids) && is_string($j->psetids)
+            if (isset($j->psetids)
+                && is_string($j->psetids)
                 && preg_match('/\A[\s\d\']*\z/', $j->psetids))
                 $j->psetids = array_map(function ($x) { return (int) $x; },
                                         preg_split('/[\s\']+/', $j->psetids));
-            if (isset($j->hashes) && is_string($j->hashes)
+            if (isset($j->hashes)
+                && is_string($j->hashes)
                 && preg_match('/\A[\sA-Fa-fx\d\']*\z/', $j->hashes))
                 $j->hashes = preg_split('/[\s\']+/', $j->hashes);
         }

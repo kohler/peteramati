@@ -1877,11 +1877,13 @@ function popup(anchor, which, dofold, populate) {
 
 // list management, conflict management
 (function ($) {
+var cookie_set_at;
 function set_cookie(info) {
-    var p = ";max-age=2", m;
-    if (siteurl && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
-        p += ";path=" + m[1];
     if (info) {
+        cookie_set_at = (new Date).getTime();
+        var p = ";max-age=20", m;
+        if (siteurl && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
+            p += "; path=" + m[1];
         if (typeof info === "object")
             info = JSON.stringify(info);
         if (info.indexOf("'") < 0)
@@ -1894,27 +1896,31 @@ function set_cookie(info) {
                 --epos;
             else if (info.charAt(epos - 2) === "%")
                 epos -= 2;
-            document.cookie = "hotlist-info" + (suffix ? "_" + suffix : "") + "=" + info.substring(pos, epos) + p;
+            document.cookie = "hotlist-info-" + cookie_set_at + (suffix ? "_" + suffix : "") + "=" + info.substring(pos, epos) + p;
             pos = epos;
             ++suffix;
         }
-        document.cookie = "hotlist-info" + (suffix ? "_" + suffix : "") + "=" + info.substring(pos) + p;
+        document.cookie = "hotlist-info-" + cookie_set_at + (suffix ? "_" + suffix : "") + "=" + info.substring(pos) + p;
     }
-    set_cookie = function () {};
 }
 function is_listable(href) {
     return /(?:^|\/)pset(?:|\.php)(?:$|\/)/.test(href.substring(siteurl.length));
 }
 function add_list() {
-    var $self = $(this), $hl, ls,
-        href = this.getAttribute(this.tagName === "FORM" ? "action" : "href");
-    if (href && href.substring(0, siteurl.length) === siteurl
-        && is_listable(href)
-        && ($hl = $self.closest(".has-hotlist")).length)
-        set_cookie($hl.attr("data-hotlist"));
+    var href = this.getAttribute(this.tagName === "FORM" ? "action" : "href");
+    if (href
+        && href.substring(0, siteurl.length) === siteurl
+        && (this.tagName === "FORM" || is_listable(href))) {
+        var $hl = $(this).closest(".has-hotlist");
+        if ($hl.length === 0 && this.tagName === "FORM")
+            $hl = $(this).find(".has-hotlist");
+        if ($hl.length === 1)
+            set_cookie($hl[0].getAttribute("data-hotlist"));
+    }
 }
 function unload_list() {
-    hotcrp_list && set_cookie(hotcrp_list);
+    if (hotcrp_list && (!cookie_set_at || cookie_set_at + 10 < (new Date).getTime()))
+        set_cookie(hotcrp_list);
 }
 function row_click(e) {
     var j = $(e.target);
@@ -4064,11 +4070,11 @@ function pa_render_pset_table(psetid, pconf, data) {
         wstorage(true, "pa-pset" + psetid + "-table", JSON.stringify(sort));
     }
     function rerender_usernames() {
-        $j.find("tbody td.pap-username").each(function () {
+        $j.find("td.pap-username").each(function () {
             var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
             $(this).html(render_username_td(s));
         });
-        $j.find("thead > tr > th.pap-username > span.heading").html(anonymous || !sort.email ? "Username" : "Email");
+        $j.find("th.pap-username > span.heading").html(anonymous || !sort.email ? "Username" : "Email");
     }
     function switch_anon() {
         anonymous = !anonymous;
@@ -4082,6 +4088,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         });
         sort_data();
         resort();
+        $j.closest("form").find("input[name=anonymous]").val(anonymous ? 1 : 0);
         return false;
     }
     function render_head() {
@@ -4095,9 +4102,9 @@ function pa_render_pset_table(psetid, pconf, data) {
         }
         t = '<span class="heading">' + (anonymous || !sort.email ? "Username" : "Email") + '</span>';
         if (pconf.anonymous && pconf.can_override_anonymous)
-            t += ' <a href="#" class="uu" style="font-weight:normal">[anon]</a>';
+            t += ' <a href="" class="uu n">[anon]</a>';
         else if (pconf.anonymous)
-            t += ' <span style="font-weight:normal">[anon]</span>';
+            t += ' <span class="n">[anon]</span>';
         a.push('<th class="pap-username l plsortable" data-pa-sort="username">' + t + '</th>');
         a.push('<th class="pap-name l' + (pconf.has_nonanonymous ? "" : " pap-nonanonymous") + ' plsortable" data-pa-sort="name">Name</th>');
         a.push('<th class="pap-extension l plsortable" data-pa-sort="extension">X?</th>');

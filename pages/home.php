@@ -264,12 +264,27 @@ if ($Me->isPC && check_post() && $Qreq->report)
 
 
 function qreq_usernames(Qrequest $qreq) {
+    global $Conf;
     $users = [];
     foreach ($qreq as $k => $v) {
         if (substr($k, 0, 4) === "s61_"
             && $v
             && ($uname = urldecode(substr($k, 4))))
             $users[] = $uname;
+    }
+    if (empty($users) && ($sl = $Conf->session_list())) {
+        $by_id = [];
+        $result = $Conf->qe("select contactId, email, github_username, anon_username from ContactInfo where contactId?a", $sl->ids);
+        while (($row = $result->fetch_row()))
+            $by_id[$row[0]] = $row;
+        Dbl::free($result);
+
+        $anonymous = !!$qreq->anonymous;
+        foreach ($sl->ids as $id)
+            if (isset($by_id[$id])) {
+                $u = $by_id[$id];
+                $users[] = $anonymous ? $u[3] : ($u[2] ? : $u[1]);
+            }
     }
     return $users;
 }
@@ -446,9 +461,9 @@ function forward_pset_links($conf, $pset, $from_pset) {
               $pset->id, $from_pset->id, $links);
 }
 
-function reconfig() {
+function reconfig($qreq) {
     global $Conf, $Me, $PsetOverrides, $PsetInfo;
-    if (!($pset = $Conf->pset_by_key(req("pset")))
+    if (!($pset = $Conf->pset_by_key($qreq->pset))
         || $pset->ui_disabled)
         return $Conf->errorMsg("No such pset");
     $psetkey = $pset->psetkey;
@@ -495,7 +510,7 @@ function reconfig() {
 }
 
 if ($Me->privChair && check_post() && get($_GET, "reconfig"))
-    reconfig();
+    reconfig($Qreq);
 
 
 // check global system settings
@@ -824,7 +839,7 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
 }
 
 function show_regrades($result, $all) {
-    global $Conf, $Me, $Now;
+    global $Conf, $Me, $Qreq, $Now;
     $rows = $uids = [];
     while (($row = edb_orow($result))) {
         $row->notes = json_decode($row->notes);
@@ -853,8 +868,8 @@ function show_regrades($result, $all) {
     echo "<h3>flagged commits</h3>";
     $nintotal = 0;
     $anonymous = null;
-    if (req("anonymous") !== null && $Me->privChair)
-        $anonymous = !!req("anonymous");
+    if ($Qreq->anonymous !== null && $Me->privChair)
+        $anonymous = !!$Qreq->anonymous;
     $any_anonymous = $any_nonanonymous = false;
     $jx = [];
     foreach ($rows as $row) {
@@ -998,7 +1013,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
 }
 
 function show_pset_table($sset) {
-    global $Now, $Profile;
+    global $Now, $Profile, $Qreq;
 
     $pset = $sset->pset;
     echo '<div id="', $pset->urlkey, '">';
@@ -1029,8 +1044,8 @@ function show_pset_table($sset) {
 
     // load students
     $anonymous = $pset->anonymous;
-    if (req("anonymous") !== null && $sset->viewer->privChair)
-        $anonymous = !!req("anonymous");
+    if ($Qreq->anonymous !== null && $sset->viewer->privChair)
+        $anonymous = !!$Qreq->anonymous;
 
     $checkbox = $sset->viewer->privChair
         || (!$pset->gitless && $pset->runners)
@@ -1070,8 +1085,11 @@ function show_pset_table($sset) {
             '<script>$("#incomplete_pset', $pset->id, '").remove().show().appendTo("#incomplete_notices")</script>';
     }
 
-    if ($checkbox)
+    if ($checkbox) {
         echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
+        if ($pset->anonymous)
+            echo Ht::hidden("anonymous", $anonymous ? 1 : 0);
+    }
 
     echo '<table class="pap" id="pa-pset' . $pset->id . '"></table>';
     $grades = $pset->numeric_grades();
@@ -1207,8 +1225,8 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     }
     $Conf->stash_hotcrp_pc($Me);
 
-    $allflags = !!req("allflags");
-    $field = req("allflags") ? "hasflags" : "hasactiveflags";
+    $allflags = !!$Qreq->allflags;
+    $field = $allflags ? "hasflags" : "hasactiveflags";
     $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradebhash,
         (select group_concat(cid) from ContactLink where pset=cn.pset and type=" . LINK_REPO . " and link=cn.repoid) repocids
         from CommitNotes cn
@@ -1216,7 +1234,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
         where $field=1");
     if (edb_nrows($result)) {
         echo $sep;
-        show_regrades($result, !!req("allflags"));
+        show_regrades($result, $allflags);
         if ($Profile)
             echo "<div>Δt ", sprintf("%.06f", microtime(true) - $t0), "</div>";
         $sep = "<hr />\n";
