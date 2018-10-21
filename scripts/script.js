@@ -1,5 +1,5 @@
 // script.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2016 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2018 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 var siteurl, siteurl_postvalue, siteurl_suffix, siteurl_defaults,
@@ -25,16 +25,24 @@ function serialize_object(x) {
         return "";
 }
 
-var hasClass, addClass, removeClass, classList;
-if ("classList" in document.createElement("span")) {
+if (!window.JSON || !window.JSON.parse)
+    window.JSON = {parse: $.parseJSON};
+
+var hasClass, addClass, removeClass, toggleClass, classList;
+if ("classList" in document.createElement("span")
+    && !/MSIE|rv:11\.0/.test(navigator.userAgent || "")) {
     hasClass = function (e, k) {
-        return e.classList.contains(k);
+        var l = e.classList;
+        return l && l.contains(k);
     };
     addClass = function (e, k) {
         e.classList.add(k);
     };
     removeClass = function (e, k) {
         e.classList.remove(k);
+    };
+    toggleClass = function (e, k, v) {
+        e.classList.toggle(k, v);
     };
     classList = function (e) {
         return e.classList;
@@ -48,6 +56,9 @@ if ("classList" in document.createElement("span")) {
     };
     removeClass = function (e, k) {
         $(e).removeClass(k);
+    };
+    toggleClass = function (e, k, v) {
+        $(e).toggleClass(k, v);
     };
     classList = function (e) {
         var k = $.trim(e.className);
@@ -146,9 +157,10 @@ function log_jserror(errormsg, error, noconsole) {
         errormsg.colno = error.columnNumber;
     if (error && error.stack)
         errormsg.stack = error.stack;
-    $.ajax(hoturl("api", "fn=jserror"), {
-        global: false, method: "POST", cache: false, data: errormsg
-    });
+    if (errormsg.lineno == null || errormsg.lineno > 1)
+        $.ajax(hoturl_post("api/jserror"), {
+            global: false, method: "POST", cache: false, data: errormsg
+        });
     if (error && !noconsole && typeof console === "object" && console.error)
         console.error(errormsg.error);
 }
@@ -167,11 +179,11 @@ function log_jserror(errormsg, error, noconsole) {
 })();
 
 function jqxhr_error_message(jqxhr, status, errormsg) {
-    if (status == "parsererror")
+    if (status === "parsererror")
         return "Internal error: bad response from server.";
     else if (errormsg)
         return errormsg.toString();
-    else if (status == "timeout")
+    else if (status === "timeout")
         return "Connection timed out.";
     else if (status)
         return "Failed [" + status + "].";
@@ -180,8 +192,26 @@ function jqxhr_error_message(jqxhr, status, errormsg) {
 }
 
 $(document).ajaxError(function (event, jqxhr, settings, httperror) {
-    if (jqxhr.readyState == 4)
-        log_jserror(settings.url + " API failure: status " + jqxhr.status + ", " + httperror);
+    if (jqxhr.readyState != 4)
+        return;
+    var data;
+    if (jqxhr.responseText && jqxhr.responseText.charAt(0) === "{") {
+        try {
+            data = JSON.parse(jqxhr.responseText);
+        } catch (e) {
+        }
+    }
+    if (!data || !data.user_error) {
+        var msg = url_absolute(settings.url) + " API failure: ";
+        if (hotcrp_user && hotcrp_user.email)
+            msg += "user " + hotcrp_user.email + ", ";
+        msg += jqxhr.status;
+        if (httperror)
+            msg += ", " + httperror;
+        if (jqxhr.responseText)
+            msg += ", " + jqxhr.responseText.substr(0, 100);
+        log_jserror(msg);
+    }
 });
 
 $.ajaxPrefilter(function (options, originalOptions, jqxhr) {
@@ -260,7 +290,8 @@ function geometry_translate(g, dx, dy) {
 
 // text transformation
 window.escape_entities = (function () {
-    var re = /[&<>\"]/g, rep = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;"};
+    var re = /[&<>\"']/g;
+    var rep = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "\'": "&#39;"};
     return function (s) {
         if (s === null || typeof s === "number")
             return s;
@@ -276,6 +307,22 @@ window.unescape_entities = (function () {
         return s.replace(re, function (match) { return rep[match]; });
     };
 })();
+
+window.urlencode = (function () {
+    var re = /%20|[!~*'()]/g;
+    var rep = {"%20": "+", "!": "%21", "~": "%7E", "*": "%2A", "'": "%27", "(": "%28", ")": "%29"};
+    return function (s) {
+        if (s === null || typeof s === "number")
+            return s;
+        return encodeURIComponent(s).replace(re, function (match) { return rep[match]; });
+    };
+})();
+
+window.urldecode = function (s) {
+    if (s === null || typeof s === "number")
+        return s;
+    return decodeURIComponent(s.replace(/\+/g, "%20"));
+};
 
 function text_to_html(text) {
     var n = document.createElement("div");
@@ -348,7 +395,7 @@ function commajoin(a, joinword) {
 }
 
 function sprintf(fmt) {
-    var words = fmt.split(/(%(?:%|-?(?:\d*|\*?)(?:[.]\d*)?[sdefgoxX]))/), wordno, word,
+    var words = fmt.split(/(%(?:%|-?(?:\d*|\*?)(?:\.\d*)?[sdefgoxX]))/), wordno, word,
         arg, argno, conv, pad, t = "";
     for (wordno = 0, argno = 1; wordno != words.length; ++wordno) {
         word = words[wordno];
@@ -402,6 +449,20 @@ window.strftime = (function () {
         str += num.toString();
         return str.length <= n ? str : str.substr(str.length - n);
     }
+    function unparse_q(d, alt, is24) {
+        if (is24 && alt && d.getSeconds())
+            return strftime("%H:%M:%S", d);
+        else if (is24)
+            return strftime("%H:%M", d);
+        else if (alt && d.getSeconds())
+            return strftime("%#l:%M:%S%P", d);
+        else if (alt && d.getMinutes())
+            return strftime("%#l:%M%P", d);
+        else if (alt)
+            return strftime("%#l%P", d);
+        else
+            return strftime("%I:%M:%S %p", d);
+    }
     var unparsers = {
         a: function (d) { return (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])[d.getDay()]; },
         A: function (d) { return (["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])[d.getDay()]; },
@@ -420,24 +481,12 @@ window.strftime = (function () {
         I: function (d) { return pad(d.getHours() % 12 || 12, "0", 2); },
         l: function (d, alt) { return pad(d.getHours() % 12 || 12, alt ? "" : " ", 2); },
         M: function (d) { return pad(d.getMinutes(), "0", 2); },
+        X: function (d) { return strftime("%#e %b %Y %#q", d); },
         p: function (d) { return d.getHours() < 12 ? "AM" : "PM"; },
         P: function (d) { return d.getHours() < 12 ? "am" : "pm"; },
-        r: function (d, alt) {
-            if (alt && d.getSeconds())
-                return strftime("%#l:%M:%S%P", d);
-            else if (alt && d.getMinutes())
-                return strftime("%#l:%M%P", d);
-            else if (alt)
-                return strftime("%#l%P", d);
-            else
-                return strftime("%I:%M:%S %p", d);
-        },
-        R: function (d, alt) {
-            if (alt && d.getSeconds())
-                return strftime("%H:%M:%S", d);
-            else
-                return strftime("%H:%M", d);
-        },
+        q: function (d, alt) { return unparse_q(d, alt, strftime.is24); },
+        r: function (d, alt) { return unparse_q(d, alt, false); },
+        R: function (d, alt) { return unparse_q(d, alt, true); },
         S: function (d) { return pad(d.getSeconds(), "0", 2); },
         T: function (d) { return strftime("%H:%M:%S", d); },
         /* XXX z Z */
@@ -448,7 +497,7 @@ window.strftime = (function () {
         t: function (d) { return "\t"; },
         "%": function (d) { return "%"; }
     };
-    return function(fmt, d) {
+    function strftime(fmt, d) {
         var words = fmt.split(/(%#?\S)/), wordno, word, alt, f, t = "";
         if (d == null)
             d = new Date;
@@ -465,24 +514,11 @@ window.strftime = (function () {
         }
         return t;
     };
+    return strftime;
 })();
 
 
 // events
-function event_stop(evt) {
-    if (evt.stopPropagation)
-        evt.stopPropagation();
-    else
-        evt.cancelBubble = true;
-}
-
-function event_prevent(evt) {
-    if (evt.preventDefault)
-        evt.preventDefault();
-    else
-        evt.returnValue = false;
-}
-
 var event_key = (function () {
 var key_map = {"Spacebar": " ", "Esc": "Escape"},
     charCode_map = {"9": "Tab", "13": "Enter", "27": "Escape"},
@@ -1301,137 +1337,6 @@ try {
 
 
 // initialization
-function event_stop(evt) {
-    if (evt.stopPropagation)
-        evt.stopPropagation();
-    else
-        evt.cancelBubble = true;
-}
-
-function event_prevent(evt) {
-    if (evt.preventDefault)
-        evt.preventDefault();
-    else
-        evt.returnValue = false;
-}
-
-function sprintf(fmt) {
-    var words = fmt.split(/(%(?:%|-?\d*(?:[.]\d*)?[sdefgoxX]))/), wordno, word,
-        arg, argno, conv, pad, t = "";
-    for (wordno = 0, argno = 1; wordno != words.length; ++wordno) {
-        word = words[wordno];
-        if (word.charAt(0) != "%")
-            t += word;
-        else if (word.charAt(1) == "%")
-            t += "%";
-        else {
-            arg = arguments[argno];
-            ++argno;
-            conv = word.match(/^%(-?)(\d*)(?:|[.](\d*))(\w)/);
-            if (conv[4] >= "e" && conv[4] <= "g" && conv[3] == null)
-                conv[3] = 6;
-            if (conv[4] == "g") {
-                arg = Number(arg).toPrecision(conv[3]).toString();
-                arg = arg.replace(/[.](\d*[1-9])?0+(|e.*)$/,
-                                  function (match, p1, p2) {
-                                      return (p1 == null ? "" : "." + p1) + p2;
-                                  });
-            } else if (conv[4] == "f")
-                arg = Number(arg).toFixed(conv[3]);
-            else if (conv[4] == "e")
-                arg = Number(arg).toExponential(conv[3]);
-            else if (conv[4] == "d")
-                arg = Math.floor(arg);
-            else if (conv[4] == "o")
-                arg = Math.floor(arg).toString(8);
-            else if (conv[4] == "x")
-                arg = Math.floor(arg).toString(16);
-            else if (conv[4] == "X")
-                arg = Math.floor(arg).toString(16).toUpperCase();
-            arg = arg.toString();
-            if (conv[2] !== "" && conv[2] !== "0") {
-                pad = conv[2].charAt(0) === "0" ? "0" : " ";
-                while (arg.length < parseInt(conv[2], 10))
-                    arg = conv[1] ? arg + pad : pad + arg;
-            }
-            t += arg;
-        }
-    }
-    return t;
-}
-
-var strftime = (function () {
-    function pad(num, str, n) {
-        str += num.toString();
-        return str.length <= n ? str : str.substr(str.length - n);
-    }
-    var unparsers = {
-        a: function (d) { return (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])[d.getDay()]; },
-        A: function (d) { return (["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])[d.getDay()]; },
-        d: function (d) { return pad(d.getDate(), "0", 2); },
-        e: function (d, alt) { return pad(d.getDate(), alt ? "" : " ", 2); },
-        u: function (d) { return d.getDay() || 7; },
-        w: function (d) { return d.getDay(); },
-        b: function (d) { return (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])[d.getMonth()]; },
-        B: function (d) { return (["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])[d.getMonth()]; },
-        h: function (d) { return unparsers.b(d); },
-        m: function (d) { return pad(d.getMonth() + 1, "0", 2); },
-        y: function (d) { return d.getFullYear() % 100; },
-        Y: function (d) { return d.getFullYear(); },
-        H: function (d) { return pad(d.getHours(), "0", 2); },
-        k: function (d, alt) { return pad(d.getHours(), alt ? "" : " ", 2); },
-        I: function (d) { return pad(d.getHours() % 12 || 12, "0", 2); },
-        l: function (d, alt) { return pad(d.getHours() % 12 || 12, alt ? "" : " ", 2); },
-        M: function (d) { return pad(d.getMinutes(), "0", 2); },
-        p: function (d) { return d.getHours() < 12 ? "AM" : "PM"; },
-        P: function (d) { return d.getHours() < 12 ? "am" : "pm"; },
-        r: function (d, alt) {
-            if (alt && d.getSeconds())
-                return strftime("%#l:%M:%S%P", d);
-            else if (alt && d.getMinutes())
-                return strftime("%#l:%M%P", d);
-            else if (alt)
-                return strftime("%#l%P", d);
-            else
-                return strftime("%I:%M:%S %p", d);
-        },
-        R: function (d, alt) {
-            if (alt && d.getSeconds())
-                return strftime("%H:%M:%S", d);
-            else
-                return strftime("%H:%M", d);
-        },
-        S: function (d) { return pad(d.getSeconds(), "0", 2); },
-        T: function (d) { return strftime("%H:%M:%S", d); },
-        /* XXX z Z */
-        D: function (d) { return strftime("%m/%d/%y", d); },
-        F: function (d) { return strftime("%Y-%m-%d", d); },
-        s: function (d) { return Math.trunc(d.getTime() / 1000); },
-        n: function (d) { return "\n"; },
-        t: function (d) { return "\t"; },
-        "%": function (d) { return "%"; }
-    };
-    return function(fmt, d) {
-        var words = fmt.split(/(%#?\S)/), wordno, word, alt, f, t = "";
-        if (d == null)
-            d = new Date;
-        else if (typeof d == "number")
-            d = new Date(d * 1000);
-        for (wordno = 0; wordno != words.length; ++wordno) {
-            word = words[wordno];
-            alt = word.charAt(1) == "#";
-            if (word.charAt(0) == "%"
-                && (f = unparsers[word.charAt(1 + alt)]))
-                t += f(d, alt);
-            else
-                t += word;
-        }
-        return t;
-    };
-})();
-
-
-// initialization
 window.setLocalTime = (function () {
 var servhr24, showdifference = false;
 function setLocalTime(elt, servtime) {
@@ -1552,8 +1457,7 @@ function foldup(e, event, opts) {
         return false;
     if (opts.s)
         jQuery.get(hoturl("sessionvar", "j=1&var=" + opts.s + "&val=" + (dofold ? 1 : 0)));
-    if (event)
-        event_stop(event);
+    event && event.stopPropagation();
     m = fold(e, dofold, foldnum);
     if ((attr = e.getAttribute(dofold ? "onfold" : "onunfold")))
         (new Function("foldnum", attr)).call(e, opts);
