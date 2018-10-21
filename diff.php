@@ -103,7 +103,7 @@ if (count($notelinks))
 // diff and line notes
 foreach ($diff as $file => $dinfo) {
     $open = $lnorder->file_has_notes($file) || !$dinfo->boring || (!$hasha_mine && !$hashb_mine);
-    $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
+    $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
 }
 
 Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",pa_beforeunload)');

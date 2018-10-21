@@ -1910,10 +1910,13 @@ function pa_diff_locate(target, direction) {
     var aline = +tr.firstChild.getAttribute("data-landmark");
     var bline = +tr.firstChild.nextSibling.getAttribute("data-landmark");
     var result = {
-        file: file, aline: aline, bline: bline,
+        ufile: file, file: file, aline: aline, bline: bline,
         lineid: bline ? "b" + bline : "a" + aline,
         tr: tr
     };
+    var user = table.getAttribute("data-pa-file-user");
+    if (user)
+        result.ufile = user + "-" + result.file;
 
     var next_tr = tr.nextSibling;
     while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gg")))
@@ -2049,7 +2052,7 @@ function fix_notelinks($tr) {
     function note_anchor(tr) {
         var anal = pa_diff_locate(tr), $td = null;
         if (anal)
-            $td = pa_ensureline(anal.file, anal.lineid);
+            $td = pa_ensureline(anal.ufile, anal.lineid);
         if ($td && $td.length)
             return "#" + $td[0].id;
         else
@@ -2111,7 +2114,7 @@ function traverse(tr, down) {
 
 function anal_tr() {
     if (curanal) {
-        var $e = pa_ensureline(curanal.file, curanal.lineid);
+        var $e = pa_ensureline(curanal.ufile, curanal.lineid);
         return $e.closest("tr")[0];
     } else
         return null;

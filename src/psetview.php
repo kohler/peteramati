@@ -1028,12 +1028,20 @@ class PsetView {
         return htmlspecialchars($t);
     }
 
-    function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $open, $args = []) {
+    function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $args) {
         if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
             || ($dinfo->is_empty() && $dinfo->loaded))
             return;
 
+        $open = !!get($args, "open");
+        $tw = get($args, "tabwidth", $this->tabwidth());
+        $only_table = get($args, "only_table");
+        $no_heading = get($args, "no_heading") || $only_table;
+        $id_by_user = !!get($args, "id_by_user");
+
         $fileid = html_id_encode($file);
+        if ($id_by_user)
+            $fileid = html_id_encode($this->user->username) . "-" . $fileid;
         $tabid = "pa-file-" . $fileid;
         $linenotes = $lnorder->file($file);
         if ($this->can_view_note_authors())
@@ -1057,10 +1065,6 @@ class PsetView {
             }
         }
 
-        $tw = get($args, "tabwidth", $this->tabwidth());
-        $only_table = get($args, "only_table");
-        $no_heading = get($args, "no_heading") || $only_table;
-
         if (!$no_heading) {
             echo '<h3><a class="qq ui pa-unfold-file-diff" href=""><span class="foldarrow">',
                 ($open ? "&#x25BC;" : "&#x25B6;"),
@@ -1083,6 +1087,8 @@ class PsetView {
             echo " hidden";
         if (!$dinfo->loaded)
             echo " need-load";
+        if ($id_by_user)
+            echo '" data-pa-file-user="', htmlspecialchars($this->user->username);
         echo '" data-pa-file="', htmlspecialchars($file), "\"";
         if ($this->conf->default_format)
             echo ' data-default-format="', $this->conf->default_format, '"';

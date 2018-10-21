@@ -789,7 +789,7 @@ if ($Pset->gitless) {
                     || !$Info->can_view_grades()
                     || !$Info->is_grading_commit()
                     || !$lnorder->has_linenotes_in_diff));
-        $Info->echo_file_diff($file, $dinfo, $lnorder, $open);
+        $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
     }
 
     Ht::stash_script('$(window).on("beforeunload",pa_beforeunload)');

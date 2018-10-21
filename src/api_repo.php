@@ -62,7 +62,7 @@ class API_Repo {
             return ["ok" => false, "error" => "No diff."];
         ob_start();
         foreach ($diff as $file => $dinfo) {
-            $info->echo_file_diff($file, $dinfo, $lnorder, true, ["only_table" => true]);
+            $info->echo_file_diff($file, $dinfo, $lnorder, ["open" => true, "only_table" => true]);
         }
         $content = ob_get_contents();
         ob_end_clean();

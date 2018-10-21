@@ -75,8 +75,9 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
             $diff[$onlyfiles[0]] = $diff[$onlyfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
 
         foreach ($diff as $file => $dinfo) {
-            $info->echo_file_diff($file, $dinfo, $lnorder, true,
-                ["no_heading" => count($qreq->files) == 1]);
+            $info->echo_file_diff($file, $dinfo, $lnorder,
+                ["open" => true, "id_by_user" => true,
+                 "no_heading" => count($qreq->files) == 1]);
         }
 
         $want_grades = $pset->has_grade_landmark;
