@@ -727,7 +727,7 @@ class Contact {
             return false;
     }
 
-    function set_link($type, $pset, $link, $data = null) {
+    function set_link($type, $pset, $link) {
         if ($this->links === null)
             $this->load_links();
         $this->clear_links($type, $pset, false);
@@ -769,25 +769,13 @@ class Contact {
         return $this->repos[$pset];
     }
 
-    private static function update_repo_lastpset($pset, $repo) {
-        global $Conf;
-        $Conf->qe("update Repository set lastpset=(select coalesce(max(pset),0) from ContactLink l where l.type=" . LINK_REPO . " and l.link=?) where repoid=?", $repo->repoid, $repo->repoid);
-    }
-
     function set_repo($pset, $repo) {
         $pset = is_object($pset) ? $pset->psetid : $pset;
-        $old_repo = $this->repo($pset);
-
         if ($repo)
             $this->set_link(LINK_REPO, $pset, $repo->repoid);
         else
             $this->clear_links(LINK_REPO, $pset);
         $this->repos[$pset] = $repo;
-
-        if ($old_repo && (!$repo || $repo->repoid != $old_repo->repoid))
-            self::update_repo_lastpset($pset, $old_repo);
-        if ($repo && (!$old_repo || $repo->repoid != $old_repo->repoid))
-            self::update_repo_lastpset($pset, $repo);
         return true;
     }
 
@@ -1362,11 +1350,6 @@ class Contact {
         return $allowed;
     }
 
-    static function update_all_repo_lastpset() {
-        global $Conf;
-        $Conf->qe("update Repository join (select link, max(pset) as pset from ContactLink where type=" . LINK_REPO . " group by link) l on (l.link=repoid) set lastpset=l.pset");
-    }
-
     static function forward_pset_links($pset) {
         global $Conf, $Me;
         $pset = is_object($pset) ? $pset->psetid : $pset;
@@ -1380,7 +1363,6 @@ class Contact {
                     where l.pset=? and l2.cid is null
                     group by l.cid, l.type, l.link",
                     $pset, $pset, $forwarded);
-            self::update_all_repo_lastpset();
             $Conf->log("forward pset links from $forwarded to $pset", $Me);
         }
         $Conf->qe("insert into Settings (name,value) values ('pset_forwarded',$pset) on duplicate key update value=greatest(value,values(value))");

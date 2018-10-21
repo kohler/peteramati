@@ -32,7 +32,6 @@ class Repository {
     public $snaphash;
     public $snapat;
     public $snapcheckat;
-    public $lastpset;
     public $working;
     public $snapcommitat;
     public $snapcommitline;
@@ -64,7 +63,6 @@ class Repository {
         if ($this->snapat !== null)
             $this->snapat = (int) $this->snapat;
         $this->snapcheckat = (int) $this->snapcheckat;
-        $this->lastpset = (int) $this->lastpset;
         $this->working = (int) $this->working;
         $this->snapcommitat = (int) $this->snapcommitat;
         $this->analyzedsnapat = (int) $this->analyzedsnapat;

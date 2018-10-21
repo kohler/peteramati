@@ -54,13 +54,6 @@ if (!$Me->isPC || !$User)
     $User = $Me;
 
 // check problem set openness
-$max_pset = $Conf->setting("pset_forwarded");
-foreach ($Conf->psets() as $pset)
-    if ($pset->student_can_view()
-        && $pset->id > $max_pset
-        && !$pset->gitless)
-        Contact::forward_pset_links($pset->id);
-
 if (!$Me->is_empty()
     && ($Me === $User || $Me->isPC)
     && $Qreq->set_username
@@ -91,7 +84,7 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
     global $Conf, $Me, $Qreq;
     $result = $Conf->qe_raw("select c.contactId, c.firstName, c.lastName, c.email,
 	c.huid, c.anon_username, c.seascode_username, c.github_username, c.extension,
-	r.repoid, r.url, r.open, r.working, r.lastpset, min(pl.link) as partnercid,
+	r.repoid, r.url, r.open, r.working, min(pl.link) as partnercid,
 	rg.gradebhash, rg.gradercid
 	from ContactInfo c
 	left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$pset->id)
@@ -351,6 +344,19 @@ if ($Me->isPC && check_post() && $Qreq->runmany)
     runmany($Qreq);
 
 
+function older_enabled_repo_same_handout($pset) {
+    $result = false;
+    foreach ($pset->conf->psets() as $p) {
+        if ($p->id == $pset->id)
+            break;
+        else if (!$p->disabled
+                 && !$p->gitless
+                 && $p->handout_repo_url === $pset->handout_repo_url)
+            $result = $p;
+    }
+    return $result;
+}
+
 function doaction(Qrequest $qreq) {
     global $Conf, $Me;
     if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled) {
@@ -366,17 +372,18 @@ function doaction(Qrequest $qreq) {
     } else if ($qreq->action === "clearrepo") {
         foreach (qreq_users($qreq) as $user) {
             $user->set_repo($pset, null);
+            $user->clear_links(LINK_BRANCH, $pset->id);
         }
     } else if ($qreq->action === "copyrepo") {
-        $older_pset = null;
-        foreach ($Conf->psets() as $p) {
-            if (!$p->disabled && $p !== $pset && $p->deadline < $pset->deadline && !$p->gitless && $p->handout_repo_url === $pset->handout_repo_url) {
-                $older_pset = $p;
+        if (($old_pset = older_enabled_repo_same_handout($pset))) {
+            foreach (qreq_users($qreq) as $user) {
+                if (!$user->repo($pset)
+                    && ($r = $user->repo($old_pset))) {
+                    $user->set_repo($pset, $r);
+                    if (($b = $user->branchid($old_pset)))
+                        $user->set_link(LINK_BRANCH, $pset->id, $b);
+                }
             }
-        }
-        foreach (qreq_users($qreq) as $user) {
-            if (!$user->repo($pset) && ($r = $user->repo($older_pset)))
-                $user->set_repo($pset, $r);
         }
     } else if (str_starts_with($qreq->action, "grademany_")) {
         $g = $pset->all_grades[substr($qreq->action, 10)];
@@ -430,9 +437,19 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
     redirectSelf(array("anchor" => $psetkey));
 }
 
+function forward_pset_links($conf, $pset, $from_pset) {
+    $links = [LINK_REPO, LINK_REPOVIEW, LINK_BRANCH];
+    if ($pset->partner && $from_pset->partner)
+        array_push($links, LINK_PARTNER, LINK_BACKPARTNER);
+    $conf->qe("insert into ContactLink (cid, type, pset, link)
+        select l.cid, l.type, ?, l.link from ContactLink l where l.pset=? and l.type?a",
+              $pset->id, $from_pset->id, $links);
+}
+
 function reconfig() {
     global $Conf, $Me, $PsetOverrides, $PsetInfo;
-    if (!($pset = $Conf->pset_by_key(req("pset"))) || $pset->ui_disabled)
+    if (!($pset = $Conf->pset_by_key(req("pset")))
+        || $pset->ui_disabled)
         return $Conf->errorMsg("No such pset");
     $psetkey = $pset->psetkey;
 
@@ -465,6 +482,14 @@ function reconfig() {
         $o->anonymous = true;
     else
         $o->anonymous = ($old_pset->anonymous ? false : null);
+
+    if (($pset->disabled || !$pset->visible)
+        && (!$pset->disabled || (isset($o->disabled) && !$o->disabled))
+        && ($pset->visible || (isset($o->visible) && $o->visible))
+        && !$pset->gitless
+        && !$Conf->fetch_ivalue("select exists (select * from ContactLink where pset=?)", $pset->id)
+        && ($older_pset = older_enabled_repo_same_handout($pset)))
+        forward_pset_links($Conf, $pset, $older_pset);
 
     save_config_overrides($psetkey, $o, $json);
 }
@@ -1116,17 +1141,10 @@ function show_pset_table($sset) {
         $actions["showgrades"] = "Show grades";
         $actions["hidegrades"] = "Hide grades";
         $actions["defaultgrades"] = "Default grades";
-        if (!$pset->gitless)
+        if (!$pset->gitless) {
             $actions["clearrepo"] = "Clear repo";
-        foreach ($sset->conf->psets() as $p) {
-            if (!$p->disabled
-                && $p->deadline < $pset->deadline
-                && !$p->gitless
-                && !$pset->gitless
-                && $p->handout_repo_url === $pset->handout_repo_url) {
+            if (older_enabled_repo_same_handout($pset))
                 $actions["copyrepo"] = "Adopt previous repo";
-                break;
-            }
         }
     }
     if (!empty($actions)) {

@@ -155,7 +155,7 @@ CREATE TABLE `ContactLink` (
   `type` int(1) NOT NULL,
   `pset` int(1) NOT NULL DEFAULT '0',
   `link` int(11) NOT NULL,
-  KEY `cid_type` (`cid`,`type`)
+  PRIMARY KEY (`cid`,`type`,`pset`,`link`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -218,7 +218,6 @@ CREATE TABLE `Repository` (
   `snaphash` binary(40) DEFAULT NULL,
   `snapat` bigint(11) DEFAULT NULL,
   `snapcheckat` bigint(11) NOT NULL DEFAULT '0',
-  `lastpset` int(11) NOT NULL DEFAULT '0',
   `working` int(1) NOT NULL DEFAULT '1',
   `snapcommitat` bigint(11) NOT NULL DEFAULT '0',
   `snapcommitline` varchar(100) DEFAULT NULL,
@@ -279,7 +278,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 128);
+insert into Settings (name, value) values ('allowPaperOption', 129);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

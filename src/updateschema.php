@@ -455,6 +455,9 @@ function updateSchema($conf) {
         && $conf->ql("alter table RepositoryGrade drop `gradehash`")
         && update_schema_branched_repo_grade($conf))
         $conf->update_schema_version(128);
+    if ($conf->sversion == 128
+        && $conf->ql("alter table Repository drop `lastpset`"))
+        $conf->update_schema_version(129);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }
