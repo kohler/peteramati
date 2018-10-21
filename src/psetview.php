@@ -1062,7 +1062,7 @@ class PsetView {
         $no_heading = get($args, "no_heading") || $only_table;
 
         if (!$no_heading) {
-            echo '<h3><a class="fold61" href="" onclick="return pa_unfoldfilediff.call(this)"><span class="foldarrow">',
+            echo '<h3><a class="qq ui pa-unfold-file-diff" href=""><span class="foldarrow">',
                 ($open ? "&#x25BC;" : "&#x25B6;"),
                 "</span>&nbsp;", htmlspecialchars($dinfo->title ? : $file), "</a>";
             if (!$dinfo->fileless && !$dinfo->removed) {
@@ -1075,10 +1075,8 @@ class PsetView {
             echo '</h3>';
         }
         echo '<table id="', $tabid, '" class="pa-filediff';
-        if ($this->pc_view) {
-            echo " pa-editablenotes live";
-            Ht::stash_script('pa_linenote.bind(document.body)', "pa_linenote");
-        }
+        if ($this->pc_view)
+            echo " uim pa-editablenotes live";
         if (!$this->user_can_view_grades())
             echo " hidegrades";
         if (!$open)
@@ -1091,8 +1089,6 @@ class PsetView {
         echo ">";
         if ($dinfo->loaded)
             echo "<tbody>\n";
-        if (!$only_table)
-            Ht::stash_script('pa_expandcontext.bind(document.body)', "pa_expandcontext");
         foreach ($dinfo as $l)
             $this->echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
                                   $wentries, $gentries, $tw);
@@ -1109,7 +1105,7 @@ class PsetView {
                                     $wentries, $gentries, $tw) {
         if ($l[0] === "@") {
             $cx = strlen($l[3]) > 76 ? substr($l[3], 0, 76) . "..." : $l[3];
-            $x = [" pa-gx", "pa-dcx", "", "", $cx];
+            $x = [" pa-gx ui", "pa-dcx", "", "", $cx];
         } else if ($l[0] === " ")
             $x = [" pa-gc", "pa-dd", $l[1], $l[2], $l[3]];
         else if ($l[0] === "-")
@@ -1187,11 +1183,11 @@ class PsetView {
             //list($pfile, $plineid) = $lnorder->get_prev($note->file, $note->lineid);
             //if ($pfile)
             //    $links[] = '<a href="#L' . $plineid . '_'
-            //        . html_id_encode($pfile) . '" onclick="return pa_gotoline(this)">&larr; Prev</a>';
+            //        . html_id_encode($pfile) . '" class="uix pa-goto">&larr; Prev</a>';
             list($nfile, $nlineid) = $lnorder->get_next($note->file, $note->lineid);
             if ($nfile)
                 $links[] = '<a href="#L' . $nlineid . '_'
-                    . html_id_encode($nfile) . '" onclick="return pa_gotoline(this)">Next &gt;</a>';
+                    . html_id_encode($nfile) . '" class="uix pa-goto">Next &gt;</a>';
             else
                 $links[] = '<a href="#">Top</a>';
             if (!empty($links))

@@ -92,10 +92,10 @@ $diff = $Info->diff($hasha, $hashb, $lnorder, $diff_options);
 $notelinks = array();
 foreach ($lnorder->seq() as $fl) {
     $f = str_starts_with($fl[0], $Pset->directory_slash) ? substr($fl[0], strlen($Pset->directory_slash)) : $fl[0];
-    $notelinks[] = '<a href="#L' . $fl[1] . '_' . html_id_encode($fl[0])
-        . '" onclick="return pa_gotoline(this)" class="pa-noteref'
+    $notelinks[] = '<a class="uix pa-goto pa-noteref'
         . (!$fl[2] && !$Info->user_can_view_grades() ? " pa-notehidden" : "")
-            .'">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
+        . '" href="#L' . $fl[1] . '_' . html_id_encode($fl[0])
+        . '">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
 }
 if (count($notelinks))
     ContactView::echo_group("notes", join(", ", $notelinks));

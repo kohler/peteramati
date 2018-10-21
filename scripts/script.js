@@ -753,6 +753,37 @@ function hoturl_absolute_base() {
 }
 
 
+// ui
+var handle_ui = (function ($) {
+var callbacks = {};
+function handle_ui(event) {
+    var e = event.target;
+    if ((e && hasClass(e, "ui"))
+        || (this.tagName === "A" && hasClass(this, "ui"))) {
+        event.preventDefault();
+    }
+    var k = classList(this);
+    for (var i = 0; i < k.length; ++i) {
+        var c = callbacks[k[i]];
+        if (c) {
+            for (var j = 0; j < c.length; ++j) {
+                c[j].call(this, event);
+            }
+        }
+    }
+}
+handle_ui.on = function (className, callback) {
+    callbacks[className] = callbacks[className] || [];
+    callbacks[className].push(callback);
+};
+return handle_ui;
+})($);
+$(document).on("click", ".ui, .uix", handle_ui);
+$(document).on("change", ".uich", handle_ui);
+$(document).on("keydown", ".uikd", handle_ui);
+$(document).on("mouseup mousedown", ".uim", handle_ui);
+
+
 // rangeclick
 function rangeclick(evt, elt, kind) {
     elt = elt || this;
@@ -1902,7 +1933,9 @@ function pa_notedata($j) {
     return note || [false, ""];
 }
 
-window.pa_linenote = (function ($) {
+
+// pa_linenote
+(function ($) {
 var labelctr = 0;
 var curanal, mousedown_selection;
 var scrolled_at;
@@ -2026,7 +2059,7 @@ function fix_notelinks($tr) {
     function set_link(tr, next_tr) {
         var $a = $(tr).find(".pa-note-links a");
         if (!$a.length) {
-            $a = $('<a onclick="pa_gotoline(this)"></a>');
+            $a = $('<a class="uix pa-goto"></a>');
             $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notediv"));
         }
 
@@ -2242,13 +2275,13 @@ function make_linenote(event) {
     }
 }
 
-pa_linenote.bind = function (selector) {
-    $(selector).on("mouseup mousedown", ".pa-editablenotes", pa_linenote);
-};
-return pa_linenote;
+handle_ui.on("pa-editablenotes", pa_linenote);
+
 })($);
 
-window.pa_expandcontext = (function ($) {
+
+// pa_expandcontext
+(function ($) {
 
 function expand(evt) {
     var contextrow = evt.currentTarget;
@@ -2283,12 +2316,10 @@ function expand(evt) {
     return true;
 }
 
-return {
-    bind: function (selector) {
-        $(selector).on("click", ".pa-gx", expand);
-    }
-};
+handle_ui.on("pa-gx", expand);
+
 })($);
+
 
 jQuery.fn.extend({
     serializeWith: function(data) {
@@ -2427,10 +2458,8 @@ function pa_loadgrades(gi) {
         var ge = gi.entries[k];
         if (ge) {
             $(this).html(pa_makegrade(k, ge, editable)).removeClass("pa-need-grade");
-            if (this.hasAttribute("data-pa-landmark-range")) {
-                $(this).find(".pa-gradeentry").append('<button type="button" class="btn pa-compute-grade">Grade from notes</button>');
-                $(this).find(".pa-compute-grade").on("click", pa_compute_note_grades);
-            }
+            if (this.hasAttribute("data-pa-landmark-range"))
+                $(this).find(".pa-gradeentry").append('<button type="button" class="btn ui pa-compute-grade">Grade from notes</button>');
         }
     });
 
@@ -2502,7 +2531,7 @@ function pa_loadgrades(gi) {
                 if ($line.length) {
                     if (directory && m[1].substr(0, directory.length) === directory)
                         m[1] = m[1].substr(directory.length);
-                    want_gbr = '@<a href="#' + $line[0].id + '" onclick="return pa_gotoline(this)">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
+                    want_gbr = '@<a href="#' + $line[0].id + '" class="uix pa-goto">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
                 }
                 var $pgbr = $gj.find(".pa-gradeboxref");
                 if (!$line.length)
@@ -2564,7 +2593,7 @@ function pa_loadgrades(gi) {
     }
 }
 
-function pa_compute_note_grades(event) {
+handle_ui.on("pa-compute-grade", function (event) {
     var x = $(this).closest(".pa-gradebox").attr("data-pa-landmark-range"), m;
     if (!x || !(m = /^(\d+),(\d+)$/.exec(x)))
         return;
@@ -2599,7 +2628,8 @@ function pa_compute_note_grades(event) {
         $gi.html("<strong>" + sum + "</strong> &nbsp; (" + noteparts.join(", ") + "; was " + escape_entities($ge.val() || "0") + ")");
         $gv.val(sum).change();
     }
-}
+});
+
 
 function fold61(sel, arrowholder, direction) {
     var j = $(sel);
@@ -2662,13 +2692,15 @@ function pa_loadfilediff(filee, callback) {
     }
 }
 
-function pa_unfoldfilediff() {
+
+handle_ui.on("pa-unfold-file-diff", function () {
     var self = this, filee = this.parentElement.nextSibling;
     pa_loadfilediff(filee, function () {
         fold61(filee, self);
     });
     return false;
-}
+});
+
 
 function pa_ensureline_callback(filename, lineid, callback) {
     // decode arguments: either (lineref) or (filename, lineid)
@@ -2723,7 +2755,7 @@ function pa_ensureline(filename, lineid) {
     return $(e);
 }
 
-function pa_gotoline(x, lineid) {
+handle_ui.on("pa-goto", function () {
     var $e;
     function flasher() {
         $e.css("backgroundColor", "#ffff00");
@@ -2733,7 +2765,7 @@ function pa_gotoline(x, lineid) {
         $e.css("backgroundColor", "");
         $(this).dequeue();
     }
-    pa_ensureline_callback(x, lineid, function (ref) {
+    pa_ensureline_callback(this, null, function (ref) {
         if (ref) {
             $(".anchorhighlight").removeClass("anchorhighlight").finish();
             $(ref).closest("table").removeClass("hidden");
@@ -2749,8 +2781,7 @@ function pa_gotoline(x, lineid) {
                 .queue(restorer);
         }
     });
-    return true;
-}
+});
 
 function pa_beforeunload(evt) {
     var ok = true;
@@ -3044,7 +3075,7 @@ return function (container, string, options) {
         }
         if (filematch.length) {
             var anchor = "Lb" + line + "_" + html_id_encode(file);
-            var a = $("<a href=\"#" + anchor + "\" onclick=\"return pa_gotoline(this)\"></a>");
+            var a = $("<a href=\"#" + anchor + "\" class=\"uix pa-goto\"></a>");
             a.text(link.replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;
@@ -4239,7 +4270,8 @@ function pa_render_pset_table(psetid, pconf, data) {
     render_body();
 }
 
-function pa_diff_toggle_hide_left() {
+
+handle_ui.on("pa-diff-toggle-hide-left", function () {
     var $x = $("head .style-hide-left");
     if ($x.length)
         $x.remove();
@@ -4250,9 +4282,10 @@ function pa_diff_toggle_hide_left() {
     }
     if (this.tagName === "BUTTON")
         $(this).html($x.length ? "Hide left" : "Show left");
-}
+});
 
-function pa_list_repositories(event) {
+
+handle_ui.on("js-repositories", function (event) {
     var self = this;
     $.ajax(hoturl("api", {fn: "repositories", u: this.getAttribute("data-pa-user")}), {
         method: "POST", cache: false,
@@ -4271,7 +4304,8 @@ function pa_list_repositories(event) {
         }
     });
     event.preventDefault();
-}
+});
+
 
 // autogrowing text areas; based on https://github.com/jaz303/jquery-grab-bag
 function textarea_shadow($self) {

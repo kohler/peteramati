@@ -128,7 +128,6 @@ class ContactView {
             && $user->github_username
             && $Me->conf->opt("githubOrganization")) {
             echo ' <a class="q small ui js-repositories need-tooltip" href="" data-tooltip="List repositories" data-pa-user="' . htmlspecialchars($user->github_username) . '">®</a>';
-            Ht::stash_script('$(".js-repositories").on("click", pa_list_repositories)', "pa_list_repositories");
         }
         echo '</h2>';
 
