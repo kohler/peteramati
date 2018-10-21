@@ -587,7 +587,7 @@ try {
 }
 wstorage.json = function (is_session, key) {
     var x = wstorage(is_session, key);
-    return x ? jQuery.parseJSON(x) : false;
+    return x ? JSON.parse(x) : false;
 };
 
 
