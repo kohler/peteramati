@@ -1096,8 +1096,8 @@ return function (content, bubopt) {
             var i, off;
             if (typeof epos === "string" || epos.tagName || epos.jquery) {
                 epos = $(epos);
-                if (dirspec == null)
-                    dirspec = $(epos).data("tooltipDir");
+                if (dirspec == null && epos[0])
+                    dirspec = epos[0].getAttribute("data-tooltip-dir");
                 epos = epos.geometry(true);
             }
             for (i = 0; i < 4; ++i)
@@ -1186,8 +1186,8 @@ return function (content, bubopt) {
 var tooltip = (function ($) {
 var builders = {};
 
-function prepare_info($self, info) {
-    var xinfo = $self.data("tooltipInfo");
+function prepare_info(elt, info) {
+    var xinfo = elt.getAttribute("data-tooltip-info");
     if (xinfo) {
         if (typeof xinfo === "string" && xinfo.charAt(0) === "{")
             xinfo = JSON.parse(xinfo);
@@ -1196,15 +1196,17 @@ function prepare_info($self, info) {
         info = $.extend(xinfo, info);
     }
     if (info.builder && builders[info.builder])
-        info = builders[info.builder].call($self[0], info) || info;
-    if (info.dir == null)
-        info.dir = $self.data("tooltipDir") || "v";
-    if (info.type == null)
-        info.type = $self.data("tooltipType");
-    if (info.className == null)
-        info.className = $self.data("tooltipClass") || "dark";
-    if (info.content == null)
-        info.content = $self.data("tooltip");
+        info = builders[info.builder].call(elt, info) || info;
+    if (info.dir == null || elt.hasAttribute("data-tooltip-dir"))
+        info.dir = elt.getAttribute("data-tooltip-dir") || "v";
+    if (info.type == null || elt.hasAttribute("data-tooltip-type"))
+        info.type = elt.getAttribute("data-tooltip-type");
+    if (info.className == null || elt.hasAttribute("data-tooltip-class"))
+        info.className = elt.getAttribute("data-tooltip-class") || "dark";
+    if (elt.hasAttribute("data-tooltip"))
+        info.content = elt.getAttribute("data-tooltip");
+    else if (info.content == null && elt.hasAttribute("aria-label"))
+        info.content = elt.getAttribute("aria-label");
     return info;
 }
 
@@ -1213,7 +1215,7 @@ function show_tooltip(info) {
         return null;
 
     var $self = $(this);
-    info = prepare_info($self, $.extend({}, info || {}));
+    info = prepare_info($self[0], $.extend({}, info || {}));
     info.element = this;
 
     var tt, bub = null, to = null, refcount = 0, content = info.content;
@@ -1300,13 +1302,13 @@ function ttleave() {
 
 function tooltip() {
     var $self = $(this).removeClass("need-tooltip");
-    if ($self.data("tooltipType") === "focus")
+    if ($self[0].getAttribute("data-tooltip-type") === "focus")
         $self.on("focus", ttenter).on("blur", ttleave);
     else
         $self.hover(ttenter, ttleave);
 }
 tooltip.erase = function () {
-    var tt = $(this).data("tooltipState");
+    var tt = this === tooltip ? window.global_tooltip : $(this).data("tooltipState");
     tt && tt.erase();
 };
 tooltip.add_builder = function (name, f) {
