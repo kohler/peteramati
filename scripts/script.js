@@ -1929,9 +1929,15 @@ function pa_diff_locate(target, direction) {
     return result;
 }
 
-function pa_notedata($j) {
-    var note = $j.data("pa-note");
-    if (typeof note === "string")
+function pa_notedata(elt, note) {
+    if (note !== undefined) {
+        if (note === false || note === null)
+            elt.removeAttribute("data-pa-note");
+        else
+            elt.setAttribute("data-pa-note", JSON.stringify(note));
+    }
+    note = elt.getAttribute("data-pa-note");
+    if (typeof note === "string" && note !== "")
         note = JSON.parse(note);
     if (typeof note === "number")
         note = [false, "", 0, note];
@@ -1955,7 +1961,7 @@ function add_notetr(linetr) {
 }
 
 function render_note($tr, note, transition) {
-    $tr.data("pa-note", note);
+    pa_notedata($tr[0], note);
     var $td = $tr.find(".pa-notebox");
     if (transition) {
         var $content = $td.children();
@@ -2005,8 +2011,8 @@ function render_note($tr, note, transition) {
 }
 
 function render_form($tr, note, transition) {
-    $tr.addClass("editing");
-    note && $tr.data("pa-note", note);
+    $tr.removeClass("hidden").addClass("editing");
+    note && pa_notedata($tr[0], note);
     var $td = $tr.find(".pa-notebox");
     if (transition) {
         $tr.css("display", "").children().css("display", "");
@@ -2048,7 +2054,7 @@ function render_form($tr, note, transition) {
 
 function fix_notelinks($tr) {
     function note_skippable(tr) {
-        return pa_notedata($(tr))[1] === "";
+        return pa_notedata(tr)[1] === "";
     }
 
     function note_anchor(tr) {
@@ -2175,8 +2181,10 @@ function uncapture() {
 
 function unedit(tr, always) {
     var $tr = $(tr).closest("tr");
-    var note = pa_notedata($tr);
-    if (!$tr.length || (!always && !text_eq(note[1], $tr.find("textarea").val())))
+    var note = pa_notedata($tr[0]);
+    if (!$tr.length
+        || (!always
+            && !text_eq(note[1], $tr.find("textarea").val().replace(/\s+$/, ""))))
         return false;
     $tr.removeClass("editing");
     $tr.find(":focus").blur();
@@ -2205,7 +2213,7 @@ function make_submit(anal) {
                     $f.find(".ajaxsave61").html("Saved");
                     var note = data.linenotes[anal.file];
                     note = note && note[anal.lineid];
-                    $tr.data("pa-note", note);
+                    pa_notedata($tr[0], note);
                     unedit($tr[0]);
                     $tr.data("pa-savefailed", null);
                 } else {
@@ -2274,7 +2282,7 @@ function make_linenote(event) {
             return false;
         }
     } else {
-        render_form($tr, pa_notedata($tr), true);
+        render_form($tr, pa_notedata($tr[0]), true);
         capture(curanal.tr, false);
         return false;
     }
@@ -2608,7 +2616,7 @@ handle_ui.on("pa-compute-grade", function (event) {
     for (; tr; tr = tr.nextSibling) {
         if (tr.nodeType !== Node.ELEMENT_NODE) {
         } else if (hasClass(tr, "pa-gw") && lna >= lnfirst && lna <= lnlast) {
-            var note = pa_notedata($(tr));
+            var note = pa_notedata(tr);
             if (note && note[1]
                 && ((m = /(?:^|\s)(\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
                     || (m = /((?:^|[\s(]))(\d+(?:\.\d*)?|\.\d+)(\/[\d.]+(?!\.\d|[\w%$*\/])\S*)/.exec(note[1])))) {
@@ -2792,7 +2800,7 @@ function pa_beforeunload(evt) {
     var ok = true;
     $(".pa-gw textarea").each(function () {
         var $tr = $(this).closest("tr");
-        var note = pa_notedata($tr);
+        var note = pa_notedata($tr[0]);
         if (note && !text_eq(this.value, note[1]) && !$tr.data("pa-savefailed"))
             ok = false;
     });

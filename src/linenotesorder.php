@@ -3,7 +3,7 @@
 // Peteramati is Copyright (c) 2006-2018 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-class LinenotesOrder {
+class LineNotesOrder {
     private $diff = null;
     private $fileorder = [];
     private $ln;
@@ -12,7 +12,7 @@ class LinenotesOrder {
     private $totalorder = null;
     public $has_linenotes_in_diff = false;
 
-    function __construct($linenotes, $seegradenotes) {
+    function __construct($linenotes, $seegradenotes, $editnotes) {
         $this->ln = [];
         foreach ($linenotes ? : [] as $file => $notelist) {
             $fln = [];
@@ -20,7 +20,8 @@ class LinenotesOrder {
                 if ((is_string($note) && $note !== "")
                     || (is_array($note)
                         && ($note[0] || $seegradenotes)
-                        && (string) $note[1] !== "")) {
+                        && ((string) $note[1] !== "" || $editnotes))
+                    || (is_int($note) && $editnotes)) {
                     $fln[$line] = $note;
                     $this->lnseq[] = [$file, $line, is_array($note) && $note[0]];
                 }

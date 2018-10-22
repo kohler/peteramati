@@ -968,16 +968,16 @@ class PsetView {
 
     function viewable_line_notes() {
         if ($this->viewer->can_view_comments($this->pset))
-            return new LinenotesOrder($this->commit_info("linenotes"), $this->can_view_grades());
+            return new LineNotesOrder($this->commit_info("linenotes"), $this->can_view_grades(), $this->pc_view);
         else
             return $this->empty_line_notes();
     }
 
     function empty_line_notes() {
-        return new LinenotesOrder(null, $this->can_view_grades());
+        return new LineNotesOrder(null, $this->can_view_grades(), $this->pc_view);
     }
 
-    function diff($hasha, $hashb, LinenotesOrder $lnorder = null, $args = []) {
+    function diff($hasha, $hashb, LineNotesOrder $lnorder = null, $args = []) {
         if (!$this->added_diffinfo) {
             if (($rs = $this->commit_info("runsettings"))
                 && ($id = get($rs, "IGNOREDIFF")))
@@ -1028,7 +1028,7 @@ class PsetView {
         return htmlspecialchars($t);
     }
 
-    function echo_file_diff($file, DiffInfo $dinfo, LinenotesOrder $lnorder, $args) {
+    function echo_file_diff($file, DiffInfo $dinfo, LineNotesOrder $lnorder, $args) {
         if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
             || ($dinfo->is_empty() && $dinfo->loaded))
             return;
@@ -1173,7 +1173,7 @@ class PsetView {
             $this->echo_linenote($nx, $lnorder);
     }
 
-    private function echo_linenote(LineNote $note, LinenotesOrder $lnorder = null) {
+    private function echo_linenote(LineNote $note, LineNotesOrder $lnorder = null) {
         echo '<tr class="pa-dl pa-gw'; /* NB script depends on this class exactly */
         if ((string) $note->note === "")
             echo ' hidden';
