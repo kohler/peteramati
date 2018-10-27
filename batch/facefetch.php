@@ -20,6 +20,8 @@ if (!$facefetch_urlpattern) {
     fwrite(STDERR, 'Need `_facefetch_urlpattern` configuration option.' . "\n");
     exit(1);
 }
+if (is_string($facefetch_urlpattern))
+    $facefetch_urlpattern = [$facefetch_urlpattern];
 
 $fetchscript = get($PsetInfo, "_facefetch_script");
 if (count($arg["_"]))
@@ -33,24 +35,37 @@ if (!isset($arg["limit"]))
     $arg["limit"] = get($arg, "l");
 $limit = (int) $arg["limit"];
 
-$result = Dbl::qe("select contactId, email, huid from ContactInfo" . (isset($arg["all"]) || isset($arg["a"]) ? "" : " where contactImageId is null"));
+$result = Dbl::qe("select contactId, email, firstName, lastName, huid from ContactInfo" . (isset($arg["all"]) || isset($arg["a"]) ? "" : " where contactImageId is null"));
 $rows = array();
-while (($row = edb_row($result)))
+while (($row = edb_orow($result)))
     $rows[] = $row;
 if ($limit)
     shuffle($rows);
 Dbl::free($result);
 
-$n = $nworked = 0;
-foreach ($rows as $row) {
-    $url = $facefetch_urlpattern;
-    if (($row[1] === null && strpos($url, '${EMAIL}') !== false)
-        || ($row[2] === null && strpos($url, '${ID}') !== false))
-        continue;
-    $url = str_replace('${EMAIL}', urlencode($row[1]), $url);
-    $url = str_replace('${ID}', urlencode($row[2]), $url);
-    // fwrite(STDOUT, "$row[1] $fetchscript " . escapeshellarg($url) . " ");
-    fwrite(STDOUT, "$row[1] ");
+
+function one_facefetch($row, $url) {
+    global $fetchscript;
+
+    if (strpos($url, '${EMAIL}') !== false) {
+        if ($row->email === null)
+            return false;
+        $url = str_replace('${EMAIL}', urlencode($row->email), $url);
+    }
+    if (strpos($url, '${ID}') !== false) {
+        if ($row->huid === null)
+            return false;
+        $url = str_replace('${ID}', urlencode($row->huid), $url);
+    }
+    if (strpos($url, '${NAMESEARCH}') !== false) {
+        if ((string) $row->lastName === "")
+            return false;
+        $name = strtolower($row->lastName);
+        if ((string) $row->firstName === "") {
+            $name .= " " . strtolower(preg_replace('/(^\S+)\s+.*/', '$1', $row->firstName));
+        }
+        $url = str_replace('${NAMESEARCH}', urlencode($name), $url);
+    }
 
     $handle = popen($fetchscript . " " . escapeshellarg($url), "r");
     $data = stream_get_contents($handle);
@@ -62,29 +77,42 @@ foreach ($rows as $row) {
         $data = substr($data, $nl + 1);
     }
 
-    $worked = false;
+    $result = false;
     if (pcntl_wifexitedsuccess($status)
         && preg_match(',\Aimage/,', $content_type)) {
-        $sresult = Dbl::fetch_first_object(Dbl::qe("select ContactImage.* from ContactImage join ContactInfo using (contactImageId) where ContactInfo.contactId=?", $row[0]));
+        $sresult = Dbl::fetch_first_object(Dbl::qe("select ContactImage.* from ContactImage join ContactInfo using (contactImageId) where ContactInfo.contactId=?", $row->contactId));
         if ($sresult && $sresult->mimetype === $content_type && $sresult->data === $data)
-            $worked = "unchanged";
+            $result = ["unchanged", $content_type, strlen($data)];
         else {
-            $iresult = Dbl::qe("insert into ContactImage set contactId=?, mimetype=?, data=?", $row[0], $content_type, $data);
+            $iresult = Dbl::qe("insert into ContactImage set contactId=?, mimetype=?, data=?", $row->contactId, $content_type, $data);
             if ($iresult) {
-                Dbl::qe("update ContactInfo set contactImageId=? where contactId=?", $iresult->insert_id, $row[0]);
-                $worked = true;
+                Dbl::qe("update ContactInfo set contactImageId=? where contactId=?", $iresult->insert_id, $row->contactId);
+                $result = [true, $content_type, strlen($data)];
             }
         }
     }
+    return $result;
+}
 
-    if ($worked === "unchanged")
-        fwrite(STDERR, strlen($data) . "B " . $content_type . " (unchanged)\n");
-    else if ($worked)
-        fwrite(STDERR, strlen($data) . "B " . $content_type . "\n");
+$n = $nworked = 0;
+foreach ($rows as $row) {
+    $ok = false;
+    fwrite(STDOUT, "$row->email ");
+
+    foreach ($facefetch_urlpattern as $url) {
+        $ok = $ok || one_facefetch($row, $url);
+        if ($ok)
+            break;
+    }
+
+    if ($ok && $ok[0] === "unchanged")
+        fwrite(STDERR, "{$ok[2]}B {$ok[1]} (unchanged)\n");
+    else if ($ok)
+        fwrite(STDERR, "{$ok[2]}B {$ok[1]}\n");
     else
         fwrite(STDERR, "failed\n");
 
-    $nworked += $worked ? 1 : 0;
+    $nworked += $ok ? 1 : 0;
     ++$n;
     if ($n == $limit)
         break;
