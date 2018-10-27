@@ -52,22 +52,23 @@ if (isset($arg["e"])) {
     $where[] = "email like '" . sqlq_for_like($arg["e"]) . "'";
     $argdesc = "email " . $arg["e"];
 }
-$q = "select contactId from ContactInfo where " . join(" and ", $where);
-error_log($q);
+$q = "select contactId, dropped from ContactInfo where " . join(" and ", $where);
 $result = $Conf->qe($q);
-$cids = array();
-while (($row = edb_row($result)))
-    $cids[] = $row[0];
+$users = array();
+while (($row = edb_orow($result)))
+    $users[] = $row;
 Dbl::free($result);
 
-if (count($cids) > 1) {
-    fwrite(STDERR, "$argdesc ambiguous, " . count($cids) . " matches\n");
+if (count($users) > 1)
+    $users = array_filter($users, function ($u) { return !$u->dropped; });
+if (count($users) > 1) {
+    fwrite(STDERR, "$argdesc ambiguous, " . count($users) . " matches\n");
     exit(1);
-} else if (empty($cids)) {
+} else if (empty($users)) {
     fwrite(STDERR, "$argdesc unknown, 0 matches\n");
     exit(1);
 }
-$cid = $cids[0];
+$cid = $users[0]->contactId;
 
 
 $worked = false;

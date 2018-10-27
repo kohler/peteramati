@@ -7,7 +7,9 @@ $ConfSitePATH = preg_replace(',/batch/[^/]+,', '', __FILE__);
 require_once("$ConfSitePATH/src/init.php");
 require_once("$ConfSitePATH/lib/getopt.php");
 
-$arg = getopt_rest($argv, "hn:l:a", array("help", "name:", "limit:", "all"));
+$arg = getopt_rest($argv, "hn:l:aV", array("help", "name:", "limit:", "all",
+     "college", "extension", "tf", "verbose"));
+$verbose = isset($arg["V"]) || isset($arg["verbose"]);
 if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {
     fwrite(STDOUT, "Usage: php batch/facefetch.php [-l LIMIT] [FETCHSCRIPT]\n");
     exit(0);
@@ -35,7 +37,18 @@ if (!isset($arg["limit"]))
     $arg["limit"] = get($arg, "l");
 $limit = (int) $arg["limit"];
 
-$result = Dbl::qe("select contactId, email, firstName, lastName, huid from ContactInfo" . (isset($arg["all"]) || isset($arg["a"]) ? "" : " where contactImageId is null"));
+$where = [];
+if (!isset($arg["all"]) && !isset($arg["a"]))
+    $where[] = "contactImageId is null";
+if (isset($arg["college"]))
+    $where[] = "college=1";
+if (isset($arg["extension"]))
+    $where[] = "extension=1";
+if (isset($arg["tf"]))
+    $where[] = "roles!=0";
+if (empty($where))
+    $where[] = "true";
+$result = Dbl::qe("select contactId, email, firstName, lastName, huid from ContactInfo where " . join(" and ", $where));
 $rows = array();
 while (($row = edb_orow($result)))
     $rows[] = $row;
@@ -45,7 +58,7 @@ Dbl::free($result);
 
 
 function one_facefetch($row, $url) {
-    global $fetchscript;
+    global $fetchscript, $verbose;
 
     if (strpos($url, '${EMAIL}') !== false) {
         if ($row->email === null)
@@ -61,11 +74,13 @@ function one_facefetch($row, $url) {
         if ((string) $row->lastName === "")
             return false;
         $name = strtolower($row->lastName);
-        if ((string) $row->firstName === "") {
+        if ((string) $row->firstName !== "") {
             $name .= " " . strtolower(preg_replace('/(^\S+)\s+.*/', '$1', $row->firstName));
         }
         $url = str_replace('${NAMESEARCH}', urlencode($name), $url);
     }
+    if ($verbose)
+        error_log("    $url\n");
 
     $handle = popen($fetchscript . " " . escapeshellarg($url), "r");
     $data = stream_get_contents($handle);
@@ -100,8 +115,7 @@ foreach ($rows as $row) {
     fwrite(STDOUT, "$row->email ");
 
     foreach ($facefetch_urlpattern as $url) {
-        $ok = $ok || one_facefetch($row, $url);
-        if ($ok)
+        if (($ok = one_facefetch($row, $url)))
             break;
     }
 
