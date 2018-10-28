@@ -132,11 +132,6 @@ else if ($Qreq->run === null || !check_post())
 else if (!$Info->can_view_repo_contents())
     quit("Unconfirmed repository");
 
-
-// extract request info
-$Rstate = new RunnerState($Info, $Runner);
-$Rstate->set_queueid($Qreq->get("queueid"));
-
 // we’re gonna run it; check permission
 if (!$Me->can_run($Pset, $Runner, $User))
     quit("You can’t run that command");
@@ -144,6 +139,11 @@ if (!$Pset->run_dirpattern)
     quit("Configuration error (run_dirpattern)");
 if (!$Pset->run_jailfiles)
     quit("Configuration error (run_jailfiles)");
+
+
+// extract request info
+$Rstate = new RunnerState($Info, $Runner);
+$Rstate->set_queueid($Qreq->get("queueid"));
 
 // recent or checkup
 if ($Qreq->check)

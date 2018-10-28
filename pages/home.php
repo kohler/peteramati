@@ -462,7 +462,7 @@ function forward_pset_links($conf, $pset, $from_pset) {
 }
 
 function reconfig($qreq) {
-    global $Conf, $Me, $PsetOverrides, $PsetInfo;
+    global $Conf, $Me;
     if (!($pset = $Conf->pset_by_key($qreq->pset))
         || $pset->ui_disabled)
         return $Conf->errorMsg("No such pset");
