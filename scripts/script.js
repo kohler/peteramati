@@ -3223,7 +3223,7 @@ function pa_run(button, opt) {
             return false;
         });
     } else
-        thepre.append("<span class='pa-runcursor'>_</span>");
+        thepre.append('<span class="pa-runcursor">_</span>');
 
     if (checkt && !therun.prop("openedbefore")) {
         therun.scrollTop(therun.children().height() - therun.height());
@@ -3233,11 +3233,6 @@ function pa_run(button, opt) {
     var ibuffer = "", // initial buffer; holds data before any results arrive
         offset = -1, backoff = 50, queueid = null,
         thecursor = therun.find("span.pa-runcursor")[0];
-
-    function animate() {
-        jQuery(thecursor).dequeue().animate({opacity: 0.1}, 200).delay(100).animate({opacity: 1}, 200).delay(400).queue(animate);
-    }
-    thecursor && animate();
 
     function done() {
         $f.find("button").prop("disabled", false);

@@ -2647,6 +2647,15 @@ span.foldarrow {
 	color: #66ee66;
 	background-color: #66ee66;
 	display: inline-block;
+	animation: 900ms infinite pa-runcursor-flash;
+}
+@keyframes pa-runcursor-flash {
+	from, 55%, to {
+		opacity: 1;
+	}
+	22%, 33% {
+		opacity: 0;
+	}
 }
 .pa-line-continues:after {
 	content: "…\A";
