@@ -3009,13 +3009,17 @@ return function (container, string, options) {
         return_html = true;
     }
 
-    var styles = container.getAttribute("data-pa-terminal-style");
-    var cursor = null;
-    if (options && options.cursor === true)
-        cursor = container.lastChild;
+    var styles = container.getAttribute("data-pa-terminal-style"),
+        fragment = null;
 
     function addlinepart(node, text) {
         node.appendChild(style_text(text, styles));
+    }
+
+    function addfragment(node) {
+        if (!fragment)
+            fragment = document.createDocumentFragment();
+        fragment.appendChild(node);
     }
 
     function ansi_combine(a1, a2) {
@@ -3126,7 +3130,7 @@ return function (container, string, options) {
                 render = render.substr(0, 132 - displaylen);
                 addlinepart(node, render);
                 node.className = "pa-line-continues";
-                isnew && container.insertBefore(node, cursor);
+                isnew && addfragment(node);
                 node = document.createElement("span");
                 isnew = true;
                 displaylen = 0;
@@ -3136,16 +3140,30 @@ return function (container, string, options) {
             }
             line = line.substr(render.length);
         }
-        isnew && container.insertBefore(node, cursor);
+        isnew && addfragment(node);
     }
 
     // hide newline on last line
-    var lines = string.split(/^/m);
-    if (lines[lines.length - 1] === "")
-        lines.pop();
-    var lastfull = ends_with(lines[lines.length - 1], "\n");
+    var lines, lastfull;
+    if (typeof string === "string") {
+        lines = string.split(/^/m);
+        if (lines.length && lines[lines.length - 1] === "")
+            lines.pop();
+        lastfull = lines.length && ends_with(lines[lines.length - 1], "\n");
+    } else {
+        lines = [];
+        lastfull = true;
+        fragment = string;
+    }
 
-    var node = cursor ? cursor.previousSibling : container.lastChild;
+    var node = container.lastChild, cursor = null;
+    if (node
+        && node.lastChild
+        && hasClass(node.lastChild, "pa-runcursor")) {
+        cursor = node.lastChild;
+        node.removeChild(cursor);
+    }
+
     if (node
         && (string = node.getAttribute("data-pa-outputpart")) !== null
         && string !== ""
@@ -3155,8 +3173,10 @@ return function (container, string, options) {
         lines[0] = string + lines[0];
         node.removeAttribute("data-pa-outputpart");
     } else {
-        if (node && lines.length)
+        if (node && (lines.length || fragment)) {
             node.appendChild(document.createTextNode("\n"));
+            node.removeAttribute("data-pa-outputpart");
+        }
         node = null;
     }
 
@@ -3171,14 +3191,29 @@ return function (container, string, options) {
         render_line(last, i ? null : node);
     }
 
-    if (!lastfull) {
-        styles = laststyles;
-        node = cursor ? cursor.previousSibling : container.lastChild;
-        if (node)
-            node.setAttribute("data-pa-outputpart", last);
+    if (options.cursor && !container.lastChild && !fragment)
+        addfragment("");
+
+    if (fragment)
+        container.appendChild(fragment);
+
+    if (options.cursor) {
+        if (!cursor) {
+            cursor = document.createElement("span");
+            cursor.className = "pa-runcursor";
+        }
+        container.lastChild.appendChild(cursor);
     }
 
-    container.setAttribute("data-pa-terminal-style", styles);
+    if (!lastfull && container.lastChild) {
+        styles = laststyles;
+        container.lastChild.setAttribute("data-pa-outputpart", last);
+    }
+
+    if (styles != null)
+        container.setAttribute("data-pa-terminal-style", styles);
+    else
+        container.removeAttribute("data-pa-terminal-style");
 
     if (return_html)
         return container.innerHTML;
@@ -3222,8 +3257,7 @@ function pa_run(button, opt) {
             write(e.key);
             return false;
         });
-    } else
-        thepre.append('<span class="pa-runcursor">_</span>');
+    }
 
     function scroll_therun() {
         var e = therun[0];
@@ -3244,8 +3278,7 @@ function pa_run(button, opt) {
     }
 
     var ibuffer = "", // initial buffer; holds data before any results arrive
-        offset = -1, backoff = 50, queueid = null,
-        thecursor = therun.find("span.pa-runcursor")[0];
+        offset = -1, backoff = 50, queueid = null;
 
     function done() {
         $f.find("button").prop("disabled", false);
@@ -3253,7 +3286,7 @@ function pa_run(button, opt) {
         if (thexterm)
             thexterm.write("\x1b[?25l"); // “hide cursor” escape
         else
-            $(thecursor).finish().remove();
+            therun.find(".pa-runcursor").remove();
         if ($(button).attr("data-pa-loadgrade"))
             loadgrade61($(button));
     }
@@ -3266,10 +3299,9 @@ function pa_run(button, opt) {
     }
 
     function append_html(html) {
-        var node = thepre[0].lastChild.previousSibling;
-        if (node)
-            node.appendChild(document.createTextNode("\n"));
-        thepre[0].insertBefore(jQuery(html)[0], thepre[0].lastChild);
+        if (typeof html === "string")
+            html = $(html)[0];
+        pa_render_terminal(thepre[0], html, {cursor: true});
     }
 
     function append_data(str, data) {
@@ -3282,12 +3314,8 @@ function pa_run(button, opt) {
             str = ibuffer.substr(pos + 2);
             ibuffer = null;
 
-            if (thecursor) {
-                var j = $(thecursor).detach();
-                if (!opt.noclear)
-                    thepre.html("");
-                thepre.append(j);
-            }
+            if (!opt.noclear)
+                thepre.html("");
 
             if (data && data.timestamp) {
                 var d = new Date(data.timestamp * 1000);
@@ -3425,7 +3453,7 @@ function pa_run(button, opt) {
         send({write: value});
     }
 
-    if (opt.headline && opt.noclear && !thexterm && thepre[0].firstChild != thecursor)
+    if (opt.headline && opt.noclear && !thexterm && thepre[0].firstChild)
         append("\n\n");
     if (opt.headline && opt.headline instanceof Node)
         append_html(opt.headline);
