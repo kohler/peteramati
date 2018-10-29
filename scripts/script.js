@@ -3225,9 +3225,17 @@ function pa_run(button, opt) {
     } else
         thepre.append('<span class="pa-runcursor">_</span>');
 
-    if (checkt && !therun.prop("openedbefore")) {
-        therun.scrollTop(therun.children().height() - therun.height());
-        therun.prop("openedbefore", true);
+    function scroll_therun(doit) {
+        var e = therun[0];
+        if (doit)
+            e.scrollTop = Math.max(e.scrollHeight - e.clientHeight, 0);
+        else
+            return e.scrollTop + e.clientHeight >= e.scrollHeight - 10;
+    }
+
+    if (checkt && !therun[0].hasAttribute("data-pa-opened")) {
+        scroll_therun(true);
+        therun[0].setAttribute("data-pa-opened", 1);
     }
 
     var ibuffer = "", // initial buffer; holds data before any results arrive
@@ -3249,23 +3257,19 @@ function pa_run(button, opt) {
         if (thexterm)
             thexterm.write(str);
         else {
-            var atbottom = therun.scrollTop() >= therun.children().height() - therun.height() - 10;
+            var atbottom = scroll_therun(false);
             pa_render_terminal(thepre[0], str, {cursor: true, directory: directory});
-            if (atbottom)
-                therun.scrollTop(Math.max(Math.ceil(therun.children().height() - therun.height()), 0));
+            atbottom && scroll_therun(true);
         }
     }
 
     function append_html(html) {
-        var atbottom = therun.scrollTop() >= therun.children().height() - therun.height() - 10;
-
+        var atbottom = scroll_therun(false);
         var node = thepre[0].lastChild.previousSibling;
         if (node)
             node.appendChild(document.createTextNode("\n"));
         thepre[0].insertBefore(jQuery(html)[0], thepre[0].lastChild);
-
-        if (atbottom)
-            therun.scrollTop(Math.max(Math.ceil(therun.children().height() - therun.height()), 0));
+        atbottom && scroll_therun(true);
     }
 
     function append_data(str, data) {
