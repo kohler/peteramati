@@ -2769,29 +2769,12 @@ function pa_ensureline(filename, lineid) {
 }
 
 handle_ui.on("pa-goto", function () {
-    var $e;
-    function flasher() {
-        $e.css("backgroundColor", "#ffff00");
-        $(this).dequeue();
-    }
-    function restorer() {
-        $e.css("backgroundColor", "");
-        $(this).dequeue();
-    }
     pa_ensureline_callback(this, null, function (ref) {
         if (ref) {
-            $(".anchorhighlight").removeClass("anchorhighlight").finish();
+            $(".pa-line-highlight").removeClass("pa-line-highlight");
             $(ref).closest("table").removeClass("hidden");
             $e = $(ref).closest("tr");
-            var color = $e.css("backgroundColor");
-            $e.addClass("anchorhighlight")
-                .queue(flasher)
-                .delay(100).queue(restorer)
-                .delay(100).queue(flasher)
-                .delay(100).queue(restorer)
-                .delay(100).queue(flasher)
-                .animate({backgroundColor: color}, 1200)
-                .queue(restorer);
+            $e.addClass("pa-line-highlight");
         }
     });
 });

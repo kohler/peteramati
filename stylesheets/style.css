@@ -2397,6 +2397,17 @@ tr.papr-partner {
 .pa-filediff {
 	width: calc(100vw - 48px);
 }
+.pa-line-highlight {
+	animation: 1600ms 1 pa-line-highlight;
+}
+@keyframes pa-line-highlight {
+	from, 12.5%, 25% {
+		background-color: #ffff00;
+	}
+	6.25%, 18.75% {
+		background-color: #ffff0000;
+	}
+}
 .pa-dd, .pa-note {
 	max-width: calc(100vw - 8rem);
 }
