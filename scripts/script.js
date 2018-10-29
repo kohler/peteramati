@@ -3231,15 +3231,16 @@ function pa_run(button, opt) {
             e.scrollTop = Math.max(e.scrollHeight - e.clientHeight, 0);
     }
 
-    if (checkt && !therun[0].hasAttribute("data-pa-opened"))
+    if (!therun[0].hasAttribute("data-pa-opened")) {
         therun[0].setAttribute("data-pa-opened", 1);
-    if (!thexterm) {
-        therun[0].setAttribute("data-pa-runbottom", 1);
-        therun[0].addEventListener("scroll", function () {
-            var bottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 10;
-            bottom ? this.setAttribute("data-pa-runbottom", 1) : this.removeAttribute("data-pa-runbottom");
-        });
-        scroll_therun();
+        if (!thexterm) {
+            therun[0].setAttribute("data-pa-runbottom", 1);
+            therun[0].addEventListener("scroll", function () {
+                var bottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 10;
+                bottom ? this.setAttribute("data-pa-runbottom", 1) : this.removeAttribute("data-pa-runbottom");
+            });
+            scroll_therun();
+        }
     }
 
     var ibuffer = "", // initial buffer; holds data before any results arrive
