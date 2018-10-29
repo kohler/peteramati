@@ -3225,17 +3225,21 @@ function pa_run(button, opt) {
     } else
         thepre.append('<span class="pa-runcursor">_</span>');
 
-    function scroll_therun(doit) {
+    function scroll_therun() {
         var e = therun[0];
-        if (doit)
+        if (e.hasAttribute("data-pa-runbottom"))
             e.scrollTop = Math.max(e.scrollHeight - e.clientHeight, 0);
-        else
-            return e.scrollTop + e.clientHeight >= e.scrollHeight - 10;
     }
 
-    if (checkt && !therun[0].hasAttribute("data-pa-opened")) {
-        scroll_therun(true);
+    if (checkt && !therun[0].hasAttribute("data-pa-opened"))
         therun[0].setAttribute("data-pa-opened", 1);
+    if (!thexterm) {
+        therun[0].setAttribute("data-pa-runbottom", 1);
+        therun[0].addEventListener("scroll", function () {
+            var bottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 10;
+            bottom ? this.setAttribute("data-pa-runbottom", 1) : this.removeAttribute("data-pa-runbottom");
+        });
+        scroll_therun();
     }
 
     var ibuffer = "", // initial buffer; holds data before any results arrive
@@ -3256,20 +3260,15 @@ function pa_run(button, opt) {
     function append(str) {
         if (thexterm)
             thexterm.write(str);
-        else {
-            var atbottom = scroll_therun(false);
+        else
             pa_render_terminal(thepre[0], str, {cursor: true, directory: directory});
-            atbottom && scroll_therun(true);
-        }
     }
 
     function append_html(html) {
-        var atbottom = scroll_therun(false);
         var node = thepre[0].lastChild.previousSibling;
         if (node)
             node.appendChild(document.createTextNode("\n"));
         thepre[0].insertBefore(jQuery(html)[0], thepre[0].lastChild);
-        atbottom && scroll_therun(true);
     }
 
     function append_data(str, data) {
@@ -3337,6 +3336,7 @@ function pa_run(button, opt) {
             else
                 x = "Unknown";
             append("\x1b[1;3;31m" + x + "\x1b[m\r\n");
+            scroll_therun();
             return done();
         }
 
@@ -3362,6 +3362,7 @@ function pa_run(button, opt) {
                     var time = times[0].time;
 
                     append_data(data.substring(pos, offset));
+                    scroll_therun();
 
                     if (times.length > 1) {
                         setTimeout(function() {
@@ -3386,6 +3387,7 @@ function pa_run(button, opt) {
         if (!data.data && !data.result)
             backoff = Math.min(backoff * 2, 500);
 
+        scroll_therun();
         if (data.status == "old")
             setTimeout(send, 2000);
         else if (!data.done)
@@ -3431,6 +3433,7 @@ function pa_run(button, opt) {
     if (opt.unfold && therun.attr("data-pa-content"))
         append(therun.attr("data-pa-content"));
     therun.removeAttr("data-pa-content");
+    scroll_therun();
 
     send();
     return false;
