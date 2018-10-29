@@ -2374,9 +2374,6 @@ div.pa-grp .pa-grp-title:before {
 	color: white;
 	background: red;
 }
-.pa-gradeentry {
-	white-space: nowrap;
-}
 #runsettings61 input {
 	font-size: 10px;
 }
@@ -2638,6 +2635,9 @@ span.foldarrow {
 	margin-left: 0;
 	padding-right: 2em;
 }
+.pa-gradebox .pa-gradeentry {
+	white-space: nowrap;
+}
 .pa-warnbox {
 	background: #f2ecef;
 	background:
@@ -2707,19 +2707,16 @@ span.foldarrow {
 	margin-left: 2em;
 }
 
-span.pa-gradevalue, input.pa-gradevalue {
+span.pa-gradewidth {
 	min-width: 3rem;
-	margin-right: 0.5rem;
-}
-span.pa-gradevalue {
-	display: inline-block;
 	padding-right: 6px;
+	margin-right: 0.5rem;
+	display: inline-block;
 }
-span.pa-gradevalue:before {
-	content: "";
-	line-height: 1.8;
+input.pa-gradevalue {
+	min-width: 3rem;
 }
-.editable span.pa-gradevalue, input.pa-gradevalue {
+.editable span.pa-gradevalue, input.pa-gradevalue, span.pa-gradewidth {
 	width: 6rem;
 }
 textarea.pa-gradevalue {

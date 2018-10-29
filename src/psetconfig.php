@@ -648,7 +648,7 @@ class GradeEntryConfig {
         $type = null;
         if (isset($g->type)) {
             $type = Pset::cstr($loc, $g, "type");
-            if ($type !== "number" && $type !== "text")
+            if ($type !== "number" && $type !== "text" && $type !== "checkbox")
                 throw new PsetConfigException("unknown grade entry type", $loc);
             if ($type === "number")
                 $type = null;
@@ -659,6 +659,8 @@ class GradeEntryConfig {
             $this->no_total = true;
         } else {
             $this->max = Pset::cnum($loc, $g, "max");
+            if ($this->type === "checkbox" && $this->max === null)
+                throw new PsetConfigException("checkbox grade entry requires max", $loc);
             if (isset($g->visible))
                 $this->visible = Pset::cbool($loc, $g, "visible");
             else if (isset($g->hide))

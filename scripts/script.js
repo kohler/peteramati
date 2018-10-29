@@ -2350,10 +2350,12 @@ jQuery.fn.extend({
     }
 });
 
-function pa_makegrade(name, ge, editable) {
-    var name = escape_entities(name);
-    var t = '<div class="pa-grade pa-grp" data-pa-grade="' + name + '">',
-        title = ge.title ? escape_entities(ge.title) : name;
+function pa_makegrade(gi, k, editable) {
+    var ge = gi.entries[k],
+        g = gi.grades ? gi.grades[ge.pos] : null,
+        name = escape_entities(k),
+        title = ge.title ? escape_entities(ge.title) : name,
+        t = '<div class="pa-grade pa-grp" data-pa-grade="' + name + '">';
     if (editable) {
         var id = "pa-ge" + ++pa_makegrade.id_counter;
         t += '<form class="ui-submit pa-gradevalue-form">'
@@ -2361,11 +2363,17 @@ function pa_makegrade(name, ge, editable) {
         if (ge.type === "text") {
             t += '<textarea class="uich pa-gradevalue" name="' + name +
                 '" id="' + id + '"></textarea>';
-        } else if (ge.type === "checkbox") {
+        } else if (ge.type === "checkbox"
+                   && (g == null || g === 0 || g === ge.max)) {
+            t += '<div class="pa-gradeentry"><span class="pa-gradewidth">' +
+                '<input type="checkbox" class="ui pa-gradevalue" name="' + name +
+                '" id="' + id + '" value="' + ge.max + '" /></span>' +
+                ' <span class="pa-grademax">of ' + ge.max +
+                ' <a href="" class="x ui pa-grade-uncheckbox">#</a></span></div>';
         } else {
-            t += '<div class="pa-gradeentry">' +
+            t += '<div class="pa-gradeentry"><span class="pa-gradewidth">' +
                 '<input type="text" class="uich pa-gradevalue" name="' + name +
-                '" id="' + id + '" />';
+                '" id="' + id + '" /></span>';
             if (ge.max)
                 t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
             t += '</div>';
@@ -2383,6 +2391,89 @@ function pa_makegrade(name, ge, editable) {
     return t + '</div>';
 }
 pa_makegrade.id_counter = 0;
+
+function pa_grade_uncheckbox() {
+    this.type = "text";
+    this.className = "uich pa-gradevalue";
+    $(this.parentElement.parentElement).find(".pa-grade-uncheckbox").remove();
+}
+handle_ui.on("pa-grade-uncheckbox", function () {
+    $(this).closest(".pa-gradeentry").find(".pa-gradevalue").each(pa_grade_uncheckbox);
+});
+
+function pa_setgrade(gi, editable) {
+    var k = this.getAttribute("data-pa-grade"),
+        ge = gi.entries[k];
+    if (!ge)
+        return;
+
+    var g = gi.grades ? gi.grades[ge.pos] : null,
+        ag = gi.autogrades ? gi.autogrades[ge.pos] : null,
+        $g = $(this);
+
+    // “grade is above max” message
+    if (ge.max && editable) {
+        if (!g || g <= ge.max)
+            $g.find(".pa-gradeabovemax").remove();
+        else if (!$g.find(".pa-gradeabovemax").length)
+            $g.find(".pa-gradeentry").after('<div class="pa-gradeabovemax">Grade is above max</div>');
+    }
+
+    // “autograde differs” message
+    if (ag != null && editable) {
+        if (g === ag)
+            $g.find(".pa-gradediffers").remove();
+        else {
+            var txt = "autograde is " + ag;
+            if (!$g.find(".pa-gradediffers").length)
+                $g.find(".pa-gradeentry").append('<span class="pa-gradediffers"></span>');
+            var $ag = $g.find(".pa-gradediffers");
+            if ($ag.text() !== txt)
+                $ag.text(txt);
+        }
+    }
+
+    // maybe uncheckbox
+    var $v = $g.find(".pa-gradevalue");
+    if ($v[0].type === "checkbox"
+        && g != null
+        && g !== 0
+        && g !== ge.max)
+        pa_grade_uncheckbox.call($v[0]);
+
+    // actual grade value
+    var gt = g == null ? "" : "" + g;
+    if (editable && $v[0].type === "checkbox") {
+        $v.prop("checked", !!g);
+    } else if (editable && $v.val() !== gt && !$v.is(":focus")) {
+        $v.val(gt);
+    } else if (!editable && $v.text() !== gt) {
+        $v.text(gt);
+    }
+
+    // maybe add landmark reference
+    if (ge.landmark
+        && this.parentElement
+        && hasClass(this.parentElement, "pa-gradelist")) {
+        var m = /^(.*):(\d+)$/.exec(ge.landmark);
+        var $line = pa_ensureline(m[1], "a" + m[2]);
+        var want_gbr = "";
+        if ($line.length) {
+            var $pi = $(this).closest(".pa-psetinfo"),
+                directory = $pi[0].getAttribute("data-pa-directory") || "";
+            if (directory && m[1].substr(0, directory.length) === directory)
+                m[1] = m[1].substr(directory.length);
+            want_gbr = '@<a href="#' + $line[0].id + '" class="uix pa-goto">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
+        }
+        var $pgbr = $g.find(".pa-gradeboxref");
+        if (!$line.length)
+            $pgbr.remove();
+        else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
+            $pgbr.remove();
+            $g.find(".pa-gradeentry").append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
+        }
+    }
+}
 
 handle_ui.on("pa-gradevalue", function () {
     $(this).closest("form").submit();
@@ -2454,94 +2545,36 @@ function pa_loadgrades(gi) {
 
     $pi.find(".pa-need-grade").each(function () {
         var k = this.getAttribute("data-pa-grade");
-        var ge = gi.entries[k];
-        if (ge) {
-            $(this).html(pa_makegrade(k, ge, editable)).removeClass("pa-need-grade");
+        if (gi.entries[k]) {
+            $(this).html(pa_makegrade(gi, k, editable)).removeClass("pa-need-grade");
             if (this.hasAttribute("data-pa-landmark-range"))
                 $(this).find(".pa-gradeentry").append('<button type="button" class="btn ui pa-compute-grade">Grade from notes</button>');
         }
     });
 
-    var $pge = $pi.find(".pa-grade");
-    var last_in_gradelist = null;
-
-    // handle grade entries
-    for (var i = 0; i < gi.order.length; ++i) {
-        var k = gi.order[i];
-        var ge = gi.entries[k];
-        var $g = [], in_gradelist = null, $pg;
-        for (var j = 0; j < $pge.length; ++j) {
-            if ($pge[j].getAttribute("data-pa-grade") == k) {
-                $g.push($pge[j]);
-                if (hasClass($pge[j].parentElement, "pa-gradelist"))
-                    in_gradelist = $pge[j];
-            }
-        }
-        if (!in_gradelist) {
-            $pg = $(pa_makegrade(k, ge, editable));
-            $g.push($pg[0]);
-            if (last_in_gradelist)
-                $pg.insertAfter(last_in_gradelist);
+    $pi.find(".pa-gradelist").each(function () {
+        var ch = this.firstChild;
+        while (ch && !hasClass(ch, "pa-grade"))
+            ch = ch.nextSibling;
+        for (var i = 0; i < gi.order.length; ++i) {
+            var k = gi.order[i];
+            if (ch && ch.getAttribute("data-pa-grade") === k)
+                ch = ch.nextSibling;
             else
-                $pg.appendTo($pi.find(".pa-gradelist"));
-            in_gradelist = $pg[0];
+                this.insertBefore($(pa_makegrade(gi, k, editable))[0], ch);
         }
-        last_in_gradelist = in_gradelist;
-        $g = $($g);
+        while (ch) {
+            var e = ch;
+            ch = ch.nextSibling;
+            this.removeChild(e);
+        }
+    });
 
-        var g = gi.grades ? gi.grades[i] : null;
-        var ag = gi.autogrades ? gi.autogrades[i] : null;
-        // “grade is above max” message
-        if (ge.max && editable) {
-            if (!g || g <= ge.max)
-                $g.find(".pa-gradeabovemax").remove();
-            else if (!$g.find(".pa-gradeabovemax").length)
-                $g.find(".pa-gradeentry").after('<div class="pa-gradeabovemax">Grade is above max</div>');
-        }
-        // “autograde differs” message
-        if (ag !== null && editable) {
-            if (g === ag)
-                $g.find(".pa-gradediffers").remove();
-            else {
-                var txt = "autograde is " + ag;
-                if (!$g.find(".pa-gradediffers").length)
-                    $g.find(".pa-gradeentry").append('<span class="pa-gradediffers"></span>');
-                var $ag = $g.find(".pa-gradediffers");
-                if ($ag.text() !== txt)
-                    $ag.text(txt);
-            }
-        }
-        // actual grade value
-        g = g === null ? "" : "" + g;
-        for (j = 0; j < $g.length; ++j) {
-            var $gj = $($g[j]);
-            var $v = $gj.find(".pa-gradevalue");
-            if (editable && $v.val() !== g && !$v.is(":focus")) {
-                $v.val(g);
-            } else if (!editable && $v.text() !== g) {
-                $v.text(g);
-            }
-            if (ge.landmark
-                && $g[j].parentElement
-                && hasClass($g[j].parentElement, "pa-gradelist")) {
-                var m = /^(.*):(\d+)$/.exec(ge.landmark);
-                var $line = pa_ensureline(m[1], "a" + m[2]);
-                var want_gbr = "";
-                if ($line.length) {
-                    if (directory && m[1].substr(0, directory.length) === directory)
-                        m[1] = m[1].substr(directory.length);
-                    want_gbr = '@<a href="#' + $line[0].id + '" class="uix pa-goto">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
-                }
-                var $pgbr = $gj.find(".pa-gradeboxref");
-                if (!$line.length)
-                    $pgbr.remove();
-                else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
-                    $pgbr.remove();
-                    $gj.find(".pa-gradeentry").append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
-                }
-            }
-        }
-    }
+    $pi.find(".pa-grade").each(function () {
+        pa_setgrade.call(this, gi, editable);
+    });
+
+    var $pge = $pi.find(".pa-grade");
 
     // handle late hours
     for (var j = 0; j < $pge.length; ++j) {
@@ -2578,7 +2611,7 @@ function pa_loadgrades(gi) {
     $g = $pi.find(".pa-total");
     if (tm[0] && !$g.length) {
         $g = $('<div class="pa-total pa-grp"><div class="pa-grp-title">total</div>' +
-            '<span class="pa-gradevalue"></span> ' +
+            '<span class="pa-gradevalue pa-gradewidth"></span> ' +
             '<span class="pa-grademax">of ' + tm[1] + '</span></div>');
         $g.prependTo($pi.find(".pa-gradelist"));
     }
