@@ -782,6 +782,7 @@ $(document).on("click", ".ui, .uix", handle_ui);
 $(document).on("change", ".uich", handle_ui);
 $(document).on("keydown", ".uikd", handle_ui);
 $(document).on("mouseup mousedown", ".uim", handle_ui);
+$(document).on("submit", ".ui-submit", handle_ui);
 
 
 // rangeclick
@@ -2349,50 +2350,29 @@ jQuery.fn.extend({
     }
 });
 
-function ajaxsave61(form, success) {
-    form = jQuery(form);
-    if (form.prop("outstanding"))
-        return true;
-    form.prop("outstanding", true);
-    form.find(".ajaxsave61").html("Saving...");
-    jQuery.ajax(form.attr("action"), {
-        data: form.serializeWith({ajax: 1}),
-        type: "POST", cache: false,
-        dataType: "json",
-        success: function (data) {
-            form.prop("outstanding", false);
-            if (data && data.ok) {
-                form.find(".ajaxsave61").html("Saved");
-                success && success(data);
-            } else
-                form.find(".ajaxsave61").html('<strong class="err">' + ((data && data.error) || "Failed") + '</strong>');
-        },
-        error: function () {
-            form.find(".ajaxsave61").html("Failed!");
-        }
-    });
-    return false;
-}
-
 function pa_makegrade(name, ge, editable) {
     var name = escape_entities(name);
-    var t = '<table class="pa-grade pa-grp" data-pa-grade="' + name +
-        '"><tbody><tr><td class="pa-grp-title">' +
-        (ge.title ? escape_entities(ge.title) : name) + '</td><td>';
+    var t = '<div class="pa-grade pa-grp" data-pa-grade="' + name + '">',
+        title = ge.title ? escape_entities(ge.title) : name;
     if (editable) {
-        t += '<form onsubmit="return pa_savegrades(this)">';
+        var id = "pa-ge" + ++pa_makegrade.id_counter;
+        t += '<form class="ui-submit pa-gradevalue-form">'
+            + '<label class="pa-grp-title" for="' + id + '">' + title + '</label>';
         if (ge.type === "text") {
-            t += '<div><textarea class="pa-gradevalue" name="' + name +
-                '" onchange="$(this).closest(\'form\').submit()"></textarea>';
+            t += '<textarea class="uich pa-gradevalue" name="' + name +
+                '" id="' + id + '"></textarea>';
+        } else if (ge.type === "checkbox") {
         } else {
-            t += '<div class="pa-gradeentry"><span class="pa-gradeholder">' +
-                '<input type="text" class="pa-gradevalue" name="' + name +
-                '" onchange="$(this).closest(\'form\').submit()" /></span>';
+            t += '<div class="pa-gradeentry">' +
+                '<input type="text" class="uich pa-gradevalue" name="' + name +
+                '" id="' + id + '" />';
             if (ge.max)
-                t += ' <span class="pa-grademax" style="display:inline-block;min-width:3.5em">of ' + ge.max + '</span>';
+                t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
+            t += '</div>';
         }
-        t += ' <input type="submit" value="Save" tabindex="1" style="display:none" /></div></form>';
+        t += '</form>';
     } else {
+        t += '<div class="pa-grp-title">' + title + '</div>';
         if (ge.type === "text")
             t += '<div class="pa-gradevalue"></div>';
         else
@@ -2400,9 +2380,54 @@ function pa_makegrade(name, ge, editable) {
         if (ge.max)
             t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
     }
-    t += '</td></tr></tbody></table>';
-    return t;
+    return t + '</div>';
 }
+pa_makegrade.id_counter = 0;
+
+handle_ui.on("pa-gradevalue", function () {
+    $(this).closest("form").submit();
+});
+
+handle_ui.on("pa-gradevalue-form", function (event) {
+    event.preventDefault();
+    if (this.getAttribute("data-outstanding"))
+        return;
+
+    var self = this, $f = $(self);
+    self.setAttribute("data-outstanding", "1");
+    $f.find(".pa-gradediffers, .pa-save-message").remove();
+    $f.find(".pa-gradeentry").append('<span class="pa-save-message">Saving…</span>');
+
+    var gi = $f.closest(".pa-psetinfo").data("pa-gradeinfo");
+    if (typeof gi === "string")
+        gi = JSON.parse(gi);
+
+    var g = {}, og = {};
+    $f.find("input.pa-gradevalue, textarea.pa-gradevalue").each(function () {
+        var ge = gi.entries[this.name];
+        if (gi.grades && ge && gi.grades[ge.pos] != null)
+            og[this.name] = gi.grades[ge.pos];
+        else if (this.name === "late_hours" && gi.late_hours != null)
+            og[this.name] = gi.late_hours;
+        if ((this.type !== "checkbox" && this.type !== "radio")
+            || this.checked)
+            g[this.name] = this.value;
+        else if (this.type === "checkbox")
+            g[this.name] = 0;
+    });
+
+    $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f)), {
+        type: "POST", cache: false, data: {grades: g, oldgrades: og},
+        success: function (data) {
+            self.removeAttribute("data-outstanding");
+            if (data.ok)
+                $f.find(".pa-save-message").html("Saved");
+            else
+                $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
+            pa_loadgrades.call(self, data);
+        }
+    });
+});
 
 function hoturl_gradeparts($j, args) {
     var $x = $j.closest(".pa-psetinfo"), v;
@@ -2414,45 +2439,6 @@ function hoturl_gradeparts($j, args) {
     if ((v = $x.attr("data-pa-hash")))
         args.commit = v;
     return args;
-}
-
-function pa_savegrades(form) {
-    var $f = $(form);
-    if ($f.prop("outstanding"))
-        return;
-
-    $f.prop("outstanding", true);
-    $f.find("input[type=submit]").prop("disabled", true);
-    $f.find(".pa-gradediffers, .ajaxsave61").remove();
-    $f.find(".pa-gradeentry").append('<span class="ajaxsave61">Saving…</span>');
-
-    var gi = $f.closest(".pa-psetinfo").data("pa-gradeinfo");
-    if (typeof gi === "string") {
-        gi = JSON.parse(gi);
-    }
-    var g = {}, og = {};
-    $f.find("input.pa-gradevalue, textarea.pa-gradevalue").each(function () {
-        var ge = gi.entries[this.name];
-        if (gi.grades && ge && gi.grades[ge.pos] != null)
-            og[this.name] = gi.grades[ge.pos];
-        else if (this.name === "late_hours" && gi.late_hours != null)
-            og[this.name] = gi.late_hours;
-        g[this.name] = this.value;
-    });
-
-    $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f)), {
-        type: "POST", cache: false, data: {grades: g, oldgrades: og},
-        success: function (data) {
-            $f.prop("outstanding", false);
-            $f.find("input[type=submit]").prop("disabled", false);
-            if (data.ok)
-                $f.find(".ajaxsave61").html("Saved");
-            else
-                $f.find(".ajaxsave61").html('<strong class="err">' + data.error + '</strong>');
-            pa_loadgrades.call(form, data);
-        }
-    });
-    return false;
 }
 
 function pa_loadgrades(gi) {
@@ -2591,11 +2577,9 @@ function pa_loadgrades(gi) {
     var tm = pa_gradeinfo_total(gi);
     $g = $pi.find(".pa-total");
     if (tm[0] && !$g.length) {
-        $g = $('<table class="pa-total pa-grp"><tbody><tr>' +
-            '<td class="pa-grp-title">total</td><td class="nw">' +
-            '<span class="pa-gradevalue' + (editable ? " pa-gradeholder" : "") +
-            '"></span> <span class="pa-grademax">of ' + tm[1] +
-            '</span></td></tr></tbody></table>');
+        $g = $('<div class="pa-total pa-grp"><div class="pa-grp-title">total</div>' +
+            '<span class="pa-gradevalue"></span> ' +
+            '<span class="pa-grademax">of ' + tm[1] + '</span></div>');
         $g.prependTo($pi.find(".pa-gradelist"));
     }
     $v = $g.find(".pa-gradevalue");

@@ -580,6 +580,7 @@ function echo_all_grades() {
     $has_grades = $Info->has_assigned_grades();
     if ($Info->can_view_grades() && ($Me !== $User || $has_grades)) {
         echo '<div class="pa-gradelist',
+            ($User !== $Me ? " editable" : " noneditable"),
             ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
         Ht::stash_script('pa_loadgrades.call($(".pa-psetinfo")[0], ' . json_encode($Info->grade_json()) . ')');
         if ($Pset->has_grade_landmark)
@@ -590,23 +591,20 @@ function echo_all_grades() {
     $lhd = $Info->late_hours_data();
     if ($lhd && $User === $Me && $Info->can_view_grades()) {
         if ((isset($lhd->hours) && $lhd->hours > 0) || $has_grades) {
-            echo '<div style="margin-top:1.5em">';
+            echo '<div>';
             ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>',
                                     array(), array("nowrap" => true));
             echo '</div>';
         }
     } else if ($User !== $Me && $Info->pset->late_hours_entry()) {
-        echo '<table class="pa-grade pa-grp" data-pa-grade="late_hours" style="margin-top:1em"><tbody>',
-            '<tr><td class="pa-grp-title">late hours</td>',
-            '<td><form onsubmit="return pa_savegrades(this)"><div class="pa-gradeentry">',
-            '<span class="pa-gradeholder">',
+        echo '<div class="pa-grade pa-grp" data-pa-grade="late_hours">',
+            '<label class="pa-grp-title" for="pa-lh">late hours</label>',
+            '<form class="ui-submit pa-gradevalue-form"><div class="pa-gradeentry">',
             Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
-                      ["onchange" => "$(this).closest('form').submit()", "class" => "pa-gradevalue"]),
-            '</span>',
-            Ht::submit("Submit", ["style" => "display:none"]);
+                      ["class" => "uich pa-gradevalue"]);
         if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours)
             echo '<span class="pa-gradediffers">auto-late hours is ', htmlspecialchars($lhd->autohours), '</span>';
-        echo '</div></form></td></tr></tbody></table>';
+        echo '</div></form></div>';
     }
 }
 

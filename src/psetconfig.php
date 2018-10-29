@@ -678,6 +678,7 @@ class GradeEntryConfig {
         $this->position = Pset::cnum($loc, $g, "position");
         if ($this->position === null && isset($g->priority))
             $this->position = -Pset::cnum($loc, $g, "priority");
+
         if (isset($g->landmark)) {
             if (is_string($g->landmark)
                 && preg_match('/\A(.*):(\d+)\z/', $g->landmark, $m)) {
