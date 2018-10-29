@@ -2685,11 +2685,12 @@ span.foldarrow {
 	padding: 1.5em 1em 1.5em 2em;
 	margin: 0;
 }
-.pa-runcursor {
+.pa-runcursor:after {
 	color: #66ee66;
 	background-color: #66ee66;
 	display: inline-block;
 	animation: 900ms infinite pa-runcursor-flash;
+	content: " ";
 }
 @keyframes pa-runcursor-flash {
 	from, 55%, to {
