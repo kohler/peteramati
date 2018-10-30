@@ -134,11 +134,6 @@ else if (!$Info->can_view_repo_contents())
 // we’re gonna run it; check permission
 if (!$Me->can_run($Pset, $Runner, $User))
     quit("You can’t run that command");
-if (!$Pset->run_dirpattern)
-    quit("Configuration error (run_dirpattern)");
-if (!$Pset->run_jailfiles)
-    quit("Configuration error (run_jailfiles)");
-
 
 // extract request info
 $Rstate = new RunnerState($Info, $Runner);
@@ -154,6 +149,12 @@ if ($Qreq->ensure) {
     if ($answer->ok || !get($answer, "run_empty"))
         json_exit($answer);
 }
+
+// check runnability
+if (!$Pset->run_dirpattern)
+    quit("Configuration error (run_dirpattern)");
+if (!$Pset->run_jailfiles)
+    quit("Configuration error (run_jailfiles)");
 
 // queue
 $Queue = $Rstate->make_queue();
