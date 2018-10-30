@@ -2668,7 +2668,7 @@ function fold61(sel, arrowholder, direction) {
     j.toggleClass("hidden", direction);
     if (arrowholder)
         $(arrowholder).find("span.foldarrow").html(
-            j.is(":visible") ? "&#x25BC;" : "&#x25B6;"
+            j.hasClass("hidden") ? "&#x25B6;" : "&#x25BC;"
         );
     return false;
 }
