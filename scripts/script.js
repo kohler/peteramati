@@ -3280,8 +3280,11 @@ function pa_run(button, opt) {
         if (!thexterm) {
             therun[0].setAttribute("data-pa-runbottom", 1);
             therun[0].addEventListener("scroll", function () {
-                var bottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 10;
-                bottom ? this.setAttribute("data-pa-runbottom", 1) : this.removeAttribute("data-pa-runbottom");
+                requestAnimationFrame(function () {
+                    var e = therun[0],
+                        bottom = e.scrollTop + e.clientHeight >= e.scrollHeight - 10;
+                    bottom ? e.setAttribute("data-pa-runbottom", 1) : e.removeAttribute("data-pa-runbottom");
+                });
             });
             scroll_therun();
         }
