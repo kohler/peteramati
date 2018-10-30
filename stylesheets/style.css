@@ -2683,7 +2683,7 @@ span.foldarrow {
 	font-style: italic;
 }
 .pa-runpre {
-	padding: 1.5em 1em 1.5em 2em;
+	padding: 1.5rem 0 1.5rem 2rem;
 	margin: 0;
 }
 .pa-runcursor:after {
@@ -2700,6 +2700,10 @@ span.foldarrow {
 	22%, 33% {
 		opacity: 0;
 	}
+}
+.pa-rl {
+	display: block;
+	height: 1rem;
 }
 .pa-rl-continues:after {
 	content: "…\A";

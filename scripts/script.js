@@ -3104,7 +3104,7 @@ return function (container, string, options) {
         var m, filematch, a, i, x, isnew = !node, displaylen = 0;
         if (isnew) {
             node = document.createElement("span");
-            //node.className = "pa-rl";
+            node.className = "pa-rl";
         }
 
         if (/\r/.test(line))
@@ -3132,10 +3132,10 @@ return function (container, string, options) {
                 || (displaylen + render.length == 133 && render.charAt(132) !== "\n")) {
                 render = render.substr(0, 132 - displaylen);
                 addlinepart(node, render);
-                node.className = "pa-rl-continues";
+                node.className = "pa-rl pa-rl-continues";
                 isnew && addfragment(node);
                 node = document.createElement("span");
-                //node.className = "pa-rl";
+                node.className = "pa-rl";
                 isnew = true;
                 displaylen = 0;
             } else {
