@@ -3266,11 +3266,13 @@ function pa_run(button, opt) {
 
     function scroll_therun() {
         var e = therun[0];
-        if (hasClass(e, "pa-run-short")
-            && e.scrollHeight > e.clientHeight)
-            removeClass(e, "pa-run-short");
-        if (e.hasAttribute("data-pa-runbottom"))
-            e.scrollTop = Math.max(e.scrollHeight - e.clientHeight, 0);
+        if (hasClass(e, "pa-run-short") || e.hasAttribute("data-pa-runbottom"))
+            requestAnimationFrame(function () {
+                if (e.scrollHeight > e.clientHeight)
+                    removeClass(e, "pa-run-short");
+                if (e.hasAttribute("data-pa-runbottom"))
+                    e.scrollTop = Math.max(e.scrollHeight - e.clientHeight, 0);
+            });
     }
 
     if (!therun[0].hasAttribute("data-pa-opened")) {
