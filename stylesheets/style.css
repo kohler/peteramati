@@ -518,6 +518,13 @@ span.impending a {
 	border-top: 1px solid #b2a584;
 	border-bottom: 1px solid #b2a584;
 }
+.home-pset-links {
+	margin: 0 -24px;
+	padding: 5px 24px;
+	background-color: #dffdf0;
+	border-top: 1px solid #b2a584;
+	border-bottom: 1px solid #b2a584;
+}
 
 /* buttons */
 /* All input styles starting with "hb" are treated specially by script. */
