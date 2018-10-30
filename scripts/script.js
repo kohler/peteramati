@@ -3248,7 +3248,7 @@ function pa_run(button, opt) {
     fold61(therun, jQuery("#pa-runout-" + category).removeClass("hidden"), true);
     if (!checkt && !opt.noclear) {
         thepre.html("");
-        addClass(thepre.parentElement, "pa-run-short");
+        addClass(thepre[0].parentElement, "pa-run-short");
         delete thepre[0].dataset.paTerminalStyle;
     } else if (therun.lastChild)
         $(therun.lastChild).find("span.pa-runcursor").remove();
