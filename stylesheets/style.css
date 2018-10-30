@@ -2664,18 +2664,19 @@ span.foldarrow {
 	font-size: 9pt;
 	font-weight: 500;
 }
-.pa-run, .pa-run a {
-	color: #e5f8e5;
-}
-.pa-run a:hover {
-	color: #228822;
-}
 .pa-run {
 	background-color: #000022;
-	color: #d5e8d5;
+	color: #d5f8e5;
 	font-size: 85%;
 	overflow: auto;
+	height: 32em;
+}
+.pa-run-short {
+	height: auto;
 	max-height: 32em;
+}
+.pa-run a.pa-goto:hover {
+	color: #228822;
 }
 .pa-runtime {
 	color: #88aa88;
@@ -2700,7 +2701,7 @@ span.foldarrow {
 		opacity: 0;
 	}
 }
-.pa-line-continues:after {
+.pa-rl-continues:after {
 	content: "…\A";
 }
 .viewoptions61 {

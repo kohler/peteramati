@@ -766,15 +766,14 @@ if ($Pset->gitless) {
             "return runfold61('{$r->category}')", '">',
             '<span class="foldarrow">&#x25B6;</span>&nbsp;',
             htmlspecialchars($r->output_title), '</a></h3>',
-            '<div class="pa-run hidden" id="pa-run-', $r->category, '"';
+            '<div class="pa-run pa-run-short hidden" id="pa-run-', $r->category, '"';
         if ($r->xterm_js || ($r->xterm_js === null && $Pset->run_xterm_js))
             echo ' data-pa-xterm-js="true"';
         if ($rj && isset($rj->timestamp))
             echo ' data-pa-timestamp="', $rj->timestamp, '"';
         if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n")))
             echo ' data-pa-content="', htmlspecialchars(substr($rj->data, $pos + 2)), '"';
-        echo '><div class="pa-runin"><pre class="pa-runpre">';
-        echo '</pre></div></div></div>', "\n";
+        echo '><pre class="pa-runpre"></pre></div></div>', "\n";
     }
 
     // line notes

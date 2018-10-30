@@ -103,9 +103,8 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
         '</div></form>';
 
     echo '<div id="pa-runout-' . $Runner->category . '">',
-        '<div class="pa-run" id="pa-run-' . $Runner->category . '">',
-        '<div class="pa-runin"><pre class="pa-runpre"></pre></div>',
-        '</div>',
+        '<div class="pa-run pa-run-short" id="pa-run-' . $Runner->category . '">',
+        '<pre class="pa-runpre"></pre></div>',
         '</div>';
 
     echo '<div id="runmany61_users">',

@@ -3092,7 +3092,7 @@ return function (container, string, options) {
         }
         if (filematch.length) {
             var anchor = "Lb" + line + "_" + html_id_encode(file);
-            var a = $("<a href=\"#" + anchor + "\" class=\"uix pa-goto\"></a>");
+            var a = $("<a href=\"#" + anchor + "\" class=\"uu uix pa-goto\"></a>");
             a.text(link.replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;
@@ -3102,7 +3102,10 @@ return function (container, string, options) {
 
     function render_line(line, node) {
         var m, filematch, a, i, x, isnew = !node, displaylen = 0;
-        node = node || document.createElement("span");
+        if (isnew) {
+            node = document.createElement("span");
+            //node.className = "pa-rl";
+        }
 
         if (/\r/.test(line))
             line = clean_cr(line);
@@ -3129,9 +3132,10 @@ return function (container, string, options) {
                 || (displaylen + render.length == 133 && render.charAt(132) !== "\n")) {
                 render = render.substr(0, 132 - displaylen);
                 addlinepart(node, render);
-                node.className = "pa-line-continues";
+                node.className = "pa-rl-continues";
                 isnew && addfragment(node);
                 node = document.createElement("span");
+                //node.className = "pa-rl";
                 isnew = true;
                 displaylen = 0;
             } else {
@@ -3191,13 +3195,13 @@ return function (container, string, options) {
         render_line(last, i ? null : node);
     }
 
-    if (options.cursor && !container.lastChild && !fragment)
+    if (options && options.cursor && !container.lastChild && !fragment)
         addfragment("");
 
     if (fragment)
         container.appendChild(fragment);
 
-    if (options.cursor) {
+    if (options && options.cursor) {
         if (!cursor) {
             cursor = document.createElement("span");
             cursor.className = "pa-runcursor";
@@ -3244,9 +3248,10 @@ function pa_run(button, opt) {
     fold61(therun, jQuery("#pa-runout-" + category).removeClass("hidden"), true);
     if (!checkt && !opt.noclear) {
         thepre.html("");
+        addClass(thepre.parentElement, "pa-run-short");
         delete thepre[0].dataset.paTerminalStyle;
-    } else
-        therun.find("span.pa-runcursor").remove();
+    } else if (therun.lastChild)
+        $(therun.lastChild).find("span.pa-runcursor").remove();
 
     if (therun[0].dataset.paXtermJs
         && therun[0].dataset.paXtermJs !== "false"
@@ -3261,6 +3266,9 @@ function pa_run(button, opt) {
 
     function scroll_therun() {
         var e = therun[0];
+        if (hasClass(e, "pa-run-short")
+            && e.scrollHeight > e.clientHeight)
+            removeClass(e, "pa-run-short");
         if (e.hasAttribute("data-pa-runbottom"))
             e.scrollTop = Math.max(e.scrollHeight - e.clientHeight, 0);
     }
