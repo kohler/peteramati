@@ -3198,17 +3198,27 @@ return function (container, string, options) {
     if (fragment)
         container.appendChild(fragment);
 
-    if (container.childNodes.length >= 4000) {
+    var len = container.childNodes.length;
+    if (len >= 4000) {
         i = container.firstChild;
-        while (i.tagName === "DIV" && i.className === "pa-rl-group")
+        while (i.tagName === "DIV" && i.className === "pa-rl-group") {
             i = i.nextSibling;
-        var div = document.createElement("div");
-        div.className = "pa-rl-group";
-        container.insertBefore(div, i);
+            --len;
+        }
+        var div = null, divlen = 0;
         while (i && (j = i.nextSibling)) {
+            if (!div
+                || (divlen >= 4000 && len >= 2000)) {
+                div = document.createElement("div");
+                div.className = "pa-rl-group";
+                container.insertBefore(div, i);
+                divlen = 0;
+            }
             container.removeChild(i);
             div.appendChild(i);
             i = j;
+            ++divlen;
+            --len;
         }
     }
 
