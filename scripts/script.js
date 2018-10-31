@@ -2691,8 +2691,8 @@ function sb() {
 }
 
 function runfold61(name) {
-    var therun = jQuery("#pa-run-" + name), thebutton;
-    if (therun[0].dataset.paTimestamp && !therun.is(":visible")) {
+    var therun = document.getElementById("pa-run-" + name), thebutton;
+    if (therun.dataset.paTimestamp && !$(therun).is(":visible")) {
         thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
         pa_run(thebutton, {unfold: true});
     } else
@@ -3102,10 +3102,8 @@ return function (container, string, options) {
 
     function render_line(line, node) {
         var m, filematch, a, i, x, isnew = !node, displaylen = 0;
-        if (isnew) {
+        if (isnew)
             node = document.createElement("span");
-            node.className = "pa-rl";
-        }
 
         if (/\r/.test(line))
             line = clean_cr(line);
@@ -3132,10 +3130,9 @@ return function (container, string, options) {
                 || (displaylen + render.length == 133 && render.charAt(132) !== "\n")) {
                 render = render.substr(0, 132 - displaylen);
                 addlinepart(node, render);
-                node.className = "pa-rl pa-rl-continues";
+                node.className = "pa-rl-continues";
                 isnew && addfragment(node);
                 node = document.createElement("span");
-                node.className = "pa-rl";
                 isnew = true;
                 displaylen = 0;
             } else {
@@ -3201,6 +3198,20 @@ return function (container, string, options) {
     if (fragment)
         container.appendChild(fragment);
 
+    if (container.childNodes.length >= 4000) {
+        i = container.firstChild;
+        while (i.tagName === "DIV" && i.className === "pa-rl-group")
+            i = i.nextSibling;
+        var div = document.createElement("div");
+        div.className = "pa-rl-group";
+        container.insertBefore(div, i);
+        while (i && (j = i.nextSibling)) {
+            container.removeChild(i);
+            div.appendChild(i);
+            i = j;
+        }
+    }
+
     if (options && options.cursor) {
         if (!cursor) {
             cursor = document.createElement("span");
@@ -3228,33 +3239,33 @@ function pa_run(button, opt) {
     var $f = $(button).closest("form"),
         category = button.getAttribute("data-pa-run-category") || button.value,
         directory = $(button).closest(".pa-psetinfo").attr("data-pa-directory"),
-        therun = $("#pa-run-" + category),
-        thepre = therun.find("pre"),
+        therun = document.getElementById("pa-run-" + category),
+        thepre = $(therun).find("pre"),
         thexterm,
         checkt;
 
     if (typeof opt !== "object")
         opt = {};
-    if (opt.unfold && therun[0].dataset.paTimestamp)
-        checkt = +therun[0].dataset.paTimestamp;
+    if (opt.unfold && therun.dataset.paTimestamp)
+        checkt = +therun.dataset.paTimestamp;
     else {
         if ($f.prop("outstanding"))
             return true;
         $f.find("button").prop("disabled", true);
         $f.prop("outstanding", true);
     }
-    delete therun[0].dataset.paTimestamp;
+    delete therun.dataset.paTimestamp;
 
     fold61(therun, jQuery("#pa-runout-" + category).removeClass("hidden"), true);
     if (!checkt && !opt.noclear) {
         thepre.html("");
         addClass(thepre[0].parentElement, "pa-run-short");
-        delete thepre[0].dataset.paTerminalStyle;
+        thepre[0].removeAttribute("data-pa-terminal-style");
     } else if (therun.lastChild)
         $(therun.lastChild).find("span.pa-runcursor").remove();
 
-    if (therun[0].dataset.paXtermJs
-        && therun[0].dataset.paXtermJs !== "false"
+    if (therun.dataset.paXtermJs
+        && therun.dataset.paXtermJs !== "false"
         && window.Terminal) {
         thexterm = new Terminal({cols: 132, rows: 25});
         thexterm.open(thepre[0], false);
@@ -3265,25 +3276,26 @@ function pa_run(button, opt) {
     }
 
     function scroll_therun() {
-        var e = therun[0];
-        if (hasClass(e, "pa-run-short") || e.hasAttribute("data-pa-runbottom"))
+        if (hasClass(therun, "pa-run-short")
+            || therun.hasAttribute("data-pa-runbottom"))
             requestAnimationFrame(function () {
-                if (e.scrollHeight > e.clientHeight)
-                    removeClass(e, "pa-run-short");
-                if (e.hasAttribute("data-pa-runbottom"))
-                    e.scrollTop = Math.max(e.scrollHeight - e.clientHeight, 0);
+                if (therun.scrollHeight > therun.clientHeight)
+                    removeClass(therun, "pa-run-short");
+                if (therun.hasAttribute("data-pa-runbottom"))
+                    therun.scrollTop = Math.max(therun.scrollHeight - therun.clientHeight, 0);
             });
     }
 
-    if (!therun[0].hasAttribute("data-pa-opened")) {
-        therun[0].setAttribute("data-pa-opened", 1);
+    if (!therun.hasAttribute("data-pa-opened")) {
+        therun.setAttribute("data-pa-opened", 1);
         if (!thexterm) {
-            therun[0].setAttribute("data-pa-runbottom", 1);
-            therun[0].addEventListener("scroll", function () {
+            therun.setAttribute("data-pa-runbottom", 1);
+            therun.addEventListener("scroll", function () {
                 requestAnimationFrame(function () {
-                    var e = therun[0],
-                        bottom = e.scrollTop + e.clientHeight >= e.scrollHeight - 10;
-                    bottom ? e.setAttribute("data-pa-runbottom", 1) : e.removeAttribute("data-pa-runbottom");
+                    if (therun.scrollTop + therun.clientHeight >= therun.scrollHeight - 10)
+                        therun.setAttribute("data-pa-runbottom", 1);
+                    else
+                        therun.removeAttribute("data-pa-runbottom");
                 });
             });
             scroll_therun();
@@ -3298,8 +3310,8 @@ function pa_run(button, opt) {
         $f.prop("outstanding", false);
         if (thexterm)
             thexterm.write("\x1b[?25l"); // “hide cursor” escape
-        else
-            therun.find(".pa-runcursor").remove();
+        else if (therun.lastChild)
+            $(therun.lastChild).find(".pa-runcursor").remove();
         if ($(button).attr("data-pa-loadgrade"))
             loadgrade61($(button));
     }
@@ -3472,9 +3484,9 @@ function pa_run(button, opt) {
         append_html(opt.headline);
     else if (opt.headline)
         append("\x1b[1;37m" + opt.headline + "\x1b[m\n");
-    if (opt.unfold && therun.attr("data-pa-content"))
-        append(therun.attr("data-pa-content"));
-    therun.removeAttr("data-pa-content");
+    if (opt.unfold && therun.getAttribute("data-pa-content"))
+        append(therun.getAttribute("data-pa-content"));
+    therun.removeAttribute("data-pa-content");
     scroll_therun();
 
     send();

@@ -2708,10 +2708,6 @@ span.foldarrow {
 		opacity: 0;
 	}
 }
-.pa-rl {
-	display: block;
-	height: 1rem;
-}
 .pa-rl-continues:after {
 	content: "…\A";
 }
