@@ -203,7 +203,7 @@ function download_psets_report($request) {
     if (isset($request["fields"]))
         $selection = explode(",", $request["fields"]);
     else
-        $selection = array("name", "username", "anon_username", "huid", "extension");
+        $selection = array("name", "username", "anon_username", "email", "huid", "extension");
     $maxbyg = array();
     $max = $max_noextra = 0;
     foreach ($Conf->psets() as $pset)
