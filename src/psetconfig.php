@@ -808,9 +808,10 @@ class RunnerConfig {
         if ($this->position === null && isset($r->priority))
             $this->position = -Pset::cnum($loc, $r, "priority");
         $this->overlay = Pset::cstr($loc, $r, "overlay");
-        $this->timed_replay = Pset::cbool($loc, $r, "timed_replay");
-        if ($this->timed_replay === null)
-            $this->timed_replay = false;
+        if (isset($r->timed_replay) && is_number($r->timed_replay))
+            $this->timed_replay = $r->timed_replay > 0 ? (float) $r->timed_replay : false;
+        else
+            $this->timed_replay = !!Pset::cbool($loc, $r, "timed_replay");
     }
     function category_argument() {
         return $this->category === $this->name ? null : $this->category;

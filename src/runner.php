@@ -237,11 +237,13 @@ class RunnerState {
                 if (!is_valid_utf8($data))
                     $data = UnicodeHelper::utf8_replace_invalid($data);
             }
-            if ($json->done) {
-                // Get time data, if it exists
-                $time = @file_get_contents($timefn);
-                if ($time !== false)
-                    $json->time_data = $time;
+            // Get time data, if it exists
+            if ($json->done
+                && $this->runner->timed_replay
+                && ($time = @file_get_contents($timefn)) !== false) {
+                $json->time_data = $time;
+                if ($this->runner->timed_replay !== true)
+                    $json->time_factor = $this->runner->timed_replay;
             }
             $json->data = $data;
             $json->offset = max($offset, 0);

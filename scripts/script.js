@@ -3277,8 +3277,10 @@ function pa_run(button, opt) {
     if (therun.dataset.paXtermJs
         && therun.dataset.paXtermJs !== "false"
         && window.Terminal) {
+        removeClass(thepre[0].parentElement, "pa-run-short");
+        addClass(thepre[0].parentElement, "pa-run-xterm-js");
         thexterm = new Terminal({cols: 132, rows: 25});
-        thexterm.open(thepre[0], false);
+        thexterm.open(thepre[0]);
         thexterm.attachCustomKeyEventHandler(function(e) {
             write(e.key);
             return false;
@@ -3286,8 +3288,9 @@ function pa_run(button, opt) {
     }
 
     function scroll_therun() {
-        if (hasClass(therun, "pa-run-short")
-            || therun.hasAttribute("data-pa-runbottom"))
+        if (!thexterm
+            && (hasClass(therun, "pa-run-short")
+                || therun.hasAttribute("data-pa-runbottom")))
             requestAnimationFrame(function () {
                 if (therun.scrollHeight > therun.clientHeight)
                     removeClass(therun, "pa-run-short");
@@ -3336,7 +3339,10 @@ function pa_run(button, opt) {
     function append_html(html) {
         if (typeof html === "string")
             html = $(html)[0];
-        pa_render_terminal(thepre[0], html, {cursor: true});
+        if (!thexterm)
+            pa_render_terminal(thepre[0], html, {cursor: true});
+        else if (window.console)
+            console.log("xterm.js cannot render " + html);
     }
 
     function append_data(str, data) {
@@ -3349,8 +3355,12 @@ function pa_run(button, opt) {
             str = ibuffer.substr(pos + 2);
             ibuffer = null;
 
-            if (!opt.noclear)
-                thepre.html("");
+            if (!opt.noclear) {
+                if (thexterm)
+                    thexterm.reset();
+                else
+                    thepre.html("");
+            }
 
             if (data && data.timestamp) {
                 var d = new Date(data.timestamp * 1000);
@@ -3363,6 +3373,33 @@ function pa_run(button, opt) {
         }
         if (str !== "")
             append(str);
+    }
+
+    function append_timed(str, times, factor) {
+        var tpos = 0, ltime = 0, ntime = 0, loff = 0, noff = 0;
+        function next() {
+            var c = times.indexOf(",", tpos);
+            if (c < 0)
+                return false;
+            var n = times.indexOf("\n", c + 1);
+            n = n < 0 ? times.length : n;
+            ltime = ntime;
+            ntime = +times.substring(tpos, c);
+            loff = noff;
+            noff = +times.substring(c + 1, n);
+            tpos = n + 1;
+            return true;
+        }
+        function f() {
+            append_data(str.substring(loff, noff));
+            scroll_therun();
+            if (next())
+                setTimeout(f, (ntime - ltime) / factor);
+            else
+                append_data(str.substring(noff));
+        }
+        factor = factor || 1;
+        next() && f();
     }
 
     function succeed(data) {
@@ -3409,34 +3446,9 @@ function pa_run(button, opt) {
             data.data = data.data.substring(offset - data.offset);
         if (data.data) {
             offset = data.lastoffset;
-            if(data.done && data.time_data != null) {
+            if (data.done && data.time_data != null) {
                 // Parse timing data
-                var parsed_data = data.time_data.trimRight().split("\n").map(function(line) {
-                    var entries = line.split(",");
-                    return {
-                        time: parseInt(entries[0]),
-                        offset: parseInt(entries[1])
-                    }
-                });
-
-                // Replay with timing
-                var cancelled = false;
-                function processRemaining(data, times, pos) {
-                    var offset = times[0].offset;
-                    var time = times[0].time;
-
-                    append_data(data.substring(pos, offset));
-                    scroll_therun();
-
-                    if (times.length > 1) {
-                        setTimeout(function() {
-                            times.shift();
-                            processRemaining(data, times, offset);
-                        }, times[1].time - time);
-                    }
-                }
-
-                processRemaining(data.data, parsed_data, 0);
+                append_timed(data.data, data.time_data, data.time_factor);
                 return;
             }
 
