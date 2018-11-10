@@ -305,29 +305,51 @@ function set_grader(Qrequest $qreq) {
         return $Conf->errorMsg("No such pset");
     else if ($pset->gitless)
         return $Conf->errorMsg("Pset has no repository");
-    $graders = array();
-    foreach ($Conf->pc_members_and_admins() as $pcm)
+
+    // collect grader weights
+    $graderw = [];
+    foreach ($Conf->pc_members_and_admins() as $pcm) {
         if (strcasecmp($pcm->email, $qreq->grader) == 0
             || $qreq->grader === "__random__"
             || ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC)))
-            $graders[] = $pcm;
-    if (!$qreq->grader || empty($graders))
+            $graderw[$pcm->contactId] = 1.0;
+    }
+
+    // enumerate grader positions
+    $graderp = [];
+    foreach ($graderw as $cid => $w)
+        if ($w > 0)
+            $graderp[$cid] = 0.0;
+    if (!$qreq->grader || empty($graderp))
         return $Conf->errorMsg("No grader");
-    $cur_graders = $graders;
+
     foreach (qreq_users($qreq) as $user) {
         // XXX check if can_set_grader
         $info = PsetView::make($pset, $user, $Me);
         if ($info->repo)
             $info->repo->refresh(2700, true);
-        if ($info->set_hash(null)) {
-            $which_grader = mt_rand(0, count($cur_graders) - 1);
-            $info->change_grader($cur_graders[$which_grader]->contactId);
-            array_splice($cur_graders, $which_grader, 1);
-            if (count($cur_graders) == 0)
-                $cur_graders = $graders;
-        } else
+        if (!$info->set_hash(null)) {
             error_log("cannot set_hash for $user->email");
+            continue;
+        }
+        // sort by position
+        asort($graderp);
+        // pick one of the lowest positions
+        $gs = [];
+        $gpos = null;
+        foreach ($graderp as $cid => $pos) {
+            if ($gpos === null || $gpos == $pos) {
+                $gs[] = $cid;
+                $gpos = $pos;
+            } else
+                break;
+        }
+        // account for grader
+        $g = $gs[mt_rand(0, count($gs) - 1)];
+        $info->change_grader($g);
+        $graderp[$g] += $graderw[$g];
     }
+
     redirectSelf();
 }
 
