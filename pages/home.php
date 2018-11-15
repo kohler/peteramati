@@ -988,7 +988,8 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
             $rg = $info->repo_grade();
             if ($rg && $rg->placeholder_at < $Now - 3600)
                 return rand(0, 2) == 0;
-            else if ($rg && $rg->placeholder_at >= $Now - 600)
+            else if (($rg && $rg->placeholder_at >= $Now - 600)
+                     || $info->user->dropped)
                 return false;
             else
                 return rand(0, 10) == 0;
