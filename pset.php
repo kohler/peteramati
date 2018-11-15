@@ -434,7 +434,9 @@ function echo_commit($Info) {
     while (($row = edb_row($result)))
         $sel[bin2hex($row[0])] .= " &nbsp;♪";
     Dbl::free($result);
-    if (($h = $Info->grading_hash()) && isset($sel[$h])) {
+    if (!empty($sel)
+        && ($h = $Info->update_grading_hash(true))
+        && isset($sel[$h])) {
         $sel[$h] = preg_replace('_\A(.*?)(?: &nbsp;|)((?:|♪))\z_', '$1 &nbsp;✱$2', $sel[$h]);
     }
     if ($Info->is_grading_commit())

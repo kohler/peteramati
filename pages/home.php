@@ -975,7 +975,7 @@ function show_pset_actions($pset) {
 }
 
 function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
-    global $Now, $Profile;
+    global $Profile;
     $t0 = $Profile ? microtime(true) : 0;
     $j = render_grading_student($info->user, $anonymous);
     if (($gcid = $info->gradercid()))
@@ -983,15 +983,17 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
 
     // are any commits committed?
     if (!$pset->gitless_grades && $info->repo) {
-        $rg = $info->repo_grade();
-        if (!$rg
-            || $rg->gradebhash === null
-            || !$info->can_view_repo_contents(true)) {
-            $t = $rg ? $rg->placeholder_at : $Now - 601;
-            if ($t < $Now - 3600 ? rand(0, 2) == 0 : ($t < $Now - 600 && rand(0, 10) == 0))
-                $info->update_placeholder_repo_grade();
-        }
-        if (($gh = $info->grading_hash()) !== null)
+        $gh = $info->update_grading_hash(function ($info) {
+            global $Now;
+            $rg = $info->repo_grade();
+            if ($rg && $rg->placeholder_at < $Now - 3600)
+                return rand(0, 2) == 0;
+            else if ($rg && $rg->placeholder_at >= $Now - 600)
+                return false;
+            else
+                return rand(0, 10) == 0;
+        });
+        if ($gh !== null)
             $j["gradehash"] = $gh;
     }
 

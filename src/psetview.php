@@ -462,6 +462,34 @@ class PsetView {
         return false;
     }
 
+    function update_grading_hash($update_chance = false) {
+        if ($this->pset->gitless_grades)
+            return false;
+        $this->ensure_grade();
+        if ((!$this->repo_grade || $this->repo_grade->gradebhash === null)
+            && $update_chance
+            && ($update_chance === true
+                || (is_callable($update_chance) && call_user_func($update_chance, $this))
+                || (is_float($update_chance) && rand(0, 999999999) < 1000000000 * $update_chance))) {
+            $this->update_placeholder_repo_grade();
+            $this->ensure_grade();
+        }
+        if ($this->repo_grade)
+            return $this->repo_grade->gradehash;
+        return false;
+    }
+
+    function update_placeholder_repo_grade() {
+        global $Now;
+        assert(!$this->pset->gitless_grades
+               && (!$this->repo_grade || $this->repo_grade->gradebhash === null));
+        $this->set_hash(null);
+        $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, placeholder=1, placeholder_at=? on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
+                $this->repo->repoid, $this->branchid, $this->pset->psetid,
+                $this->hash ? hex2bin($this->hash) : null, $Now);
+        $this->clear_grade();
+    }
+
     function grading_commit() {
         if ($this->pset->gitless_grades)
             return false;
@@ -708,7 +736,7 @@ class PsetView {
                  $this->user->contactId, $this->pset->psetid, $grader);
         else {
             assert(!!$this->hash);
-            if (!$this->repo_grade || !$this->repo_grade->gradehash)
+            if (!$this->repo_grade || $this->repo_grade->gradebhash === null)
                 $q = Dbl::format_query
                     ("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
                      $this->repo->repoid, $this->branchid, $this->pset->psetid,
@@ -739,17 +767,6 @@ class PsetView {
                     $this->repo->repoid, $this->branchid, $this->pset->psetid,
                     $this->hash ? hex2bin($this->hash) : null, $grader ? : null);
         }
-        $this->clear_grade();
-    }
-
-    function update_placeholder_repo_grade() {
-        global $Now;
-        assert(!$this->pset->gitless_grades
-               && (!$this->repo_grade || $this->repo_grade->gradebhash === null));
-        $this->set_hash(null);
-        $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, placeholder=1, placeholder_at=? on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
-                $this->repo->repoid, $this->branchid, $this->pset->psetid,
-                $this->hash ? hex2bin($this->hash) : null, $Now);
         $this->clear_grade();
     }
 
