@@ -7,7 +7,7 @@ require_once("src/initweb.php");
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"));
 if ($Me->is_empty())
     $Me->escape();
-global $User, $Pset, $Info, $Commit;
+global $User, $Pset, $Info;
 
 $User = $Me;
 if (isset($_REQUEST["u"])
@@ -94,13 +94,12 @@ class Series {
 
 // load user repo and current commit
 $Info = PsetView::make($Pset, $User, $Me);
-if (($Commit = req("newcommit")) == null)
-    $Commit = req("commit");
-if (!$Info->set_hash($Commit) && $Commit && $Info->repo) {
-    $Conf->errorMsg("Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository.");
+if (($commit = req("newcommit")) == null)
+    $commit = req("commit");
+if (!$Info->set_hash($commit) && $commit && $Info->repo) {
+    $Conf->errorMsg("Commit " . htmlspecialchars($commit) . " isn’t connected to this repository.");
     redirectSelf(array("newcommit" => null, "commit" => null));
 }
-$Commit = $Info->commit_hash();
 
 // get JSON grade series data
 if (isset($_REQUEST["gradecdf"])) {

@@ -983,13 +983,11 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
 
     // are any commits committed?
     if (!$pset->gitless_grades && $info->repo) {
-        $gh = $info->update_grading_hash(function ($info) {
+        $gh = $info->update_grading_hash(function ($info, $placeholder_at) {
             global $Now;
-            $rg = $info->repo_grade();
-            if ($rg && $rg->placeholder_at < $Now - 3600)
+            if ($placeholder_at && $placeholder_at < $Now - 3600)
                 return rand(0, 2) == 0;
-            else if (($rg && $rg->placeholder_at >= $Now - 600)
-                     || $info->user->dropped)
+            else if ($placeholder_at >= $Now - 600 || $info->user->dropped)
                 return false;
             else
                 return rand(0, 10) == 0;

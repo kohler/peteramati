@@ -17,6 +17,8 @@ class PsetView {
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
     private $repo_grade;            // RepositoryGrade+CommitNotes
+    private $_repo_grade_placeholder_bhash;
+    private $_repo_grade_placeholder_at;
     private $grade_notes;
     private $can_view_grades;
     private $user_can_view_grades;
@@ -399,8 +401,13 @@ class PsetView {
 
 
     private function analyze_grade() {
-        if ($this->repo_grade && $this->repo_grade->placeholder)
+        $this->_repo_grade_placeholder_bhash = null;
+        $this->_repo_grade_placeholder_at = 0;
+        if ($this->repo_grade && $this->repo_grade->placeholder) {
+            $this->_repo_grade_placeholder_at = +$this->repo_grade->placeholder_at;
+            $this->_repo_grade_placeholder_bhash = $this->repo_grade->gradebhash;
             $this->repo_grade = null;
+        }
         if ($this->repo_grade) {
             if ($this->repo_grade->gradebhash !== null)
                 $this->repo_grade->gradehash = bin2hex($this->repo_grade->gradebhash);
@@ -429,7 +436,7 @@ class PsetView {
                 $result = $this->conf->qe("select rg.*, cn.bhash, cn.notes, cn.notesversion
                     from RepositoryGrade rg
                     left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)
-                    where rg.repoid=? and rg.branchid=? and rg.pset=? and not rg.placeholder",
+                    where rg.repoid=? and rg.branchid=? and rg.pset=?",
                     $this->repo->repoid, $this->branchid, $this->pset->psetid);
                 $this->repo_grade = $result ? $result->fetch_object() : null;
                 Dbl::free($result);
@@ -469,11 +476,9 @@ class PsetView {
         if ((!$this->repo_grade || $this->repo_grade->gradebhash === null)
             && $update_chance
             && ($update_chance === true
-                || (is_callable($update_chance) && call_user_func($update_chance, $this))
-                || (is_float($update_chance) && rand(0, 999999999) < 1000000000 * $update_chance))) {
+                || (is_callable($update_chance) && call_user_func($update_chance, $this, $this->_repo_grade_placeholder_at))
+                || (is_float($update_chance) && rand(0, 999999999) < 1000000000 * $update_chance)))
             $this->update_placeholder_repo_grade();
-            $this->ensure_grade();
-        }
         if ($this->repo_grade)
             return $this->repo_grade->gradehash;
         return false;
@@ -483,11 +488,16 @@ class PsetView {
         global $Now;
         assert(!$this->pset->gitless_grades
                && (!$this->repo_grade || $this->repo_grade->gradebhash === null));
-        $this->set_hash(null);
-        $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, placeholder=1, placeholder_at=? on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
-                $this->repo->repoid, $this->branchid, $this->pset->psetid,
-                $this->hash ? hex2bin($this->hash) : null, $Now);
-        $this->clear_grade();
+        $c = $this->latest_commit();
+        $h = $c ? hex2bin($c->hash) : null;
+        if ($this->_repo_grade_placeholder_at === 0
+            || $this->_repo_grade_placeholder_bhash !== $h) {
+            $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, placeholder=1, placeholder_at=? on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
+                    $this->repo->repoid, $this->branchid, $this->pset->psetid,
+                    $c ? hex2bin($c->hash) : null, $Now);
+            $this->clear_grade();
+            $this->ensure_grade();
+        }
     }
 
     function grading_commit() {
