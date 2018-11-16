@@ -634,7 +634,7 @@ if ($Me->privChair && (!$User || $User === $Me)) {
 </div>\n";
 }
 
-if ($Me->isPC) {
+if ($Me->isPC && $User === $Me) {
     $a = [];
     foreach ($Conf->psets_newest_first() as $pset)
         if ($Me->can_view_pset($pset) && !$pset->disabled)
