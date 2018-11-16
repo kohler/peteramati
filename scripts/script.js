@@ -3560,7 +3560,7 @@ function pa_run(button, opt) {
             data.data = data.data.substring(offset - data.offset);
         if (data.data) {
             offset = data.lastoffset;
-            if (data.done && data.time_data != null) {
+            if (data.done && data.time_data != null && ibuffer === "") {
                 // Parse timing data
                 append_timed(data.data, data.time_data, data.time_factor);
                 return;
