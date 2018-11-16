@@ -746,7 +746,10 @@ if ($Pset->gitless) {
         ContactView::echo_group("notes", join(", ", $notelinks));
 
     // print runners
-    $crunners = $Info->commit_info("run");
+    if ($Info->is_handout_commit()) // XXX this is a hack
+        $crunners = [];
+    else
+        $crunners = $Info->commit_info("run");
     $runcategories = [];
     foreach ($Pset->runners as $r) {
         if (!$Me->can_view_run($Pset, $r, $User)

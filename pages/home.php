@@ -309,6 +309,15 @@ function set_grader(Qrequest $qreq) {
     // collect grader weights
     $graderw = [];
     foreach ($Conf->pc_members_and_admins() as $pcm) {
+        if ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC)) {
+            if (in_array($pcm->email, ["cassels@college.harvard.edu", "tnguyenhuy@college.harvard.edu", "skandaswamy@college.harvard.edu"]))
+                $graderw[$pcm->contactId] = 1.0 / 1.5;
+            else if ($pcm->email === "yihehuang@g.harvard.edu")
+                continue;
+            else
+                $graderw[$pcm->contactId] = 1.0;
+            continue;
+        }
         if (strcasecmp($pcm->email, $qreq->grader) == 0
             || $qreq->grader === "__random__"
             || ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC)))
