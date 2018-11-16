@@ -3415,18 +3415,16 @@ function pa_run(button, opt) {
         factor = factor || 1;
 
         function f(time) {
-            var npos = tpos;
             if (time === null) {
                 if (running)
                     time = ((new Date).getTime() - tstart) * factor;
                 else
                     return;
             }
-            if (npos >= times.length
-                || time < times[npos]
-                || (npos + 2 < times.length && time >= times[npos])) {
-                if (npos >= times.length || time < times[npos])
-                    npos = 0;
+            var npos = tpos;
+            if (npos >= times.length || time < times[npos])
+                npos = 0;
+            if (npos + 2 < times.length && time >= times[npos]) {
                 var rpos = times.length;
                 while (npos < rpos) {
                     var m = npos + (((rpos - npos) >> 1) & ~1);
@@ -3436,7 +3434,7 @@ function pa_run(button, opt) {
                         npos = m + 2;
                 }
             }
-            while (npos < times.length && time === times[npos])
+            while (npos < times.length && time >= times[npos])
                 npos += 2;
 
             if (npos < tpos) {
