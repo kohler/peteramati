@@ -227,7 +227,6 @@ class RunnerState {
         $this->status_json($json);
         if ($offset !== null) {
             $logfn = $this->info->runner_logfile($this->checkt);
-            $timefn = $logfn . ".time";
             $data = @file_get_contents($logfn, false, null, max($offset, 0));
             if ($data === false)
                 return (object) ["error" => true, "message" => "No such log"];
@@ -238,9 +237,12 @@ class RunnerState {
                     $data = UnicodeHelper::utf8_replace_invalid($data);
             }
             // Get time data, if it exists
+            if ($this->runner->timed_replay)
+                $json->timed = true;
             if ($json->done
+                && $offset <= 0
                 && $this->runner->timed_replay
-                && ($time = @file_get_contents($timefn)) !== false) {
+                && ($time = @file_get_contents($logfn . ".time")) !== false) {
                 $json->time_data = $time;
                 if ($this->runner->timed_replay !== true)
                     $json->time_factor = $this->runner->timed_replay;
