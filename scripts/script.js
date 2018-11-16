@@ -3325,13 +3325,17 @@ function pa_run(button, opt) {
     var ibuffer = "", // initial buffer; holds data before any results arrive
         offset = -1, backoff = 50, queueid = null;
 
-    function done() {
-        $f.find("button").prop("disabled", false);
-        $f.prop("outstanding", false);
+    function hide_cursor() {
         if (thexterm)
             thexterm.write("\x1b[?25l"); // “hide cursor” escape
         else if (therun.lastChild)
             $(therun.lastChild).find(".pa-runcursor").remove();
+    }
+
+    function done() {
+        $f.find("button").prop("disabled", false);
+        $f.prop("outstanding", false);
+        hide_cursor();
         if ($(button).attr("data-pa-loadgrade"))
             loadgrade61($(button));
     }
@@ -3401,16 +3405,31 @@ function pa_run(button, opt) {
     }
 
     function append_timed(str, times, factor) {
-        var tpos = 0, erange, etime, tstart, running = true;
+        var tpos = 0, erange, etime, ebutton, tstart, tlast, running = true;
         if (typeof times === "string")
             times = parse_times(times);
         if (times.length > 2) {
-            erange = $('<div class="pa-runrange"><input type="range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span></div>').prependTo(therun);
+            erange = $('<div class="pa-runrange"><button type="button" class="pa-runrange-play"></button><input type="range" class="pa-runrange-range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span></div>').prependTo(therun);
             etime = erange[0].lastChild;
-            erange = erange[0].firstChild;
+            ebutton = erange[0].firstChild;
+            erange = ebutton.nextSibling;
             erange.addEventListener("input", function (event) {
                 running = false;
+                addClass(ebutton, "paused");
                 f(+this.value);
+            }, false);
+            ebutton.addEventListener("click", function (event) {
+                if (hasClass(ebutton, "paused")) {
+                    removeClass(ebutton, "paused");
+                    running = true;
+                    tstart = (new Date).getTime();
+                    if (tlast < times[times.length - 2])
+                        tstart -= tlast / factor;
+                    f(null);
+                } else {
+                    addClass(ebutton, "paused");
+                    running = false;
+                }
             }, false);
         }
         factor = factor || 1;
@@ -3437,6 +3456,7 @@ function pa_run(button, opt) {
             }
             while (npos < times.length && time >= times[npos])
                 npos += 2;
+            tlast = time;
 
             if (npos < tpos) {
                 ibuffer = "";
@@ -3452,11 +3472,19 @@ function pa_run(button, opt) {
             }
 
             tpos = npos;
-            if (running && tpos < times.length)
-                setTimeout(f, Math.min(100, (times[tpos] - (tpos ? times[tpos - 2] : 0)) / factor), null);
+            if (running) {
+                if (tpos < times.length)
+                    setTimeout(f, Math.min(100, (times[tpos] - (tpos ? times[tpos - 2] : 0)) / factor), null);
+                else {
+                    if (ebutton)
+                        addClass(ebutton, "paused");
+                    hide_cursor();
+                }
+            }
         }
 
         tstart = (new Date).getTime();
+        tlast = 0;
         if (times.length)
             f(null);
     }

@@ -2714,6 +2714,36 @@ span.foldarrow {
 .pa-rl-continues:after {
 	content: "…\A";
 }
+.pa-runrange-play {
+	background: none;
+	padding: 0;
+	border: 0 none;
+	font-size: larger;
+}
+.pa-runrange {
+	background: #333333;
+	padding: 0.25rem 2rem;
+	margin: 0;
+}
+.pa-runrange-range {
+	width: 120ch;
+	max-width: 80vw;
+}
+.pa-runrange-play {
+	margin-right: 0.5rem;
+}
+.pa-runrange-play:after {
+	content: "⏸️";
+}
+.pa-runrange-play.paused:after {
+	content: "▶️";
+}
+.pa-runrange-time {
+	display: inline-block;
+	min-width: 9ch;
+	text-align: right;
+	vertical-align: 0.2rem;
+}
 .viewoptions61 {
 	display: inline-block;
 	margin-left: 2em;
