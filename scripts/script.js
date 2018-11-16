@@ -3009,6 +3009,13 @@ return function (container, string, options) {
         return_html = true;
     }
 
+    if (options && options.clear) {
+        container.removeAttribute("data-pa-terminal-style");
+        container.removeAttribute("data-pa-outputpart");
+        while (container.firstChild)
+            container.removeChild(container.firstChild);
+    }
+
     var styles = container.getAttribute("data-pa-terminal-style"),
         fragment = null;
 
@@ -3300,13 +3307,13 @@ function pa_run(button, opt) {
     }
 
     if (!therun.hasAttribute("data-pa-opened")) {
-        therun.setAttribute("data-pa-opened", 1);
+        therun.setAttribute("data-pa-opened", "true");
         if (!thexterm) {
-            therun.setAttribute("data-pa-runbottom", 1);
+            therun.setAttribute("data-pa-runbottom", "true");
             therun.addEventListener("scroll", function () {
                 requestAnimationFrame(function () {
                     if (therun.scrollTop + therun.clientHeight >= therun.scrollHeight - 10)
-                        therun.setAttribute("data-pa-runbottom", 1);
+                        therun.setAttribute("data-pa-runbottom", "true");
                     else
                         therun.removeAttribute("data-pa-runbottom");
                 });
@@ -3339,10 +3346,11 @@ function pa_run(button, opt) {
     function append_html(html) {
         if (typeof html === "string")
             html = $(html)[0];
-        if (!thexterm)
+        if (thexterm) {
+            if (window.console)
+                console.log("xterm.js cannot render " + html);
+        } else
             pa_render_terminal(thepre[0], html, {cursor: true});
-        else if (window.console)
-            console.log("xterm.js cannot render " + html);
     }
 
     function append_data(str, data) {
@@ -3355,51 +3363,101 @@ function pa_run(button, opt) {
             str = ibuffer.substr(pos + 2);
             ibuffer = null;
 
-            if (!opt.noclear) {
-                if (thexterm)
-                    thexterm.reset();
-                else
-                    thepre.html("");
+            var tsmsg = "";
+            if (data && data.timestamp) {
+                tsmsg = "...started " + strftime("%l:%M:%S%P %e %b %Y", new Date(data.timestamp * 1000));
             }
 
-            if (data && data.timestamp) {
-                var d = new Date(data.timestamp * 1000);
-                var msg = "...started " + strftime("%l:%M:%S%P %e %b %Y", d);
-                if (thexterm)
-                    append("\x1b[3;1;38;5;86m" + msg + "\x1b[m\r\n");
-                else
-                    append_html("<span class=\"pa-runtime\">" + msg + "</span>");
+            if (thexterm) {
+                if (tsmsg !== "")
+                    tsmsg = "\x1b[3;1;38;5;86m" + tsmsg + "\x1b[m\r\n";
+                if (!opt.noclear)
+                    tsmsg = "\x1bc" + tsmsg;
+                str = tsmsg + str;
+            } else {
+                if (!opt.noclear)
+                    thepre.html("");
+                if (tsmsg !== "")
+                    append_html("<span class=\"pa-runtime\">" + tsmsg + "</span>");
             }
         }
         if (str !== "")
             append(str);
     }
 
-    function append_timed(str, times, factor) {
-        var tpos = 0, ltime = 0, ntime = 0, loff = 0, noff = 0;
-        function next() {
-            var c = times.indexOf(",", tpos);
+    function parse_times(times) {
+        var a = [0, 0], p = 0;
+        while (p < times.length) {
+            var c = times.indexOf(",", p);
             if (c < 0)
-                return false;
+                break;
             var n = times.indexOf("\n", c + 1);
-            n = n < 0 ? times.length : n;
-            ltime = ntime;
-            ntime = +times.substring(tpos, c);
-            loff = noff;
-            noff = +times.substring(c + 1, n);
-            tpos = n + 1;
-            return true;
+            if (n < 0)
+                n = times.length;
+            a.push(+times.substring(p, c), +times.substring(c + 1, n));
+            p = n + 1;
         }
-        function f() {
-            append_data(str.substring(loff, noff));
-            scroll_therun();
-            if (next())
-                setTimeout(f, (ntime - ltime) / factor);
-            else
-                append_data(str.substring(noff));
+        return a;
+    }
+
+    function append_timed(str, times, factor) {
+        var tpos = 0, trange, tstart, running = true;
+        if (typeof times === "string")
+            times = parse_times(times);
+        if (times.length > 2) {
+            trange = $('<input type="range" min="0" max="' + times[times.length - 2] + '">')[0];
+            therun.insertBefore(trange, therun.firstChild);
+            trange.addEventListener("input", function (event) {
+                running = false;
+                f(+this.value);
+            }, false);
         }
         factor = factor || 1;
-        next() && f();
+
+        function f(time) {
+            var npos = tpos;
+            if (time === null) {
+                if (running)
+                    time = ((new Date).getTime() - tstart) * factor;
+                else
+                    return;
+            }
+            if (npos >= times.length
+                || time < times[npos]
+                || (npos + 2 < times.length && time >= times[npos])) {
+                if (npos >= times.length || time < times[npos])
+                    npos = 0;
+                var rpos = times.length;
+                while (npos < rpos) {
+                    var m = npos + (((rpos - npos) >> 1) & ~1);
+                    if (time <= times[m])
+                        rpos = m;
+                    else
+                        npos = m + 2;
+                }
+            }
+            while (npos < times.length && time === times[npos])
+                npos += 2;
+
+            if (npos < tpos) {
+                ibuffer = "";
+                tpos = 0;
+            }
+
+            append_data(str.substring(tpos < times.length ? times[tpos + 1] : str.length,
+                                      npos < times.length ? times[npos + 1] : str.length));
+            scroll_therun();
+            if (trange)
+                trange.value = time;
+
+            tpos = npos;
+            if (running && tpos < times.length)
+                setTimeout(f, Math.min(100, (times[tpos] - (tpos ? times[tpos - 2] : 0)) / factor), null);
+        }
+
+        tstart = (new Date).getTime();
+        if (times.length)
+            f(null);
     }
 
     function succeed(data) {
