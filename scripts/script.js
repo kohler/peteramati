@@ -3401,13 +3401,14 @@ function pa_run(button, opt) {
     }
 
     function append_timed(str, times, factor) {
-        var tpos = 0, trange, tstart, running = true;
+        var tpos = 0, erange, etime, tstart, running = true;
         if (typeof times === "string")
             times = parse_times(times);
         if (times.length > 2) {
-            trange = $('<input type="range" min="0" max="' + times[times.length - 2] + '">')[0];
-            therun.insertBefore(trange, therun.firstChild);
-            trange.addEventListener("input", function (event) {
+            erange = $('<div class="pa-runrange"><input type="range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span></div>').prependTo(therun);
+            etime = erange[0].lastChild;
+            erange = erange[0].firstChild;
+            erange.addEventListener("input", function (event) {
                 running = false;
                 f(+this.value);
             }, false);
@@ -3445,8 +3446,10 @@ function pa_run(button, opt) {
             append_data(str.substring(tpos < times.length ? times[tpos + 1] : str.length,
                                       npos < times.length ? times[npos + 1] : str.length));
             scroll_therun();
-            if (trange)
-                trange.value = time;
+            if (erange) {
+                erange.value = time;
+                etime.innerHTML = sprintf("%d:%02d.%03d", Math.trunc(time / 60000), Math.trunc(time / 1000) % 60, Math.trunc(time) % 1000);
+            }
 
             tpos = npos;
             if (running && tpos < times.length)
