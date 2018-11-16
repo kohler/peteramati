@@ -3284,6 +3284,7 @@ function pa_run(button, opt) {
         thepre.html("");
         addClass(thepre[0].parentElement, "pa-run-short");
         thepre[0].removeAttribute("data-pa-terminal-style");
+        $(therun).children(".pa-runrange").remove();
     } else if (therun.lastChild)
         $(therun.lastChild).find("span.pa-runcursor").remove();
 
