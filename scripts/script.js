@@ -3288,12 +3288,19 @@ function pa_run(button, opt) {
     } else if (therun.lastChild)
         $(therun.lastChild).find("span.pa-runcursor").remove();
 
+    function terminal_char_width(min, max) {
+        var x = $('<span style="position:absolute">0</span>').appendTo(thepre),
+            w = Math.trunc(thepre.width() / x.width() / 1.33);
+        x.remove();
+        return Math.max(min, Math.min(w, max));
+    }
+
     if (therun.dataset.paXtermJs
         && therun.dataset.paXtermJs !== "false"
         && window.Terminal) {
         removeClass(thepre[0].parentElement, "pa-run-short");
         addClass(thepre[0].parentElement, "pa-run-xterm-js");
-        thexterm = new Terminal({cols: 132, rows: 25});
+        thexterm = new Terminal({cols: terminal_char_width(80, 132), rows: 25});
         thexterm.open(thepre[0]);
         thexterm.attachCustomKeyEventHandler(function(e) {
             write(e.key);

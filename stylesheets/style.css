@@ -2721,18 +2721,18 @@ span.foldarrow {
 .pa-rl-continues:after {
 	content: "…\A";
 }
-.pa-runrange-play {
-	background: none;
-	padding: 0;
-	border: 0 none;
-	font-size: larger;
-}
 .pa-runrange {
 	background: #333333;
 	padding: 0.25rem 2rem;
 	margin: 0;
 	display: flex;
 	align-items: center;
+}
+.pa-runrange-play {
+	background: none;
+	padding: 0;
+	border: 0 none;
+	font-size: larger;
 }
 .pa-runrange-range {
 	min-width: 12rem;
