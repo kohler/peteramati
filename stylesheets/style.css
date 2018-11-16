@@ -2724,10 +2724,13 @@ span.foldarrow {
 	background: #333333;
 	padding: 0.25rem 2rem;
 	margin: 0;
+	display: flex;
+	align-items: center;
 }
 .pa-runrange-range {
-	width: 120ch;
-	max-width: 80vw;
+	min-width: 12rem;
+	max-width: 80em;
+	flex: 1 0 auto;
 }
 .pa-runrange-play {
 	margin-right: 0.5rem;
@@ -2743,6 +2746,16 @@ span.foldarrow {
 	min-width: 9ch;
 	text-align: right;
 	vertical-align: 0.2rem;
+}
+.pa-runrange-speed {
+	width: 10ch;
+}
+.pa-runrange-speed-slow {
+	padding-left: 2rem;
+	padding-right: 0.25rem;
+}
+.pa-runrange-speed-fast {
+	padding-left: 0.5rem;
 }
 .viewoptions61 {
 	display: inline-block;

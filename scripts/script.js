@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 var siteurl, siteurl_postvalue, siteurl_suffix, siteurl_defaults,
-    siteurl_absolute_base,
+    siteurl_path, siteurl_absolute_base,
     hotcrp_paperid, hotcrp_list, hotcrp_status, hotcrp_user,
     peteramati_uservalue, peteramati_psets,
     hotcrp_want_override_conflict;
@@ -624,6 +624,12 @@ try {
 wstorage.json = function (is_session, key) {
     var x = wstorage(is_session, key);
     return x ? JSON.parse(x) : false;
+};
+wstorage.site = function (is_session, key, value) {
+    return wstorage(is_session, siteurl_path + key, value);
+};
+wstorage.site_json = function (is_session, key) {
+    return wstorage.json(is_session, siteurl_path + key);
 };
 
 
@@ -3405,14 +3411,17 @@ function pa_run(button, opt) {
     }
 
     function append_timed(str, times, factor) {
-        var tpos = 0, erange, etime, ebutton, tstart, tlast, running = true;
+        var erange, etime, ebutton, espeed,
+            tpos, tstart, tlast, timeout, running = true;
         if (typeof times === "string")
             times = parse_times(times);
         if (times.length > 2) {
-            erange = $('<div class="pa-runrange"><button type="button" class="pa-runrange-play"></button><input type="range" class="pa-runrange-range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span></div>').prependTo(therun);
+            erange = $('<div class="pa-runrange"><button type="button" class="pa-runrange-play"></button><input type="range" class="pa-runrange-range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span><span class="pa-runrange-speed-slow">🐢</span><input type="range" class="pa-runrange-speed" min="0.1" max="10" step="0.1"><span class="pa-runrange-speed-fast">🐇</span></div>').prependTo(therun);
             etime = erange[0].lastChild;
             ebutton = erange[0].firstChild;
             erange = ebutton.nextSibling;
+            etime = erange.nextSibling;
+            espeed = etime.nextSibling.nextSibling;
             erange.addEventListener("input", function (event) {
                 running = false;
                 addClass(ebutton, "paused");
@@ -3431,8 +3440,22 @@ function pa_run(button, opt) {
                     running = false;
                 }
             }, false);
+            espeed.addEventListener("input", function (event) {
+                factor = +this.value;
+                wstorage.site(false, "pa-runspeed-" + category, [factor, (new Date).getTime()]);
+                if (running) {
+                    tstart = (new Date).getTime() - tlast / factor;
+                    f(null);
+                }
+            }, false);
         }
-        factor = factor || 1;
+        if ((tpos = wstorage.site_json(false, "pa-runspeed-" + category))
+            && tpos[1] >= (new Date).getTime() - 86400000)
+            factor = tpos[0];
+        if (factor < 0.1 || factor > 10)
+            factor = 1;
+        if (espeed)
+            espeed.value = factor;
 
         function f(time) {
             if (time === null) {
@@ -3472,9 +3495,11 @@ function pa_run(button, opt) {
             }
 
             tpos = npos;
+            if (timeout)
+                timeout = clearTimeout(timeout);
             if (running) {
                 if (tpos < times.length)
-                    setTimeout(f, Math.min(100, (times[tpos] - (tpos ? times[tpos - 2] : 0)) / factor), null);
+                    timeout = setTimeout(f, Math.min(100, (times[tpos] - (tpos ? times[tpos - 2] : 0)) / factor), null);
                 else {
                     if (ebutton)
                         addClass(ebutton, "paused");
@@ -3483,6 +3508,7 @@ function pa_run(button, opt) {
             }
         }
 
+        tpos = 0;
         tstart = (new Date).getTime();
         tlast = 0;
         if (times.length)
@@ -3889,7 +3915,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         anonymous = pconf.anonymous;
 
     function initialize() {
-        var x = wstorage(true, "pa-pset" + psetid + "-table");
+        var x = wstorage.site(true, "pa-pset" + psetid + "-table");
         x && (sort = JSON.parse(x));
         if (!sort.f || !/^\w+$/.test(sort.f))
             sort.f = "username";
@@ -4180,7 +4206,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             });
         }
         set_hotlist($b);
-        wstorage(true, "pa-pset" + psetid + "-table", JSON.stringify(sort));
+        wstorage.site(true, "pa-pset" + psetid + "-table", JSON.stringify(sort));
     }
     function rerender_usernames() {
         $j.find("td.pap-username").each(function () {
