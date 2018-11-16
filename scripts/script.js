@@ -3544,12 +3544,17 @@ function pa_run(button, opt) {
             $("#pa-runstop-" + category).remove();
 
         if (!data || !data.ok) {
-            if (data && data.loggedout)
+            x = "Unknown error";
+            if (data && data.loggedout) {
                 x = "You have been logged out (perhaps due to inactivity). Please reload this page.";
-            else if (data)
-                x = data.error_text || data.error || "Unknown";
-            else
-                x = "Unknown";
+            } else if (data) {
+                if (data.error_text)
+                    x = data.error_text;
+                else if (data.error && data.error !== true)
+                    x = data.error;
+                else if (data.message)
+                    x = data.message;
+            }
             append("\x1b[1;3;31m" + x + "\x1b[m\r\n");
             scroll_therun();
             return done();
