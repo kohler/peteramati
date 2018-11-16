@@ -3411,9 +3411,10 @@ function pa_run(button, opt) {
         return a;
     }
 
-    function append_timed(str, times, factor) {
+    function append_timed(data, at_end) {
         var erange, etime, ebutton, espeed,
-            tpos, tstart, tlast, timeout, running = true;
+            tpos, tstart, tlast, timeout, running,
+            times = data.time_data, factor = data.time_factor;
         if (typeof times === "string")
             times = parse_times(times);
         if (times.length > 2) {
@@ -3457,6 +3458,14 @@ function pa_run(button, opt) {
             factor = 1;
         if (espeed)
             espeed.value = factor;
+        data = {data: data.data, timestamp: data.timestamp};
+
+        function set_time() {
+            if (erange) {
+                erange.value = tlast;
+                etime.innerHTML = sprintf("%d:%02d.%03d", Math.trunc(tlast / 60000), Math.trunc(tlast / 1000) % 60, Math.trunc(tlast) % 1000);
+            }
+        }
 
         function f(time) {
             if (time === null) {
@@ -3487,13 +3496,12 @@ function pa_run(button, opt) {
                 tpos = 0;
             }
 
+            var str = data.data;
             append_data(str.substring(tpos < times.length ? times[tpos + 1] : str.length,
-                                      npos < times.length ? times[npos + 1] : str.length));
+                                      npos < times.length ? times[npos + 1] : str.length),
+                        data);
             scroll_therun();
-            if (erange) {
-                erange.value = time;
-                etime.innerHTML = sprintf("%d:%02d.%03d", Math.trunc(time / 60000), Math.trunc(time / 1000) % 60, Math.trunc(time) % 1000);
-            }
+            set_time();
 
             tpos = npos;
             if (timeout)
@@ -3509,11 +3517,20 @@ function pa_run(button, opt) {
             }
         }
 
-        tpos = 0;
-        tstart = (new Date).getTime();
-        tlast = 0;
-        if (times.length)
-            f(null);
+        if (at_end) {
+            tpos = times.length;
+            tlast = times[tpos - 2];
+            running = false;
+            ebutton && addClass(ebutton, "paused");
+            set_time();
+        } else {
+            tpos = 0;
+            tlast = 0;
+            tstart = (new Date).getTime();
+            running = true;
+            if (times.length)
+                f(null);
+        }
     }
 
     function succeed(data) {
@@ -3567,7 +3584,7 @@ function pa_run(button, opt) {
             offset = data.lastoffset;
             if (data.done && data.time_data != null && ibuffer === "") {
                 // Parse timing data
-                append_timed(data.data, data.time_data, data.time_factor);
+                append_timed(data);
                 return;
             }
 
@@ -3587,11 +3604,19 @@ function pa_run(button, opt) {
             setTimeout(send, 2000);
         else if (!data.done)
             setTimeout(send, backoff);
-        else
+        else {
             done();
+            if (data.timed && !hasClass(therun.firstChild, "pa-runrange"))
+                send({offset: 0}, succeed_add_times);
+        }
     }
 
-    function send(args) {
+    function succeed_add_times(data) {
+        if (data.data && data.done && data.time_data != null)
+            append_timed(data, true);
+    }
+
+    function send(args, success) {
         var a = {};
         if (!$f[0].run)
             a.run = category;
@@ -3601,9 +3626,8 @@ function pa_run(button, opt) {
         args && $.extend(a, args);
         jQuery.ajax($f.attr("action"), {
             data: $f.serializeWith(a),
-            type: "POST", cache: false,
-            dataType: "json",
-            success: succeed,
+            type: "POST", cache: false, dataType: "json",
+            success: success || succeed,
             error: function () {
                 $f.find(".ajaxsave61").html("Failed");
                 $f.prop("outstanding", false);
