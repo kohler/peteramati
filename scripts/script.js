@@ -3092,7 +3092,7 @@ return function (container, string, options) {
         });
     }
 
-    function add_file_link(node, file, line, link) {
+    function add_file_link(node, prefix, file, line, link) {
         var m;
         while ((m = file.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
             styles = ansi_combine(styles, m[1]);
@@ -3104,9 +3104,11 @@ return function (container, string, options) {
             filematch = find_filediff(file);
         }
         if (filematch.length) {
+            if (prefix.length)
+                addlinepart(node, prefix);
             var anchor = "Lb" + line + "_" + html_id_encode(file);
             var a = $("<a href=\"#" + anchor + "\" class=\"uu uix pa-goto\"></a>");
-            a.text(link.replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
+            a.text(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;
         }
@@ -3121,9 +3123,14 @@ return function (container, string, options) {
         if (/\r/.test(line))
             line = clean_cr(line);
 
-        if (((m = line.match(/^([^:\s]+):(\d+)(?=:)/))
-             || (m = line.match(/^file \"(.*?)\", line (\d+)/i)))
-            && add_file_link(node, m[1], m[2], m[0])) {
+        while ((m = line.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
+            styles = ansi_combine(styles, m[1]);
+            line = m[2];
+        }
+
+        if (((m = line.match(/^([ \t]*)([^:\s]+):(\d+)(?=:)/))
+             || (m = line.match(/^([ \t]*)file \"(.*?)\", line (\d+)/i)))
+            && add_file_link(node, m[1], m[2], m[3], m[0])) {
             displaylen = m[0].length;
             line = line.substr(displaylen);
         }
