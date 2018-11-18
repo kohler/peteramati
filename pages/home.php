@@ -9,7 +9,7 @@ require_once("src/initweb.php");
 if (!$Conf)
     exit();
 
-global $Qreq;
+global $Qreq, $MicroNow;
 ContactView::set_path_request(array("/u"));
 $Qreq = make_qreq();
 
@@ -984,23 +984,27 @@ function show_pset_actions($pset) {
 }
 
 function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
-    global $Profile;
-    $t0 = $Profile ? microtime(true) : 0;
+    global $Profile, $MicroNow;
+    $t0 = microtime(true);
     $j = render_grading_student($info->user, $anonymous);
     if (($gcid = $info->gradercid()))
         $j["gradercid"] = $gcid;
 
     // are any commits committed?
     if (!$pset->gitless_grades && $info->repo) {
-        $gh = $info->update_grading_hash(function ($info, $placeholder_at) {
-            global $Now;
-            if ($placeholder_at && $placeholder_at < $Now - 3600)
-                return rand(0, 2) == 0;
-            else if ($placeholder_at >= $Now - 600 || $info->user->dropped)
-                return false;
-            else
-                return rand(0, 10) == 0;
-        });
+        if ($t0 - $MicroNow < 0.2
+            && $pset->student_can_view_grades($info->user->extension)) {
+            $gh = $info->update_grading_hash(function ($info, $placeholder_at) {
+                global $MicroNow;
+                if ($placeholder_at && $placeholder_at < $t1 - 3600)
+                    return rand(0, 2) == 0;
+                else if ($placeholder_at >= $t1 - 600 || $info->user->dropped)
+                    return false;
+                else
+                    return rand(0, 10) == 0;
+            });
+        } else
+            $gh = $info->grading_hash();
         if ($gh !== null)
             $j["gradehash"] = $gh;
     }
@@ -1282,6 +1286,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     }
 
     $sset = null;
+    $MicroNow = microtime(true);
     foreach ($Conf->psets_newest_first() as $pset)
         if ($Me->can_view_pset($pset)) {
             if (!$sset)
