@@ -444,6 +444,14 @@ function sprintf(fmt) {
     return t;
 }
 
+function now_msec() {
+    return (new Date).getTime();
+}
+
+function now_sec() {
+    return now_msec() / 1000;
+}
+
 window.strftime = (function () {
     function pad(num, str, n) {
         str += num.toString();
@@ -1955,7 +1963,7 @@ function pa_notedata(elt, note) {
 // pa_linenote
 (function ($) {
 var labelctr = 0;
-var curanal, mousedown_selection;
+var curanal, down_event;
 var scrolled_at;
 
 function add_notetr(linetr) {
@@ -2248,32 +2256,40 @@ function keydown(evt) {
         return true;
 }
 
-function selection_string() {
-    var s;
-    if (window.getSelection
-        && (s = window.getSelection())
-        && s.toString)
-        return s.toString();
-    else
-        return "";
+function nearby(dx, dy) {
+    return (dx * dx) + (dy * dy) < 144;
 }
 
 function pa_linenote(event) {
-    var anal = pa_diff_locate(event.target);
-    if (anal && event.type == "mousedown") {
+    if (event.button !== 0)
+        return;
+    var anal = pa_diff_locate(event.target), t = now_msec();
+    if (event.type === "mousedown" && anal) {
+        if (curanal
+            && curanal.tr === anal.tr
+            && down_event
+            && nearby(down_event[0] - event.clientX, down_event[1] - event.clientY)
+            && t - down_event[2] <= 500)
+            /* skip */;
+        else {
+            curanal = anal;
+            down_event = [event.clientX, event.clientY, t, false];
+        }
+    } else if (event.type === "mouseup" && anal) {
+        if (curanal
+            && curanal.tr === anal.tr
+            && down_event
+            && nearby(down_event[0] - event.clientX, down_event[1] - event.clientY)
+            && !down_event[3]) {
+            curanal = anal;
+            down_event[3] = true;
+            make_linenote(event);
+        }
+    } else if (event.type === "click" && anal) {
         curanal = anal;
-        mousedown_selection = selection_string();
-        return true;
-    } else if (anal
-               && ((event.type === "mouseup"
-                    && curanal && curanal.tr == anal.tr
-                    && mousedown_selection == selection_string())
-                   || event.type === "click")) {
-        curanal = anal;
-        return make_linenote(event);
+        make_linenote(event);
     } else {
-        curanal = mousedown_selection = null;
-        return true;
+        curanal = down_event = null;
     }
 }
 
@@ -3344,7 +3360,7 @@ function pa_run(button, opt) {
     }
 
     var ibuffer = "", // initial buffer; holds data before any results arrive
-        offset = -1, backoff = 50, queueid = null;
+        offset = -1, backoff = 50, queueid = null, times = null;
 
     function hide_cursor() {
         if (thexterm)
@@ -3427,10 +3443,13 @@ function pa_run(button, opt) {
 
     function append_timed(data, at_end) {
         var erange, etime, ebutton, espeed,
-            tpos, tstart, tlast, timeout, running,
-            times = data.time_data, factor = data.time_factor;
+            tpos, tstart, tlast, timeout, running, factor;
+        if (times)
+            return;
+        times = data.time_date;
         if (typeof times === "string")
             times = parse_times(times);
+        factor = data.time_factor;
         if (times.length > 2) {
             erange = $('<div class="pa-runrange"><button type="button" class="pa-runrange-play"></button><input type="range" class="pa-runrange-range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span><span class="pa-runrange-speed-slow" title="Slow">🐢</span><input type="range" class="pa-runrange-speed" min="0.1" max="10" step="0.1"><span class="pa-runrange-speed-fast" title="Fast">🐇</span></div>').prependTo(therun);
             etime = erange[0].lastChild;
