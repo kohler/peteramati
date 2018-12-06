@@ -339,8 +339,7 @@ class RunnerState {
         $this->checkout_code();
 
         // save commit settings
-        if (($runsettings = $this->info->commit_info("runsettings")))
-            $this->add_run_settings($runsettings);
+        $this->add_run_settings($this->info->commit_info("runsettings"));
 
         // actually run
         $command = "echo; jail/pa-jail run"
