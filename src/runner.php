@@ -452,10 +452,18 @@ class RunnerState {
     }
 
     private function add_run_settings($s) {
-        $x = array();
-        foreach ((array) $s as $k => $v)
-            $x[] = "$k = $v\n";
-        file_put_contents($this->jailhomedir . "/config.mk", join("", $x), true);
+        $mk = $sh = [];
+        foreach ((array) $s as $k => $v) {
+            if (preg_match('{\A[A-Za-z_][A-Za-z_0-9]*\z}', $k)
+                && !preg_match('{\A(?:PATH|MAKE|HOME|SHELL|POSIXLY_CORRECT|TMPDIR|LANG|USER|LOGNAME|SSH.*|PS\d|HISTFILE|LD_LIBRARY_PATH|HOST|HOSTNAME|TERM|TERMCAP|EDITOR|PAGER|MANPATH)\z}', $k)) {
+                if (preg_match('{\A[-A-Za-z0-9_:/ .,]*\z}', $v)) {
+                    $mk[] = "$k = $v\n";
+                }
+                $sh[] = "$k=" . escapeshellarg($v) . "\n";
+            }
+        }
+        file_put_contents($this->jailhomedir . "/config.mk", join("", $mk), true);
+        file_put_contents($this->jailhomedir . "/config.sh", join("", $sh), true);
     }
 
 
