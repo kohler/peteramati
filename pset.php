@@ -673,8 +673,7 @@ if ($Pset->gitless) {
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
                 $last_run = true;
             } else
-                $runnerbuttons[] = Ht::hidden("run", $r->name,
-                                              array("class" => "pa-runner"));
+                $runnerbuttons[] = '<input type="hidden" class="pa-runner" value="' . htmlspecialchars($r->name) . '">';
         }
     if (count($runnerbuttons) && $Me->isPC && $Me != $User && $last_run)
         $runnerbuttons[] = " &nbsp;"
