@@ -996,9 +996,9 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
             && $pset->student_can_view_grades($info->user->extension)) {
             $gh = $info->update_grading_hash(function ($info, $placeholder_at) {
                 global $MicroNow;
-                if ($placeholder_at && $placeholder_at < $t1 - 3600)
+                if ($placeholder_at && $placeholder_at < $t0 - 3600)
                     return rand(0, 2) == 0;
-                else if ($placeholder_at >= $t1 - 600 || $info->user->dropped)
+                else if ($placeholder_at >= $t0 - 600 || $info->user->dropped)
                     return false;
                 else
                     return rand(0, 10) == 0;
@@ -1237,7 +1237,7 @@ function show_pset_table($sset) {
 
     if ($Profile) {
         $t2 = microtime(true);
-        echo sprintf("<div>Δt %.06f DB, %.06f total</div>", $t1 - $t0, $t2 - $t0);
+        echo sprintf("<div>Δt %.06f total</div>", $t2 - $t0);
     }
 
     echo "</div>\n";
