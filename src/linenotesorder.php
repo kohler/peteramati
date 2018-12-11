@@ -107,7 +107,7 @@ class LineNotesOrder {
             return (int) substr($a[1], 1) - (int) substr($b[1], 1);
         $to = get($this->totalorder, $a[0]);
         if (!$to) {
-            $to = array();
+            $to = ["a0" => 0];
             $n = 0;
             foreach ($this->diff[$a[0]] as $l) {
                 if ($l[0] === "+" || $l[0] === " ")
