@@ -177,6 +177,7 @@ if (!$Runner->command && $Runner->eval) {
 try {
     if ($Rstate->is_recent_job_running())
         quit("Recent job still running");
+    session_write_close();
 
     // run
     $Rstate->start($Queue);
