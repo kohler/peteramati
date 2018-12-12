@@ -423,7 +423,7 @@ class RunnerState {
         // make the checkout
         $status = $this->run_and_log("cd " . escapeshellarg($clonedir) . " && "
                                      . "if test ! -d .git; then git init --shared=group; fi && "
-                                     . "git fetch --depth=2 -p " . escapeshellarg($repodir) . " $branch && "
+                                     . "git fetch --depth=1 -p " . escapeshellarg($repodir) . " $branch && "
                                      . "git reset --hard " . $this->info->commit_hash());
 
         $this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch -D $branch");
