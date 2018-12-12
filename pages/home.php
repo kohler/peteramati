@@ -994,8 +994,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     if (!$pset->gitless_grades && $info->repo) {
         if ($t0 - $MicroNow < 0.2
             && $pset->student_can_view_grades($info->user->extension)) {
-            $gh = $info->update_grading_hash(function ($info, $placeholder_at) {
-                global $MicroNow;
+            $gh = $info->update_grading_hash(function ($info, $placeholder_at) use ($t0) {
                 if ($placeholder_at && $placeholder_at < $t0 - 3600)
                     return rand(0, 2) == 0;
                 else if ($placeholder_at >= $t0 - 600 || $info->user->dropped)
