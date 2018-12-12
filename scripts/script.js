@@ -3660,7 +3660,7 @@ function pa_run(button, opt) {
         jQuery.ajax($f.attr("action"), {
             data: $f.serializeWith(a),
             type: "POST", cache: false, dataType: "json",
-            success: success || succeed,
+            success: success || succeed, timeout: 30000,
             error: function () {
                 $f.find(".ajaxsave61").html("Failed");
                 $f.prop("outstanding", false);
