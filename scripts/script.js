@@ -2848,11 +2848,14 @@ function pa_ensureline_callback(filename, lineid, callback) {
         lineid = m[1];
     } else {
         if (filename instanceof Node) {
-            while (filename && !filename.hasAttribute("data-pa-file"))
-                filename = filename.parentElement;
-            if (!filename)
+            var node = filename;
+            while (node && !node.hasAttribute("data-pa-file"))
+                node = node.parentElement;
+            if (!node)
                 return $(null);
-            filename = filename.getAttribute("data-pa-file");
+            filename = node.getAttribute("data-pa-file");
+            if (node.hasAttribute("data-pa-file-user"))
+                filename = node.getAttribute("data-pa-file-user") + "-" + filename;
         }
         filename = html_id_encode(filename);
     }
