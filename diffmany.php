@@ -7,7 +7,7 @@ require_once("src/initweb.php");
 ContactView::set_path_request(["/p"]);
 if ($Me->is_empty() || !$Me->isPC)
     $Me->escape();
-global $Pset, $Qreq, $psetinfo_idx;
+global $Pset, $Qreq, $psetinfo_idx, $all_viewed_gradeentries;
 $Qreq = make_qreq();
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
@@ -22,9 +22,10 @@ if ($Qreq->files) {
 $Qreq->files = $Pset->maybe_prefix_directory($Qreq->files);
 
 $psetinfo_idx = 0;
+$all_viewed_gradeentries = [];
 
 function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
-    global $Me, $psetinfo_idx;
+    global $Me, $psetinfo_idx, $all_viewed_gradeentries;
     ++$psetinfo_idx;
     $info = PsetView::make($pset, $user, $Me);
     if (!$info->repo)
@@ -81,6 +82,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         }
 
         $want_grades = $pset->has_grade_landmark;
+        $all_viewed_gradeentries += $info->viewed_gradeentries;
     } else {
         echo '<div class="pa-gradelist',
             ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
@@ -128,6 +130,18 @@ foreach (explode(" ", $Qreq->users) as $user) {
         echo_one($user, $Pset, $Qreq);
     } else if ($user !== "") {
         echo "<p>no such user ", htmlspecialchars($user), "</p>\n";
+    }
+}
+
+if (count($all_viewed_gradeentries) == 1) {
+    reset($all_viewed_gradeentries);
+    $gkey = key($all_viewed_gradeentries);
+    $gradeentry = $Pset->all_grades[$gkey];
+    if ($gradeentry->landmark_buttons) {
+        foreach ($gradeentry->landmark_buttons as $lb) {
+            if (is_object($lb) && isset($lb->summary_className))
+                echo '<button type="button" class="ui btn ', $lb->summary_className, '" data-pa-class="', $lb->className, '">Summarize ', $lb->title, '</button>';
+        }
     }
 }
 

@@ -39,6 +39,7 @@ class PsetView {
     public $last_runner_error;
     private $transferred_warnings;
     private $transferred_warnings_priority;
+    public $viewed_gradeentries = [];
 
     function __construct(Pset $pset, Contact $user, Contact $viewer) {
         $this->conf = $pset->conf;
@@ -1196,6 +1197,7 @@ class PsetView {
                         echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode($g->landmark_buttons)), '"';
                 }
                 echo '></div></td></tr>';
+                $this->viewed_gradeentries[$g->key] = true;
             }
         }
 
