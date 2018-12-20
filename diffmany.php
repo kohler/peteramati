@@ -102,7 +102,7 @@ if ($Qreq->files)
     echo Ht::button("Hide left", ["class" => "btn ui pa-diff-toggle-hide-left"]);
 if ($Pset->grade_script) {
     foreach ($Pset->grade_script as $gs)
-        Ht::stash_html($Info->conf->make_script_file($gs));
+        Ht::stash_html($Conf->make_script_file($gs));
 }
 echo "<hr />\n";
 
