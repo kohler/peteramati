@@ -1944,14 +1944,15 @@ function pa_diff_locate(target, direction) {
     return result;
 }
 
-function pa_notedata(elt, note) {
-    if (note !== undefined) {
-        if (note === false || note === null)
-            elt.removeAttribute("data-pa-note");
-        else
-            elt.setAttribute("data-pa-note", JSON.stringify(note));
-    }
-    note = elt.getAttribute("data-pa-note");
+function pa_set_note(elt, note) {
+    if (note === false || note === null)
+        elt.removeAttribute("data-pa-note");
+    else if (note !== undefined)
+        elt.setAttribute("data-pa-note", JSON.stringify(note));
+}
+
+function pa_note(elt) {
+    var note = elt.getAttribute("data-pa-note");
     if (typeof note === "string" && note !== "")
         note = JSON.parse(note);
     if (typeof note === "number")
@@ -1959,33 +1960,77 @@ function pa_notedata(elt, note) {
     return note || [false, ""];
 }
 
-
-// pa_linenote
-(function ($) {
-var labelctr = 0;
-var curanal, down_event;
-var scrolled_at;
-
-function add_notetr(linetr) {
-    var next_tr = linetr.nextSibling;
-    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gg"))) {
-        linetr = next_tr;
-        next_tr = next_tr.nextSibling;
+function pa_fix_note_links() {
+    function note_skippable(tr) {
+        return pa_note(tr)[1] === "";
     }
-    return $('<tr class="pa-dl pa-gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter(linetr);
+
+    function note_anchor(tr) {
+        var anal = pa_diff_locate(tr), $td = null;
+        if (anal)
+            $td = pa_ensureline(anal.ufile, anal.lineid);
+        if ($td && $td.length)
+            return "#" + $td[0].id;
+        else
+            return "";
+    }
+
+    function set_link(tr, next_tr) {
+        var $a = $(tr).find(".pa-note-links a");
+        if (!$a.length) {
+            $a = $('<a class="uix pa-goto"></a>');
+            $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notediv"));
+        }
+
+        $a.attr("href", note_anchor(next_tr));
+        var t = next_tr ? "NEXT >" : "TOP";
+        if ($a.text() !== t)
+            $a.text(t);
+    }
+
+    var notes = $(".pa-gw");
+    var notepos = 0;
+    while (notepos < notes.length && notes[notepos] !== this)
+        ++notepos;
+    if (notepos >= notes.length)
+        return;
+
+    var prevpos = notepos - 1;
+    while (prevpos >= 0 && note_skippable(notes[prevpos]))
+        --prevpos;
+
+    var nextpos = notepos + 1;
+    while (nextpos < notes.length && note_skippable(notes[nextpos]))
+        ++nextpos;
+
+    if (prevpos >= 0)
+        set_link(notes[prevpos], note_skippable(this) ? notes[nextpos] : this);
+    set_link(this, notes[nextpos]);
 }
 
-function render_note($tr, note, transition) {
-    pa_notedata($tr[0], note);
+function pa_render_note(note, transition) {
+    var tr = this, $tr = $(this);
+    if (!hasClass(tr, "pa-gw")) {
+        var ntr = tr.nextSibling;
+        while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE || hasClass(ntr, "pa-gg"))) {
+            tr = ntr;
+            ntr = ntr.nextSibling;
+        }
+        $tr = $('<tr class="pa-dl pa-gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter(tr);
+        tr = $tr[0];
+    }
+    if (arguments.length == 0)
+        return tr;
+    pa_set_note(tr, note);
     var $td = $tr.find(".pa-notebox");
     if (transition) {
         var $content = $td.children();
         $content.slideUp(80).queue(function () { $content.remove(); });
     }
     if (note[1] === "") {
-        fix_notelinks($tr);
+        pa_fix_note_links.call(tr);
         transition ? $tr.children().slideUp(80) : $tr.children().hide();
-        return;
+        return tr;
     }
 
     var t = '<div class="pa-notediv">';
@@ -2019,15 +2064,21 @@ function render_note($tr, note, transition) {
         $td.find(".pa-note").addClass("format" + (r.format || 0)).html(r.content);
     }
 
-    fix_notelinks($tr);
+    pa_fix_note_links.call(tr);
 
     if (transition)
         $td.find(".pa-notediv").hide().slideDown(80);
+    return tr;
 }
+
+
+// pa_linenote
+(function ($) {
+var labelctr = 0, curanal, down_event, scrolled_at;
 
 function render_form($tr, note, transition) {
     $tr.removeClass("hidden").addClass("editing");
-    note && pa_notedata($tr[0], note);
+    note && pa_set_note($tr[0], note);
     var $td = $tr.find(".pa-notebox");
     if (transition) {
         $tr.css("display", "").children().css("display", "");
@@ -2065,54 +2116,6 @@ function render_form($tr, note, transition) {
         $ta.focus();
         $form.hide().slideDown(100);
     }
-}
-
-function fix_notelinks($tr) {
-    function note_skippable(tr) {
-        return pa_notedata(tr)[1] === "";
-    }
-
-    function note_anchor(tr) {
-        var anal = pa_diff_locate(tr), $td = null;
-        if (anal)
-            $td = pa_ensureline(anal.ufile, anal.lineid);
-        if ($td && $td.length)
-            return "#" + $td[0].id;
-        else
-            return "";
-    }
-
-    function set_link(tr, next_tr) {
-        var $a = $(tr).find(".pa-note-links a");
-        if (!$a.length) {
-            $a = $('<a class="uix pa-goto"></a>');
-            $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notediv"));
-        }
-
-        $a.attr("href", note_anchor(next_tr));
-        var t = next_tr ? "NEXT >" : "TOP";
-        if ($a.text() !== t)
-            $a.text(t);
-    }
-
-    var notes = $(".pa-gw");
-    var notepos = 0;
-    while (notepos < notes.length && notes[notepos] !== $tr[0])
-        ++notepos;
-    if (notepos >= notes.length)
-        return;
-
-    var prevpos = notepos - 1;
-    while (prevpos >= 0 && note_skippable(notes[prevpos]))
-        --prevpos;
-
-    var nextpos = notepos + 1;
-    while (nextpos < notes.length && note_skippable(notes[nextpos]))
-        ++nextpos;
-
-    if (prevpos >= 0)
-        set_link(notes[prevpos], note_skippable($tr[0]) ? notes[nextpos] : $tr[0]);
-    set_link($tr[0], notes[nextpos]);
 }
 
 function traverse(tr, down) {
@@ -2196,14 +2199,14 @@ function uncapture() {
 
 function unedit(tr, always) {
     var $tr = $(tr).closest("tr");
-    var note = pa_notedata($tr[0]);
+    var note = pa_note($tr[0]);
     if (!$tr.length
         || (!always
             && !text_eq(note[1], $tr.find("textarea").val().replace(/\s+$/, ""))))
         return false;
     $tr.removeClass("editing");
     $tr.find(":focus").blur();
-    render_note($tr, note, true);
+    pa_render_note.call($tr[0], note, true);
 
     var click_tr = anal_tr();
     if (click_tr)
@@ -2228,7 +2231,7 @@ function make_submit(anal) {
                     $f.find(".ajaxsave61").html("Saved");
                     var note = data.linenotes[anal.file];
                     note = note && note[anal.lineid];
-                    pa_notedata($tr[0], note);
+                    pa_set_note($tr[0], note);
                     unedit($tr[0]);
                     $tr.data("pa-savefailed", null);
                 } else {
@@ -2294,7 +2297,11 @@ function pa_linenote(event) {
 }
 
 function make_linenote(event) {
-    var $tr = curanal.notetr ? $(curanal.notetr) : add_notetr(curanal.tr);
+    var $tr;
+    if (curanal.notetr)
+        $tr = $(curanal.notetr);
+    else
+        $tr = $(pa_render_note.call(curanal.tr));
     if ($tr.hasClass("editing")) {
         if (unedit($tr[0])) {
             event && event.stopPropagation();
@@ -2305,7 +2312,7 @@ function make_linenote(event) {
             return false;
         }
     } else {
-        render_form($tr, pa_notedata($tr[0]), true);
+        render_form($tr, pa_note($tr[0]), true);
         capture(curanal.tr, false);
         return false;
     }
@@ -2645,32 +2652,44 @@ function pa_loadgrades(gi) {
     }
 }
 
-handle_ui.on("pa-compute-grade", function (event) {
-    var x = $(this).closest(".pa-gradebox").attr("data-pa-landmark-range"), m;
-    if (!x || !(m = /^(\d+),(\d+)$/.exec(x)))
+function pa_process_landmark_range(func, selector) {
+    var lr = $(this).closest(".pa-gradebox").attr("data-pa-landmark-range");
+    var m = lr ? /^(\d+),(\d+)$/.exec(lr) : null;
+    if (!m)
         return;
-    var lnfirst = +m[1], lnlast = +m[2];
+    var lnfirst = +m[1], lnlast = +m[2], lna = -1, lnb = -1;
     var tr = $(this).closest(".pa-filediff")[0].firstChild.firstChild;
-    var lna = -1, lnb = -1, sum = 0, noteparts = [];
-    for (; tr; tr = tr.nextSibling) {
-        if (tr.nodeType !== Node.ELEMENT_NODE) {
-        } else if (hasClass(tr, "pa-gw") && lna >= lnfirst && lna <= lnlast) {
-            var note = pa_notedata(tr);
-            if (note && note[1]
-                && ((m = /(?:^|\s)(\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
-                    || (m = /((?:^|[\s(]))(\d+(?:\.\d*)?|\.\d+)(\/[\d.]+(?!\.\d|[\w%$*\/])\S*)/.exec(note[1])))) {
-                sum += parseFloat(m[2]);
-                noteparts.push("@" + (lnb || lna) + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]));
+    while (tr) {
+        if (tr.nodeType === Node.ELEMENT_NODE) {
+            if (!hasClass(tr, "pa-gw")) {
+                var td = tr.firstChild;
+                if (td.hasAttribute("data-landmark"))
+                    lna = +td.getAttribute("data-landmark");
+                td = td.nextSibling;
+                if (td && td.hasAttribute("data-landmark"))
+                    lnb = +td.getAttribute("data-landmark");
             }
-        } else {
-            var td = tr.firstChild;
-            if (td.hasAttribute("data-landmark"))
-                lna = +td.getAttribute("data-landmark");
-            td = td.nextSibling;
-            if (td && td.hasAttribute("data-landmark"))
-                lnb = +td.getAttribute("data-landmark");
+            if (lna >= lnfirst
+                && lna <= lnlast
+                && (!selector || tr.matches(selector))) {
+                func.call(this, tr, lna, lnb);
+            }
         }
+        tr = tr.nextSibling;
     }
+}
+
+handle_ui.on("pa-compute-grade", function (event) {
+    var sum = 0, noteparts = [];
+    pa_process_landmark_range.call(this, function (tr, lna, lnb) {
+        var note = pa_note(tr), m;
+        if (note[1]
+            && ((m = /(?:^|\s)(\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
+                || (m = /((?:^|[\s(]))(\d+(?:\.\d*)?|\.\d+)(\/[\d.]+(?!\.\d|[\w%$*\/])\S*)/.exec(note[1])))) {
+            sum += parseFloat(m[2]);
+            noteparts.push("@" + (lnb || lna) + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]));
+        }
+    }, ".pa-gw");
     if (noteparts.length) {
         var $ge = $(this).closest(".pa-gradeentry"),
             $gv = $ge.find(".pa-gradevalue"),
@@ -2764,8 +2783,16 @@ function pa_ensureline_callback(filename, lineid, callback) {
             return $(null);
         filename = m[2];
         lineid = m[1];
-    } else
+    } else {
+        if (filename instanceof Node) {
+            while (filename && !filename.hasAttribute("data-pa-file"))
+                filename = filename.parentElement;
+            if (!filename)
+                return $(null);
+            filename = filename.getAttribute("data-pa-file");
+        }
         filename = html_id_encode(filename);
+    }
 
     // check lineref
     var lineref = "L" + lineid + "_" + filename;
@@ -2822,7 +2849,7 @@ function pa_beforeunload(evt) {
     var ok = true;
     $(".pa-gw textarea").each(function () {
         var $tr = $(this).closest("tr");
-        var note = pa_notedata($tr[0]);
+        var note = pa_note($tr[0]);
         if (note && !text_eq(this.value, note[1]) && !$tr.data("pa-savefailed"))
             ok = false;
     });
