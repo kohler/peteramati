@@ -790,6 +790,14 @@ handle_ui.on = function (className, callback) {
     callbacks[className] = callbacks[className] || [];
     callbacks[className].push(callback);
 };
+handle_ui.trigger = function (className, event) {
+    var c = callbacks[className];
+    if (c) {
+        for (var j = 0; j < c.length; ++j) {
+            c[j].call(this, event);
+        }
+    }
+};
 return handle_ui;
 })($);
 $(document).on("click", ".ui, .uix", handle_ui);
@@ -2107,6 +2115,8 @@ function pa_render_note(note, transition) {
 
     if (transition)
         $td.find(".pa-notediv").hide().slideDown(80);
+    else
+        removeClass(tr, "hidden");
     return tr;
 }
 
@@ -2617,6 +2627,20 @@ function pa_loadgrades(gi) {
             $(this).html(pa_makegrade(gi, k, editable)).removeClass("pa-need-grade");
             if (this.hasAttribute("data-pa-landmark-range"))
                 $(this).find(".pa-gradeentry").append('<button type="button" class="btn ui pa-compute-grade">Grade from notes</button>');
+            if (this.hasAttribute("data-pa-landmark-buttons")) {
+                var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
+                for (var i = 0; i < lb.length; ++i) {
+                    if (typeof lb[i] === "string")
+                        $(this).find(".pa-gradeentry").append(lb[i]);
+                    else {
+                        var t = '<button type="button" class="btn ui';
+                        if (lb[i].className)
+                            t += ' ' + lb[i].className;
+                        t += '">' + lb[i].title + '</button>';
+                        $(this).find(".pa-gradeentry").append(t);
+                    }
+                }
+            }
         }
     });
 
@@ -2718,7 +2742,7 @@ function pa_process_landmark_range(func, selector) {
     }
 }
 
-handle_ui.on("pa-compute-grade", function (event) {
+handle_ui.on("pa-compute-grade", function () {
     var sum = 0, noteparts = [];
     pa_process_landmark_range.call(this, function (tr, lna, lnb) {
         var note = pa_note(tr), m;

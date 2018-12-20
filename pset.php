@@ -579,7 +579,12 @@ function echo_all_grades() {
         return;
 
     $has_grades = $Info->has_assigned_grades();
-    if ($Info->can_view_grades() && ($Me !== $User || $has_grades)) {
+    if ($Info->can_view_grades()
+        && ($Me !== $User || $has_grades)) {
+        if ($User !== $Me && $Pset->grade_script) {
+            foreach ($Pset->grade_script as $gs)
+                Ht::stash_html($Info->conf->make_script_file($gs));
+        }
         echo '<div class="pa-gradelist',
             ($User !== $Me ? " editable" : " noneditable"),
             ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';

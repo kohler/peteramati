@@ -65,6 +65,7 @@ class Pset {
     public $separate_extension_grades;
     public $has_extra = false;
     public $max_total;
+    public $grade_script;
     private $_late_hours;
 
     public $all_runners = array();
@@ -214,6 +215,9 @@ class Pset {
         $this->grade_statistics_visible = self::cdate_or_grades($p, "grade_statistics_visible", "grade_cdf_visible");
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
+        $this->grade_script = get($p, "grade_script");
+        if (is_string($this->grade_script))
+            $this->grade_script = [$this->grade_script];
 
         if (($this->deadline || $this->deadline_college || $this->deadline_extension)
             && !self::cbool($p, "no_late_hours"))
@@ -629,6 +633,7 @@ class GradeEntryConfig {
     public $landmark_range_file;
     public $landmark_range_first;
     public $landmark_range_last;
+    public $landmark_buttons;
 
     function __construct($name, $g) {
         $loc = array("grades", $name);
@@ -719,6 +724,14 @@ class GradeEntryConfig {
             if ($this->landmark_range_file === null
                 || $this->landmark_range_first > $this->landmark_range_last)
                 throw new PsetConfigException("grade entry `landmark_range` format error", $loc);
+        }
+        if (isset($g->landmark_buttons)
+            && is_array($g->landmark_buttons)) {
+            $this->landmark_buttons = [];
+            foreach ($g->landmark_buttons as $lb)
+                if (is_string($lb)
+                    || (is_object($lb) && isset($lb->title)))
+                    $this->landmark_buttons[] = $lb;
         }
     }
 

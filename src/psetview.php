@@ -1190,8 +1190,11 @@ class PsetView {
             foreach ($gentries[$aln] as $g) {
                 echo '<tr class="pa-dl pa-gg"><td colspan="3" class="pa-graderow">',
                     '<div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"';
-                if ($g->landmark_file === $g->landmark_range_file)
+                if ($g->landmark_file === $g->landmark_range_file) {
                     echo ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
+                    if ($g->landmark_buttons)
+                        echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode($g->landmark_buttons)), '"';
+                }
                 echo '></div></td></tr>';
             }
         }
