@@ -133,9 +133,7 @@ foreach (explode(" ", $Qreq->users) as $user) {
     }
 }
 
-if (count($all_viewed_gradeentries) == 1) {
-    reset($all_viewed_gradeentries);
-    $gkey = key($all_viewed_gradeentries);
+foreach ($all_viewed_gradeentries as $gkey => $x) {
     $gradeentry = $Pset->all_grades[$gkey];
     if ($gradeentry->landmark_buttons) {
         foreach ($gradeentry->landmark_buttons as $lb) {
