@@ -2529,6 +2529,9 @@ function pa_setgrade(gi, editable) {
         $v.text(gt);
     }
 
+    if (!editable)
+        toggleClass(this, "hidden", $v.text() === "" && !ge.max);
+
     // maybe add landmark reference
     if (ge.landmark
         && this.parentElement
@@ -2650,10 +2653,12 @@ function pa_loadgrades(gi) {
             ch = ch.nextSibling;
         for (var i = 0; i < gi.order.length; ++i) {
             var k = gi.order[i];
-            if (ch && ch.getAttribute("data-pa-grade") === k)
-                ch = ch.nextSibling;
-            else
-                this.insertBefore($(pa_makegrade(gi, k, editable))[0], ch);
+            if (k) {
+                if (ch && ch.getAttribute("data-pa-grade") === k)
+                    ch = ch.nextSibling;
+                else
+                    this.insertBefore($(pa_makegrade(gi, k, editable))[0], ch);
+            }
         }
         while (ch) {
             var e = ch;
@@ -3885,8 +3890,9 @@ function pa_gradeinfo_total(gi) {
         gi = JSON.parse(gi);
     var total = 0, maxtotal = 0;
     for (var i = 0; i < gi.order.length; ++i) {
-        var ge = gi.entries[gi.order[i]];
-        if (ge.in_total) {
+        var k = gi.order[i];
+        var ge = k ? gi.entries[k] : null;
+        if (ge && ge.in_total) {
             total += (gi.grades && gi.grades[i]) || 0;
             if (!ge.is_extra)
                 maxtotal += ge.max || 0;

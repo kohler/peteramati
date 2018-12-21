@@ -947,6 +947,7 @@ class PsetView {
         if (!$this->can_view_grades()) {
             return null;
         }
+
         $notes = $this->current_info();
         $result = $this->pset->gradeentry_json($this->pc_view);
         $agx = get($notes, "autogrades");
@@ -977,7 +978,7 @@ class PsetView {
                 $result["autogrades"] = $ag;
             $result["total"] = round_grade($total);
             if ($total != $total_noextra)
-                $g["total_noextra"] = round_grade($total_noextra);
+                $result["total_noextra"] = round_grade($total_noextra);
         }
         if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
             $result["grading_hash"] = $this->grading_hash();
@@ -990,6 +991,34 @@ class PsetView {
                 $result["auto_late_hours"] = $lhd->autohours;
             }
         }
+
+        // maybe hide extra-credits that are missing
+        if (!$this->pc_view) {
+            $gi = 0;
+            $deleted = false;
+            foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
+                if ($ge->is_extra
+                    && !$ge->max_visible
+                    && (!isset($result["grades"])
+                        || $result["grades"][$gi] === null)) {
+                    error_log("fuck $k");
+                    unset($result["entries"][$key]);
+                    $result["order"][$gi] = null;
+                    $deleted = true;
+                }
+                ++$gi;
+            }
+            if ($deleted) {
+                for ($gi = count($result["order"]) - 1;
+                     $gi >= 0 && !isset($result["order"][$gi]);
+                     --$gi) {
+                     array_pop($result["order"]);
+                     if (isset($result["grades"]))
+                         array_pop($result["grades"]);
+                }
+            }
+        }
+
         return $result;
     }
 
