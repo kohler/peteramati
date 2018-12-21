@@ -1001,7 +1001,6 @@ class PsetView {
                     && !$ge->max_visible
                     && (!isset($result["grades"])
                         || $result["grades"][$gi] === null)) {
-                    error_log("fuck $k");
                     unset($result["entries"][$key]);
                     $result["order"][$gi] = null;
                     $deleted = true;

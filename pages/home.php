@@ -235,13 +235,15 @@ function download_psets_report($request) {
         set_ranks($students, $selection, "psets");
         set_ranks($students, $selection, "psets_noextra");
         set_ranks($students, $selection, "tests");
-        $m_noextra = $maxbyg["psets_noextra"];
-        $m_psets = $maxbyg["psets"];
-        $m_tests = $maxbyg["tests"];
+        set_ranks($students, $selection, "tests_noextra");
+        $mp = $maxbyg["psets"];
+        $mt = $maxbyg["tests"];
+        $mp_noextra = $maxbyg["psets_noextra"];
+        $mt_noextra = $maxbyg["tests_noextra"];
 
         foreach ($students as $s) {
-            $s->performance_noextra = round(1000 * (1.65 * ($s->psets_noextra / $m_noextra) + 1.2 * ($s->tests / $m_tests))) / 10;
-            $s->performance = round(1000 * (0.9 * ($s->psets_noextra / $m_noextra) + 0.75 * ($s->psets / $m_psets) + 1.2 * ($s->tests / $m_tests))) / 10;
+            $s->performance_noextra = round(1000 * (1.65 * ($s->psets_noextra / $mp_noextra) + 1.2 * ($s->tests_noextra / $mt_noextra))) / 10;
+            $s->performance = round(1000 * (0.9 * ($s->psets_noextra / $mp_noextra) + 0.75 * ($s->psets / $m_psets) + 1.2 * ($s->tests / $mt))) / 10;
         }
         set_ranks($students, $selection, "performance");
         set_ranks($students, $selection, "performance_noextra");
