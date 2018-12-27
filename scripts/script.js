@@ -555,10 +555,12 @@ var key_map = {"Spacebar": " ", "Esc": "Escape"},
         "ArrowRight": 1,
         "ArrowUp": 1,
         "ArrowDown": 1,
+        "Backspace": 1,
+        "Enter": 1,
+        "Escape": 1,
         "PageUp": 1,
         "PageDown": 1,
-        "Escape": 1,
-        "Enter": 1
+        "Tab": 1
     };
 function event_key(evt) {
     var x;
@@ -577,10 +579,15 @@ function event_key(evt) {
     return "";
 }
 event_key.printable = function (evt) {
-    return !nonprintable_map[event_key(evt)];
+    return !nonprintable_map[event_key(evt)]
+        && (typeof evt === "string" || !(evt.ctrlKey || evt.metaKey));
 };
 event_key.modifier = function (evt) {
     return nonprintable_map[event_key(evt)] > 1;
+};
+event_key.is_default_a = function (evt, a) {
+    return !evt.metaKey && !evt.ctrlKey && evt.which != 2
+        && (!a || !/(?:^|\s)(?:ui|btn)(?=\s|$)/i.test(a.className || ""));
 };
 return event_key;
 })();
@@ -2752,8 +2759,8 @@ handle_ui.on("pa-compute-grade", function () {
     pa_process_landmark_range.call(this, function (tr, lna, lnb) {
         var note = pa_note(tr), m;
         if (note[1]
-            && ((m = /(?:^|\s)(\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
-                || (m = /((?:^|[\s(]))(\d+(?:\.\d*)?|\.\d+)(\/[\d.]+(?!\.\d|[\w%$*\/])\S*)/.exec(note[1])))) {
+            && ((m = /^\s*(\(?\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
+                || (m = /^\s*(\(?)(\d+(?:\.\d*)?|\.\d+)(\/[\d.]+(?!\.\d|[\w%$*\/])\S*)/.exec(note[1])))) {
             sum += parseFloat(m[2]);
             noteparts.push("@" + (lnb || lna) + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]));
         }
@@ -2764,7 +2771,7 @@ handle_ui.on("pa-compute-grade", function () {
             $gi = $ge.find(".pa-compute-grade-info");
         if (!$gi.length)
             $gi = $('<div class="pa-compute-grade-info"></div>').appendTo($ge);
-        $gi.html("<strong>" + sum + "</strong> &nbsp; (" + noteparts.join(", ") + "; was " + escape_entities($ge.val() || "0") + ")");
+        $gi.html("<strong>" + sum + "</strong> &nbsp; (" + noteparts.join(", ") + "; was " + escape_entities($gv.val() || "0") + ")");
         $gv.val(sum).change();
     }
 });
