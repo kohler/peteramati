@@ -290,7 +290,7 @@ function download_psets_report($request) {
     global $Conf, $Me, $PsetInfo;
     $where = array();
     $report = $request["report"];
-    $nonanonymous = false;
+    $anonymous = null;
     $ssflags = StudentSet::ENROLLED;
     foreach (explode(" ", strtolower($report)) as $rep) {
         if ($rep === "college")
@@ -298,7 +298,7 @@ function download_psets_report($request) {
         else if ($rep === "extension")
             $ssflags |= StudentSet::EXTENSION;
         else if ($rep === "nonanonymous")
-            $nonanonymous = true;
+            $anonymous = false;
     }
     $sset = new StudentSet($Me, $ssflags);
 
@@ -338,7 +338,7 @@ function download_psets_report($request) {
 
     foreach ($grouped_psets as $grp => $psets) {
         foreach ($psets as $pset) {
-            $sset->set_pset($pset, $nonanonymous);
+            $sset->set_pset($pset, $anonymous);
             collect_pset_info($students, $sset, !!$sel_pset);
             set_ranks($students, $selection, $pset->psetkey);
             if ($pset->has_extra) {
