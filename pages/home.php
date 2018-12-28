@@ -142,9 +142,14 @@ function collect_pset_info(&$students, $sset, $entries) {
     }
 }
 
-function set_ranks(&$students, &$selection, $key) {
+function set_ranks(&$students, &$selection, $key, $round = false) {
     $selection[] = $key;
     $selection[] = $key . "_rank";
+    if ($round) {
+        foreach ($students as $s) {
+            $s->$key = round($s->$key * 10) / 10;
+        }
+    }
     uasort($students, function ($a, $b) use ($key) {
             $av = get($a, $key);
             $bv = get($b, $key);
@@ -349,9 +354,9 @@ function download_psets_report($request) {
 
     foreach ($grouped_psets as $grp => $psets) {
         if ($grp !== "") {
-            set_ranks($students, $selection, $grp);
+            set_ranks($students, $selection, $grp, true);
             if (get($group_has_extra, $grp)) {
-                set_ranks($students, $selection, "{$grp}_noextra");
+                set_ranks($students, $selection, "{$grp}_noextra", true);
             }
         }
     }
