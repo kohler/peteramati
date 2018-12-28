@@ -126,8 +126,8 @@ function collect_pset_info(&$students, $sset, $entries) {
 
             if ($grp) {
                 $ss->{$grp} = get_f($ss, $grp) + $total * $factor;
-                $k .= "_noextra";
-                $ss->{$grp} = get_f($ss, $grp) + $total_noextra * $factor;
+                $k = "{$grp}_noextra";
+                $ss->{$k} = get_f($ss, $k) + $total_noextra * $factor;
             }
 
             if ($entries)
