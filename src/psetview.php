@@ -457,7 +457,7 @@ class PsetView {
         return $this->grade;
     }
 
-    function has_assignable_grades() {
+    function is_current_grades() {
         return $this->pset->gitless_grades || $this->grading_commit();
     }
 
@@ -603,7 +603,7 @@ class PsetView {
     }
 
     function grade_total() {
-        $total = $maxtotal = 0;
+        $total = $total_noextra = $maxtotal = 0;
         $notes = $this->current_info();
         $ag = get($notes, "autogrades");
         $g = get($notes, "grades");
@@ -613,10 +613,12 @@ class PsetView {
                 $gv = get($ag, $ge->key);
             if ($gv)
                 $total += $gv;
+            if ($gv && !$ge->is_extra)
+                $total_noextra += $gv;
             if (!$ge->is_extra && $ge->max && $ge->max_visible)
                 $maxtotal += $ge->max;
         }
-        return [$total, $maxtotal];
+        return [$total, $maxtotal, $total_noextra];
     }
 
     function gradercid() {

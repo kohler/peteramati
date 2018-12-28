@@ -42,7 +42,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         echo '" data-pa-can-set-grades="yes';
     if ($info->user_can_view_grades())
         echo '" data-pa-user-can-view-grades="yes';
-    if ($info->can_view_grades() && $info->has_assignable_grades())
+    if ($info->can_view_grades() && $info->is_current_grades())
         echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode($info->grade_json()));
     echo '">';
 

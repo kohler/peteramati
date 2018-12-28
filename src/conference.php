@@ -54,6 +54,7 @@ class Conf {
     private $_psets = [];
     private $_psets_by_urlkey = [];
     private $_psets_sorted = false;
+    private $_group_weights;
 
     private $_date_format_initialized = false;
     private $_pc_members_cache = null;
@@ -1474,6 +1475,7 @@ class Conf {
             throw new Exception("pset urlkey `{$pset->urlkey}` reused");
         $this->_psets_by_urlkey[$pset->urlkey] = $pset;
         $this->_psets_sorted = false;
+        $this->_group_weights = null;
     }
 
     function psets() {
@@ -1499,6 +1501,16 @@ class Conf {
             if ($key === $p->psetkey)
                 return $p;
         return null;
+    }
+
+    function group_weight($group) {
+        if ($this->_group_weights === null) {
+            $this->_group_weights = [];
+            foreach ($this->psets() as $pset)
+                if (!$pset->disabled && $pset->group)
+                    $this->_group_weights[$pset->group] = get($this->_group_weights, $pset->group, 0.0) + $pset->group_weight;
+        }
+        return get($this->_group_weights, $group, 0.0);
     }
 
 

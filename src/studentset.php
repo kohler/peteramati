@@ -3,7 +3,7 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2018 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-class StudentSet implements Iterator {
+class StudentSet implements Iterator, Countable {
 	public $conf;
 	public $viewer;
 	public $pset;
@@ -18,12 +18,34 @@ class StudentSet implements Iterator {
 	private $_cg = [];
 	private $_rb_uids = [];
 
-	function __construct(Contact $viewer) {
+    const COLLEGE = 1;
+    const EXTENSION = 2;
+    const ENROLLED = 4;
+    const DROPPED = 8;
+
+	function __construct(Contact $viewer, $flags = 0) {
 		$this->conf = $viewer->conf;
 		$this->viewer = $viewer;
-		$result = $this->conf->qe("select ContactInfo.*, group_concat(type, ' ', pset, ' ', link) contactLinks from ContactInfo left join ContactLink on (ContactLink.cid=ContactInfo.contactId) where college or extension group by ContactInfo.contactId");
-		while (($u = Contact::fetch($result, $this->conf)))
+        $ce = [];
+        if ($flags & self::COLLEGE) {
+            $ce[] = "college";
+        }
+        if ($flags & self::EXTENSION) {
+            $ce[] = "extension";
+        }
+        $ce = $ce ? join(" or ", $ce) : "college or extension";
+        $ed = [];
+        if ($flags & self::ENROLLED) {
+            $ed[] = "not dropped";
+        }
+        if ($flags & self::DROPPED) {
+            $ed[] = "dropped";
+        }
+        $ed = $ed ? join(" or ", $ed) : "true";
+		$result = $this->conf->qe("select ContactInfo.*, group_concat(type, ' ', pset, ' ', link) contactLinks from ContactInfo left join ContactLink on (ContactLink.cid=ContactInfo.contactId) where ($ce) and ($ed) group by ContactInfo.contactId");
+		while (($u = Contact::fetch($result, $this->conf))) {
 			$this->_u[$u->contactId] = $u;
+        }
 		$this->_ua = array_values($this->_u);
 		Dbl::free($result);
 	}
@@ -79,9 +101,14 @@ class StudentSet implements Iterator {
         	}
         }
 
-        foreach ($this->_u as $u)
+        foreach ($this->_u as $u) {
         	$u->visited = $u->incomplete = false;
+        }
 	}
+
+    function users() {
+        return $this->_u;
+    }
 
 	function user($cid) {
 		return get($this->_u, $cid);
@@ -160,4 +187,9 @@ class StudentSet implements Iterator {
 	function valid() {
 		return $this->_upos < count($this->_ua);
 	}
+
+
+    function count() {
+        return count($this->_ua);
+    }
 }

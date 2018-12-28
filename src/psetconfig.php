@@ -26,6 +26,7 @@ class Pset {
 
     public $title;
     public $group;
+    public $group_weight;
 
     public $disabled;
     public $ui_disabled;
@@ -55,7 +56,7 @@ class Pset {
     public $deadline_extension;
 
     public $has_grade_landmark = false;
-    public $all_grades = array();
+    public $all_grades = [];
     public $grades;
     public $grades_visible;
     public $grades_visible_college;
@@ -64,7 +65,7 @@ class Pset {
     public $grade_cdf_cutoff;
     public $separate_extension_grades;
     public $has_extra = false;
-    public $max_total;
+    private $_max_grade = [null, null, null, null];
     public $grade_script;
     private $_late_hours;
 
@@ -124,6 +125,10 @@ class Pset {
         if ((string) $this->title === "")
             $this->title = $this->psetkey;
         $this->group = self::cstr($p, "group");
+        $this->group_weight = self::cnum($p, "group_weight");
+        if ($this->group_weight === null)
+            $this->group_weight = 1.0;
+        $this->group_weight = (float) $this->group_weight;
 
         $this->disabled = self::cbool($p, "disabled");
         if (($this->ui_disabled = self::cbool($p, "ui_disabled")))
@@ -340,6 +345,22 @@ class Pset {
 
     function late_hours_entry() {
         return $this->_late_hours;
+    }
+
+    function max_grade($pcview, $include_extra = false) {
+        $i = ($pcview ? 1 : 0) | ($include_extra ? 2 : 0);
+        if (!isset($this->_max_grade[$i])) {
+            $max = 0;
+            foreach ($this->visible_grades($pcview) as $ge) {
+                if ($ge->max
+                    && !$ge->no_total
+                    && ($pcview || $ge->max_visible)
+                    && (!$ge->is_extra || $include_extra))
+                    $max += $ge->max;
+            }
+            $this->_max_grade[$i] = $max;
+        }
+        return $this->_max_grade[$i];
     }
 
     function gradeinfo_json($pcview) {

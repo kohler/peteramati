@@ -80,33 +80,27 @@ if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
 
 
 // download
-function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
+function collect_pset_info(&$students, $sset, $entries) {
     global $Conf, $Me, $Qreq;
-    $result = $Conf->qe_raw("select c.contactId, c.firstName, c.lastName, c.email,
-	c.huid, c.anon_username, c.seascode_username, c.github_username, c.extension,
-	r.repoid, r.url, r.open, r.working, min(pl.link) as partnercid,
-	rg.gradebhash, rg.gradercid
-	from ContactInfo c
-	left join ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$pset->id)
-    left join ContactLink pl on (l.cid=c.contactId and l.type=" . LINK_PARTNER . " and l.pset=$pset->id)
-	left join Repository r on (r.repoid=l.link)
-	left join RepositoryGrade rg on (rg.repoid=r.repoid and rg.pset=$pset->id and not rg.placeholder)
-	where ($where)
-	and (rg.repoid is not null or not c.dropped)
-	group by c.contactId");
-    $sort = $Qreq->sort;
-    while (($s = edb_orow($result))) {
-        $s->is_anonymous = $pset->anonymous && !$nonanonymous;
-        $s->username = $s->is_anonymous ? $s->anon_username : ($s->github_username ? : $s->seascode_username);
-        Contact::set_sorter($s, $Conf);
+
+    $pset = $sset->pset;
+    $grp = null;
+    if ($pset->group && $pset->group_weight) {
+        $grp = $pset->group;
+        $max = $pset->max_grade(true);
+        $factor = (100.0 * $pset->group_weight) / ($max * $Conf->group_weight($grp));
+    }
+
+    foreach ($sset as $info) {
+        $s = $info->user;
         $ss = get($students, $s->username);
-        if (!$ss && $s->is_anonymous)
+        if (!$ss && $s->is_anonymous) {
             $students[$s->username] = $ss = (object)
                 array("username" => $s->username,
                       "extension" => ($s->extension ? "Y" : "N"),
                       "sorter" => $s->username,
                       "npartners" => 0);
-        else if (!$ss)
+        } else if (!$ss) {
             $students[$s->username] = $ss = (object)
                 array("name" => trim("$s->lastName, $s->firstName"),
                       "email" => $s->email,
@@ -116,39 +110,36 @@ function collect_pset_info(&$students, $pset, $where, $entries, $nonanonymous) {
                       "extension" => ($s->extension ? "Y" : "N"),
                       "sorter" => $s->sorter,
                       "npartners" => 0);
+        }
 
-        $gi = null;
-        if ($pset->gitless_grades)
-            $gi = $pset->contact_grade_for($s);
-        else if ($s->gradebhash)
-            $gi = $pset->commit_notes($s->gradebhash);
-        else
-            continue;
-        $gi = $gi ? $gi->notes : null;
+        if ($info->has_assigned_grades()) {
+            list($total, $max, $total_noextra) = $info->grade_total();
 
-        $gd = ContactView::pset_grade($gi, $pset);
-        if ($gd) {
             $k = $pset->psetkey;
-            $ss->{$k} = $gd->total;
-            $k .= "_noextra";
-            $ss->{$k} = $gd->total_noextra;
-            if (($k = $pset->group)) {
-                $ss->{$k} = get_f($ss, $k) + $gd->total;
+            $ss->{$k} = $total;
+            $k = $pset->psetkey . "_noextra";
+            $ss->{$k} = $total_noextra;
+            $k = $pset->psetkey . "_norm";
+            $ss->{$k} = round($total * 100.0 / $max);
+            $k = $pset->psetkey . "_noextra_norm";
+            $ss->{$k} = round($total_noextra * 100.0 / $max);
+
+            if ($grp) {
+                $ss->{$grp} = get_f($ss, $grp) + $total * $factor;
                 $k .= "_noextra";
-                $ss->{$k} = get_f($ss, $k) + $gd->total_noextra;
+                $ss->{$grp} = get_f($ss, $grp) + $total_noextra * $factor;
             }
+
             if ($entries)
                 foreach ($pset->numeric_grades() as $ge) {
-                    $k = $ge->key;
-                    if (get($gd, $k) !== null)
-                        $ss->{$k} = $gd->{$k};
+                    if (($g = $info->current_grade_entry($ge->key)) !== null)
+                        $ss->{$ge->key} = $g;
                 }
         }
 
         if ($s->partnercid)
             ++$ss->npartners;
     }
-    Dbl::free($result);
 }
 
 function set_ranks(&$students, &$selection, $key) {
@@ -165,91 +156,223 @@ function set_ranks(&$students, &$selection, $key) {
                 return $av < $bv ? 1 : -1;
         });
     $rank = $key . "_rank";
+    $relrank = $key . "_normrank";
+    $nstudents = count($students);
     $r = $i = 1;
+    $rr = 100.0;
     $lastval = null;
     foreach ($students as $s) {
         if (get($s, $key) != $lastval) {
             $lastval = get($s, $key);
             $r = $i;
+            $rr = round(($nstudents + 1 - $i) * 100.0 / $nstudents);
         }
         $s->{$rank} = $r;
+        $s->{$relrank} = $rr;
         ++$i;
     }
 }
 
+function parse_formula(&$t, $nstudents, $minprec) {
+    $t = ltrim($t);
+
+    if ($t === "") {
+        $e = null;
+    } else if ($t[0] === "(") {
+        $t = substr($t, 1);
+        $e = parse_formula($t, $nstudents, 0);
+        if ($e !== null) {
+            $t = ltrim($t);
+            if ($t === "" || $t[0] !== ")") {
+                return $e;
+            }
+            $t = substr($t, 1);
+        }
+    } else if ($t[0] === "-" || $t[0] === "+") {
+        $op = $t[0];
+        $t = substr($t, 1);
+        $e = parse_formula($t, $nstudents, 12);
+        if ($e !== null && $op === "-") {
+            $e = ["neg", $e];
+        }
+    } else if (preg_match('{\A(\d+\.?\d*|\.\d+)(.*)\z}s', $t, $m)) {
+        $t = $m[2];
+        $e = (float) $m[1];
+    } else if (preg_match('{\A(?:pi|π|m_pi)(.*)\z}si', $t, $m)) {
+        $t = $m[2];
+        $e = (float) M_PI;
+    } else if (preg_match('{\A(log10|log|ln|lg|exp)\b(.*)\z}s', $t, $m)) {
+        $t = $m[2];
+        $e = parse_formula($t, $nstudents, 12);
+        if ($e !== null) {
+            $e = [$m[1], $e];
+        }
+    } else if (preg_match('{\A(\w+)(.*)\z}s', $t, $m)) {
+        $t = $m[2];
+        $e = ($m[1] === "nstudents" ? (float) $nstudents : $m[1]);
+    } else {
+        $e = null;
+    }
+
+    if ($e === null) {
+        return null;
+    }
+
+    while (true) {
+        $t = ltrim($t);
+        if (preg_match('{\A(\+|-|\*\*?|/|%)(.*)\z}s', $t, $m)) {
+            $op = $m[1];
+            if ($op === "**") {
+                $prec = 13;
+            } else if ($op === "*" || $op === "/" || $op === "%") {
+                $prec = 11;
+            } else {
+                $prec = 10;
+            }
+            if ($prec < $minprec) {
+                return $e;
+            }
+            $t = $m[2];
+            $e2 = parse_formula($t, $nstudents, $op === "**" ? $prec : $prec + 1);
+            if ($e === null) {
+                return null;
+            }
+            $e = [$op, $e, $e2];
+        } else {
+            return $e;
+        }
+    }
+}
+
+function evaluate_formula($student, $formula) {
+    if (is_float($formula)) {
+        return $formula;
+    } else if (is_string($formula)) {
+        return get($student, $formula);
+    } else {
+        $ex = [];
+        for ($i = 1; $i !== count($formula); ++$i) {
+            $e = evaluate_formula($student, $formula[$i]);
+            if ($e === null) {
+                return null;
+            }
+            $ex[] = $e;
+        }
+        switch ($formula[0]) {
+        case "+":
+            return $ex[0] + $ex[1];
+        case "-":
+            return $ex[0] - $ex[1];
+        case "*":
+            return $ex[0] * $ex[1];
+        case "/":
+            return $ex[0] / $ex[1];
+        case "%":
+            return $ex[0] % $ex[1];
+        case "**":
+            return $ex[0] ** $ex[1];
+        case "log":
+        case "log10":
+            return log10($ex[0]);
+        case "ln":
+            return log($ex[0]);
+        case "lg":
+            return log($ex[0]) / log(2);
+        case "exp":
+            return exp($ex[0]);
+        default:
+            return null;
+        }
+    }
+}
+
 function download_psets_report($request) {
-    global $Conf;
+    global $Conf, $Me, $PsetInfo;
     $where = array();
     $report = $request["report"];
     $nonanonymous = false;
-    foreach (explode(" ", strtolower($report)) as $rep)
+    $ssflags = StudentSet::ENROLLED;
+    foreach (explode(" ", strtolower($report)) as $rep) {
         if ($rep === "college")
-            $where[] = "not c.extension";
+            $ssflags |= StudentSet::COLLEGE;
         else if ($rep === "extension")
-            $where[] = "c.extension";
+            $ssflags |= StudentSet::EXTENSION;
         else if ($rep === "nonanonymous")
             $nonanonymous = true;
-    if (count($where))
-        $where = array("(" . join(" or ", $where) . ")");
-    $where[] = "(c.roles&" . Contact::ROLE_PCLIKE . ")=0";
-    $where[] = "not c.dropped";
-    $where = join(" and ", $where);
+    }
+    $sset = new StudentSet($Me, $ssflags);
 
     $sel_pset = null;
-    if (get($request, "pset") && !($sel_pset = $Conf->pset_by_key($request["pset"])))
+    if (get($request, "pset")
+        && !($sel_pset = $Conf->pset_by_key($request["pset"])))
         return $Conf->errorMsg("No such pset");
 
-    $students = array();
+    $students = [];
     if (isset($request["fields"]))
         $selection = explode(",", $request["fields"]);
     else
-        $selection = array("name", "username", "anon_username", "email", "huid", "extension");
-    $maxbyg = array();
-    $max = $max_noextra = 0;
-    foreach ($Conf->psets() as $pset)
-        if (!$pset->disabled && (!$sel_pset || $sel_pset === $pset)) {
-            collect_pset_info($students, $pset, $where, !!$sel_pset, $nonanonymous);
-            if (($g = $pset->group)) {
-                if (!isset($maxbyg[$g]))
-                    $maxbyg[$g] = $maxbyg["${g}_noextra"] = 0;
-                foreach ($pset->grades() as $ge)
-                    if ($ge->max && !$ge->no_total) {
-                        $maxbyg[$g] += $ge->max;
-                        if (!$ge->is_extra)
-                            $maxbyg["${g}_noextra"] += $ge->max;
+        $selection = ["name", "username", "anon_username", "email", "huid", "extension", "npartners"];
+
+    $group_has_extra = [];
+    if (!$sel_pset) {
+        $grouped_psets = [];
+        $ungrouped_psets = [];
+        foreach ($Conf->psets() as $pset) {
+            if (!$pset->disabled) {
+                if ($pset->group) {
+                    $grouped_psets[$pset->group][] = $pset;
+                    if ($pset->has_extra) {
+                        $group_has_extra[$pset->group] = true;
                     }
+                } else {
+                    $ungrouped_psets[] = $pset;
+                }
             }
         }
-
-    foreach ($Conf->psets() as $pset)
-        if (!$pset->disabled && (!$sel_pset || $sel_pset === $pset)) {
-            set_ranks($students, $selection, $pset->psetkey);
-            if ($pset->has_extra)
-                set_ranks($students, $selection, $pset->psetkey . "_noextra");
-            if ($sel_pset)
-                foreach ($pset->grades() as $ge)
-                    $selection[] = $ge->key;
+        if (!empty($ungrouped_psets)) {
+            $grouped_psets[""] = $ungrouped_psets;
         }
-
-    if (!$sel_pset) {
-        set_ranks($students, $selection, "psets");
-        set_ranks($students, $selection, "psets_noextra");
-        set_ranks($students, $selection, "tests");
-        set_ranks($students, $selection, "tests_noextra");
-        $mp = $maxbyg["psets"];
-        $mt = $maxbyg["tests"];
-        $mp_noextra = $maxbyg["psets_noextra"];
-        $mt_noextra = $maxbyg["tests_noextra"];
-
-        foreach ($students as $s) {
-            $s->performance_noextra = round(1000 * (1.65 * ($s->psets_noextra / $mp_noextra) + 1.2 * ($s->tests_noextra / $mt_noextra))) / 10;
-            $s->performance = round(1000 * (0.9 * ($s->psets_noextra / $mp_noextra) + 0.75 * ($s->psets / $m_psets) + 1.2 * ($s->tests / $mt))) / 10;
-        }
-        set_ranks($students, $selection, "performance");
-        set_ranks($students, $selection, "performance_noextra");
+    } else {
+        $grouped_psets[""] = [$sel_pset];
     }
 
-    $selection[] = "npartners";
+    foreach ($grouped_psets as $grp => $psets) {
+        foreach ($psets as $pset) {
+            $sset->set_pset($pset, $nonanonymous);
+            collect_pset_info($students, $sset, !!$sel_pset);
+            set_ranks($students, $selection, $pset->psetkey);
+            if ($pset->has_extra) {
+                set_ranks($students, $selection, "{$pset->psetkey}_noextra");
+            }
+        }
+    }
+
+    foreach ($grouped_psets as $grp => $psets) {
+        if ($grp !== "") {
+            set_ranks($students, $selection, $grp);
+            if (get($group_has_extra, $grp)) {
+                set_ranks($students, $selection, "{$grp}_noextra");
+            }
+        }
+    }
+
+    foreach (get($PsetInfo, "_report_summaries") as $fname => $formula) {
+        $fexpr = parse_formula($formula, count($students), 0);
+        if ($fexpr !== null && trim($formula) === "") {
+            foreach ($students as $s) {
+                $s->$fname = round(evaluate_formula($s, $fexpr) * 10) / 10;
+            }
+            set_ranks($students, $selection, $fname);
+        } else {
+            error_log("bad formula $fname @$formula");
+        }
+    }
+
+    if ($sel_pset) {
+        foreach ($sel_pset->grades() as $ge) {
+            $selection[] = $ge->key;
+        }
+    }
 
     $csv = new CsvGenerator;
     $csv->set_header($selection);
