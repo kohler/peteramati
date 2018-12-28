@@ -80,6 +80,18 @@ if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
 
 
 // download
+function report_set($s, $k, $total, $total_noextra, $normfactor = null) {
+    $s->$k = $total;
+    $x = "{$k}_noextra";
+    $s->$x = $total_noextra;
+    if ($normfactor !== null) {
+        $x = "{$k}_norm";
+        $s->$x = round($total * $normfactor);
+        $x = "{$k}_noextra_norm";
+        $s->$x = round($total_noextra * $normfactor);
+    }
+}
+
 function collect_pset_info(&$students, $sset, $entries) {
     global $Conf, $Me, $Qreq;
 
@@ -114,15 +126,7 @@ function collect_pset_info(&$students, $sset, $entries) {
 
         if ($info->has_assigned_grades()) {
             list($total, $max, $total_noextra) = $info->grade_total();
-
-            $k = $pset->psetkey;
-            $ss->{$k} = $total;
-            $k = $pset->psetkey . "_noextra";
-            $ss->{$k} = $total_noextra;
-            $k = $pset->psetkey . "_norm";
-            $ss->{$k} = round($total * 100.0 / $max);
-            $k = $pset->psetkey . "_noextra_norm";
-            $ss->{$k} = round($total_noextra * 100.0 / $max);
+            report_set($ss, $pset->psetkey, $total, $total_noextra, 100.0 / $max);
 
             if ($grp) {
                 $ss->{$grp} = get_f($ss, $grp) + $total * $factor;
@@ -142,12 +146,14 @@ function collect_pset_info(&$students, $sset, $entries) {
     }
 }
 
-function set_ranks(&$students, &$selection, $key, $round = false) {
+function set_ranks(&$students, &$selection, $example, $key, $round = false) {
     $selection[] = $key;
     $selection[] = $key . "_rank";
     if ($round) {
         foreach ($students as $s) {
-            $s->$key = round($s->$key * 10) / 10;
+            if (isset($s->$key)) {
+                $s->$key = round($s->$key * 10) / 10;
+            }
         }
     }
     uasort($students, function ($a, $b) use ($key) {
@@ -161,7 +167,7 @@ function set_ranks(&$students, &$selection, $key, $round = false) {
                 return $av < $bv ? 1 : -1;
         });
     $rank = $key . "_rank";
-    $relrank = $key . "_normrank";
+    $relrank = $key . "_rank_norm";
     $nstudents = count($students);
     $r = $i = 1;
     $rr = 100.0;
@@ -176,16 +182,19 @@ function set_ranks(&$students, &$selection, $key, $round = false) {
         $s->{$relrank} = $rr;
         ++$i;
     }
+    foreach ([$key, "{$key}_rank", "{$key}_rank_norm"] as $k) {
+        $example->$k = 100;
+    }
 }
 
-function parse_formula(&$t, $nstudents, $minprec) {
+function parse_formula(&$t, $example, $minprec) {
     $t = ltrim($t);
 
     if ($t === "") {
         $e = null;
     } else if ($t[0] === "(") {
         $t = substr($t, 1);
-        $e = parse_formula($t, $nstudents, 0);
+        $e = parse_formula($t, $example, 0);
         if ($e !== null) {
             $t = ltrim($t);
             if ($t === "" || $t[0] !== ")") {
@@ -196,7 +205,7 @@ function parse_formula(&$t, $nstudents, $minprec) {
     } else if ($t[0] === "-" || $t[0] === "+") {
         $op = $t[0];
         $t = substr($t, 1);
-        $e = parse_formula($t, $nstudents, 12);
+        $e = parse_formula($t, $example, 12);
         if ($e !== null && $op === "-") {
             $e = ["neg", $e];
         }
@@ -208,13 +217,20 @@ function parse_formula(&$t, $nstudents, $minprec) {
         $e = (float) M_PI;
     } else if (preg_match('{\A(log10|log|ln|lg|exp)\b(.*)\z}s', $t, $m)) {
         $t = $m[2];
-        $e = parse_formula($t, $nstudents, 12);
+        $e = parse_formula($t, $example, 12);
         if ($e !== null) {
             $e = [$m[1], $e];
         }
     } else if (preg_match('{\A(\w+)(.*)\z}s', $t, $m)) {
         $t = $m[2];
-        $e = ($m[1] === "nstudents" ? (float) $nstudents : $m[1]);
+        $k = $m[1];
+        if (!isset($example->$k)) {
+            return null;
+        } else if ($k === "nstudents") {
+            $e = $example->nstudents;
+        } else {
+            $e = $k;
+        }
     } else {
         $e = null;
     }
@@ -238,7 +254,7 @@ function parse_formula(&$t, $nstudents, $minprec) {
                 return $e;
             }
             $t = $m[2];
-            $e2 = parse_formula($t, $nstudents, $op === "**" ? $prec : $prec + 1);
+            $e2 = parse_formula($t, $example, $op === "**" ? $prec : $prec + 1);
             if ($e === null) {
                 return null;
             }
@@ -253,7 +269,11 @@ function evaluate_formula($student, $formula) {
     if (is_float($formula)) {
         return $formula;
     } else if (is_string($formula)) {
-        return get($student, $formula);
+        if (property_exists($student, $formula)) {
+            return $student->$formula;
+        } else {
+            return 0.0;
+        }
     } else {
         $ex = [];
         for ($i = 1; $i !== count($formula); ++$i) {
@@ -341,33 +361,37 @@ function download_psets_report($request) {
         $grouped_psets[""] = [$sel_pset];
     }
 
+    $example = (object) ["nstudents" => count($students)];
+
     foreach ($grouped_psets as $grp => $psets) {
         foreach ($psets as $pset) {
             $sset->set_pset($pset, $anonymous);
+            report_set($example, $pset->psetkey, 100, 100, 1);
+
             collect_pset_info($students, $sset, !!$sel_pset);
-            set_ranks($students, $selection, $pset->psetkey);
+            set_ranks($students, $selection, $example, $pset->psetkey);
             if ($pset->has_extra) {
-                set_ranks($students, $selection, "{$pset->psetkey}_noextra");
+                set_ranks($students, $selection, $example, "{$pset->psetkey}_noextra");
             }
         }
     }
 
     foreach ($grouped_psets as $grp => $psets) {
         if ($grp !== "") {
-            set_ranks($students, $selection, $grp, true);
+            set_ranks($students, $selection, $example, $grp, true);
             if (get($group_has_extra, $grp)) {
-                set_ranks($students, $selection, "{$grp}_noextra", true);
+                set_ranks($students, $selection, $example, "{$grp}_noextra", true);
             }
         }
     }
 
     foreach (get($PsetInfo, "_report_summaries") as $fname => $formula) {
-        $fexpr = parse_formula($formula, count($students), 0);
+        $fexpr = parse_formula($formula, $example, 0);
         if ($fexpr !== null && trim($formula) === "") {
             foreach ($students as $s) {
                 $s->$fname = round(evaluate_formula($s, $fexpr) * 10) / 10;
             }
-            set_ranks($students, $selection, $fname);
+            set_ranks($students, $selection, $example, $fname);
         } else {
             error_log("bad formula $fname @$formula");
         }
@@ -382,6 +406,9 @@ function download_psets_report($request) {
     $csv = new CsvGenerator;
     $csv->set_header($selection);
     $csv->set_selection($selection);
+    usort($students, function ($a, $b) {
+        return strcasecmp($a->name, $b->name);
+    });
     foreach ($students as $s)
         $csv->add($s);
     $csv->download_headers("gradereport.csv");
