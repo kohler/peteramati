@@ -511,8 +511,8 @@ function echo_commit($Info) {
                 $cmd = "git pull handout";
                 if ($Pset->handout_hash)
                     $cmd .= " " . htmlspecialchars($Pset->handout_hash);
-                else if ($Pset->handout_repo_branch)
-                    $cmd .= " " . htmlspecialchars($Pset->handout_repo_branch);
+                else if ($Pset->handout_branch)
+                    $cmd .= " " . htmlspecialchars($Pset->handout_branch);
                 else
                     $cmd .= " master";
                 $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");

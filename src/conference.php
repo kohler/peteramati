@@ -1564,7 +1564,7 @@ class Conf {
             $hset->snaphash = $hrepo->snaphash;
             $hset->snaphash_at = $Now;
             $hset->commits = [];
-            foreach ($hrepo->commits($pset, $pset->handout_repo_branch) as $c)
+            foreach ($hrepo->commits($pset, $pset->handout_branch) as $c)
                 $hset->commits[] = [$c->hash, $c->commitat, $c->subject];
             $this->save_setting($key, 1, $hset);
             $this->qe("delete from Settings where name!=? and name like 'handoutcommits_%_?s'", $key, $pset->id);
