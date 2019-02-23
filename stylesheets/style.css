@@ -5,12 +5,15 @@
 
 /* page background */
 body {
-	font-family: "Helvetica Neue", Helvetica, Arial, verdana, tahoma, sans-serif;
-	font-size: 11pt; /* grep MAINSIZE */
 	color: #333333;
 	background-color: white;
 	margin: 0;
-	line-height: 1.35;
+}
+html {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+		"Helvetica Neue", Arial, sans-serif,
+		"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+	line-height: 1.4;
 }
 
 /* header */
@@ -167,7 +170,7 @@ body#review div.body, body#comment div.body, body#contactauthors div.body,
 body#assign div.body, body#offrev div.body {
 	margin: 0 22px 0 12px;
 }
-body#account div.body, body#scorehelp div.body, body#settings div.body {
+body#account div.body, body#settings div.body {
 	margin: 0;
 }
 
@@ -2395,9 +2398,6 @@ div.pa-grp .pa-grp-title:before {
 	font-weight: bold;
 	white-space: nowrap;
 }
-table.pap {
-	line-height: 1.35;
-}
 table.pap > thead {
 	font-size: smaller;
 	color: #7777aa;
@@ -2408,6 +2408,9 @@ table.pap > thead {
 }
 .pap-username, .pap-name, .pap-extension, .pap-grader, .pap-notes, .pap-grade, .pap-ngrades, .pap-total, .pap-repo, .pap-pset, .pap-at {
 	padding-left: 12px;
+}
+.pap-grade, .pap-total, .pap-ngrades {
+	font-variant-numeric: tabular-nums;
 }
 tr.papr-partner > td.pap-username {
 	padding-left: 1em;
@@ -3022,34 +3025,11 @@ h3.infacebook61 {
 }
 
 /* score help */
-a.scorehelp {
-	font-weight: normal;
-	position: relative;
-	text-decoration: none;
-}
 a.help {
 	font-size: smaller;
 	font-weight: normal;
 	position: relative;
 	bottom: 0.5em;
-}
-div.scorehelpc, div.scorehelpo {
-	font-size: smaller;
-	font-weight: normal;
-	color: black;
-	text-align: left;
-	border: 3px solid #9999cc;
-	padding: 0.5em;
-	background: #f8f8ff;
-	position: absolute;
-	min-width: 15em;
-	z-index: 6;
-}
-div.scorehelpc, tr.aueditc td {
-	display: none;
-}
-div.scorehelpc span.rev_num, div.scorehelpo span.rev_num {
-	font-size: 10.5pt; /* MAINSIZE */
 }
 
 /* popup dialogs */
