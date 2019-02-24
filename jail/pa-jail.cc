@@ -1681,9 +1681,9 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         die("Out of memory\n");
     int newargvpos = 0;
     std::string command;
-    this->argv_[newargvpos++] = (char*) owner_sh_.c_str();
-    this->argv_[newargvpos++] = (char*) "-l";
-    this->argv_[newargvpos++] = (char*) "-c";
+    argv_[newargvpos++] = (char*) owner_sh_.c_str();
+    argv_[newargvpos++] = (char*) "-l";
+    argv_[newargvpos++] = (char*) "-c";
     if (argc == 1)
         command = argv[0];
     else {
@@ -1691,8 +1691,8 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         for (int i = 0; i < argc; ++i)
             command += std::string(" ") + shell_quote(argv[i]);
     }
-    this->argv_[newargvpos++] = const_cast<char*>(command.c_str());
-    this->argv_[newargvpos++] = nullptr;
+    argv_[newargvpos++] = const_cast<char*>(command.c_str());
+    argv_[newargvpos++] = nullptr;
 
     // store other arguments
     this->jaildir_ = &jaildir;
