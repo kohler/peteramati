@@ -4098,8 +4098,6 @@ function pa_gradegraph_geometry() {
         this.ml = Math.max(this.ml, Math.ceil(this.xdw / 2));
     }
 
-    console.log(this);
-
     this.gw = this.tw - this.ml - this.mr;
     var gh = this.gh = this.th - this.mt - this.mb;
     var xfactor = this.gw / this.max;
