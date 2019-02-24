@@ -3878,6 +3878,7 @@ function load(j) {
 return {add: add, load: load};
 })(jQuery);
 
+
 function pa_gradecdf_series(d, total) {
     var i, data = [];
     for (i = 0; i < d.cdf.length; i += 2) {
@@ -3980,6 +3981,197 @@ function pa_draw_gradecdf($graph) {
         }
     }
 }
+
+
+
+function pa_gradecdf_series2(d, xax, yax) {
+    var cdf = d.cdf, i, data = [], totalx = null, nr = 1 / d.n;
+    for (i = 0; i < cdf.length; i += 2) {
+        var x = Math.max(0, cdf[i] - 0.5);
+        if (i !== 0)
+            data.push("H", xax(x));
+        else
+            data.push("M", xax(x), ",", yax(d.cutoff || 0));
+        data.push("V", yax(cdf[i+1] * nr));
+    }
+    if (cdf.length)
+        data.push("H", xax(cdf[cdf.length-2] + 0.5));
+    return data.join("");
+}
+
+function path_y_at_x(x) {
+    var l = 0, r = this.getTotalLength();
+    while (r - l > 0.5) {
+        var m = l + (r - l) / 2,
+            pt = this.getPointAtLength(m);
+        if (pt.x >= x + 0.25)
+            r = m;
+        else if (pt.x >= x - 0.25)
+            return pt.y;
+        else
+            l = m;
+    }
+    return null;
+}
+
+function pa_gradecdf_findy(d, x) {
+    var cdf = d.cdf, l = 0, r = cdf.length;
+    while (l < r) {
+        var m = l + ((r - l) >> 2) * 2;
+        if (cdf[m] >= x)
+            r = m;
+        else
+            l = m + 2;
+    }
+    return cdf[l+1];
+}
+
+function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
+    var H = maxg * hfrac, iH = 1 / H;
+    function epanechnikov(x) {
+        if (x >= -H && x <= H) {
+            x *= iH;
+            return 0.75 * iH * (1 - x * x);
+        } else {
+            return 0;
+        }
+    }
+    var bins = [], i;
+    for (i = 0; i !== nbins + 1; ++i) {
+        bins.push(0);
+    }
+    var cdf = d.cdf, dx = maxg / nbins, idx = 1 / dx;
+    for (i = 0; i < cdf.length; i += 2) {
+        var y = cdf[i+1] - (i === 0 ? 0 : d.cdf[i-1]);
+        var x1 = Math.max(0, Math.floor((d.cdf[i] - H) * idx));
+        var x2 = Math.min(nbins + 1, Math.ceil((d.cdf[i] + H) * idx));
+        while (x1 < x2) {
+            bins[x1] += epanechnikov(x1 * dx - d.cdf[i]) * y;
+            ++x1;
+        }
+    }
+    var nr = 1 / d.n, maxp = 0;
+    for (i = 0; i !== nbins + 1; ++i) {
+        bins[i] *= nr;
+        maxp = Math.max(maxp, bins[i]);
+    }
+    return {kde: bins, maxp: maxp, binwidth: dx};
+}
+
+function pa_gradecdf_kdepath(kde, maxp, xax, yax) {
+    var data = [], bins = kde.kde, nrdy = 0.8 / maxp;
+    for (i = 0; i !== bins.length; ++i) {
+        if (i !== 0)
+            data.push(" ", xax(i * kde.binwidth), ",", yax(bins[i] * nrdy));
+        else
+            data.push("M", xax(i * kde.binwidth), ",", yax(bins[i] * nrdy), "L");
+    }
+    return data.join("");
+}
+
+function pa_draw_gradecdf2($graph) {
+    var d = $graph.data("pa-gradecdfinfo");
+    if (!d) {
+        return;
+    }
+
+    function mksvg(tag) {
+        return document.createElementNS("http://www.w3.org/2000/svg", tag);
+    }
+
+    function mkpath(series, attr) {
+        var path = mksvg("path");
+        path.setAttribute("d", series);
+        path.setAttribute("fill", "none");
+        for (var x in attr) {
+            path.setAttribute(x, attr[x]);
+        }
+        return path;
+    }
+
+    var W = 400;
+    var H = 200;
+    var datamax = d.cdf[d.cdf.length - 2];
+    if (d.extension && d.extension.cdf) {
+        datamax = Math.max(datamax, d.extension.cdf[d.extension.cdf.length - 2]);
+    }
+    var graphmax = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
+    var XFACTOR = W / graphmax;
+
+    function xax(x) {
+        return x * XFACTOR;
+    }
+
+    function yax(y) {
+        return H - y * H;
+    }
+
+    // load user grade
+    var gi = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
+    var tm = pa_gradeinfo_total(gi);
+
+    var svg = mksvg("svg");
+    svg.setAttribute("width", "600");
+    svg.setAttribute("height", "400");
+    svg.setAttribute("preserveAspectRatio", "none");
+
+    var g = mksvg("g");
+    svg.appendChild(g);
+    g.setAttribute("transform", "translate(0,20)");
+    //g.setAttribute("width", 500);
+    //g.setAttribute("height", 350);
+
+    // series
+    var dx = d.extension, dm = dx || d,
+        kdem = pa_gradecdf_kde(dm, graphmax, 0.1, 100),
+        highlight_path;
+    if (dx) {
+        g.appendChild(mkpath(pa_gradecdf_series2(d, xax, yax), {stroke: "#ffaaaa", "stroke-width": 2}));
+    } else if (d.noextra) {
+        g.appendChild(mkpath(pa_gradecdf_series2(d.noextra, xax, yax), {stroke: "#ffaaaa", "stroke-width": 2}));
+        var kde = pa_gradecdf_kde(d.noextra, graphmax, 0.08, 100);
+        kdem.maxp = Math.max(kdem.maxp, kde.maxp);
+        g.appendChild(mkpath(pa_gradecdf_kdepath(kde, kdem.maxp, xax, yax), {stroke: "#ffaaaa"}));
+    }
+    highlight_path = mkpath(pa_gradecdf_series2(dm, xax, yax, graphmax), {stroke: "#220000", "stroke-width": 3});
+    g.appendChild(highlight_path);
+    highlight_path = mkpath(pa_gradecdf_kdepath(kdem, kdem.maxp, xax, yax), {stroke: "blue"});
+    g.appendChild(highlight_path);
+
+    var dot = mksvg("circle");
+    dot.setAttribute("cx", xax(tm[0]));
+    dot.setAttribute("cy", path_y_at_x.call(highlight_path, xax(tm[0])));
+    dot.setAttribute("stroke", "#ffffff");
+    dot.setAttribute("stroke-width", 1.5);
+    dot.setAttribute("fill", "#bb0000");
+    dot.setAttribute("r", 4);
+    g.appendChild(dot);
+
+    if (d.maxtotal && d.maxtotal < datamax) {
+        var total = mksvg("line");
+        total.setAttribute("x1", xax(d.maxtotal));
+        total.setAttribute("y1", yax(0));
+        total.setAttribute("x2", xax(d.maxtotal));
+        total.setAttribute("y2", yax(1));
+        total.setAttribute("stroke", "silver");
+        g.appendChild(total);
+    }
+
+    if (d.cutoff) {
+        var cutoff = mksvg("rect");
+        cutoff.setAttribute("x", xax(0));
+        cutoff.setAttribute("y", yax(d.cutoff));
+        cutoff.setAttribute("width", xax(xaxis.graphmax));
+        cutoff.setAttribute("height", yax(0) - yax(d.cutoff));
+        cutoff.setAttribute("fill", "rgba(255,0,0,0.1)");
+        g.appendChild(cutoff);
+    }
+
+    $graph.html(svg);
+}
+
+
+
 
 function pa_gradecdf($graph) {
     jQuery.ajax(hoturl_post("pset", hoturl_gradeparts($graph, {gradecdf:1})), {
