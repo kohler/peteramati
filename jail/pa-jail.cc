@@ -1812,18 +1812,14 @@ int jailownerinfo::exec_go() {
         perror_die(owner_home_);
 
     // check that shell exists
-    if (!dryrun) {
-        int f = open(owner_sh_.c_str(), O_RDONLY);
-        if (f < 0)
-            perror_die(owner_sh_);
-        close(f);
-    }
+    if (!dryrun && access(owner_sh_.c_str(), R_OK | X_OK) != 0)
+        perror_die(owner_sh_);
 
     if (verbose) {
         for (int i = 0; newenv_[i]; ++i)
             fprintf(verbosefile, "%s ", newenv_[i]);
-        for (int i = 0; this->argv_[i]; ++i)
-            fprintf(verbosefile, i ? " %s" : "%s", shell_quote(this->argv_[i]).c_str());
+        for (int i = 0; argv_[i]; ++i)
+            fprintf(verbosefile, i ? " %s" : "%s", shell_quote(argv_[i]).c_str());
         fprintf(verbosefile, "\n");
     }
 
@@ -1887,7 +1883,7 @@ int jailownerinfo::exec_go() {
             for (int sig = 1; sig < NSIG; ++sig)
                 signal(sig, SIG_DFL);
 
-            if (execve(this->argv_[0], (char* const*) this->argv_,
+            if (execve(argv_[0], (char* const*) argv_,
                        (char* const*) newenv_.data()) != 0) {
                 fprintf(stderr, "exec %s: %s\n", owner_sh_.c_str(), strerror(errno));
                 exit(126);
@@ -2113,7 +2109,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         from_slave_.rerrno_ = EIO; // don't misinterpret closed as error
     }
 
-    while (1) {
+    while (true) {
         // check child and timeout
         // (only wait for child if read done/failed)
         int exit_status = check_child_timeout(child, from_slave_.done());
