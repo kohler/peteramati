@@ -1198,7 +1198,6 @@ class Conf {
         if ($this->opt("jqueryMigrate"))
             Ht::stash_html($this->make_script_file("//code.jquery.com/jquery-migrate-3.0.0.min.js", true));
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
-        Ht::stash_html($this->make_script_file("scripts/jquery.flot.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
         foreach (mkarray($this->opt("javascripts", [])) as $scriptfile)
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");

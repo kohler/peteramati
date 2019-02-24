@@ -2808,6 +2808,40 @@ textarea.pa-gradevalue {
 	min-width: 3.5em;
 }
 
+.pa-gg-axis {
+	font-size: 0.8rem;
+}
+.pa-gg-xaxis {
+	text-anchor: middle;
+}
+.pa-gg-yaxis {
+	text-anchor: end;
+}
+.pa-gg-mark-total {
+	stroke: #ccddff;
+	stroke-width: 3;
+}
+.pa-gg-mark-grade {
+	stroke: #ffffff;
+	stroke-width: 2;
+	fill: #ff5522;
+}
+.pa-gg-main {
+	stroke: #220000;
+	stroke-width: 3;
+}
+.pa-gg-main.pa-gg-extension {
+	stroke: #222288;
+}
+.pa-gg-universal {
+	stroke: #220000;
+	stroke-width: 1.5;
+}
+.pa-gg-noextra {
+	stroke: #998888;
+	stroke-width: 1.5;
+}
+
 /* ANSI escapes */
 .ansib {
 	font-weight: bold;
@@ -2922,29 +2956,6 @@ textarea.pa-gradevalue {
 	background-color: #e9ebeb;
 }
 
-
-.xaxislabelcontainer, .yaxislabelcontainer {
-	position: relative;
-}
-.yaxislabelcontainer {
-	width: 1em;
-}
-.xaxislabel, .yaxislabel {
-	font-size: smaller;
-}
-.xaxislabel {
-	padding-left: 1em;
-	text-align: center;
-}
-.yaxislabel {
-	position: absolute;
-	top: 45%;
-	white-space: nowrap;
-	transform: rotate(-90deg);
-	-webkit-transform: rotate(-90deg);
-	transform-origin: 50% 50%;
-	-webkit-transform-origin: 50% 50%;
-}
 
 .bigface61 {
 	float: left;

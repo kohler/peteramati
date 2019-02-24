@@ -3879,20 +3879,6 @@ return {add: add, load: load};
 })(jQuery);
 
 
-function pa_gradecdf_series(d, total) {
-    var i, data = [];
-    for (i = 0; i < d.cdf.length; i += 2) {
-        if (i != 0 || !d.cutoff)
-            data.push([d.cdf[i], i > 0 ? d.cdf[i-1] / d.n : 0]);
-        else
-            data.push([d.cdf[0], d.cutoff]);
-        data.push([d.cdf[i], d.cdf[i+1]/d.n]);
-        if (data.totalx == null && d.cdf[i] >= total)
-            data.totalx = d.cdf[i+1] / d.n;
-    }
-    return data;
-}
-
 function pa_gradeinfo_total(gi) {
     if (typeof gi === "string")
         gi = JSON.parse(gi);
@@ -3909,79 +3895,6 @@ function pa_gradeinfo_total(gi) {
     return [Math.round(total * 1000) / 1000,
             Math.round(maxtotal * 1000) / 1000];
 }
-
-function pa_draw_gradecdf($graph) {
-    var d = $graph.data("pa-gradecdfinfo");
-    if (!d)
-        return;
-
-    // load user grade
-    var gi = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
-    var tm = pa_gradeinfo_total(gi);
-
-    // series
-    var dx = d.extension;
-    var series;
-    if (dx)
-        series = [{data: pa_gradecdf_series(dx, tm[0]), color: "#ee6666", label: "extension"},
-                  {data: pa_gradecdf_series(d, tm[0]), color: "#ffaaaa", lines: {lineWidth: 0.8}, label: "all"}];
-    else if (d.noextra)
-        series = [{data: pa_gradecdf_series(d, tm[0]), color: "#ee6666", label: "all"},
-                  {data: pa_gradecdf_series(d.noextra, tm[0]), color: "#ffaaaa", lines: {lineWidth: 0.8}, label: "noextra"}];
-    else
-        series = [{data: pa_gradecdf_series(d, tm[0]), color: "#ee6666"}];
-    series.push({data: [[tm[0], series[0].data.totalx]], color: "#222266", points: {show: true, radius: 5, fillColor: "#ffff00"}});
-
-    // check max-x
-    var xaxis = {min: 0};
-    var datamax = d.cdf[d.cdf.length - 2];
-    if (dx && dx.cdf)
-        datamax = Math.max(datamax, dx.cdf[dx.cdf.length - 2]);
-    var grid = {markings: []};
-    if (d.maxtotal) {
-        if (d.maxtotal > datamax)
-            xaxis.max = d.maxtotal;
-        else
-            grid.markings.push({
-                    xaxis: {from: d.maxtotal, to: d.maxtotal},
-                    color: "rgba(0,0,255,0.2)"
-                });
-    }
-
-    // check grid
-    if (d.cutoff)
-        grid.markings.push({
-                xaxis: {from: 0, to: xaxis.max || datamax},
-                yaxis: {from: 0, to: d.cutoff},
-                color: "rgba(255,0,0,0.1)"
-            });
-
-    // plot
-    var $table = $graph.find(".pa-stat-cdf");
-    $table.find(".plot > div").plot(series, {
-        xaxis: xaxis,
-        yaxis: {min: 0, max: 1},
-        grid: grid,
-        legend: {position: "nw", labelBoxBorderColor: "transparent"}
-    });
-    $table.find(".yaxislabelcontainer").html('<div class="yaxislabel">fraction of results</div>');
-    $table.find(".yaxislabel").css("left", -0.5 * $table.find(".yaxislabel").width());
-    $table.find(".xaxislabelcontainer").html('<div class="xaxislabel">grade</div>');
-
-    // summary
-    for (var i in {"all": 1, "extension": 1}) {
-        var $sum = $graph.find(".pa-stat-text." + i);
-        var dd = (i == "all" ? d : dx) || {};
-        for (var x in {"mean":1, "median":1, "stddev":1}) {
-            var $v = $sum.find("." + x);
-            if (x in dd)
-                $v.removeClass("hidden").find(".val").text(dd[x].toFixed(1));
-            else
-                $v.addClass("hidden");
-        }
-    }
-}
-
 
 
 function pa_gradecdf_series2(d, xax, yax) {
@@ -4043,10 +3956,11 @@ function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
     var cdf = d.cdf, dx = maxg / nbins, idx = 1 / dx;
     for (i = 0; i < cdf.length; i += 2) {
         var y = cdf[i+1] - (i === 0 ? 0 : d.cdf[i-1]);
-        var x1 = Math.max(0, Math.floor((d.cdf[i] - H) * idx));
-        var x2 = Math.min(nbins + 1, Math.ceil((d.cdf[i] + H) * idx));
+        var x1 = Math.floor((d.cdf[i] - H) * idx);
+        var x2 = Math.ceil((d.cdf[i] + H) * idx);
         while (x1 < x2) {
-            bins[x1] += epanechnikov(x1 * dx - d.cdf[i]) * y;
+            var x = Math.max(0, Math.min(nbins, x1));
+            bins[x] += epanechnikov(x1 * dx - d.cdf[i]) * y;
             ++x1;
         }
     }
@@ -4059,7 +3973,7 @@ function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
 }
 
 function pa_gradecdf_kdepath(kde, maxp, xax, yax) {
-    var data = [], bins = kde.kde, nrdy = 0.8 / maxp;
+    var data = [], bins = kde.kde, nrdy = 0.9 / maxp;
     for (i = 0; i !== bins.length; ++i) {
         if (i !== 0)
             data.push(" ", xax(i * kde.binwidth), ",", yax(bins[i] * nrdy));
@@ -4069,15 +3983,285 @@ function pa_gradecdf_kdepath(kde, maxp, xax, yax) {
     return data.join("");
 }
 
+function pa_gradecdf_kdepath(kde, maxp, xax, yax) {
+    var data = [], bins = kde.kde, nrdy = 0.9 / maxp;
+    // adapted from d3-shape by Mike Bostock
+    var xs = [0, 0, 0, 0], ys = [0, 0, 0, 0],
+        la = [0, 0, 0, 0], la2 = [0, 0, 0, 0],
+        epsilon = 1e-6;
+    function point(i2) {
+        var i0 = (i2 + 2) % 4, i1 = (i2 + 3) % 4, i3 = (i2 + 1) % 4;
+        var x1 = xs[i1], y1 = ys[i1], x2 = xs[i2], y2 = ys[i2];
+        if (la[i1] > epsilon) {
+            var a = 2 * la2[i1] + 3 * la[i1] * la[i2] + la2[i2],
+                n = 3 * la[i1] * (la[i1] + la[i2]);
+            x1 = (x1 * a - xs[i0] * la2[i2] + xs[i2] * la2[i1]) / n;
+            y1 = (y1 * a - ys[i0] * la2[i2] + ys[i2] * la2[i1]) / n;
+        }
+        if (la[i3] > epsilon) {
+            var b = 2 * la2[i3] + 3 * la[i3] * la[i2] + la2[i2],
+                m = 3 * la[i3] * (la[i3] + la[i2]);
+            x2 = (x2 * b - xs[i3] * la2[i2] + xs[i1] * la2[i3]) / m;
+            y2 = (y2 * b - ys[i3] * la2[i2] + ys[i1] * la2[i3]) / m;
+        }
+        data.push("C", x1, y1, x2, y2, xs[i2], ys[i2]);
+    }
+    for (i = 0; i !== bins.length; ++i) {
+        var x = xax(i * kde.binwidth), y = yax(bins[i] * nrdy);
+        if (i === 0) {
+            data.push("M", x, y);
+            xs[3] = xs[0] = x;
+            ys[3] = ys[0] = y;
+        } else {
+            var i1 = (i + 3) % 4, i2 = i % 4;
+            xs[i2] = x;
+            ys[i2] = y;
+
+            var dx = xs[i1] - x, dy = ys[i1] - y;
+            la2[i2] = Math.sqrt(dx * dx + dy * dy);
+            la[i2] = Math.sqrt(la2[i2]);
+            if (i > 1)
+                point(i1);
+
+            if (i === bins.length - 1) {
+                var i3 = (i + 1) % 4;
+                xs[i3] = x;
+                ys[i3] = y;
+                la2[i3] = 0;
+                la[i3] = 0;
+                point(i2);
+            }
+        }
+    }
+    return data.join(" ");
+}
+
+function mksvg(tag) {
+    return document.createElementNS("http://www.w3.org/2000/svg", tag);
+}
+
+function pa_gradegraph_geometry() {
+    var digits = mksvg("text");
+    digits.appendChild(document.createTextNode("888"));
+    this.gx.appendChild(digits);
+    var domr = digits.getBBox();
+    this.xdw = domr.width / 3;
+    this.xdh = domr.height;
+    this.gx.removeChild(digits);
+
+    this.xlw = this.xdw * (Math.floor(Math.log10(this.max)) + 1);
+
+    this.mt = Math.ceil(Math.max(this.yl ? this.xdh / 2 : 0, 2));
+    this.mr = Math.ceil(this.xl ? this.xlw / 2 : 0);
+    this.mb = (this.xt ? 5 : 0) + (this.xl ? this.xdh + 3 : 0);
+    if (this.yl) {
+        var h = this.th - this.mt - Math.max(this.mb, Math.ceil(this.xdh / 2));
+        if (h > this.xdh) {
+            var labelcap = h / this.xdh;
+            if (labelcap > 15)
+                this.ylu = 1;
+            else if (labelcap > 5)
+                this.ylu = 2.5;
+            else if (labelcap > 3)
+                this.ylu = 5;
+            else
+                this.ylu = 10;
+            this.ml = (this.yt ? 5 : 0) + 5 +
+                (this.ylu == 10 ? 1.5 : (this.ylu == 2.5 ? 3.5 : 2.5)) * this.xdw;
+
+            if (this.yltext !== false
+                && this.yltext !== null
+                && this.yltext !== "") {
+                var text = this.yltext || "fraction of grades";
+                this.yltext = mksvg("text");
+                this.yltext.appendChild(document.createTextNode(text));
+                this.gy.appendChild(this.yltext);
+                domr = this.yltext.getBBox();
+                if (domr.width <= 0.875 * h) {
+                    this.ml += this.xdw * 1.5 + this.xdh;
+                } else {
+                    this.gy.removeText(this.yltext);
+                    this.yltext = null;
+                }
+            }
+
+            this.mb = Math.max(this.mb, Math.ceil(this.xdh / 2));
+        } else {
+            this.yl = false;
+            this.ml = 0;
+            this.mt = 2;
+        }
+    } else {
+        this.ml = this.yt ? 5 : 0;
+    }
+    if (this.xl) {
+        this.ml = Math.max(this.ml, Math.ceil(this.xdw / 2));
+    }
+
+    console.log(this);
+
+    this.gw = this.tw - this.ml - this.mr;
+    var gh = this.gh = this.th - this.mt - this.mb;
+    var xfactor = this.gw / this.max;
+    this.xax = function (x) {
+        return x * xfactor;
+    };
+    this.yax = function (y) {
+        return gh - y * gh;
+    };
+
+    this.gg.setAttribute("transform", "translate(" + this.ml + "," + this.mt + ")");
+    this.gx.setAttribute("transform", "translate(" + this.ml + "," + (this.mt + this.gh + (this.xt ? 2 : -5)) + ")");
+    this.gy.setAttribute("transform", "translate(" + (this.ml + (this.yt ? -2 : 5)) + "," + this.mt + ")");
+}
+
+function pa_gradegraph_xaxis() {
+    // determine number
+    var ndigit_max = Math.floor(Math.log10(this.max)) + 1,
+        labelw = this.xdw * ndigit_max,
+        labelcap = this.gw / labelw;
+
+    var unitbase = Math.pow(10, Math.max(0, ndigit_max - 2)),
+        nunits = this.max / unitbase,
+        unit;
+    if (labelcap > nunits * 4 && unitbase > 1)
+        unit = unitbase / 2;
+    else if (labelcap > nunits * 2)
+        unit = unitbase;
+    else if (labelcap > nunits * (unitbase <= 1 ? 0.75 : 1))
+        unit = 2 * unitbase;
+    else if (unitbase > 1 && labelcap > nunits * 0.6)
+        unit = 2.5 * unitbase;
+    else if (labelcap > nunits * 0.3)
+        unit = 5 * unitbase;
+    else
+        unit = 10 * unitbase;
+
+    var x = 0, d = [], total_done = false, e;
+    while (x < this.max + unit) {
+        var xx = x, draw = this.xl;
+        if (this.total) {
+            if (xx > this.total
+                && xx - unit < this.total
+                && !total_done) {
+                xx = this.total;
+                x -= unit;
+            }
+            if (xx == this.total)
+                total_done = true;
+            else if (Math.abs(this.xax(xx) - this.xax(this.total)) < 1.5 * labelw)
+                draw = false;
+        }
+        if (xx > this.max) {
+            xx = this.max;
+            if (this.total
+                && Math.abs(this.xax(xx) - this.xax(this.total)) < 1.15 * labelw)
+                draw = false;
+        } else if (xx < this.max
+                   && xx > this.total
+                   && Math.abs(this.xax(xx) - this.xax(this.total)) < 1.5 * labelw)
+            draw = false;
+
+        if (draw) {
+            e = mksvg("text");
+            e.appendChild(document.createTextNode(xx));
+            e.setAttribute("x", this.xax(xx));
+            e.setAttribute("y", this.xdh + 3);
+            this.gx.appendChild(e);
+        }
+
+        d.push("M", this.xax(xx), ",0v5");
+
+        x += unit;
+    }
+
+    if (this.xt) {
+        e = mksvg("path");
+        e.setAttribute("d", d.join(""));
+        e.setAttribute("fill", "none");
+        e.setAttribute("stroke", "black");
+        this.gx.appendChild(e);
+    }
+}
+
+function pa_gradegraph_yaxis() {
+    var y = 0, d = [], e;
+    while (y <= 10 && this.yl) {
+        e = mksvg("text");
+        e.appendChild(document.createTextNode(y / 10));
+        e.setAttribute("x", -8);
+        e.setAttribute("y", this.yax(y / 10) + 0.25 * this.xdh);
+        this.gy.appendChild(e);
+
+        d.push("M-5,", this.yax(y / 10), "h5");
+
+        y += this.ylu;
+    }
+
+    if (this.yt) {
+        e = mksvg("path");
+        e.setAttribute("d", d.join(""));
+        e.setAttribute("fill", "none");
+        e.setAttribute("stroke", "black");
+        this.gy.appendChild(e);
+    }
+
+    if (this.yltext) {
+        this.yltext.setAttribute("transform", "translate(" + (-this.ml + this.xdh) + "," + this.yax(0.5) + ") rotate(-90)");
+        this.yltext.setAttribute("text-anchor", "middle");
+    }
+}
+
 function pa_draw_gradecdf2($graph) {
     var d = $graph.data("pa-gradecdfinfo");
     if (!d) {
         return;
     }
 
-    function mksvg(tag) {
-        return document.createElementNS("http://www.w3.org/2000/svg", tag);
+    var datamax = d.cdf[d.cdf.length - 2];
+    if (d.extension && d.extension.cdf) {
+        datamax = Math.max(datamax, d.extension.cdf[d.extension.cdf.length - 2]);
     }
+    var max = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
+
+    var $plot = $graph.find(".plot");
+    if (!$plot.length)
+        $plot = $graph;
+
+    var gi = {
+        max: max,
+        total: d.maxtotal,
+        svg: mksvg("svg"),
+        gg: mksvg("g"),
+        gx: mksvg("g"),
+        gy: mksvg("g"),
+        xl: true,
+        xt: true,
+        tw: $plot.width(),
+        th: $plot.height()
+    };
+
+    var want_pdf = $plot.hasClass("pa-gg-has-pdf");
+    var want_cdf = $plot.hasClass("pa-gg-has-cdf");
+    if (!want_pdf && !want_cdf) {
+        $plot.addClass("pa-gg-has-cdf");
+        want_cdf = true;
+    }
+    if (want_cdf)
+        gi.yl = gi.yt = true;
+
+    gi.svg.setAttribute("preserveAspectRatio", "none");
+    gi.svg.setAttribute("width", gi.tw);
+    gi.svg.setAttribute("height", gi.th);
+    $plot.html(gi.svg);
+
+    gi.svg.appendChild(gi.gg);
+    gi.gx.setAttribute("class", "pa-gg-axis pa-gg-xaxis");
+    gi.svg.appendChild(gi.gx);
+    gi.gy.setAttribute("class", "pa-gg-axis pa-gg-yaxis");
+    gi.svg.appendChild(gi.gy);
+
+    pa_gradegraph_geometry.call(gi);
 
     function mkpath(series, attr) {
         var path = mksvg("path");
@@ -4089,85 +4273,85 @@ function pa_draw_gradecdf2($graph) {
         return path;
     }
 
-    var W = 400;
-    var H = 200;
-    var datamax = d.cdf[d.cdf.length - 2];
-    if (d.extension && d.extension.cdf) {
-        datamax = Math.max(datamax, d.extension.cdf[d.extension.cdf.length - 2]);
-    }
-    var graphmax = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
-    var XFACTOR = W / graphmax;
-
-    function xax(x) {
-        return x * XFACTOR;
+    if (gi.total && gi.total < gi.max) {
+        var total = mksvg("line");
+        total.setAttribute("x1", gi.xax(gi.total));
+        total.setAttribute("y1", gi.yax(0));
+        total.setAttribute("x2", gi.xax(gi.total));
+        total.setAttribute("y2", gi.yax(1));
+        total.setAttribute("class", "pa-gg-mark-total");
+        gi.gg.appendChild(total);
     }
 
-    function yax(y) {
-        return H - y * H;
+    // series
+    var dx = d.extension,
+        dm = dx || d,
+        kde_nbins = Math.ceil(gi.max / 2),
+        kde_hfactor = 0.08,
+        kdem = pa_gradecdf_kde(dm, gi.max, kde_hfactor, kde_nbins),
+        kde, pdfpath, cdfpath;
+    if (dx) {
+        if (want_cdf)
+            gi.gg.appendChild(mkpath(pa_gradecdf_series2(d, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-universal"}));
+        if (want_pdf) {
+            kde = pa_gradecdf_kde(d, gi.max, kde_hfactor, kde_nbins);
+            kdem.maxp = Math.max(kdem.maxp, kde.maxp);
+            gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kde, kdem.maxp, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-universal"}));
+        }
+    } else if (d.noextra) {
+        if (want_cdf)
+            gi.gg.appendChild(mkpath(pa_gradecdf_series2(d.noextra, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-noextra"}));
+        if (want_pdf) {
+            kde = pa_gradecdf_kde(d.noextra, gi.max, 0.08, kde_nbins);
+            kdem.maxp = Math.max(kdem.maxp, kde.maxp);
+            gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kde, kdem.maxp, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-noextra"}));
+        }
+    }
+    if (want_cdf) {
+        cdfpath = mkpath(pa_gradecdf_series2(dm, gi.xax, gi.yax, gi.max), {"class": "pa-gg-cdf pa-gg-main" + (dx ? " pa-gg-extension" : "")});
+        gi.gg.appendChild(cdfpath);
+    }
+    if (want_pdf) {
+        pdfpath = mkpath(pa_gradecdf_kdepath(kdem, kdem.maxp, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-main" + (dx ? " pa-gg-extension" : "")});
+        gi.gg.appendChild(pdfpath);
     }
 
     // load user grade
-    var gi = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
-    var tm = pa_gradeinfo_total(gi);
-
-    var svg = mksvg("svg");
-    svg.setAttribute("width", "600");
-    svg.setAttribute("height", "400");
-    svg.setAttribute("preserveAspectRatio", "none");
-
-    var g = mksvg("g");
-    svg.appendChild(g);
-    g.setAttribute("transform", "translate(0,20)");
-    //g.setAttribute("width", 500);
-    //g.setAttribute("height", 350);
-
-    // series
-    var dx = d.extension, dm = dx || d,
-        kdem = pa_gradecdf_kde(dm, graphmax, 0.1, 100),
-        highlight_path;
-    if (dx) {
-        g.appendChild(mkpath(pa_gradecdf_series2(d, xax, yax), {stroke: "#ffaaaa", "stroke-width": 2}));
-    } else if (d.noextra) {
-        g.appendChild(mkpath(pa_gradecdf_series2(d.noextra, xax, yax), {stroke: "#ffaaaa", "stroke-width": 2}));
-        var kde = pa_gradecdf_kde(d.noextra, graphmax, 0.08, 100);
-        kdem.maxp = Math.max(kdem.maxp, kde.maxp);
-        g.appendChild(mkpath(pa_gradecdf_kdepath(kde, kdem.maxp, xax, yax), {stroke: "#ffaaaa"}));
-    }
-    highlight_path = mkpath(pa_gradecdf_series2(dm, xax, yax, graphmax), {stroke: "#220000", "stroke-width": 3});
-    g.appendChild(highlight_path);
-    highlight_path = mkpath(pa_gradecdf_kdepath(kdem, kdem.maxp, xax, yax), {stroke: "blue"});
-    g.appendChild(highlight_path);
-
+    var gri = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
+    var tm = pa_gradeinfo_total(gri);
     var dot = mksvg("circle");
-    dot.setAttribute("cx", xax(tm[0]));
-    dot.setAttribute("cy", path_y_at_x.call(highlight_path, xax(tm[0])));
-    dot.setAttribute("stroke", "#ffffff");
-    dot.setAttribute("stroke-width", 1.5);
-    dot.setAttribute("fill", "#bb0000");
-    dot.setAttribute("r", 4);
-    g.appendChild(dot);
-
-    if (d.maxtotal && d.maxtotal < datamax) {
-        var total = mksvg("line");
-        total.setAttribute("x1", xax(d.maxtotal));
-        total.setAttribute("y1", yax(0));
-        total.setAttribute("x2", xax(d.maxtotal));
-        total.setAttribute("y2", yax(1));
-        total.setAttribute("stroke", "silver");
-        g.appendChild(total);
-    }
+    dot.setAttribute("cx", gi.xax(tm[0]));
+    dot.setAttribute("cy", path_y_at_x.call(cdfpath || pdfpath, gi.xax(tm[0])));
+    dot.setAttribute("class", "pa-gg-mark-grade");
+    dot.setAttribute("r", 5);
+    gi.gg.appendChild(dot);
 
     if (d.cutoff) {
         var cutoff = mksvg("rect");
-        cutoff.setAttribute("x", xax(0));
-        cutoff.setAttribute("y", yax(d.cutoff));
-        cutoff.setAttribute("width", xax(xaxis.graphmax));
-        cutoff.setAttribute("height", yax(0) - yax(d.cutoff));
+        cutoff.setAttribute("x", gi.xax(0));
+        cutoff.setAttribute("y", gi.yax(d.cutoff));
+        cutoff.setAttribute("width", gi.xax(xaxis.graphmax));
+        cutoff.setAttribute("height", gi.yax(0) - gi.yax(d.cutoff));
         cutoff.setAttribute("fill", "rgba(255,0,0,0.1)");
-        g.appendChild(cutoff);
+        gi.gg.appendChild(cutoff);
     }
 
-    $graph.html(svg);
+    // axes
+    pa_gradegraph_xaxis.call(gi);
+    pa_gradegraph_yaxis.call(gi);
+
+    // summary
+    for (var i in {"all": 1, "extension": 1}) {
+        var $sum = $graph.find(".pa-stat-text." + i);
+        var dd = (i == "all" ? d : dx) || {};
+        for (var x in {"mean":1, "median":1, "stddev":1}) {
+            var $v = $sum.find("." + x);
+            if (x in dd)
+                $v.removeClass("hidden").find(".val").text(dd[x].toFixed(1));
+            else
+                $v.addClass("hidden");
+        }
+    }
 }
 
 
@@ -4180,7 +4364,7 @@ function pa_gradecdf($graph) {
         success: function (d) {
             if (d.cdf) {
                 $graph.data("pa-gradecdfinfo", d);
-                pa_draw_gradecdf($graph);
+                pa_draw_gradecdf2($graph);
             }
         }
     });

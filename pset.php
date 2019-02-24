@@ -382,11 +382,7 @@ function echo_grade_cdf() {
     $xmark = $sepx ? "extension " : "";
     echo '<div id="pa-grade-statistics" class="pa-grade-statistics" style="float:right;position:relative">';
     if ($Pset->grade_cdf_cutoff < 1)
-        echo '<table class="pa-stat-cdf"><tbody><tr>',
-            '<td class="yaxislabelcontainer"></td>',
-            '<td class="plot"><div style="width:300px;height:200px"></div></td>',
-            '</tr><tr><td></td><td class="xaxislabelcontainer"></td></tr>',
-            '</tbody></table>';
+        echo '<div class="plot pa-gg-has-cdf" style="width:350px;height:200px"></div>';
     echo '<table class="pa-stat-text', ($sepx ? " extension" : " all"), '"><tbody>',
         '<tr class="mean"><td class="cap">', $xmark, ' mean</td><td class="val"></td></tr>',
         '<tr class="median"><td class="cap">', $xmark, ' median</td><td class="val"></td></tr>',
