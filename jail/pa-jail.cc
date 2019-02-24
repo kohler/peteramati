@@ -1716,19 +1716,17 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     int child;
     if (!dryrun)
         child = clone(exec_clone_function, new_stack + 256 * 1024,
-                      CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID, this);
+                      CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | SIGCHLD, this);
     else {
         exec_clone_function(this);
         exit(0);
     }
     if (child == -1)
         perror_die("clone");
-    int child_waitflags = __WALL;
 #else
     int child = fork();
     if (child == 0)
         exit(exec_go());
-    int child_waitflags = 0;
 #endif
     if (child == -1)
         perror_die("fork");
@@ -1745,7 +1743,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         (void) r;
         r = setresuid(caller_owner, caller_owner, caller_owner);
         (void) r;
-        exit_status = x_waitpid(child, child_waitflags).second;
+        exit_status = x_waitpid(child, 0).second;
     } else
         pidfd = -1;
     exit(exit_status);
