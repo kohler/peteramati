@@ -2080,10 +2080,9 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     // On Linux, if it dies, everything in the jail dies too.
 
     // go back to being the caller
-    // XXX (preserve the saved root identity just in case)
     if (setresuid(ROOT, ROOT, ROOT) != 0
-        || setresgid(caller_group, caller_group, ROOT) != 0
-        || setresuid(caller_owner, caller_owner, ROOT) != 0) {
+        || setresgid(caller_group, caller_group, caller_group) != 0
+        || setresuid(caller_owner, caller_owner, caller_owner) != 0) {
         perror("setresuid");
         exec_done(child, 127);
     }
