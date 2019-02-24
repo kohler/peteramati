@@ -3900,7 +3900,12 @@ function pa_gradeinfo_total(gi) {
 function pa_gradecdf_series2(d, xax, yax) {
     var cdf = d.cdf, i, data = [], totalx = null, nr = 1 / d.n;
     for (i = 0; i < cdf.length; i += 2) {
-        var x = Math.max(0, cdf[i] - 0.5);
+        var x;
+        if (i === 0)
+            x = cdf[i] - 0.5;
+        else
+            x = cdf[i] - Math.min(1, cdf[i] - cdf[i - 1]) / 2;
+        x = Math.max(0, x);
         if (i !== 0)
             data.push("H", xax(x));
         else
