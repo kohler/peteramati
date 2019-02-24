@@ -1830,7 +1830,9 @@ int jailownerinfo::exec_go() {
             perror_die("fork");
         else if (child == 0) {
             child = getpid();
-#if !__linux__
+#if __linux__
+            // sigfd is close-on-exec
+#else
             close(sigpipe[0]);
             close(sigpipe[1]);
 #endif
