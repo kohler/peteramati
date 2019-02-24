@@ -386,7 +386,7 @@ static const mountarg mountargs[] = {
     { "nosuid", MFLAG(NOSUID), true },
 #if __linux__
     { "private", MS_PRIVATE, true },
-    { "rec", MS_REC, true },
+    { "rec", MS_REC, false },
 #endif
 #if __linux__ && defined(MS_RELATIME)
     { "relatime", MS_RELATIME, true },
@@ -401,6 +401,9 @@ static const mountarg mountargs[] = {
 #endif
 #if __linux__ && defined(MS_STRICTATIME)
     { "strictatime", MS_STRICTATIME, true },
+#endif
+#if __linux__ && defined(MS_UNBINDABLE)
+    { "unbindable", MS_UNBINDABLE, true },
 #endif
 };
 static const mountarg* find_mountarg(const char* name, int namelen) {
@@ -456,10 +459,11 @@ std::string mountslot::debug_mountopts_args(unsigned long opts) const {
     if (!data.empty())
         arg += (arg.empty() ? "" : ",") + data;
 #ifdef MS_BIND
+    std::string start = opts & MS_REC ? " --rbind " : " --bind ";
     if ((opts & MS_BIND) && arg == "rw")
-        return " --bind ";
+        return start;
     if (opts & MS_BIND)
-        return " --bind -o " + arg;
+        return start + "-o " + arg;
 #endif
     if (!arg.empty())
         return " -o " + arg;
@@ -1032,7 +1036,7 @@ static int construct_jail(dev_t jaildev, std::string& str) {
             if (!bind_tag.empty() && !bind_files.empty())
                 fix_jail_bind_src(jaildev, src, bind_tag, bind_files);
             mountslot ms(src.c_str(), "none",
-                         flags & FLAG_BIND_RO ? "bind,rec,ro" : "bind,rec");
+                         flags & FLAG_BIND_RO ? "bind,rec,unbindable,ro" : "bind,rec,unbindable");
             ms.wanted = true;
             populate_mount_table();
             mount_table[src] = ms;
