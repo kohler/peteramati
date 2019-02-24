@@ -1226,7 +1226,9 @@ span.asspref-1 {
 	position: absolute;
 	width: 100%;
 	height: 100%;
-	font-family: "Helvetica Neue", Helvetica, verdana, tahoma, sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+		"Helvetica Neue", Arial, sans-serif,
+		"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 	font-size: 70%;
 	text-align: center;
 }
@@ -2609,7 +2611,9 @@ span.foldarrow {
 	background-size: 25px 7px, 25px 5px, 25px 100%, 10px 20px, 10px 20px;
 }
 .pa-note-links, .pa-note-aa, .pa-note-author {
-	font-family: Helvetica, sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+		"Helvetica Neue", Arial, sans-serif,
+		"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 	font-style: normal;
 }
 .pa-note-links {
