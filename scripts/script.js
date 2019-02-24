@@ -3904,7 +3904,7 @@ function pa_gradecdf_series2(d, xax, yax) {
         if (i === 0)
             x = cdf[i] - 0.5;
         else
-            x = cdf[i] - Math.min(1, cdf[i] - cdf[i - 1]) / 2;
+            x = cdf[i] - Math.min(1, cdf[i] - cdf[i - 2]) / 2;
         x = Math.max(0, x);
         if (i !== 0)
             data.push("H", xax(x));
