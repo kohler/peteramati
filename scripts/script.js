@@ -4212,7 +4212,7 @@ function pa_gradegraph_yaxis() {
     }
 }
 
-function pa_draw_gradecdf2($graph) {
+function pa_draw_gradecdf($graph) {
     var d = $graph.data("pa-gradecdfinfo");
     if (!d) {
         return;
@@ -4364,7 +4364,7 @@ function pa_gradecdf($graph) {
         success: function (d) {
             if (d.cdf) {
                 $graph.data("pa-gradecdfinfo", d);
-                pa_draw_gradecdf2($graph);
+                pa_draw_gradecdf($graph);
             }
         }
     });
