@@ -157,25 +157,37 @@ class RunnerState {
         return $f ? $this->expand($f) : false;
     }
 
-    private function overlayfile() {
+    private function overlayfiles() {
         global $ConfSitePATH;
         $f = $this->runner->overlay;
         if (!isset($f))
             $f = $this->pset->run_overlay;
-        if ((string) $f !== "") {
-            if ($f[0] !== "/")
-                $f = $ConfSitePATH . "/" . $f;
-            return $this->expand($f);
-        } else
-            return false;
+        if ($f === null || $f === "" || $f === [])
+            return [];
+        if (is_string($f))
+            $f = [$f];
+        for ($i = 0; $i !== count($f); ) {
+            if ($f[$i] === "") {
+                array_splice($f, $i, 1);
+            } else {
+                if ($f[$i][0] !== "/") {
+                    $f[$i] = $ConfSitePATH . "/" . $f;
+                }
+                $f[$i] = $this->expand($f[$i]);
+                ++$i;
+            }
+        }
+        return $f;
     }
 
     function environment_timestamp() {
         $t = 0;
         if (($f = $this->jailfiles()))
             $t = max($t, (int) @filemtime($f));
-        if (($f = $this->overlayfile()))
-            $t = max($t, (int) @filemtime($f));
+        if (($fs = $this->overlayfiles())) {
+            foreach ($fs as $f)
+                $t = max($t, (int) @filemtime($f));
+        }
         return $t;
     }
 
@@ -435,13 +447,22 @@ class RunnerState {
             throw new RunnerException("Can’t clean up checkout in jail");
 
         // create overlay
-        if (($overlay = $this->overlayfile()))
+        if (($overlay = $this->overlayfiles()))
             $this->checkout_overlay($checkoutdir, $overlay);
     }
 
-    function checkout_overlay($checkoutdir, $overlayfile) {
-        if ($this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($overlayfile)))
-            throw new RunnerException("Can’t unpack overlay");
+    function checkout_overlay($checkoutdir, $overlayfiles) {
+        foreach ($overlayfiles as $overlayfile) {
+            if (preg_match('/(?:\.tar|\.tar\.[gx]z|\.t[bgx]z|\.tar\.bz2)\z/', $overlayfile)) {
+                $x = $this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($overlayfile));
+            } else {
+                fwrite($this->logstream, "++ cp " . escapeshellarg($overlayfile) . " " . escapeshellarg($checkoutdir) . "\n");
+                $rslash = strrpos($overlayfile, "/");
+                $x = !copy($overlayfile, $checkoutdir . substr($overlayfile, $rslash));
+            }
+            if ($x)
+                throw new RunnerException("Can’t unpack overlay");
+        }
 
         $checkout_instructions = @file_get_contents($checkoutdir . "/.gitcheckout");
         if ($checkout_instructions)

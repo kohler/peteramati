@@ -250,7 +250,7 @@ class Pset {
             $this->runners = self::position_sort("runners", $this->all_runners);
         $this->run_username = self::cstr($p, "run_username");
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
-        $this->run_overlay = self::cstr($p, "run_overlay");
+        $this->run_overlay = self::cstr_or_str_array($p, "run_overlay");
         $this->run_skeletondir = self::cstr($p, "run_skeletondir");
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
         $this->run_timeout = self::cinterval($p, "run_timeout");
@@ -266,11 +266,8 @@ class Pset {
                 $this->diffs[] = new DiffConfig($k, $v);
         } else if ($diffs)
             throw new PsetConfigException("`diffs` format error", "diffs");
-        $ignore = get($p, "ignore");
-        if (is_array($ignore))
-            $this->ignore = self::cstr_array($p, "ignore");
-        else if ($ignore)
-            $this->ignore = self::cstr($p, "ignore");
+        if (($ignore = get($p, "ignore")))
+            $this->ignore = self::cstr_or_str_array($p, "ignore");
     }
 
     static function compare(Pset $a, Pset $b) {
@@ -575,6 +572,10 @@ class Pset {
         return self::ccheck("is_string_array", func_get_args());
     }
 
+    static function cstr_or_str_array(/* ... */) {
+        return self::ccheck("is_string_or_string_array", func_get_args());
+    }
+
     static function cdate(/* ... */) {
         return self::ccheck("check_date", func_get_args());
     }
@@ -847,7 +848,7 @@ class RunnerConfig {
         $this->position = Pset::cnum($loc, $r, "position");
         if ($this->position === null && isset($r->priority))
             $this->position = -Pset::cnum($loc, $r, "priority");
-        $this->overlay = Pset::cstr($loc, $r, "overlay");
+        $this->overlay = Pset::cstr_or_str_array($loc, $r, "overlay");
         if (isset($r->timed_replay) && is_number($r->timed_replay))
             $this->timed_replay = $r->timed_replay > 0 ? (float) $r->timed_replay : false;
         else
@@ -937,6 +938,10 @@ function is_string_array($x) {
         && array_reduce($x, function ($carry, $item) {
                return $carry && is_string($item);
            }, true);
+}
+
+function is_string_or_string_array($x) {
+    return is_string($x) || is_string_array($x);
 }
 
 function check_date($x) {
