@@ -171,7 +171,7 @@ class RunnerState {
                 array_splice($f, $i, 1);
             } else {
                 if ($f[$i][0] !== "/") {
-                    $f[$i] = $ConfSitePATH . "/" . $f;
+                    $f[$i] = $ConfSitePATH . "/" . $f[$i];
                 }
                 $f[$i] = $this->expand($f[$i]);
                 ++$i;
@@ -453,7 +453,7 @@ class RunnerState {
 
     function checkout_overlay($checkoutdir, $overlayfiles) {
         foreach ($overlayfiles as $overlayfile) {
-            if (preg_match('/(?:\.tar|\.tar\.[gx]z|\.t[bgx]z|\.tar\.bz2)\z/', $overlayfile)) {
+            if (preg_match('/(?:\.tar|\.tar\.[gx]z|\.t[bgx]z|\.tar\.bz2)\z/i', $overlayfile)) {
                 $x = $this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($overlayfile));
             } else {
                 fwrite($this->logstream, "++ cp " . escapeshellarg($overlayfile) . " " . escapeshellarg($checkoutdir) . "\n");
