@@ -3551,7 +3551,7 @@ function pa_run(button, opt) {
             tpos, tstart, tlast, timeout, running, factor;
         if (times)
             return;
-        times = data.time_date;
+        times = data.time_data;
         if (typeof times === "string")
             times = parse_times(times);
         factor = data.time_factor;
