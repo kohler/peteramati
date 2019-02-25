@@ -173,11 +173,16 @@ class PsetView {
         if ($this->derived_handout_commit === false) {
             $this->derived_handout_commit = null;
             $hbases = $this->pset->handout_commits();
-            foreach ($this->recent_commits() as $c)
+            $seen_hash = !$this->hash;
+            foreach ($this->recent_commits() as $c) {
+                if ($c->hash === $this->hash)
+                    $seen_hash = true;
                 if (isset($hbases[$c->hash])) {
                     $this->derived_handout_commit = $c->hash;
-                    break;
+                    if ($seen_hash)
+                        break;
                 }
+            }
         }
         return $this->derived_handout_commit ? : false;
     }
