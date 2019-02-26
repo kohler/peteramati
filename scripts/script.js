@@ -3879,14 +3879,14 @@ return {add: add, load: load};
 })(jQuery);
 
 
-function pa_gradeinfo_total(gi) {
+function pa_gradeinfo_total(gi, noextra) {
     if (typeof gi === "string")
         gi = JSON.parse(gi);
     var total = 0, maxtotal = 0;
     for (var i = 0; i < gi.order.length; ++i) {
         var k = gi.order[i];
         var ge = k ? gi.entries[k] : null;
-        if (ge && ge.in_total) {
+        if (ge && ge.in_total && (!noextra || !ge.is_extra)) {
             total += (gi.grades && gi.grades[i]) || 0;
             if (!ge.is_extra)
                 maxtotal += ge.max || 0;
@@ -3897,7 +3897,7 @@ function pa_gradeinfo_total(gi) {
 }
 
 
-function pa_gradecdf_series2(d, xax, yax) {
+function pa_gradecdf_series(d, xax, yax) {
     var cdf = d.cdf, i, data = [], totalx = null, nr = 1 / d.n;
     for (i = 0; i < cdf.length; i += 2) {
         var x;
@@ -3977,8 +3977,8 @@ function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
     return {kde: bins, maxp: maxp, binwidth: dx};
 }
 
-function pa_gradecdf_kdepath(kde, maxp, xax, yax) {
-    var data = [], bins = kde.kde, nrdy = 0.9 / maxp;
+/*function pa_gradecdf_kdepath(kde, xax, yax) {
+    var data = [], bins = kde.kde, nrdy = 0.9 / kde.maxp;
     for (i = 0; i !== bins.length; ++i) {
         if (i !== 0)
             data.push(" ", xax(i * kde.binwidth), ",", yax(bins[i] * nrdy));
@@ -3986,10 +3986,10 @@ function pa_gradecdf_kdepath(kde, maxp, xax, yax) {
             data.push("M", xax(i * kde.binwidth), ",", yax(bins[i] * nrdy), "L");
     }
     return data.join("");
-}
+}*/
 
-function pa_gradecdf_kdepath(kde, maxp, xax, yax) {
-    var data = [], bins = kde.kde, nrdy = 0.9 / maxp;
+function pa_gradecdf_kdepath(kde, xax, yax) {
+    var data = [], bins = kde.kde, nrdy = 0.9 / kde.maxp;
     // adapted from d3-shape by Mike Bostock
     var xs = [0, 0, 0, 0], ys = [0, 0, 0, 0],
         la = [0, 0, 0, 0], la2 = [0, 0, 0, 0],
@@ -4218,15 +4218,52 @@ function pa_gradegraph_yaxis() {
 function pa_draw_gradecdf($graph) {
     var d = $graph.data("pa-gradecdfinfo");
     if (!d) {
+        $graph.addClass("hidden");
         return;
     }
 
-    var datamax = d.cdf[d.cdf.length - 2];
-    if (d.extension && d.extension.cdf) {
-        datamax = Math.max(datamax, d.extension.cdf[d.extension.cdf.length - 2]);
+    // compute plot types
+    var plot_types = [];
+    if (d.extension)
+        plot_types.push("cdf-extension", "pdf-extension");
+    plot_types.push("cdf", "pdf");
+    if (d.noextra)
+        plot_types.push("cdf-noextra", "pdf-noextra");
+    plot_types.push("all");
+    $graph[0].setAttribute("data-pa-gg-types", plot_types.join(" "));
+
+    // compute this plot type
+    var plot_type = $graph[0].getAttribute("data-pa-gg-type");
+    if (!plot_type)
+        plot_type = wstorage(false, "pa-gg-type");
+    if (!plot_type)
+        plot_type = plot_types[0];
+    if (plot_types.indexOf(plot_type) < 0) {
+        if (plot_type.substring(0, 3) === "pdf")
+            plot_type = plot_types[1];
+        else
+            plot_type = plot_types[0];
     }
+    $graph[0].setAttribute("data-pa-gg-type", plot_type);
+    $graph.removeClass("cdf pdf all cdf-extension pdf-extension all-extension cdf-noextra pdf-noextra all-noextra");
+    $graph.addClass(plot_type);
+
+    var want_pdf = plot_type.substring(0, 3) === "all" || plot_type.substring(0, 3) === "pdf";
+    var want_cdf = plot_type.substring(0, 3) === "all" || plot_type.substring(0, 3) === "cdf";
+    var want_noextra = plot_type.indexOf("-noextra") >= 0;
+    var want_extension = plot_type.indexOf("-extension") >= 0;
+
+    // maxes
+    var datamax = 0;
+    if (want_noextra)
+        datamax = Math.max(datamax, d.noextra.cdf[d.noextra.cdf.length - 2]);
+    if (want_extension)
+        datamax = Math.max(datamax, d.extension.cdf[d.extension.cdf.length - 2]);
+    if (!want_noextra && !want_extension)
+        datamax = Math.max(datamax, d.cdf[d.cdf.length - 2]);
     var max = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
 
+    $graph.removeClass("hidden");
     var $plot = $graph.find(".plot");
     if (!$plot.length)
         $plot = $graph;
@@ -4243,13 +4280,6 @@ function pa_draw_gradecdf($graph) {
         tw: $plot.width(),
         th: $plot.height()
     };
-
-    var want_pdf = $plot.hasClass("pa-gg-has-pdf");
-    var want_cdf = $plot.hasClass("pa-gg-has-cdf");
-    if (!want_pdf && !want_cdf) {
-        $plot.addClass("pa-gg-has-cdf");
-        want_cdf = true;
-    }
     if (want_cdf)
         gi.yl = gi.yt = true;
 
@@ -4287,44 +4317,38 @@ function pa_draw_gradecdf($graph) {
     }
 
     // series
-    var dx = d.extension,
-        dm = dx || d,
-        kde_nbins = Math.ceil(gi.max / 2),
-        kde_hfactor = 0.08,
-        kdem = pa_gradecdf_kde(dm, gi.max, kde_hfactor, kde_nbins),
-        kde, pdfpath, cdfpath;
-    if (dx) {
-        if (want_cdf)
-            gi.gg.appendChild(mkpath(pa_gradecdf_series2(d, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-universal"}));
-        if (want_pdf) {
-            kde = pa_gradecdf_kde(d, gi.max, kde_hfactor, kde_nbins);
-            kdem.maxp = Math.max(kdem.maxp, kde.maxp);
-            gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kde, kdem.maxp, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-universal"}));
-        }
-    } else if (d.noextra) {
-        if (want_cdf)
-            gi.gg.appendChild(mkpath(pa_gradecdf_series2(d.noextra, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-noextra"}));
-        if (want_pdf) {
-            kde = pa_gradecdf_kde(d.noextra, gi.max, 0.08, kde_nbins);
-            kdem.maxp = Math.max(kdem.maxp, kde.maxp);
-            gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kde, kdem.maxp, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-noextra"}));
-        }
-    }
-    if (want_cdf) {
-        cdfpath = mkpath(pa_gradecdf_series2(dm, gi.xax, gi.yax, gi.max), {"class": "pa-gg-cdf pa-gg-main" + (dx ? " pa-gg-extension" : "")});
-        gi.gg.appendChild(cdfpath);
-    }
-    if (want_pdf) {
-        pdfpath = mkpath(pa_gradecdf_kdepath(kdem, kdem.maxp, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-main" + (dx ? " pa-gg-extension" : "")});
-        gi.gg.appendChild(pdfpath);
-    }
+    var kde_nbins = Math.ceil(gi.max / 2), kde_hfactor = 0.08, kdes = [];
+    if (plot_type === "pdf-extension" || plot_type === "all-extension")
+        kdes.extension = pa_gradecdf_kde(d.extension, gi.max, kde_hfactor, kde_nbins);
+    if (plot_type === "pdf-noextra" || plot_type === "all-noextra")
+        kdes.noextra = pa_gradecdf_kde(d.noextra, gi.max, kde_hfactor, kde_nbins);
+    if (plot_type === "pdf" || plot_type === "all")
+        kdes.main = pa_gradecdf_kde(d, gi.max, kde_hfactor, kde_nbins);
+    var kde_maxp = 0;
+    for (var i in kdes)
+        kde_maxp = Math.max(kde_maxp, kdes[i].maxp);
+    for (var i in kdes)
+        kdes[i].maxp = kde_maxp;
+
+    if (plot_type === "cdf-extension" || plot_type === "all-extension")
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.extension, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-extension"}));
+    if (plot_type === "pdf-extension" || plot_type === "all-extension")
+        gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.extension, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-extension"}));
+    if (plot_type === "cdf-noextra" || plot_type === "all-noextra")
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.noextra, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-noextra"}));
+    if (plot_type === "pdf-noextra" || plot_type === "all-noextra")
+        gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.noextra, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-noextra"}));
+    if (plot_type === "cdf" || plot_type === "all")
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d, gi.xax, gi.yax, gi.max), {"class": "pa-gg-cdf"}));
+    if (plot_type === "pdf" || plot_type === "all")
+        gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.main, gi.xax, gi.yax), {"class": "pa-gg-pdf"}));
 
     // load user grade
     var gri = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
-    var tm = pa_gradeinfo_total(gri);
+    var tm = pa_gradeinfo_total(gri, want_noextra);
     var dot = mksvg("circle");
     dot.setAttribute("cx", gi.xax(tm[0]));
-    dot.setAttribute("cy", path_y_at_x.call(cdfpath || pdfpath, gi.xax(tm[0])));
+    dot.setAttribute("cy", path_y_at_x.call(gi.gg.lastChild, gi.xax(tm[0])));
     dot.setAttribute("class", "pa-gg-mark-grade");
     dot.setAttribute("r", 5);
     gi.gg.appendChild(dot);
@@ -4344,19 +4368,51 @@ function pa_draw_gradecdf($graph) {
     pa_gradegraph_yaxis.call(gi);
 
     // summary
-    for (var i in {"all": 1, "extension": 1}) {
-        var $sum = $graph.find(".pa-stat-text." + i);
-        var dd = (i == "all" ? d : dx) || {};
-        for (var x in {"mean":1, "median":1, "stddev":1}) {
-            var $v = $sum.find("." + x);
-            if (x in dd)
-                $v.removeClass("hidden").find(".val").text(dd[x].toFixed(1));
-            else
-                $v.addClass("hidden");
+    $graph.find(".statistics").each(function () {
+        var dd = d, x = [];
+        if (want_extension)
+            dd = d.extension;
+        if (want_noextra)
+            dd = dd.noextra || d.noextra;
+        if (dd && dd.mean)
+            x.push("mean " + dd.mean.toFixed(1));
+        if (dd && dd.median)
+            x.push("median " + dd.median.toFixed(1));
+        if (dd && dd.stddev)
+            x.push("stddev " + dd.stddev.toFixed(1));
+        if (x.length) {
+            removeClass(this, "hidden");
+            this.innerHTML = x.join(", ");
+        } else {
+            addClass(this, "hidden");
+            this.innerHTML = "";
         }
-    }
+    });
+
+    var title = [];
+    if (plot_type.startsWith("cdf"))
+        title.push("CDF");
+    else if (plot_type.startsWith("pdf"))
+        title.push("PDF");
+    if (want_extension)
+        title.push("extension");
+    if (want_noextra)
+        title.push("no extra credit");
+    $graph.find(".title").html("grade statistics" + (title.length ? " (" + title.join(", ") + ")" : ""));
 }
 
+handle_ui.on("js-grade-statistics-flip", function () {
+    var $graph = $(this).closest(".pa-grade-statistics"),
+        plot_types = ($graph[0].getAttribute("data-pa-gg-types") || "").split(/ /),
+        plot_type = $graph[0].getAttribute("data-pa-gg-type"),
+        i = plot_types.indexOf(plot_type);
+    if (i >= 0) {
+        i = (i + (hasClass(this, "prev") ? plot_types.length - 1 : 1)) % plot_types.length;
+        $graph[0].setAttribute("data-pa-gg-type", plot_types[i]);
+        wstorage(false, "pa-gg-type", plot_types[i]);
+        pa_draw_gradecdf($graph);
+    }
+});
 
 
 

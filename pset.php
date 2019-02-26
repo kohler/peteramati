@@ -380,15 +380,16 @@ function echo_grade_cdf() {
     global $Conf, $Info, $Pset, $User, $Me;
     $sepx = $User->extension && $Pset->separate_extension_grades;
     $xmark = $sepx ? "extension " : "";
-    echo '<div id="pa-grade-statistics" class="pa-grade-statistics" style="float:right;position:relative">';
+    echo '<div id="pa-grade-statistics" class="pa-grade-statistics hidden';
+    if (!$Info->user_can_view_grade_statistics())
+        echo ' pa-pset-hidden';
+    echo '" style="float:right;position:relative">';
+    echo '<a class="qq ui js-grade-statistics-flip prev" href="">&lt;</a>';
+    echo '<a class="qq ui js-grade-statistics-flip next" href="">&gt;</a>';
+    echo '<h4 class="title"></h4>';
     if ($Pset->grade_cdf_cutoff < 1)
-        echo '<div class="plot pa-gg-has-cdf" style="width:350px;height:200px"></div>';
-    echo '<table class="pa-stat-text', ($sepx ? " extension" : " all"), '"><tbody>',
-        '<tr class="mean"><td class="cap">', $xmark, ' mean</td><td class="val"></td></tr>',
-        '<tr class="median"><td class="cap">', $xmark, ' median</td><td class="val"></td></tr>',
-        '<tr class="stddev"><td class="cap">', $xmark, ' stddev</td><td class="val"></td></tr>',
-        '</tbody></table>',
-        '</div>';
+        echo '<div class="plot" style="width:350px;height:200px"></div>';
+    echo '<div class="statistics"', ($sepx ? ' data-pa-extension' : ''), '></div></div>';
     Ht::stash_script("pa_gradecdf(\$(\"#pa-grade-statistics\"))");
 }
 

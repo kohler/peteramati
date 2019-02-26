@@ -2429,16 +2429,6 @@ tr.papr-partner {
 .pap-anonymous .pap-nonanonymous {
 	display: none;
 }
-.pa-stat-text {
-	font-size: 90%;
-	margin: 0.5em auto;
-}
-.pa-stat-text .cap {
-	padding-right: 1em;
-}
-.pa-stat-text .val {
-	text-align: right;
-}
 .pa-filediff {
 	width: calc(100vw - 48px);
 }
@@ -2827,9 +2817,15 @@ textarea.pa-gradevalue {
 	stroke-width: 2;
 	fill: #ff5522;
 }
-.pa-gg-main {
+.pa-gg-cdf, .pa-gg-pdf {
 	stroke: #220000;
 	stroke-width: 3;
+}
+.pa-gg-cdf.pa-gg-noextra, .pa-gg-pdf.pa-gg-noextra {
+	stroke: #bb7777;
+}
+.all .pa-gg-pdf {
+	stroke-width: 2;
 }
 .pa-gg-main.pa-gg-extension {
 	stroke: #222288;
@@ -2838,9 +2834,30 @@ textarea.pa-gradevalue {
 	stroke: #220000;
 	stroke-width: 1.5;
 }
-.pa-gg-noextra {
+.pdf-all .pa-gg-noextra {
 	stroke: #998888;
 	stroke-width: 1.5;
+}
+
+.pa-grade-statistics {
+	position: relative;
+}
+.pa-grade-statistics > .title {
+	text-align: center;
+	margin: 0 auto 1rem;
+}
+.pa-grade-statistics > .statistics {
+	width: fit-content;
+	font-size: 90%;
+	margin: 1rem auto 0;
+}
+.js-grade-statistics-flip.prev {
+	float: left;
+	padding-right: 1rem;
+}
+.js-grade-statistics-flip.next {
+	float: right;
+	padding-left: 1rem;
 }
 
 /* ANSI escapes */
