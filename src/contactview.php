@@ -125,6 +125,7 @@ class ContactView {
         if ($Me->privChair)
             echo "&nbsp;", become_user_link($user);
         if ($Me->isPC
+            && !$user->is_anonymous
             && $user->github_username
             && $Me->conf->opt("githubOrganization")) {
             echo ' <a class="q small ui js-repositories need-tooltip" href="" data-tooltip="List repositories" data-pa-user="' . htmlspecialchars($user->github_username) . '">®</a>';
