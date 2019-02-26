@@ -385,7 +385,7 @@ function download_psets_report($request) {
         }
     }
 
-    foreach (get($PsetInfo, "_report_summaries") as $fname => $formula) {
+    foreach (get($PsetInfo, "_report_summaries", []) as $fname => $formula) {
         $fexpr = parse_formula($formula, $example, 0);
         if ($fexpr !== null && trim($formula) === "") {
             foreach ($students as $s) {
