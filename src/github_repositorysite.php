@@ -224,6 +224,12 @@ class GitHub_RepositorySite extends RepositorySite {
     function friendly_url() {
         return $this->base ? : $this->url;
     }
+    function owner_name() {
+        if (preg_match('{\A([^/"\\\\]+)/([^/"\\\\]+)\z}', $this->base, $m))
+            return [$m[1], $m[2]];
+        else
+            return false;
+    }
 
     function message_defs(Contact $user) {
         $base = $user->is_anonymous ? "[anonymous]" : $this->base;
@@ -234,20 +240,24 @@ class GitHub_RepositorySite extends RepositorySite {
     }
 
     function validate_open(MessageSet $ms = null) {
-        $response = self::api($this->conf, "https://api.github.com/repos/" . $this->base);
-        if (!$response)
+        $owner_name = $this->owner_name();
+        if (!$owner_name)
             return -1;
-        if ($response->status == 200 && $response->j && $response->j->private)
-            return 0;
-        if ($response->status == 200 && $response->j && !$response->j->private) {
-            $ms && $ms->set_error_html("open", $this->expand_message("repo_toopublic", $ms->user));
-            return 1;
-        }
-        if ($response->status == 404) {
+        $gql = self::graphql($this->conf,
+            "{ repository(owner:\"{$owner_name[0]}\", name:\"{$owner_name[1]}\") { isPrivate } }");
+        if ($gql->status !== 200
+            || !$gql->j
+            || !isset($gql->j->data)) {
+            error_log(json_encode($gql));
+            return -1;
+        } else if ($gql->j->data->repository == null) {
             $ms && $ms->set_error_html("open", $this->expand_message("repo_nonexistent", $ms->user));
             return 1;
-        }
-        return -1;
+        } else if (!$gql->j->data->repository->isPrivate) {
+            $ms && $ms->set_error_html("open", $this->expand_message("repo_toopublic", $ms->user));
+            return 1;
+        } else
+            return 0;
     }
     function validate_working(MessageSet $ms = null) {
         $status = RepositorySite::run_ls_remote($this->conf, $this->ssh_url(), $output);
