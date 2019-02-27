@@ -1337,7 +1337,10 @@ function show_pset_table($sset) {
         $actions["diffmany"] = $pset->gitless ? "Diffs" : "Grades";
         if (!$pset->gitless_grades) {
             foreach ($pset->all_diffconfig() as $dc) {
-                if (($dc->full || $dc->gradable) && ($f = $dc->exact_filename())) {
+                if (($dc->collate
+                     || $dc->gradable
+                     || ($dc->full && $dc->collate !== false))
+                    && ($f = $dc->exact_filename())) {
                     if ($stage !== -1 && $stage !== 0)
                         $actions[] = null;
                     $stage = 0;

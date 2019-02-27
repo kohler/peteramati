@@ -866,6 +866,7 @@ class DiffConfig {
     public $position;
     public $fileless;
     public $full;
+    public $collate;
     public $ignore;
     public $boring;
     public $gradable;
@@ -885,6 +886,7 @@ class DiffConfig {
             $this->position = -Pset::cnum($loc, $d, "priority");
         $this->fileless = Pset::cbool($loc, $d, "fileless");
         $this->full = Pset::cbool($loc, $d, "full");
+        $this->collate = Pset::cbool($loc, $d, "collate");
         $this->ignore = Pset::cbool($loc, $d, "ignore");
         $this->boring = Pset::cbool($loc, $d, "boring");
         $this->gradable = Pset::cbool($loc, $d, "gradable", "gradeable");
@@ -911,6 +913,8 @@ class DiffConfig {
             $x->fileless = $y->fileless;
         if ($x->full === null)
             $x->full = $y->full;
+        if ($x->collate === null)
+            $x->collate = $y->collate;
         if ($x->ignore === null)
             $x->ignore = $y->ignore;
         if ($x->boring === null)
