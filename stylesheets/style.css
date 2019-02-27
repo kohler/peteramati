@@ -2741,9 +2741,12 @@ span.foldarrow {
 }
 .pa-runrange-play:after {
 	content: "⏸️";
+	font-family: "Apple Color Emoji", "Segoe UI Emoji",
+		-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+		"Helvetica Neue", Arial, sans-serif;
 }
 .pa-runrange-play.paused:after {
-	content: "▶️";
+	content: "\25b6\fe0f";
 }
 .pa-runrange-time {
 	display: inline-block;
