@@ -4330,18 +4330,18 @@ function pa_draw_gradecdf($graph) {
     for (var i in kdes)
         kdes[i].maxp = kde_maxp;
 
-    if (plot_type === "cdf-extension" || plot_type === "all-extension")
-        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.extension, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-extension"}));
     if (plot_type === "pdf-extension" || plot_type === "all-extension")
         gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.extension, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-extension"}));
-    if (plot_type === "cdf-noextra" || plot_type === "all-noextra")
-        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.noextra, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-noextra"}));
+    if (plot_type === "cdf-extension" || plot_type === "all-extension")
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.extension, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-extension"}));
     if (plot_type === "pdf-noextra" || plot_type === "all-noextra")
         gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.noextra, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-noextra"}));
-    if (plot_type === "cdf" || plot_type === "all")
-        gi.gg.appendChild(mkpath(pa_gradecdf_series(d, gi.xax, gi.yax, gi.max), {"class": "pa-gg-cdf"}));
+    if (plot_type === "cdf-noextra" || plot_type === "all-noextra")
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.noextra, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-noextra"}));
     if (plot_type === "pdf" || plot_type === "all")
         gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.main, gi.xax, gi.yax), {"class": "pa-gg-pdf"}));
+    if (plot_type === "cdf" || plot_type === "all")
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d, gi.xax, gi.yax, gi.max), {"class": "pa-gg-cdf"}));
 
     // load user grade
     var gri = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
