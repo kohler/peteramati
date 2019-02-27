@@ -384,7 +384,7 @@ function echo_grade_cdf() {
     echo '<div id="pa-grade-statistics" class="pa-grade-statistics hidden';
     if (!$Info->user_can_view_grade_statistics())
         echo ' pa-pset-hidden';
-    echo '" style="float:right;position:relative">';
+    echo '">';
     echo '<a class="qq ui js-grade-statistics-flip prev" href="">&lt;</a>';
     echo '<a class="qq ui js-grade-statistics-flip next" href="">&gt;</a>';
     echo '<h4 class="title"></h4>';

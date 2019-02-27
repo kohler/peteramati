@@ -2833,8 +2833,13 @@ textarea.pa-gradevalue {
 
 .pa-grade-statistics {
 	position: relative;
+	float: right;
 	padding-left: 1rem;
 	padding-bottom: 0.5rem;
+}
+.pa-grade-statistics.pa-pset-hidden {
+	margin-left: 0;
+	padding-left: 1rem;
 }
 .pa-grade-statistics > .title {
 	text-align: center;
