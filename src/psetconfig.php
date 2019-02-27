@@ -924,11 +924,16 @@ class DiffConfig {
 
 
     function exact_filename() {
-        $unquoted = preg_replace(",\\\\(.),", '$1', $this->regex);
-        if (preg_quote($unquoted) == $this->regex)
-            return $unquoted;
-        else
-            return false;
+        $ok = true;
+        // XXX should allow \n, \f, \a, \e, \000, etc.
+        $unquoted = preg_replace_callback(',(\\\\[^0-9a-zA-Z]?|[$^.\\[\\]|()?*+{}]),',
+            function ($m) use (&$ok) {
+                if ($m[1][0] === "\\" && strlen($m[1]) > 1)
+                    return substr($m[1], 1);
+                else
+                    $ok = false;
+            }, $this->regex);
+        return $ok ? $unquoted : false;
     }
 }
 
