@@ -2824,19 +2824,11 @@ textarea.pa-gradevalue {
 .pa-gg-cdf.pa-gg-noextra, .pa-gg-pdf.pa-gg-noextra {
 	stroke: #bb7777;
 }
-.all .pa-gg-pdf {
+.all .pa-gg-pdf, .all .pa-gg-noextra, .all .pa-gg-extension {
 	stroke-width: 2;
 }
-.pa-gg-main.pa-gg-extension {
+.pa-gg-cdf.pa-gg-extension, .pa-gg-pdf.pa-gg-extension {
 	stroke: #222288;
-}
-.pa-gg-universal {
-	stroke: #220000;
-	stroke-width: 1.5;
-}
-.pdf-all .pa-gg-noextra {
-	stroke: #998888;
-	stroke-width: 1.5;
 }
 
 .pa-grade-statistics {

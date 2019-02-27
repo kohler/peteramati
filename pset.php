@@ -81,13 +81,14 @@ class Series {
     }
 
     static public function truncate_summary_below($r, $cutoff) {
-        $cx = $cutoff * $r->n;
-        for ($i = 0; $i < count($r->cdf) && $r->cdf[$i+1] < $cx; $i += 2)
-            /* nada */;
+        /*$cx = $cutoff * $r->n;
+        for ($i = 0; $i < count($r->cdf) && $r->cdf[$i+1] < $cx; $i += 2) {
+        }
         if ($i !== 0) {
             $r->cdf = array_slice($r->cdf, $i);
             $r->cutoff = $cutoff;
-        }
+        }*/
+        $r->cutoff = $cutoff;
     }
 
 }

@@ -2469,7 +2469,7 @@ function pa_makegrade(gi, k, editable) {
         if (ge.type === "text")
             t += '<div class="pa-gradevalue"></div>';
         else
-            t += '<span class="pa-gradevalue"></span>';
+            t += '<span class="pa-gradevalue pa-gradewidth"></span>';
         if (ge.max)
             t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
     }
@@ -3898,18 +3898,19 @@ function pa_gradeinfo_total(gi, noextra) {
 
 
 function pa_gradecdf_series(d, xax, yax) {
-    var cdf = d.cdf, i, data = [], totalx = null, nr = 1 / d.n;
-    for (i = 0; i < cdf.length; i += 2) {
-        var x;
-        if (i === 0)
-            x = cdf[i] - 0.5;
-        else
-            x = cdf[i] - Math.min(1, cdf[i] - cdf[i - 2]) / 2;
-        x = Math.max(0, x);
-        if (i !== 0)
+    var cdf = d.cdf, data = [], totalx = null, nr = 1 / d.n,
+        cutoff = d.cutoff || 0, i = 0, x;
+    if (cutoff) {
+        while (i < cdf.length && cdf[i+1] < cutoff * d.n) {
+            i += 2;
+        }
+    }
+    for (; i < cdf.length; i += 2) {
+        if (data.length) {
+            x = Math.max(0, cdf[i] - Math.min(1, cdf[i] - cdf[i - 2]) / 2);
             data.push("H", xax(x));
-        else
-            data.push("M", xax(x), ",", yax(d.cutoff || 0));
+        } else
+            data.push("M", xax(Math.max(0, cdf[i] - 0.5)), ",", yax(cutoff));
         data.push("V", yax(cdf[i+1] * nr));
     }
     if (cdf.length)
@@ -4077,7 +4078,7 @@ function pa_gradegraph_geometry() {
             if (this.yltext !== false
                 && this.yltext !== null
                 && this.yltext !== "") {
-                var text = this.yltext || "fraction of grades";
+                var text = this.yltext || "% of grades";
                 this.yltext = mksvg("text");
                 this.yltext.appendChild(document.createTextNode(text));
                 this.gy.appendChild(this.yltext);
@@ -4191,7 +4192,7 @@ function pa_gradegraph_yaxis() {
     var y = 0, d = [], e;
     while (y <= 10 && this.yl) {
         e = mksvg("text");
-        e.appendChild(document.createTextNode(y / 10));
+        e.appendChild(document.createTextNode(y * 10));
         e.setAttribute("x", -8);
         e.setAttribute("y", this.yax(y / 10) + 0.25 * this.xdh);
         this.gy.appendChild(e);
@@ -4248,10 +4249,13 @@ function pa_draw_gradecdf($graph) {
     $graph.removeClass("cdf pdf all cdf-extension pdf-extension all-extension cdf-noextra pdf-noextra all-noextra");
     $graph.addClass(plot_type);
 
-    var want_pdf = plot_type.substring(0, 3) === "all" || plot_type.substring(0, 3) === "pdf";
-    var want_cdf = plot_type.substring(0, 3) === "all" || plot_type.substring(0, 3) === "cdf";
-    var want_noextra = plot_type.indexOf("-noextra") >= 0;
-    var want_extension = plot_type.indexOf("-extension") >= 0;
+    var want_all = plot_type.substring(0, 3) === "all";
+    var want_pdf = plot_type.substring(0, 3) === "pdf";
+    var want_cdf = want_all || plot_type.substring(0, 3) === "cdf";
+    var want_noextra = plot_type.indexOf("-noextra") >= 0
+        || (want_all && d.noextra && !d.extension);
+    var want_extension = plot_type.indexOf("-extension") >= 0
+        || (want_all && d.extension);
 
     // maxes
     var datamax = 0;
@@ -4259,7 +4263,7 @@ function pa_draw_gradecdf($graph) {
         datamax = Math.max(datamax, d.noextra.cdf[d.noextra.cdf.length - 2]);
     if (want_extension)
         datamax = Math.max(datamax, d.extension.cdf[d.extension.cdf.length - 2]);
-    if (!want_noextra && !want_extension)
+    if (want_all || (!want_noextra && !want_extension))
         datamax = Math.max(datamax, d.cdf[d.cdf.length - 2]);
     var max = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
 
@@ -4330,34 +4334,37 @@ function pa_draw_gradecdf($graph) {
     for (var i in kdes)
         kdes[i].maxp = kde_maxp;
 
-    if (plot_type === "pdf-extension" || plot_type === "all-extension")
-        gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.extension, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-extension"}));
-    if (plot_type === "cdf-extension" || plot_type === "all-extension")
-        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.extension, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-extension"}));
     if (plot_type === "pdf-noextra" || plot_type === "all-noextra")
         gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.noextra, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-noextra"}));
-    if (plot_type === "cdf-noextra" || plot_type === "all-noextra")
-        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.noextra, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-noextra"}));
-    if (plot_type === "pdf" || plot_type === "all")
+    if (plot_type === "pdf")
         gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.main, gi.xax, gi.yax), {"class": "pa-gg-pdf"}));
+    if (plot_type === "pdf-extension" || plot_type === "all-extension")
+        gi.gg.appendChild(mkpath(pa_gradecdf_kdepath(kdes.extension, gi.xax, gi.yax), {"class": "pa-gg-pdf pa-gg-extension"}));
+    if (plot_type === "cdf-noextra" || (plot_type === "all" && d.noextra))
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.noextra, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-noextra"}));
     if (plot_type === "cdf" || plot_type === "all")
         gi.gg.appendChild(mkpath(pa_gradecdf_series(d, gi.xax, gi.yax, gi.max), {"class": "pa-gg-cdf"}));
+    if (plot_type === "cdf-extension" || (plot_type === "all" && d.extension))
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.extension, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-extension"}));
 
     // load user grade
     var gri = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
-    var tm = pa_gradeinfo_total(gri, want_noextra);
+    var tm = pa_gradeinfo_total(gri, want_noextra && !want_all);
     var dot = mksvg("circle");
     dot.setAttribute("cx", gi.xax(tm[0]));
-    dot.setAttribute("cy", path_y_at_x.call(gi.gg.lastChild, gi.xax(tm[0])));
+    var y = path_y_at_x.call(gi.gg.lastChild, gi.xax(tm[0]));
+    if (y === null && d.cutoff)
+        y = gi.yax(d.cutoff);
+    dot.setAttribute("cy", y);
     dot.setAttribute("class", "pa-gg-mark-grade");
     dot.setAttribute("r", 5);
     gi.gg.appendChild(dot);
 
-    if (d.cutoff) {
+    if (d.cutoff && plot_type.substring(0, 3) !== "pdf") {
         var cutoff = mksvg("rect");
         cutoff.setAttribute("x", gi.xax(0));
         cutoff.setAttribute("y", gi.yax(d.cutoff));
-        cutoff.setAttribute("width", gi.xax(xaxis.graphmax));
+        cutoff.setAttribute("width", gi.xax(gi.max));
         cutoff.setAttribute("height", gi.yax(0) - gi.yax(d.cutoff));
         cutoff.setAttribute("fill", "rgba(255,0,0,0.1)");
         gi.gg.appendChild(cutoff);
@@ -4370,19 +4377,25 @@ function pa_draw_gradecdf($graph) {
     // summary
     $graph.find(".statistics").each(function () {
         var dd = d, x = [];
-        if (want_extension)
-            dd = d.extension;
-        if (want_noextra)
+        if (want_noextra && !want_all)
             dd = dd.noextra || d.noextra;
+        if (want_extension && !want_all)
+            dd = d.extension;
         if (dd && dd.mean)
             x.push("mean " + dd.mean.toFixed(1));
         if (dd && dd.median)
             x.push("median " + dd.median.toFixed(1));
         if (dd && dd.stddev)
             x.push("stddev " + dd.stddev.toFixed(1));
+        x = [x.join(", ")];
+        y = pa_gradecdf_findy(dd, tm[0]);
+        if (dd.cutoff && y < dd.cutoff * dd.n)
+            x.push("≤" + Math.round(dd.cutoff * 100) + " %ile");
+        else
+            x.push(Math.round(Math.min(Math.max(1, y * 100 / dd.n), 99)) + " %ile");
         if (x.length) {
             removeClass(this, "hidden");
-            this.innerHTML = x.join(", ");
+            this.innerHTML = x.join(" · ");
         } else {
             addClass(this, "hidden");
             this.innerHTML = "";
@@ -4394,9 +4407,9 @@ function pa_draw_gradecdf($graph) {
         title.push("CDF");
     else if (plot_type.startsWith("pdf"))
         title.push("PDF");
-    if (want_extension)
+    if (want_extension && !want_all)
         title.push("extension");
-    if (want_noextra)
+    if (want_noextra && !want_all)
         title.push("no extra credit");
     $graph.find(".title").html("grade statistics" + (title.length ? " (" + title.join(", ") + ")" : ""));
 }
