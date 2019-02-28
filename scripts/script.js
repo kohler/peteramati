@@ -4084,7 +4084,7 @@ function pa_gradegraph_geometry() {
                 this.gy.appendChild(this.yltext);
                 domr = this.yltext.getBBox();
                 if (domr.width <= 0.875 * h) {
-                    this.ml += this.xdw * 1.5 + this.xdh;
+                    this.ml += this.xdw * 0.5 + this.xdh;
                 } else {
                     this.gy.removeText(this.yltext);
                     this.yltext = null;
