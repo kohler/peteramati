@@ -2014,11 +2014,12 @@ void jailownerinfo::buffer::transfer_in(int from) {
 #define QEMUDEF 0
 static const uint16_t cp437[256] = {
     0, 0x263A, 0x263B, 0x2665, QEMUDEF, 0x2663, 0x2660, 0x2022,
-    0x25D8, 0x25CB, 0x25D9, 0x2642, 0x2640, 0x266A, 0x266B, 0x263C,
+    QEMUDEF /*\b; 0x25D8*/, QEMUDEF /*\t; 0x25CB*/, QEMUDEF /*\n; 0x25D9*/, 0x2642, 0x2640, QEMUDEF /*\r; 0x266A*/, 0x266B, 0x263C,
 
     0x25BA, 0x25C4, 0x2195, 0x203C, 0x00B6, 0x00A7, 0x25AC, 0x21A8,
     QEMUDEF, QEMUDEF, QEMUDEF, QEMUDEF, 0x221F, 0x2194, 0x25B2, 0x25BC,
 
+    0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
@@ -2090,7 +2091,7 @@ void jailownerinfo::buffer::rewrite_buffer_cp437() {
             buf_ = newbuf;
             cap_ *= 2;
         }
-        memmove(buf_ + tail_ + expansion - 1, buf_ + tail_ + 1, end_ - tail_ - 1);
+        memmove(buf_ + tail_ + expansion, buf_ + tail_ + 1, end_ - tail_ - 1);
         memcpy(buf_ + tail_, chbuf, expansion);
         tail_ += expansion;
         end_ += expansion - 1;
