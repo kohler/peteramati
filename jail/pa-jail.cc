@@ -1236,6 +1236,27 @@ static std::string absolute(const std::string& dir) {
     return std::string(buf) + dir;
 }
 
+int utf8chr(char* buf, unsigned ch) {
+    char* ibuf = buf;
+    if (ch < 0x80) {
+        *buf++ = ch;
+    } else if (ch < 0x800) {
+        *buf++ = 0xC0 | (ch >> 6);
+        *buf++ = 0x80 | (ch & 0x3F);
+    } else if (ch < 0x10000) {
+        *buf++ = 0xE0 | (ch >> 12);
+        *buf++ = 0x80 | ((ch >> 6) & 0x3F);
+        *buf++ = 0x80 | (ch & 0x3F);
+    } else {
+        *buf++ = 0xF0 | (ch >> 18);
+        *buf++ = 0x80 | ((ch >> 12) & 0x3F);
+        *buf++ = 0x80 | ((ch >> 6) & 0x3F);
+        *buf++ = 0x80 | (ch & 0x3F);
+    }
+    return buf - ibuf;
+}
+
+
 struct jaildirinfo {
     std::string dir;
     std::string parent;
@@ -1513,6 +1534,7 @@ class jailownerinfo {
     jailownerinfo();
     ~jailownerinfo();
     void init(const char* owner_name);
+    void set_cp437();
     void exec(int argc, char** argv, jaildirinfo& jaildir,
               int inputfd, double timeout, bool foreground);
     int exec_go();
@@ -1525,17 +1547,24 @@ class jailownerinfo {
     struct timeval start_time_;
     struct timeval expiry_;
     struct buffer {
-        char buf_[8192];
+        unsigned char* buf_;
         size_t head_;
         size_t tail_;
+        size_t end_;
+        size_t cap_;
         bool input_closed_;
         bool output_closed_;
+        bool cp437_;
         int rerrno_;
-        buffer()
-            : head_(0), tail_(0), input_closed_(false), output_closed_(false),
-              rerrno_(0) {
+        buffer(size_t cap)
+            : buf_(new unsigned char[cap]), head_(0), tail_(0), end_(0), cap_(cap),
+              input_closed_(false), output_closed_(false), cp437_(false), rerrno_(0) {
+        }
+        ~buffer() {
+            delete[] buf_;
         }
         void transfer_in(int from);
+        void rewrite_buffer_cp437();
         void transfer_out(int to);
         bool done();
     };
@@ -1557,7 +1586,8 @@ class jailownerinfo {
 };
 
 jailownerinfo::jailownerinfo()
-    : owner_(ROOT), group_(ROOT), argv_(), child_status_(-1) {
+    : owner_(ROOT), group_(ROOT), argv_(),
+      to_slave_(4096), from_slave_(8192), child_status_(-1) {
     stdin_tty_ = isatty(STDIN_FILENO);
     stdout_tty_ = isatty(STDOUT_FILENO);
     stderr_tty_ = isatty(STDERR_FILENO);
@@ -1952,23 +1982,118 @@ void jailownerinfo::start_sigpipe() {
         make_nonblocking(STDOUT_FILENO);
 }
 
+void jailownerinfo::set_cp437() {
+    from_slave_.cp437_ = true;
+}
+
 void jailownerinfo::buffer::transfer_in(int from) {
-    if (tail_ == sizeof(buf_) && head_ != 0) {
-        memmove(buf_, &buf_[head_], tail_ - head_);
+    if (end_ == cap_ && head_ != 0) {
+        memmove(buf_, &buf_[head_], end_ - head_);
         tail_ -= head_;
+        end_ -= head_;
         head_ = 0;
     }
 
-    if (from >= 0 && !input_closed_ && tail_ != sizeof(buf_)) {
-        ssize_t nr = read(from, &buf_[tail_], sizeof(buf_) - tail_);
+    if (from >= 0 && !input_closed_ && end_ != cap_) {
+        ssize_t nr = read(from, &buf_[end_], cap_ - end_);
         if (nr != 0 && nr != -1)
-            tail_ += nr;
+            end_ += nr;
         else if (nr == 0)
             input_closed_ = true;
         else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
             input_closed_ = true;
             rerrno_ = errno;
         }
+        if (cp437_)
+            rewrite_buffer_cp437();
+        else
+            tail_ = end_;
+    }
+}
+
+#define QEMUDEF 0
+static const uint16_t cp437[256] = {
+    0, 0x263A, 0x263B, 0x2665, QEMUDEF, 0x2663, 0x2660, 0x2022,
+    0x25D8, 0x25CB, 0x25D9, 0x2642, 0x2640, 0x266A, 0x266B, 0x263C,
+
+    0x25BA, 0x25C4, 0x2195, 0x203C, 0x00B6, 0x00A7, 0x25AC, 0x21A8,
+    QEMUDEF, QEMUDEF, QEMUDEF, QEMUDEF, 0x221F, 0x2194, 0x25B2, 0x25BC,
+
+    0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0x2302,
+
+    0x00C7, 0x00FC, 0x00E9, 0x00E2, 0x00E4, 0x00E0, 0x00E5, 0x00E7,
+    0x00EA, 0x00EB, 0x00E8, 0x00EF, 0x00EE, 0x00EC, 0x00C4, 0x00C5,
+
+    0x00C9, 0x00E6, 0x00C6, 0x00F4, 0x00F6, 0x00F2, 0x00FB, 0x00F9,
+    0x00FF, 0x00D6, 0x00DC, 0x00A2, QEMUDEF, 0x00A5, 0x20A7, 0x0192,
+
+    0x00E1, 0x00ED, 0x00F3, 0x00FA, 0x00F1, 0x00D1, 0x00AA, 0x00BA,
+    0x00BF, 0x2310, 0x00AC, 0x00BD, 0x00BC, 0x00A1, 0x00AB, 0x00BB,
+
+    QEMUDEF, QEMUDEF, 0x2593, QEMUDEF, QEMUDEF, 0x2561, 0x2562, 0x2556,
+    0x2555, 0x2563, 0x2551, 0x2557, 0x255D, 0x255C, 0x255B, QEMUDEF,
+
+    QEMUDEF, QEMUDEF, QEMUDEF, QEMUDEF, QEMUDEF, QEMUDEF, 0x255E, 0x255F,
+    0x255A, 0x2554, 0x2569, 0x2566, 0x2560, 0x2550, QEMUDEF, 0x2567,
+
+    0x2568, 0x2564, 0x2565, 0x2559, 0x2558, 0x2552, 0x2553, 0x256B,
+    QEMUDEF, QEMUDEF, QEMUDEF, QEMUDEF, 0x2584, 0x258C, 0x2590, 0x2580,
+
+    0x03B1, 0x00DF, 0x0393, QEMUDEF, 0x03A3, 0x03C3, 0x00B5, 0x03C4,
+    0x03A6, 0x0398, 0x03A9, 0x03B4, 0x221E, 0x03C6, 0x03B5, 0x2229,
+
+    0x2261, QEMUDEF, QEMUDEF, QEMUDEF, 0x2320, 0x2321, 0x00F7, 0x2248,
+    QEMUDEF, 0x2219, 0x00B7, 0x221A, 0x207F, 0x00B2, QEMUDEF, 0x00A0
+};
+
+void jailownerinfo::buffer::rewrite_buffer_cp437() {
+    while (true) {
+        // skip ASCII
+        while (tail_ < end_ && buf_[tail_] < 0x80 && !cp437[buf_[tail_]])
+            ++tail_;
+        if (tail_ == end_)
+            break;
+
+        // pass UTF-8 through unmolested
+        if (buf_[tail_] >= 0xC2 && buf_[tail_] < 0xF5) {
+            size_t want = 2 + (buf_[tail_] >= 0xE0) + (buf_[tail_] >= 0xF0);
+            if (tail_ + want > end_) {
+                if (!input_closed_)
+                    break;
+            } else if (buf_[tail_ + 1] >= 0x80 && buf_[tail_ + 1] < 0xC0
+                       && (want < 3
+                           || (buf_[tail_ + 2] >= 0x80 && buf_[tail_ + 2] < 0xC0))
+                       && (want < 4
+                           || (buf_[tail_ + 3] >= 0x80 && buf_[tail_ + 3] < 0xC0))) {
+                tail_ += want;
+                continue;
+            }
+        }
+
+        // pass unmolested chars
+        if (!cp437[buf_[tail_]]) {
+            ++tail_;
+            continue;
+        }
+
+        // expand
+        char chbuf[5];
+        int expansion = utf8chr(chbuf, cp437[buf_[tail_]]);
+        if (end_ + expansion > cap_) {
+            unsigned char* newbuf = new unsigned char[cap_ * 2];
+            memcpy(newbuf, buf_, end_);
+            delete[] buf_;
+            buf_ = newbuf;
+            cap_ *= 2;
+        }
+        memmove(buf_ + tail_ + expansion - 1, buf_ + tail_ + 1, end_ - tail_ - 1);
+        memcpy(buf_ + tail_, chbuf, expansion);
+        tail_ += expansion;
+        end_ += expansion - 1;
     }
 }
 
@@ -2234,8 +2359,9 @@ static struct option longoptions_before[] = {
     { NULL, 0, NULL, 0 }
 };
 
-#define ARG_ONLCR 1000
+#define ARG_ONLCR    1000
 #define ARG_NO_ONLCR 1001
+#define ARG_CP437    1002
 static struct option longoptions_run[] = {
     { "verbose", no_argument, NULL, 'V' },
     { "dry-run", no_argument, NULL, 'n' },
@@ -2254,6 +2380,7 @@ static struct option longoptions_run[] = {
     { "onlcr", no_argument, NULL, ARG_ONLCR },
     { "no-onlcr", no_argument, NULL, ARG_NO_ONLCR },
     { "timing-file", required_argument, NULL, 't' },
+    { "cp437", no_argument, NULL, ARG_CP437 },
     { NULL, 0, NULL, 0 }
 };
 
@@ -2275,7 +2402,7 @@ static const char* shortoptions_action[] = {
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
-    bool chown_home = false, foreground = false;
+    bool chown_home = false, foreground = false, cp437 = false;
     double timeout = -1;
     std::string inputarg, linkarg, manifest;
     std::vector<std::string> chown_user_args;
@@ -2308,6 +2435,8 @@ int main(int argc, char** argv) {
                 no_onlcr = false;
             else if (ch == ARG_NO_ONLCR)
                 no_onlcr = true;
+            else if (ch == ARG_CP437)
+                cp437 = true;
             else if (ch == 'g')
                 foreground = true;
             else if (ch == 'h')
@@ -2365,6 +2494,8 @@ int main(int argc, char** argv) {
     jailownerinfo jailuser;
     if ((action == do_add || action == do_run) && optind + 1 < argc)
         jailuser.init(argv[optind + 1]);
+    if (cp437)
+        jailuser.set_cp437();
 
     // open infile non-blocking as current user
     // if it is a named FIFO, open it read-write so we never get EOF
