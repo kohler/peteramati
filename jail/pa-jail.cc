@@ -2292,7 +2292,7 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
         xmsg = "...terminated";
     if (xmsg) {
         const char* nl = no_onlcr ? "\n" : "\r\n";
-        fprintf(stderr, inputfd_ > 0 || stderr_tty_ ? "%s\x1b[3;7;31m%s\x1b[0m%s" : "%s%s%s", nl, xmsg, nl);
+        fprintf(stderr, inputfd_ > 0 || stderr_tty_ ? "%s\x1b[3;7;31m%s\x1b[K\x1b[0m%s\x1b[K%s" : "%s%s%s%s", nl, xmsg, nl, nl);
     }
 #if __linux__
     (void) child;
