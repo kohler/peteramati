@@ -1,7 +1,6 @@
 <?php
 // mailer.php -- HotCRP mail template manager
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 class MailPreparation {
     public $subject = "";
@@ -525,7 +524,7 @@ class Mailer {
             $f = popen($extra ? "$sendmail $extra" : $sendmail, "wb");
             fwrite($f, $htext . $eol . $prep->body);
             $status = pclose($f);
-            if (pcntl_wifexitedsuccess($status))
+            if (pcntl_wifexitedwith($status))
                 return true;
             else {
                 $Conf->set_opt("internalMailer", false);

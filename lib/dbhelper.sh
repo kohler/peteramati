@@ -1,6 +1,5 @@
 ## dbhelper.sh -- shell program helpers for HotCRP database access
-## HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-## See LICENSE for open-source distribution terms
+## Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 echo_n () {
         # suns can't echo -n, and Mac OS X can't echo "x\c"
@@ -124,6 +123,13 @@ sql_quote () {
     sed -e 's,\([\\"'"'"']\),\\\1,g' | sed -e 's,,\\Z,g'
 }
 
+json_quote () {
+    echo_n '"'
+    perl -pe 's{([\\\"])}{\\$1}g;s{([\000-\017])}{sprintf("\\%03o", ord($1))}eg'
+    # sed -e 's,\([\\"]\),\\\1,g' | tr -d '\n'
+    echo_n '"'
+}
+
 check_mysqlish () {
     local m="`eval echo '$'$1`"
     if test -n "$m"; then :;
@@ -163,6 +169,13 @@ set_myargs () {
         else
             PASSWORDFILE=""
             myargs="$myargs -p$password"
+        fi
+    fi
+    if test -n "$dbhost" -a "$dbhost" != "''"; then
+        if expr "$dbhost" : "'" >/dev/null 2>&1; then
+            myargs="$myargs -h$dbhost"
+        else
+            myargs="$myargs -h'$dbhost'"
         fi
     fi
 }
@@ -222,6 +235,7 @@ get_dboptions () {
     dbname="`getdbopt dbName 2>/dev/null`"
     dbuser="`getdbopt dbUser 2>/dev/null`"
     dbpass="`getdbopt dbPassword 2>/dev/null`"
+    dbhost="`getdbopt dbHost 2>/dev/null`"
     if test -z "$dbname" -o -z "$dbuser" -o -z "$dbpass"; then
         echo "$1: Can't extract database options from `findoptions`!" 1>&2
         if test "`getdbopt multiconference 2>/dev/null`" '!=' "''"; then

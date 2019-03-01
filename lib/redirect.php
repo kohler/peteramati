@@ -1,15 +1,15 @@
 <?php
 // redirect.php -- HotCRP redirection helper functions
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 function go($url = false) {
     Navigation::redirect($url);
 }
 
 function error_go($url, $message) {
-    if ($url === false)
+    if ($url === false) {
         $url = hoturl("index");
+    }
     Conf::msg_error($message);
     go($url);
 }

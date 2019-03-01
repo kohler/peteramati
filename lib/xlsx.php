@@ -1,7 +1,6 @@
 <?php
 // xlsx.php -- HotCRP XLSX generator functions
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and others
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 class XlsxGenerator {
 
@@ -24,7 +23,7 @@ class XlsxGenerator {
         if ($col < 26)
             return chr($col + 65);
         else {
-            $x = int($col / 26);
+            $x = (int) ($col / 26);
             return chr($x + 65) . chr(($col % 26) + 65);
         }
     }

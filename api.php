@@ -1,7 +1,6 @@
 <?php
 // api.php -- HotCRP JSON API access page
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 require_once("src/initweb.php");
 

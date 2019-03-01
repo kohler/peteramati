@@ -1,7 +1,6 @@
 #! /bin/sh
 ## runsql.sh -- HotCRP database shell
-## HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-## See LICENSE for open-source distribution terms
+## Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 export LC_ALL=C LC_CTYPE=C LC_COLLATE=C CONFNAME=
 if ! expr "$0" : '.*[/]' >/dev/null; then LIBDIR=./
@@ -50,6 +49,9 @@ while [ $# -gt 0 ]; do
     --show-opt|--show-option)
         test "$#" -gt 1 -a -z "$mode" || usage
         optname="$2"; shift; mode=showopt;;
+    --json-dbopt)
+        test -z "$mode" || usage
+        mode=json_dbopt;;
     -c|--co|--con|--conf|--confi|--config|-c*|--co=*|--con=*|--conf=*|--confi=*|--config=*)
         parse_common_argument "$@";;
     -n|--n|--na|--nam|--name|-n*|--n=*|--na=*|--nam=*|--name=*)
@@ -83,11 +85,21 @@ while [ $# -gt 0 ]; do
 done
 
 if ! findoptions >/dev/null; then
-    echo "runsql.sh: Can't read options file! Is this a CRP directory?" 1>&2
+    echo "runsql.sh: No options file" 1>&2
     exit 1
 fi
 
 get_dboptions runsql.sh
+
+if test "$mode" = json_dbopt; then
+    eval "x0=$dbname;x1=$dbuser;x2=$dbpass;x3=$dbhost"
+    echo_n '{"dbName":'; echo_n "$x0" | json_quote
+    echo_n ',"dbUser":'; echo_n "$x1" | json_quote
+    echo_n ',"dbPassword":'; echo_n "$x2" | json_quote
+    echo_n ',"dbHost":'; if [ -z "$x3" ]; then echo_n 'null'; else echo_n "$x3" | json_quote; fi
+    echo '}'
+    exit
+fi
 
 check_mysqlish MYSQL mysql
 set_myargs "$dbuser" "$dbpass"

@@ -1,19 +1,18 @@
 <?php
 // text.php -- HotCRP text helper functions
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 class NameInfo {
-    public $firstName = null;
-    public $middleName = null;
-    public $lastName = null;
-    public $email = null;
-    public $withMiddle = null;
-    public $lastFirst = null;
-    public $nameAmbiguous = null;
-    public $name = null;
-    public $affiliation = null;
-    public $unaccentedName = null;
+    public $firstName;
+    public $lastName;
+    public $affiliation;
+    public $email;
+    public $name;
+    public $unaccentedName;
+    public $middleName;
+    public $withMiddle;
+    public $lastFirst;
+    public $nameAmbiguous;
     static function make_last_first() {
         $ni = new NameInfo;
         $ni->lastFirst = true;
@@ -38,6 +37,10 @@ class Text {
                                     "first" => "firstName",
                                     "lastName" => "lastName",
                                     "last" => "lastName",
+                                    "givenName" => "firstName",
+                                    "given" => "firstName",
+                                    "familyName" => "lastName",
+                                    "family" => "lastName",
                                     "email" => "email",
                                     "withMiddle" => "withMiddle",
                                     "middleName" => "middleName",
@@ -47,9 +50,9 @@ class Text {
                                     "name" => "name",
                                     "fullName" => "name",
                                     "affiliation" => "affiliation");
-    static private $boolkeys = array("withMiddle" => true,
-                                     "lastFirst" => true,
-                                     "nameAmbiguous" => true);
+    static private $boolkeys = array("lastFirst" => true,
+                                     "nameAmbiguous" => true,
+                                     "withMiddle" => true);
     static private $boring_words = [
         "a" => true, "an" => true, "as" => true, "be" => true,
         "by" => true, "did" => true, "do" => true, "for" => true,
@@ -59,15 +62,16 @@ class Text {
     ];
 
     static function analyze_von($lastName) {
-        // see also split_name
-        if (preg_match('@\A(v[oa]n|d[eu])\s+(.*)\z@s', $lastName, $m))
-            return array($m[1], $m[2]);
+        // see also split_name; NB intentionally case sensitive
+        if (preg_match('@\A((?:(?:v[ao]n|d[aeiu]|de[nr]|l[ae])\s+)+)(.*)\z@s', $lastName, $m))
+            return array(rtrim($m[1]), $m[2]);
         else
             return null;
     }
 
     static function analyze_name_args($args, $ret = null) {
         $ret = $ret ? : new NameInfo;
+        // collect arguments
         $delta = 0;
         if (count($args) == 1 && is_string($args[0]))
             $args = self::split_name($args[0], true);
@@ -160,7 +164,7 @@ class Text {
 
     static function user_html_nolink(/* ... */) {
         $r = self::analyze_name_args(func_get_args());
-        if (($e = $r->email))
+        if (($e = $r->email) !== "")
             $e = "&lt;" . htmlspecialchars($e) . "&gt;";
         if ($r->name)
             return htmlspecialchars($r->name) . ($e ? " " . $e : "");
@@ -198,7 +202,7 @@ class Text {
 
     static function initial($s) {
         $x = "";
-        if ($s != null && $s != "") {
+        if ((string) $s !== "") {
             if (ctype_alpha($s[0]))
                 $x = $s[0];
             else if (preg_match("/^(\\pL)/us", $s, $m))
@@ -213,11 +217,11 @@ class Text {
     static function abbrevname_text(/* ... */) {
         $r = self::analyze_name_args(func_get_args());
         $u = "";
-        if ($r->lastName) {
+        if ($r->lastName !== "") {
             $t = $r->lastName;
-            if ($r->firstName && ($u = self::initial($r->firstName)) != "")
+            if ($r->firstName !== "" && ($u = self::initial($r->firstName)) !== "")
                 $u .= " "; // non-breaking space
-        } else if ($r->firstName)
+        } else if ($r->firstName !== "")
             $t = $r->firstName;
         else
             $t = $r->email ? $r->email : "???";
@@ -234,7 +238,8 @@ class Text {
 
     static function split_name($name, $with_email = false) {
         $name = simplify_whitespace($name);
-        $ret = array("", "");
+
+        $ret = ["", ""];
         if ($with_email) {
             $ret[2] = "";
             if (preg_match('%^\s*\"?(.*?)\"?\s*<([^<>]+)>\s*$%', $name, $m)
@@ -283,6 +288,13 @@ class Text {
         return $ret;
     }
 
+    static function split_first_prefix($first) {
+        if (preg_match('%\A((?:dr\.?|mr\.?|mrs\.?|ms\.?|prof\.?)\s+)(?=\S)%i', $first, $m))
+            return [$m[2], $m[1]];
+        else
+            return [$first, ""];
+    }
+
     static function split_first_middle($first) {
         if (preg_match('%\A((?:\pL\.\s*)*\pL[^\s.]\S*)\s+(.*)\z%', $first, $m)
             || preg_match('%\A(\pL[^\s.]\S*)\s*(.*)\z%', $first, $m))
@@ -292,7 +304,7 @@ class Text {
     }
 
     static function split_last_suffix($last) {
-        if (preg_match('{\A(.*?\S)(?:\s+|\s*,\s*)(' . self::SUFFIX_REGEX . ')\z}i', $last, $m)) {
+        if (preg_match('{\A(.*?)[\s,]+(' . self::SUFFIX_REGEX . ')\z}i', $last, $m)) {
             if (preg_match('{\A(?:jr|sr|esq)\z}i', $m[2]))
                 $m[2] .= ".";
             return [$m[1], $m[2]];
@@ -333,7 +345,7 @@ class Text {
             . ($zw ? self::UTF8_FINAL_NONLETTERDIGIT : '');
     }
 
-    static function star_text_pregexes($word) {
+    static function star_text_pregexes($word, $literal_star = false) {
         if (is_object($word))
             $reg = $word;
         else
@@ -344,7 +356,7 @@ class Text {
             $reg->preg_raw = Text::word_regex($word);
         $reg->preg_utf8 = Text::utf8_word_regex($word);
 
-        if (strpos($word, "*") !== false) {
+        if (!$literal_star && strpos($word, "*") !== false) {
             if ($reg->preg_raw)
                 $reg->preg_raw = str_replace('\\\\\S*', '\*', str_replace('\*', '\S*', $reg->preg_raw));
             $reg->preg_utf8 = str_replace('\\\\\S*', '\*', str_replace('\*', '\S*', $reg->preg_utf8));
@@ -357,11 +369,12 @@ class Text {
         if (empty($regex))
             return false;
         $a = $b = [];
-        foreach ($regex as $x) {
-            $a[] = $x->preg_utf8;
-            if (isset($x->preg_raw))
-                $b[] = $x->preg_raw;
-        }
+        foreach ($regex as $x)
+            if ($x) {
+                $a[] = $x->preg_utf8;
+                if (isset($x->preg_raw))
+                    $b[] = $x->preg_raw;
+            }
         $x = (object) ["preg_utf8" => join("|", $a)];
         if (count($a) == count($b))
             $x->preg_raw = join("|", $b);
@@ -465,17 +478,17 @@ class Text {
     }
 
     static function single_line_paragraphs($text) {
-        preg_match_all('/.*?(?:\r\n?|\n|\z)/', $text, $m);
-        $out = "";
-        $last = false;
-        foreach ($m[0] as $line) {
-            if ($line !== "" && $last && !ctype_space(substr($line, 0, 1)))
-                $out = rtrim($out) . " " . $line;
-            else
-                $out .= $line;
-            $last = strlen($line) > 50;
+        $lines = preg_split('/((?:\r\n?|\n)(?:[-+*][ \t]|\d+\.)?)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+        $n = count($lines);
+        for ($i = 1; $i < $n; $i += 2) {
+            if (strlen($lines[$i - 1]) > 49
+                && strlen($lines[$i]) <= 2
+                && $lines[$i + 1] !== ""
+                && $lines[$i + 1][0] !== " "
+                && $lines[$i + 1][0] !== "\t")
+                $lines[$i] = " ";
         }
-        return $out;
+        return join("", $lines);
     }
 
     static function html_to_text($x) {

@@ -93,7 +93,7 @@ function one_facefetch($row, $url) {
     }
 
     $result = false;
-    if (pcntl_wifexitedsuccess($status)
+    if (pcntl_wifexitedwith($status)
         && preg_match(',\Aimage/,', $content_type)) {
         $sresult = Dbl::fetch_first_object(Dbl::qe("select ContactImage.* from ContactImage join ContactInfo using (contactImageId) where ContactInfo.contactId=?", $row->contactId));
         if ($sresult && $sresult->mimetype === $content_type && $sresult->data === $data)

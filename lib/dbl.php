@@ -1,7 +1,6 @@
 <?php
 // dbl.php -- database interface layer
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 class Dbl_Result {
     public $affected_rows;

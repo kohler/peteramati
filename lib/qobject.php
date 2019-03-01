@@ -1,7 +1,6 @@
 <?php
 // qobject.php -- HotCRP helper class for quiet objects (no warnings)
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 class Qobject implements ArrayAccess, IteratorAggregate, Countable, JsonSerializable {
     function __construct($x = null) {

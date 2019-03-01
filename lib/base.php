@@ -1,7 +1,6 @@
 <?php
 // base.php -- HotCRP base helper functions
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 // string helpers
 
@@ -21,11 +20,13 @@ function stri_ends_with($haystack, $needle) {
 }
 
 function cleannl($text) {
+    if (substr($text, 0, 3) === "\xEF\xBB\xBF")
+        $text = substr($text, 3);
     if (strpos($text, "\r") !== false) {
         $text = str_replace("\r\n", "\n", $text);
         $text = strtr($text, "\r", "\n");
     }
-    if (strlen($text) && $text[strlen($text) - 1] !== "\n")
+    if ($text !== "" && $text[strlen($text) - 1] !== "\n")
         $text .= "\n";
     return $text;
 }
@@ -70,6 +71,8 @@ if (!function_exists("mac_os_roman_to_utf8")) {
 }
 
 function convert_to_utf8($str) {
+    if (substr($str, 0, 3) === "\xEF\xBB\xBF")
+        $str = substr($str, 3);
     if (is_valid_utf8($str))
         return $str;
     $pfx = substr($str, 0, 5000);
@@ -80,8 +83,9 @@ function convert_to_utf8($str) {
 }
 
 function simplify_whitespace($x) {
-    // Replace ALL invisible Unicode space-type characters with true spaces
-    return trim(preg_replace('/(?:\s|\xC2\xA0|\xE2\x80[\x80-\x8A\xA8\xA9\xAF]|\xE2\x81\x9F|\xE3\x80\x80)+/', " ", $x));
+    // Replace invisible Unicode space-type characters with true spaces,
+    // including control characters and DEL.
+    return trim(preg_replace('/(?:[\x00-\x20\x7F]|\xC2[\x80-\xA0]|\xE2\x80[\x80-\x8A\xA8\xA9\xAF]|\xE2\x81\x9F|\xE3\x80\x80)+/', " ", $x));
 }
 
 function prefix_word_wrap($prefix, $text, $indent = 18, $totWidth = 75) {
@@ -408,11 +412,11 @@ function assert_callback() {
 // pcntl helpers
 
 if (function_exists("pcntl_wifexited") && pcntl_wifexited(0) !== null) {
-    function pcntl_wifexitedsuccess($status) {
-        return pcntl_wifexited($status) && pcntl_wexitstatus($status) == 0;
+    function pcntl_wifexitedwith($status, $exitstatus = 0) {
+        return pcntl_wifexited($status) && pcntl_wexitstatus($status) == $exitstatus;
     }
 } else {
-    function pcntl_wifexitedsuccess($status) {
-        return ($status & 0x7f) == 0 && (($status & 0xff00) >> 8) == 0;
+    function pcntl_wifexitedwith($status, $exitstatus = 0) {
+        return ($status & 0xff7f) == ($exitstatus << 8);
     }
 }
