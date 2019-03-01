@@ -1,6 +1,6 @@
 <?php
 // psetview.php -- CS61-monster helper class for pset view
-// Peteramati is Copyright (c) 2006-2018 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class PsetView {

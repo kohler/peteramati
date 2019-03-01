@@ -1,6 +1,6 @@
 <?php
 // text.php -- HotCRP text helper functions
-// HotCRP is Copyright (c) 2006-2018 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 class NameInfo {

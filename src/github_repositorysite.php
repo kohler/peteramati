@@ -1,6 +1,6 @@
 <?php
 // github_repositorysite.php -- Peteramati GitHub Classroom repositories
-// Peteramati is Copyright (c) 2013-2018 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class GitHubResponse implements JsonSerializable {

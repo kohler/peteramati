@@ -1,5 +1,5 @@
 // script.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2018 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 var siteurl, siteurl_postvalue, siteurl_suffix, siteurl_defaults,

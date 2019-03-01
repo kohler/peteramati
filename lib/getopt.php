@@ -1,6 +1,6 @@
 <?php
 // getopt.php -- HotCRP helper function for extended getopt
-// HotCRP is Copyright (c) 2009-2018 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2009-2019 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 function getopt_rest($argv, $options, $longopts = array()) {

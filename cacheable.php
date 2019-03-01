@@ -1,6 +1,6 @@
 <?php
 // cacheable.php -- HotCRP cacheability helper
-// HotCRP and Peteramati are Copyright (c) 2006-2018 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 session_cache_limiter("");

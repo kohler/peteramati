@@ -1,6 +1,6 @@
 <?php
 // facesave.php -- Peteramati script for storing faces
-// HotCRP and Peteramati are Copyright (c) 2006-2018 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 $ConfSitePATH = preg_replace(',/batch/[^/]+,', '', __FILE__);

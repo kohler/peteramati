@@ -1,6 +1,6 @@
 <?php
 // linenotesorder.php -- Peteramati helper class for linenotes
-// Peteramati is Copyright (c) 2006-2018 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class LineNotesOrder {

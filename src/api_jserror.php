@@ -1,4 +1,7 @@
 <?php
+// api/api_repo.php -- Peteramati API for Javascript errors
+// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// See LICENSE for open-source distribution terms
 
 class API_JSError {
     static function jserror(Contact $user, Qrequest $qreq, APIData $api) {

@@ -1,4 +1,7 @@
 <?php
+// api/api_repo.php -- Peteramati API for grading
+// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// See LICENSE for open-source distribution terms
 
 class API_Grade {
     static function parse_full_grades($x) {

@@ -1,6 +1,6 @@
 <?php
 // repository.php -- Peteramati helper class representing repositories
-// Peteramati is Copyright (c) 2013-2018 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class RepositoryCommitInfo {
