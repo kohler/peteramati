@@ -8,7 +8,6 @@ ContactView::set_path_request(["/p"]);
 if ($Me->is_empty() || !$Me->isPC)
     $Me->escape();
 global $Pset, $Qreq, $psetinfo_idx, $all_viewed_gradeentries;
-$Qreq = make_qreq();
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 if ($Qreq->files) {

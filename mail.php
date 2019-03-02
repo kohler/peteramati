@@ -10,18 +10,19 @@ if (!$Me->privChair && !$Me->isPC)
 $Error = array();
 
 // load mail from log
-if (isset($_REQUEST["fromlog"]) && ctype_digit($_REQUEST["fromlog"])
+if (isset($Qreq->fromlog)
+    && ctype_digit($Qreq->fromlog)
     && $Me->privChair) {
-    $result = $Conf->qe("select * from MailLog where mailId=" . $_REQUEST["fromlog"]);
+    $result = $Conf->qe("select * from MailLog where mailId=" . $Qreq->fromlog);
     if (($row = edb_orow($result))) {
         foreach (array("recipients", "q", "t", "cc", "replyto", "subject", "emailBody") as $field)
-            if (isset($row->$field) && !isset($_REQUEST[$field]))
-                $_REQUEST[$field] = $row->$field;
+            if (isset($row->$field) && !isset($Qreq[$field]))
+                $Qreq[$field] = $row->$field;
         if (@$row->q)
-            $_REQUEST["plimit"] = 1;
-        if (@$_REQUEST["recipients"] && ($space = strpos($_REQUEST["recipients"], " "))) {
-            $_REQUEST["userrecipients"] = substr($_REQUEST["recipients"], $space + 1);
-            $_REQUEST["recipients"] = substr($_REQUEST["recipients"], 0, $space);
+            $Qreq["plimit"] = 1;
+        if ($Qreq->recipients && ($space = strpos($Qreq->recipients, " "))) {
+            $Qreq->userrecipients = substr($Qreq->recipients, $space + 1);
+            $Qreq->recipients = substr($Qreq->recipients, 0, $space);
         }
     }
 }
@@ -34,49 +35,48 @@ if ($Me->privChair) {
     $tOpt["all"] = "All papers";
 }
 $tOpt["req"] = "Your review requests";
-if (!isset($_REQUEST["t"]) || !isset($tOpt[$_REQUEST["t"]]))
-    $_REQUEST["t"] = key($tOpt);
+if (!isset($Qreq->t) || !isset($tOpt[$Qreq->t]))
+    $Qreq->t = key($tOpt);
 
 // mailer
 $mailer_options = array("requester_contact" => $Me);
 $null_mailer = new CS61Mailer(null, null, array_merge(array("width" => false), $mailer_options));
 
 // template options
-if (isset($_REQUEST["monreq"]))
-    $_REQUEST["template"] = "myreviewremind";
-if (isset($_REQUEST["template"]) && !isset($_REQUEST["check"]))
-    $_REQUEST["loadtmpl"] = 1;
+if (isset($Qreq->monreq))
+    $Qreq->template = "myreviewremind";
+if (isset($Qreq->template) && !isset($Qreq->check))
+    $Qreq->loadtmpl = 1;
 
 // paper selection
-if (isset($_REQUEST["q"]) && trim($_REQUEST["q"]) == "(All)")
-    $_REQUEST["q"] = "";
-if (!isset($_REQUEST["p"]) && isset($_REQUEST["pap"])) // support p= and pap=
-    $_REQUEST["p"] = $_REQUEST["pap"];
-if (isset($_REQUEST["p"]) && is_string($_REQUEST["p"]))
-    $_REQUEST["p"] = preg_split('/\s+/', $_REQUEST["p"]);
-if (isset($_REQUEST["p"]) && is_array($_REQUEST["p"])) {
+if (isset($Qreq->q) && trim($Qreq->q) == "(All)")
+    $Qreq->q = "";
+if (!isset($Qreq->p) && isset($Qreq->pap)) // support p= and pap=
+    $Qreq->p = $Qreq->pap;
+if (isset($Qreq->p) && is_string($Qreq->p))
+    $Qreq->p = preg_split('/\s+/', $Qreq->p);
+if (isset($Qreq->p) && is_array($Qreq->p)) {
     $papersel = array();
-    foreach ($_REQUEST["p"] as $p)
+    foreach ($Qreq->p as $p)
         if (($p = cvtint($p)) > 0)
             $papersel[] = $p;
     sort($papersel);
-    $_REQUEST["q"] = join(" ", $papersel);
-    $_REQUEST["plimit"] = 1;
-} else if (isset($_REQUEST["plimit"])) {
-    $_REQUEST["q"] = defval($_REQUEST, "q", "");
-    $search = new PaperSearch($Me, array("t" => $_REQUEST["t"], "q" => $_REQUEST["q"]));
+    $Qreq->q = join(" ", $papersel);
+    $Qreq->plimit = 1;
+} else if (isset($Qreq->plimit)) {
+    $Qreq->q = (string) $Qreq->q;
+    $search = new PaperSearch($Me, array("t" => $Qreq->t, "q" => $Qreq->q));
     $papersel = $search->paperList();
     sort($papersel);
 } else
-    $_REQUEST["q"] = "";
+    $Qreq->q = "";
 if (isset($papersel) && count($papersel) == 0) {
     $Conf->errorMsg("No papers match that search.");
     unset($papersel);
-    unset($_REQUEST["check"]);
-    unset($_REQUEST["send"]);
+    unset($Qreq->check, $Qreq->send);
 }
 
-if (isset($_REQUEST["monreq"]))
+if (isset($Qreq->monreq))
     $Conf->header("Monitor external reviews", "mail");
 else
     $Conf->header("Mail", "mail");
@@ -99,9 +99,10 @@ class MailSender {
     private $mailid_text = "";
 
     function __construct($recip, $sending) {
+        global $Qreq;
         $this->recip = $recip;
         $this->sending = $sending;
-        $this->group = @$_REQUEST["group"] || !@$_REQUEST["ungroup"];
+        $this->group = $Qreq->group || !$Qreq->ungroup;
     }
 
     static function check($recip) {
@@ -115,11 +116,12 @@ class MailSender {
     }
 
     private function echo_actions($extra_class = "") {
+        global $Qreq;
         echo '<div class="aa', $extra_class, '">',
             Ht::submit("send", "Send", array("style" => "margin-right:4em")),
             ' &nbsp; ';
         $style = $this->groupable ? "" : "display:none";
-        if (!@$_REQUEST["group"] && @$_REQUEST["ungroup"])
+        if (!$Qreq->group && $Qreq->ungroup)
             echo Ht::submit("group", "Gather recipients", array("style" => $style, "class" => "mail_groupable"));
         else
             echo Ht::submit("ungroup", "Separate recipients", array("style" => $style, "class" => "mail_groupable"));
@@ -127,16 +129,16 @@ class MailSender {
     }
 
     private function echo_prologue() {
-        global $Conf, $Me;
+        global $Conf, $Me, $Qreq;
         if ($this->started)
             return;
         echo Ht::form_div(hoturl_post("mail"));
         foreach (array("recipients", "subject", "emailBody", "cc", "replyto", "q", "t", "plimit") as $x)
-            if (isset($_REQUEST[$x]))
-                echo Ht::hidden($x, $_REQUEST[$x]);
+            if (isset($Qreq[$x]))
+                echo Ht::hidden($x, $Qreq[$x]);
         if (!$this->group)
             echo Ht::hidden("ungroup", 1);
-        $recipients = defval($_REQUEST, "recipients", "");
+        $recipients = (string) $Qreq->recipients;
         if ($this->sending) {
             echo "<div id='foldmail' class='foldc fold2c'>",
                 "<div class='fn fx2 merror'>In the process of sending mail.  <strong>Do not leave this page until this message disappears!</strong><br /><span id='mailcount'></span></div>",
@@ -150,15 +152,15 @@ class MailSender {
                 "<div class='fn2 warning'>Sending mail. <strong>Do not leave this page until it finishes rendering!</strong></div>",
                 "</div>";
         } else {
-            if (isset($_REQUEST["emailBody"]) && $Me->privChair
-                && (strpos($_REQUEST["emailBody"], "%REVIEWS%")
-                    || strpos($_REQUEST["emailBody"], "%COMMENTS%"))) {
+            if (isset($Qreq->emailBody) && $Me->privChair
+                && (strpos($Qreq->emailBody, "%REVIEWS%")
+                    || strpos($Qreq->emailBody, "%COMMENTS%"))) {
                 if (!$Conf->timeAuthorViewReviews())
                     echo "<div class='warning'>Although these mails contain reviews and/or comments, authors can’t see reviews or comments on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change this setting</a>)</div>\n";
                 else if (!$Conf->timeAuthorViewReviews(true))
                     echo "<div class='warning'>Mails to users who have not completed their own reviews will not include reviews or comments. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change the setting</a>)</div>\n";
             }
-            if (isset($_REQUEST["emailBody"]) && $Me->privChair
+            if (isset($Qreq->emailBody) && $Me->privChair
                 && substr($recipients, 0, 4) == "dec:") {
                 if (!$Conf->timeAuthorViewDecision())
                     echo "<div class='warning'>You appear to be sending an acceptance or rejection notification, but authors can’t see paper decisions on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change this setting</a>)</div>\n";
@@ -170,8 +172,9 @@ class MailSender {
                 "Mailing to:&nbsp;", $this->recip->unparse(),
                 "<span id='mailinfo'></span>";
             if (!preg_match('/\A(?:pc\z|pc:|all\z)/', $recipients)
-                && defval($_REQUEST, "plimit") && $_REQUEST["q"] !== "")
-                echo "<br />Paper selection:&nbsp;", htmlspecialchars($_REQUEST["q"]);
+                && $Qreq->plimit
+                && $Qreq->q !== "")
+                echo "<br />Paper selection:&nbsp;", htmlspecialchars($Qreq->q);
             echo "</div>";
             $this->echo_actions(" fx");
             // This next is only displayed when Javascript is off
@@ -205,10 +208,10 @@ class MailSender {
     }
 
     private function send_prep($prep) {
-        global $Conf, $Opt;
+        global $Conf, $Opt, $Qreq;
 
         $cbkey = "c" . join("_", $prep->contacts);
-        if ($this->sending && !defval($_REQUEST, $cbkey))
+        if ($this->sending && !$Qreq[$cbkey])
             return;
         set_time_limit(30);
         $this->echo_prologue();
@@ -294,14 +297,14 @@ class MailSender {
     }
 
     private function run() {
-        global $Conf, $Opt, $Me, $Error, $subjectPrefix, $mailer_options;
+        global $Conf, $Opt, $Me, $Qreq, $Error, $subjectPrefix, $mailer_options;
 
-        $subject = trim(defval($_REQUEST, "subject", ""));
+        $subject = trim((string) $Qreq->subject);
         if (substr($subject, 0, strlen($subjectPrefix)) != $subjectPrefix)
             $subject = $subjectPrefix . $subject;
-        $emailBody = $_REQUEST["emailBody"];
+        $emailBody = $Qreq->emailBody;
         $template = array("subject" => $subject, "body" => $emailBody);
-        $rest = array("cc" => $_REQUEST["cc"], "reply-to" => $_REQUEST["replyto"],
+        $rest = array("cc" => $Qreq->cc, "reply-to" => $Qreq->replyto,
                       "pset" => $this->recip->pset, "no_error_quit" => true);
         $rest = array_merge($rest, $mailer_options);
 
@@ -315,16 +318,16 @@ class MailSender {
         $result = $Conf->qe_raw($q);
         if (!$result)
             return;
-        $recipients = defval($_REQUEST, "recipients", "");
+        $recipients = (string) $Qreq->recipients;
 
         if ($this->sending) {
             $q = "recipients='" . sqlq($recipients)
-                . "', cc='" . sqlq($_REQUEST["cc"])
-                . "', replyto='" . sqlq($_REQUEST["replyto"])
-                . "', subject='" . sqlq($_REQUEST["subject"])
-                . "', emailBody='" . sqlq($_REQUEST["emailBody"]) . "'";
+                . "', cc='" . sqlq($Qreq->cc)
+                . "', replyto='" . sqlq($Qreq->replyto)
+                . "', subject='" . sqlq($Qreq->subject)
+                . "', emailBody='" . sqlq($Qreq->emailBody) . "'";
             if ($Conf->sversion >= 79)
-                $q .= ", q='" . sqlq($_REQUEST["q"]) . "', t='" . sqlq($_REQUEST["t"]) . "'";
+                $q .= ", q='" . sqlq($Qreq->q) . "', t='" . sqlq($Qreq->t) . "'";
             if (($log_result = Dbl::query_raw("insert into MailLog set $q")))
                 $this->mailid_text = " #" . $log_result->insert_id;
             $Me->log_activity("Sending mail$this->mailid_text \"$subject\"");
@@ -405,58 +408,59 @@ while (($row = edb_row($result))) {
 }
 
 // Load template
-if (defval($_REQUEST, "loadtmpl")) {
-    $t = defval($_REQUEST, "template", "genericmailtool");
+if ($Qreq->loadtmpl) {
+    $t = $Qreq->get("template", "genericmailtool");
     if (!isset($mailTemplates[$t])
         || !isset($mailTemplates[$t]["mailtool_name"]))
         $t = "genericmailtool";
     $template = $mailTemplates[$t];
-    $_REQUEST["recipients"] = defval($template, "mailtool_recipients", "s");
-    if (($space = strpos($_REQUEST["recipients"], " ")) !== false) {
-        $_REQUEST["userrecipients"] = substr($_REQUEST["recipients"], $space + 1);
-        $_REQUEST["recipients"] = substr($_REQUEST["recipients"], 0, $space);
+    $Qreq->recipients = get($template, "mailtool_recipients", "s");
+    if (($space = strpos($Qreq->recipients, " ")) !== false) {
+        $Qreq->userrecipients = substr($Qreq->recipients, $space + 1);
+        $Qreq->recipients = substr($Qreq->recipients, 0, $space);
     }
     if (isset($template["mailtool_search_type"]))
-        $_REQUEST["t"] = $template["mailtool_search_type"];
-    $_REQUEST["subject"] = $null_mailer->expand($template["subject"]);
-    $_REQUEST["emailBody"] = $null_mailer->expand($template["body"]);
+        $Qreq->t = $template["mailtool_search_type"];
+    $Qreq->subject = $null_mailer->expand($template["subject"]);
+    $Qreq->emailBody = $null_mailer->expand($template["body"]);
 }
 
 
 // Set recipients list, now that template is loaded
-$recip = new MailRecipients($Me, @$_REQUEST["recipients"], @$_REQUEST["userrecipients"]);
+$recip = new MailRecipients($Me, (string) $Qreq->recipients, (string) $Qreq->userrecipients);
 
 
 // Set subject and body if necessary
-if (!isset($_REQUEST["subject"]))
-    $_REQUEST["subject"] = $null_mailer->expand($mailTemplates["genericmailtool"]["subject"]);
-if (!isset($_REQUEST["emailBody"]))
-    $_REQUEST["emailBody"] = $null_mailer->expand($mailTemplates["genericmailtool"]["body"]);
-if (substr($_REQUEST["subject"], 0, strlen($subjectPrefix)) == $subjectPrefix)
-    $_REQUEST["subject"] = substr($_REQUEST["subject"], strlen($subjectPrefix));
-if (isset($_REQUEST["cc"]) && $Me->privChair)
-    $_REQUEST["cc"] = simplify_whitespace($_REQUEST["cc"]);
+if (!isset($Qreq->subject))
+    $Qreq->subject = $null_mailer->expand($mailTemplates["genericmailtool"]["subject"]);
+if (!isset($Qreq->emailBody))
+    $Qreq->emailBody = $null_mailer->expand($mailTemplates["genericmailtool"]["body"]);
+if (substr($Qreq->subject, 0, strlen($subjectPrefix)) == $subjectPrefix)
+    $Qreq->subject = substr($Qreq->subject, strlen($subjectPrefix));
+if (isset($Qreq->cc) && $Me->privChair)
+    $Qreq->cc = simplify_whitespace($Qreq->cc);
 else if (isset($Opt["emailCc"]))
-    $_REQUEST["cc"] = $Opt["emailCc"] ? $Opt["emailCc"] : "";
+    $Qreq->cc = $Opt["emailCc"] ? $Opt["emailCc"] : "";
 else
-    $_REQUEST["cc"] = Text::user_email_to(Contact::site_contact());
-if (isset($_REQUEST["replyto"]) && $Me->privChair)
-    $_REQUEST["replyto"] = simplify_whitespace($_REQUEST["replyto"]);
+    $Qreq->cc = Text::user_email_to(Contact::site_contact());
+if (isset($Qreq->replyto) && $Me->privChair)
+    $Qreq->replyto = simplify_whitespace($Qreq->replyto);
 else
-    $_REQUEST["replyto"] = defval($Opt, "emailReplyTo", "");
+    $Qreq->replyto = defval($Opt, "emailReplyTo", "");
 
 
 // Check or send
-if (defval($_REQUEST, "loadtmpl") || defval($_REQUEST, "cancel"))
+if ($Qreq->loadtmpl || $Qreq->cancel)
     /* do nothing */;
-else if (defval($_REQUEST, "send") && !$recip->error && check_post())
+else if ($Qreq->send && !$recip->error && check_post())
     MailSender::send($recip);
-else if ((@$_REQUEST["check"] || @$_REQUEST["group"] || @$_REQUEST["ungroup"])
-         && !$recip->error && check_post())
+else if (($Qreq->check || $Qreq->group || $Qreq->ungroup)
+         && !$recip->error
+         && check_post())
     MailSender::check($recip);
 
 
-if (isset($_REQUEST["monreq"])) {
+if ($Qreq->monreq) {
     $plist = new PaperList(new PaperSearch($Me, array("t" => "req", "q" => "")), array("list" => true));
     $ptext = $plist->text("reqrevs", array("header_links" => true));
     if ($plist->count == 0)
@@ -490,9 +494,9 @@ asort($tmpl);
 foreach ($tmpl as $k => &$v) {
     $v = $mailTemplates[$k]["mailtool_name"];
 }
-if (!isset($_REQUEST["template"]) || !isset($tmpl[$_REQUEST["template"]]))
-    $_REQUEST["template"] = "genericmailtool";
-echo Ht::select("template", $tmpl, $_REQUEST["template"], array("onchange" => "highlightUpdate(\"loadtmpl\")")),
+if (!$Qreq->template || !isset($tmpl[$Qreq->template]))
+    $Qreq->template = "genericmailtool";
+echo Ht::select("template", $tmpl, $Qreq->template, array("onchange" => "highlightUpdate(\"loadtmpl\")")),
     " &nbsp;",
     Ht::submit("loadtmpl", "Load", array("id" => "loadtmpl")),
     " &nbsp;
@@ -509,19 +513,19 @@ echo '<tr><td class="mhnp">To:</td><td class="mhdd">',
 // paper selection
 echo '<div id="foldpsel" class="fold8c fold9o fold10c">';
 echo '<table class="fx9"><tr><td>',
-    Ht::checkbox("plimit", 1, isset($_REQUEST["plimit"]),
+    Ht::checkbox("plimit", 1, isset($Qreq->plimit),
                   array("id" => "plimit",
                         "onchange" => "fold('psel', !this.checked, 8)")),
     "&nbsp;</td><td>", Ht::label("Choose individual papers", "plimit");
 echo "<span class='fx8'>:</span><br /><div class='fx8'>";
-$q = defval($_REQUEST, "q", "(All)");
+$q = $Qreq->get("q", "(All)");
 echo "Search&nbsp; ",
-    Ht::entry("q", @$_REQUEST["q"],
+    Ht::entry("q", $Qreq->q,
               array("id" => "q", "hottemptext" => "(All)",
                     "class" => "hotcrp_searchbox", "size" => 36,
                     "title" => "Enter paper numbers or search terms")),
     " &nbsp;in &nbsp;",
-    Ht::select("t", $tOpt, $_REQUEST["t"], array("id" => "t")),
+    Ht::select("t", $tOpt, $Qreq->t, array("id" => "t")),
     "</div></td></tr></table>\n";
 
 echo '<div class="fx9 g"></div></div>';
@@ -540,7 +544,7 @@ if ($Me->privChair) {
             $ec = (isset($Error[$xfield]) ? " error" : "");
             echo "  <tr><td class='mhnp$ec'>$field:</td><td class='mhdp$ec'>",
                 "<input type='text' class='textlite-tt' name='$xfield' value=\"",
-                htmlspecialchars($_REQUEST[$xfield]), "\" size='64' />",
+                htmlspecialchars($Qreq[$xfield]), "\" size='64' />",
                 ($xfield == "replyto" ? "<div class='g'></div>" : ""),
                 "</td></tr>\n\n";
         }
@@ -548,10 +552,10 @@ if ($Me->privChair) {
 
 // ** SUBJECT
 echo "  <tr><td class='mhnp'>Subject:</td><td class='mhdp'>",
-    "<tt>[", htmlspecialchars($Opt["shortName"]), "]&nbsp;</tt><input type='text' class='textlite-tt' name='subject' value=\"", htmlspecialchars($_REQUEST["subject"]), "\" size='64' /></td></tr>
+    "<tt>[", htmlspecialchars($Opt["shortName"]), "]&nbsp;</tt><input type='text' class='textlite-tt' name='subject' value=\"", htmlspecialchars($Qreq->subject), "\" size='64' /></td></tr>
 
  <tr><td></td><td class='mhb'>
-  <textarea class='tt' rows='20' name='emailBody' cols='80'>", htmlspecialchars($_REQUEST["emailBody"]), "</textarea>
+  <textarea class='tt' rows='20' name='emailBody' cols='80'>", htmlspecialchars($Qreq->emailBody), "</textarea>
  </td></tr>
 </table></div>\n\n";
 

@@ -25,7 +25,7 @@ function user_pset_info() {
 
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/h/f", "/@/p/f",
                                     "/p/h/f", "/p/f"));
-$Qreq = make_qreq();
+
 
 // user, pset, runner
 $User = $Me;
@@ -52,8 +52,8 @@ if ($result === null || $result === "") {
 }
 
 // filetype determination
-$slash = strrpos($_REQUEST["file"], "/");
-$filename = substr($_REQUEST["file"], $slash === false ? 0 : $slash + 1);
+$slash = strrpos($Qreq->file, "/");
+$filename = substr($Qreq->file, $slash === false ? 0 : $slash + 1);
 $dot = strrpos($filename, ".");
 $ext = ($dot === false ? "" : strtolower(substr($filename, $dot + 1)));
 

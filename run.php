@@ -24,7 +24,6 @@ function user_pset_info() {
 }
 
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"));
-$Qreq = make_qreq();
 
 // user, pset, runner
 $User = $Me;
@@ -36,7 +35,7 @@ assert($User == $Me || $Me->isPC);
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // XXX this should be under `api`
-if ($Qreq->flag && check_post($Qreq) && user_pset_info()) {
+if ($Qreq->flag && $Qreq->post_ok() && user_pset_info()) {
     $flags = (array) $Info->current_info("flags");
     if ($Qreq->flagid && !isset($flags["t" . $Qreq->flagid]))
         json_exit(["ok" => false, "error" => "No such flag"]);
@@ -57,7 +56,7 @@ if ($Qreq->flag && check_post($Qreq) && user_pset_info()) {
 }
 
 // XXX this should be under `api`
-if ($Qreq->resolveflag && check_post($Qreq) && user_pset_info()) {
+if ($Qreq->resolveflag && $Qreq->post_ok() && user_pset_info()) {
     $flags = (array) $Info->current_info("flags");
     if (!$Qreq->flagid || !isset($flags[$Qreq->flagid]))
         json_exit(["ok" => false, "error" => "No such flag"]);
@@ -72,7 +71,7 @@ $Runner = null;
 foreach ($Pset->runners as $r)
     if ($r->name == $Qreq->run)
         $Runner = $r;
-$RunMany = $Me->isPC && get($_GET, "runmany") && check_post();
+$RunMany = $Me->isPC && $Qreq->runmany && $Qreq->post_ok();
 if (!$Runner)
     quit("No such command");
 else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
@@ -85,9 +84,9 @@ else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
 }
 
 // magic multi-runner
-if ($Me->isPC && get($_GET, "runmany") && check_post()) {
+if ($Me->isPC && $Qreq->runmany && $Qreq->post_ok()) {
     $t = $Pset->title;
-    if (get($_GET, "ensure"))
+    if ($Qreq->ensure)
         $t .= " Ensure";
     $t .= " " . $Runner->title;
     $Conf->header(htmlspecialchars($t), "home");
@@ -97,7 +96,7 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
         '<div class="f-contain">',
         Ht::hidden("u", ""),
         Ht::hidden("pset", $Pset->urlkey);
-    if (get($_GET, "ensure"))
+    if ($Qreq->ensure)
         echo Ht::hidden("ensure", 1);
     echo Ht::hidden("run", $Runner->name, ["id" => "runmany61", "data-pa-run-category" => $Runner->category_argument()]),
         '</div></form>';
@@ -108,7 +107,7 @@ if ($Me->isPC && get($_GET, "runmany") && check_post()) {
         '</div>';
 
     echo '<div id="runmany61_users">',
-        htmlspecialchars($_GET["users"]),
+        htmlspecialchars($Qreq->users),
         '</div>';
 
     Ht::stash_script('runmany61()');
@@ -126,7 +125,7 @@ if (!$Repo)
     quit("No repository to run");
 else if (!$Info->commit())
     quit("No commit to run");
-else if ($Qreq->run === null || !check_post())
+else if ($Qreq->run === null || !$Qreq->post_ok())
     quit("Permission error");
 else if (!$Info->can_view_repo_contents())
     quit("Unconfirmed repository");

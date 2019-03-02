@@ -7,11 +7,11 @@ require_once("src/initweb.php");
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"));
 if ($Me->is_empty())
     $Me->escape();
-global $User, $Pset, $Info;
+global $User, $Pset, $Info, $Qreq;
 
 $User = $Me;
-if (isset($_REQUEST["u"])
-    && !($User = ContactView::prepare_user($_REQUEST["u"])))
+if (isset($Qreq->u)
+    && !($User = ContactView::prepare_user($Qreq->u)))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
@@ -103,7 +103,7 @@ if (!$Info->set_hash($commit) && $commit && $Info->repo) {
 }
 
 // get JSON grade series data
-if (isset($_REQUEST["gradecdf"])) {
+if (isset($Qreq->gradecdf)) {
     if (!$Me->isPC && !$Info->user_can_view_grade_statistics())
         json_exit(["error" => "Grades are not visible now"]);
 
@@ -168,8 +168,11 @@ if (isset($_REQUEST["gradecdf"])) {
 }
 
 // maybe set commit
-if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
-    && $Info->can_have_grades() && $Me->can_set_grader($Pset, $User)) {
+if (isset($Qreq->setgrader)
+    && isset($Qreq->grader)
+    && $Qreq->post_ok()
+    && $Info->can_have_grades()
+    && $Me->can_set_grader($Pset, $User)) {
     $grader = 0;
     foreach ($Conf->pc_members_and_admins() as $pcm)
         if ($pcm->email === $_POST["grader"])
@@ -179,14 +182,14 @@ if (isset($_REQUEST["setgrader"]) && isset($_POST["grader"]) && check_post()
     $Info->change_grader($grader);
     json_exit(["ok" => null, "grader_email" => $_POST["grader"]]);
 }
-if (isset($_REQUEST["setcommit"])
-    && isset($_REQUEST["grade"])
+if (isset($Qreq->setcommit)
+    && isset($Qreq->grade)
     && check_post()
     && $Info->can_have_grades()
     && $Me->isPC
     && $Me != $User)
     $Info->mark_grading_commit();
-if (isset($_REQUEST["setcommit"]))
+if (isset($Qreq->setcommit))
     go($Info->hoturl("pset"));
 
 // maybe set partner/repo
@@ -266,7 +269,7 @@ function upload_grades($pset, $text, $fname) {
     return true;
 }
 
-if ($Me->isPC && check_post() && isset($_REQUEST["uploadgrades"])
+if ($Me->isPC && check_post() && isset($Qreq->uploadgrades)
     && file_uploaded($_FILES["file"])) {
     if (($text = file_get_contents($_FILES["file"]["tmp_name"])) === false)
 	$Conf->errorMsg("Internal error: cannot read file.");
@@ -275,25 +278,27 @@ if ($Me->isPC && check_post() && isset($_REQUEST["uploadgrades"])
 }
 
 // save tab width, wdiff
-if (isset($_REQUEST["tab"]) && ctype_digit($_REQUEST["tab"])
-    && $_REQUEST["tab"] >= 1 && $_REQUEST["tab"] <= 16) {
-    $tab = (int) $_REQUEST["tab"];
+if (isset($Qreq->tab)
+    && ctype_digit($Qreq->tab)
+    && $Qreq->tab >= 1
+    && $Qreq->tab <= 16) {
+    $tab = (int) $Qreq->tab;
     $tab = $tab == 4 ? null : $tab;
     $Info->update_commit_info(array("tabwidth" => $tab));
-} else if (isset($_REQUEST["tab"])
-           && ($_REQUEST["tab"] == "" || $_REQUEST["tab"] == "none"))
+} else if (isset($Qreq->tab)
+           && ($Qreq->tab === "" || $Qreq->tab === "none"))
     $Info->update_commit_info(array("tabwidth" => null));
-if (isset($_REQUEST["wdiff"]))
-    $Info->update_commit_info(array("wdiff" => ((int) $_REQUEST["wdiff"] != 0)));
+if (isset($Qreq->wdiff))
+    $Info->update_commit_info(array("wdiff" => ((int) $Qreq->wdiff != 0)));
 
 // save run settings
-if ($Me->isPC && $Me != $User && isset($_REQUEST["saverunsettings"])
+if ($Me->isPC && $Me != $User && isset($Qreq->saverunsettings)
     && check_post()) {
     $x = req("runsettings");
     if (empty($x))
         $x = null;
     $Info->update_commit_info(array("runsettings" => $x), true);
-    if (isset($_REQUEST["ajax"]))
+    if (isset($Qreq->ajax))
         json_exit(["ok" => true, "runsettings" => $x]);
 }
 
@@ -448,7 +453,7 @@ function echo_commit($Info) {
     }
 
     // view options
-    $fold_viewoptions = !isset($_REQUEST["tab"]) && !isset($_REQUEST["wdiff"]);
+    $fold_viewoptions = !isset($Qreq->tab) && !isset($Qreq->wdiff);
     $value .= '<div class="viewoptions61">'
         . '<a class="q" href="#" onclick="return fold61(this.nextSibling,this.parentNode)">'
         . '<span class="foldarrow">'

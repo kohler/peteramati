@@ -5,29 +5,28 @@
 require_once("src/initweb.php");
 
 // parse request
-$qreq = make_qreq();
-if ($qreq->base !== null)
-    $Conf->set_siteurl($qreq->base);
-if ($qreq->path_front() && substr($qreq->path_front(), 0, 1) === "~")
-    $qreq->u = substr(urldecode($qreq->shift_path()), 1);
-if (($x = $qreq->shift_path()))
-    $qreq->fn = urldecode($x);
-if (($x = $qreq->shift_path())) {
-    if (!$qreq->pset)
-        $qreq->pset = urldecode($x);
-    if (($x = $qreq->shift_path())) {
-        if (!$qreq->commit)
-            $qreq->commit = urldecode($x);
+if ($Qreq->base !== null)
+    $Conf->set_siteurl($Qreq->base);
+if ($Qreq->path_front() && substr($Qreq->path_front(), 0, 1) === "~")
+    $Qreq->u = substr(urldecode($Qreq->shift_path()), 1);
+if (($x = $Qreq->shift_path()))
+    $Qreq->fn = urldecode($x);
+if (($x = $Qreq->shift_path())) {
+    if (!$Qreq->pset)
+        $Qreq->pset = urldecode($x);
+    if (($x = $Qreq->shift_path())) {
+        if (!$Qreq->commit)
+            $Qreq->commit = urldecode($x);
     }
 }
 
 // check user
 $api = new APIData($Me);
-if ($qreq->u && !($api->user = ContactView::prepare_user($qreq->u)))
+if ($Qreq->u && !($api->user = ContactView::prepare_user($Qreq->u)))
     json_exit(["ok" => false, "error" => "User permission error."]);
 
 // check pset
-if ($qreq->pset && !($api->pset = $Conf->pset_by_key($qreq->pset)))
+if ($Qreq->pset && !($api->pset = $Conf->pset_by_key($Qreq->pset)))
     json_exit(["ok" => false, "error" => "No such pset."]);
 if ($api->pset && $api->pset->disabled) {
     if ($Me->isPC)
@@ -43,8 +42,8 @@ if ($api->pset && !$api->pset->gitless && !$Me->is_empty()) {
     $api->repo = $api->user->repo($api->pset);
     $api->branch = $api->user->branch_name($api->pset);
 }
-if ($api->repo && $qreq->commit)
-    $api->hash = $qreq->commit;
+if ($api->repo && $Qreq->commit)
+    $api->hash = $Qreq->commit;
 
 // call api
-$Conf->call_api_exit($qreq->fn, $Me, $qreq, $api);
+$Conf->call_api_exit($Qreq->fn, $Me, $Qreq, $api);

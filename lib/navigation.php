@@ -1,17 +1,21 @@
 <?php
 // navigation.php -- HotCRP navigation helper functions
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 class NavigationState {
-    public $protocol;           // "http://" or "https://"
-    public $host;
+    // Base URL:    PROTOCOL://HOST[:PORT]/SITEPATH/
+    // Current URL: PROTOCOL://HOST[:PORT]/SITEPATH/PAGE/PATH?QUERY
+    public $protocol;           // "PROTOCOL://"
+    public $host;               // "HOST"
     public $server;             // "PROTOCOL://HOST[:PORT]"
-    public $site_path;          // "/PATH", does not include $page, ends in /
-    public $page;               // Name of page
-    public $path;
-    public $query;
-    public $site_path_relative;
+    public $site_path;          // "/SITEPATH/"; always ends in /
+    public $site_path_relative; // "/SITEPATH/", "../"+, or ""
+    public $base_path;          // "/BASEPATH/"; always ends in /; $site_path prefix
+    public $base_path_relative; // "/BASEPATH/", "../"+, or ""
+    public $page;               // "PAGE" or "index" (.php suffix stripped)
+    public $path;               // "/PATH" or ""
+    public $shifted_path;
+    public $query;              // "?QUERY" or ""
     public $php_suffix;
     public $request_uri;
 
@@ -29,10 +33,15 @@ class NavigationState {
         if (!$this->host && isset($server["SERVER_NAME"]))
             $this->host = $server["SERVER_NAME"];
 
-        if (isset($server["HTTPS"]) && $server["HTTPS"] != "off")
-            list($x, $xport) = array("https://", 443);
-        else
-            list($x, $xport) = array("http://", 80);
+        if (isset($server["HTTPS"])
+            && $server["HTTPS"] !== ""
+            && $server["HTTPS"] !== "off") {
+            $x = "https://";
+            $xport = 443;
+        } else {
+            $x = "http://";
+            $xport = 80;
+        }
         $this->protocol = $x;
         $x .= $this->host ? : "localhost";
         if (($port = $server["SERVER_PORT"])
@@ -88,6 +97,7 @@ class NavigationState {
             && substr($this->page, $pagelen - 4) === ".php")
             $this->page = substr($this->page, 0, $pagelen - 4);
         $this->path = $m[2];
+        $this->shifted_path = "";
         $this->query = $m[3];
 
         // detect $site_path_relative
@@ -98,6 +108,10 @@ class NavigationState {
             $this->site_path_relative = $this->site_path;
         else
             $this->site_path_relative = "";
+
+        // set $base_path
+        $this->base_path = $this->site_path;
+        $this->base_path_relative = $this->site_path_relative;
 
         $this->php_suffix = ".php";
         if ((isset($server["SERVER_SOFTWARE"])
@@ -114,6 +128,11 @@ class NavigationState {
     function site_absolute($downcase_host = false) {
         $x = $downcase_host ? strtolower($this->server) : $this->server;
         return $x . $this->site_path;
+    }
+
+    function base_absolute($downcase_host = false) {
+        $x = $downcase_host ? strtolower($this->server) : $this->server;
+        return $x . $this->base_path;
     }
 
     function siteurl($url = null) {
@@ -148,7 +167,7 @@ class NavigationState {
             if ($n + 1 < count($p) || ($n + 1 == count($p) && $p[$n] !== ""))
                 return $decoded ? urldecode($p[$n]) : $p[$n];
         }
-        return null;
+        return false;
     }
 
     function path_suffix($n) {
@@ -160,6 +179,36 @@ class NavigationState {
                 return substr($this->path, $p);
         }
         return "";
+    }
+
+    function shift_path_components($n) {
+        $nx = $n;
+        $pos = 0;
+        $path = $this->page . $this->path;
+        while ($n > 0 && $pos < strlen($path)) {
+            if (($pos = strpos($path, "/", $pos)) !== false) {
+                ++$pos;
+                --$n;
+            } else
+                $pos = strlen($path);
+        }
+        if ($n > 0)
+            return false;
+        $this->site_path .= substr($path, 0, $pos);
+        if (substr($this->site_path_relative, 0, 3) === "../")
+            $this->site_path_relative = substr($this->site_path_relative, 3 * $nx);
+        else
+            $this->site_path_relative = $this->site_path;
+        $this->shifted_path .= substr($path, 0, $pos);
+        $spos = $pos;
+        if ($pos < strlen($path) && ($spos = strpos($path, "/", $pos)) === false)
+            $spos = strlen($path);
+        $this->page = ($pos === $spos ? "index" : substr($path, $pos, $spos - $pos));
+        if (($pagelen = strlen($this->page)) > 4
+            && substr($this->page, $pagelen - 4) === ".php")
+            $this->page = substr($this->page, 0, $pagelen - 4);
+        $this->path = (string) substr($path, $spos);
+        return $this->page;
     }
 
     function make_absolute($url) {
@@ -208,6 +257,10 @@ class Navigation {
         return self::$s->site_absolute($downcase_host);
     }
 
+    static function base_absolute($downcase_host = false) {
+        return self::$s->base_absolute($downcase_host);
+    }
+
     static function site_path() {
         return self::$s->site_path;
     }
@@ -238,6 +291,14 @@ class Navigation {
 
     static function path_suffix($n) {
         return self::$s->path_suffix($n);
+    }
+
+    static function shift_path_components($n) {
+        return self::$s->shift_path_components($n);
+    }
+
+    static function shifted_path() {
+        return self::$s->shifted_path;
     }
 
     static function set_page($page) {
@@ -277,6 +338,10 @@ class Navigation {
 
     static function redirect_site($site_url) {
         self::redirect(self::site_absolute() . $site_url);
+    }
+
+    static function redirect_base($base_url) {
+        self::redirect(self::base_absolute() . $base_url);
     }
 
     static function redirect_http_to_https($allow_http_if_localhost = false) {

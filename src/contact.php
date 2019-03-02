@@ -47,6 +47,7 @@ class Contact {
     private $lastLogin;
 
     public $disabled = false;
+    private $_disabled;
     public $activity_at = false;
     public $note;
     public $data;
@@ -419,6 +420,17 @@ class Contact {
 
     function is_empty() {
         return $this->contactId <= 0 && !$this->capabilities && !$this->email;
+    }
+
+    function owns_email($email) {
+        return (string) $email !== "" && strcasecmp($email, $this->email) === 0;
+    }
+
+    function is_disabled() {
+        if ($this->_disabled === null)
+            $this->_disabled = $this->disabled
+                || (!$this->isPC && $this->conf->opt("disableNonPC"));
+        return $this->_disabled;
     }
 
     function has_email() {

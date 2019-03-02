@@ -8,7 +8,6 @@ ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/@/p/h/h", "/p/h/h"
 if ($Me->is_empty())
     $Me->escape();
 global $User, $Pset, $Info, $Qreq;
-$Qreq = make_qreq();
 
 $User = $Me;
 if (isset($Qreq->u)

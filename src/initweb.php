@@ -1,10 +1,22 @@
 <?php
 // initweb.php -- HotCRP initialization for web scripts
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 require_once("init.php");
-global $Conf, $Me, $Opt;
+global $Conf, $Me, $Opt, $Qreq;
+
+// Check method: GET/HEAD/POST only, except OPTIONS is allowed for API calls
+if ($_SERVER["REQUEST_METHOD"] !== "GET"
+    && $_SERVER["REQUEST_METHOD"] !== "HEAD"
+    && $_SERVER["REQUEST_METHOD"] !== "POST"
+    && (Navigation::page() !== "api"
+        || $_SERVER["REQUEST_METHOD"] !== "OPTIONS")) {
+    header("HTTP/1.0 405 Method Not Allowed");
+    exit;
+}
+
+// Collect $Qreq
+$Qreq = make_qreq();
 
 // Check for redirect to https
 if (get($Opt, "redirectToHttps"))
@@ -29,54 +41,94 @@ if ($Me === false)
     return;
 
 
-// Set up session
-$Opt["globalSessionLifetime"] = ini_get("session.gc_maxlifetime");
-if (!isset($Opt["sessionLifetime"]))
-    $Opt["sessionLifetime"] = 86400;
-ini_set("session.gc_maxlifetime", $Opt["sessionLifetime"]);
-ensure_session();
-
 // Initialize user
 function initialize_user() {
-    global $Conf, $Me;
+    global $Conf, $Me, $Now, $Qreq;
 
-    // load current user
+    // set up session
+    if (isset($Conf->opt["sessionHandler"])) {
+        $sh = $Conf->opt["sessionHandler"];
+        $Conf->_session_handler = new $sh($Conf);
+        session_set_save_handler($Conf->_session_handler, true);
+    }
+    set_session_name($Conf);
+    $sn = session_name();
+
+    // check CSRF token, using old value of session ID
+    if ($Qreq->post && $sn) {
+        if (isset($_COOKIE[$sn])) {
+            $sid = $_COOKIE[$sn];
+            $l = strlen($Qreq->post);
+            if ($l >= 8 && $Qreq->post === substr($sid, strlen($sid) > 16 ? 8 : 0, $l))
+                $Qreq->approve_post();
+        } else if ($Qreq->post === "<empty-session>"
+                   || $Qreq->post === ".empty") {
+            $Qreq->approve_post();
+        }
+    }
+    ensure_session(ENSURE_SESSION_ALLOW_EMPTY);
+
+    // upgrade session format
+    if (!isset($_SESSION["u"]) && isset($_SESSION["trueuser"])) {
+        $_SESSION["u"] = $_SESSION["trueuser"]->email;
+    }
+
+    // determine user
+    $nav = Navigation::get();
+    $trueemail = isset($_SESSION["u"]) ? $_SESSION["u"] : null;
+
+    // look up and activate user
     $Me = null;
-    $trueuser = get($_SESSION, "trueuser");
-    if ($trueuser && $trueuser->email)
-        $Me = $Conf->user_by_email($trueuser->email);
-    if (!$Me)
-        $Me = new Contact($trueuser);
-    $Me = $Me->activate();
+    if ($trueemail) {
+        $Me = $Conf->user_by_email($trueemail);
+    }
+    if (!$Me) {
+        $Me = new Contact($trueemail ? (object) ["email" => $trueemail] : null);
+    }
+    $Me = $Me->activate($Qreq, true);
 
     // redirect if disabled
-    if ($Me->disabled) {
-        if (Navigation::page() === "api")
+    if ($Me->is_disabled()) {
+        if ($nav->page === "api") {
             json_exit(["ok" => false, "error" => "Your account is disabled."]);
-        else if (Navigation::page() !== "index")
-            Navigation::redirect_site(hoturl_site_relative("index"));
+        } else if ($nav->page !== "index" && $nav->page !== "resetpassword") {
+            Navigation::redirect_site($Conf->hoturl_site_relative_raw("index"));
+        }
     }
 
     // if bounced through login, add post data
-    if (isset($_SESSION["login_bounce"]) && !$Me->is_empty()) {
+    if (isset($_SESSION["login_bounce"][4])
+        && $_SESSION["login_bounce"][4] <= $Now)
+        unset($_SESSION["login_bounce"]);
+
+    if (!$Me->is_empty()
+        && isset($_SESSION["login_bounce"])
+        && !isset($_SESSION["testsession"])) {
         $lb = $_SESSION["login_bounce"];
-        if ($lb[0] == $Conf->dsn && $lb[2] !== "index" && $lb[2] == Navigation::page()) {
+        if ($lb[0] == $Conf->dsn
+            && $lb[2] !== "index"
+            && $lb[2] == Navigation::page()) {
             foreach ($lb[3] as $k => $v)
-                if (!isset($_REQUEST[$k]))
-                    $_REQUEST[$k] = $_GET[$k] = $v;
-            $_REQUEST["after_login"] = 1;
+                if (!isset($Qreq[$k]))
+                    $Qreq[$k] = $v;
+            $Qreq->set_annex("after_login", true);
         }
         unset($_SESSION["login_bounce"]);
     }
 
     // set $_SESSION["addrs"]
     if ($_SERVER["REMOTE_ADDR"]
-        && (!is_array(get($_SESSION, "addrs")) || get($_SESSION["addrs"], 0) !== $_SERVER["REMOTE_ADDR"])) {
-        $as = array($_SERVER["REMOTE_ADDR"]);
-        if (is_array(get($_SESSION, "addrs")))
+        && (!$Me->is_empty()
+            || isset($_SESSION["addrs"]))
+        && (!isset($_SESSION["addrs"])
+            || !is_array($_SESSION["addrs"])
+            || $_SESSION["addrs"][0] !== $_SERVER["REMOTE_ADDR"])) {
+        $as = [$_SERVER["REMOTE_ADDR"]];
+        if (isset($_SESSION["addrs"]) && is_array($_SESSION["addrs"])) {
             foreach ($_SESSION["addrs"] as $a)
                 if ($a !== $_SERVER["REMOTE_ADDR"] && count($as) < 5)
                     $as[] = $a;
+        }
         $_SESSION["addrs"] = $as;
     }
 }

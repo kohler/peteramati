@@ -296,18 +296,30 @@ function make_qreq() {
     $qreq = new Qrequest($_SERVER["REQUEST_METHOD"]);
     $qreq->set_path(Navigation::path());
     foreach ($_GET as $k => $v)
-        $qreq[$k] = $v;
+        $qreq->set_req($k, $v);
     foreach ($_POST as $k => $v)
-        $qreq[$k] = $v;
+        $qreq->set_req($k, $v);
+    if (empty($_POST))
+        $qreq->set_post_empty();
 
     // $_FILES requires special processing since we want error messages.
     $errors = [];
-    foreach ($_FILES as $f => $finfo) {
-        if ($finfo["error"] == UPLOAD_ERR_OK) {
-            if (is_uploaded_file($finfo["tmp_name"]))
-                $qreq->set_file($f, $finfo);
-        } else if (($err = uploaded_file_error($finfo)))
-            $errors[] = $err;
+    foreach ($_FILES as $nx => $fix) {
+        if (is_array($fix["error"])) {
+            $fis = [];
+            foreach (array_keys($fix["error"]) as $i) {
+                $fis[$i ? "$nx.$i" : $nx] = ["name" => $fix["name"][$i], "type" => $fix["type"][$i], "size" => $fix["size"][$i], "tmp_name" => $fix["tmp_name"][$i], "error" => $fix["error"][$i]];
+            }
+        } else {
+            $fis = [$nx => $fix];
+        }
+        foreach ($fis as $n => $fi) {
+            if ($fi["error"] == UPLOAD_ERR_OK) {
+                if (is_uploaded_file($fi["tmp_name"]))
+                    $qreq->set_file($n, $fi);
+            } else if (($err = uploaded_file_error($fi)))
+                $errors[] = $err;
+        }
     }
     if (!empty($errors) && Conf::$g)
         Conf::msg_error("<div class=\"parseerr\"><p>" . join("</p>\n<p>", $errors) . "</p></div>");

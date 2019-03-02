@@ -11,7 +11,6 @@ if (!$Conf)
 
 global $Qreq, $MicroNow;
 ContactView::set_path_request(array("/u"));
-$Qreq = make_qreq();
 
 $email_class = "";
 $password_class = "";
@@ -24,10 +23,10 @@ if (isset($_REQUEST["email"]) && isset($_REQUEST["password"])) {
     $_REQUEST["signin"] = defval($_REQUEST, "signin", "go");
 }
 // CSRF protection: ignore unvalidated signin/signout for known users
-if (!$Me->is_empty() && !check_post())
+if (!$Me->is_empty() && !$Qreq->post_ok())
     unset($_REQUEST["signout"]);
 if ($Me->has_email()
-    && (!check_post() || strcasecmp($Me->email, trim($Qreq->email)) == 0))
+    && (!$Qreq->post_ok() || strcasecmp($Me->email, trim($Qreq->email)) == 0))
     unset($_REQUEST["signin"]);
 if (!isset($_REQUEST["email"]) || !isset($_REQUEST["action"]))
     unset($_REQUEST["signin"]);
@@ -57,7 +56,7 @@ if (!$Me->isPC || !$User)
 if (!$Me->is_empty()
     && ($Me === $User || $Me->isPC)
     && $Qreq->set_username
-    && check_post()
+    && $Qreq->post_ok()
     && ($repoclass = RepositorySite::$sitemap[$Qreq->reposite])
     && in_array($repoclass, RepositorySite::site_classes($Conf), true)) {
     if ($repoclass::save_username($User, $Qreq->username))
@@ -72,7 +71,7 @@ if ($Qreq->set_partner !== null)
     ContactView::set_partner_action($User);
 
 if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
-    && $Me->isPC && $User->is_student() && check_post()) {
+    && $Me->isPC && $User->is_student() && $Qreq->post_ok()) {
     Dbl::qe("update ContactInfo set dropped=? where contactId=?",
             isset($_REQUEST["set_drop"]) ? $Now : 0, $User->contactId);
     redirectSelf();
@@ -416,7 +415,7 @@ function download_psets_report($request) {
     exit;
 }
 
-if ($Me->isPC && check_post() && $Qreq->report)
+if ($Me->isPC && $Qreq->post_ok() && $Qreq->report)
     download_psets_report($Qreq);
 
 
@@ -519,7 +518,7 @@ function set_grader(Qrequest $qreq) {
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && $Qreq->setgrader)
+if ($Me->isPC && $Qreq->post_ok() && $Qreq->setgrader)
     set_grader($Qreq);
 
 
@@ -543,7 +542,7 @@ function runmany($qreq) {
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && $Qreq->runmany)
+if ($Me->isPC && $Qreq->post_ok() && $Qreq->runmany)
     runmany($Qreq);
 
 
@@ -607,7 +606,7 @@ function doaction(Qrequest $qreq) {
     redirectSelf();
 }
 
-if ($Me->isPC && check_post() && $Qreq->doaction)
+if ($Me->isPC && $Qreq->post_ok() && $Qreq->doaction)
     doaction($Qreq);
 
 
@@ -627,7 +626,7 @@ function psets_json_diff_from($original, $update) {
 }
 
 function save_config_overrides($psetkey, $overrides, $json = null) {
-    global $Conf;
+    global $Conf, $Qreq;
 
     $dbjson = $Conf->setting_json("psets_override") ? : (object) array();
     $all_overrides = (object) array();
@@ -636,7 +635,7 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
     $dbjson = psets_json_diff_from($json ? : load_psets_json(true), $dbjson);
     $Conf->save_setting("psets_override", 1, $dbjson);
 
-    unset($_GET["pset"], $_REQUEST["pset"]);
+    unset($_GET["pset"], $_REQUEST["pset"], $Qreq->pset);
     redirectSelf(array("anchor" => $psetkey));
 }
 
@@ -697,7 +696,7 @@ function reconfig($qreq) {
     save_config_overrides($psetkey, $o, $json);
 }
 
-if ($Me->privChair && check_post() && get($_GET, "reconfig"))
+if ($Me->privChair && $Qreq->post_ok() && $Qreq->reconfig)
     reconfig($Qreq);
 
 
@@ -707,9 +706,16 @@ if ($Me->privChair)
 
 
 // Enable users
-if ($Me->privChair && check_post()
-    && (isset($_GET["enable_user"]) || isset($_GET["send_account_info"]) || isset($_GET["reset_password"]))) {
-    $who = get($_GET, "enable_user", get($_GET, "send_account_info", get($_GET, "reset_password", null)));
+if ($Me->privChair
+    && $Qreq->post_ok()
+    && (isset($Qreq->enable_user)
+        || isset($Qreq->send_account_info)
+        || isset($Qreq->reset_password))) {
+    $who = $Qreq->enable_user;
+    if ($who === null)
+        $who = $Qreq->send_account_info;
+    if ($who === null)
+        $who = $Qreq->reset_password;
     if ($who == "college")
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension"));
     else if ($who == "college-empty")
@@ -733,10 +739,10 @@ if ($Me->privChair && check_post()
     if (empty($users))
         $Conf->warnMsg("No users match “" . htmlspecialchars($who) . "”.");
     else {
-        if (isset($_GET["enable_user"]))
+        if (isset($Qreq->enable_user))
             UserActions::enable($users, $Me);
-        else if (isset($_GET["reset_password"]))
-            UserActions::reset_password($users, $Me, isset($_GET["ifempty"]) && $_GET["ifempty"]);
+        else if (isset($Qreq->reset_password))
+            UserActions::reset_password($users, $Me, isset($Qreq->ifempty) && $Qreq->ifempty);
         else
             UserActions::send_account_info($users, $Me);
         redirectSelf();

@@ -5,7 +5,7 @@
 
 class ContactView {
     static function set_path_request($paths) {
-        global $Conf;
+        global $Conf, $Qreq;
         $path = Navigation::path();
         if ($path === "")
             return;
@@ -62,7 +62,7 @@ class ContactView {
             if ($settings && $xpos == count($x) - 1) {
                 foreach ($settings as $k => $v)
                     if (!isset($_GET[$k]) && !isset($_POST[$k]))
-                        $_GET[$k] = $_REQUEST[$k] = $v;
+                        $_GET[$k] = $_REQUEST[$k] = $Qreq[$k] = $v;
                 break;
             }
         }
@@ -224,7 +224,7 @@ class ContactView {
     }
 
     static function echo_repo_group(PsetView $info, $full = false) {
-        global $Conf, $Me, $Now;
+        global $Conf, $Me, $Now, $Qreq;
         if ($info->pset->gitless)
             return;
         list($user, $pset, $partner, $repo) =
@@ -241,8 +241,11 @@ class ContactView {
         if ($editable) {
             $xvalue = $repo_url;
             $js = ["style" => "width:32em"];
-            if ($repo_url === "" && isset($_GET["set_repo"]) && $_GET["pset"] === $pset->urlkey && isset($_POST["repo"])) {
-                $xvalue = htmlspecialchars($_POST["repo"]);
+            if ($repo_url === ""
+                && isset($Qreq->set_repo)
+                && $Qreq->pset === $pset->urlkey
+                && isset($Qreq->repo)) {
+                $xvalue = htmlspecialchars($Qreq->repo);
                 $js["class"] = "error";
             }
             $value = Ht::entry("repo", $xvalue, $js) . " " . Ht::submit("Save");
@@ -316,7 +319,7 @@ class ContactView {
     }
 
     static function echo_branch_group(PsetView $info) {
-        global $Conf, $Me, $Now;
+        global $Conf, $Me, $Now, $Qreq;
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
         $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
@@ -325,8 +328,10 @@ class ContactView {
         if ($editable) {
             $xvalue = $branch;
             $js = ["style" => "width:32em", "placeholder" => "master"];
-            if (isset($_GET["set_branch"]) && $_GET["pset"] === $pset->urlkey && isset($_POST["branch"])) {
-                $xvalue = htmlspecialchars($_POST["branch"]);
+            if (isset($Qreq->set_branch)
+                && $Qreq->pset === $pset->urlkey
+                && isset($Qreq->branch)) {
+                $xvalue = htmlspecialchars($Qreq->branch);
                 $js["class"] = "error";
             }
             $value = Ht::entry("branch", $xvalue, $js) . " " . Ht::submit("Save");
