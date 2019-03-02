@@ -8,7 +8,7 @@ require_once("src/initweb.php");
 if ($Conf->external_login())
     error_go(false, "Password reset links aren’t used for this conference. Contact your system administrator if you’ve forgotten your password.");
 
-$resetcap = req("resetcap");
+$resetcap = $Qreq->resetcap;
 if ($resetcap === null && preg_match(',\A/(U?1[-\w]+)(?:/|\z),i', Navigation::path(), $m))
     $resetcap = $m[1];
 if (!$resetcap)

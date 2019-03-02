@@ -46,8 +46,8 @@ else if ((isset($_REQUEST["signin"]) || isset($_REQUEST["signout"]))
 
 // set interesting user
 $User = null;
-if (isset($_REQUEST["u"])
-    && !($User = ContactView::prepare_user($_REQUEST["u"])))
+if (isset($Qreq->u)
+    && !($User = ContactView::prepare_user($Qreq->u)))
     redirectSelf(array("u" => null));
 if (!$Me->isPC || !$User)
     $User = $Me;
@@ -64,16 +64,17 @@ if (!$Me->is_empty()
 }
 
 if (!$Me->is_empty() && $Qreq->set_repo !== null)
-    ContactView::set_repo_action($User);
+    ContactView::set_repo_action($User, $Qreq);
 if (!$Me->is_empty() && $Qreq->set_branch !== null)
-    ContactView::set_branch_action($User);
+    ContactView::set_branch_action($User, $Qreq);
 if ($Qreq->set_partner !== null)
-    ContactView::set_partner_action($User);
+    ContactView::set_partner_action($User, $Qreq);
 
-if ((isset($_REQUEST["set_drop"]) || isset($_REQUEST["set_undrop"]))
+if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
     && $Me->isPC && $User->is_student() && $Qreq->post_ok()) {
-    Dbl::qe("update ContactInfo set dropped=? where contactId=?",
-            isset($_REQUEST["set_drop"]) ? $Now : 0, $User->contactId);
+    $Conf->qe("update ContactInfo set dropped=? where contactId=?",
+              isset($Qreq->set_drop) ? $Now : 0, $User->contactId);
+    $Conf->qe("delete from Settings where name like '__gradets.%'");
     redirectSelf();
 }
 
@@ -626,14 +627,14 @@ function psets_json_diff_from($original, $update) {
 }
 
 function save_config_overrides($psetkey, $overrides, $json = null) {
-    global $Conf, $Qreq;
+    global $Conf, $Now, $Qreq;
 
     $dbjson = $Conf->setting_json("psets_override") ? : (object) array();
     $all_overrides = (object) array();
     $all_overrides->$psetkey = $overrides;
     object_replace_recursive($dbjson, $all_overrides);
     $dbjson = psets_json_diff_from($json ? : load_psets_json(true), $dbjson);
-    $Conf->save_setting("psets_override", 1, $dbjson);
+    $Conf->save_setting("psets_override", $Now, $dbjson);
 
     unset($_GET["pset"], $_REQUEST["pset"], $Qreq->pset);
     redirectSelf(array("anchor" => $psetkey));
@@ -841,8 +842,8 @@ Sign in to tell us about your code.";
   <div class='f-e", $email_class, "'><input",
 	($passwordFocus ? "" : " id='login_d'"),
 	" type='text' class='textlite' name='email' size='36' tabindex='1' ";
-    if (isset($_REQUEST["email"]))
-	echo "value=\"", htmlspecialchars($_REQUEST["email"]), "\" ";
+    if (isset($Qreq->email))
+	echo "value=\"", htmlspecialchars($Qreq->email), "\" ";
     echo " /></div>
 </div>
 <div class='f-i fx'>

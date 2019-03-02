@@ -1,5 +1,5 @@
 <?php
-// api/api_repo.php -- Peteramati API for grading
+// api/api_grade.php -- Peteramati API for grading
 // HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
@@ -22,14 +22,8 @@ class API_Grade {
 
     static function grade(Contact $user, Qrequest $qreq, APIData $api) {
         $info = PsetView::make($api->pset, $api->user, $user);
-        $hash = null;
-        if (!$api->pset->gitless_grades) {
-            if (!$api->repo)
-                return ["ok" => false, "error" => "Missing repository."];
-            $api->commit = $api->conf->check_api_hash($api->hash, $api);
-            if (!$api->commit)
-                return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
-            $info->force_set_hash($api->commit->hash);
+        if (($err = $api->prepare_grading_commit($info))) {
+            return $err;
         }
         if (!$info->can_view_grades()) {
             return ["ok" => false, "error" => "Permission error."];

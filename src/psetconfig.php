@@ -89,6 +89,9 @@ class Pset {
     private $_all_diffs;
     private $_file_diffinfo = [];
 
+    public $config_signature;
+    public $config_mtime;
+
     const URLKEY_REGEX = '/\A[0-9A-Za-z][-0-9A-Za-z_.]*\z/';
 
     function __construct(Conf $conf, $pk, $p) {
@@ -268,6 +271,9 @@ class Pset {
             throw new PsetConfigException("`diffs` format error", "diffs");
         if (($ignore = get($p, "ignore")))
             $this->ignore = self::cstr_or_str_array($p, "ignore");
+
+        $this->config_signature = self::cstr($p, "config_signature");
+        $this->config_mtime = self::cint($p, "config_mtime");
     }
 
     static function compare(Pset $a, Pset $b) {

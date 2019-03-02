@@ -225,23 +225,28 @@ if (!$Conf->dblink)
 
 
 // Extract problem set information
-function psets_json_data($exclude_overrides) {
+function psets_json_data($exclude_overrides, &$mtime) {
     global $Conf;
     $datamap = array();
     $fnames = expand_includes($Conf->opt("psetsConfig"),
                               ["CONFID" => $Conf->opt("confid") ? : $Conf->dbname,
                                "HOSTTYPE" => $Conf->opt("hostType", "")]);
-    foreach ($fnames as $fname)
+    foreach ($fnames as $fname) {
         $datamap[$fname] = @file_get_contents($fname);
+        $mtime = max($mtime, @filemtime($fname));
+    }
     if (!$exclude_overrides
-        && ($override_data = $Conf->setting_data("psets_override")))
+        && ($override_data = $Conf->setting_data("psets_override"))) {
         $datamap["<overrides>"] = $override_data;
+        $mtime = max($mtime, $Conf->setting("psets_override"));
+    }
     return $datamap;
 }
 
 function load_psets_json($exclude_overrides) {
-    $datamap = psets_json_data($exclude_overrides);
-    if (!count($datamap))
+    $mtime = 0;
+    $datamap = psets_json_data($exclude_overrides, $mtime);
+    if (empty($datamap))
         Multiconference::fail_message("\$Opt[\"psetsConfig\"] is not set correctly.");
     $json = (object) array("_defaults" => (object) array());
     foreach ($datamap as $fname => $data) {
@@ -255,6 +260,8 @@ function load_psets_json($exclude_overrides) {
             Multiconference::fail_message("$fname: Not a JSON object.");
         object_replace_recursive($json, $x);
     }
+    $json->_defaults->config_signature = md5(json_encode(array_keys($datamap)) . $mtime);
+    $json->_defaults->config_mtime = $mtime;
     return $json;
 }
 
@@ -282,7 +289,8 @@ function load_pset_info() {
             // Want to give a good error message, so discover where the error is.
             // - create pset landmark object
             $locinfo = (object) array();
-            foreach (psets_json_data(false) as $fname => $data) {
+            $mtime = 0;
+            foreach (psets_json_data(false, $mtime) as $fname => $data) {
                 $x = Json::decode_landmarks($data, $fname);
                 object_replace_recursive($locinfo, $x);
             }

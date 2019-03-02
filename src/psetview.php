@@ -278,12 +278,12 @@ class PsetView {
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record) {
                 $result = $this->conf->qe("insert into CommitNotes set pset=?, bhash=?, notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, repoid=?",
-                                          $this->pset->psetid, hex2bin($hash),
+                                          $this->pset->id, hex2bin($hash),
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $this->repo->repoid);
             } else {
                 $result = $this->conf->qe("update CommitNotes set notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?, notesversion=? where pset=? and bhash=? and notesversion=?",
                                           $notes, $haslinenotes, $hasflags, $hasactiveflags, $record->notesversion + 1,
-                                          $this->pset->psetid, hex2bin($hash), $record->notesversion);
+                                          $this->pset->id, hex2bin($hash), $record->notesversion);
             }
             if ($result && $result->affected_rows) {
                 break;
@@ -294,7 +294,7 @@ class PsetView {
         }
 
         if (!$record) {
-            $record = (object) ["hash" => $hash, "pset" => $this->pset->psetid, "repoid" => $this->repo->repoid, "notesversion" => 0];
+            $record = (object) ["hash" => $hash, "pset" => $this->pset->id, "repoid" => $this->repo->repoid, "notesversion" => 0];
         }
         $record->notes = $new_notes;
         $record->haslinenotes = $haslinenotes;
@@ -312,6 +312,8 @@ class PsetView {
             $this->repo_grade->hasactiveflags = $record->hasactiveflags;
             $this->repo_grade->notesversion = $record->notesversion;
             $this->grade_notes = $record->notes;
+            if (isset($updates["grades"]) || isset($updates["autogrades"]))
+                $this->conf->qe("delete from Settings where name=?", "__gradets.p" . $this->pset->id);
         }
     }
 
@@ -336,12 +338,12 @@ class PsetView {
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record) {
                 $result = $this->conf->qx("insert into ContactGrade set cid=?, pset=?, notes=?, hasactiveflags=?",
-                                          $this->user->contactId, $this->pset->psetid,
+                                          $this->user->contactId, $this->pset->id,
                                           $notes, $hasactiveflags);
             } else {
                 $result = $this->conf->qe("update ContactGrade set notes=?, hasactiveflags=?, notesversion=? where cid=? and pset=? and notesversion=?",
                                           $notes, $hasactiveflags, $record->notesversion + 1,
-                                          $this->user->contactId, $this->pset->psetid, $record->notesversion);
+                                          $this->user->contactId, $this->pset->id, $record->notesversion);
             }
             if ($result && $result->affected_rows)
                 break;
@@ -351,13 +353,15 @@ class PsetView {
         }
 
         if (!$record)
-            $record = (object) ["cid" => $this->user->contactId, "pset" => $this->pset->psetid, "gradercid" => null, "hidegrade" => 0, "notesversion" => 0];
+            $record = (object) ["cid" => $this->user->contactId, "pset" => $this->pset->id, "gradercid" => null, "hidegrade" => 0, "notesversion" => 0];
         $record->notes = $new_notes;
         $record->hasactiveflags = $hasactiveflags;
         $record->notesversion = $record->notesversion + 1;
         $this->grade = $record;
         $this->grade_notes = $record->notes;
         $this->can_view_grades = $this->user_can_view_grades = null;
+        if (isset($updates["grades"]) || isset($updates["autogrades"]))
+            $this->conf->qe("delete from Settings where name=?", "__gradets.p" . $this->pset->id);
     }
 
     function update_current_info($updates, $reset_keys = false) {
@@ -443,7 +447,7 @@ class PsetView {
                     from RepositoryGrade rg
                     left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)
                     where rg.repoid=? and rg.branchid=? and rg.pset=?",
-                    $this->repo->repoid, $this->branchid, $this->pset->psetid);
+                    $this->repo->repoid, $this->branchid, $this->pset->id);
                 $this->repo_grade = $result ? $result->fetch_object() : null;
                 Dbl::free($result);
             }
@@ -499,7 +503,7 @@ class PsetView {
         if ($this->_repo_grade_placeholder_at === 0
             || $this->_repo_grade_placeholder_bhash !== $h) {
             $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, placeholder=1, placeholder_at=? on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
-                    $this->repo->repoid, $this->branchid, $this->pset->psetid,
+                    $this->repo->repoid, $this->branchid, $this->pset->id,
                     $c ? hex2bin($c->hash) : null, $Now);
             $this->clear_grade();
             $this->ensure_grade();
@@ -559,6 +563,7 @@ class PsetView {
 
     function user_can_view_grade_statistics() {
         global $Now;
+        // also see API_GradeStatistics
         $gsv = $this->pset->grade_statistics_visible;
         return $gsv === true
             || (is_int($gsv) && $gsv <= $Now)
@@ -751,19 +756,19 @@ class PsetView {
         if ($this->pset->gitless_grades)
             $q = Dbl::format_query
                 ("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=values(gradercid)",
-                 $this->user->contactId, $this->pset->psetid, $grader);
+                 $this->user->contactId, $this->pset->id, $grader);
         else {
             assert(!!$this->hash);
             if (!$this->repo_grade || $this->repo_grade->gradebhash === null)
                 $q = Dbl::format_query
                     ("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
-                     $this->repo->repoid, $this->branchid, $this->pset->psetid,
+                     $this->repo->repoid, $this->branchid, $this->pset->id,
                      $this->hash ? hex2bin($this->hash) : null, $grader);
             else
                 $q = Dbl::format_query
                     ("update RepositoryGrade set gradebhash=?, gradercid=?, placeholder=0 where repoid=? and branchid=? and pset=? and gradebhash=?",
                      $this->hash ? hex2bin($this->hash) : $this->repo_grade->gradebhash, $grader,
-                     $this->repo->repoid, $this->branchid, $this->pset->psetid, $this->repo_grade->gradebhash);
+                     $this->repo->repoid, $this->branchid, $this->pset->id, $this->repo_grade->gradebhash);
             $this->update_commit_info(array("gradercid" => $grader));
         }
         if ($q)
@@ -773,7 +778,7 @@ class PsetView {
 
     function mark_grading_commit() {
         if ($this->pset->gitless_grades)
-            $this->conf->qe("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=gradercid",
+            $this->conf->qe("insert into ContactGrade set cid=?, pset=?, gradercid=? on duplicate key update gradercid=gradercid",
                     $this->user->contactId, $this->pset->psetid,
                     $this->viewer->contactId);
         else {
@@ -784,6 +789,7 @@ class PsetView {
             $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
                     $this->repo->repoid, $this->branchid, $this->pset->psetid,
                     $this->hash ? hex2bin($this->hash) : null, $grader ? : null);
+            $this->conf->qe("delete from Settings where name=?", "__gradets.p" . $this->pset->id);
         }
         $this->clear_grade();
     }

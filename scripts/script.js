@@ -4430,9 +4430,9 @@ handle_ui.on("js-grade-statistics-flip", function () {
 
 
 function pa_gradecdf($graph) {
-    jQuery.ajax(hoturl_post("pset", hoturl_gradeparts($graph, {gradecdf:1})), {
-        type: "GET", cache: false,
-        dataType: "json",
+    var $x = $graph.closest(".pa-psetinfo"), p = $x.attr("data-pa-pset");
+    jQuery.ajax(hoturl_post("api/gradestatistics", p ? {pset: p} : {}), {
+        type: "GET", cache: true, dataType: "json",
         success: function (d) {
             if (d.cdf) {
                 $graph.data("pa-gradecdfinfo", d);

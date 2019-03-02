@@ -458,6 +458,12 @@ function updateSchema($conf) {
     if ($conf->sversion == 128
         && $conf->ql("alter table Repository drop `lastpset`"))
         $conf->update_schema_version(129);
+    if ($conf->sversion == 129
+        && $conf->ql("create table GroupSettings ( `name` varbinary(256) NOT NULL, `value` int(11) NOT NULL, `data` varbinary(32767) DEFAULT NULL, `dataOverflow` longblob, PRIMARY KEY (`name`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8"))
+        $conf->update_schema_version(130);
+    if ($conf->sversion == 130
+        && $conf->ql("delete from Settings where name like 'gradejson_%'"))
+        $conf->update_schema_version(131);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

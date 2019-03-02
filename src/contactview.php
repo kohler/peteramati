@@ -212,10 +212,11 @@ class ContactView {
         echo "\n";
     }
 
-    static function set_partner_action($user) {
+    static function set_partner_action($user, $qreq) {
         global $Conf, $Me;
-        if (!($Me->has_database_account() && check_post()
-              && ($pset = $Conf->pset_by_key(req("pset")))))
+        if (!($Me->has_database_account()
+              && $qreq->post_ok()
+              && ($pset = $Conf->pset_by_key($qreq->pset))))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return $Conf->errorMsg("You can’t edit repository information for that problem set now.");
@@ -349,16 +350,17 @@ class ContactView {
             echo "</div></form>\n";
     }
 
-    static function set_repo_action($user) {
+    static function set_repo_action($user, $qreq) {
         global $Conf, $Me, $ConfSitePATH;
-        if (!($Me->has_database_account() && check_post()
-              && ($pset = $Conf->pset_by_key(req("pset")))))
+        if (!($Me->has_database_account()
+              && $qreq->post_ok()
+              && ($pset = $Conf->pset_by_key($qreq->pset))))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return Conf::msg_error("You can’t edit repository information for that problem set now.");
 
         // clean up repo url
-        $repo_url = trim(req("repo"));
+        $repo_url = trim($qreq->repo);
         if ($pset->repo_guess_patterns)
             for ($i = 0; $i + 1 < count($pset->repo_guess_patterns); $i += 2) {
                 $x = preg_replace('`' . str_replace("`", "\\`", $pset->repo_guess_patterns[$i]) . '`s',
@@ -413,16 +415,17 @@ class ContactView {
             redirectSelf();
     }
 
-    static function set_branch_action($user) {
+    static function set_branch_action($user, $qreq) {
         global $Conf, $Me, $ConfSitePATH;
-        if (!($Me->has_database_account() && check_post()
-              && ($pset = $Conf->pset_by_key(req("pset")))
+        if (!($Me->has_database_account()
+              && $qreq->post_ok()
+              && ($pset = $Conf->pset_by_key($qreq->pset))
               && !$pset->no_branch))
             return;
         if (!$Me->can_set_repo($pset, $user))
             return Conf::msg_error("You can’t edit repository information for that problem set now.");
 
-        $branch = trim(req("branch"));
+        $branch = trim($qreq->branch);
         if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $branch))
             return Conf::msg_error("That branch contains funny characters. Remove them.");
 

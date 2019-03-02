@@ -262,23 +262,6 @@ function opt($idx, $default = null) {
     return get($Conf ? $Conf->opt : $Opt, $idx, $default);
 }
 
-function req($idx, $default = null) {
-    if (isset($_POST[$idx]))
-        return $_POST[$idx];
-    else if (isset($_GET[$idx]))
-        return $_GET[$idx];
-    else
-        return $default;
-}
-
-function req_s($idx, $default = null) {
-    return (string) req($idx, $default);
-}
-
-function set_req($idx, $value) {
-    $_GET[$idx] = $_POST[$idx] = $_REQUEST[$idx] = $value;
-}
-
 function uploaded_file_error($finfo) {
     $e = $finfo["error"];
     $name = get($finfo, "name") ? "<span class=\"lineno\">" . htmlspecialchars($finfo["name"]) . ":</span> " : "";

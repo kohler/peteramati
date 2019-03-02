@@ -16,155 +16,15 @@ if (isset($Qreq->u)
 assert($User == $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
 
-$Pset = ContactView::find_pset_redirect(req("pset"));
-
-class Series {
-    public $n;
-    public $sum;
-    public $sumsq;
-    public $series;
-    public $cdf;
-    private $calculated;
-
-    public function __construct() {
-        $this->n = $this->sum = $this->sumsq = 0;
-        $this->byg = $this->series = array();
-        $this->calculated = false;
-    }
-
-    public function add($g) {
-        $this->series[] = $g;
-        $this->n += 1;
-        $this->sum += $g;
-        $this->sumsq += $g * $g;
-        $this->calculated = false;
-    }
-
-    private function calculate() {
-        sort($this->series);
-        $this->cdf = array();
-        $last = false;
-        $subtotal = 0;
-        $cdfi = 0;
-        for ($i = 0; $i < count($this->series); ++$i) {
-            if ($this->series[$i] !== $last) {
-                $this->cdf[] = $last = $this->series[$i];
-                $this->cdf[] = $i + 1;
-                $cdfi += 2;
-            } else
-                $this->cdf[$cdfi - 1] = $i + 1;
-        }
-        $this->calculated = true;
-    }
-
-    public function summary() {
-        if (!$this->calculated)
-            $this->calculate();
-
-        $r = (object) array("n" => $this->n, "cdf" => $this->cdf);
-        if ($this->n != 0) {
-            $r->mean = $this->sum / $this->n;
-
-            $halfn = (int) ($this->n / 2);
-            if ($this->n % 2 == 0)
-                $r->median = ($this->series[$halfn-1] + $this->series[$halfn]) / 2.0;
-            else
-                $r->median = $this->series[$halfn];
-
-            if ($this->n > 1)
-                $r->stddev = sqrt(($this->sumsq - $this->sum * $this->sum / $this->n) / ($this->n - 1));
-            else
-                $r->stddev = 0;
-        }
-
-        return $r;
-    }
-
-    static public function truncate_summary_below($r, $cutoff) {
-        /*$cx = $cutoff * $r->n;
-        for ($i = 0; $i < count($r->cdf) && $r->cdf[$i+1] < $cx; $i += 2) {
-        }
-        if ($i !== 0) {
-            $r->cdf = array_slice($r->cdf, $i);
-            $r->cutoff = $cutoff;
-        }*/
-        $r->cutoff = $cutoff;
-    }
-
-}
+$Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // load user repo and current commit
 $Info = PsetView::make($Pset, $User, $Me);
-if (($commit = req("newcommit")) == null)
-    $commit = req("commit");
+if (($commit = $Qreq->newcommit) == null)
+    $commit = $Qreq->commit;
 if (!$Info->set_hash($commit) && $commit && $Info->repo) {
     $Conf->errorMsg("Commit " . htmlspecialchars($commit) . " isn’t connected to this repository.");
     redirectSelf(array("newcommit" => null, "commit" => null));
-}
-
-// get JSON grade series data
-if (isset($Qreq->gradecdf)) {
-    if (!$Me->isPC && !$Info->user_can_view_grade_statistics())
-        json_exit(["error" => "Grades are not visible now"]);
-
-    if ($Conf->setting("gradejson_pset$Pset->id", 0) < $Now - 30) {
-        if (is_int($Pset->grades_visible))
-            $notdropped = "(not c.dropped or c.dropped<$Pset->grades_visible)";
-        else
-            $notdropped = "not c.dropped";
-        $q = "select cn.notes, c.extension from ContactInfo c\n";
-        if ($Pset->gitless_grades)
-            $q .= "\t\tjoin ContactGrade cn on (cn.cid=c.contactId and cn.pset=$Pset->psetid)";
-        else
-            $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset=$Pset->id)
-		join RepositoryGrade rg on (rg.repoid=l.link and rg.pset=$Pset->id and not rg.placeholder)
-		join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)\n";
-        $result = $Conf->qe_raw($q . " where $notdropped");
-
-        $series = new Series;
-        $xseries = new Series;
-        $noextra_series = $Pset->has_extra ? new Series : null;
-        $has_extra = false;
-        while (($row = edb_row($result)))
-            if (($g = ContactView::pset_grade(json_decode($row[0]), $Pset))) {
-                $series->add($g->total);
-                if ($row[1])
-                    $xseries->add($g->total);
-                if ($noextra_series) {
-                    $noextra_series->add($g->total_noextra);
-                    if ($g->total_noextra != $g->total)
-                        $has_extra = true;
-                }
-            }
-
-        $r = $series->summary();
-        if ($xseries->n)
-            $r->extension = $xseries->summary();
-        if ($has_extra)
-            $r->noextra = $noextra_series->summary();
-
-        $pgj = $Pset->gradeinfo_json(false);
-        if ($pgj && isset($pgj->maxgrades->total)) {
-            $r->maxtotal = $pgj->maxgrades->total;
-            if (isset($r->noextra))
-                $r->noextra->maxtotal = $pgj->maxgrades->total;
-        }
-
-        $Conf->save_setting("gradejson_pset$Pset->id", $Now, json_encode_db($r));
-    }
-
-    $j = json_decode($Conf->setting_data("gradejson_pset$Pset->id"));
-    $j->ok = true;
-    if (!$Pset->separate_extension_grades || !$User->extension)
-        unset($j->extension);
-    if ($User == $Me && $Pset->grade_cdf_cutoff) {
-        Series::truncate_summary_below($j, $Pset->grade_cdf_cutoff);
-        if (get($j, "extension"))
-            Series::truncate_summary_below($j->extension, $Pset->grade_cdf_cutoff);
-        if (get($j, "noextra"))
-            Series::truncate_summary_below($j->noextra, $Pset->grade_cdf_cutoff);
-    }
-    json_exit($j);
 }
 
 // maybe set commit
@@ -193,12 +53,12 @@ if (isset($Qreq->setcommit))
     go($Info->hoturl("pset"));
 
 // maybe set partner/repo
-if (req("set_partner"))
-    ContactView::set_partner_action($User);
-if (req("set_repo"))
-    ContactView::set_repo_action($User);
-if (req("set_branch"))
-    ContactView::set_branch_action($User);
+if ($Qreq->set_partner)
+    ContactView::set_partner_action($User, $Qreq);
+if ($Qreq->set_repo)
+    ContactView::set_repo_action($User, $Qreq);
+if ($Qreq->set_branch)
+    ContactView::set_branch_action($User, $Qreq);
 
 // save grades
 function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
@@ -284,20 +144,20 @@ if (isset($Qreq->tab)
     && $Qreq->tab <= 16) {
     $tab = (int) $Qreq->tab;
     $tab = $tab == 4 ? null : $tab;
-    $Info->update_commit_info(array("tabwidth" => $tab));
+    $Info->update_commit_info(["tabwidth" => $tab]);
 } else if (isset($Qreq->tab)
            && ($Qreq->tab === "" || $Qreq->tab === "none"))
-    $Info->update_commit_info(array("tabwidth" => null));
+    $Info->update_commit_info(["tabwidth" => null]);
 if (isset($Qreq->wdiff))
-    $Info->update_commit_info(array("wdiff" => ((int) $Qreq->wdiff != 0)));
+    $Info->update_commit_info(["wdiff" => ((int) $Qreq->wdiff != 0)]);
 
 // save run settings
 if ($Me->isPC && $Me != $User && isset($Qreq->saverunsettings)
     && check_post()) {
-    $x = req("runsettings");
+    $x = $Qreq->runsettings;
     if (empty($x))
         $x = null;
-    $Info->update_commit_info(array("runsettings" => $x), true);
+    $Info->update_commit_info(["runsettings" => $x], true);
     if (isset($Qreq->ajax))
         json_exit(["ok" => true, "runsettings" => $x]);
 }
@@ -319,7 +179,7 @@ $xsep = ' <span class="barsep">&nbsp;·&nbsp;</span> ';
 function session_list_position($sl, $info) {
     $p = array_search($info->user->contactId, $sl->ids);
     if ($p !== false && isset($sl->psetids)) {
-        $reqcommit = req("commit");
+        $reqcommit = $Qreq->commit;
         $x = $p;
         while (isset($sl->ids[$x])
                && ($sl->ids[$x] !== $info->user->contactId

@@ -20,6 +20,17 @@ class APIData {
         $this->repo = $repo;
         $this->at = $Now;
     }
+    function prepare_grading_commit($info) {
+        if (!$this->pset->gitless_grades) {
+            if (!$this->repo)
+                return ["ok" => false, "error" => "Missing repository."];
+            $this->commit = $this->conf->check_api_hash($this->hash, $this);
+            if (!$this->commit)
+                return ["ok" => false, "error" => ($this->hash ? "Missing commit." : "Disconnected commit.")];
+            $info->force_set_hash($this->commit->hash);
+        }
+        return false;
+    }
 }
 
 class Conf {
@@ -28,7 +39,9 @@ class Conf {
     private $settings;
     private $settingTexts;
     public $sversion;
-    var $deadlineCache;
+    private $_gsettings = [];
+    private $_gsettings_data = [];
+    private $_gsettings_loaded = [];
 
     public $dbname;
     public $dsn = null;
@@ -115,7 +128,6 @@ class Conf {
         $this->opt_override = [];
 
         $this->_pc_seeall_cache = null;
-        $this->deadlineCache = null;
 
         $result = $this->q_raw("select name, value, data from Settings");
         while ($result && ($row = $result->fetch_row())) {
@@ -132,7 +144,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 129) {
+        if ($this->sversion < 131) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -381,6 +393,101 @@ class Conf {
             if (str_starts_with($name, "opt."))
                 $this->crosscheck_options();
         }
+        return $change;
+    }
+
+
+    function load_gsetting($name) {
+        if ($name === null || $name === "") {
+            $this->_gsettings_loaded = true;
+            $filter = function ($k) { return false; };
+            $where = "true";
+            $qv = [];
+        } else if (($dot = strpos($name, ".")) === false) {
+            if ($this->_gsettings_loaded !== true)
+                $this->_gsettings_loaded[$name] = true;
+            $filter = function ($k) use ($name) {
+                return substr($k, 0, strlen($name)) !== $name
+                    || ($k !== $name && $k[strlen($name)] !== ".");
+            };
+            $where = "name=? or (name>=? and name<=?)";
+            $qv = [$name, $name . ".", $name . "/"];
+        } else {
+            if ($this->_gsettings_loaded !== true)
+                $this->_gsettings_loaded[$name] = true;
+            $filter = function ($k) use ($name) {
+                return $k !== $name;
+            };
+            $where = "name=?";
+            $qv = [$name];
+        }
+        $this->_gsettings = array_filter($this->_gsettings, $filter, ARRAY_FILTER_USE_KEY);
+        $this->_gsettings_data = array_filter($this->_gsettings_data, $filter, ARRAY_FILTER_USE_KEY);
+        $result = $this->qe_apply("select name, value, `data`, dataOverflow from GroupSettings where $where", $qv);
+        while (($row = $result->fetch_row())) {
+            $this->_gsettings[$row[0]] = (int) $row[1];
+            $this->_gsettings_data[$row[0]] = isset($row[3]) ? $row[3] : $row[2];
+        }
+        Dbl::free($result);
+    }
+
+    function ensure_gsetting($name) {
+        if ($this->_gsettings_loaded !== true
+            && !isset($this->_gsettings_loaded[$name])
+            && (($dot = strpos($name, ".")) === false
+                || !isset($this->_gsettings_loaded[substr($name, 0, $dot)]))) {
+            $this->load_gsetting($name);
+        }
+    }
+
+    function gsetting($name, $defval = null) {
+        $this->ensure_gsetting($name);
+        return isset($this->_gsettings[$name]) ? $this->_gsettings[$name] : $defval;
+    }
+
+    function gsetting_data($name, $defval = false) {
+        $this->ensure_gsetting($name);
+        $x = get($this->_gsettings_data, $name, $defval);
+        if ($x && is_object($x) && isset($this->_gsettings_data[$name]))
+            $x = $this->_gsettings_data[$name] = json_encode_db($x);
+        return $x;
+    }
+
+    function gsetting_json($name, $defval = false) {
+        $this->ensure_gsetting($name);
+        $x = get($this->_gsettings_data, $name, $defval);
+        if ($x && is_string($x) && isset($this->_gsettings_data[$name])
+            && is_object(($x = json_decode($x))))
+            $this->_gsettings_data[$name] = $x;
+        return $x;
+    }
+
+    function save_gsetting($name, $value, $data = null) {
+        $change = false;
+        if ($value === null && $data === null) {
+            if ($this->qe("delete from GroupSettings where name=?", $name)) {
+                unset($this->_gsettings[$name], $this->_gsettings_data[$name]);
+                $change = true;
+            }
+        } else {
+            $value = (int) $value;
+            $dval = $data;
+            if (is_array($dval) || is_object($dval))
+                $dval = json_encode_db($dval);
+            if (strlen($dval) > 32700) {
+                $odval = $dval;
+                $dval = null;
+            } else {
+                $odval = null;
+            }
+            if ($this->qe("insert into GroupSettings set name=?, value=?, data=?, dataOverflow=? on duplicate key update value=values(value), data=values(data), dataOverflow=values(dataOverflow)", $name, $value, $dval, $odval)) {
+                $this->_gsettings[$name] = $value;
+                $this->_gsettings_data[$name] = isset($odval) ? $odval : $dval;
+                $change = true;
+            }
+        }
+        if ($this->_gsettings_loaded !== true)
+            $this->_gsettings_loaded[$name] = true;
         return $change;
     }
 
@@ -1710,6 +1817,7 @@ class Conf {
             "blob" => "15 API_Repo::blob",
             "filediff" => "15 API_Repo::filediff",
             "grade" => "3 API_Grade::grade",
+            "gradestatistics" => "3 API_GradeStatistics::run",
             "jserror" => "1 API_JSError::jserror",
             "latestcommit" => "3 API_Repo::latestcommit",
             "linenote" => "15 API_Grade::linenote",

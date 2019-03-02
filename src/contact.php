@@ -299,14 +299,15 @@ class Contact {
 
     // initialization
 
-    function activate() {
-        global $Now;
+    function activate($qreq = null) {
+        global $Now, $Qreq;
+        $qreq = $qreq ? : $Qreq;
         $this->activated_ = true;
         $trueuser = get($_SESSION, "trueuser");
         $truecontact = null;
 
         // Handle actas requests
-        $actas = req("actas");
+        $actas = $qreq->actas;
         if ($actas && $trueuser) {
             if (is_numeric($actas)) {
                 $acct = $this->conf->user_by_query("contactId=? or huid=? order by contactId=? desc limit 1", [$actas, $actas, $actas]);
@@ -335,29 +336,9 @@ class Contact {
         }
 
         // Handle invalidate-caches requests
-        if (req("invalidatecaches") && $this->privChair) {
-            unset($_GET["invalidatecaches"], $_POST["invalidatecaches"], $_REQUEST["invalidatecaches"]);
+        if ($qreq->invalidatecaches && $this->privChair) {
+            unset($_GET["invalidatecaches"], $_POST["invalidatecaches"], $_REQUEST["invalidatecaches"], $qreq->invalidatecaches);
             $this->conf->invalidate_caches();
-        }
-
-        // If validatorContact is set, use it
-        if ($this->contactId <= 0 && req("validator")
-            && ($vc = $this->conf->opt("validatorContact"))) {
-            unset($_GET["validator"], $_POST["validator"], $_REQUEST["validator"]);
-            if (($newc = $this->conf->user_by_email($vc))) {
-                $this->activated_ = false;
-                return $newc->activate();
-            }
-        }
-
-        // Add capabilities from session and request
-        if (!$this->conf->opt("disableCapabilities")) {
-            if (($caps = $this->conf->session("capabilities"))) {
-                $this->capabilities = $caps;
-                ++self::$rights_version;
-            }
-            if (isset($_REQUEST["cap"]) || isset($_REQUEST["testcap"]))
-                $this->activate_capabilities();
         }
 
         // Maybe set up the shared contacts database
@@ -368,7 +349,7 @@ class Contact {
         }
 
         // Check forceShow
-        self::$active_forceShow = $this->privChair && req("forceShow");
+        self::$active_forceShow = $this->privChair && $qreq->forceShow;
 
         return $this;
     }
@@ -610,7 +591,8 @@ class Contact {
     }
 
     function escape() {
-        if (req("ajax") || req("latestcommit")) {
+        global $Qreq;
+        if ($Qreq->ajax || $Qreq->latestcommit) {
             if ($this->is_empty())
                 json_exit(["ok" => false, "loggedout" => true]);
             else
@@ -622,8 +604,8 @@ class Contact {
             $x = array();
             if (Navigation::path())
                 $x["__PATH__"] = preg_replace(",^/+,", "", Navigation::path());
-            if (req("anchor"))
-                $x["anchor"] = req("anchor");
+            if ($Qreq->anchor)
+                $x["anchor"] = $Qreq->anchor;
             $url = self_href($x, array("raw" => true, "site_relative" => true));
             $_SESSION["login_bounce"] = array($this->conf->dsn, $url, Navigation::page(), $_POST);
             if (check_post())
@@ -726,6 +708,8 @@ class Contact {
             $this->repos = array();
         else if ($type == LINK_PARTNER)
             $this->partners = array();
+        if ($type === LINK_REPO || $type === LINK_BRANCH)
+            $this->conf->qe("delete from Settings where name=?", "__gradets.p$pset");
     }
 
     function clear_links($type, $pset = 0, $nolog = false) {
