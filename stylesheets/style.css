@@ -157,6 +157,9 @@ form {
 .inline {
 	display: inline;
 }
+.float-left {
+	float: left;
+}
 
 
 /* body */
@@ -2977,34 +2980,30 @@ textarea.pa-gradevalue {
 }
 
 
-.bigface61 {
-	float: left;
+.pa-face {
 	margin-right: 12px;
 	margin-bottom: 8px;
-	max-width: 160px;
-	max-height: 160px;
+	height: 160px;
 }
 .pa-smallface {
-	float: left;
 	margin-right: 12px;
 	margin-bottom: 8px;
-	max-width: 96px;
-	max-height: 96px;
+	height: 96px;
 }
-.facebook61 {
-	float: left;
-	max-width: 200px;
-	min-height: 232px;
-	padding: 0 10px 10px 0;
+.pa-facebook {
+	display: flex;
+	flex-flow: row wrap;
+	margin-right: -1rem;
+	margin-bottom: -2rem;
+}
+.pa-facebook-entry {
 	word-wrap: break-word;
+	width: 200px;
+	margin-right: 1rem;
+	margin-bottom: 2rem;
 }
-h2.infacebook61 {
+.pa-facebook-entry > h2 {
 	font-size: normal;
-	clear: both;
-	margin: 0 auto;
-}
-h3.infacebook61 {
-	font-size: smaller;
 }
 
 /* folding */

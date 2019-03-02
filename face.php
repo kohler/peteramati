@@ -10,14 +10,14 @@ if ($Me->is_empty())
 global $User, $Pset, $Info;
 
 $User = $Me;
-if (isset($_REQUEST["u"]))
-    $User = ContactView::prepare_user($_REQUEST["u"]);
+if (isset($Qreq->u))
+    $User = ContactView::prepare_user($Qreq->u);
 
-if (isset($_REQUEST["imageid"])) {
+if (isset($Qreq->imageid)) {
     if ($User
         && ($User === $Me || $Me->isPC)
-        && $_REQUEST["imageid"]
-        && ($result = Dbl::qe("select mimetype, `data` from ContactImage where contactId=? and contactImageId=?", $User->contactId, $_REQUEST["imageid"]))
+        && $Qreq->imageid
+        && ($result = Dbl::qe("select mimetype, `data` from ContactImage where contactId=? and contactImageId=?", $User->contactId, $Qreq->imageid))
         && ($row = edb_row($result))) {
         header("Content-Type: $row[0]");
         header("Cache-Control: public, max-age=31557600");
@@ -40,24 +40,27 @@ if (!$Me->isPC)
 function output($User) {
     global $Me;
     $u = $Me->user_linkpart($User);
-    echo '<div class="facebook61">',
+    echo '<div class="pa-facebook-entry">',
         '<a href="', hoturl("index", ["u" => $u]), '">',
-        '<img class="bigface61" src="' . hoturl("face", ["u" => $u, "imageid" => $User->contactImageId ? : 0]) . '" border="0" />',
+        '<img class="pa-face" src="' . hoturl("face", ["u" => $u, "imageid" => $User->contactImageId ? : 0]) . '" border="0" />',
         '</a>',
-        '<h2 class="infacebook61"><a class="q" href="', hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+        '<h2><a class="q" href="', hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
     if ($Me->privChair)
         echo "&nbsp;", become_user_link($User);
     echo '</h2>';
     if ($User !== $Me)
-        echo '<h3 class="infacebook61">', Text::user_html($User), '</h3>';
+        echo Text::name_html($User),
+            ($User->extension ? " (X)" : ""),
+            ($User->email ? " &lt;" . htmlspecialchars($User->email) . "&gt;" : "");
     echo '</div>';
 }
 
 $Conf->header("Thefacebook", "face");
 
-$result = Dbl::qe("select contactId, email, firstName, lastName, seascode_username, contactImageId from ContactInfo where roles=0");
+$result = Dbl::qe("select contactId, email, firstName, lastName, github_username, contactImageId, extension from ContactInfo where roles=0");
+echo '<div class="pa-facebook">';
 while (($user = Contact::fetch($result, $Conf)))
     output($user);
+echo '</div>';
 
-echo "<div class='clear'></div>\n";
 $Conf->footer();

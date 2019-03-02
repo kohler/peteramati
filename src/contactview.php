@@ -114,7 +114,7 @@ class ContactView {
         global $Me;
         $u = $Me->user_linkpart($user);
         if ($user !== $Me && !$user->is_anonymous && $user->contactImageId)
-            echo '<img class="pa-smallface" src="' . hoturl("face", array("u" => $u, "imageid" => $user->contactImageId)) . '" />';
+            echo '<img class="pa-smallface float-left" src="' . hoturl("face", array("u" => $u, "imageid" => $user->contactImageId)) . '" />';
 
         echo '<h2 class="homeemail"><a href="',
             hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';

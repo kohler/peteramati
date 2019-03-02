@@ -873,7 +873,7 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
     echo "<div id='homeinfo'>";
     $u = $Me->user_linkpart($User);
     if ($User !== $Me && !$User->is_anonymous && $User->contactImageId)
-        echo '<img class="bigface61" src="' . hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
+        echo '<img class="pa-face float-left" src="' . hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
     echo '<h2 class="homeemail"><a class="q" href="',
         hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
     if ($Me->privChair)
