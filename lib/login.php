@@ -164,7 +164,7 @@ class LoginHelper {
 
         // check password
         if (!$external_login) {
-            if (($password = trim((string) get($_GET, "password"))) === "") {
+            if (($password = trim((string) get($_REQUEST, "password"))) === "") {
                 $password_class = " error";
                 return Conf::msg_error("Enter your password. If you’ve forgotten it, enter your email address and use the “I forgot my password” option.");
             }
