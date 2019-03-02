@@ -25,8 +25,8 @@ class APIData {
 class Conf {
     public $dblink = null;
 
-    var $settings;
-    var $settingTexts;
+    private $settings;
+    private $settingTexts;
     public $sversion;
     var $deadlineCache;
 
@@ -104,8 +104,8 @@ class Conf {
         global $Now;
 
         // load settings from database
-        $this->settings = array();
-        $this->settingTexts = array();
+        $this->settings = [];
+        $this->settingTexts = [];
         foreach ($this->opt_override ? : [] as $k => $v) {
             if ($v === null)
                 unset($this->opt[$k]);
@@ -322,6 +322,7 @@ class Conf {
         $this->_api_map = null;
     }
 
+
     function has_setting($name) {
         return isset($this->settings[$name]);
     }
@@ -332,20 +333,57 @@ class Conf {
 
     function setting_data($name, $defval = false) {
         $x = get($this->settingTexts, $name, $defval);
-        if ($x && is_object($x))
-            $x = $this->settingTexts[$name] = json_encode($x);
+        if ($x && is_object($x) && isset($this->settingTexts[$name]))
+            $x = $this->settingTexts[$name] = json_encode_db($x);
         return $x;
     }
 
     function setting_json($name, $defval = false) {
         $x = get($this->settingTexts, $name, $defval);
-        if ($x && is_string($x)) {
-            $x = json_decode($x);
-            if (is_object($x))
-                $this->settingTexts[$name] = $x;
-        }
+        if ($x && is_string($x) && isset($this->settingTexts[$name])
+            && is_object(($x = json_decode($x))))
+            $this->settingTexts[$name] = $x;
         return $x;
     }
+
+    private function __save_setting($name, $value, $data = null) {
+        $change = false;
+        if ($value === null && $data === null) {
+            if ($this->qe("delete from Settings where name=?", $name)) {
+                unset($this->settings[$name], $this->settingTexts[$name]);
+                $change = true;
+            }
+        } else {
+            $value = (int) $value;
+            $dval = $data;
+            if (is_array($dval) || is_object($dval))
+                $dval = json_encode_db($dval);
+            if ($this->qe("insert into Settings set name=?, value=?, data=? on duplicate key update value=values(value), data=values(data)", $name, $value, $dval)) {
+                $this->settings[$name] = $value;
+                $this->settingTexts[$name] = $data;
+                $change = true;
+            }
+        }
+        if ($change && str_starts_with($name, "opt.")) {
+            $oname = substr($name, 4);
+            if ($value === null && $data === null)
+                $this->opt[$oname] = get($this->opt_override, $oname);
+            else
+                $this->opt[$oname] = $data === null ? $value : $data;
+        }
+        return $change;
+    }
+
+    function save_setting($name, $value, $data = null) {
+        $change = $this->__save_setting($name, $value, $data);
+        if ($change) {
+            $this->crosscheck_settings();
+            if (str_starts_with($name, "opt."))
+                $this->crosscheck_options();
+        }
+        return $change;
+    }
+
 
     function opt($name, $defval = null) {
         return get($this->opt, $name, $defval);
@@ -709,32 +747,6 @@ class Conf {
     }
 
 
-    function save_setting($name, $value, $data = null) {
-        $change = false;
-        if ($value === null && $data === null) {
-            if ($this->qe("delete from Settings where name=?", $name)) {
-                unset($this->settings[$name]);
-                unset($this->settingTexts[$name]);
-                $change = true;
-            }
-        } else {
-            $dval = $data;
-            if (is_array($dval) || is_object($dval))
-                $dval = json_encode($dval);
-            if ($this->qe("insert into Settings (name, value, data) values (?, ?, ?) on duplicate key update value=values(value), data=values(data)", $name, $value, $dval)) {
-                $this->settings[$name] = $value;
-                $this->settingTexts[$name] = $data;
-                $change = true;
-            }
-        }
-        if ($change) {
-            $this->crosscheck_settings();
-            if (str_starts_with($name, "opt."))
-                $this->crosscheck_options();
-        }
-        return $change;
-    }
-
     function update_schema_version($n) {
         if (!$n)
             $n = $this->fetch_ivalue("select value from Settings where name='allowPaperOption'");
@@ -1011,7 +1023,7 @@ class Conf {
 
     static public function msg_debugt($text) {
         if (is_object($text) || is_array($text) || $text === null || $text === false || $text === true)
-            $text = json_encode($text);
+            $text = json_encode_browser($text);
         self::$g->msg("merror", Ht::pre_text_wrap($text));
         return false;
     }
@@ -1204,20 +1216,20 @@ class Conf {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
 
         // Javascript settings to set before script.js
-        Ht::stash_script("siteurl=" . json_encode(Navigation::siteurl()) . ";siteurl_suffix=\"" . Navigation::php_suffix() . "\";siteurl_site=" . json_encode(Navigation::site_path()));
+        Ht::stash_script("siteurl=" . json_encode_browser(Navigation::siteurl()) . ";siteurl_suffix=\"" . Navigation::php_suffix() . "\";siteurl_site=" . json_encode_browser(Navigation::site_path()));
         if (session_id() !== "")
             Ht::stash_script("siteurl_postvalue=\"" . post_value() . "\"");
         if (($list = $this->encoded_session_list()))
-            Ht::stash_script("hotcrp_list=" . json_encode($list) . ";");
+            Ht::stash_script("hotcrp_list=" . json_encode_browser($list) . ";");
         if (($urldefaults = hoturl_defaults()))
-            Ht::stash_script("siteurl_defaults=" . json_encode($urldefaults) . ";");
-        Ht::stash_script("assetsurl=" . json_encode($this->opt["assetsUrl"]) . ";");
+            Ht::stash_script("siteurl_defaults=" . json_encode_browser($urldefaults) . ";");
+        Ht::stash_script("assetsurl=" . json_encode_browser($this->opt["assetsUrl"]) . ";");
         $huser = (object) array();
         if ($Me && $Me->email)
             $huser->email = $Me->email;
         if ($Me && $Me->is_pclike())
             $huser->is_pclike = true;
-        Ht::stash_script("hotcrp_user=" . json_encode($huser));
+        Ht::stash_script("hotcrp_user=" . json_encode_browser($huser));
 
         // script.js
         if (!$this->opt("noDefaultScript"))
@@ -1366,7 +1378,7 @@ class Conf {
         $hpcj["__order__"] = $list;
         if ($this->sort_by_last)
             $hpcj["__sort__"] = "last";
-        Ht::stash_script("hotcrp_pc=" . json_encode($hpcj) . ";");
+        Ht::stash_script("hotcrp_pc=" . json_encode_browser($hpcj) . ";");
     }
 
     function output_ajax($values = null, $div = false) {
@@ -1398,7 +1410,7 @@ class Conf {
             header("Content-Type: application/json");
         if (check_post())
             header("Access-Control-Allow-Origin: *");
-        echo json_encode($values);
+        echo json_encode_browser($values);
     }
 
 

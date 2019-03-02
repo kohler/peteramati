@@ -225,7 +225,7 @@ class Repository {
                         $value = json_decode($value, true) ? : [];
                         $value["owner." . $user->contactId] = [time(), $ownership];
                         $this->notes = $value;
-                        return json_encode($value);
+                        return json_encode_db($value);
                     },
                     "update Repository set notes=?{desired} where notes?{expected}e and repoid=?", [$this->repoid]);
         }

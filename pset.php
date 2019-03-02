@@ -14,7 +14,7 @@ if (isset($Qreq->u)
     && !($User = ContactView::prepare_user($Qreq->u)))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
-Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
+Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect(req("pset"));
 
@@ -150,7 +150,7 @@ if (isset($Qreq->gradecdf)) {
                 $r->noextra->maxtotal = $pgj->maxgrades->total;
         }
 
-        $Conf->save_setting("gradejson_pset$Pset->id", $Now, json_encode($r));
+        $Conf->save_setting("gradejson_pset$Pset->id", $Now, json_encode_db($r));
     }
 
     $j = json_decode($Conf->setting_data("gradejson_pset$Pset->id"));
@@ -365,7 +365,7 @@ if ($Me->isPC && ($sl = $Conf->session_list())
     while ($result && ($s = Contact::fetch($result)))
         $links[$p > 0 && $sl->ids[$p - 1] == $s->contactId ? 0 : 1] = $s;
     echo "<div class=\"has-hotlist\" style=\"color:gray;float:right\"",
-        " data-hotlist=\"", htmlspecialchars(json_encode($sl)), "\">",
+        " data-hotlist=\"", htmlspecialchars(json_encode_browser($sl)), "\">",
         "<h3 style=\"margin-top:0\">";
     if ($links[0])
         echo session_list_link($sl, $p - 1, true, $Me, $links[0]);
@@ -591,7 +591,7 @@ function echo_all_grades() {
         echo '<div class="pa-gradelist',
             ($User !== $Me ? " editable" : " noneditable"),
             ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
-        Ht::stash_script('pa_loadgrades.call($(".pa-psetinfo")[0], ' . json_encode($Info->grade_json()) . ')');
+        Ht::stash_script('pa_loadgrades.call($(".pa-psetinfo")[0], ' . json_encode_browser($Info->grade_json()) . ')');
         if ($Pset->has_grade_landmark)
             Ht::stash_script('$(function(){pa_loadgrades.call($(".pa-psetinfo")[0], true)})');
         echo Ht::unstash();
@@ -724,7 +724,7 @@ if ($Pset->gitless) {
                 '<div class="f-contain"><div id="runsettings61"></div></div></form>', "\n";
             // XXX always using grading commit's settings?
             if (($runsettings = $Info->commit_info("runsettings")))
-                echo '<script>runsetting61.load(', json_encode($runsettings), ')</script>';
+                echo '<script>runsetting61.load(', json_encode_browser($runsettings), ')</script>';
         }
         Ht::stash_script("jQuery('button.pa-runner').prop('disabled',false)");
     }

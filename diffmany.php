@@ -42,7 +42,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     if ($info->user_can_view_grades())
         echo '" data-pa-user-can-view-grades="yes';
     if ($info->can_view_grades() && $info->is_current_grades())
-        echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode($info->grade_json()));
+        echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json()));
     echo '">';
 
     $u = $Me->user_linkpart($user);

@@ -272,7 +272,7 @@ class PsetView {
             self::clean_notes($new_notes);
 
             // update database
-            $notes = json_encode($new_notes);
+            $notes = json_encode_db($new_notes);
             $haslinenotes = self::notes_haslinenotes($new_notes);
             $hasflags = self::notes_hasflags($new_notes);
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
@@ -332,7 +332,7 @@ class PsetView {
             self::clean_notes($new_notes);
 
             // update database
-            $notes = json_encode($new_notes);
+            $notes = json_encode_db($new_notes);
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record) {
                 $result = $this->conf->qx("insert into ContactGrade set cid=?, pset=?, notes=?, hasactiveflags=?",
@@ -1229,7 +1229,7 @@ class PsetView {
                 if ($g->landmark_file === $g->landmark_range_file) {
                     echo ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
                     if ($g->landmark_buttons)
-                        echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode($g->landmark_buttons)), '"';
+                        echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode_browser($g->landmark_buttons)), '"';
                 }
                 echo '></div></td></tr>';
                 $this->viewed_gradeentries[$g->key] = true;
@@ -1244,7 +1244,7 @@ class PsetView {
         echo '<tr class="pa-dl pa-gw'; /* NB script depends on this class exactly */
         if ((string) $note->note === "")
             echo ' hidden';
-        echo '" data-pa-note="', htmlspecialchars(json_encode($note->render_json($this->can_view_note_authors()))),
+        echo '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render_json($this->can_view_note_authors()))),
             '"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox">';
         if ((string) $note->note === "") {
             echo '</td></tr>';

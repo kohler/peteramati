@@ -969,7 +969,7 @@ function show_pset($pset, $user) {
 }
 
 if (!$Me->is_empty() && $User->is_student()) {
-    Ht::stash_script("peteramati_uservalue=" . json_encode($Me->user_linkpart($User)));
+    Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
     foreach ($Conf->psets_newest_first() as $pset)
         if ($Me->can_view_pset($pset) && !$pset->disabled)
             show_pset($pset, $User);
@@ -1106,7 +1106,7 @@ function show_regrades($result, $all) {
         $jd["can_override_anonymous"] = true;
     if ($nintotal)
         $jd["need_total"] = 1;
-    echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode($jd), ',', json_encode($jx), ')</script>';
+    echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode_browser($jd), ',', json_encode_browser($jx), ')</script>';
 }
 
 function show_pset_actions($pset) {
@@ -1322,7 +1322,7 @@ function show_pset_table($sset) {
         $jd["total_key"] = $last_in_total;
     if ($grades_visible)
         $jd["grades_visible"] = true;
-    echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode($jd), ',', json_encode($jx), ')</script>';
+    echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode_browser($jd), ',', json_encode_browser($jx), ')</script>';
 
     if ($sset->viewer->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";
@@ -1424,7 +1424,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
                 $pj["gitless_grades"] = true;
             $psetj[$pset->psetid] = $pj;
         }
-    Ht::stash_script('peteramati_psets=' . json_encode($psetj) . ';');
+    Ht::stash_script('peteramati_psets=' . json_encode_browser($psetj) . ';');
 
     $pctable = [];
     foreach ($Conf->pc_members_and_admins() as $pc) {
