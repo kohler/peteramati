@@ -952,7 +952,7 @@ class PsetView {
             }
             unset($wlist);
         }
-        unset($lines);
+        unset($linemap);
     }
 
     function transferred_warnings_for($file) {
