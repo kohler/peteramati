@@ -831,107 +831,144 @@ class PsetView {
     private function transfer_one_warning($file, $line, $text, $priority) {
         if ($file !== null && $text !== "") {
             $loc = "$file:$line";
-            if (!isset($this->transferred_warnings[$file]))
+            if (!isset($this->transferred_warnings[$file])) {
                 $this->transferred_warnings[$file] = [];
-            if (!isset($this->transferred_warnings_priority[$loc]))
+            }
+            if (!isset($this->transferred_warnings_priority[$loc])) {
                 $this->transferred_warnings_priority[$loc] = $priority - 1;
+            }
             if ($this->transferred_warnings_priority[$loc] < $priority) {
-                $this->transferred_warnings[$file][$line] = "";
+                $this->transferred_warnings[$file][$line] = [];
                 $this->transferred_warnings_priority[$loc] = $priority;
             }
-            if ($this->transferred_warnings_priority[$loc] == $priority)
-                $this->transferred_warnings[$file][$line] .= $text;
+            if ($this->transferred_warnings_priority[$loc] == $priority) {
+                $this->transferred_warnings[$file][$line][] .= $text;
+            }
         }
+    }
+
+    private function transfer_warning_lines($lines, $prio) {
+        $file = $line = null;
+        $expect_context = false;
+        $in_instantiation = 0;
+        $text = "";
+        $nlines = count($lines);
+        for ($i = 0; $i !== $nlines; ++$i) {
+            $s = $lines[$i];
+            $sda = preg_replace('/\x1b\[[\d;]*m|\x1b\[\d*K/', '', $s);
+            if (preg_match('/\A([^\s:]*):(\d+):(?:\d+:)?\s*(\S*)/', $sda, $m)) {
+                $this_instantiation = strpos($sda, "required from") !== false;
+                if ($file && $m[3] === "note:") {
+                    if (strpos($sda, "in expansion of macro") !== false) {
+                        $file = $m[1];
+                        $line = $m[2];
+                    }
+                } else {
+                    if (!$in_instantiation) {
+                        $this->transfer_one_warning($file, $line, $text, $prio);
+                        $text = "";
+                    }
+                    if ($in_instantiation !== 2 || $this_instantiation) {
+                        $file = $m[1];
+                        $line = $m[2];
+                    }
+                }
+                $text .= $s . "\n";
+                $expect_context = true;
+                if ($in_instantiation !== 0 && $this_instantiation) {
+                    $in_instantiation = 2;
+                } else {
+                    $in_instantiation = 0;
+                }
+            } else if (preg_match('/\A(?:\S|\s+[A-Z]+\s)/', $sda)) {
+                if (str_starts_with($sda, "In file included")) {
+                    $text .= $s . "\n";
+                    while ($i + 1 < $nlines && str_starts_with($lines[$i + 1], " ")) {
+                        ++$i;
+                        $text .= $lines[$i] . "\n";
+                    }
+                    $in_instantiation = 1;
+                } else if (strpos($sda, "In instantiation of")) {
+                    if (!$in_instantiation) {
+                        $this->transfer_one_warning($file, $line, $text, $prio);
+                        $file = $line = null;
+                        $text = "";
+                    }
+                    $text .= $s . "\n";
+                    $in_instantiation = 1;
+                } else if ($expect_context
+                           && $i + 1 < $nlines
+                           && strpos($lines[$i + 1], "^") !== false) {
+                    $text .= $s . "\n" . $lines[$i + 1] . "\n";
+                    ++$i;
+                    $in_instantiation = 0;
+                } else {
+                    $this->transfer_one_warning($file, $line, $text, $prio);
+                    $file = $line = null;
+                    $text = "";
+                    $in_instantiation = 0;
+                }
+                $expect_context = false;
+            } else if ($file !== null) {
+                $text .= $s . "\n";
+                $expect_context = false;
+            }
+        }
+        $this->transfer_one_warning($file, $line, $text, $prio);
     }
 
     private function transfer_warnings() {
         $this->transferred_warnings = [];
+
+        // collect warnings from runner output
         foreach ($this->pset->runners as $runner) {
             if ($runner->transfer_warnings
                 && $this->viewer->can_view_transferred_warnings($this->pset, $runner, $this->user)
                 && ($output = $this->runner_output_for($runner))) {
-                $prio = $runner->transfer_warnings_priority ? : 0;
-                $file = $line = null;
-                $expect_context = false;
-                $in_instantiation = 0;
-                $text = "";
-                $lines = explode("\n", $output);
-                $nlines = count($lines);
-                for ($i = 0; $i < $nlines; ++$i) {
-                    $s = $lines[$i];
-                    $sda = preg_replace('/\x1b\[[\d;]*m|\x1b\[\d*K/', '', $s);
-                    if (preg_match('/\A([^\s:]*):(\d+):(?:\d+:)?\s*(\S*)/', $sda, $m)) {
-		        $this_instantiation = strpos($sda, "required from") !== false;
-                        if ($file && $m[3] === "note:") {
-                            if (strpos($sda, "in expansion of macro") !== false) {
-                                $file = $m[1];
-                                $line = $m[2];
-                            }
-                        } else {
-			    if (!$in_instantiation) {
-                                $this->transfer_one_warning($file, $line, $text, $prio);
-                                $text = "";
-			    }
-			    if ($in_instantiation !== 2 || $this_instantiation) {
-                                $file = $m[1];
-                                $line = $m[2];
-			    }
-                        }
-                        $text .= $s . "\n";
-                        $expect_context = true;
-			if ($in_instantiation !== 0 && $this_instantiation)
-			    $in_instantiation = 2;
-			else
-			    $in_instantiation = 0;
-                    } else if (preg_match('/\A(?:\S|\s+[A-Z]+\s)/', $sda)) {
-                        if (str_starts_with($sda, "In file included")) {
-			    $text .= $s . "\n";
-			    while ($i + 1 < $nlines && str_starts_with($lines[$i + 1], " ")) {
-			        ++$i;
-				$text .= $lines[$i] . "\n";
-		            }
-			    $in_instantiation = 1;
-			} else if (strpos($sda, "In instantiation of")) {
-			    if (!$in_instantiation) {
-			        $this->transfer_one_warning($file, $line, $text, $prio);
-				$file = $line = null;
-				$text = "";
-			    }
-			    $text .= $s . "\n";
-			    $in_instantiation = 1;
-                        } else if ($expect_context
-                                   && $i + 1 < $nlines
-                                   && strpos($lines[$i + 1], "^") !== false) {
-                            $text .= $s . "\n" . $lines[$i + 1] . "\n";
-                            ++$i;
-			    $in_instantiation = 0;
-                        } else {
-                            $this->transfer_one_warning($file, $line, $text, $prio);
-                            $file = $line = null;
-                            $text = "";
-			    $in_instantiation = 0;
-                        }
-                        $expect_context = false;
-                    } else if ($file !== null) {
-                        $text .= $s . "\n";
-                        $expect_context = false;
-                    }
-                }
-                $this->transfer_one_warning($file, $line, $text, $prio);
+                $this->transfer_warning_lines(explode("\n", $output), $runner->transfer_warnings_priority ? : 0);
             }
         }
+
+        // squeeze out redundant warnings
+        foreach ($this->transferred_warnings as $file => &$linemap) {
+            foreach ($linemap as $line => &$wlist) {
+                $wmap = [];
+                $wtext = "";
+                $nw = count($wlist);
+                for ($i = 0; $i !== $nw; ++$i) {
+                    $w = $wlist[$i];
+                    if ($w[0] !== " " && isset($wmap[$w])) {
+                        $j = $wmap[$w];
+                        while ($i + 1 !== $nw && $wlist[$i + 1] === $wlist[$j + 1]) {
+                            ++$i;
+                            ++$j;
+                        }
+                    } else {
+                        $wmap[$w] = $i;
+                        $wtext .= $w;
+                    }
+                }
+                $wlist = $wtext;
+            }
+            unset($wlist);
+        }
+        unset($lines);
     }
 
     function transferred_warnings_for($file) {
-        if ($this->transferred_warnings === null)
+        if ($this->transferred_warnings === null) {
             $this->transfer_warnings();
-        if (isset($this->transferred_warnings[$file]))
+        }
+        if (isset($this->transferred_warnings[$file])) {
             return $this->transferred_warnings[$file];
+        }
         $slash = strrpos($file, "/");
         if ($slash !== false
-            && isset($this->transferred_warnings[substr($file, $slash + 1)]))
+            && isset($this->transferred_warnings[substr($file, $slash + 1)])) {
             return $this->transferred_warnings[substr($file, $slash + 1)];
-        return [];
+        } else {
+            return [];
+        }
     }
 
 
