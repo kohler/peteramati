@@ -177,6 +177,7 @@ $xsep = ' <span class="barsep">&nbsp;·&nbsp;</span> ';
 // Top: user info
 
 function session_list_position($sl, $info) {
+    global $Qreq;
     $p = array_search($info->user->contactId, $sl->ids);
     if ($p !== false && isset($sl->psetids)) {
         $reqcommit = $Qreq->commit;
