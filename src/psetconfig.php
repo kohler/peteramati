@@ -780,9 +780,9 @@ class GradeEntryConfig {
             $v = trim($v);
             if ($v === "") {
                 return null;
-            } else if (preg_match('_\A\+?\d+\z_', $v)) {
+            } else if (preg_match('_\A[-+]?\d+\z_', $v)) {
                 return intval($v);
-            } else if (preg_match('_\A\+?(?:\d+\.|\.\d)\d*\z_', $v)) {
+            } else if (preg_match('_\A[-+]?(?:\d+\.|\.\d)\d*\z_', $v)) {
                 return floatval($v);
             }
         }

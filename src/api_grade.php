@@ -37,25 +37,13 @@ class API_Grade {
                 return ["ok" => false, "error" => "Permission error."];
             }
 
-            // parse full grades
+            // parse grade elements
+            $qreq->allow_a("grades", "autogrades", "oldgrades");
             $g = self::parse_full_grades($qreq->grades);
             $ag = self::parse_full_grades($qreq->autogrades);
             $og = self::parse_full_grades($qreq->oldgrades);
             if ($g === false || $ag === false || $og === false) {
                 return ["ok" => false, "error" => "Invalid request."];
-            }
-
-            // add grade elements
-            foreach ($qreq as $k => $v) {
-                if (preg_match('_\A(auto|old|)grades\[(.*)\]\z_', $k, $m)) {
-                    if ($m[1] === "") {
-                        $g[$m[2]] = $v;
-                    } else if ($m[1] === "auto") {
-                        $ag[$m[2]] = $v;
-                    } else {
-                        $og[$m[2]] = $v;
-                    }
-                }
             }
 
             // check grade entries
