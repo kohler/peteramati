@@ -3841,7 +3841,6 @@ function save() {
         if (k != "")
             j[k] = v;
     }
-    console.log(j);
     $.ajax($j.closest("form").attr("action"), {
         data: {runsettings: j},
         type: "POST", cache: false,
