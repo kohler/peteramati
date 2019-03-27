@@ -154,7 +154,7 @@ if (isset($Qreq->wdiff))
 // save run settings
 if ($Me->isPC && $Me != $User && isset($Qreq->saverunsettings)
     && check_post()) {
-    $x = $Qreq->runsettings;
+    $x = $Qreq->get_a("runsettings");
     if (empty($x))
         $x = null;
     $Info->update_commit_info(["runsettings" => $x], true);
