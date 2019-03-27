@@ -141,18 +141,17 @@ class ContactView {
         echo '<hr class="c" />';
     }
 
-    static function echo_group($key, $value, $notes = null, $extra = null) {
-        echo "<table class=\"pa-grp\"><tr><td class=\"pa-grp-title\">", $key, "</td><td";
-        if ($extra && isset($extra["nowrap"]) && $extra["nowrap"])
-            echo " class=\"nw\"";
-        echo ">", $value, "</td></tr><tr><td colspan=\"2\"><div class=\"cs61infgroup\">";
-        if ($notes)
-            foreach ($notes as $v) {
-                $v = is_array($v) ? $v : array(false, $v);
-                echo "<div class=\"", ($v[0] ? "pa-inf-error" : "pa-inf"),
-                    "\">", $v[1], "</div>";
-            }
-        echo "</div></td></tr></table>\n";
+    static function echo_group($key, $value, $notes = null) {
+        echo "<div class=\"pa-p\"><div class=\"pa-pt\">", $key, "</div><div class=\"pa-pd\">";
+        if ($notes && $value && !str_starts_with($value, '<div'))
+            $value = "<div>" . $value . "</div>";
+        echo $value;
+        foreach ($notes ? : [] as $v) {
+            $v = is_array($v) ? $v : array(false, $v);
+            echo "<div class=\"", ($v[0] ? "pa-inf-error" : "pa-inf"),
+                "\">", $v[1], "</div>";
+        }
+        echo "</div></div>\n";
     }
 
     static function echo_partner_group(PsetView $info) {

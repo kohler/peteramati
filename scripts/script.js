@@ -2438,25 +2438,25 @@ jQuery.fn.extend({
 function pa_makegrade(gi, k, editable) {
     var ge = gi.entries[k],
         g = gi.grades ? gi.grades[ge.pos] : null,
+        t,
         name = escape_entities(k),
-        title = ge.title ? escape_entities(ge.title) : name,
-        t = '<div class="pa-grade pa-grp" data-pa-grade="' + name + '">';
+        title = ge.title ? escape_entities(ge.title) : name;
     if (editable) {
         var id = "pa-ge" + ++pa_makegrade.id_counter;
-        t += '<form class="ui-submit pa-gradevalue-form">'
-            + '<label class="pa-grp-title" for="' + id + '">' + title + '</label>';
+        t = '<form class="ui-submit pa-grade pa-p pa-gradevalue-form" data-pa-grade="' +
+            name + '"><label class="pa-pt" for="' + id + '">' + title + '</label>';
         if (ge.type === "text") {
-            t += '<textarea class="uich pa-gradevalue" name="' + name +
+            t += '<textarea class="uich pa-pd pa-gradevalue" name="' + name +
                 '" id="' + id + '"></textarea>';
         } else if (ge.type === "checkbox"
                    && (g == null || g === 0 || g === ge.max)) {
-            t += '<div class="pa-gradeentry"><span class="pa-gradewidth">' +
+            t += '<div class="pa-gradeentry pa-pd"><span class="pa-gradewidth">' +
                 '<input type="checkbox" class="ui pa-gradevalue" name="' + name +
                 '" id="' + id + '" value="' + ge.max + '" /></span>' +
                 ' <span class="pa-grademax">of ' + ge.max +
                 ' <a href="" class="x ui pa-grade-uncheckbox">#</a></span></div>';
         } else {
-            t += '<div class="pa-gradeentry"><span class="pa-gradewidth">' +
+            t += '<div class="pa-gradeentry pa-pd"><span class="pa-gradewidth">' +
                 '<input type="text" class="uich pa-gradevalue" name="' + name +
                 '" id="' + id + '" /></span>';
             if (ge.max)
@@ -2465,15 +2465,19 @@ function pa_makegrade(gi, k, editable) {
         }
         t += '</form>';
     } else {
-        t += '<div class="pa-grp-title">' + title + '</div>';
+        t = '<div class="pa-grade pa-p" data-pa-grade="' + name + '">' +
+            '<div class="pa-pt">' + title + '</div>';
         if (ge.type === "text")
-            t += '<div class="pa-gradevalue"></div>';
-        else
-            t += '<span class="pa-gradevalue pa-gradewidth"></span>';
-        if (ge.max)
-            t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
+            t += '<div class="pa-pd pa-gradevalue"></div>';
+        else {
+            t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
+            if (ge.max)
+                t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
+            t += '</div>';
+        }
+        t += '</div>';
     }
-    return t + '</div>';
+    return t;
 }
 pa_makegrade.id_counter = 0;
 
@@ -2501,7 +2505,7 @@ function pa_setgrade(gi, editable) {
         if (!g || g <= ge.max)
             $g.find(".pa-gradeabovemax").remove();
         else if (!$g.find(".pa-gradeabovemax").length)
-            $g.find(".pa-gradeentry").after('<div class="pa-gradeabovemax">Grade is above max</div>');
+            $g.find(".pa-pd").append('<div class="pa-gradeabovemax">Grade is above max</div>');
     }
 
     // “autograde differs” message
@@ -2714,9 +2718,9 @@ function pa_loadgrades(gi) {
     var tm = pa_gradeinfo_total(gi);
     $g = $pi.find(".pa-total");
     if (tm[0] && !$g.length) {
-        $g = $('<div class="pa-total pa-grp"><div class="pa-grp-title">total</div>' +
-            '<span class="pa-gradevalue pa-gradewidth"></span> ' +
-            '<span class="pa-grademax">of ' + tm[1] + '</span></div>');
+        $g = $('<div class="pa-total pa-p"><div class="pa-pt">total</div>' +
+            '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span> ' +
+            '<span class="pa-grademax">of ' + tm[1] + '</span></div></div>');
         $g.prependTo($pi.find(".pa-gradelist"));
     }
     $v = $g.find(".pa-gradevalue");
@@ -3826,16 +3830,18 @@ function runmany61() {
     setTimeout(runmany61, 10);
 }
 
-var runsetting61 = (function ($) {
+
+var pa_runsetting = (function ($) {
 
 function save() {
-    var $j = $("#runsettings61 .pa-grp"), j = {}, i, k, v;
+    var $j = $("#pa-runsettings .pa-p"), j = {}, i, k, v;
     for (i = 0; i != $j.length; ++i) {
         k = $.trim($($j[i]).find(".n").val());
         v = $.trim($($j[i]).find(".v").val());
         if (k != "")
             j[k] = v;
     }
+    console.log(j);
     $.ajax($j.closest("form").attr("action"), {
         data: {runsettings: j},
         type: "POST", cache: false,
@@ -3844,22 +3850,23 @@ function save() {
 }
 
 function add(name, value) {
-    var $j = $("#runsettings61"), num = $j.find(".n").length;
-    while ($j.find("[runsetting61num=" + num + "]").length)
+    var $j = $("#pa-runsettings"), num = $j.find(".n").length;
+    while ($j.find("[data-runsetting-num=" + num + "]").length)
         ++num;
-    var $x = $("<table class=\"pa-grp\" runsetting61num=\"" + num + "\"><tr><td class=\"pa-grp-title\"></td><td><input name=\"n" + num + "\" class=\"n\" size=\"30\" placeholder=\"Name\" /> &nbsp; <input name=\"v" + num + "\" class=\"v\" size=\"40\" placeholder=\"Value\" /></td></tr></table>");
+    var $x = $("<div class=\"pa-p\" data-runsetting-num=\"" + num + "\"><div class=\"pa-pt\"></div><div class=\"pa-pd\"><input name=\"n" + num + "\" class=\"n\" size=\"30\" placeholder=\"Name\"> &nbsp; <input name=\"v" + num + "\" class=\"v\" size=\"40\" placeholder=\"Value\"></div></div>");
     if (name) {
         $x.find(".n").val(name);
         $x.find(".v").val(value);
-    } else
-        $x.find(".n").focus();
+    }
     $x.find("input").on("change", save);
     $j.append($x);
+    if (!name)
+        $x.find(".n").focus();
 }
 
 function load(j) {
-    var $j = $("#runsettings61"), $n = $j.find(".n"), i, x;
-    $n.attr("outstanding61", "1");
+    var $j = $("#pa-runsettings"), $n = $j.find(".n"), i, x;
+    $n.attr("data-outstanding", "1");
     for (x in j) {
         for (i = 0; i != $n.length && $.trim($($n[0]).val()) != x; ++i)
             /* nada */;
@@ -3867,12 +3874,12 @@ function load(j) {
             add(x, j[x]);
         else if ($.trim($j.find("[name=v" + i + "]").val()) != j[x]) {
             $j.find("[name=v" + i + "]").val(j[x]);
-            $($n[i]).removeAttr("outstanding61");
+            $($n[i]).removeAttr("data-outstanding");
         }
     }
     for (i = 0; i != $n.length; ++i)
-        if ($($n[i]).attr("outstanding61"))
-            $("[runsetting61num=" + $($n[i]).attr("name").substr(1) + "]").remove();
+        if ($($n[i]).attr("data-outstanding"))
+            $("[data-runsetting-num=" + $($n[i]).attr("name").substr(1) + "]").remove();
 }
 
 return {add: add, load: load};

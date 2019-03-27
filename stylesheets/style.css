@@ -145,11 +145,6 @@ span.nb {
 	content: "";
 	display: block;
 }
-div.pa-grp:after {
-	clear: left;
-	content: "";
-	display: block;
-}
 form {
 	margin-bottom: 0;
 	display: inline;
@@ -2329,14 +2324,33 @@ td.mhcb {
 }
 
 
-/* cs61 */
-.pa-grp {
+/* peteramati */
+.pa-p {
 	margin-bottom: 0.5rem;
+	position: relative;
+	display: flex;
+	align-items: baseline;
+	align-content: space-between;
+	justify-content: flex-end;
+	flex-wrap: wrap;
 }
+.pa-pt {
+	min-width: 162px;
+	padding-right: 6px;
+	padding-bottom: 2px;
+	flex-grow: 1;
+	font-weight: bold;
+}
+.pa-pd {
+	width: calc(100% - 168px);
+}
+
 .pa-gradelist {
 	margin: 1.5rem 0;
 }
-.pa-gradelist.noneditable > .pa-grp {
+.pa-gradelist.noneditable > .pa-p,
+.pa-gradelist.pa-pset-hidden > .pa-p:last-child,
+.pa-grp-hidden > .pa-p {
 	margin-bottom: 0;
 }
 .pa-grp-hidden, .pa-pset-hidden {
@@ -2349,35 +2363,8 @@ td.mhcb {
 	padding-bottom: 0.5rem;
 	margin-bottom: 0.5rem;
 }
-.pa-gradelist.pa-pset-hidden > .pa-grp:last-child {
-	margin-bottom: 0;
-}
 .pa-pset-hidden > .pa-grp-hidden {
 	padding: 0 24px;
-}
-.pa-grp-hidden > .pa-grp {
-	margin-bottom: 0;
-}
-.pa-grp-title {
-	font-weight: bold;
-	width: 162px;
-	padding-right: 6px;
-}
-div.pa-grp {
-	margin-left: 168px;
-}
-div.pa-grp-title, label.pa-grp-title {
-	float: left;
-	margin-left: -168px;
-	width: 162px;
-	padding-right: 0;
-}
-div.pa-grp .pa-grp-title:before {
-	content: "";
-	line-height: 1.8;
-}
-.cs61infgroup {
-	padding-left: 168px;
 }
 .pa-inf:first-child, .pa-inf-error:first-child, .pa-gradeabovemax {
 	padding-top: 4px;
@@ -2395,9 +2382,6 @@ div.pa-grp .pa-grp-title:before {
 .pa-inf-alert {
 	color: white;
 	background: red;
-}
-#runsettings61 input {
-	font-size: 10px;
 }
 .pap-username {
 	font-weight: bold;
@@ -2639,15 +2623,9 @@ span.foldarrow {
 	background-size: 100% 7px, 100% 5px, 100% 100%;
 	padding: 0.8rem 168px 0.8rem 0.8rem;
 }
-.pa-gradebox > .pa-grp {
+.pa-gradebox > .pa-p {
 	margin-bottom: 0;
 	margin-left: 0;
-}
-.pa-gradebox label.pa-grp-title {
-	width: auto;
-	max-width: 168px;
-	margin-left: 0;
-	padding-right: 2em;
 }
 .pa-gradebox .pa-gradeentry {
 	white-space: nowrap;

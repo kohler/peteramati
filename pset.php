@@ -461,20 +461,17 @@ function echo_all_grades() {
     $lhd = $Info->late_hours_data();
     if ($lhd && $User === $Me && $Info->can_view_grades()) {
         if ((isset($lhd->hours) && $lhd->hours > 0) || $has_grades) {
-            echo '<div>';
-            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>',
-                                    array(), array("nowrap" => true));
-            echo '</div>';
+            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>');
         }
     } else if ($User !== $Me && $Info->pset->late_hours_entry()) {
-        echo '<div class="pa-grade pa-grp" data-pa-grade="late_hours">',
-            '<label class="pa-grp-title" for="pa-lh">late hours</label>',
-            '<form class="ui-submit pa-gradevalue-form"><div class="pa-gradeentry">',
+        echo '<form class="ui-submit pa-gradevalue-form pa-grade pa-p" data-pa-grade="late_hours">',
+            '<label class="pa-pt" for="pa-lh">late hours</label>',
+            '<div class="pa-pd pa-gradeentry">',
             Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
                       ["class" => "uich pa-gradevalue"]);
         if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours)
             echo '<span class="pa-gradediffers">auto-late hours is ', htmlspecialchars($lhd->autohours), '</span>';
-        echo '</div></form></div>';
+        echo '</div></form>';
     }
 }
 
@@ -550,7 +547,7 @@ if ($Pset->gitless) {
                          array("class" => "btn pa-runner",
                                "style" => "font-weight:bold",
                                "name" => "define",
-                               "onclick" => "runsetting61.add()"));
+                               "onclick" => "pa_runsetting.add()"));
     if ((($Me->isPC && $Me != $User) || $Me == $User)
         && !$Info->is_handout_commit()) {
         $runnerbuttons[] = '<div class="g"></div>';
@@ -582,10 +579,10 @@ if ($Pset->gitless) {
         echo "</div></form>\n";
         if ($Me->isPC && $Me != $User) {
             echo Ht::form($Info->hoturl_post("pset", array("saverunsettings" => 1, "ajax" => 1))),
-                '<div class="f-contain"><div id="runsettings61"></div></div></form>', "\n";
+                '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
             // XXX always using grading commit's settings?
             if (($runsettings = $Info->commit_info("runsettings")))
-                echo '<script>runsetting61.load(', json_encode_browser($runsettings), ')</script>';
+                echo '<script>pa_runsetting.load(', json_encode_browser($runsettings), ')</script>';
         }
         Ht::stash_script("jQuery('button.pa-runner').prop('disabled',false)");
     }
