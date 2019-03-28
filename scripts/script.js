@@ -2522,26 +2522,25 @@ function pa_setgrade(gi, editable) {
         }
     }
 
-    // maybe uncheckbox
-    var $v = $g.find(".pa-gradevalue");
-    if ($v[0].type === "checkbox"
-        && g != null
-        && g !== 0
-        && g !== ge.max)
-        pa_grade_uncheckbox.call($v[0]);
-
     // actual grade value
+    var $v = $g.find(".pa-gradevalue");
     var gt = g == null ? "" : "" + g;
-    if (editable && $v[0].type === "checkbox") {
-        $v.prop("checked", !!g);
-    } else if (editable && $v.val() !== gt && !$v.is(":focus")) {
-        $v.val(gt);
-    } else if (!editable && $v.text() !== gt) {
-        $v.text(gt);
+    if (!editable) {
+        if ($v.text() !== gt)
+            $v.text(gt);
+        toggleClass(this, "hidden", gt === "" && !ge.max);
+    } else {
+        if ($v[0].type === "checkbox"
+            && g != null
+            && g !== 0
+            && g !== ge.max)
+            pa_grade_uncheckbox.call($v[0]);
+        if ($v[0].type === "checkbox") {
+            $v.prop("checked", !!g);
+        } else if ($v.val() !== gt && !$v.is(":focus")) {
+            $v.val(gt);
+        }
     }
-
-    if (!editable)
-        toggleClass(this, "hidden", $v.text() === "" && !ge.max);
 
     // maybe add landmark reference
     if (ge.landmark
