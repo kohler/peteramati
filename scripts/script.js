@@ -3895,8 +3895,26 @@ function pa_gradeinfo_total(gi, noextra) {
 }
 
 
+function pa_cdf(d) {
+    if (!d.cdf && d.xcdf) {
+        var xcdf = d.xcdf, cdf = [], i = 0, y = 0;
+        while (i < xcdf.length) {
+            y += xcdf[i+1].length;
+            cdf.push(xcdf[i], y);
+            i += 2;
+        }
+        d.cdf = cdf;
+    }
+    return d.cdf;
+}
+
+function pa_cdfmax(d) {
+    var cdf = d.cdf || d.xcdf;
+    return cdf[cdf.length - 2];
+}
+
 function pa_gradecdf_series(d, xax, yax) {
-    var cdf = d.cdf, data = [], totalx = null, nr = 1 / d.n,
+    var cdf = pa_cdf(d), data = [], totalx = null, nr = 1 / d.n,
         cutoff = d.cutoff || 0, i = 0, x;
     if (cutoff) {
         while (i < cdf.length && cdf[i+1] < cutoff * d.n) {
@@ -3932,7 +3950,7 @@ function path_y_at_x(x) {
 }
 
 function pa_gradecdf_findy(d, x) {
-    var cdf = d.cdf, l = 0, r = cdf.length;
+    var cdf = pa_cdf(d), l = 0, r = cdf.length;
     while (l < r) {
         var m = l + ((r - l) >> 2) * 2;
         if (cdf[m] >= x)
@@ -3957,14 +3975,14 @@ function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
     for (i = 0; i !== nbins + 1; ++i) {
         bins.push(0);
     }
-    var cdf = d.cdf, dx = maxg / nbins, idx = 1 / dx;
+    var cdf = pa_cdf(d), dx = maxg / nbins, idx = 1 / dx;
     for (i = 0; i < cdf.length; i += 2) {
-        var y = cdf[i+1] - (i === 0 ? 0 : d.cdf[i-1]);
-        var x1 = Math.floor((d.cdf[i] - H) * idx);
-        var x2 = Math.ceil((d.cdf[i] + H) * idx);
+        var y = cdf[i+1] - (i === 0 ? 0 : cdf[i-1]);
+        var x1 = Math.floor((cdf[i] - H) * idx);
+        var x2 = Math.ceil((cdf[i] + H) * idx);
         while (x1 < x2) {
             var x = Math.max(0, Math.min(nbins, x1));
-            bins[x] += epanechnikov(x1 * dx - d.cdf[i]) * y;
+            bins[x] += epanechnikov(x1 * dx - cdf[i]) * y;
             ++x1;
         }
     }
@@ -4258,11 +4276,11 @@ function pa_draw_gradecdf($graph) {
     // maxes
     var datamax = 0;
     if (want_noextra)
-        datamax = Math.max(datamax, d.noextra.cdf[d.noextra.cdf.length - 2]);
+        datamax = Math.max(datamax, pa_cdfmax(d.noextra));
     if (want_extension)
-        datamax = Math.max(datamax, d.extension.cdf[d.extension.cdf.length - 2]);
+        datamax = Math.max(datamax, pa_cdfmax(d.extension));
     if (want_all || (!want_noextra && !want_extension))
-        datamax = Math.max(datamax, d.all.cdf[d.all.cdf.length - 2]);
+        datamax = Math.max(datamax, pa_cdfmax(d.all));
     var max = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
 
     $graph.removeClass("hidden");

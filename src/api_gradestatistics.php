@@ -28,7 +28,7 @@ class Series {
 
     function calculate() {
         if (!$this->calculated) {
-            sort($this->series);
+            asort($this->series);
             $this->cdf = array();
             $this->median = false;
             $lastg = false;
@@ -55,9 +55,24 @@ class Series {
         }
     }
 
-    function summary() {
+    function summary($pcview = false) {
         $this->calculate();
-        $r = (object) array("n" => $this->n, "cdf" => $this->cdf);
+        $r = (object) ["n" => $this->n];
+        if ($pcview) {
+            $xcdf = [];
+            $lastg = false;
+            $cdfi = 0;
+            foreach ($this->series as $cid => $g) {
+                if ($g !== $lastg) {
+                    $xcdf[] = $lastg = $g;
+                    $xcdf[] = [];
+                    $cdfi += 2;
+                }
+                $xcdf[$cdfi - 1][] = $cid;
+            }
+            $r->xcdf = $xcdf;
+        } else
+            $r->cdf = $this->cdf;
         if ($this->n != 0) {
             $r->mean = $this->mean();
             $r->median = $this->median;
@@ -95,9 +110,7 @@ class Series {
 }
 
 class API_GradeStatistics {
-    static function compute(Pset $pset) {
-        global $Now;
-
+    static function compute(Pset $pset, $pcview) {
         $series = new Series;
         $xseries = $noextra_series = $xnoextra_series = null;
         if ($pset->has_extra)
@@ -140,13 +153,13 @@ class API_GradeStatistics {
         }
         Dbl::free($result);
 
-        $r = (object) ["all" => $series->summary()];
+        $r = (object) ["all" => $series->summary($pcview)];
         if ($xseries && $xseries->n)
-            $r->extension = $xseries->summary();
+            $r->extension = $xseries->summary($pcview);
         if ($has_extra)
-            $r->noextra = $noextra_series->summary();
+            $r->noextra = $noextra_series->summary($pcview);
         if ($has_xextra)
-            $r->extension_noextra = $xnoextra_series->summary();
+            $r->extension_noextra = $xnoextra_series->summary($pcview);
 
         $pgj = $pset->gradeinfo_json(false);
         if ($pgj && isset($pgj->maxgrades->total)) {
@@ -159,8 +172,6 @@ class API_GradeStatistics {
                 $r->extension_noextra->maxtotal = $pgj->maxgrades->total;
         }
 
-        $pset->conf->save_setting("__gradets.p" . $pset->id, $Now);
-        $pset->conf->save_gsetting("__gradestat.p" . $pset->id, $Now, $r);
         return $r;
     }
 
@@ -175,7 +186,8 @@ class API_GradeStatistics {
                 return ["error" => "Grades are not visible now"];
         }
 
-        $gradets = $pset->conf->setting("__gradets.p" . $pset->id);
+        $suffix = ($user->isPC ? ".pp" : ".p") . $pset->id;
+        $gradets = $pset->conf->setting("__gradets$suffix");
         if ($gradets < @filemtime(__FILE__))
             $gradets = 0;
         if ($gradets
@@ -188,9 +200,11 @@ class API_GradeStatistics {
         }
 
         if (!$gradets
-            || !($r = $pset->conf->gsetting_json("__gradestat.p" . $pset->id))) {
-            $r = self::compute($pset);
+            || !($r = $pset->conf->gsetting_json("__gradestat$suffix"))) {
+            $r = self::compute($pset, $user->isPC);
             $gradets = $Now;
+            $pset->conf->save_setting("__gradets$suffix", $Now);
+            $pset->conf->save_gsetting("__gradestat$suffix", $Now, $r);
         }
 
         $r->ok = true;
