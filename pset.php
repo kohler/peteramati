@@ -245,17 +245,17 @@ $u = $Me->user_linkpart($User);
 
 function echo_grade_cdf() {
     global $Info;
-    echo '<div id="pa-grade-statistics" class="pa-grade-statistics hidden';
+    echo '<div id="pa-grade-statistics" class="pa-grgraph pa-grade-statistics hidden';
     if (!$Info->user_can_view_grade_statistics())
         echo ' pa-pset-hidden';
-    echo '">';
-    echo '<a class="qq ui js-grade-statistics-flip prev" href="">&lt;</a>';
-    echo '<a class="qq ui js-grade-statistics-flip next" href="">&gt;</a>';
-    echo '<h4 class="title"></h4>';
+    echo '" data-pa-pset="', $Info->pset->urlkey, '">';
+    echo '<a class="qq ui js-grgraph-flip prev" href="">&lt;</a>';
+    echo '<a class="qq ui js-grgraph-flip next" href="">&gt;</a>';
+    echo '<h4 class="title pa-grgraph-type"></h4>';
     if ($Info->can_view_grade_statistics_graph())
         echo '<div class="plot" style="width:350px;height:200px"></div>';
     echo '<div class="statistics"></div></div>';
-    Ht::stash_script("pa_gradecdf(\$(\"#pa-grade-statistics\"))");
+    Ht::stash_script("\$(\"#pa-grade-statistics\").each(pa_gradecdf)");
 }
 
 function echo_commit($Info) {

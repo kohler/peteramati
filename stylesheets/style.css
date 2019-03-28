@@ -2697,22 +2697,47 @@ textarea.pa-gradevalue {
 	margin-left: 0;
 	padding-left: 1rem;
 }
-.pa-grade-statistics > .title {
+.pa-grgraph > .title {
 	text-align: center;
 	margin: 0 auto 1rem;
 }
-.pa-grade-statistics > .statistics {
+.pa-grgraph > .statistics {
 	width: fit-content;
 	font-size: 90%;
 	margin: 1rem auto 0;
 }
-.js-grade-statistics-flip.prev {
+.js-grgraph-flip.prev {
 	float: left;
 	padding-right: 1rem;
 }
-.js-grade-statistics-flip.next {
+.js-grgraph-flip.next {
 	float: right;
 	padding-left: 1rem;
+}
+
+.pa-grade-overview {
+	display: grid;
+	grid-template-columns: 1fr;
+}
+.pa-gradegrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	grid-auto-rows: auto;
+	grid-gap: 1rem 1rem;
+}
+.pa-gradegrid > .pa-grgraph {
+	padding: 0.25rem 0.5rem;
+}
+.pa-gradegrid > .pa-grgraph.pa-pset-hidden {
+	margin: 0;
+}
+@media screen and (min-width: 600px) {
+.pa-grade-overview {
+	grid-template-columns: minmax(250px, 30vw) auto;
+}
+.pa-gradegrid {
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
 }
 
 /* ANSI escapes */

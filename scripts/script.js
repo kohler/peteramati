@@ -1892,7 +1892,7 @@ function unload_list() {
 function prepare() {
     $(document).on("click", "a", add_list);
     $(document).on("submit", "form", add_list);
-    hotcrp_list && $(window).on("beforeunload", unload_list);
+hotcrp_list && $(window).on("beforeunload", unload_list);
 }
 prepare();
 })(jQuery);
@@ -4346,17 +4346,20 @@ function pa_draw_gradecdf($graph) {
         gi.gg.appendChild(mkpath(pa_gradecdf_series(d.extension, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-extension"}));
 
     // load user grade
+    var tm;
     var gri = $graph.closest(".pa-psetinfo").data("pa-gradeinfo");
-    var tm = pa_gradeinfo_total(gri, want_noextra && !want_all);
-    var dot = mksvg("circle");
-    dot.setAttribute("cx", gi.xax(tm[0]));
-    var y = path_y_at_x.call(gi.gg.lastChild, gi.xax(tm[0]));
-    if (y === null && d.cutoff)
-        y = gi.yax(d.cutoff);
-    dot.setAttribute("cy", y);
-    dot.setAttribute("class", "pa-gg-mark-grade");
-    dot.setAttribute("r", 5);
-    gi.gg.appendChild(dot);
+    if (gri) {
+        tm = pa_gradeinfo_total(gri, want_noextra && !want_all);
+        var dot = mksvg("circle");
+        dot.setAttribute("cx", gi.xax(tm[0]));
+        var y = path_y_at_x.call(gi.gg.lastChild, gi.xax(tm[0]));
+        if (y === null && d.cutoff)
+            y = gi.yax(d.cutoff);
+        dot.setAttribute("cy", y);
+        dot.setAttribute("class", "pa-gg-mark-grade");
+        dot.setAttribute("r", 5);
+        gi.gg.appendChild(dot);
+    }
 
     if (d.cutoff && plot_type.substring(0, 3) !== "pdf") {
         var cutoff = mksvg("rect");
@@ -4386,11 +4389,13 @@ function pa_draw_gradecdf($graph) {
         if (dd && dd.stddev)
             x.push("stddev " + dd.stddev.toFixed(1));
         x = [x.join(", ")];
-        y = pa_gradecdf_findy(dd, tm[0]);
-        if (dd.cutoff && y < dd.cutoff * dd.n)
-            x.push("≤" + Math.round(dd.cutoff * 100) + " %ile");
-        else
-            x.push(Math.round(Math.min(Math.max(1, y * 100 / dd.n), 99)) + " %ile");
+        if (tm) {
+            y = pa_gradecdf_findy(dd, tm[0]);
+            if (dd.cutoff && y < dd.cutoff * dd.n)
+                x.push("≤" + Math.round(dd.cutoff * 100) + " %ile");
+            else
+                x.push(Math.round(Math.min(Math.max(1, y * 100 / dd.n), 99)) + " %ile");
+        }
         if (x.length) {
             removeClass(this, "hidden");
             this.innerHTML = x.join(" · ");
@@ -4409,11 +4414,11 @@ function pa_draw_gradecdf($graph) {
         title.push("extension");
     if (want_noextra && !want_all)
         title.push("no extra credit");
-    $graph.find(".title").html("grade statistics" + (title.length ? " (" + title.join(", ") + ")" : ""));
+    $graph.find(".pa-grgraph-type").html("grade statistics" + (title.length ? " (" + title.join(", ") + ")" : ""));
 }
 
-handle_ui.on("js-grade-statistics-flip", function () {
-    var $graph = $(this).closest(".pa-grade-statistics"),
+handle_ui.on("js-grgraph-flip", function () {
+    var $graph = $(this).closest(".pa-grgraph"),
         plot_types = ($graph[0].getAttribute("data-pa-gg-types") || "").split(/ /),
         plot_type = $graph[0].getAttribute("data-pa-gg-type"),
         i = plot_types.indexOf(plot_type);
@@ -4427,14 +4432,14 @@ handle_ui.on("js-grade-statistics-flip", function () {
 
 
 
-function pa_gradecdf($graph) {
-    var $x = $graph.closest(".pa-psetinfo"), p = $x.attr("data-pa-pset");
+function pa_gradecdf() {
+    var self = this, p = self.getAttribute("data-pa-pset");
     jQuery.ajax(hoturl_post("api/gradestatistics", p ? {pset: p} : {}), {
         type: "GET", cache: true, dataType: "json",
         success: function (d) {
             if (d.cdf) {
-                $graph.data("pa-gradecdfinfo", d);
-                pa_draw_gradecdf($graph);
+                $(self).data("pa-gradecdfinfo", d);
+                pa_draw_gradecdf($(self));
             }
         }
     });
