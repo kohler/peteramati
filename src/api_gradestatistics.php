@@ -10,6 +10,7 @@ class Series {
     public $series;
     public $cdf;
     private $calculated;
+    private $median;
 
     function __construct() {
         $this->n = $this->sum = $this->sumsq = 0;
@@ -17,8 +18,8 @@ class Series {
         $this->calculated = false;
     }
 
-    public function add($g) {
-        $this->series[] = $g;
+    function add($cid, $g) {
+        $this->series[$cid] = $g;
         $this->n += 1;
         $this->sum += $g;
         $this->sumsq += $g * $g;
@@ -26,43 +27,59 @@ class Series {
     }
 
     function calculate() {
-        sort($this->series);
-        $this->cdf = array();
-        $last = false;
-        $subtotal = 0;
-        $cdfi = 0;
-        for ($i = 0; $i < count($this->series); ++$i) {
-            if ($this->series[$i] !== $last) {
-                $this->cdf[] = $last = $this->series[$i];
-                $this->cdf[] = $i + 1;
-                $cdfi += 2;
-            } else
-                $this->cdf[$cdfi - 1] = $i + 1;
+        if (!$this->calculated) {
+            sort($this->series);
+            $this->cdf = array();
+            $this->median = false;
+            $lastg = false;
+            $subtotal = 0;
+            $i = $cdfi = 0;
+            $halfn = (int) ($this->n / 2);
+            foreach ($this->series as $g) {
+                if ($i === $halfn) {
+                    if ($this->n % 2 == 0)
+                        $this->median = ($lastg + $g) / 2.0;
+                    else
+                        $this->median = $g;
+                }
+
+                ++$i;
+                if ($g !== $lastg) {
+                    $this->cdf[] = $lastg = $g;
+                    $this->cdf[] = $i;
+                    $cdfi += 2;
+                } else
+                    $this->cdf[$cdfi - 1] = $i;
+            }
+            $this->calculated = true;
         }
-        $this->calculated = true;
     }
 
     function summary() {
-        if (!$this->calculated)
-            $this->calculate();
-
+        $this->calculate();
         $r = (object) array("n" => $this->n, "cdf" => $this->cdf);
         if ($this->n != 0) {
-            $r->mean = $this->sum / $this->n;
-
-            $halfn = (int) ($this->n / 2);
-            if ($this->n % 2 == 0)
-                $r->median = ($this->series[$halfn-1] + $this->series[$halfn]) / 2.0;
-            else
-                $r->median = $this->series[$halfn];
-
-            if ($this->n > 1)
-                $r->stddev = sqrt(($this->sumsq - $this->sum * $this->sum / $this->n) / ($this->n - 1));
-            else
-                $r->stddev = 0;
+            $r->mean = $this->mean();
+            $r->median = $this->median;
+            $r->stddev = $this->stddev();
         }
-
         return $r;
+    }
+
+    function mean() {
+        return $this->n ? $this->sum / $this->n : false;
+    }
+
+    function median() {
+        $this->calculate();
+        return $this->median;
+    }
+
+    function stddev() {
+        if ($this->n > 1)
+            return sqrt(($this->sumsq - $this->sum * $this->sum / $this->n) / ($this->n - 1));
+        else
+            return $this->n ? 0 : false;
     }
 
     static function truncate_summary_below($r, $cutoff) {
@@ -95,7 +112,7 @@ class API_GradeStatistics {
             $notdropped = "(not c.dropped or c.dropped<$pset->grades_visible)";
         else
             $notdropped = "not c.dropped";
-        $q = "select cn.notes, c.extension from ContactInfo c\n";
+        $q = "select c.contactId, cn.notes, c.extension from ContactInfo c\n";
         if ($pset->gitless_grades)
             $q .= "\t\tjoin ContactGrade cn on (cn.cid=c.contactId and cn.pset={$pset->id})";
         else
@@ -104,17 +121,18 @@ class API_GradeStatistics {
                 join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)\n";
         $result = $pset->conf->qe_raw($q . " where $notdropped");
         while (($row = $result->fetch_row())) {
-            if (($g = ContactView::pset_grade(json_decode($row[0]), $pset))) {
-                $series->add($g->total);
-                if ($xseries && $row[1])
-                    $xseries->add($g->total);
+            if (($g = ContactView::pset_grade(json_decode($row[1]), $pset))) {
+                $cid = +$row[0];
+                $series->add($cid, $g->total);
+                if ($xseries && $row[2])
+                    $xseries->add($cid, $g->total);
                 if ($noextra_series) {
-                    $noextra_series->add($g->total_noextra);
+                    $noextra_series->add($cid, $g->total_noextra);
                     if ($g->total_noextra != $g->total)
                         $has_extra = true;
                 }
-                if ($xnoextra_series && $row[1]) {
-                        $xnoextra_series->add($g->total_noextra);
+                if ($xnoextra_series && $row[2]) {
+                    $xnoextra_series->add($cid, $g->total_noextra);
                     if ($g->total_noextra != $g->total)
                         $has_xextra = true;
                 }
