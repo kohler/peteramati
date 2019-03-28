@@ -1889,16 +1889,9 @@ function unload_list() {
     if (hotcrp_list && (!cookie_set_at || cookie_set_at + 10 < (new Date).getTime()))
         set_cookie(hotcrp_list);
 }
-function row_click(e) {
-    var j = $(e.target);
-    if (j.hasClass("pl_id") || j.hasClass("pl_title")
-        || j.closest("td").hasClass("pl_rowclick"))
-        $(this).find("a.pnum")[0].click();
-}
 function prepare() {
     $(document).on("click", "a", add_list);
     $(document).on("submit", "form", add_list);
-    //$(document).on("click", "tbody.pltable > tr.pl", row_click);
     hotcrp_list && $(window).on("beforeunload", unload_list);
 }
 prepare();
