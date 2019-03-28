@@ -208,7 +208,7 @@ class API_GradeStatistics {
         }
 
         $r->ok = true;
-        if (!$user->extension)
+        if (!$user->isPC && !$user->extension)
             unset($r->extension, $r->extension_noextra);
         if (!$user->isPC && $pset->grade_cdf_cutoff) {
             $r->cutoff = $pset->grade_cdf_cutoff;

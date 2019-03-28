@@ -504,6 +504,8 @@ if ($Me->can_set_grades($Pset, $Info))
     echo '" data-pa-can-set-grades="yes';
 if ($Info->user_can_view_grades())
     echo '" data-pa-user-can-view-grades="yes';
+if ($Info->user->extension)
+    echo '" data-pa-user-extension="yes';
 echo '">';
 
 if ($Pset->gitless) {
