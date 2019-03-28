@@ -1,6 +1,6 @@
 <?php
-// home.php -- HotCRP home page
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
+// home.php -- Peteramati home page
+// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");

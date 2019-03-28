@@ -244,9 +244,7 @@ $u = $Me->user_linkpart($User);
 // Per-pset
 
 function echo_grade_cdf() {
-    global $Conf, $Info, $Pset, $User, $Me;
-    $sepx = $User->extension && $Pset->separate_extension_grades;
-    $xmark = $sepx ? "extension " : "";
+    global $Info;
     echo '<div id="pa-grade-statistics" class="pa-grade-statistics hidden';
     if (!$Info->user_can_view_grade_statistics())
         echo ' pa-pset-hidden';
@@ -254,9 +252,9 @@ function echo_grade_cdf() {
     echo '<a class="qq ui js-grade-statistics-flip prev" href="">&lt;</a>';
     echo '<a class="qq ui js-grade-statistics-flip next" href="">&gt;</a>';
     echo '<h4 class="title"></h4>';
-    if ($Pset->grade_cdf_cutoff < 1)
+    if ($Info->can_view_grade_statistics_graph())
         echo '<div class="plot" style="width:350px;height:200px"></div>';
-    echo '<div class="statistics"', ($sepx ? ' data-pa-extension' : ''), '></div></div>';
+    echo '<div class="statistics"></div></div>';
     Ht::stash_script("pa_gradecdf(\$(\"#pa-grade-statistics\"))");
 }
 
@@ -430,10 +428,8 @@ function echo_grader() {
 }
 
 function echo_grade_cdf_here() {
-    global $Me, $User, $Pset, $Info;
-    if ($Info->can_view_grades()
-        && ($Me != $User || $Info->user_can_view_grade_statistics())
-        && $Info->has_assigned_grades())
+    global $Info;
+    if ($Info->can_view_grade_statistics())
         echo_grade_cdf();
 }
 

@@ -561,6 +561,11 @@ class PsetView {
         return $this->user_can_view_grades;
     }
 
+    function can_view_grade_statistics() {
+        return ($this->viewer->isPC && $this->viewer !== $this->user)
+            || $this->user_can_view_grade_statistics();
+    }
+
     function user_can_view_grade_statistics() {
         global $Now;
         // also see API_GradeStatistics
@@ -568,6 +573,12 @@ class PsetView {
         return $gsv === true
             || (is_int($gsv) && $gsv <= $Now)
             || ($gsv !== false && $this->user_can_view_grades());
+    }
+
+    function can_view_grade_statistics_graph() {
+        return ($this->viewer->isPC && $this->viewer !== $this->user)
+            || ($this->pset->grade_cdf_cutoff < 1
+                && $this->user_can_view_grade_statistics());
     }
 
 
