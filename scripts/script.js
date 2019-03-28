@@ -4262,7 +4262,7 @@ function pa_draw_gradecdf($graph) {
     if (want_extension)
         datamax = Math.max(datamax, d.extension.cdf[d.extension.cdf.length - 2]);
     if (want_all || (!want_noextra && !want_extension))
-        datamax = Math.max(datamax, d.cdf[d.cdf.length - 2]);
+        datamax = Math.max(datamax, d.all.cdf[d.all.cdf.length - 2]);
     var max = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
 
     $graph.removeClass("hidden");
@@ -4325,7 +4325,7 @@ function pa_draw_gradecdf($graph) {
     if (plot_type === "pdf-noextra" || plot_type === "all-noextra")
         kdes.noextra = pa_gradecdf_kde(d.noextra, gi.max, kde_hfactor, kde_nbins);
     if (plot_type === "pdf" || plot_type === "all")
-        kdes.main = pa_gradecdf_kde(d, gi.max, kde_hfactor, kde_nbins);
+        kdes.main = pa_gradecdf_kde(d.all, gi.max, kde_hfactor, kde_nbins);
     var kde_maxp = 0;
     for (var i in kdes)
         kde_maxp = Math.max(kde_maxp, kdes[i].maxp);
@@ -4341,7 +4341,7 @@ function pa_draw_gradecdf($graph) {
     if (plot_type === "cdf-noextra" || (plot_type === "all" && d.noextra))
         gi.gg.appendChild(mkpath(pa_gradecdf_series(d.noextra, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-noextra"}));
     if (plot_type === "cdf" || plot_type === "all")
-        gi.gg.appendChild(mkpath(pa_gradecdf_series(d, gi.xax, gi.yax, gi.max), {"class": "pa-gg-cdf"}));
+        gi.gg.appendChild(mkpath(pa_gradecdf_series(d.all, gi.xax, gi.yax, gi.max), {"class": "pa-gg-cdf"}));
     if (plot_type === "cdf-extension" || (plot_type === "all" && d.extension))
         gi.gg.appendChild(mkpath(pa_gradecdf_series(d.extension, gi.xax, gi.yax), {"class": "pa-gg-cdf pa-gg-extension"}));
 
@@ -4377,9 +4377,9 @@ function pa_draw_gradecdf($graph) {
 
     // summary
     $graph.find(".statistics").each(function () {
-        var dd = d, x = [];
+        var dd = d.all, x = [];
         if (want_noextra && !want_all)
-            dd = dd.noextra || d.noextra;
+            dd = d.noextra;
         if (want_extension && !want_all)
             dd = d.extension;
         if (dd && dd.mean)
@@ -4437,7 +4437,7 @@ function pa_gradecdf() {
     jQuery.ajax(hoturl_post("api/gradestatistics", p ? {pset: p} : {}), {
         type: "GET", cache: true, dataType: "json",
         success: function (d) {
-            if (d.cdf) {
+            if (d.all) {
                 $(self).data("pa-gradecdfinfo", d);
                 pa_draw_gradecdf($(self));
             }

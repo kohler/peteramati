@@ -11,7 +11,7 @@ class Series {
     public $cdf;
     private $calculated;
 
-    public function __construct() {
+    function __construct() {
         $this->n = $this->sum = $this->sumsq = 0;
         $this->byg = $this->series = array();
         $this->calculated = false;
@@ -25,7 +25,7 @@ class Series {
         $this->calculated = false;
     }
 
-    private function calculate() {
+    function calculate() {
         sort($this->series);
         $this->cdf = array();
         $last = false;
@@ -42,7 +42,7 @@ class Series {
         $this->calculated = true;
     }
 
-    public function summary() {
+    function summary() {
         if (!$this->calculated)
             $this->calculate();
 
@@ -65,7 +65,7 @@ class Series {
         return $r;
     }
 
-    static public function truncate_summary_below($r, $cutoff) {
+    static function truncate_summary_below($r, $cutoff) {
         /*$cx = $cutoff * $r->n;
         for ($i = 0; $i < count($r->cdf) && $r->cdf[$i+1] < $cx; $i += 2) {
         }
@@ -122,7 +122,7 @@ class API_GradeStatistics {
         }
         Dbl::free($result);
 
-        $r = $series->summary();
+        $r = (object) ["all" => $series->summary()];
         if ($xseries && $xseries->n)
             $r->extension = $xseries->summary();
         if ($has_extra)
@@ -132,7 +132,7 @@ class API_GradeStatistics {
 
         $pgj = $pset->gradeinfo_json(false);
         if ($pgj && isset($pgj->maxgrades->total)) {
-            $r->maxtotal = $pgj->maxgrades->total;
+            $r->maxtotal = $r->all->maxtotal = $pgj->maxgrades->total;
             if (isset($r->extension))
                 $r->extension->maxtotal = $pgj->maxgrades->total;
             if (isset($r->noextra))
@@ -158,6 +158,8 @@ class API_GradeStatistics {
         }
 
         $gradets = $pset->conf->setting("__gradets.p" . $pset->id);
+        if ($gradets < @filemtime(__FILE__))
+            $gradets = 0;
         if ($gradets
             && $gradets >= $Now - 7200
             && isset($_SERVER["HTTP_IF_NONE_MATCH"])
@@ -177,7 +179,8 @@ class API_GradeStatistics {
         if (!$user->extension)
             unset($r->extension, $r->extension_noextra);
         if (!$user->isPC && $pset->grade_cdf_cutoff) {
-            Series::truncate_summary_below($r, $pset->grade_cdf_cutoff);
+            $r->cutoff = $pset->grade_cdf_cutoff;
+            Series::truncate_summary_below($r->all, $pset->grade_cdf_cutoff);
             if (isset($r->extension))
                 Series::truncate_summary_below($r->extension, $pset->grade_cdf_cutoff);
             if (isset($r->noextra))
