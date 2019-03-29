@@ -4687,7 +4687,7 @@ function pa_render_pset_table(psetid, pconf, data) {
     function escaped_href(s) {
         var psetkey = s.psetid ? peteramati_psets[s.psetid].urlkey : pconf.psetkey;
         var args = {pset: psetkey, u: ukey(s)};
-        if (s.hash && !s.is_grade)
+        if (s.hash && (!s.is_grade || flagged))
             args.commit = s.hash;
         return escape_entities(hoturl("pset", args));
     }
