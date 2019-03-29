@@ -153,7 +153,8 @@ class API_GradeStatistics {
         }
         Dbl::free($result);
 
-        $r = (object) ["all" => $series->summary($pcview)];
+        $r = (object) ["pset" => $pset->urlkey, "psetid" => $pset->id,
+                       "all" => $series->summary($pcview)];
         if ($xseries && $xseries->n)
             $r->extension = $xseries->summary($pcview);
         if ($has_extra)

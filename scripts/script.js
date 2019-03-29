@@ -3910,7 +3910,7 @@ function pa_cdf(d) {
 
 function pa_cdfmax(d) {
     var cdf = d.cdf || d.xcdf;
-    return cdf[cdf.length - 2];
+    return cdf.length ? cdf[cdf.length - 2] : 0;
 }
 
 function path_y_at_x(x) {
@@ -3965,10 +3965,13 @@ function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
             ++x1;
         }
     }
-    var nr = 1 / d.n, maxp = 0;
-    for (i = 0; i !== nbins + 1; ++i) {
-        bins[i] *= nr;
-        maxp = Math.max(maxp, bins[i]);
+    var maxp = 0;
+    if (d.n) {
+        var nr = 1 / d.n;
+        for (i = 0; i !== nbins + 1; ++i) {
+            bins[i] *= nr;
+            maxp = Math.max(maxp, bins[i]);
+        }
     }
     return {kde: bins, maxp: maxp, binwidth: dx};
 }
@@ -4009,6 +4012,7 @@ function PAGradeGraph(parent, max, maxtotal, cutoff, want_cdf) {
     this.svg.appendChild(this.gx);
     this.gy.setAttribute("class", "pa-gg-axis pa-gg-yaxis");
     this.svg.appendChild(this.gy);
+    this.maxp = 0;
     $parent.html(this.svg);
 
     var digits = mksvg("text");
@@ -4178,15 +4182,15 @@ PAGradeGraph.prototype.yaxis = function () {
     }
 };
 PAGradeGraph.prototype.append_cdf = function (d, klass) {
-    var cdf = pa_cdf(d), data = [], totalx = null, nr = 1 / d.n,
-        cutoff = d.cutoff || 0, i = 0, x;
+    var cdf = pa_cdf(d), data = [], nr = 1 / d.n,
+        cutoff = this.cutoff || 0, i = 0, x;
     if (cutoff) {
         while (i < cdf.length && cdf[i+1] < cutoff * d.n) {
             i += 2;
         }
     }
     for (; i < cdf.length; i += 2) {
-        if (data.length) {
+        if (i !== 0) {
             x = Math.max(0, cdf[i] - Math.min(1, cdf[i] - cdf[i - 2]) / 2);
             data.push("H", this.xax(x));
         } else
@@ -4203,7 +4207,9 @@ PAGradeGraph.prototype.append_cdf = function (d, klass) {
     return path;
 };
 PAGradeGraph.prototype.append_pdf = function (kde, klass) {
-    var data = [], bins = kde.kde, nrdy = 0.9 / kde.maxp,
+    if (kde.maxp === 0)
+        return null;
+    var data = [], bins = kde.kde, nrdy = 0.9 / this.maxp,
         xax = this.xax, yax = this.yax;
     // adapted from d3-shape by Mike Bostock
     var xs = [0, 0, 0, 0], ys = [0, 0, 0, 0],
@@ -4269,10 +4275,56 @@ PAGradeGraph.prototype.remove_if = function (predicate) {
         e = next;
     }
 };
-PAGradeGraph.prototype.annotate_on_curve = function (elt, x) {
+PAGradeGraph.prototype.last_curve = function () {
     var e = this.gg.lastChild;
     while (e && !hasClass(e, "pa-gg-cdf") && !hasClass(e, "pa-gg-pdf"))
         e = e.previousSibling;
+    return e;
+}
+PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
+    var e = this.last_curve();
+    if (!e || !d.xcdf)
+        return null;
+    var ispdf = hasClass(e, "pa-gg-pdf"), xcdf = d.xcdf, data = [], nr, nrgh,
+        i, xv, yv, cdfy = 0, cids, j, yc;
+    if (ispdf) {
+        nr = 0.9 / (this.maxp * d.n);
+    } else {
+        nr = 1 / d.n;
+    }
+    nrgh = nr * this.gh;
+    for (i = 0; i < xcdf.length; i += 2) {
+        cids = xcdf[i + 1];
+        cdfy += cids.length;
+        for (j = yc = 0; j < cids.length; ++j) {
+            if (predicate(cids[j], d))
+                ++yc;
+        }
+        if (yc) {
+            xv = this.xax(xcdf[i]);
+            if (ispdf) {
+                yv = path_y_at_x.call(e, xv);
+            } else {
+                yv = this.yax(cdfy * nr);
+            }
+            if (yv != null)
+                data.push("M", xv, ",", yv, "v", yc * nrgh);
+        }
+    }
+    if (!data.length)
+        return null;
+    else {
+        var path = mksvg("path");
+        path.setAttribute("d", data.join(""));
+        path.setAttribute("fill", "none");
+        path.setAttribute("class", klass);
+        this.gg.appendChild(path);
+        addClass(this.gg, "pa-gg-has-hl");
+        return path;
+    }
+};
+PAGradeGraph.prototype.annotate_last_curve = function (x, elt) {
+    var e = this.last_curve();
     if (e) {
         var xv = this.xax(x), yv = path_y_at_x.call(e, xv);
         if (yv === null && this.cutoff)
@@ -4369,11 +4421,8 @@ function pa_draw_gradecdf($graph) {
         kdes.noextra = pa_gradecdf_kde(d.noextra, gi.max, kde_hfactor, kde_nbins);
     if (plot_type === "pdf")
         kdes.main = pa_gradecdf_kde(d.all, gi.max, kde_hfactor, kde_nbins);
-    var kde_maxp = 0;
     for (var i in kdes)
-        kde_maxp = Math.max(kde_maxp, kdes[i].maxp);
-    for (var i in kdes)
-        kdes[i].maxp = kde_maxp;
+        gi.maxp = Math.max(gi.maxp, kdes[i].maxp);
 
     if (plot_type === "pdf-noextra")
         gi.append_pdf(kdes.noextra, "pa-gg-pdf pa-gg-noextra");
@@ -4385,6 +4434,7 @@ function pa_draw_gradecdf($graph) {
         gi.append_cdf(d.noextra, "pa-gg-cdf pa-gg-noextra");
     if (plot_type === "cdf" || plot_type === "all")
         gi.append_cdf(d.all, "pa-gg-cdf");
+    gi.highlight_last_curve(d.all, cid => [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19].indexOf(cid) >= 0, "pa-gg-cdfhl");
     if (plot_type === "cdf-extension" || (plot_type === "all" && d.extension && user_extension))
         gi.append_cdf(d.extension, "pa-gg-cdf pa-gg-extension");
 
@@ -4407,7 +4457,7 @@ function pa_draw_gradecdf($graph) {
         var dot = mksvg("circle");
         dot.setAttribute("class", "pa-gg-mark-grade");
         dot.setAttribute("r", 5);
-        gi.annotate_on_curve(dot, total);
+        gi.annotate_last_curve(total, dot);
     }
 
     // axes

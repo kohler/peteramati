@@ -2674,17 +2674,30 @@ textarea.pa-gradevalue {
 	fill: #ff5522;
 }
 .pa-gg-cdf, .pa-gg-pdf {
-	stroke: #220000;
-	stroke-width: 3;
+	stroke: #222222;
+	stroke-width: 2.5;
+}
+.pa-gg-has-hl > .pa-gg-cdf, .pa-gg-has-hl > .pa-gg-pdf {
+	stroke: #22222222;
 }
 .pa-gg-cdf.pa-gg-noextra, .pa-gg-pdf.pa-gg-noextra {
 	stroke: #bb7777;
 }
+.pa-gg-has-hl > .pa-gg-cdf.pa-gg-noextra, .pa-gg-has-hl > .pa-gg-pdf-noextra {
+	stroke: #bb777722;
+}
 .all .pa-gg-pdf, .all .pa-gg-noextra, .all .pa-gg-extension {
-	stroke-width: 2;
+	stroke-width: 1.5;
 }
 .pa-gg-cdf.pa-gg-extension, .pa-gg-pdf.pa-gg-extension {
 	stroke: #222288;
+}
+.pa-gg-has-hl > .pa-gg-cdf.pa-gg-extension, .pa-gg-has-hl > .pa-gg-pdf-extension {
+	stroke: #22228822;
+}
+.pa-gg-cdfhl {
+	stroke: #ff0000;
+	stroke-width: 3;
 }
 
 .pa-grade-statistics {
