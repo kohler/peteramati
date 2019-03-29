@@ -422,7 +422,7 @@ function echo_grader() {
                     if ($xpset === $Pset)
                         $seen_pset = true;
                     else if ($seen_pset && $xpset->group === $Pset->group) {
-                        $xinfo = new PsetView($xpset, $User, $Me);
+                        $xinfo = PsetView::make($xpset, $User, $Me);
                         if (($xcid = $xinfo->gradercid())
                             && ($pcm = get($Conf->pc_members_and_admins(), $xcid))) {
                             $sel[$pcm->email] .= " [✱" . htmlspecialchars($xpset->title) . "]";
