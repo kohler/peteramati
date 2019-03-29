@@ -3988,10 +3988,11 @@ function mksvg(tag) {
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
 }
 
-function PAGradeGraph(parent, max, maxtotal, want_cdf) {
+function PAGradeGraph(parent, max, maxtotal, cutoff, want_cdf) {
     var $parent = $(parent);
     this.max = max;
     this.total = maxtotal;
+    this.cutoff = cutoff;
     this.svg = mksvg("svg");
     this.gg = mksvg("g");
     this.gx = mksvg("g");
@@ -4259,6 +4260,31 @@ PAGradeGraph.prototype.append_pdf = function (kde, klass) {
     this.gg.appendChild(path);
     return path;
 };
+PAGradeGraph.prototype.remove_if = function (predicate) {
+    var e = this.gg.firstChild;
+    while (e) {
+        var next = e.nextSibling;
+        if (predicate.call(e))
+            this.gg.removeChild(e);
+        e = next;
+    }
+};
+PAGradeGraph.prototype.annotate_on_curve = function (elt, x) {
+    var e = this.gg.lastChild;
+    while (e && !hasClass(e, "pa-gg-cdf") && !hasClass(e, "pa-gg-pdf"))
+        e = e.previousSibling;
+    if (e) {
+        var xv = this.xax(x), yv = path_y_at_x.call(e, xv);
+        if (yv === null && this.cutoff)
+            yv = this.yax(this.cutoff);
+        if (yv !== null) {
+            elt.setAttribute("transform", "translate(" + xv + "," + yv + ")");
+            this.gg.appendChild(elt);
+            return true;
+        }
+    }
+    return false;
+};
 
 
 function pa_draw_gradecdf($graph) {
@@ -4323,7 +4349,7 @@ function pa_draw_gradecdf($graph) {
     if (!$plot.length)
         $plot = $graph;
 
-    var gi = new PAGradeGraph($plot[0], max, d.maxtotal, want_cdf);
+    var gi = new PAGradeGraph($plot[0], max, d.maxtotal, d.cutoff, want_cdf);
 
     if (gi.total && gi.total < gi.max) {
         var total = mksvg("line");
@@ -4337,11 +4363,11 @@ function pa_draw_gradecdf($graph) {
 
     // series
     var kde_nbins = Math.ceil(gi.max / 2), kde_hfactor = 0.08, kdes = [];
-    if (plot_type === "pdf-extension" || plot_type === "all-extension")
+    if (plot_type === "pdf-extension")
         kdes.extension = pa_gradecdf_kde(d.extension, gi.max, kde_hfactor, kde_nbins);
-    if (plot_type === "pdf-noextra" || plot_type === "all-noextra")
+    if (plot_type === "pdf-noextra")
         kdes.noextra = pa_gradecdf_kde(d.noextra, gi.max, kde_hfactor, kde_nbins);
-    if (plot_type === "pdf" || plot_type === "all")
+    if (plot_type === "pdf")
         kdes.main = pa_gradecdf_kde(d.all, gi.max, kde_hfactor, kde_nbins);
     var kde_maxp = 0;
     for (var i in kdes)
@@ -4349,11 +4375,11 @@ function pa_draw_gradecdf($graph) {
     for (var i in kdes)
         kdes[i].maxp = kde_maxp;
 
-    if (plot_type === "pdf-noextra" || plot_type === "all-noextra")
+    if (plot_type === "pdf-noextra")
         gi.append_pdf(kdes.noextra, "pa-gg-pdf pa-gg-noextra");
     if (plot_type === "pdf")
         gi.append_pdf(kdes.main, "pa-gg-pdf");
-    if (plot_type === "pdf-extension" || plot_type === "all-extension")
+    if (plot_type === "pdf-extension")
         gi.append_pdf(kdes.extension, "pa-gg-pdf pa-gg-extension");
     if (plot_type === "cdf-noextra" || (plot_type === "all" && d.noextra))
         gi.append_cdf(d.noextra, "pa-gg-cdf pa-gg-noextra");
@@ -4379,14 +4405,9 @@ function pa_draw_gradecdf($graph) {
         total = pa_gradeinfo_total(gri, want_noextra && !want_all)[0];
     if (total != null) {
         var dot = mksvg("circle");
-        dot.setAttribute("cx", gi.xax(total));
-        var y = path_y_at_x.call(gi.gg.lastChild, gi.xax(total));
-        if (y === null && d.cutoff)
-            y = gi.yax(d.cutoff);
-        dot.setAttribute("cy", y);
         dot.setAttribute("class", "pa-gg-mark-grade");
         dot.setAttribute("r", 5);
-        gi.gg.appendChild(dot);
+        gi.annotate_on_curve(dot, total);
     }
 
     // axes
