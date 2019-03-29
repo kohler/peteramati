@@ -4085,7 +4085,7 @@ function PAGradeGraph(parent, max, maxtotal, cutoff, want_cdf) {
 PAGradeGraph.prototype.xaxis = function () {
     // determine number
     var ndigit_max = Math.floor(Math.log10(this.max)) + 1,
-        labelw = this.xdw * ndigit_max,
+        labelw = this.xdw * (ndigit_max + 0.5),
         labelcap = this.gw / labelw;
 
     var unitbase = Math.pow(10, Math.max(0, ndigit_max - 2)),
@@ -4116,28 +4116,28 @@ PAGradeGraph.prototype.xaxis = function () {
             }
             if (xx == this.total)
                 total_done = true;
-            else if (Math.abs(this.xax(xx) - this.xax(this.total)) < 1.5 * labelw)
-                draw = false;
         }
-        if (xx > this.max) {
+        if (xx > this.max)
             xx = this.max;
-            if (this.total
-                && Math.abs(this.xax(xx) - this.xax(this.total)) < 1.15 * labelw)
-                draw = false;
-        } else if (xx < this.max
-                   && xx > this.total
-                   && Math.abs(this.xax(xx) - this.xax(this.total)) < 1.5 * labelw)
+
+        var xxv = this.xax(xx);
+        if ((this.total
+             && xx != this.total
+             && Math.abs(xxv - this.xax(this.total)) < labelw)
+            || (xx != this.max
+                && xx != this.total
+                && Math.abs(xxv - this.xax(this.max)) < labelw))
             draw = false;
 
         if (draw) {
             e = mksvg("text");
             e.appendChild(document.createTextNode(xx));
-            e.setAttribute("x", this.xax(xx));
+            e.setAttribute("x", xxv);
             e.setAttribute("y", this.xdh + 3);
             this.gx.appendChild(e);
         }
 
-        d.push("M", this.xax(xx), ",0v5");
+        d.push("M", xxv, ",0v5");
 
         x += unit;
     }
