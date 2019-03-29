@@ -410,8 +410,28 @@ function echo_grader() {
                 $sel["none"] = "(None)";
                 $sel[] = null;
             }
-            foreach ($Conf->pc_members_and_admins() as $pcm)
+            foreach ($Conf->pc_members_and_admins() as $pcm) {
                 $sel[$pcm->email] = Text::name_html($pcm);
+            }
+
+            // if no current grader, highlight previous grader
+            if (!$gpc) {
+                $seen_pset = false;
+                $older_pset = null;
+                foreach ($Conf->psets_newest_first() as $xpset) {
+                    if ($xpset === $Pset)
+                        $seen_pset = true;
+                    else if ($seen_pset && $xpset->group === $Pset->group) {
+                        $xinfo = new PsetView($xpset, $User, $Me);
+                        if (($xcid = $xinfo->gradercid())
+                            && ($pcm = get($Conf->pc_members_and_admins(), $xcid))) {
+                            $sel[$pcm->email] .= " [✱" . htmlspecialchars($xpset->title) . "]";
+                        }
+                        break;
+                    }
+                }
+            }
+
             $value = Ht::form($Info->hoturl_post("pset", array("setgrader" => 1)))
                 . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", array("onchange" => "setgrader61(this)"));
             $value_post = "<span class=\"ajaxsave61\"></span></div></form>";
