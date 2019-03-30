@@ -987,32 +987,9 @@ if (!$Me->is_empty() && $User->is_student()) {
     }
 }
 
-function render_grading_student(Contact $s, $anonymous) {
-    $j = ["uid" => $s->contactId];
-    $j["username"] = ($s->github_username ? : $s->seascode_username) ? : ($s->email ? : $s->huid);
-    if ($s->email)
-        $j["email"] = $s->email;
-    if ($anonymous)
-        $j["anon_username"] = $s->anon_username;
-
-    if ((string) $s->firstName !== "" && (string) $s->lastName === "")
-        $j["last"] = $s->firstName;
-    else {
-        if ((string) $s->firstName !== "")
-            $j["first"] = $s->firstName;
-        if ((string) $s->lastName !== "")
-            $j["last"] = $s->lastName;
-    }
-    if ($s->extension)
-        $j["x"] = true;
-    if ($s->dropped)
-        $j["dropped"] = true;
-    return $j;
-}
-
 function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
-    $j = $s ? render_grading_student($s, $anonymous) : [];
+    $j = $s ? StudentSet::json_basics($s, $anonymous) : [];
     if (($gcid = get($row->notes, "gradercid")))
         $j["gradercid"] = $gcid;
     else if ($row->main_gradercid)
@@ -1102,12 +1079,12 @@ function show_regrades($result, $all) {
             ++$nintotal;
     }
     echo '<table class="pap" id="pa-pset-flagged"></table></div>', "\n";
-    $jd = ["flagged_commits" => true, "anonymous" => true, "has_nonanonymous" => $any_nonanonymous];
+    $jd = ["id" => "flagged", "flagged_commits" => true, "anonymous" => true, "has_nonanonymous" => $any_nonanonymous];
     if ($Me->privChair)
         $jd["can_override_anonymous"] = true;
     if ($nintotal)
         $jd["need_total"] = 1;
-    echo Ht::unstash(), '<script>pa_render_pset_table("-flagged",', json_encode_browser($jd), ',', json_encode_browser($jx), ')</script>';
+    echo Ht::unstash(), '<script>$("#pa-pset-flagged").each(function(){pa_render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 }
 
 function show_pset_actions($pset) {
@@ -1150,7 +1127,7 @@ function show_pset_actions($pset) {
 function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     global $Profile, $MicroNow;
     $t0 = microtime(true);
-    $j = render_grading_student($info->user, $anonymous);
+    $j = StudentSet::json_basics($info->user, $anonymous);
     if (($gcid = $info->gradercid()))
         $j["gradercid"] = $gcid;
 
@@ -1301,7 +1278,9 @@ function show_pset_table($sset) {
 
     echo '<table class="pap" id="pa-pset' . $pset->id . '"></table>';
     $grades = $pset->numeric_grades();
-    $jd = ["checkbox" => $checkbox, "anonymous" => $anonymous,
+    $jd = ["id" => $pset->id,
+           "checkbox" => $checkbox,
+           "anonymous" => $anonymous,
            "grade_keys" => array_keys($grades),
            "grade_titles" => array_values(array_map(function ($ge) { return $ge->title; }, $grades)),
            "gitless" => $pset->gitless,
@@ -1323,7 +1302,7 @@ function show_pset_table($sset) {
         $jd["total_key"] = $last_in_total;
     if ($grades_visible)
         $jd["grades_visible"] = true;
-    echo Ht::unstash(), '<script>pa_render_pset_table(', $pset->id, ',', json_encode_browser($jd), ',', json_encode_browser($jx), ')</script>';
+    echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){pa_render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 
     if ($sset->viewer->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";

@@ -2731,6 +2731,17 @@ textarea.pa-gradevalue {
 .pa-grade-overview {
 	display: grid;
 	grid-template-columns: 1fr;
+	position: relative;
+}
+.pa-grade-overview-users {
+	position: relative;
+	overflow: scroll;
+	min-height: 25vh;
+}
+.pa-grade-overview-users-inner {
+}
+#pa-overview-table {
+	position: absolute;
 }
 .pa-gradegrid {
 	display: grid;

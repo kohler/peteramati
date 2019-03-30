@@ -10,11 +10,16 @@ if ($Me->is_empty() || !$Me->isPC)
 $Conf->header("Overview", "home");
 
 echo '<div class="pa-grade-overview">';
-echo '<div class="pa-grade-overview-users"></div>';
+echo '<div class="pa-grade-overview-users"><div class="pa-grade-overview-users-inner">',
+    '<table class="pap" id="pa-overview-table"></table>',
+    '</div></div>';
 echo '<div class="pa-gradegrid">';
+$any_anonymous = false;
 foreach ($Conf->psets() as $pset) {
     if ($Me->can_view_pset($pset)
         && !$pset->disabled) {
+        if ($pset->anonymous)
+            $any_anonymous = true;
         echo '<div class="pa-grgraph';
         if (!$pset->grades_visible)
             echo ' pa-pset-hidden';
@@ -28,5 +33,18 @@ foreach ($Conf->psets() as $pset) {
 }
 echo '</div></div>';
 Ht::stash_script("\$(\".pa-grgraph\").each(pa_gradecdf);\$(window).on(\"resize\",function(){\$(\".pa-grgraph\").each(pa_gradecdf)})");
+
+$Sset = new StudentSet($Me);
+$sj = [];
+foreach ($Sset->users() as $u)
+    $sj[] = StudentSet::json_basics($u, false);
+$jd = ["id" => "overview",
+       "checkbox" => true,
+       "anonymous" => $any_anonymous,
+       "can_override_anonymous" => $any_anonymous,
+       "col" => ["checkbox", "rownumber", "name"]];
+echo Ht::unstash(),
+    '<script>$("#pa-overview-table").each(function(){pa_render_pset_table.call(this,',
+    json_encode_browser($jd), ',', json_encode_browser($sj), ')})</script>';
 echo '<hr class="c">';
 $Conf->footer();

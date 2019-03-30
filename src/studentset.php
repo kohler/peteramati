@@ -42,7 +42,7 @@ class StudentSet implements Iterator, Countable {
             $ed[] = "dropped";
         }
         $ed = $ed ? join(" or ", $ed) : "true";
-		$result = $this->conf->qe("select ContactInfo.*, group_concat(type, ' ', pset, ' ', link) contactLinks from ContactInfo left join ContactLink on (ContactLink.cid=ContactInfo.contactId) where ($ce) and ($ed) group by ContactInfo.contactId");
+		$result = $this->conf->qe("select *, (select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId) contactLinks from ContactInfo where ($ce) and ($ed)");
 		while (($u = Contact::fetch($result, $this->conf))) {
 			$this->_u[$u->contactId] = $u;
         }
@@ -169,8 +169,9 @@ class StudentSet implements Iterator, Countable {
 	function next() {
 		++$this->_upos;
 		while ($this->_upos < count($this->_ua)
-			   && $this->_ua[$this->_upos]->dropped) {
-			if ($this->pset->gitless_grades) {
+			   && $this->_ua[$this->_upos]->dropped
+               && $this->pset) {
+            if ($this->pset->gitless_grades) {
 				if (get($this->_cg, $this->_ua[$this->_upos]->contactId))
 					break;
 			} else {
@@ -191,5 +192,34 @@ class StudentSet implements Iterator, Countable {
 
     function count() {
         return count($this->_ua);
+    }
+
+
+    static function json_basics(Contact $s, $anonymous) {
+        $j = ["uid" => $s->contactId];
+        if ($s->github_username)
+            $j["username"] = $s->github_username;
+        else if ($s->seascode_username)
+            $j["username"] = $s->seascode_username;
+        else
+            $j["username"] = $s->email ? : $s->huid;
+        if ($s->email)
+            $j["email"] = $s->email;
+        if ($anonymous)
+            $j["anon_username"] = $s->anon_username;
+
+        if ((string) $s->firstName !== "" && (string) $s->lastName === "")
+            $j["last"] = $s->firstName;
+        else {
+            if ((string) $s->firstName !== "")
+                $j["first"] = $s->firstName;
+            if ((string) $s->lastName !== "")
+                $j["last"] = $s->lastName;
+        }
+        if ($s->extension)
+            $j["x"] = true;
+        if ($s->dropped)
+            $j["dropped"] = true;
+        return $j;
     }
 }

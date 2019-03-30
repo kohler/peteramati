@@ -4612,8 +4612,8 @@ function pa_anonymize_linkto(link, event) {
     return false;
 }
 
-function pa_render_pset_table(psetid, pconf, data) {
-    var $j = $("#pa-pset" + psetid), dmap = [],
+function pa_render_pset_table(pconf, data) {
+    var $j = $(this), dmap = [],
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
         grade_keys = pconf.grade_keys || [],
@@ -4625,7 +4625,7 @@ function pa_render_pset_table(psetid, pconf, data) {
         col;
 
     function initialize() {
-        var x = wstorage.site(true, "pa-pset" + psetid + "-table");
+        var x = wstorage.site(true, "pa-pset" + pconf.id + "-table");
         x && (sort = JSON.parse(x));
         if (!sort.f || !/^\w+$/.test(sort.f))
             sort.f = "username";
@@ -4675,25 +4675,32 @@ function pa_render_pset_table(psetid, pconf, data) {
                 grade_abbr[i] += m[1];
             }
         }
-        col = [];
-        if (pconf.checkbox)
-            col.push({type: "checkbox"});
-        col.push({type: "rownumber"});
-        if (flagged) {
-            col.push({type: "pset"});
-            col.push({type: "at"});
+        if (pconf.col) {
+            col = pconf.col;
+        } else {
+            col = [];
+            if (pconf.checkbox)
+                col.push("checkbox");
+            col.push("rownumber");
+            if (flagged) {
+                col.push("pset");
+                col.push("at");
+            }
+            col.push("username", "name", "extension", "grader");
+            if (flagged || !pconf.gitless_grades || visible)
+                col.push("notes");
+            if (pconf.need_total)
+                col.push("total");
+            for (i = 0; i < grade_keys.length; ++i)
+                col.push({type: "grade", gidx: i});
+            if (need_ngrades)
+                col.push("ngrades");
+            if (!pconf.gitless)
+                col.push("repo");
         }
-        col.push({type: "username"}, {type: "name"}, {type: "extension"}, {type: "grader"});
-        if (flagged || !pconf.gitless_grades || visible)
-            col.push({type: "notes"});
-        if (pconf.need_total)
-            col.push({type: "total"});
-        for (i = 0; i < grade_keys.length; ++i)
-            col.push({type: "grade", gidx: i});
-        if (need_ngrades)
-            col.push({type: "ngrades"});
-        if (!pconf.gitless)
-            col.push({type: "repo"});
+        for (i = 0; i !== col.length; ++i)
+            if (typeof col[i] === "string")
+                col[i] = {type: col[i]};
     }
 
     function ukey(s) {
@@ -4961,7 +4968,7 @@ function pa_render_pset_table(psetid, pconf, data) {
             });
         }
         set_hotlist($b);
-        wstorage.site(true, "pa-pset" + psetid + "-table", JSON.stringify(sort));
+        wstorage.site(true, "pa-pset" + pconf.id + "-table", JSON.stringify(sort));
     }
     function rerender_usernames() {
         $j.find("td.pap-username").each(function () {
