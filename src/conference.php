@@ -1323,7 +1323,10 @@ class Conf {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
 
         // Javascript settings to set before script.js
-        Ht::stash_script("siteurl=" . json_encode_browser(Navigation::siteurl()) . ";siteurl_suffix=\"" . Navigation::php_suffix() . "\";siteurl_site=" . json_encode_browser(Navigation::site_path()));
+        $nav = Navigation::get();
+        Ht::stash_script("siteurl=" . json_encode_browser($nav->site_path_relative)
+            . ";siteurl_base_path=" . json_encode_browser($nav->base_path)
+            . ";siteurl_suffix=\"" . $nav->php_suffix . "\"");
         if (session_id() !== "")
             Ht::stash_script("siteurl_postvalue=\"" . post_value() . "\"");
         if (($list = $this->encoded_session_list()))
