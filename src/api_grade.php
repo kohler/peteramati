@@ -13,11 +13,13 @@ class API_Grade {
         return is_array($x) ? $x : [];
     }
 
-    static private function check_grade_entry(&$gv, GradeEntryConfig $ge, &$errors) {
-        if (isset($gv[$ge->key])
-            && ($gv[$ge->key] = $ge->parse_value($gv[$ge->key])) === false) {
-            $errors = true;
+    static private function check_grade_entry(&$gv, GradeEntryConfig $ge) {
+        if (isset($gv[$ge->key])) {
+            $gv[$ge->key] = $ge->parse_value($gv[$ge->key]);
+            if ($gv[$ge->key] === false)
+                return false;
         }
+        return true;
     }
 
     static function grade(Contact $user, Qrequest $qreq, APIData $api) {
@@ -47,18 +49,26 @@ class API_Grade {
             }
 
             // check grade entries
-            $errors = false;
+            $errf = [];
             foreach ($info->pset->grades() as $ge) {
-                self::check_grade_entry($g, $ge, $errors);
-                self::check_grade_entry($ag, $ge, $errors);
-                self::check_grade_entry($og, $ge, $errors);
+                if (!self::check_grade_entry($g, $ge)
+                    || !self::check_grade_entry($ag, $ge)
+                    || !self::check_grade_entry($og, $ge))
+                    $errf[$ge->key] = true;
             }
             if (($ge = $info->pset->late_hours_entry())) {
-                self::check_grade_entry($g, $ge, $errors);
-                self::check_grade_entry($og, $ge, $errors);
+                if (!self::check_grade_entry($g, $ge)
+                    || !self::check_grade_entry($og, $ge))
+                    $errf[$ge->key] = true;
             }
-            if ($errors) {
-                return ["ok" => false, "error" => "Invalid request."];
+            if (!empty($errf)) {
+                if (count($errf) === 1) {
+                    reset($errf);
+                    $ge = $info->pset->gradelike_by_key(key($errf));
+                    $error = $ge->parse_value_error();
+                } else
+                    $error = "Invalid grade.";
+                return ["ok" => false, "error" => $error, "errf" => $errf];
             }
 
             // assign grades

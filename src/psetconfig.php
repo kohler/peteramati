@@ -192,7 +192,8 @@ class Pset {
         if (is_array($grades) || is_object($grades)) {
             foreach ((array) $p->grades as $k => $v) {
                 $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v);
-                if (get($this->all_grades, $g->key))
+                if (get($this->all_grades, $g->key)
+                    || $g->key === "late_hours")
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
                 $this->all_grades[$g->key] = $g;
                 if ($g->landmark_file || $g->landmark_range_file)
@@ -326,6 +327,15 @@ class Pset {
 
     function grades() {
         return $this->grades;
+    }
+
+    function gradelike_by_key($key) {
+        if (isset($this->all_grades[$key]))
+            return $this->all_grades[$key];
+        else if ($key === "late_hours")
+            return $this->late_hours_entry();
+        else
+            return null;
     }
 
     function numeric_grades() {
@@ -621,14 +631,14 @@ class Pset {
         return $b;
     }
 
-    private static function position_sort($what, $a) {
+    private static function position_sort($what, $x) {
         $i = 0;
-        $b = array();
-        foreach ($a as $k => $v) {
-            $b[$k] = array($v->position, $i);
+        $xp = [];
+        foreach ($x as $k => $v) {
+            $xp[$k] = [$v->position, $i];
             ++$i;
         }
-        uasort($b, function ($a, $b) {
+        uasort($xp, function ($a, $b) {
                 if ($a[0] != $b[0])
                     return $a[0] < $b[0] ? -1 : 1;
                 else if ($a[1] != $b[1])
@@ -636,9 +646,10 @@ class Pset {
                 else
                     return 0;
             });
-        foreach ($b as $k => &$v)
-            $v = $a[$k];
-        return $b;
+        $y = [];
+        foreach (array_keys($xp) as $k)
+            $y[$k] = $x[$k];
+        return $y;
     }
 }
 
@@ -662,6 +673,14 @@ class GradeEntryConfig {
     public $landmark_range_first;
     public $landmark_range_last;
     public $landmark_buttons;
+
+    static public $letter_map = [
+        "A+" => 98, "A" => 95, "A-" => 92, "A–" => 92, "A−" => 92,
+        "B+" => 88, "B" => 85, "B-" => 82, "B–" => 82, "B−" => 82,
+        "C+" => 78, "C" => 75, "C-" => 72, "C–" => 72, "C−" => 72,
+        "D+" => 68, "D" => 65, "D-" => 62, "D–" => 62, "D−" => 62,
+        "E" => 50, "F" => 50
+    ];
 
     function __construct($name, $g) {
         $loc = array("grades", $name);
@@ -687,10 +706,12 @@ class GradeEntryConfig {
         $type = null;
         if (isset($g->type)) {
             $type = Pset::cstr($loc, $g, "type");
-            if ($type !== "number" && $type !== "text" && $type !== "checkbox")
-                throw new PsetConfigException("unknown grade entry type", $loc);
             if ($type === "number")
                 $type = null;
+            else if ($type === "text" || $type === "checkbox" || $type === "letter")
+                /* nada */;
+            else
+                throw new PsetConfigException("unknown grade entry type", $loc);
         }
         $this->type = $type;
 
@@ -698,8 +719,15 @@ class GradeEntryConfig {
             $this->no_total = true;
         } else {
             $this->max = Pset::cnum($loc, $g, "max");
-            if ($this->type === "checkbox" && $this->max === null)
-                throw new PsetConfigException("checkbox grade entry requires max", $loc);
+            if ($this->type === "checkbox") {
+                if ($this->max === null)
+                    throw new PsetConfigException("checkbox grade entry requires max", $loc);
+            } else if ($this->type === "letter") {
+                if ($this->max === null)
+                    $this->max = 100;
+                if ((float) $this->max !== 100.0)
+                    throw new PsetConfigException("letter grade entry requires max 100", $loc);
+            }
             if (isset($g->visible))
                 $this->visible = Pset::cbool($loc, $g, "visible");
             else if (isset($g->hide))
@@ -780,13 +808,26 @@ class GradeEntryConfig {
             $v = trim($v);
             if ($v === "") {
                 return null;
-            } else if (preg_match('_\A[-+]?\d+\z_', $v)) {
+            } else if (preg_match('{\A[-+]?\d+\z}', $v)) {
                 return intval($v);
-            } else if (preg_match('_\A[-+]?(?:\d+\.|\.\d)\d*\z_', $v)) {
+            } else if (preg_match('{\A[-+]?(?:\d+\.|\.\d)\d*\z}', $v)) {
                 return floatval($v);
+            }
+            if ($this->type === "letter"
+                && isset(self::$letter_map[strtoupper($v)])) {
+                return self::$letter_map[strtoupper($v)];
             }
         }
         return false;
+    }
+
+    function parse_value_error() {
+        if ($this->type === null)
+            return "Numeric grade expected.";
+        else if ($this->type === "letter")
+            return "Letter grade expected.";
+        else
+            return "Invalid grade.";
     }
 
     function value_differs($v1, $v2) {

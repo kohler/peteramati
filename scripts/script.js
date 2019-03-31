@@ -2563,7 +2563,9 @@ function pa_makegrade(gi, k, editable) {
             t += '<div class="pa-gradeentry pa-pd"><span class="pa-gradewidth">' +
                 '<input type="text" class="uich pa-gradevalue" name="' + name +
                 '" id="' + id + '" /></span>';
-            if (ge.max)
+            if (ge.type === "letter")
+                t += ' <span class="pa-grademax">letter grade</span>';
+            else if (ge.max)
                 t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
             t += '</div>';
         }
@@ -2575,7 +2577,7 @@ function pa_makegrade(gi, k, editable) {
             t += '<div class="pa-pd pa-gradevalue"></div>';
         else {
             t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
-            if (ge.max)
+            if (ge.max && ge.type !== "letter")
                 t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
             t += '</div>';
         }
@@ -2629,6 +2631,11 @@ function pa_setgrade(gi, editable) {
     // actual grade value
     var $v = $g.find(".pa-gradevalue");
     var gt = g == null ? "" : "" + g;
+    if (ge.type === "letter") {
+        var l = {98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-", 78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"};
+        if (l[gt])
+            gt = l[gt];
+    }
     if (!editable) {
         if ($v.text() !== gt)
             $v.text(gt);
