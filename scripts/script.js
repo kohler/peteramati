@@ -4635,11 +4635,7 @@ function pa_draw_gradecdf($graph) {
 
     // summary
     $graph.find(".statistics").each(function () {
-        var dd = d.all, x = [];
-        if (want_noextra && !want_all)
-            dd = d.noextra;
-        if (want_extension && !want_all)
-            dd = d.extension;
+        var dd = gi.last_curve_data, x = [];
         if (dd && dd.mean)
             x.push("mean " + dd.mean.toFixed(1));
         if (dd && dd.median)
@@ -4647,7 +4643,7 @@ function pa_draw_gradecdf($graph) {
         if (dd && dd.stddev)
             x.push("stddev " + dd.stddev.toFixed(1));
         x = [x.join(", ")];
-        if (total != null) {
+        if (dd && total != null) {
             y = pa_gradecdf_findy(dd, total);
             if (dd.cutoff && y < dd.cutoff * dd.n)
                 x.push("≤" + Math.round(dd.cutoff * 100) + " %ile");
