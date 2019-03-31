@@ -1281,8 +1281,7 @@ function show_pset_table($sset) {
     $jd = ["id" => $pset->id,
            "checkbox" => $checkbox,
            "anonymous" => $anonymous,
-           "grade_keys" => array_keys($grades),
-           "grade_titles" => array_values(array_map(function ($ge) { return $ge->title; }, $grades)),
+           "grades" => $pset->gradeentry_json(true),
            "gitless" => $pset->gitless,
            "gitless_grades" => $pset->gitless_grades,
            "psetkey" => $pset->urlkey];

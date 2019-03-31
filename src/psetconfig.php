@@ -340,7 +340,7 @@ class Pset {
 
     function numeric_grades() {
         return array_filter($this->grades, function ($ge) {
-            return $ge->type === null;
+            return $ge->type !== "text";
         });
     }
 

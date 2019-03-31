@@ -2550,8 +2550,8 @@ function pa_makegrade(gi, k, editable) {
         t = '<form class="ui-submit pa-grade pa-p pa-gradevalue-form" data-pa-grade="' +
             name + '"><label class="pa-pt" for="' + id + '">' + title + '</label>';
         if (ge.type === "text") {
-            t += '<textarea class="uich pa-pd pa-gradevalue" name="' + name +
-                '" id="' + id + '"></textarea>';
+            t += '<div class="pa-pd"><textarea class="uich pa-pd pa-gradevalue" name="' + name +
+                '" id="' + id + '"></textarea></div>';
         } else if (ge.type === "checkbox"
                    && (g == null || g === 0 || g === ge.max)) {
             t += '<div class="pa-gradeentry pa-pd"><span class="pa-gradewidth">' +
@@ -2596,6 +2596,40 @@ handle_ui.on("pa-grade-uncheckbox", function () {
     $(this).closest(".pa-gradeentry").find(".pa-gradevalue").each(pa_grade_uncheckbox);
 });
 
+var pa_grade_types = {
+    numeric: {
+        text: function (v) {
+            return v + "";
+        }
+    },
+    text: {
+        text: function (v) {
+            return v;
+        }
+    },
+    checkbox: {
+        text: function (v) {
+            if (v == null || v === 0)
+                return "";
+            else if (v == this.max)
+                return "✓";
+            else
+                return v + "";
+        }
+    },
+    letter: (function () {
+        var lm = {98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-", 78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"};
+        return {
+            text: function (v) {
+                if (lm[v])
+                    return lm[v];
+                else
+                    return v + "";
+            }
+        };
+    })()
+};
+
 function pa_setgrade(gi, editable) {
     var k = this.getAttribute("data-pa-grade"),
         ge = gi.entries[k];
@@ -2630,12 +2664,9 @@ function pa_setgrade(gi, editable) {
 
     // actual grade value
     var $v = $g.find(".pa-gradevalue");
-    var gt = g == null ? "" : "" + g;
-    if (ge.type === "letter") {
-        var l = {98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-", 78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"};
-        if (l[gt])
-            gt = l[gt];
-    }
+    var gt = "";
+    if (g != null)
+        gt = pa_grade_types[ge.type || "numeric"].text.call(ge, g);
     if (!editable) {
         if ($v.text() !== gt)
             $v.text(gt);
@@ -2828,7 +2859,10 @@ function pa_loadgrades(gi) {
     var tm = pa_gradeinfo_total(gi);
     $g = $pi.find(".pa-total");
     if (tm[0] && !$g.length) {
-        $g = $('<div class="pa-total pa-p"><div class="pa-pt">total</div>' +
+        var t = '<div class="pa-total pa-p';
+        if (gi.order.length === 1)
+            t += ' hidden';
+        $g = $(t + '"><div class="pa-pt">total</div>' +
             '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span> ' +
             '<span class="pa-grademax">of ' + tm[1] + '</span></div></div>');
         $g.prependTo($pi.find(".pa-gradelist"));
@@ -4821,9 +4855,7 @@ function pa_render_pset_table(pconf, data) {
     var $j = $(this), dmap = [],
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
-        grade_keys = pconf.grade_keys || [],
-        grade_abbr,
-        need_ngrades,
+        grade_entries, need_ngrades,
         sort = {f: flagged ? "at" : "username", last: true, rev: 1},
         sorting_last, displaying_last_first = null,
         anonymous = pconf.anonymous,
@@ -4840,7 +4872,35 @@ function pa_render_pset_table(pconf, data) {
             delete sort.override_anonymous;
         if (anonymous && sort.override_anonymous)
             anonymous = false;
-        var ngrades_expected = -1, ngrades;
+
+        grade_entries = {};
+        var grade_keys = [], grade_abbr = [];
+        if (pconf.grades) {
+            var grade_abbr_count = {}, grade_titles = [];
+            for (var i = 0; i !== pconf.grades.order.length; ++i) {
+                var k = pconf.grades.order[i], ge = pconf.grades.entries[k];
+                if (ge.type !== "text") {
+                    grade_entries[k] = ge;
+                    grade_keys.push(k);
+                    var t = ge.title || k;
+                    grade_titles.push(t);
+                    var m = t.match(/^(p)(?:art\s*|(?=\d))([.a-z\d]+)(?:[\s:]|$)/i);
+                    m = m || t.match(/^(q)(?:uestion\s*|(?=\d))([.a-z\d]+)(?:[\s:]|$)/i);
+                    m = m || t.match(/^()(\S{1,3})/);
+                    var tx = m ? m[1] + m[2] : ":" + grade_keys.length + ":";
+                    grade_abbr.push(tx);
+                    grade_abbr_count[tx] = (grade_abbr_count[tx] || 0) + 1;
+                }
+            }
+            for (i = 0; i !== grade_abbr.length; ++i) {
+                if (grade_abbr_count[grade_abbr[i]] > 1
+                    && (m = grade_titles[i].match(/\s+(\S{1,3})/))) {
+                    grade_abbr[i] += m[1];
+                }
+            }
+        }
+
+        var ngrades_expected = -1;
         for (var i = 0; i < data.length; ++i) {
             var s = data[i];
             if (s.dropped)
@@ -4849,7 +4909,7 @@ function pa_render_pset_table(pconf, data) {
                 s.boringness = 1;
             else
                 s.boringness = 0;
-            ngrades = 0;
+            var ngrades = 0;
             for (var j = 0; j < grade_keys.length; ++j) {
                 if (grade_keys[j] != pconf.total_key
                     && s.grades[j] != null
@@ -4863,23 +4923,7 @@ function pa_render_pset_table(pconf, data) {
                 ngrades_expected = -2;
         }
         need_ngrades = ngrades_expected === -2;
-        grade_abbr = [];
-        var grade_abbr_count = {}, m, grade_titles = pconf.grade_titles || [];
-        for (i = 0; i < grade_keys.length; ++i) {
-            grade_titles[i] = grade_titles[i] || grade_keys[i];
-            m = grade_titles[i].match(/^(p)(?:art\s*|(?=\d))([.a-z\d]+)(?:[\s:]|$)/i);
-            m = m || grade_titles[i].match(/^(q)(?:uestion\s*|(?=\d))([.a-z\d]+)(?:[\s:]|$)/i);
-            m = m || grade_titles[i].match(/^()(\S{1,3})/);
-            x = m ? m[1] + m[2] : ":" + i + ":";
-            grade_abbr.push(x);
-            grade_abbr_count[x] = (grade_abbr_count[x] || 0) + 1;
-        }
-        for (i = 0; i < grade_keys.length; ++i) {
-            if (grade_abbr_count[grade_abbr[i]] > 1
-                && (m = grade_titles[i].match(/\s+(\S{1,3})/))) {
-                grade_abbr[i] += m[1];
-            }
-        }
+
         if (pconf.col) {
             col = pconf.col;
         } else {
@@ -4896,8 +4940,8 @@ function pa_render_pset_table(pconf, data) {
                 col.push("notes");
             if (pconf.need_total)
                 col.push("total");
-            for (i = 0; i < grade_keys.length; ++i)
-                col.push({type: "grade", gidx: i});
+            for (i = 0; i !== grade_keys.length; ++i)
+                col.push({type: "grade", gidx: i, gkey: grade_keys[i], gabbr: grade_abbr[i], gtype: grade_entries[grade_keys[i]].type});
             if (need_ngrades)
                 col.push("ngrades");
             if (!pconf.gitless)
@@ -5033,15 +5077,18 @@ function pa_render_pset_table(pconf, data) {
         return '<td class="pap-total r">' + s.total + '</td>';
     };
     th_render.grade = function () {
-        return '<th class="pap-grade r plsortable" data-pa-sort="grade' + this.gidx + '">' + grade_abbr[this.gidx] + '</th>';
+        return '<th class="pap-grade r plsortable" data-pa-sort="grade' + this.gidx + '">' + this.gabbr + '</th>';
     };
     td_render.grade = function (s) {
-        var gr = s.grades[this.gidx], gr_empty = gr == null || gr === "",
+        var gr = s.grades[this.gidx],
+            gr_empty = gr == null || gr === "",
             k = "pap-grade";
-        if (grade_keys[this.gidx] == pconf.total_key && !gr_empty)
+        if (this.gkey == pconf.total_key && !gr_empty)
             k = "pap-total";
-        if (s.highlight_grades && s.highlight_grades[grade_keys[this.gidx]])
+        if (s.highlight_grades && s.highlight_grades[this.gkey])
             k += " pap-highlight";
+        if (!gr_empty && this.gtype)
+            gr = escape_entities(pa_grade_types[this.gtype].text.call(grade_entries[this.gkey], gr));
         return '<td class="' + k + ' r">' + (gr_empty ? "" : gr) + '</td>';
     };
     th_render.ngrades = '<th class="pap-ngrades r plsortable" data-pa-sort="ngrades">#G</th>';
