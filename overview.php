@@ -9,7 +9,7 @@ if ($Me->is_empty() || !$Me->isPC)
 
 $Conf->header("Overview", "home");
 
-echo '<div class="pa-grade-overview">';
+echo '<form class="pa-grade-overview">';
 echo '<div class="pa-grade-overview-users"><div class="pa-grade-overview-users-inner">',
     '<table class="pap" id="pa-overview-table"></table>',
     '</div></div>';
@@ -31,7 +31,7 @@ foreach ($Conf->psets() as $pset) {
         echo '<div class="statistics"></div></div>';
     }
 }
-echo '</div></div>';
+echo '</div></form>';
 Ht::stash_script("\$(\".pa-grgraph\").each(pa_gradecdf);\$(window).on(\"resize\",function(){\$(\".pa-grgraph\").each(pa_gradecdf)})");
 
 $Sset = new StudentSet($Me);
@@ -42,7 +42,7 @@ $jd = ["id" => "overview",
        "checkbox" => true,
        "anonymous" => $any_anonymous,
        "can_override_anonymous" => $any_anonymous,
-       "col" => ["checkbox", "rownumber", "name"]];
+       "col" => [["type" => "checkbox", "className" => "uix uich js-range-click js-grgraph-highlight"], "rownumber", "name"]];
 echo Ht::unstash(),
     '<script>$("#pa-overview-table").each(function(){pa_render_pset_table.call(this,',
     json_encode_browser($jd), ',', json_encode_browser($sj), ')})</script>';

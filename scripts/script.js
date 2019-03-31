@@ -854,6 +854,9 @@ $(document).on("submit", ".ui-submit", handle_ui);
 
 // rangeclick
 handle_ui.on("js-range-click", function (event) {
+    if (event.type === "change")
+        return;
+
     var $f = $(this).closest("form"),
         rangeclick_state = $f[0].jsRangeClick || {},
         kind = this.getAttribute("data-range-type") || this.name;
@@ -4081,7 +4084,7 @@ function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
             maxp = Math.max(maxp, bins[i]);
         }
     }
-    return {kde: bins, maxp: maxp, binwidth: dx};
+    return {data: d, kde: bins, maxp: maxp, binwidth: dx};
 }
 
 /*function pa_gradecdf_kdepath(kde, xax, yax) {
@@ -4099,17 +4102,24 @@ function mksvg(tag) {
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
 }
 
-function PAGradeGraph(parent, max, maxtotal, cutoff, want_cdf) {
+function PAGradeGraph(parent, d, plot_type) {
     var $parent = $(parent);
-    this.max = max;
-    this.total = maxtotal;
-    this.cutoff = cutoff;
+
+    if (plot_type.indexOf("noextra") >= 0)
+        this.max = pa_cdfmax(d.noextra);
+    else
+        this.max = pa_cdfmax(d.all);
+    if (d.maxtotal)
+        this.max = Math.max(this.max, d.maxtotal);
+    this.total = d.maxtotal;
+    this.cutoff = d.cutoff;
+
     this.svg = mksvg("svg");
     this.gg = mksvg("g");
     this.gx = mksvg("g");
     this.gy = mksvg("g");
     this.xl = this.xt = true;
-    this.yl = this.yt = !!want_cdf;
+    this.yl = this.yt = plot_type.substring(0, 3) !== "pdf";
     this.tw = $parent.width();
     this.th = $parent.height();
     this.svg.setAttribute("preserveAspectRatio", "none");
@@ -4289,6 +4299,9 @@ PAGradeGraph.prototype.yaxis = function () {
         this.yltext.setAttribute("text-anchor", "middle");
     }
 };
+PAGradeGraph.prototype.container = function () {
+    return $(this.svg).closest(".pa-grgraph")[0];
+};
 PAGradeGraph.prototype.append_cdf = function (d, klass) {
     var cdf = pa_cdf(d), data = [], nr = 1 / d.n,
         cutoff = this.cutoff || 0, i = 0, x;
@@ -4312,6 +4325,8 @@ PAGradeGraph.prototype.append_cdf = function (d, klass) {
     path.setAttribute("fill", "none");
     path.setAttribute("class", klass);
     this.gg.appendChild(path);
+    this.last_curve = path;
+    this.last_curve_data = d;
     return path;
 };
 PAGradeGraph.prototype.append_pdf = function (kde, klass) {
@@ -4372,6 +4387,8 @@ PAGradeGraph.prototype.append_pdf = function (kde, klass) {
     path.setAttribute("fill", "none");
     path.setAttribute("class", klass);
     this.gg.appendChild(path);
+    this.last_curve = path;
+    this.last_curve_data = kde.data;
     return path;
 };
 PAGradeGraph.prototype.remove_if = function (predicate) {
@@ -4383,17 +4400,11 @@ PAGradeGraph.prototype.remove_if = function (predicate) {
         e = next;
     }
 };
-PAGradeGraph.prototype.last_curve = function () {
-    var e = this.gg.lastChild;
-    while (e && !hasClass(e, "pa-gg-cdf") && !hasClass(e, "pa-gg-pdf"))
-        e = e.previousSibling;
-    return e;
-}
 PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
-    var e = this.last_curve();
-    if (!e || !d.xcdf)
+    if (!this.last_curve || !this.last_curve_data.xcdf)
         return null;
-    var ispdf = hasClass(e, "pa-gg-pdf"), xcdf = d.xcdf, data = [], nr, nrgh,
+    var ispdf = hasClass(this.last_curve, "pa-gg-pdf"),
+        xcdf = this.last_curve_data.xcdf, data = [], nr, nrgh,
         i, xv, yv, cdfy = 0, cids, j, yc;
     if (ispdf) {
         nr = 0.9 / (this.maxp * d.n);
@@ -4411,7 +4422,7 @@ PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
         if (yc) {
             xv = this.xax(xcdf[i]);
             if (ispdf) {
-                yv = path_y_at_x.call(e, xv);
+                yv = path_y_at_x.call(this.last_curve, xv);
             } else {
                 yv = this.yax(cdfy * nr);
             }
@@ -4431,13 +4442,19 @@ PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
         return path;
     }
 };
+PAGradeGraph.prototype.default_annotation = function (klass) {
+    var dot = mksvg("circle");
+    dot.setAttribute("class", klass || "pa-gg-mark-grade");
+    dot.setAttribute("r", 5);
+    return dot;
+};
 PAGradeGraph.prototype.annotate_last_curve = function (x, elt) {
-    var e = this.last_curve();
-    if (e) {
-        var xv = this.xax(x), yv = path_y_at_x.call(e, xv);
+    if (this.last_curve) {
+        var xv = this.xax(x), yv = path_y_at_x.call(this.last_curve, xv);
         if (yv === null && this.cutoff)
             yv = this.yax(this.cutoff);
         if (yv !== null) {
+            elt = elt || this.default_annotation();
             elt.setAttribute("transform", "translate(" + xv + "," + yv + ")");
             this.gg.appendChild(elt);
             return true;
@@ -4445,12 +4462,57 @@ PAGradeGraph.prototype.annotate_last_curve = function (x, elt) {
     }
     return false;
 };
+PAGradeGraph.prototype.user_x = function (uid) {
+    if (!this.last_curve_data.xcdf)
+        return undefined;
+    if (!this.last_curve_data.ucdf) {
+        var xcdf = this.last_curve_data.xcdf,
+            ucdf = this.last_curve_data.ucdf = {};
+        for (var i = 0; i !== xcdf.length; i += 2) {
+            var uids = xcdf[i + 1];
+            for (var j = 0; j !== uids.length; ++j)
+                ucdf[uids[j]] = xcdf[i];
+        }
+    }
+    return this.last_curve_data.ucdf[uid];
+};
+PAGradeGraph.prototype.highlight_users = function () {
+    var uids = this.container().getAttribute("data-pa-highlight-users") || "";
+    if (this.last_curve
+        && this.last_curve_data.xcdf
+        && uids !== (this.highlight_users || "")) {
+        var uidm = {}, uidx = uids.split(/\s+/), x;
+        for (var i = 0; i !== uidx.length; ++i) {
+            if (uidx[i] !== "")
+                uidm[uidx[i]] = 1;
+        }
+        this.remove_if(function () {
+            if (hasClass(this, "pa-gg-highlight")) {
+                var uid = +this.getAttribute("data-pa-uid");
+                if (uidm[uid]) {
+                    uidm[uid] = 2;
+                } else {
+                    return true;
+                }
+            }
+        });
+        for (var i = 0; i !== uidx.length; ++i) {
+            if (uidm[uidx[i]] === 1
+                && (x = this.user_x(uidx[i])) != null) {
+                var e = this.default_annotation("pa-gg-mark-grade pa-gg-highlight");
+                e.setAttribute("data-pa-uid", uidx[i]);
+                this.annotate_last_curve(x, e);
+            }
+        }
+    }
+};
 
 
 function pa_draw_gradecdf($graph) {
-    var d = $graph.data("pa-gradecdfinfo");
+    var d = $graph.data("paGradeData");
     if (!d) {
         $graph.addClass("hidden");
+        $graph.removeData("paGradeGraph");
         return;
     }
 
@@ -4489,10 +4551,10 @@ function pa_draw_gradecdf($graph) {
     var want_all = plot_type.substring(0, 3) === "all";
     var want_pdf = plot_type.substring(0, 3) === "pdf";
     var want_cdf = want_all || plot_type.substring(0, 3) === "cdf";
-    var want_noextra = plot_type.indexOf("-noextra") >= 0
-        || (want_all && d.noextra && !d.extension);
     var want_extension = plot_type.indexOf("-extension") >= 0
         || (want_all && user_extension && d.extension);
+    var want_noextra = plot_type.indexOf("-noextra") >= 0
+        || (want_all && d.noextra && !want_extension);
 
     // maxes
     var datamax = 0;
@@ -4509,7 +4571,8 @@ function pa_draw_gradecdf($graph) {
     if (!$plot.length)
         $plot = $graph;
 
-    var gi = new PAGradeGraph($plot[0], max, d.maxtotal, d.cutoff, want_cdf);
+    var gi = new PAGradeGraph($plot[0], d, plot_type);
+    $graph.data("paGradeGraph", gi);
 
     if (gi.total && gi.total < gi.max) {
         var total = mksvg("line");
@@ -4542,7 +4605,6 @@ function pa_draw_gradecdf($graph) {
         gi.append_cdf(d.noextra, "pa-gg-cdf pa-gg-noextra");
     if (plot_type === "cdf" || plot_type === "all")
         gi.append_cdf(d.all, "pa-gg-cdf");
-    gi.highlight_last_curve(d.all, cid => [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19].indexOf(cid) >= 0, "pa-gg-cdfhl");
     if (plot_type === "cdf-extension" || (plot_type === "all" && d.extension && user_extension))
         gi.append_cdf(d.extension, "pa-gg-cdf pa-gg-extension");
 
@@ -4561,12 +4623,8 @@ function pa_draw_gradecdf($graph) {
     var total = null, gri = $pi.data("pa-gradeinfo");
     if (gri)
         total = pa_gradeinfo_total(gri, want_noextra && !want_all)[0];
-    if (total != null) {
-        var dot = mksvg("circle");
-        dot.setAttribute("class", "pa-gg-mark-grade");
-        dot.setAttribute("r", 5);
-        gi.annotate_last_curve(total, dot);
-    }
+    if (total != null)
+        gi.annotate_last_curve(total);
 
     // axes
     gi.xaxis();
@@ -4602,16 +4660,19 @@ function pa_draw_gradecdf($graph) {
         }
     });
 
-    var title = [];
-    if (plot_type.startsWith("cdf"))
-        title.push("CDF");
-    else if (plot_type.startsWith("pdf"))
-        title.push("PDF");
-    if (want_extension && !want_all)
-        title.push("extension");
-    if (want_noextra && !want_all)
-        title.push("no extra credit");
-    $graph.find(".pa-grgraph-type").html("grade statistics" + (title.length ? " (" + title.join(", ") + ")" : ""));
+    $graph.find(".pa-grgraph-type").each(function () {
+        var title = [];
+        if (plot_type.startsWith("cdf"))
+            title.push("CDF");
+        else if (plot_type.startsWith("pdf"))
+            title.push("PDF");
+        if (want_extension && !want_all)
+            title.push("extension");
+        if (want_noextra && !want_all)
+            title.push("no extra credit");
+        var t = title.length ? " (" + title.join(", ") + ")" : "";
+        this.innerHTML = "grade statistics" + t;
+    });
 }
 
 handle_ui.on("js-grgraph-flip", function () {
@@ -4627,6 +4688,36 @@ handle_ui.on("js-grgraph-flip", function () {
     }
 });
 
+handle_ui.on("js-grgraph-highlight", function (event) {
+    if (event.type !== "change")
+        return;
+    var rt = this.getAttribute("data-range-type"),
+        $cb = $(this).closest("form").find("input[type=checkbox]"),
+        a = [];
+    $(this).closest("form").find("input[type=checkbox]").each(function () {
+        var $tr;
+        if (this.getAttribute("data-range-type") === rt
+            && this.checked
+            && ($tr = $(this).closest("tr"))
+            && $tr[0].hasAttribute("data-pa-uid"))
+            a.push(+$tr[0].getAttribute("data-pa-uid"));
+    });
+    a.sort();
+    var attr = a.length ? a.join(" ") : null;
+    $(this).closest("form").find(".pa-grgraph").each(function () {
+        if (this.getAttribute("data-pa-highlight-users") !== attr) {
+            if (attr === null)
+                this.removeAttribute("data-pa-highlight-users");
+            else
+                this.setAttribute("data-pa-highlight-users", attr);
+            var gg = $(this).data("paGradeGraph");
+            gg && window.requestAnimationFrame(function () {
+                gg.highlight_users();
+            });
+        }
+    });
+})
+
 
 
 function pa_gradecdf() {
@@ -4635,7 +4726,7 @@ function pa_gradecdf() {
         type: "GET", cache: true, dataType: "json",
         success: function (d) {
             if (d.all) {
-                $(self).data("pa-gradecdfinfo", d);
+                $(self).data("paGradeData", d);
                 pa_draw_gradecdf($(self));
             }
         }
@@ -4874,7 +4965,8 @@ function pa_render_pset_table(pconf, data) {
     td_render.checkbox = function (s, rownum) {
         return rownum == "" ? '<td></td>' :
             '<td class="pap-checkbox"><input type="checkbox" name="' +
-            render_checkbox_name(s) + '" value="1" class="uix js-range-click" data-range-type="s61"></td>';
+            render_checkbox_name(s) + '" value="1" class="' +
+            (this.className || "uix js-range-click") + '" data-range-type="s61"></td>';
     };
     th_render.rownumber = '<th class="pap-rownumber"></th>';
     td_render.rownumber = function (s, rownum) {
@@ -5020,7 +5112,10 @@ function pa_render_pset_table(pconf, data) {
                 a.push('<tr class="pap-boring"><td colspan="' + col.length + '"><hr /></td></tr>');
             was_boringness = s.boringness;
             var stds = render_tds(s, trn);
-            a.push('<tr class="k' + (trn % 2) + '" data-pa-spos="' + s._spos + '">' + stds.join('') + '</tr>');
+            var t = '<tr class="k' + (trn % 2) + '" data-pa-spos="' + s._spos;
+            if (s.uid)
+                t += '" data-pa-uid="' + s.uid;
+            a.push(t + '">' + stds.join('') + '</tr>');
             for (var j = 0; s.partners && j < s.partners.length; ++j) {
                 var ss = s.partners[j];
                 ss._spos = dmap.length;
@@ -5062,7 +5157,8 @@ function pa_render_pset_table(pconf, data) {
                     tb.insertBefore(tr[j], last);
                 else
                     last = last.nextSibling;
-                tr[j].className = "k" + (trn % 2) + " " + tr[j].className.replace(/\bk[01]\s*/, "");
+                removeClass(tr[j], "k" + (1 - trn % 2));
+                addClass(tr[j], "k" + (trn % 2));
             }
             $(tr[0]).find(".pap-rownumber").html(trn + ".");
         }
