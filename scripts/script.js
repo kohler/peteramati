@@ -4630,6 +4630,9 @@ function pa_draw_gradecdf($graph) {
     gi.xaxis();
     gi.yaxis();
 
+    if ($graph[0].hasAttribute("data-pa-highlight-users"))
+        gi.highlight_users();
+
     // summary
     $graph.find(".statistics").each(function () {
         var dd = d.all, x = [];
