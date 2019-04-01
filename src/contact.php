@@ -709,7 +709,7 @@ class Contact {
         else if ($type == LINK_PARTNER)
             $this->partners = array();
         if ($type === LINK_REPO || $type === LINK_BRANCH)
-            $this->conf->qe("delete from Settings where name=?", "__gradets.p$pset");
+            $this->conf->invalidate_grades($pset);
     }
 
     function clear_links($type, $pset = 0, $nolog = false) {

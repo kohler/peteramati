@@ -313,7 +313,7 @@ class PsetView {
             $this->repo_grade->notesversion = $record->notesversion;
             $this->grade_notes = $record->notes;
             if (isset($updates["grades"]) || isset($updates["autogrades"]))
-                $this->conf->qe("delete from Settings where name=?", "__gradets.p" . $this->pset->id);
+                $this->conf->invalidate_grades($this->pset);
         }
     }
 
@@ -361,7 +361,7 @@ class PsetView {
         $this->grade_notes = $record->notes;
         $this->can_view_grades = $this->user_can_view_grades = null;
         if (isset($updates["grades"]) || isset($updates["autogrades"]))
-            $this->conf->qe("delete from Settings where name=?", "__gradets.p" . $this->pset->id);
+            $this->conf->invalidate_grades($this->pset);
     }
 
     function update_current_info($updates, $reset_keys = false) {
@@ -800,7 +800,7 @@ class PsetView {
             $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
                     $this->repo->repoid, $this->branchid, $this->pset->psetid,
                     $this->hash ? hex2bin($this->hash) : null, $grader ? : null);
-            $this->conf->qe("delete from Settings where name=?", "__gradets.p" . $this->pset->id);
+            $this->conf->invalidate_grades($this->pset);
         }
         $this->clear_grade();
     }

@@ -492,6 +492,14 @@ class Conf {
     }
 
 
+    function invalidate_grades($pset) {
+        if (is_object($pset))
+            $pset = $pset->id;
+        $this->qe("delete from Settings where name=? or name=?",
+                  "__gradets.p$pset", "__gradets.pp$pset");
+    }
+
+
     function opt($name, $defval = null) {
         return get($this->opt, $name, $defval);
     }

@@ -2860,7 +2860,11 @@ function pa_loadgrades(gi) {
     $g = $pi.find(".pa-total");
     if (tm[0] && !$g.length) {
         var t = '<div class="pa-total pa-p';
-        if (gi.order.length === 1)
+        var ne = 0;
+        for (var k in gi.entries)
+            if (gi.entries[k].type !== "text")
+                ++ne;
+        if (ne <= 1)
             t += ' hidden';
         $g = $(t + '"><div class="pa-pt">total</div>' +
             '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span> ' +
@@ -4146,6 +4150,7 @@ function mksvg(tag) {
 function PAGradeGraph(parent, d, plot_type) {
     var $parent = $(parent);
 
+    this.min = 50;
     if (plot_type.indexOf("noextra") >= 0)
         this.max = pa_cdfmax(d.noextra);
     else
@@ -4233,9 +4238,9 @@ function PAGradeGraph(parent, d, plot_type) {
 
     this.gw = this.tw - this.ml - this.mr;
     var gh = this.gh = this.th - this.mt - this.mb;
-    var xfactor = this.gw / this.max;
+    var xfactor = this.gw / (this.max - this.min);
     this.xax = function (x) {
-        return x * xfactor;
+        return (x - this.min) * xfactor;
     };
     this.yax = function (y) {
         return gh - y * gh;
@@ -4252,7 +4257,7 @@ PAGradeGraph.prototype.xaxis = function () {
         labelcap = this.gw / labelw;
 
     var unitbase = Math.pow(10, Math.max(0, ndigit_max - 2)),
-        nunits = this.max / unitbase,
+        nunits = (this.max - this.min) / unitbase,
         unit;
     if (labelcap > nunits * 4 && unitbase > 1)
         unit = unitbase / 2;
@@ -4267,7 +4272,8 @@ PAGradeGraph.prototype.xaxis = function () {
     else
         unit = 10 * unitbase;
 
-    var x = 0, d = [], total_done = false, e;
+    var x = Math.floor(this.min / unit) * unit,
+        d = [], total_done = false, e;
     while (x < this.max + unit) {
         var xx = x, draw = this.xl;
         if (this.total) {
@@ -4280,6 +4286,9 @@ PAGradeGraph.prototype.xaxis = function () {
             if (xx == this.total)
                 total_done = true;
         }
+        x += unit;
+        if (xx < this.min)
+            continue;
         if (xx > this.max)
             xx = this.max;
 
@@ -4301,8 +4310,6 @@ PAGradeGraph.prototype.xaxis = function () {
         }
 
         d.push("M", xxv, ",0v5");
-
-        x += unit;
     }
 
     if (this.xt) {
