@@ -1662,50 +1662,58 @@ function make_link_callback(elt) {
 
 
 // check marks for ajax saves
-function make_ajaxcheck_swinger(elt) {
-    return function () {
-        var h = elt.hotcrp_ajaxcheck;
-        var now = (new Date).getTime(), delta = now - h.start, opacity = 0;
-        if (delta < 2000)
-            opacity = 0.5;
-        else if (delta <= 7000)
-            opacity = 0.5 * Math.cos((delta - 2000) / 5000 * Math.PI);
-        if (opacity <= 0.03) {
-            elt.style.outline = h.old_outline;
-            clearInterval(h.interval);
-            h.interval = null;
-        } else
-            elt.style.outline = "4px solid rgba(0, 200, 0, " + opacity + ")";
-    };
+function make_outline_flasher(elt, rgba, duration) {
+    var h = elt.hotcrp_outline_flasher, hold_duration;
+    if (!h)
+        h = elt.hotcrp_outline_flasher = {old_outline: elt.style.outline};
+    if (h.interval) {
+        clearInterval(h.interval);
+        h.interval = null;
+    }
+    if (rgba) {
+        duration = duration || 3000;
+        hold_duration = duration * 0.6;
+        h.start = now_msec();
+        h.interval = setInterval(function () {
+            var now = now_msec(), delta = now - h.start, opacity = 0;
+            if (delta < hold_duration)
+                opacity = 0.5;
+            else if (delta <= duration)
+                opacity = 0.5 * Math.cos((delta - hold_duration) / (duration - hold_duration) * Math.PI);
+            if (opacity <= 0.03) {
+                elt.style.outline = h.old_outline;
+                clearInterval(h.interval);
+                h.interval = null;
+            } else
+                elt.style.outline = "4px solid rgba(" + rgba + ", " + opacity + ")";
+        }, 13);
+    }
 }
 
 function setajaxcheck(elt, rv) {
     if (typeof elt == "string")
-        elt = $$(elt);
-    if (elt) {
-        var h = elt.hotcrp_ajaxcheck;
-        if (!h)
-            h = elt.hotcrp_ajaxcheck = {old_outline: elt.style.outline};
-        if (h.interval) {
-            clearInterval(h.interval);
-            h.interval = null;
-        }
-
-        var s;
-        if (rv.ok)
-            s = "Saved";
-        else if (rv.error)
-            s = rv.error.replace(/<\/?.*?>/g, "").replace(/\(Override conflict\)\s*/g, "").replace(/\s+$/, "");
-        else
-            s = "Error";
-        elt.setAttribute("title", s);
-
-        if (rv.ok) {
-            h.start = (new Date).getTime();
-            h.interval = setInterval(make_ajaxcheck_swinger(elt), 13);
-        } else
-            elt.style.outline = "5px solid red";
+        elt = document.getElementById(elt);
+    if (!elt)
+        return;
+    if (elt.jquery && rv && !rv.ok && rv.errf) {
+        var i, e, f = elt.closest("form")[0];
+        for (i in rv.errf)
+            if (f && (e = f.elements[i])) {
+                elt = e;
+                break;
+            }
     }
+    if (elt.jquery)
+        elt = elt[0];
+    make_outline_flasher(elt);
+    if (rv && !rv.ok && !rv.error)
+        rv = {error: "Error"};
+    if (!rv || rv.ok)
+        make_outline_flasher(elt, "0, 200, 0");
+    else
+        elt.style.outline = "5px solid red";
+    if (rv && rv.error)
+        make_bubble(rv.error, "errorbubble").near(elt).removeOn(elt, "input change click hide");
 }
 
 function link_urls(t) {
@@ -2605,7 +2613,8 @@ var pa_grade_types = {
     text: {
         text: function (v) {
             return v;
-        }
+        },
+        justify: "left"
     },
     checkbox: {
         text: function (v) {
@@ -2615,7 +2624,8 @@ var pa_grade_types = {
                 return "✓";
             else
                 return v + "";
-        }
+        },
+        justify: "center"
     },
     letter: (function () {
         var lm = {98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-", 78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"};
@@ -2625,7 +2635,8 @@ var pa_grade_types = {
                     return lm[v];
                 else
                     return v + "";
-            }
+            },
+            justify: "left"
         };
     })()
 };
@@ -4862,7 +4873,7 @@ function pa_render_pset_table(pconf, data) {
     var $j = $(this), dmap = [],
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
-        grade_entries, need_ngrades,
+        grade_entries, grade_keys, need_ngrades,
         sort = {f: flagged ? "at" : "username", last: true, rev: 1},
         sorting_last, displaying_last_first = null,
         anonymous = pconf.anonymous,
@@ -4881,7 +4892,8 @@ function pa_render_pset_table(pconf, data) {
             anonymous = false;
 
         grade_entries = {};
-        var grade_keys = [], grade_abbr = [];
+        grade_keys = [];
+        var grade_abbr = [];
         if (pconf.grades) {
             var grade_abbr_count = {}, grade_titles = [];
             for (var i = 0; i !== pconf.grades.order.length; ++i) {
@@ -4962,12 +4974,17 @@ function pa_render_pset_table(pconf, data) {
     function ukey(s) {
         return (anonymous && s.anon_username) || s.username || "";
     }
-    function escaped_href(s) {
-        var psetkey = s.psetid ? peteramati_psets[s.psetid].urlkey : pconf.psetkey;
-        var args = {pset: psetkey, u: ukey(s)};
+    function url_gradeparts(s) {
+        var args = {
+            u: ukey(s),
+            pset: s.psetid ? peteramati_psets[s.psetid].urlkey : pconf.psetkey
+        };
         if (s.hash && (!s.is_grade || flagged))
             args.commit = s.hash;
-        return escape_entities(hoturl("pset", args));
+        return args;
+    }
+    function escaped_href(s) {
+        return escape_entities(hoturl("pset", url_gradeparts(s)));
     }
     function render_username_td(s) {
         var t = '<a href="' + escaped_href(s), un;
@@ -5084,19 +5101,26 @@ function pa_render_pset_table(pconf, data) {
         return '<td class="pap-total r">' + s.total + '</td>';
     };
     th_render.grade = function () {
-        return '<th class="pap-grade r plsortable" data-pa-sort="grade' + this.gidx + '">' + this.gabbr + '</th>';
+        var justify = (this.gtype ? pa_grade_types[this.gtype].justify : false) || "right";
+        var klass = justify === "right" ? "pap-grade r" : "pap-grade";
+        return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '">' + this.gabbr + '</th>';
     };
-    td_render.grade = function (s) {
-        var gr = s.grades[this.gidx],
-            gr_empty = gr == null || gr === "",
-            k = "pap-grade";
-        if (this.gkey == pconf.total_key && !gr_empty)
-            k = "pap-total";
-        if (s.highlight_grades && s.highlight_grades[this.gkey])
-            k += " pap-highlight";
-        if (!gr_empty && this.gtype)
+    td_render.grade = function (s, rownum, text) {
+        var gr = s.grades[this.gidx];
+        if (gr == null)
+            gr = "";
+        if (gr !== "" && this.gtype)
             gr = escape_entities(pa_grade_types[this.gtype].text.call(grade_entries[this.gkey], gr));
-        return '<td class="' + k + ' r">' + (gr_empty ? "" : gr) + '</td>';
+        if (text)
+            return gr;
+        else {
+            var k = this.gkey === pconf.total_key ? "pap-total" : "pap-grade";
+            if (s.highlight_grades && s.highlight_grades[this.gkey])
+                k += " pap-highlight";
+            if (!this.gtype || (pa_grade_types[this.gtype].justify || "right") === "right")
+                k += " r";
+            return '<td class="' + k + '">' + gr + '</td>';
+        }
     };
     th_render.ngrades = '<th class="pap-ngrades r plsortable" data-pa-sort="ngrades">#G</th>';
     td_render.ngrades = function (s) {
@@ -5300,7 +5324,7 @@ function pa_render_pset_table(pconf, data) {
         }
     }
     function sort_data() {
-        var f = sort.f, rev = sort.rev;
+        var f = sort.f, rev = sort.rev, m;
         if (f === "name" && !anonymous) {
             set_name_sorters();
             data.sort(function (a, b) {
@@ -5448,11 +5472,95 @@ function pa_render_pset_table(pconf, data) {
         resort();
     }
 
+    function grade_click(evt) {
+        if ((!evt
+             || (evt.metaKey
+                 && evt.button === 0
+                 && evt.target.tagName !== "A"))
+            && !this.hasAttribute("contenteditable")) {
+            grade_start.call(this);
+        }
+    }
+    function grade_start() {
+        this.setAttribute("contenteditable", "true");
+        if (!this.hasAttribute("data-pa-original-grade"))
+            this.setAttribute("data-pa-original-grade", this.innerText);
+        this.addEventListener("keydown", grade_key, false);
+        this.addEventListener("blur", grade_blur, false);
+        this.focus();
+        document.execCommand("selectAll", false, null);
+    }
+    function grade_blur() {
+        this.removeAttribute("contenteditable");
+        this.removeEventListener("keydown", grade_key, false);
+        this.removeEventListener("blur", grade_blur, false);
+
+        var t = this.innerText,
+            original_grade = this.getAttribute("data-pa-original-grade"),
+            spos = this.parentElement.getAttribute("data-pa-spos"),
+            gidx = grade_index(this),
+            self = this;
+        if (original_grade !== t
+            && spos !== null
+            && data[spos].uid) {
+            var grades = {}, oldgrades = {};
+            grades[grade_keys[gidx]] = t;
+            oldgrades[grade_keys[gidx]] = original_grade;
+            $.ajax(hoturl_post("api/grade", url_gradeparts(data[spos])), {
+                type: "POST", cache: false,
+                data: {grades: grades, oldgrades: oldgrades},
+                success: function (rv) {
+                    if (rv.ok) {
+                        data[spos].grades[gidx] = rv.grades[gidx];
+                        var c = col[self.cellIndex];
+                        var gr = td_render[c.type].call(c, data[spos], null, true);
+                        self.setAttribute("data-pa-original-grade", gr);
+                        self.innerText = gr;
+                    }
+                    setajaxcheck(self, rv);
+                }
+            });
+        }
+    }
+    function grade_td(n) {
+        while (n.tagName !== "TD")
+            n = n.parentElement;
+        return n;
+    }
+    function grade_index(n) {
+        n = grade_td(n);
+        var i = n.cellIndex, m;
+        var table = n.parentElement.parentElement.parentElement;
+        var th = table.tHead.firstChild.cells[i];
+        var sort = th ? th.getAttribute("data-pa-sort") : null;
+        if (sort && (m = sort.match(/^grade(\d+)$/)))
+            return +sort.substring(5);
+        else
+            return null;
+    }
+    function grade_key(evt) {
+        var key = event_key(evt), mod = event_modkey(evt);
+        if (key === "Tab" && (mod === 0 || mod === event_modkey.SHIFT)) {
+            var td = grade_td(this), tr = td.parentElement, i = td.cellIndex;
+            var dir = mod ? "previousSibling" : "nextSibling";
+            do {
+                tr = tr[dir];
+            } while (tr && hasClass(tr, "pap-boring"));
+            if (tr) {
+                grade_click.call(tr.cells[i]);
+                evt.preventDefault();
+            }
+            return;
+        }
+    }
+
     initialize();
     $j.html("<thead></thead><tbody class='has-hotlist'></tbody>");
     $j.toggleClass("pap-anonymous", !!anonymous);
     $j.toggleClass("pap-useemail", !!sort.email);
     $j.find("thead").on("click", "th", head_click);
+    $j.find("tbody").on("click", "td.pap-grade", grade_click);
+    $j.find("tbody").on("click", "td.pap-total", grade_click);
     render_head();
     if (!pconf.no_sort)
         sort_data();

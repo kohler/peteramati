@@ -2263,12 +2263,20 @@ table.pap > thead {
 	font-size: smaller;
 	color: #7777aa;
 }
-.pap-rownumber, .pap-checkbox {
+.pap-checkbox {
 	text-align: right;
-	padding: 0 5px;
+	padding-left: 0.25rem;
+	padding-right: 0.25rem;
 }
-.pap-username, .pap-name, .pap-extension, .pap-grader, .pap-notes, .pap-grade, .pap-ngrades, .pap-total, .pap-repo, .pap-pset, .pap-at {
-	padding-left: 12px;
+.pap-rownumber {
+	text-align: right;
+	padding-left: 0.25rem;
+	padding-right: 0.75rem;
+}
+.pap-username, .pap-name, .pap-extension, .pap-grader,
+.pap-notes, .pap-grade, .pap-ngrades, .pap-total,
+.pap-repo, .pap-pset, .pap-at {
+	padding-right: 0.75rem;
 }
 .pap-grade, .pap-total, .pap-ngrades {
 	font-variant-numeric: tabular-nums;
