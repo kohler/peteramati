@@ -4104,10 +4104,10 @@ function pa_cdfmax(d) {
 }
 
 function path_y_at_x(x) {
-    var l = 0, r = this.getTotalLength();
+    var l = 0, r = this.getTotalLength(), m, pt;
     while (r - l > 0.5) {
-        var m = l + (r - l) / 2,
-            pt = this.getPointAtLength(m);
+        m = l + (r - l) / 2;
+        pt = this.getPointAtLength(m);
         if (pt.x >= x + 0.25)
             r = m;
         else if (pt.x >= x - 0.25)
@@ -4115,6 +4115,9 @@ function path_y_at_x(x) {
         else
             l = m;
     }
+    pt = this.getPointAtLength(r === m ? l : r);
+    if (pt.x >= x - 0.25 && pt.x <= x + 0.25)
+        return pt.y;
     return null;
 }
 
