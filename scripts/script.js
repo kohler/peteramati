@@ -5624,18 +5624,18 @@ function pa_render_pset_table(pconf, data) {
             self = this;
         if (original_grade !== t
             && spos !== null
-            && data[spos].uid) {
+            && dmap[spos].uid) {
             var grades = {}, oldgrades = {};
             grades[grade_keys[gidx]] = t;
             oldgrades[grade_keys[gidx]] = original_grade;
-            $.ajax(hoturl_post("api/grade", url_gradeparts(data[spos])), {
+            $.ajax(hoturl_post("api/grade", url_gradeparts(dmap[spos])), {
                 type: "POST", cache: false,
                 data: {grades: grades, oldgrades: oldgrades},
                 success: function (rv) {
                     if (rv.ok) {
-                        data[spos].grades[gidx] = rv.grades[gidx];
+                        dmap[spos].grades[gidx] = rv.grades[gidx];
                         var c = col[self.cellIndex];
-                        var gr = td_render[c.type].call(c, data[spos], null, true);
+                        var gr = td_render[c.type].call(c, dmap[spos], null, true);
                         self.setAttribute("data-pa-original-grade", gr);
                         self.innerText = gr;
                     }
