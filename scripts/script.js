@@ -4130,8 +4130,9 @@ function pa_gradecdf_findy(d, x) {
     return cdf[l+1];
 }
 
-function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
-    var H = maxg * hfrac, iH = 1 / H;
+function pa_gradecdf_kde(d, gi, hfrac, nbins) {
+    var maxg = gi.max, ming = gi.min,
+        H = (maxg - ming) * hfrac, iH = 1 / H;
     function epanechnikov(x) {
         if (x >= -H && x <= H) {
             x *= iH;
@@ -4144,14 +4145,16 @@ function pa_gradecdf_kde(d, maxg, hfrac, nbins) {
     for (i = 0; i !== nbins + 1; ++i) {
         bins.push(0);
     }
-    var cdf = pa_cdf(d), dx = maxg / nbins, idx = 1 / dx;
+    var cdf = pa_cdf(d), dx = (maxg - ming) / nbins, idx = 1 / dx;
     for (i = 0; i < cdf.length; i += 2) {
         var y = cdf[i+1] - (i === 0 ? 0 : cdf[i-1]);
-        var x1 = Math.floor((cdf[i] - H) * idx);
-        var x2 = Math.ceil((cdf[i] + H) * idx);
+        var x1 = Math.floor((cdf[i] - ming - H) * idx);
+        var x2 = Math.ceil((cdf[i] - ming + H) * idx);
         while (x1 < x2) {
-            var x = Math.max(0, Math.min(nbins, x1));
-            bins[x] += epanechnikov(x1 * dx - cdf[i]) * y;
+            var x = Math.max(-1, Math.min(nbins + 1, x1));
+            if (x >= 0 && x <= nbins) {
+                bins[x] += epanechnikov(x1 * dx - cdf[i] + ming) * y;
+            }
             ++x1;
         }
     }
@@ -4224,11 +4227,12 @@ function PAGradeGraph(parent, d, plot_type) {
     var $parent = $(parent);
 
     var dd = plot_type.indexOf("noextra") >= 0 ? d.noextra : d.all;
-    var ddmin = pa_cdfmin(dd), ddmax = pa_cdfmax(dd);
-    this.min = ddmin < 0 ? ddmin - 1 : 0;
+    var ddmin = pa_cdfmin(dd);
+    var xmin = xmin < 0 ? xmin - 1 : 0;
     if (d.entry && d.entry.type === "letter")
-        this.min = Math.min(65, ddmin < 0 ? ddmin : Math.max(ddmin - 5, 0));
-    this.max = ddmax;
+        xmin = Math.min(65, ddmin < 0 ? ddmin : Math.max(ddmin - 5, 0));
+    this.min = xmin;
+    this.max = pa_cdfmax(dd);
     if (d.maxtotal)
         this.max = Math.max(this.max, d.maxtotal);
     this.total = d.maxtotal;
@@ -4314,7 +4318,7 @@ function PAGradeGraph(parent, d, plot_type) {
     var gh = this.gh = this.th - this.mt - this.mb;
     var xfactor = this.gw / (this.max - this.min);
     this.xax = function (x) {
-        return (x - this.min) * xfactor;
+        return (x - xmin) * xfactor;
     };
     this.yax = function (y) {
         return gh - y * gh;
@@ -4529,7 +4533,8 @@ PAGradeGraph.prototype.append_pdf = function (kde, klass) {
         data.push("C", x1, y1, x2, y2, xs[i2], ys[i2]);
     }
     for (i = 0; i !== bins.length; ++i) {
-        var x = xax(i * kde.binwidth), y = yax(bins[i] * nrdy);
+        var x = xax(this.min + i * kde.binwidth),
+            y = yax(bins[i] * nrdy);
         if (i === 0) {
             data.push("M", x, y);
             xs[3] = xs[0] = x;
@@ -4758,13 +4763,13 @@ function pa_draw_gradecdf($graph) {
     }
 
     // series
-    var kde_nbins = Math.ceil(gi.max / 2), kde_hfactor = 0.08, kdes = [];
+    var kde_nbins = Math.ceil((gi.max - gi.min) / 2), kde_hfactor = 0.08, kdes = [];
     if (plot_type === "pdf-extension")
-        kdes.extension = pa_gradecdf_kde(d.extension, gi.max, kde_hfactor, kde_nbins);
+        kdes.extension = pa_gradecdf_kde(d.extension, gi, kde_hfactor, kde_nbins);
     if (plot_type === "pdf-noextra")
-        kdes.noextra = pa_gradecdf_kde(d.noextra, gi.max, kde_hfactor, kde_nbins);
+        kdes.noextra = pa_gradecdf_kde(d.noextra, gi, kde_hfactor, kde_nbins);
     if (plot_type === "pdf")
-        kdes.main = pa_gradecdf_kde(d.all, gi.max, kde_hfactor, kde_nbins);
+        kdes.main = pa_gradecdf_kde(d.all, gi, kde_hfactor, kde_nbins);
     for (var i in kdes)
         gi.maxp = Math.max(gi.maxp, kdes[i].maxp);
 
