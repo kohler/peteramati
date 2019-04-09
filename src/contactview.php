@@ -561,7 +561,7 @@ class ContactView {
         if (!empty($r)) {
             $r["total"] = $total;
             $r["total_noextra"] = $nonextra;
-            if (count($rag))
+            if (!empty($rag))
                 $r["autogrades"] = (object) $rag;
             return (object) $r;
         } else

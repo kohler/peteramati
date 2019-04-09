@@ -2628,7 +2628,10 @@ var pa_grade_types = {
         justify: "center"
     },
     letter: (function () {
-        var lm = {98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-", 78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"};
+        var lm = {
+            98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-",
+            78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"
+        };
         return {
             text: function (v) {
                 if (lm[v])
@@ -2636,7 +2639,23 @@ var pa_grade_types = {
                 else
                     return v + "";
             },
-            justify: "left"
+            justify: "left",
+            tics: function () {
+                var a = [];
+                for (var g in lm) {
+                    if (lm[g].length === 1)
+                        a.push({x: g, text: lm[g]});
+                }
+                for (var g in lm) {
+                    if (lm[g].length === 2)
+                        a.push({x: g, text: lm[g], label_space: 5});
+                }
+                for (var g in lm) {
+                    if (lm[g].length === 2)
+                        a.push({x: g, text: lm[g].substring(1), label_space: 2, notic: true});
+                }
+                return a;
+            }
         };
     })()
 };
@@ -4075,6 +4094,10 @@ function pa_cdf(d) {
     return d.cdf;
 }
 
+function pa_cdfmin(d) {
+    var cdf = d.cdf || d.xcdf;
+    return cdf.length ? cdf[0] : 0;
+}
 function pa_cdfmax(d) {
     var cdf = d.cdf || d.xcdf;
     return cdf.length ? cdf[cdf.length - 2] : 0;
@@ -4158,14 +4181,54 @@ function mksvg(tag) {
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
 }
 
+function PAIntervals() {
+    this.is = [];
+}
+PAIntervals.prototype.lower = function (x) {
+    var is = this.is, l = 0, r = is.length;
+    while (l < r) {
+        var m = l + ((r - l) >> 2) * 2;
+        if (is[m] > x)
+            r = m;
+        else if (x > is[m + 1])
+            l = m + 2;
+        else /* is[m] <= x <= is[m + 1] */
+            return m;
+    }
+    return l;
+};
+PAIntervals.prototype.contains = function (x) {
+    var is = this.is, i = this.lower(x);
+    return i < is.length && x >= is[i];
+};
+PAIntervals.prototype.overlaps = function (lo, hi) {
+    var is = this.is, i = this.lower(lo);
+    return i < is.length && hi >= is[i];
+};
+PAIntervals.prototype.add = function (lo, hi) {
+    var is = this.is, i = this.lower(lo);
+    if (i >= is.length || lo < is[i])
+        is.splice(i, 0, lo, lo);
+    var j = i;
+    while (j + 2 < is.length && hi >= is[j + 2])
+        j += 2;
+    if (j !== i)
+        is.splice(i + 1, j - i);
+    is[i + 1] = Math.max(is[i + 1], hi);
+};
+PAIntervals.prototype.clear = function () {
+    this.is = [];
+};
+
 function PAGradeGraph(parent, d, plot_type) {
     var $parent = $(parent);
 
-    this.min = 50;
-    if (plot_type.indexOf("noextra") >= 0)
-        this.max = pa_cdfmax(d.noextra);
-    else
-        this.max = pa_cdfmax(d.all);
+    var dd = plot_type.indexOf("noextra") >= 0 ? d.noextra : d.all;
+    var ddmin = pa_cdfmin(dd), ddmax = pa_cdfmax(dd);
+    this.min = ddmin < 0 ? ddmin - 1 : 0;
+    if (d.entry && d.entry.type === "letter")
+        this.min = Math.min(65, ddmin < 0 ? ddmin : Math.max(ddmin - 5, 0));
+    this.max = ddmax;
     if (d.maxtotal)
         this.max = Math.max(this.max, d.maxtotal);
     this.total = d.maxtotal;
@@ -4256,12 +4319,17 @@ function PAGradeGraph(parent, d, plot_type) {
     this.yax = function (y) {
         return gh - y * gh;
     };
+    if (d.entry && d.entry.type) {
+        var gt = pa_grade_types[d.entry.type];
+        if (gt && gt.tics)
+            this.xtics = gt.tics.call(gt);
+    }
 
     this.gg.setAttribute("transform", "translate(" + this.ml + "," + this.mt + ")");
     this.gx.setAttribute("transform", "translate(" + this.ml + "," + (this.mt + this.gh + (this.xt ? 2 : -5)) + ")");
     this.gy.setAttribute("transform", "translate(" + (this.ml + (this.yt ? -2 : 5)) + "," + this.mt + ")");
 }
-PAGradeGraph.prototype.xaxis = function () {
+PAGradeGraph.prototype.numeric_xaxis = function () {
     // determine number
     var ndigit_max = Math.floor(Math.log10(this.max)) + 1,
         labelw = this.xdw * (ndigit_max + 0.5),
@@ -4304,6 +4372,8 @@ PAGradeGraph.prototype.xaxis = function () {
             xx = this.max;
 
         var xxv = this.xax(xx);
+        d.push("M", xxv, ",0v5");
+
         if ((this.total
              && xx != this.total
              && Math.abs(xxv - this.xax(this.total)) < labelw)
@@ -4319,8 +4389,6 @@ PAGradeGraph.prototype.xaxis = function () {
             e.setAttribute("y", this.xdh + 3);
             this.gx.appendChild(e);
         }
-
-        d.push("M", xxv, ",0v5");
     }
 
     if (this.xt) {
@@ -4330,6 +4398,52 @@ PAGradeGraph.prototype.xaxis = function () {
         e.setAttribute("stroke", "black");
         this.gx.appendChild(e);
     }
+};
+PAGradeGraph.prototype.xtics_xaxis = function () {
+    // determine number
+    var label_restrictions = new PAIntervals,
+        tic_restrictions = new PAIntervals,
+        d = [];
+
+    for (i = 0; i !== this.xtics.length; ++i) {
+        xt = this.xtics[i];
+        if (xt.x < this.min || xt.x > this.max)
+            continue;
+        var xxv = this.xax(xt.x);
+        if (xt.notic || !tic_restrictions.contains(xxv)) {
+            if (!xt.notic) {
+                d.push("M", xxv, ",0v5");
+                tic_restrictions.add(xxv - 3, xxv + 3);
+            }
+
+            if (this.xl && xt.text) {
+                var lw = this.xdw * (xt.label_space || xt.text.length + 0.5) * 0.5;
+                if (!label_restrictions.overlaps(xxv - lw, xxv + lw)) {
+                    var e = mksvg("text");
+                    e.appendChild(document.createTextNode(xt.text));
+                    e.setAttribute("x", xxv);
+                    e.setAttribute("y", this.xdh + 3);
+                    this.gx.appendChild(e);
+                    lw = this.xdw * (xt.text.length + 0.5) * 0.5;
+                    label_restrictions.add(xxv - lw, xxv + lw);
+                }
+            }
+        }
+    }
+
+    if (this.xt) {
+        e = mksvg("path");
+        e.setAttribute("d", d.join(""));
+        e.setAttribute("fill", "none");
+        e.setAttribute("stroke", "black");
+        this.gx.appendChild(e);
+    }
+};
+PAGradeGraph.prototype.xaxis = function () {
+    if (this.xtics)
+        this.xtics_xaxis();
+    else
+        this.numeric_xaxis();
 };
 PAGradeGraph.prototype.yaxis = function () {
     var y = 0, d = [], e;

@@ -396,23 +396,12 @@ class Pset {
         $ej = $order = [];
         $count = $maxtotal = 0;
         foreach ($this->visible_grades($pcview) as $ge) {
-            $gej = ["title" => $ge->title, "pos" => $count];
-            if ($ge->type !== null)
-                $gej["type"] = $ge->type;
-            if ($ge->max && ($pcview || $ge->max_visible)) {
-                $gej["max"] = $ge->max;
-                if (!$ge->is_extra && !$ge->no_total)
-                    $maxtotal += $ge->max;
-            }
-            if (!$ge->no_total)
-                $gej["in_total"] = true;
-            if ($ge->is_extra)
-                $gej["is_extra"] = true;
-            if ($ge->landmark_file)
-                $gej["landmark"] = $ge->landmark_file . ":" . $ge->landmark_line;
-            $ej[$ge->key] = $gej;
+            $ej[$ge->key] = $ge->json($pcview, $count);
             $order[] = $ge->key;
             ++$count;
+            if ($ge->max && !$ge->is_extra && !$ge->no_total
+                && ($pcview || $ge->max_visible))
+                $maxtotal += $ge->max;
         }
         $j = ["entries" => $ej, "order" => $order];
         if ($maxtotal)
@@ -835,6 +824,25 @@ class GradeEntryConfig {
             return $v1 !== $v2;
         else
             return abs($v1 - $v2) >= 0.0001;
+    }
+
+    function json($pcview, $pos = null) {
+        $gej = ["title" => $this->title];
+        if ($pos !== null)
+            $gej["pos"] = $pos;
+        else
+            $gej["key"] = $this->key;
+        if ($this->type !== null)
+            $gej["type"] = $this->type;
+        if ($this->max && ($pcview || $this->max_visible))
+            $gej["max"] = $this->max;
+        if (!$this->no_total)
+            $gej["in_total"] = true;
+        if ($this->is_extra)
+            $gej["is_extra"] = true;
+        if ($this->landmark_file)
+            $gej["landmark"] = $this->landmark_file . ":" . $this->landmark_line;
+        return $gej;
     }
 }
 
