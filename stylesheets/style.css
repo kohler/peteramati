@@ -2760,6 +2760,9 @@ textarea.pa-gradevalue {
 .pa-gradegrid > .pa-grgraph {
 	padding: 0.25rem 0.5rem;
 }
+.pa-gradegrid > .pa-grgraph > .plot {
+	height: 20vh;
+}
 .pa-gradegrid > .pa-grgraph.pa-pset-hidden {
 	margin: 0;
 }

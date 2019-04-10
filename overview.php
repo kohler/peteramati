@@ -27,7 +27,7 @@ foreach ($Conf->psets() as $pset) {
         echo '<a class="qq ui js-grgraph-flip prev" href="">&lt;</a>';
         echo '<a class="qq ui js-grgraph-flip next" href="">&gt;</a>';
         echo '<h4 class="title">', htmlspecialchars($pset->title), '</h4>';
-        echo '<div class="plot" style="height:200px"></div>';
+        echo '<div class="plot pa-grgraph-min-yaxis"></div>';
         echo '<div class="statistics"></div></div>';
     }
 }

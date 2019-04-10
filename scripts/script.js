@@ -4276,24 +4276,23 @@ function PAGradeGraph(parent, d, plot_type) {
     if (this.yl) {
         var h = this.th - this.mt - Math.max(this.mb, Math.ceil(this.xdh / 2));
         if (h > this.xdh) {
+            var minyaxis = $parent.hasClass("pa-grgraph-min-yaxis");
+            this.yfmt = minyaxis ? "%d%%" : "%d";
             var labelcap = h / this.xdh;
+            this.ymax = 100;
             if (labelcap > 15)
-                this.ylu = 1;
-            else if (labelcap > 5)
-                this.ylu = 2.5;
-            else if (labelcap > 3)
-                this.ylu = 5;
-            else
                 this.ylu = 10;
-            this.ml = (this.yt ? 5 : 0) + 5 +
-                (this.ylu == 10 ? 1.5 : (this.ylu == 2.5 ? 3.5 : 2.5)) * this.xdw;
+            else if (labelcap > 5)
+                this.ylu = 25;
+            else if (labelcap > 3)
+                this.ylu = 50;
+            else
+                this.ylu = 100;
+            this.ml = (this.yt ? 5 : 0) + 5 + (minyaxis ? 4.2 : 3) * this.xdw;
 
-            if (this.yltext !== false
-                && this.yltext !== null
-                && this.yltext !== "") {
-                var text = this.yltext || "% of grades";
+            if (!$parent.hasClass("pa-grgraph-min-yaxis")) {
                 this.yltext = mksvg("text");
-                this.yltext.appendChild(document.createTextNode(text));
+                this.yltext.appendChild(document.createTextNode("% of grades"));
                 this.gy.appendChild(this.yltext);
                 domr = this.yltext.getBBox();
                 if (domr.width <= 0.875 * h) {
@@ -4454,14 +4453,14 @@ PAGradeGraph.prototype.xaxis = function () {
 };
 PAGradeGraph.prototype.yaxis = function () {
     var y = 0, d = [], e;
-    while (y <= 10 && this.yl) {
+    while (y <= this.ymax && this.yl) {
         e = mksvg("text");
-        e.appendChild(document.createTextNode(y * 10));
+        e.appendChild(document.createTextNode(sprintf(this.yfmt, y)));
         e.setAttribute("x", -8);
-        e.setAttribute("y", this.yax(y / 10) + 0.25 * this.xdh);
+        e.setAttribute("y", this.yax(y / this.ymax) + 0.25 * this.xdh);
         this.gy.appendChild(e);
 
-        d.push("M-5,", this.yax(y / 10), "h5");
+        d.push("M-5,", this.yax(y / this.ymax), "h5");
 
         y += this.ylu;
     }
