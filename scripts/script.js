@@ -4657,17 +4657,30 @@ PAGradeGraph.prototype.user_x = function (uid) {
     return this.last_curve_data.ucdf[uid];
 };
 PAGradeGraph.prototype.highlight_users = function () {
-    var uids = this.container().getAttribute("data-pa-highlight-users") || "";
-    if (this.last_curve
-        && this.last_curve_data.xcdf
-        && uids !== (this.highlight_users || "")) {
+    if (!this.last_curve || !this.last_curve_data.xcdf)
+        return;
+
+    this.last_highlight = this.last_highlight || {};
+    var attrs = this.container().attributes, desired = {}, x;
+    for (var i = 0; i !== attrs.length; ++i) {
+        if (attrs[i].name.startsWith("data-pa-grgraph-highlight")) {
+            var type = "pa-gg" + attrs[i].name.substring(15);
+            desired[type] = attrs[i].value;
+            this.last_highlight[type] = this.last_highlight[type] || "";
+        }
+    }
+
+    for (var type in this.last_highlight) {
+        var uids = desired[type] || "";
+        if (this.last_highlight[type] === uids)
+            continue;
         var uidm = {}, uidx = uids.split(/\s+/), x;
         for (var i = 0; i !== uidx.length; ++i) {
             if (uidx[i] !== "")
                 uidm[uidx[i]] = 1;
         }
         this.remove_if(function () {
-            if (hasClass(this, "pa-gg-highlight")) {
+            if (hasClass(this, type)) {
                 var uid = +this.getAttribute("data-pa-uid");
                 if (uidm[uid]) {
                     uidm[uid] = 2;
@@ -4679,11 +4692,12 @@ PAGradeGraph.prototype.highlight_users = function () {
         for (var i = 0; i !== uidx.length; ++i) {
             if (uidm[uidx[i]] === 1
                 && (x = this.user_x(uidx[i])) != null) {
-                var e = this.default_annotation("pa-gg-mark-grade pa-gg-highlight");
+                var e = this.default_annotation("pa-gg-mark-grade " + type);
                 e.setAttribute("data-pa-uid", uidx[i]);
                 this.annotate_last_curve(x, e);
             }
         }
+        this.last_highlight[type] = uids;
     }
 };
 
@@ -4810,7 +4824,7 @@ function pa_draw_gradecdf($graph) {
     gi.xaxis();
     gi.yaxis();
 
-    if ($graph[0].hasAttribute("data-pa-highlight-users"))
+    if ($graph[0].hasAttribute("data-pa-grgraph-highlight"))
         gi.highlight_users();
 
     // summary
@@ -4884,19 +4898,44 @@ handle_ui.on("js-grgraph-highlight", function (event) {
     a.sort();
     var attr = a.length ? a.join(" ") : null;
     $(this).closest("form").find(".pa-grgraph").each(function () {
-        if (this.getAttribute("data-pa-highlight-users") !== attr) {
-            if (attr === null)
-                this.removeAttribute("data-pa-highlight-users");
-            else
-                this.setAttribute("data-pa-highlight-users", attr);
-            var gg = $(this).data("paGradeGraph");
-            gg && window.requestAnimationFrame(function () {
-                gg.highlight_users();
-            });
-        }
+        if (attr === null)
+            this.removeAttribute("data-pa-grgraph-highlight");
+        else
+            this.setAttribute("data-pa-grgraph-highlight", attr);
+        var gg = $(this).data("paGradeGraph");
+        gg && window.requestAnimationFrame(function () {
+            gg.highlight_users();
+        });
     });
-})
+});
 
+handle_ui.on("js-grgraph-highlight-a", function (event) {
+    var want = null;
+    if (this.checked) {
+        $(".pa-grgraph[data-pa-pset=course]").each(function () {
+            var d = $(this).data("paGradeData");
+            var as = [];
+            if (d && d.all && d.all.xcdf) {
+                var xcdf = d.all.xcdf;
+                for (var i = 0; i !== xcdf.length; i += 2)
+                    if (xcdf[i] >= 90)
+                        Array.prototype.push.apply(as, xcdf[i + 1]);
+            }
+            as.sort();
+            want = as.length ? as.join(" ") : null;
+        });
+    }
+    if (want === null)
+        $(".pa-grgraph[data-pa-pset!=course]").removeAttr("data-pa-grgraph-highlight-green");
+    else
+        $(".pa-grgraph[data-pa-pset!=course]").attr("data-pa-grgraph-highlight-green", want);
+    window.requestAnimationFrame(function () {
+        $(".pa-grgraph").each(function () {
+            var gg = $(this).data("paGradeGraph");
+            gg && gg.highlight_users();
+        });
+    });
+});
 
 
 function pa_gradecdf() {

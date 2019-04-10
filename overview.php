@@ -11,6 +11,7 @@ $Conf->header("Overview", "home");
 
 echo '<form class="pa-grade-overview">';
 echo '<div class="pa-grade-overview-users"><div class="pa-grade-overview-users-inner">',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-a">As</label>',
     '<table class="pap" id="pa-overview-table"></table>',
     '</div></div>';
 echo '<div class="pa-gradegrid">';
@@ -36,8 +37,10 @@ Ht::stash_script("\$(\".pa-grgraph\").each(pa_gradecdf);\$(window).on(\"resize\"
 
 $Sset = new StudentSet($Me);
 $sj = [];
-foreach ($Sset->users() as $u)
-    $sj[] = StudentSet::json_basics($u, false);
+foreach ($Sset->users() as $u) {
+    if (!$u->extension)
+        $sj[] = StudentSet::json_basics($u, false);
+}
 $jd = ["id" => "overview",
        "checkbox" => true,
        "anonymous" => $any_anonymous,

@@ -2681,6 +2681,11 @@ textarea.pa-gradevalue {
 	stroke-width: 2;
 	fill: #ff5522;
 }
+.pa-gg-mark-grade.pa-gg-highlight-green {
+	stroke-width: 0.5;
+	fill: #00ff00;
+	r: 2;
+}
 .pa-gg-cdf, .pa-gg-pdf {
 	stroke: #222222;
 	stroke-width: 2.5;
