@@ -4628,7 +4628,7 @@ PAGradeGraph.prototype.default_annotation = function (klass) {
     dot.setAttribute("r", 5);
     return dot;
 };
-PAGradeGraph.prototype.annotate_last_curve = function (x, elt) {
+PAGradeGraph.prototype.annotate_last_curve = function (x, elt, after) {
     if (this.last_curve) {
         var xv = this.xax(x), yv = path_y_at_x.call(this.last_curve, xv);
         if (yv === null && this.cutoff)
@@ -4636,7 +4636,7 @@ PAGradeGraph.prototype.annotate_last_curve = function (x, elt) {
         if (yv !== null) {
             elt = elt || this.default_annotation();
             elt.setAttribute("transform", "translate(" + xv + "," + yv + ")");
-            this.gg.appendChild(elt);
+            this.gg.insertBefore(elt, after || null);
             return true;
         }
     }
@@ -4664,7 +4664,11 @@ PAGradeGraph.prototype.highlight_users = function () {
     var attrs = this.container().attributes, desired = {}, x;
     for (var i = 0; i !== attrs.length; ++i) {
         if (attrs[i].name.startsWith("data-pa-highlight")) {
-            var type = "pa-gg" + attrs[i].name.substring(7);
+            var type;
+            if (attrs[i].name === "data-pa-highlight")
+                type = "pa-gg-highlight-main";
+            else
+                type = "pa-gg" + attrs[i].name.substring(7);
             desired[type] = attrs[i].value;
             this.last_highlight[type] = this.last_highlight[type] || "";
         }
@@ -4674,29 +4678,39 @@ PAGradeGraph.prototype.highlight_users = function () {
         var uids = desired[type] || "";
         if (this.last_highlight[type] === uids)
             continue;
+
         var uidm = {}, uidx = uids.split(/\s+/), x;
         for (var i = 0; i !== uidx.length; ++i) {
             if (uidx[i] !== "")
                 uidm[uidx[i]] = 1;
         }
-        this.remove_if(function () {
-            if (hasClass(this, type)) {
-                var uid = +this.getAttribute("data-pa-uid");
-                if (uidm[uid]) {
-                    uidm[uid] = 2;
-                } else {
-                    return true;
-                }
+
+        var el = this.gg.firstChild, elnext;
+        var klass = "pa-gg-mark-grade " + type;
+        while (el && (!hasClass(el, "pa-gg-mark-grade") || el.className.animVal < klass)) {
+            el = el.nextSibling;
+        }
+
+        while (el && el.className.animVal === klass) {
+            elnext = el.nextSibling;
+            var uid = +el.getAttribute("data-pa-uid");
+            if (uidm[uid]) {
+                uidm[uid] = 2;
+            } else {
+                this.gg.removeChild(el);
             }
-        });
+            el = elnext;
+        }
+
         for (var i = 0; i !== uidx.length; ++i) {
             if (uidm[uidx[i]] === 1
                 && (x = this.user_x(uidx[i])) != null) {
-                var e = this.default_annotation("pa-gg-mark-grade " + type);
+                var e = this.default_annotation(klass);
                 e.setAttribute("data-pa-uid", uidx[i]);
-                this.annotate_last_curve(x, e);
+                this.annotate_last_curve(x, e, el);
             }
         }
+
         this.last_highlight[type] = uids;
     }
 };
@@ -4912,7 +4926,7 @@ handle_ui.on("js-grgraph-highlight", function (event) {
 handle_ui.on("js-grgraph-highlight-course", function (event) {
     var want = null,
         range = this.getAttribute("data-pa-highlight-range") || "90-100",
-        color = this.getAttribute("data-pa-highlight-color") || "green",
+        color = this.getAttribute("data-pa-highlight-type") || "h00",
         min, max, m;
     if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-([-+]?(?:\d+\.?\d*|\.\d))(\.?)$/))) {
         min = +m[1];
@@ -4923,7 +4937,6 @@ handle_ui.on("js-grgraph-highlight-course", function (event) {
     } else {
         throw new Error("bad range");
     }
-    console.log([min, max]);
 
     if (this.checked) {
         $(".pa-grgraph[data-pa-pset=course]").each(function () {

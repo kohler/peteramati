@@ -2681,12 +2681,12 @@ textarea.pa-gradevalue {
 	stroke-width: 2;
 	fill: #ff5522;
 }
-.pa-gg-mark-grade.pa-gg-highlight-green, .pa-gg-mark-grade.pa-gg-highlight-green1 {
+.pa-gg-mark-grade.pa-gg-highlight-h00, .pa-gg-mark-grade.pa-gg-highlight-h01 {
 	stroke-width: 1;
 	fill: #00cc00;
 	r: 2.5;
 }
-.pa-gg-mark-grade.pa-gg-highlight-blue, .pa-gg-mark-grade.pa-gg-highlight-blue1 {
+.pa-gg-mark-grade.pa-gg-highlight-h10, .pa-gg-mark-grade.pa-gg-highlight-h11 {
 	stroke-width: 1;
 	fill: #ff99ff;
 	r: 2.5;
