@@ -4663,8 +4663,8 @@ PAGradeGraph.prototype.highlight_users = function () {
     this.last_highlight = this.last_highlight || {};
     var attrs = this.container().attributes, desired = {}, x;
     for (var i = 0; i !== attrs.length; ++i) {
-        if (attrs[i].name.startsWith("data-pa-grgraph-highlight")) {
-            var type = "pa-gg" + attrs[i].name.substring(15);
+        if (attrs[i].name.startsWith("data-pa-highlight")) {
+            var type = "pa-gg" + attrs[i].name.substring(7);
             desired[type] = attrs[i].value;
             this.last_highlight[type] = this.last_highlight[type] || "";
         }
@@ -4824,7 +4824,7 @@ function pa_draw_gradecdf($graph) {
     gi.xaxis();
     gi.yaxis();
 
-    if ($graph[0].hasAttribute("data-pa-grgraph-highlight"))
+    if ($graph[0].hasAttribute("data-pa-highlight"))
         gi.highlight_users();
 
     // summary
@@ -4899,9 +4899,9 @@ handle_ui.on("js-grgraph-highlight", function (event) {
     var attr = a.length ? a.join(" ") : null;
     $(this).closest("form").find(".pa-grgraph").each(function () {
         if (attr === null)
-            this.removeAttribute("data-pa-grgraph-highlight");
+            this.removeAttribute("data-pa-highlight");
         else
-            this.setAttribute("data-pa-grgraph-highlight", attr);
+            this.setAttribute("data-pa-highlight", attr);
         var gg = $(this).data("paGradeGraph");
         gg && window.requestAnimationFrame(function () {
             gg.highlight_users();
@@ -4909,8 +4909,22 @@ handle_ui.on("js-grgraph-highlight", function (event) {
     });
 });
 
-handle_ui.on("js-grgraph-highlight-a", function (event) {
-    var want = null;
+handle_ui.on("js-grgraph-highlight-course", function (event) {
+    var want = null,
+        range = this.getAttribute("data-pa-highlight-range") || "90-100",
+        color = this.getAttribute("data-pa-highlight-color") || "green",
+        min, max, m;
+    if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-([-+]?(?:\d+\.?\d*|\.\d))(\.?)$/))) {
+        min = +m[1];
+        max = +m[2] + (m[3] ? 0.00001 : 0);
+    } else if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-$/))) {
+        min = +m[1];
+        max = Infinity;
+    } else {
+        throw new Error("bad range");
+    }
+    console.log([min, max]);
+
     if (this.checked) {
         $(".pa-grgraph[data-pa-pset=course]").each(function () {
             var d = $(this).data("paGradeData");
@@ -4918,7 +4932,7 @@ handle_ui.on("js-grgraph-highlight-a", function (event) {
             if (d && d.all && d.all.xcdf) {
                 var xcdf = d.all.xcdf;
                 for (var i = 0; i !== xcdf.length; i += 2)
-                    if (xcdf[i] >= 90)
+                    if (xcdf[i] >= min && xcdf[i] < max)
                         Array.prototype.push.apply(as, xcdf[i + 1]);
             }
             as.sort();
@@ -4926,9 +4940,9 @@ handle_ui.on("js-grgraph-highlight-a", function (event) {
         });
     }
     if (want === null)
-        $(".pa-grgraph[data-pa-pset!=course]").removeAttr("data-pa-grgraph-highlight-green");
+        $(".pa-grgraph[data-pa-pset!=course]").removeAttr("data-pa-highlight-" + color);
     else
-        $(".pa-grgraph[data-pa-pset!=course]").attr("data-pa-grgraph-highlight-green", want);
+        $(".pa-grgraph[data-pa-pset!=course]").attr("data-pa-highlight-" + color, want);
     window.requestAnimationFrame(function () {
         $(".pa-grgraph").each(function () {
             var gg = $(this).data("paGradeGraph");

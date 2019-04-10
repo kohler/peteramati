@@ -2681,10 +2681,15 @@ textarea.pa-gradevalue {
 	stroke-width: 2;
 	fill: #ff5522;
 }
-.pa-gg-mark-grade.pa-gg-highlight-green {
-	stroke-width: 0.5;
-	fill: #00ff00;
-	r: 2;
+.pa-gg-mark-grade.pa-gg-highlight-green, .pa-gg-mark-grade.pa-gg-highlight-green1 {
+	stroke-width: 1;
+	fill: #00cc00;
+	r: 2.5;
+}
+.pa-gg-mark-grade.pa-gg-highlight-blue, .pa-gg-mark-grade.pa-gg-highlight-blue1 {
+	stroke-width: 1;
+	fill: #ff99ff;
+	r: 2.5;
 }
 .pa-gg-cdf, .pa-gg-pdf {
 	stroke: #222222;

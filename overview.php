@@ -11,7 +11,9 @@ $Conf->header("Overview", "home");
 
 echo '<form class="pa-grade-overview">';
 echo '<div class="pa-grade-overview-users"><div class="pa-grade-overview-users-inner">',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-a">As</label>',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="93.5-">A</label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="90-93.5" data-pa-highlight-color="green1">A-</label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="86.5-90" data-pa-highlight-color="blue">B+</label> ',
     '<table class="pap" id="pa-overview-table"></table>',
     '</div></div>';
 echo '<div class="pa-gradegrid">';
