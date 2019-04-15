@@ -3021,11 +3021,17 @@ function pa_loadfilediff(filee, callback) {
 }
 
 
-handle_ui.on("pa-unfold-file-diff", function () {
-    var self = this, filee = this.parentElement.nextSibling;
-    pa_loadfilediff(filee, function () {
-        fold61(filee, self);
-    });
+handle_ui.on("pa-unfold-file-diff", function (evt) {
+    if (evt.metaKey) {
+        $(".pa-unfold-file-diff").each(function () {
+            fold61(this.parentElement.nextSibling, this, false);
+        });
+    } else {
+        var self = this, filee = this.parentElement.nextSibling;
+        pa_loadfilediff(filee, function () {
+            fold61(filee, self);
+        });
+    }
     return false;
 });
 
