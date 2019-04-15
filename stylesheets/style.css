@@ -2404,10 +2404,10 @@ table.hidegrades .pa-gradenote {
 .pa-gx {
 	background-color: #f3f3ff;
 }
-.pa-gd {
+.pa-gd, .pa-gdsamp {
 	background-color: #ffdddd;
 }
-.pa-gi {
+.pa-gi, .pa-gisamp {
 	background-color: #ddffdd;
 }
 .pa-note-entry {

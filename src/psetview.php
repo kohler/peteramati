@@ -1155,6 +1155,7 @@ class PsetView {
         $only_table = get($args, "only_table");
         $no_heading = get($args, "no_heading") || $only_table;
         $id_by_user = !!get($args, "id_by_user");
+        $no_grades = get($args, "only_diff") || $only_table;
 
         $fileid = html_id_encode($file);
         if ($id_by_user)
@@ -1167,7 +1168,8 @@ class PsetView {
         if ($this->pset->has_grade_landmark
             && $this->pc_view
             && !$this->is_handout_commit()
-            && $dinfo->is_handout_commit_a()) {
+            && $dinfo->is_handout_commit_a()
+            && !$no_grades) {
             foreach ($this->pset->grades() as $g) {
                 if ($g->landmark_file === $file) {
                     $gentries["a" . $g->landmark_line][] = $g;

@@ -78,10 +78,25 @@ if ($commitb->hash === $Info->grading_hash())
     $commitb->subject .= "  ✱"; // space, nbsp
 $TABWIDTH = $Info->commit_info("tabwidth") ? : 4;
 
+echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey);
+if (!$Pset->gitless && $Info->maybe_commit_hash())
+    echo '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
+if (!$Pset->gitless && $Pset->directory)
+    echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
+if ($Me->can_set_grades($Pset, $Info))
+    echo '" data-pa-can-set-grades="yes';
+if ($Info->user_can_view_grades())
+    echo '" data-pa-user-can-view-grades="yes';
+if ($Info->user->extension)
+    echo '" data-pa-user-extension="yes';
+echo '">';
+
 echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height:110%\">",
-    "<div class=\"pa-dl pa-gd\" style=\"padding:2px 5px\"><big><code>", substr($hasha, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</big></div>",
-    "<div class=\"pa-dl pa-gi\" style=\"padding:2px 5px\"><big><code>", substr($hashb, 0, 7), "</code> ", htmlspecialchars($commitb->subject), "</big></div>",
-    "</td></tr></table><hr>\n";
+    "<div class=\"pa-dl pa-gdsamp\" style=\"padding:2px 5px\"><big><code>", substr($hasha, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</big></div>",
+    "<div class=\"pa-dl pa-gisamp\" style=\"padding:2px 5px\"><big><code>", substr($hashb, 0, 7), "</code> ", htmlspecialchars($commitb->subject), "</big></div>",
+    "</td></tr></table>";
+echo Ht::button("Hide left", ["class" => "btn ui pa-diff-toggle-hide-left pa-diff-show-right"]);
+echo "<hr>\n";
 
 // collect diff and sort line notes
 $lnorder = $hashb_mine ? $Info->viewable_line_notes() : $Info->empty_line_notes();
@@ -102,9 +117,9 @@ if (count($notelinks))
 // diff and line notes
 foreach ($diff as $file => $dinfo) {
     $open = $lnorder->file_has_notes($file) || !$dinfo->boring || (!$hasha_mine && !$hashb_mine);
-    $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
+    $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open, "only_diff" => true]);
 }
 
 Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",pa_beforeunload)');
-echo "<hr class=\"c\" />\n";
+echo "</div><hr class=\"c\" />\n";
 $Conf->footer();

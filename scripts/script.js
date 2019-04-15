@@ -5768,7 +5768,8 @@ handle_ui.on("pa-diff-toggle-hide-left", function () {
     else {
         var styles = $('<style class="style-hide-left"></style>').appendTo("head")[0].sheet;
         styles.insertRule('.pa-gd { display: none; }');
-        styles.insertRule('.pa-gi { background-color: inherit; }');
+        if (!hasClass(this, "pa-diff-show-right"))
+            styles.insertRule('.pa-gi { background-color: inherit; }');
     }
     if (this.tagName === "BUTTON")
         $(this).html($x.length ? "Hide left" : "Show left");
