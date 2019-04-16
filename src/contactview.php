@@ -132,8 +132,21 @@ class ContactView {
         }
         echo '</h2>';
 
-        if ($user !== $Me && !$user->is_anonymous)
-            echo '<h3>', Text::user_html($user), '</h3>';
+        if ($user !== $Me && !$user->is_anonymous) {
+            echo '<h3>', Text::user_html($user);
+            if ($user->studentYear) {
+                if (strlen($user->studentYear) <= 2
+                    && preg_match('/\A(?:[1-9]|1[0-9]|20)\z/', $user->studentYear))
+                    echo ' &#', (9311 + $user->studentYear), ';';
+                else if (strlen($user->studentYear) === 1
+                         && $user->studentYear >= "A"
+                         && $user->studentYear <= "Z")
+                    echo ' &#', (9398 + ord($user->studentYear) - 65), ';';
+                else
+                    echo ' ', htmlspecialchars($user->studentYear);
+            }
+            echo '</h3>';
+        }
 
         if ($user->dropped)
             ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
