@@ -234,10 +234,11 @@ class Pset {
 
         // runners
         $runners = get($p, "runners");
+        $default_runner = get($p, "default_runner");
         $this->has_transfer_warnings = $this->has_xterm_js = false;
         if (is_array($runners) || is_object($runners)) {
             foreach ((array) $p->runners as $k => $v) {
-                $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v);
+                $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v, $default_runner);
                 if (get($this->all_runners, $r->name))
                     throw new PsetConfigException("runner `$r->name` reused", "runners", $k);
                 $this->all_runners[$r->name] = $r;
@@ -539,18 +540,20 @@ class Pset {
             $format = $args[$i];
             ++$i;
         }
-        $p = $args[$i];
+        $ps = is_object($args[$i]) ? [$args[$i]] : $args[$i];
         for (++$i; $i < count($args); ++$i) {
             $x = $args[$i];
-            if (isset($p->$x)) {
-                $v = call_user_func($callable, $p->$x);
-                if (is_array($v) && $v[0])
-                    return $v[1];
-                else if (!is_array($v) && $v)
-                    return $p->$x;
-                else {
-                    $errormsg = is_array($v) ? $v[1] : "format error";
-                    throw new PsetConfigException("`$x` $errormsg", $format, $x);
+            foreach ($ps as $p) {
+                if (isset($p->$x)) {
+                    $v = call_user_func($callable, $p->$x);
+                    if (is_array($v) && $v[0])
+                        return $v[1];
+                    else if (!is_array($v) && $v)
+                        return $p->$x;
+                    else {
+                        $errormsg = is_array($v) ? $v[1] : "format error";
+                        throw new PsetConfigException("`$x` $errormsg", $format, $x);
+                    }
                 }
             }
         }
@@ -868,46 +871,62 @@ class RunnerConfig {
     public $eval;
     public $timed_replay;
 
-    function __construct($name, $r) {
+    function __construct($name, $r, $defr) {
         $loc = array("runners", $name);
         if (!is_object($r))
             throw new PsetConfigException("runner format error", $loc);
+        $rs = $defr ? [$r, $defr] : $r;
+
         $this->name = isset($r->name) ? $r->name : $name;
         if (!is_string($this->name) || !preg_match(',\A[A-Za-z][0-9A-Za-z_]*\z,', $this->name))
             throw new PsetConfigException("runner name format error", $loc);
-        $this->category = isset($r->category) ? $r->category : $this->name;
+
+        if (isset($r->category))
+            $this->category = $r->category;
+        else if ($defr && isset($defr->category))
+            $this->category = $defr->category;
+        else
+            $this->category = $this->name;
         if (!is_string($this->category) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->category))
             throw new PsetConfigException("runner category format error", $loc);
+
         $this->title = Pset::cstr($loc, $r, "title", "text");
         if ($this->title === null)
             $this->title = $this->name;
+
         $this->output_title = Pset::cstr($loc, $r, "output_title", "output_text");
         if ($this->output_title === null)
             $this->output_title = $this->title . " output";
-        $this->disabled = Pset::cbool($loc, $r, "disabled");
-        $this->visible = Pset::cbool($loc, $r, "visible", "show_to_students");
-        $this->output_visible = Pset::cdate_or_grades($loc, $r, "output_visible", "show_output_to_students", "show_results_to_students");
-        $this->timeout = Pset::cinterval($loc, $r, "timeout", "run_timeout");
-        $this->xterm_js = Pset::cbool($loc, $r, "xterm_js");
-        if (isset($r->transfer_warnings) && $r->transfer_warnings === "grades")
+
+        $this->disabled = Pset::cbool($loc, $rs, "disabled");
+        $this->visible = Pset::cbool($loc, $rs, "visible", "show_to_students");
+        $this->output_visible = Pset::cdate_or_grades($loc, $rs, "output_visible", "show_output_to_students", "show_results_to_students");
+        $this->timeout = Pset::cinterval($loc, $rs, "timeout", "run_timeout");
+        $this->xterm_js = Pset::cbool($loc, $rs, "xterm_js");
+        if (isset($r->transfer_warnings)
+            ? $r->transfer_warnings === "grades"
+            : $defr && isset($defr->transfer_warnings) && $defr->transfer_warnings === "grades")
             $this->transfer_warnings = "grades";
         else
-            $this->transfer_warnings = Pset::cbool($loc, $r, "transfer_warnings");
-        $this->transfer_warnings_priority = Pset::cnum($loc, $r, "transfer_warnings_priority");
-        $this->command = Pset::cstr($loc, $r, "command");
-        $this->username = Pset::cstr($loc, $r, "username", "run_username");
-        $this->require = Pset::cstr($loc, $r, "require", "load");
-        $this->eval = Pset::cstr($loc, $r, "eval");
-        $this->queue = Pset::cstr($loc, $r, "queue");
-        $this->nconcurrent = Pset::cint($loc, $r, "nconcurrent");
-        $this->position = Pset::cnum($loc, $r, "position");
+            $this->transfer_warnings = Pset::cbool($loc, $rs, "transfer_warnings");
+        $this->transfer_warnings_priority = Pset::cnum($loc, $rs, "transfer_warnings_priority");
+        $this->command = Pset::cstr($loc, $rs, "command");
+        $this->username = Pset::cstr($loc, $rs, "username", "run_username");
+        $this->require = Pset::cstr($loc, $rs, "require", "load");
+        $this->eval = Pset::cstr($loc, $rs, "eval");
+        $this->queue = Pset::cstr($loc, $rs, "queue");
+        $this->nconcurrent = Pset::cint($loc, $rs, "nconcurrent");
+        $this->position = Pset::cnum($loc, $rs, "position");
         if ($this->position === null && isset($r->priority))
             $this->position = -Pset::cnum($loc, $r, "priority");
-        $this->overlay = Pset::cstr_or_str_array($loc, $r, "overlay");
-        if (isset($r->timed_replay) && is_number($r->timed_replay))
-            $this->timed_replay = $r->timed_replay > 0 ? (float) $r->timed_replay : false;
-        else
-            $this->timed_replay = !!Pset::cbool($loc, $r, "timed_replay");
+        $this->overlay = Pset::cstr_or_str_array($loc, $rs, "overlay");
+        if (isset($r->timed_replay)
+            ? is_number($r->timed_replay)
+            : $defr && isset($defr->timed_replay) && is_number($defr->timed_replay)) {
+            $n = isset($r->timed_replay) ? $r->timed_replay : $defr->timed_replay;
+            $this->timed_replay = $n > 0 ? (float) $n : false;
+        } else
+            $this->timed_replay = !!Pset::cbool($loc, $rs, "timed_replay");
     }
     function category_argument() {
         return $this->category === $this->name ? null : $this->category;

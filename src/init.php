@@ -262,6 +262,8 @@ function load_psets_json($exclude_overrides) {
     }
     $json->_defaults->config_signature = md5(json_encode(array_keys($datamap)) . $mtime);
     $json->_defaults->config_mtime = $mtime;
+    if (isset($json->_defaults->runner))
+        $json->_defaults->default_runner = $json->_defaults->runner;
     return $json;
 }
 
