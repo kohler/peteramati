@@ -1000,6 +1000,12 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
         $j["is_grade"] = true;
     if ($row->haslinenotes)
         $j["has_notes"] = true;
+    if ($row->conversation) {
+        if (strlen($row->conversation) < 40)
+            $j["conversation"] = $row->conversation;
+        else
+            $j["conversation_pfx"] = UnicodeHelper::utf8_word_prefix($row->conversation, 40);
+    }
     if ($row->notes) {
         $garr = render_grades($pset, $row->notes, null);
         $j["total"] = $garr->totalv;
@@ -1028,9 +1034,13 @@ function show_regrades($result, $all) {
         $row->notes = json_decode($row->notes);
         $flags = (array) get($row->notes, "flags");
         $any = false;
-        foreach ($flags as $t => $v)
-            if ($all || !get($v, "resolved"))
+        foreach ($flags as $t => $v) {
+            if ($all || !get($v, "resolved")) {
                 $uids[get($v, "uid", 0)] = $any = true;
+                if (isset($v->conversation))
+                    $row->conversation = (string) $v->conversation[0][2];
+            }
+        }
         if ($any) {
             $flagrows[] = $row;
             $psets[$row->pset] = true;
@@ -1456,7 +1466,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
 
     $allflags = !!$Qreq->allflags;
     $field = $allflags ? "hasflags" : "hasactiveflags";
-    $result = Dbl::qe("select *, null as main_gradercid, null as gradebhash, null as repocids from CommitNotes where $field=1");
+    $result = Dbl::qe("select *, null as main_gradercid, null as gradebhash, null as repocids, null as conversation from CommitNotes where $field=1");
     if (edb_nrows($result)) {
         echo $sep;
         show_regrades($result, $allflags);

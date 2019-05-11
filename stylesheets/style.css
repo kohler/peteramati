@@ -2275,7 +2275,7 @@ table.pap > thead {
 }
 .pap-username, .pap-name, .pap-extension, .pap-grader,
 .pap-notes, .pap-grade, .pap-ngrades, .pap-total,
-.pap-repo, .pap-pset, .pap-at {
+.pap-conversation, .pap-repo, .pap-pset, .pap-at {
 	padding-right: 0.75rem;
 }
 .pap-grade, .pap-total, .pap-ngrades {

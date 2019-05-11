@@ -5148,6 +5148,8 @@ function pa_render_pset_table(pconf, data) {
                 col.push("at");
             }
             col.push("username", "name", "extension", "grader");
+            if (flagged)
+                col.push("conversation");
             if (flagged || !pconf.gitless_grades || visible)
                 col.push("notes");
             if (pconf.need_total)
@@ -5288,6 +5290,12 @@ function pa_render_pset_table(pconf, data) {
         if (!flagged && s.has_nongrader_notes)
             t += '<sup>*</sup>';
         return '<td class="pap-notes">' + t + '</td>';
+    };
+    th_render.conversation = '<th class="pap-conversation l">Flag</th>';
+    td_render.conversation = function (s) {
+        return '<td class="pap-conversation l">' +
+            (s.conversation || s.conversation_pfx) +
+            (s.conversation_pfx ? "…" : "") + '</td>';
     };
     th_render.total = '<th class="pap-total r plsortable" data-pa-sort="total">Tot</th>';
     td_render.total = function (s) {
