@@ -289,17 +289,32 @@ function echo_commit($Info) {
         $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
         $bhashes[] = hex2bin($k->hash);
     }
-    $result = $Conf->qe("select bhash from CommitNotes where (haslinenotes & ?)!=0 and pset=? and bhash ?a",
-                        $Me == $User && !$Info->can_view_grades() ? HASNOTES_COMMENT : HASNOTES_ANY,
-                        $Pset->psetid, $bhashes);
-    while (($row = edb_row($result)))
-        $sel[bin2hex($row[0])] .= " &nbsp;♪";
+    $notesflag = HASNOTES_ANY;
+    if ($Me == $User && !$Info->can_view_grades())
+        $notesflag = HASNOTES_COMMENT;
+    $result = $Conf->qe("select bhash, haslinenotes, hasflags, hasactiveflags
+        from CommitNotes where pset=? and bhash?a and (haslinenotes or hasflags)",
+        $Pset->psetid, $bhashes);
+    while (($row = edb_row($result))) {
+        $hex = bin2hex($row[0]);
+        $f = "";
+        if ($row[1] & $notesflag)
+            $f .= "♪";
+        if ($row[3])
+            $f .= "⚑";
+        else if ($row[2])
+            $f .= "⚐";
+        if ($f !== "")
+            $sel[bin2hex($row[0])] .= "  $f";
+    }
     Dbl::free($result);
+
     if (!empty($sel)
         && ($h = $Info->update_grading_hash(true))
         && isset($sel[$h])) {
-        $sel[$h] = preg_replace('_\A(.*?)(?: &nbsp;|)((?:|♪))\z_', '$1 &nbsp;✱$2', $sel[$h]);
+        $sel[$h] = preg_replace('_\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z_', '$1 &nbsp;✱$2', $sel[$h]);
     }
+
     if ($Info->is_grading_commit())
         $key = "grading commit";
     else
