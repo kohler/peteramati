@@ -1021,7 +1021,9 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
 
 function show_regrades($result, $all) {
     global $Conf, $Me, $Qreq, $Now;
-    $rows = $uids = [];
+
+    // 1. load commit notes
+    $flagrows = $uids = $psets = [];
     while (($row = edb_orow($result))) {
         $row->notes = json_decode($row->notes);
         $flags = (array) get($row->notes, "flags");
@@ -1030,19 +1032,57 @@ function show_regrades($result, $all) {
             if ($all || !get($v, "resolved"))
                 $uids[get($v, "uid", 0)] = $any = true;
         if ($any) {
-            $rows[] = $row;
-            foreach (explode(",", $row->repocids) as $uid)
-                $uids[$uid] = true;
+            $flagrows[] = $row;
+            $psets[$row->pset] = true;
         }
     }
     Dbl::free($result);
-    if (empty($rows))
+    if (empty($flags))
         return;
 
-    $contacts = [];
+    // 2. load repouids and branches
+    $repouids = $branches = $rgwanted = [];
+    $result = $Conf->qe("select cid, type, pset, link from ContactLink where (type=" . LINK_REPO . " or type=" . LINK_BRANCH . ") and pset?a", array_keys($psets));
+    while (($row = edb_row($result))) {
+        if ($row[1] == LINK_REPO) {
+            $repouids[$row[3] . "," . $row[2]][] = (int) $row[0];
+            $rgwanted[] = "(repoid={$row[3]} and pset={$row[2]})";
+        } else {
+            $branches[$row[0] . "," . $row[2]] = (int) $row[3];
+        }
+    }
+    Dbl::free($result);
+
+    // 3. load RepositoryGrades
+    $rgs = [];
+    $result = $Conf->qe("select * from RepositoryGrade where " . join(" or ", $rgwanted));
+    while (($row = edb_orow($result))) {
+        $rgs["{$row->repoid},{$row->pset},{$row->branchid}"] = $row;
+    }
+    Dbl::free($result);
+
+    // 4. resolve `repocids`, `main_gradercid`, `gradebhash`
+    foreach ($flagrows as $row) {
+        $rowuids = [];
+        foreach (get($repouids, "{$row->repoid},{$row->pset}", []) as $uid) {
+            $rowuids[] = $uid;
+            $uids[$uid] = true;
+
+            $branch = get($branches, "{$uid},{$row->pset}", 0);
+            $bkey = "{$row->repoid},{$row->pset},{$branch}";
+            if (isset($rgs[$bkey])) {
+                $row->main_gradercid = $rgs[$bkey]->gradercid;
+                $row->gradebhash = $rgs[$bkey]->gradebhash;
+            }
+        }
+        $row->repocids = join(",", $rowuids);
+    }
+
+    // 5. load users
     $result = $Conf->qe("select * from ContactInfo where contactId?a", array_keys($uids));
-    while (($c = Contact::fetch($result, $Conf)))
+    while (($c = Contact::fetch($result, $Conf))) {
         $contacts[$c->contactId] = $c;
+    }
     Dbl::free($result);
 
     echo '<div>';
@@ -1053,7 +1093,7 @@ function show_regrades($result, $all) {
         $anonymous = !!$Qreq->anonymous;
     $any_anonymous = $any_nonanonymous = false;
     $jx = [];
-    foreach ($rows as $row) {
+    foreach ($flagrows as $row) {
         if (!$row->repocids)
             continue;
         $pset = $Conf->pset_by_id($row->pset);
@@ -1416,11 +1456,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
 
     $allflags = !!$Qreq->allflags;
     $field = $allflags ? "hasflags" : "hasactiveflags";
-    $result = Dbl::qe("select cn.*, rg.gradercid main_gradercid, rg.gradebhash,
-        (select group_concat(cid) from ContactLink where pset=cn.pset and type=" . LINK_REPO . " and link=cn.repoid) repocids
-        from CommitNotes cn
-        left join RepositoryGrade rg on (rg.repoid=cn.repoid and rg.pset=cn.pset)
-        where $field=1");
+    $result = Dbl::qe("select *, null as main_gradercid, null as gradebhash, null as repocids from CommitNotes where $field=1");
     if (edb_nrows($result)) {
         echo $sep;
         show_regrades($result, $allflags);
