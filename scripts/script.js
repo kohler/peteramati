@@ -5294,7 +5294,7 @@ function pa_render_pset_table(pconf, data) {
     th_render.conversation = '<th class="pap-conversation l">Flag</th>';
     td_render.conversation = function (s) {
         return '<td class="pap-conversation l">' +
-            (s.conversation || s.conversation_pfx || "") +
+            escape_entities(s.conversation || s.conversation_pfx || "") +
             (s.conversation_pfx ? "…" : "") + '</td>';
     };
     th_render.total = '<th class="pap-total r plsortable" data-pa-sort="total">Tot</th>';
