@@ -80,7 +80,7 @@ if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
 
 
 // download
-function report_set($s, $k, $total, $total_noextra, $normfactor = null) {
+function report_set($s, $k, $total, $total_noextra, $normfactor) {
     $s->$k = $total;
     $x = "{$k}_noextra";
     $s->$x = $total_noextra;
@@ -146,7 +146,7 @@ function collect_pset_info(&$students, $sset, $entries) {
     }
 }
 
-function set_ranks(&$students, &$selection, $example, $key, $round = false) {
+function set_ranks(&$students, &$selection, $key, $round = false) {
     $selection[] = $key;
     $selection[] = $key . "_rank";
     if ($round) {
@@ -182,19 +182,16 @@ function set_ranks(&$students, &$selection, $example, $key, $round = false) {
         $s->{$relrank} = $rr;
         ++$i;
     }
-    foreach ([$key, "{$key}_rank", "{$key}_rank_norm"] as $k) {
-        $example->$k = 100;
-    }
 }
 
-function parse_formula(&$t, $example, $minprec) {
+function parse_formula($conf, &$t, $example, $minprec) {
     $t = ltrim($t);
 
     if ($t === "") {
         $e = null;
     } else if ($t[0] === "(") {
         $t = substr($t, 1);
-        $e = parse_formula($t, $example, 0);
+        $e = parse_formula($conf, $t, $example, 0);
         if ($e !== null) {
             $t = ltrim($t);
             if ($t === "" || $t[0] !== ")") {
@@ -205,7 +202,7 @@ function parse_formula(&$t, $example, $minprec) {
     } else if ($t[0] === "-" || $t[0] === "+") {
         $op = $t[0];
         $t = substr($t, 1);
-        $e = parse_formula($t, $example, 12);
+        $e = parse_formula($conf, $t, $example, 12);
         if ($e !== null && $op === "-") {
             $e = ["neg", $e];
         }
@@ -217,19 +214,43 @@ function parse_formula(&$t, $example, $minprec) {
         $e = (float) M_PI;
     } else if (preg_match('{\A(log10|log|ln|lg|exp)\b(.*)\z}s', $t, $m)) {
         $t = $m[2];
-        $e = parse_formula($t, $example, 12);
+        $e = parse_formula($conf, $t, $example, 12);
         if ($e !== null) {
             $e = [$m[1], $e];
         }
     } else if (preg_match('{\A(\w+)(.*)\z}s', $t, $m)) {
         $t = $m[2];
         $k = $m[1];
-        if (!isset($example->$k)) {
-            return null;
-        } else if ($k === "nstudents") {
+        if ($k === "nstudents") {
             $e = $example->nstudents;
         } else {
-            $e = $k;
+            $kbase = $k;
+            $noextra = false;
+            $rank = $norm = "";
+            while (true) {
+                if (str_ends_with($kbase, "_noextra")) {
+                    $kbase = substr($kbase, 0, -8);
+                    $noextra = true;
+                } else if (str_ends_with($kbase, "_norm") && !$norm) {
+                    $kbase = substr($kbase, 0, -5);
+                    $norm = "_norm";
+                } else if (str_ends_with($kbase, "_rank") && !$rank) {
+                    $kbase = substr($kbase, 0, -5);
+                    $rank = "_rank";
+                } else {
+                    break;
+                }
+            }
+            if (($pset = $conf->pset_by_key_or_title($kbase))) {
+                $noextra = $noextra && $pset->has_extra;
+                $kbase = $pset->psetkey;
+            } else if ($conf->pset_group($kbase)) {
+                $noextra = $noextra && $conf->pset_group_has_extra($kbase);
+            } else {
+                return null;
+            }
+            $k = $kbase . ($noextra ? "_noextra" : "") . $rank . $norm;
+            $e = $rank ? 100 : 100.0;
         }
     } else {
         $e = null;
@@ -254,7 +275,7 @@ function parse_formula(&$t, $example, $minprec) {
                 return $e;
             }
             $t = $m[2];
-            $e2 = parse_formula($t, $example, $op === "**" ? $prec : $prec + 1);
+            $e2 = parse_formula($conf, $t, $example, $op === "**" ? $prec : $prec + 1);
             if ($e === null) {
                 return null;
             }
@@ -338,62 +359,42 @@ function download_psets_report($request) {
     else
         $selection = ["name", "username", "anon_username", "email", "huid", "extension", "npartners"];
 
-    $group_has_extra = [];
-    if (!$sel_pset) {
-        $grouped_psets = [];
-        $ungrouped_psets = [];
-        foreach ($Conf->psets() as $pset) {
-            if (!$pset->disabled) {
-                if ($pset->group) {
-                    $grouped_psets[$pset->group][] = $pset;
-                    if ($pset->has_extra) {
-                        $group_has_extra[$pset->group] = true;
-                    }
-                } else {
-                    $ungrouped_psets[] = $pset;
-                }
-            }
-        }
-        if (!empty($ungrouped_psets)) {
-            $grouped_psets[""] = $ungrouped_psets;
-        }
-    } else {
-        $grouped_psets[""] = [$sel_pset];
-    }
-
-    $example = (object) ["nstudents" => count($students)];
+    $grouped_psets = $sel_pset ? ["" => [$pset]] : $Conf->pset_groups();
 
     foreach ($grouped_psets as $grp => $psets) {
         foreach ($psets as $pset) {
             $sset->set_pset($pset, $anonymous);
-            report_set($example, $pset->psetkey, 100, 100, 1);
 
             collect_pset_info($students, $sset, !!$sel_pset);
-            set_ranks($students, $selection, $example, $pset->psetkey);
+            set_ranks($students, $selection, $pset->psetkey);
             if ($pset->has_extra) {
-                set_ranks($students, $selection, $example, "{$pset->psetkey}_noextra");
+                set_ranks($students, $selection, "{$pset->psetkey}_noextra");
             }
         }
     }
 
     foreach ($grouped_psets as $grp => $psets) {
         if ($grp !== "") {
-            set_ranks($students, $selection, $example, $grp, true);
-            if (get($group_has_extra, $grp)) {
-                set_ranks($students, $selection, $example, "{$grp}_noextra", true);
+            set_ranks($students, $selection, $grp, true);
+            if ($Conf->pset_group_has_extra($grp)) {
+                set_ranks($students, $selection, "{$grp}_noextra", true);
             }
         }
     }
 
-    foreach (get($PsetInfo, "_report_summaries", []) as $fname => $formula) {
-        $fexpr = parse_formula($formula, $example, 0);
-        if ($fexpr !== null && trim($formula) === "") {
-            foreach ($students as $s) {
-                $s->$fname = round(evaluate_formula($s, $fexpr) * 10) / 10;
+    $example->nstudents = count($students);
+
+    if (!$sel_pset) {
+        foreach (get($PsetInfo, "_report_summaries", []) as $fname => $formula) {
+            $fexpr = parse_formula($Conf, $formula, $example, 0);
+            if ($fexpr !== null && trim($formula) === "") {
+                foreach ($students as $s) {
+                    $s->$fname = round(evaluate_formula($s, $fexpr) * 10) / 10;
+                }
+                set_ranks($students, $selection, $fname);
+            } else {
+                error_log("bad formula $fname @$formula");
             }
-            set_ranks($students, $selection, $example, $fname);
-        } else {
-            error_log("bad formula $fname @$formula");
         }
     }
 

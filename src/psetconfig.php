@@ -105,8 +105,10 @@ class Pset {
         // pset key
         if (ctype_digit($pk) && intval($pk) !== $p->psetid)
             throw new PsetConfigException("numeric pset key disagrees with `psetid`");
-        else if (!preg_match(',\A[^_./&;#][^/&;#]*\z,', $pk))
+        else if (!preg_match('{\A[^_./&;#][^/&;#]*\z}', $pk))
             throw new PsetConfigException("pset key format error");
+        else if (preg_match('{(_rank|_noextra|_norm)\z}', $pk, $m))
+            throw new PsetConfigException("pset key cannot end with `{$m[0]}`");
         $this->psetkey = $pk;
 
         // url keys

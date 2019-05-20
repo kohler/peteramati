@@ -69,6 +69,8 @@ class Conf {
     private $_psets_by_urlkey = [];
     private $_psets_sorted = false;
     private $_group_weights;
+    private $_grouped_psets;
+    private $_group_has_extra;
 
     private $_date_format_initialized = false;
     private $_pc_members_cache = null;
@@ -1633,6 +1635,18 @@ class Conf {
         return null;
     }
 
+    function pset_by_key_or_title($key) {
+        if (($p = get($this->_psets_by_urlkey, $key)))
+            return $p;
+        $tm = null;
+        foreach ($this->_psets as $p)
+            if ($key === $p->psetkey)
+                return $p;
+            else if ($key === $p->title)
+                $tm = $p;
+        return $tm;
+    }
+
     function group_weight($group) {
         if ($this->_group_weights === null) {
             $this->_group_weights = [];
@@ -1641,6 +1655,39 @@ class Conf {
                     $this->_group_weights[$pset->group] = get($this->_group_weights, $pset->group, 0.0) + $pset->group_weight;
         }
         return get($this->_group_weights, $group, 0.0);
+    }
+
+    function pset_groups() {
+        if ($this->_grouped_psets === null) {
+            $this->_grouped_psets = [];
+            $this->_group_has_extra = [];
+            foreach ($this->psets() as $pset) {
+                if (!$pset->disabled) {
+                    $group = $pset->group ? : "";
+                    $this->_grouped_psets[$group][] = $pset;
+                    if ($pset->has_extra) {
+                        $this->_group_has_extra[$group] = true;
+                    }
+                }
+            }
+            uksort($this->_grouped_psets, function ($a, $b) {
+                if ($a === "") {
+                    return 1;
+                } else {
+                    return strnatcmp($a, $b);
+                }
+            });
+        }
+        return $this->_grouped_psets;
+    }
+
+    function pset_group($group) {
+        return get($this->pset_groups(), $group, []);
+    }
+
+    function pset_group_has_extra($group) {
+        $this->pset_groups();
+        return get($this->_group_has_extra, $group, false);
     }
 
 
