@@ -404,8 +404,7 @@ function download_psets_report($request) {
     }
 
     $csv = new CsvGenerator;
-    $csv->set_header($selection);
-    $csv->set_selection($selection);
+    $csv->select($selection);
     usort($students, function ($a, $b) {
         return strcasecmp($a->name, $b->name);
     });
