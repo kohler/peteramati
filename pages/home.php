@@ -249,8 +249,7 @@ function parse_formula($conf, &$t, $example, $minprec) {
             } else {
                 return null;
             }
-            $k = $kbase . ($noextra ? "_noextra" : "") . $rank . $norm;
-            $e = $rank ? 100 : 100.0;
+            $e = $kbase . ($noextra ? "_noextra" : "") . $rank . $norm;
         }
     } else {
         $e = null;
