@@ -653,6 +653,7 @@ class GradeEntryConfig {
     public $name;
     public $title;
     public $type;
+    public $options;
     public $max;
     public $visible;
     private $_visible_defaulted = false;
@@ -681,66 +682,79 @@ class GradeEntryConfig {
         if (!is_object($g))
             throw new PsetConfigException("grade entry format error", $loc);
         $this->key = $name;
-        if (isset($g->key))
+        if (isset($g->key)) {
             $this->key = $g->key;
-        else if (isset($g->name))
+        } else if (isset($g->name)) {
             $this->key = $g->name;
+        }
         if (!is_string($this->key)
             || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->key)
             || $this->key[0] === "_"
             || $this->key === "total"
             || $this->key === "late_hours"
-            || $this->key === "auto_late_hours")
+            || $this->key === "auto_late_hours") {
             throw new PsetConfigException("grade entry key format error", $loc);
+        }
         $this->name = $this->key;
         $this->title = Pset::cstr($loc, $g, "title");
-        if ((string) $this->title === "")
+        if ((string) $this->title === "") {
             $this->title = $this->key;
+        }
 
         $type = null;
         if (isset($g->type)) {
             $type = Pset::cstr($loc, $g, "type");
-            if ($type === "number")
+            if ($type === "number") {
                 $type = null;
-            else if ($type === "text" || $type === "checkbox" || $type === "letter")
-                /* nada */;
-            else
+            } else if ($type === "text" || $type === "checkbox" || $type === "letter") {
+                // nada
+            } else if ($type === "selector"
+                       && isset($g->options)
+                       && is_array($g->options)) {
+                // XXX check components are strings all different
+                $this->options = $g->options;
+            } else {
                 throw new PsetConfigException("unknown grade entry type", $loc);
+            }
         }
         $this->type = $type;
 
-        if ($this->type === "text") {
+        if ($this->type === "text" || $this->type === "selector") {
             $this->no_total = true;
         } else {
-            $this->max = Pset::cnum($loc, $g, "max");
-            if ($this->type === "checkbox") {
-                if ($this->max === null)
-                    throw new PsetConfigException("checkbox grade entry requires max", $loc);
-            } else if ($this->type === "letter") {
-                if ($this->max === null)
-                    $this->max = 100;
-                if ((float) $this->max !== 100.0)
-                    throw new PsetConfigException("letter grade entry requires max 100", $loc);
-            }
-            if (isset($g->visible))
-                $this->visible = Pset::cbool($loc, $g, "visible");
-            else if (isset($g->hide))
-                $this->visible = !Pset::cbool($loc, $g, "hide");
-            else
-                $this->visible = $this->_visible_defaulted = true;
-            if (isset($g->max_visible))
-                $this->max_visible = Pset::cbool($loc, $g, "max_visible");
-            else if (isset($g->hide_max))
-                $this->max_visible = !Pset::cbool($loc, $g, "hide_max");
-            else
-                $this->max_visible = $this->_max_visible_defaulted = true;
             $this->no_total = Pset::cbool($loc, $g, "no_total");
-            $this->is_extra = Pset::cbool($loc, $g, "is_extra");
         }
 
+        $this->max = Pset::cnum($loc, $g, "max");
+        if ($this->type === "checkbox") {
+            if ($this->max === null)
+                throw new PsetConfigException("checkbox grade entry requires max", $loc);
+        } else if ($this->type === "letter") {
+            if ($this->max === null)
+                $this->max = 100;
+            if ((float) $this->max !== 100.0)
+                throw new PsetConfigException("letter grade entry requires max 100", $loc);
+        }
+        if (isset($g->visible)) {
+            $this->visible = Pset::cbool($loc, $g, "visible");
+        } else if (isset($g->hide)) {
+            $this->visible = !Pset::cbool($loc, $g, "hide");
+        } else {
+            $this->visible = $this->_visible_defaulted = true;
+        }
+        if (isset($g->max_visible)) {
+            $this->max_visible = Pset::cbool($loc, $g, "max_visible");
+        } else if (isset($g->hide_max)) {
+            $this->max_visible = !Pset::cbool($loc, $g, "hide_max");
+        } else {
+            $this->max_visible = $this->_max_visible_defaulted = true;
+        }
+        $this->is_extra = Pset::cbool($loc, $g, "is_extra");
+
         $this->position = Pset::cnum($loc, $g, "position");
-        if ($this->position === null && isset($g->priority))
+        if ($this->position === null && isset($g->priority)) {
             $this->position = -Pset::cnum($loc, $g, "priority");
+        }
 
         if (isset($g->landmark)) {
             if (is_string($g->landmark)
@@ -753,8 +767,9 @@ class GradeEntryConfig {
                        && is_int($g->landmark[1])) {
                 $this->landmark_file = $g->landmark[0];
                 $this->landmark_line = $g->landmark[1];
-            } else
+            } else {
                 throw new PsetConfigException("grade entry `landmark` format error", $loc);
+            }
         }
         if (isset($g->landmark_range)) {
             if (is_string($g->landmark_range)
@@ -772,16 +787,18 @@ class GradeEntryConfig {
                 $this->landmark_range_last = $g->landmark_range[2];
             }
             if ($this->landmark_range_file === null
-                || $this->landmark_range_first > $this->landmark_range_last)
+                || $this->landmark_range_first > $this->landmark_range_last) {
                 throw new PsetConfigException("grade entry `landmark_range` format error", $loc);
+            }
         }
         if (isset($g->landmark_buttons)
             && is_array($g->landmark_buttons)) {
             $this->landmark_buttons = [];
-            foreach ($g->landmark_buttons as $lb)
+            foreach ($g->landmark_buttons as $lb) {
                 if (is_string($lb)
                     || (is_object($lb) && isset($lb->title)))
                     $this->landmark_buttons[] = $lb;
+            }
         }
     }
 
@@ -798,6 +815,13 @@ class GradeEntryConfig {
         } else if (is_string($v)) {
             if ($this->type === "text") {
                 return rtrim($v);
+            } else if ($this->type === "selector") {
+                if ($v === null || $v === "" || strcasecmp($v, "none") === 0)
+                    return null;
+                else if (in_array((string) $v, $this->options))
+                    return $v;
+                else
+                    return false;
             }
             $v = trim($v);
             if ($v === "") {
@@ -816,37 +840,51 @@ class GradeEntryConfig {
     }
 
     function parse_value_error() {
-        if ($this->type === null)
+        if ($this->type === null) {
             return "Numeric grade expected.";
-        else if ($this->type === "letter")
+        } else if ($this->type === "letter") {
             return "Letter grade expected.";
-        else
+        } else {
             return "Invalid grade.";
+        }
     }
 
     function value_differs($v1, $v2) {
-        if ($v1 === null || $v2 === null || $this->type === "text")
+        if ($v1 === null
+            || $v2 === null
+            || $this->type === "text"
+            || $this->type === "selector") {
             return $v1 !== $v2;
-        else
+        } else {
             return abs($v1 - $v2) >= 0.0001;
+        }
     }
 
     function json($pcview, $pos = null) {
         $gej = ["title" => $this->title];
-        if ($pos !== null)
+        if ($pos !== null) {
             $gej["pos"] = $pos;
-        else
+        } else {
             $gej["key"] = $this->key;
-        if ($this->type !== null)
+        }
+        if ($this->type !== null) {
             $gej["type"] = $this->type;
-        if ($this->max && ($pcview || $this->max_visible))
+            if ($this->type === "selector") {
+                $gej["options"] = $this->options;
+            }
+        }
+        if ($this->max && ($pcview || $this->max_visible)) {
             $gej["max"] = $this->max;
-        if (!$this->no_total)
+        }
+        if (!$this->no_total) {
             $gej["in_total"] = true;
-        if ($this->is_extra)
+        }
+        if ($this->is_extra) {
             $gej["is_extra"] = true;
-        if ($this->landmark_file)
+        }
+        if ($this->landmark_file) {
             $gej["landmark"] = $this->landmark_file . ":" . $this->landmark_line;
+        }
         return $gej;
     }
 }

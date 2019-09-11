@@ -2560,6 +2560,13 @@ function pa_makegrade(gi, k, editable) {
         if (ge.type === "text") {
             t += '<div class="pa-pd"><textarea class="uich pa-pd pa-gradevalue" name="' + name +
                 '" id="' + id + '"></textarea></div>';
+        } else if (ge.type === "selector") {
+            t += '<div class="pa-pd pa-gradeentry"><select class="uich pa-gradevalue" name="' + name + '" id="' + id + '"><option value="">None</option>';
+            for (var i = 0; i !== ge.options.length; ++i) {
+                var n = escape_entities(ge.options[i]);
+                t += '<option value="' + n + '">' + n + '</option>';
+            }
+            t += '</select></div>';
         } else if (ge.type === "checkbox"
                    && (g == null || g === 0 || g === ge.max)) {
             t += '<div class="pa-gradeentry pa-pd"><span class="pa-gradewidth">' +
@@ -2581,9 +2588,9 @@ function pa_makegrade(gi, k, editable) {
     } else {
         t = '<div class="pa-grade pa-p" data-pa-grade="' + name + '">' +
             '<div class="pa-pt">' + title + '</div>';
-        if (ge.type === "text")
+        if (ge.type === "text") {
             t += '<div class="pa-pd pa-gradevalue"></div>';
-        else {
+        } else {
             t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
             if (ge.max && ge.type !== "letter")
                 t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
@@ -2611,6 +2618,12 @@ var pa_grade_types = {
         }
     },
     text: {
+        text: function (v) {
+            return v;
+        },
+        justify: "left"
+    },
+    selector: {
         text: function (v) {
             return v;
         },
@@ -2680,9 +2693,9 @@ function pa_setgrade(gi, editable) {
 
     // “autograde differs” message
     if (ag != null && editable) {
-        if (g === ag)
+        if (g === ag) {
             $g.find(".pa-gradediffers").remove();
-        else {
+        } else {
             var txt = "autograde is " + ag;
             if (!$g.find(".pa-gradediffers").length)
                 $g.find(".pa-gradeentry").append('<span class="pa-gradediffers"></span>');
@@ -2695,8 +2708,9 @@ function pa_setgrade(gi, editable) {
     // actual grade value
     var $v = $g.find(".pa-gradevalue");
     var gt = "";
-    if (g != null)
+    if (g != null) {
         gt = pa_grade_types[ge.type || "numeric"].text.call(ge, g);
+    }
     if (!editable) {
         if ($v.text() !== gt)
             $v.text(gt);
@@ -2757,17 +2771,19 @@ handle_ui.on("pa-gradevalue-form", function (event) {
         gi = JSON.parse(gi);
 
     var g = {}, og = {};
-    $f.find("input.pa-gradevalue, textarea.pa-gradevalue").each(function () {
+    $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
         var ge = gi.entries[this.name];
-        if (gi.grades && ge && gi.grades[ge.pos] != null)
+        if (gi.grades && ge && gi.grades[ge.pos] != null) {
             og[this.name] = gi.grades[ge.pos];
-        else if (this.name === "late_hours" && gi.late_hours != null)
+        } else if (this.name === "late_hours" && gi.late_hours != null) {
             og[this.name] = gi.late_hours;
+        }
         if ((this.type !== "checkbox" && this.type !== "radio")
-            || this.checked)
+            || this.checked) {
             g[this.name] = this.value;
-        else if (this.type === "checkbox")
+        } else if (this.type === "checkbox") {
             g[this.name] = 0;
+        }
     });
 
     $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f)), {
@@ -2865,9 +2881,9 @@ function pa_loadgrades(gi) {
             var lh_editable = $v.is("input");
             // “auto-late hours differs” message
             if (ag !== null && lh_editable) {
-                if (g === ag || ag == null)
+                if (g === ag || ag == null) {
                     $g.find(".pa-gradediffers").remove();
-                else {
+                } else {
                     var txt = "auto-late hours is " + ag;
                     if (!$g.find(".pa-gradediffers").length)
                         $g.find(".pa-gradeentry").append('<span class="pa-gradediffers"></span>');
