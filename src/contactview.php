@@ -308,8 +308,9 @@ class ContactView {
         $notes = array_map(function ($m) use ($prefixes) {
             return [$m[2] > 0, $prefixes[$m[2]] . $m[1]];
         }, $ms->messages(true));
-        if ($repo && $repo->truncated_psetdir($pset))
-            $notes[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for us to grade and harder for you to get pset updates.");
+        if ($repo && $repo->truncated_psetdir($pset)) {
+            $notes[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for us to grade and harder for you to get pset updates."];
+        }
         if (!$repo) {
             $repoclasses = RepositorySite::site_classes($Conf);
             $x = commajoin(array_map(function ($k) { return Ht::link($k::global_friendly_siteclass(), $k::global_friendly_siteurl()); }, $repoclasses), "or");

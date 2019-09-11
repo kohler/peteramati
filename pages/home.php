@@ -980,9 +980,10 @@ function show_pset($pset, $user) {
 
 if (!$Me->is_empty() && $User->is_student()) {
     Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
-    foreach ($Conf->psets_newest_first() as $pset)
+    foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset) && !$pset->disabled)
             show_pset($pset, $User);
+    }
     if ($Me->isPC) {
         echo "<div style='margin-top:5em'></div>\n";
         if ($User->dropped) {
@@ -995,7 +996,7 @@ if (!$Me->is_empty() && $User->is_student()) {
                 "<div>", Ht::submit("Drop"), "</div></form>";
         }
     }
-    if ($Me->privChair && ($User->disabled || $User->password === "")) {
+    if ($Me->privChair && $User->can_enable()) {
         echo Ht::form(hoturl_post("index", ["enable_user" => 1,
                                             "u" => $Me->user_linkpart($User)])),
             Ht::submit("Enable"), "</form>";

@@ -414,6 +414,13 @@ class Contact {
         return $this->_disabled;
     }
 
+    function can_enable() {
+        if (!$this->isPC && $this->conf->opt("disableNonPC"))
+            return false;
+        else
+            return $this->disabled || $this->password === "";
+    }
+
     function has_email() {
         return !!$this->email;
     }

@@ -394,9 +394,9 @@ function echo_commit($Info) {
                     $cmd .= " master";
                 $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
             }
-        } else if ($last_handout)
-            $remarks[] = array(true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.");
-        else if (!$last_handout && $Me->isPC) {
+        } else if ($last_handout) {
+            $remarks[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.<br>This <em>somewhat dangerous</em> command will merge your repository with ours; make a backup of your Git repository before trying it:<br><pre>git pull --allow-unrelated-histories \"" . htmlspecialchars($Pset->handout_repo_url) . "\" --no-edit &amp;&amp; git push</pre>"];
+        } else if (!$last_handout && $Me->isPC) {
             $handout_files = $Pset->handout_repo()->ls_files("master");
             if (!count($handout_files))
                 $remarks[] = array(true, "The handout repository, " . htmlspecialchars($Pset->handout_repo_url) . ", contains no files; perhaps handout_repo_url is misconfigured.");
