@@ -2621,13 +2621,15 @@ var pa_grade_types = {
         text: function (v) {
             return v;
         },
-        justify: "left"
+        justify: "left",
+        sort: "forward"
     },
     selector: {
         text: function (v) {
             return v;
         },
-        justify: "left"
+        justify: "left",
+        sort: "forward"
     },
     checkbox: {
         text: function (v) {
@@ -2908,7 +2910,7 @@ function pa_loadgrades(gi) {
         var t = '<div class="pa-total pa-p';
         var ne = 0;
         for (var k in gi.entries)
-            if (gi.entries[k].type !== "text")
+            if (gi.entries[k].type !== "text" && gi.entries[k].type !== "selector")
                 ++ne;
         if (ne <= 1)
             t += ' hidden';
@@ -5100,30 +5102,47 @@ function pa_render_pset_table(pconf, data) {
         if (anonymous && sort.override_anonymous)
             anonymous = false;
 
-        grade_entries = {};
+        grade_entries = [];
         grade_keys = [];
         var grade_abbr = [];
         if (pconf.grades) {
-            var grade_abbr_count = {}, grade_titles = [];
+            var pabbr = {}, grade_titles = [], grade_titles_rest = [];
             for (var i = 0; i !== pconf.grades.order.length; ++i) {
                 var k = pconf.grades.order[i], ge = pconf.grades.entries[k];
                 if (ge.type !== "text") {
-                    grade_entries[k] = ge;
+                    grade_entries.push(ge);
                     grade_keys.push(k);
                     var t = ge.title || k;
                     grade_titles.push(t);
-                    var m = t.match(/^(p)(?:art\s*|(?=\d))([.a-z\d]+)(?:[\s:]|$)/i);
-                    m = m || t.match(/^(q)(?:uestion\s*|(?=\d))([.a-z\d]+)(?:[\s:]|$)/i);
-                    m = m || t.match(/^()(\S{1,3})/);
-                    var tx = m ? m[1] + m[2] : ":" + grade_keys.length + ":";
-                    grade_abbr.push(tx);
-                    grade_abbr_count[tx] = (grade_abbr_count[tx] || 0) + 1;
-                }
-            }
-            for (i = 0; i !== grade_abbr.length; ++i) {
-                if (grade_abbr_count[grade_abbr[i]] > 1
-                    && (m = grade_titles[i].match(/\s+(\S{1,3})/))) {
-                    grade_abbr[i] += m[1];
+                    var m = t.match(/^(p)(?:art\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i);
+                    m = m || t.match(/^(q)(?:uestion\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i);
+                    m = m || t.match(/^[\s:]*()(\S{1,3}[\d.]*)\S*[\s:]*/);
+                    if (!m) {
+                        grade_abbr.push(":" + grade_keys.length);
+                    } else {
+                        var abbr = m[1] + m[2],
+                            rest = t.substring(m[0].length),
+                            abbrx;
+                        while ((abbrx = pabbr[abbr])) {
+                            if (abbrx !== true
+                                && (m = abbrx[1].match(/^(\S{1,3}[\d.]*)\S*[\s:]*(.*)$/))) {
+                                grade_abbr[abbrx[0]] += m[1];
+                                pabbr[grade_abbr[abbrx[0]]] = [abbrx[0], m[2]];
+                                pabbr[abbr] = abbrx = true;
+                            }
+                            if ((m = rest.match(/^(\S{1,3}[\d.]*)\S*[\s:]*(.*)$/))) {
+                                abbr += m[1];
+                                rest = m[2];
+                            } else {
+                                if (abbrx !== true) {
+                                    abbr += ":" + grade_keys.length;
+                                }
+                                break;
+                            }
+                        }
+                        grade_abbr.push(abbr);
+                        pabbr[abbr] = [grade_keys.length - 1, rest];
+                    }
                 }
             }
         }
@@ -5156,30 +5175,46 @@ function pa_render_pset_table(pconf, data) {
             col = pconf.col;
         } else {
             col = [];
-            if (pconf.checkbox)
+            if (pconf.checkbox) {
                 col.push("checkbox");
+            }
             col.push("rownumber");
             if (flagged) {
                 col.push("pset");
                 col.push("at");
             }
             col.push("username", "name", "extension", "grader");
-            if (flagged)
+            if (flagged) {
                 col.push("conversation");
-            if (flagged || !pconf.gitless_grades || visible)
+            }
+            if (flagged || !pconf.gitless_grades || visible) {
                 col.push("notes");
-            if (pconf.need_total)
+            }
+            if (pconf.need_total) {
                 col.push("total");
-            for (i = 0; i !== grade_keys.length; ++i)
-                col.push({type: "grade", gidx: i, gkey: grade_keys[i], gabbr: grade_abbr[i], gtype: grade_entries[grade_keys[i]].type});
-            if (need_ngrades)
+            }
+            for (i = 0; i !== grade_keys.length; ++i) {
+                var gtype = grade_entries[i].type;
+                col.push({
+                    type: "grade",
+                    gidx: i,
+                    gkey: grade_keys[i],
+                    gabbr: grade_abbr[i],
+                    gtype: gtype,
+                    justify: pa_grade_types[gtype || "numeric"].justify || "right"
+                });
+            }
+            if (need_ngrades) {
                 col.push("ngrades");
-            if (!pconf.gitless)
+            }
+            if (!pconf.gitless) {
                 col.push("repo");
+            }
         }
-        for (i = 0; i !== col.length; ++i)
+        for (i = 0; i !== col.length; ++i) {
             if (typeof col[i] === "string")
                 col[i] = {type: col[i]};
+        }
     }
 
     function ukey(s) {
@@ -5318,8 +5353,7 @@ function pa_render_pset_table(pconf, data) {
         return '<td class="pap-total r">' + s.total + '</td>';
     };
     th_render.grade = function () {
-        var justify = (this.gtype ? pa_grade_types[this.gtype].justify : false) || "right";
-        var klass = justify === "right" ? "pap-grade r" : "pap-grade";
+        var klass = this.justify === "right" ? "pap-grade r" : "pap-grade";
         return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '">' + this.gabbr + '</th>';
     };
     td_render.grade = function (s, rownum, text) {
@@ -5327,14 +5361,14 @@ function pa_render_pset_table(pconf, data) {
         if (gr == null)
             gr = "";
         if (gr !== "" && this.gtype)
-            gr = escape_entities(pa_grade_types[this.gtype].text.call(grade_entries[this.gkey], gr));
+            gr = escape_entities(pa_grade_types[this.gtype].text.call(grade_entries[this.gidx], gr));
         if (text)
             return gr;
         else {
             var k = this.gkey === pconf.total_key ? "pap-total" : "pap-grade";
             if (s.highlight_grades && s.highlight_grades[this.gkey])
                 k += " pap-highlight";
-            if (!this.gtype || (pa_grade_types[this.gtype].justify || "right") === "right")
+            if (this.justify === "right")
                 k += " r";
             return '<td class="' + k + '">' + gr + '</td>';
         }
@@ -5607,20 +5641,30 @@ function pa_render_pset_table(pconf, data) {
                     return -user_compare(a, b);
             });
         } else if ((m = /^grade(\d+)$/.exec(f))) {
+            var gidx = +m[1],
+                erev = (grade_entries[gidx].type
+                        && pa_grade_types[grade_entries[gidx].type].sort === "forward"
+                        ? -rev : rev);
             data.sort(function (a, b) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
                 else {
-                    var ag = a.grades && a.grades[m[1]];
-                    if (ag === "" || ag == null)
-                        ag = -1000;
-                    var bg = b.grades && b.grades[m[1]];
-                    if (bg === "" || bg == null)
-                        bg = -1000;
-                    if (ag != bg)
-                        return ag < bg ? -rev : rev;
-                    else
+                    var ag = a.grades && a.grades[gidx],
+                        bg = b.grades && b.grades[gidx];
+                    if (ag === "" || ag == null || bg === "" || bg == null) {
+                        if (ag !== "" && ag != null)
+                            return erev;
+                        else if (bg !== "" && bg != null)
+                            return -erev;
+                        else
+                            return -user_compare(a, b);
+                    } else if (ag < bg) {
+                        return rev;
+                    } else if (ag > bg) {
+                        return -rev;
+                    } else {
                         return -user_compare(a, b);
+                    }
                 }
             });
         } else if (f === "ngrades" && need_ngrades) {
@@ -5664,14 +5708,18 @@ function pa_render_pset_table(pconf, data) {
     function head_click(event) {
         if (!this.hasAttribute("data-pa-sort"))
             return;
-        var sf = this.getAttribute("data-pa-sort");
+        var sf = this.getAttribute("data-pa-sort"), m;
         if (sf !== sort.f) {
             sort.f = sf;
             if (sf === "username" || sf === "name" || sf === "grader"
-                || sf === "extension" || sf === "pset" || sf === "at")
+                || sf === "extension" || sf === "pset" || sf === "at"
+                || ((m = sf.match(/^grade(\d+)$/))
+                    && grade_entries[m[1]].type
+                    && pa_grade_types[grade_entries[m[1]].type].sort === "forward")) {
                 sort.rev = 1;
-            else
+            } else {
                 sort.rev = -1;
+            }
         } else if (sf === "name") {
             sort.last = !sort.last;
             if (sort.last)
