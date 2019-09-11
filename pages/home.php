@@ -71,7 +71,9 @@ if ($Qreq->set_partner !== null)
     ContactView::set_partner_action($User, $Qreq);
 
 if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
-    && $Me->isPC && $User->is_student() && $Qreq->post_ok()) {
+    && $Me->isPC
+    && $User->is_student()
+    && $Qreq->post_ok()) {
     $Conf->qe("update ContactInfo set dropped=? where contactId=?",
               isset($Qreq->set_drop) ? $Now : 0, $User->contactId);
     $Conf->qe("delete from Settings where name like '__gradets.%'");
@@ -711,34 +713,42 @@ if ($Me->privChair
     && (isset($Qreq->enable_user)
         || isset($Qreq->send_account_info)
         || isset($Qreq->reset_password))) {
-    $who = $Qreq->enable_user;
-    if ($who === null)
+    $who = $who_user = null;
+    if (isset($Qreq->u)) {
+        $who_user = $Qreq->u;
+    } else if (isset($Qreq->enable_user)) {
+        $who = $Qreq->enable_user;
+    } else if (isset($Qreq->send_account_info)) {
         $who = $Qreq->send_account_info;
-    if ($who === null)
+    } else if (isset($Qreq->reset_password)) {
         $who = $Qreq->reset_password;
-    if ($who == "college")
+    }
+    if ($who_user !== null) {
+        $users = edb_first_columns(Dbl::qe("select contactId from ContactInfo where email=?", $who_user));
+    } else if ($who === "college") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension"));
-    else if ($who == "college-empty")
+    } else if ($who === "college-empty") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension and password=''"));
-    else if ($who == "college-nologin")
+    } else if ($who === "college-nologin") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension and lastLogin=0"));
-    else if ($who == "extension")
+    } else if ($who === "extension") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension"));
-    else if ($who == "extension-empty")
+    } else if ($who === "extension-empty") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension and password=''"));
-    else if ($who == "extension-nologin")
+    } else if ($who === "extension-nologin") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension and lastLogin=0"));
-    else if ($who == "ta")
+    } else if ($who === "ta") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0"));
-    else if ($who == "ta-empty")
+    } else if ($who === "ta-empty") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0 and password=''"));
-    else if ($who == "ta-nologin")
+    } else if ($who === "ta-nologin") {
         $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0 and lastLogin=0"));
-    else
+    } else {
         $users = edb_first_columns(Dbl::qe("select contactId from ContactInfo where email like ?", $who));
-    if (empty($users))
+    }
+    if (empty($users)) {
         $Conf->warnMsg("No users match “" . htmlspecialchars($who) . "”.");
-    else {
+    } else {
         if (isset($Qreq->enable_user))
             UserActions::enable($users, $Me);
         else if (isset($Qreq->reset_password))
@@ -975,14 +985,20 @@ if (!$Me->is_empty() && $User->is_student()) {
             show_pset($pset, $User);
     if ($Me->isPC) {
         echo "<div style='margin-top:5em'></div>\n";
-        if ($User->dropped)
+        if ($User->dropped) {
             echo Ht::form(hoturl_post("index", array("set_undrop" => 1,
                                                      "u" => $Me->user_linkpart($User)))),
                 "<div>", Ht::submit("Undrop"), "</div></form>";
-        else
+        } else {
             echo Ht::form(hoturl_post("index", array("set_drop" => 1,
                                                      "u" => $Me->user_linkpart($User)))),
                 "<div>", Ht::submit("Drop"), "</div></form>";
+        }
+    }
+    if ($Me->privChair && ($User->disabled || $User->password === "")) {
+        echo Ht::form(hoturl_post("index", ["enable_user" => 1,
+                                            "u" => $Me->user_linkpart($User)])),
+            Ht::submit("Enable"), "</form>";
     }
 }
 
