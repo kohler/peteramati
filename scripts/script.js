@@ -5642,9 +5642,8 @@ function pa_render_pset_table(pconf, data) {
             });
         } else if ((m = /^grade(\d+)$/.exec(f))) {
             var gidx = +m[1],
-                erev = (grade_entries[gidx].type
-                        && pa_grade_types[grade_entries[gidx].type].sort === "forward"
-                        ? -rev : rev);
+                fwd = grade_entries[gidx].type && pa_grade_types[grade_entries[gidx].type].sort === "forward",
+                erev = fwd ? -rev : rev;
             data.sort(function (a, b) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
@@ -5659,9 +5658,11 @@ function pa_render_pset_table(pconf, data) {
                         else
                             return -user_compare(a, b);
                     } else if (ag < bg) {
-                        return rev;
-                    } else if (ag > bg) {
                         return -rev;
+                    } else if (ag > bg) {
+                        return rev;
+                    } else if (fwd) {
+                        return user_compare(a, b);
                     } else {
                         return -user_compare(a, b);
                     }
