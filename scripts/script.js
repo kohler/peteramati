@@ -5007,7 +5007,7 @@ function pa_checklatest() {
 
     function checkdata(d) {
         if (d && d.hash && d.hash !== hash && (!d.snaphash || d.snaphash !== hash)) {
-            jQuery(".commitcontainer61 .cs61infgroup").first().append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: peteramati_uservalue, pset: pset, commit: d.hash}) + "\">Load them</a></div>");
+            jQuery(".commitcontainer61 .pa-pd").first().append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: peteramati_uservalue, pset: pset, commit: d.hash}) + "\">Load them</a></div>");
             clearTimeout(timeout);
         }
     }
