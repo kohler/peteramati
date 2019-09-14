@@ -5,18 +5,22 @@
 
 class API_Repo {
     static function latestcommit(Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$api->repo
-            || !($c = $api->repo->latest_commit($api->pset, $api->branch)))
+        if (!$api->repo) {
             return ["hash" => false];
-        else if (!$user->can_view_repo_contents($api->repo, $api->branch))
+        }
+        $api->repo->refresh(30);
+        $c = $api->repo->latest_commit($api->pset, $api->branch);
+        if (!$c) {
+            return ["hash" => false];
+        } else if (!$user->can_view_repo_contents($api->repo, $api->branch)) {
             return ["hash" => false, "error" => "Unconfirmed repository."];
-        else {
+        } else {
             $j = clone $c;
             unset($j->fromhead);
             $j->snaphash = $api->repo->snaphash;
             $j->snapcheckat = $api->repo->snapcheckat;
+            return $j;
         }
-        return $j;
     }
 
     static function blob(Contact $user, Qrequest $qreq, APIData $api) {
