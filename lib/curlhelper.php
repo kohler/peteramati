@@ -276,7 +276,12 @@ class CurlHelper {
         $lochost .= $locp["host"];
         if (isset($locp["port"]))
             $lochost .= ":" . $locp["port"];
-        if ($url[0] === "/")
+        if ($url === "") {
+            $lochost .= $locp["path"];
+            if (isset($locp["query"]))
+                $lochost .= "?" . $locp["query"];
+            return $lochost;
+        } else if ($url[0] === "/")
             return $lochost . $url;
         $lochost .= preg_replace(',/+[^/]+\z,', "/", $locp["path"]);
         while (substr($url, 0, 3) === "../") {
