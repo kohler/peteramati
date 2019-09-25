@@ -642,8 +642,8 @@ class RunnerState {
         if ($answer->status !== "working" && $this->queueid > 0)
             $this->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repo->repoid);
         if ($answer->status === "done") {
-            $user = $this->info->user;
-            if ($user->can_run($this->pset, $this->runner, $user)
+            $viewer = $this->info->viewer;
+            if ($viewer->can_run($this->pset, $this->runner, $this->info->user)
                 && $this->runner->eval)
                 $this->evaluate($answer);
         }
