@@ -136,11 +136,12 @@ function collect_pset_info(&$students, $sset, $entries) {
                 $ss->{$k} = get_f($ss, $k) + $total_noextra * $factor;
             }
 
-            if ($entries)
+            if ($entries) {
                 foreach ($pset->numeric_grades() as $ge) {
                     if (($g = $info->current_grade_entry($ge->key)) !== null)
                         $ss->{$ge->key} = $g;
                 }
+            }
         }
 
         if ($s->partnercid)

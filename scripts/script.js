@@ -897,6 +897,129 @@ $(document).on("mouseup mousedown", ".uim", handle_ui);
 $(document).on("submit", ".ui-submit", handle_ui);
 
 
+// differences and focusing
+function input_is_checkboxlike(elt) {
+    return elt.type === "checkbox" || elt.type === "radio";
+}
+
+function input_default_value(elt) {
+    if (input_is_checkboxlike(elt)) {
+        if (elt.hasAttribute("data-default-checked"))
+            return !!elt.getAttribute("data-default-checked");
+        else
+            return elt.defaultChecked;
+    } else {
+        if (elt.hasAttribute("data-default-value"))
+            return elt.getAttribute("data-default-value");
+        else
+            return elt.defaultValue;
+    }
+}
+
+function input_differs(elt) {
+    var expected = input_default_value(elt);
+    if (input_is_checkboxlike(elt))
+        return elt.checked !== expected;
+    else {
+        var current = elt.tagName === "SELECT" ? $(elt).val() : elt.value;
+        return !text_eq(current, expected);
+    }
+}
+
+function form_differs(form, want_ediff) {
+    var ediff = null, $is = $(form).find("input, select, textarea");
+    if (!$is.length)
+        $is = $(form).filter("input, select, textarea");
+    $is.each(function () {
+        if (!hasClass(this, "ignore-diff") && input_differs(this)) {
+            ediff = this;
+            return false;
+        }
+    });
+    return want_ediff ? ediff : !!ediff;
+}
+
+function form_defaults(form, values) {
+    if (values) {
+        $(form).find("input, select, textarea").each(function () {
+            if (input_is_checkboxlike(this))
+                this.setAttribute("data-default-checked", values[this.name] ? "1" : "");
+            else
+                this.setAttribute("data-default-value", values[this.name] || "");
+        });
+    } else {
+        values = {};
+        $(form).find("input, select, textarea").each(function () {
+            values[this.name] = input_default_value(this);
+        });
+        return values;
+    }
+}
+
+function form_highlight(form, elt) {
+    (form instanceof HTMLElement) || (form = $(form)[0]);
+    toggleClass(form, "alert", (elt && form_differs(elt)) || form_differs(form));
+}
+
+function hiliter_children(form) {
+    form = $(form)[0];
+    form_highlight(form);
+    $(form).on("change input", "input, select, textarea", function () {
+        if (!hasClass(this, "ignore-diff") && !hasClass(form, "ignore-diff"))
+            form_highlight(form, this);
+    });
+}
+
+$(function () {
+    $("form.need-unload-protection").each(function () {
+        var form = this;
+        removeClass(form, "need-unload-protection");
+        $(form).on("submit", function () { addClass(this, "submitting"); });
+        $(window).on("beforeunload", function () {
+            if (hasClass(form, "alert") && !hasClass(form, "submitting"))
+                return "If you leave this page now, your edits may be lost.";
+        });
+    });
+});
+
+function focus_at(felt) {
+    felt.jquery && (felt = felt[0]);
+    felt.focus();
+    if (!felt.hotcrp_ever_focused) {
+        if (felt.select && hasClass(felt, "want-select")) {
+            felt.select();
+        } else if (felt.setSelectionRange) {
+            try {
+                felt.setSelectionRange(felt.value.length, felt.value.length);
+            } catch (e) { // ignore errors
+            }
+        }
+        felt.hotcrp_ever_focused = true;
+    }
+}
+
+function focus_within(elt, subfocus_selector) {
+    var $wf = $(elt).find(".want-focus");
+    if (subfocus_selector)
+        $wf = $wf.filter(subfocus_selector);
+    if ($wf.length == 1)
+        focus_at($wf[0]);
+    return $wf.length == 1;
+}
+
+function refocus_within(elt) {
+    var focused = document.activeElement;
+    if (focused && focused.tagName !== "A" && !$(focused).is(":visible")) {
+        while (focused && focused !== elt)
+            focused = focused.parentElement;
+        if (focused) {
+            var focusable = $(elt).find("input, select, textarea, a, button").filter(":visible").first();
+            focusable.length ? focusable.focus() : $(document.activeElement).blur();
+        }
+    }
+}
+
+
 // rangeclick
 handle_ui.on("js-range-click", function (event) {
     if (event.type === "change")
@@ -1537,36 +1660,6 @@ return tooltip;
 })($);
 
 
-// temporary text
-if (Object.prototype.toString.call(window.operamini) === '[object OperaMini]'
-    || !("placeholder" in document.createElement("input"))
-    || !("placeholder" in document.createElement("textarea"))) {
-    window.mktemptext = (function () {
-    function ttaction(event) {
-        var $e = $(this), p = $e.attr("placeholder"), v = $e.val();
-        if (event.type == "focus" && v === p)
-            $e.val("");
-        if (event.type == "blur" && (v === "" | v === p))
-            $e.val(p);
-        $e.toggleClass("temptext", event.type != "focus" && (v === "" || v === p));
-    }
-
-    return function ($base) {
-        $base.find("input[placeholder], textarea[placeholder]").each(function () {
-            if (!hasClass(this, "has-mktemptext")) {
-                $(this).on("focus blur change input", ttaction).addClass("has-mktemptext");
-                ttaction.call(this, {type: "blur"});
-            }
-        });
-    };
-    })();
-
-    $(function () { mktemptext($(document)); });
-} else {
-    window.mktemptext = $.noop;
-}
-
-
 // HtmlCollector
 function HtmlCollector() {
     this.clear();
@@ -1582,11 +1675,12 @@ HtmlCollector.prototype.push = function (open, close) {
     return this;
 };
 HtmlCollector.prototype.pop = function (pos) {
+    var n = this.open.length;
     if (pos == null)
-        pos = Math.max(0, this.open.length - 1);
-    while (this.open.length > pos) {
-        this.html = this.open[this.open.length - 1] + this.html +
-            this.close[this.open.length - 1];
+        pos = Math.max(0, n - 1);
+    while (n > pos) {
+        --n;
+        this.html = this.open[n] + this.html + this.close[n];
         this.open.pop();
         this.close.pop();
     }
@@ -1699,7 +1793,9 @@ function popup_skeleton(options) {
         }
         if (visible !== false) {
             popup_near($d, options.anchor || window);
-            $d.find("textarea, input[type=text]").autogrow();
+            $d.find(".need-autogrow").autogrow();
+            $d.find(".need-suggest").each(suggest);
+            $d.find(".need-tooltip").each(tooltip);
         }
         return $d;
     };
@@ -2648,70 +2744,6 @@ jQuery.fn.extend({
     }
 });
 
-function pa_makegrade(gi, k, editable) {
-    var ge = gi.entries[k],
-        g = gi.grades ? gi.grades[ge.pos] : null,
-        t,
-        name = escape_entities(k),
-        title = ge.title ? escape_entities(ge.title) : name;
-    if (editable) {
-        var id = "pa-ge" + ++pa_makegrade.id_counter;
-        t = '<form class="ui-submit pa-grade pa-p" data-pa-grade="' +
-            name + '"><label class="pa-pt" for="' + id + '">' + title + '</label>';
-        if (ge.type === "text") {
-            t += '<div class="pa-pd"><textarea class="uich pa-pd pa-gradevalue" name="' + name +
-                '" id="' + id + '"></textarea></div>';
-        } else if (ge.type === "selector") {
-            t += '<div class="pa-pd"><select class="uich pa-gradevalue" name="' + name + '" id="' + id + '"><option value="">None</option>';
-            for (var i = 0; i !== ge.options.length; ++i) {
-                var n = escape_entities(ge.options[i]);
-                t += '<option value="' + n + '">' + n + '</option>';
-            }
-            t += '</select></div>';
-        } else if (ge.type === "checkbox"
-                   && (g == null || g === 0 || g === ge.max)) {
-            t += '<div class="pa-pd"><span class="pa-gradewidth">' +
-                '<input type="checkbox" class="ui pa-gradevalue" name="' + name +
-                '" id="' + id + '" value="' + ge.max + '" /></span>' +
-                ' <span class="pa-grademax">of ' + ge.max +
-                ' <a href="" class="x ui pa-grade-uncheckbox">#</a></span></div>';
-        } else {
-            t += '<div class="pa-pd"><span class="pa-gradewidth">' +
-                '<input type="text" class="uich pa-gradevalue" name="' + name +
-                '" id="' + id + '" /></span>';
-            if (ge.type === "letter")
-                t += ' <span class="pa-grademax">letter grade</span>';
-            else if (ge.max)
-                t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
-            t += '</div>';
-        }
-        t += '</form>';
-    } else {
-        t = '<div class="pa-grade pa-p" data-pa-grade="' + name + '">' +
-            '<div class="pa-pt">' + title + '</div>';
-        if (ge.type === "text") {
-            t += '<div class="pa-pd pa-gradevalue"></div>';
-        } else {
-            t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
-            if (ge.max && ge.type !== "letter")
-                t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
-            t += '</div>';
-        }
-        t += '</div>';
-    }
-    return t;
-}
-pa_makegrade.id_counter = 0;
-
-function pa_grade_uncheckbox() {
-    this.type = "text";
-    this.className = "uich pa-gradevalue";
-    $(this.parentElement.parentElement).find(".pa-grade-uncheckbox").remove();
-}
-handle_ui.on("pa-grade-uncheckbox", function () {
-    $(this).closest(".pa-pd").find(".pa-gradevalue").each(pa_grade_uncheckbox);
-});
-
 var pa_grade_types = {
     numeric: {
         text: function (v) {
@@ -2776,79 +2808,142 @@ var pa_grade_types = {
     })()
 };
 
-function pa_setgrade(gi, editable) {
-    var k = this.getAttribute("data-pa-grade"),
-        ge = gi.entries[k];
-    if (!ge)
-        return;
+function pa_render_grade(ge, g, options) {
+    var t, name = ge.key, title = ge.title ? escape_entities(ge.title) : name;
+    if (options === true || (options && options.editable)) {
+        var live = options === true || options.live,
+            livecl = live ? 'uich ' : '',
+            id = "pa-ge" + ++pa_render_grade.id_counter;
+        t = (live ? '<form class="ui-submit ' : '<div class="') +
+            'pa-grade pa-p" data-pa-grade="' + name +
+            '"><label class="pa-pt" for="' + id + '">' + title + '</label>';
+        if (ge.type === "text") {
+            t += '<div class="pa-pd"><textarea class="' + livecl + 'pa-pd pa-gradevalue" name="' + name +
+                '" id="' + id + '"></textarea></div>';
+        } else if (ge.type === "selector") {
+            t += '<div class="pa-pd"><select class="' + livecl + 'pa-gradevalue" name="' + name + '" id="' + id + '"><option value="">None</option>';
+            for (var i = 0; i !== ge.options.length; ++i) {
+                var n = escape_entities(ge.options[i]);
+                t += '<option value="' + n + '">' + n + '</option>';
+            }
+            t += '</select></div>';
+        } else if (ge.type === "checkbox"
+                   && (g == null || g === 0 || g === ge.max)) {
+            t += '<div class="pa-pd"><span class="pa-gradewidth">' +
+                '<input type="checkbox" class="' + (live ? 'ui ' : '') +
+                'pa-gradevalue" name="' + name + '" id="' + id + '" value="' +
+                ge.max + '"></span>' + ' <span class="pa-grademax">of ' + ge.max +
+                ' <a href="" class="x ui pa-grade-uncheckbox">#</a></span></div>';
+        } else {
+            t += '<div class="pa-pd"><span class="pa-gradewidth">' +
+                '<input type="text" class="' + livecl + 'pa-gradevalue" name="' + name +
+                '" id="' + id + '" /></span>';
+            if (ge.type === "letter")
+                t += ' <span class="pa-grademax">letter grade</span>';
+            else if (ge.max)
+                t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
+            t += '</div>';
+        }
+        t += live ? '</form>' : '</div>';
+    } else {
+        t = '<div class="pa-grade pa-p" data-pa-grade="' + name + '">' +
+            '<div class="pa-pt">' + title + '</div>';
+        if (ge.type === "text") {
+            t += '<div class="pa-pd pa-gradevalue"></div>';
+        } else {
+            t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
+            if (ge.max && ge.type !== "letter") {
+                t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
+            }
+            t += '</div>';
+        }
+        t += '</div>';
+    }
+    return t;
+}
+pa_render_grade.id_counter = 0;
 
-    var g = gi.grades ? gi.grades[ge.pos] : null,
-        ag = gi.autogrades ? gi.autogrades[ge.pos] : null,
-        $g = $(this);
+function pa_grade_uncheckbox() {
+    this.type = "text";
+    this.className = "uich pa-gradevalue";
+    $(this.parentElement.parentElement).find(".pa-grade-uncheckbox").remove();
+}
+handle_ui.on("pa-grade-uncheckbox", function () {
+    $(this).closest(".pa-pd").find(".pa-gradevalue").each(pa_grade_uncheckbox);
+});
+
+function pa_setgrade(ge, g, ag) {
+    var $g = $(this),
+        $v = $g.find(".pa-gradevalue"),
+        editable = $v[0].tagName !== "SPAN" && $v[0].tagName !== "DIV",
+        typeinfo = pa_grade_types[ge.type || "numeric"];
 
     // “grade is above max” message
     if (ge.max && editable) {
-        if (!g || g <= ge.max)
+        if (!g || g <= ge.max) {
             $g.find(".pa-gradeabovemax").remove();
-        else if (!$g.find(".pa-gradeabovemax").length)
+        } else if (!$g.find(".pa-gradeabovemax").length) {
             $g.find(".pa-pd").append('<div class="pa-gradeabovemax">Grade is above max</div>');
+        }
     }
 
     // “autograde differs” message
-    if (ag != null && editable) {
-        if (g === ag) {
+    if (editable) {
+        if (ag == null || g === ag) {
             $g.find(".pa-gradediffers").remove();
         } else {
-            var txt = "autograde is " + ag;
-            if (!$g.find(".pa-gradediffers").length)
+            var txt = (ge.key === "late_hours" ? "auto-late hours" : "autograde") +
+                " is " + typeinfo.text.call(ge, ag);
+            if (!$g.find(".pa-gradediffers").length) {
                 $g.find(".pa-pd").append('<span class="pa-gradediffers"></span>');
+            }
             var $ag = $g.find(".pa-gradediffers");
-            if ($ag.text() !== txt)
+            if ($ag.text() !== txt) {
                 $ag.text(txt);
+            }
         }
     }
 
     // actual grade value
-    var $v = $g.find(".pa-gradevalue");
-    var gt = "";
-    if (g != null) {
-        gt = pa_grade_types[ge.type || "numeric"].text.call(ge, g);
-    }
-    if (!editable) {
-        if ($v.text() !== gt)
-            $v.text(gt);
-        toggleClass(this, "hidden", gt === "" && !ge.max);
-    } else {
+    var gt = g == null ? "" : typeinfo.text.call(ge, g);
+    if (editable) {
         if ($v[0].type === "checkbox"
             && g != null
             && g !== 0
-            && g !== ge.max)
+            && g !== ge.max) {
             pa_grade_uncheckbox.call($v[0]);
+        }
         if ($v[0].type === "checkbox") {
             $v.prop("checked", !!g);
         } else if ($v.val() !== gt && !$v.is(":focus")) {
             $v.val(gt);
         }
+    } else {
+        if ($v.text() !== gt) {
+            $v.text(gt);
+        }
+        toggleClass(this, "hidden", gt === "" && !ge.max);
     }
 
     // maybe add landmark reference
     if (ge.landmark
         && this.parentElement
         && hasClass(this.parentElement, "pa-gradelist")) {
-        var m = /^(.*):(\d+)$/.exec(ge.landmark);
-        var $line = $(pa_ensureline(m[1], "a" + m[2]));
-        var want_gbr = "";
+        var m = /^(.*):(\d+)$/.exec(ge.landmark),
+            $line = $(pa_ensureline(m[1], "a" + m[2])),
+            want_gbr = "";
         if ($line.length) {
             var $pi = $(this).closest(".pa-psetinfo"),
                 directory = $pi[0].getAttribute("data-pa-directory") || "";
-            if (directory && m[1].substr(0, directory.length) === directory)
+            if (directory && m[1].substr(0, directory.length) === directory) {
                 m[1] = m[1].substr(directory.length);
+            }
             want_gbr = '@<a href="#' + $line[0].id + '" class="uix pa-goto">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
         }
         var $pgbr = $g.find(".pa-gradeboxref");
-        if (!$line.length)
+        if (!$line.length) {
             $pgbr.remove();
-        else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
+        } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
             $pgbr.remove();
             $g.find(".pa-pd").append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
         }
@@ -2870,8 +2965,9 @@ handle_ui.on("pa-grade", function (event) {
     $f.find(".pa-pd").append('<span class="pa-save-message">Saving…</span>');
 
     var gi = $f.closest(".pa-psetinfo").data("pa-gradeinfo");
-    if (typeof gi === "string")
+    if (typeof gi === "string") {
         gi = JSON.parse(gi);
+    }
 
     var g = {}, og = {};
     $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
@@ -2893,10 +2989,11 @@ handle_ui.on("pa-grade", function (event) {
         type: "POST", cache: false, data: {grades: g, oldgrades: og},
         success: function (data) {
             self.removeAttribute("data-outstanding");
-            if (data.ok)
+            if (data.ok) {
                 $f.find(".pa-save-message").html("Saved");
-            else
+            } else {
                 $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
+            }
             pa_loadgrades.call(self, data);
         }
     });
@@ -2907,30 +3004,39 @@ function hoturl_gradeparts($j, args) {
     args = args || {};
     v = $x.attr("data-pa-user");
     args.u = v || peteramati_uservalue;
-    if ((v = $x.attr("data-pa-pset")))
+    if ((v = $x.attr("data-pa-pset"))) {
         args.pset = v;
-    if ((v = $x.attr("data-pa-hash")))
+    }
+    if ((v = $x.attr("data-pa-hash"))) {
         args.commit = v;
+    }
     return args;
 }
 
 function pa_loadgrades(gi) {
     var $pi = $(this).closest(".pa-psetinfo");
-    if (gi === true)
+    if (gi === true) {
         gi = $pi.data("pa-gradeinfo");
-    if (!gi || !gi.order)
+    }
+    if (!gi || !gi.order) {
         return;
+    }
 
     $pi.data("pa-gradeinfo", gi);
-    var editable = $pi[0].hasAttribute("data-pa-can-set-grades");
-    var directory = $pi[0].getAttribute("data-pa-directory") || "";
+    var editable = $pi[0].hasAttribute("data-pa-can-set-grades"),
+        directory = $pi[0].getAttribute("data-pa-directory") || "";
+    function makegrade(k) {
+        var ge = gi.entries[k];
+        return pa_render_grade(ge, gi.grade ? gi.grades[ge.pos] : null, editable);
+    }
 
     $pi.find(".pa-need-grade").each(function () {
         var k = this.getAttribute("data-pa-grade");
         if (gi.entries[k]) {
-            $(this).html(pa_makegrade(gi, k, editable)).removeClass("pa-need-grade");
-            if (this.hasAttribute("data-pa-landmark-range"))
+            $(this).html(makegrade(k)).removeClass("pa-need-grade");
+            if (this.hasAttribute("data-pa-landmark-range")) {
                 $(this).find(".pa-pd").append('<button type="button" class="btn ui pa-compute-grade">Grade from notes</button>');
+            }
             if (this.hasAttribute("data-pa-landmark-buttons")) {
                 var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
                 for (var i = 0; i < lb.length; ++i) {
@@ -2958,7 +3064,7 @@ function pa_loadgrades(gi) {
                 if (ch && ch.getAttribute("data-pa-grade") === k)
                     ch = ch.nextSibling;
                 else
-                    this.insertBefore($(pa_makegrade(gi, k, editable))[0], ch);
+                    this.insertBefore($(makegrade(k))[0], ch);
             }
         }
         while (ch) {
@@ -2969,40 +3075,14 @@ function pa_loadgrades(gi) {
     });
 
     $pi.find(".pa-grade").each(function () {
-        pa_setgrade.call(this, gi, editable);
-    });
-
-    var $pge = $pi.find(".pa-grade");
-
-    // handle late hours
-    for (var j = 0; j < $pge.length; ++j) {
-        if ($pge[j].getAttribute("data-pa-grade") === "late_hours") {
-            var $g = $($pge[j]);
-            var g = gi.late_hours;
-            var ag = gi.auto_late_hours;
-            var $v = $g.find(".pa-gradevalue");
-            var lh_editable = $v.is("input");
-            // “auto-late hours differs” message
-            if (ag !== null && lh_editable) {
-                if (g === ag || ag == null) {
-                    $g.find(".pa-gradediffers").remove();
-                } else {
-                    var txt = "auto-late hours is " + ag;
-                    if (!$g.find(".pa-gradediffers").length)
-                        $g.find(".pa-pd").append('<span class="pa-gradediffers"></span>');
-                    var $ag = $g.find(".pa-gradediffers");
-                    if ($ag.text() !== txt)
-                        $ag.text(txt);
-                }
-            }
-            // late hours value
-            if (lh_editable && $v.val() !== g && !$v.is(":focus")) {
-                $v.val(g);
-            } else if (!lh_editable && $v.text() !== g) {
-                $v.text(g);
-            }
+        var k = this.getAttribute("data-pa-grade"),
+            ge = gi.entries[k];
+        if (k === "late_hours") {
+            pa_setgrade.call(this, {key: "late_hours"}, gi.late_hours, gi.auto_late_hours);
+        } else if (ge) {
+            pa_setgrade.call(this, ge, gi.grades[ge.pos], gi.autogrades[ge.pos]);
         }
-    }
+    });
 
     // print totals
     var tm = pa_gradeinfo_total(gi);
@@ -5850,12 +5930,22 @@ function pa_render_pset_table(pconf, data) {
         else
             return null;
     }
+    function grade_dialog() {
+        var spos = this.parentElement.getAttribute("data-pa-spos");
+        var hc = popup_skeleton();
+        hc.push('<div class="pa-gradelist editable">', '</div>');
+        for (var i = 0; i !== grade_entries.length; ++i) {
+            hc.push(pa_render_grade(grade_entries[i], dmap[spos].grades[i], {editable: true, live: false}));
+        }
+        hc.show();
+    }
     function grade_click(evt) {
         if ((!evt
              || (evt.metaKey
                  && evt.button === 0
                  && evt.target.tagName !== "A"))
             && !this.hasAttribute("contenteditable")) {
+            grade_dialog.call(this); return;
             grade_start.call(this);
         }
     }
@@ -5968,12 +6058,12 @@ handle_ui.on("js-repositories", function (event) {
 
 
 // autogrowing text areas; based on https://github.com/jaz303/jquery-grab-bag
-function textarea_shadow($self) {
+function textarea_shadow($self, width) {
     return jQuery("<div></div>").css({
         position:    'absolute',
         top:         -10000,
         left:        -10000,
-        width:       $self.width(),
+        width:       width || $self.width(),
         fontSize:    $self.css('fontSize'),
         fontFamily:  $self.css('fontFamily'),
         fontWeight:  $self.css('fontWeight'),
@@ -5985,19 +6075,31 @@ function textarea_shadow($self) {
 }
 
 (function ($) {
-function do_autogrow_textarea($self) {
-    if ($self.data("autogrowing")) {
-        $self.data("autogrowing")();
-        return;
-    }
-
+var autogrowers = null;
+function resizer() {
+    for (var i = autogrowers.length - 1; i >= 0; --i)
+        autogrowers[i]();
+}
+function remover($self, shadow) {
+    var f = $self.data("autogrower");
+    $self.removeData("autogrower");
+    shadow && shadow.remove();
+    for (var i = autogrowers.length - 1; i >= 0; --i)
+        if (autogrowers[i] === f) {
+            autogrowers[i] = autogrowers[autogrowers.length - 1];
+            autogrowers.pop();
+        }
+}
+function make_textarea_autogrower($self) {
     var shadow, minHeight, lineHeight;
-    var update = function (event) {
+    return function (event) {
+        if (event === false)
+            return remover($self, shadow);
         var width = $self.width();
         if (width <= 0)
             return;
         if (!shadow) {
-            shadow = textarea_shadow($self);
+            shadow = textarea_shadow($self, width);
             minHeight = $self.height();
             lineHeight = shadow.text("!").height();
         }
@@ -6010,45 +6112,78 @@ function do_autogrow_textarea($self) {
 
         var wh = Math.max($(window).height() - 4 * lineHeight, 4 * lineHeight);
         $self.height(Math.min(wh, Math.max(shadow.height(), minHeight)));
-    }
-
-    $self.on("change input", update).data("autogrowing", update);
-    $(window).resize(update);
-    $self.val() && update();
+    };
 }
-function do_autogrow_text_input($self) {
-    if ($self.data("autogrowing")) {
-        $self.data("autogrowing")();
-        return;
-    }
-
+function make_input_autogrower($self) {
     var shadow;
-    var update = function (event) {
-        var width = $self.width(), val = $self[0].value, ws;
-        if (width <= 0)
+    return function (event) {
+        if (event === false) {
+            return remover($self, shadow);
+        }
+        var width = 0, ws;
+        try {
+            width = $self.outerWidth();
+        } catch (e) { // IE11 is annoying here
+        }
+        if (width <= 0) {
             return;
+        }
         if (!shadow) {
-            shadow = textarea_shadow($self);
+            shadow = textarea_shadow($self, width);
             var p = $self.css(["paddingRight", "paddingLeft", "borderLeftWidth", "borderRightWidth"]);
-            shadow.css({width: "auto", display: "table-cell", paddingLeft: $self.css("paddingLeft"), paddingLeft: (parseFloat(p.paddingRight) + parseFloat(p.paddingLeft) + parseFloat(p.borderLeftWidth) + parseFloat(p.borderRightWidth)) + "px"});
+            shadow.css({
+                width: "auto",
+                display: "table-cell",
+                paddingLeft: p.paddingLeft,
+                paddingLeft: (parseFloat(p.paddingRight) + parseFloat(p.paddingLeft) + parseFloat(p.borderLeftWidth) + parseFloat(p.borderRightWidth)) + "px"
+            });
             ws = $self.css(["minWidth", "maxWidth"]);
-            if (ws.minWidth == "0px")
+            if (ws.minWidth === "0px") {
                 $self.css("minWidth", width + "px");
-            if (ws.maxWidth == "none")
+            }
+            if (ws.maxWidth === "none" && !$self.hasClass("wide")) {
                 $self.css("maxWidth", "640px");
+            }
         }
         shadow.text($self[0].value + "  ");
         ws = $self.css(["minWidth", "maxWidth"]);
-        $self.outerWidth(Math.max(Math.min(shadow.outerWidth(), parseFloat(ws.maxWidth), $(window).width()), parseFloat(ws.minWidth)));
-    }
-
-    $self.on("change input", update).data("autogrowing", update);
-    $(window).resize(update);
-    $self.val() && update();
+        var outerWidth = Math.min(shadow.outerWidth(), $(window).width()),
+            maxWidth = parseFloat(ws.maxWidth);
+        if (maxWidth === maxWidth) { // i.e., isn't NaN
+            outerWidth = Math.min(outerWidth, maxWidth);
+        }
+        $self.outerWidth(Math.max(outerWidth, parseFloat(ws.minWidth)));
+    };
 }
 $.fn.autogrow = function () {
-    this.filter("textarea").each(function () { do_autogrow_textarea($(this)); });
-    this.filter("input[type='text']").each(function () { do_autogrow_text_input($(this)); });
+    this.each(function () {
+        var $self = $(this), f = $self.data("autogrower");
+        if (!f) {
+            if (this.tagName === "TEXTAREA") {
+                f = make_textarea_autogrower($self);
+            } else if (this.tagName === "INPUT" && this.type === "text") {
+                f = make_input_autogrower($self);
+            }
+            if (f) {
+                $self.data("autogrower", f).on("change input", f);
+                if (!autogrowers) {
+                    autogrowers = [];
+                    $(window).resize(resizer);
+                }
+                autogrowers.push(f);
+            }
+        }
+        if (f && $self.val() !== "") {
+            f();
+        }
+    });
+    return this;
+};
+$.fn.unautogrow = function () {
+    this.each(function () {
+        var f = $(this).data("autogrower");
+        f && f(false);
+    });
     return this;
 };
 })(jQuery);

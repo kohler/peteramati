@@ -534,7 +534,6 @@ Ht::stash_script("fold(\"psel\",!\$\$(\"plimit\").checked,8);"
                  . "setmailpsel(\$\$(\"recipients\"))");
 
 echo "</td></tr>\n";
-Ht::stash_script("mktemptext('q','(All)')");
 
 // ** CC, REPLY-TO
 if ($Me->privChair) {

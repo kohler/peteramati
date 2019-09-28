@@ -843,7 +843,7 @@ class GradeEntryConfig {
 
     function parse_value_error() {
         if ($this->type === null) {
-            return "Numeric grade expected.";
+            return "Number expected.";
         } else if ($this->type === "letter") {
             return "Letter grade expected.";
         } else {
@@ -863,11 +863,9 @@ class GradeEntryConfig {
     }
 
     function json($pcview, $pos = null) {
-        $gej = ["title" => $this->title];
+        $gej = ["key" => $this->key, "title" => $this->title];
         if ($pos !== null) {
             $gej["pos"] = $pos;
-        } else {
-            $gej["key"] = $this->key;
         }
         if ($this->type !== null) {
             $gej["type"] = $this->type;
