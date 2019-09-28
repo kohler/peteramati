@@ -66,6 +66,27 @@ if ("classList" in document.createElement("span")
         return k === "" ? [] : k.split(/\s+/);
     };
 }
+if (!Element.prototype.closest) {
+    Element.prototype.closest = function (s) {
+        return $(this).closest(s)[0];
+    };
+}
+
+if (!String.prototype.startsWith) {
+    String.prototype.startsWith = function (search, pos) {
+        pos = !pos || pos < 0 ? 0 : +pos;
+        return this.substring(pos, pos + search.length) === search;
+    };
+}
+if (!String.prototype.endsWith) {
+    String.prototype.endsWith = function (search, this_len) {
+        if (this_len === undefined || this_len > this.length) {
+            this_len = this.length;
+        }
+        return this.substring(this_len - search.length, this_len) === search;
+    };
+}
+
 
 
 
@@ -202,6 +223,9 @@ function jqxhr_error_message(jqxhr, status, errormsg) {
         return "Failed.";
 }
 
+var after_outstanding = (function () {
+var outstanding = 0, after = [];
+
 $(document).ajaxError(function (event, jqxhr, settings, httperror) {
     if (jqxhr.readyState != 4)
         return;
@@ -220,8 +244,15 @@ $(document).ajaxError(function (event, jqxhr, settings, httperror) {
         if (httperror)
             msg += ", " + httperror;
         if (jqxhr.responseText)
-            msg += ", " + jqxhr.responseText.substr(0, 100);
+            msg += ", " + jqxhr.responseText.substring(0, 100);
         log_jserror(msg);
+    }
+});
+
+$(document).ajaxComplete(function (event, jqxhr, settings) {
+    if (settings.trackOutstanding && --outstanding === 0) {
+        while (after.length)
+            after.shift()();
     }
 });
 
@@ -256,11 +287,21 @@ $.ajaxPrefilter(function (options, originalOptions, jqxhr) {
         options.error = [options.error, onerror];
     if (options.timeout == null)
         options.timeout = 10000;
-    if (options.method == null)
-        options.method = "POST";
     if (options.dataType == null)
         options.dataType = "json";
+    if (options.trackOutstanding)
+        ++outstanding;
 });
+
+return function (f) {
+    if (f === undefined)
+        return outstanding > 0;
+    else if (outstanding > 0)
+        after.push(f);
+    else
+        f();
+};
+})();
 
 
 // geometry
@@ -290,15 +331,18 @@ jQuery.fn.extend({
         }
         return g;
     },
-    scrollIntoView: function () {
-        var p = this.geometry(), x = this[0].parentNode;
-        while (x && x.tagName && $(x).css("overflow-y") === "visible")
-            x = x.parentNode;
-        var w = jQuery(x && x.tagName ? x : window).geometry();
-        if (p.top < w.top)
-            this[0].scrollIntoView();
-        else if (p.bottom > w.bottom)
-            this[0].scrollIntoView(false);
+    scrollIntoView: function (bottom) {
+        if (this.length > 0) {
+            var p = this.geometry(), x = this[0].parentNode;
+            while (x && x.tagName && $(x).css("overflow-y") === "visible")
+                x = x.parentNode;
+            var w = jQuery(x && x.tagName ? x : window).geometry();
+            if (p.top < w.top && bottom !== false) {
+                this[0].scrollIntoView();
+            } else if (p.bottom > w.bottom) {
+                this[0].scrollIntoView(false);
+            }
+        }
         return this;
     }
 });
@@ -387,8 +431,8 @@ function plural_noun(n, what) {
     if (what == "this")
         return "these";
     if (/^.*?(?:s|sh|ch|[bcdfgjklmnpqrstvxz][oy])$/.test(what)) {
-        if (what.substr(-1) == "y")
-            return what.substr(0, what.length - 1) + "ies";
+        if (what.charAt(what.length - 1) === "y")
+            return what.substring(0, what.length - 1) + "ies";
         else
             return what + "es";
     } else
@@ -482,13 +526,13 @@ function now_sec() {
 var strftime = (function () {
     function pad(num, str, n) {
         str += num.toString();
-        return str.length <= n ? str : str.substr(str.length - n);
+        return str.length <= n ? str : str.substring(str.length - n);
     }
     function unparse_q(d, alt, is24) {
-        if (is24 && alt && d.getSeconds())
-            return strftime("%H:%M:%S", d);
-        else if (is24)
+        if (is24 && alt && !d.getSeconds())
             return strftime("%H:%M", d);
+        else if (is24)
+            return strftime("%H:%M:%S", d);
         else if (alt && d.getSeconds())
             return strftime("%#l:%M:%S%P", d);
         else if (alt && d.getMinutes())
@@ -613,8 +657,9 @@ event_key.modifier = function (evt) {
     return nonprintable_map[event_key(evt)] > 1;
 };
 event_key.is_default_a = function (evt, a) {
-    return !evt.metaKey && !evt.ctrlKey && evt.which != 2
-        && (!a || !/(?:^|\s)(?:ui|btn)(?=\s|$)/i.test(a.className || ""));
+    return !evt.shiftKey && !evt.metaKey && !evt.ctrlKey
+        && evt.button == 0
+        && (!a || !hasClass("ui", a));
 };
 return event_key;
 })();
@@ -813,7 +858,7 @@ var handle_ui = (function ($) {
 var callbacks = {};
 function handle_ui(event) {
     var e = event.target;
-    if ((e && hasClass(e, "ui"))
+    if ((e && (hasClass(e, "ui") || hasClass(e, "ui-submit")))
         || (this.tagName === "A" && hasClass(this, "ui"))) {
         event.preventDefault();
     }
@@ -1371,32 +1416,59 @@ function prepare_info(elt, info) {
 }
 
 function show_tooltip(info) {
-    if (window.disable_tooltip)
+    if (window.disable_tooltip) {
         return null;
+    }
 
     var $self = $(this);
     info = prepare_info($self[0], $.extend({}, info || {}));
     info.element = this;
 
-    var tt, bub = null, to = null, refcount = 0, content = info.content;
+    var tt, bub = null, to = null, near = null,
+        refcount = 0, content = info.content;
+
     function erase() {
         to = clearTimeout(to);
         bub && bub.remove();
         $self.removeData("tooltipState");
-        if (window.global_tooltip === tt)
+        if (window.global_tooltip === tt) {
             window.global_tooltip = null;
+        }
     }
+
     function show_bub() {
         if (content && !bub) {
             bub = make_bubble(content, {color: "tooltip " + info.className, dir: info.dir});
-            bub.near(info.near || info.element).hover(tt.enter, tt.exit);
-        } else if (content)
+            near = info.near || info.element;
+            bub.near(near).hover(tt.enter, tt.exit);
+        } else if (content) {
             bub.html(content);
-        else if (bub) {
+        } else if (bub) {
             bub && bub.remove();
-            bub = null;
+            bub = near = null;
         }
     }
+
+    function complete(new_content) {
+        if (new_content instanceof HPromise) {
+            new_content.then(complete);
+        } else {
+            var tx = window.global_tooltip;
+            content = new_content;
+            if (tx
+                && tx._element === info.element
+                && tx.html() === content
+                && !info.done) {
+                tt = tx;
+            } else {
+                tx && tx.erase();
+                $self.data("tooltipState", tt);
+                show_bub();
+                window.global_tooltip = tt;
+            }
+        }
+    }
+
     tt = {
         enter: function () {
             to = clearTimeout(to);
@@ -1413,37 +1485,21 @@ function show_tooltip(info) {
         erase: erase,
         _element: $self[0],
         html: function (new_content) {
-            if (new_content === undefined)
+            if (new_content === undefined) {
                 return content;
-            else {
+            } else {
                 content = new_content;
                 show_bub();
+                return tt;
             }
-            return tt;
         },
         text: function (new_text) {
             return tt.html(escape_entities(new_text));
+        },
+        near: function () {
+            return near;
         }
     };
-
-    function complete(new_content) {
-        if (new_content instanceof HPromise)
-            new_content.then(complete);
-        else {
-            var tx = window.global_tooltip;
-            content = new_content;
-            if (tx && tx._element === info.element
-                && tx.html() === content
-                && !info.done)
-                tt = tx;
-            else {
-                tx && tx.erase();
-                $self.data("tooltipState", tt);
-                show_bub();
-                window.global_tooltip = tt;
-            }
-        }
-    }
 
     complete(content);
     info.done = true;
@@ -1461,11 +1517,12 @@ function ttleave() {
 }
 
 function tooltip() {
-    var $self = $(this).removeClass("need-tooltip");
-    if ($self[0].getAttribute("data-tooltip-type") === "focus")
-        $self.on("focus", ttenter).on("blur", ttleave);
+    removeClass(this, "need-tooltip");
+    var tt = this.getAttribute("data-tooltip-type");
+    if (tt === "focus")
+        $(this).on("focus", ttenter).on("blur", ttleave);
     else
-        $self.hover(ttenter, ttleave);
+        $(this).hover(ttenter, ttleave);
 }
 tooltip.erase = function () {
     var tt = this === tooltip ? window.global_tooltip : $(this).data("tooltipState");
@@ -1507,6 +1564,180 @@ if (Object.prototype.toString.call(window.operamini) === '[object OperaMini]'
     $(function () { mktemptext($(document)); });
 } else {
     window.mktemptext = $.noop;
+}
+
+
+// HtmlCollector
+function HtmlCollector() {
+    this.clear();
+}
+HtmlCollector.prototype.push = function (open, close) {
+    if (open && close) {
+        this.open.push(this.html + open);
+        this.close.push(close);
+        this.html = "";
+        return this.open.length - 1;
+    } else
+        this.html += open;
+    return this;
+};
+HtmlCollector.prototype.pop = function (pos) {
+    if (pos == null)
+        pos = Math.max(0, this.open.length - 1);
+    while (this.open.length > pos) {
+        this.html = this.open[this.open.length - 1] + this.html +
+            this.close[this.open.length - 1];
+        this.open.pop();
+        this.close.pop();
+    }
+    return this;
+};
+HtmlCollector.prototype.pop_n = function (n) {
+    this.pop(Math.max(0, this.open.length - n));
+    return this;
+};
+HtmlCollector.prototype.push_pop = function (text) {
+    this.html += text;
+    return this.pop();
+};
+HtmlCollector.prototype.pop_push = function (open, close) {
+    this.pop();
+    return this.push(open, close);
+};
+HtmlCollector.prototype.pop_collapse = function (pos) {
+    if (pos == null)
+        pos = this.open.length ? this.open.length - 1 : 0;
+    while (this.open.length > pos) {
+        if (this.html !== "")
+            this.html = this.open[this.open.length - 1] + this.html +
+                this.close[this.open.length - 1];
+        this.open.pop();
+        this.close.pop();
+    }
+    return this;
+};
+HtmlCollector.prototype.render = function () {
+    this.pop(0);
+    return this.html;
+};
+HtmlCollector.prototype.clear = function () {
+    this.open = [];
+    this.close = [];
+    this.html = "";
+    return this;
+};
+HtmlCollector.prototype.next_htctl_id = (function () {
+var id = 1;
+return function () {
+    while (document.getElementById("htctl" + id))
+        ++id;
+    ++id;
+    return "htctl" + (id - 1);
+};
+})();
+
+
+// popup dialogs
+function popup_skeleton(options) {
+    var hc = new HtmlCollector, $d = null;
+    options = options || {};
+    hc.push('<div class="modal" role="dialog"><div class="modal-dialog'
+        + (!options.anchor || options.anchor === window ? " modal-dialog-centered" : "")
+        + (options.style ? '" style="' + escape_entities(options.style) : '')
+        + '" role="document"><div class="modal-content"><form enctype="multipart/form-data" accept-charset="UTF-8"'
+        + (options.form_class ? ' class="' + options.form_class + '"' : '')
+        + '>', '</form></div></div></div>');
+    hc.push_actions = function (actions) {
+        hc.push('<div class="popup-actions">', '</div>');
+        if (actions)
+            hc.push(actions.join("")).pop();
+        return hc;
+    };
+    function show_errors(data) {
+        var form = $d.find("form")[0],
+            dbody = $d.find(".popup-body"),
+            m = render_xmsg(2, data.error);
+        $d.find(".msg-error").remove();
+        dbody.length ? dbody.prepend(m) : $d.find("h2").after(m);
+        for (var f in data.errf || {}) {
+            var e = form[f];
+            if (e) {
+                var x = $(e).closest(".entryi, .f-i");
+                (x.length ? x : $(e)).addClass("has-error");
+            }
+        }
+        return $d;
+    }
+    function close() {
+        tooltip.erase();
+        $d.find("textarea, input").unautogrow();
+        $d.trigger("closedialog");
+        $d.remove();
+        removeClass(document.body, "modal-open");
+    }
+    hc.show = function (visible) {
+        if (!$d) {
+            $d = $(hc.render()).appendTo(document.body);
+            $d.find(".need-tooltip").each(tooltip);
+            $d.on("click", function (event) {
+                event.target === $d[0] && close();
+            });
+            $d.find("button[name=cancel]").on("click", close);
+            if (options.action) {
+                if (options.action instanceof HTMLFormElement) {
+                    $d.find("form").attr({action: options.action.action, method: options.action.method});
+                } else {
+                    $d.find("form").attr({action: options.action, method: options.method || "post"});
+                }
+            }
+            for (var k in {minWidth: 1, maxWidth: 1, width: 1}) {
+                if (options[k] != null)
+                    $d.children().css(k, options[k]);
+            }
+            $d.show_errors = show_errors;
+            $d.close = close;
+        }
+        if (visible !== false) {
+            popup_near($d, options.anchor || window);
+            $d.find("textarea, input[type=text]").autogrow();
+        }
+        return $d;
+    };
+    return hc;
+}
+
+function popup_near(elt, anchor) {
+    tooltip.erase();
+    if (elt.jquery)
+        elt = elt[0];
+    while (!hasClass(elt, "modal-dialog"))
+        elt = elt.childNodes[0];
+    var bgelt = elt.parentNode;
+    addClass(bgelt, "show");
+    addClass(document.body, "modal-open");
+    if (!hasClass(elt, "modal-dialog-centered")) {
+        var anchorPos = $(anchor).geometry(),
+            wg = $(window).geometry(),
+            po = $(bgelt).offset(),
+            y = (anchorPos.top + anchorPos.bottom - elt.offsetHeight) / 2;
+        y = Math.max(wg.top + 5, Math.min(wg.bottom - 5 - elt.offsetHeight, y)) - po.top;
+        elt.style.top = y + "px";
+        var x = (anchorPos.right + anchorPos.left - elt.offsetWidth) / 2;
+        x = Math.max(wg.left + 5, Math.min(wg.right - 5 - elt.offsetWidth, x)) - po.left;
+        elt.style.left = x + "px";
+    }
+    var efocus;
+    $(elt).find("input, button, textarea, select").filter(":visible").each(function () {
+        if (hasClass(this, "want-focus")) {
+            efocus = this;
+            return false;
+        } else if (!efocus
+                   && !hasClass(this, "dangerous")
+                   && !hasClass(this, "no-focus")) {
+            efocus = this;
+        }
+    });
+    efocus && focus_at(efocus);
 }
 
 
@@ -1723,75 +1954,6 @@ function link_urls(t) {
     });
 }
 
-function HtmlCollector() {
-    this.clear();
-}
-HtmlCollector.prototype.push = function (open, close) {
-    if (open && close) {
-        this.open.push(this.html + open);
-        this.close.push(close);
-        this.html = "";
-        return this.open.length - 1;
-    } else
-        this.html += open;
-    return this;
-};
-HtmlCollector.prototype.pop = function (pos) {
-    if (pos == null)
-        pos = Math.max(0, this.open.length - 1);
-    while (this.open.length > pos) {
-        this.html = this.open[this.open.length - 1] + this.html +
-            this.close[this.open.length - 1];
-        this.open.pop();
-        this.close.pop();
-    }
-    return this;
-};
-HtmlCollector.prototype.pop_n = function (n) {
-    this.pop(Math.max(0, this.open.length - n));
-    return this;
-};
-HtmlCollector.prototype.push_pop = function (text) {
-    this.html += text;
-    return this.pop();
-};
-HtmlCollector.prototype.pop_push = function (open, close) {
-    this.pop();
-    return this.push(open, close);
-};
-HtmlCollector.prototype.pop_collapse = function (pos) {
-    if (pos == null)
-        pos = this.open.length ? this.open.length - 1 : 0;
-    while (this.open.length > pos) {
-        if (this.html !== "")
-            this.html = this.open[this.open.length - 1] + this.html +
-                this.close[this.open.length - 1];
-        this.open.pop();
-        this.close.pop();
-    }
-    return this;
-};
-HtmlCollector.prototype.render = function () {
-    this.pop(0);
-    return this.html;
-};
-HtmlCollector.prototype.clear = function () {
-    this.open = [];
-    this.close = [];
-    this.html = "";
-    return this;
-};
-HtmlCollector.prototype.next_htctl_id = (function () {
-var id = 1;
-return function () {
-    while (document.getElementById("htctl" + id))
-        ++id;
-    ++id;
-    return "htctl" + (id - 1);
-};
-})();
-
-
 // text rendering
 window.render_text = (function () {
 function render0(text) {
@@ -1898,67 +2060,6 @@ render_text.add_format({
 })(window.markdownit());
 
 $(render_text.on_page);
-
-
-// popup dialogs
-function popup_near(elt, anchor) {
-    var parent_offset = {left: 0, top: 0};
-    if (/popupbg/.test(elt.parentNode.className)) {
-        elt.parentNode.style.display = "block";
-        parent_offset = $(elt.parentNode).offset();
-    }
-    var anchorPos = $(anchor).geometry();
-    var wg = $(window).geometry();
-    var x = (anchorPos.right + anchorPos.left - elt.offsetWidth) / 2;
-    var y = (anchorPos.top + anchorPos.bottom - elt.offsetHeight) / 2;
-    x = Math.max(wg.left + 5, Math.min(wg.right - 5 - elt.offsetWidth, x)) - parent_offset.left;
-    y = Math.max(wg.top + 5, Math.min(wg.bottom - 5 - elt.offsetHeight, y)) - parent_offset.top;
-    elt.style.left = x + "px";
-    elt.style.top = y + "px";
-    var efocus = $(elt).find("input, button, textarea, select").filter(":visible").filter(":not(.dangerous)")[0];
-    efocus && efocus.focus();
-}
-
-function popup(anchor, which, dofold, populate) {
-    var elt, form, elts, populates, i, xelt, type;
-    if (typeof which === "string") {
-        elt = $$("popup_" + which);
-        if (!elt)
-            log_jserror("no popup " + which);
-        anchor = anchor || $$("popupanchor_" + which);
-    }
-
-    if (dofold) {
-        elt.className = "popupc";
-        if (/popupbg/.test(elt.parentNode.className))
-            elt.parentNode.style.display = "none";
-    } else {
-        elt.className = "popupo";
-        popup_near(elt, anchor);
-    }
-
-    // transfer input values to the new form if asked
-    if (anchor && populate) {
-        elts = elt.getElementsByTagName("input");
-        populates = {};
-        for (i = 0; i < elts.length; ++i)
-            if (elts[i].className.indexOf("popup_populate") >= 0)
-                populates[elts[i].name] = elts[i];
-        form = anchor;
-        while (form && form.tagName && form.tagName != "FORM")
-            form = form.parentNode;
-        elts = (form && form.tagName ? form.getElementsByTagName("input") : []);
-        for (i = 0; i < elts.length; ++i)
-            if (elts[i].name && (xelt = populates[elts[i].name])) {
-                if (elts[i].type == "checkbox" && !elts[i].checked)
-                    xelt.value = "";
-                else if (elts[i].type != "radio" || elts[i].checked)
-                    xelt.value = elts[i].value;
-            }
-    }
-
-    return false;
-}
 
 
 // list management, conflict management
@@ -5738,6 +5839,17 @@ function pa_render_pset_table(pconf, data) {
         resort();
     }
 
+    function grade_index(n) {
+        n = n.closest("td");
+        var i = n.cellIndex, m;
+        var table = n.parentElement.parentElement.parentElement;
+        var th = table.tHead.firstChild.cells[i];
+        var sort = th ? th.getAttribute("data-pa-sort") : null;
+        if (sort && (m = sort.match(/^grade(\d+)$/)))
+            return +sort.substring(5);
+        else
+            return null;
+    }
     function grade_click(evt) {
         if ((!evt
              || (evt.metaKey
@@ -5788,26 +5900,10 @@ function pa_render_pset_table(pconf, data) {
             });
         }
     }
-    function grade_td(n) {
-        while (n.tagName !== "TD")
-            n = n.parentElement;
-        return n;
-    }
-    function grade_index(n) {
-        n = grade_td(n);
-        var i = n.cellIndex, m;
-        var table = n.parentElement.parentElement.parentElement;
-        var th = table.tHead.firstChild.cells[i];
-        var sort = th ? th.getAttribute("data-pa-sort") : null;
-        if (sort && (m = sort.match(/^grade(\d+)$/)))
-            return +sort.substring(5);
-        else
-            return null;
-    }
     function grade_key(evt) {
         var key = event_key(evt), mod = event_modkey(evt);
         if (key === "Tab" && (mod === 0 || mod === event_modkey.SHIFT)) {
-            var td = grade_td(this), tr = td.parentElement, i = td.cellIndex;
+            var td = this.closest("td"), tr = td.parentElement, i = td.cellIndex;
             var dir = mod ? "previousSibling" : "nextSibling";
             do {
                 tr = tr[dir];

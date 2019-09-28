@@ -111,12 +111,65 @@ span.lgsep {
 .nw, .nb {
 	white-space: nowrap;
 }
+.pw {
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
 span.nb {
 	display: inline-block; /* why? */
 	text-indent: 0;
 }
-.childfold {
+.childfold, .js-foldup {
 	cursor: pointer;
+}
+.checki {
+	padding-left: 1.3125em;
+}
+label.checki {
+	display: block;
+}
+.checkc {
+	display: inline-block;
+	margin-left: -1.3125em;
+	width: 1.3125em;
+	white-space: nowrap;
+}
+.checkc > input {
+	margin-left: 0;
+	padding-left: 0;
+}
+.entryg, .entryi {
+	margin-bottom: 0.5em;
+}
+.entryi {
+	display: flex;
+	align-items: baseline;
+}
+.entryi > label {
+	width: 8rem;
+	margin-right: 1rem;
+	text-align: right;
+	flex: 0 0 auto;
+}
+.entryi.medium > label {
+	width: 12rem;
+}
+.entryi.wide > label {
+	width: 19rem;
+}
+.entryi > .entry {
+	flex: 1 1 auto;
+}
+.entry > textarea:first-child {
+	vertical-align: top;
+}
+.checki, .entryi, .entryg {
+	-webkit-column-break-inside: avoid;
+	page-break-inside: avoid;
+	break-inside: avoid;
+}
+.fullw {
+	width: 100%;
 }
 .n {
 	font-weight: normal;
@@ -2987,23 +3040,58 @@ a.help {
 }
 
 /* popup dialogs */
-div.popupc, div.popupo {
-	border: 3px solid red;
-	padding: 0.5em;
-	background: #fff2f2;
-	position: absolute;
-	min-width: 15em;
-	max-width: 30em;
-	z-index: 6;
+.modal-open {
+	overflow: hidden;
 }
-div.popupc {
+.modal {
+	background-color: rgba(0, 0, 0, 0.4);
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	z-index: 59;
 	display: none;
 }
-div.popupc p:first-child, div.popupo p:first-child {
-	margin-top: 0;
+.modal.show {
+	display: block;
 }
-div.popup_actions {
-	text-align: right;
+.modal-open .modal {
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+.modal-dialog {
+	position: relative;
+	min-width: 15em;
+	max-width: 32em;
+	z-index: 60;
+	pointer-events: none;
+}
+.modal-dialog-centered {
+	margin: 5vh auto;
+	position: relative;
+	display: flex;
+}
+.modal-content {
+	border: 1px solid rgba(0, 0, 0, 0.6);
+	border-radius: 4px;
+	box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+	padding: 0.75em 1em;
+	background: #fbfbfa;
+	pointer-events: auto;
+}
+
+.popup-actions {
+	margin-top: 1em;
+}
+.popup-actions > .btn, .popup-actions > button {
+	float: right;
+	margin-left: 1em;
+}
+.popup-actions > .btn.btnl, .popup-actions > button.btnl {
+	float: left;
+	margin-left: 0;
+	margin-right: 1em;
 }
 
 /* scores */
