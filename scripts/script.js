@@ -2656,13 +2656,13 @@ function pa_makegrade(gi, k, editable) {
         title = ge.title ? escape_entities(ge.title) : name;
     if (editable) {
         var id = "pa-ge" + ++pa_makegrade.id_counter;
-        t = '<form class="ui-submit pa-grade pa-p pa-gradevalue-form" data-pa-grade="' +
+        t = '<form class="ui-submit pa-grade pa-p" data-pa-grade="' +
             name + '"><label class="pa-pt" for="' + id + '">' + title + '</label>';
         if (ge.type === "text") {
             t += '<div class="pa-pd"><textarea class="uich pa-pd pa-gradevalue" name="' + name +
                 '" id="' + id + '"></textarea></div>';
         } else if (ge.type === "selector") {
-            t += '<div class="pa-pd pa-gradeentry"><select class="uich pa-gradevalue" name="' + name + '" id="' + id + '"><option value="">None</option>';
+            t += '<div class="pa-pd"><select class="uich pa-gradevalue" name="' + name + '" id="' + id + '"><option value="">None</option>';
             for (var i = 0; i !== ge.options.length; ++i) {
                 var n = escape_entities(ge.options[i]);
                 t += '<option value="' + n + '">' + n + '</option>';
@@ -2670,13 +2670,13 @@ function pa_makegrade(gi, k, editable) {
             t += '</select></div>';
         } else if (ge.type === "checkbox"
                    && (g == null || g === 0 || g === ge.max)) {
-            t += '<div class="pa-gradeentry pa-pd"><span class="pa-gradewidth">' +
+            t += '<div class="pa-pd"><span class="pa-gradewidth">' +
                 '<input type="checkbox" class="ui pa-gradevalue" name="' + name +
                 '" id="' + id + '" value="' + ge.max + '" /></span>' +
                 ' <span class="pa-grademax">of ' + ge.max +
                 ' <a href="" class="x ui pa-grade-uncheckbox">#</a></span></div>';
         } else {
-            t += '<div class="pa-gradeentry pa-pd"><span class="pa-gradewidth">' +
+            t += '<div class="pa-pd"><span class="pa-gradewidth">' +
                 '<input type="text" class="uich pa-gradevalue" name="' + name +
                 '" id="' + id + '" /></span>';
             if (ge.type === "letter")
@@ -2709,7 +2709,7 @@ function pa_grade_uncheckbox() {
     $(this.parentElement.parentElement).find(".pa-grade-uncheckbox").remove();
 }
 handle_ui.on("pa-grade-uncheckbox", function () {
-    $(this).closest(".pa-gradeentry").find(".pa-gradevalue").each(pa_grade_uncheckbox);
+    $(this).closest(".pa-pd").find(".pa-gradevalue").each(pa_grade_uncheckbox);
 });
 
 var pa_grade_types = {
@@ -2801,7 +2801,7 @@ function pa_setgrade(gi, editable) {
         } else {
             var txt = "autograde is " + ag;
             if (!$g.find(".pa-gradediffers").length)
-                $g.find(".pa-gradeentry").append('<span class="pa-gradediffers"></span>');
+                $g.find(".pa-pd").append('<span class="pa-gradediffers"></span>');
             var $ag = $g.find(".pa-gradediffers");
             if ($ag.text() !== txt)
                 $ag.text(txt);
@@ -2850,7 +2850,7 @@ function pa_setgrade(gi, editable) {
             $pgbr.remove();
         else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
             $pgbr.remove();
-            $g.find(".pa-gradeentry").append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
+            $g.find(".pa-pd").append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
         }
     }
 }
@@ -2859,7 +2859,7 @@ handle_ui.on("pa-gradevalue", function () {
     $(this).closest("form").submit();
 });
 
-handle_ui.on("pa-gradevalue-form", function (event) {
+handle_ui.on("pa-grade", function (event) {
     event.preventDefault();
     if (this.getAttribute("data-outstanding"))
         return;
@@ -2867,7 +2867,7 @@ handle_ui.on("pa-gradevalue-form", function (event) {
     var self = this, $f = $(self);
     self.setAttribute("data-outstanding", "1");
     $f.find(".pa-gradediffers, .pa-save-message").remove();
-    $f.find(".pa-gradeentry").append('<span class="pa-save-message">Saving…</span>');
+    $f.find(".pa-pd").append('<span class="pa-save-message">Saving…</span>');
 
     var gi = $f.closest(".pa-psetinfo").data("pa-gradeinfo");
     if (typeof gi === "string")
@@ -2930,18 +2930,18 @@ function pa_loadgrades(gi) {
         if (gi.entries[k]) {
             $(this).html(pa_makegrade(gi, k, editable)).removeClass("pa-need-grade");
             if (this.hasAttribute("data-pa-landmark-range"))
-                $(this).find(".pa-gradeentry").append('<button type="button" class="btn ui pa-compute-grade">Grade from notes</button>');
+                $(this).find(".pa-pd").append('<button type="button" class="btn ui pa-compute-grade">Grade from notes</button>');
             if (this.hasAttribute("data-pa-landmark-buttons")) {
                 var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
                 for (var i = 0; i < lb.length; ++i) {
-                    if (typeof lb[i] === "string")
-                        $(this).find(".pa-gradeentry").append(lb[i]);
-                    else {
+                    if (typeof lb[i] === "string") {
+                        $(this).find(".pa-pd").append(lb[i]);
+                    } else {
                         var t = '<button type="button" class="btn ui';
                         if (lb[i].className)
                             t += ' ' + lb[i].className;
                         t += '">' + lb[i].title + '</button>';
-                        $(this).find(".pa-gradeentry").append(t);
+                        $(this).find(".pa-pd").append(t);
                     }
                 }
             }
@@ -2989,7 +2989,7 @@ function pa_loadgrades(gi) {
                 } else {
                     var txt = "auto-late hours is " + ag;
                     if (!$g.find(".pa-gradediffers").length)
-                        $g.find(".pa-gradeentry").append('<span class="pa-gradediffers"></span>');
+                        $g.find(".pa-pd").append('<span class="pa-gradediffers"></span>');
                     var $ag = $g.find(".pa-gradediffers");
                     if ($ag.text() !== txt)
                         $ag.text(txt);
@@ -3067,7 +3067,7 @@ handle_ui.on("pa-compute-grade", function () {
         }
     }, ".pa-gw");
     if (noteparts.length) {
-        var $ge = $(this).closest(".pa-gradeentry"),
+        var $ge = $(this).closest(".pa-pd"),
             $gv = $ge.find(".pa-gradevalue"),
             $gi = $ge.find(".pa-compute-grade-info");
         if (!$gi.length)

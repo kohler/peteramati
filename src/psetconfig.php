@@ -201,15 +201,17 @@ class Pset {
                 if ($g->landmark_file || $g->landmark_range_file)
                     $this->has_grade_landmark = true;
             }
-        } else if ($grades)
+        } else if ($grades) {
             throw new PsetConfigException("`grades` format error`", "grades");
+        }
         if (get($p, "grade_order"))
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         else
             $this->grades = self::position_sort("grades", $this->all_grades);
-        foreach ($this->grades as $g)
+        foreach ($this->grades as $g) {
             if ($g->is_extra)
                 $this->has_extra = true;
+        }
         $this->grades_visible = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible_college = self::cdate($p, "grades_visible_college", "show_grades_to_college");
         if ($this->grades_visible_college === null)

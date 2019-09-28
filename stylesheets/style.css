@@ -2560,9 +2560,6 @@ span.foldarrow {
 	margin-bottom: 0;
 	margin-left: 0;
 }
-.pa-gradebox .pa-gradeentry {
-	white-space: nowrap;
-}
 .pa-warnbox {
 	background: #f2ecef;
 	background:
@@ -2711,7 +2708,7 @@ textarea.pa-gradevalue {
 	font-size: smaller;
 	color: #999999;
 }
-.pa-gradeentry > .pa-grademax {
+.pa-pd > .pa-grademax {
 	display: inline-block;
 	min-width: 3.5em;
 }

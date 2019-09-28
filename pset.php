@@ -495,9 +495,9 @@ function echo_all_grades() {
             ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>');
         }
     } else if ($User !== $Me && $Info->pset->late_hours_entry()) {
-        echo '<form class="ui-submit pa-gradevalue-form pa-grade pa-p" data-pa-grade="late_hours">',
+        echo '<form class="ui-submit pa-grade pa-p" data-pa-grade="late_hours">',
             '<label class="pa-pt" for="pa-lh">late hours</label>',
-            '<div class="pa-pd pa-gradeentry">',
+            '<div class="pa-pd">',
             Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
                       ["class" => "uich pa-gradevalue"]);
         if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours)
