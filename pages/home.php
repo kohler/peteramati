@@ -1195,8 +1195,9 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     global $Profile, $MicroNow;
     $t0 = microtime(true);
     $j = StudentSet::json_basics($info->user, $anonymous);
-    if (($gcid = $info->gradercid()))
+    if (($gcid = $info->gradercid())) {
         $j["gradercid"] = $gcid;
+    }
 
     // are any commits committed?
     if (!$pset->gitless_grades && $info->repo) {
@@ -1210,10 +1211,12 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
                 else
                     return rand(0, 10) == 0;
             });
-        } else
+        } else {
             $gh = $info->grading_hash();
-        if ($gh !== null)
+        }
+        if ($gh !== null) {
             $j["gradehash"] = $gh;
+        }
     }
 
     if ($pset->grades()) {
@@ -1221,21 +1224,27 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
 
         if (!$pset->gitless_grades) {
             $gradercid = $info->gradercid();
-            if ($gi && get($gi, "linenotes"))
+            if ($gi && get($gi, "linenotes")) {
                 $j["has_notes"] = true;
-            else if ($info->viewer->contactId == $gradercid)
+            } else if ($info->viewer->contactId == $gradercid) {
                 $info->user->incomplete = "no line notes";
-            if ($gi && $gradercid != get($gi, "gradercid") && $info->viewer->privChair)
+            }
+            if ($gi
+                && $gradercid != get($gi, "gradercid")
+                && $info->viewer->privChair) {
                 $j["has_nongrader_notes"] = true;
+            }
         }
 
         $garr = render_grades($pset, $gi, $info->user);
         $j["grades"] = $garr->allv;
         $j["total"] = $garr->totalv;
-        if ($garr->differentk)
+        if ($garr->differentk) {
             $j["highlight_grades"] = $garr->differentk;
-        if ($info->user_can_view_grades())
+        }
+        if ($info->user_can_view_grades()) {
             $j["grades_visible"] = true;
+        }
     }
 
     //echo "<td><a href=\"mailto:", htmlspecialchars($s->email), "\">",
@@ -1243,21 +1252,24 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
 
     if (!$pset->gitless && $info->repo) {
         $j["repo"] = RepositorySite::make_web_url($info->repo->url, $info->conf);
-        if (!$info->repo->working)
+        if (!$info->repo->working) {
             $j["repo_broken"] = true;
-        else if (!$info->user_can_view_repo_contents(true))
+        } else if (!$info->user_can_view_repo_contents(true)) {
             $j["repo_unconfirmed"] = true;
-        if ($info->repo->open)
+        }
+        if ($info->repo->open) {
             $j["repo_too_open"] = true;
-        if (!$info->partner_same())
+        }
+        if (!$info->partner_same()) {
             $j["repo_partner_error"] = true;
-        else if ($pset->partner_repo
-                 && $info->partner
-                 && $info->repo
-                 && $info->repo->repoid != $info->partner->link(LINK_REPO, $pset->id))
+        } else if ($pset->partner_repo
+                   && $info->partner
+                   && $info->repo
+                   && $info->repo->repoid != $info->partner->link(LINK_REPO, $pset->id)) {
             $j["repo_partner_error"] = true;
-        else if ($sset->repo_sharing($info->user))
+        } else if ($sset->repo_sharing($info->user)) {
             $j["repo_sharing"] = true;
+        }
     }
 
     $info->user->visited = true;
@@ -1307,9 +1319,13 @@ function show_pset_table($sset) {
     $incomplete = array();
     $grades_visible = false;
     $jx = [];
+    $gradercounts = [];
     foreach ($sset as $s) {
         if (!$s->user->visited) {
             $j = render_pset_row($pset, $sset, $s, $anonymous);
+            if (!$s->user->dropped && isset($j["gradercid"])) {
+                $gradercounts[$j["gradercid"]] = get($gradercounts, $j["gradercid"], 0) + 1;
+            }
             if (!$pset->partner_repo) {
                 foreach ($s->user->links(LINK_PARTNER, $pset->id) as $pcid) {
                     if (($ss = $sset->info($pcid)))
@@ -1379,8 +1395,10 @@ function show_pset_table($sset) {
     if ($sset->viewer->privChair && !$pset->gitless_grades) {
         echo "<div class='g'></div>";
         $sel = array("none" => "N/A");
-        foreach ($sset->conf->pc_members_and_admins() as $pcm)
-            $sel[$pcm->email] = Text::name_html($pcm);
+        foreach ($sset->conf->pc_members_and_admins() as $uid => $pcm) {
+            $n = get($gradercounts, $uid) ? " (" . $gradercounts[$uid] . ")" : "";
+            $sel[$pcm->email] = Text::name_html($pcm) . $n;
+        }
         $sel["__random__"] = "Random";
         $sel["__random_tf__"] = "Random TF";
         echo '<span class="nb" style="padding-right:2em">',

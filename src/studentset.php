@@ -197,29 +197,34 @@ class StudentSet implements Iterator, Countable {
 
     static function json_basics(Contact $s, $anonymous) {
         $j = ["uid" => $s->contactId];
-        if ($s->github_username)
+        if ($s->github_username) {
             $j["username"] = $s->github_username;
-        else if ($s->seascode_username)
+        } else if ($s->seascode_username) {
             $j["username"] = $s->seascode_username;
-        else
+        } else {
             $j["username"] = $s->email ? : $s->huid;
-        if ($s->email)
+        }
+        if ($s->email) {
             $j["email"] = $s->email;
-        if ($anonymous)
+        }
+        if ($anonymous) {
             $j["anon_username"] = $s->anon_username;
+        }
 
-        if ((string) $s->firstName !== "" && (string) $s->lastName === "")
+        if ((string) $s->firstName !== "" && (string) $s->lastName === "") {
             $j["last"] = $s->firstName;
-        else {
+        } else {
             if ((string) $s->firstName !== "")
                 $j["first"] = $s->firstName;
             if ((string) $s->lastName !== "")
                 $j["last"] = $s->lastName;
         }
-        if ($s->extension)
+        if ($s->extension) {
             $j["x"] = true;
-        if ($s->dropped)
+        }
+        if ($s->dropped) {
             $j["dropped"] = true;
+        }
         return $j;
     }
 }

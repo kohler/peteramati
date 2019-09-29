@@ -2826,12 +2826,12 @@ function pa_render_grade_entry(ge, options) {
             t += '<div class="pa-pd"><textarea class="' + livecl + 'pa-pd pa-gradevalue" name="' + name +
                 '" id="' + id + '"></textarea></div>';
         } else if (ge.type === "select") {
-            t += '<div class="pa-pd"><select class="' + livecl + 'pa-gradevalue" name="' + name + '" id="' + id + '"><option value="">None</option>';
+            t += '<div class="pa-pd"><span class="select"><select class="' + livecl + 'pa-gradevalue" name="' + name + '" id="' + id + '"><option value="">None</option>';
             for (var i = 0; i !== ge.options.length; ++i) {
                 var n = escape_entities(ge.options[i]);
                 t += '<option value="' + n + '">' + n + '</option>';
             }
-            t += '</select></div>';
+            t += '</select></span></div>';
         } else if (ge.type === "checkbox") {
             t += '<div class="pa-pd"><span class="pa-gradewidth">' +
                 '<input type="checkbox" class="' + (live ? 'ui ' : '') +

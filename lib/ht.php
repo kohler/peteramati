@@ -4,7 +4,6 @@
 // See LICENSE for open-source distribution terms
 
 class Ht {
-
     public static $img_base = "";
     public static $default_button_class = "";
     private static $_script_open = "<script";
@@ -12,7 +11,8 @@ class Ht {
     private static $_lastcontrolid = 0;
     private static $_stash = "";
     private static $_stash_inscript = false;
-    private static $_stash_map = array();
+    private static $_stash_map = [];
+    private static $_msgset = null;
     const ATTR_SKIP = 1;
     const ATTR_BOOL = 2;
     const ATTR_BOOLTEXT = 3;
@@ -197,10 +197,10 @@ class Ht {
 
         if ($selected === null || !isset($opt[$selected]))
             $selected = key($opt);
-        $t = '<select name="' . $name . '"' . self::extra($js);
+        $t = '<span class="select"><select name="' . $name . '"' . self::extra($js);
         if (!isset($js["data-default-value"]))
             $t .= ' data-default-value="' . htmlspecialchars($has_selected ? $selected : $first_value) . '"';
-        return $t . '>' . $x . $optgroup . "</select>";
+        return $t . '>' . $x . $optgroup . "</select></span>";
     }
 
     static function checkbox($name, $value = 1, $checked = false, $js = null) {
@@ -254,18 +254,10 @@ class Ht {
             $html = null;
         } else if ($js === null)
             $js = array();
-        if (!isset($js["class"]) && self::$default_button_class)
-            $js["class"] = self::$default_button_class;
         $type = isset($js["type"]) ? $js["type"] : "button";
-        if ($type === "button" || preg_match("_[<>]_", $html) || isset($js["value"])) {
-            if (!isset($js["value"]))
-                $js["value"] = 1;
-            return "<button type=\"$type\"" . self::extra($js)
-                . ">" . $html . "</button>";
-        } else {
-            $js["value"] = $html;
-            return "<input type=\"$type\"" . self::extra($js) . " />";
-        }
+        if (!isset($js["value"]) && isset($js["name"]) && $type !== "button")
+            $js["value"] = "1";
+        return "<button type=\"$type\"" . self::extra($js) . ">" . $html . "</button>";
     }
 
     static function submit($name, $html = null, $js = null) {
@@ -338,7 +330,7 @@ class Ht {
             $t .= '">';
             if (is_array($a)) {
                 $t .= $a[0];
-                if (count($a) > 1)
+                if (count($a) > 1 && $a[1] !== "")
                     $t .= '<div class="hint">' . $a[1] . '</div>';
             } else
                 $t .= $a;
@@ -392,7 +384,7 @@ class Ht {
         if (isset($js["onclick"]) && !preg_match('/(?:^return|;)/', $js["onclick"]))
             $js["onclick"] = "return " . $js["onclick"];
         if (isset($js["onclick"])
-            && (!isset($js["class"]) || !preg_match('/(?:\A|\s)(?:ui|btn|tla)(?=\s|\z)/', $js["class"])))
+            && (!isset($js["class"]) || !preg_match('/(?:\A|\s)(?:ui|btn|lla|tla)(?=\s|\z)/', $js["class"])))
             error_log(caller_landmark(2) . ": JS Ht::link lacks class");
         return "<a" . self::extra($js) . ">" . $html . "</a>";
     }
@@ -466,25 +458,57 @@ class Ht {
     }
 
 
-    static function xmsg($type, $content) {
-        if (is_int($type))
-            $type = $type >= 2 ? "merror" : ($type > 0 ? "warning" : "info");
-        if (substr($type, 0, 1) === "x")
-            $type = substr($type, 1);
-        if ($type === "error")
-            $type = "merror";
-        return '<div class="xmsg x' . $type . '"><div class="xmsg0"></div>'
-            . '<div class="xmsgc">' . $content . '</div>'
-            . '<div class="xmsg1"></div></div>';
+    static function msg($msg, $status) {
+        if (is_int($status))
+            $status = $status >= 2 ? "error" : ($status > 0 ? "warning" : "info");
+        if (substr($status, 0, 1) === "x")
+            $status = substr($status, 1);
+        if ($status === "merror")
+            $status = "error";
+        if (is_array($msg)) {
+            $msg = join("", array_map(function ($x) {
+                if (str_starts_with($x, "<p") || str_starts_with($x, "<div"))
+                    return $x;
+                else
+                    return "<p>{$x}</p>";
+            }, $msg));
+        } else if ($msg !== ""
+                   && !str_starts_with($msg, "<p")
+                   && !str_starts_with($msg, "<div"))
+            $msg = "<p>{$msg}</p>";
+        if ($msg === "")
+            return "";
+        return '<div class="msg msg-' . $status . '">' . $msg . '</div>';
     }
 
-    static function ymsg($type, $content) {
-        if (substr($type, 0, 1) === "x")
-            $type = substr($type, 1);
-        if ($type === "error")
-            $type = "merror";
-        return '<div class="ymsg x' . $type . '"><div class="xmsg0"></div>'
-            . '<div class="ymsgc">' . $content . '</div>'
-            . '<div class="xmsg1"></div></div>';
+    static function xmsg($status, $msg) {
+        return self::msg($msg, $status);
+    }
+
+
+    static function control_class($field, $rest = "") {
+        if (self::$_msgset)
+            return self::$_msgset->control_class($field, $rest);
+        else
+            return $rest;
+    }
+    static function error_at($field, $msg = "") {
+        self::$_msgset || (self::$_msgset = new MessageSet);
+        self::$_msgset->error_at($field, $msg);
+    }
+    static function warning_at($field, $msg = "") {
+        self::$_msgset || (self::$_msgset = new MessageSet);
+        self::$_msgset->warning_at($field, $msg);
+    }
+    static function problem_status_at($field) {
+        return self::$_msgset ? self::$_msgset->problem_status_at($field) : 0;
+    }
+    static function render_messages_at($field) {
+        $t = "";
+        if (self::$_msgset) {
+            foreach (self::$_msgset->messages_at($field, true) as $mx)
+                $t .= '<p class="' . MessageSet::status_class($mx[2], "f-h", "is-") . '">' . $mx[1] . '</p>';
+        }
+        return $t;
     }
 }
