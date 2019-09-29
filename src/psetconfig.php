@@ -204,21 +204,24 @@ class Pset {
         } else if ($grades) {
             throw new PsetConfigException("`grades` format error`", "grades");
         }
-        if (get($p, "grade_order"))
+        if (get($p, "grade_order")) {
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
-        else
+        } else {
             $this->grades = self::position_sort("grades", $this->all_grades);
+        }
         foreach ($this->grades as $g) {
             if ($g->is_extra)
                 $this->has_extra = true;
         }
         $this->grades_visible = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible_college = self::cdate($p, "grades_visible_college", "show_grades_to_college");
-        if ($this->grades_visible_college === null)
+        if ($this->grades_visible_college === null) {
             $this->grades_visible_college = $this->grades_visible;
+        }
         $this->grades_visible_extension = self::cdate($p, "grades_visible_extension", "show_grades_to_extension");
-        if ($this->grades_visible_extension === null)
+        if ($this->grades_visible_extension === null) {
             $this->grades_visible_extension = $this->grades_visible;
+        }
         if ($this->grades_visible === null) {
             if ($this->grades_visible_college === null)
                 $this->grades_visible = $this->grades_visible_college;
@@ -229,12 +232,14 @@ class Pset {
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
         $this->grade_script = get($p, "grade_script");
-        if (is_string($this->grade_script))
+        if (is_string($this->grade_script)) {
             $this->grade_script = [$this->grade_script];
+        }
 
         if (($this->deadline || $this->deadline_college || $this->deadline_extension)
-            && !self::cbool($p, "no_late_hours"))
+            && !self::cbool($p, "no_late_hours")) {
             $this->_late_hours = GradeEntryConfig::make_late_hours();
+        }
 
         // runners
         $runners = get($p, "runners");
@@ -251,20 +256,23 @@ class Pset {
                 if ($r->xterm_js)
                     $this->has_xterm_js = true;
             }
-        } else if ($runners)
+        } else if ($runners) {
             throw new PsetConfigException("`runners` format error", "runners");
-        if (get($p, "runner_order"))
+        }
+        if (get($p, "runner_order")) {
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
-        else
+        } else {
             $this->runners = self::position_sort("runners", $this->all_runners);
+        }
         $this->run_username = self::cstr($p, "run_username");
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
         $this->run_overlay = self::cstr_or_str_array($p, "run_overlay");
         $this->run_skeletondir = self::cstr($p, "run_skeletondir");
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
         $this->run_timeout = self::cinterval($p, "run_timeout");
-        if ($this->run_timeout === null) // default run_timeout is 10m
+        if ($this->run_timeout === null) { // default run_timeout is 10m
             $this->run_timeout = 600;
+        }
         $this->run_xterm_js = self::cbool($p, "run_xterm_js");
         $this->run_binddir = self::cstr($p, "run_binddir");
 
@@ -273,10 +281,12 @@ class Pset {
         if (is_array($diffs) || is_object($diffs)) {
             foreach (self::make_config_array($p->diffs) as $k => $v)
                 $this->diffs[] = new DiffConfig($k, $v);
-        } else if ($diffs)
+        } else if ($diffs) {
             throw new PsetConfigException("`diffs` format error", "diffs");
-        if (($ignore = get($p, "ignore")))
+        }
+        if (($ignore = get($p, "ignore"))) {
             $this->ignore = self::cstr_or_str_array($p, "ignore");
+        }
 
         $this->config_signature = self::cstr($p, "config_signature");
         $this->config_mtime = self::cint($p, "config_mtime");
@@ -614,7 +624,7 @@ class Pset {
         if (!is_array($order))
             throw new PsetConfigException("`$what` format error", $what);
         $b = array();
-        foreach ($order as $name)
+        foreach ($order as $name) {
             if (is_string($name)) {
                 if (isset($a[$name]) && !isset($b[$name]))
                     $b[$name] = $a[$name];
@@ -622,8 +632,10 @@ class Pset {
                     throw new PsetConfigException("`$what` entry `$name` reused", $what);
                 else
                     throw new PsetConfigException("`$what` entry `$name` unknown", $what);
-            } else
+            } else {
                 throw new PsetConfigException("`$what` format error", $what);
+            }
+        }
         return $b;
     }
 
@@ -635,16 +647,17 @@ class Pset {
             ++$i;
         }
         uasort($xp, function ($a, $b) {
-                if ($a[0] != $b[0])
-                    return $a[0] < $b[0] ? -1 : 1;
-                else if ($a[1] != $b[1])
-                    return $a[1] < $b[1] ? -1 : 1;
-                else
-                    return 0;
-            });
+            if ($a[0] != $b[0])
+                return $a[0] < $b[0] ? -1 : 1;
+            else if ($a[1] != $b[1])
+                return $a[1] < $b[1] ? -1 : 1;
+            else
+                return 0;
+        });
         $y = [];
-        foreach (array_keys($xp) as $k)
+        foreach (array_keys($xp) as $k) {
             $y[$k] = $x[$k];
+        }
         return $y;
     }
 }
@@ -710,7 +723,7 @@ class GradeEntryConfig {
                 $type = null;
             } else if ($type === "text" || $type === "checkbox" || $type === "letter") {
                 // nada
-            } else if ($type === "selector"
+            } else if ($type === "select"
                        && isset($g->options)
                        && is_array($g->options)) {
                 // XXX check components are strings all different
@@ -721,7 +734,7 @@ class GradeEntryConfig {
         }
         $this->type = $type;
 
-        if ($this->type === "text" || $this->type === "selector") {
+        if ($this->type === "text" || $this->type === "select") {
             $this->no_total = true;
         } else {
             $this->no_total = Pset::cbool($loc, $g, "no_total");
@@ -817,7 +830,7 @@ class GradeEntryConfig {
         } else if (is_string($v)) {
             if ($this->type === "text") {
                 return rtrim($v);
-            } else if ($this->type === "selector") {
+            } else if ($this->type === "select") {
                 if ($v === null || $v === "" || strcasecmp($v, "none") === 0)
                     return null;
                 else if (in_array((string) $v, $this->options))
@@ -852,10 +865,14 @@ class GradeEntryConfig {
     }
 
     function value_differs($v1, $v2) {
-        if ($v1 === null
-            || $v2 === null
-            || $this->type === "text"
-            || $this->type === "selector") {
+        if ($this->type === "checkbox"
+            && (int) $v1 === 0
+            && (int) $v2 === 0) {
+            return false;
+        } else if ($v1 === null
+                   || $v2 === null
+                   || $this->type === "text"
+                   || $this->type === "select") {
             return $v1 !== $v2;
         } else {
             return abs($v1 - $v2) >= 0.0001;
@@ -869,7 +886,7 @@ class GradeEntryConfig {
         }
         if ($this->type !== null) {
             $gej["type"] = $this->type;
-            if ($this->type === "selector") {
+            if ($this->type === "select") {
                 $gej["options"] = $this->options;
             }
         }
@@ -921,22 +938,26 @@ class RunnerConfig {
         if (!is_string($this->name) || !preg_match(',\A[A-Za-z][0-9A-Za-z_]*\z,', $this->name))
             throw new PsetConfigException("runner name format error", $loc);
 
-        if (isset($r->category))
+        if (isset($r->category)) {
             $this->category = $r->category;
-        else if ($defr && isset($defr->category))
+        } else if ($defr && isset($defr->category)) {
             $this->category = $defr->category;
-        else
+        } else {
             $this->category = $this->name;
-        if (!is_string($this->category) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->category))
+        }
+        if (!is_string($this->category) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->category)) {
             throw new PsetConfigException("runner category format error", $loc);
+        }
 
         $this->title = Pset::cstr($loc, $r, "title", "text");
-        if ($this->title === null)
+        if ($this->title === null) {
             $this->title = $this->name;
+        }
 
         $this->output_title = Pset::cstr($loc, $r, "output_title", "output_text");
-        if ($this->output_title === null)
+        if ($this->output_title === null) {
             $this->output_title = $this->title . " output";
+        }
 
         $this->disabled = Pset::cbool($loc, $rs, "disabled");
         $this->visible = Pset::cbool($loc, $rs, "visible", "show_to_students");
@@ -957,16 +978,18 @@ class RunnerConfig {
         $this->queue = Pset::cstr($loc, $rs, "queue");
         $this->nconcurrent = Pset::cint($loc, $rs, "nconcurrent");
         $this->position = Pset::cnum($loc, $rs, "position");
-        if ($this->position === null && isset($r->priority))
+        if ($this->position === null && isset($r->priority)) {
             $this->position = -Pset::cnum($loc, $r, "priority");
+        }
         $this->overlay = Pset::cstr_or_str_array($loc, $rs, "overlay");
         if (isset($r->timed_replay)
             ? is_number($r->timed_replay)
             : $defr && isset($defr->timed_replay) && is_number($defr->timed_replay)) {
             $n = isset($r->timed_replay) ? $r->timed_replay : $defr->timed_replay;
             $this->timed_replay = $n > 0 ? (float) $n : false;
-        } else
+        } else {
             $this->timed_replay = !!Pset::cbool($loc, $rs, "timed_replay");
+        }
     }
     function category_argument() {
         return $this->category === $this->name ? null : $this->category;
@@ -996,8 +1019,9 @@ class DiffConfig {
         $this->title = Pset::cstr($loc, $d, "title");
         $this->match_priority = (float) Pset::cint($loc, $d, "match_priority");
         $this->position = Pset::cnum($loc, $d, "position");
-        if ($this->position === null && isset($d->priority))
+        if ($this->position === null && isset($d->priority)) {
             $this->position = -Pset::cnum($loc, $d, "priority");
+        }
         $this->fileless = Pset::cbool($loc, $d, "fileless");
         $this->full = Pset::cbool($loc, $d, "full");
         $this->collate = Pset::cbool($loc, $d, "collate");

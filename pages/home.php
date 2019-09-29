@@ -1345,15 +1345,19 @@ function show_pset_table($sset) {
 
     echo '<table class="pap" id="pa-pset' . $pset->id . '"></table>';
     $grades = $pset->numeric_grades();
-    $jd = ["id" => $pset->id,
-           "checkbox" => $checkbox,
-           "anonymous" => $anonymous,
-           "grades" => $pset->gradeentry_json(true),
-           "gitless" => $pset->gitless,
-           "gitless_grades" => $pset->gitless_grades,
-           "psetkey" => $pset->urlkey];
-    if ($anonymous)
+    $jd = [
+        "id" => $pset->id,
+        "checkbox" => $checkbox,
+        "anonymous" => $anonymous,
+        "grades" => $pset->gradeentry_json(true),
+        "gitless" => $pset->gitless,
+        "gitless_grades" => $pset->gitless_grades,
+        "psetkey" => $pset->urlkey,
+        "title" => $pset->title
+    ];
+    if ($anonymous) {
         $jd["can_override_anonymous"] = true;
+    }
     $i = $nintotal = $last_in_total = 0;
     foreach ($grades as $ge) {
         if (!$ge->no_total) {
@@ -1362,12 +1366,14 @@ function show_pset_table($sset) {
         }
         ++$i;
     }
-    if ($nintotal > 1)
+    if ($nintotal > 1) {
         $jd["need_total"] = true;
-    else if ($nintotal == 1)
+    } else if ($nintotal == 1) {
         $jd["total_key"] = $last_in_total;
-    if ($grades_visible)
+    }
+    if ($grades_visible) {
         $jd["grades_visible"] = true;
+    }
     echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){pa_render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 
     if ($sset->viewer->privChair && !$pset->gitless_grades) {
@@ -1431,11 +1437,12 @@ function show_pset_table($sset) {
     if (!$pset->gitless) {
         $sel = ["__run_group" => ["optgroup", "Run"]];
         $esel = ["__ensure_group" => ["optgroup", "Ensure"]];
-        foreach ($pset->runners as $r)
+        foreach ($pset->runners as $r) {
             if ($sset->viewer->can_run($pset, $r)) {
                 $sel[$r->name] = htmlspecialchars($r->title);
                 $esel[$r->name . ".ensure"] = htmlspecialchars($r->title);
             }
+        }
         if (count($sel) > 1)
             echo '<span class="nb" style="padding-right:2em">',
                 Ht::select("runner", $sel + $esel),
@@ -1460,16 +1467,21 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $t0 = $Profile ? microtime(true) : 0;
 
     $psetj = [];
-    foreach ($Conf->psets() as $pset)
+    foreach ($Conf->psets() as $pset) {
         if ($Me->can_view_pset($pset)) {
-            $pj = ["title" => $pset->title, "urlkey" => $pset->urlkey,
-                   "pos" => count($psetj)];
-            if ($pset->gitless)
+            $pj = [
+                "title" => $pset->title, "urlkey" => $pset->urlkey,
+                "pos" => count($psetj)
+            ];
+            if ($pset->gitless) {
                 $pj["gitless"] = true;
-            if ($pset->gitless || $pset->gitless_grades)
+            }
+            if ($pset->gitless || $pset->gitless_grades) {
                 $pj["gitless_grades"] = true;
+            }
             $psetj[$pset->psetid] = $pj;
         }
+    }
     Ht::stash_script('peteramati_psets=' . json_encode_browser($psetj) . ';');
 
     $pctable = [];
@@ -1494,7 +1506,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
 
     $sset = null;
     $MicroNow = microtime(true);
-    foreach ($Conf->psets_newest_first() as $pset)
+    foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset)) {
             if (!$sset)
                 $sset = new StudentSet($Me);
@@ -1503,6 +1515,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             show_pset_table($sset);
             $sep = "<hr />\n";
         }
+    }
 }
 
 echo "<div class='clear'></div>\n";

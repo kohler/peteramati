@@ -26,7 +26,7 @@ class APIData {
                 return ["ok" => false, "error" => "Missing repository."];
             $this->commit = $this->conf->check_api_hash($this->hash, $this);
             if (!$this->commit)
-                return ["ok" => false, "error" => ($this->hash ? "Missing commit." : "Disconnected commit.")];
+                return ["ok" => false, "error" => ($this->hash ? "Disconnected commit." : "Missing commit.")];
             $info->force_set_hash($this->commit->hash);
         }
         return false;
@@ -1879,6 +1879,7 @@ class Conf {
             "jserror" => "1 API_JSError::jserror",
             "latestcommit" => "3 API_Repo::latestcommit",
             "linenote" => "15 API_Grade::linenote",
+            "multigrade" => "3 API_Grade::multigrade",
             "repositories" => "17 API_Repo::user_repositories"
         ];
         if (($olist = $this->opt("apiFunctions")))

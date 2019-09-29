@@ -113,10 +113,11 @@ interface JsonUpdatable extends JsonSerializable {
 }
 
 function json_update($j, $updates) {
-    if (is_object($j))
+    if (is_object($j)) {
         $j = get_object_vars($j);
-    else if (!is_array($j))
+    } else if (!is_array($j)) {
         $j = [];
+    }
     if (is_object($updates)) {
         $is_replacement = $updates instanceof JsonUpdatable
             && $updates->jsonIsReplacement();
@@ -133,12 +134,14 @@ function json_update($j, $updates) {
             error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . ", user $Me->email");
             continue;
         }
-        if (is_object($v) || is_associative_array($v))
+        if (is_object($v) || is_associative_array($v)) {
             $v = json_update(isset($j[$k]) ? $j[$k] : null, $v);
-        if ($v === null)
+        }
+        if ($v === null) {
             unset($j[$k]);
-        else
+        } else {
             $j[$k] = $v;
+        }
     }
     $n = count($j);
     if ($n == 0)

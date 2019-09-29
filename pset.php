@@ -480,7 +480,7 @@ function echo_all_grades() {
             foreach ($Pset->grade_script as $gs)
                 Ht::stash_html($Info->conf->make_script_file($gs));
         }
-        echo '<div class="pa-gradelist',
+        echo '<div class="pa-gradelist want-pa-landmark-links',
             ($User !== $Me ? " editable" : " noneditable"),
             ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
         Ht::stash_script('pa_loadgrades.call($(".pa-psetinfo")[0], ' . json_encode_browser($Info->grade_json()) . ')');

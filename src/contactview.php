@@ -73,16 +73,17 @@ class ContactView {
         $user = $Me;
         if (isset($usertext) && $usertext) {
             $user = $Conf->user_by_whatever($usertext);
-            if (!$user)
+            if (!$user) {
                 $Conf->errorMsg("No such user “" . htmlspecialchars($usertext) . "”.");
-            else if ($user->contactId == $Me->contactId)
+            } else if ($user->contactId == $Me->contactId) {
                 $user = $Me;
-            else if (!$Me->isPC) {
+            } else if (!$Me->isPC) {
                 $Conf->errorMsg("You can’t see that user’s information.");
                 $user = null;
-            } else
+            } else {
                 $user->set_anonymous(substr($usertext, 0, 5) === "[anon"
                                      || ($pset && $pset->anonymous));
+            }
         }
         if ($user && ($Me->isPC || $Me->chairContact)) {
             if ($pset && $pset->anonymous)

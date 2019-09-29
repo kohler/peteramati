@@ -266,7 +266,7 @@ class PsetView {
         }
 
         // compare-and-swap loop
-        while (1) {
+        while (true) {
             // change notes
             $new_notes = json_update($record ? $record->notes : null, $updates);
             self::clean_notes($new_notes);
@@ -328,7 +328,7 @@ class PsetView {
         $record = $this->grade;
 
         // compare-and-swap loop
-        while (1) {
+        while (true) {
             // change notes
             $new_notes = json_update($record ? $record->notes : null, $updates);
             self::clean_notes($new_notes);
@@ -1003,14 +1003,18 @@ class PsetView {
     }
 
 
-    function grade_json() {
+    function grade_json($no_entries = false) {
         $this->ensure_grade();
         if (!$this->can_view_grades()) {
             return null;
         }
 
         $notes = $this->current_info();
-        $result = $this->pset->gradeentry_json($this->pc_view);
+        if ($no_entries)
+            $result = [];
+        else
+            $result = $this->pset->gradeentry_json($this->pc_view);
+        $result["uid"] = $this->user->contactId;
         $agx = get($notes, "autogrades");
         $gx = get($notes, "grades");
         if ($agx || $gx || $this->is_grading_commit()) {
