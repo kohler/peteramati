@@ -240,7 +240,7 @@ label.checki {
 .c, .clear {
 	clear: both;
 }
-.clearfix:after, .pst:after, .pavt:after, .papet:after, .submission_modes:after,
+.clearfix:after, .pst:after, .submission_modes:after,
 .revet:after, .cmteditinfo:after, .aa:after, .aab:after, .pa-notediv:after {
 	clear: both;
 	content: "";
@@ -1929,77 +1929,6 @@ span.contactpulldown select {
 	vertical-align: top;
 }
 
-/* paper mode tabs */
-div.psmodec {
-	position: relative;
-	top: -2.4ex;
-	left: 1px;
-	z-index: 6;
-}
-div.psmode {
-	padding: 0 0 1em 0;
-	position: absolute;
-}
-div.papmode, div.papmodex {
-	float: left;
-	text-align: center;
-	font-size: smaller;
-	padding: 0.5ex 5px 0.6ex 5px;
-	margin: 0 5px;
-}
-div.papmodex {
-	background: #cec1ff;
-	border-top-left-radius: 5px;
-	border-top-right-radius: 5px;
-}
-div.papmodex a {
-	font-weight: bold;
-}
-div.papmode img, div.papmodex img {
-	position: relative;
-	margin: -10px 0;
-	bottom: 10px;
-}
-
-/* paper banner */
-div.pban {
-	position: relative;
-	background: #cec1ff;
-	margin: 0 -22px 0 -12px;
-	padding: 0 22px 0 12px;
-	z-index: 5;
-}
-table.pban {
-	position: relative;
-	width: 100%;
-}
-td.pboxi div.papnum {
-	width: 14em;
-}
-td.pboxi h2 {
-	text-align: right;
-	padding: 8px;
-}
-td.pboxt h2 {
-	padding: 8px 0.5em;
-}
-
-div.pbanb {
-	padding: 0 14px 0 12px;
-	/*box-shadow: inset 0 2px 3px #6e629a;
-	-moz-box-shadow: inset 0 2px 3px 2px #6e629a;*/
-}
-
-/* reviews and comments */
-table.pbox {
-	width: 100%;
-}
-td.pboxi {
-	width: 14em;
-	vertical-align: top;
-	position: relative;
-}
-
 /* paper strip */
 #papstriptagsedit {
 	font-size: 8.7pt;
@@ -2159,61 +2088,6 @@ div.pst span.hint {
 }
 
 /* paper */
-table.paptab {
-	width: 100%;
-}
-td.papbe {
-	padding-bottom: 0.5em;
-}
-td.paple, td.papre {
-	width: 50%;
-	vertical-align: top;
-	font-size: smaller;
-}
-div.paple {
-	padding-right: 0.75em;
-}
-div.papre {
-	padding-left: 0.75em;
-}
-div.papt {
-	padding: 0.25em 1em 0.25em 8px;
-	background: #eaeaff; /*#ffeaee;*/
-}
-div.pavt {
-	margin: 0 -5px;
-	padding: 0.25em 5px;
-}
-span.papfn, span.pavfn, span.psfn {
-	font-variant: small-caps;
-	font-weight: bold;
-}
-div.papt span.papfn, div.pavt span.pavfn {
-	float: left;
-}
-body#paper_edit span.papfn {
-	font-size: smaller;
-}
-div.papt span.papfnh {
-	font-variant: normal;
-	font-weight: normal;
-	text-transform: none;
-	color: #555555;
-}
-div.papt span.hint {
-	float: right;
-}
-div.paphint {
-	font-size: smaller;
-	margin-bottom: 0.5ex;
-	color: #555555;
-	background: #f8f8f6;
-	padding: 0.2em 1em 0.3em 8px;
-}
-div.papv {
-	padding: 2px 0 1em 7px;
-}
-
 div.pg {
 	margin-top: 1em;
 }
