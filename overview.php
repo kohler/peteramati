@@ -39,8 +39,10 @@ Ht::stash_script("\$(\".pa-grgraph\").each(pa_gradecdf);\$(window).on(\"resize\"
 
 $Sset = new StudentSet($Me);
 $sj = [];
+$college = $Qreq->college || $Qreq->all || !$Qreq->extension;
+$extension = $Qreq->extension || $Qreq->all;
 foreach ($Sset->users() as $u) {
-    if (!$u->extension)
+    if ($u->extension ? $extension : $college)
         $sj[] = StudentSet::json_basics($u, false);
 }
 $jd = ["id" => "overview",
