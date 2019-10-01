@@ -6396,7 +6396,7 @@ function pa_render_pset_table(pconf, data) {
             for (i = 0; i !== col.length && !col[i].pin; ++i) {
             }
             overlay_left = col[i].left;
-            var overlay_div = $('<div style="position:absolute;left:0;top:0;bottom:0;width:' + (overlay_left) + 'px"></div>').prependTo($j.parent())[0];
+            var overlay_div = $('<div style="position:absolute;left:0;top:0;bottom:0;width:' + (overlay_left) + 'px;pointer-events:none"></div>').prependTo($j.parent())[0];
             (new IntersectionObserver(function (entries) {
                 var e = entries[entries.length - 1];
                 if (!e.isIntersecting && !$overlay) {
