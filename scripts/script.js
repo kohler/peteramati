@@ -5294,7 +5294,8 @@ function pa_anonymize_linkto(link, event) {
 }
 
 function pa_render_pset_table(pconf, data) {
-    var $j = $(this), dmap = [],
+    var $j = $(this), table_width = 0, dmap = [],
+        $overlay = null, username_col, name_col,
         $gdialog, dialog_su,
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
@@ -5397,7 +5398,11 @@ function pa_render_pset_table(pconf, data) {
                 col.push("pset");
                 col.push("at");
             }
-            col.push("username", "name", "extension", "gdialog", "grader");
+            col.push("username", "name", "extension");
+            if (!flagged) {
+                col.push("gdialog");
+            }
+            col.push("grader");
             if (flagged) {
                 col.push("conversation");
             }
@@ -5429,8 +5434,16 @@ function pa_render_pset_table(pconf, data) {
             }
         }
         for (i = 0; i !== col.length; ++i) {
-            if (typeof col[i] === "string")
+            if (typeof col[i] === "string") {
                 col[i] = {type: col[i]};
+            }
+            col[i].index = i;
+            if (col[i].type === "username" && !username_col) {
+                username_col = col[i];
+            }
+            if (col[i].type === "name" && !name_col) {
+                name_col = col[i];
+            }
         }
     }
 
@@ -5479,11 +5492,7 @@ function pa_render_pset_table(pconf, data) {
         }
     }
     function render_display_name(s) {
-        var txt = escape_entities(render_name(s, displaying_last_first));
-        if (!s.anon_username || !pconf.can_override_anonymous)
-            return txt;
-        else
-            return '<span class="pap-nonanonymous">' + txt + '</span>';
+        return escape_entities(render_name(s, displaying_last_first));
     }
     function render_checkbox_name(s) {
         var u = anonymous ? s.anon_username || s.username : s.username;
@@ -5501,56 +5510,65 @@ function pa_render_pset_table(pconf, data) {
         return p.__nickname;
     }
 
-    var th_render = {}, td_render = {};
-    th_render.checkbox = '<th class="pap-checkbox"></th>';
+    var th_render = {}, td_render = {}, tw_render = {};
+    th_render.checkbox = '<th class="gt-checkbox" scope="col"></th>';
     td_render.checkbox = function (s, rownum) {
         return rownum == "" ? '<td></td>' :
-            '<td class="pap-checkbox"><input type="checkbox" name="' +
+            '<td class="gt-checkbox"><input type="checkbox" name="' +
             render_checkbox_name(s) + '" value="1" class="' +
             (this.className || "uix js-range-click papsel") + '" data-range-type="s61"></td>';
     };
-    th_render.rownumber = '<th class="pap-rownumber"></th>';
+    tw_render.checkbox = 1.5;
+    th_render.rownumber = '<th class="gt-rownumber" scope="col"></th>';
     td_render.rownumber = function (s, rownum) {
-        return rownum == "" ? '<td></td>' : '<td class="pap-rownumber">' + rownum + '.</td>';
+        return rownum == "" ? '<td></td>' : '<td class="gt-rownumber">' + rownum + '.</td>';
     };
-    th_render.pset = '<th class="pap-pset l plsortable" data-pa-sort="pset">Pset</th>';
+    tw_render.rownumber = Math.ceil(Math.log10(Math.max(data.length, 1))) * 0.75 + 1;
+    th_render.pset = '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>';
     td_render.pset = function (s) {
-        return '<td class="pap-pset"><a href="' + escaped_href(s) + '">' +
+        return '<td class="gt-pset"><a href="' + escaped_href(s) + '">' +
            escape_entities(peteramati_psets[s.psetid].title) +
            (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>';
     };
-    th_render.at = '<th class="pap-at l plsortable" data-pa-sort="at">Flagged</th>';
+    tw_render.pset = 12;
+    th_render.at = '<th class="gt-at l plsortable" data-pa-sort="at" scope="col">Flagged</th>';
     td_render.at = function (s) {
-        return '<td class="pap-at">' + (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>';
+        return '<td class="gt-at">' + (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>';
     };
+    tw_render.at = 8;
     th_render.username = function () {
         var t = '<span class="heading">' + (anonymous || !sort.email ? "Username" : "Email") + '</span>';
         if (pconf.anonymous && pconf.can_override_anonymous)
             t += ' <a href="" class="uu n">[anon]</a>';
         else if (pconf.anonymous)
             t += ' <span class="n">[anon]</span>';
-        return '<th class="pap-username l plsortable" data-pa-sort="username">' + t + '</th>';
+        return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
     };
     td_render.username = function (s) {
-        return '<td class="pap-username">' + render_username_td(s) + '</td>';
+        return '<td class="gt-username">' + render_username_td(s) + '</td>';
     };
-    th_render.name = '<th class="pap-name l' + (pconf.has_nonanonymous ? "" : " pap-nonanonymous") + ' plsortable" data-pa-sort="name">Name</th>';
+    tw_render.username = 12;
+    th_render.name = function () {
+        return '<th class="gt-name l plsortable" data-pa-sort="name" scope="col">Name</th>';
+    };
     td_render.name = function (s) {
-        var k = !s.anon_username || pconf.has_nonanonymous ? "" : " pap-nonanonymous";
-        return '<td class="pap-name' + k + '">' + render_display_name(s) + '</td>';
+        return '<td class="gt-name">' + render_display_name(s) + '</td>';
     };
-    th_render.extension = '<th class="pap-extension l plsortable" data-pa-sort="extension">X?</th>';
+    tw_render.name = 14;
+    th_render.extension = '<th class="gt-extension l plsortable" data-pa-sort="extension" scope="col">X?</th>';
     td_render.extension = function (s) {
-        return '<td class="pap-extension">' + (s.x ? "X" : "") + '</td>';
+        return '<td class="gt-extension">' + (s.x ? "X" : "") + '</td>';
     };
-    th_render.grader = '<th class="pap-grader l plsortable" data-pa-sort="grader">Grader</th>';
+    tw_render.extension = 2;
+    th_render.grader = '<th class="gt-grader l plsortable" data-pa-sort="grader" scope="col">Grader</th>';
     td_render.grader = function (s) {
         var t = s.gradercid ? "???" : "";
         if (s.gradercid && hotcrp_pc[s.gradercid])
             t = grader_name(hotcrp_pc[s.gradercid]);
-        return '<td class="pap-grader">' + t + '</td>';
+        return '<td class="gt-grader">' + t + '</td>';
     };
-    th_render.notes = '<th class="pap-notes l plsortable" data-pa-sort="gradestatus">⎚</th>';
+    tw_render.grader = 6;
+    th_render.notes = '<th class="gt-notes l plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>';
     td_render.notes = function (s) {
         var t = '';
         if (s.grades_visible)
@@ -5561,25 +5579,29 @@ function pa_render_pset_table(pconf, data) {
             t += '♪';
         if (!flagged && s.has_nongrader_notes)
             t += '<sup>*</sup>';
-        return '<td class="pap-notes">' + t + '</td>';
+        return '<td class="gt-notes">' + t + '</td>';
     };
-    th_render.conversation = '<th class="pap-conversation l">Flag</th>';
+    tw_render.notes = 2;
+    th_render.conversation = '<th class="gt-conversation l" scope="col">Flag</th>';
     td_render.conversation = function (s) {
-        return '<td class="pap-conversation l">' +
+        return '<td class="gt-conversation l">' +
             escape_entities(s.conversation || s.conversation_pfx || "") +
             (s.conversation_pfx ? "…" : "") + '</td>';
     };
+    tw_render.conversation = 20;
     th_render.gdialog = '<th></th>';
     td_render.gdialog = function (s) {
-        return '<td><a href="" class="ui x js-gdialog" tabindex="-1">Ⓖ</a></td>';
+        return '<td><a href="" class="ui x js-gdialog" tabindex="-1" scope="col">Ⓖ</a></td>';
     };
-    th_render.total = '<th class="pap-total r plsortable" data-pa-sort="total">Tot</th>';
+    tw_render.gdialog = 1;
+    th_render.total = '<th class="gt-total r plsortable" data-pa-sort="total" scope="col">Tot</th>';
     td_render.total = function (s) {
-        return '<td class="pap-total r">' + s.total + '</td>';
+        return '<td class="gt-total r">' + s.total + '</td>';
     };
+    tw_render.total = 3;
     th_render.grade = function () {
-        var klass = this.justify === "right" ? "pap-grade r" : "pap-grade";
-        return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '">' + this.gabbr + '</th>';
+        var klass = this.justify === "right" ? "gt-grade r" : "gt-grade";
+        return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '" scope="col">' + this.gabbr + '</th>';
     };
     td_render.grade = function (s, rownum, text) {
         var gr = s.grades[this.gidx];
@@ -5592,9 +5614,9 @@ function pa_render_pset_table(pconf, data) {
         if (text) {
             return gr;
         } else {
-            var k = this.gkey === pconf.total_key ? "pap-total" : "pap-grade";
+            var k = this.gkey === pconf.total_key ? "gt-total" : "gt-grade";
             if (s.highlight_grades && s.highlight_grades[this.gkey]) {
-                k += " pap-highlight";
+                k += " gt-highlight";
             }
             if (this.justify === "right") {
                 k += " r";
@@ -5602,11 +5624,15 @@ function pa_render_pset_table(pconf, data) {
             return '<td class="' + k + '">' + gr + '</td>';
         }
     };
-    th_render.ngrades = '<th class="pap-ngrades r plsortable" data-pa-sort="ngrades">#G</th>';
-    td_render.ngrades = function (s) {
-        return '<td class="pap-ngrades r">' + (s.ngrades_nonempty || "") + '</td>';
+    tw_render.grade = function () {
+        return Math.max(3, this.gabbr.length * 0.5 + 1.5);
     };
-    th_render.repo = '<th class="pap-repo"></th>';
+    th_render.ngrades = '<th class="gt-ngrades r plsortable" data-pa-sort="ngrades" scope="col">#G</th>';
+    td_render.ngrades = function (s) {
+        return '<td class="gt-ngrades r">' + (s.ngrades_nonempty || "") + '</td>';
+    };
+    tw_render.ngrades = 2;
+    th_render.repo = '<th class="gt-repo" scope="col"></th>';
     td_render.repo = function (s) {
         var txt;
         if (!s.repo)
@@ -5625,15 +5651,9 @@ function pa_render_pset_table(pconf, data) {
             txt += ' <strong class="err">partner</strong>';
         if (s.repo_sharing)
             txt += ' <strong class="err">sharing</strong>';
-        return '<td class="pap-repo">' + txt + '</td>';
+        return '<td class="gt-repo">' + txt + '</td>';
     };
-
-    function render_tds(s, rownum) {
-        var a = [];
-        for (var i = 0; i !== col.length; ++i)
-            a.push(td_render[col[i].type].call(col[i], s, rownum));
-        return a;
-    }
+    tw_render.repo = 10;
 
     function set_hotlist($b) {
         var j = {sort: sort.f}, i, l, p;
@@ -5661,40 +5681,7 @@ function pa_render_pset_table(pconf, data) {
         }
         $b.attr("data-hotlist", JSON.stringify(j));
     }
-    function render_body() {
-        var $b = $j.find("tbody");
-        $b.html("");
-        var trn = 0, was_boringness = 0;
-        displaying_last_first = sort.f === "name" && sort.last;
-        for (var i = 0; i < data.length; ++i) {
-            var s = data[i];
-            s._spos = dmap.length;
-            dmap.push(s);
-            var a = [];
-            ++trn;
-            if (s.boringness !== was_boringness && trn != 1)
-                a.push('<tr class="pap-boring"><td colspan="' + col.length + '"><hr /></td></tr>');
-            was_boringness = s.boringness;
-            var stds = render_tds(s, trn);
-            var t = '<tr class="k' + (trn % 2) + '" data-pa-spos="' + s._spos;
-            if (s.uid)
-                t += '" data-pa-uid="' + s.uid;
-            a.push(t + '">' + stds.join('') + '</tr>');
-            for (var j = 0; s.partners && j < s.partners.length; ++j) {
-                var ss = s.partners[j];
-                ss._spos = dmap.length;
-                dmap.push(ss);
-                var sstds = render_tds(s.partners[j], "");
-                for (var k = 0; k < sstds.length; ++k)
-                    if (sstds[k] === stds[k])
-                        sstds[k] = '<td></td>';
-                a.push('<tr class="k' + (trn % 2) + ' papr-partner" data-pa-spos="' + ss._spos + '" data-pa-partner="1">' + sstds.join('') + '</tr>');
-            }
-            $b.append(a.join(''));
-        }
-        set_hotlist($b);
-    }
-    function make_rmap() {
+    function make_rmap($j) {
         var rmap = {}, tr = $j.find("tbody")[0].firstChild, last = null;
         while (tr) {
             if (tr.hasAttribute("data-pa-partner"))
@@ -5705,6 +5692,55 @@ function pa_render_pset_table(pconf, data) {
         }
         return rmap;
     }
+    function resort_table($j) {
+        var $b = $j.children("tbody"),
+            ncol = $j.children("thead")[0].firstChild.childNodes.length,
+            tb = $b[0],
+            rmap = make_rmap($j),
+            i, j, trn = 0, was_boringness = false,
+            last = tb.firstChild;
+        for (i = 0; i < data.length; ++i) {
+            while ((j = last) && j.className === "gt-boring") {
+                last = last.nextSibling;
+                tb.removeChild(j);
+            }
+            if (data[i].boringness !== was_boringness && was_boringness !== false) {
+                tb.insertBefore($('<tr class="gt-boring"><td colspan="' + ncol + '"><hr></td></tr>')[0], last);
+            }
+            was_boringness = data[i].boringness;
+            var tr = rmap[data[i]._spos];
+            for (j = 0; j < tr.length; ++j) {
+                if (last !== tr[j])
+                    tb.insertBefore(tr[j], last);
+                else
+                    last = last.nextSibling;
+                removeClass(tr[j], "k" + (1 - trn % 2));
+                addClass(tr[j], "k" + (trn % 2));
+            }
+            ++trn;
+        }
+
+        var trn = 0;
+        $b.find(".gt-rownumber").html(function () {
+            ++trn;
+            return trn + ".";
+        });
+
+        var display_last_first = sort.f && sort.last;
+        if (display_last_first !== displaying_last_first) {
+            displaying_last_first = display_last_first;
+            $b.find(".gt-name").html(function () {
+                var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
+                return render_display_name(s);
+            });
+        }
+    }
+    function resort() {
+        resort_table($j);
+        $overlay && resort_table($overlay);
+        set_hotlist($j.children("tbody"));
+        wstorage.site(true, "pa-pset" + pconf.id + "-table", JSON.stringify(sort));
+    }
     function make_umap() {
         var umap = {}, tr = $j.find("tbody")[0].firstChild;
         while (tr) {
@@ -5713,56 +5749,28 @@ function pa_render_pset_table(pconf, data) {
         }
         return umap;
     }
-    function resort() {
-        var $b = $j.find("tbody"), tb = $b[0],
-            rmap = make_rmap(),
-            i, j, trn = 0, was_boringness = 0,
-            last = tb.firstChild;
-        for (i = 0; i < data.length; ++i) {
-            ++trn;
-            while ((j = last) && j.className === "pap-boring") {
-                last = last.nextSibling;
-                tb.removeChild(j);
-            }
-            if (data[i].boringness !== was_boringness && trn != 1)
-                tb.insertBefore($('<tr class="pap-boring"><td colspan="' + col.length + '"><hr /></td></tr>')[0], last);
-            was_boringness = data[i].boringness;
-            var tr = rmap[data[i]._spos];
-            for (j = 0; j < tr.length; ++j) {
-                if (last != tr[j])
-                    tb.insertBefore(tr[j], last);
-                else
-                    last = last.nextSibling;
-                removeClass(tr[j], "k" + (1 - trn % 2));
-                addClass(tr[j], "k" + (trn % 2));
-            }
-            $(tr[0]).find(".pap-rownumber").html(trn + ".");
-        }
-        var display_last_first = sort.f && sort.last;
-        if (display_last_first !== displaying_last_first) {
-            displaying_last_first = display_last_first;
-            $b.find(".pap-name").html(function () {
-                var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
-                return render_display_name(s);
-            });
-        }
-        set_hotlist($b);
-        wstorage.site(true, "pa-pset" + pconf.id + "-table", JSON.stringify(sort));
-    }
     function rerender_usernames() {
-        $j.find("td.pap-username").each(function () {
+        var $x = $overlay ? $([$j[0], $overlay[0]]) : $j;
+        $x.find("td.gt-username").each(function () {
             var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
             $(this).html(render_username_td(s));
         });
-        $j.find("th.pap-username > span.heading").html(anonymous || !sort.email ? "Username" : "Email");
+        $x.find("th.gt-username > span.heading").html(anonymous || !sort.email ? "Username" : "Email");
+    }
+    function display_anon() {
+        $j.toggleClass("gt-anonymous", !!anonymous);
+        if (table_width && name_col) {
+            $j.css("width", (table_width - (anonymous ? name_col.width : 0)) + "px");
+            $($j[0].firstChild).find(".gt-name").css("width", (anonymous ? 0 : name_col.width) + "px");
+        }
     }
     function switch_anon() {
         anonymous = !anonymous;
         if (!anonymous)
             sort.override_anonymous = true;
-        $j.toggleClass("pap-anonymous", anonymous);
+        display_anon();
         rerender_usernames();
-        $j.find("tbody input.pap-check").each(function () {
+        $j.find("tbody input.gt-check").each(function () {
             var s = dmap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
             this.setAttribute("name", render_checkbox_name(s));
         });
@@ -5771,17 +5779,44 @@ function pa_render_pset_table(pconf, data) {
         $j.closest("form").find("input[name=anonymous]").val(anonymous ? 1 : 0);
         return false;
     }
-    function render_head() {
-        var a = [];
-        for (var i = 0; i !== col.length; ++i) {
-            var r = th_render[col[i].type];
-            if (typeof r === "string")
-                a.push(r);
-            else
-                a.push(r.call(col[i]));
+    function overlay_create() {
+        var t = th_render.username.call(username_col);
+        $overlay = $('<table class="gtable gtable-fixed" style="position:absolute;left:-24px;width:' + (username_col.width + 24) + 'px"><thead><tr class="k0"><th style="width:24px"></th><th style="width:' + username_col.width + 'px"' + t.substring(3) + '</thead><tbody></tbody></table>');
+        $overlay[0].firstChild.firstChild.lastChild.className = $j[0].firstChild.firstChild.childNodes[username_col.index].className;
+        $j[0].parentNode.prepend($('<div style="position:sticky;left:0;z-index:2"></div>').append($overlay)[0]);
+        $overlay.find("thead").on("click", "th", head_click);
+        $overlay.find("thead .gt-username a").click(switch_anon);
+
+        var tr = $j.children("tbody")[0].firstChild,
+            a = [];
+        while (tr) {
+            if (hasClass(tr, "gt-boring")) {
+                a.push('<tr class="gt-boring"><td colspan="2"><hr></td></tr>');
+            } else {
+                var spos = tr.getAttribute("data-pa-spos"),
+                    t = '<tr class="' + tr.className + '" data-pa-spos="' + spos;
+                if (tr.hasAttribute("data-pa-uid")) {
+                    t += '" data-pa-uid="' + tr.getAttribute("data-pa-uid");
+                }
+                if (tr.hasAttribute("data-pa-partner")) {
+                    t += '" data-pa-partner="1';
+                }
+                var tt = td_render.username.call(username_col, dmap[spos]);
+                a.push(t + '"><td></td><td style="height:' + tr.childNodes[username_col.index].clientHeight + 'px"' + tt.substring(3) + '</tr>');
+            }
+            tr = tr.nextSibling;
         }
-        $j.find("thead").html('<tr>' + a.join('') + '</tr>');
-        $j.find("thead .pap-username a").click(switch_anon);
+        $overlay.find("tbody").html(a.join(""));
+    }
+    function overlay_check(event) {
+        var scroll = $j[0].parentElement.scrollLeft;
+        console.log(username_col.left);
+        if (scroll > username_col.left && !$overlay) {
+            overlay_create();
+        } else if (scroll < username_col.left && $overlay) {
+            $overlay[0].parentNode.remove();
+            $overlay = null;
+        }
     }
     function user_compare(a, b) {
         var au = ukey(a).toLowerCase();
@@ -5943,8 +5978,10 @@ function pa_render_pset_table(pconf, data) {
                     return user_compare(a, b);
             });
         }
-        $j.find(".plsortable").removeClass("plsortactive plsortreverse");
-        $j.find("th[data-pa-sort='" + f + "']").addClass("plsortactive").
+
+        var $x = $overlay ? $([$j[0].firstChild, $overlay[0].firstChild]) : $($j[0].firstChild);
+        $x.find(".plsortable").removeClass("plsortactive plsortreverse");
+        $x.find("th[data-pa-sort='" + f + "']").addClass("plsortactive").
             toggleClass("plsortreverse", sort.rev < 0);
     }
     function head_click(event) {
@@ -6111,9 +6148,9 @@ function pa_render_pset_table(pconf, data) {
         var su1 = gdialog_su.length === 1 ? gdialog_su[0] : null;
         if (su1) {
             var t = (su1.first || su1.last ? su1.first + " " + su1.last + " " : "") + "<" + su1.email + ">";
-            $gdialog.find(".pap-name-email").html(escape_entities(t)).removeClass("hidden");
+            $gdialog.find(".gt-name-email").html(escape_entities(t)).removeClass("hidden");
         } else {
-            $gdialog.find(".pap-name-email").addClass("hidden");
+            $gdialog.find(".gt-name-email").addClass("hidden");
         }
 
         $gdialog.find(".pa-gradelist").toggleClass("pa-pset-hidden",
@@ -6178,7 +6215,7 @@ function pa_render_pset_table(pconf, data) {
         var hc = popup_skeleton();
         hc.push('<h2></h2>');
         if (!anonymous)
-            hc.push('<strong class="pap-name-email"></strong>');
+            hc.push('<strong class="gt-name-email"></strong>');
         hc.push('<div class="pa-messages"></div>');
 
         hc.push('<div class="pa-gradelist in-modal editable">', '</div>');
@@ -6219,15 +6256,95 @@ function pa_render_pset_table(pconf, data) {
         event.preventDefault();
     });
 
+    function render_tds(s, rownum) {
+        var a = [];
+        for (var i = 0; i !== col.length; ++i)
+            a.push(td_render[col[i].type].call(col[i], s, rownum));
+        return a;
+    }
+    function render() {
+        var thead = $('<thead><tr class="k0"></tr></thead>')[0],
+            tfixed = $j.hasClass("want-gtable-fixed"),
+            rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+        for (i = 0; i !== col.length; ++i) {
+            var th = th_render[col[i].type];
+            if (typeof th !== "string") {
+                th = th.call(col[i]);
+            }
+            var $th = $(th);
+            if (tfixed) {
+                col[i].left = table_width;
+                var w = tw_render[col[i].type];
+                if (typeof w !== "number") {
+                    w = w.call(col[i]);
+                }
+                w *= rem;
+                col[i].width = w;
+                $th.css("width", w + "px");
+                table_width += w;
+            }
+            thead.firstChild.appendChild($th[0]);
+        }
+        display_anon();
+        $j[0].appendChild(thead);
+        $j.toggleClass("gt-useemail", !!sort.email);
+        $j.find("thead").on("click", "th", head_click);
+        $j.find("thead .gt-username a").click(switch_anon);
+        if (tfixed) {
+            $j.removeClass("want-gtable-fixed").css("table-layout", "fixed");
+        }
+
+        var tbody = $('<tbody class="has-hotlist"></tbody>')[0],
+            trn = 0, was_boringness = 0, a = [];
+        $j[0].appendChild(tbody);
+        if (!pconf.no_sort) {
+            sort_data();
+        }
+        displaying_last_first = sort.f === "name" && sort.last;
+        for (var i = 0; i < data.length; ++i) {
+            var s = data[i];
+            s._spos = dmap.length;
+            dmap.push(s);
+            ++trn;
+            if (s.boringness !== was_boringness && trn != 1)
+                a.push('<tr class="gt-boring"><td colspan="' + col.length + '"><hr></td></tr>');
+            was_boringness = s.boringness;
+            var stds = render_tds(s, trn);
+            var t = '<tr class="k' + (trn % 2) + '" data-pa-spos="' + s._spos;
+            if (s.uid)
+                t += '" data-pa-uid="' + s.uid;
+            a.push(t + '">' + stds.join('') + '</tr>');
+            for (var j = 0; s.partners && j < s.partners.length; ++j) {
+                var ss = s.partners[j];
+                ss._spos = dmap.length;
+                dmap.push(ss);
+                var sstds = render_tds(s.partners[j], "");
+                for (var k = 0; k < sstds.length; ++k) {
+                    if (sstds[k] === stds[k])
+                        sstds[k] = '<td></td>';
+                }
+                t = '<tr class="k' + (trn % 2) + ' gtrow-partner" data-pa-spos="' + ss._spos;
+                if (ss.uid)
+                    t += '" data-pa-uid="' + ss.uid;
+                a.push(t + '" data-pa-partner="1">' + sstds.join('') + '</tr>');
+            }
+            if (a.length > 50) {
+                $(a.join('')).appendTo(tbody);
+                a = [];
+            }
+        }
+        if (a.length !== 0) {
+            $(a.join('')).appendTo(tbody);
+        }
+        set_hotlist($(tbody));
+
+        if (tfixed && username_col) {
+            $j.parent().on("scroll", overlay_check);
+        }
+    }
+
     initialize();
-    $j.html("<thead></thead><tbody class='has-hotlist'></tbody>");
-    $j.toggleClass("pap-anonymous", !!anonymous);
-    $j.toggleClass("pap-useemail", !!sort.email);
-    $j.find("thead").on("click", "th", head_click);
-    render_head();
-    if (!pconf.no_sort)
-        sort_data();
-    render_body();
+    render();
 }
 
 

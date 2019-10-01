@@ -260,7 +260,7 @@ form {
 
 /* body */
 div.body {
-	margin: 0 24px; /* see also width on .pa-filediff */
+	margin: 0 24px; /* see also width on .pa-filediff, .gtable-container */
 	position: relative;
 	z-index: 3;
 }
@@ -876,6 +876,9 @@ th.l, td.l {
 }
 th.r, td.r {
 	text-align: right;
+}
+th.c, td.c {
+	text-align: center;
 }
 td.rcaption {
 	text-align: right;
@@ -1705,6 +1708,9 @@ tbody.pltable_colored > tr:first-child {
 tbody.pltable > tr:last-child > td {
 	padding-bottom: 2px;
 }
+.k0 {
+	background-color: white;
+}
 .k1, tbody.pltable_alternate > tr:nth-child(even) {
 	background-color: #f1f8fc;
 }
@@ -2222,45 +2228,63 @@ td.mhcb {
 	color: white;
 	background: red;
 }
-.pap-username {
-	font-weight: bold;
-	white-space: nowrap;
+
+.gtable-container-0 {
+	margin-left: -24px;
+	margin-right: -24px;
 }
-table.pap > thead {
+.gtable-container-1 {
+	padding-left: 24px;
+	padding-right: 24px;
+	overflow-x: scroll;
+	position: relative;
+	z-index: 1;
+}
+.gtable-fixed {
+	table-layout: fixed;
+}
+.gtable > thead {
 	font-size: smaller;
 	color: #7777aa;
 }
-.pap-checkbox {
+.gt-checkbox {
 	text-align: right;
 	padding-left: 0.25rem;
 	padding-right: 0.25rem;
 }
-.pap-rownumber {
+.gt-rownumber {
 	text-align: right;
 	padding-left: 0.25rem;
+}
+.gt-username {
+	font-weight: bold;
+	white-space: nowrap;
+}
+.gt-username, .gt-name, .gt-grader {
+	text-overflow: ellipsis;
+	overflow: hidden;
+}
+.gt-rownumber, .gt-username, .gt-name, .gt-grader,
+.gt-notes, .gt-grade, .gt-ngrades, .gt-total,
+.gt-conversation, .gt-repo, .gt-pset, .gt-at {
 	padding-right: 0.75rem;
 }
-.pap-username, .pap-name, .pap-extension, .pap-grader,
-.pap-notes, .pap-grade, .pap-ngrades, .pap-total,
-.pap-conversation, .pap-repo, .pap-pset, .pap-at {
-	padding-right: 0.75rem;
-}
-.pap-grade, .pap-total, .pap-ngrades {
+.gt-grade, .gt-total, .gt-ngrades {
 	font-variant-numeric: tabular-nums;
 }
-tr.papr-partner > td.pap-username {
+tr.gtrow-partner > .gt-username {
 	padding-left: 1em;
 }
-tr.papr-partner {
+tr.gtrow-partner {
 	font-size: smaller;
 }
-.pap-total, .pap-ngrades {
+.gt-total, .gt-ngrades {
 	font-weight: bold;
 }
-.pap-highlight {
+.gt-highlight {
 	color: red;
 }
-.pap-anonymous .pap-nonanonymous {
+.gt-anonymous .gt-name {
 	display: none;
 }
 .pa-filediff {

@@ -1145,7 +1145,7 @@ function show_regrades($result, $all) {
         if (isset($j["total"]))
             ++$nintotal;
     }
-    echo '<table class="pap" id="pa-pset-flagged"></table></div>', "\n";
+    echo '<table class="gtable" id="pa-pset-flagged"></table></div>', "\n";
     $jd = ["id" => "flagged", "flagged_commits" => true, "anonymous" => true, "has_nonanonymous" => $any_nonanonymous];
     if ($Me->privChair)
         $jd["can_override_anonymous"] = true;
@@ -1354,12 +1354,12 @@ function show_pset_table($sset) {
     }
 
     if ($checkbox) {
-        echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
+        echo Ht::form(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
         if ($pset->anonymous)
             echo Ht::hidden("anonymous", $anonymous ? 1 : 0);
     }
 
-    echo '<table class="pap" id="pa-pset' . $pset->id . '"></table>';
+    echo '<div class="gtable-container-0"><div class="gtable-container-1"><table class="gtable want-gtable-fixed" id="pa-pset' . $pset->id . '"></table></div></div>';
     $grades = $pset->numeric_grades();
     $jd = [
         "id" => $pset->id,
@@ -1469,7 +1469,7 @@ function show_pset_table($sset) {
     }
 
     if ($checkbox)
-        echo "</div></form>\n";
+        echo "</form>\n";
 
     if ($Profile) {
         $t2 = microtime(true);
