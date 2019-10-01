@@ -1393,7 +1393,6 @@ function show_pset_table($sset) {
     echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){pa_render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 
     if ($sset->viewer->privChair && !$pset->gitless_grades) {
-        echo "<div class='g'></div>";
         $sel = array("none" => "N/A");
         foreach ($sset->conf->pc_members_and_admins() as $uid => $pcm) {
             $n = get($gradercounts, $uid) ? " (" . $gradercounts[$uid] . ")" : "";

@@ -75,9 +75,13 @@ class API_Grade {
             if (!check_post($qreq)) {
                 return ["ok" => false, "error" => "Missing credentials."];
             } else if ($info->is_handout_commit()) {
-                return ["ok" => false, "error" => "This is a handout commit."];
+                return ["ok" => false, "error" => "Cannot set grades on handout commit."];
             } else if (!$user->can_set_grades($info->pset, $info)) {
                 return ["ok" => false, "error" => "Permission error."];
+            } else if (!$info->pset->gitless_grades
+                       && $qreq->commit_is_grade
+                       && $info->grading_hash() !== $info->commit_hash()) {
+                return ["ok" => false, "error" => "The grading commit has changed."];
             }
 
             // parse grade elements
@@ -139,7 +143,7 @@ class API_Grade {
             // XXX branch nonsense
             if (!$api->pset->gitless) {
                 if (!$info->repo) {
-                    $errno = max($errno, 4);
+                    $errno = max($errno, 5);
                     continue;
                 }
                 $commit = null;
@@ -148,10 +152,14 @@ class API_Grade {
                         ? : $info->repo->connected_commit($hash, $info->pset, $info->branch);
                 }
                 if (!$commit) {
-                    $errno = max($errno, $hash ? 2 : 3);
+                    $errno = max($errno, $hash ? 3 : 4);
                     continue;
                 }
                 $info->force_set_hash($commit->hash);
+                if (get($ugs[$uid], "commit_is_grade")
+                    && $commit->hash !== $info->grading_hash()) {
+                    $errno = max($errno, 2);
+                }
             }
             if (!$info->can_view_grades()
                 || ($ispost && !$viewer->can_set_grades($info->pset, $info)))
@@ -161,12 +169,14 @@ class API_Grade {
             $infos[$u->contactId] = $info;
         }
 
-        if ($errno === 4)
+        if ($errno === 5)
             return ["ok" => false, "error" => "Missing repository."];
-        else if ($errno === 3)
+        else if ($errno === 4)
             return ["ok" => false, "error" => "Disconnected commit."];
-        else if ($errno === 2)
+        else if ($errno === 3)
             return ["ok" => false, "error" => "Missing commit."];
+        else if ($errno === 2)
+            return ["ok" => false, "error" => "The grading commit has changed."];
         else if ($errno === 1)
             return ["ok" => false, "error" => "Cannot set grades on handout commit."];
 

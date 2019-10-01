@@ -789,9 +789,9 @@ function hoturl(page, options) {
         }
     }
 
-    if (page === "help")
+    if (page === "help") {
         hoturl_clean(x, /^t=(\w+)$/);
-    else if (page.substr(0, 3) === "api") {
+    } else if (page.substr(0, 3) === "api") {
         if (page.length > 3) {
             x.t = "api" + siteurl_suffix;
             x.v.push("fn=" + page.substr(4));
@@ -801,9 +801,9 @@ function hoturl(page, options) {
         hoturl_clean(x, /^pset=([^?&#]+)$/);
         hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
         want_forceShow = true;
-    } else if (page === "index")
+    } else if (page === "index") {
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
-    else if (page === "pset" || page === "run") {
+    } else if (page === "pset" || page === "run") {
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
         hoturl_clean(x, /^pset=([^?&#]+)$/);
         hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
@@ -5295,7 +5295,7 @@ function pa_anonymize_linkto(link, event) {
 
 function pa_render_pset_table(pconf, data) {
     var $j = $(this), table_width = 0, dmap = [],
-        $overlay = null, username_col, name_col,
+        $overlay = null, overlay_left, username_col, name_col,
         $gdialog, dialog_su,
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
@@ -5305,6 +5305,187 @@ function pa_render_pset_table(pconf, data) {
         anonymous = pconf.anonymous,
         col, total_colpos, ngrades_colpos;
 
+    var col_renderers = {
+        checkbox: {
+            th: '<th class="gt-checkbox" scope="col"></th>',
+            td: function (s, rownum) {
+                return rownum == "" ? '<td></td>' :
+                    '<td class="gt-checkbox"><input type="checkbox" name="' +
+                    render_checkbox_name(s) + '" value="1" class="' +
+                    (this.className || "uix js-range-click papsel") + '" data-range-type="s61"></td>';
+            },
+            tw: 1.5
+        },
+        rownumber: {
+            th: '<th class="gt-rownumber" scope="col"></th>',
+            td: function (s, rownum) {
+                return rownum == "" ? '<td></td>' : '<td class="gt-rownumber">' + rownum + '.</td>';
+            },
+            tw: Math.ceil(Math.log10(Math.max(data.length, 1))) * 0.75 + 1
+        },
+        pset: {
+            th: '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>',
+            td: function (s) {
+                return '<td class="gt-pset"><a href="' + escaped_href(s) + '">' +
+                   escape_entities(peteramati_psets[s.psetid].title) +
+                   (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>';
+            },
+            tw: 12
+        },
+        at: {
+            th: '<th class="gt-at l plsortable" data-pa-sort="at" scope="col">Flagged</th>',
+            td: function (s) {
+                return '<td class="gt-at">' + (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>';
+            },
+            tw: 8
+        },
+        username: {
+            th: function () {
+                var t = '<span class="heading">' + (anonymous || !sort.email ? "Username" : "Email") + '</span>';
+                if (pconf.anonymous && pconf.can_override_anonymous)
+                    t += ' <a href="" class="uu n">[anon]</a>';
+                else if (pconf.anonymous)
+                    t += ' <span class="n">[anon]</span>';
+                return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
+            },
+            td: function (s) {
+                return '<td class="gt-username">' + render_username_td(s) + '</td>';
+            },
+            tw: 12,
+            pin: true
+        },
+        name: {
+            th: function () {
+                return '<th class="gt-name l plsortable" data-pa-sort="name" scope="col">Name</th>';
+            },
+            td: function (s) {
+                return '<td class="gt-name">' + render_display_name(s) + '</td>';
+            },
+            tw: 14
+        },
+        extension: {
+            th: '<th class="gt-extension l plsortable" data-pa-sort="extension" scope="col">X?</th>',
+            td: function (s) {
+                return '<td class="gt-extension">' + (s.x ? "X" : "") + '</td>';
+            },
+            tw: 2
+        },
+        grader: {
+            th: '<th class="gt-grader l plsortable" data-pa-sort="grader" scope="col">Grader</th>',
+            td: function (s) {
+                var t = s.gradercid ? "???" : "";
+                if (s.gradercid && hotcrp_pc[s.gradercid])
+                    t = grader_name(hotcrp_pc[s.gradercid]);
+                return '<td class="gt-grader">' + t + '</td>';
+            },
+            tw: 6
+        },
+        notes: {
+            th: '<th class="gt-notes l plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
+            td: function (s) {
+                var t = '';
+                if (s.grades_visible)
+                    t += '⎚';
+                if (flagged && s.is_grade)
+                    t += '✱';
+                if (s.has_notes)
+                    t += '♪';
+                if (!flagged && s.has_nongrader_notes)
+                    t += '<sup>*</sup>';
+                return '<td class="gt-notes">' + t + '</td>';
+            },
+            tw: 2
+        },
+        conversation: {
+            th: '<th class="gt-conversation l" scope="col">Flag</th>',
+            td: function (s) {
+                return '<td class="gt-conversation l">' +
+                    escape_entities(s.conversation || s.conversation_pfx || "") +
+                    (s.conversation_pfx ? "…" : "") + '</td>';
+            },
+            tw: 20
+        },
+        gdialog: {
+            th: '<th></th>',
+            td: function (s) {
+                return '<td><a href="" class="ui x js-gdialog" tabindex="-1" scope="col">Ⓖ</a></td>';
+            },
+            tw: 1.5,
+            pin: true
+        },
+        total: {
+            th: '<th class="gt-total r plsortable" data-pa-sort="total" scope="col">Tot</th>',
+            td: function (s) {
+                return '<td class="gt-total r">' + s.total + '</td>';
+            },
+            tw: 3
+        },
+        grade: {
+            th: function () {
+                var klass = this.justify === "right" ? "gt-grade r" : "gt-grade";
+                return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '" scope="col">' + this.gabbr + '</th>';
+            },
+            td: function (s, rownum, text) {
+                var gr = s.grades[this.gidx];
+                if (gr == null) {
+                    gr = "";
+                }
+                if (gr !== "" && this.gtype) {
+                    gr = escape_entities(pa_grade_types[this.gtype].text.call(grade_entries[this.gidx], gr));
+                }
+                if (text) {
+                    return gr;
+                } else {
+                    var k = this.gkey === pconf.total_key ? "gt-total" : "gt-grade";
+                    if (s.highlight_grades && s.highlight_grades[this.gkey]) {
+                        k += " gt-highlight";
+                    }
+                    if (this.justify === "right") {
+                        k += " r";
+                    }
+                    return '<td class="' + k + '">' + gr + '</td>';
+                }
+            },
+            tw: function () {
+                return Math.max(3, this.gabbr.length * 0.5 + 1.5);
+            }
+        },
+        ngrades: {
+            th: '<th class="gt-ngrades r plsortable" data-pa-sort="ngrades" scope="col">#G</th>',
+            td: function (s) {
+                return '<td class="gt-ngrades r">' + (s.ngrades_nonempty || "") + '</td>';
+            },
+            tw: 2
+        },
+        repo: {
+            th: '<th class="gt-repo" scope="col"></th>',
+            td: function (s) {
+                var txt;
+                if (!s.repo)
+                    txt = '';
+                else if (anonymous)
+                    txt = '<a href="#" onclick="return pa_anonymize_linkto(' + escape_entities(JSON.stringify(s.repo)) + ',event)">repo</a>';
+                else
+                    txt = '<a href="' + escape_entities(s.repo) + '">repo</a>';
+                if (s.repo_broken)
+                    txt += ' <strong class="err">broken</strong>';
+                if (s.repo_unconfirmed)
+                    txt += ' <strong class="err">unconfirmed</strong>';
+                if (s.repo_too_open)
+                    txt += ' <strong class="err">open</strong>';
+                if (s.repo_partner_error)
+                    txt += ' <strong class="err">partner</strong>';
+                if (s.repo_sharing)
+                    txt += ' <strong class="err">sharing</strong>';
+                return '<td class="gt-repo">' + txt + '</td>';
+            },
+            tw: 10
+        }
+    };
+
+    function string_function(s) {
+        return function () { return s; };
+    }
     function initialize() {
         var x = wstorage.site(true, "pa-pset" + pconf.id + "-table");
         x && (sort = JSON.parse(x));
@@ -5397,12 +5578,10 @@ function pa_render_pset_table(pconf, data) {
             if (flagged) {
                 col.push("pset");
                 col.push("at");
-            }
-            col.push("username", "name", "extension");
-            if (!flagged) {
+            } else {
                 col.push("gdialog");
             }
-            col.push("grader");
+            col.push("username", "name", "extension", "grader");
             if (flagged) {
                 col.push("conversation");
             }
@@ -5438,6 +5617,10 @@ function pa_render_pset_table(pconf, data) {
                 col[i] = {type: col[i]};
             }
             col[i].index = i;
+            Object.assign(col[i], col_renderers[col[i].type]);
+            if (typeof col[i].th === "string") {
+                col[i].th = string_function(col[i].th);
+            }
             if (col[i].type === "username" && !username_col) {
                 username_col = col[i];
             }
@@ -5457,6 +5640,9 @@ function pa_render_pset_table(pconf, data) {
         };
         if (s.hash && (!s.is_grade || flagged)) {
             args.commit = s.hash;
+        } else if (s.gradehash) {
+            args.commit = s.gradehash;
+            args.commit_is_grade = 1;
         }
         return args;
     }
@@ -5509,151 +5695,6 @@ function pa_render_pset_table(pconf, data) {
         }
         return p.__nickname;
     }
-
-    var th_render = {}, td_render = {}, tw_render = {};
-    th_render.checkbox = '<th class="gt-checkbox" scope="col"></th>';
-    td_render.checkbox = function (s, rownum) {
-        return rownum == "" ? '<td></td>' :
-            '<td class="gt-checkbox"><input type="checkbox" name="' +
-            render_checkbox_name(s) + '" value="1" class="' +
-            (this.className || "uix js-range-click papsel") + '" data-range-type="s61"></td>';
-    };
-    tw_render.checkbox = 1.5;
-    th_render.rownumber = '<th class="gt-rownumber" scope="col"></th>';
-    td_render.rownumber = function (s, rownum) {
-        return rownum == "" ? '<td></td>' : '<td class="gt-rownumber">' + rownum + '.</td>';
-    };
-    tw_render.rownumber = Math.ceil(Math.log10(Math.max(data.length, 1))) * 0.75 + 1;
-    th_render.pset = '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>';
-    td_render.pset = function (s) {
-        return '<td class="gt-pset"><a href="' + escaped_href(s) + '">' +
-           escape_entities(peteramati_psets[s.psetid].title) +
-           (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>';
-    };
-    tw_render.pset = 12;
-    th_render.at = '<th class="gt-at l plsortable" data-pa-sort="at" scope="col">Flagged</th>';
-    td_render.at = function (s) {
-        return '<td class="gt-at">' + (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>';
-    };
-    tw_render.at = 8;
-    th_render.username = function () {
-        var t = '<span class="heading">' + (anonymous || !sort.email ? "Username" : "Email") + '</span>';
-        if (pconf.anonymous && pconf.can_override_anonymous)
-            t += ' <a href="" class="uu n">[anon]</a>';
-        else if (pconf.anonymous)
-            t += ' <span class="n">[anon]</span>';
-        return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
-    };
-    td_render.username = function (s) {
-        return '<td class="gt-username">' + render_username_td(s) + '</td>';
-    };
-    tw_render.username = 12;
-    th_render.name = function () {
-        return '<th class="gt-name l plsortable" data-pa-sort="name" scope="col">Name</th>';
-    };
-    td_render.name = function (s) {
-        return '<td class="gt-name">' + render_display_name(s) + '</td>';
-    };
-    tw_render.name = 14;
-    th_render.extension = '<th class="gt-extension l plsortable" data-pa-sort="extension" scope="col">X?</th>';
-    td_render.extension = function (s) {
-        return '<td class="gt-extension">' + (s.x ? "X" : "") + '</td>';
-    };
-    tw_render.extension = 2;
-    th_render.grader = '<th class="gt-grader l plsortable" data-pa-sort="grader" scope="col">Grader</th>';
-    td_render.grader = function (s) {
-        var t = s.gradercid ? "???" : "";
-        if (s.gradercid && hotcrp_pc[s.gradercid])
-            t = grader_name(hotcrp_pc[s.gradercid]);
-        return '<td class="gt-grader">' + t + '</td>';
-    };
-    tw_render.grader = 6;
-    th_render.notes = '<th class="gt-notes l plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>';
-    td_render.notes = function (s) {
-        var t = '';
-        if (s.grades_visible)
-            t += '⎚';
-        if (flagged && s.is_grade)
-            t += '✱';
-        if (s.has_notes)
-            t += '♪';
-        if (!flagged && s.has_nongrader_notes)
-            t += '<sup>*</sup>';
-        return '<td class="gt-notes">' + t + '</td>';
-    };
-    tw_render.notes = 2;
-    th_render.conversation = '<th class="gt-conversation l" scope="col">Flag</th>';
-    td_render.conversation = function (s) {
-        return '<td class="gt-conversation l">' +
-            escape_entities(s.conversation || s.conversation_pfx || "") +
-            (s.conversation_pfx ? "…" : "") + '</td>';
-    };
-    tw_render.conversation = 20;
-    th_render.gdialog = '<th></th>';
-    td_render.gdialog = function (s) {
-        return '<td><a href="" class="ui x js-gdialog" tabindex="-1" scope="col">Ⓖ</a></td>';
-    };
-    tw_render.gdialog = 1;
-    th_render.total = '<th class="gt-total r plsortable" data-pa-sort="total" scope="col">Tot</th>';
-    td_render.total = function (s) {
-        return '<td class="gt-total r">' + s.total + '</td>';
-    };
-    tw_render.total = 3;
-    th_render.grade = function () {
-        var klass = this.justify === "right" ? "gt-grade r" : "gt-grade";
-        return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '" scope="col">' + this.gabbr + '</th>';
-    };
-    td_render.grade = function (s, rownum, text) {
-        var gr = s.grades[this.gidx];
-        if (gr == null) {
-            gr = "";
-        }
-        if (gr !== "" && this.gtype) {
-            gr = escape_entities(pa_grade_types[this.gtype].text.call(grade_entries[this.gidx], gr));
-        }
-        if (text) {
-            return gr;
-        } else {
-            var k = this.gkey === pconf.total_key ? "gt-total" : "gt-grade";
-            if (s.highlight_grades && s.highlight_grades[this.gkey]) {
-                k += " gt-highlight";
-            }
-            if (this.justify === "right") {
-                k += " r";
-            }
-            return '<td class="' + k + '">' + gr + '</td>';
-        }
-    };
-    tw_render.grade = function () {
-        return Math.max(3, this.gabbr.length * 0.5 + 1.5);
-    };
-    th_render.ngrades = '<th class="gt-ngrades r plsortable" data-pa-sort="ngrades" scope="col">#G</th>';
-    td_render.ngrades = function (s) {
-        return '<td class="gt-ngrades r">' + (s.ngrades_nonempty || "") + '</td>';
-    };
-    tw_render.ngrades = 2;
-    th_render.repo = '<th class="gt-repo" scope="col"></th>';
-    td_render.repo = function (s) {
-        var txt;
-        if (!s.repo)
-            txt = '';
-        else if (anonymous)
-            txt = '<a href="#" onclick="return pa_anonymize_linkto(' + escape_entities(JSON.stringify(s.repo)) + ',event)">repo</a>';
-        else
-            txt = '<a href="' + escape_entities(s.repo) + '">repo</a>';
-        if (s.repo_broken)
-            txt += ' <strong class="err">broken</strong>';
-        if (s.repo_unconfirmed)
-            txt += ' <strong class="err">unconfirmed</strong>';
-        if (s.repo_too_open)
-            txt += ' <strong class="err">open</strong>';
-        if (s.repo_partner_error)
-            txt += ' <strong class="err">partner</strong>';
-        if (s.repo_sharing)
-            txt += ' <strong class="err">sharing</strong>';
-        return '<td class="gt-repo">' + txt + '</td>';
-    };
-    tw_render.repo = 10;
 
     function set_hotlist($b) {
         var j = {sort: sort.f}, i, l, p;
@@ -5780,43 +5821,55 @@ function pa_render_pset_table(pconf, data) {
         return false;
     }
     function overlay_create() {
-        var t = th_render.username.call(username_col);
-        $overlay = $('<table class="gtable gtable-fixed" style="position:absolute;left:-24px;width:' + (username_col.width + 24) + 'px"><thead><tr class="k0"><th style="width:24px"></th><th style="width:' + username_col.width + 'px"' + t.substring(3) + '</thead><tbody></tbody></table>');
-        $overlay[0].firstChild.firstChild.lastChild.className = $j[0].firstChild.firstChild.childNodes[username_col.index].className;
+        var li, ri, i, tw = 0, t, a = [];
+        for (li = 0; li !== col.length && !col[li].pin; ++li) {
+        }
+        for (ri = li; ri !== col.length && col[ri].pin; ++ri) {
+            tw += col[ri].width;
+        }
+
+        t = '<table class="gtable gtable-fixed gtable-overlay new" style="position:absolute;left:-24px;width:' +
+            (tw + 24) + 'px"><thead><tr class="k0 kfade"><th style="width:24px"></th>';
+        for (i = li; i !== ri; ++i) {
+            t += '<th style="width:' + col[i].width + 'px"' +
+                col[i].th.call(col[i]).substring(3);
+        }
+        $overlay = $(t + '</thead><tbody></tbody></table>');
+
+        var tr = $j[0].firstChild.firstChild,
+            otr = $overlay[0].firstChild.firstChild;
+        for (i = li; i !== ri; ++i) {
+            otr.childNodes[i - li + 1].className = tr.childNodes[i].className;
+        }
+
         $j[0].parentNode.prepend($('<div style="position:sticky;left:0;z-index:2"></div>').append($overlay)[0]);
         $overlay.find("thead").on("click", "th", head_click);
         $overlay.find("thead .gt-username a").click(switch_anon);
 
-        var tr = $j.children("tbody")[0].firstChild,
-            a = [];
+        tr = $j.children("tbody")[0].firstChild;
         while (tr) {
             if (hasClass(tr, "gt-boring")) {
-                a.push('<tr class="gt-boring"><td colspan="2"><hr></td></tr>');
+                a.push('<tr class="gt-boring"><td colspan="' + (ri - li + 1) + '"><hr></td></tr>');
             } else {
                 var spos = tr.getAttribute("data-pa-spos"),
-                    t = '<tr class="' + tr.className + '" data-pa-spos="' + spos;
+                    t = '<tr class="' + tr.className + ' kfade" data-pa-spos="' + spos;
                 if (tr.hasAttribute("data-pa-uid")) {
                     t += '" data-pa-uid="' + tr.getAttribute("data-pa-uid");
                 }
                 if (tr.hasAttribute("data-pa-partner")) {
                     t += '" data-pa-partner="1';
                 }
-                var tt = td_render.username.call(username_col, dmap[spos]);
-                a.push(t + '"><td></td><td style="height:' + tr.childNodes[username_col.index].clientHeight + 'px"' + tt.substring(3) + '</tr>');
+                t += '"><td></td>';
+                for (i = li; i !== ri; ++i) {
+                    t += '<td style="height:' + tr.childNodes[i].clientHeight +
+                        'px"' + col[i].td.call(col[i], dmap[spos], "").substring(3);
+                }
+                a.push(t + '</tr>');
             }
             tr = tr.nextSibling;
         }
         $overlay.find("tbody").html(a.join(""));
-    }
-    function overlay_check(event) {
-        var scroll = $j[0].parentElement.scrollLeft;
-        console.log(username_col.left);
-        if (scroll > username_col.left && !$overlay) {
-            overlay_create();
-        } else if (scroll < username_col.left && $overlay) {
-            $overlay[0].parentNode.remove();
-            $overlay = null;
-        }
+        setTimeout(function () { removeClass($overlay[0], "new"); }, 0);
     }
     function user_compare(a, b) {
         var au = ukey(a).toLowerCase();
@@ -6040,7 +6093,7 @@ function pa_render_pset_table(pconf, data) {
             if (ge && (c = col[ge.colpos])) {
                 if (su.grades[ge.pos] !== rv.grades[i]) {
                     su.grades[ge.pos] = rv.grades[i];
-                    tr.childNodes[ge.colpos].innerText = td_render[c.type].call(c, su, null, true);
+                    tr.childNodes[ge.colpos].innerText = c.td.call(c, su, null, true);
                 }
                 if (rv.grades[i] != null && rv.grades[i] !== "") {
                     ++ngrades_nonempty;
@@ -6108,8 +6161,10 @@ function pa_render_pset_table(pconf, data) {
             });
         } else {
             for (var i = 0; i !== gdialog_su.length; ++i) {
-                if (gdialog_su[i].hash)
-                    byuid[gdialog_su[i].uid].commit = gdialog_su[i].hash;
+                if (gdialog_su[i].gradehash) {
+                    byuid[gdialog_su[i].uid].commit = gdialog_su[i].gradehash;
+                    byuid[gdialog_su[i].uid].commit_is_grade = 1;
+                }
             }
             $.ajax(hoturl_post("api/multigrade", {pset: pconf.psetkey}), {
                 type: "POST", cache: false,
@@ -6198,7 +6253,10 @@ function pa_render_pset_table(pconf, data) {
             event.preventDefault();
         } else if (event.key === "Return" || event.key === "Enter") {
             gdialog_store(function () { $gdialog.close(); });
+            event.stopImmediatePropagation();
+            event.preventDefault();
         } else if (event.key === "Esc" || event.key === "Escape") {
+            event.stopImmediatePropagation();
             $gdialog.close();
         } else if (event.key === "Backspace" && this.hasAttribute("placeholder")) {
             gdialog_input.call(this);
@@ -6251,7 +6309,7 @@ function pa_render_pset_table(pconf, data) {
         $gdialog.find("button[name=prev], button[name=next]").on("click", gdialog_traverse);
         hc.show();
     }
-    $j.on("click", "a.js-gdialog", function (event) {
+    $j.parent().on("click", "a.js-gdialog", function (event) {
         gdialog.call(this);
         event.preventDefault();
     });
@@ -6259,22 +6317,18 @@ function pa_render_pset_table(pconf, data) {
     function render_tds(s, rownum) {
         var a = [];
         for (var i = 0; i !== col.length; ++i)
-            a.push(td_render[col[i].type].call(col[i], s, rownum));
+            a.push(col[i].td.call(col[i], s, rownum));
         return a;
     }
     function render() {
         var thead = $('<thead><tr class="k0"></tr></thead>')[0],
             tfixed = $j.hasClass("want-gtable-fixed"),
             rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
-        for (i = 0; i !== col.length; ++i) {
-            var th = th_render[col[i].type];
-            if (typeof th !== "string") {
-                th = th.call(col[i]);
-            }
-            var $th = $(th);
+        for (var i = 0; i !== col.length; ++i) {
+            var th = col[i].th.call(col[i]), $th = $(th);
             if (tfixed) {
                 col[i].left = table_width;
-                var w = tw_render[col[i].type];
+                var w = col[i].tw;
                 if (typeof w !== "number") {
                     w = w.call(col[i]);
                 }
@@ -6301,7 +6355,7 @@ function pa_render_pset_table(pconf, data) {
             sort_data();
         }
         displaying_last_first = sort.f === "name" && sort.last;
-        for (var i = 0; i < data.length; ++i) {
+        for (var i = 0; i !== data.length; ++i) {
             var s = data[i];
             s._spos = dmap.length;
             dmap.push(s);
@@ -6338,8 +6392,20 @@ function pa_render_pset_table(pconf, data) {
         }
         set_hotlist($(tbody));
 
-        if (tfixed && username_col) {
-            $j.parent().on("scroll", overlay_check);
+        if (tfixed && window.IntersectionObserver) {
+            for (i = 0; i !== col.length && !col[i].pin; ++i) {
+            }
+            overlay_left = col[i].left;
+            var overlay_div = $('<div style="position:absolute;left:0;top:0;bottom:0;width:' + (overlay_left) + 'px"></div>').prependTo($j.parent())[0];
+            (new IntersectionObserver(function (entries) {
+                var e = entries[entries.length - 1];
+                if (!e.isIntersecting && !$overlay) {
+                    overlay_create();
+                } else if (e.isIntersecting && $overlay) {
+                    $overlay.parent().remove();
+                    $overlay = null;
+                }
+            })).observe(overlay_div);
         }
     }
 
