@@ -5422,7 +5422,7 @@ function pa_render_pset_table(pconf, data) {
         },
         grade: {
             th: function () {
-                var klass = this.justify === "right" ? "gt-grade r" : "gt-grade";
+                var klass = this.justify === "right" ? "gt-grade r" : "gt-grade l";
                 return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '" scope="col">' + this.gabbr + '</th>';
             },
             td: function (s, rownum, text) {
@@ -5431,23 +5431,33 @@ function pa_render_pset_table(pconf, data) {
                     gr = "";
                 }
                 if (gr !== "" && this.gtype) {
-                    gr = escape_entities(pa_grade_types[this.gtype].text.call(grade_entries[this.gidx], gr));
+                    gr = escape_entities(pa_grade_types[this.gtype].text.call(this.ge, gr));
                 }
                 if (text) {
                     return gr;
                 } else {
-                    var k = this.gkey === pconf.total_key ? "gt-total" : "gt-grade";
+                    var t = '<td class="' + this.klass;
                     if (s.highlight_grades && s.highlight_grades[this.gkey]) {
-                        k += " gt-highlight";
+                        t += " gt-highlight";
                     }
-                    if (this.justify === "right") {
-                        k += " r";
-                    }
-                    return '<td class="' + k + '">' + gr + '</td>';
+                    return t + '">' + gr + '</td>';
                 }
             },
             tw: function () {
-                return Math.max(3, this.gabbr.length * 0.5 + 1.5);
+                var w = 0;
+                this.klass = this.gkey === pconf.total_key ? "gt-total" : "gt-grade";
+                if (this.justify === "right") {
+                    this.klass += " r";
+                }
+                if (this.gtype === "select") {
+                    this.klass += " gt-el";
+                    for (var i = 0; i !== this.ge.options.length; ++i)
+                        w = Math.max(w, this.ge.options[i].length);
+                    w = Math.floor(Math.min(w, 10) * 1.25) / 2;
+                } else {
+                    w = 3;
+                }
+                return Math.max(w, this.gabbr.length * 0.5 + 1.5);
             }
         },
         ngrades: {
@@ -5600,6 +5610,7 @@ function pa_render_pset_table(pconf, data) {
                     gidx: i,
                     gkey: grade_keys[i],
                     gabbr: grade_abbr[i],
+                    ge: grade_entries[i],
                     gtype: gtype,
                     justify: pa_grade_types[gtype || "numeric"].justify || "right"
                 });

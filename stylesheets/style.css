@@ -2274,11 +2274,11 @@ td.mhcb {
 }
 .gt-username {
 	font-weight: bold;
-	white-space: nowrap;
 }
-.gt-username, .gt-name, .gt-grader {
+.gt-username, .gt-grader, .gt-el {
 	text-overflow: ellipsis;
 	overflow: hidden;
+	white-space: nowrap;
 }
 .gt-rownumber, .gt-username, .gt-name, .gt-grader,
 .gt-notes, .gt-grade, .gt-ngrades, .gt-total,
