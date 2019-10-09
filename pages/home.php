@@ -1260,6 +1260,11 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         if ($info->repo->open) {
             $j["repo_too_open"] = true;
         }
+        if ($pset->handout_warn_hash
+            && isset($_GET["handout"])
+            && !$info->repo->connected_commit($pset->handout_warn_hash, $pset, $info->branch)) {
+            $j["repo_handout_old"] = true;
+        }
         if (!$info->partner_same()) {
             $j["repo_partner_error"] = true;
         } else if ($pset->partner_repo

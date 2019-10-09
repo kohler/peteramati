@@ -378,7 +378,7 @@ function echo_commit($Info) {
             && $last_handout->hash == $last_myhandout) {
             /* this is ideal: they have the latest handout commit */
         } else if ($last_handout && $last_myhandout) {
-            $need_handout_hash = $Pset->handout_hash ? : $Pset->handout_warn_hash;
+            $need_handout_hash = $Pset->handout_warn_hash ? : $Pset->handout_hash;
             if ($need_handout_hash
                 && ($hcf = $Pset->handout_commits_from($need_handout_hash))
                 && isset($hcf[$last_myhandout])) {

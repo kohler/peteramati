@@ -5483,6 +5483,8 @@ function pa_render_pset_table(pconf, data) {
                     txt += ' <strong class="err">unconfirmed</strong>';
                 if (s.repo_too_open)
                     txt += ' <strong class="err">open</strong>';
+                if (s.repo_handout_old)
+                    txt += ' <strong class="err">handout</strong>';
                 if (s.repo_partner_error)
                     txt += ' <strong class="err">partner</strong>';
                 if (s.repo_sharing)
