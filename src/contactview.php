@@ -303,8 +303,9 @@ class ContactView {
                 $ms->set_error_html("partner", "This repository differs from $your_partner$prepo_url.");
             }
         }
-        if ($repo)
+        if ($repo) {
             $repo->check_ownership($user, $partner, $ms);
+        }
         $prefixes = ["", "WARNING: ", "ERROR: "];
         $notes = array_map(function ($m) use ($prefixes) {
             return [$m[2] > 0, $prefixes[$m[2]] . $m[1]];
@@ -458,9 +459,9 @@ class ContactView {
         $branch = $user->branch_name($info->pset) ? : "master";
 
         $snaphash = $snapcommitline = $snapcommitat = null;
-        if ($repo && !$info->user_can_view_repo_contents())
+        if ($repo && !$info->user_can_view_repo_contents()) {
             $value = "(unconfirmed repository)";
-        else if ($repo && $repo->snaphash && $branch === "master") {
+        } else if ($repo && $repo->snaphash && $branch === "master") {
             $snaphash = $repo->snaphash;
             $snapcommitline = $repo->snapcommitline;
             $snapcommitat = $repo->snapcommitat;
@@ -472,12 +473,14 @@ class ContactView {
                 $snapcommitat = $c->commitat;
             } else
                 $value = "(no such branch)";
-        } else if ($repo)
+        } else if ($repo) {
             $value = "(checking)";
-        else
+        } else {
             $value = "(no repo yet)";
-        if ($snaphash)
+        }
+        if ($snaphash) {
             $value = substr($snaphash, 0, 7) . " " . htmlspecialchars($snapcommitline);
+        }
 
         $notes = array();
         if ($repo && $info->can_view_repo_contents() && $repo->snapat) {
@@ -490,9 +493,9 @@ class ContactView {
             $notes[] = $n;
         }
         if ($repo && !$info->user_can_view_repo_contents()) {
-            if ($user->is_anonymous)
+            if ($user->is_anonymous) {
                 $notes[] = array(true, "ERROR: The user hasn’t confirmed that they can view this repository.");
-            else {
+            } else {
                 $uname = Text::analyze_name($user);
                 if ($uname->name && $uname->email)
                     $uname = "$uname->name <$uname->email>";
