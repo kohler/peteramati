@@ -16,6 +16,7 @@ class PsetView {
     private $partner_same;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
+    private $contact_grade = false; // always ContactGrade
     private $repo_grade;            // RepositoryGrade+CommitNotes
     private $_repo_grade_placeholder_bhash;
     private $_repo_grade_placeholder_at;
@@ -71,10 +72,12 @@ class PsetView {
             $info->branch = $info->branchid ? $info->conf->branch($info->branchid) : null;
         }
 
-        if ($info->pset->gitless_grades)
-            $info->grade = $sset->contact_grade($user);
-        else if ($info->repo)
+        $info->contact_grade = $sset->contact_grade($user);
+        if ($info->pset->gitless_grades) {
+            $info->grade = $info->contact_grade;
+        } else if ($info->repo) {
             $info->repo_grade = $sset->repo_grade_with_notes($user);
+        }
         $info->analyze_grade();
         return $info;
     }
@@ -322,10 +325,10 @@ class PsetView {
         $this->update_commit_info_at($this->hash, $updates, $reset_keys);
     }
 
-    function update_contact_grade_info($updates, $reset_keys = false) {
-        assert(!!$this->pset->gitless_grades);
+    function update_user_info($updates, $reset_keys = false) {
         // find original
-        $record = $this->grade;
+        $this->ensure_contact_grade();
+        $record = $this->contact_grade;
 
         // compare-and-swap loop
         while (true) {
@@ -352,13 +355,17 @@ class PsetView {
             $record = $this->pset->contact_grade_for($this->user);
         }
 
-        if (!$record)
+        if (!$record) {
             $record = (object) ["cid" => $this->user->contactId, "pset" => $this->pset->id, "gradercid" => null, "hidegrade" => 0, "notesversion" => 0];
+        }
         $record->notes = $new_notes;
         $record->hasactiveflags = $hasactiveflags;
         $record->notesversion = $record->notesversion + 1;
-        $this->grade = $record;
-        $this->grade_notes = $record->notes;
+        $this->contact_grade = $record;
+        if ($this->pset->gitless || $this->pset->gitless_grades) {
+            $this->grade = $record;
+            $this->grade_notes = $record->notes;
+        }
         $this->can_view_grades = $this->user_can_view_grades = null;
         if (isset($updates["grades"]) || isset($updates["autogrades"]))
             $this->conf->invalidate_grades($this->pset);
@@ -366,14 +373,14 @@ class PsetView {
 
     function update_current_info($updates, $reset_keys = false) {
         if ($this->pset->gitless)
-            $this->update_contact_grade_info($updates, $reset_keys);
+            $this->update_user_info($updates, $reset_keys);
         else
             $this->update_commit_info($updates, $reset_keys);
     }
 
     function update_grade_info($updates, $reset_keys = false) {
         if ($this->pset->gitless || $this->pset->gitless_grades)
-            $this->update_contact_grade_info($updates, $reset_keys);
+            $this->update_user_info($updates, $reset_keys);
         else
             $this->update_commit_info($updates, $reset_keys);
     }
@@ -424,23 +431,37 @@ class PsetView {
             if ($this->repo_grade->bhash !== null)
                 $this->repo_grade->hash = bin2hex($this->repo_grade->bhash);
         }
-        if (!$this->pset->gitless_grades)
+        if (!$this->pset->gitless_grades) {
             $this->grade = $this->repo_grade;
-        if ($this->grade && $this->grade->notes && is_string($this->grade->notes))
+        }
+        if ($this->grade && $this->grade->notes && is_string($this->grade->notes)) {
             $this->grade->notes = json_decode($this->grade->notes);
+        }
         $this->grade_notes = $this->grade ? $this->grade->notes : null;
         if ($this->grade_notes
             && $this->repo_grade
             && $this->grade->gradercid
-            && !get($this->grade_notes, "gradercid"))
+            && !get($this->grade_notes, "gradercid")) {
             $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
+        }
         $this->n_visible_grades = null;
     }
 
+    private function load_contact_grade() {
+        $this->contact_grade = $this->pset->contact_grade_for($this->user);
+    }
+
+    private function ensure_contact_grade() {
+        if ($this->contact_grade === false) {
+            $this->load_contact_grade();
+        }
+    }
+
     private function load_grade() {
-        if ($this->pset->gitless_grades)
-            $this->grade = $this->pset->contact_grade_for($this->user);
-        else {
+        if ($this->pset->gitless_grades) {
+            $this->load_contact_grade();
+            $this->grade = $this->contact_grade;
+        } else {
             $this->repo_grade = null;
             if ($this->repo) {
                 $result = $this->conf->qe("select rg.*, cn.bhash, cn.notes, cn.notesversion
@@ -644,13 +665,14 @@ class PsetView {
 
     function gradercid() {
         $this->ensure_grade();
-        if ($this->pset->gitless_grades)
+        if ($this->pset->gitless_grades) {
             return $this->grade ? $this->grade->gradercid : 0;
-        else if ($this->repo_grade
-                 && $this->hash === $this->repo_grade->gradehash)
+        } else if ($this->repo_grade
+                   && $this->hash === $this->repo_grade->gradehash) {
             return $this->repo_grade->gradercid;
-        else
+        } else {
             return $this->commit_info("gradercid") ? : 0;
+        }
     }
 
     function can_edit_line_note($file, $lineid) {
@@ -660,17 +682,27 @@ class PsetView {
 
     function grading_info($key = null) {
         $this->ensure_grade();
-        if ($key && $this->grade_notes)
+        if ($key && $this->grade_notes) {
             return get($this->grade_notes, $key);
-        else
+        } else {
             return $this->grade_notes;
+        }
     }
 
     function current_info($key = null) {
-        if ($this->pset->gitless_grades || $this->hash === null)
+        if ($this->pset->gitless_grades || $this->hash === null) {
             return $this->grading_info($key);
-        else
+        } else {
             return $this->commit_info($key);
+        }
+    }
+
+    function user_info($key = null) {
+        $this->ensure_contact_grade();
+        if ($key && $this->contact_grade)
+            return get($this->contact_grade, $key);
+        else
+            return $this->contact_grade;
     }
 
     function current_line_note($file, $lineid) {
@@ -757,7 +789,7 @@ class PsetView {
 
 
     function clear_grade() {
-        $this->grade = $this->repo_grade = false;
+        $this->grade = $this->contact_grade = $this->repo_grade = false;
         $this->can_view_grades = $this->user_can_view_grades = null;
     }
 

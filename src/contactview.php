@@ -365,6 +365,22 @@ class ContactView {
             echo "</div></form>\n";
     }
 
+    static function echo_downloads_group(PsetView $info) {
+        global $Conf, $Me, $Now, $Qreq;
+        $n = 0;
+        foreach ($info->pset->downloads as $dl) {
+            if ($info->user == $info->viewer && !$dl->visible)
+                continue;
+            if (!$n)
+                echo '<hr><h2>downloads</h2>';
+            ++$n;
+            echo '<div class="pa-p', ($dl->visible ? "" : " pa-p-hidden"), '">';
+            echo '<div class="pa-pt">', $n, '.</div><div class="pa-pd">';
+            echo '<a href="', hoturl("pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "post" => post_value(), "download" => $dl->key]), '">', htmlspecialchars($dl->title), '</a>';
+            echo '</div></div>';
+        }
+    }
+
     static function set_repo_action($user, $qreq) {
         global $Conf, $Me, $ConfSitePATH;
         if (!($Me->has_database_account()

@@ -60,6 +60,42 @@ if ($Qreq->set_repo)
 if ($Qreq->set_branch)
     ContactView::set_branch_action($User, $Qreq);
 
+// maybe download file
+if ($Qreq->download
+    && check_post()) {
+    $dl = get($Info->pset->downloads, $Qreq->download);
+    if (!$dl
+        || (!$dl->visible && $Info->viewer === $Info->user)) {
+        header("HTTP/1.0 404 Not Found");
+        exit;
+    }
+    $content = @file_get_contents($dl->file);
+    if ($content === false) {
+        if (!file_exists($dl->file)) {
+            header("HTTP/1.0 404 Not Found");
+        } else if (!is_readable($dl->file)) {
+            header("HTTP/1.0 403 Forbidden");
+        } else {
+            header("HTTP/1.0 500 Internal Server Error");
+        }
+        exit;
+    }
+    if ($dl->timed) {
+        $dls = $Info->user_info("downloads") ? : [];
+        $old_dls = $dls ? get($dls, $dl->key, []) : [];
+        $old_dls[] = ($Info->viewer === $Info->user ? $Now : [$Now, $Info->viewer->contactId]);
+        $Info->update_user_info(["downloads" => [$dl->key => $old_dls]]);
+    }
+    session_write_close();
+    header("Content-Type: " . Mimetype::type_with_charset(Mimetype::content_type($content)));
+    header("Content-Disposition: attachment; filename=" . mime_quote_string($dl->title));
+    header("X-Content-Type-Options: nosniff");
+    // Etag
+    header("Content-Length: " . strlen($content));
+    echo $content;
+    exit;
+}
+
 // save grades
 function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
     if ($info->is_handout_commit())
@@ -516,6 +552,7 @@ function show_pset($info) {
     ContactView::echo_partner_group($info);
     ContactView::echo_repo_group($info, $Me != $info->user);
     ContactView::echo_repo_last_commit_group($info, false);
+    ContactView::echo_downloads_group($info);
 }
 
 show_pset($Info);

@@ -69,6 +69,8 @@ class Pset {
     public $grade_script;
     private $_late_hours;
 
+    public $downloads = [];
+
     public $all_runners = array();
     public $runners;
     public $run_username;
@@ -240,6 +242,20 @@ class Pset {
             && !self::cbool($p, "no_late_hours")) {
             $this->_late_hours = GradeEntryConfig::make_late_hours();
         }
+
+        // downloads
+        $downloads = get($p, "downloads");
+        if (is_array($downloads) || is_object($downloads)) {
+            foreach ((array) $p->downloads as $k => $v) {
+                $g = new DownloadEntryConfig(is_int($k) ? $k + 1 : $k, $v);
+                if (get($this->downloads, $g->key))
+                    throw new PsetConfigException("download `$g->key` reused", "downloads", $k);
+                $this->downloads[$g->key] = $g;
+            }
+        } else if ($downloads) {
+            throw new PsetConfigException("`downloads` format error`", "downloads");
+        }
+        $this->downloads = self::position_sort("downloads", $this->downloads);
 
         // runners
         $runners = get($p, "runners");
@@ -662,6 +678,46 @@ class Pset {
     }
 }
 
+
+class DownloadEntryConfig {
+    public $key;
+    public $name;
+    public $title;
+    public $file;
+    public $timed;
+    public $position;
+    public $visible;
+
+    function __construct($name, $g) {
+        $loc = array("downloads", $name);
+        if (!is_object($g))
+            throw new PsetConfigException("download entry format error", $loc);
+        $this->key = $name;
+        if (isset($g->key)) {
+            $this->key = $g->key;
+        } else if (isset($g->name)) {
+            $this->key = $g->name;
+        }
+        if (!is_string($this->key)
+            || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->key)
+            || $this->key[0] === "_") {
+            throw new PsetConfigException("download entry key format error", $loc);
+        }
+        $this->name = $this->key;
+        $this->title = Pset::cstr($loc, $g, "title");
+        if ((string) $this->title === "") {
+            $this->title = $this->key;
+        }
+        if (!isset($g->file)
+            || !is_string($g->file)) {
+            throw new PsetConfigException("download entry file format error", $loc);
+        }
+        $this->file = $g->file;
+        $this->timed = Pset::cbool($loc, $g, "timed");
+        $this->position = Pset::cnum($loc, $g, "position");
+        $this->visible = Pset::cbool($loc, $g, "visible");
+    }
+}
 
 class GradeEntryConfig {
     public $key;
