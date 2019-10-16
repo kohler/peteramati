@@ -902,6 +902,9 @@ class GradeEntryConfig {
         if ($this->landmark_file) {
             $gej["landmark"] = $this->landmark_file . ":" . $this->landmark_line;
         }
+        if (!$this->visible) {
+            $gej["visible"] = false;
+        }
         return $gej;
     }
 }

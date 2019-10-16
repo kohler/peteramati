@@ -2198,12 +2198,15 @@ td.mhcb {
 .pa-grp-hidden > .pa-p {
 	margin-bottom: 0;
 }
-.pa-grp-hidden, .pa-pset-hidden {
+.pa-grp-hidden, .pa-pset-hidden, .pa-p-hidden {
 	background-color: #f3f3f3;
 	color: #888888;
 	margin-left: -24px;
 	margin-right: -24px;
 	padding: 0.5rem 24px;
+}
+.pa-p-hidden + .pa-p-hidden {
+	margin-top: -1rem;
 }
 .pa-pset-hidden.in-modal {
 	background-color: #e8e8e8;

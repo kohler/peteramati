@@ -2819,8 +2819,10 @@ function pa_render_grade_entry(ge, options) {
         var live = options === true || options.live,
             livecl = live ? 'uich ' : '',
             id = "pa-ge" + ++pa_render_grade_entry.id_counter;
-        t = (live ? '<form class="ui-submit ' : '<div class="') +
-            'pa-grade pa-p" data-pa-grade="' + name +
+        t = (live ? '<form class="ui-submit ' : '<div class="');
+        if (ge.visible === false)
+            t += 'pa-p-hidden ';
+        t += 'pa-grade pa-p" data-pa-grade="' + name +
             '"><label class="pa-pt" for="' + id + '">' + title + '</label>';
         if (ge.type === "text") {
             t += '<div class="pa-pd"><textarea class="' + livecl + 'pa-pd pa-gradevalue" name="' + name +
