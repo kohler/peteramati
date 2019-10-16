@@ -393,10 +393,10 @@ class ContactView {
                 if ($dl->max_timer_interval)
                     echo '" data-download-max-timer="', $dl->max_timer_interval;
             }
-            echo '"><div class="pa-pt">', htmlspecialchars($dl->title), '</div><div class="pa-pd"><span class="pa-gradewidth">';
-            echo '<a href="', hoturl("pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "post" => post_value(), "download" => $dl->key]), '">', htmlspecialchars($dl->filename), '</a></span>';
+            echo '"><div class="pa-pt">', htmlspecialchars($dl->title), '</div><div class="pa-pd">';
+            echo '<a href="', hoturl("pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "post" => post_value(), "download" => $dl->key]), '">', htmlspecialchars($dl->filename), '</a>';
             if ($timer_start)
-                echo '<span class="pa-download-timer"></span>';
+                echo '<span class="pa-download-timer" style="padding-left:1em"></span>';
             echo '</span></div></div>';
         }
     }
