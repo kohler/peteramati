@@ -699,10 +699,13 @@ class PsetView {
 
     function user_info($key = null) {
         $this->ensure_contact_grade();
-        if ($key && $this->contact_grade)
-            return get($this->contact_grade, $key);
-        else
-            return $this->contact_grade;
+        if (!$this->contact_grade || !$this->contact_grade->notes) {
+            return null;
+        } else if ($key) {
+            return get($this->contact_grade->notes, $key);
+        } else {
+            return $this->contact_grade->notes;
+        }
     }
 
     function current_line_note($file, $lineid) {

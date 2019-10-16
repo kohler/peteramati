@@ -684,7 +684,10 @@ class DownloadEntryConfig {
     public $name;
     public $title;
     public $file;
+    public $filename;
     public $timed;
+    public $timer_interval;
+    public $max_timer_interval;
     public $position;
     public $visible;
 
@@ -713,9 +716,15 @@ class DownloadEntryConfig {
             throw new PsetConfigException("download entry file format error", $loc);
         }
         $this->file = $g->file;
+        $this->filename = Pset::cstr($loc, $g, "filename");
+        if ((string) $this->filename === "") {
+            $this->filename = $this->key;
+        }
         $this->timed = Pset::cbool($loc, $g, "timed");
         $this->position = Pset::cnum($loc, $g, "position");
         $this->visible = Pset::cbool($loc, $g, "visible");
+        $this->timer_interval = Pset::cinterval($loc, $g, "timer_interval");
+        $this->max_timer_interval = Pset::cinterval($loc, $g, "max_timer_interval");
     }
 }
 

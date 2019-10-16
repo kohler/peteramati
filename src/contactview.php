@@ -374,10 +374,30 @@ class ContactView {
             if (!$n)
                 echo '<hr><h2>downloads</h2>';
             ++$n;
-            echo '<div class="pa-p', ($dl->visible ? "" : " pa-p-hidden"), '">';
-            echo '<div class="pa-pt">', $n, '.</div><div class="pa-pd">';
-            echo '<a href="', hoturl("pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "post" => post_value(), "download" => $dl->key]), '">', htmlspecialchars($dl->title), '</a>';
-            echo '</div></div>';
+
+            $timer_start = 0;
+            if ($dl->timed) {
+                $all_dltimes = $info->user_info("downloaded_at");
+                if ($all_dltimes && isset($all_dltimes->{$dl->key})) {
+                    foreach ($all_dltimes->{$dl->key} as $dltime) {
+                        if (!isset($dltime[1]) || $dltime[1] == $info->viewer->contactId) {
+                            $timer_start = $timer_start ? min($timer_start, $dltime[0]) : $dltime[0];
+                        }
+                    }
+                }
+            }
+
+            echo '<div class="pa-p', ($dl->visible ? "" : " pa-p-hidden");
+            if ($timer_start) {
+                echo ' pa-download-timed" data-downloaded-at="', htmlspecialchars($timer_start);
+                if ($dl->max_timer_interval)
+                    echo '" data-download-max-timer="', $dl->max_timer_interval;
+            }
+            echo '"><div class="pa-pt">', htmlspecialchars($dl->title), '</div><div class="pa-pd"><span class="pa-gradewidth">';
+            echo '<a href="', hoturl("pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "post" => post_value(), "download" => $dl->key]), '">', htmlspecialchars($dl->filename), '</a></span>';
+            if ($timer_start)
+                echo '<span class="pa-download-timer"></span>';
+            echo '</span></div></div>';
         }
     }
 

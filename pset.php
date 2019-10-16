@@ -81,14 +81,14 @@ if ($Qreq->download
         exit;
     }
     if ($dl->timed) {
-        $dls = $Info->user_info("downloads") ? : [];
+        $dls = $Info->user_info("downloaded_at") ? : [];
         $old_dls = $dls ? get($dls, $dl->key, []) : [];
-        $old_dls[] = ($Info->viewer === $Info->user ? $Now : [$Now, $Info->viewer->contactId]);
-        $Info->update_user_info(["downloads" => [$dl->key => $old_dls]]);
+        $old_dls[] = ($Info->viewer === $Info->user ? [$Now] : [$Now, $Info->viewer->contactId]);
+        $Info->update_user_info(["downloaded_at" => [$dl->key => $old_dls]]);
     }
     session_write_close();
     header("Content-Type: " . Mimetype::type_with_charset(Mimetype::content_type($content)));
-    header("Content-Disposition: attachment; filename=" . mime_quote_string($dl->title));
+    header("Content-Disposition: attachment; filename=" . mime_quote_string($dl->filename));
     header("X-Content-Type-Options: nosniff");
     // Etag
     header("Content-Length: " . strlen($content));

@@ -2886,8 +2886,8 @@ function pa_grade_recheckbox() {
 
 function pa_set_grade(ge, g, ag, options) {
     var $g = $(this),
-        $v = $g.find(".pa-gradevalue"),
-        editable = $v[0].tagName !== "SPAN" && $v[0].tagName !== "DIV",
+        $v = $g.find(".pa-gradevalue");
+        editable = $v[0] && $v[0].tagName !== "SPAN" && $v[0].tagName !== "DIV",
         typeinfo = pa_grade_types[ge.type || "numeric"];
 
     // “grade is above max” message
@@ -5201,6 +5201,22 @@ handle_ui.on("js-grgraph-highlight-course", function (event) {
             gg && gg.highlight_users();
         });
     });
+});
+
+$(function () {
+var delta = document.body.getAttribute("data-now") - ((new Date).getTime() / 1000);
+$(".pa-download-timed").each(function () {
+    var that = this;
+    function show() {
+        var age = ((new Date).getTime() / 1000 + delta) - that.getAttribute("data-downloaded-at");
+        if (that.hasAttribute("data-download-max-timer"))
+            age = Math.min(age, +that.getAttribute("data-download-max-timer"));
+        age = Math.round(age / 60);
+        $(that).find(".pa-download-timer").text(age + " min");
+    }
+    show();
+    setInterval(show, 15000);
+});
 });
 
 

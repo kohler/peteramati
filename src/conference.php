@@ -1374,7 +1374,7 @@ class Conf {
         $this->encoded_session_list(); // clear cookie if set
 
         // <body>
-        echo "<body", ($id ? " id=\"$id\"" : ""), " onload=\"hotcrp_load()\">\n";
+        echo "<body", ($id ? " id=\"$id\"" : ""), " onload=\"hotcrp_load()\" data-now=\"$Now\">\n";
 
         // initial load (JS's timezone offsets are negative of PHP's)
         Ht::stash_script("hotcrp_load.time(" . (-date("Z", $Now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
