@@ -533,18 +533,20 @@ class ContactView {
                 $notes[] = array(true, "ERROR: The user hasn’t confirmed that they can view this repository.");
             } else {
                 $uname = Text::analyze_name($user);
-                if ($uname->name && $uname->email)
+                if ($uname->name && $uname->email) {
                     $uname = "$uname->name <$uname->email>";
-                else if ($uname->email)
+                } else if ($uname->email) {
                     $uname = "Your Name <$uname->email>";
-                else if ($uname->name)
+                } else if ($uname->name) {
                     $uname = "$uname->name <youremail@example.com>";
-                else
+                } else {
                     $uname = "Your Name <youremail@example.com>";
+                }
+                $uname = addcslashes($uname, "\\\"\`\$!");
                 $notes[] = array(true, "ERROR: We haven’t confirmed that you can view this repository.<br>
     We only let you view repositories that you’ve committed to.<br>
     Fix this error by making a commit from your email address, " . htmlspecialchars($user->email) . ", and pushing that commit to the repository.<br>
-    For example, try these commands: <pre>git commit --allow-empty --author=" . htmlspecialchars(escapeshellarg($uname)) . " \\\n        -m \"Confirm repository\" &amp;&amp; git push</pre>");
+    For example, try these commands: <pre>git commit --allow-empty --author=\"" . htmlspecialchars($uname) . "\" -m \"Confirm repository\"\ngit push</pre>");
             }
             $commitgroup = true;
         }
