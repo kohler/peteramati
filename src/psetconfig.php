@@ -868,10 +868,6 @@ class GradeEntryConfig {
                 $this->landmark_range_file = $lmr[0];
                 $this->landmark_range_first = $lmr[1];
                 $this->landmark_range_last = $lmr[count($lmr) - 1];
-                if (count($lmr) === 4 && !isset($this->landmark_file)) {
-                    $this->landmark_file = $lmr[0];
-                    $this->landmark_line = $lmr[2];
-                }
             }
             if ($this->landmark_range_file === null
                 || $this->landmark_range_first > $this->landmark_range_last) {
@@ -904,9 +900,9 @@ class GradeEntryConfig {
             && preg_match('{\A(.*?):(\d+)(:\d+|)(:\d+|)\z}', $x, $m)) {
             $x = [$m[1], intval($m[2])];
             if ($m[3] !== "")
-                $x[] = intval($m[3]);
+                $x[] = intval(substr($m[3], 1));
             if ($m[4] !== "")
-                $x[] = intval($m[4]);
+                $x[] = intval(substr($m[4], 1));
         }
         return $x;
     }
