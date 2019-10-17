@@ -836,35 +836,42 @@ class GradeEntryConfig {
             $this->position = -Pset::cnum($loc, $g, "priority");
         }
 
-        if (isset($g->landmark)) {
-            if (is_string($g->landmark)
-                && preg_match('/\A(.*):(\d+)\z/', $g->landmark, $m)) {
-                $this->landmark_file = $m[1];
-                $this->landmark_line = intval($m[2]);
-            } else if (is_array($g->landmark)
-                       && count($g->landmark) === 2
-                       && is_string($g->landmark[0])
-                       && is_int($g->landmark[1])) {
-                $this->landmark_file = $g->landmark[0];
-                $this->landmark_line = $g->landmark[1];
+        $lm = self::clean_landmark($g, "landmark");
+        $lmr = self::clean_landmark($g, "landmark_range");
+        if ($lm === null && $lmr !== null) {
+            $lm = $lmr;
+        } else if ($lmr === null && $lm !== null && count($lm) > 2) {
+            $lmr = $lm;
+        }
+        if ($lm !== null) {
+            if (is_array($lm)
+                && count($lm) >= 2
+                && count($lm) <= 4
+                && is_string($lm[0])
+                && is_int($lm[1])
+                && (count($lm) < 3 || is_int($lm[2]))
+                && (count($lm) < 4 || is_int($lm[3]))) {
+                $this->landmark_file = $lm[0];
+                $this->landmark_line = $lm[count($lm) === 4 ? 2 : 1];
             } else {
                 throw new PsetConfigException("grade entry `landmark` format error", $loc);
             }
         }
-        if (isset($g->landmark_range)) {
-            if (is_string($g->landmark_range)
-                && preg_match('/\A(.*):(\d+):(\d+)\z/', $g->landmark, $m)) {
-                $this->landmark_range_file = $m[1];
-                $this->landmark_range_first = intval($m[2]);
-                $this->landmark_range_last = intval($m[3]);
-            } else if (is_array($g->landmark_range)
-                       && count($g->landmark_range) === 3
-                       && is_string($g->landmark_range[0])
-                       && is_int($g->landmark_range[1])
-                       && is_int($g->landmark_range[2])) {
-                $this->landmark_range_file = $g->landmark_range[0];
-                $this->landmark_range_first = $g->landmark_range[1];
-                $this->landmark_range_last = $g->landmark_range[2];
+        if ($lmr !== null) {
+            if (is_array($lmr)
+                && count($lmr) >= 3
+                && count($lmr) <= 4
+                && is_string($lmr[0])
+                && is_int($lmr[1])
+                && is_int($lmr[2])
+                && (count($lmr) < 4 || is_int($lmr[3]))) {
+                $this->landmark_range_file = $lmr[0];
+                $this->landmark_range_first = $lmr[1];
+                $this->landmark_range_last = $lmr[count($lmr) - 1];
+                if (count($lmr) === 4 && !isset($this->landmark_file)) {
+                    $this->landmark_file = $lmr[0];
+                    $this->landmark_line = $lmr[2];
+                }
             }
             if ($this->landmark_range_file === null
                 || $this->landmark_range_first > $this->landmark_range_last) {
@@ -886,6 +893,22 @@ class GradeEntryConfig {
         $ge = new GradeEntryConfig("x_late_hours", (object) ["no_total" => true, "position" => PHP_INT_MAX, "title" => "late hours"]);
         $ge->key = "late_hours";
         return $ge;
+    }
+
+    static private function clean_landmark($g, $k) {
+        if (!isset($g->$k)) {
+            return null;
+        }
+        $x = $g->$k;
+        if (is_string($x)
+            && preg_match('{\A(.*?):(\d+)(:\d+|)(:\d+|)\z}', $x, $m)) {
+            $x = [$m[1], intval($m[2])];
+            if ($m[3] !== "")
+                $x[] = intval($m[3]);
+            if ($m[4] !== "")
+                $x[] = intval($m[4]);
+        }
+        return $x;
     }
 
 
