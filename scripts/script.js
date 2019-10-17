@@ -4729,14 +4729,14 @@ PAGradeGraph.prototype.append_cdf = function (d, klass) {
         }
     }
     for (; i < cdf.length; i += 2) {
-        if (i !== 0) {
+        if (data.length !== 0) {
             x = Math.max(0, cdf[i] - Math.min(1, cdf[i] - cdf[i - 2]) / 2);
             data.push("H", this.xax(x));
         } else
             data.push("M", this.xax(Math.max(0, cdf[i] - 0.5)), ",", this.yax(cutoff));
         data.push("V", this.yax(cdf[i+1] * nr));
     }
-    if (cdf.length)
+    if (data.length !== 0)
         data.push("H", this.xax(cdf[cdf.length-2] + 0.5));
     var path = mksvg("path");
     path.setAttribute("d", data.join(""));
