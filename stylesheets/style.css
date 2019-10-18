@@ -1708,17 +1708,20 @@ tbody.pltable_colored > tr:first-child {
 tbody.pltable > tr:last-child > td {
 	padding-bottom: 2px;
 }
-.k0 {
+.k0, .k0.kfade > td {
 	background-color: white;
 }
-.k0.kfade {
+.k0.kfade > td:last-child {
 	background: linear-gradient(to left, rgba(255, 255, 255, 0), white 10px, white);
 }
-.k1, tbody.pltable_alternate > tr:nth-child(even) {
+.k1, .k1.kfade > td, tbody.pltable_alternate > tr:nth-child(even) {
 	background-color: #f1f8fc;
 }
-.k1.kfade {
+.k1.kfade > td:last-child {
 	background: linear-gradient(to left, rgba(241, 248, 252, 0), #f1f8fc 10px, #f1f8fc);
+}
+.k0.kfade, .k1.kfade {
+	background: none;
 }
 tbody.pltable_colored > tr.k1, tfoot.pltable_colored > tr.k1 {
 	background-color: inherit;
