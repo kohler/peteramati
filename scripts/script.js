@@ -2989,6 +2989,25 @@ handle_ui.on("pa-gradevalue", function () {
     $(this).closest("form").submit();
 });
 
+function pa_gradeinfo() {
+    var e = this.closest(".pa-psetinfo"),
+        gi = $(e).data("pa-gradeinfo");
+    if (typeof gi === "string") {
+        gi = JSON.parse(gi);
+    }
+    while (gi && !gi.entries && e) {
+        e = e.parentElement.closest(".pa-psetinfo");
+        var gix = $(e).data("pa-gradeinfo");
+        if (typeof gix === "string") {
+            gix = JSON.pare(gix);
+        }
+        if (gix && typeof gix === "object") {
+            $.extend(gi, gix);
+        }
+    }
+    return gi;
+}
+
 handle_ui.on("pa-grade", function (event) {
     event.preventDefault();
     if (this.getAttribute("data-outstanding"))
@@ -2999,12 +3018,7 @@ handle_ui.on("pa-grade", function (event) {
     $f.find(".pa-gradediffers, .pa-save-message").remove();
     $f.find(".pa-pd").first().append('<span class="pa-save-message">Saving…</span>');
 
-    var gi = $f.closest(".pa-psetinfo").data("pa-gradeinfo");
-    if (typeof gi === "string") {
-        gi = JSON.parse(gi);
-    }
-
-    var g = {}, og = {};
+    var gi = pa_gradeinfo.call(self), g = {}, og = {};
     $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
         var ge = gi.entries[this.name];
         if (gi.grades && ge && gi.grades[ge.pos] != null) {
@@ -3051,7 +3065,7 @@ function hoturl_gradeparts($j, args) {
 function pa_loadgrades(gi) {
     var $pi = $(this).closest(".pa-psetinfo");
     if (gi === true) {
-        gi = $pi.data("pa-gradeinfo");
+        gi = pa_gradeinfo.call(this);
     }
     if (!gi || !gi.order) {
         return;

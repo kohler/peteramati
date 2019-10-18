@@ -41,8 +41,9 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         echo '" data-pa-can-set-grades="yes';
     if ($info->user_can_view_grades())
         echo '" data-pa-user-can-view-grades="yes';
-    if ($info->can_view_grades() && $info->is_current_grades())
-        echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json()));
+    if ($Me->can_set_grades($pset, $info)
+        || ($info->can_view_grades() && $info->is_current_grades()))
+        echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(true)));
     echo '">';
 
     $u = $Me->user_linkpart($user);
@@ -105,7 +106,9 @@ if ($Pset->grade_script) {
     foreach ($Pset->grade_script as $gs)
         Ht::stash_html($Conf->make_script_file($gs));
 }
-echo "<hr />\n";
+echo "<hr />\n<div class=\"pa-psetinfo\" data-pa-gradeinfo=\"",
+     htmlspecialchars(json_encode($Pset->gradeentry_json($Me->isPC))),
+     "\">";
 
 if (trim((string) $Qreq->users) === "") {
     $want = [];
@@ -143,5 +146,5 @@ foreach ($all_viewed_gradeentries as $gkey => $x) {
 }
 
 Ht::stash_script('$(window).on("beforeunload",pa_beforeunload)');
-echo "<div class='clear'></div>\n";
+echo "</div><div class='clear'></div>\n";
 $Conf->footer();
