@@ -395,7 +395,7 @@ class ContactView {
                 }
                 if ($info->repo
                     && !$info->pset->gitless
-                    && ($h = $info->hash ? : $info->grading_hash())
+                    && ($h = $info->maybe_commit_hash() ? : $info->grading_hash())
                     && ($ls = $info->recent_commits($h))) {
                     echo '" data-pa-commit-at="', $ls->commitat;
                 }
