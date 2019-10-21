@@ -5220,16 +5220,26 @@ handle_ui.on("js-grgraph-highlight-course", function (event) {
 $(function () {
 var delta = document.body.getAttribute("data-now") - ((new Date).getTime() / 1000);
 $(".pa-download-timed").each(function () {
-    var that = this;
+    var that = this, timer = setInterval(show, 15000);
     function show() {
-        var age = ((new Date).getTime() / 1000 + delta) - that.getAttribute("data-downloaded-at");
-        if (that.hasAttribute("data-download-max-timer"))
-            age = Math.min(age, +that.getAttribute("data-download-max-timer"));
-        age = Math.round(age / 60);
-        $(that).find(".pa-download-timer").text(age + " min");
+        var downloadat = +that.getAttribute("data-pa-download-at"),
+            commitat = +that.getAttribute("data-pa-commit-at"),
+            expiry = +that.getAttribute("data-pa-download-expiry"),
+            now = ((new Date).getTime() / 1000 + delta), t;
+        if (now > expiry) {
+            t = strftime("%Y/%m/%d %H:%M", downloadat);
+        } else {
+            t = Math.round((now - downloadat) / 60) + " min";
+        }
+        if (commitat > downloadat) {
+            t += " · " + Math.round((commitat - downloadat) / 60) + " min";
+        }
+        $(that).find(".pa-download-timer").text(t);
+        if (now > expiry) {
+            clearInterval(timer);
+        }
     }
     show();
-    setInterval(show, 15000);
 });
 });
 

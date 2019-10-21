@@ -326,8 +326,9 @@ function echo_commit($Info) {
         $bhashes[] = hex2bin($k->hash);
     }
     $notesflag = HASNOTES_ANY;
-    if ($Me == $User && !$Info->can_view_grades())
+    if ($Me == $User && !$Info->can_view_grades()) {
         $notesflag = HASNOTES_COMMENT;
+    }
     $result = $Conf->qe("select bhash, haslinenotes, hasflags, hasactiveflags
         from CommitNotes where pset=? and bhash?a and (haslinenotes or hasflags)",
         $Pset->psetid, $bhashes);
@@ -351,10 +352,11 @@ function echo_commit($Info) {
         $sel[$h] = preg_replace('_\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z_', '$1 &nbsp;✱$2', $sel[$h]);
     }
 
-    if ($Info->is_grading_commit())
+    if ($Info->is_grading_commit()) {
         $key = "grading commit";
-    else
+    } else {
         $key = "this commit";
+    }
     $value = Ht::select("newcommit", $sel, $Info->commit_hash(),
                         array("onchange" => "jQuery(this).closest('form').submit()"));
     if ($Me != $User) {
@@ -383,16 +385,18 @@ function echo_commit($Info) {
 
     // warnings
     $remarks = array();
-    if (!$Info->grading_hash() && $Me != $User && !$Pset->gitless_grades)
+    if (!$Info->grading_hash() && $Me != $User && !$Pset->gitless_grades) {
         $remarks[] = array(true, "No commit has been marked for grading.");
-    else if (!$Info->is_grading_commit() && $Info->grading_hash())
+    } else if (!$Info->is_grading_commit() && $Info->grading_hash()) {
         $remarks[] = array(true, "This is not "
                            . "<a class=\"uu\" href=\"" . $Info->hoturl("pset", array("commit" => $Info->grading_hash())) . "\">the commit currently marked for grading</a>"
                            . " <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit1" => $Info->grading_hash())) . "\">see diff</a>)</span>.");
-    if (!$Info->is_latest_commit())
+    }
+    if (!$Info->is_latest_commit()) {
         $remarks[] = array(true, "This is not "
                            . "<a class=\"uu\" href=\"" . $Info->hoturl("pset", array("commit" => $Info->latest_hash())) . "\">the latest commit</a>"
                            . " <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit1" => $Info->latest_hash())) . "\">see diff</a>)</span>.");
+    }
     $lhd = $Info->late_hours_data();
     if ($lhd && isset($lhd->hours) && $lhd->hours > 0) {
         $extra = array();

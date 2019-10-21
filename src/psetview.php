@@ -741,8 +741,9 @@ class PsetView {
         } else if ($this->user->extension && $this->pset->deadline_extension) {
             $deadline = $this->pset->deadline_extension;
         }
-        if (!$deadline)
+        if (!$deadline) {
             return null;
+        }
 
         $timestamp = get($cinfo, "timestamp");
         if (!$timestamp

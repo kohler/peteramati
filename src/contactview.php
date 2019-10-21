@@ -389,9 +389,16 @@ class ContactView {
 
             echo '<div class="pa-p', ($dl->visible ? "" : " pa-p-hidden");
             if ($timer_start) {
-                echo ' pa-download-timed" data-downloaded-at="', htmlspecialchars($timer_start);
-                if ($dl->max_timer_interval)
-                    echo '" data-download-max-timer="', $dl->max_timer_interval;
+                echo ' pa-download-timed" data-pa-download-at="', htmlspecialchars($timer_start);
+                if ($dl->timeout !== null) {
+                    echo '" data-pa-download-expiry="', ($timer_start + $dl->timeout);
+                }
+                if ($info->repo
+                    && !$info->pset->gitless
+                    && ($h = $info->hash ? : $info->grading_hash())
+                    && ($ls = $info->recent_commits($h))) {
+                    echo '" data-pa-commit-at="', $ls->commitat;
+                }
             }
             echo '"><div class="pa-pt">', htmlspecialchars($dl->title), '</div><div class="pa-pd">';
             echo '<a href="', hoturl("pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "post" => post_value(), "download" => $dl->key]), '">', htmlspecialchars($dl->filename), '</a>';

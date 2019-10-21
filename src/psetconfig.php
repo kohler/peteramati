@@ -442,12 +442,12 @@ class Pset {
 
 
     function contact_grade_for($student) {
-        assert(!!$this->gitless_grades);
         $cid = is_object($student) ? $student->contactId : $sstudent;
         $result = $this->conf->qe("select * from ContactGrade where cid=? and pset=?", $cid, $this->psetid);
         $cg = edb_orow($result);
-        if ($cg && $cg->notes)
+        if ($cg && $cg->notes) {
             $cg->notes = json_decode($cg->notes);
+        }
         Dbl::free($result);
         return $cg;
     }
@@ -456,8 +456,9 @@ class Pset {
         assert(!$this->gitless);
         $result = $this->conf->qe("select * from CommitNotes where pset=? and bhash=?", $this->psetid, strlen($bhash) === 40 ? hex2bin($bhash) : $bhash);
         $cn = edb_orow($result);
-        if ($cn && $cn->notes)
+        if ($cn && $cn->notes) {
             $cn->notes = json_decode($cn->notes);
+        }
         Dbl::free($result);
         return $cn;
     }
@@ -686,8 +687,7 @@ class DownloadEntryConfig {
     public $file;
     public $filename;
     public $timed;
-    public $timer_interval;
-    public $max_timer_interval;
+    public $timeout;
     public $position;
     public $visible;
 
@@ -723,8 +723,7 @@ class DownloadEntryConfig {
         $this->timed = Pset::cbool($loc, $g, "timed");
         $this->position = Pset::cnum($loc, $g, "position");
         $this->visible = Pset::cbool($loc, $g, "visible");
-        $this->timer_interval = Pset::cinterval($loc, $g, "timer_interval");
-        $this->max_timer_interval = Pset::cinterval($loc, $g, "max_timer_interval");
+        $this->timeout = Pset::cinterval($loc, $g, "timeout");
     }
 }
 
