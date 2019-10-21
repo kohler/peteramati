@@ -5232,7 +5232,7 @@ $(".pa-download-timed").each(function () {
             t = Math.round((now - downloadat) / 60) + " min";
         }
         if (commitat > downloadat) {
-            t += " · " + Math.round((commitat - downloadat) / 60) + " min";
+            t += " · " + Math.round((commitat - downloadat) / 60) + " min before commit";
         }
         $(that).find(".pa-download-timer").text(t);
         if (now > expiry) {
