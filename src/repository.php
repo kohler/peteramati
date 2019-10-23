@@ -509,17 +509,19 @@ class Repository {
 
     private function parse_diff($diffargs, Pset $pset, $hasha_arg, $hashb_arg, $options) {
         $command = "git diff";
-        if (get($options, "wdiff"))
+        if (get($options, "wdiff")) {
             $command .= " -w";
+        }
         $command .= " {$hasha_arg} {$hashb_arg} --";
-        foreach ($diffargs as $fn => $di)
+        foreach ($diffargs as $fn => $di) {
             $command .= " " . escapeshellarg(quotemeta($fn));
+        }
         $result = $this->gitrun($command);
         $alineno = $blineno = null;
         $di = null;
         $pos = 0;
         $len = strlen($result);
-        while (1) {
+        while (true) {
             if ($di && $di->truncated) {
                 while ($pos < $len
                        && (($ch = $result[$pos]) === " " || $ch === "+" || $ch === "-")) {
@@ -558,13 +560,14 @@ class Repository {
             } else if ($line[0] === "B" && $di && preg_match('_\ABinary files_', $line)) {
                 $di->add("@", null, null, $line);
             } else if ($line[0] === "\\" && strpos($line, "No newline") !== false) {
-                $di->ends_without_newline();
+                $di->set_ends_without_newline();
             } else {
                 $alineno = $blineno = null;
             }
         }
-        if ($di)
+        if ($di) {
             $di->finish();
+        }
     }
 
     function diff(Pset $pset, $hasha, $hashb, $options = null) {

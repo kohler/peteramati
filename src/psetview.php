@@ -1187,8 +1187,9 @@ class PsetView {
 
     function echo_file_diff($file, DiffInfo $dinfo, LineNotesOrder $lnorder, $args) {
         if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
-            || ($dinfo->is_empty() && $dinfo->loaded))
+            || ($dinfo->is_empty() && $dinfo->loaded)) {
             return;
+        }
 
         $open = !!get($args, "open");
         $tw = get($args, "tabwidth", $this->tabwidth());
@@ -1198,12 +1199,14 @@ class PsetView {
         $no_grades = get($args, "only_diff") || $only_table;
 
         $fileid = html_id_encode($file);
-        if ($id_by_user)
+        if ($id_by_user) {
             $fileid = html_id_encode($this->user->username) . "-" . $fileid;
+        }
         $tabid = "pa-file-" . $fileid;
         $linenotes = $lnorder->file($file);
-        if ($this->can_view_note_authors())
+        if ($this->can_view_note_authors()) {
             $this->conf->stash_hotcrp_pc($this->viewer);
+        }
         $gentries = null;
         if ($this->pset->has_grade_landmark
             && $this->pc_view
@@ -1271,14 +1274,15 @@ class PsetView {
         if ($l[0] === "@") {
             $cx = strlen($l[3]) > 76 ? substr($l[3], 0, 76) . "..." : $l[3];
             $x = [" pa-gx ui", "pa-dcx", "", "", $cx];
-        } else if ($l[0] === " ")
+        } else if ($l[0] === " ") {
             $x = [" pa-gc", "pa-dd", $l[1], $l[2], $l[3]];
-        else if ($l[0] === "-")
+        } else if ($l[0] === "-") {
             $x = [" pa-gd", "pa-dd", $l[1], "", $l[3]];
-        else if ($l[0] === "+")
+        } else if ($l[0] === "+") {
             $x = [" pa-gi", "pa-dd", "", $l[2], $l[3]];
-        else
+        } else {
             $x = [null, null, "", $l[2], $l[3]];
+        }
 
         $aln = $x[2] ? "a" . $x[2] : "";
         $bln = $x[3] ? "b" . $x[3] : "";

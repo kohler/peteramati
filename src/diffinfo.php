@@ -65,25 +65,30 @@ class DiffInfo implements Iterator {
         }
     }
 
-    function ends_without_newline() {
+    function set_ends_without_newline() {
         $di = $this->_diffsz - 4;
         assert($di >= 0 && ($this->_diff[$di] === "-" || $this->_diff[$di] === "+"));
-        if ($this->_dflags === null)
+        if ($this->_dflags === null) {
             $this->_dflags = [];
-        if (!isset($this->_dflags[$di]))
+        }
+        if (!isset($this->_dflags[$di])) {
             $this->_dflags[$di] = 0;
+        }
         $this->_dflags[$di] |= self::LINE_NONL;
     }
 
     function finish() {
-        if ($this->_diffsz === 4 && str_starts_with($this->_diff[3], "B"))
+        if ($this->_diffsz === 4 && str_starts_with($this->_diff[3], "B")) {
             $this->binary = true;
-        if ($this->binary && !$this->_boring_set)
+        }
+        if ($this->binary && !$this->_boring_set) {
             $this->boring = true;
+        }
         if ($this->binary
             ? preg_match('_ and /dev/null differ$_', $this->_diff[3])
-            : $this->_diffsz && $this->_diff[$this->_diffsz - 2] === 0)
+            : $this->_diffsz && $this->_diff[$this->_diffsz - 2] === 0) {
             $this->removed = true;
+        }
     }
 
     function finish_unloaded() {
@@ -103,11 +108,30 @@ class DiffInfo implements Iterator {
         return $this->_hasha_hrepo;
     }
 
+    function max_lineno() {
+        $l = $this->_diffsz;
+        $max = 0;
+        $have = 0;
+        while ($l !== 0 && $have !== 3) {
+            $l -= 4;
+            if ($this->_diff[$l + 1] !== null) {
+                $max = max($max, $this->_diff[$l + 1]);
+                $have |= 1;
+            }
+            if ($this->_diff[$l + 2] !== null) {
+                $max = max($max, $this->_diff[$l + 2]);
+                $have |= 2;
+            }
+        }
+        return $max;
+    }
+
     function entry($i) {
-        if ($i >= 0 && $i < ($this->_diffsz >> 2))
+        if ($i >= 0 && $i < ($this->_diffsz >> 2)) {
             return array_slice($this->_diff, $i << 2, 4);
-        else
+        } else {
             return false;
+        }
     }
 
     private function linea_lower_bound($linea) {
@@ -115,13 +139,15 @@ class DiffInfo implements Iterator {
         $r = $this->_diffsz;
         while ($l < $r) {
             $m = $l + ((($r - $l) >> 2) & ~3);
-            while ($m + 4 < $r && $this->_diff[$m + 1] === null)
+            while ($m + 4 < $r && $this->_diff[$m + 1] === null) {
                 $m += 4;
+            }
             $ln = $this->_diff[$m + 1];
-            if ($ln === null || $ln >= $linea)
+            if ($ln === null || $ln >= $linea) {
                 $r = $m;
-            else
+            } else {
                 $l = $m + 4;
+            }
         }
         return $l;
     }
@@ -133,11 +159,13 @@ class DiffInfo implements Iterator {
 
     private function fix_context($pos) {
         $lx = $rx = $pos;
-        while ($lx >= 0 && $this->_diff[$lx] !== "@")
+        while ($lx >= 0 && $this->_diff[$lx] !== "@") {
             $lx -= 4;
+        }
         $rx = max($rx, $lx + 4);
-        while ($rx < $this->_diffsz && $this->_diff[$rx] !== "@")
+        while ($rx < $this->_diffsz && $this->_diff[$rx] !== "@") {
             $rx += 4;
+        }
         if ($lx >= 0 && $rx < $this->_diffsz) {
             $lnal = $this->_diff[$lx + 5];
             $lnbl = $this->_diff[$lx + 6];
@@ -166,46 +194,55 @@ class DiffInfo implements Iterator {
         // perform insert
         assert($l === $this->_diffsz || $this->_diff[$l] === "@");
         assert($l === 0 || $this->_diff[$l - 3] !== null);
-        if (!$this->_repoa)
+        if (!$this->_repoa) {
             return false;
+        }
         $lines = $this->_repoa->content_lines($this->_hasha, $this->_filenamea);
-        if ($linea_lx > count($lines))
+        if ($linea_lx > count($lines)) {
             return true;
+        }
         $linea_rx = min(count($lines), $linea_rx);
 
         $lx = $l;
-        while ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] === null)
+        while ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] === null) {
             $lx -= 4;
+        }
         $rx = $l;
-        while ($rx < $this->_diffsz && $this->_diff[$rx + 1] === null)
+        while ($rx < $this->_diffsz && $this->_diff[$rx + 1] === null) {
             $rx += 4;
+        }
 
         $deltab = 0;
-        if ($lx >= 0 && $lx < $this->_diffsz)
+        if ($lx >= 0 && $lx < $this->_diffsz) {
             $deltab = $this->_diff[$lx + 2] - $this->_diff[$lx + 1];
+        }
 
         $splice = [];
         if ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] >= $linea_lx - 1
             && $rx < $this->_diffsz && $this->_diff[$rx + 1] <= $linea_rx) {
-            for ($i = $this->_diff[$lx + 1] + 1; $i < $this->_diff[$rx + 1]; ++$i)
+            for ($i = $this->_diff[$lx + 1] + 1; $i < $this->_diff[$rx + 1]; ++$i) {
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
+            }
             array_splice($this->_diff, $lx + 4, $rx - $lx - 4, $splice);
             $this->fix_context($lx);
         } else if ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] >= $linea_lx - 1) {
-            for ($i = $this->_diff[$lx + 1] + 1; $i < $linea_rx; ++$i)
+            for ($i = $this->_diff[$lx + 1] + 1; $i < $linea_rx; ++$i) {
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
+            }
             array_splice($this->_diff, $lx + 4, 0, $splice);
             $this->fix_context($lx);
         } else if ($rx < $this->_diffsz && $this->_diff[$rx + 1] <= $linea_rx) {
-            for ($i = $linea_lx; $i < $this->_diff[$rx + 1]; ++$i)
+            for ($i = $linea_lx; $i < $this->_diff[$rx + 1]; ++$i) {
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
+            }
             array_splice($this->_diff, $rx, 0, $splice);
             $this->fix_context($rx);
         } else {
             $linecount = $linea_rx - $linea_lx;
             array_push($splice, "@", null, null, "@@ -{$linea_lx},{$linecount} +" . ($linea_lx + $deltab) . ",{$linecount} @@");
-            for ($i = $linea_lx; $i < $linea_rx; ++$i)
+            for ($i = $linea_lx; $i < $linea_rx; ++$i) {
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
+            }
             array_splice($this->_diff, $l, 0, $splice);
         }
         $this->_diffsz = count($this->_diff);
@@ -215,20 +252,23 @@ class DiffInfo implements Iterator {
     function restrict_linea($linea_lx, $linea_rx) {
         $l = $this->linea_lower_bound($linea_lx);
         $r = $this->linea_lower_bound($linea_rx);
-        while ($l < $r && $this->_diff[$l] === "+")
+        while ($l < $r && $this->_diff[$l] === "+") {
             $l += 4;
+        }
         while ($r < $this->_diffsz
                && ($this->_diff[$r] === "+"
                    || ($this->_diff[$r] === "-" && $this->_diff[$r + 1] <= $linea_rx))) {
             $r += 4;
         }
         $c = clone $this;
-        if ($l < $this->_diffsz && $this->_diff[$l] !== "@") {
+        if ($l > 0
+            && $l < $this->_diffsz
+            && $this->_diff[$l] !== "@") {
             $c->_diff = array_slice($this->_diff, $l - 4, $r - $l + 4);
             $c->_diffsz = $r - $l + 4;
             $c->_diff[0] = "@";
             $c->_diff[1] = $c->_diff[2] = null;
-            $c->_diff[2] = "@@ @@";
+            $c->_diff[3] = "@@ @@";
             $c->fix_context(0);
         } else {
             $c->_diff = array_slice($this->_diff, $l, $r - $l);
@@ -244,17 +284,19 @@ class DiffInfo implements Iterator {
 
 
     static function compare($a, $b) {
-        if ($a->position != $b->position)
+        if ($a->position != $b->position) {
             return $a->position < $b->position ? -1 : 1;
-        else
+        } else {
             return strcmp($a->filename, $b->filename);
+        }
     }
 
 
     function current() {
         $x = array_slice($this->_diff, $this->_itpos, 4);
-        if ($this->_dflags !== null && isset($this->_dflags[$this->_itpos]))
+        if ($this->_dflags !== null && isset($this->_dflags[$this->_itpos])) {
             $x[] = $this->_dflags[$this->_itpos];
+        }
         return $x;
     }
     function key() {
