@@ -1075,11 +1075,13 @@ class PsetView {
                 }
             }
             $result["grades"] = $g;
-            if ($this->pc_view && !empty($ag))
+            if ($this->pc_view && !empty($ag)) {
                 $result["autogrades"] = $ag;
+            }
             $result["total"] = round_grade($total);
-            if ($total != $total_noextra)
+            if ($total != $total_noextra) {
                 $result["total_noextra"] = round_grade($total_noextra);
+            }
         }
         if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
             $result["grading_hash"] = $this->grading_hash();
@@ -1113,8 +1115,9 @@ class PsetView {
                      $gi >= 0 && !isset($result["order"][$gi]);
                      --$gi) {
                      array_pop($result["order"]);
-                     if (isset($result["grades"]))
+                     if (isset($result["grades"])) {
                          array_pop($result["grades"]);
+                     }
                 }
             }
         }
@@ -1124,10 +1127,11 @@ class PsetView {
 
 
     function viewable_line_notes() {
-        if ($this->viewer->can_view_comments($this->pset))
+        if ($this->viewer->can_view_comments($this->pset)) {
             return new LineNotesOrder($this->commit_info("linenotes"), $this->can_view_grades(), $this->pc_view);
-        else
+        } else {
             return $this->empty_line_notes();
+        }
     }
 
     function empty_line_notes() {
@@ -1137,14 +1141,16 @@ class PsetView {
     function diff($hasha, $hashb, LineNotesOrder $lnorder = null, $args = []) {
         if (!$this->added_diffinfo) {
             if (($rs = $this->commit_info("runsettings"))
-                && ($id = get($rs, "IGNOREDIFF")))
+                && ($id = get($rs, "IGNOREDIFF"))) {
                 $this->pset->add_diffconfig(new DiffConfig($id, (object) ["ignore" => true]));
+            }
             $this->added_diffinfo = true;
         }
 
         assert(!isset($args["needfiles"]));
-        if ($lnorder)
+        if ($lnorder) {
             $args["needfiles"] = $lnorder->fileorder();
+        }
         $diff = $this->repo->diff($this->pset, $hasha, $hashb, $args);
 
         // expand diff to include all grade landmarks
@@ -1164,11 +1170,13 @@ class PsetView {
             foreach ($lnorder->fileorder() as $fn => $order) {
                 if (isset($diff[$fn])
                     || !($diffc = $this->pset->find_diffconfig($fn))
-                    || !$diffc->fileless)
+                    || !$diffc->fileless) {
                     continue;
+                }
                 $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
-                foreach ((array) $lnorder->file($fn) as $ln => $note)
+                foreach ((array) $lnorder->file($fn) as $ln => $note) {
                     $diffi->add("Z", "", (int) substr($ln, 1), "");
+                }
                 uasort($diff, "DiffInfo::compare");
             }
 
@@ -1180,8 +1188,9 @@ class PsetView {
     }
 
     private function diff_line_code($t, $tw) {
-        while (($p = strpos($t, "\t")) !== false)
+        while (($p = strpos($t, "\t")) !== false) {
             $t = substr($t, 0, $p) . str_repeat(" ", $tw - ($p % $tw)) . substr($t, $p + 1);
+        }
         return htmlspecialchars($t);
     }
 
@@ -1241,27 +1250,35 @@ class PsetView {
             echo '</h3>';
         }
         echo '<table id="', $tabid, '" class="pa-filediff';
-        if ($this->pc_view)
+        if ($this->pc_view) {
             echo " uim pa-editablenotes live";
-        if (!$this->user_can_view_grades())
+        }
+        if (!$this->user_can_view_grades()) {
             echo " hidegrades";
-        if (!$open)
+        }
+        if (!$open) {
             echo " hidden";
-        if (!$dinfo->loaded)
+        }
+        if (!$dinfo->loaded) {
             echo " need-load";
-        if ($id_by_user)
+        }
+        if ($id_by_user) {
             echo '" data-pa-file-user="', htmlspecialchars($this->user->username);
+        }
         echo '" data-pa-file="', htmlspecialchars($file), "\"";
-        if ($this->conf->default_format)
+        if ($this->conf->default_format) {
             echo ' data-default-format="', $this->conf->default_format, '"';
+        }
         echo ">";
-        if ($dinfo->loaded)
+        if ($dinfo->loaded) {
             echo "<tbody>\n";
+        }
         foreach ($dinfo as $l)
             $this->echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
                                   $wentries, $gentries, $tw);
-        if ($dinfo->loaded)
+        if ($dinfo->loaded) {
             echo "</tbody>";
+        }
         echo "</table>\n";
         if (($this->need_format || $wentries) && !$only_table) {
             echo "<script>render_text.on_page()</script>\n";
@@ -1336,14 +1353,16 @@ class PsetView {
             }
         }
 
-        if ($nx)
+        if ($nx) {
             $this->echo_linenote($nx, $lnorder);
+        }
     }
 
     private function echo_linenote(LineNote $note, LineNotesOrder $lnorder = null) {
         echo '<tr class="pa-dl pa-gw'; /* NB script depends on this class exactly */
-        if ((string) $note->note === "")
+        if ((string) $note->note === "") {
             echo ' hidden';
+        }
         echo '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render_json($this->can_view_note_authors()))),
             '"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox">';
         if ((string) $note->note === "") {
@@ -1358,34 +1377,39 @@ class PsetView {
             //    $links[] = '<a href="#L' . $plineid . '_'
             //        . html_id_encode($pfile) . '" class="uix pa-goto">&larr; Prev</a>';
             list($nfile, $nlineid) = $lnorder->get_next($note->file, $note->lineid);
-            if ($nfile)
+            if ($nfile) {
                 $links[] = '<a href="#L' . $nlineid . '_'
                     . html_id_encode($nfile) . '" class="uix pa-goto">Next &gt;</a>';
-            else
+            } else {
                 $links[] = '<a href="#">Top</a>';
-            if (!empty($links))
+            }
+            if (!empty($links)) {
                 echo '<div class="pa-note-links">',
                     join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
+            }
         }
         if ($this->can_view_note_authors() && !empty($note->users)) {
             $pcmembers = $this->conf->pc_members_and_admins();
             $autext = [];
-            foreach ($note->users as $au)
+            foreach ($note->users as $au) {
                 if (($p = get($pcmembers, $au))) {
                     if ($p->nicknameAmbiguous)
                         $autext[] = Text::name_html($p);
                     else
                         $autext[] = htmlspecialchars($p->nickname ? : $p->firstName);
                 }
-            if (!empty($autext))
+            }
+            if (!empty($autext)) {
                 echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
+            }
         }
         echo '<div class="pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
         if ($note->format) {
             echo ' need-format" data-format="', $note->format;
             $this->need_format = true;
-        } else
+        } else {
             echo ' format0';
+        }
         echo '">', htmlspecialchars($note->note), '</div>';
         echo '</div></td></tr>';
     }
