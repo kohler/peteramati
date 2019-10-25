@@ -2223,7 +2223,7 @@ function setmailpsel(sel) {
 function pa_diff_locate(target, direction) {
     if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
         return null;
-    while (target && target.tagName !== "TR") {
+    while (target && !hasClass(target, "pa-dl")) {
         if (target.tagName === "FORM")
             return null;
         target = target.parentNode;
@@ -2372,7 +2372,7 @@ function pa_fix_note_links() {
 function pa_render_note(note, transition) {
     var tr = this, $tr = $(this);
     if (!hasClass(tr, "pa-gw")) {
-        while (tr.tagName === "TD")
+        while (!hasClass(tr, "pa-dl"))
             tr = tr.parentElement;
         var ntr = tr.nextSibling;
         while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE || hasClass(ntr, "pa-gg"))) {
@@ -2485,13 +2485,15 @@ function render_form($tr, note, transition) {
 
 function traverse(tr, down) {
     var direction = down ? "nextSibling" : "previousSibling";
-    var table = tr.parentElement.parentElement;
+    var table = tr.closest(".pa-filediff");
     tr = tr[direction];
     while (1) {
-        while (tr && !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className))
+        while (tr && !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className)) {
             tr = tr[direction];
-        if (tr)
+        }
+        if (tr) {
             return tr;
+        }
         table = table[direction];
         while (table && (table.nodeType !== Node.ELEMENT_NODE
                          || table.tagName !== "TABLE"
@@ -2506,9 +2508,10 @@ function traverse(tr, down) {
 function anal_tr() {
     if (curanal) {
         var elt = pa_ensureline(curanal.ufile, curanal.lineid);
-        return $(elt).closest("tr")[0];
-    } else
+        return elt.closest(".pa-dl");
+    } else {
         return null;
+    }
 }
 
 function arrowcapture(evt) {
@@ -2563,7 +2566,7 @@ function uncapture() {
 }
 
 function unedit(tr, always) {
-    var $tr = $(tr).closest("tr");
+    var $tr = $(tr).closest(".pa-dl");
     var note = pa_note($tr[0]);
     if (!$tr.length
         || (!always
@@ -2585,7 +2588,7 @@ function make_submit(anal) {
         if ($f.prop("outstanding"))
             return false;
         $f.prop("outstanding", true);
-        var $tr = $f.closest("tr");
+        var $tr = $f.closest(".pa-dl");
         $f.find(".ajaxsave61").remove();
         $f.find(".aab").append('<div class="aabut ajaxsave61">Saving…</div>');
         $.ajax($f.attr("action"), {
@@ -3351,8 +3354,8 @@ handle_ui.on("pa-goto", function () {
     pa_ensureline_callback(this, null, function (ref) {
         if (ref) {
             $(".pa-line-highlight").removeClass("pa-line-highlight");
-            $(ref).closest("table").removeClass("hidden");
-            $e = $(ref).closest("tr");
+            $(ref).closest(".pa-filediff").removeClass("hidden");
+            $e = $(ref).closest(".pa-dl");
             $e.addClass("pa-line-highlight");
         }
     });
@@ -3361,7 +3364,7 @@ handle_ui.on("pa-goto", function () {
 function pa_beforeunload(evt) {
     var ok = true;
     $(".pa-gw textarea").each(function () {
-        var $tr = $(this).closest("tr");
+        var $tr = $(this).closest(".pa-dl");
         var note = pa_note($tr[0]);
         if (note && !text_eq(this.value, note[1]) && !$tr.data("pa-savefailed"))
             ok = false;
@@ -5158,7 +5161,7 @@ handle_ui.on("js-grgraph-highlight", function (event) {
         var $tr;
         if (this.getAttribute("data-range-type") === rt
             && this.checked
-            && ($tr = $(this).closest("tr"))
+            && ($tr = $(this).closest(".pa-dl"))
             && $tr[0].hasAttribute("data-pa-uid"))
             a.push(+$tr[0].getAttribute("data-pa-uid"));
     });
@@ -6346,7 +6349,7 @@ function pa_render_pset_table(pconf, data) {
         var checked_spos = $j.find(".papsel:checked").toArray().map(function (x) {
                 return x.parentElement.parentElement.getAttribute("data-pa-spos");
             }),
-            my_spos = this.closest("tr").getAttribute("data-pa-spos");
+            my_spos = this.closest(".pa-dl").getAttribute("data-pa-spos");
         if (checked_spos.indexOf(my_spos) < 0) {
             gdialog_fill([my_spos]);
         } else {
