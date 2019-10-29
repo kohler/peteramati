@@ -69,11 +69,11 @@ class API_Repo {
             return ["ok" => false, "error" => "No diff."];
         ob_start();
         foreach ($diff as $file => $dinfo) {
-            $info->echo_file_diff($file, $dinfo, $lnorder, ["open" => true, "only_table" => true]);
+            $info->echo_file_diff($file, $dinfo, $lnorder, ["open" => true, "only_content" => true]);
         }
         $content = ob_get_contents();
         ob_end_clean();
-        return ["ok" => true, "table_html" => $content];
+        return ["ok" => true, "content_html" => $content];
     }
 
     static function user_repositories(Contact $user, Qrequest $qreq, APIData $api) {

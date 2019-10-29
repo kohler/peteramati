@@ -2230,9 +2230,9 @@ function pa_diff_locate(target, direction) {
     }
 
     var tr;
-    if (direction)
+    if (direction) {
         tr = target[direction];
-    else {
+    } else {
         tr = target;
         direction = "previousSibling";
     }
@@ -2243,10 +2243,12 @@ function pa_diff_locate(target, direction) {
         tr = tr[direction];
 
     var table = tr, file;
-    while (table && !(file = table.getAttribute("data-pa-file")))
+    while (table && !(file = table.getAttribute("data-pa-file"))) {
         table = table.parentNode;
-    if (!tr || !table || !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className))
+    }
+    if (!tr || !table || !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className)) {
         return null;
+    }
 
     var aline = +tr.firstChild.getAttribute("data-landmark");
     var bline = +tr.firstChild.nextSibling.getAttribute("data-landmark");
@@ -2316,8 +2318,9 @@ function pa_save_note(elt, text) {
                     pa_set_note(elt, note);
                     pa_render_note.call(elt, note);
                     resolve(elt);
-                } else
+                } else {
                     reject(elt);
+                }
             }
         });
     });
@@ -3165,7 +3168,7 @@ function pa_process_landmark_range(func, selector) {
     if (!m)
         return;
     var lnfirst = +m[1], lnlast = +m[2], lna = -1, lnb = -1;
-    var tr = $(this).closest(".pa-filediff")[0].firstChild.firstChild;
+    var tr = $(this).closest(".pa-filediff")[0].firstChild;
     while (tr) {
         if (tr.nodeType === Node.ELEMENT_NODE) {
             if (!hasClass(tr, "pa-gw")) {
@@ -3257,8 +3260,8 @@ function pa_loadfilediff(filee, callback) {
                 "base_hash": $p[0].getAttribute("data-pa-base-hash"),
                 "hash": $p[0].getAttribute("data-pa-hash")},
             success: function (data) {
-                if (data.ok && data.table_html) {
-                    var $h = $(data.table_html);
+                if (data.ok && data.content_html) {
+                    var $h = $(data.content_html);
                     $(filee).html($h.html());
                 }
                 removeClass(filee, "need-load");
@@ -3326,7 +3329,7 @@ function pa_ensureline_callback(filename, lineid, callback) {
     }
 
     function try_file() {
-        var $tds = $(filee).find("td.pa-d" + lineid.charAt(0));
+        var $tds = $(filee).find(".pa-d" + lineid.charAt(0));
         var lineno = lineid.substr(1);
         // XXX expand
         for (var i = 0; i < $tds.length; ++i) {

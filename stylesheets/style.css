@@ -2340,11 +2340,41 @@ tr.gtrow-partner {
 	left: -1rem;
 }
 }
-table.live > tbody > tr.pa-gi:hover > td,
-tr.pa-dl.live > td {
+
+.pa-dl {
+	display: flex;
+}
+.pa-da, .pa-db {
+	text-align: right;
+	color: rgba(0, 0, 0, 0.3);
+	padding-left: 0.5em;
+	user-select: none;
+}
+.pa-da {
+	width: 3em;
+	padding-right: 0.5em;
+}
+.pa-db {
+	width: 3.5em;
+	padding-right: 1em;
+}
+.pa-dd {
+	flex: 1 1 auto;
+}
+.pa-notebox {
+	flex: 1 1 auto;
+	padding: 0.8em 1em 0.8em 6.5em;
+	background: #f3d1fc;
+	background:
+	    linear-gradient(180deg, rgba(180,120,180,0.2), rgba(0,0,0,0)) no-repeat left top,
+	    linear-gradient(0deg, rgba(180,120,180,0.2), rgba(0,0,0,0)) no-repeat left bottom,
+	    linear-gradient(85deg, rgba(227,163,227,0), rgba(227,163,227,0) 5.5em, rgba(227,163,227,1) 5.5em, rgba(238,192,242,1) 6em, rgba(243,209,252,1) 95%, rgba(238,192,242,1) 100%) right top;
+	background-size: 100% 5px, 100% 5px, 100% 100%;
+}
+.live > .pa-gi:hover, .pa-dl.live {
 	background-color: #f8eec7;
 }
-tr.pa-gx:hover > td {
+.pa-gx:hover {
 	background-color: #e8e8f8;
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
@@ -2393,21 +2423,6 @@ table.hidegrades .pa-gradenote {
 .pa-noteref.pa-notehidden {
 	font-style: italic;
 }
-.pa-da, .pa-db {
-	text-align: right;
-	color: rgba(0, 0, 0, 0.3);
-	padding-left: 0.5em;
-	padding-right: 0.5em;
-	user-select: none;
-	width: 1%;
-	min-width: 2rem;
-}
-.pa-db {
-	padding-right: 1em;
-}
-.pa-dd {
-	width: 99%;
-}
 .pa-dnonl:after {
 	content: "⏎̸";
 }
@@ -2453,22 +2468,15 @@ a.fold61 {
 a.fold61:hover {
 	text-decoration: underline;
 }
-span.foldarrow {
+.foldarrow {
+	display: inline-block;
 	font-size: 80%;
 	color: #000099;
+	padding-right: 0.25em;
 }
 .gradesready {
 	color: #009900;
 	text-decoration: none;
-}
-.pa-notebox {
-	background: #f3d1fc;
-	background:
-	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-	    #f3d1fc;
-	background-size: 100% 7px, 100% 5px, 100% 100%;
-	padding: 0.8em 1em 0.8em 0;
 }
 .pa-note-edge {
 	background: #f3d1fc;

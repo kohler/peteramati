@@ -858,7 +858,7 @@ class PsetView {
     }
 
     function runner_output($checkt) {
-        return file_get_contents($this->runner_logfile($checkt));
+        return @file_get_contents($this->runner_logfile($checkt));
     }
 
     function runner_output_for($runner) {
@@ -1160,8 +1160,14 @@ class PsetView {
                 if ($g->landmark_file
                     && ($di = get($diff, $g->landmark_file))
                     && !$di->contains_linea($g->landmark_line)
-                    && $di->is_handout_commit_a())
+                    && $di->is_handout_commit_a()) {
                     $di->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
+                }
+                if ($g->landmark_range_file
+                    && ($di = get($diff, $g->landmark_range_file))
+                    && $di->is_handout_commit_a()) {
+                    $di->expand_linea($g->landmark_range_first, $g->landmark_range_last);
+                }
             }
         }
 
@@ -1202,10 +1208,10 @@ class PsetView {
 
         $open = !!get($args, "open");
         $tw = get($args, "tabwidth", $this->tabwidth());
-        $only_table = get($args, "only_table");
-        $no_heading = get($args, "no_heading") || $only_table;
+        $only_content = get($args, "only_content");
+        $no_heading = get($args, "no_heading") || $only_content;
         $id_by_user = !!get($args, "id_by_user");
-        $no_grades = get($args, "only_diff") || $only_table;
+        $no_grades = get($args, "only_diff") || $only_content;
 
         $fileid = html_id_encode($file);
         if ($id_by_user) {
@@ -1239,7 +1245,7 @@ class PsetView {
         if (!$no_heading) {
             echo '<h3><a class="qq ui pa-unfold-file-diff" href=""><span class="foldarrow">',
                 ($open ? "&#x25BC;" : "&#x25B6;"),
-                "</span>&nbsp;", htmlspecialchars($dinfo->title ? : $file), "</a>";
+                "</span>", htmlspecialchars($dinfo->title ? : $file), "</a>";
             if (!$dinfo->fileless && !$dinfo->removed) {
                 $rawfile = $file;
                 if ($this->repo->truncated_psetdir($this->pset)
@@ -1249,7 +1255,7 @@ class PsetView {
             }
             echo '</h3>';
         }
-        echo '<table id="', $tabid, '" class="pa-filediff';
+        echo '<div id="', $tabid, '" class="pa-filediff';
         if ($this->pc_view) {
             echo " uim pa-editablenotes live";
         }
@@ -1261,6 +1267,9 @@ class PsetView {
         }
         if (!$dinfo->loaded) {
             echo " need-load";
+        } else {
+            $maxline = max(1000, $dinfo->max_lineno()) - 1;
+            echo " pa-linenod", ceil(log10($maxline));
         }
         if ($id_by_user) {
             echo '" data-pa-file-user="', htmlspecialchars($this->user->username);
@@ -1270,17 +1279,12 @@ class PsetView {
             echo ' data-default-format="', $this->conf->default_format, '"';
         }
         echo ">";
-        if ($dinfo->loaded) {
-            echo "<tbody>\n";
-        }
-        foreach ($dinfo as $l)
+        foreach ($dinfo as $l) {
             $this->echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
                                   $wentries, $gentries, $tw);
-        if ($dinfo->loaded) {
-            echo "</tbody>";
         }
-        echo "</table>\n";
-        if (($this->need_format || $wentries) && !$only_table) {
+        echo "</div>\n";
+        if (($this->need_format || $wentries) && !$only_content) {
             echo "<script>render_text.on_page()</script>\n";
             $this->need_format = false;
         }
@@ -1326,29 +1330,30 @@ class PsetView {
         }
 
         if ($x[0]) {
-            echo '<tr class="pa-dl', $x[0], '">',
-                '<td class="pa-da"', $ak, '></td>',
-                '<td class="pa-db"', $bk, '></td>',
-                '<td class="', $x[1];
-            if (isset($l[4]) && ($l[4] & DiffInfo::LINE_NONL))
+            echo '<div class="pa-dl', $x[0], '">',
+                '<div class="pa-da"', $ak, '></div>',
+                '<div class="pa-db"', $bk, '></div>',
+                '<div class="', $x[1];
+            if (isset($l[4]) && ($l[4] & DiffInfo::LINE_NONL)) {
                 echo ' pa-dnonl';
-            echo '">', $this->diff_line_code($x[4], $tw), "</td></tr>\n";
+            }
+            echo '">', $this->diff_line_code($x[4], $tw), "</div></div>\n";
         }
 
         if ($wentries !== null && $bln && isset($wentries[$bln])) {
-            echo '<tr class="pa-dl pa-gg"><td colspan="2" class="pa-warn-edge"></td><td class="pa-warnbox need-format" data-format="2">', htmlspecialchars($wentries[$bln]), '</td></tr>';
+            echo '<div class="pa-dl pa-gg"><div class="pa-warnbox need-format" data-format="2">', htmlspecialchars($wentries[$bln]), '</div></div>';
         }
 
         if ($gentries !== null && $aln && isset($gentries[$aln])) {
             foreach ($gentries[$aln] as $g) {
-                echo '<tr class="pa-dl pa-gg"><td colspan="3" class="pa-graderow">',
+                echo '<div class="pa-dl pa-gg"><div class="pa-graderow">',
                     '<div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"';
                 if ($g->landmark_file === $g->landmark_range_file) {
                     echo ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
                     if ($g->landmark_buttons)
                         echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode_browser($g->landmark_buttons)), '"';
                 }
-                echo '></div></td></tr>';
+                echo '></div></div></div>';
                 $this->viewed_gradeentries[$g->key] = true;
             }
         }
@@ -1359,14 +1364,14 @@ class PsetView {
     }
 
     private function echo_linenote(LineNote $note, LineNotesOrder $lnorder = null) {
-        echo '<tr class="pa-dl pa-gw'; /* NB script depends on this class exactly */
+        echo '<div class="pa-dl pa-gw'; /* NB script depends on this class exactly */
         if ((string) $note->note === "") {
             echo ' hidden';
         }
         echo '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render_json($this->can_view_note_authors()))),
-            '"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox">';
+            '"><div class="pa-notebox">';
         if ((string) $note->note === "") {
-            echo '</td></tr>';
+            echo '</div></div>';
             return;
         }
         echo '<div class="pa-notediv">';
@@ -1411,6 +1416,6 @@ class PsetView {
             echo ' format0';
         }
         echo '">', htmlspecialchars($note->note), '</div>';
-        echo '</div></td></tr>';
+        echo '</div></div></div>';
     }
 }
