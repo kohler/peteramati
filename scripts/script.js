@@ -2220,93 +2220,128 @@ function setmailpsel(sel) {
     fold("psel", !sel.value.match(/^new.*rev$/), 10);
 }
 
-function pa_diff_locate(target, direction) {
-    if (!target || target.tagName === "TEXTAREA" || target.tagName === "A")
-        return null;
-    while (target && !hasClass(target, "pa-dl")) {
-        if (target.tagName === "FORM")
-            return null;
-        target = target.parentNode;
-    }
-
-    var tr;
-    if (direction) {
-        tr = target[direction];
-    } else {
-        tr = target;
+// pa_diff_traverse(tr, down, flags)
+//    Find the diff line (pa-d[idc]) near `tr` in the direction of `down`.
+//    If `down === null`, look up *starting* from `tr`.
+//    Flags: 1 means stay within the current file; otherwise traverse
+//    between files. 2 means return all lines.
+function pa_diff_traverse(tr, down, flags) {
+    tr = tr.closest(".pa-dl, .pa-dg, .pa-filediff");
+    var tref = tr, direction;
+    if (down == null) {
+        down = false;
         direction = "previousSibling";
+    } else {
+        direction = down ? "nextSibling" : "previousSibling";
+        if (hasClass(tr, "pa-dl")) {
+            tr = tr[direction];
+        }
     }
-    while (tr
-           && (tr.nodeType !== Node.ELEMENT_NODE
-               || hasClass(tr, "pa-gw")
-               || hasClass(tr, "pa-gg")))
-        tr = tr[direction];
+    while (true) {
+        if (!tr) {
+            if (tref && hasClass(tref.parentElement, "pa-dg")) {
+                tr = tref.parentElement[direction];
+            } else if (!tref || (flags & 1)) {
+                return null;
+            } else {
+                tr = tref.closest(".pa-filediff");
+                tr = tr ? tr[direction] : null;
+                tref = null;
+            }
+        } else if (tr.nodeType !== Node.ELEMENT_NODE) {
+            tr = tr[direction];
+        } else if (hasClass(tr, "pa-dl")
+                   && ((flags & 2) || / pa-g[idc]/.test(tr.className))) {
+            return tr;
+        } else if ((hasClass(tr, "pa-dg") || hasClass(tr, "pa-filediff"))
+                   && tr.firstChild) {
+            tref = tr = tr[down ? "firstChild" : "lastChild"];
+        } else {
+            tref = tr;
+            tr = tr[direction];
+        }
+    }
+}
 
-    var table = tr, file;
-    while (table && !(file = table.getAttribute("data-pa-file"))) {
-        table = table.parentNode;
+// pa_diff_locate(tr, down)
+//    Like `pa_diff_traverse(tr, down, 1)`. Returns `null` if the target
+//    is a <textarea> or <a>.
+function pa_diff_locate(tr, down) {
+    if (!tr
+        || tr.tagName === "TEXTAREA"
+        || tr.tagName === "A"
+        || !(tr = pa_diff_traverse(tr, down, 1))) {
+        return null;
     }
-    if (!tr || !table || !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className)) {
+    var table = tr.closest(".pa-filediff");
+    if (!table) {
         return null;
     }
 
-    var aline = +tr.firstChild.getAttribute("data-landmark");
-    var bline = +tr.firstChild.nextSibling.getAttribute("data-landmark");
-    var result = {
-        ufile: file, file: file, aline: aline, bline: bline,
-        lineid: bline ? "b" + bline : "a" + aline,
-        tr: tr
-    };
-    var user = table.getAttribute("data-pa-file-user");
-    if (user)
+    var file = table.getAttribute("data-pa-file"),
+        user = table.getAttribute("data-pa-file-user"),
+        aline = +tr.firstChild.getAttribute("data-landmark"),
+        bline = +tr.firstChild.nextSibling.getAttribute("data-landmark"),
+        result = {
+            ufile: file, file: file, aline: aline, bline: bline,
+            lineid: bline ? "b" + bline : "a" + aline, tr: tr
+        };
+    if (user) {
         result.ufile = user + "-" + result.file;
-
+    }
     var next_tr = tr.nextSibling;
-    while (next_tr && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gg")))
+    while (next_tr
+           && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gg"))) {
         next_tr = next_tr.nextSibling;
-    if (next_tr && hasClass(next_tr, "pa-gw"))
+    }
+    if (next_tr && hasClass(next_tr, "pa-gw")) {
         result.notetr = next_tr;
-
+    }
     return result;
 }
 
 function pa_note(elt) {
     var note = elt.getAttribute("data-pa-note");
-    if (typeof note === "string" && note !== "")
+    if (typeof note === "string" && note !== "") {
         note = JSON.parse(note);
-    if (typeof note === "number")
+    }
+    if (typeof note === "number") {
         note = [false, "", 0, note];
+    }
     return note || [false, ""];
 }
 
 function pa_set_note(elt, note) {
-    if (note === false || note === null)
+    if (note === false || note === null) {
         elt.removeAttribute("data-pa-note");
-    else if (note !== undefined)
+    } else if (note !== undefined) {
         elt.setAttribute("data-pa-note", JSON.stringify(note));
+    }
 }
 
 function pa_save_note(elt, text) {
     if (!hasClass(elt, "pa-gw"))
         throw new Error("!");
-    var note = pa_note(elt);
-    var tr = elt.previousSibling;
-    while (tr && !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className))
-        tr = tr.previousSibling;
-    var $pf = $(elt).closest(".pa-filediff");
-    var file = $pf[0].getAttribute("data-pa-file"), lineid;
-    if (hasClass(tr, "pa-gd"))
+    var note = pa_note(elt),
+        table = elt.closest(".pa-filediff"),
+        file = table.getAttribute("data-pa-file"),
+        tr = pa_diff_traverse(elt, false, 1),
+        lineid;
+    if (hasClass(tr, "pa-gd")) {
         lineid = "a" + tr.firstChild.getAttribute("data-landmark");
-    else
+    } else {
         lineid = "b" + tr.firstChild.nextSibling.getAttribute("data-landmark");
-    var $pi = $pf.closest(".pa-psetinfo");
+    }
+    var pi = table.closest(".pa-psetinfo");
     var format = note ? note[4] : null;
-    if (format == null)
-        format = $pf.attr("data-default-format");
-    if (typeof text === "function")
+    if (format == null) {
+        format = table.getAttribute("data-default-format");
+    }
+    if (typeof text === "function") {
         text = text(note ? note[1] : "", note);
+    }
     return new Promise(function (resolve, reject) {
-        $.ajax(hoturl_post("api/linenote", hoturl_gradeparts($pi, {
+        $.ajax(hoturl_post("api/linenote", hoturl_gradeparts($(pi), {
             file: file, line: lineid, oldversion: (note && note[3]) || 0, format: format
         })), {
             data: {note: text},
@@ -2333,10 +2368,11 @@ function pa_fix_note_links() {
 
     function note_anchor(tr) {
         var anal = pa_diff_locate(tr), td;
-        if (anal && (td = pa_ensureline(anal.ufile, anal.lineid)))
+        if (anal && (td = pa_ensureline(anal.ufile, anal.lineid))) {
             return "#" + td.id;
-        else
+        } else {
             return "";
+        }
     }
 
     function set_link(tr, next_tr) {
@@ -2486,28 +2522,6 @@ function render_form($tr, note, transition) {
     }
 }
 
-function traverse(tr, down) {
-    var direction = down ? "nextSibling" : "previousSibling";
-    var table = tr.closest(".pa-filediff");
-    tr = tr[direction];
-    while (1) {
-        while (tr && !/\bpa-dl\b.*\bpa-g[idc]\b/.test(tr.className)) {
-            tr = tr[direction];
-        }
-        if (tr) {
-            return tr;
-        }
-        table = table[direction];
-        while (table && (table.nodeType !== Node.ELEMENT_NODE
-                         || table.tagName !== "TABLE"
-                         || !table.hasAttribute("data-pa-file")))
-            table = table[direction];
-        if (!table)
-            return null;
-        tr = table.firstChild[down ? "firstChild" : "lastChild"];
-    }
-}
-
 function anal_tr() {
     if (curanal) {
         var elt = pa_ensureline(curanal.ufile, curanal.lineid);
@@ -2519,36 +2533,38 @@ function anal_tr() {
 
 function arrowcapture(evt) {
     var key;
-    if (evt.type === "mousemove" && scrolled_at
-        && evt.timeStamp - scrolled_at <= 200)
+    if ((evt.type === "mousemove"
+         && scrolled_at
+         && evt.timeStamp - scrolled_at <= 200)
+        || (evt.type === "keydown"
+            && event_key.modifier(evt))) {
         return;
-    if (evt.type === "keydown" && event_key.modifier(evt))
-        return;
-    if (evt.type !== "keydown"
-        || ((key = event_key(evt)) !== "ArrowUp" && key !== "ArrowDown"
-            && key !== "ArrowLeft" && key !== "ArrowRight"
-            && key !== "Enter")
-        || event_modkey(evt)
-        || !curanal)
+    } else if (evt.type !== "keydown"
+               || ((key = event_key(evt)) !== "ArrowUp"
+                   && key !== "ArrowDown"
+                   && key !== "Enter")
+               || event_modkey(evt)
+               || !curanal) {
         return uncapture();
-    if (key === "ArrowLeft" || key === "ArrowRight")
-        return;
+    }
 
     var tr = anal_tr();
-    if (!tr)
+    if (!tr) {
         return uncapture();
+    }
     if (key === "ArrowDown" || key === "ArrowUp") {
         $(tr).removeClass("live");
-        tr = traverse(tr, key === "ArrowDown");
-        if (!tr)
+        tr = pa_diff_traverse(tr, key === "ArrowDown", 0);
+        if (!tr) {
             return;
+        }
     }
 
     curanal = pa_diff_locate(tr);
     evt.preventDefault();
-    if (key === "Enter")
+    if (key === "Enter") {
         make_linenote();
-    else {
+    } else {
         scrolled_at = evt.timeStamp;
         $(tr).addClass("live").scrollIntoView();
     }
@@ -2563,7 +2579,7 @@ function capture(tr, keydown) {
 }
 
 function uncapture() {
-    $("tr.live").removeClass("live");
+    $(".pa-dl.live").removeClass("live");
     $(".pa-filediff").addClass("live");
     $(document).off(".pa-linenote");
 }
@@ -2621,13 +2637,14 @@ function cancel(evt) {
 }
 
 function keydown(evt) {
-    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(this))
+    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(this)) {
         return false;
-    else if (event_key(evt) === "Enter" && event_modkey(evt) === event_modkey.META) {
+    } else if (event_key(evt) === "Enter" && event_modkey(evt) === event_modkey.META) {
         $(this).closest("form").submit();
         return false;
-    } else
+    } else {
         return true;
+    }
 }
 
 function nearby(dx, dy) {
@@ -2635,17 +2652,20 @@ function nearby(dx, dy) {
 }
 
 function pa_linenote(event) {
-    if (event.button !== 0)
+    if (event.button !== 0
+        || event.target.closest(".pa-dl").matches(".pa-gg, .pa-gx")) {
         return;
-    var anal = pa_diff_locate(event.target), t = now_msec();
+    }
+    var anal = pa_diff_locate(event.target),
+        t = now_msec();
     if (event.type === "mousedown" && anal) {
         if (curanal
             && curanal.tr === anal.tr
             && down_event
             && nearby(down_event[0] - event.clientX, down_event[1] - event.clientY)
-            && t - down_event[2] <= 500)
-            /* skip */;
-        else {
+            && t - down_event[2] <= 500) {
+            // skip
+        } else {
             curanal = anal;
             down_event = [event.clientX, event.clientY, t, false];
         }
@@ -2669,10 +2689,11 @@ function pa_linenote(event) {
 
 function make_linenote(event) {
     var $tr;
-    if (curanal.notetr)
+    if (curanal.notetr) {
         $tr = $(curanal.notetr);
-    else
+    } else {
         $tr = $(pa_render_note.call(curanal.tr));
+    }
     if ($tr.hasClass("editing")) {
         if (unedit($tr[0])) {
             event && event.stopPropagation();
@@ -2699,20 +2720,24 @@ handle_ui.on("pa-editablenotes", pa_linenote);
 
 function expand(evt) {
     var contextrow = evt.currentTarget;
-    var panal = pa_diff_locate(contextrow, "previousSibling");
-    while (panal && !panal.bline)
-        panal = pa_diff_locate(panal.tr, "previousSibling");
-    var nanal = pa_diff_locate(contextrow, "nextSibling");
-    if (!panal && !nanal)
-        return false;
+    var panal = pa_diff_locate(contextrow, false);
+    while (panal && !panal.bline) {
+        panal = pa_diff_locate(panal.tr, false);
+    }
+    var nanal = pa_diff_locate(contextrow, true);
+    if (!panal && !nanal) {
+        return;
+    }
     var paline = panal ? panal.aline + 1 : 1;
     var pbline = panal ? panal.bline + 1 : 1;
     var lbline = nanal ? nanal.bline : 0;
-    if (nanal && nanal.aline <= 1)
-        return false;
+    if (nanal && nanal.aline <= 1) {
+        return;
+    }
     var args = {file: (panal || nanal).file, fromline: pbline};
-    if (lbline)
+    if (lbline) {
         args.linecount = lbline - pbline;
+    }
     $.ajax(hoturl("api/blob", hoturl_gradeparts($(this), args)), {
         success: function (data) {
             if (data.ok && data.data) {
@@ -3163,29 +3188,28 @@ function pa_loadgrades(gi) {
 }
 
 function pa_process_landmark_range(func, selector) {
-    var lr = $(this).closest(".pa-gradebox").attr("data-pa-landmark-range");
+    var lr = this.closest(".pa-gradebox").getAttribute("data-pa-landmark-range");
     var m = lr ? /^(\d+),(\d+)$/.exec(lr) : null;
-    if (!m)
+    if (!m) {
         return;
+    }
     var lnfirst = +m[1], lnlast = +m[2], lna = -1, lnb = -1;
-    var tr = $(this).closest(".pa-filediff")[0].firstChild;
-    while (tr) {
-        if (tr.nodeType === Node.ELEMENT_NODE) {
-            if (!hasClass(tr, "pa-gw")) {
-                var td = tr.firstChild;
-                if (td.hasAttribute("data-landmark"))
-                    lna = +td.getAttribute("data-landmark");
-                td = td.nextSibling;
-                if (td && td.hasAttribute("data-landmark"))
-                    lnb = +td.getAttribute("data-landmark");
-            }
-            if (lna >= lnfirst
-                && lna <= lnlast
-                && (!selector || tr.matches(selector))) {
-                func.call(this, tr, lna, lnb);
-            }
+    console.log([lnfirst,lnlast,selector])
+    var tr = this.closest(".pa-filediff");
+    while ((tr = pa_diff_traverse(tr, true, 3))) {
+        var td = tr.firstChild;
+        if (td.hasAttribute("data-landmark")) {
+            lna = +td.getAttribute("data-landmark");
         }
-        tr = tr.nextSibling;
+        td = td.nextSibling;
+        if (td && td.hasAttribute("data-landmark")) {
+            lnb = +td.getAttribute("data-landmark");
+        }
+        if (lna >= lnfirst
+            && lna <= lnlast
+            && (!selector || tr.matches(selector))) {
+            func.call(this, tr, lna, lnb);
+        }
     }
 }
 

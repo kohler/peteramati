@@ -42,6 +42,9 @@ class PsetView {
     private $transferred_warnings_priority;
     public $viewed_gradeentries = [];
 
+    private $_diff_tabwidth;
+    private $_diff_lnorder;
+
     function __construct(Pset $pset, Contact $user, Contact $viewer) {
         $this->conf = $pset->conf;
         $this->pset = $pset;
@@ -1193,9 +1196,11 @@ class PsetView {
         return $diff;
     }
 
-    private function diff_line_code($t, $tw) {
+    private function diff_line_code($t) {
         while (($p = strpos($t, "\t")) !== false) {
-            $t = substr($t, 0, $p) . str_repeat(" ", $tw - ($p % $tw)) . substr($t, $p + 1);
+            $t = substr($t, 0, $p)
+                . str_repeat(" ", $this->_diff_tabwidth - ($p % $this->_diff_tabwidth))
+                . substr($t, $p + 1);
         }
         return htmlspecialchars($t);
     }
@@ -1206,8 +1211,9 @@ class PsetView {
             return;
         }
 
+        $this->_diff_tabwidth = get($args, "tabwidth", $this->tabwidth());
+        $this->_diff_lnorder = $lnorder;
         $open = !!get($args, "open");
-        $tw = get($args, "tabwidth", $this->tabwidth());
         $only_content = get($args, "only_content");
         $no_heading = get($args, "no_heading") || $only_content;
         $id_by_user = !!get($args, "id_by_user");
@@ -1222,23 +1228,32 @@ class PsetView {
         if ($this->can_view_note_authors()) {
             $this->conf->stash_hotcrp_pc($this->viewer);
         }
-        $gentries = null;
+        $lineanno = [];
         if ($this->pset->has_grade_landmark
             && $this->pc_view
             && !$this->is_handout_commit()
             && $dinfo->is_handout_commit_a()
             && !$no_grades) {
             foreach ($this->pset->grades() as $g) {
+                if ($g->landmark_range_file === $file) {
+                    $la = PsetViewLineAnno::ensure($lineanno, "a" . $g->landmark_range_first);
+                    $la->grade_first[] = $g;
+                    $la = PsetViewLineAnno::ensure($lineanno, "a" . $g->landmark_range_last);
+                    $la->grade_last[] = $g;
+                }
                 if ($g->landmark_file === $file) {
-                    $gentries["a" . $g->landmark_line][] = $g;
+                    $la = PsetViewLineAnno::ensure($lineanno, "a" . $g->landmark_line);
+                    $la->grade_entries[] = $g;
                 }
             }
         }
-        $wentries = null;
         if ($this->pset->has_transfer_warnings
             && !$this->is_handout_commit()) {
             foreach ($this->transferred_warnings_for($file) as $lineno => $w) {
-                $wentries["b" . $lineno] = $w;
+                $la = PsetViewLineAnno::ensure($lineanno, "b" . $lineno);
+                $la->warnings = $w;
+                if (!$only_content)
+                    $this->need_format = true;
             }
         }
 
@@ -1279,19 +1294,22 @@ class PsetView {
             echo ' data-default-format="', $this->conf->default_format, '"';
         }
         echo ">";
+        $curanno = new PsetViewLineAnno;
         foreach ($dinfo as $l) {
-            $this->echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
-                                  $wentries, $gentries, $tw);
+            $this->echo_line_diff($l, $file, $fileid, $linenotes, $lineanno, $curanno);
+        }
+        if ($curanno->grade_last) {
+            echo "</div>";
         }
         echo "</div>\n";
-        if (($this->need_format || $wentries) && !$only_content) {
+        if ($this->need_format && !$only_content) {
             echo "<script>render_text.on_page()</script>\n";
             $this->need_format = false;
         }
     }
 
-    private function echo_line_diff($l, $file, $fileid, $linenotes, $lnorder,
-                                    $wentries, $gentries, $tw) {
+    private function echo_line_diff($l, $file, $fileid, $linenotes, $lineanno,
+                                    $curanno) {
         if ($l[0] === "@") {
             $cx = strlen($l[3]) > 76 ? substr($l[3], 0, 76) . "..." : $l[3];
             $x = [" pa-gx ui", "pa-dcx", "", "", $cx];
@@ -1307,6 +1325,21 @@ class PsetView {
 
         $aln = $x[2] ? "a" . $x[2] : "";
         $bln = $x[3] ? "b" . $x[3] : "";
+        $ala = $aln && isset($lineanno[$aln]) ? $lineanno[$aln] : null;
+
+        if ($ala
+            && $ala->grade_last
+            && $curanno->grade_first
+            && array_search($curanno->grade_first, $ala->grade_last) !== false) {
+            echo '</div>';
+            $curanno->grade_first = null;
+        }
+        if ($ala
+            && $ala->grade_first
+            && !$curanno->grade_first) {
+            echo '<div class="pa-dg">';
+            $curanno->grade_first = $ala->grade_first[0];
+        }
 
         $ak = $bk = "";
         if ($linenotes && $aln && isset($linenotes->$aln))
@@ -1337,15 +1370,15 @@ class PsetView {
             if (isset($l[4]) && ($l[4] & DiffInfo::LINE_NONL)) {
                 echo ' pa-dnonl';
             }
-            echo '">', $this->diff_line_code($x[4], $tw), "</div></div>\n";
+            echo '">', $this->diff_line_code($x[4]), "</div></div>\n";
         }
 
-        if ($wentries !== null && $bln && isset($wentries[$bln])) {
-            echo '<div class="pa-dl pa-gg"><div class="pa-warnbox need-format" data-format="2">', htmlspecialchars($wentries[$bln]), '</div></div>';
+        if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {
+            echo '<div class="pa-dl pa-gg"><div class="pa-warnbox need-format" data-format="2">', htmlspecialchars($lineanno[$bln]->warnings), '</div></div>';
         }
 
-        if ($gentries !== null && $aln && isset($gentries[$aln])) {
-            foreach ($gentries[$aln] as $g) {
+        if ($ala) {
+            foreach ($ala->grade_entries ? : [] as $g) {
                 echo '<div class="pa-dl pa-gg"><div class="pa-graderow">',
                     '<div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"';
                 if ($g->landmark_file === $g->landmark_range_file) {
@@ -1359,11 +1392,11 @@ class PsetView {
         }
 
         if ($nx) {
-            $this->echo_linenote($nx, $lnorder);
+            $this->echo_linenote($nx);
         }
     }
 
-    private function echo_linenote(LineNote $note, LineNotesOrder $lnorder = null) {
+    private function echo_linenote(LineNote $note) {
         echo '<div class="pa-dl pa-gw'; /* NB script depends on this class exactly */
         if ((string) $note->note === "") {
             echo ' hidden';
@@ -1375,23 +1408,17 @@ class PsetView {
             return;
         }
         echo '<div class="pa-notediv">';
-        if ($lnorder) {
-            $links = array();
-            //list($pfile, $plineid) = $lnorder->get_prev($note->file, $note->lineid);
-            //if ($pfile)
-            //    $links[] = '<a href="#L' . $plineid . '_'
-            //        . html_id_encode($pfile) . '" class="uix pa-goto">&larr; Prev</a>';
-            list($nfile, $nlineid) = $lnorder->get_next($note->file, $note->lineid);
-            if ($nfile) {
-                $links[] = '<a href="#L' . $nlineid . '_'
-                    . html_id_encode($nfile) . '" class="uix pa-goto">Next &gt;</a>';
-            } else {
-                $links[] = '<a href="#">Top</a>';
-            }
-            if (!empty($links)) {
-                echo '<div class="pa-note-links">',
-                    join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
-            }
+        $links = array();
+        list($nfile, $nlineid) = $this->_diff_lnorder->get_next($note->file, $note->lineid);
+        if ($nfile) {
+            $links[] = '<a href="#L' . $nlineid . '_'
+                . html_id_encode($nfile) . '" class="uix pa-goto">Next &gt;</a>';
+        } else {
+            $links[] = '<a href="#">Top</a>';
+        }
+        if (!empty($links)) {
+            echo '<div class="pa-note-links">',
+                join("&nbsp;&nbsp;&nbsp;", $links) , '</div>';
         }
         if ($this->can_view_note_authors() && !empty($note->users)) {
             $pcmembers = $this->conf->pc_members_and_admins();
@@ -1417,5 +1444,19 @@ class PsetView {
         }
         echo '">', htmlspecialchars($note->note), '</div>';
         echo '</div></div></div>';
+    }
+}
+
+class PsetViewLineAnno {
+    public $grade_entries;
+    public $grade_first;
+    public $grade_last;
+    public $warnings;
+
+    static function ensure(&$lineanno, $line) {
+        if (!isset($lineanno[$line])) {
+            $lineanno[$line] = new PsetViewLineAnno;
+        }
+        return $lineanno[$line];
     }
 }

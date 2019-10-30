@@ -2371,7 +2371,7 @@ tr.gtrow-partner {
 	    linear-gradient(85deg, rgba(227,163,227,0), rgba(227,163,227,0) 5.5em, rgba(227,163,227,1) 5.5em, rgba(238,192,242,1) 6em, rgba(243,209,252,1) 95%, rgba(238,192,242,1) 100%) right top;
 	background-size: 100% 5px, 100% 5px, 100% 100%;
 }
-.live > .pa-gi:hover, .pa-dl.live {
+.live .pa-gi:hover, .pa-dl.live {
 	background-color: #f8eec7;
 }
 .pa-gx:hover {
