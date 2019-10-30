@@ -2166,23 +2166,22 @@ td.mhcb {
 
 /* peteramati */
 .pa-p {
-	margin-bottom: 0.5rem;
-	position: relative;
 	display: flex;
 	align-items: baseline;
 	align-content: space-between;
-	justify-content: flex-end;
 	flex-wrap: wrap;
+	margin-bottom: 0.5rem;
+	justify-content: flex-end;
 }
 .pa-pt {
-	min-width: 162px;
+	min-width: 168px;
 	padding-right: 6px;
 	padding-bottom: 2px;
 	flex-grow: 1;
 	font-weight: bold;
 }
 .pa-pd {
-	min-width: 300px;
+	min-width: 168px;
 	width: calc(100% - 168px);
 }
 .pa-pd.pa-grade-changed:after {
@@ -2191,6 +2190,16 @@ td.mhcb {
 }
 .pa-pd.pa-grade-error:after {
 	content: " \274C\FE0E"
+}
+.pa-ps .pa-p {
+	justify-content: flex-start;
+}
+.pa-ps .pa-pt {
+	min-width: initial;
+}
+.pa-ps .pa-pd {
+	min-width: initial;
+	width: auto;
 }
 
 .pa-gradelist {
@@ -2358,6 +2367,35 @@ tr.gtrow-partner {
 	width: 3.5em;
 	padding-right: 1em;
 }
+.pa-withgrade {
+	display: flex;
+	flex-direction: row-reverse;
+}
+.pa-withgrade > .pa-dg {
+	flex: 1 1 auto;
+}
+.pa-withgrade > .pa-gradeside {
+	min-width: 144px;
+	width: 20%;
+	flex: 0 0 20%;
+	padding-left: 1em;
+}
+.pa-gradeside > .pa-gradebox {
+	position: sticky;
+	top: 16px;
+	display: block;
+	padding: 0.8rem;
+}
+@media screen and (max-width: 640px) {
+.pa-withgrade > .pa-gradeside {
+	display: none;
+}
+}
+@media screen and (min-width: 640px) {
+.pa-no-gradeside {
+	display: none;
+}
+}
 .pa-dd {
 	flex: 1 1 auto;
 }
@@ -2368,7 +2406,7 @@ tr.gtrow-partner {
 	background:
 	    linear-gradient(180deg, rgba(180,120,180,0.2), rgba(0,0,0,0)) no-repeat left top,
 	    linear-gradient(0deg, rgba(180,120,180,0.2), rgba(0,0,0,0)) no-repeat left bottom,
-	    linear-gradient(85deg, rgba(227,163,227,0), rgba(227,163,227,0) 5.5em, rgba(227,163,227,1) 5.5em, rgba(238,192,242,1) 6em, rgba(243,209,252,1) 95%, rgba(238,192,242,1) 100%) right top;
+	    linear-gradient(83.5deg, rgba(227,163,227,0), rgba(227,163,227,0) 5.4em, rgba(227,163,227,1) 5.5em, rgba(238,192,242,1) 6em, rgba(243,209,252,1) 95%, rgba(238,192,242,1) 100%) right top;
 	background-size: 100% 5px, 100% 5px, 100% 100%;
 }
 .live .pa-gi:hover, .pa-dl.live {
@@ -2527,6 +2565,9 @@ a.fold61:hover {
 .pa-gradebox > .pa-p {
 	margin-bottom: 0;
 	margin-left: 0;
+}
+.pa-gradebox .pa-pd {
+	width: auto;
 }
 .pa-warnbox {
 	background: #f2ecef;

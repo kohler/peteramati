@@ -1298,8 +1298,8 @@ class PsetView {
         foreach ($dinfo as $l) {
             $this->echo_line_diff($l, $file, $fileid, $linenotes, $lineanno, $curanno);
         }
-        if ($curanno->grade_last) {
-            echo "</div>";
+        if ($curanno->grade_first) {
+            echo '</div></div>';
         }
         echo "</div>\n";
         if ($this->need_format && !$only_content) {
@@ -1328,17 +1328,17 @@ class PsetView {
         $ala = $aln && isset($lineanno[$aln]) ? $lineanno[$aln] : null;
 
         if ($ala
-            && $ala->grade_last
-            && $curanno->grade_first
-            && array_search($curanno->grade_first, $ala->grade_last) !== false) {
-            echo '</div>';
-            $curanno->grade_first = null;
-        }
-        if ($ala
             && $ala->grade_first
             && !$curanno->grade_first) {
-            echo '<div class="pa-dg">';
-            $curanno->grade_first = $ala->grade_first[0];
+            $g = $curanno->grade_first = $ala->grade_first[0];
+            echo '<div class="pa-dg pa-withgrade"><div class="pa-gradeside">',
+                '<div class="pa-gradebox pa-ps pa-need-grade" data-pa-grade="', $g->key, '"',
+                ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
+            if ($g->landmark_buttons) {
+                echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode_browser($g->landmark_buttons)), '"';
+            }
+            echo '></div></div><div class="pa-dg">';
+            $this->viewed_gradeentries[$g->key] = true;
         }
 
         $ak = $bk = "";
@@ -1374,12 +1374,22 @@ class PsetView {
         }
 
         if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {
-            echo '<div class="pa-dl pa-gg"><div class="pa-warnbox need-format" data-format="2">', htmlspecialchars($lineanno[$bln]->warnings), '</div></div>';
+            echo '<div class="pa-dl pa-gn"><div class="pa-warnbox need-format" data-format="2">', htmlspecialchars($lineanno[$bln]->warnings), '</div></div>';
         }
 
         if ($ala) {
+            if ($ala->grade_last
+                && $curanno->grade_first
+                && array_search($curanno->grade_first, $ala->grade_last) !== false) {
+                echo '</div></div>';
+                $curanno->grade_first = null;
+            }
             foreach ($ala->grade_entries ? : [] as $g) {
-                echo '<div class="pa-dl pa-gg"><div class="pa-graderow">',
+                echo '<div class="pa-dl pa-gn';
+                if ($curanno->grade_first === $g) {
+                    echo ' pa-no-gradeside';
+                }
+                echo '"><div class="pa-graderow">',
                     '<div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"';
                 if ($g->landmark_file === $g->landmark_range_file) {
                     echo ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';

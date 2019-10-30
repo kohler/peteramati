@@ -2227,7 +2227,7 @@ function setmailpsel(sel) {
 //    between files. 2 means return all lines.
 function pa_diff_traverse(tr, down, flags) {
     tr = tr.closest(".pa-dl, .pa-dg, .pa-filediff");
-    var tref = tr, direction;
+    var tref = tr ? tr.parentElement : null, direction;
     if (down == null) {
         down = false;
         direction = "previousSibling";
@@ -2238,26 +2238,24 @@ function pa_diff_traverse(tr, down, flags) {
         }
     }
     while (true) {
-        if (!tr) {
-            if (tref && hasClass(tref.parentElement, "pa-dg")) {
-                tr = tref.parentElement[direction];
-            } else if (!tref || (flags & 1)) {
+        while (!tr && tref) {
+            if ((flags & 1) && hasClass(tref, "pa-filediff")) {
                 return null;
-            } else {
-                tr = tref.closest(".pa-filediff");
-                tr = tr ? tr[direction] : null;
-                tref = null;
             }
+            tr = tref[direction];
+            tref = tref.parentElement;
+        }
+        if (!tr) {
+            return null;
         } else if (tr.nodeType !== Node.ELEMENT_NODE) {
             tr = tr[direction];
         } else if (hasClass(tr, "pa-dl")
-                   && ((flags & 2) || / pa-g[idc]/.test(tr.className))) {
+                   && ((flags & 2) | / pa-g[idc]/.test(tr.className))) {
             return tr;
-        } else if ((hasClass(tr, "pa-dg") || hasClass(tr, "pa-filediff"))
-                   && tr.firstChild) {
-            tref = tr = tr[down ? "firstChild" : "lastChild"];
-        } else {
+        } else if (hasClass(tr, "pa-dg") || hasClass(tr, "pa-filediff")) {
             tref = tr;
+            tr = tref[down ? "firstChild" : "lastChild"];
+        } else {
             tr = tr[direction];
         }
     }
@@ -2291,7 +2289,7 @@ function pa_diff_locate(tr, down) {
     }
     var next_tr = tr.nextSibling;
     while (next_tr
-           && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gg"))) {
+           && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gn"))) {
         next_tr = next_tr.nextSibling;
     }
     if (next_tr && hasClass(next_tr, "pa-gw")) {
@@ -2414,7 +2412,7 @@ function pa_render_note(note, transition) {
         while (!hasClass(tr, "pa-dl"))
             tr = tr.parentElement;
         var ntr = tr.nextSibling;
-        while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE || hasClass(ntr, "pa-gg"))) {
+        while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE || hasClass(ntr, "pa-gn"))) {
             tr = ntr;
             ntr = ntr.nextSibling;
         }
@@ -2468,10 +2466,11 @@ function pa_render_note(note, transition) {
 
     pa_fix_note_links.call(tr);
 
-    if (transition)
+    if (transition) {
         $td.find(".pa-notediv").hide().slideDown(80);
-    else
+    } else {
         removeClass(tr, "hidden");
+    }
     return tr;
 }
 
@@ -2553,8 +2552,11 @@ function arrowcapture(evt) {
         return uncapture();
     }
     if (key === "ArrowDown" || key === "ArrowUp") {
-        $(tr).removeClass("live");
+        removeClass(tr, "live");
+        console.log(tr);
         tr = pa_diff_traverse(tr, key === "ArrowDown", 0);
+        console.log(tr);
+        console.log("done");
         if (!tr) {
             return;
         }
@@ -2652,8 +2654,10 @@ function nearby(dx, dy) {
 }
 
 function pa_linenote(event) {
+    var dl = event.target.closest(".pa-dl");
     if (event.button !== 0
-        || event.target.closest(".pa-dl").matches(".pa-gg, .pa-gx")) {
+        || !dl
+        || dl.matches(".pa-gn, .pa-gx")) {
         return;
     }
     var anal = pa_diff_locate(event.target),
@@ -3194,7 +3198,6 @@ function pa_process_landmark_range(func, selector) {
         return;
     }
     var lnfirst = +m[1], lnlast = +m[2], lna = -1, lnb = -1;
-    console.log([lnfirst,lnlast,selector])
     var tr = this.closest(".pa-filediff");
     while ((tr = pa_diff_traverse(tr, true, 3))) {
         var td = tr.firstChild;
