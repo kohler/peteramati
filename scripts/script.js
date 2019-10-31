@@ -2514,7 +2514,7 @@ function render_form($tr, note, transition) {
         '" enctype="multipart/form-data" accept-charset="UTF-8">' +
         '<div class="f-contain"><textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
-        '<div class="aabut"><input type="submit" value="Save comment" /></div>' +
+        '<div class="aabut"><button class="btn-primary" type="submit">Save comment</button></div>' +
         '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
     if (!$pi[0].hasAttribute("data-pa-user-can-view-grades")) {
         ++labelctr;
@@ -3242,8 +3242,8 @@ function pa_compute_landmark_range_grade(edit) {
     pa_process_landmark_range.call(tr, +m[1], +m[2], function (tr, lna, lnb) {
         var note = pa_note(tr), m, gch;
         if (note[1]
-            && ((m = /^\s*(\(?\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
-                || (m = /^\s*(\(?)(\d+(?:\.\d*)?|\.\d+)(\/[\d.]+(?!\.\d|[\w%$*\/])\S*)/.exec(note[1])))) {
+            && ((m = /^\s*(\(?\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;]?(?:\s|$)/.exec(note[1]))
+                || (m = /^\s*(\(?)(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;]?(?:\s|$)/.exec(note[1])))) {
             sum += parseFloat(m[2]);
             gch = title + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]);
         }

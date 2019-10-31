@@ -1238,7 +1238,7 @@ class PsetView {
                 if ($g->landmark_range_file === $file) {
                     $la = PsetViewLineAnno::ensure($lineanno, "a" . $g->landmark_range_first);
                     $la->grade_first[] = $g;
-                    $la = PsetViewLineAnno::ensure($lineanno, "a" . $g->landmark_range_last);
+                    $la = PsetViewLineAnno::ensure($lineanno, "a" . ($g->landmark_range_last + 1));
                     $la->grade_last[] = $g;
                 }
                 if ($g->landmark_file === $file) {
@@ -1328,6 +1328,13 @@ class PsetView {
         $ala = $aln && isset($lineanno[$aln]) ? $lineanno[$aln] : null;
 
         if ($ala
+            && $ala->grade_last
+            && $curanno->grade_first
+            && array_search($curanno->grade_first, $ala->grade_last) !== false) {
+            echo '</div></div>';
+            $curanno->grade_first = null;
+        }
+        if ($ala
             && $ala->grade_first
             && !$curanno->grade_first) {
             $g = $curanno->grade_first = $ala->grade_first[0];
@@ -1342,17 +1349,22 @@ class PsetView {
         }
 
         $ak = $bk = "";
-        if ($linenotes && $aln && isset($linenotes->$aln))
+        if ($linenotes && $aln && isset($linenotes->$aln)) {
             $ak = ' id="L' . $aln . '_' . $fileid . '"';
-        if ($linenotes && $bln && isset($linenotes->$bln))
+        }
+        if ($linenotes && $bln && isset($linenotes->$bln)) {
             $bk = ' id="L' . $bln . '_' . $fileid . '"';
+        }
 
-        if (!$x[2] && !$x[3])
+        if (!$x[2] && !$x[3]) {
             $x[2] = $x[3] = "...";
-        if ($x[2])
+        }
+        if ($x[2]) {
             $ak .= ' data-landmark="' . $x[2] . '"';
-        if ($x[3])
+        }
+        if ($x[3]) {
             $bk .= ' data-landmark="' . $x[3] . '"';
+        }
 
         $nx = null;
         if ($linenotes) {
@@ -1378,12 +1390,6 @@ class PsetView {
         }
 
         if ($ala) {
-            if ($ala->grade_last
-                && $curanno->grade_first
-                && array_search($curanno->grade_first, $ala->grade_last) !== false) {
-                echo '</div></div>';
-                $curanno->grade_first = null;
-            }
             foreach ($ala->grade_entries ? : [] as $g) {
                 echo '<div class="pa-dl pa-gn';
                 if ($curanno->grade_first === $g) {
