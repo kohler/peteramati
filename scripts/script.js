@@ -2382,35 +2382,44 @@ function pa_fix_note_links() {
 
         $a.attr("href", note_anchor(next_tr));
         var t = next_tr ? "NEXT >" : "TOP";
-        if ($a.text() !== t)
+        if ($a.text() !== t) {
             $a.text(t);
+        }
     }
 
-    var notes = $(".pa-gw");
-    var notepos = 0;
-    while (notepos < notes.length && notes[notepos] !== this)
+    var notes = $(".pa-gw"), notepos = 0;
+    while (notepos < notes.length && notes[notepos] !== this) {
         ++notepos;
-    if (notepos >= notes.length)
-        return;
+    }
+    if (notepos < notes.length) {
+        var prevpos = notepos - 1;
+        while (prevpos >= 0 && note_skippable(notes[prevpos])) {
+            --prevpos;
+        }
 
-    var prevpos = notepos - 1;
-    while (prevpos >= 0 && note_skippable(notes[prevpos]))
-        --prevpos;
+        var nextpos = notepos + 1;
+        while (nextpos < notes.length && note_skippable(notes[nextpos])) {
+            ++nextpos;
+        }
 
-    var nextpos = notepos + 1;
-    while (nextpos < notes.length && note_skippable(notes[nextpos]))
-        ++nextpos;
+        if (prevpos >= 0) {
+            set_link(notes[prevpos], note_skippable(this) ? notes[nextpos] : this);
+        }
+        set_link(this, notes[nextpos]);
+    }
 
-    if (prevpos >= 0)
-        set_link(notes[prevpos], note_skippable(this) ? notes[nextpos] : this);
-    set_link(this, notes[nextpos]);
+    var dg = $(this).closest(".pa-with-sidegrade").find(".pa-grade")[0];
+    if (dg) {
+        pa_compute_landmark_range_grade.call(dg, true);
+    }
 }
 
 function pa_render_note(note, transition) {
     var tr = this, $tr = $(this);
     if (!hasClass(tr, "pa-gw")) {
-        while (!hasClass(tr, "pa-dl"))
+        while (!hasClass(tr, "pa-dl")) {
             tr = tr.parentElement;
+        }
         var ntr = tr.nextSibling;
         while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE || hasClass(ntr, "pa-gn"))) {
             tr = ntr;
@@ -2419,17 +2428,25 @@ function pa_render_note(note, transition) {
         $tr = $('<tr class="pa-dl pa-gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter(tr);
         tr = $tr[0];
     }
-    if (arguments.length == 0)
+    if (arguments.length == 0) {
         return tr;
+    }
+
     pa_set_note(tr, note);
     var $td = $tr.find(".pa-notebox"), $content = $td.children();
-    if (transition)
+    if (transition) {
         $content.slideUp(80).queue(function () { $content.remove(); });
-    else
+    } else {
         $content.remove();
+    }
+
     if (note[1] === "") {
         pa_fix_note_links.call(tr);
-        transition ? $tr.children().slideUp(80) : $tr.children().hide();
+        if (transition) {
+            $tr.children().slideUp(80);
+        } else {
+            addClass(tr, "hidden");
+        }
         return tr;
     }
 
@@ -2465,7 +2482,6 @@ function pa_render_note(note, transition) {
     }
 
     pa_fix_note_links.call(tr);
-
     if (transition) {
         $td.find(".pa-notediv").hide().slideDown(80);
     } else {
@@ -2531,7 +2547,7 @@ function anal_tr() {
 }
 
 function arrowcapture(evt) {
-    var key;
+    var key, modkey;
     if ((evt.type === "mousemove"
          && scrolled_at
          && evt.timeStamp - scrolled_at <= 200)
@@ -2542,7 +2558,8 @@ function arrowcapture(evt) {
                || ((key = event_key(evt)) !== "ArrowUp"
                    && key !== "ArrowDown"
                    && key !== "Enter")
-               || event_modkey(evt)
+               || ((modkey = event_modkey(evt))
+                   && (modkey !== event_modkey.META || key !== "Enter"))
                || !curanal) {
         return uncapture();
     }
@@ -2553,10 +2570,7 @@ function arrowcapture(evt) {
     }
     if (key === "ArrowDown" || key === "ArrowUp") {
         removeClass(tr, "live");
-        console.log(tr);
         tr = pa_diff_traverse(tr, key === "ArrowDown", 0);
-        console.log(tr);
-        console.log("done");
         if (!tr) {
             return;
         }
@@ -3113,25 +3127,29 @@ function pa_loadgrades(gi) {
         return pa_render_grade_entry(gi.entries[k], editable);
     }
 
-    $pi.find(".pa-need-grade").each(function () {
-        var k = this.getAttribute("data-pa-grade");
-        if (gi.entries[k]) {
-            $(this).html(makegrade(k)).removeClass("pa-need-grade");
-            if (this.hasAttribute("data-pa-landmark-range")) {
-                $(this).find(".pa-pd").append('<button type="button" class="btn ui pa-compute-grade">Grade from notes</button>');
+    $pi.find(".need-pa-grade").each(function () {
+        var k = this.getAttribute("data-pa-grade"), ge = gi.entries[k];
+        if (!ge) {
+            return;
+        }
+        $(this).html(makegrade(k)).removeClass("need-pa-grade");
+        if (this.hasAttribute("data-pa-landmark-range")) {
+            var sum = pa_compute_landmark_range_grade.call(this);
+            if (gi.grades && gi.grades[ge.pos] != sum) {
+                $(this).find(".pa-grade").addClass("pa-grade-pinned");
             }
-            if (this.hasAttribute("data-pa-landmark-buttons")) {
-                var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
-                for (var i = 0; i < lb.length; ++i) {
-                    if (typeof lb[i] === "string") {
-                        $(this).find(".pa-pd").append(lb[i]);
-                    } else {
-                        var t = '<button type="button" class="btn ui';
-                        if (lb[i].className)
-                            t += ' ' + lb[i].className;
-                        t += '">' + lb[i].title + '</button>';
-                        $(this).find(".pa-pd").append(t);
-                    }
+        }
+        if (this.hasAttribute("data-pa-landmark-buttons")) {
+            var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
+            for (var i = 0; i < lb.length; ++i) {
+                if (typeof lb[i] === "string") {
+                    $(this).find(".pa-pd").append(lb[i]);
+                } else {
+                    var t = '<button type="button" class="btn ui';
+                    if (lb[i].className)
+                        t += ' ' + lb[i].className;
+                    t += '">' + lb[i].title + '</button>';
+                    $(this).find(".pa-pd").append(t);
                 }
             }
         }
@@ -3139,8 +3157,9 @@ function pa_loadgrades(gi) {
 
     $pi.find(".pa-gradelist").each(function () {
         var ch = this.firstChild;
-        while (ch && !hasClass(ch, "pa-grade"))
+        while (ch && !hasClass(ch, "pa-grade")) {
             ch = ch.nextSibling;
+        }
         for (var i = 0; i < gi.order.length; ++i) {
             var k = gi.order[i];
             if (k) {
@@ -3191,14 +3210,8 @@ function pa_loadgrades(gi) {
     }
 }
 
-function pa_process_landmark_range(func, selector) {
-    var lr = this.closest(".pa-gradebox").getAttribute("data-pa-landmark-range");
-    var m = lr ? /^(\d+),(\d+)$/.exec(lr) : null;
-    if (!m) {
-        return;
-    }
-    var lnfirst = +m[1], lnlast = +m[2], lna = -1, lnb = -1;
-    var tr = this.closest(".pa-filediff");
+function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
+    var lna = -1, lnb = -1, tr = this;
     while ((tr = pa_diff_traverse(tr, true, 3))) {
         var td = tr.firstChild;
         if (td.hasAttribute("data-landmark")) {
@@ -3216,27 +3229,43 @@ function pa_process_landmark_range(func, selector) {
     }
 }
 
-handle_ui.on("pa-compute-grade", function () {
-    var sum = 0, noteparts = [];
-    pa_process_landmark_range.call(this, function (tr, lna, lnb) {
-        var note = pa_note(tr), m;
+function pa_compute_landmark_range_grade(edit) {
+    var gb = this.closest(".pa-gradebox"),
+        lr = gb.getAttribute("data-pa-landmark-range"),
+        tr = this.closest(".pa-filediff"),
+        title = $(gb).find(".pa-pt").html(),
+        m = lr ? /^(\d+),(\d+)$/.exec(lr) : null,
+        sum = 0.0;
+    if (!m) {
+        return null;
+    }
+    pa_process_landmark_range.call(tr, +m[1], +m[2], function (tr, lna, lnb) {
+        var note = pa_note(tr), m, gch;
         if (note[1]
             && ((m = /^\s*(\(?\+)(\d+(?:\.\d*)?|\.\d+)((?!\.\d|[\w%$*])\S*)/.exec(note[1]))
                 || (m = /^\s*(\(?)(\d+(?:\.\d*)?|\.\d+)(\/[\d.]+(?!\.\d|[\w%$*\/])\S*)/.exec(note[1])))) {
             sum += parseFloat(m[2]);
-            noteparts.push("@" + (lnb || lna) + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]));
+            gch = title + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]);
         }
+        var $nd = $(tr).find(".pa-note-gradecontrib");
+        if (!$nd.length && gch) {
+            $nd = $('<div class="pa-note-gradecontrib"></div>').insertBefore($(tr).find(".pa-note"));
+        }
+        gch ? $nd.html(gch) : $nd.remove();
     }, ".pa-gw");
-    if (noteparts.length) {
-        var $ge = $(this).closest(".pa-pd"),
-            $gv = $ge.find(".pa-gradevalue"),
-            $gi = $ge.find(".pa-compute-grade-info");
-        if (!$gi.length)
-            $gi = $('<div class="pa-compute-grade-info"></div>').appendTo($ge);
-        $gi.html("<strong>" + sum + "</strong> &nbsp; (" + noteparts.join(", ") + "; was " + escape_entities($gv.val() || "0") + ")");
-        $gv.val(sum).change();
+
+    var $gnv = $(this).find(".pa-gradenotesvalue");
+    if (!$gnv.length) {
+        $gnv = $('<div class="pa-gradenotesvalue"></div>').appendTo($(this).find(".pa-pd"));
     }
-});
+    $gnv.text("Notes grade " + sum);
+
+    if (edit && !$(gb).find(".pa-grade").hasClass("pa-grade-pinned")) {
+        $(gb).find(".pa-gradevalue").val(sum).change();
+    }
+
+    return sum;
+}
 
 
 function fold61(sel, arrowholder, direction) {

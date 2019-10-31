@@ -1331,8 +1331,8 @@ class PsetView {
             && $ala->grade_first
             && !$curanno->grade_first) {
             $g = $curanno->grade_first = $ala->grade_first[0];
-            echo '<div class="pa-dg pa-withgrade"><div class="pa-gradeside">',
-                '<div class="pa-gradebox pa-ps pa-need-grade" data-pa-grade="', $g->key, '"',
+            echo '<div class="pa-dg pa-with-sidegrade"><div class="pa-sidegrade">',
+                '<div class="pa-gradebox pa-ps need-pa-grade" data-pa-grade="', $g->key, '"',
                 ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
             if ($g->landmark_buttons) {
                 echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode_browser($g->landmark_buttons)), '"';
@@ -1387,10 +1387,10 @@ class PsetView {
             foreach ($ala->grade_entries ? : [] as $g) {
                 echo '<div class="pa-dl pa-gn';
                 if ($curanno->grade_first === $g) {
-                    echo ' pa-no-gradeside';
+                    echo ' pa-no-sidegrade';
                 }
                 echo '"><div class="pa-graderow">',
-                    '<div class="pa-gradebox pa-need-grade" data-pa-grade="', $g->key, '"';
+                    '<div class="pa-gradebox need-pa-grade" data-pa-grade="', $g->key, '"';
                 if ($g->landmark_file === $g->landmark_range_file) {
                     echo ' data-pa-landmark-range="', $g->landmark_range_first, ',', $g->landmark_range_last, '"';
                     if ($g->landmark_buttons)

@@ -2367,32 +2367,32 @@ tr.gtrow-partner {
 	width: 3.5em;
 	padding-right: 1em;
 }
-.pa-withgrade {
+.pa-with-sidegrade {
 	display: flex;
 	flex-direction: row-reverse;
 }
-.pa-withgrade > .pa-dg {
+.pa-with-sidegrade > .pa-dg {
 	flex: 1 1 auto;
 }
-.pa-withgrade > .pa-gradeside {
+.pa-sidegrade {
 	min-width: 144px;
 	width: 20%;
 	flex: 0 0 20%;
 	padding-left: 1em;
 }
-.pa-gradeside > .pa-gradebox {
+.pa-sidegrade > .pa-gradebox {
 	position: sticky;
 	top: 16px;
 	display: block;
 	padding: 0.8rem;
 }
 @media screen and (max-width: 640px) {
-.pa-withgrade > .pa-gradeside {
+.pa-sidegrade {
 	display: none;
 }
 }
 @media screen and (min-width: 640px) {
-.pa-no-gradeside {
+.pa-no-sidegrade {
 	display: none;
 }
 }
@@ -2499,6 +2499,10 @@ table.hidegrades .pa-gradenote {
 	padding-left: 1em;
 	font-size: smaller;
 }
+.pa-gradenotesvalue {
+	font-size: smaller;
+	color: #999999;
+}
 a.fold61 {
 	color: inherit;
 	text-decoration: inherit;
@@ -2546,7 +2550,7 @@ a.fold61:hover {
 .pa-note-links > a:hover {
 	text-decoration: underline;
 }
-.pa-note-author {
+.pa-note-author, .pa-note-gradecontrib {
 	float: right;
 	font-size: smaller;
 	padding-left: 1em;
