@@ -3059,8 +3059,9 @@ function pa_gradeinfo() {
 
 handle_ui.on("pa-grade", function (event) {
     event.preventDefault();
-    if (this.getAttribute("data-outstanding"))
+    if (this.getAttribute("data-outstanding")) {
         return;
+    }
 
     var self = this, $f = $(self);
     self.setAttribute("data-outstanding", "1");
@@ -3134,7 +3135,8 @@ function pa_loadgrades(gi) {
         }
         $(this).html(makegrade(k)).removeClass("need-pa-grade");
         if (this.hasAttribute("data-pa-landmark-range")) {
-            var sum = pa_compute_landmark_range_grade.call(this);
+            this.firstChild.setAttribute("data-pa-landmark-range", this.getAttribute("data-pa-landmark-range"));
+            var sum = pa_compute_landmark_range_grade.call(this.firstChild);
             if (gi.grades && gi.grades[ge.pos] != sum) {
                 $(this).find(".pa-grade").addClass("pa-grade-pinned");
             }
@@ -3230,10 +3232,10 @@ function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
 }
 
 function pa_compute_landmark_range_grade(edit) {
-    var gb = this.closest(".pa-gradebox"),
-        lr = gb.getAttribute("data-pa-landmark-range"),
+    var gr = this.closest(".pa-grade"),
+        lr = gr.getAttribute("data-pa-landmark-range"),
         tr = this.closest(".pa-filediff"),
-        title = $(gb).find(".pa-pt").html(),
+        title = $(gr).find(".pa-pt").html(),
         m = lr ? /^(\d+),(\d+)$/.exec(lr) : null,
         sum = 0.0;
     if (!m) {
@@ -3260,8 +3262,8 @@ function pa_compute_landmark_range_grade(edit) {
     }
     $gnv.text("Notes grade " + sum);
 
-    if (edit && !$(gb).find(".pa-grade").hasClass("pa-grade-pinned")) {
-        $(gb).find(".pa-gradevalue").val(sum).change();
+    if (edit && !$(gr).find(".pa-grade").hasClass("pa-grade-pinned")) {
+        $(gr).find(".pa-gradevalue").val(sum).change();
     }
 
     return sum;
