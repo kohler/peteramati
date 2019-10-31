@@ -3214,6 +3214,18 @@ function pa_loadgrades(gi) {
 
 function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
     var lna = -1, lnb = -1, tr = this;
+    if (typeof lnfirst === "function") {
+        func = lnfirst;
+        selector = lnlast;
+        var gr = this.closest(".pa-grade"),
+            lr = gr.getAttribute("data-pa-landmark-range"),
+            m = lr ? /^(\d+),(\d+)$/.exec(lr) : null;
+        if (!m || !(tr = tr.closest(".pa-filediff"))) {
+            return null;
+        }
+        lnfirst = +m[1];
+        lnlast = +m[2];
+    }
     while ((tr = pa_diff_traverse(tr, true, 3))) {
         var td = tr.firstChild;
         if (td.hasAttribute("data-landmark")) {
@@ -3233,15 +3245,10 @@ function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
 
 function pa_compute_landmark_range_grade(edit) {
     var gr = this.closest(".pa-grade"),
-        lr = gr.getAttribute("data-pa-landmark-range"),
-        tr = this.closest(".pa-filediff"),
         title = $(gr).find(".pa-pt").html(),
-        m = lr ? /^(\d+),(\d+)$/.exec(lr) : null,
         sum = 0.0;
-    if (!m) {
-        return null;
-    }
-    pa_process_landmark_range.call(tr, +m[1], +m[2], function (tr, lna, lnb) {
+
+    pa_process_landmark_range.call(this, function (tr, lna, lnb) {
         var note = pa_note(tr), m, gch;
         if (note[1]
             && ((m = /^\s*(\(?\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;]?(?:\s|$)/.exec(note[1]))
