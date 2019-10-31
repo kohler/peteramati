@@ -5054,27 +5054,48 @@ function pa_draw_gradecdf($graph) {
 
     // compute plot types
     var plot_types = [];
-    if (d.extension && $pi.length && user_extension)
+    if (d.extension && $pi.length && user_extension) {
         plot_types.push("cdf-extension", "pdf-extension");
+    }
     plot_types.push("cdf", "pdf");
-    if (d.extension && !$pi.length)
+    if (d.extension && !$pi.length) {
         plot_types.push("cdf-extension", "pdf-extension");
-    if (d.noextra)
+    }
+    if (d.noextra) {
         plot_types.push("cdf-noextra", "pdf-noextra");
+    }
     plot_types.push("all");
     $graph[0].setAttribute("data-pa-gg-types", plot_types.join(" "));
 
     // compute this plot type
     var plot_type = $graph[0].getAttribute("data-pa-gg-type");
-    if (!plot_type)
-        plot_type = wstorage(false, "pa-gg-type");
-    if (!plot_type)
+    if (!plot_type) {
+        plot_type = wstorage(true, "pa-gg-type");
+    }
+    if (!plot_type) {
+        var plotarg = wstorage(false, "pa-gg-type");
+        if (plotarg && plotarg[0] === "{") {
+            try {
+                plotarg = JSON.parse(plotarg);
+                // remember previous plot choice for up to two hours
+                if (typeof plotarg.type === "string"
+                    && typeof plotarg.at === "number"
+                    && plotarg.at >= now_sec() - 7200) {
+                    plot_type = plotarg.type;
+                }
+            } catch (e) {
+            }
+        }
+    }
+    if (!plot_type || plot_type === "default") {
         plot_type = plot_types[0];
+    }
     if (plot_types.indexOf(plot_type) < 0) {
-        if (plot_type.substring(0, 3) === "pdf")
+        if (plot_type.substring(0, 3) === "pdf") {
             plot_type = plot_types[1];
-        else
+        } else {
             plot_type = plot_types[0];
+        }
     }
     $graph[0].setAttribute("data-pa-gg-type", plot_type);
     $graph.removeClass("cdf pdf all cdf-extension pdf-extension all-extension cdf-noextra pdf-noextra all-noextra");
@@ -5214,7 +5235,8 @@ handle_ui.on("js-grgraph-flip", function () {
     if (i >= 0) {
         i = (i + (hasClass(this, "prev") ? plot_types.length - 1 : 1)) % plot_types.length;
         $graph[0].setAttribute("data-pa-gg-type", plot_types[i]);
-        wstorage(false, "pa-gg-type", plot_types[i]);
+        wstorage(true, "pa-gg-type", plot_types[i]);
+        wstorage(false, "pa-gg-type", {type: plot_types[i], at: now_sec()});
         pa_draw_gradecdf($graph);
     }
 });

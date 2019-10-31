@@ -280,16 +280,21 @@ $u = $Me->user_linkpart($User);
 // Per-pset
 
 function echo_grade_cdf() {
-    global $Info;
+    global $Info, $Qreq;
     echo '<div id="pa-grade-statistics" class="pa-grgraph pa-grade-statistics hidden';
-    if (!$Info->user_can_view_grade_statistics())
+    if (!$Info->user_can_view_grade_statistics()) {
         echo ' pa-pset-hidden';
-    echo '" data-pa-pset="', $Info->pset->urlkey, '">';
-    echo '<a class="qq ui js-grgraph-flip prev" href="">&lt;</a>';
+    }
+    echo '" data-pa-pset="', $Info->pset->urlkey;
+    if (is_string($Qreq->gg)) {
+        echo '" data-pa-gg-type="', htmlspecialchars($Qreq->gg);
+    }
+    echo '"><a class="qq ui js-grgraph-flip prev" href="">&lt;</a>';
     echo '<a class="qq ui js-grgraph-flip next" href="">&gt;</a>';
     echo '<h4 class="title pa-grgraph-type"></h4>';
-    if ($Info->can_view_grade_statistics_graph())
+    if ($Info->can_view_grade_statistics_graph()) {
         echo '<div class="plot" style="width:350px;height:200px"></div>';
+    }
     echo '<div class="statistics"></div></div>';
     Ht::stash_script("\$(\"#pa-grade-statistics\").each(pa_gradecdf)");
 }
@@ -572,16 +577,21 @@ if ($Me->isPC) {
 
 echo "<hr>\n";
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey);
-if (!$Pset->gitless && $Info->maybe_commit_hash())
+if (!$Pset->gitless && $Info->maybe_commit_hash()) {
     echo '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
-if (!$Pset->gitless && $Pset->directory)
+}
+if (!$Pset->gitless && $Pset->directory) {
     echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
-if ($Me->can_set_grades($Pset, $Info))
+}
+if ($Me->can_set_grades($Pset, $Info)) {
     echo '" data-pa-can-set-grades="yes';
-if ($Info->user_can_view_grades())
+}
+if ($Info->user_can_view_grades()) {
     echo '" data-pa-user-can-view-grades="yes';
-if ($Info->user->extension)
+}
+if ($Info->user->extension) {
     echo '" data-pa-user-extension="yes';
+}
 echo '">';
 
 if ($Pset->gitless) {
