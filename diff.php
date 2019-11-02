@@ -5,15 +5,17 @@
 
 require_once("src/initweb.php");
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/@/p/h/h", "/p/h/h"));
-if ($Me->is_empty())
+if ($Me->is_empty()) {
     $Me->escape();
+}
 global $User, $Pset, $Info, $Qreq;
 
 $User = $Me;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u)))
-    redirectSelf(array("u" => null));
-assert($User == $Me || $Me->isPC);
+    && !($User = ContactView::prepare_user($Qreq->u))) {
+    redirectSelf(["u" => null]);
+}
+assert($User === $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
@@ -45,26 +47,37 @@ if (!$Qreq->commit || !$Qreq->commit1) {
 $diff_options = ["wdiff" => false];
 
 $hasha = $hashb = $hasha_mine = $hashb_mine = null;
+if ($Qreq->commit === "handout") {
+    $Qreq->commit = $Pset->latest_handout_commit()->hash;
+}
+if ($Qreq->commit1 === "handout") {
+    $Qreq->commit1 = $Pset->latest_handout_commit()->hash;
+}
 $hrecent = $Pset->handout_commits();
-if (($hasha = git_commit_in_list($hrecent, $Qreq->commit)))
+if (($hasha = git_commit_in_list($hrecent, $Qreq->commit))) {
     $diff_options["hasha_hrepo"] = true;
-else
+} else {
     $hasha = $hasha_mine = $Info->set_hash($Qreq->commit);
-if (($hashb = git_commit_in_list($hrecent, $Qreq->commit1)))
+}
+if (($hashb = git_commit_in_list($hrecent, $Qreq->commit1))) {
     $diff_options["hashb_hrepo"] = true;
-else
+} else {
     $hashb = $hashb_mine = $Info->set_hash($Qreq->commit1);
+}
 if (!$hasha || !$hashb) {
-    if (!$hasha)
+    if (!$hasha) {
         $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->commit) . " is not connected to your repository.");
-    if (!$hashb)
+    }
+    if (!$hashb) {
         $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->commit1) . " is not connected to your repository.");
+    }
     $Me->escape();
 }
 
 $diff_options["hasha"] = $hasha;
-if (!get($diff_options, "hasha_hrepo") || get($diff_options, "hashb_hrepo"))
+if (!get($diff_options, "hasha_hrepo") || get($diff_options, "hashb_hrepo")) {
     $diff_options["no_full"] = true;
+}
 
 $Conf->header(htmlspecialchars($Pset->title), "home");
 ContactView::echo_heading($User);

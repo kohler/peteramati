@@ -10,7 +10,7 @@ class ContactView {
         if ($path === "")
             return;
         $x = explode("/", $path);
-        if (count($x) && $x[count($x) - 1] == "")
+        if (count($x) && $x[count($x) - 1] === "")
             array_pop($x);
         foreach ($x as &$xp)
             $xp = urldecode($xp);
@@ -20,38 +20,42 @@ class ContactView {
             $commitsuf = "";
             $settings = array();
             while ($ppos < strlen($p) && $xpos < count($x)) {
-                if ($p[$ppos] == "/") {
+                if ($p[$ppos] === "/") {
                     ++$xpos;
-                } else if ($p[$ppos] == "p"
+                } else if ($p[$ppos] === "p"
                            && $Conf->pset_by_key(get($x, $xpos))) {
                     $settings["pset"] = $x[$xpos];
-                } else if ($p[$ppos] == "H"
+                } else if ($p[$ppos] === "H"
                            && (strlen($x[$xpos]) == 40 || strlen($x[$xpos]) == 64)
                            && ctype_xdigit($x[$xpos])) {
                     $settings["commit" . $commitsuf] = $x[$xpos];
                     $commitsuf = (int) $commitsuf + 1;
-                } else if ($p[$ppos] == "h"
+                } else if ($p[$ppos] === "h"
                            && strlen($x[$xpos]) >= 6
                            && ctype_xdigit($x[$xpos])) {
                     $settings["commit" . $commitsuf] = $x[$xpos];
                     $commitsuf = (int) $commitsuf + 1;
-                } else if ($p[$ppos] == "u"
+                } else if (($p[$ppos] === "H" || $p[$ppos] === "h")
+                           && $x[$xpos] === "handout") {
+                    $settings["commit" . $commitsuf] = $x[$xpos];
+                    $commitsuf = (int) $commitsuf + 1;
+                } else if ($p[$ppos] === "u"
                            && strlen($x[$xpos])) {
-                    if ($x[$xpos][0] != "@" && $x[$xpos][0] != "~") {
+                    if ($x[$xpos][0] !== "@" && $x[$xpos][0] !== "~") {
                         $settings["u"] = $x[$xpos];
                     } else if (strlen($x[$xpos]) > 1) {
                         $settings["u"] = substr($x[$xpos], 1);
                     }
-                } else if ($p[$ppos] == "@"
+                } else if ($p[$ppos] === "@"
                            && strlen($x[$xpos])
-                           && ($x[$xpos][0] == "@" || $x[$xpos][0] == "~")) {
+                           && ($x[$xpos][0] === "@" || $x[$xpos][0] === "~")) {
                     if (strlen($x[$xpos]) > 1) {
                         $settings["u"] = substr($x[$xpos], 1);
                     }
-                } else if ($p[$ppos] == "f") {
+                } else if ($p[$ppos] === "f") {
                     $settings["file"] = join("/", array_slice($x, $xpos));
                     $xpos = count($x) - 1;
-                } else if ($p[$ppos] == "*") {
+                } else if ($p[$ppos] === "*") {
                     $xpos = count($x) - 1;
                 } else {
                     $settings = null;
@@ -60,9 +64,10 @@ class ContactView {
                 ++$ppos;
             }
             if ($settings && $xpos == count($x) - 1) {
-                foreach ($settings as $k => $v)
+                foreach ($settings as $k => $v) {
                     if (!isset($_GET[$k]) && !isset($_POST[$k]))
                         $_GET[$k] = $_REQUEST[$k] = $Qreq[$k] = $v;
+                }
                 break;
             }
         }
