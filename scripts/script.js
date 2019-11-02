@@ -3029,7 +3029,7 @@ function pa_set_grade(ge, g, ag, options) {
             $pgbr.remove();
         } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
             $pgbr.remove();
-            $g.find(".pa-pd").append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
+            $g.find(".pa-pd").first().append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
         }
     }
 }
@@ -3048,13 +3048,19 @@ function pa_gradeinfo() {
         e = e.parentElement.closest(".pa-psetinfo");
         var gix = $(e).data("pa-gradeinfo");
         if (typeof gix === "string") {
-            gix = JSON.pare(gix);
+            gix = JSON.parse(gix);
         }
         if (gix && typeof gix === "object") {
             $.extend(gi, gix);
         }
     }
     return gi;
+}
+
+function pa_gradeentry() {
+    var e = this.closest(".pa-grade"),
+        gi = pa_gradeinfo.call(e);
+    return gi.entries[e.getAttribute("data-pa-grade")];
 }
 
 handle_ui.on("pa-grade", function (event) {
@@ -3122,8 +3128,7 @@ function pa_loadgrades(gi) {
     }
 
     $pi.data("pa-gradeinfo", gi);
-    var editable = $pi[0].hasAttribute("data-pa-can-set-grades"),
-        directory = $pi[0].getAttribute("data-pa-directory") || "";
+    var editable = $pi[0].hasAttribute("data-pa-can-set-grades");
     function makegrade(k) {
         return pa_render_grade_entry(gi.entries[k], editable);
     }
@@ -3134,8 +3139,7 @@ function pa_loadgrades(gi) {
             return;
         }
         $(this).html(makegrade(k)).removeClass("need-pa-grade");
-        if (this.hasAttribute("data-pa-landmark-range")) {
-            this.firstChild.setAttribute("data-pa-landmark-range", this.getAttribute("data-pa-landmark-range"));
+        if (ge.landmark_range && hasClass(this, "pa-gradebox")) {
             var sum = pa_compute_landmark_range_grade.call(this.firstChild);
             if (gi.grades && gi.grades[ge.pos] != sum) {
                 $(this).find(".pa-grade").addClass("pa-grade-pinned");
@@ -3217,9 +3221,8 @@ function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
     if (typeof lnfirst === "function") {
         func = lnfirst;
         selector = lnlast;
-        var gr = this.closest(".pa-grade"),
-            lr = gr.getAttribute("data-pa-landmark-range"),
-            m = lr ? /^(\d+),(\d+)$/.exec(lr) : null;
+        var ge = pa_gradeentry.call(this),
+            m = ge && ge.landmark_range ? /:(\d+):(\d+)$/.exec(ge.landmark_range) : null;
         if (!m || !(tr = tr.closest(".pa-filediff"))) {
             return null;
         }
@@ -3269,7 +3272,7 @@ function pa_compute_landmark_range_grade(edit) {
     }
     $gnv.text("Notes grade " + sum);
 
-    if (edit && !$(gr).find(".pa-grade").hasClass("pa-grade-pinned")) {
+    if (edit && !hasClass(gr, "pa-grade-pinned")) {
         $(gr).find(".pa-gradevalue").val(sum).change();
     }
 

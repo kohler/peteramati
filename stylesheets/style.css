@@ -2196,6 +2196,7 @@ td.mhcb {
 }
 .pa-ps .pa-pt {
 	min-width: initial;
+	width: 100%;
 }
 .pa-ps .pa-pd {
 	min-width: initial;
@@ -2384,7 +2385,7 @@ tr.gtrow-partner {
 	position: sticky;
 	top: 16px;
 	display: block;
-	padding: 0.8rem;
+	padding: 0.8rem 0.8rem 0.3rem 0.8rem;
 }
 @media screen and (max-width: 640px) {
 .pa-sidegrade {
@@ -2564,10 +2565,9 @@ a.fold61:hover {
 	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
 	    #f3f3f3;
 	background-size: 100% 7px, 100% 5px, 100% 100%;
-	padding: 0.8rem 168px 0.8rem 0.8rem;
+	padding: 0.8rem 168px 0.3rem 0.8rem;
 }
 .pa-gradebox > .pa-p {
-	margin-bottom: 0;
 	margin-left: 0;
 }
 .pa-gradebox .pa-pd {
