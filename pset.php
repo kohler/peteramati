@@ -34,9 +34,10 @@ if (isset($Qreq->setgrader)
     && $Info->can_have_grades()
     && $Me->can_set_grader($Pset, $User)) {
     $grader = 0;
-    foreach ($Conf->pc_members_and_admins() as $pcm)
+    foreach ($Conf->pc_members_and_admins() as $pcm) {
         if ($pcm->email === $_POST["grader"])
             $grader = $pcm->contactId;
+    }
     if (!$grader && $_POST["grader"] !== "none")
         json_exit(["ok" => false, "error" => "No such grader"]);
     $Info->change_grader($grader);
@@ -521,26 +522,27 @@ function echo_all_grades() {
 
     $has_grades = $Info->has_assigned_grades();
     if ($Info->can_view_grades()
-        && ($Me !== $User || $has_grades)) {
-        if ($User !== $Me && $Pset->grade_script) {
+        && ($has_grades || $Info->can_edit_grades())) {
+        if ($Pset->grade_script && $Info->can_edit_grades()) {
             foreach ($Pset->grade_script as $gs)
                 Ht::stash_html($Info->conf->make_script_file($gs));
         }
         echo '<div class="pa-gradelist want-pa-landmark-links',
-            ($User !== $Me ? " editable" : " noneditable"),
+            ($Info->can_edit_grades() ? " editable" : " noneditable"),
             ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
         Ht::stash_script('pa_loadgrades.call($(".pa-psetinfo")[0], ' . json_encode_browser($Info->grade_json()) . ')');
-        if ($Pset->has_grade_landmark)
+        if ($Pset->has_grade_landmark) {
             Ht::stash_script('$(function(){pa_loadgrades.call($(".pa-psetinfo")[0], true)})');
+        }
         echo Ht::unstash();
     }
 
     $lhd = $Info->late_hours_data();
-    if ($lhd && $User === $Me && $Info->can_view_grades()) {
+    if ($lhd && $Info->can_view_grades() && !$Info->can_edit_grades()) {
         if ((isset($lhd->hours) && $lhd->hours > 0) || $has_grades) {
             ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>');
         }
-    } else if ($User !== $Me && $Info->pset->late_hours_entry()) {
+    } else if ($Info->can_edit_grades() && $Info->pset->late_hours_entry()) {
         echo '<form class="ui-submit pa-grade pa-p" data-pa-grade="late_hours">',
             '<label class="pa-pt" for="pa-lh">late hours</label>',
             '<div class="pa-pd">',
@@ -554,24 +556,23 @@ function echo_all_grades() {
 
 
 function show_pset($info) {
-    global $Me;
-    echo "<hr/>\n";
-    if ($Me->isPC && get($info->pset, "gitless_grades"))
+    echo "<hr>\n";
+    if ($info->can_edit_grades() && get($info->pset, "gitless_grades"))
         echo '<div style="float:right"><button type="button" onclick="jQuery(\'#upload\').show()">upload</button></div>';
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);
-    ContactView::echo_repo_group($info, $Me != $info->user);
+    ContactView::echo_repo_group($info, $info->can_edit_grades());
     ContactView::echo_repo_last_commit_group($info, false);
     ContactView::echo_downloads_group($info);
 }
 
 show_pset($Info);
 
-if ($Me->isPC) {
+if ($Info->can_edit_grades()) {
     echo '<div id="upload" style="display:none"><hr/>',
         Ht::form($Info->hoturl_post("pset", array("uploadgrades" => 1))),
         '<div class="f-contain">',
-        '<input type="file" name="file" />',
+        '<input type="file" name="file">',
         Ht::submit("Upload"),
         '</div></form></div>';
 }
@@ -612,7 +613,7 @@ if ($Pset->gitless) {
     // print runners
     $runnerbuttons = array();
     $last_run = false;
-    foreach ($Pset->runners as $r)
+    foreach ($Pset->runners as $r) {
         if ($Me->can_view_run($Pset, $r, $User)) {
             if ($Me->can_run($Pset, $r, $User)) {
                 $b = Ht::button(htmlspecialchars($r->title),
@@ -623,16 +624,19 @@ if ($Pset->gitless) {
                                       "data-pa-loadgrade" => isset($r->eval) ? "true" : null));
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
                 $last_run = true;
-            } else
+            } else {
                 $runnerbuttons[] = '<input type="hidden" class="pa-runner" value="' . htmlspecialchars($r->name) . '">';
+            }
         }
-    if (count($runnerbuttons) && $Me->isPC && $Me != $User && $last_run)
+    }
+    if (count($runnerbuttons) && $Me->isPC && $Me != $User && $last_run) {
         $runnerbuttons[] = " &nbsp;"
             . Ht::button("+",
                          array("class" => "btn pa-runner",
                                "style" => "font-weight:bold",
                                "name" => "define",
                                "onclick" => "pa_runsetting.add()"));
+    }
     if ((($Me->isPC && $Me != $User) || $Me == $User)
         && !$Info->is_handout_commit()) {
         $runnerbuttons[] = '<div class="g"></div>';
@@ -703,30 +707,37 @@ if ($Pset->gitless) {
     $runcategories = [];
     foreach ($Pset->runners as $r) {
         if (!$Me->can_view_run($Pset, $r, $User)
-            || isset($runcategories[$r->category]))
+            || isset($runcategories[$r->category])) {
             continue;
+        }
 
         $rj = null;
-        if (($checkt = get($crunners, $r->category)))
+        if (($checkt = get($crunners, $r->category))) {
             $rj = (new RunnerState($Info, $r, $checkt))->full_json();
-        if (!$rj && !$Me->can_run($Pset, $r, $User))
+        }
+        if (!$rj && !$Me->can_run($Pset, $r, $User)) {
             continue;
+        }
 
         $runcategories[$r->category] = true;
         echo '<div id="pa-runout-' . $r->category . '"';
-        if (!$rj || !isset($rj->timestamp))
+        if (!$rj || !isset($rj->timestamp)) {
             echo ' class="hidden"';
+        }
         echo '><h3><a class="fold61" href="#" onclick="',
             "return runfold61('{$r->category}')", '">',
             '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($r->output_title), '</a></h3>',
             '<div class="pa-run pa-run-short hidden" id="pa-run-', $r->category, '"';
-        if ($r->xterm_js || ($r->xterm_js === null && $Pset->run_xterm_js))
+        if ($r->xterm_js || ($r->xterm_js === null && $Pset->run_xterm_js)) {
             echo ' data-pa-xterm-js="true"';
-        if ($rj && isset($rj->timestamp))
+        }
+        if ($rj && isset($rj->timestamp)) {
             echo ' data-pa-timestamp="', $rj->timestamp, '"';
-        if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n")))
+        }
+        if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n"))) {
             echo ' data-pa-content="', htmlspecialchars(substr($rj->data, $pos + 2)), '"';
+        }
         echo '><pre class="pa-runpre"></pre></div></div>', "\n";
     }
 

@@ -55,7 +55,6 @@ class Pset {
     public $deadline_college;
     public $deadline_extension;
 
-    public $has_grade_landmark = false;
     public $all_grades = [];
     public $grades;
     public $grades_visible;
@@ -65,6 +64,8 @@ class Pset {
     public $grade_cdf_cutoff;
     public $separate_extension_grades;
     public $has_extra = false;
+    public $has_grade_landmark = false;
+    public $has_grade_landmark_range = false;
     private $_max_grade = [null, null, null, null];
     public $grade_script;
     private $_late_hours;
@@ -202,6 +203,8 @@ class Pset {
                 $this->all_grades[$g->key] = $g;
                 if ($g->landmark_file || $g->landmark_range_file)
                     $this->has_grade_landmark = true;
+                if ($g->landmark_range_file)
+                    $this->has_grade_landmark_range = true;
             }
         } else if ($grades) {
             throw new PsetConfigException("`grades` format error`", "grades");

@@ -605,6 +605,10 @@ class PsetView {
                 && $this->user_can_view_grade_statistics());
     }
 
+    function can_edit_grades() {
+        return $this->viewer !== $this->user;
+    }
+
 
     function can_view_repo_contents($cached = false) {
         return $this->viewer->can_view_repo_contents($this->repo, $this->branch, $cached);
