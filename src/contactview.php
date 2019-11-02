@@ -559,7 +559,7 @@ class ContactView {
         }
 
         if ($commitgroup) {
-            echo "<div class=\"commitcontainer61\" data-pa-pset=\"", htmlspecialchars($info->pset->urlkey);
+            echo "<div class=\"pa-commitcontainer\" data-pa-pset=\"", htmlspecialchars($info->pset->urlkey);
             if ($repo && $repo->snaphash && $info->can_view_repo_contents())
                 echo "\" data-pa-commit=\"", $repo->snaphash;
             echo "\">";

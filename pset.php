@@ -451,7 +451,8 @@ function echo_commit($Info) {
     }
 
     // actually print
-    echo Ht::form($Info->hoturl_post("pset", array("commit" => null, "setcommit" => 1)), array("class" => "commitcontainer61", "data-pa-pset" => $Info->pset->urlkey, "data-pa-commit" => $Info->latest_hash())),
+    echo Ht::form($Info->hoturl_post("pset", ["commit" => null, "setcommit" => 1]),
+            ["class" => "pa-commitcontainer", "data-pa-pset" => $Info->pset->urlkey, "data-pa-commit" => $Info->latest_hash()]),
         "<div class=\"f-contain\">";
     ContactView::echo_group($key, $value, $remarks);
     echo "</div></form>\n";
@@ -717,7 +718,7 @@ if ($Pset->gitless) {
             echo ' class="hidden"';
         echo '><h3><a class="fold61" href="#" onclick="',
             "return runfold61('{$r->category}')", '">',
-            '<span class="foldarrow">&#x25B6;</span>&nbsp;',
+            '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($r->output_title), '</a></h3>',
             '<div class="pa-run pa-run-short hidden" id="pa-run-', $r->category, '"';
         if ($r->xterm_js || ($r->xterm_js === null && $Pset->run_xterm_js))
@@ -730,8 +731,9 @@ if ($Pset->gitless) {
     }
 
     // line notes
-    if (!empty($diff))
-        echo "<hr class=\"c\" />\n";
+    if (!empty($diff)) {
+        echo "<hr>\n";
+    }
     foreach ($diff as $file => $dinfo) {
         $open = $lnorder->file_has_notes($file)
             || (!$dinfo->boring
@@ -747,7 +749,7 @@ if ($Pset->gitless) {
     if ($Pset->gitless_grades)
         echo_grade_cdf_here();
 
-    echo "<div class=\"commitcontainer61\" data-pa-pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
+    echo "<div class=\"pa-commitcontainer\" data-pa-pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
     ContactView::echo_group("this commit", "No commits yet for this problem set", array());
     echo "</div>\n";
 
