@@ -24,49 +24,63 @@ class API_Repo {
     }
 
     static function blob(Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$user->can_view_repo_contents($api->repo, $api->branch))
+        if (!$user->can_view_repo_contents($api->repo, $api->branch)) {
             return ["ok" => false, "error" => "Permission error."];
+        }
         if (!$qreq->file
             || (isset($qreq->fromline) && !ctype_digit($qreq->fromline))
-            || (isset($qreq->linecount) && !ctype_digit($qreq->linecount)))
+            || (isset($qreq->linecount) && !ctype_digit($qreq->linecount))) {
             return ["ok" => false, "error" => "Invalid request."];
+        }
         $repo = $api->repo;
-        if ($api->commit->from_handout())
+        if ($api->commit->is_handout()) {
             $repo = $api->pset->handout_repo($api->repo);
+        }
         $command = "git show {$api->hash}:" . escapeshellarg($qreq->file);
-        if ($qreq->fromline && intval($qreq->fromline) > 1)
+        if ($qreq->fromline && intval($qreq->fromline) > 1) {
             $command .= " | tail -n +" . intval($qreq->fromline);
-        if ($qreq->linecount)
+        }
+        if ($qreq->linecount) {
             $command .= " | head -n " . intval($qreq->linecount);
+        }
         $x = $api->repo->gitrun($command, true);
         if (!$x->status && ($x->stdout !== "" || $x->stderr === "")) {
             $data = $x->stdout;
-            if (is_valid_utf8($data))
+            if (is_valid_utf8($data)) {
                 return ["ok" => true, "data" => $data];
-            else
+            } else {
                 return ["ok" => true, "data" => UnicodeHelper::utf8_replace_invalid($data), "invalid_utf8" => true];
-        } else if (strpos($x->stderr, "does not exist") !== false)
+            }
+        } else if (strpos($x->stderr, "does not exist") !== false) {
             return ["ok" => false, "error" => "No such file."];
-        else {
+        } else {
             error_log("$command: $x->stderr");
             return ["ok" => false, "error" => "Problem."];
         }
     }
 
     static function filediff(Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$user->can_view_repo_contents($api->repo, $api->branch))
+        if (!$user->can_view_repo_contents($api->repo, $api->branch)) {
             return ["ok" => false, "error" => "Permission error."];
-        if (!$qreq->file)
+        }
+        if (!$qreq->file) {
             return ["ok" => false, "error" => "Invalid request."];
-        $base_hash = $qreq->base_hash;
-        if ($base_hash && !($base_commit = $user->conf->check_api_hash($base_hash, $api)))
+        }
+        if ((string) $qreq->base_hash === "") {
+            $base_commit = $api->pset->handout_commit();
+        } else {
+            $base_commit = $user->conf->check_api_hash($qreq->base_hash, $api);
+        }
+        if (!$base_commit) {
             return ["ok" => false, "error" => "Disconnected commit."];
+        }
         $info = PsetView::make($api->pset, $api->user, $user);
         $info->set_commit($api->commit);
         $lnorder = $info->viewable_line_notes();
-        $diff = $info->repo->diff($api->pset, $base_hash, $info->commit_hash(), array("needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file]));
-        if (empty($diff))
+        $diff = $info->repo->diff($api->pset, $base_commit, $info->commit(), array("needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file]));
+        if (empty($diff)) {
             return ["ok" => false, "error" => "No diff."];
+        }
         ob_start();
         foreach ($diff as $file => $dinfo) {
             $info->echo_file_diff($file, $dinfo, $lnorder, ["open" => true, "only_content" => true]);
@@ -77,12 +91,15 @@ class API_Repo {
     }
 
     static function user_repositories(Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$user->isPC)
+        if (!$user->isPC) {
             return ["ok" => false, "error" => "Permission error."];
-        if (!($organization = $user->conf->opt("githubOrganization")))
+        }
+        if (!($organization = $user->conf->opt("githubOrganization"))) {
             return ["ok" => false, "error" => "No GitHub organization."];
-        if (!$api->user->github_username)
+        }
+        if (!$api->user->github_username) {
             return ["ok" => false, "error" => "No GitHub username."];
+        }
         $cursor = null;
         $repos = [];
         for ($i = 0; $i < 10; ++$i) {

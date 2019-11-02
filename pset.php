@@ -315,13 +315,14 @@ function echo_commit($Info) {
         // visually separate older heads
         if ($curhead === null)
             $curhead = $k->fromhead;
-        if ($curhead !== $k->fromhead && !$k->from_handout()) {
-            if (!$grouphead)
-                $sel["from.$k->fromhead"] = (object)
-                    array("type" => "optgroup",
-                          "label" => "Other snapshots");
-            else
+        if ($curhead !== $k->fromhead && !$k->is_handout()) {
+            if (!$grouphead) {
+                $sel["from.$k->fromhead"] = (object) [
+                    "type" => "optgroup", "label" => "Other snapshots"
+                ];
+            } else {
                 $sel["from.$k->fromhead"] = null;
+            }
             $curhead = $grouphead = $k->fromhead;
         }
         // actual option
@@ -684,8 +685,7 @@ if ($Pset->gitless) {
 
     // collect diff and sort line notes
     $lnorder = $Info->viewable_line_notes();
-    $hasha = $Pset->handout_hash ? : $Info->derived_handout_hash();
-    $diff = $Info->diff($hasha, $Info->commit_hash(), $lnorder, ["wdiff" => $WDIFF]);
+    $diff = $Info->diff($Info->base_handout_commit(), $Info->commit(), $lnorder, ["wdiff" => $WDIFF]);
 
     // print line notes
     $notelinks = array();
@@ -744,15 +744,15 @@ if ($Pset->gitless) {
     // line notes
     if (!empty($diff)) {
         echo "<hr>\n";
-    }
-    foreach ($diff as $file => $dinfo) {
-        $open = $lnorder->file_has_notes($file)
-            || (!$dinfo->boring
-                && ($Me != $Info->user
-                    || !$Info->can_view_grades()
-                    || !$Info->is_grading_commit()
-                    || !$lnorder->has_linenotes_in_diff));
-        $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
+        foreach ($diff as $file => $dinfo) {
+            $open = $lnorder->file_has_notes($file)
+                || (!$dinfo->boring
+                    && ($Me != $Info->user
+                        || !$Info->can_view_grades()
+                        || !$Info->is_grading_commit()
+                        || !$lnorder->has_linenotes_in_diff));
+            $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
+        }
     }
 
     Ht::stash_script('$(window).on("beforeunload",pa_beforeunload)');

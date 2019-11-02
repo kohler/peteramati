@@ -1733,23 +1733,25 @@ class Conf {
         $hrepoid = $hrepo->repoid;
         $key = "handoutcommits_{$hrepoid}_{$pset->id}";
         $hset = $this->setting_json($key);
-        if (!$hset)
-            $hset = (object) array();
+        if (!$hset) {
+            $hset = (object) [];
+        }
         if (get($hset, "snaphash") !== $hrepo->snaphash
             || (int) get($hset, "snaphash_at") + 300 < $Now
             || !get($hset, "commits")) {
             $hset->snaphash = $hrepo->snaphash;
             $hset->snaphash_at = $Now;
             $hset->commits = [];
-            foreach ($hrepo->commits($pset, $pset->handout_branch) as $c)
+            foreach ($hrepo->commits($pset, $pset->handout_branch) as $c) {
                 $hset->commits[] = [$c->hash, $c->commitat, $c->subject];
+            }
             $this->save_setting($key, 1, $hset);
             $this->qe("delete from Settings where name!=? and name like 'handoutcommits_%_?s'", $key, $pset->id);
         }
         $commits = [];
-        foreach ($hset->commits as $c)
-            $commits[$c[0]] = new RepositoryCommitInfo($c[1], $c[0], $c[2],
-                                        RepositoryCommitInfo::HANDOUTHEAD);
+        foreach ($hset->commits as $c) {
+            $commits[$c[0]] = new CommitRecord($c[1], $c[0], $c[2], CommitRecord::HANDOUTHEAD);
+        }
         $this->_handout_commits[$pset->id] = $commits;
         reset($commits);
         $this->_handout_latest_commit[$pset->id] = current($commits);
@@ -1757,14 +1759,15 @@ class Conf {
 
     function handout_commits(Pset $pset, $hash = null) {
         global $Now;
-        if (!array_key_exists($pset->id, $this->_handout_commits))
+        if (!array_key_exists($pset->id, $this->_handout_commits)) {
             $this->populate_handout_commits($pset);
+        }
         $commits = $this->_handout_commits[$pset->id];
-        if (!$hash)
+        if (!$hash) {
             return $commits;
-        else if (strlen($hash) === 40 || strlen($hash) === 64)
+        } else if (strlen($hash) === 40 || strlen($hash) === 64) {
             return get($commits, $hash);
-        else {
+        } else {
             $matches = [];
             foreach ($commits as $h => $c)
                 if (str_starts_with($h, $hash))
@@ -1775,8 +1778,9 @@ class Conf {
 
     function handout_commits_from(Pset $pset, $hash) {
         global $Now;
-        if (!array_key_exists($pset->id, $this->_handout_commits))
+        if (!array_key_exists($pset->id, $this->_handout_commits)) {
             $this->populate_handout_commits($pset);
+        }
         $commits = $this->_handout_commits[$pset->id];
         $matches = $list = [];
         foreach ($commits as $h => $c) {
@@ -1789,8 +1793,9 @@ class Conf {
     }
 
     function latest_handout_commit(Pset $pset) {
-        if (!array_key_exists($pset->id, $this->_handout_latest_commit))
+        if (!array_key_exists($pset->id, $this->_handout_latest_commit)) {
             $this->populate_handout_commits($pset);
+        }
         return get($this->_handout_latest_commit, $pset->id);
     }
 

@@ -3,7 +3,7 @@
 // Peteramati is Copyright (c) 2013-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-class RepositoryCommitInfo {
+class CommitRecord {
     public $commitat;
     public $hash;
     public $subject;
@@ -15,7 +15,7 @@ class RepositoryCommitInfo {
         $this->subject = $subject;
         $this->fromhead = $fromhead;
     }
-    function from_handout() {
+    function is_handout() {
         return $this->fromhead === self::HANDOUTHEAD;
     }
 }
@@ -248,9 +248,9 @@ class Repository {
             is_dir($repodir) || mkdir($repodir, 0770);
             shell_exec("cd $repodir && git init --shared");
         }
-        if (!$want_stderr)
+        if (!$want_stderr) {
             return shell_exec("cd $repodir && $command");
-        else {
+        } else {
             $descriptors = [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]];
             $proc = proc_open($command, $descriptors, $pipes, $repodir);
             $stdout = stream_get_contents($pipes[1]);
@@ -277,10 +277,12 @@ class Repository {
         $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
         preg_match_all(',^(\S+)\s+(\S+)\s+(.*)$,m', $result, $ms, PREG_SET_ORDER);
         foreach ($ms as $m) {
-            if (!isset($this->_commits[$m[2]]))
-                $this->_commits[$m[2]] = new RepositoryCommitInfo((int) $m[1], $m[2], $m[3], $head);
-            if (!isset($list[$m[2]]))
+            if (!isset($this->_commits[$m[2]])) {
+                $this->_commits[$m[2]] = new CommitRecord((int) $m[1], $m[2], $m[3], $head);
+            }
+            if (!isset($list[$m[2]])) {
                 $list[$m[2]] = $this->_commits[$m[2]];
+            }
         }
     }
 
@@ -570,40 +572,38 @@ class Repository {
         }
     }
 
-    function diff(Pset $pset, $hasha, $hashb, $options = null) {
+    function diff(Pset $pset, CommitRecord $commita, CommitRecord $commitb, $options = null) {
         $options = (array) $options;
         assert($pset); // code remains for `!$pset`; maybe revive it?
         $diffs = [];
 
         $repodir = $truncpfx = "";
-        if ($pset && $pset->directory_noslash !== "") {
+        if ($pset->directory_noslash !== "") {
             $psetdir = escapeshellarg($pset->directory_noslash);
             if ($this->truncated_psetdir($pset))
                 $truncpfx = $pset->directory_noslash . "/";
             else
                 $repodir = $psetdir . "/";
-        } else
+        } else {
             $psetdir = null;
-
-        if (!$hasha) {
-            $hrepo = $pset->handout_repo($this);
-            if ($pset->handout_hash
-                && ($hc = $pset->handout_commits($pset->handout_hash)))
-                $hasha = $hc->hash;
-            else if (isset($pset->handout_branch))
-                $hasha = "repo{$hrepo->repoid}/" . $pset->handout_branch;
-            else
-                $hasha = "repo{$hrepo->repoid}/master";
-            $options["hasha_hrepo"] = true;
         }
-        if ($truncpfx && get($options, "hasha_hrepo") && !get($options, "hashb_hrepo"))
-            $hasha = $this->truncated_hash($pset, $hasha);
 
+        $hasha = $commita->hash;
+        if ($truncpfx
+            && $commita->is_handout()
+            && !$commitb->is_handout()) {
+            $hasha = $this->truncated_hash($pset, $hasha);
+        }
         $hasha_arg = escapeshellarg($hasha);
+        $hashb = $commitb->hash;
+        if ($truncpfx
+            && $commitb->is_handout()
+            && !$commita->is_handout()) {
+            $hashb = $this->truncated_hash($pset, $hashb);
+        }
         $hashb_arg = escapeshellarg($hashb);
 
-        $hasha_hrepo = get($options, "hasha_hrepo");
-        $ignore_diffconfig = $hasha_hrepo && get($options, "hashb_hrepo");
+        $ignore_diffconfig = $commita->is_handout() && $commitb->is_handout();
         $no_full = get($options, "no_full");
         $needfiles = self::fix_diff_files(get($options, "needfiles"));
         $onlyfiles = self::fix_diff_files(get($options, "onlyfiles"));
@@ -626,8 +626,9 @@ class Repository {
         }
 
         $command = "git diff --name-only {$hasha_arg} {$hashb_arg}";
-        if ($pset && !$truncpfx && $pset->directory_noslash)
+        if ($pset && !$truncpfx && $pset->directory_noslash) {
             $command .= " -- " . escapeshellarg($pset->directory_noslash);
+        }
         $result = $this->gitrun($command);
 
         $xdiffs = [];
@@ -640,15 +641,17 @@ class Repository {
                     && !$ignore_diffconfig
                     && !$no_full
                     && $diffconfig->full
-                    && get($diffs, $file))
+                    && get($diffs, $file)) {
                     continue;
+                }
                 // skip files that aren't allowed
                 if ($onlyfiles
-                    && !get($onlyfiles, $truncpfx . $line))
+                    && !get($onlyfiles, $truncpfx . $line)) {
                     continue;
+                }
                 // skip ignored files, unless user requested them
                 $di = new DiffInfo($file, $diffconfig);
-                $di->set_repoa($this, $pset, $hasha, $line, $hasha_hrepo);
+                $di->set_repoa($this, $pset, $hasha, $line, $commita->is_handout());
                 if ($diffconfig
                     && !$ignore_diffconfig
                     && ($diffconfig->ignore || $diffconfig->boring)
@@ -657,8 +660,9 @@ class Repository {
                         $di->finish_unloaded();
                         $diffs[$file] = $di;
                     }
-                } else
+                } else {
                     $xdiffs[] = $di;
+                }
             }
         }
 
@@ -683,9 +687,10 @@ class Repository {
                     $darg = [];
                 }
             }
-            foreach ($xdiffs as $di)
+            foreach ($xdiffs as $di) {
                 if (!$di->is_empty())
                     $diffs[$di->filename] = $di;
+            }
         }
 
         // ensure a diff for every landmarked file, even if empty
@@ -694,7 +699,7 @@ class Repository {
                 $file = $g->landmark_file;
                 if ($file && !isset($diffs[$file])) {
                     $diffs[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
-                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $hasha_hrepo);
+                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $commita->is_handout());
                     $di->finish();
                 }
             }

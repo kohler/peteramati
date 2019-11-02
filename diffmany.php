@@ -64,16 +64,16 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         echo '<h3>', Text::user_html($user), '</h3>';
     echo '<hr class="c" />';
 
-    if (!$pset->gitless) {
+    if (!$pset->gitless && $info->commit()) {
         $lnorder = $info->viewable_line_notes();
         $onlyfiles = $qreq->files;
-        $hasha = $pset->handout_hash ? : $info->derived_handout_hash();
-        $diff = $info->diff($hasha, $info->commit_hash(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
+        $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
         if (count($onlyfiles) == 1
             && isset($diff[$onlyfiles[0]])
             && $qreq->lines
-            && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m))
+            && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m)) {
             $diff[$onlyfiles[0]] = $diff[$onlyfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
+        }
 
         foreach ($diff as $file => $dinfo) {
             $info->echo_file_diff($file, $dinfo, $lnorder,
@@ -90,8 +90,9 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     }
 
     echo "</div>\n";
-    if ($want_grades)
+    if ($want_grades) {
         echo Ht::unstash_script('pa_loadgrades.call($("#pa-psetinfo' . $psetinfo_idx . '")[0], true)');
+    }
     echo "<hr />\n";
 }
 

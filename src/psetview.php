@@ -90,12 +90,33 @@ class PsetView {
         return $c ? $c->hash : false;
     }
 
+    function find_commit($hash) {
+        if ($hash === "handout") {
+            return $this->base_handout_commit();
+        }
+        if ($hash && ($c = git_commit_in_list($this->pset->handout_commits(), $hash))) {
+            return $c;
+        }
+        if ($this->repo) {
+            if ($hash === "head" || $hash === "latest") {
+                return $this->latest_commit();
+            } else if ($hash === "grade" || $hash === "grading") {
+                $hash = $this->grading_hash();
+            }
+            if ($hash) {
+                return $this->repo->connected_commit($hash, $this->pset, $this->branch);
+            }
+        }
+        return null;
+    }
+
     function set_hash($reqhash) {
         $this->hash = false;
         $this->commit_record = $this->commit_notes = $this->derived_handout_commit = $this->tabwidth = false;
         $this->n_visible_grades = null;
-        if (!$this->repo)
+        if (!$this->repo) {
             return false;
+        }
         if ($reqhash) {
             $c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch);
         } else {
@@ -107,8 +128,9 @@ class PsetView {
                 $c = $this->latest_commit();
             }
         }
-        if ($c)
+        if ($c) {
             $this->hash = $c->hash;
+        }
         return $this->hash;
     }
 
@@ -120,7 +142,7 @@ class PsetView {
         }
     }
 
-    function set_commit(RepositoryCommitInfo $commit) {
+    function set_commit(CommitRecord $commit) {
         $this->force_set_hash($commit->hash);
     }
 
@@ -141,10 +163,11 @@ class PsetView {
         if ($this->hash === null)
             error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $this->viewer->email);
         assert($this->hash !== null);
-        if ($this->hash)
+        if ($this->hash) {
             return $this->recent_commits($this->hash);
-        else
+        } else {
             return false;
+        }
     }
 
     function can_have_grades() {
@@ -152,12 +175,13 @@ class PsetView {
     }
 
     function recent_commits($hash = null) {
-        if (!$this->repo)
-            return [];
-        else if (!$hash)
+        if (!$this->repo) {
+            return $hash ? null : [];
+        } else if (!$hash) {
             return $this->repo->commits($this->pset, $this->branch);
-        else
+        } else {
             return $this->repo->connected_commit($hash, $this->pset, $this->branch);
+        }
     }
 
     function latest_commit() {
@@ -175,7 +199,7 @@ class PsetView {
         return $this->hash && $this->hash === $this->latest_hash();
     }
 
-    function derived_handout_hash() {
+    function derived_handout_commit() {
         if ($this->derived_handout_commit === false) {
             $this->derived_handout_commit = null;
             $hbases = $this->pset->handout_commits();
@@ -184,13 +208,27 @@ class PsetView {
                 if ($c->hash === $this->hash)
                     $seen_hash = true;
                 if (isset($hbases[$c->hash])) {
-                    $this->derived_handout_commit = $c->hash;
+                    $this->derived_handout_commit = $c;
                     if ($seen_hash)
                         break;
                 }
             }
         }
-        return $this->derived_handout_commit ? : false;
+        return $this->derived_handout_commit;
+    }
+
+    function derived_handout_hash() {
+        $c = $this->derived_handout_commit();
+        return $c ? $c->hash : false;
+    }
+
+    function base_handout_commit() {
+        if (!$this->pset->handout_hash
+            && ($c = $this->derived_handout_commit())) {
+            return $c;
+        } else {
+            return $this->pset->handout_commit();
+        }
     }
 
     function is_handout_commit() {
@@ -1145,7 +1183,7 @@ class PsetView {
         return new LineNotesOrder(null, $this->can_view_grades(), $this->pc_view);
     }
 
-    function diff($hasha, $hashb, LineNotesOrder $lnorder = null, $args = []) {
+    function diff($commita, $commitb, LineNotesOrder $lnorder = null, $args = []) {
         if (!$this->added_diffinfo) {
             if (($rs = $this->commit_info("runsettings"))
                 && ($id = get($rs, "IGNOREDIFF"))) {
@@ -1158,7 +1196,7 @@ class PsetView {
         if ($lnorder) {
             $args["needfiles"] = $lnorder->fileorder();
         }
-        $diff = $this->repo->diff($this->pset, $hasha, $hashb, $args);
+        $diff = $this->repo->diff($this->pset, $commita, $commitb, $args);
 
         // expand diff to include all grade landmarks
         if ($this->pset->has_grade_landmark
