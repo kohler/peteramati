@@ -159,44 +159,50 @@ class GitHub_RepositorySite extends RepositorySite {
                 return $user->change_username("github", null);
             return Conf::msg_error("Empty username.");
         }
-        if (preg_match('_[@,;:~/\[\](){}\\<>&#=\\000-\\027]_', $username))
+        if (preg_match('_[@,;:~/\[\](){}\\<>&#=\\000-\\027]_', $username)) {
             return Conf::msg_error("The username “" . htmlspecialchars($username) . "” contains funny characters. Remove them.");
+        }
 
         // is it in use?
         $x = $user->conf->fetch_value("select contactId from ContactInfo where github_username=?", $username);
-        if ($x && $x != $user->contactId)
+        if ($x && $x != $user->contactId) {
             return Conf::msg_error("That username is already in use.");
+        }
 
         // is it valid? XXX GitHub API
-        $response = null;
-        if (($org = $user->conf->opt("githubOrganization"))) {
-            $url = "https://api.github.com/orgs/" . urlencode($org) . "/members/" . urlencode($username);
-            $response = self::api($user->conf, $url);
-            if ($response->status == 404 && $user->conf->opt("githubRequireOrganizationMembership"))
-                return Conf::msg_error("That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . " that manages the class. Follow the link for registering with the class, or contact course staff.");
-        }
-        if (!$response || $response->status == 404) {
-            $url = "https://api.github.com/users/" . urlencode($username);
-            $response = self::api($user->conf, $url);
-        }
-
-        if ($response->status == 404)
-            return Conf::msg_error("That username doesn’t appear to exist. Check your spelling.");
-        else if ($response->status != 200 && $response->status != 204)
-            return Conf::msg_error("Error contacting " . htmlspecialchars($userurl) . " (response code $response_code). Maybe try again?");
-
-        if ($org && ($staff_team = $user->conf->opt("githubStaffTeam")) && $user->is_student()) {
-            if (!is_int($staff_team)) {
-                $staff_team = self::api_find_first($user->conf, "https://api.github.com/orgs/" . urlencode($org) . "/teams?per_page=100", function ($team) use ($staff_team) {
-                    if (isset($team->name) && $team->name === $staff_team)
-                        return $team->id;
-                });
+        $org = $user->conf->opt("githubOrganization");
+        $staff_team = $user->conf->opt("githubStaffTeam");
+        $gq = "{ user(login:" . json_encode($username) . ") { id";
+        if ($org) {
+            $gq .= ", organization(login:" . json_encode($org) . ") { id";
+            if ($staff_team) {
+                $gq .= ", team(slug:" . json_encode($staff_team) . ") {"
+                    . " members(query:" . json_encode($username) . ") { nodes { login } } }";
             }
-            if (is_int($staff_team)) {
-                $tresp = self::api($user->conf, "https://api.github.com/teams/$staff_team/members/" . urlencode($username));
-                if ($tresp->status == 200 || $tresp->status == 204)
-                    return Conf::msg_error("That username belongs to a member of the course staff.");
+            $gq .= " }";
+        }
+        $gq .= " } }";
+        $gql = self::graphql($user->conf, $gq);
+        if ($gql->status !== 200
+            || !$gql->j
+            || !isset($gql->j->data)) {
+            error_log(json_encode($gql));
+            return Conf::msg_error("Error contacting the GitHub API. Maybe try again?");
+        } else if (!isset($gql->j->data->user)) {
+            return Conf::msg_error("That user doesn’t exist. Check your spelling and try again.");
+        } else if (!isset($gql->j->data->user->organization)) {
+            if ($user->conf->opt("githubRequireOrganizationMembership")) {
+                return Conf::msg_error("That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . ", which manages the class. Follow the link to register with the class, or contact course staff.");
             }
+        } else if ($staff_team
+                   && $user->is_student()
+                   && isset($gql->j->data->user->organization->team)
+                   && isset($gql->j->data->user->organization->team->members)
+                   && array_filter($gql->j->data->user->organization->team->members->nodes,
+                                function ($node) use ($username) {
+                                    return strcasecmp($username, $node->login) === 0;
+                                })) {
+            return Conf::msg_error("That user is a member of the course staff.");
         }
 
         return $user->change_username("github", $username);
@@ -241,8 +247,9 @@ class GitHub_RepositorySite extends RepositorySite {
 
     function validate_open(MessageSet $ms = null) {
         $owner_name = $this->owner_name();
-        if (!$owner_name)
+        if (!$owner_name) {
             return -1;
+        }
         $gql = self::graphql($this->conf,
             "{ repository(owner:\"{$owner_name[0]}\", name:\"{$owner_name[1]}\") { isPrivate } }");
         if ($gql->status !== 200
@@ -256,8 +263,9 @@ class GitHub_RepositorySite extends RepositorySite {
         } else if (!$gql->j->data->repository->isPrivate) {
             $ms && $ms->set_error_html("open", $this->expand_message("repo_toopublic", $ms->user));
             return 1;
-        } else
+        } else {
             return 0;
+        }
     }
     function validate_working(MessageSet $ms = null) {
         $status = RepositorySite::run_remote_oauth($this->conf,
