@@ -66,15 +66,15 @@ class API_Repo {
         if (!$qreq->file) {
             return ["ok" => false, "error" => "Invalid request."];
         }
+        $info = PsetView::make($api->pset, $api->user, $user);
         if ((string) $qreq->base_hash === "") {
-            $base_commit = $api->pset->handout_commit();
+            $base_commit = $info->base_handout_commit();
         } else {
             $base_commit = $user->conf->check_api_hash($qreq->base_hash, $api);
         }
         if (!$base_commit) {
             return ["ok" => false, "error" => "Disconnected commit."];
         }
-        $info = PsetView::make($api->pset, $api->user, $user);
         $info->set_commit($api->commit);
         $lnorder = $info->viewable_line_notes();
         $diff = $info->repo->diff($api->pset, $base_commit, $info->commit(), array("needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file]));

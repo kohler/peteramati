@@ -60,8 +60,9 @@ class LineNotesOrder {
 
         $old_fileorder = $this->fileorder;
         $this->fileorder = [];
-        foreach ($this->diff as $file => $di)
+        foreach ($this->diff as $file => $di) {
             $this->fileorder[$file] = count($this->fileorder) + 1;
+        }
         foreach ($old_fileorder as $file => $x) {
             // Normally every file with notes will be present
             // already, but just in case---for example, the

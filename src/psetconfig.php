@@ -359,15 +359,6 @@ class Pset {
         return $this->conf->latest_handout_commit($this);
     }
 
-    function handout_commit() {
-        if ($this->handout_hash
-            && ($c = $this->handout_commits($this->handout_hash))) {
-            return $c;
-        } else {
-            return $this->latest_handout_commit();
-        }
-    }
-
 
     function grades() {
         return $this->grades;

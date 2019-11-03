@@ -223,11 +223,15 @@ class PsetView {
     }
 
     function base_handout_commit() {
-        if (!$this->pset->handout_hash
-            && ($c = $this->derived_handout_commit())) {
+        if ($this->pset->handout_hash
+            && ($c = $this->pset->handout_commits($this->pset->handout_hash))) {
+            return $c;
+        } else if (($c = $this->derived_handout_commit())) {
+            return $c;
+        } else if (($c = $this->pset->latest_handout_commit())) {
             return $c;
         } else {
-            return $this->pset->handout_commit();
+            return new CommitRecord(0, "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "", CommitRecord::HANDOUTHEAD);
         }
     }
 
