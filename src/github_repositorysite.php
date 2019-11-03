@@ -50,40 +50,6 @@ class GitHub_RepositorySite extends RepositorySite {
         return Ht::link($html, self::MAINURL);
     }
 
-    static function api(Conf $conf, $url, $post_data = null) {
-        $token = $conf->opt("githubOAuthToken");
-        if (!$token || $conf->opt("disableRemote"))
-            return false;
-        $header = "Accept: application/vnd.github.v3+json\r\n"
-            . "Authorization: token $token\r\n"
-            . "User-Agent: kohler/peteramati\r\n";
-        $htopt = ["timeout" => (float) $conf->validate_timeout, "ignore_errors" => true, "header" => $header];
-        if ($post_data !== null) {
-            $header .= "Content-Length: " . strlen($post_data) . "\r\n";
-            $htopt["method"] = "POST";
-            $htopt["content"] = $post_data;
-        }
-        $context = stream_context_create(array("http" => $htopt));
-        $response = new GitHubResponse($url);
-        if (($stream = fopen($url, "r", false, $context))) {
-            if (($metadata = stream_get_meta_data($stream))
-                && ($w = get($metadata, "wrapper_data"))
-                && is_array($w)) {
-                if (preg_match(',\AHTTP/[\d.]+\s+(\d+)\s+(.+)\z,', $w[0], $m)) {
-                    $response->status = (int) $m[1];
-                    $response->status_text = $m[2];
-                }
-                for ($i = 1; $i != count($w); ++$i)
-                    if (preg_match(',\A(.*?):\s*(.*)\z,', $w[$i], $m))
-                        $response->headers[strtolower($m[1])] = $m[2];
-            }
-            $response->content = stream_get_contents($stream);
-            if ($response->content !== false)
-                $response->j = json_decode($response->content);
-            fclose($stream);
-        }
-        return $response;
-    }
     static function graphql(Conf $conf, $post_data, $preencoded = false) {
         $token = $conf->opt("githubOAuthToken");
         if (!$token || $conf->opt("disableRemote"))
