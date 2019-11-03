@@ -84,23 +84,6 @@ class GitHub_RepositorySite extends RepositorySite {
         }
         return $response;
     }
-    static function api_next(Conf $conf, GitHubResponse $response) {
-        if (isset($response->headers["link"])
-            && preg_match('@(?:,|\A)\s*<(.*?)>\s*;\s*rel=\"?next\"?@', $response->headers["link"], $m))
-            return self::api($conf, $m[1]);
-        return false;
-    }
-    static function api_find_first(Conf $conf, $url, $callback) {
-        $resp = self::api($conf, $url);
-        while ($resp && $resp->status == 200 && is_array($resp->j)) {
-            foreach ($resp->j as $what)
-                if (($result = call_user_func($callback, $what, $resp)) !== null
-                    && $result !== false)
-                    return $result;
-            $resp = self::api_next($conf, $resp);
-        }
-        return false;
-    }
     static function graphql(Conf $conf, $post_data, $preencoded = false) {
         $token = $conf->opt("githubOAuthToken");
         if (!$token || $conf->opt("disableRemote"))
@@ -246,12 +229,12 @@ class GitHub_RepositorySite extends RepositorySite {
     }
 
     function validate_open(MessageSet $ms = null) {
-        $owner_name = $this->owner_name();
-        if (!$owner_name) {
+        if (!($owner_name = $this->owner_name())) {
             return -1;
         }
         $gql = self::graphql($this->conf,
-            "{ repository(owner:\"{$owner_name[0]}\", name:\"{$owner_name[1]}\") { isPrivate } }");
+            "{ repository(owner:" . json_encode($owner_name[0])
+            . ", name:" . json_encode($owner_name[1]) . ") { isPrivate } }");
         if ($gql->status !== 200
             || !$gql->j
             || !isset($gql->j->data)) {
@@ -306,13 +289,29 @@ class GitHub_RepositorySite extends RepositorySite {
     }
     function validate_ownership(Repository $repo, Contact $user, Contact $partner = null,
                                 MessageSet $ms = null) {
-        if (!$user->github_username)
+        if (!$user->github_username
+            || !($owner_name = $this->owner_name())) {
             return -1;
-        $response = self::api($this->conf, "https://api.github.com/repos/" . $this->base . "/collaborators/" . urlencode($user->github_username));
-        if ($response && $response->status == 204)
+        }
+        $gq = "{ repository(owner:" . json_encode($owner_name[0])
+            . ", name:" . json_encode($owner_name[1]) . ") { "
+            . " collaborators(query:" . json_encode($user->github_username)
+            . ") { nodes { login } } } }";
+        $gql = self::graphql($this->conf, $gq);
+        if ($gql->status !== 200
+            || !$gql->j
+            || !isset($gql->j->data)) {
+            error_log(json_encode($gql));
+            return -1;
+        } else if ($gql->j->data->repository == null) { // no such repository
+            return -1;
+        } else if (array_filter($gql->j->data->repository->collaborators->nodes,
+                        function ($node) use ($user) {
+                            return strcasecmp($node->login, $user->github_username) === 0;
+                        })) {
             return 1;
-        if ($response && $response->status == 404)
+        } else {
             return 0;
-        return -1;
+        }
     }
 }
