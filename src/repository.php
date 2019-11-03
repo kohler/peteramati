@@ -108,8 +108,8 @@ class Repository {
         return $repo;
     }
 
-    function web_url() {
-        return $this->reposite->web_url();
+    function https_url() {
+        return $this->reposite->https_url();
     }
     function ssh_url() {
         return $this->reposite->ssh_url();
@@ -134,15 +134,13 @@ class Repository {
     function refresh($delta, $foreground = false) {
         global $ConfSitePATH, $Now;
         if ((!$this->snapcheckat || $this->snapcheckat + $delta <= $Now)
-            && !$this->conf->opt("disableGitfetch")
             && !$this->conf->opt("disableRemote")) {
             $this->conf->qe("update Repository set snapcheckat=? where repoid=?", $Now, $this->repoid);
             $this->snapcheckat = $Now;
-            if ($foreground)
+            if ($foreground) {
                 set_time_limit(30);
-            // see also handout_repo
-            $command = "$ConfSitePATH/src/gitfetch $this->repoid $this->cacheid " . escapeshellarg($this->ssh_url()) . " 1>&2" . ($foreground ? "" : " &");
-            shell_exec($command);
+            }
+            $this->reposite->gitfetch($this->repoid, $this->cacheid, $foreground);
         }
     }
 

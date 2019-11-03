@@ -11,14 +11,13 @@ usage () {
     echo "       gitfetch [-f] [-u|--user] USERNAME [PSET]" 1>&2
     echo "       gitfetch [-f] [--url] URL [CACHEID]" 1>&2
     echo "       gitfetch [-f] --refresh" 1>&2
+    echo "Requires GIT_USERNAME and GIT_PASSWORD from the environment." 1>&2
     exit $1
 }
 
-test -z "$GITSSH_CONFIG" && export GITSSH_CONFIG="${CONFDIR}gitssh_config"
-test -z "$GITSSH_REPOCACHE" && GITSSH_REPOCACHE="${MAINDIR}repo"
-test -z "$GIT_SSH" && export GIT_SSH="${SRCDIR}gitssh"
-if [ ! -r "$GITSSH_CONFIG" -o ! -d "$GITSSH_REPOCACHE" ]; then
-    echo "Bad GITSSH_CONFIG and/or GITSSH_REPOCACHE" 1>&2
+test -z "$GIT_REPOCACHE" && GIT_REPOCACHE="${MAINDIR}repo"
+if [ ! -d "$GIT_REPOCACHE" -o -z "$GIT_USERNAME" -o -z "$GIT_PASSWORD" ]; then
+    echo "Bad GIT_USERNAME/GIT_PASSWORD/GIT_REPOCACHE" 1>&2
     usage 1
 fi
 
@@ -107,15 +106,11 @@ else
     fi
 fi
 
-if expr "$url" : "https://github.com/" >/dev/null 2>&1; then
-    url="`echo "$url" | sed 's,^https://github.com/,git@github.com:,'`"
-fi
-
-repo_dir="$GITSSH_REPOCACHE/repo$cacheid"
+repo_dir="$GIT_REPOCACHE/repo$cacheid"
 if test ! -d "$repo_dir"; then
     mkdir -m 02770 "$repo_dir" || exit 1
     chmod g+s "$repo_dir"
-    chgrp `find "$GITSSH_REPOCACHE" -maxdepth 0 -printf %g` "$repo_dir"
+    chgrp `find "$GIT_REPOCACHE" -maxdepth 0 -printf %g` "$repo_dir"
 fi
 
 old_dir="`pwd`"
@@ -147,7 +142,7 @@ if test -f .git/FETCH_HEAD -a ! -w .git/FETCH_HEAD; then
     rm -f .git/FETCH_HEAD
 fi
 
-git fetch repo$repoid
+git -c credential.helper= -c credential.helper='!f () { echo username=$GIT_USERNAME; echo password=$GIT_PASSWORD; }; f' fetch repo$repoid
 gitfetch_status=$?
 
 now=`date -u '+%Y%m%d.%H%M%S<%s'`

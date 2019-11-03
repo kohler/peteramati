@@ -255,7 +255,7 @@ class ContactView {
         if (!RepositorySite::is_primary($repo))
             $title = $repo->reposite->friendly_siteclass() . " " . $title;
         if ($repo && $repo->url)
-            $title = $user->link_repo($title, $repo->web_url());
+            $title = $user->link_repo($title, $repo->https_url());
 
         if ($editable) {
             $xvalue = $repo_url;

@@ -1708,18 +1708,20 @@ class Conf {
             $cacheid = $inrepo ? $inrepo->cacheid : $hrepo->cacheid;
             $hset = $this->setting_json("handoutrepos");
             $save = false;
-            if (!$hset)
+            if (!$hset) {
                 $save = $hset = (object) array();
-            if (!($hme = get($hset, $hrepoid)))
+            }
+            if (!($hme = get($hset, $hrepoid))) {
                 $save = $hme = $hset->$hrepoid = (object) array();
+            }
             if ((int) get($hme, $cacheid) + 300 < $Now
-                && !$this->opt("disableGitfetch")
                 && !$this->opt("disableRemote")) {
                 $save = $hme->$cacheid = $Now;
-                shell_exec("$ConfSitePATH/src/gitfetch $hrepo->repoid $cacheid " . escapeshellarg($hrepo->ssh_url()) . " </dev/null 1>&2 &");
+                $hrepo->reposite->gitfetch($hrepo->repoid, $cacheid, false);
             }
-            if ($save)
+            if ($save) {
                 $this->save_setting("handoutrepos", 1, $hset);
+            }
         }
         return $hrepo;
     }

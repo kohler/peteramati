@@ -212,7 +212,7 @@ class GitHub_RepositorySite extends RepositorySite {
         return "https://github.com/";
     }
 
-    function web_url() {
+    function https_url() {
         return "https://github.com/" . $this->base;
     }
     function ssh_url() {
@@ -260,16 +260,38 @@ class GitHub_RepositorySite extends RepositorySite {
             return 0;
     }
     function validate_working(MessageSet $ms = null) {
-        $status = RepositorySite::run_ls_remote($this->conf, $this->ssh_url(), $output);
+        $status = RepositorySite::run_remote_oauth($this->conf,
+            $this->conf->opt("githubOAuthClientId"), $this->conf->opt("githubOAuthToken"),
+            "ls-remote " . escapeshellarg($this->https_url()) . " 2>&1",
+            $output);
         $answer = join("\n", $output);
-        if ($status == 0 && $ms)
-            $ms->set_error_html("working", $this->expand_message("repo_unreadable", $ms->user));
-        if ($status > 0 && !preg_match(',^[0-9a-f]{40}\s+refs/heads/master,m', $answer)) {
-            if ($ms)
-                $ms->set_error_html("working", $this->expand_message("repo_nomaster", $ms->user));
+        if ($status >= 124) { // timeout
+            $status = -1;
+        } else if (!preg_match('{\A[0-9a-f]{40,}\s+}', $answer)) {
+            $ms && $ms->set_error_html("working", $this->expand_message("repo_unreadable", $ms->user));
             $status = 0;
+        } else if (!preg_match('{^[0-9a-f]{40,}\s+refs/heads/master}m', $answer)) {
+            $ms && $ms->set_error_html("working", $this->expand_message("repo_nomaster", $ms->user));
+            $status = 0;
+        } else {
+            $status = 1;
         }
         return $status;
+    }
+    function gitfetch($repoid, $cacheid, $foreground) {
+        global $ConfSitePATH;
+        if (!($id = $this->conf->opt("githubOAuthClientId"))
+            || !($token = $this->conf->opt("githubOAuthToken"))
+            || !ctype_alnum($token)) {
+            return false;
+        }
+        putenv("GIT_USERNAME=$id");
+        putenv("GIT_PASSWORD=$token");
+        shell_exec(escapeshellarg("$ConfSitePATH/src/gitfetch")
+            . " $repoid $cacheid " . escapeshellarg($this->https_url())
+            . " 1>&2 " . ($foreground ? "" : " &"));
+        putenv("GIT_USERNAME");
+        putenv("GIT_PASSWORD");
     }
     function validate_ownership_always() {
         return false;

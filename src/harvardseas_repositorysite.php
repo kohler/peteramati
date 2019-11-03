@@ -98,7 +98,7 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
         return "https://code.seas.harvard.edu/";
     }
 
-    function web_url() {
+    function https_url() {
         return "https://code.seas.harvard.edu/" . $this->base;
     }
     function ssh_url() {

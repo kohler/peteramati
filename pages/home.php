@@ -1251,7 +1251,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     //htmlspecialchars($s->email), "</a></td>";
 
     if (!$pset->gitless && $info->repo) {
-        $j["repo"] = RepositorySite::make_web_url($info->repo->url, $info->conf);
+        $j["repo"] = RepositorySite::make_https_url($info->repo->url, $info->conf);
         if (!$info->repo->working) {
             $j["repo_broken"] = true;
         } else if (!$info->user_can_view_repo_contents(true)) {

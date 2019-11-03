@@ -6,7 +6,6 @@
 class RepositorySite {
     public $url;
     static public $sitemap = ["github" => "GitHub_RepositorySite", "harvardseas" => "HarvardSEAS_RepositorySite"];
-    static private $gitssh_config_checked = 0;
 
     static function is_primary(Repository $repo = null) {
         return $repo === null
@@ -24,7 +23,7 @@ class RepositorySite {
         }
         return new Bad_RepositorySite($url);
     }
-    static function make_web_url($url, Conf $conf) {
+    static function make_https_url($url, Conf $conf) {
         if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)([^/:]+(?::\d+)?)(?::/*|/+)(.*?)(?:\.git|)\z_i', $url, $m))
             return "https://" . $m[1] . "/" . $m[2];
         return $url;
@@ -38,7 +37,7 @@ class RepositorySite {
         return $this->siteclass;
     }
 
-    function web_url() {
+    function https_url() {
         return $this->url;
     }
     function ssh_url() {
@@ -69,35 +68,36 @@ class RepositorySite {
         return -1;
     }
 
-    static function run_ls_remote(Conf $conf, $url, &$output) {
-        global $ConfSitePATH, $Me;
-        $output = [];
-        if ($conf->opt("disableRemote") || self::$gitssh_config_checked < 0)
-            return -1;
-        if (self::$gitssh_config_checked == 0) {
-            $config = getenv("GITSSH_CONFIG");
-            if (!$config || !is_readable($config)) {
-                if ($Me && $Me->privChair)
-                    $conf->errorMsg("The <code>gitssh_config</code> file isn’t configured, so I can’t access remote repositories.");
-                return (self::$gitssh_config_checked = -1);
-            }
-            if (!is_executable("$ConfSitePATH/jail/pa-timeout")) {
-                if ($Me && $Me->privChair)
-                    $conf->errorMsg("The <code>jail/pa-timeout</code> program hasn’t been built, so I can’t access remote repositories. Run <code>cd DIR/jail; make</code>.");
-                return (self::$gitssh_config_checked = -1);
-            }
-            self::$gitssh_config_checked = 1;
+    static private function chair_error($error) {
+        global $Me;
+        if ($Me && $Me->privChair) {
+            $Me->conf->errorMsg($s);
         }
-        $command = "GIT_SSH=" . escapeshellarg("$ConfSitePATH/src/gitssh")
-            . " $ConfSitePATH/jail/pa-timeout " . $conf->validate_timeout
-            . " git ls-remote " . escapeshellarg($url) . " 2>&1";
-        exec($command, $output, $status);
-        if ($status >= 124) // timeout or pa-timeout error
+        return -1;
+    }
+    static function run_remote_oauth(Conf $conf, $clientid, $token,
+                                     $gitcommand, &$output) {
+        global $ConfSitePATH, $Me;
+        if ($conf->opt("disableRemote")) {
+            if (is_string($conf->opt("disableRemote"))) {
+                self::chair_error(htmlspecialchars($conf->opt("disableRemote")));
+            }
             return -1;
-        else if (!empty($output) && preg_match(',\A[0-9a-f]{40}\s+,', $output[0]))
-            return 1;
-        else
-            return 0;
+        }
+        if (!$clientid || !$token) {
+            return self::chair_error("Missing OAuth client ID and/or token.");
+        } else if (!ctype_alnum($token)) {
+            return $this->chair_error("Bad OAuth token.");
+        }
+        putenv("GIT_USERNAME=$clientid");
+        putenv("GIT_PASSWORD=$token");
+        $command = "$ConfSitePATH/jail/pa-timeout " . $conf->validate_timeout
+            . " git -c credential.helper= -c " . escapeshellarg("credential.helper=!f() { echo username=\$GIT_USERNAME; echo password=\$GIT_PASSWORD; }; f")
+            . " " . $gitcommand;
+        exec($command, $output, $status);
+        putenv("GIT_USERNAME");
+        putenv("GIT_PASSWORD");
+        return $status;
     }
 }
 

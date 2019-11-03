@@ -348,8 +348,11 @@ function load_pset_info() {
 
 load_pset_info();
 
-putenv("GIT_SSH=$ConfSitePATH/src/gitssh");
-putenv("GITSSH_CONFIG=$ConfSitePATH/conf/gitssh_config");
-putenv("GITSSH_REPOCACHE=$ConfSitePATH/repo");
-if ($Conf->opt("mysql", null) !== null)
+putenv("GIT_REPOCACHE=$ConfSitePATH/repo");
+if ($Conf->opt("mysql", null) !== null) {
     putenv("MYSQL=" . $Conf->opt("mysql"));
+}
+if (!$Conf->opt("disableRemote")
+    && !is_executable("$ConfSitePATH/jail/pa-timeout")) {
+    $Conf->set_opt("disableRemote", "The `pa-timeout` program has not been built. Run `cd DIR/jail; make` to access remote repositories.");
+}
