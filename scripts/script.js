@@ -3212,7 +3212,7 @@ function pa_loadgrades(gi) {
     g = "" + tm[0];
     if ($v.text() !== g) {
         $v.text(g);
-        pa_draw_gradecdf($pi.find(".pa-gradecdf"));
+        pa_draw_gradecdf($pi.find(".pa-grgraph"));
     }
 }
 
