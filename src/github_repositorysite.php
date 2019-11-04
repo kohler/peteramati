@@ -94,15 +94,14 @@ class GitHub_RepositorySite extends RepositorySite {
     }
 
     static function graphql(Conf $conf, $post_data, $preencoded = false) {
-        $token = $conf->opt("githubOAuthToken");
-        if (!$token || $conf->opt("disableRemote")) {
-            return false;
-        }
-        if (is_string($post_data) && !$preencoded) {
-            $post_data = json_encode(["query" => $post_data]);
-        }
         $response = new GitHubResponse("https://api.github.com/graphql");
-        $response->run_post($conf, "application/json", $post_data, "Authorization: token $token\r\n");
+        $token = $conf->opt("githubOAuthToken");
+        if ($token && !$conf->opt("disableRemote")) {
+            if (is_string($post_data) && !$preencoded) {
+                $post_data = json_encode(["query" => $post_data]);
+            }
+            $response->run_post($conf, "application/json", $post_data, "Authorization: token $token\r\n");
+        }
         return $response;
     }
 

@@ -36,11 +36,11 @@ if ($Qreq->code) {
             "client_id" => $clientid, "client_secret" => $clientsecret,
             "code" => $Qreq->code, "state" => $state
         ], "Accept: application/json\r\n");
-    error_log($response->content);
     if ($response->status === 200
         && $response->j
         && isset($response->j->access_token)) {
         $Conf->save_setting("opt.githubOAuthToken", 1, $response->j->access_token);
+        $Conf->save_setting("__github_oauth", null);
         Navigation::redirect_site("");
     } else {
         error_exit($Conf, "Failed response to authorization attempt.");
