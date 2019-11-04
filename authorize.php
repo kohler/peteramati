@@ -12,9 +12,9 @@ $clientid = $Conf->opt("githubOAuthClientId");
 $clientsecret = $Conf->opt("githubOAuthClientSecret");
 
 function error_exit($conf, $msg) {
-    $Conf->header("GitHub authorization", "home");
-    $Conf->errorMsg($msg);
-    $Conf->footer();
+    $conf->header("GitHub authorization", "home");
+    $conf->errorMsg($msg);
+    $conf->footer();
     exit;
 }
 

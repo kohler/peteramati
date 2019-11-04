@@ -53,7 +53,7 @@ class GitHubResponse implements JsonSerializable {
             }
             $this->content = stream_get_contents($stream);
             if ($this->content !== false
-                && (empty($this->headers) || $this->headers["content-type"] === "application/json")) {
+                && (empty($this->headers) || str_starts_with($this->headers["content-type"], "application/json"))) {
                 $this->j = json_decode($this->content);
             }
             fclose($stream);
