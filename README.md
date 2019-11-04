@@ -34,6 +34,24 @@ stored here.
 3. Configure your web server to access Peteramati. The right way to do
 this depends on which server you’re running.
 
+    **Nginx**: Configure Nginx to access `php-fpm` for anything under
+the Peteramati URL path. All accesses should be redirected to
+`index.php`. This example, which would go in a `server` block, makes
+`/testclass` point at a Peteramati installation in
+/home/kohler/peteramati (assuming that the running `php-fpm` is
+listening on port 9000):
+
+        location /testclass/ {
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_split_path_info ^(/testclass)(/.*)$;
+            fastcgi_param SCRIPT_FILENAME /home/kohler/peteramati/index.php;
+            include fastcgi_params;
+        }
+
+    You may also set up separate `location` blocks so that Nginx
+directly serves static files under `/testclass/images/`,
+`/testclass/scripts/`, and `/testclass/stylesheets/`.
+
     **Apache**: Add a `<Directory>` to `httpd.conf` (or one of its
 inclusions) for the Peteramati directory; an `Alias` redirecting your
 preferred URL path to that directory; and a `FallbackResource` for
@@ -57,32 +75,15 @@ be served by Peteramati. This normally happens automatically. However,
 if the URL path is `/`, you may need to turn off your server’s default
 handlers for subdirectories such as `/doc`.
 
-    **Nginx**: Configure Nginx to access `php-fpm` for anything under
-the Peteramati URL path. All accesses should be redirected to
-`index.php`. This example, which would go in a `server` block, makes
-`/testclass` point at a Peteramati installation in
-/home/kohler/peteramati (assuming that the running `php-fpm` is
-listening on port 9000):
-
-        location /testclass/ {
-            fastcgi_pass 127.0.0.1:9000;
-            fastcgi_split_path_info ^(/testclass)(/.*)$;
-            fastcgi_param SCRIPT_FILENAME /home/kohler/peteramati/index.php;
-            include fastcgi_params;
-        }
-
-    You may also set up separate `location` blocks so that Nginx
-directly serves static files under `/testclass/images/`,
-`/testclass/scripts/`, and `/testclass/stylesheets/`.
-
 4. Build the `pa-jail` program and other helper programs.
 
         cd jail && make
 
     The `pa-jail` program must be set-uid/gid root, so you may need to build
-    it using `sudo make`.
+it using `sudo make`.
 
-5. Configure a GitHub OAuth app.
+5. Configure a GitHub OAuth app. Peteramati assumes you’re using GitHub to
+collect user information.
 
     * Create a new OAuth app on your organization’s Settings page. Set the
       callback URL to a prefix of the URL where your application will live;
@@ -94,9 +95,13 @@ directly serves static files under `/testclass/images/`,
       `$Opt["githubOAuthClientSecret"]` to the app’s Client ID and Client
       Secret, respectively. These values are strings.
 
-6. XXX Create an access token
+6. XXX Log in to the site. The first user gets administrator privilege.
 
-7. XXX Configure the jail
+7. XXX Obtain a GitHub OAuth token, either by visiting `SITE/authorize`, or by
+configuring a personal access token and setting `$Opt["githubOAuthToken"]`
+explicitly in `conf/options.php`.
+
+8. XXX Configure the jail.
 
 License
 -------
