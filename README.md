@@ -82,9 +82,21 @@ directly serves static files under `/testclass/images/`,
     The `pa-jail` program must be set-uid/gid root, so you may need to build
     it using `sudo make`.
 
-5. XXX Configure conf/gitssh_config and conf/sshid
+5. Configure a GitHub OAuth app.
 
-6. XXX Configure the jail
+    * Create a new OAuth app on your organization’s Settings page. Set the
+      callback URL to a prefix of the URL where your application will live;
+      for instance, an application living at
+      `https://cs61.seas.harvard.edu/grade/cs61-2019/` might have that
+      callback URL, or callback URL `https://cs61.seas.harvard.edu/`.
+
+    * Edit `conf/options.php` to set `$Opt["githubOAuthClientId"]` and
+      `$Opt["githubOAuthClientSecret"]` to the app’s Client ID and Client
+      Secret, respectively. These values are strings.
+
+6. XXX Create an access token
+
+7. XXX Configure the jail
 
 License
 -------

@@ -16,6 +16,49 @@ class GitHubResponse implements JsonSerializable {
     function jsonSerialize() {
         return $this->j ? : ["status" => $this->status, "content" => $this->content];
     }
+    function run_post(Conf $conf, $content_type, $content, $header = "") {
+        if (is_array($content) || is_object($content)) {
+            if ($content_type === "application/x-www-form-urlencoded") {
+                $content = (array) $content;
+                $content = join("&", array_map(function ($k, $v) {
+                    return urlencode($k) . "=" . urlencode($v);
+                }, array_keys($content), array_values($content)));
+            } else if ($content_type === "application/json") {
+                $content = json_encode($content);
+            } else {
+                throw new Error();
+            }
+        }
+        $header .= "User-Agent: kohler/peteramati\r\n"
+            . "Content-Type: $content_type\r\n"
+            . "Content-Length: " . strlen($content) . "\r\n";
+        $htopt = [
+            "timeout" => (float) $conf->validate_timeout,
+            "ignore_errors" => true, "method" => "POST",
+            "header" => $header, "content" => $content
+        ];
+        $context = stream_context_create(array("http" => $htopt));
+        if (($stream = fopen($this->url, "r", false, $context))) {
+            if (($metadata = stream_get_meta_data($stream))
+                && ($w = get($metadata, "wrapper_data"))
+                && is_array($w)) {
+                if (preg_match(',\AHTTP/[\d.]+\s+(\d+)\s+(.+)\z,', $w[0], $m)) {
+                    $this->status = (int) $m[1];
+                    $this->status_text = $m[2];
+                }
+                for ($i = 1; $i != count($w); ++$i) {
+                    if (preg_match(',\A(.*?):\s*(.*)\z,', $w[$i], $m))
+                        $this->headers[strtolower($m[1])] = $m[2];
+                }
+            }
+            $this->content = stream_get_contents($stream);
+            if ($this->content !== false
+                && (empty($this->headers) || $this->headers["content-type"] === "application/json")) {
+                $this->j = json_decode($this->content);
+            }
+            fclose($stream);
+        }
+    }
 }
 
 class GitHub_RepositorySite extends RepositorySite {
@@ -52,36 +95,14 @@ class GitHub_RepositorySite extends RepositorySite {
 
     static function graphql(Conf $conf, $post_data, $preencoded = false) {
         $token = $conf->opt("githubOAuthToken");
-        if (!$token || $conf->opt("disableRemote"))
+        if (!$token || $conf->opt("disableRemote")) {
             return false;
-        if (is_string($post_data) && !$preencoded)
-            $post_data = json_encode(["query" => $post_data]);
-        $header = "Authorization: token $token\r\n"
-            . "User-Agent: kohler/peteramati\r\n"
-            . "Content-Type: application/json\r\n"
-            . "Content-Length: " . strlen($post_data) . "\r\n";
-        $htopt = ["timeout" => (float) $conf->validate_timeout,
-            "ignore_errors" => true, "method" => "POST",
-            "header" => $header, "content" => $post_data];
-        $context = stream_context_create(array("http" => $htopt));
-        $response = new GitHubResponse("https://api.github.com/graphql");
-        if (($stream = fopen("https://api.github.com/graphql", "r", false, $context))) {
-            if (($metadata = stream_get_meta_data($stream))
-                && ($w = get($metadata, "wrapper_data"))
-                && is_array($w)) {
-                if (preg_match(',\AHTTP/[\d.]+\s+(\d+)\s+(.+)\z,', $w[0], $m)) {
-                    $response->status = (int) $m[1];
-                    $response->status_text = $m[2];
-                }
-                for ($i = 1; $i != count($w); ++$i)
-                    if (preg_match(',\A(.*?):\s*(.*)\z,', $w[$i], $m))
-                        $response->headers[strtolower($m[1])] = $m[2];
-            }
-            $response->content = stream_get_contents($stream);
-            if ($response->content !== false)
-                $response->j = json_decode($response->content);
-            fclose($stream);
         }
+        if (is_string($post_data) && !$preencoded) {
+            $post_data = json_encode(["query" => $post_data]);
+        }
+        $response = new GitHubResponse("https://api.github.com/graphql");
+        $response->run_post($conf, "application/json", $post_data, "Authorization: token $token\r\n");
         return $response;
     }
 
