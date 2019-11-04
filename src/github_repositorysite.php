@@ -264,9 +264,10 @@ class GitHub_RepositorySite extends RepositorySite {
         }
         putenv("GIT_USERNAME=$id");
         putenv("GIT_PASSWORD=$token");
-        shell_exec(escapeshellarg("$ConfSitePATH/src/gitfetch")
+        $command = escapeshellarg("$ConfSitePATH/src/gitfetch")
             . " $repoid $cacheid " . escapeshellarg($this->https_url())
-            . " 1>&2 " . ($foreground ? "" : " &"));
+            . " 1>&2" . ($foreground ? "" : " &");
+        shell_exec($command);
         putenv("GIT_USERNAME");
         putenv("GIT_PASSWORD");
     }

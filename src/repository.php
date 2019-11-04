@@ -246,14 +246,24 @@ class Repository {
             is_dir($repodir) || mkdir($repodir, 0770);
             shell_exec("cd $repodir && git init --shared");
         }
+        $descriptors = [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]];
+        $proc = proc_open("cd $repodir && $command", $descriptors, $pipes, $repodir);
+        $stdout = $stderr = "";
+        while (!feof($pipes[1]) || !feof($pipes[2])) {
+            $x = fread($pipes[1], 32768);
+            $y = fread($pipes[2], 32768);
+            $stdout .= $x;
+            $stderr .= $y;
+            if ($x === false || $y === false) {
+                break;
+            }
+        }
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $status = proc_close($proc);
         if (!$want_stderr) {
-            return shell_exec("cd $repodir && $command");
+            return $stdout;
         } else {
-            $descriptors = [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]];
-            $proc = proc_open($command, $descriptors, $pipes, $repodir);
-            $stdout = stream_get_contents($pipes[1]);
-            $stderr = stream_get_contents($pipes[2]);
-            $status = proc_close($proc);
             return (object) ["stdout" => $stdout, "stderr" => $stderr, "status" => $status];
         }
     }

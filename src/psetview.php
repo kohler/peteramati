@@ -1195,6 +1195,11 @@ class PsetView {
             }
             $this->added_diffinfo = true;
         }
+        // both repos must be in the same directory; assume handout
+        // is only potential problem
+        if ($commita->is_handout() !== $commitb->is_handout()) {
+            $this->conf->handout_repo($this->pset, $this->repo);
+        }
 
         assert(!isset($args["needfiles"]));
         if ($lnorder) {
