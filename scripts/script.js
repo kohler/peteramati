@@ -6442,7 +6442,7 @@ function pa_render_pset_table(pconf, data) {
         var checked_spos = $j.find(".papsel:checked").toArray().map(function (x) {
                 return x.parentElement.parentElement.getAttribute("data-pa-spos");
             }),
-            my_spos = this.closest(".pa-dl").getAttribute("data-pa-spos");
+            my_spos = this.closest("tr").getAttribute("data-pa-spos");
         if (checked_spos.indexOf(my_spos) < 0) {
             gdialog_fill([my_spos]);
         } else {
