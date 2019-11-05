@@ -2430,7 +2430,7 @@ tr.gtrow-partner {
 }
 .garrett .pa-notebox {
 	background:
-	    conic-gradient(red, orange, yellow, green, blue, purple, red);
+	    conic-gradient(red, orange, yellow, green, #ddddff, purple, red);
 }
 .live .pa-gi:hover, .pa-dl.live {
 	background-color: #f8eec7;
