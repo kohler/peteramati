@@ -1326,7 +1326,7 @@ class PsetView {
             echo " uim pa-editablenotes live";
         }
         if ($this->viewer->email === "gtanzer@college.harvard.edu") {
-            echo ' garrett';
+            echo " garrett";
         }
         if (!$this->user_can_view_grades()) {
             echo " hidegrades";

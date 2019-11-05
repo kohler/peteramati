@@ -2430,7 +2430,22 @@ tr.gtrow-partner {
 }
 .garrett .pa-notebox {
 	background:
-	    conic-gradient(red, orange, yellow, green, #ddddff, purple, red);
+	    conic-gradient(from 0 at 10% 50%, red, orange, yellow, green, #ddddff, purple, red);
+}
+.garrett .pa-notebox:before {
+	content: "Thank you Garrett";
+	width: 100vw;
+	height: 100vh;
+	position: absolute;
+	animation: 9000ms infinite garrett-notebox;
+}
+@keyframes garrett-notebox {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 .live .pa-gi:hover, .pa-dl.live {
 	background-color: #f8eec7;
