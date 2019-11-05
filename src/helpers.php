@@ -392,115 +392,32 @@ function redirectSelf($extra = array()) {
     go(self_href($extra, array("raw" => true)));
 }
 
-class JsonResult {
-    public $status;
-    public $content;
-    public $has_messages = false;
-
-    function __construct($values = null) {
-        if (is_int($values)) {
-            $this->status = $values;
-            if (func_num_args() === 2) {
-                $values = func_get_arg(1);
-            } else {
-                $values = null;
-            }
-        }
-        if ($values === true || $values === false) {
-            $this->content = ["ok" => $values];
-        } else if ($values === null) {
-            $this->content = [];
-        } else if (is_object($values)) {
-            assert(!($values instanceof JsonResult));
-            $this->content = (array) $values;
-        } else if (is_string($values)) {
-            if ($this->status && $this->status > 299) {
-                $this->content = ["ok" => false, "error" => $values];
-            } else {
-                $this->content = ["ok" => true, "response" => $values];
-            }
-        } else {
-            $this->content = $values;
-        }
-    }
-    static function make($json, Contact $user = null, $arg2 = null) {
-        if (is_int($json)) {
-            $json = new JsonResult($json, $arg2);
-        } else if (!is_object($json) || !($json instanceof JsonResult)) {
-            $json = new JsonResult($json);
-        }
-        if (!$json->has_messages && $user) {
-            $json->take_messages($user);
-        }
-        return $json;
-    }
-    function take_messages(Contact $user, $div = false) {
-        if (session_id() !== ""
-            && ($msgs = $user->session("msgs", []))) {
-            $user->save_session("msgs", null);
-            $t = "";
-            foreach ($msgs as $msg) {
-                if (($msg[1] === "merror" || $msg[1] === "xmerror")
-                    && !isset($this->content["error"])) {
-                    $this->content["error"] = $msg[0];
-                }
-                if ($div) {
-                    $t .= Ht::msg($msg[0], $msg[1]);
-                } else {
-                    $t .= "<span class=\"$msg[1]\">$msg[0]</span>";
-                }
-            }
-            if ($t !== "") {
-                $this->content["response"] = $t . get_s($this->content, "response");
-            }
-            $this->has_messages = true;
-        }
-    }
-    function export_errors() {
-        if (isset($this->content["error"])) {
-            Conf::msg_error($this->content["error"]);
-        }
-        if (isset($this->content["errf"])) {
-            foreach ($this->content["errf"] as $f => $x)
-                Ht::error_at($f);
-        }
-    }
-}
-
 class JsonResultException extends Exception {
     public $result;
+    public $status;
     static public $capturing = false;
-    function __construct($j) {
+    function __construct($status, $j) {
+        $this->status = $status;
         $this->result = $j;
     }
 }
 
-function json_exit($json, $arg2 = null) {
-    global $Me, $Qreq;
-    $json = JsonResult::make($json, $Me ? : null, $arg2);
-    if (JsonResultException::$capturing) {
-        throw new JsonResultException($json);
+function json_exit(/* [$status], $json, $div = false */) {
+    global $Conf;
+    $args = func_get_args();
+    if (is_int($args[0])) {
+        $status = $args[0];
+        $json = $args[1];
+        $div = get($args, 2, false);
     } else {
-        if ($Qreq && $Qreq->post_ok()) {
-            if ($json->status) {
-                http_response_code($json->status);
-            }
-            header("Access-Control-Allow-Origin: *");
-        } else if ($json->status) {
-            // Don’t set status on unvalidated requests, since that can leak
-            // information (e.g. via <link prefetch onerror>).
-            if (!isset($json->content["ok"])) {
-                $json->content["ok"] = $json->status <= 299;
-            }
-            if (!isset($json->content["status"])) {
-                $json->content["status"] = $json->status;
-            }
-            if ($Qreq->post && !$Qreq->post_ok()) {
-                $json->content["postvalue"] = post_value(true);
-            }
-        }
-        header("Content-Type: application/json; charset=utf-8");
-        echo json_encode_browser($json->content);
+        $status = 200;
+        $json = $args[0];
+        $div = get($args, 1, false);
+    }
+    if (JsonResultException::$capturing)
+        throw new JsonResultException($status, $json);
+    else {
+        $Conf->output_ajax($json, $div);
         exit;
     }
 }

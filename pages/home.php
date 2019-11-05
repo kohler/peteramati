@@ -1206,10 +1206,10 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
             $gh = $info->update_grading_hash(function ($info, $placeholder_at) use ($t0) {
                 if ($placeholder_at && $placeholder_at < $t0 - 3600)
                     return rand(0, 2) == 0;
-                else if ($placeholder_at < $t0 - 600 && !$info->user->dropped)
-                    return rand(0, 10) == 0;
-                else
+                else if ($placeholder_at >= $t0 - 600 || $info->user->dropped)
                     return false;
+                else
+                    return rand(0, 10) == 0;
             });
         } else {
             $gh = $info->grading_hash();
@@ -1414,7 +1414,7 @@ function show_pset_table($sset) {
     $actions = [];
     if ($sset->viewer->isPC) {
         $stage = -1;
-        $actions["diffmany"] = $pset->gitless ? "Grades" : "Diffs";
+        $actions["diffmany"] = $pset->gitless ? "Diffs" : "Grades";
         if (!$pset->gitless_grades) {
             foreach ($pset->all_diffconfig() as $dc) {
                 if (($dc->collate
