@@ -1325,6 +1325,9 @@ class PsetView {
         if ($this->pc_view) {
             echo " uim pa-editablenotes live";
         }
+        if ($this->viewer->email === "gtanzer@college.harvard.edu") {
+            echo ' garrett';
+        }
         if (!$this->user_can_view_grades()) {
             echo " hidegrades";
         }
@@ -1467,11 +1470,7 @@ class PsetView {
             echo ' hidden';
         }
         echo '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render_json($this->can_view_note_authors()))),
-            '"><div class="pa-notebox';
-        if ($this->viewer->email === "gtanzer@college.harvard.edu") {
-            echo ' garrett';
-        }
-        echo '">';
+            '"><div class="pa-notebox">';
         if ((string) $note->note === "") {
             echo '</div></div>';
             return;
