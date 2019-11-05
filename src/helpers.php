@@ -822,19 +822,22 @@ function git_refname_is_full_hash($refname) {
         && strtolower($refname) === $refname;
 }
 
-function git_commit_in_list($list, $commit) {
+function git_commit_in_list($list, $hash) {
     // XXX strtolower
-    if ((string) $commit === "")
+    if ((string) $hash === "") {
         return false;
-    if (strlen($commit) === 40 || strlen($commit) === 64)
-        return isset($list[$commit]) ? $commit : false;
-    $cx = false;
-    foreach ($list as $hash => $v)
-        if (str_starts_with($hash, $commit)) {
-            if ($cx)
+    } else if (strlen($hash) === 40 || strlen($hash) === 64) {
+        return get($list, $hash);
+    }
+    $cx = null;
+    foreach ($list as $h => $commit) {
+        if (str_starts_with($h, $hash)) {
+            if ($cx) {
                 return false;
-            $cx = $hash;
+            }
+            $cx = $commit;
         }
+    }
     return $cx;
 }
 
