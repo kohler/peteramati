@@ -248,6 +248,8 @@ class Repository {
         }
         $descriptors = [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]];
         $proc = proc_open("cd $repodir && $command", $descriptors, $pipes, $repodir);
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
         $stdout = $stderr = "";
         while (!feof($pipes[1]) || !feof($pipes[2])) {
             $x = fread($pipes[1], 32768);
@@ -257,6 +259,9 @@ class Repository {
             if ($x === false || $y === false) {
                 break;
             }
+            $r = [$pipes[1], $pipes[2]];
+            $w = $e = [];
+            stream_select($r, $w, $e, 5);
         }
         fclose($pipes[1]);
         fclose($pipes[2]);
@@ -470,16 +475,19 @@ class Repository {
 
     private function prepare_truncated_hash(Pset $pset, $hash) {
         $pset_files = $this->ls_files($hash, $pset->directory_noslash);
-        foreach ($pset_files as &$f)
+        foreach ($pset_files as &$f) {
             $f = escapeshellarg(substr($f, strlen($pset->directory_slash)));
+        }
         unset($f);
 
-        if (!($trepo = $this->_temp_repo_clone()))
+        if (!($trepo = $this->_temp_repo_clone())) {
             return false;
+        }
         $psetdir_arg = escapeshellarg($pset->directory_slash);
         $trepo_arg = escapeshellarg($trepo);
-        foreach ($pset_files as $f)
+        foreach ($pset_files as $f) {
             $this->gitrun("mkdir -p \"`dirname {$trepo_arg}/{$f}`\" && git show {$hash}:{$psetdir_arg}{$f} > {$trepo_arg}/{$f}");
+        }
 
         shell_exec("cd $trepo_arg && git add " . join(" ", $pset_files) . " && git commit -m 'Truncated version of $hash'");
         shell_exec("cd $trepo_arg && git push -f origin master:refs/tags/truncated_$hash");

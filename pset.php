@@ -696,14 +696,16 @@ if ($Pset->gitless) {
             . (!$fl[2] && !$Info->user_can_view_grades() ? " pa-notehidden" : "")
             . '">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
     }
-    if (!empty($notelinks))
+    if (!empty($notelinks)) {
         ContactView::echo_group("notes", join(", ", $notelinks));
+    }
 
     // print runners
-    if ($Info->is_handout_commit()) // XXX this is a hack
+    if ($Info->is_handout_commit()) { // XXX this is a hack
         $crunners = [];
-    else
+    } else {
         $crunners = $Info->commit_info("run");
+    }
     $runcategories = [];
     foreach ($Pset->runners as $r) {
         if (!$Me->can_view_run($Pset, $r, $User)
