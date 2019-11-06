@@ -710,6 +710,7 @@ if ($Pset->gitless) {
         $crunners = $Info->commit_info("run");
     }
     $runcategories = [];
+    $any_runners = false;
     foreach ($Pset->runners as $r) {
         if (!$Me->can_view_run($Pset, $r, $User)
             || isset($runcategories[$r->category])) {
@@ -723,13 +724,17 @@ if ($Pset->gitless) {
         if (!$rj && !$Me->can_run($Pset, $r, $User)) {
             continue;
         }
+        if (!$any_runners) {
+            echo '<div class="pa-run-outlist">';
+            $any_runners = true;
+        }
 
         $runcategories[$r->category] = true;
-        echo '<div id="pa-runout-' . $r->category . '"';
+        echo '<div id="pa-runout-' . $r->category . '" class="pa-run-out';
         if (!$rj || !isset($rj->timestamp)) {
-            echo ' class="hidden"';
+            echo ' hidden';
         }
-        echo '><h3><a class="fold61" href="#" onclick="',
+        echo '"><h3><a class="fold61" href="#" onclick="',
             "return runfold61('{$r->category}')", '">',
             '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($r->output_title), '</a></h3>',
@@ -745,10 +750,19 @@ if ($Pset->gitless) {
         }
         echo '><pre class="pa-runpre"></pre></div></div>', "\n";
     }
+    if ($any_runners) {
+        echo '</div>';
+    }
 
     // line notes
     if (!empty($diff)) {
         echo "<hr>\n";
+        if ($Info->can_edit_grades()
+            && !$Pset->has_grade_landmark_range) {
+            echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
+                '<div class="pa-gradebox pa-ps need-pa-gradelist"></div>',
+                '</div><div class="pa-dg">';
+        }
         foreach ($diff as $file => $dinfo) {
             $open = $lnorder->file_has_notes($file)
                 || (!$dinfo->boring
@@ -757,6 +771,10 @@ if ($Pset->gitless) {
                         || !$Info->is_grading_commit()
                         || !$lnorder->has_linenotes_in_diff));
             $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
+        }
+        if ($Info->can_edit_grades()
+            && !$Pset->has_grade_landmark_range) {
+            echo '</div></div>';
         }
     }
 

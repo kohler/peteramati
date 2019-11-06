@@ -1285,6 +1285,7 @@ class PsetView {
             $this->conf->stash_hotcrp_pc($this->viewer);
         }
         $lineanno = [];
+        $has_grade_range = false;
         if ($this->pset->has_grade_landmark
             && $this->pc_view
             && !$this->is_handout_commit()
@@ -1296,6 +1297,7 @@ class PsetView {
                     $la->grade_first[] = $g;
                     $la = PsetViewLineAnno::ensure($lineanno, "a" . ($g->landmark_range_last + 1));
                     $la->grade_last[] = $g;
+                    $has_grade_range = true;
                 }
                 if ($g->landmark_file === $file) {
                     $la = PsetViewLineAnno::ensure($lineanno, "a" . $g->landmark_line);
@@ -1353,11 +1355,15 @@ class PsetView {
             echo ' data-default-format="', $this->conf->default_format, '"';
         }
         echo ">";
+        if ($has_grade_range) {
+            echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
+                '</div><div class="pa-dg">';
+        }
         $curanno = new PsetViewLineAnno;
         foreach ($dinfo as $l) {
             $this->echo_line_diff($l, $file, $fileid, $linenotes, $lineanno, $curanno);
         }
-        if ($curanno->grade_first) {
+        if ($has_grade_range) {
             echo '</div></div>';
         }
         echo "</div>\n";
@@ -1386,24 +1392,28 @@ class PsetView {
         $bln = $x[3] ? "b" . $x[3] : "";
         $ala = $aln && isset($lineanno[$aln]) ? $lineanno[$aln] : null;
 
-        if ($ala
-            && $ala->grade_last
-            && $curanno->grade_first
-            && array_search($curanno->grade_first, $ala->grade_last) !== false) {
-            echo '</div></div>';
-            $curanno->grade_first = null;
-        }
-        if ($ala
-            && $ala->grade_first
-            && !$curanno->grade_first) {
-            $g = $curanno->grade_first = $ala->grade_first[0];
-            echo '<div class="pa-dg pa-with-sidegrade"><div class="pa-sidegrade">',
-                '<div class="pa-gradebox pa-ps need-pa-grade" data-pa-grade="', $g->key, '"';
-            if ($g->landmark_buttons) {
-                echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode_browser($g->landmark_buttons)), '"';
+        if ($ala && ($ala->grade_first || $ala->grade_last)) {
+            $end_grade_range = $ala->grade_last
+                && $curanno->grade_first
+                && array_search($curanno->grade_first, $ala->grade_last) !== false;
+            $start_grade_range = $ala->grade_first
+                && (!$curanno->grade_first || $end_grade_range);
+            if ($start_grade_range || $end_grade_range) {
+                echo '</div></div>';
+                $curanno->grade_first = null;
             }
-            echo '></div></div><div class="pa-dg">';
-            $this->viewed_gradeentries[$g->key] = true;
+            if ($start_grade_range) {
+                $g = $curanno->grade_first = $ala->grade_first[0];
+                echo '<div class="pa-dg pa-with-sidebar pa-grade-range-block"><div class="pa-sidebar">',
+                    '<div class="pa-gradebox pa-ps need-pa-grade" data-pa-grade="', $g->key, '"';
+                if ($g->landmark_buttons) {
+                    echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode_browser($g->landmark_buttons)), '"';
+                }
+                echo '></div></div><div class="pa-dg">';
+                $this->viewed_gradeentries[$g->key] = true;
+            } else if ($end_grade_range) {
+                echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar"></div><div class="pa-dg">';
+            }
         }
 
         $ak = $bk = "";
@@ -1451,7 +1461,7 @@ class PsetView {
             foreach ($ala->grade_entries ? : [] as $g) {
                 echo '<div class="pa-dl pa-gn';
                 if ($curanno->grade_first === $g) {
-                    echo ' pa-no-sidegrade';
+                    echo ' pa-no-sidebar';
                 }
                 echo '"><div class="pa-graderow">',
                     '<div class="pa-gradebox need-pa-grade" data-pa-grade="', $g->key, '"';

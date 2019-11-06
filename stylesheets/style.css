@@ -98,6 +98,9 @@ h1 {
 	font-size: 144%;
 	margin: 0;
 }
+h3 {
+	margin-top: 0;
+}
 
 /* Tab bar */
 #header_left a {
@@ -945,12 +948,8 @@ td.hint, div.hint, span.hint, p.hint, a.hint {
 td.caption span.hint {
 	font-weight: normal;
 }
-div#aumg td.hint, table.paper td.hint, table.setreviewform td.hint {
+div#aumg td.hint, table.paper td.hint {
 	width: 25%;
-}
-td h2, td h3 {
-	margin-top: 0;
-	margin-bottom: 0;
 }
 
 
@@ -1588,7 +1587,7 @@ div.merror pre {
 }
 
 hr {
-	margin: 0.75em 0;
+	margin: 1em 0;
 	border: 0 none;
 	height: 1px;
 	color: #9999cc; /* for IE6 */
@@ -2153,6 +2152,12 @@ td.mhcb {
 .pa-gradelist {
 	margin: 1.5rem 0;
 }
+.pa-gradelist:first-child {
+	margin-top: 0;
+}
+.pa-plist {
+	margin-bottom: 1rem;
+}
 .pa-gradelist.noneditable > .pa-p,
 .pa-gradelist.pa-pset-hidden > .pa-p:last-child,
 .pa-grp-hidden > .pa-p {
@@ -2277,6 +2282,9 @@ tr.gtrow-partner {
 		background-color: #ffff0000;
 	}
 }
+.pa-filediff {
+	margin-bottom: 1rem;
+}
 @media screen and (min-width: 640px) {
 .pa-filediff {
 	 margin-left: 2rem;
@@ -2325,36 +2333,36 @@ tr.gtrow-partner {
 	margin-left: -1.5em;
 }
 }
-.pa-with-sidegrade {
+.pa-with-sidebar {
 	display: flex;
 	flex-direction: row-reverse;
 }
-.pa-with-sidegrade > .pa-dg {
+.pa-with-sidebar > .pa-dg {
 	flex: 1 1 auto;
 	max-width: 80%;
 }
-.pa-sidegrade {
+.pa-sidebar {
 	min-width: 144px;
 	width: 20%;
 	flex: 0 0 20%;
 	padding-left: 1em;
 }
-.pa-sidegrade > .pa-gradebox {
+.pa-sidebar > .pa-gradebox {
 	position: sticky;
 	top: 16px;
 	display: block;
 	padding-right: 0.8rem;
 }
 @media screen and (max-width: 640px), print {
-.pa-sidegrade {
+.pa-sidebar {
 	display: none;
 }
-.pa-with-sidegrade > .pa-dg {
+.pa-with-sidebar > .pa-dg {
 	max-width: 100%;
 }
 }
 @media screen and (min-width: 640px) {
-.pa-no-sidegrade {
+.pa-no-sidebar {
 	display: none;
 }
 }
@@ -2588,6 +2596,9 @@ a.fold61:hover {
 	font-size: 85%;
 	overflow: auto;
 	height: 32em;
+}
+.pa-run-outlist {
+	margin-top: 1.5rem;
 }
 .pa-run-short {
 	height: auto;

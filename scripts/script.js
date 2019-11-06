@@ -2408,7 +2408,7 @@ function pa_fix_note_links() {
         set_link(this, notes[nextpos]);
     }
 
-    var dg = $(this).closest(".pa-with-sidegrade").find(".pa-grade")[0];
+    var dg = $(this).closest(".pa-grade-range-block").find(".pa-grade")[0];
     if (dg) {
         pa_compute_landmark_range_grade.call(dg, true);
     }
