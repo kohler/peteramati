@@ -80,9 +80,6 @@ echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->ur
 if (!$Pset->gitless && $Pset->directory) {
     echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
 }
-if ($Me->can_set_grades($Pset, $Info)) {
-    echo '" data-pa-can-set-grades="yes';
-}
 if ($Info->user_can_view_grades()) {
     echo '" data-pa-user-can-view-grades="yes';
 }

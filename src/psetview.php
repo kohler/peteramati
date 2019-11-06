@@ -51,6 +51,7 @@ class PsetView {
         $this->user = $user;
         $this->viewer = $viewer;
         $this->pc_view = $viewer->isPC && $viewer !== $user;
+        assert($viewer === $user || $this->pc_view);
     }
 
     static function make(Pset $pset, Contact $user, Contact $viewer) {
@@ -1095,10 +1096,11 @@ class PsetView {
         }
 
         $notes = $this->current_info();
-        if ($no_entries)
+        if ($no_entries) {
             $result = [];
-        else
+        } else {
             $result = $this->pset->gradeentry_json($this->pc_view);
+        }
         $result["uid"] = $this->user->contactId;
         $agx = get($notes, "autogrades");
         $gx = get($notes, "grades");
@@ -1142,6 +1144,9 @@ class PsetView {
             if (isset($lhd->autohours) && $lhd->autohours !== $lhd->hours) {
                 $result["auto_late_hours"] = $lhd->autohours;
             }
+        }
+        if ($this->can_edit_grades()) {
+            $result["editable"] = true;
         }
 
         // maybe hide extra-credits that are missing

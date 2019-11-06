@@ -76,7 +76,7 @@ class API_Grade {
                 return ["ok" => false, "error" => "Missing credentials."];
             } else if ($info->is_handout_commit()) {
                 return ["ok" => false, "error" => "Cannot set grades on handout commit."];
-            } else if (!$user->can_set_grades($info->pset, $info)) {
+            } else if (!$info->can_edit_grades()) {
                 return ["ok" => false, "error" => "Permission error."];
             } else if (!$info->pset->gitless_grades
                        && $qreq->commit_is_grade
@@ -162,7 +162,7 @@ class API_Grade {
                 }
             }
             if (!$info->can_view_grades()
-                || ($ispost && !$viewer->can_set_grades($info->pset, $info)))
+                || ($ispost && !$info->can_edit_grades()))
                 return ["ok" => false, "error" => "Permission error."];
             else if ($ispost && $info->is_handout_commit())
                 $errno = max($errno, 1);

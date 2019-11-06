@@ -2339,7 +2339,7 @@ function pa_save_note(elt, text) {
         text = text(note ? note[1] : "", note);
     }
     return new Promise(function (resolve, reject) {
-        $.ajax(hoturl_post("api/linenote", hoturl_gradeparts($(pi), {
+        $.ajax(hoturl_post("api/linenote", hoturl_gradeparts(pi, {
             file: file, line: lineid, oldversion: (note && note[3]) || 0, format: format
         })), {
             data: {note: text},
@@ -2510,7 +2510,7 @@ function render_form($tr, note, transition) {
     if (format == null)
         format = $tr.closest(".pa-filediff").attr("data-default-format");
     var t = '<form method="post" action="' +
-        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi, {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0, format: format}))) +
+        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi[0], {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0, format: format}))) +
         '" enctype="multipart/form-data" accept-charset="UTF-8">' +
         '<div class="f-contain"><textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
@@ -2756,7 +2756,7 @@ function expand(evt) {
     if (lbline) {
         args.linecount = lbline - pbline;
     }
-    $.ajax(hoturl("api/blob", hoturl_gradeparts($(this), args)), {
+    $.ajax(hoturl("api/blob", hoturl_gradeparts(this, args)), {
         success: function (data) {
             if (data.ok && data.data) {
                 var lines = data.data.replace(/\n$/, "").split("\n");
@@ -3039,20 +3039,18 @@ handle_ui.on("pa-gradevalue", function () {
 });
 
 function pa_gradeinfo() {
-    var e = this.closest(".pa-psetinfo"),
-        gi = $(e).data("pa-gradeinfo");
-    if (typeof gi === "string") {
-        gi = JSON.parse(gi);
-    }
-    while (gi && !gi.entries && e) {
-        e = e.parentElement.closest(".pa-psetinfo");
+    var e = this.closest(".pa-psetinfo"), gi = null;
+    while (e) {
         var gix = $(e).data("pa-gradeinfo");
         if (typeof gix === "string") {
             gix = JSON.parse(gix);
+            $(e).data("pa-gradeinfo", gix);
         }
-        if (gix && typeof gix === "object") {
-            $.extend(gi, gix);
+        gi = gi ? $.extend(gi, gix) : gix;
+        if (gi && gi.entries) {
+            break;
         }
+        e = e.parentElement.closest(".pa-psetinfo");
     }
     return gi;
 }
@@ -3090,99 +3088,132 @@ handle_ui.on("pa-grade", function (event) {
         }
     });
 
-    $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f)), {
+    $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f[0])), {
         type: "POST", cache: false, data: {grades: g, oldgrades: og},
         success: function (data) {
             self.removeAttribute("data-outstanding");
             if (data.ok) {
                 $f.find(".pa-save-message").html("Saved");
+                $(self).closest(".pa-psetinfo").data("pa-gradeinfo", data).each(pa_loadgrades);
             } else {
                 $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
             }
-            pa_loadgrades.call(self, data);
         }
     });
 });
 
-function hoturl_gradeparts($j, args) {
-    var $x = $j.closest(".pa-psetinfo"), v;
+function hoturl_gradeparts(e, args) {
+    var p = e.closest(".pa-psetinfo"), v;
     args = args || {};
-    v = $x.attr("data-pa-user");
+    v = p.getAttribute("data-pa-user");
     args.u = v || peteramati_uservalue;
-    if ((v = $x.attr("data-pa-pset"))) {
+    if ((v = p.getAttribute("data-pa-pset"))) {
         args.pset = v;
     }
-    if ((v = $x.attr("data-pa-hash"))) {
+    if ((v = p.getAttribute("data-pa-hash"))) {
         args.commit = v;
     }
     return args;
 }
 
-function pa_loadgrades(gi) {
-    var $pi = $(this).closest(".pa-psetinfo");
-    if (gi === true) {
-        gi = pa_gradeinfo.call(this);
+function pa_show_grade(gi) {
+    gi = gi || pa_gradeinfo.call(this);
+    var k = this.getAttribute("data-pa-grade"), ge = gi.entries[k];
+    if (k === "late_hours") {
+        pa_set_grade.call(this, {key: "late_hours"}, gi.late_hours, gi.auto_late_hours);
+    } else if (ge) {
+        pa_set_grade.call(this, ge, gi.grades ? gi.grades[ge.pos] : null, gi.autogrades ? gi.autogrades[ge.pos] : null);
     }
+}
+
+function pa_resolve_grade(noshow) {
+    removeClass(this, "need-pa-grade");
+    var k = this.getAttribute("data-pa-grade"),
+        gi = pa_gradeinfo.call(this), ge;
+    if (!gi || !k || !(ge = gi.entries[k])) {
+        return;
+    }
+    $(this).html(pa_render_grade_entry(ge, gi.editable));
+    if (ge.landmark_range && hasClass(this, "pa-gradebox")) {
+        var sum = pa_compute_landmark_range_grade.call(this.firstChild);
+        if (gi.grades && gi.grades[ge.pos] != sum) {
+            $(this).find(".pa-grade").addClass("pa-grade-pinned");
+        }
+    }
+    if (this.hasAttribute("data-pa-landmark-buttons")) {
+        var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
+        for (var i = 0; i < lb.length; ++i) {
+            if (typeof lb[i] === "string") {
+                $(this).find(".pa-pd").append(lb[i]);
+            } else {
+                var t = '<button type="button" class="btn ui';
+                if (lb[i].className)
+                    t += ' ' + lb[i].className;
+                t += '">' + lb[i].title + '</button>';
+                $(this).find(".pa-pd").append(t);
+            }
+        }
+    }
+    if (noshow !== false) {
+        pa_show_grade.call($(this).find(".pa-grade")[0], gi);
+    }
+}
+
+function pa_resolve_gradelist(noshow) {
+    removeClass(this, "need-pa-gradelist");
+    addClass(this, "pa-gradelist");
+    var pi = this.closest(".pa-psetinfo"), gi = pa_gradeinfo.call(pi);
+    if (!gi) {
+        return;
+    }
+    var ch = this.firstChild;
+    while (ch && !hasClass(ch, "pa-grade")) {
+        ch = ch.nextSibling;
+    }
+    for (var i = 0; i !== gi.order.length; ++i) {
+        var k = gi.order[i];
+        if (k) {
+            if (ch && ch.getAttribute("data-pa-grade") === k) {
+                ch = ch.nextSibling;
+            } else {
+                var e = $(pa_render_grade_entry(gi.entries[k], gi.editable))[0];
+                this.insertBefore(e, ch);
+                if (noshow !== false) {
+                    pa_show_grade.call(e, gi);
+                }
+            }
+        }
+    }
+    while (ch) {
+        var e = ch;
+        ch = ch.nextSibling;
+        this.removeChild(e);
+    }
+}
+
+$(function () {
+    $(".need-pa-grade").each(pa_resolve_grade);
+    $(".need-pa-gradelist").each(pa_resolve_gradelist);
+});
+
+function pa_loadgrades() {
+    if (!hasClass(this, "pa-psetinfo")) {
+        throw new Error("bad pa_loadgrades");
+    }
+    var gi = pa_gradeinfo.call(this);
     if (!gi || !gi.order) {
         return;
     }
 
-    $pi.data("pa-gradeinfo", gi);
-    var editable = $pi[0].hasAttribute("data-pa-can-set-grades");
-    function makegrade(k) {
-        return pa_render_grade_entry(gi.entries[k], editable);
-    }
-
-    $pi.find(".need-pa-grade").each(function () {
-        var k = this.getAttribute("data-pa-grade"), ge = gi.entries[k];
-        if (!ge) {
-            return;
-        }
-        $(this).html(makegrade(k)).removeClass("need-pa-grade");
-        if (ge.landmark_range && hasClass(this, "pa-gradebox")) {
-            var sum = pa_compute_landmark_range_grade.call(this.firstChild);
-            if (gi.grades && gi.grades[ge.pos] != sum) {
-                $(this).find(".pa-grade").addClass("pa-grade-pinned");
-            }
-        }
-        if (this.hasAttribute("data-pa-landmark-buttons")) {
-            var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
-            for (var i = 0; i < lb.length; ++i) {
-                if (typeof lb[i] === "string") {
-                    $(this).find(".pa-pd").append(lb[i]);
-                } else {
-                    var t = '<button type="button" class="btn ui';
-                    if (lb[i].className)
-                        t += ' ' + lb[i].className;
-                    t += '">' + lb[i].title + '</button>';
-                    $(this).find(".pa-pd").append(t);
-                }
-            }
-        }
+    $(this).find(".need-pa-grade").each(function () {
+        pa_resolve_grade.call(this, true);
     });
 
-    $pi.find(".pa-gradelist").each(function () {
-        var ch = this.firstChild;
-        while (ch && !hasClass(ch, "pa-grade")) {
-            ch = ch.nextSibling;
-        }
-        for (var i = 0; i < gi.order.length; ++i) {
-            var k = gi.order[i];
-            if (k) {
-                if (ch && ch.getAttribute("data-pa-grade") === k)
-                    ch = ch.nextSibling;
-                else
-                    this.insertBefore($(makegrade(k))[0], ch);
-            }
-        }
-        while (ch) {
-            var e = ch;
-            ch = ch.nextSibling;
-            this.removeChild(e);
-        }
+    $(this).find(".pa-gradelist").each(function () {
+        pa_resolve_gradelist.call(this, true);
     });
 
-    $pi.find(".pa-grade").each(function () {
+    $(this).find(".pa-grade").each(function () {
         var k = this.getAttribute("data-pa-grade"),
             ge = gi.entries[k];
         if (k === "late_hours") {
@@ -3194,7 +3225,7 @@ function pa_loadgrades(gi) {
 
     // print totals
     var tm = pa_gradeinfo_total(gi);
-    $g = $pi.find(".pa-total");
+    $g = $(this).find(".pa-total");
     if (tm[0] && !$g.length) {
         var t = '<div class="pa-total pa-p';
         var ne = 0;
@@ -3206,13 +3237,13 @@ function pa_loadgrades(gi) {
         $g = $(t + '"><div class="pa-pt">total</div>' +
             '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span> ' +
             '<span class="pa-grademax">of ' + tm[1] + '</span></div></div>');
-        $g.prependTo($pi.find(".pa-gradelist"));
+        $g.prependTo($(this).find(".pa-gradelist"));
     }
     $v = $g.find(".pa-gradevalue");
     g = "" + tm[0];
     if ($v.text() !== g) {
         $v.text(g);
-        pa_draw_gradecdf($pi.find(".pa-grgraph"));
+        pa_draw_gradecdf($(this).find(".pa-grgraph"));
     }
 }
 
@@ -3321,12 +3352,12 @@ function runfold61(name) {
 
 function pa_loadfilediff(filee, callback) {
     if (hasClass(filee, "need-load")) {
-        var $p = $(filee).closest(".pa-psetinfo");
-        $.ajax(hoturl("api/filediff", hoturl_gradeparts($(filee))), {
+        var p = filee.closest(".pa-psetinfo");
+        $.ajax(hoturl("api/filediff", hoturl_gradeparts(filee)), {
             type: "GET", cache: false, dataType: "json",
             data: {"file": html_id_decode(filee.id.substr(8)),
-                "base_hash": $p[0].getAttribute("data-pa-base-hash"),
-                "hash": $p[0].getAttribute("data-pa-hash")},
+                "base_hash": p.getAttribute("data-pa-base-hash"),
+                "hash": p.getAttribute("data-pa-hash")},
             success: function (data) {
                 if (data.ok && data.content_html) {
                     var $h = $(data.content_html);
@@ -3444,11 +3475,15 @@ function pa_beforeunload(evt) {
         return (event.returnValue = "You have unsaved notes. You will lose them if you leave the page now.");
 }
 
-function loadgrade61($b) {
-    var $p = $b.closest(".pa-psetinfo");
-    $.ajax(hoturl("api/grade", hoturl_gradeparts($p)), {
+function pa_fetchgrades() {
+    var p = this.closest(".pa-psetinfo");
+    $.ajax(hoturl("api/grade", hoturl_gradeparts(p)), {
         type: "GET", cache: false, dataType: "json",
-        success: function (data) { pa_loadgrades.call($p[0], data); }
+        success: function (data) {
+            if (data && data.ok) {
+                $(p).data("pa-gradeinfo", data).each(pa_loadgrades);
+            }
+        }
     });
 }
 
@@ -3987,8 +4022,9 @@ function pa_run(button, opt) {
         $f.find("button").prop("disabled", false);
         $f.prop("outstanding", false);
         hide_cursor();
-        if ($(button).attr("data-pa-loadgrade"))
-            loadgrade61($(button));
+        if (button.hasAttribute("data-pa-run-grade")) {
+            pa_fetchgrades.call(button.closest(".pa-psetinfo"));
+        }
     }
 
     function append(str) {
@@ -6374,10 +6410,11 @@ function pa_render_pset_table(pconf, data) {
                     mixed = true;
                 }
             }
-            if (mixed)
+            if (mixed) {
                 pa_set_grade.call(this, ge, null, null, {reset: true, mixed: true});
-            else
+            } else {
                 pa_set_grade.call(this, ge, sv, null, {reset: true});
+            }
         });
         if (su1) {
             var tr = $j.find("tbody")[0].firstChild, tr1;

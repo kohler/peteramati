@@ -1402,11 +1402,6 @@ class Contact {
             && ($this->isPC || $pset->student_can_view_grades($this->extension));
     }
 
-    function can_set_grades(Pset $pset, PsetView $info = null) {
-        return ($this->isPC && (!$info || $info->user !== $this))
-            || $this->privChair;
-    }
-
     function can_view_grader(Pset $pset, Contact $user = null) {
         return ($this->isPC && (!$user || $user != $this))
             || $this->privChair;

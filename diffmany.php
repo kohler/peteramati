@@ -30,20 +30,22 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     if (!$info->repo)
         return;
     $info->set_hash(false);
-    echo '<div id="pa-psetinfo', $psetinfo_idx, '" class="pa-psetinfo"',
-        ' data-pa-pset="', htmlspecialchars($pset->urlkey),
+    echo '<div id="pa-psetinfo', $psetinfo_idx, '" class="pa-psetinfo',
+        '" data-pa-pset="', htmlspecialchars($pset->urlkey),
         '" data-pa-user="', htmlspecialchars($Me->user_linkpart($user));
-    if (!$pset->gitless && $info->commit_hash())
+    if (!$pset->gitless && $info->commit_hash()) {
         echo '" data-pa-hash="', htmlspecialchars($info->commit_hash());
-    if (!$pset->gitless && $pset->directory)
+    }
+    if (!$pset->gitless && $pset->directory) {
         echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);
-    if ($Me->can_set_grades($pset, $info))
-        echo '" data-pa-can-set-grades="yes';
-    if ($info->user_can_view_grades())
+    }
+    if ($info->user_can_view_grades()) {
         echo '" data-pa-user-can-view-grades="yes';
-    if ($Me->can_set_grades($pset, $info)
-        || ($info->can_view_grades() && $info->is_current_grades()))
+    }
+    if ($info->can_edit_grades()
+        || ($info->can_view_grades() && $info->is_current_grades())) {
         echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(true)));
+    }
     echo '">';
 
     $u = $Me->user_linkpart($user);
@@ -91,7 +93,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
 
     echo "</div>\n";
     if ($want_grades) {
-        echo Ht::unstash_script('pa_loadgrades.call($("#pa-psetinfo' . $psetinfo_idx . '")[0], true)');
+        echo Ht::unstash_script('pa_loadgrades.call(document.getElementById("pa-psetinfo' . $psetinfo_idx . '"))');
     }
     echo "<hr />\n";
 }

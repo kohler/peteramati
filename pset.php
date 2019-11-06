@@ -531,9 +531,9 @@ function echo_all_grades() {
         echo '<div class="pa-gradelist want-pa-landmark-links',
             ($Info->can_edit_grades() ? " editable" : " noneditable"),
             ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
-        Ht::stash_script('pa_loadgrades.call($(".pa-psetinfo")[0], ' . json_encode_browser($Info->grade_json()) . ')');
+        Ht::stash_script('$(".pa-psetinfo").first().data("pa-gradeinfo", ' . json_encode_browser($Info->grade_json()) . ').each(pa_loadgrades);');
         if ($Pset->has_grade_landmark) {
-            Ht::stash_script('$(function(){pa_loadgrades.call($(".pa-psetinfo")[0], true)})');
+            Ht::stash_script('$(function(){$(".pa-psetinfo").each(pa_loadgrades)})');
         }
         echo Ht::unstash();
     }
@@ -586,9 +586,6 @@ if (!$Pset->gitless && $Info->maybe_commit_hash()) {
 if (!$Pset->gitless && $Pset->directory) {
     echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
 }
-if ($Me->can_set_grades($Pset, $Info)) {
-    echo '" data-pa-can-set-grades="yes';
-}
 if ($Info->user_can_view_grades()) {
     echo '" data-pa-user-can-view-grades="yes';
 }
@@ -622,7 +619,7 @@ if ($Pset->gitless) {
                                       "class" => "btn pa-runner",
                                       "onclick" => "pa_run(this)",
                                       "data-pa-run-category" => $r->category_argument(),
-                                      "data-pa-loadgrade" => isset($r->eval) ? "true" : null));
+                                      "data-pa-run-grade" => isset($r->eval) ? "true" : null));
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
                 $last_run = true;
             } else {

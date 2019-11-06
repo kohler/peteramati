@@ -435,12 +435,14 @@ class Pset {
             $order[] = $ge->key;
             ++$count;
             if ($ge->max && !$ge->is_extra && !$ge->no_total
-                && ($pcview || $ge->max_visible))
+                && ($pcview || $ge->max_visible)) {
                 $maxtotal += $ge->max;
+            }
         }
         $j = ["entries" => $ej, "order" => $order];
-        if ($maxtotal)
+        if ($maxtotal) {
             $j["maxtotal"] = $maxtotal;
+        }
         return $j;
     }
 
