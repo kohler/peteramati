@@ -100,6 +100,7 @@ h1 {
 }
 h3 {
 	margin-top: 0;
+	margin-bottom: 1rem;
 }
 
 /* Tab bar */
@@ -2283,9 +2284,9 @@ tr.gtrow-partner {
 	}
 }
 .pa-filediff {
-	margin-bottom: 1rem;
+	margin-bottom: 1.5rem;
 }
-@media screen and (min-width: 640px) {
+@media screen and (min-width: 800px) {
 .pa-filediff {
 	 margin-left: 2rem;
 }
@@ -2315,6 +2316,37 @@ tr.gtrow-partner {
 	min-width: 3.5em;
 	width: 3.5em;
 	padding-right: 1em;
+}
+.pa-da::before, .pa-db::before {
+	content: attr(data-landmark);
+}
+.pa-dd {
+	flex: 1 1 auto;
+	max-width: calc(100% - 6.5em);
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+.pa-line-digits-4 .pa-da {
+	min-width: 3.5em;
+	width: 3.5em;
+}
+.pa-line-digits-4 .pa-db {
+	min-width: 4em;
+	width: 4em;
+}
+.pa-line-digits-4 .pa-dd {
+	max-width: calc(100% - 7.5em);
+}
+.pa-line-digits-5 .pa-da {
+	min-width: 4.25em;
+	width: 4.25em;
+}
+.pa-line-digits-5 .pa-db {
+	min-width: 4.75em;
+	width: 4.75em;
+}
+.pa-line-digits-5 .pa-dd {
+	max-width: calc(100% - 9em);
 }
 @media print {
 .pa-dd {
@@ -2353,7 +2385,7 @@ tr.gtrow-partner {
 	display: block;
 	padding-right: 0.8rem;
 }
-@media screen and (max-width: 640px), print {
+@media screen and (max-width: 800px), print {
 .pa-sidebar {
 	display: none;
 }
@@ -2361,16 +2393,13 @@ tr.gtrow-partner {
 	max-width: 100%;
 }
 }
-@media screen and (min-width: 640px) {
+@media screen and (min-width: 800px) {
 .pa-no-sidebar {
 	display: none;
 }
 }
-.pa-dd {
-	flex: 1 1 auto;
-}
-.pa-dd, .pa-note {
-	overflow-wrap: anywhere;
+.pa-note {
+	overflow-wrap: break-word;
 }
 .pa-notebox {
 	flex: 1 1 auto;
@@ -2418,12 +2447,6 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 }
 .pa-gradeboxref > a {
 	color: #777777;
-}
-.pa-da::before, .pa-db::before {
-	content: attr(data-landmark);
-}
-.pa-dd {
-	white-space: pre-wrap;
 }
 .pa-note {
 	overflow-wrap: break-word;

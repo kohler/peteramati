@@ -1345,7 +1345,7 @@ class PsetView {
             echo " need-load";
         } else {
             $maxline = max(1000, $dinfo->max_lineno()) - 1;
-            echo " pa-linenod", ceil(log10($maxline));
+            echo " pa-line-digits-", ceil(log10($maxline));
         }
         if ($id_by_user) {
             echo '" data-pa-file-user="', htmlspecialchars($this->user->username);
