@@ -3327,16 +3327,17 @@ function sb() {
     var wp, de, dde, e, dh;
     de = document;
     dde = de.documentElement;
-    if (window.innerWidth)
+    if (window.innerWidth) {
         wp = {x: window.pageXOffset, y: window.pageYOffset,
               h: window.innerHeight};
-    else {
+    } else {
         e = (dde && dde.clientWidth ? dde : document.body);
         wp = {x: e.scrollLeft, y: e.scrollTop, h: e.clientHeight};
     }
     dh = Math.max(de.scrollHeight || 0, de.offsetHeight || 0);
-    if (dde)
+    if (dde) {
         dh = Math.max(dh, dde.clientHeight || 0, dde.scrollHeight || 0, dde.offsetHeight || 0);
+    }
     window.scroll(wp.x, Math.max(0, wp.y, dh - wp.h));
 }
 
@@ -3345,8 +3346,9 @@ function runfold61(name) {
     if (therun.dataset.paTimestamp && !$(therun).is(":visible")) {
         thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
         pa_run(thebutton, {unfold: true});
-    } else
+    } else {
         fold61(therun, jQuery("#pa-runout-" + name));
+    }
     return false;
 }
 
@@ -3355,9 +3357,11 @@ function pa_loadfilediff(filee, callback) {
         var p = filee.closest(".pa-psetinfo");
         $.ajax(hoturl("api/filediff", hoturl_gradeparts(filee)), {
             type: "GET", cache: false, dataType: "json",
-            data: {"file": html_id_decode(filee.id.substr(8)),
+            data: {
+                "file": html_id_decode(filee.id.substr(8)),
                 "base_hash": p.getAttribute("data-pa-base-hash"),
-                "hash": p.getAttribute("data-pa-hash")},
+                "hash": p.getAttribute("data-pa-hash")
+            },
             success: function (data) {
                 if (data.ok && data.content_html) {
                     var $h = $(data.content_html);
@@ -3391,23 +3395,28 @@ handle_ui.on("pa-unfold-file-diff", function (evt) {
 function pa_ensureline_callback(filename, lineid, callback) {
     // decode arguments: either (lineref) or (filename, lineid)
     if (lineid == null) {
-        if (filename instanceof Node)
+        if (filename instanceof Node) {
             filename = filename.hash;
+        }
         var m = filename.match(/^#?L([ab]\d+)_(.*)$/);
-        if (!m)
+        if (!m) {
             return $(null);
+        }
         filename = m[2];
         lineid = m[1];
     } else {
         if (filename instanceof Node) {
             var node = filename;
-            while (node && !node.hasAttribute("data-pa-file"))
+            while (node && !node.hasAttribute("data-pa-file")) {
                 node = node.parentElement;
-            if (!node)
+            }
+            if (!node) {
                 return $(null);
+            }
             filename = node.getAttribute("data-pa-file");
-            if (node.hasAttribute("data-pa-file-user"))
+            if (node.hasAttribute("data-pa-file-user")) {
                 filename = node.getAttribute("data-pa-file-user") + "-" + filename;
+            }
         }
         filename = html_id_encode(filename);
     }

@@ -1318,45 +1318,10 @@ table.topicinterest tr td.ti_interest, table.topicinterest tr th {
 table.topicinterest tr td.ti_topic {
 	padding-right: 0.5em;
 }
-table.reviewers, div.revnotes {
-	margin-bottom: 0.5em;
-}
-table.reviewers {
-	line-height: 125%;
-	margin-left: -6px;
-}
-table.reviewers > tbody > tr > td:first-child {
-	padding-left: 6px;
-}
-table.reviewers td {
-	padding-right: 1em;
-}
-table.reviewers > tbody > tr.hilite {
-	background: #f0f0ff;
-}
-table.reviewers th {
-	font-size: smaller;
-	padding: 0 0.25em;
-}
-table.reviewers td.highlight {
-	padding-right: 0.25em;
-}
 span.revround {
 	font-size: 69%;
 	font-style: italic;
 	/* border-bottom: 1px dotted #777777; */
-}
-table.reviewers td.revscore {
-	padding-right: 0;
-	text-align: center;
-	font-weight: bold;
-	color: red;
-}
-table.reviewers td.rs_id, table.reviewscores td.rs_num {
-	text-align: left;
-}
-table.reviewers td.empty {
-	padding: 0;
 }
 
 
@@ -1464,24 +1429,6 @@ img.bmabs {
 }
 span.pcrole {
 	font-weight: bold;
-	font-size: smaller;
-}
-tr.al td {
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-tr.al td, tr.al_headrow th {
-	padding-left: 3px;
-	padding-right: 12px;
-}
-tr.al_headrow th {
-	text-align: left;
-	vertical-align: bottom;
-}
-tr.al_headrow th, table.setreviewform th {
-	border-bottom: 1px solid #999999;
-}
-tr.al_headrow th, table.setreviewform th, table.auedittable th {
 	font-size: smaller;
 }
 

@@ -643,21 +643,26 @@ if ($Pset->gitless) {
             $resolved = get($v, "resolved");
             $all_resolved = $all_resolved && $resolved;
             $conversation = "";
-            if (get($v, "conversation"))
+            if (get($v, "conversation")) {
                 $conversation = htmlspecialchars((string) $v->conversation[0][2]);
-            if ($resolved && $conversation === "")
+            }
+            if ($resolved && $conversation === "") {
                 continue;
+            }
             $x = $resolved ? "Resolved" : "<strong>Flagged</strong>";
-            if ($conversation !== "")
+            if ($conversation !== "") {
                 $x .= " (" . $conversation . ")";
-            if (!$resolved)
+            }
+            if (!$resolved) {
                 $x .= '<span style="display:inline-block;margin-left:1em">'
                     . Ht::button("Resolve", ["name" => "resolveflag", "onclick" => "flag61(this)", "data-flagid" => $k])
                     . '</span>';
+            }
             $runnerbuttons[] = $x . "<br />";
         }
-        if ($all_resolved)
+        if ($all_resolved) {
             $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "onclick" => "flag61(this)", "name" => "flag"]);
+        }
     }
     if (!empty($runnerbuttons)) {
         echo Ht::form($Info->hoturl_post("run")),
@@ -668,8 +673,9 @@ if ($Pset->gitless) {
             echo Ht::form($Info->hoturl_post("pset", array("saverunsettings" => 1, "ajax" => 1))),
                 '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
             // XXX always using grading commit's settings?
-            if (($runsettings = $Info->commit_info("runsettings")))
+            if (($runsettings = $Info->commit_info("runsettings"))) {
                 echo '<script>pa_runsetting.load(', json_encode_browser($runsettings), ')</script>';
+            }
         }
         Ht::stash_script("jQuery('button.pa-runner').prop('disabled',false)");
     }
@@ -756,8 +762,9 @@ if ($Pset->gitless) {
 
     Ht::stash_script('$(window).on("beforeunload",pa_beforeunload)');
 } else {
-    if ($Pset->gitless_grades)
+    if ($Pset->gitless_grades) {
         echo_grade_cdf_here();
+    }
 
     echo "<div class=\"pa-commitcontainer\" data-pa-pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
     ContactView::echo_group("this commit", "No commits yet for this problem set", array());
