@@ -2413,15 +2413,21 @@ tr.gtrow-partner {
 	background-size: 100% 5px, 100% 5px, 100% 100%;
 }
 .garrett .pa-notebox {
-	background:
-	    conic-gradient(from 0 at 10% 50%, red, orange, yellow, green, #ddddff, purple, red);
+	background: transparent;
+	overflow: hidden;
+	position: relative;
 }
 .garrett .pa-notebox:before {
-	content: "Thank you Garrett";
-	width: 100vw;
-	height: 100vh;
+	content: "";
+	width: 200vmax;
+	height: 200vmax;
 	position: absolute;
-	animation: 9000ms infinite garrett-notebox;
+	left: calc(10% - 100vmax);
+	top: calc(50% - 100vmax);
+	background:
+	    conic-gradient(from 0 at 50% 50%, red, orange, yellow, green, #ddddff, #993399, red);
+	animation: 9000ms infinite linear garrett-notebox;
+	z-index: -1;
 }
 @keyframes garrett-notebox {
 	from {
