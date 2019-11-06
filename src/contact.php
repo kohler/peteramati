@@ -303,6 +303,9 @@ class Contact {
         global $Now, $Qreq;
         $qreq = $qreq ? : $Qreq;
         $this->activated_ = true;
+        if (!isset($_SESSION)) {
+            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
+        }
         $trueuser = get($_SESSION, "trueuser");
         $truecontact = null;
 
@@ -398,6 +401,16 @@ class Contact {
         } else
             return false;
     }
+
+
+    function session($name, $defval = null) {
+        return $this->conf->session($name, $defval);
+    }
+
+    function save_session($name, $value) {
+        $this->conf->save_session($name, $value);
+    }
+
 
     function is_empty() {
         return $this->contactId <= 0 && !$this->capabilities && !$this->email;
