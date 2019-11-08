@@ -2416,14 +2416,15 @@ tr.gtrow-partner {
 	background: transparent;
 	overflow: hidden;
 	position: relative;
+	color: black;
 }
 .garrett .pa-notebox:before {
 	content: "";
-	width: 200vmax;
-	height: 200vmax;
+	width: 250vmax;
+	height: 250vmax;
 	position: absolute;
-	left: calc(10% - 100vmax);
-	top: calc(50% - 100vmax);
+	left: calc(5em - 125vmax);
+	top: calc(50% - 125vmax);
 	background:
 	    conic-gradient(from 0 at 50% 50%, red, orange, yellow, green, #ddddff, #993399, red);
 	animation: 9000ms infinite linear garrett-notebox;
