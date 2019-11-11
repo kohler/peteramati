@@ -2539,8 +2539,8 @@ function render_form($tr, note, transition) {
 }
 
 function anal_tr() {
-    if (curanal) {
-        var elt = pa_ensureline(curanal.ufile, curanal.lineid);
+    var elt;
+    if (curanal && (elt = pa_ensureline(curanal.ufile, curanal.lineid))) {
         return elt.closest(".pa-dl");
     } else {
         return null;
