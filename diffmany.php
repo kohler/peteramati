@@ -49,21 +49,25 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     echo '">';
 
     $u = $Me->user_linkpart($user);
-    if ($user !== $Me && !$user->is_anonymous && $user->contactImageId)
+    if ($user !== $Me && !$user->is_anonymous && $user->contactImageId) {
         echo '<img class="pa-smallface" src="' . hoturl("face", array("u" => $u, "imageid" => $user->contactImageId)) . '" />';
+    }
 
     echo '<h2 class="homeemail"><a href="',
         hoturl("pset", array("u" => $u, "pset" => $pset->urlkey)), '">', htmlspecialchars($u), '</a>';
-    if ($user->extension)
+    if ($user->extension) {
         echo " (X)";
+    }
     /*if ($Me->privChair && $user->is_anonymous)
         echo " ",*/
-    if ($Me->privChair)
+    if ($Me->privChair) {
         echo "&nbsp;", become_user_link($user);
+    }
     echo '</h2>';
 
-    if ($user !== $Me && !$user->is_anonymous)
+    if ($user !== $Me && !$user->is_anonymous) {
         echo '<h3>', Text::user_html($user), '</h3>';
+    }
     echo '<hr class="c" />';
 
     if (!$pset->gitless && $info->commit()) {

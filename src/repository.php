@@ -510,14 +510,14 @@ class Repository {
     }
 
 
-    static private function fix_diff_files($files) {
-        if ($files === null || empty($files))
+    static function fix_diff_files($files) {
+        if ($files === null || empty($files)) {
             return null;
-        else if (is_associative_array($files))
+        } else if (is_associative_array($files)) {
             return $files;
-        else if (is_string($files))
+        } else if (is_string($files)) {
             return [$files => true];
-        else {
+        } else {
             $xfiles = [];
             foreach ($files as $f)
                 $xfiles[$f] = true;
