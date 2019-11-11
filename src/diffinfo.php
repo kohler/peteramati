@@ -89,6 +89,15 @@ class DiffInfo implements Iterator {
             : $this->_diffsz && $this->_diff[$this->_diffsz - 2] === 0) {
             $this->removed = true;
         }
+        // add `@@` context line at end of diff to allow expanding file
+        if ($this->_diffsz > 12
+            && $this->_diff[$this->_diffsz - 4] === ' '
+            && $this->_diff[$this->_diffsz - 8] === ' '
+            && $this->_diff[$this->_diffsz - 12] === ' ') {
+            array_push($this->_diff, "@", $this->_diff[$this->_diffsz - 3] + 1,
+                       $this->_diff[$this->_diffsz - 2] + 1, "");
+            $this->_diffsz += 4;
+        }
     }
 
     function finish_unloaded() {
