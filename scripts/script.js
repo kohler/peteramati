@@ -2250,7 +2250,8 @@ function pa_diff_traverse(tr, down, flags) {
         } else if (tr.nodeType !== Node.ELEMENT_NODE) {
             tr = tr[direction];
         } else if (hasClass(tr, "pa-dl")
-                   && ((flags & 2) | / pa-g[idc]/.test(tr.className))) {
+                   && ((flags & 2) || / pa-g[idc]/.test(tr.className))
+                   && tr.offsetParent) {
             return tr;
         } else if (hasClass(tr, "pa-dg") || hasClass(tr, "pa-filediff")) {
             tref = tr;
