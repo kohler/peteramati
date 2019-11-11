@@ -1362,7 +1362,7 @@ class PsetView {
             echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
                 '</div><div class="pa-dg">';
         }
-        $curanno = new PsetViewLineAnno($file, $fileid);
+        $curanno = new PsetViewAnnoState($file, $fileid);
         foreach ($dinfo as $l) {
             $this->echo_line_diff($l, $linenotes, $lineanno, $curanno);
         }
@@ -1539,22 +1539,26 @@ class PsetView {
 }
 
 class PsetViewLineAnno {
-    public $file;
-    public $fileid;
     public $grade_entries;
     public $grade_first;
     public $grade_last;
     public $warnings;
-
-    function __construct($file, $fileid) {
-        $this->file = $file;
-        $this->fileid = $fileid;
-    }
 
     static function ensure(&$lineanno, $line) {
         if (!isset($lineanno[$line])) {
             $lineanno[$line] = new PsetViewLineAnno;
         }
         return $lineanno[$line];
+    }
+}
+
+class PsetViewAnnoState {
+    public $file;
+    public $fileid;
+    public $grade_first;
+
+    function __construct($file, $fileid) {
+        $this->file = $file;
+        $this->fileid = $fileid;
     }
 }
