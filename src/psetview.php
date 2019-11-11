@@ -1331,7 +1331,7 @@ class PsetView {
             }
             echo '</h3>';
         }
-        echo '<div id="', $tabid, '" class="pa-filediff';
+        echo '<div id="', $tabid, '" class="pa-filediff need-pa-observe-diff';
         if ($this->pc_view) {
             echo " uim pa-editablenotes live";
         }
@@ -1341,7 +1341,7 @@ class PsetView {
         if (!$this->user_can_view_grades()) {
             echo " hidegrades";
         }
-        if (!$open) {
+        if (!$open && false) {
             echo " hidden";
         }
         if (!$dinfo->loaded) {
@@ -1529,6 +1529,12 @@ class PsetView {
         }
         echo '">', htmlspecialchars($note->note), '</div>';
         echo '</div></div></div>';
+    }
+
+    static function echo_pa_diffbar() {
+        echo '<div class="pa-diffbar"><div class="pa-diffbar-file pa-diffbar-top hidden"></div>',
+            '<div class="pa-diffbar-buttons"><a href="" class="ui pa-diff-toggle-hide-left btn btn-primary">±</a></div>',
+            '</div>';
     }
 }
 

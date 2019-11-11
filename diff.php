@@ -92,8 +92,6 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
     "<div class=\"pa-dl pa-gdsamp\" style=\"padding:2px 5px\"><big><code>", substr($commita->hash, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</big></div>",
     "<div class=\"pa-dl pa-gisamp\" style=\"padding:2px 5px\"><big><code>", substr($commitb->hash, 0, 7), "</code> ", htmlspecialchars($commitb->subject), "</big></div>",
     "</td></tr></table>";
-echo Ht::button("Hide left", ["class" => "btn ui pa-diff-toggle-hide-left pa-diff-show-right"]);
-echo "<hr>\n";
 
 // collect diff and sort line notes
 $lnorder = $commitb->is_handout() ? $Info->empty_line_notes() : $Info->viewable_line_notes();
@@ -112,10 +110,17 @@ if (!empty($notelinks)) {
     ContactView::echo_group("notes", join(", ", $notelinks));
 }
 
-// diff and line notes
-foreach ($diff as $file => $dinfo) {
-    $open = $lnorder->file_has_notes($file) || !$dinfo->boring || empty($notelinks);
-    $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open, "only_diff" => true]);
+if ($diff) {
+    echo '<div class="pa-diffset">';
+    PsetView::echo_pa_diffbar();
+
+    // diff and line notes
+    foreach ($diff as $file => $dinfo) {
+        $open = $lnorder->file_has_notes($file) || !$dinfo->boring || empty($notelinks);
+        $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open, "only_diff" => true]);
+    }
+
+    echo '</div>';
 }
 
 Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",pa_beforeunload)');

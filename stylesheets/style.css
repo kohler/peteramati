@@ -2272,19 +2272,26 @@ tr.gtrow-partner {
 .gt-anonymous .gt-name {
 	display: none;
 }
-.pa-line-highlight {
-	animation: 1600ms 1 pa-line-highlight;
+
+.pa-diffbar {
+	position: sticky;
+	top: 0;
+	padding: 4px 4px 4px 12px;
+	margin-bottom: 0.5rem;
+	background: #f2f2f5;
+	display: flex;
+	align-items: baseline;
+	font-size: smaller;
+	font-weight: 500;
 }
-@keyframes pa-line-highlight {
-	from, 12.5%, 25% {
-		background-color: #ffff00;
-	}
-	6.25%, 18.75% {
-		background-color: #ffff0000;
-	}
+.pa-diffbar-file {
+	flex: 1 1 auto;
 }
 .pa-filediff {
 	margin-bottom: 1.5rem;
+}
+.pa-filediff.need-load {
+	margin-bottom: 0;
 }
 @media screen and (min-width: 800px) {
 .pa-filediff {
@@ -2365,6 +2372,18 @@ tr.gtrow-partner {
 	margin-left: -1.5em;
 }
 }
+.pa-line-highlight {
+	animation: 1600ms 1 pa-line-highlight;
+}
+@keyframes pa-line-highlight {
+	from, 12.5%, 25% {
+		background-color: #ffff00;
+	}
+	6.25%, 18.75% {
+		background-color: #ffff0000;
+	}
+}
+
 .pa-with-sidebar {
 	display: flex;
 	flex-direction: row-reverse;
@@ -2381,7 +2400,7 @@ tr.gtrow-partner {
 }
 .pa-sidebar > .pa-gradebox {
 	position: sticky;
-	top: 16px;
+	top: 2rem;
 	display: block;
 	padding-right: 0.8rem;
 }

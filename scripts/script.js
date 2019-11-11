@@ -2775,8 +2775,68 @@ function expand(evt) {
 }
 
 handle_ui.on("pa-gx", expand);
-
 })($);
+
+handle_ui.on("pa-diff-toggle-hide-left", function () {
+    var $x = $("head .style-hide-left"), show = $x.length;
+    if (show) {
+        $x.remove();
+    } else {
+        var styles = $('<style class="style-hide-left"></style>').appendTo("head")[0].sheet;
+        styles.insertRule('.pa-gd { display: none; }');
+        styles.insertRule('.pa-gi { background-color: #f0fff0; }');
+    }
+    toggleClass(this, "btn-primary", show);
+});
+
+var pa_observe_diff = (function () {
+var observers = new WeakMap;
+function observer_fn(entries) {
+    var tops = this.pa_tops;
+    for (var i = 0; i !== entries.length; ++i) {
+        var e = entries[i], p = tops.indexOf(e.target);
+        if (e.isIntersecting && p < 0) {
+            tops.push(e.target);
+        } else if (!e.isIntersecting && p >= 0) {
+            tops.splice(p, 1);
+        }
+    }
+    tops.sort(function (a, b) {
+        return a.offsetTop < b.offsetTop ? -1 : 1;
+    });
+    if (tops.length && tops[0] !== this.pa_top) {
+        var e = tops[0], t = e.getAttribute("data-pa-file");
+        while (e && (e = e.parentElement.closest(".pa-diffcontext"))) {
+            if (e.hasAttribute("data-pa-diffcontext"))
+                t = e.getAttribute("data-pa-diffcontext") + "/" + t;
+            else
+                t = e.getAttribute("data-pa-user") + "/" + t;
+        }
+        this.pa_top = e;
+        $(this.pa_ds).find(".pa-diffbar-top").removeClass("hidden").text(t);
+    }
+}
+return function () {
+    if (!this || this === window || this === document) {
+        $(".need-pa-observe-diff").each(pa_observe_diff);
+    } else {
+        removeClass(this, "need-pa-observe-diff");
+        var ds = this.closest(".pa-diffset");
+        if (ds && window.IntersectionObserver) {
+            if (!observers.has(ds)) {
+                var o = new IntersectionObserver(observer_fn, {threshold: 0.01});
+                o.pa_ds = ds;
+                o.pa_tops = [];
+                o.pa_top = null;
+                observers.set(ds, o);
+            }
+            observers.get(ds).observe(this);
+        }
+    }
+};
+})();
+$(pa_observe_diff);
+
 
 
 jQuery.fn.extend({
@@ -6610,21 +6670,6 @@ function pa_render_pset_table(pconf, data) {
     initialize();
     render();
 }
-
-
-handle_ui.on("pa-diff-toggle-hide-left", function () {
-    var $x = $("head .style-hide-left");
-    if ($x.length)
-        $x.remove();
-    else {
-        var styles = $('<style class="style-hide-left"></style>').appendTo("head")[0].sheet;
-        styles.insertRule('.pa-gd { display: none; }');
-        if (!hasClass(this, "pa-diff-show-right"))
-            styles.insertRule('.pa-gi { background-color: inherit; }');
-    }
-    if (this.tagName === "BUTTON")
-        $(this).html($x.length ? "Hide left" : "Show left");
-});
 
 
 handle_ui.on("js-repositories", function (event) {

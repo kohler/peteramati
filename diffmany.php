@@ -30,7 +30,8 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     if (!$info->repo)
         return;
     $info->set_hash(false);
-    echo '<div id="pa-psetinfo', $psetinfo_idx, '" class="pa-psetinfo',
+    echo '<div id="pa-psetinfo', $psetinfo_idx,
+        '" class="pa-psetinfo pa-diffcontext',
         '" data-pa-pset="', htmlspecialchars($pset->urlkey),
         '" data-pa-user="', htmlspecialchars($Me->user_linkpart($user));
     if (!$pset->gitless && $info->commit_hash()) {
@@ -107,15 +108,14 @@ if ($Qreq->files)
     $title .= " > " . join(" ", $Qreq->files);
 $Conf->header(htmlspecialchars($title), "home");
 
-if ($Qreq->files)
-    echo Ht::button("Hide left", ["class" => "btn ui pa-diff-toggle-hide-left"]);
 if ($Pset->grade_script) {
     foreach ($Pset->grade_script as $gs)
         Ht::stash_html($Conf->make_script_file($gs));
 }
-echo "<hr />\n<div class=\"pa-psetinfo\" data-pa-gradeinfo=\"",
+echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
      htmlspecialchars(json_encode($Pset->gradeentry_json($Me->isPC))),
      "\">";
+PsetView::echo_pa_diffbar();
 
 if (trim((string) $Qreq->users) === "") {
     $want = [];
