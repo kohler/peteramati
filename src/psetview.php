@@ -1231,11 +1231,13 @@ class PsetView {
         }
 
         if ($lnorder) {
+            $onlyfiles = Repository::fix_diff_files(get($args, "onlyfiles"));
             // expand diff to include fake files
             foreach ($lnorder->fileorder() as $fn => $order) {
                 if (isset($diff[$fn])
                     || !($diffc = $this->pset->find_diffconfig($fn))
-                    || !$diffc->fileless) {
+                    || !$diffc->fileless
+                    || ($onlyfiles && !get($onlyfiles, $fn))) {
                     continue;
                 }
                 $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
