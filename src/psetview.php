@@ -1322,8 +1322,9 @@ class PsetView {
             if (!$dinfo->fileless && !$dinfo->removed) {
                 $rawfile = $file;
                 if ($this->repo->truncated_psetdir($this->pset)
-                    && str_starts_with($rawfile, $this->pset->directory_slash))
+                    && str_starts_with($rawfile, $this->pset->directory_slash)) {
                     $rawfile = substr($rawfile, strlen($this->pset->directory_slash));
+                }
                 echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $this->hoturl("raw", ["file" => $rawfile]), '">[Raw]</a>';
             }
             echo '</h3>';
@@ -1359,9 +1360,9 @@ class PsetView {
             echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
                 '</div><div class="pa-dg">';
         }
-        $curanno = new PsetViewLineAnno;
+        $curanno = new PsetViewLineAnno($file, $fileid);
         foreach ($dinfo as $l) {
-            $this->echo_line_diff($l, $file, $fileid, $linenotes, $lineanno, $curanno);
+            $this->echo_line_diff($l, $linenotes, $lineanno, $curanno);
         }
         if ($has_grade_range) {
             echo '</div></div>';
@@ -1373,8 +1374,7 @@ class PsetView {
         }
     }
 
-    private function echo_line_diff($l, $file, $fileid, $linenotes, $lineanno,
-                                    $curanno) {
+    private function echo_line_diff($l, $linenotes, $lineanno, $curanno) {
         if ($l[0] === "@") {
             $cx = strlen($l[3]) > 76 ? substr($l[3], 0, 76) . "..." : $l[3];
             $x = [" pa-gx ui", "pa-dcx", "", "", $cx];
@@ -1418,10 +1418,10 @@ class PsetView {
 
         $ak = $bk = "";
         if ($linenotes && $aln && isset($linenotes->$aln)) {
-            $ak = ' id="L' . $aln . '_' . $fileid . '"';
+            $ak = ' id="L' . $aln . '_' . $curanno->fileid . '"';
         }
         if ($linenotes && $bln && isset($linenotes->$bln)) {
-            $bk = ' id="L' . $bln . '_' . $fileid . '"';
+            $bk = ' id="L' . $bln . '_' . $curanno->fileid . '"';
         }
 
         if (!$x[2] && !$x[3]) {
@@ -1437,9 +1437,9 @@ class PsetView {
         $nx = null;
         if ($linenotes) {
             if ($bln && isset($linenotes->$bln))
-                $nx = LineNote::make_json($file, $bln, $linenotes->$bln);
+                $nx = LineNote::make_json($curanno->file, $bln, $linenotes->$bln);
             if (!$nx && $aln && isset($linenotes->$aln))
-                $nx = LineNote::make_json($file, $aln, $linenotes->$aln);
+                $nx = LineNote::make_json($curanno->file, $aln, $linenotes->$aln);
         }
 
         if ($x[0]) {
@@ -1531,10 +1531,17 @@ class PsetView {
 }
 
 class PsetViewLineAnno {
+    public $file;
+    public $fileid;
     public $grade_entries;
     public $grade_first;
     public $grade_last;
     public $warnings;
+
+    function __construct($file, $fileid) {
+        $this->file = $file;
+        $this->fileid = $fileid;
+    }
 
     static function ensure(&$lineanno, $line) {
         if (!isset($lineanno[$line])) {
