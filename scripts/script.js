@@ -2791,30 +2791,32 @@ handle_ui.on("pa-diff-toggle-hide-left", function () {
 
 var pa_observe_diff = (function () {
 var observers = new WeakMap;
-function observer_fn(entries) {
-    var tops = this.pa_tops;
-    for (var i = 0; i !== entries.length; ++i) {
-        var e = entries[i], p = tops.indexOf(e.target);
-        if (e.isIntersecting && p < 0) {
-            tops.push(e.target);
-        } else if (!e.isIntersecting && p >= 0) {
-            tops.splice(p, 1);
+function make_observer_fn(ds) {
+    var tops = [], top = null;
+    return function (entries) {
+        for (var i = 0; i !== entries.length; ++i) {
+            var e = entries[i], p = tops.indexOf(e.target);
+            if (e.isIntersecting && p < 0) {
+                tops.push(e.target);
+            } else if (!e.isIntersecting && p >= 0) {
+                tops.splice(p, 1);
+            }
         }
-    }
-    tops.sort(function (a, b) {
-        return a.offsetTop < b.offsetTop ? -1 : 1;
-    });
-    if (tops.length && tops[0] !== this.pa_top) {
-        var e = tops[0], t = e.getAttribute("data-pa-file");
-        while (e && (e = e.parentElement.closest(".pa-diffcontext"))) {
-            if (e.hasAttribute("data-pa-diffcontext"))
-                t = e.getAttribute("data-pa-diffcontext") + "/" + t;
-            else
-                t = e.getAttribute("data-pa-user") + "/" + t;
+        tops.sort(function (a, b) {
+            return a.offsetTop < b.offsetTop ? -1 : 1;
+        });
+        if (tops.length && tops[0] !== top) {
+            top = tops[0];
+            var e = top, t = top.getAttribute("data-pa-file");
+            while (e && (e = e.parentElement.closest(".pa-diffcontext"))) {
+                if (e.hasAttribute("data-pa-diffcontext"))
+                    t = e.getAttribute("data-pa-diffcontext") + "/" + t;
+                else
+                    t = e.getAttribute("data-pa-user") + "/" + t;
+            }
+            $(ds).find(".pa-diffbar-top").removeClass("hidden").text(t);
         }
-        this.pa_top = e;
-        $(this.pa_ds).find(".pa-diffbar-top").removeClass("hidden").text(t);
-    }
+    };
 }
 return function () {
     if (!this || this === window || this === document) {
@@ -2824,11 +2826,7 @@ return function () {
         var ds = this.closest(".pa-diffset");
         if (ds && window.IntersectionObserver) {
             if (!observers.has(ds)) {
-                var o = new IntersectionObserver(observer_fn, {threshold: 0.01});
-                o.pa_ds = ds;
-                o.pa_tops = [];
-                o.pa_top = null;
-                observers.set(ds, o);
+                observers.set(ds, new IntersectionObserver(make_observer_fn(ds), {threshold: 0.01}));
             }
             observers.get(ds).observe(this);
         }
