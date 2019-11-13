@@ -4,7 +4,6 @@
 // See LICENSE for open-source distribution terms
 
 class UserActions {
-
     static private function modify_password_mail($where, $dopassword, $sendtype, $ids) {
         global $Conf;
         $j = (object) array("ok" => true);
@@ -55,19 +54,4 @@ class UserActions {
         return self::modify_password_mail("true", false, "send", $ids);
         $Conf->confirmMsg("Account information sent.");
     }
-
-    static function save_clickthrough($user) {
-        global $Conf, $Now;
-        $confirmed = false;
-        if (@$_REQUEST["clickthrough_accept"]
-            && @$_REQUEST["clickthrough_sha1"]) {
-            $user->merge_and_save_data(array("clickthrough" => array($_REQUEST["clickthrough_sha1"] => $Now)));
-            $confirmed = true;
-        } else if (@$_REQUEST["clickthrough_decline"])
-            $Conf->errorMsg("You can’t continue until you accept these terms.");
-        if (@$_REQUEST["ajax"])
-            json_exit(["ok" => $confirmed]);
-        redirectSelf();
-    }
-
 }

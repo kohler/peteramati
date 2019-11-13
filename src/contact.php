@@ -345,7 +345,7 @@ class Contact {
         }
 
         // Maybe set up the shared contacts database
-        if ($this->conf->opt("contactdb_dsn") && $this->has_database_account()
+        if ($this->conf->opt("contactdb_dsn") && $this->has_account_here()
             && $this->conf->session("contactdb_roles", 0) != $this->all_roles()) {
             if ($this->contactdb_update())
                 $this->conf->save_session("contactdb_roles", $this->all_roles());
@@ -368,38 +368,12 @@ class Contact {
         }
     }
 
-    function activate_database_account() {
-        assert($this->has_email());
-        if (!$this->has_database_account()) {
-            $reg = clone $_SESSION["trueuser"];
-            if (strcasecmp($reg->email, $this->email) != 0)
-                $reg = (object) array();
-            $reg->email = $this->email;
-            if (($c = Contact::create($this->conf, $reg))) {
-                $this->load_by_id($c->contactId);
-                $this->activate();
-            }
-        }
-        return $this;
-    }
-
     static function contactdb() {
         return null;
     }
 
     function contactdb_user() {
         return null;
-    }
-
-    function update_trueuser($always) {
-        if (($trueuser = get($_SESSION, "trueuser"))
-            && strcasecmp($trueuser->email, $this->email) == 0) {
-            foreach (array("firstName", "lastName", "affiliation", "country") as $k)
-                if ($this->$k && ($always || !get($trueuser, $k)))
-                    $trueuser->$k = $this->$k;
-            return true;
-        } else
-            return false;
     }
 
 
@@ -448,7 +422,7 @@ class Contact {
         return $this->email && self::is_anonymous_email($this->email);
     }
 
-    function has_database_account() {
+    function has_account_here() {
         return $this->contactId > 0;
     }
 
@@ -506,96 +480,6 @@ class Contact {
 
     function all_contact_tags() {
         return self::roles_all_contact_tags($this->roles, $this->contactTags);
-    }
-
-    function capability($pid) {
-        $caps = $this->capabilities ? : array();
-        return get($caps, $pid) ? : 0;
-    }
-
-    function change_capability($pid, $c, $on = null) {
-        if (!$this->capabilities)
-            $this->capabilities = array();
-        $oldval = get($this->capabilities, $pid) ? : 0;
-        if ($on === null)
-            $newval = ($c != null ? $c : 0);
-        else
-            $newval = ($oldval | ($on ? $c : 0)) & ~($on ? 0 : $c);
-        if ($newval !== $oldval) {
-            ++self::$rights_version;
-            if ($newval !== 0)
-                $this->capabilities[$pid] = $newval;
-            else
-                unset($this->capabilities[$pid]);
-        }
-        if (!count($this->capabilities))
-            $this->capabilities = null;
-        if ($this->activated_ && $newval !== $oldval)
-            $this->conf->save_session("capabilities", $this->capabilities);
-        return $newval != $oldval;
-    }
-
-    function apply_capability_text($text) {
-        if (preg_match(',\A([-+]?)0([1-9][0-9]*)(a)(\S+)\z,', $text, $m)
-            && ($result = $this->conf->ql("select paperId, capVersion from Paper where paperId=$m[2]"))
-            && ($row = edb_orow($result))) {
-            $rowcap = $this->conf->capability_text($row, $m[3]);
-            $text = substr($text, strlen($m[1]));
-            if ($rowcap === $text
-                || $rowcap === str_replace("/", "_", $text))
-                return $this->change_capability((int) $m[2], self::CAP_AUTHORVIEW, $m[1] !== "-");
-        }
-        return null;
-    }
-
-    private function make_data() {
-        if (is_string($this->data_))
-            $this->data_ = json_decode($this->data_);
-        if (!$this->data_)
-            $this->data_ = (object) array();
-    }
-
-    function data($key = null) {
-        $this->make_data();
-        if ($key)
-            return get($this->data_, $key);
-        else
-            return $this->data_;
-    }
-
-    private function encode_data() {
-        if ($this->data_ && ($t = json_encode($this->data_)) !== "{}")
-            return $t;
-        else
-            return null;
-    }
-
-    function save_data($key, $value) {
-        $this->merge_and_save_data((object) array($key => array_to_object_recursive($value)));
-    }
-
-    function merge_data($data) {
-        $this->make_data();
-        object_replace_recursive($this->data_, array_to_object_recursive($data));
-    }
-
-    function merge_and_save_data($data) {
-        $this->activate_database_account();
-        $this->make_data();
-        $old = $this->encode_data();
-        object_replace_recursive($this->data_, array_to_object_recursive($data));
-        $new = $this->encode_data();
-        if ($old !== $new)
-            $this->conf->qe("update ContactInfo set data=? where contactId=?", $new, $this->contactId);
-    }
-
-    private function data_str() {
-        $d = null;
-        if (is_string($this->data))
-            $d = $this->data;
-        else if (is_object($this->data))
-            $d = json_encode($this->data);
-        return $d === "{}" ? null : $d;
     }
 
     private function trim() {
@@ -982,7 +866,7 @@ class Contact {
     private function prefer_contactdb_password() {
         $cdbu = $this->contactdb_user();
         return $cdbu && $cdbu->password
-            && (!$this->has_database_account() || $this->password === "");
+            && (!$this->has_account_here() || $this->password === "");
     }
 
     function plaintext_password() {
@@ -1265,7 +1149,7 @@ class Contact {
         if ($this->privChair)
             return true;
         $is_pc = $user && $user != $this && $this->isPC;
-        return $pset && $this->has_database_account()
+        return $pset && $this->has_account_here()
             && (!isset($pset->repo_edit_deadline)
                 || $pset->repo_edit_deadline === false
                 || (is_int($pset->repo_edit_deadline)

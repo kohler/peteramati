@@ -1171,10 +1171,6 @@ class DiffConfig {
 }
 
 
-function is_number($x) {
-    return is_int($x) || is_float($x);
-}
-
 function is_string_array($x) {
     return is_array($x)
         && array_reduce($x, function ($carry, $item) {

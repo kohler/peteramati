@@ -2,6 +2,13 @@
 // base.php -- HotCRP base helper functions
 // Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
+// type helpers
+
+function is_number($x) {
+    return is_int($x) || is_float($x);
+}
+
+
 // string helpers
 
 function str_starts_with($haystack, $needle) {
@@ -17,6 +24,13 @@ function str_ends_with($haystack, $needle) {
 function stri_ends_with($haystack, $needle) {
     $p = strlen($haystack) - strlen($needle);
     return $p >= 0 && strcasecmp(substr($haystack, $p), $needle) == 0;
+}
+
+function preg_matchpos($pattern, $subject) {
+    if (preg_match($pattern, $subject, $m, PREG_OFFSET_CAPTURE))
+        return $m[0][1];
+    else
+        return false;
 }
 
 function cleannl($text) {
@@ -413,5 +427,20 @@ if (function_exists("pcntl_wifexited") && pcntl_wifexited(0) !== null) {
 } else {
     function pcntl_wifexitedwith($status, $exitstatus = 0) {
         return ($status & 0xff7f) == ($exitstatus << 8);
+    }
+}
+
+
+// setcookie helper
+
+if (PHP_VERSION_ID >= 70300) {
+    function hotcrp_setcookie($name, $value = "", $options = []) {
+        return setcookie($name, $value, $options);
+    }
+} else {
+    function hotcrp_setcookie($name, $value = "", $options = []) {
+        return setcookie($name, $value, get($options, "expires", 0),
+                         get($options, "path", ""), get($options, "domain", ""),
+                         get($options, "secure", false), get($options, "httponly", false));
     }
 }

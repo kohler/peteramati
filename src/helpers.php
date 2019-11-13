@@ -29,16 +29,6 @@ function &array_ensure(&$arr, $key, $val) {
     return $arr[$key];
 }
 
-function set_error_html($x, $error_html = null) {
-    if (!$error_html) {
-        $error_html = $x;
-        $x = (object) array();
-    }
-    $x->error = true;
-    $x->error_html = $error_html;
-    return $x;
-}
-
 function ago($t) {
     global $Now;
     if ($t + 60 >= $Now)

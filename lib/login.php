@@ -43,7 +43,7 @@ class LoginHelper {
         }
 
         // if user is still valid, OK
-        if ($Me->has_database_account())
+        if ($Me->has_account_here())
             return;
 
         // check HTTP auth
@@ -223,7 +223,7 @@ class LoginHelper {
         global $Conf, $email_class;
 
         // check for errors
-        if ($user && $user->has_database_account() && $user->activity_at > 0) {
+        if ($user && $user->has_account_here() && $user->activity_at > 0) {
             $email_class = " error";
             return Conf::msg_error("An account already exists for " . htmlspecialchars($_REQUEST["email"]) . ". To retrieve your password, select “I forgot my password.”");
         } else if ($cdb_user && $cdb_user->allow_contactdb_password()
@@ -237,7 +237,7 @@ class LoginHelper {
         }
 
         // create database account
-        if (!$user || !$user->has_database_account()) {
+        if (!$user || !$user->has_account_here()) {
             if (!($user = Contact::create($Conf, Contact::safe_registration($_REQUEST))))
                 return Conf::msg_error($Conf->db_error_html(true, "while adding your account"));
         }
