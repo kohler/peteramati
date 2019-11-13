@@ -227,10 +227,10 @@ class GitHub_RepositorySite extends RepositorySite {
             error_log(json_encode($gql));
             return -1;
         } else if ($gql->j->data->repository == null) {
-            $ms && $ms->set_error_html("open", $this->expand_message("repo_nonexistent", $ms->user));
+            $ms && $ms->error_at("open", $this->expand_message("repo_nonexistent", $ms->user));
             return 1;
         } else if (!$gql->j->data->repository->isPrivate) {
-            $ms && $ms->set_error_html("open", $this->expand_message("repo_toopublic", $ms->user));
+            $ms && $ms->error_at("open", $this->expand_message("repo_toopublic", $ms->user));
             return 1;
         } else {
             return 0;
@@ -245,10 +245,10 @@ class GitHub_RepositorySite extends RepositorySite {
         if ($status >= 124) { // timeout
             $status = -1;
         } else if (!preg_match('{\A[0-9a-f]{40,}\s+}', $answer)) {
-            $ms && $ms->set_error_html("working", $this->expand_message("repo_unreadable", $ms->user));
+            $ms && $ms->error_at("working", $this->expand_message("repo_unreadable", $ms->user));
             $status = 0;
         } else if (!preg_match('{^[0-9a-f]{40,}\s+refs/heads/master}m', $answer)) {
-            $ms && $ms->set_error_html("working", $this->expand_message("repo_nomaster", $ms->user));
+            $ms && $ms->error_at("working", $this->expand_message("repo_nomaster", $ms->user));
             $status = 0;
         } else {
             $status = 1;

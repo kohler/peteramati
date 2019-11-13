@@ -305,7 +305,7 @@ class ContactView {
                 $your_partner = "your partner’s";
                 if ($Me->isPC)
                     $your_partner = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $Me->user_linkpart($partner))) . '">' . $your_partner . '</a>';
-                $ms->set_error_html("partner", "This repository differs from $your_partner$prepo_url.");
+                $ms->error_at("partner", "This repository differs from $your_partner$prepo_url.");
             }
         }
         if ($repo) {
@@ -464,7 +464,7 @@ class ContactView {
         }
 
         // if !working, complain
-        if (!$working && !$ms->has_problems())
+        if (!$working && !$ms->has_problem())
             return Conf::msg_error("Can’t access the repository “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
         else if (!$working) {
             $msgs = join("<br />", $ms->messages()) ? : "Repository unreachable at the moment.";

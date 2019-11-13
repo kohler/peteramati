@@ -169,10 +169,10 @@ class Repository {
                 $this->opencheckat = $Now;
             }
         }
-        if ($this->open < 0 && $ms && $ms->user->isPC && !$ms->has_problems())
-            $ms->set_warning_html("open", Messages::$main->expand_html("repo_toopublic_timeout", $this->reposite->message_defs($ms->user)));
-        if ($this->open > 0 && $ms && !$ms->has_problems())
-            $ms->set_error_html("open", Messages::$main->expand_html("repo_toopublic", $this->reposite->message_defs($ms->user)));
+        if ($this->open < 0 && $ms && $ms->user->isPC && !$ms->has_problem())
+            $ms->warning_at("open", Messages::$main->expand_html("repo_toopublic_timeout", $this->reposite->message_defs($ms->user)));
+        if ($this->open > 0 && $ms && !$ms->has_problem())
+            $ms->error_at("open", Messages::$main->expand_html("repo_toopublic", $this->reposite->message_defs($ms->user)));
         return $this->open;
     }
 
@@ -198,10 +198,10 @@ class Repository {
                     $this->conf->qe("update Repository set working=? where repoid=?", $Now, $this->repoid);
             }
         }
-        if ($working < 0 && $ms && $ms->user->isPC && !$ms->has_problem("working"))
-            $ms->set_warning_html("working", Messages::$main->expand_html("repo_working_timeout", $this->reposite->message_defs($ms->user)));
-        if ($working == 0 && $ms && !$ms->has_problem("working"))
-            $ms->set_error_html("working", Messages::$main->expand_html("repo_unreadable", $this->reposite->message_defs($ms->user)));
+        if ($working < 0 && $ms && $ms->user->isPC && !$ms->has_problem_at("working"))
+            $ms->warning_at("working", Messages::$main->expand_html("repo_working_timeout", $this->reposite->message_defs($ms->user)));
+        if ($working == 0 && $ms && !$ms->has_problem_at("working"))
+            $ms->error_at("working", Messages::$main->expand_html("repo_unreadable", $this->reposite->message_defs($ms->user)));
         return $working > 0;
     }
 
@@ -227,8 +227,8 @@ class Repository {
                     },
                     "update Repository set notes=?{desired} where notes?{expected}e and repoid=?", [$this->repoid]);
         }
-        if ($ownership == 0 && $ms && !$ms->has_problem("ownership"))
-            $ms->set_warning_html("ownership", $this->expand_message("repo_notowner", $ms->user));
+        if ($ownership == 0 && $ms && !$ms->has_problem_at("ownership"))
+            $ms->warning_at("ownership", $this->expand_message("repo_notowner", $ms->user));
 
         return $ownership;
     }
