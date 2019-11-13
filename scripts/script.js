@@ -2602,11 +2602,13 @@ function uncapture() {
 }
 
 function unedit(tr, always) {
-    var $tr = $(tr).closest(".pa-dl");
-    var note = pa_note($tr[0]);
+    var $tr = $(tr).closest(".pa-dl"),
+        note = pa_note($tr[0]),
+        $text = $tr.find("textarea");
     if (!$tr.length
         || (!always
-            && !text_eq(note[1], $tr.find("textarea").val().replace(/\s+$/, ""))))
+            && $text.length
+            && !text_eq(note[1], $text.val().replace(/\s+$/, ""))))
         return false;
     $tr.removeClass("editing");
     $tr.find(":focus").blur();
