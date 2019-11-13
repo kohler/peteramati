@@ -301,7 +301,7 @@ function echo_grade_cdf() {
 }
 
 function echo_commit($Info) {
-    global $Conf, $Me, $User, $Pset;
+    global $Conf, $Me, $User, $Pset, $Qreq;
     global $TABWIDTH, $WDIFF;
 
     $Notes = $Info->commit_info();
@@ -380,12 +380,12 @@ function echo_commit($Info) {
         . '</span>&nbsp;options</a><span style="padding-left:1em"'
         . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
     foreach (array(2, 4, 8) as $i)
-        $value .= '&nbsp;<a href="' . self_href(array("tab" => $i)) . '"'
+        $value .= '&nbsp;<a href="' . $Conf->selfurl($Qreq, ["tab" => $i]) . '"'
             . ($TABWIDTH == $i ? " class=\"q\"><strong>$i</strong>" : '>' . $i)
             . '</a>';
     $value .= '<span style="padding-left:1em">wdiff:';
     foreach (array("no", "yes") as $i => $t)
-        $value .= '&nbsp;<a href="' . self_href(array("wdiff" => $i)) . '"'
+        $value .= '&nbsp;<a href="' . $Conf->selfurl($Qreq, ["wdiff" => $i]) . '"'
             . (!$WDIFF == !$i ? " class=\"q\"><strong>$t</strong>" : '>' . $t)
             . '</a>';
     $value .= '</span></span></div>';

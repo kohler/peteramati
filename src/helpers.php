@@ -146,180 +146,22 @@ function json_update($j, $updates) {
 
 // web helpers
 
-global $_hoturl_defaults;
-$_hoturl_defaults = null;
-
-function hoturl_defaults($options = array()) {
-    global $_hoturl_defaults;
-    foreach ($options as $k => $v)
-        if ($v !== null)
-            $_hoturl_defaults[$k] = urlencode($v);
-        else
-            unset($_hoturl_defaults[$k]);
-    $ret = array();
-    if ($_hoturl_defaults)
-        foreach ($_hoturl_defaults as $k => $v)
-            $ret[$k] = urldecode($v);
-    return $ret;
-}
-
-function hoturl_site_relative($page, $options = null) {
-    global $Conf, $Me, $_hoturl_defaults;
-    $t = $page . Navigation::php_suffix();
-    // parse options, separate anchor; see also redirectSelf
-    $anchor = "";
-    if ($options && is_array($options)) {
-        $x = "";
-        foreach ($options as $k => $v)
-            if ($v === null || $v === false)
-                /* skip */;
-            else if ($k !== "anchor")
-                $x .= ($x === "" ? "" : "&amp;") . $k . "=" . urlencode($v);
-            else
-                $anchor = "#" . urlencode($v);
-        $options = $x;
-    } else if (preg_match('/\A(.*?)(#.*)\z/', $options, $m))
-        list($options, $anchor) = array($m[1], $m[2]);
-    // append defaults
-    $are = '/\A(|.*?(?:&|&amp;))';
-    $zre = '(?:&(?:amp;)?|\z)(.*)\z/';
-    if ($_hoturl_defaults)
-        foreach ($_hoturl_defaults as $k => $v)
-            if (!preg_match($are . preg_quote($k) . '=/', $options))
-                $options .= "&amp;" . $k . "=" . $v;
-    // create slash-based URLs if appropriate
-    if ($options && !$Conf->opt("disableSlashURLs")) {
-        if (preg_match('{\A(?:index|pset|diff|run|raw)\z}', $page)
-            && preg_match($are . 'u=([^&#?]+)' . $zre, $options, $m)) {
-            $t = "~" . $m[2] . ($t === "index" ? "" : "/$t");
-            $options = $m[1] . $m[3];
-        }
-        if (($page == "pset" || $page == "run")
-            && preg_match($are . 'pset=(\w+)' . $zre, $options, $m)) {
-            $t .= "/" . $m[2];
-            $options = $m[1] . $m[3];
-            if (preg_match($are . 'u=([^&#?]+)' . $zre, $options, $m)) {
-                $t .= "/" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-            if (preg_match($are . 'commit=([0-9a-f]+)' . $zre, $options, $m)) {
-                $t .= "/" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-        } else if (($page == "file" || $page == "raw")
-                   && preg_match($are . 'pset=\w+' . $zre, $options)) {
-            if (preg_match($are . 'u=([^&#?]+)' . $zre, $options, $m)) {
-                $t .= "/~" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-            if (preg_match($are . 'pset=(\w+)' . $zre, $options, $m)) {
-                $t .= "/" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-            if (preg_match($are . 'commit=([0-9a-f]+)' . $zre, $options, $m)) {
-                $t .= "/" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-            if (preg_match($are . 'file=([^&#?]+)' . $zre, $options, $m)) {
-                $t .= "/" . str_replace("%2F", "/", $m[2]);
-                $options = $m[1] . $m[3];
-            }
-        } else if ($page == "diff"
-                   && preg_match($are . 'pset=\w+' . $zre, $options)) {
-            if (preg_match($are . 'u=([^&#?]+)' . $zre, $options, $m)) {
-                $t .= "/~" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-            if (preg_match($are . 'pset=(\w+)' . $zre, $options, $m)) {
-                $t .= "/" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-            if (preg_match($are . 'commit=([0-9a-f]+)' . $zre, $options, $m)) {
-                $t .= "/" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-            if (preg_match($are . 'commit1=([0-9a-f]+)' . $zre, $options, $m)) {
-                $t .= "/" . $m[2];
-                $options = $m[1] . $m[3];
-            }
-        } else if (($page == "profile" || $page == "face")
-                   && preg_match($are . 'u=([^&#?]+)' . $zre, $options, $m)) {
-            $t .= "/" . $m[2];
-            $options = $m[1] . $m[3];
-        } else if ($page == "help"
-                   && preg_match($are . 't=(\w+)' . $zre, $options, $m)) {
-            $t .= "/" . $m[2];
-            $options = $m[1] . $m[3];
-        } else if (preg_match($are . '__PATH__=([^&]+)' . $zre, $options, $m)) {
-            $t .= "/" . str_replace("%2F", "/", $m[2]);
-            $options = $m[1] . $m[3];
-        }
-        $options = preg_replace('/&(?:amp;)?\z/', "", $options);
+function hoturl_add_raw($url, $component) {
+    if (($pos = strpos($url, "#")) !== false) {
+        $component .= substr($url, $pos);
+        $url = substr($url, 0, $pos);
     }
-    if ($options && preg_match('/\A&(?:amp;)?(.*)\z/', $options, $m))
-        $options = $m[1];
-    if ($options)
-        return $t . "?" . $options . $anchor;
-    else
-        return $t . $anchor;
+    return $url . (strpos($url, "?") === false ? "?" : "&") . $component;
 }
 
-function hoturl($page, $options = null) {
-    $siteurl = Navigation::siteurl();
-    $t = hoturl_site_relative($page, $options);
-    if ($page !== "index")
-        return $siteurl . $t;
-    $expectslash = 5 + strlen(Navigation::php_suffix());
-    if (strlen($t) < $expectslash
-        || substr($t, 0, $expectslash) !== "index" . Navigation::php_suffix()
-        || (strlen($t) > $expectslash && $t[$expectslash] === "/"))
-        return $siteurl . $t;
-    else
-        return ($siteurl !== "" ? $siteurl : Navigation::site_path())
-            . substr($t, $expectslash);
+function hoturl($page, $param = null) {
+    global $Conf;
+    return $Conf->hoturl($page, $param);
 }
 
-function hoturl_post($page, $options = null) {
-    if (is_array($options))
-        $options["post"] = post_value();
-    else if ($options)
-        $options .= "&amp;post=" . post_value();
-    else
-        $options = "post=" . post_value();
-    return hoturl($page, $options);
-}
-
-function hoturl_absolute($page, $options = null) {
-    return opt("paperSite") . "/" . hoturl_site_relative($page, $options);
-}
-
-function hoturl_absolute_nodefaults($page, $options = null) {
-    global $_hoturl_defaults;
-    $defaults = $_hoturl_defaults;
-    $_hoturl_defaults = null;
-    $url = hoturl_absolute($page, $options);
-    $_hoturl_defaults = $defaults;
-    return $url;
-}
-
-function hoturl_site_relative_raw($page, $options = null) {
-    return htmlspecialchars_decode(hoturl_site_relative($page, $options));
-}
-
-function hoturl_raw($page, $options = null) {
-    return htmlspecialchars_decode(hoturl($page, $options));
-}
-
-function hoturl_post_raw($page, $options = null) {
-    return htmlspecialchars_decode(hoturl_post($page, $options));
-}
-
-function hoturl_absolute_raw($page, $options = null) {
-    return htmlspecialchars_decode(hoturl_absolute($page, $options));
-}
-
-function hoturl_image($page) {
-    return Navigation::siteurl() . $page;
+function hoturl_post($page, $param = null) {
+    global $Conf;
+    return $Conf->hoturl($page, $param, Conf::HOTURL_POST);
 }
 
 
@@ -346,40 +188,9 @@ function file_uploaded(&$var) {
     }
 }
 
-function self_href($extra = array(), $options = null) {
-    global $CurrentList;
-    // clean parameters from pathinfo URLs
-    foreach (array("paperId" => "p", "pap" => "p", "reviewId" => "r", "commentId" => "c") as $k => $v)
-        if (isset($_REQUEST[$k]) && !isset($_REQUEST[$v]))
-            $_REQUEST[$v] = $_REQUEST[$k];
-
-    $param = "";
-    foreach (array("p", "r", "c", "m", "pset", "u", "commit", "mode", "forceShow", "validator", "ls", "list", "t", "q", "qa", "qo", "qx", "qt", "tab", "atab", "group", "sort", "monreq", "noedit", "contact", "reviewer") as $what)
-        if (isset($_REQUEST[$what]) && !array_key_exists($what, $extra))
-            $param .= "&$what=" . urlencode($_REQUEST[$what]);
-    foreach ($extra as $key => $value)
-        if ($key != "anchor" && $value !== null)
-            $param .= "&$key=" . urlencode($value);
-    if (isset($CurrentList) && $CurrentList > 0
-        && !isset($_REQUEST["ls"]) && !array_key_exists("ls", $extra))
-        $param .= "&ls=" . $CurrentList;
-
-    $param = $param ? substr($param, 1) : "";
-    if (!$options || !get($options, "site_relative"))
-        $uri = hoturl(Navigation::page(), $param);
-    else
-        $uri = hoturl_site_relative(Navigation::page(), $param);
-    if (isset($extra["anchor"]))
-        $uri .= "#" . $extra["anchor"];
-    $uri = str_replace("&amp;", "&", $uri);
-    if (!$options || get($options, "raw"))
-        return $uri;
-    else
-        return htmlspecialchars($uri);
-}
-
-function redirectSelf($extra = array()) {
-    go(self_href($extra, array("raw" => true)));
+function redirectSelf($param = []) {
+    global $Conf;
+    $Conf->self_redirect(null, $extra);
 }
 
 class JsonResult {
@@ -509,7 +320,7 @@ function become_user_link($link, $text = "user") {
         $link = $link->seascode_username;
     else if (is_object($link))
         $link = $link->email;
-    return "<a class=\"actas\" href=\"" . self_href(array("actas" => $link)) . "\">"
+    return "<a class=\"actas\" href=\"" . $Conf->selfurl(null, ["actas" => $link]) . "\">"
         . $Conf->cacheableImage("viewas.png", "[Become user]", "Act as " . htmlspecialchars($text)) . "</a>";
 }
 
@@ -788,9 +599,9 @@ function whyNotText($whyNot, $action) {
         $text .= "If you know a valid review token, enter it above to edit that review. ";
     // finish it off
     if (isset($whyNot['chairMode']))
-        $text .= "(<a class='nw' href=\"" . self_href(array("forceShow" => 1)) . "\">" . ucfirst($action) . " the paper anyway</a>) ";
+        $text .= "(<a class='nw' href=\"" . $Conf->selfurl(null, ["forceShow" => 1]) . "\">" . ucfirst($action) . " the paper anyway</a>) ";
     if (isset($whyNot['forceShow']))
-        $text .= "(<a class='nw' href=\"". self_href(array("forceShow" => 1)) . "\">Override conflict</a>) ";
+        $text .= "(<a class='nw' href=\"". $Conf->selfurl(null, ["forceShow" => 1]) . "\">Override conflict</a>) ";
     if ($text && $action == "view")
         $text .= "Enter a paper number above, or <a href='" . hoturl("search", "q=") . "'>list the papers you can view</a>. ";
     return rtrim($text);

@@ -16,7 +16,7 @@ class Contact_Update {
 
 class Contact {
     static public $rights_version = 1;
-    static public $trueuser_privChair = null;
+    static public $true_user;
     static public $allow_nonexistent_properties = false;
 
     public $contactId = 0;
@@ -299,47 +299,50 @@ class Contact {
 
     // initialization
 
-    function activate($qreq = null) {
+    private function actas_user($x) {
+        assert(!self::$true_user || self::$true_user === $this);
+
+        // translate to email
+        if (is_numeric($x)) {
+            $acct = $this->conf->user_by_id($x);
+            $email = $acct ? $acct->email : null;
+        } else if ($x === "admin") {
+            $email = $this->email;
+        } else {
+            $email = $x;
+        }
+        if (!$email
+            || strcasecmp($email, $this->email) === 0
+            || !$this->privChair) {
+            return $this;
+        }
+
+        // new account must exist
+        $u = $this->conf->user_by_email($email);
+        return $u ? : $this;
+    }
+
+    function activate($qreq, $signin = false) {
         global $Now, $Qreq;
         $qreq = $qreq ? : $Qreq;
         $this->activated_ = true;
-        if (!isset($_SESSION)) {
-            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
-        }
-        $trueuser = get($_SESSION, "trueuser");
-        $truecontact = null;
 
         // Handle actas requests
-        $actas = $qreq->actas;
-        if ($actas && $trueuser) {
-            if (is_numeric($actas)) {
-                $acct = $this->conf->user_by_query("contactId=? or huid=? order by contactId=? desc limit 1", [$actas, $actas, $actas]);
-                $actasemail = $acct ? $acct->email : null;
-            } else if ($actas === "admin")
-                $actasemail = $trueuser->email;
-            else
-                $actasemail = $actas;
-            unset($_GET["actas"], $_POST["actas"], $_REQUEST["actas"]);
-            if ($actasemail
-                && strcasecmp($actasemail, $this->email) != 0
-                && (strcasecmp($actasemail, $trueuser->email) == 0
-                    || $this->privChair
-                    || (($truecontact = $this->conf->user_by_email($trueuser->email))
-                        && $truecontact->privChair))
-                && ($actascontact = $this->conf->user_by_whatever($actasemail))) {
+        if ($qreq && $qreq->actas && $signin && $this->email) {
+            $actas = $qreq->actas;
+            unset($qreq->actas, $_GET["actas"], $_POST["actas"]);
+            $actascontact = $this->actas_user($actas);
+            if ($actascontact !== $this) {
                 $this->conf->save_session("l", null);
-                if ($actascontact->email !== $trueuser->email) {
-                    hoturl_defaults(array("actas" => $actascontact->email));
-                    $_SESSION["last_actas"] = $actascontact->email;
-                }
-                if ($this->privChair || ($truecontact && $truecontact->privChair))
-                    self::$trueuser_privChair = $actascontact;
-                return $actascontact->activate();
+                Conf::$hoturl_defaults["actas"] = urlencode($actascontact->email);
+                $_SESSION["last_actas"] = $actascontact->email;
+                self::$true_user = $this;
+                return $actascontact->activate($qreq);
             }
         }
 
         // Handle invalidate-caches requests
-        if ($qreq->invalidatecaches && $this->privChair) {
+        if ($qreq && $qreq->invalidatecaches && $this->privChair) {
             unset($_GET["invalidatecaches"], $_POST["invalidatecaches"], $_REQUEST["invalidatecaches"], $qreq->invalidatecaches);
             $this->conf->invalidate_caches();
         }
@@ -510,7 +513,7 @@ class Contact {
                 $x["__PATH__"] = preg_replace(",^/+,", "", Navigation::path());
             if ($Qreq->anchor)
                 $x["anchor"] = $Qreq->anchor;
-            $url = self_href($x, array("raw" => true, "site_relative" => true));
+            $url = $this->conf->selfurl($Qreq, [], Conf::HOTURL_RAW | Conf::HOTURL_SITE_RELATIVE);
             $_SESSION["login_bounce"] = array($this->conf->dsn, $url, Navigation::page(), $_POST);
             if (check_post())
                 error_go(false, "You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.");

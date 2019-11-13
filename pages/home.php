@@ -12,8 +12,6 @@ if (!$Conf)
 global $Qreq, $MicroNow;
 ContactView::set_path_request(array("/u"));
 
-$email_class = "";
-$password_class = "";
 $Profile = $Me && $Me->privChair && $Qreq->profile;
 
 // signin links
@@ -31,18 +29,20 @@ if ($Me->has_email()
 if (!isset($_REQUEST["email"]) || !isset($_REQUEST["action"]))
     unset($_REQUEST["signin"]);
 // signout
-if (isset($_REQUEST["signout"]))
-    LoginHelper::logout(true);
-else if (isset($_REQUEST["signin"]) && !opt("httpAuthLogin"))
-    LoginHelper::logout(false);
+if (isset($_REQUEST["signout"])) {
+    $Me = LoginHelper::logout($Me, true);
+} else if (isset($_REQUEST["signin"]) && !$Conf->opt("httpAuthLogin")) {
+    $Me = LoginHelper::logout($Me, false);
+}
 // signin
-if (opt("httpAuthLogin"))
-    LoginHelper::check_http_auth();
-else if (isset($_REQUEST["signin"]))
-    LoginHelper::check_login();
-else if ((isset($_REQUEST["signin"]) || isset($_REQUEST["signout"]))
-         && isset($_REQUEST["post"]))
+if ($Conf->opt("httpAuthLogin")) {
+    LoginHelper::check_http_auth($Me, $Qreq);
+} else if (isset($_REQUEST["signin"])) {
+    LoginHelper::login_redirect($Me->conf, $Qreq);
+} else if ((isset($_REQUEST["signin"]) || isset($_REQUEST["signout"]))
+           && isset($_REQUEST["post"])) {
     redirectSelf();
+}
 
 // set interesting user
 $User = null;
@@ -838,7 +838,7 @@ This is the ", htmlspecialchars($Conf->long_name), " turnin site.
 Sign in to tell us about your code.";
     if ($Conf->opt("conferenceSite"))
 	echo " For general information about ", htmlspecialchars($Conf->short_name), ", see <a href=\"", htmlspecialchars($Conf->opt("conferenceSite")), "\">the conference site</a>.";
-    $passwordFocus = ($email_class == "" && $password_class != "");
+    $passwordFocus = Ht::problem_status_at("email") === 0 && Ht::problem_status_at("password") !== 0;
     echo "</div>
 <hr class='home' />
 <div class='homegrp' id='homeacct'>\n",
@@ -846,10 +846,10 @@ Sign in to tell us about your code.";
         "<div class='f-contain foldo fold2o' id='logingroup'>
 <input type='hidden' name='cookie' value='1' />
 <div class='f-ii'>
-  <div class='f-c", $email_class, "'><span class='fx2'>",
+  <div class=\"", Ht::control_class("email", "f-c"), "\"><span class='fx2'>",
 	($Conf->opt("ldapLogin") ? "Username" : "Email/username/HUID"),
 	"</span><span class='fn2'>Email</span></div>
-  <div class='f-e", $email_class, "'><input",
+  <div class=\"", Ht::control_class("email", "f-e"), "\"><input",
 	($passwordFocus ? "" : " id='login_d'"),
 	" type='text' class='textlite' name='email' size='36' tabindex='1' ";
     if (isset($Qreq->email))
@@ -857,8 +857,8 @@ Sign in to tell us about your code.";
     echo " /></div>
 </div>
 <div class='f-i fx'>
-  <div class='f-c", $password_class, "'>Password</div>
-  <div class='f-e'><input",
+  <div class=\"", Ht::control_class("password", "f-c"), "\">Password</div>
+  <div class=\"", Ht::control_class("password", "f-e"), "\"><input",
 	($passwordFocus ? " id='login_d'" : ""),
 	" type='password' class='textlite' name='password' size='36' tabindex='1' value='' /></div>
 </div>\n";

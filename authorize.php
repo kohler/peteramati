@@ -51,7 +51,7 @@ if ($Qreq->code) {
     $Conf->save_setting("__github_oauth", $Now, $state);
     Navigation::redirect("https://github.com/login/oauth/authorize"
         . "?client_id=" . urlencode($clientid)
-        . "&redirect_uri=" . urlencode(hoturl_absolute("authorize"))
+        . "&redirect_uri=" . urlencode($Conf->hoturl_absolute("authorize"))
         . "&scope=" . urlencode("repo read:org read:user user:email user:follow")
         . "&state=" . $state);
 }

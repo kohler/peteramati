@@ -165,7 +165,7 @@ class Mailer {
                 $a[$i] = $this->expand($a[$i], "urlpart");
                 $a[$i] = preg_replace('/\&(?=\&|\z)/', "", $a[$i]);
             }
-            return hoturl_absolute_nodefaults($a[0], isset($a[1]) ? $a[1] : "");
+            return $Conf->hoturl_absolute($a[0], isset($a[1]) ? $a[1] : "", Conf::HOTURL_NO_DEFAULTS);
         }
         if ($what == "%PHP%")
             return Navigation::php_suffix();

@@ -222,7 +222,7 @@ class ContactView {
         }
 
         if ($editable)
-            echo Ht::form(self_href(array("post" => post_value(), "set_partner" => 1, "pset" => $pset->urlkey))),
+            echo Ht::form($Conf->selfurl(null, ["set_partner" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 "<div class='f-contain'>";
         self::echo_group($title, $value, $notes);
         if ($editable)
@@ -327,7 +327,7 @@ class ContactView {
 
         // edit
         if ($editable)
-            echo Ht::form(self_href(array("post" => post_value(), "set_repo" => 1, "pset" => $pset->urlkey))),
+            echo Ht::form($Conf->selfurl(null, ["set_repo" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 '<div class="f-contain">';
         self::echo_group($title, $value, $notes);
         if ($editable)
@@ -363,7 +363,7 @@ class ContactView {
 
         // edit
         if ($editable)
-            echo Ht::form(self_href(array("post" => post_value(), "set_branch" => 1, "pset" => $pset->urlkey))),
+            echo Ht::form($Conf->selfurl(null, ["set_branch" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 '<div class="f-contain">';
         self::echo_group("branch", $value, []);
         if ($editable)

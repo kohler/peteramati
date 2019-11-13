@@ -91,6 +91,8 @@ class Conf {
 
     static public $g = null;
 
+    static public $hoturl_defaults = null;
+
     function __construct($options, $make_dsn) {
         // unpack dsn, connect to database, load current settings
         if ($make_dsn && ($this->dsn = Dbl::make_dsn($options)))
@@ -241,11 +243,15 @@ class Conf {
             }
 
         // remove final slash from $Opt["paperSite"]
-        if (!isset($this->opt["paperSite"]) || $this->opt["paperSite"] == "")
-            $this->opt["paperSite"] = Navigation::site_absolute();
-        if ($this->opt["paperSite"] == "" && isset($this->opt["defaultPaperSite"]))
+        if (!isset($this->opt["paperSite"]) || $this->opt["paperSite"] === "") {
+            $this->opt["paperSite"] = Navigation::base_absolute();
+        }
+        if ($this->opt["paperSite"] == "" && isset($this->opt["defaultPaperSite"])) {
             $this->opt["paperSite"] = $this->opt["defaultPaperSite"];
-        $this->opt["paperSite"] = preg_replace('|/+\z|', "", $this->opt["paperSite"]);
+        }
+        while (str_ends_with($this->opt["paperSite"], "/")) {
+            $this->opt["paperSite"] = substr($this->opt["paperSite"], 0, -1);
+        }
 
         // option name updates (backwards compatibility)
         foreach (array("assetsURL" => "assetsUrl",
@@ -1165,6 +1171,166 @@ class Conf {
             $this->opt["scriptAssetsUrl"] = $base;
     }
 
+    const HOTURL_RAW = 1;
+    const HOTURL_POST = 2;
+    const HOTURL_ABSOLUTE = 4;
+    const HOTURL_SITE_RELATIVE = 8;
+    const HOTURL_NO_DEFAULTS = 16;
+
+    function hoturl($page, $param = null, $flags = 0) {
+        global $Me;
+        $nav = Navigation::get();
+        $amp = ($flags & self::HOTURL_RAW ? "&" : "&amp;");
+        $t = $page . $nav->php_suffix;
+        $are = '/\A(|.*?(?:&|&amp;))';
+        $zre = '(?:&(?:amp;)?|\z)(.*)\z/';
+        // parse options, separate anchor
+        $anchor = "";
+        if (is_array($param)) {
+            $x = "";
+            foreach ($param as $k => $v) {
+                if ($v === null || $v === false)
+                    /* skip */;
+                else if ($k === "anchor")
+                    $anchor = "#" . urlencode($v);
+                else
+                    $x .= ($x === "" ? "" : $amp) . $k . "=" . urlencode($v);
+            }
+            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS))
+                foreach (Conf::$hoturl_defaults as $k => $v)
+                    if (!array_key_exists($k, $param))
+                        $x .= ($x === "" ? "" : $amp) . $k . "=" . $v;
+            $param = $x;
+        } else {
+            $param = (string) $param;
+            if (($pos = strpos($param, "#"))) {
+                $anchor = substr($param, $pos);
+                $param = substr($param, 0, $pos);
+            }
+            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS))
+                foreach (Conf::$hoturl_defaults as $k => $v)
+                    if (!preg_match($are . preg_quote($k) . '=/', $param))
+                        $param .= ($param === "" ? "" : $amp) . $k . "=" . $v;
+        }
+        if ($flags & self::HOTURL_POST)
+            $param .= ($param === "" ? "" : $amp) . "post=" . post_value();
+        // create slash-based URLs if appropriate
+        if ($param) {
+            $has_commit = false;
+            if (in_array($page, ["index", "pset", "diff", "run", "raw", "file"])
+                && preg_match($are . 'u=([^&#?]+)' . $zre, $param, $m)) {
+                $t = "~" . $m[2] . ($page === "index" ? "" : "/$t");
+                $param = $m[1] . $m[3];
+            }
+            if (in_array($page, ["pset", "run", "diff", "raw", "file"])
+                && preg_match($are . 'pset=(\w+)' . $zre, $param, $m)) {
+                $t .= "/" . $m[2];
+                $param = $m[1] . $m[3];
+                if (preg_match($are . 'commit=([0-9a-f]+)' . $zre, $param, $m)) {
+                    $t .= "/" . $m[2];
+                    $param = $m[1] . $m[3];
+                    $has_commit = true;
+                }
+            }
+            if (($page === "raw" || $page === "file")
+                && preg_match($are . 'file=([^&#?]+)' . $zre, $param, $m)) {
+                $t .= "/" . str_replace("%2F", "/", $m[2]);
+                $param = $m[1] . $m[3];
+            } else if ($page == "diff"
+                       && $has_commit
+                       && preg_match($are . 'commit1=([0-9a-f]+)' . $zre, $param, $m)) {
+                $t .= "/" . $m[2];
+                $param = $m[1] . $m[3];
+            } else if (($page == "profile" || $page == "face")
+                       && preg_match($are . 'u=([^&#?]+)' . $zre, $param, $m)) {
+                $t .= "/" . $m[2];
+                $param = $m[1] . $m[3];
+            } else if ($page == "help"
+                       && preg_match($are . 't=(\w+)' . $zre, $param, $m)) {
+                $t .= "/" . $m[2];
+                $param = $m[1] . $m[3];
+            } else if (preg_match($are . '__PATH__=([^&]+)' . $zre, $param, $m)) {
+                $t .= "/" . urldecode($m[2]);
+                $param = $m[1] . $m[3];
+            }
+            $param = preg_replace('/&(?:amp;)?\z/', "", $param);
+        }
+        if ($param !== "" && preg_match('/\A&(?:amp;)?(.*)\z/', $param, $m))
+            $param = $m[1];
+        if ($param !== "")
+            $t .= "?" . $param;
+        if ($anchor !== "")
+            $t .= $anchor;
+        if ($flags & self::HOTURL_SITE_RELATIVE)
+            return $t;
+        $need_site_path = false;
+        if ($page === "index") {
+            $expect = "index" . $nav->php_suffix;
+            $lexpect = strlen($expect);
+            if (substr($t, 0, $lexpect) === $expect
+                && ($t === $expect || $t[$lexpect] === "?" || $t[$lexpect] === "#")) {
+                $need_site_path = true;
+                $t = substr($t, $lexpect);
+            }
+        }
+        if (($flags & self::HOTURL_ABSOLUTE) || $this !== Conf::$g)
+            return $this->opt("paperSite") . "/" . $t;
+        else {
+            $siteurl = $nav->site_path_relative;
+            if ($need_site_path && $siteurl === "")
+                $siteurl = $nav->site_path;
+            return $siteurl . $t;
+        }
+    }
+
+    function hoturl_absolute($page, $param = null, $flags = 0) {
+        return $this->hoturl($page, $param, self::HOTURL_ABSOLUTE | $flags);
+    }
+
+    function hoturl_site_relative_raw($page, $param = null) {
+        return $this->hoturl($page, $param, self::HOTURL_SITE_RELATIVE | self::HOTURL_RAW);
+    }
+
+    function hoturl_post($page, $param = null) {
+        return $this->hoturl($page, $param, self::HOTURL_POST);
+    }
+
+    function hotlink($html, $page, $param = null, $js = null) {
+        return Ht::link($html, $this->hoturl($page, $param), $js);
+    }
+
+
+    static $selfurl_safe = [
+        "u" => true, "pset" => true, "commit" => true, "commit1" => true,
+        "file" => true,
+        "forceShow" => true, "sort" => true, "t" => true, "group" => true
+    ];
+
+    function selfurl(Qrequest $qreq = null, $params = [], $flags = 0) {
+        global $Qreq;
+        $qreq = $qreq ? : $Qreq;
+
+        $x = [];
+        foreach ($qreq as $k => $v) {
+            $ak = get(self::$selfurl_safe, $k);
+            if ($ak === true)
+                $ak = $k;
+            if ($ak
+                && ($ak === $k || !isset($qreq[$ak]))
+                && !array_key_exists($ak, $params)
+                && !is_array($v))
+                $x[$ak] = $v;
+        }
+        foreach ($params as $k => $v)
+            $x[$k] = $v;
+        return $this->hoturl(Navigation::page(), $x, $flags);
+    }
+
+    function self_redirect(Qrequest $qreq = null, $params = []) {
+        Navigation::redirect($this->selfurl($qreq, $params, self::HOTURL_RAW));
+    }
+
+
     function encoded_session_list() {
         global $Now;
         if ($this->_session_list === false) {
@@ -1263,7 +1429,7 @@ class Conf {
     }
 
     private function header_head($title) {
-        global $Me, $ConfSitePATH, $CurrentList;
+        global $Me, $ConfSitePATH;
         echo "<!DOCTYPE html>
 <html lang=\"en\">
 <head>
@@ -1341,8 +1507,13 @@ class Conf {
             Ht::stash_script("siteurl_postvalue=\"" . post_value() . "\"");
         if (($list = $this->encoded_session_list()))
             Ht::stash_script("hotcrp_list=" . json_encode_browser($list) . ";");
-        if (($urldefaults = hoturl_defaults()))
+        if (self::$hoturl_defaults) {
+            $urldefaults = [];
+            foreach (self::$hoturl_defaults as $k => $v) {
+                $urldefaults[$k] = urldecode($v);
+            }
             Ht::stash_script("siteurl_defaults=" . json_encode_browser($urldefaults) . ";");
+        }
         Ht::stash_script("assetsurl=" . json_encode_browser($this->opt["assetsUrl"]) . ";");
         $huser = (object) array();
         if ($Me && $Me->email)
@@ -1400,16 +1571,15 @@ class Conf {
 
             // "act as" link
             if (($actas = get($_SESSION, "last_actas"))
-                && get($_SESSION, "trueuser")
-                && ($Me->privChair || Contact::$trueuser_privChair === $Me)) {
+                && (($Me->privChair && strcasecmp($actas, $Me->email) !== 0)
+                    || Contact::$true_user)) {
                 // Link becomes true user if not currently chair.
-                if (!$Me->privChair || strcasecmp($Me->email, $actas) == 0)
-                    $actas = $_SESSION["trueuser"]->email;
-                if (strcasecmp($Me->email, $actas) != 0)
-                    $profile_parts[] = "<a href=\"" . self_href(["actas" => $actas]) . "\">"
-                        . ($Me->privChair ? htmlspecialchars($actas) : "Admin")
-                        . "&nbsp;" . Ht::img("viewas.png", "Act as " . htmlspecialchars($actas))
-                        . "</a>";
+                $actas = Contact::$true_user ? Contact::$true_user->email : $actas;
+                $profile_parts[] = "<a href=\""
+                    . $this->selfurl(null, ["actas" => Contact::$true_user ? null : $actas]) . "\">"
+                    . (Contact::$true_user ? "Admin" : htmlspecialchars($actas))
+                    . "&nbsp;" . Ht::img("viewas.png", "Act as " . htmlspecialchars($actas))
+                    . "</a>";
             }
 
             // help, sign out
