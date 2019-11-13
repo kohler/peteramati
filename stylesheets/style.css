@@ -1655,10 +1655,10 @@ tbody.pltable_colored > tr:first-child {
 tbody.pltable > tr:last-child > td {
 	padding-bottom: 2px;
 }
-.k0, .k0.kfade > td {
+.k0, .k0.kfade > td, .k0.kfade > th {
 	background-color: white;
 }
-.k0.kfade > td:last-child {
+.k0.kfade > td:last-child, .k0.kfade > th:last-child {
 	background: linear-gradient(to left, rgba(255, 255, 255, 0), white 10px, white);
 }
 .k1, .k1.kfade > td, tbody.pltable_alternate > tr:nth-child(even) {

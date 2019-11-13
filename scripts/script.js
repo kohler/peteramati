@@ -6124,7 +6124,9 @@ function pa_render_pset_table(pconf, data) {
             tr = tr.nextSibling;
         }
         $overlay.find("tbody").html(a.join(""));
-        setTimeout(function () { removeClass($overlay[0], "new"); }, 0);
+        setTimeout(function () {
+            $overlay && removeClass($overlay[0], "new");
+        }, 0);
     }
     function user_compare(a, b) {
         var au = ukey(a).toLowerCase();
@@ -6652,7 +6654,7 @@ function pa_render_pset_table(pconf, data) {
             for (i = 0; i !== col.length && !col[i].pin; ++i) {
             }
             overlay_left = col[i].left;
-            var overlay_div = $('<div style="position:absolute;left:0;top:0;bottom:0;width:' + (overlay_left) + 'px;pointer-events:none"></div>').prependTo($j.parent())[0];
+            var overlay_div = $('<div style="position:absolute;left:0;top:0;bottom:0;width:' + (overlay_left - 10) + 'px;pointer-events:none"></div>').prependTo($j.parent())[0];
             (new IntersectionObserver(function (entries) {
                 var e = entries[entries.length - 1];
                 if (!e.isIntersecting && !$overlay) {
