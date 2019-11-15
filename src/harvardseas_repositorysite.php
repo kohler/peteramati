@@ -123,10 +123,10 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
         $status = RepositorySite::run_ls_remote($this->conf, $this->ssh_url(), $output);
         $answer = join("\n", $output);
         if ($status == 0 && $ms)
-            $ms->set_error_html("working", Messages::$main->expand_html("repo_unreadable", $this->message_defs($ms->user)));
+            $ms->error_at("working", Messages::$main->expand_html("repo_unreadable", $this->message_defs($ms->user)));
         if ($status > 0 && !preg_match(',^[0-9a-f]{40}\s+refs/heads/master,m', $answer)) {
             if ($ms)
-                $ms->set_error_html("working", Messages::$main->expand_html("repo_nomaster", $this->message_defs($ms->user)));
+                $ms->error_at("working", Messages::$main->expand_html("repo_nomaster", $this->message_defs($ms->user)));
             $status = 0;
         }
         return $status;
@@ -141,7 +141,7 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
                        . ')/_i', $this->base))
             return 1;
         if ($ms)
-            $ms->set_error_html("ownership", $partner ? "This repository belongs to neither you nor your partner." : "This repository does not belong to you.");
+            $ms->error_at("ownership", $partner ? "This repository belongs to neither you nor your partner." : "This repository does not belong to you.");
         return 0;
     }
 }
