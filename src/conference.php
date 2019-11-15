@@ -828,16 +828,6 @@ class Conf {
             unset($_SESSION[$this->dsn][$name]);
     }
 
-    function save_session_array($name, $index, $value) {
-        if (!isset($_SESSION[$this->dsn][$name])
-            || !is_array($_SESSION[$this->dsn][$name]))
-            $_SESSION[$this->dsn][$name] = array();
-        if ($index !== true)
-            $_SESSION[$this->dsn][$name][$index] = $value;
-        else
-            $_SESSION[$this->dsn][$name][] = $value;
-    }
-
     function capability_text($prow, $capType) {
         // A capability has the following representation (. is concatenation):
         //    capFormat . paperId . capType . hashPrefix
@@ -1094,7 +1084,7 @@ class Conf {
     // Message routines
     //
 
-    function msg($type, $text) {
+    function msg($text, $type) {
         if (PHP_SAPI == "cli") {
             if ($type === "xmerror" || $type === "merror")
                 fwrite(STDERR, "$text\n");
@@ -1103,56 +1093,57 @@ class Conf {
                 fwrite(STDOUT, "$text\n");
         } else if ($this->save_messages) {
             ensure_session();
-            $this->save_session_array("msgs", true, array($type, $text));
-        } else if ($type[0] == "x")
-            echo Ht::xmsg($type, $text);
-        else
+            $_SESSION[$this->dsn]["msgs"][] = [$text, $type];
+        } else if ($type[0] == "x") {
+            echo Ht::xmsg($text, $type);
+        } else {
             echo "<div class=\"$type\">$text</div>";
+        }
     }
 
     function infoMsg($text, $minimal = false) {
-        $this->msg($minimal ? "xinfo" : "info", $text);
+        $this->msg($text, $minimal ? "xinfo" : "info");
     }
 
     static public function msg_info($text, $minimal = false) {
-        self::$g->msg($minimal ? "xinfo" : "info", $text);
+        self::$g->msg($text, $minimal ? "xinfo" : "info");
     }
 
     function warnMsg($text, $minimal = false) {
-        $this->msg($minimal ? "xwarning" : "warning", $text);
+        $this->msg($text, $minimal ? "xwarning" : "warning");
     }
 
     static public function msg_warning($text, $minimal = false) {
-        self::$g->msg($minimal ? "xwarning" : "warning", $text);
+        self::$g->msg($text, $minimal ? "xwarning" : "warning");
     }
 
     function confirmMsg($text, $minimal = false) {
-        $this->msg($minimal ? "xconfirm" : "confirm", $text);
+        $this->msg($text, $minimal ? "xconfirm" : "confirm");
     }
 
     static public function msg_confirm($text, $minimal = false) {
-        self::$g->msg($minimal ? "xconfirm" : "confirm", $text);
+        self::$g->msg($text, $minimal ? "xconfirm" : "confirm");
     }
 
     function errorMsg($text, $minimal = false) {
-        $this->msg($minimal ? "xmerror" : "merror", $text);
+        $this->msg($text, $minimal ? "xmerror" : "merror");
         return false;
     }
 
     static public function msg_error($text, $minimal = false) {
-        self::$g->msg($minimal ? "xmerror" : "merror", $text);
+        self::$g->msg($text, $minimal ? "xmerror" : "merror");
         return false;
     }
 
     static public function msg_debugt($text) {
         if (is_object($text) || is_array($text) || $text === null || $text === false || $text === true)
             $text = json_encode_browser($text);
-        self::$g->msg("merror", Ht::pre_text_wrap($text));
+        self::$g->msg(Ht::pre_text_wrap($text), "merror");
         return false;
     }
 
     function post_missing_msg() {
-        $this->msg("merror", "Your uploaded data wasn’t received. This can happen on unusually slow connections, or if you tried to upload a file larger than I can accept.");
+        $this->msg("Your uploaded data wasn’t received. This can happen on unusually slow connections, or if you tried to upload a file larger than I can accept.", "merror");
     }
 
 
@@ -1602,7 +1593,8 @@ class Conf {
         if (($x = $this->opt("maintenance")))
             echo "<div class=\"merror\"><strong>The site is down for maintenance.</strong> ", (is_string($x) ? $x : "Please check back later."), "</div>";
         $this->save_messages = false;
-        if (($msgs = $this->session("msgs")) && count($msgs)) {
+        if (($msgs = $this->session("msgs"))
+            && !empty($msgs)) {
             $this->save_session("msgs", null);
             foreach ($msgs as $m)
                 $this->msg($m[0], $m[1]);

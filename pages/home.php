@@ -836,8 +836,9 @@ if ($Me->is_empty() || isset($_REQUEST["signin"])) {
     echo "<div class='homegrp'>
 This is the ", htmlspecialchars($Conf->long_name), " turnin site.
 Sign in to tell us about your code.";
-    if ($Conf->opt("conferenceSite"))
-	echo " For general information about ", htmlspecialchars($Conf->short_name), ", see <a href=\"", htmlspecialchars($Conf->opt("conferenceSite")), "\">the conference site</a>.";
+    if ($Conf->opt("conferenceSite")) {
+        echo " For general information about ", htmlspecialchars($Conf->short_name), ", see <a href=\"", htmlspecialchars($Conf->opt("conferenceSite")), "\">the conference site</a>.";
+    }
     $passwordFocus = Ht::problem_status_at("email") === 0 && Ht::problem_status_at("password") !== 0;
     echo "</div>
 <hr class='home' />
@@ -845,36 +846,37 @@ Sign in to tell us about your code.";
         Ht::form(hoturl_post("index")),
         "<div class='f-contain foldo fold2o' id='logingroup'>
 <input type='hidden' name='cookie' value='1' />
-<div class='f-ii'>
-  <div class=\"", Ht::control_class("email", "f-c"), "\"><span class='fx2'>",
-	($Conf->opt("ldapLogin") ? "Username" : "Email/username/HUID"),
-	"</span><span class='fn2'>Email</span></div>
-  <div class=\"", Ht::control_class("email", "f-e"), "\"><input",
-	($passwordFocus ? "" : " id='login_d'"),
-	" type='text' class='textlite' name='email' size='36' tabindex='1' ";
-    if (isset($Qreq->email))
-	echo "value=\"", htmlspecialchars($Qreq->email), "\" ";
-    echo " /></div>
+<div class=\"", Ht::control_class("email", "f-ii"), "\">
+  <div class=\"f-c\"><span class='fx2'>",
+    ($Conf->opt("ldapLogin") ? "Username" : "Email/username/HUID"),
+    "</span><span class='fn2'>Email</span></div>
+  <div class=\"f-e\"><input",
+    ($passwordFocus ? "" : " id='login_d'"),
+    " type='text' class='textlite' name='email' size='36' tabindex='1' ";
+    if (isset($Qreq->email)) {
+        echo "value=\"", htmlspecialchars($Qreq->email), "\" ";
+    }
+    echo ">", Ht::render_messages_at("email"), "</div>
 </div>
-<div class='f-i fx'>
-  <div class=\"", Ht::control_class("password", "f-c"), "\">Password</div>
-  <div class=\"", Ht::control_class("password", "f-e"), "\"><input",
-	($passwordFocus ? " id='login_d'" : ""),
-	" type='password' class='textlite' name='password' size='36' tabindex='1' value='' /></div>
+<div class=\"", Ht::control_class("password", "f-i fx"), "\">
+  <div class=\"f-c\">Password</div>
+  <div class=\"f-e\"><input",
+        ($passwordFocus ? " id='login_d'" : ""),
+        " type='password' class='textlite' name='password' size='36' tabindex='1' value=''>", Ht::render_messages_at("password"), "</div>
 </div>\n";
-    if ($Conf->opt("ldapLogin"))
-	echo "<input type='hidden' name='action' value='login' />\n";
-    else {
-	echo "<div class='f-i'>\n  ",
-	    Ht::radio("action", "login", true, array("id" => "signin_action_login", "tabindex" => 2, "onclick" => "fold('logingroup',false);fold('logingroup',false,2);\$\$('signin').value='Sign in'")),
-	    "&nbsp;", Ht::label("<b>Sign me in</b>"), "<br />\n";
-	echo Ht::radio("action", "forgot", false, array("tabindex" => 2, "onclick" => "fold('logingroup',true);fold('logingroup',false,2);\$\$('signin').value='Reset password'")),
-	    "&nbsp;", Ht::label("I forgot my password"), "<br />\n";
+    if ($Conf->opt("ldapLogin")) {
+        echo "<input type='hidden' name='action' value='login' />\n";
+    } else {
+        echo "<div class='f-i'>\n  ",
+            Ht::radio("action", "login", true, array("id" => "signin_action_login", "tabindex" => 2, "onclick" => "fold('logingroup',false);fold('logingroup',false,2);\$\$('signin').value='Sign in'")),
+        "&nbsp;", Ht::label("<b>Sign me in</b>"), "<br />\n";
+        echo Ht::radio("action", "forgot", false, array("tabindex" => 2, "onclick" => "fold('logingroup',true);fold('logingroup',false,2);\$\$('signin').value='Reset password'")),
+            "&nbsp;", Ht::label("I forgot my password"), "<br />\n";
         if (!$Conf->opt("disableNewUsers"))
             echo Ht::radio("action", "new", false, array("id" => "signin_action_new", "tabindex" => 2, "onclick" => "fold('logingroup',true);fold('logingroup',true,2);\$\$('signin').value='Create account'")),
                 "&nbsp;", Ht::label("Create an account"), "<br />\n";
-	Ht::stash_script("jQuery('#homeacct input[name=action]:checked').click()");
-	echo "\n</div>\n";
+        Ht::stash_script("jQuery('#homeacct input[name=action]:checked').click()");
+        echo "\n</div>\n";
     }
     echo "<div class='f-i'>
   <input class='b' type='submit' value='Sign in' name='signin' id='signin' tabindex='1' />

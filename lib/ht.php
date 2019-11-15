@@ -481,7 +481,7 @@ class Ht {
         return '<div class="msg msg-' . $status . '">' . $msg . '</div>';
     }
 
-    static function xmsg($status, $msg) {
+    static function xmsg($msg, $status) {
         return self::msg($msg, $status);
     }
 
