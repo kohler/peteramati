@@ -5586,7 +5586,7 @@ function pa_anonymize_linkto(link, event) {
 
 function pa_render_pset_table(pconf, data) {
     var $j = $(this), table_width = 0, dmap = [],
-        $overlay = null, overlay_left, username_col, name_col,
+        $overlay = null, username_col, name_col,
         $gdialog, dialog_su,
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
@@ -6621,6 +6621,30 @@ function pa_render_pset_table(pconf, data) {
         event.preventDefault();
     });
 
+    function make_overlay_observer() {
+        for (var i = 0; i !== col.length && !col[i].pin; ++i) {
+        }
+        var overlay_div = $('<div style="position:absolute;left:0;top:0;bottom:0;width:' + (col[i].left - 10) + 'px;pointer-events:none"></div>').prependTo($j.parent())[0],
+            table_hit = false, left_hit = false;
+        function observer_fn(entries) {
+            for (var e of entries) {
+                if (e.target === overlay_div) {
+                    left_hit = e.isIntersecting;
+                } else {
+                    table_hit = e.isIntersecting;
+                }
+            }
+            if (table_hit && !left_hit && !$overlay) {
+                overlay_create();
+            } else if (table_hit && left_hit && $overlay) {
+                $overlay.parent().remove();
+                $overlay = null;
+            }
+        }
+        var observer = new IntersectionObserver(observer_fn);
+        observer.observe(overlay_div);
+        observer.observe($j.parent()[0]);
+    }
     function render_tds(s, rownum) {
         var a = [];
         for (var i = 0; i !== col.length; ++i)
@@ -6700,19 +6724,7 @@ function pa_render_pset_table(pconf, data) {
         set_hotlist($(tbody));
 
         if (tfixed && window.IntersectionObserver) {
-            for (i = 0; i !== col.length && !col[i].pin; ++i) {
-            }
-            overlay_left = col[i].left;
-            var overlay_div = $('<div style="position:absolute;left:0;top:0;bottom:0;width:' + (overlay_left - 10) + 'px;pointer-events:none"></div>').prependTo($j.parent())[0];
-            (new IntersectionObserver(function (entries) {
-                var e = entries[entries.length - 1];
-                if (!e.isIntersecting && !$overlay) {
-                    overlay_create();
-                } else if (e.isIntersecting && $overlay) {
-                    $overlay.parent().remove();
-                    $overlay = null;
-                }
-            })).observe(overlay_div);
+            make_overlay_observer();
         }
     }
 
