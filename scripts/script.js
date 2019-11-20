@@ -308,9 +308,9 @@ return function (f) {
 jQuery.fn.extend({
     geometry: function (outer) {
         var g, d;
-        if (this[0] == window)
+        if (this[0] == window) {
             g = {left: this.scrollLeft(), top: this.scrollTop()};
-        else if (this.length == 1 && this[0].getBoundingClientRect) {
+        } else if (this.length == 1 && this[0].getBoundingClientRect) {
             g = jQuery.extend({}, this[0].getBoundingClientRect());
             if ((d = window.pageXOffset))
                 g.left += d, g.right += d;
@@ -321,8 +321,9 @@ jQuery.fn.extend({
                 g.height = g.bottom - g.top;
             }
             return g;
-        } else
+        } else {
             g = this.offset();
+        }
         if (g) {
             g.width = outer ? this.outerWidth() : this.width();
             g.height = outer ? this.outerHeight() : this.height();
@@ -331,16 +332,29 @@ jQuery.fn.extend({
         }
         return g;
     },
-    scrollIntoView: function (bottom) {
-        if (this.length > 0) {
-            var p = this.geometry(), x = this[0].parentNode;
-            while (x && x.tagName && $(x).css("overflow-y") === "visible")
+    scrollIntoView: function (opts) {
+        opts = opts || {};
+        for (var i = 0; i !== this.length; ++i) {
+            var p = $(this[i]).geometry(), x = this[i].parentNode;
+            while (x && x.tagName && $(x).css("overflow-y") === "visible") {
                 x = x.parentNode;
-            var w = jQuery(x && x.tagName ? x : window).geometry();
-            if (p.top < w.top && bottom !== false) {
-                this[0].scrollIntoView();
-            } else if (p.bottom > w.bottom) {
-                this[0].scrollIntoView(false);
+            }
+            x = x && x.tagName ? x : window;
+            var w = $(x).geometry();
+            if (p.top < w.top + (opts.marginTop || 0)) {
+                var pos = Math.max(p.top - (opts.marginTop || 0), 0);
+                if (x === window) {
+                    x.scrollTo(x.scrollX, pos);
+                } else {
+                    x.scrollTop = pos;
+                }
+            } else if (p.bottom > w.bottom - (opts.marginBottom || 0)) {
+                var pos = Math.max(p.bottom + (opts.marginBottom || 0) - w.height, 0);
+                if (x === window) {
+                    x.scrollTo(x.scrollX, pos);
+                } else {
+                    x.scrollTop = pos;
+                }
             }
         }
         return this;
@@ -2607,7 +2621,8 @@ function arrowcapture(evt) {
         make_linenote();
     } else {
         scrolled_at = evt.timeStamp;
-        $(tr).addClass("live").scrollIntoView();
+        var wdb = tr.closest(".pa-with-diffbar")
+        $(tr).addClass("live").scrollIntoView(wdb ? {marginTop: wdb.firstChild.offsetHeight} : null);
     }
     return true;
 }

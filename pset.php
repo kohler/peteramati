@@ -757,7 +757,7 @@ if ($Pset->gitless) {
     // line notes
     if (!empty($diff)) {
         echo "<hr>\n";
-        echo '<div class="pa-diffset">';
+        echo '<div class="pa-diffset pa-with-diffbar">';
         PsetView::echo_pa_diffbar();
         if ($Info->can_edit_grades()
             && !$Pset->has_grade_landmark_range) {

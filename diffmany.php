@@ -112,7 +112,7 @@ if ($Pset->grade_script) {
     foreach ($Pset->grade_script as $gs)
         Ht::stash_html($Conf->make_script_file($gs));
 }
-echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
+echo "<div class=\"pa-psetinfo pa-diffset pa-with-diffbar\" data-pa-gradeinfo=\"",
      htmlspecialchars(json_encode($Pset->gradeentry_json($Me->isPC))),
      "\">";
 PsetView::echo_pa_diffbar();

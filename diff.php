@@ -111,7 +111,7 @@ if (!empty($notelinks)) {
 }
 
 if ($diff) {
-    echo '<div class="pa-diffset">';
+    echo '<div class="pa-diffset pa-with-diffbar">';
     PsetView::echo_pa_diffbar();
 
     // diff and line notes
