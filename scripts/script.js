@@ -359,6 +359,30 @@ function geometry_translate(g, dx, dy) {
 }
 
 
+// history
+
+var push_history_state, ever_push_history_state = false;
+if ("pushState" in window.history) {
+    push_history_state = function (href) {
+        var state;
+        if (!history.state) {
+            state = {href: location.href};
+            $(document).trigger("collectState", [state]);
+            history.replaceState(state, document.title, state.href);
+        }
+        if (href) {
+            state = {href: href};
+            $(document).trigger("collectState", [state]);
+            history.pushState(state, document.title, state.href);
+        }
+        ever_push_history_state = true;
+        return true;
+    };
+} else {
+    push_history_state = function () { return false; };
+}
+
+
 // text transformation
 var escape_entities = (function () {
     var re = /[&<>\"']/g;
@@ -2377,7 +2401,7 @@ function pa_fix_note_links() {
     function set_link(tr, next_tr) {
         var $a = $(tr).find(".pa-note-links a");
         if (!$a.length) {
-            $a = $('<a class="uix pa-goto"></a>');
+            $a = $('<a class="ui pa-goto"></a>');
             $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notediv"));
         }
 
@@ -3083,7 +3107,7 @@ function pa_set_grade(ge, g, ag, options) {
             if (directory && m[1].substr(0, directory.length) === directory) {
                 m[1] = m[1].substr(directory.length);
             }
-            want_gbr = '@<a href="#' + $line[0].id + '" class="uix pa-goto">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
+            want_gbr = '@<a href="#' + $line[0].id + '" class="ui pa-goto">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
         }
         var $pgbr = $g.find(".pa-gradeboxref");
         if (!$line.length) {
@@ -3523,12 +3547,14 @@ function pa_ensureline(filename, lineid) {
 }
 
 handle_ui.on("pa-goto", function () {
+    $(".pa-line-highlight").removeClass("pa-line-highlight");
     pa_ensureline_callback(this, null, function (ref) {
         if (ref) {
-            $(".pa-line-highlight").removeClass("pa-line-highlight");
             $(ref).closest(".pa-filediff").removeClass("hidden");
             $e = $(ref).closest(".pa-dl");
             $e.addClass("pa-line-highlight");
+            window.scrollTo(0, Math.max($e.geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
+            push_history_state(this.href);
         }
     });
 });
