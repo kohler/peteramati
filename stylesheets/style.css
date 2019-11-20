@@ -2275,10 +2275,11 @@ tr.gtrow-partner {
 
 .pa-diffbar {
 	position: sticky;
+	z-index: 1;
 	top: 0;
-	padding: 4px 4px 4px 12px;
-	margin-bottom: 0.5rem;
-	background: #f2f2f5;
+	padding: 4px 24px;
+	margin: 0 -24px 0.5rem -24px;
+	background: #f3f3ff;
 	display: flex;
 	align-items: baseline;
 	font-size: smaller;
@@ -2394,8 +2395,8 @@ tr.gtrow-partner {
 }
 .pa-sidebar {
 	min-width: 144px;
-	width: 20%;
-	flex: 0 0 20%;
+	width: 17.5%;
+	flex: 0 0 17.5%;
 	padding-left: 1em;
 }
 .pa-sidebar > .pa-gradebox {
@@ -2403,6 +2404,7 @@ tr.gtrow-partner {
 	top: 2rem;
 	display: block;
 	padding-right: 0.8rem;
+	font-size: 90%;
 }
 @media screen and (max-width: 800px), print {
 .pa-sidebar {
@@ -2426,10 +2428,11 @@ tr.gtrow-partner {
 	padding: 0.8em 1em 0.8em 6.5em;
 	background: #f3d1fc;
 	background:
-	    linear-gradient(180deg, rgba(180,120,180,0.2), rgba(0,0,0,0)) no-repeat left top,
-	    linear-gradient(0deg, rgba(180,120,180,0.2), rgba(0,0,0,0)) no-repeat left bottom,
-	    linear-gradient(83.5deg, rgba(227,163,227,0), rgba(227,163,227,0) 5.4em, rgba(227,163,227,1) 5.5em, rgba(238,192,242,1) 6em, rgba(243,209,252,1) 95%, rgba(238,192,242,1) 100%) right top;
-	background-size: 100% 5px, 100% 5px, 100% 100%;
+	    left top / 100% 5px no-repeat linear-gradient(180deg, rgba(180,120,180,0.2), rgba(0,0,0,0)),
+	    left bottom / 100% 5px no-repeat linear-gradient(0deg, rgba(180,120,180,0.2), rgba(0,0,0,0)),
+	    linear-gradient(90deg, rgba(238,192,242,0) 5.4em, rgba(238,192,242,1) 5.5em, rgba(243,209,252,1) 95%, rgba(238,192,242,1) 100%) right top,
+            4.7em center / 0.8em 0.8em repeat-y linear-gradient(125deg, rgba(227,163,227,0) 0.7em, rgba(227,163,227,1) 0.8em, rgba(238,192,242,1) 1em),
+            4.7em center / 0.8em 0.8em repeat-y linear-gradient(55deg, rgba(227,163,227,0) 0.7em, rgba(227,163,227,1) 0.8em, rgba(238,192,242,1) 1em);
 }
 .garrett .pa-notebox {
 	background: transparent;
@@ -2467,12 +2470,6 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-noteref, .pa-gradeboxref, .pa-warnbox {
 	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 1.5;
-}
-.pa-gradeboxref {
-	line-height: inherit;
-}
-.pa-gradeboxref > a {
-	color: #777777;
 }
 .pa-note {
 	overflow-wrap: break-word;
@@ -2543,6 +2540,10 @@ table.hidegrades .pa-gradenote {
 .pa-gradeboxref {
 	padding-left: 1em;
 	font-size: smaller;
+	line-height: inherit;
+}
+.pa-gradeboxref > a {
+	color: #777777;
 }
 .pa-gradenotesvalue {
 	font-size: smaller;
