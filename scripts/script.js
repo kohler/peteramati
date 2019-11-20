@@ -2987,17 +2987,17 @@ function pa_render_grade_entry(ge, options) {
             t += '<div class="pa-pd"><span class="pa-gradewidth">' +
                 '<input type="checkbox" class="' + (live ? 'ui ' : '') +
                 'pa-gradevalue" name="' + name + '" id="' + id + '" value="' +
-                ge.max + '"></span>' + ' <span class="pa-grademax">of ' + ge.max +
+                ge.max + '"></span> <span class="pa-gradedesc">of ' + ge.max +
                 ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span></div>';
         } else {
             t += '<div class="pa-pd"><span class="pa-gradewidth">' +
                 '<input type="text" class="' + livecl + 'pa-gradevalue" name="' + name +
-                '" id="' + id + '"></span>';
+                '" id="' + id + '"></span> <span class="pa-gradedesc">';
             if (ge.type === "letter")
-                t += ' <span class="pa-grademax">letter grade</span>';
+                t += 'letter grade';
             else if (ge.max)
-                t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
-            t += '</div>';
+                t += 'of ' + ge.max;
+            t += '</span></div>';
         }
         t += live ? '</form>' : '</div>';
     } else {
@@ -3008,7 +3008,7 @@ function pa_render_grade_entry(ge, options) {
         } else {
             t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
             if (ge.max && ge.type !== "letter") {
-                t += ' <span class="pa-grademax">of ' + ge.max + '</span>';
+                t += ' <span class="pa-gradedesc">of ' + ge.max + '</span>';
             }
             t += '</div>';
         }
@@ -3030,7 +3030,7 @@ handle_ui.on("pa-grade-uncheckbox", function () {
 function pa_grade_recheckbox() {
     this.type = "checkbox";
     this.className = (hasClass(this, "uich") ? "ui " : "") + "pa-gradevalue";
-    $(this.closest(".pa-pd")).find(".pa-grademax").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
+    $(this.closest(".pa-pd")).find(".pa-gradedesc").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
 }
 
 function pa_set_grade(ge, g, ag, options) {
@@ -3170,7 +3170,13 @@ handle_ui.on("pa-grade", function (event) {
     var self = this, $f = $(self);
     self.setAttribute("data-outstanding", "1");
     $f.find(".pa-gradediffers, .pa-save-message").remove();
-    $f.find(".pa-pd").first().append('<span class="pa-save-message">Saving…</span>');
+    var $pd = $f.find(".pa-pd").first(),
+        $gd = $pd.find(".pa-gradedesc");
+    if (!$gd.length) {
+        $($pd[0].firstChild).after(' <span class="pa-gradedesc"></span>');
+        $gd = $pd.find(".pa-gradedesc");
+    }
+    $gd.append('<span class="pa-save-message"><span class="spinner"></span></span>');
 
     var gi = pa_gradeinfo.call(self), g = {}, og = {};
     $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
@@ -3193,7 +3199,7 @@ handle_ui.on("pa-grade", function (event) {
         success: function (data) {
             self.removeAttribute("data-outstanding");
             if (data.ok) {
-                $f.find(".pa-save-message").html("Saved");
+                $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
                 $(self).closest(".pa-psetinfo").data("pa-gradeinfo", data).each(pa_loadgrades);
             } else {
                 $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');

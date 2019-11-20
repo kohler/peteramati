@@ -2526,7 +2526,11 @@ table.hidegrades .pa-gradenote {
 	padding: 1ex 0;
 	position: relative;
 }
-.pa-save-message, .ajaxsave61 {
+.pa-save-message {
+	padding-left: 1em;
+	font-style: italic;
+}
+.ajaxsave61 {
 	padding-left: 1em;
 	font-size: smaller;
 	font-style: italic;
@@ -2760,11 +2764,11 @@ textarea.pa-gradevalue {
 	position: relative;
 	width: 8em;
 }
-.pa-grademax {
+.pa-gradedesc {
 	font-size: smaller;
 	color: #999999;
 }
-.pa-pd > .pa-grademax {
+.pa-pd > .pa-gradedesc {
 	display: inline-block;
 	min-width: 3.5em;
 }
@@ -3145,4 +3149,43 @@ a.help {
 	float: left;
 	margin-left: 0;
 	margin-right: 1em;
+}
+
+@keyframes spinner {
+	to {transform: rotate(360deg);}
+}
+.spinner {
+	display: inline-block;
+	margin-left: 0.5em;
+	min-width: 1em;
+	min-height: 1em;
+	position: relative;
+	bottom: -0.3em;
+}
+.spinner:before {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 0.8em;
+	height: 0.8em;
+	margin-top: -0.7em;
+	margin-left: -0.7em;
+	border-radius: 50%;
+	border-top: 1px solid #000080;
+	border-right: 1px solid #000080;
+	border-bottom: 1px solid transparent;
+	animation: spinner .6s linear infinite;
+	content: '';
+}
+.savesuccess:before {
+	content: "\2713";
+	color: #00bb00;
+	padding-left: 0.5em;
+}
+@keyframes fadeout {
+	to {opacity: 0;}
+}
+.fadeout {
+	opacity: 0;
+	transition: opacity .6s 3s;
 }

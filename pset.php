@@ -546,9 +546,10 @@ function echo_all_grades() {
     } else if ($Info->can_edit_grades() && $Info->pset->late_hours_entry()) {
         echo '<form class="ui-submit pa-grade pa-p" data-pa-grade="late_hours">',
             '<label class="pa-pt" for="pa-lh">late hours</label>',
-            '<div class="pa-pd">',
+            '<div class="pa-pd"><span class="pa-gradewidth">',
             Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
-                      ["class" => "uich pa-gradevalue"]);
+                      ["class" => "uich pa-gradevalue"]),
+            '</span> <span class="pa-gradedesc"></span>';
         if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours)
             echo '<span class="pa-gradediffers">auto-late hours is ', htmlspecialchars($lhd->autohours), '</span>';
         echo '</div></form>';
