@@ -190,7 +190,7 @@ function file_uploaded(&$var) {
 
 function redirectSelf($param = []) {
     global $Conf;
-    $Conf->self_redirect(null, $extra);
+    $Conf->self_redirect(null, $param);
 }
 
 class JsonResult {
