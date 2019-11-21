@@ -2616,9 +2616,9 @@ a.fold61:hover {
 	background:
 	    left top / 100% 5px no-repeat linear-gradient(180deg, rgba(120,80,120,0.1), rgba(0,0,0,0)),
 	    left bottom / 100% 5px no-repeat linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)),
-	    linear-gradient(90deg, rgba(212,210,211,0) 5.0em, rgba(212,210,211,1) 5.1em, rgba(242,236,239,1) 5.5em, rgba(242,236,239,1) 100%) right top;
-            /*4.7em center / 0.8em 0.8em repeat-y linear-gradient(125deg, rgba(227,163,227,0) 0.7em, rgba(227,163,227,1) 0.8em, rgba(238,192,242,1) 1em),
-            4.7em center / 0.8em 0.8em repeat-y linear-gradient(55deg, rgba(227,163,227,0) 0.7em, rgba(227,163,227,1) 0.8em, rgba(238,192,242,1) 1em);*/
+	    linear-gradient(90deg, rgba(242,236,239,0) 5.4em, rgba(242,236,239,1) 5.5em, rgba(242,236,239,1) 100%) right top,
+	    4.7em center / 0.8em 0.8em repeat-y linear-gradient(115deg, rgba(222,220,221,0) 0.7em, rgba(222,220,221,1) 0.8em, rgba(242,236,239,1) 1em),
+	    4.7em center / 0.8em 0.8em repeat-y linear-gradient(65deg, rgba(222,220,221,0) 0.7em, rgba(222,220,221,1) 0.8em, rgba(242,236,239,1) 1em);
 }
 .pa-warncontent {
 	font-size: smaller;
