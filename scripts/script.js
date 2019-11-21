@@ -2464,7 +2464,7 @@ function pa_render_note(note, transition) {
             tr = ntr;
             ntr = ntr.nextSibling;
         }
-        $tr = $('<tr class="pa-dl pa-gw"><td colspan="2" class="pa-note-edge"></td><td class="pa-notebox"></td></tr>').insertAfter(tr);
+        $tr = $('<div class="pa-dl pa-gw"><div class="pa-notebox"></div></div>').insertAfter(tr);
         tr = $tr[0];
     }
     if (arguments.length == 0) {
@@ -2803,9 +2803,9 @@ function expand(evt) {
             if (data.ok && data.data) {
                 var lines = data.data.replace(/\n$/, "").split("\n");
                 for (var i = lines.length - 1; i >= 0; --i) {
-                    var t = '<tr class="pa-dl pa-gc"><td class="pa-da">' +
-                        (paline + i) + '</td><td class="pa-db">' +
-                        (pbline + i) + '</td><td class="pa-dd"></td></tr>';
+                    var t = '<div class="pa-dl pa-gc"><div class="pa-da">' +
+                        (paline + i) + '</div><div class="pa-db">' +
+                        (pbline + i) + '</div><div class="pa-dd"></div></div>';
                     $(t).insertAfter(contextrow).find(".pa-dd").text(lines[i]);
                 }
                 $(contextrow).remove();
