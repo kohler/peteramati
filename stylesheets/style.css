@@ -2566,16 +2566,6 @@ a.fold61:hover {
 	color: #009900;
 	text-decoration: none;
 }
-.pa-note-edge {
-	background: #f3d1fc;
-	background:
-	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) no-repeat right top,
-	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) no-repeat right bottom,
-	    linear-gradient(270deg, #f3d1fc 20%, #e3a3e3 100%, transparent 100%) repeat-y right top,
-	    linear-gradient(125deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center,
-	    linear-gradient(55deg, transparent 70%, #e3a3e3 70%) repeat-y right 24px center;
-	background-size: 25px 7px, 25px 5px, 25px 100%, 10px 20px, 10px 20px;
-}
 .pa-note-links, .pa-note-aa, .pa-note-author {
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
 		"Helvetica Neue", Arial, sans-serif,
@@ -2619,26 +2609,21 @@ a.fold61:hover {
 	width: auto;
 }
 .pa-warnbox {
+	flex: 1 1 auto;
+	max-width: 100%;
+	padding: 0.8em 1em 0.8em 6.5em;
 	background: #f2ecef;
 	background:
-	    linear-gradient(180deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) repeat-x top center,
-	    linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) repeat-x bottom center,
-	    #f2ecef;
-	background-size: 100% 7px, 100% 5px, 100% 100%;
+	    left top / 100% 5px no-repeat linear-gradient(180deg, rgba(120,80,120,0.1), rgba(0,0,0,0)),
+	    left bottom / 100% 5px no-repeat linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)),
+	    linear-gradient(90deg, rgba(212,210,211,0) 5.0em, rgba(212,210,211,1) 5.1em, rgba(242,236,239,1) 5.5em, rgba(242,236,239,1) 100%) right top;
+            /*4.7em center / 0.8em 0.8em repeat-y linear-gradient(125deg, rgba(227,163,227,0) 0.7em, rgba(227,163,227,1) 0.8em, rgba(238,192,242,1) 1em),
+            4.7em center / 0.8em 0.8em repeat-y linear-gradient(55deg, rgba(227,163,227,0) 0.7em, rgba(227,163,227,1) 0.8em, rgba(238,192,242,1) 1em);*/
+}
+.pa-warncontent {
 	font-size: smaller;
-	padding: 0.8em 1em 0.8em 0;
 	white-space: pre-wrap;
 	color: #440000;
-}
-.pa-warn-edge {
-	background: #f2ecef;
-	background:
-	    linear-gradient(180deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) no-repeat right top,
-	    linear-gradient(0deg, rgba(120,80,120,0.1), rgba(0,0,0,0)) no-repeat right bottom,
-	    linear-gradient(270deg, #efe8ec 20%, #bfb8bc 100%, transparent 100%) repeat-y right top,
-	    linear-gradient(125deg, transparent 70%, #bfb8bc 70%) repeat-y right 24px center,
-	    linear-gradient(55deg, transparent 70%, #bfb8bc 70%) repeat-y right 24px center;
-	background-size: 25px 7px, 25px 5px, 25px 100%, 10px 20px, 10px 20px;
 }
 .pa-runner {
 	font-size: 9pt;

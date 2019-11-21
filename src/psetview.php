@@ -1456,7 +1456,7 @@ class PsetView {
         }
 
         if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {
-            echo '<div class="pa-dl pa-gn"><div class="pa-warnbox need-format" data-format="2">', htmlspecialchars($lineanno[$bln]->warnings), '</div></div>';
+            echo '<div class="pa-dl pa-gn"><div class="pa-warnbox"><div class="pa-warncontent need-format" data-format="2">', htmlspecialchars($lineanno[$bln]->warnings), '</div></div></div>';
         }
 
         if ($ala) {
