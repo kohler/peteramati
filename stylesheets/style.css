@@ -2391,7 +2391,7 @@ tr.gtrow-partner {
 }
 .pa-with-sidebar > .pa-dg {
 	flex: 1 1 auto;
-	max-width: 80%;
+	max-width: 82.5%;
 }
 .pa-sidebar {
 	min-width: 144px;
