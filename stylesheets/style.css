@@ -245,7 +245,7 @@ label.checki {
 	clear: both;
 }
 .clearfix:after, .pst:after, .submission_modes:after,
-.revet:after, .cmteditinfo:after, .aa:after, .aab:after, .pa-notediv:after {
+.revet:after, .cmteditinfo:after, .aa:after, .aab:after {
 	clear: both;
 	content: "";
 	display: block;
@@ -2518,7 +2518,7 @@ table.hidegrades .pa-gradenote {
 	width: 99%;
 	height: 5em;
 }
-.pa-notebox > form {
+.pa-noteform {
 	display: block;
 	padding: 1ex 0;
 	position: relative;

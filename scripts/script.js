@@ -2416,7 +2416,7 @@ function pa_fix_note_links() {
         var $a = $(tr).find(".pa-note-links a");
         if (!$a.length) {
             $a = $('<a class="ui pa-goto"></a>');
-            $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notediv"));
+            $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notecontent"));
         }
 
         $a.attr("href", note_anchor(next_tr));
@@ -2489,7 +2489,7 @@ function pa_render_note(note, transition) {
         return tr;
     }
 
-    var t = '<div class="pa-notediv">';
+    var t = '<div class="pa-notecontent clearfix">';
     if (note[2]) {
         var authorids = $.isArray(note[2]) ? note[2] : [note[2]];
         var authors = [];
@@ -2522,7 +2522,7 @@ function pa_render_note(note, transition) {
 
     pa_fix_note_links.call(tr);
     if (transition) {
-        $td.find(".pa-notediv").hide().slideDown(80);
+        $td.find(".pa-notecontent").hide().slideDown(80);
     } else {
         removeClass(tr, "hidden");
     }
@@ -2550,8 +2550,8 @@ function render_form($tr, note, transition) {
         format = $tr.closest(".pa-filediff").attr("data-default-format");
     var t = '<form method="post" action="' +
         escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi[0], {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0, format: format}))) +
-        '" enctype="multipart/form-data" accept-charset="UTF-8">' +
-        '<div class="f-contain"><textarea class="pa-note-entry" name="note"></textarea>' +
+        '" enctype="multipart/form-data" accept-charset="UTF-8" class="pa-noteform">' +
+        '<textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
         '<div class="aabut"><button class="btn-primary" type="submit">Save comment</button></div>' +
         '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
@@ -2559,7 +2559,7 @@ function render_form($tr, note, transition) {
         ++labelctr;
         t += '<div class="aabut"><input type="checkbox" id="pa-linenotecb' + labelctr + '" name="iscomment" value="1" /> <label for="pa-linenotecb' + labelctr + '">Show immediately</label></div>';
     }
-    var $form = $(t).appendTo($td);
+    var $form = $(t + '</div></form>').appendTo($td);
 
     var $ta = $form.find("textarea");
     if (note && note[1] !== null) {

@@ -1492,7 +1492,7 @@ class PsetView {
             echo '</div></div>';
             return;
         }
-        echo '<div class="pa-notediv">';
+        echo '<div class="pa-notecontent">';
         $links = array();
         list($nfile, $nlineid) = $this->_diff_lnorder->get_next($note->file, $note->lineid);
         if ($nfile) {
