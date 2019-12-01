@@ -100,26 +100,30 @@ class LineNotesOrder {
             return $this->lnseq[$seq - 1];
     }
     function compare($a, $b) {
-        if ($a[0] != $b[0])
+        if ($a[0] != $b[0]) {
             return $this->fileorder[$a[0]] - $this->fileorder[$b[0]];
-        if (!$this->diff || !get($this->diff, $a[0]))
+        } else if (!$this->diff || !get($this->diff, $a[0])) {
             return strcmp($a[1], $b[1]);
-        if ($a[1][0] == $b[1][0])
+        } else if ($a[1][0] == $b[1][0]) {
             return (int) substr($a[1], 1) - (int) substr($b[1], 1);
+        }
         $to = get($this->totalorder, $a[0]);
         if (!$to) {
             $to = ["a0" => 0];
             $n = 0;
             foreach ($this->diff[$a[0]] as $l) {
-                if ($l[0] === "+" || $l[0] === " ")
+                if ($l[0] === "+" || $l[0] === " ") {
                     $to["b" . $l[2]] = ++$n;
-                if ($l[0] === "-" || $l[0] === " ")
+                }
+                if ($l[0] === "-" || $l[0] === " ") {
                     $to["a" . $l[1]] = ++$n;
+                }
             }
             $this->totalorder[$a[0]] = $to;
         }
-        if (!isset($to[$a[1]]) || !isset($to[$b[1]]))
+        if (!isset($to[$a[1]]) || !isset($to[$b[1]])) {
             error_log(json_encode($a) . " / " . json_encode($b) . " / " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
+        }
         return $to[$a[1]] - $to[$b[1]];
     }
 }

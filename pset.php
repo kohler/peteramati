@@ -233,7 +233,7 @@ function session_list_position($sl, $info) {
 }
 
 function session_list_link($sl, $pos, $isprev, Contact $me, Contact $user) {
-    global $Conf, $Pset, $User;
+    global $Conf, $Pset;
     $pset = $Pset;
     if (isset($sl->psetids) && isset($sl->psetids[$pos])
         && ($p = $Conf->pset_by_id($sl->psetids[$pos])))
@@ -280,38 +280,38 @@ $u = $Me->user_linkpart($User);
 
 // Per-pset
 
-function echo_grade_cdf() {
-    global $Info, $Qreq;
+function echo_grade_cdf($info) {
+    global $Qreq;
     echo '<div id="pa-grade-statistics" class="pa-grgraph pa-grade-statistics hidden';
-    if (!$Info->user_can_view_grade_statistics()) {
+    if (!$info->user_can_view_grade_statistics()) {
         echo ' pa-pset-hidden';
     }
-    echo '" data-pa-pset="', $Info->pset->urlkey;
+    echo '" data-pa-pset="', $info->pset->urlkey;
     if (is_string($Qreq->gg)) {
         echo '" data-pa-gg-type="', htmlspecialchars($Qreq->gg);
     }
     echo '"><a class="qq ui js-grgraph-flip prev" href="">&lt;</a>';
     echo '<a class="qq ui js-grgraph-flip next" href="">&gt;</a>';
     echo '<h4 class="title pa-grgraph-type"></h4>';
-    if ($Info->can_view_grade_statistics_graph()) {
+    if ($info->can_view_grade_statistics_graph()) {
         echo '<div class="plot" style="width:350px;height:200px"></div>';
     }
     echo '<div class="statistics"></div></div>';
     Ht::stash_script("\$(\"#pa-grade-statistics\").each(pa_gradecdf)");
 }
 
-function echo_commit($Info) {
-    global $Conf, $Me, $User, $Pset, $Qreq;
-    global $TABWIDTH, $WDIFF;
-
-    $Notes = $Info->commit_info();
-    $TABWIDTH = $Info->tabwidth();
+function echo_commit($info) {
+    global $Qreq, $TABWIDTH, $WDIFF;
+    $conf = $info->conf;
+    $pset = $info->pset;
+    $Notes = $info->commit_info();
+    $TABWIDTH = $info->tabwidth();
     $WDIFF = isset($Notes->wdiff) ? $Notes->wdiff : false;
 
     // current commit and commit selector
     $sel = $bhashes = [];
     $curhead = $grouphead = null;
-    foreach ($Info->recent_commits() as $k) {
+    foreach ($info->recent_commits() as $k) {
         // visually separate older heads
         if ($curhead === null)
             $curhead = $k->fromhead;
@@ -333,12 +333,12 @@ function echo_commit($Info) {
         $bhashes[] = hex2bin($k->hash);
     }
     $notesflag = HASNOTES_ANY;
-    if ($Me == $User && !$Info->can_view_grades()) {
+    if (!$info->pc_view && !$info->can_view_grades()) {
         $notesflag = HASNOTES_COMMENT;
     }
-    $result = $Conf->qe("select bhash, haslinenotes, hasflags, hasactiveflags
+    $result = $info->conf->qe("select bhash, haslinenotes, hasflags, hasactiveflags
         from CommitNotes where pset=? and bhash?a and (haslinenotes or hasflags)",
-        $Pset->psetid, $bhashes);
+        $pset->psetid, $bhashes);
     while (($row = edb_row($result))) {
         $hex = bin2hex($row[0]);
         $f = "";
@@ -354,20 +354,20 @@ function echo_commit($Info) {
     Dbl::free($result);
 
     if (!empty($sel)
-        && ($h = $Info->update_grading_hash(true))
+        && ($h = $info->update_grading_hash(true))
         && isset($sel[$h])) {
         $sel[$h] = preg_replace('_\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z_', '$1 &nbsp;✱$2', $sel[$h]);
     }
 
-    if ($Info->is_grading_commit()) {
+    if ($info->is_grading_commit()) {
         $key = "grading commit";
     } else {
         $key = "this commit";
     }
-    $value = Ht::select("newcommit", $sel, $Info->commit_hash(),
+    $value = Ht::select("newcommit", $sel, $info->commit_hash(),
                         array("onchange" => "jQuery(this).closest('form').submit()"));
-    if ($Me != $User) {
-        $x = $Info->is_grading_commit() ? "" : "font-weight:bold";
+    if ($info->pc_view) {
+        $x = $info->is_grading_commit() ? "" : "font-weight:bold";
         $value .= " " . Ht::submit("grade", "Grade", array("style" => $x));
     }
 
@@ -380,100 +380,100 @@ function echo_commit($Info) {
         . '</span>&nbsp;options</a><span style="padding-left:1em"'
         . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
     foreach (array(2, 4, 8) as $i)
-        $value .= '&nbsp;<a href="' . $Conf->selfurl($Qreq, ["tab" => $i]) . '"'
+        $value .= '&nbsp;<a href="' . $info->conf->selfurl($Qreq, ["tab" => $i]) . '"'
             . ($TABWIDTH == $i ? " class=\"q\"><strong>$i</strong>" : '>' . $i)
             . '</a>';
     $value .= '<span style="padding-left:1em">wdiff:';
     foreach (array("no", "yes") as $i => $t)
-        $value .= '&nbsp;<a href="' . $Conf->selfurl($Qreq, ["wdiff" => $i]) . '"'
+        $value .= '&nbsp;<a href="' . $info->conf->selfurl($Qreq, ["wdiff" => $i]) . '"'
             . (!$WDIFF == !$i ? " class=\"q\"><strong>$t</strong>" : '>' . $t)
             . '</a>';
     $value .= '</span></span></div>';
 
     // warnings
     $remarks = array();
-    if (!$Info->grading_hash() && $Me != $User && !$Pset->gitless_grades) {
+    if (!$info->grading_hash() && $info->pc_view && !$pset->gitless_grades) {
         $remarks[] = array(true, "No commit has been marked for grading.");
-    } else if (!$Info->is_grading_commit() && $Info->grading_hash()) {
+    } else if (!$info->is_grading_commit() && $info->grading_hash()) {
         $remarks[] = array(true, "This is not "
-                           . "<a class=\"uu\" href=\"" . $Info->hoturl("pset", array("commit" => $Info->grading_hash())) . "\">the commit currently marked for grading</a>"
-                           . " <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit1" => $Info->grading_hash())) . "\">see diff</a>)</span>.");
+                           . "<a class=\"uu\" href=\"" . $info->hoturl("pset", array("commit" => $info->grading_hash())) . "\">the commit currently marked for grading</a>"
+                           . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->grading_hash())) . "\">see diff</a>)</span>.");
     }
-    if (!$Info->is_latest_commit()) {
+    if (!$info->is_latest_commit()) {
         $remarks[] = array(true, "This is not "
-                           . "<a class=\"uu\" href=\"" . $Info->hoturl("pset", array("commit" => $Info->latest_hash())) . "\">the latest commit</a>"
-                           . " <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit1" => $Info->latest_hash())) . "\">see diff</a>)</span>.");
+                           . "<a class=\"uu\" href=\"" . $info->hoturl("pset", array("commit" => $info->latest_hash())) . "\">the latest commit</a>"
+                           . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->latest_hash())) . "\">see diff</a>)</span>.");
     }
-    $lhd = $Info->late_hours_data();
+    $lhd = $info->late_hours_data();
     if ($lhd && isset($lhd->hours) && $lhd->hours > 0) {
         $extra = array();
         if (isset($lhd->timestamp)) {
-            $extra[] = "commit at " . $Conf->printableTimestamp($lhd->timestamp);
+            $extra[] = "commit at " . $info->conf->printableTimestamp($lhd->timestamp);
         }
         if (isset($lhd->deadline)) {
-            $extra[] = "deadline " . $Conf->printableTimestamp($lhd->deadline);
+            $extra[] = "deadline " . $info->conf->printableTimestamp($lhd->deadline);
         }
         $extra = count($extra) ? ' <span style="font-weight:normal">(' . join(", ", $extra) . ')</span>' : "";
         $remarks[] = array(true, "This commit uses " . plural($lhd->hours, "late hour") . $extra . ".");
     }
-    if (($Info->is_latest_commit() || $Me->isPC)
-        && $Pset->handout_repo_url) {
-        $last_handout = $Pset->latest_handout_commit();
-        $last_myhandout = $last_handout ? $Info->derived_handout_hash() : false;
+    if (($info->is_latest_commit() || $info->viewer->isPC)
+        && $pset->handout_repo_url) {
+        $last_handout = $pset->latest_handout_commit();
+        $last_myhandout = $last_handout ? $info->derived_handout_hash() : false;
         if ($last_handout
             && $last_myhandout
             && $last_handout->hash == $last_myhandout) {
             /* this is ideal: they have the latest handout commit */
         } else if ($last_handout && $last_myhandout) {
-            $need_handout_hash = $Pset->handout_warn_hash ? : $Pset->handout_hash;
+            $need_handout_hash = $pset->handout_warn_hash ? : $pset->handout_hash;
             if ($need_handout_hash
-                && ($hcf = $Pset->handout_commits_from($need_handout_hash))
+                && ($hcf = $pset->handout_commits_from($need_handout_hash))
                 && isset($hcf[$last_myhandout])) {
                 // also fine
             } else {
                 // they don't have the latest updates
                 $cmd = "git pull handout";
-                if ($Pset->handout_hash)
-                    $cmd .= " " . htmlspecialchars($Pset->handout_hash);
-                else if ($Pset->handout_branch)
-                    $cmd .= " " . htmlspecialchars($Pset->handout_branch);
+                if ($pset->handout_hash)
+                    $cmd .= " " . htmlspecialchars($pset->handout_hash);
+                else if ($pset->handout_branch)
+                    $cmd .= " " . htmlspecialchars($pset->handout_branch);
                 else
                     $cmd .= " master";
-                $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $Info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
+                $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
             }
         } else if ($last_handout) {
-            $remarks[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.<br>This <em>somewhat dangerous</em> command will merge your repository with ours; make a backup of your Git repository before trying it:<br><pre>git pull --allow-unrelated-histories \"" . htmlspecialchars($Pset->handout_repo_url) . "\" --no-edit &amp;&amp; git push</pre>"];
-        } else if (!$last_handout && $Me->isPC) {
-            $handout_files = $Pset->handout_repo()->ls_files("master");
+            $remarks[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.<br>This <em>somewhat dangerous</em> command will merge your repository with ours; make a backup of your Git repository before trying it:<br><pre>git pull --allow-unrelated-histories \"" . htmlspecialchars($pset->handout_repo_url) . "\" --no-edit &amp;&amp; git push</pre>"];
+        } else if (!$last_handout && $info->viewer->isPC) {
+            $handout_files = $pset->handout_repo()->ls_files("master");
             if (!count($handout_files))
-                $remarks[] = array(true, "The handout repository, " . htmlspecialchars($Pset->handout_repo_url) . ", contains no files; perhaps handout_repo_url is misconfigured.");
+                $remarks[] = array(true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", contains no files; perhaps handout_repo_url is misconfigured.");
             else
-                $remarks[] = array(true, "The handout repository, " . htmlspecialchars($Pset->handout_repo_url) . ", does not contain problem set code yet.");
+                $remarks[] = array(true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", does not contain problem set code yet.");
         }
     }
 
     // actually print
-    echo Ht::form($Info->hoturl_post("pset", ["commit" => null, "setcommit" => 1]),
-            ["class" => "pa-commitcontainer", "data-pa-pset" => $Info->pset->urlkey, "data-pa-commit" => $Info->latest_hash()]),
+    echo Ht::form($info->hoturl_post("pset", ["commit" => null, "setcommit" => 1]),
+            ["class" => "pa-commitcontainer", "data-pa-pset" => $info->pset->urlkey, "data-pa-commit" => $info->latest_hash()]),
         "<div class=\"f-contain\">";
     ContactView::echo_group($key, $value, $remarks);
     echo "</div></form>\n";
 }
 
-function echo_grader() {
-    global $Conf, $Me, $User, $Pset, $Info;
-    $gradercid = $Info->gradercid();
-    if ($Info->is_grading_commit() && $Me->can_view_grader($Pset, $User)) {
-        $pcm = $Conf->pc_members_and_admins();
+function echo_grader($info) {
+    $gradercid = $info->gradercid();
+    if ($info->is_grading_commit()
+        && $info->viewer->can_view_grader($info->pset, $info->user)) {
+        $pcm = $info->conf->pc_members_and_admins();
         $gpc = get($pcm, $gradercid);
         $value_post = "";
-        if ($Me->can_set_grader($Pset, $User)) {
+        if ($info->viewer->can_set_grader($info->pset, $info->user)) {
             $sel = array();
             if (!$gpc) {
                 $sel["none"] = "(None)";
                 $sel[] = null;
             }
-            foreach ($Conf->pc_members_and_admins() as $pcm) {
+            foreach ($info->conf->pc_members_and_admins() as $pcm) {
                 $sel[$pcm->email] = Text::name_html($pcm);
             }
 
@@ -481,13 +481,13 @@ function echo_grader() {
             if (!$gpc) {
                 $seen_pset = false;
                 $older_pset = null;
-                foreach ($Conf->psets_newest_first() as $xpset) {
-                    if ($xpset === $Pset)
+                foreach ($info->conf->psets_newest_first() as $xpset) {
+                    if ($xpset === $info->pset) {
                         $seen_pset = true;
-                    else if ($seen_pset && $xpset->group === $Pset->group) {
-                        $xinfo = PsetView::make($xpset, $User, $Me);
+                    } else if ($seen_pset && $xpset->group === $info->pset->group) {
+                        $xinfo = PsetView::make($xpset, $info->user, $info->viewer);
                         if (($xcid = $xinfo->gradercid())
-                            && ($pcm = get($Conf->pc_members_and_admins(), $xcid))) {
+                            && ($pcm = get($info->conf->pc_members_and_admins(), $xcid))) {
                             $sel[$pcm->email] .= " [✱" . htmlspecialchars($xpset->title) . "]";
                         }
                         break;
@@ -495,7 +495,7 @@ function echo_grader() {
                 }
             }
 
-            $value = Ht::form($Info->hoturl_post("pset", array("setgrader" => 1)))
+            $value = Ht::form($info->hoturl_post("pset", array("setgrader" => 1)))
                 . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", array("onchange" => "setgrader61(this)"));
             $value_post = "<span class=\"ajaxsave61\"></span></div></form>";
         } else {
@@ -504,46 +504,44 @@ function echo_grader() {
             else
                 $value = "???";
         }
-        if ($Me->privChair)
+        if ($info->viewer->privChair)
             $value .= "&nbsp;" . become_user_link($gpc);
         ContactView::echo_group("grader", $value . $value_post);
     }
 }
 
-function echo_grade_cdf_here() {
-    global $Info;
-    if ($Info->can_view_grade_statistics())
-        echo_grade_cdf();
+function echo_grade_cdf_here($info) {
+    if ($info->can_view_grade_statistics())
+        echo_grade_cdf($info);
 }
 
-function echo_all_grades() {
-    global $Me, $User, $Pset, $Info;
-    if ($Info->is_handout_commit())
+function echo_all_grades($info) {
+    if ($info->is_handout_commit())
         return;
 
-    $has_grades = $Info->has_assigned_grades();
-    if ($Info->can_view_grades()
-        && ($has_grades || $Info->can_edit_grades())) {
-        if ($Pset->grade_script && $Info->can_edit_grades()) {
-            foreach ($Pset->grade_script as $gs)
-                Ht::stash_html($Info->conf->make_script_file($gs));
+    $has_grades = $info->has_assigned_grades();
+    if ($info->can_view_grades()
+        && ($has_grades || $info->can_edit_grades())) {
+        if ($info->pset->grade_script && $info->can_edit_grades()) {
+            foreach ($info->pset->grade_script as $gs)
+                Ht::stash_html($info->conf->make_script_file($gs));
         }
         echo '<div class="pa-gradelist want-pa-landmark-links',
-            ($Info->can_edit_grades() ? " editable" : " noneditable"),
-            ($Info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
-        Ht::stash_script('$(".pa-psetinfo").first().data("pa-gradeinfo", ' . json_encode_browser($Info->grade_json()) . ').each(pa_loadgrades);');
-        if ($Pset->has_grade_landmark) {
+            ($info->can_edit_grades() ? " editable" : " noneditable"),
+            ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
+        Ht::stash_script('$(".pa-psetinfo").first().data("pa-gradeinfo", ' . json_encode_browser($info->grade_json()) . ').each(pa_loadgrades);');
+        if ($info->pset->has_grade_landmark) {
             Ht::stash_script('$(function(){$(".pa-psetinfo").each(pa_loadgrades)})');
         }
         echo Ht::unstash();
     }
 
-    $lhd = $Info->late_hours_data();
-    if ($lhd && $Info->can_view_grades() && !$Info->can_edit_grades()) {
+    $lhd = $info->late_hours_data();
+    if ($lhd && $info->can_view_grades() && !$info->can_edit_grades()) {
         if ((isset($lhd->hours) && $lhd->hours > 0) || $has_grades) {
             ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>');
         }
-    } else if ($Info->can_edit_grades() && $Info->pset->late_hours_entry()) {
+    } else if ($info->can_edit_grades() && $info->pset->late_hours_entry()) {
         echo '<form class="ui-submit pa-grade pa-p" data-pa-grade="late_hours">',
             '<label class="pa-pt" for="pa-lh">late hours</label>',
             '<div class="pa-pd"><span class="pa-gradewidth">',
@@ -596,17 +594,17 @@ if ($Info->user->extension) {
 echo '">';
 
 if ($Pset->gitless) {
-    echo_grade_cdf_here();
-    echo_grader();
-    echo_all_grades();
+    echo_grade_cdf_here($Info);
+    echo_grader($Info);
+    echo_all_grades($Info);
 
 } else if ($Info->repo && !$Info->can_view_repo_contents()) {
-    echo_grade_cdf_here();
-    echo_grader();
-    echo_all_grades();
+    echo_grade_cdf_here($Info);
+    echo_grader($Info);
+    echo_all_grades($Info);
 
 } else if ($Info->repo && $Info->recent_commits()) {
-    echo_grade_cdf_here();
+    echo_grade_cdf_here($Info);
     echo_commit($Info);
 
     // print runners
@@ -682,10 +680,10 @@ if ($Pset->gitless) {
     }
 
     // print current grader
-    echo_grader();
+    echo_grader($Info);
 
     // print grade entries
-    echo_all_grades();
+    echo_all_grades($Info);
 
     // collect diff and sort line notes
     $lnorder = $Info->viewable_line_notes();
@@ -785,7 +783,7 @@ if ($Pset->gitless) {
     Ht::stash_script('$(window).on("beforeunload",pa_beforeunload)');
 } else {
     if ($Pset->gitless_grades) {
-        echo_grade_cdf_here();
+        echo_grade_cdf_here($Info);
     }
 
     echo "<div class=\"pa-commitcontainer\" data-pa-pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
@@ -793,8 +791,8 @@ if ($Pset->gitless) {
     echo "</div>\n";
 
     if ($Pset->gitless_grades) {
-        echo_grader();
-        echo_all_grades();
+        echo_grader($Info);
+        echo_all_grades($Info);
     }
 }
 

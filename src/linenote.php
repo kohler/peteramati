@@ -22,21 +22,24 @@ class LineNote implements JsonUpdatable {
             for ($i = 0; property_exists($x_in, $i); ++$i)
                 $x[] = $x_in->$i;
         }
-        if (is_int($x) || $x === null)
+        if (is_int($x) || $x === null) {
             $ln->version = $x;
-        else if (is_string($x))
+        } else if (is_string($x)) {
             $ln->note = $x;
-        else if (is_array($x)) {
+        } else if (is_array($x)) {
             $ln->iscomment = $x[0];
             $ln->note = $x[1];
-            if (isset($x[2]) && is_int($x[2]))
+            if (isset($x[2]) && is_int($x[2])) {
                 $ln->users[] = $x[2];
-            else if (isset($x[2]) && is_array($x[2]))
+            } else if (isset($x[2]) && is_array($x[2])) {
                 $ln->users = $x[2];
-            if (isset($x[3]))
+            }
+            if (isset($x[3])) {
                 $ln->version = $x[3];
-            if (isset($x[4]) && is_int($x[4]))
+            }
+            if (isset($x[4]) && is_int($x[4])) {
                 $ln->format = $x[4];
+            }
         }
         return $ln;
     }
