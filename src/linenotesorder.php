@@ -76,8 +76,9 @@ class LineNotesOrder {
         if ($this->lnorder === null) {
             $this->totalorder = [];
             usort($this->lnseq, [$this, "compare"]);
-            foreach ($this->lnseq as $i => $note)
+            foreach ($this->lnseq as $i => $note) {
                 $this->lnorder[$note->lineid . "_" . $note->file] = $i;
+            }
         }
     }
     function seq() {
@@ -87,18 +88,24 @@ class LineNotesOrder {
     function get_next($file, $lineid) {
         $this->ensure_lnorder();
         $seq = $this->lnorder[$lineid . "_" . $file];
-        if ($seq === null || $seq == count($this->lnseq) - 1)
-            return null;
-        else
-            return $this->lnseq[$seq + 1];
+        while ($seq !== null && $seq !== count($this->lnseq) - 1) {
+            ++$seq;
+            if (!$this->lnseq[$seq]->is_empty()) {
+                return $this->lnseq[$seq];
+            }
+        }
+        return null;
     }
     function get_prev($file, $lineid) {
         $this->ensure_lnorder();
         $seq = $this->lnorder[$lineid . "_" . $file];
-        if ($seq === null || $seq == 0)
-            return null;
-        else
-            return $this->lnseq[$seq - 1];
+        while ($seq !== null && $seq !== 0) {
+            --$seq;
+            if (!$this->lnseq[$seq]->is_empty()) {
+                return $this->lnseq[$seq];
+            }
+        }
+        return null;
     }
     function compare($a, $b) {
         if ($a->file != $b->file) {

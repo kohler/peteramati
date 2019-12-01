@@ -2496,9 +2496,6 @@ table.hidegrades .pa-gradenote {
 .pa-noteref {
 	font-size: smaller;
 }
-.pa-noteref.pa-notehidden {
-	font-style: italic;
-}
 .pa-dnonl:after {
 	content: "⏎̸";
 }

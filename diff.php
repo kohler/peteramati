@@ -100,14 +100,9 @@ $diff = $Info->diff($commita, $commitb, $lnorder, $diff_options);
 // print line notes
 $notelinks = array();
 foreach ($lnorder->seq() as $note) {
-    $f = $note->file;
-    if (str_starts_with($f, $Pset->directory_slash)) {
-        $f = substr($f, strlen($Pset->directory_slash));
+    if (!$note->is_empty()) {
+        $notelinks[] = $note->render_line_link_html($Pset);
     }
-    $notelinks[] = '<a class="ui pa-goto pa-noteref'
-        . (!$note->iscomment && !$Info->user_can_view_grades() ? " pa-notehidden" : "")
-        . '" href="#L' . $note->lineid . '_' . html_id_encode($note->file)
-        . '">' . htmlspecialchars($f) . ':' . substr($note->lineid, 1) . '</a>';
 }
 if (!empty($notelinks)) {
     ContactView::echo_group("notes", join(", ", $notelinks));

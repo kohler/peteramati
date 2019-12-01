@@ -44,6 +44,23 @@ class LineNote implements JsonUpdatable {
         }
         return $ln;
     }
+
+    function is_empty() {
+        return (string) $this->note === "";
+    }
+
+
+    function render_line_link_html(Pset $pset = null) {
+        $f = $this->file;
+        if ($pset && str_starts_with($f, $pset->directory_slash)) {
+            $f = substr($f, strlen($pset->directory_slash));
+        }
+        return '<a class="ui pa-goto pa-noteref" href="#L' . $this->lineid
+            . '_' . html_id_encode($this->file) . '">' . htmlspecialchars($f)
+            . ':' . substr($this->lineid, 1) . '</a>';
+    }
+
+
     function jsonIsReplacement() {
         return true;
     }
