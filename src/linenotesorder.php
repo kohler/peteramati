@@ -16,18 +16,19 @@ class LineNotesOrder {
         $this->ln = [];
         foreach ($linenotes ? : [] as $file => $notelist) {
             $fln = [];
-            foreach ($notelist as $line => $note) {
+            foreach ($notelist as $lineid => $note) {
                 if ((is_string($note) && $note !== "")
                     || (is_array($note)
                         && ($note[0] || $seegradenotes)
                         && ((string) $note[1] !== "" || $editnotes))
                     || (is_int($note) && $editnotes)) {
-                    $fln[$line] = $note;
-                    $this->lnseq[] = [$file, $line, is_array($note) && $note[0]];
+                    $note = LineNote::make_json($file, $lineid, $note);
+                    $fln[$lineid] = $note;
+                    $this->lnseq[] = $note;
                 }
             }
             if (!empty($fln)) {
-                $this->ln[$file] = (object) $fln;
+                $this->ln[$file] = $fln;
                 $this->fileorder[$file] = count($this->fileorder) + 1;
             }
         }
@@ -75,8 +76,8 @@ class LineNotesOrder {
         if ($this->lnorder === null) {
             $this->totalorder = [];
             usort($this->lnseq, [$this, "compare"]);
-            foreach ($this->lnseq as $i => $fl)
-                $this->lnorder[$fl[1] . "_" . $fl[0]] = $i;
+            foreach ($this->lnseq as $i => $note)
+                $this->lnorder[$note->lineid . "_" . $note->file] = $i;
         }
     }
     function seq() {
@@ -87,7 +88,7 @@ class LineNotesOrder {
         $this->ensure_lnorder();
         $seq = $this->lnorder[$lineid . "_" . $file];
         if ($seq === null || $seq == count($this->lnseq) - 1)
-            return array(null, null);
+            return null;
         else
             return $this->lnseq[$seq + 1];
     }
@@ -95,23 +96,23 @@ class LineNotesOrder {
         $this->ensure_lnorder();
         $seq = $this->lnorder[$lineid . "_" . $file];
         if ($seq === null || $seq == 0)
-            return array(null, null);
+            return null;
         else
             return $this->lnseq[$seq - 1];
     }
     function compare($a, $b) {
-        if ($a[0] != $b[0]) {
-            return $this->fileorder[$a[0]] - $this->fileorder[$b[0]];
-        } else if (!$this->diff || !get($this->diff, $a[0])) {
-            return strcmp($a[1], $b[1]);
-        } else if ($a[1][0] == $b[1][0]) {
-            return (int) substr($a[1], 1) - (int) substr($b[1], 1);
+        if ($a->file != $b->file) {
+            return $this->fileorder[$a->file] - $this->fileorder[$b->file];
+        } else if (!$this->diff || !get($this->diff, $a->file)) {
+            return strcmp($a->lineid, $b->lineid);
+        } else if ($a->lineid[0] === $b->lineid[0]) {
+            return (int) substr($a->lineid, 1) - (int) substr($b->lineid, 1);
         }
-        $to = get($this->totalorder, $a[0]);
+        $to = get($this->totalorder, $a->file);
         if (!$to) {
             $to = ["a0" => 0];
             $n = 0;
-            foreach ($this->diff[$a[0]] as $l) {
+            foreach ($this->diff[$a->file] as $l) {
                 if ($l[0] === "+" || $l[0] === " ") {
                     $to["b" . $l[2]] = ++$n;
                 }
@@ -119,11 +120,11 @@ class LineNotesOrder {
                     $to["a" . $l[1]] = ++$n;
                 }
             }
-            $this->totalorder[$a[0]] = $to;
+            $this->totalorder[$a->file] = $to;
         }
-        if (!isset($to[$a[1]]) || !isset($to[$b[1]])) {
+        if (!isset($to[$a->lineid]) || !isset($to[$b->lineid])) {
             error_log(json_encode($a) . " / " . json_encode($b) . " / " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
         }
-        return $to[$a[1]] - $to[$b[1]];
+        return $to[$a->lineid] - $to[$b->lineid];
     }
 }

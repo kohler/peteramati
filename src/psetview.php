@@ -1241,8 +1241,8 @@ class PsetView {
                     continue;
                 }
                 $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
-                foreach ((array) $lnorder->file($fn) as $ln => $note) {
-                    $diffi->add("Z", "", (int) substr($ln, 1), "");
+                foreach ($lnorder->file($fn) as $note) {
+                    $diffi->add("Z", "", (int) substr($note->lineid, 1), "");
                 }
                 uasort($diff, "DiffInfo::compare");
             }
@@ -1419,10 +1419,10 @@ class PsetView {
         }
 
         $ak = $bk = "";
-        if ($linenotes && $aln && isset($linenotes->$aln)) {
+        if ($linenotes && $aln && isset($linenotes[$aln])) {
             $ak = ' id="L' . $aln . '_' . $curanno->fileid . '"';
         }
-        if ($linenotes && $bln && isset($linenotes->$bln)) {
+        if ($linenotes && $bln && isset($linenotes[$bln])) {
             $bk = ' id="L' . $bln . '_' . $curanno->fileid . '"';
         }
 
@@ -1438,10 +1438,11 @@ class PsetView {
 
         $nx = null;
         if ($linenotes) {
-            if ($bln && isset($linenotes->$bln))
-                $nx = LineNote::make_json($curanno->file, $bln, $linenotes->$bln);
-            if (!$nx && $aln && isset($linenotes->$aln))
-                $nx = LineNote::make_json($curanno->file, $aln, $linenotes->$aln);
+            if ($bln && isset($linenotes[$bln])) {
+                $nx = $linenotes[$bln];
+            } else if ($aln && isset($linenotes[$aln])) {
+                $nx = $linenotes[$aln];
+            }
         }
 
         if ($x[0]) {
@@ -1494,10 +1495,10 @@ class PsetView {
         }
         echo '<div class="pa-notecontent">';
         $links = array();
-        list($nfile, $nlineid) = $this->_diff_lnorder->get_next($note->file, $note->lineid);
-        if ($nfile) {
-            $links[] = '<a href="#L' . $nlineid . '_'
-                . html_id_encode($nfile) . '" class="ui pa-goto">Next &gt;</a>';
+        $nnote = $this->_diff_lnorder->get_next($note->file, $note->lineid);
+        if ($nnote) {
+            $links[] = '<a href="#L' . $nnote->lineid . '_'
+                . html_id_encode($nnote->file) . '" class="ui pa-goto">Next &gt;</a>';
         } else {
             $links[] = '<a href="#">Top</a>';
         }

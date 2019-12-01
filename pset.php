@@ -691,12 +691,15 @@ if ($Pset->gitless) {
 
     // print line notes
     $notelinks = array();
-    foreach ($lnorder->seq() as $fl) {
-        $f = str_starts_with($fl[0], $Pset->directory_slash) ? substr($fl[0], strlen($Pset->directory_slash)) : $fl[0];
-        $notelinks[] = '<a href="#L' . $fl[1] . '_' . html_id_encode($fl[0])
+    foreach ($lnorder->seq() as $note) {
+        $f = $note->file;
+        if (str_starts_with($f, $Pset->directory_slash)) {
+            $f = substr($f, strlen($Pset->directory_slash));
+        }
+        $notelinks[] = '<a href="#L' . $note->lineid . '_' . html_id_encode($note->file)
             . '" class="ui pa-goto pa-noteref'
-            . (!$fl[2] && !$Info->user_can_view_grades() ? " pa-notehidden" : "")
-            . '">' . htmlspecialchars($f) . ':' . substr($fl[1], 1) . '</a>';
+            . (!$note->iscomment && !$Info->user_can_view_grades() ? " pa-notehidden" : "")
+            . '">' . htmlspecialchars($f) . ':' . substr($note->lineid, 1) . '</a>';
     }
     if (!empty($notelinks)) {
         ContactView::echo_group("notes", join(", ", $notelinks));

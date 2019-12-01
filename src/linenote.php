@@ -3,7 +3,7 @@
 class LineNote implements JsonUpdatable {
     public $file;
     public $lineid;
-    public $iscomment;
+    public $iscomment = false;
     public $note;
     public $users = [];
     public $version;
@@ -16,11 +16,12 @@ class LineNote implements JsonUpdatable {
 
     static function make_json($file, $lineid, $x) {
         $ln = new LineNote($file, $lineid);
-        if (is_object($x)) {
+        if (is_object($x) && property_exists($x, 0)) {
             $x_in = $x;
             $x = [];
-            for ($i = 0; property_exists($x_in, $i); ++$i)
+            for ($i = 0; property_exists($x_in, $i); ++$i) {
                 $x[] = $x_in->$i;
+            }
         }
         if (is_int($x) || $x === null) {
             $ln->version = $x;
@@ -47,23 +48,26 @@ class LineNote implements JsonUpdatable {
         return true;
     }
     function jsonSerialize() {
-        if ((string) $this->note === "")
+        if ((string) $this->note === "") {
             return $this->version;
-        else {
+        } else {
             $j = [$this->iscomment, $this->note,
                   count($this->users) === 1 ? $this->users[0] : $this->users];
-            if ($this->version || $this->format !== null)
+            if ($this->version || $this->format !== null) {
                 $j[] = $this->version;
-            if ($this->format !== null)
+            }
+            if ($this->format !== null) {
                 $j[] = $this->format;
+            }
             return $j;
         }
     }
     function render_json($can_view_authors) {
         if (!$can_view_authors) {
             $j = [$this->iscomment, $this->note];
-            if ($this->format !== null)
+            if ($this->format !== null) {
                 array_push($j, null, null, $this->format);
+            }
             return $j;
         } else {
             return $this->jsonSerialize();
