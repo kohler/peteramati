@@ -31,18 +31,26 @@ class API_Grade {
     static private function apply_grades($info, $g, $ag, $og, &$errf) {
         $v = [];
         foreach ($info->pset->grades() as $ge) {
-            if (array_key_exists($ge->key, $og)) {
-                $curgv = $info->current_grade_entry($ge->key);
-                if ($ge->value_differs($curgv, $og[$ge->key])
-                    && (!array_key_exists($ge->key, $g)
-                        || $ge->value_differs($curgv, $g[$ge->key])))
-                    $errf[$ge->key] = true;
+            $k = $ge->key;
+            if (array_key_exists($k, $og)) {
+                $curgv = $info->current_grade_entry($k);
+                if ($ge->value_differs($curgv, $og[$k])
+                    && (!array_key_exists($k, $g)
+                        || $ge->value_differs($curgv, $g[$k]))) {
+                    $errf[$k] = true;
+                }
             }
-            if (array_key_exists($ge->key, $g)) {
-                $v["grades"][$ge->key] = $g[$ge->key];
+            if (array_key_exists($k, $g)) {
+                $gv = $g[$k];
+                if ($gv === null
+                    && ($notes = $info->current_info())
+                    && isset($notes->autogrades->$k)) {
+                    $gv = false;
+                }
+                $v["grades"][$k] = $gv;
             }
-            if (array_key_exists($ge->key, $ag)) {
-                $v["autogrades"][$ge->key] = $ag[$ge->key];
+            if (array_key_exists($k, $ag)) {
+                $v["autogrades"][$k] = $ag[$k];
             }
         }
         if (array_key_exists("late_hours", $g)) { // XXX separate permission check?
@@ -91,11 +99,12 @@ class API_Grade {
             $ag = self::parse_full_grades($info->pset, $qreq->autogrades, $errf);
             $og = self::parse_full_grades($info->pset, $qreq->oldgrades, $errf);
             if (!empty($errf)) {
-                reset($errf);
-                if (isset($errf["!invalid"]))
+                if (isset($errf["!invalid"])) {
                     return ["ok" => false, "error" => "Invalid request."];
-                else
+                } else {
+                    reset($errf);
                     return ["ok" => false, "error" => (count($errf) === 1 ? current($errf) : "Invalid grades."), "errf" => $errf];
+                }
             }
 
             // assign grades
@@ -169,16 +178,17 @@ class API_Grade {
             $infos[$u->contactId] = $info;
         }
 
-        if ($errno === 5)
+        if ($errno === 5) {
             return ["ok" => false, "error" => "Missing repository."];
-        else if ($errno === 4)
+        } else if ($errno === 4) {
             return ["ok" => false, "error" => "Disconnected commit."];
-        else if ($errno === 3)
+        } else if ($errno === 3) {
             return ["ok" => false, "error" => "Missing commit."];
-        else if ($errno === 2)
+        } else if ($errno === 2) {
             return ["ok" => false, "error" => "The grading commit has changed."];
-        else if ($errno === 1)
+        } else if ($errno === 1) {
             return ["ok" => false, "error" => "Cannot set grades on handout commit."];
+        }
 
         // XXX match commit with grading commit
         if ($ispost) {
@@ -231,37 +241,43 @@ class API_Grade {
 
         if ($qreq->method() === "POST") {
             if (!$qreq->file || !$qreq->line
-                || !preg_match('/\A[ab]\d+\z/', $qreq->line))
+                || !preg_match('/\A[ab]\d+\z/', $qreq->line)) {
                 return ["ok" => false, "error" => "Invalid request."];
-            if (!$info->can_edit_line_note($qreq->file, $qreq->line))
+            } else if (!$info->can_edit_line_note($qreq->file, $qreq->line)) {
                 return ["ok" => false, "error" => "Permission error."];
-            if ($info->is_handout_commit())
+            } else if ($info->is_handout_commit()) {
                 return ["ok" => false, "error" => "This is a handout commit."];
+            }
 
             $note = $info->current_line_note($qreq->file, $qreq->line);
-            if (isset($qreq->oldversion) && $qreq->oldversion != +$note->version)
+            if (isset($qreq->oldversion) && $qreq->oldversion != +$note->version) {
                 return ["ok" => false, "error" => "Edit conflict, you need to reload."];
+            }
 
-            if (array_search($user->contactId, $note->users) === false)
+            if (array_search($user->contactId, $note->users) === false) {
                 $note->users[] = $user->contactId;
+            }
             $note->iscomment = !!$qreq->iscomment;
             $note->note = (string) rtrim(cleannl($qreq->note));
             $note->version = intval($note->version) + 1;
-            if ($qreq->format && ctype_digit($qreq->format))
+            if ($qreq->format && ctype_digit($qreq->format)) {
                 $note->format = intval($qreq->format);
+            }
 
             $lnotes = ["linenotes" => [$qreq->file => [$qreq->line => $note]]];
             $info->update_current_info($lnotes);
         }
 
-        if (!$user->can_view_comments($api->pset, $info))
+        if (!$user->can_view_comments($api->pset, $info)) {
             return ["ok" => false, "error" => "Permission error."];
+        }
         $can_view_grades = $info->can_view_grades();
         $can_view_note_authors = $info->can_view_note_authors();
         $notes = [];
         foreach ((array) $info->current_info("linenotes") as $file => $linemap) {
-            if ($qreq->file && $file !== $qreq->file)
+            if ($qreq->file && $file !== $qreq->file) {
                 continue;
+            }
             $filenotes = [];
             foreach ((array) $linemap as $lineid => $note) {
                 $note = LineNote::make_json($file, $lineid, $note);
@@ -269,8 +285,9 @@ class API_Grade {
                     && (!$qreq->line || $qreq->line === $lineid))
                     $filenotes[$lineid] = $note->render_json($can_view_note_authors);
             }
-            if (!empty($filenotes))
+            if (!empty($filenotes)) {
                 $notes[$file] = $filenotes;
+            }
         }
         return ["ok" => true, "linenotes" => $notes];
     }

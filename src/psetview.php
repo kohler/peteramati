@@ -1114,8 +1114,10 @@ class PsetView {
                     $gv = property_exists($agx, $key) ? $agx->$key : null;
                     $ag[] = $gv;
                 }
-                if ($gx) {
-                    $gv = property_exists($gx, $key) ? $gx->$key : $gv;
+                if ($gx && property_exists($gx, $key)) {
+                    $gv = $gx->$key;
+                    if ($gx->$key === false)
+                        $gv = null;
                 }
                 $g[] = $gv;
                 if (!$ge->no_total && $gv) {
