@@ -3342,7 +3342,7 @@ function pa_loadgrades() {
             t += ' hidden';
         $g = $(t + '"><div class="pa-pt">total</div>' +
             '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span> ' +
-            '<span class="pa-grademax">of ' + tm[1] + '</span></div></div>');
+            '<span class="pa-gradedesc">of ' + tm[1] + '</span></div></div>');
         $g.prependTo($(this).find(".pa-gradelist"));
     }
     $v = $g.find(".pa-gradevalue");
