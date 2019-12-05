@@ -3056,7 +3056,7 @@ function pa_set_grade(ge, g, ag, options) {
             var txt = (ge.key === "late_hours" ? "auto-late hours" : "autograde") +
                 " is " + typeinfo.text.call(ge, ag);
             if (!$g.find(".pa-gradediffers").length) {
-                $g.find(".pa-pd").append('<span class="pa-gradediffers"></span>');
+                $g.find(".pa-pd").first().append('<span class="pa-gradediffers"></span>');
             }
             var $ag = $g.find(".pa-gradediffers");
             if ($ag.text() !== txt) {
