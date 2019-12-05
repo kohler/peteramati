@@ -3302,6 +3302,20 @@ $(function () {
     $(".need-pa-gradelist").each(pa_resolve_gradelist);
 });
 
+function pa_render_total(gi, tm) {
+    var t = '<div class="pa-total pa-p', ne = 0;
+    for (var k in gi.entries) {
+        if (gi.entries[k].type !== "text" && gi.entries[k].type !== "select")
+            ++ne;
+    }
+    if (ne <= 1) {
+        t += ' hidden';
+    }
+    return t + '"><div class="pa-pt">total</div>' +
+        '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span> ' +
+        '<span class="pa-gradedesc">of ' + tm[1] + '</span></div></div>';
+}
+
 function pa_loadgrades() {
     if (!hasClass(this, "pa-psetinfo")) {
         throw new Error("bad pa_loadgrades");
@@ -3330,25 +3344,21 @@ function pa_loadgrades() {
     });
 
     // print totals
-    var tm = pa_gradeinfo_total(gi);
-    $g = $(this).find(".pa-total");
-    if (tm[0] && !$g.length) {
-        var t = '<div class="pa-total pa-p';
-        var ne = 0;
-        for (var k in gi.entries)
-            if (gi.entries[k].type !== "text" && gi.entries[k].type !== "select")
-                ++ne;
-        if (ne <= 1)
-            t += ' hidden';
-        $g = $(t + '"><div class="pa-pt">total</div>' +
-            '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span> ' +
-            '<span class="pa-gradedesc">of ' + tm[1] + '</span></div></div>');
-        $g.prependTo($(this).find(".pa-gradelist"));
+    var tm = pa_gradeinfo_total(gi), total = "" + tm[0], drawgraph = false;
+    if (tm[0]) {
+        $(this).find(".pa-gradelist:not(.pa-gradebox)").each(function () {
+            var $t = $(this).find(".pa-total");
+            $t.length || $(this).prepend(pa_render_total(gi, tm));
+        });
     }
-    $v = $g.find(".pa-gradevalue");
-    g = "" + tm[0];
-    if ($v.text() !== g) {
-        $v.text(g);
+    $(this).find(".pa-total").each(function () {
+        var $v = $(this).find(".pa-gradevalue");
+        if ($v.text() !== total) {
+            $v.text(total);
+            drawgraph = true;
+        }
+    });
+    if (drawgraph) {
         pa_draw_gradecdf($(this).find(".pa-grgraph"));
     }
 }
