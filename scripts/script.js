@@ -5417,7 +5417,7 @@ handle_ui.on("js-grgraph-highlight", function (event) {
         var $tr;
         if (this.getAttribute("data-range-type") === rt
             && this.checked
-            && ($tr = $(this).closest(".pa-dl"))
+            && ($tr = $(this).closest("tr"))
             && $tr[0].hasAttribute("data-pa-uid"))
             a.push(+$tr[0].getAttribute("data-pa-uid"));
     });
@@ -5644,7 +5644,7 @@ function pa_render_pset_table(pconf, data) {
             th: function () {
                 var t = '<span class="heading">' + (anonymous || !sort.email ? "Username" : "Email") + '</span>';
                 if (pconf.anonymous && pconf.can_override_anonymous)
-                    t += ' <a href="" class="uu n">[anon]</a>';
+                    t += ' <a href="" class="uu n js-switch-anon">[anon]</a>';
                 else if (pconf.anonymous)
                     t += ' <span class="n">[anon]</span>';
                 return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
@@ -5660,7 +5660,19 @@ function pa_render_pset_table(pconf, data) {
                 return '<th class="gt-name l plsortable" data-pa-sort="name" scope="col">Name</th>';
             },
             td: function (s) {
-                return '<td class="gt-name">' + render_display_name(s) + '</td>';
+                return '<td class="gt-name">' + render_display_name(s, false) + '</td>';
+            },
+            tw: 14
+        },
+        name2: {
+            th: function () {
+                var t = '<span class="heading">' + (anonymous ? "Username" : "Name") + '</span>';
+                if (pconf.anonymous && pconf.can_override_anonymous)
+                    t += ' <a href="" class="uu n js-switch-anon">[anon]</a>';
+                return '<th class="gt-name2 l plsortable" data-pa-sort="name2" scope="col">' + t + '</th>';
+            },
+            td: function (s) {
+                return '<td class="gt-name2">' + render_display_name(s, true) + '</td>';
             },
             tw: 14
         },
@@ -5963,11 +5975,12 @@ function pa_render_pset_table(pconf, data) {
     function escaped_href(s) {
         return escape_entities(hoturl("pset", url_gradeparts(s)));
     }
+    function render_student_link(t, s) {
+        return '<a href="' + escaped_href(s) +
+            (s.dropped ? '" class="gt-dropped' : '') + '">' + t + '</a>';
+    }
     function render_username_td(s) {
-        var t = '<a href="' + escaped_href(s), un;
-        if (s.dropped) {
-            t += '" style="text-decoration:line-through';
-        }
+        var un;
         if (anonymous && s.anon_username) {
             un = s.anon_username;
         } else if (sort.email && s.email) {
@@ -5975,7 +5988,7 @@ function pa_render_pset_table(pconf, data) {
         } else {
             un = s.username || "";
         }
-        return t + '">' + escape_entities(un) + '</a>';
+        return render_student_link(escape_entities(un), s);
     }
     function render_name(s, last_first) {
         if (s.first != null && s.last != null) {
@@ -5991,8 +6004,9 @@ function pa_render_pset_table(pconf, data) {
             return "";
         }
     }
-    function render_display_name(s) {
-        return escape_entities(render_name(s, displaying_last_first));
+    function render_display_name(s, is2) {
+        var t = escape_entities(is2 && anonymous ? s.anon_username || "?" : render_name(s, displaying_last_first));
+        return is2 ? render_student_link(t, s) : t;
     }
     function render_checkbox_name(s) {
         var u = anonymous ? s.anon_username || s.username : s.username;
@@ -6084,9 +6098,9 @@ function pa_render_pset_table(pconf, data) {
         var display_last_first = sort.f && sort.last;
         if (display_last_first !== displaying_last_first) {
             displaying_last_first = display_last_first;
-            $b.find(".gt-name").html(function () {
+            $b.find(".gt-name, .gt-name2").html(function () {
                 var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
-                return render_display_name(s);
+                return render_display_name(s, hasClass(this, "gt-name2"));
             });
         }
     }
@@ -6111,6 +6125,11 @@ function pa_render_pset_table(pconf, data) {
             $(this).html(render_username_td(s));
         });
         $x.find("th.gt-username > span.heading").html(anonymous || !sort.email ? "Username" : "Email");
+        $x.find("td.gt-name2").each(function () {
+            var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
+            $(this).html(render_display_name(s, true));
+        });
+        $x.find("th.gt-name2 > span.heading").html(anonymous ? "Username" : "Name");
     }
     function display_anon() {
         $j.toggleClass("gt-anonymous", !!anonymous);
@@ -6119,7 +6138,7 @@ function pa_render_pset_table(pconf, data) {
             $($j[0].firstChild).find(".gt-name").css("width", (anonymous ? 0 : name_col.width) + "px");
         }
     }
-    function switch_anon() {
+    function switch_anon(evt) {
         anonymous = !anonymous;
         if (!anonymous)
             sort.override_anonymous = true;
@@ -6132,7 +6151,8 @@ function pa_render_pset_table(pconf, data) {
         sort_data();
         resort();
         $j.closest("form").find("input[name=anonymous]").val(anonymous ? 1 : 0);
-        return false;
+        evt.preventDefault();
+        evt.stopPropagation();
     }
     function overlay_create() {
         var li, ri, i, tw = 0, t, a = [];
@@ -6158,7 +6178,7 @@ function pa_render_pset_table(pconf, data) {
 
         $j[0].parentNode.prepend($('<div style="position:sticky;left:0;z-index:2"></div>').append($overlay)[0]);
         $overlay.find("thead").on("click", "th", head_click);
-        $overlay.find("thead .gt-username a").click(switch_anon);
+        $overlay.find(".js-switch-anon").click(switch_anon);
 
         tr = $j.children("tbody")[0].firstChild;
         while (tr) {
@@ -6221,7 +6241,7 @@ function pa_render_pset_table(pconf, data) {
     }
     function sort_data() {
         var f = sort.f, rev = sort.rev, m;
-        if (f === "name" && !anonymous) {
+        if ((f === "name" || f === "name2") && !anonymous) {
             set_name_sorters();
             data.sort(function (a, b) {
                 if (a.boringness !== b.boringness)
@@ -6339,7 +6359,8 @@ function pa_render_pset_table(pconf, data) {
                 }
             });
         } else { /* "username" */
-            f = "username";
+            if (f !== "name2")
+                f = "username";
             data.sort(function (a, b) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
@@ -6359,8 +6380,9 @@ function pa_render_pset_table(pconf, data) {
         var sf = this.getAttribute("data-pa-sort"), m;
         if (sf !== sort.f) {
             sort.f = sf;
-            if (sf === "username" || sf === "name" || sf === "grader"
-                || sf === "extension" || sf === "pset" || sf === "at"
+            if (sf === "username" || sf === "name" || sf === "name2"
+                || sf === "grader" || sf === "extension" || sf === "pset"
+                || sf === "at"
                 || ((m = sf.match(/^grade(\d+)$/))
                     && grade_entries[m[1]].type
                     && pa_grade_types[grade_entries[m[1]].type].sort === "forward")) {
@@ -6368,7 +6390,7 @@ function pa_render_pset_table(pconf, data) {
             } else {
                 sort.rev = -1;
             }
-        } else if (sf === "name") {
+        } else if (sf === "name" || (sf === "name2" && !anonymous)) {
             sort.last = !sort.last;
             if (sort.last)
                 sort.rev = -sort.rev;
@@ -6684,7 +6706,7 @@ function pa_render_pset_table(pconf, data) {
         $j[0].appendChild(thead);
         $j.toggleClass("gt-useemail", !!sort.email);
         $j.find("thead").on("click", "th", head_click);
-        $j.find("thead .gt-username a").click(switch_anon);
+        $j.find(".js-switch-anon").click(switch_anon);
         if (tfixed) {
             $j.removeClass("want-gtable-fixed").css("table-layout", "fixed");
         }

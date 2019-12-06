@@ -49,7 +49,7 @@ $jd = ["id" => "overview",
        "checkbox" => true,
        "anonymous" => $any_anonymous,
        "can_override_anonymous" => $any_anonymous,
-       "col" => [["type" => "checkbox", "className" => "uix uich js-range-click js-grgraph-highlight"], "rownumber", "name"]];
+       "col" => [["type" => "checkbox", "className" => "uix uich js-range-click js-grgraph-highlight"], "rownumber", "name2"]];
 echo Ht::unstash(),
     '<script>$("#pa-overview-table").each(function(){pa_render_pset_table.call(this,',
     json_encode_browser($jd), ',', json_encode_browser($sj), ')})</script>';

@@ -2232,6 +2232,9 @@ td.mhcb {
 	font-size: smaller;
 	color: #7777aa;
 }
+.gt-dropped {
+	text-decoration: line-through;
+}
 .gt-checkbox {
 	text-align: right;
 	padding-left: 0.25rem;
@@ -2249,7 +2252,7 @@ td.mhcb {
 	overflow: hidden;
 	white-space: nowrap;
 }
-.gt-rownumber, .gt-username, .gt-name, .gt-grader,
+.gt-rownumber, .gt-username, .gt-name, .gt-name2, .gt-grader,
 .gt-notes, .gt-grade, .gt-ngrades, .gt-total,
 .gt-conversation, .gt-repo, .gt-pset, .gt-at {
 	padding-right: 0.75rem;
