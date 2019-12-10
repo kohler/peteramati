@@ -99,8 +99,9 @@ if ($Qreq->download
 
 // save grades
 function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
-    if ($info->is_handout_commit())
+    if ($info->is_handout_commit()) {
         json_exit(["ok" => false, "error" => "This is a handout commit."]);
+    }
     $grades = $maxgrades = [];
     foreach ($pset->grades() as $ge) {
         if (isset($values[$ge->key])
@@ -114,8 +115,9 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
         }
     }
     $updates = [];
-    if (!empty($grades))
+    if (!empty($grades)) {
         $updates[$isauto ? "autogrades" : "grades"] = $grades;
+    }
     if (isset($values["timestamp"]) && is_numeric($values["timestamp"])) {
         $timestamp = intval($values["timestamp"]);
         if ($timestamp >= 1400000000)
@@ -123,8 +125,9 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
         else if ($timestamp <= 0)
             $updates["timestamp"] = null;
     }
-    if (!empty($updates))
+    if (!empty($updates)) {
         $info->update_grade_info($updates);
+    }
     return $grades;
 }
 

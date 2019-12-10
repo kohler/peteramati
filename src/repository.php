@@ -314,15 +314,17 @@ class Repository {
         $list = [];
         $heads = explode(" ", $this->heads);
         $heads[0] = "%REPO%/$branch";
-        foreach ($heads as $h)
+        foreach ($heads as $h) {
             $this->load_commits_from_head($list, $h, $dir);
+        }
 
         if (!$list && $dir !== "" && $pset && isset($pset->test_file)
             && !isset($this->_truncated_psetdir[$pset->psetid])) {
             $this->_truncated_psetdir[$pset->psetid] =
                 !!$this->ls_files("%REPO%/$branch", $pset->test_file);
-            if ($this->_truncated_psetdir[$pset->psetid])
+            if ($this->_truncated_psetdir[$pset->psetid]) {
                 return $this->commits(null, $branch);
+            }
         }
 
         $this->_commit_lists[$key] = $list;
@@ -336,9 +338,10 @@ class Repository {
     }
 
     function connected_commit($hash, Pset $pset = null, $branch = null) {
-        if (empty($this->_commits))
+        if (empty($this->_commits)) {
             // load some commits first
             $this->commits($pset, $branch);
+        }
 
         $hash = strtolower($hash);
         if (strlen($hash) === 40) {
@@ -346,13 +349,15 @@ class Repository {
                 return $this->_commits[$hash];
         } else {
             $matches = [];
-            foreach ($this->_commits as $h => $cx)
+            foreach ($this->_commits as $h => $cx) {
                 if (str_starts_with($h, $hash))
                     $matches[] = $cx;
-            if (count($matches) == 1)
+            }
+            if (count($matches) == 1) {
                 return $matches[0];
-            else if (!empty($matches))
+            } else if (!empty($matches)) {
                 return null;
+            }
         }
 
         // not found yet
@@ -368,33 +373,38 @@ class Repository {
 
     function author_emails($pset = null, $branch = null, $limit = null) {
         $dir = "";
-        if (is_object($pset) && $pset->directory_noslash !== "")
+        if (is_object($pset) && $pset->directory_noslash !== "") {
             $dir = " -- " . escapeshellarg($pset->directory_noslash);
-        else if (is_string($pset) && $pset !== "")
+        } else if (is_string($pset) && $pset !== "") {
             $dir = " -- " . escapeshellarg($pset);
+        }
         $limit = $limit ? " -n$limit" : "";
         $users = [];
         $heads = explode(" ", $this->heads);
         $heads[0] = "%REPO%/" . ($branch ? : "master");
         foreach ($heads as $h) {
             $result = $this->gitrun("git log$limit --simplify-merges --format=%ae " . escapeshellarg($h) . $dir);
-            foreach (explode("\n", $result) as $line)
+            foreach (explode("\n", $result) as $line) {
                 if ($line !== "")
                     $users[strtolower($line)] = $line;
+            }
         }
         return $users;
     }
 
     function ls_files($tree, $files = []) {
-        $suffix = "";
-        if (is_string($files))
+        if (is_string($files)) {
             $files = array($files);
-        foreach ($files as $f)
+        }
+        $suffix = "";
+        foreach ($files as $f) {
             $suffix .= " " . escapeshellarg(preg_replace(',/+\z,', '', $f));
+        }
         $result = $this->gitrun("git ls-tree -r --name-only " . escapeshellarg($tree) . $suffix);
         $x = explode("\n", $result);
-        if (!empty($x) && $x[count($x) - 1] == "")
+        if (!empty($x) && $x[count($x) - 1] == "") {
             array_pop($x);
+        }
         return $x;
     }
 
