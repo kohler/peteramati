@@ -33,7 +33,7 @@ class API_Repo {
             return ["ok" => false, "error" => "Invalid request."];
         }
         $repo = $api->repo;
-        if ($api->commit->is_handout()) {
+        if ($api->pset->is_handout($api->commit)) {
             $repo = $api->pset->handout_repo($api->repo);
         }
         $command = "git show {$api->hash}:" . escapeshellarg($qreq->file);

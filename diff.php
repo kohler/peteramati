@@ -60,7 +60,7 @@ $Info->set_hash($commitb->hash);
 
 $diff_options = [
     "wdiff" => false,
-    "no_full" => !$commita->is_handout() || $commitb->is_handout()
+    "no_full" => !$Pset->is_handout($commita) || $Pset->is_handout($commitb)
 ];
 if ($commita->hash === $Info->grading_hash()) {
     $commita->subject .= "  ✱"; // space, nbsp
@@ -94,7 +94,7 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
     "</td></tr></table>";
 
 // collect diff and sort line notes
-$lnorder = $commitb->is_handout() ? $Info->empty_line_notes() : $Info->viewable_line_notes();
+$lnorder = $Pset->is_handout($commitb) ? $Info->empty_line_notes() : $Info->viewable_line_notes();
 $diff = $Info->diff($commita, $commitb, $lnorder, $diff_options);
 
 // print line notes

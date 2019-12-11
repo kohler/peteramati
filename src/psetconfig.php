@@ -359,6 +359,14 @@ class Pset {
         return $this->conf->latest_handout_commit($this);
     }
 
+    function is_handout($commit) {
+        if ($commit->_is_handout_pset !== $this) {
+            $commit->_is_handout_pset = $this;
+            $commit->_is_handout = !!$this->handout_commits($commit->hash);
+        }
+        return $commit->_is_handout;
+    }
+
 
     function grades() {
         return $this->grades;

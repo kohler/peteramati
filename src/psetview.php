@@ -1204,7 +1204,7 @@ class PsetView {
         }
         // both repos must be in the same directory; assume handout
         // is only potential problem
-        if ($commita->is_handout() !== $commitb->is_handout()) {
+        if ($this->pset->is_handout($commita) !== $this->pset->is_handout($commitb)) {
             $this->conf->handout_repo($this->pset, $this->repo);
         }
 

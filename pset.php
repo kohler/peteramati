@@ -318,7 +318,7 @@ function echo_commit($info) {
         // visually separate older heads
         if ($curhead === null)
             $curhead = $k->fromhead;
-        if ($curhead !== $k->fromhead && !$k->is_handout()) {
+        if ($curhead !== $k->fromhead && !$pset->is_handout($k)) {
             if (!$grouphead) {
                 $sel["from.$k->fromhead"] = (object) [
                     "type" => "optgroup", "label" => "Other snapshots"

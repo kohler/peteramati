@@ -1948,10 +1948,12 @@ class Conf {
         $commits = $this->_handout_commits[$pset->id];
         $matches = $list = [];
         foreach ($commits as $h => $c) {
-            if (str_starts_with($h, $hash))
+            if (str_starts_with($h, $hash)) {
                 $matches[] = $c;
-            if (!empty($matches))
+            }
+            if (!empty($matches)) {
                 $list[$h] = $c;
+            }
         }
         return count($matches) === 1 ? $list : null;
     }

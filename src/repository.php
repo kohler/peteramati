@@ -8,15 +8,14 @@ class CommitRecord {
     public $hash;
     public $subject;
     public $fromhead;
+    public $_is_handout;
+    public $_is_handout_pset;
     const HANDOUTHEAD = "*handout*";
     function __construct($commitat, $hash, $subject, $fromhead = null) {
         $this->commitat = $commitat;
         $this->hash = $hash;
         $this->subject = $subject;
         $this->fromhead = $fromhead;
-    }
-    function is_handout() {
-        return $this->fromhead === self::HANDOUTHEAD;
     }
 }
 
@@ -616,20 +615,20 @@ class Repository {
 
         $hasha = $commita->hash;
         if ($truncpfx
-            && $commita->is_handout()
-            && !$commitb->is_handout()) {
+            && $pset->is_handout($commita)
+            && !$pset->is_handout($commitb)) {
             $hasha = $this->truncated_hash($pset, $hasha);
         }
         $hasha_arg = escapeshellarg($hasha);
         $hashb = $commitb->hash;
         if ($truncpfx
-            && $commitb->is_handout()
-            && !$commita->is_handout()) {
+            && $pset->is_handout($commitb)
+            && !$pset->is_handout($commita)) {
             $hashb = $this->truncated_hash($pset, $hashb);
         }
         $hashb_arg = escapeshellarg($hashb);
 
-        $ignore_diffconfig = $commita->is_handout() && $commitb->is_handout();
+        $ignore_diffconfig = $pset->is_handout($commita) && $pset->is_handout($commitb);
         $no_full = get($options, "no_full");
         $needfiles = self::fix_diff_files(get($options, "needfiles"));
         $onlyfiles = self::fix_diff_files(get($options, "onlyfiles"));
@@ -677,7 +676,7 @@ class Repository {
                 }
                 // skip ignored files, unless user requested them
                 $di = new DiffInfo($file, $diffconfig);
-                $di->set_repoa($this, $pset, $hasha, $line, $commita->is_handout());
+                $di->set_repoa($this, $pset, $hasha, $line, $pset->is_handout($commita));
                 if ($diffconfig
                     && !$ignore_diffconfig
                     && ($diffconfig->ignore || $diffconfig->boring)
@@ -725,7 +724,7 @@ class Repository {
                 $file = $g->landmark_file;
                 if ($file && !isset($diffs[$file])) {
                     $diffs[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
-                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $commita->is_handout());
+                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $pset->is_handout($commita));
                     $di->finish();
                 }
             }
