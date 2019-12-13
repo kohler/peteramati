@@ -5601,8 +5601,10 @@ function pa_render_pset_table(pconf, data) {
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
         grade_entries, grade_keys, need_ngrades,
-        sort = {f: flagged ? "at" : "username", last: true, rev: 1},
-        sorting_last, displaying_last_first = null,
+        sort = {
+            f: flagged ? "at" : "username", last: true, rev: 1
+        },
+        active_nameflag = -1, displaying_last_first = null,
         anonymous = pconf.anonymous,
         col, total_colpos, ngrades_colpos;
 
@@ -5811,6 +5813,20 @@ function pa_render_pset_table(pconf, data) {
     function string_function(s) {
         return function () { return s; };
     }
+    function set_sort_nameflag() {
+        if (sort.f === "name" || sort.f === "name2" || sort.f === "username"
+            || sort.f === "email" || sort.nameflag == null) {
+            sort.nameflag = 0;
+            if (sort.f === "name" || sort.f === "name2")
+                sort.nameflag |= 1;
+            if (sort.last)
+                sort.nameflag |= 2;
+            if (sort.email)
+                sort.nameflag |= 4;
+            if (anonymous)
+                sort.nameflag |= 8;
+        }
+    }
     function initialize() {
         var x = wstorage.site(true, "pa-pset" + pconf.id + "-table");
         x && (sort = JSON.parse(x));
@@ -5822,6 +5838,8 @@ function pa_render_pset_table(pconf, data) {
             delete sort.override_anonymous;
         if (anonymous && sort.override_anonymous)
             anonymous = false;
+        if (sort.nameflag == null)
+            set_sort_nameflag();
 
         grade_entries = [];
         grade_keys = [];
@@ -6207,20 +6225,26 @@ function pa_render_pset_table(pconf, data) {
             $overlay && removeClass($overlay[0], "new");
         }, 0);
     }
+    function render_user_compare(u) {
+        var t = "";
+        if ((active_nameflag & 8) && u.anon_username) {
+            t = u.anon_username + " ";
+        } else if (active_nameflag & 1) {
+            t = render_name(u, (active_nameflag & 2) === 2) + " ";
+        }
+        if ((active_nameflag & 4) && u.email) {
+            t += u.email;
+        } else {
+            t += u.username || "";
+        }
+        if (u.psetid != null)
+            t += sprintf(" %5d", u.psetid);
+        if (u.at != null)
+            t += sprintf(" %11g", u.at);
+        return t.toLowerCase();
+    }
     function user_compare(a, b) {
-        var au = ukey(a).toLowerCase();
-        var bu = ukey(b).toLowerCase();
-        var rev = sort.rev;
-        if (au < bu)
-            return -rev;
-        else if (au > bu)
-            return rev;
-        else if (a.psetid != b.psetid)
-            return peteramati_psets[a.psetid].pos < peteramati_psets[b.psetid].pos ? -rev : rev;
-        else if (a.at != b.at)
-            return a.at < b.at ? -rev : rev;
-        else
-            return 0;
+        return a._sort_user < b._sort_user ? -sort.rev : (a._sort_user == b._sort_user ? 0 : sort.rev);
     }
     function grader_compare(a, b) {
         var ap = a.gradercid ? hotcrp_pc[a.gradercid] : null;
@@ -6232,22 +6256,21 @@ function pa_render_pset_table(pconf, data) {
         else
             return 0;
     }
-    function set_name_sorters() {
-        if (!!sort.last !== sorting_last) {
-            sorting_last = !!sort.last;
-            for (var i = 0; i < data.length; ++i)
-                data[i]._sort_name = render_name(data[i], sorting_last).toLowerCase();
+    function set_user_sorters() {
+        if (sort.nameflag !== active_nameflag) {
+            active_nameflag = sort.nameflag;
+            for (var i = 0; i < data.length; ++i) {
+                data[i]._sort_user = render_user_compare(data[i]);
+            }
         }
     }
     function sort_data() {
         var f = sort.f, rev = sort.rev, m;
+        set_user_sorters();
         if ((f === "name" || f === "name2") && !anonymous) {
-            set_name_sorters();
             data.sort(function (a, b) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
-                else if (a._sort_name != b._sort_name)
-                    return a._sort_name < b._sort_name ? -rev : rev;
                 else
                     return user_compare(a, b);
             });
@@ -6345,9 +6368,9 @@ function pa_render_pset_table(pconf, data) {
         } else if (sort.email && !anonymous) {
             f = "username";
             data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
+                if (a.boringness !== b.boringness) {
                     return a.boringness - b.boringness;
-                else {
+                } else {
                     var ae = (a.email || "").toLowerCase(), be = (b.email || "").toLowerCase();
                     if (ae !== be) {
                         if (ae === "" || be === "")
@@ -6359,8 +6382,9 @@ function pa_render_pset_table(pconf, data) {
                 }
             });
         } else { /* "username" */
-            if (f !== "name2")
+            if (f !== "name2") {
                 f = "username";
+            }
             data.sort(function (a, b) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
@@ -6391,9 +6415,9 @@ function pa_render_pset_table(pconf, data) {
                 sort.rev = -1;
             }
         } else if (sf === "name" || (sf === "name2" && !anonymous)) {
-            sort.last = !sort.last;
-            if (sort.last)
-                sort.rev = -sort.rev;
+            sort.rev = -sort.rev;
+            if (sort.rev === 1)
+                sort.last = !sort.last;
         } else if (sf === "username") {
             if (sort.rev === -1 && !anonymous) {
                 sort.email = !sort.email;
@@ -6403,6 +6427,7 @@ function pa_render_pset_table(pconf, data) {
         } else {
             sort.rev = -sort.rev;
         }
+        set_sort_nameflag();
         sort_data();
         resort();
     }
@@ -6412,9 +6437,9 @@ function pa_render_pset_table(pconf, data) {
         var i = n.cellIndex, m;
         var table = n.parentElement.parentElement.parentElement;
         var th = table.tHead.firstChild.cells[i];
-        var sort = th ? th.getAttribute("data-pa-sort") : null;
-        if (sort && (m = sort.match(/^grade(\d+)$/)))
-            return +sort.substring(5);
+        var sorter = th ? th.getAttribute("data-pa-sort") : null;
+        if (sorter && /^grade\d+$/.test(sorter))
+            return +sorter.substring(5);
         else
             return null;
     }
