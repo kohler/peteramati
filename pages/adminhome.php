@@ -13,10 +13,6 @@ function admin_home_messages($conf) {
     $errmarker = "<span class=\"error\">Error:</span> ";
     if (preg_match("/^(?:[1-4]\\.|5\\.[012])/", phpversion()))
         $m[] = $errmarker . "HotCRP requires PHP version 5.3 or higher.  You are running PHP version " . htmlspecialchars(phpversion()) . ".";
-    if (get_magic_quotes_gpc())
-        $m[] = $errmarker . "The PHP <code>magic_quotes_gpc</code> feature is on, which is a bad idea.  Check that your Web server is using HotCRP’s <code>.htaccess</code> file.  You may also want to disable <code>magic_quotes_gpc</code> in your <code>php.ini</code> configuration file.";
-    if (get_magic_quotes_runtime())
-        $m[] = $errmarker . "The PHP <code>magic_quotes_runtime</code> feature is on, which is a bad idea.  Check that your Web server is using HotCRP’s <code>.htaccess</code> file.  You may also want to disable <code>magic_quotes_runtime</code> in your <code>php.ini</code> configuration file.";
     if (defined("JSON_HOTCRP"))
         $m[] = "Your PHP was built without JSON functionality. HotCRP is using its built-in replacements; the native functions would be faster.";
     if ((int) ini_get("session.gc_maxlifetime") < $conf->opt("sessionLifetime", 86400)
