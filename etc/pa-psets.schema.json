@@ -1,0 +1,71 @@
+{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "title": "Peteramati configuration schema",
+
+    "$defs": {
+        "boolean_date": {
+            "anyOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "type": "integer",
+                    "exclusiveMinimum": 1000000000
+                },
+                {
+                    "type": "string"
+                }
+            ]
+        },
+        "pset": {
+            "type": "object",
+            "properties": {
+                "psetid": {
+                    "description": "Unique database identifier for pset",
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                },
+                "key": {
+                    "description": "Unique string identifier for pset",
+                    "type": "string",
+                    "pattern": "^(?!.*_(?:rank|noextra|norm)$)[^_./&;#][^/&;#]*$"
+                },
+                "urlkey": {
+                    "description": "Preferred URL component for pset",
+                    "type": ["string", "integer"],
+                    "pattern": "^[0-9A-Za-z][-0-9A-Za-z_.]*$"
+                },
+                "title": {
+                    "description": "Textual description of pset",
+                    "type": "string"
+                },
+                "group": {
+                    "description": "Name of pset group",
+                    "type": "string"
+                },
+                "group_weight": {
+                    "description": "Weight of pset within group",
+                    "type": "number",
+                    "minimum": 0
+                },
+                "disabled": {
+                    "description": "True if pset is not shown to users",
+                    "type": "boolean"
+                },
+                "admin_disabled": {
+                    "description": "True if pset is not shown to users or administrators",
+                    "type": "boolean"
+                },
+                "visible": {
+                    "description": "True if pset is shown to students",
+                    "$ref": "#/$defs/boolean_date"
+                },
+                "frozen": {
+                    "description": "True if students cannot update pset",
+                    "$ref": "#/$defs/boolean_date"
+                }
+            },
+            "required": ["psetid"]
+        }
+    }
+}
