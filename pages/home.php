@@ -654,7 +654,7 @@ function forward_pset_links($conf, $pset, $from_pset) {
 function reconfig($qreq) {
     global $Conf, $Me;
     if (!($pset = $Conf->pset_by_key($qreq->pset))
-        || $pset->ui_disabled)
+        || $pset->admin_disabled)
         return $Conf->errorMsg("No such pset");
     $psetkey = $pset->key;
 

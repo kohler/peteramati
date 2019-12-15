@@ -29,7 +29,7 @@ class Pset {
     public $group_weight;
 
     public $disabled;
-    public $ui_disabled;
+    public $admin_disabled;
     public $visible;
     public $frozen;
     public $partner;
@@ -149,7 +149,7 @@ class Pset {
         $this->group_weight = (float) $this->group_weight;
 
         $this->disabled = self::cbool($p, "disabled");
-        if (($this->ui_disabled = self::cbool($p, "ui_disabled"))) {
+        if (($this->admin_disabled = self::cbool($p, "admin_disabled", "ui_disabled"))) {
             $this->disabled = true;
         }
         $this->visible = self::cdate($p, "visible", "show_to_students");
