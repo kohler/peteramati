@@ -1,5 +1,5 @@
 {
-    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Peteramati configuration schema",
 
     "$defs": {
@@ -17,7 +17,7 @@
                 }
             ]
         },
-        "pset": {
+        "pset_base": {
             "type": "object",
             "properties": {
                 "psetid": {
@@ -39,11 +39,11 @@
                     "description": "Textual description of pset",
                     "type": "string"
                 },
-                "group": {
+                "category": {
                     "description": "Name of pset group",
                     "type": "string"
                 },
-                "group_weight": {
+                "weight": {
                     "description": "Weight of pset within group",
                     "type": "number",
                     "minimum": 0
@@ -63,9 +63,125 @@
                 "frozen": {
                     "description": "True if students cannot update pset",
                     "$ref": "#/$defs/boolean_date"
-                }
-            },
-            "required": ["psetid"]
+                },
+                "anonymous": {},
+                "gitless": {},
+                "gitless_grades": {},
+                "partner": {},
+                "no_branch": {},
+                "partner_repo": {},
+                "hide_comments": {},
+                "handout_repo_url": {},
+                "handout_branch": {},
+                "handout_hash": {},
+                "handout_warn_hash": {},
+                "directory": {},
+                "test_file": {},
+                "deadline": {},
+                "grades": {},
+                "grade_order": {},
+                "grades_visible": {},
+                "grade_statistics_visible": {},
+                "grade_cdf_cutoff": {},
+                "separate_extension_grades": {},
+                "grade_script": {},
+                "downloads": {},
+                "runners": {},
+                "default_runner": {},
+                "runner_order": {},
+                "run_dirpattern": {},
+                "run_username": {},
+                "run_overlay": {},
+                "run_jailfiles": {},
+                "run_xterm_js": {},
+                "run_timeout": {},
+                "run_skeletondir": {},
+                "run_binddir": {},
+                "diffs": {}
+            }
+        },
+        "pset": {
+            "$ref": "#/$defs/pset_base",
+            "required": ["psetid", "key"]
+        },
+        "grade": {
+            "type": "object",
+            "properties": {
+                "key": {},
+                "name": {},
+                "title": {},
+                "type": {},
+                "visible": {},
+                "no_total": {},
+                "max": {},
+                "max_visible": {},
+                "is_extra": {},
+                "position": {},
+                "landmark": {},
+                "landmark_buttons": {}
+            }
+        },
+        "runner": {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "category": {},
+                "title": {},
+                "output_title": {},
+                "disabled": {},
+                "visible": {},
+                "output_visible": {},
+                "position": {},
+                "timeout": {},
+                "xterm_js": {},
+                "timed_replay": {},
+                "transfer_warnings": {},
+                "transfer_warnings_priority": {},
+                "command": {},
+                "username": {},
+                "overlay": {},
+                "queue": {},
+                "nconcurrent": {},
+                "eval": {},
+                "require": {}
+            }
+        },
+        "diff": {
+            "type": "object",
+            "properties": {
+                "regex": {},
+                "title": {},
+                "match_priority": {},
+                "position": {},
+                "fileless": {},
+                "full": {},
+                "ignore": {},
+                "boring": {},
+                "collate": {},
+                "gradeable": {},
+                "hide_if_anonymous": {}
+            }
+        },
+        "download": {
+            "type": "object",
+            "properties": {
+                "key": {},
+                "title": {},
+                "filename": {},
+                "visible": {},
+                "position": {},
+                "file": {},
+                "timed": {},
+                "timeout": {}
+            }
         }
+    },
+
+    "type": "object",
+    "patternProperties": {
+        "^[^_./&;#][^/&;#]*$": {"$ref": "#/$defs/pset"}
+    },
+    "properties": {
+        "_defaults": {"$ref": "#/$defs/pset_base"}
     }
 }

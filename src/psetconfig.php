@@ -8,11 +8,12 @@ class PsetConfigException extends Exception {
 
     function __construct($msg, $path) {
         $this->path = array();
-        foreach (func_get_args() as $i => $x)
+        foreach (func_get_args() as $i => $x) {
             if ($i && is_array($x))
                 $this->path = array_merge($this->path, $x);
             else if ($i && $x !== false && $x !== null)
                 $this->path[] = $x;
+        }
         parent::__construct($msg);
     }
 }
@@ -141,8 +142,8 @@ class Pset {
         if ((string) $this->title === "") {
             $this->title = $this->key;
         }
-        $this->group = self::cstr($p, "group");
-        $this->group_weight = self::cnum($p, "group_weight");
+        $this->group = self::cstr($p, "category", "group");
+        $this->group_weight = self::cnum($p, "weight", "group_weight");
         if ($this->group_weight === null) {
             $this->group_weight = 1.0;
         }
@@ -710,7 +711,6 @@ class Pset {
 
 class DownloadEntryConfig {
     public $key;
-    public $name;
     public $title;
     public $file;
     public $filename;
@@ -721,8 +721,9 @@ class DownloadEntryConfig {
 
     function __construct($name, $g) {
         $loc = array("downloads", $name);
-        if (!is_object($g))
+        if (!is_object($g)) {
             throw new PsetConfigException("download entry format error", $loc);
+        }
         $this->key = $name;
         if (isset($g->key)) {
             $this->key = $g->key;
@@ -834,13 +835,16 @@ class GradeEntryConfig {
 
         $this->max = Pset::cnum($loc, $g, "max");
         if ($this->type === "checkbox") {
-            if ($this->max === null)
+            if ($this->max === null) {
                 throw new PsetConfigException("checkbox grade entry requires max", $loc);
+            }
         } else if ($this->type === "letter") {
-            if ($this->max === null)
+            if ($this->max === null) {
                 $this->max = 100;
-            if ((float) $this->max !== 100.0)
+            }
+            if ((float) $this->max !== 100.0) {
                 throw new PsetConfigException("letter grade entry requires max 100", $loc);
+            }
         }
         if (isset($g->visible)) {
             $this->visible = Pset::cbool($loc, $g, "visible");
@@ -1047,13 +1051,15 @@ class RunnerConfig {
 
     function __construct($name, $r, $defr) {
         $loc = array("runners", $name);
-        if (!is_object($r))
+        if (!is_object($r)) {
             throw new PsetConfigException("runner format error", $loc);
+        }
         $rs = $defr ? [$r, $defr] : $r;
 
         $this->name = isset($r->name) ? $r->name : $name;
-        if (!is_string($this->name) || !preg_match(',\A[A-Za-z][0-9A-Za-z_]*\z,', $this->name))
+        if (!is_string($this->name) || !preg_match(',\A[A-Za-z][0-9A-Za-z_]*\z,', $this->name)) {
             throw new PsetConfigException("runner name format error", $loc);
+        }
 
         if (isset($r->category)) {
             $this->category = $r->category;
@@ -1083,10 +1089,11 @@ class RunnerConfig {
         $this->xterm_js = Pset::cbool($loc, $rs, "xterm_js");
         if (isset($r->transfer_warnings)
             ? $r->transfer_warnings === "grades"
-            : $defr && isset($defr->transfer_warnings) && $defr->transfer_warnings === "grades")
+            : $defr && isset($defr->transfer_warnings) && $defr->transfer_warnings === "grades") {
             $this->transfer_warnings = "grades";
-        else
+        } else {
             $this->transfer_warnings = Pset::cbool($loc, $rs, "transfer_warnings");
+        }
         $this->transfer_warnings_priority = Pset::cnum($loc, $rs, "transfer_warnings_priority");
         $this->command = Pset::cstr($loc, $rs, "command");
         $this->username = Pset::cstr($loc, $rs, "username", "run_username");
@@ -1128,11 +1135,13 @@ class DiffConfig {
 
     function __construct($regex, $d) {
         $loc = array("diffs", $regex);
-        if (!is_object($d))
+        if (!is_object($d)) {
             throw new PsetConfigException("diff format error", $loc);
+        }
         $this->regex = isset($d->regex) ? $d->regex : $regex;
-        if (!is_string($this->regex) || $this->regex === "")
+        if (!is_string($this->regex) || $this->regex === "") {
             throw new PsetConfigException("`regex` diff format error", $loc);
+        }
         $this->title = Pset::cstr($loc, $d, "title");
         $this->match_priority = (float) Pset::cint($loc, $d, "match_priority");
         $this->position = Pset::cnum($loc, $d, "position");
