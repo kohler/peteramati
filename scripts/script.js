@@ -5548,7 +5548,7 @@ function pa_checklatest() {
     }
 }
 
-function repoclip() {
+handle_ui.on("js-repoclip", function () {
     var node = document.createTextNode(this.getAttribute("data-pa-repo"));
     var bub = make_bubble(node, {color: "tooltip", dir: "t"});
     bub.near(this);
@@ -5565,11 +5565,7 @@ function repoclip() {
     bub.remove();
     if (global_tooltip && global_tooltip.elt == this)
         global_tooltip.text(this.getAttribute("data-pa-repo"));
-}
-
-function pa_init_repoclip() {
-    $(this).click(repoclip);
-}
+});
 
 function pa_pset_actions() {
     var $f = $(this);
