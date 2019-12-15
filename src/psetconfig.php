@@ -101,28 +101,30 @@ class Pset {
         $this->conf = $conf;
 
         // pset id
-        if (!isset($p->psetid) || !is_int($p->psetid) || $p->psetid <= 0)
+        if (!isset($p->psetid) || !is_int($p->psetid) || $p->psetid <= 0) {
             throw new PsetConfigException("`psetid` must be positive integer", "psetid");
+        }
         $this->id = $this->psetid = $p->psetid;
 
         // pset key
-        if (ctype_digit($pk) && intval($pk) !== $p->psetid)
+        if (ctype_digit($pk) && intval($pk) !== $p->psetid) {
             throw new PsetConfigException("numeric pset key disagrees with `psetid`");
-        else if (!preg_match('{\A[^_./&;#][^/&;#]*\z}', $pk))
+        } else if (!preg_match('{\A[^_./&;#][^/&;#]*\z}', $pk)) {
             throw new PsetConfigException("pset key format error");
-        else if (preg_match('{(_rank|_noextra|_norm)\z}', $pk, $m))
+        } else if (preg_match('{(_rank|_noextra|_norm)\z}', $pk, $m)) {
             throw new PsetConfigException("pset key cannot end with `{$m[0]}`");
+        }
         $this->psetkey = $pk;
 
         // url keys
         $urlkey = get($p, "urlkey");
-        if (is_string($urlkey) && preg_match(self::URLKEY_REGEX, $urlkey))
+        if (is_string($urlkey) && preg_match(self::URLKEY_REGEX, $urlkey)) {
             $this->urlkey = $urlkey;
-        else if (is_int($urlkey))
+        } else if (is_int($urlkey)) {
             $this->urlkey = (string) $urlkey;
-        else if ($urlkey)
+        } else if ($urlkey) {
             throw new PsetConfigException("`urlkey` format error", "urlkey");
-        else {
+        } else {
             $this->urlkey = (string) $this->psetid;
             if (preg_match(self::URLKEY_REGEX, $this->psetkey)
                 && $this->psetkey !== "pset" . $this->psetid)
@@ -130,17 +132,20 @@ class Pset {
         }
 
         $this->title = self::cstr($p, "title");
-        if ((string) $this->title === "")
+        if ((string) $this->title === "") {
             $this->title = $this->psetkey;
+        }
         $this->group = self::cstr($p, "group");
         $this->group_weight = self::cnum($p, "group_weight");
-        if ($this->group_weight === null)
+        if ($this->group_weight === null) {
             $this->group_weight = 1.0;
+        }
         $this->group_weight = (float) $this->group_weight;
 
         $this->disabled = self::cbool($p, "disabled");
-        if (($this->ui_disabled = self::cbool($p, "ui_disabled")))
+        if (($this->ui_disabled = self::cbool($p, "ui_disabled"))) {
             $this->disabled = true;
+        }
         $this->visible = self::cdate($p, "visible", "show_to_students");
         $this->frozen = self::cdate($p, "frozen", "freeze");
         $this->partner = self::cbool($p, "partner");
@@ -148,39 +153,47 @@ class Pset {
         $this->anonymous = self::cbool($p, "anonymous");
         $this->gitless = self::cbool($p, "gitless");
         $this->gitless_grades = self::cbool($p, "gitless_grades");
-        if ($this->gitless_grades === null)
+        if ($this->gitless_grades === null) {
             $this->gitless_grades = $this->gitless;
-        if (!$this->gitless_grades && $this->gitless)
+        }
+        if (!$this->gitless_grades && $this->gitless) {
             throw new PsetConfigException("`gitless` requires `gitless_grades`", "gitless_grades");
+        }
         $this->partner_repo = self::cstr($p, "partner_repo");
-        if ((string) $this->partner_repo === "" || $this->partner_repo === "same")
+        if ((string) $this->partner_repo === "" || $this->partner_repo === "same") {
             $this->partner_repo = null;
-        else if ($this->partner_repo !== "different")
+        } else if ($this->partner_repo !== "different") {
             throw new PsetConfigException("`partner_repo` should be \"same\" or \"different\"");
+        }
         $this->hide_comments = self::cbool($p, "hide_comments");
 
         // directory
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");
-        if (!$this->handout_repo_url && !$this->gitless)
+        if (!$this->handout_repo_url && !$this->gitless) {
             throw new PsetConfigException("`handout_repo_url` missing");
+        }
         $this->handout_branch = self::cstr($p, "handout_branch", "handout_repo_branch");
         $this->handout_hash = self::cstr($p, "handout_hash", "handout_commit_hash");
         $this->handout_warn_hash = self::cstr($p, "handout_warn_hash");
         $this->repo_guess_patterns = self::cstr_array($p, "repo_guess_patterns", "repo_transform_patterns");
         $this->repo_tarball_patterns = self::cstr_array($p, "repo_tarball_patterns");
-        if (!property_exists($p, "repo_tarball_patterns"))
+        if (!property_exists($p, "repo_tarball_patterns")) {
             $this->repo_tarball_patterns = array("^git@(.*?):(.*)\.git$",
                 "https://\$1/\$2/archive-tarball/\${HASH}");
+        }
         $this->directory = $this->directory_slash = "";
-        if (isset($p->directory) && is_string($p->directory))
+        if (isset($p->directory) && is_string($p->directory)) {
             $this->directory = $p->directory;
-        else if (isset($p->directory) && $p->directory !== false)
+        } else if (isset($p->directory) && $p->directory !== false) {
             throw new PsetConfigException("`directory` format error", "directory");
+        }
         $this->directory_slash = preg_replace(',([^/])/*\z,', '$1/', $this->directory);
-        while (str_starts_with($this->directory_slash, "./"))
+        while (str_starts_with($this->directory_slash, "./")) {
             $this->directory_slash = substr($this->directory_slash, 2);
-        if (str_starts_with($this->directory_slash, "/"))
+        }
+        if (str_starts_with($this->directory_slash, "/")) {
             $this->directory_slash = substr($this->directory_slash, 1);
+        }
         $this->directory_noslash = preg_replace(',/+\z,', '', $this->directory_slash);
         $this->test_file = self::cstr($p, "test_file");
 
