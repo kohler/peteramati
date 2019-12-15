@@ -279,10 +279,6 @@ class ContactView {
             else
                 $value .= ' data-tooltip="' . htmlspecialchars($repo->ssh_url()) . '"';
             $value .= ' type="button">Copy URL to clipboard</button>';
-            if ($full
-                && $info->commit_hash()
-                && ($tarball_url = $info->tarball_url()))
-                $value .= ' <a class="bsm q" href="' . htmlspecialchars($tarball_url) . '">Download tarball for ' . substr($info->commit_hash(), 0, 7) . '</a>';
         }
 
         // check repo

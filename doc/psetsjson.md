@@ -196,17 +196,6 @@ others are shown to users in different contexts.
         ["^([_a-zA-Z0-9.]*s)$", "~$1/cs61/$1-cs61-psets",
          "^([_a-zA-Z0-9.]+)$", "~$1/cs61/$1s-cs61-psets"]
 
-* `repo_tarball_patterns`: array of strings
-
-    These patterns are used to derive a link that downloads a tarball with the
-    contents of a student’s repository at a specific commit. The pattern is
-    matched against the student’s repository URL; if it matches, the
-    replacement is used, and any `${HASH}` string replaced with the commit
-    hash. The default patterns, which work for gitorious deployments, are:
-
-        ["^git@(.*?):(.*)\.git$",
-         "https://$1/$2/archive-tarball/${HASH}"]
-
 ### Deadlines
 
 * `deadline`: date

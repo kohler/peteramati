@@ -432,21 +432,6 @@ class PsetView {
     }
 
 
-    function tarball_url() {
-        if ($this->repo && $this->hash !== null
-            && $this->pset->repo_tarball_patterns) {
-            for ($i = 0; $i + 1 < count($this->pset->repo_tarball_patterns); $i += 2) {
-                $x = preg_replace('`' . str_replace("`", "\\`", $this->pset->repo_tarball_patterns[$i]) . '`s',
-                                  $this->pset->repo_tarball_patterns[$i + 1],
-                                  $this->repo->ssh_url(), -1, $nreplace);
-                if ($x !== null && $nreplace)
-                    return str_replace('${HASH}', $this->hash, $x);
-            }
-        }
-        return null;
-    }
-
-
     function backpartners() {
         return array_unique($this->user->links(LINK_BACKPARTNER, $this->pset->id));
     }
