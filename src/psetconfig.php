@@ -21,7 +21,7 @@ class Pset {
     public $conf;
     public $id;
     public $psetid;
-    public $psetkey;
+    public $key;
     public $urlkey;
 
     public $title;
@@ -106,14 +106,21 @@ class Pset {
         $this->id = $this->psetid = $p->psetid;
 
         // pset key
-        if (ctype_digit($pk) && intval($pk) !== $p->psetid) {
-            throw new PsetConfigException("numeric pset key disagrees with `psetid`");
-        } else if (!preg_match('{\A[^_./&;#][^/&;#]*\z}', $pk)) {
-            throw new PsetConfigException("pset key format error");
-        } else if (preg_match('{(_rank|_noextra|_norm)\z}', $pk, $m)) {
-            throw new PsetConfigException("pset key cannot end with `{$m[0]}`");
+        if (!isset($p->key) && (string) $pk === "") {
+            $pk = $p->psetid;
+        } else if (isset($p->key) && $pk !== null && (string) $p->key !== (string) $pk) {
+            throw new PsetConfigException("pset key disagrees with `key`");
+        } else if (isset($p->key)) {
+            $pk = $p->key;
         }
-        $this->psetkey = $pk;
+        if (ctype_digit($pk) && intval($pk) !== $p->psetid) {
+            throw new PsetConfigException("numeric pset key disagrees with `psetid`", "key");
+        } else if (!preg_match('{\A[^_./&;#][^/&;#]*\z}', $pk)) {
+            throw new PsetConfigException("pset key format error", "key");
+        } else if (preg_match('{(_rank|_noextra|_norm)\z}', $pk, $m)) {
+            throw new PsetConfigException("pset key cannot end with `{$m[0]}`", "key");
+        }
+        $this->key = $pk;
 
         // url keys
         $urlkey = get($p, "urlkey");
@@ -125,14 +132,14 @@ class Pset {
             throw new PsetConfigException("`urlkey` format error", "urlkey");
         } else {
             $this->urlkey = (string) $this->psetid;
-            if (preg_match(self::URLKEY_REGEX, $this->psetkey)
-                && $this->psetkey !== "pset" . $this->psetid)
-                $this->urlkey = $this->psetkey;
+            if (preg_match(self::URLKEY_REGEX, $this->key)
+                && $this->key !== "pset" . $this->psetid)
+                $this->urlkey = $this->key;
         }
 
         $this->title = self::cstr($p, "title");
         if ((string) $this->title === "") {
-            $this->title = $this->psetkey;
+            $this->title = $this->key;
         }
         $this->group = self::cstr($p, "group");
         $this->group_weight = self::cnum($p, "group_weight");

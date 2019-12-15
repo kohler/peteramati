@@ -5976,7 +5976,7 @@ function pa_render_pset_table(pconf, data) {
     function url_gradeparts(s) {
         var args = {
             u: ukey(s),
-            pset: s.psetid ? peteramati_psets[s.psetid].urlkey : pconf.psetkey
+            pset: s.psetid ? peteramati_psets[s.psetid].urlkey : pconf.key
         };
         if (s.hash && (!s.is_grade || flagged)) {
             args.commit = s.hash;
@@ -6525,7 +6525,7 @@ function pa_render_pset_table(pconf, data) {
                     byuid[gdialog_su[i].uid].commit_is_grade = 1;
                 }
             }
-            $.ajax(hoturl_post("api/multigrade", {pset: pconf.psetkey}), {
+            $.ajax(hoturl_post("api/multigrade", {pset: pconf.key}), {
                 type: "POST", cache: false,
                 data: {us: JSON.stringify(byuid)},
                 success: function (rv) {

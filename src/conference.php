@@ -1789,23 +1789,28 @@ class Conf {
     }
 
     function pset_by_key($key) {
-        if (($p = get($this->_psets_by_urlkey, $key)))
+        if (($p = get($this->_psets_by_urlkey, $key))) {
             return $p;
-        foreach ($this->_psets as $p)
-            if ($key === $p->psetkey)
+        }
+        foreach ($this->_psets as $p) {
+            if ($key === $p->key)
                 return $p;
+        }
         return null;
     }
 
     function pset_by_key_or_title($key) {
-        if (($p = get($this->_psets_by_urlkey, $key)))
+        if (($p = get($this->_psets_by_urlkey, $key))) {
             return $p;
+        }
         $tm = null;
-        foreach ($this->_psets as $p)
-            if ($key === $p->psetkey)
+        foreach ($this->_psets as $p) {
+            if ($key === $p->key) {
                 return $p;
-            else if ($key === $p->title)
+            } else if ($key === $p->title) {
                 $tm = $p;
+            }
+        }
         return $tm;
     }
 

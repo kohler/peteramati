@@ -128,7 +128,7 @@ function collect_pset_info(&$students, $sset, $entries) {
 
         if ($info->has_assigned_grades()) {
             list($total, $max, $total_noextra) = $info->grade_total();
-            report_set($ss, $pset->psetkey, $total, $total_noextra, 100.0 / $max);
+            report_set($ss, $pset->key, $total, $total_noextra, 100.0 / $max);
 
             if ($grp) {
                 $ss->{$grp} = get_f($ss, $grp) + $total * $factor;
@@ -246,7 +246,7 @@ function parse_formula($conf, &$t, $example, $minprec) {
             }
             if (($pset = $conf->pset_by_key_or_title($kbase))) {
                 $noextra = $noextra && $pset->has_extra;
-                $kbase = $pset->psetkey;
+                $kbase = $pset->key;
             } else if ($conf->pset_group($kbase)) {
                 $noextra = $noextra && $conf->pset_group_has_extra($kbase);
             } else {
@@ -368,9 +368,9 @@ function download_psets_report($request) {
             $sset->set_pset($pset, $anonymous);
 
             collect_pset_info($students, $sset, !!$sel_pset);
-            set_ranks($students, $selection, $pset->psetkey);
+            set_ranks($students, $selection, $pset->key);
             if ($pset->has_extra) {
-                set_ranks($students, $selection, "{$pset->psetkey}_noextra");
+                set_ranks($students, $selection, "{$pset->key}_noextra");
             }
         }
     }
@@ -656,7 +656,7 @@ function reconfig($qreq) {
     if (!($pset = $Conf->pset_by_key($qreq->pset))
         || $pset->ui_disabled)
         return $Conf->errorMsg("No such pset");
-    $psetkey = $pset->psetkey;
+    $psetkey = $pset->key;
 
     $json = load_psets_json(true);
     object_merge_recursive($json->$psetkey, $json->_defaults);
@@ -1375,7 +1375,7 @@ function show_pset_table($sset) {
         "grades" => $pset->gradeentry_json(true),
         "gitless" => $pset->gitless,
         "gitless_grades" => $pset->gitless_grades,
-        "psetkey" => $pset->urlkey,
+        "key" => $pset->urlkey,
         "title" => $pset->title
     ];
     if ($anonymous) {

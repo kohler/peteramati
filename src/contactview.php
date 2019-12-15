@@ -111,8 +111,9 @@ class ContactView {
                     redirectSelf(array("pset" => $p->urlkey));
             go("index");
         }
-        if ($pset)
+        if ($pset) {
             $pset->urlkey = $psetkey;
+        }
         return $pset;
     }
 
