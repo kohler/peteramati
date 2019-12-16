@@ -298,16 +298,16 @@ class Pset {
         } else {
             $this->runners = self::position_sort("runners", $this->all_runners);
         }
-        $this->run_username = self::cstr($p, "run_username");
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
+        $this->run_username = self::cstr($p, "run_username");
         $this->run_overlay = self::cstr_or_str_array($p, "run_overlay");
-        $this->run_skeletondir = self::cstr($p, "run_skeletondir");
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
+        $this->run_xterm_js = self::cbool($p, "run_xterm_js");
         $this->run_timeout = self::cinterval($p, "run_timeout");
         if ($this->run_timeout === null) { // default run_timeout is 10m
             $this->run_timeout = 600;
         }
-        $this->run_xterm_js = self::cbool($p, "run_xterm_js");
+        $this->run_skeletondir = self::cstr($p, "run_skeletondir");
         $this->run_binddir = self::cstr($p, "run_binddir");
 
         // diffs
