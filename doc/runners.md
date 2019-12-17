@@ -15,15 +15,29 @@ special characters—only letters, numbers, and characters in `-._~`. There must
 be no symbolic links in the path.
 
 The jail directory must also be _enabled_ by the `/etc/pa-jail.conf`
-configuration file. To enable a directory `DIR` and its descendants for jails,
-add the line `enablejail DIR` to `/etc/pa-jail.conf`. `DIR` can also be a
-shell-style matching pattern, such as `/usr/local/pa-jail-*`.
+configuration file. That file looks like this:
 
-To disable a jail directory and its descendants, add a line `disablejail DIR`
-or `disablejail`. Peteramati will reject any jail that isn’t enabled.
+```
+enablejail PATTERN
+disablejail PATTERN
+treedir PATTERN
+```
 
-Peteramati automatically creates missing directories, `mkdir -p` style,
-underneath the enabled ancestor.
+Each PATTERN is a shell wildcard pattern, such as `/jails/*`. The file
+is parsed one line at a time.
+
+* `enablejail PATTERN` allows jail directories that match `PATTERN`.
+
+* `disablejail PATTERN` disallows jail directories with leading
+  segments that match `PATTERN`. For instance, `disablejail /foo` will
+  disable all jails under `/foo`, including `/foo/bar` and
+  `/foo/bar/baz`.
+
+* `treedir TREEPATTERN` marks `TREEPATTERN` as a tree directory. If a
+  jail directory is allowed and has a leading segment that matches
+  `TREEPATTERN`, then components of that directory after `TREEPATTERN`
+  may be created at runtime. As a special case, `enablejail PATTERN/*`
+  also acts like `treedir PATTERN`.
 
 Container components
 --------------------
