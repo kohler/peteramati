@@ -34,6 +34,7 @@
 #include <mntent.h>
 #include <sched.h>
 #include <sys/signalfd.h>
+#include <sys/sysmacros.h>
 #elif __APPLE__
 #include <sys/param.h>
 #include <sys/ucred.h>
