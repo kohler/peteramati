@@ -909,14 +909,16 @@ static void fix_jail_bind_src(dev_t jaildev,
         dstroot = path_noendslash(src);
         construct_jail(jaildev, contents);
         dstroot = old_dstroot;
-        if (verbose)
+        if (verbose) {
             fprintf(verbosefile, "echo %s > %s\n", shell_quote(want_tag).c_str(), srcx.c_str());
+        }
         if (!dryrun) {
             want_tag += "\n";
             int fd = open(srcx.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0600);
             if (fd == -1
-                || (size_t) write(fd, want_tag.data(), want_tag.length()) != want_tag.length())
+                || (size_t) write(fd, want_tag.data(), want_tag.length()) != want_tag.length()) {
                 perror_die(srcx.c_str());
+            }
             close(fd);
         }
     }
@@ -925,8 +927,9 @@ static void fix_jail_bind_src(dev_t jaildev,
 static int construct_jail(dev_t jaildev, std::string& str) {
     // prepare root
     if (x_chmod(dstroot.c_str(), 0755)
-        || x_lchown(dstroot.c_str(), 0, 0))
+        || x_lchown(dstroot.c_str(), 0, 0)) {
         return 1;
+    }
     dst_table[dstroot + "/"] = 1;
 
     // Mounts
@@ -939,31 +942,41 @@ static int construct_jail(dev_t jaildev, std::string& str) {
 
     const char* pos = str.data(), *endpos = pos + str.length();
     while (pos < endpos) {
-        while (pos < endpos && isspace((unsigned char) *pos))
+        while (pos < endpos && isspace((unsigned char) *pos)) {
             ++pos;
+        }
         const char* line = pos;
-        while (pos < endpos && *pos != '\n')
+        while (pos < endpos && *pos != '\n') {
             ++pos;
+        }
         const char* endline = pos;
-        while (line < endline && isspace((unsigned char) endline[-1]))
+        while (line < endline && isspace((unsigned char) endline[-1])) {
             --endline;
-        if (line == endline || line[0] == '#')
+        }
+        if (line == endline || line[0] == '#') {
             continue;
+        }
 
         // 'directory:'
         if (endline[-1] == ':') {
-            if (line + 2 == endline && line[0] == '.')
+            if (line + 2 == endline && line[0] == '.') {
                 cursrcdir = std::string("/");
-            else if (line + 2 > endline && line[0] == '.' && line[1] == '/')
+            } else if (line + 2 > endline && line[0] == '.' && line[1] == '/') {
                 cursrcdir = std::string(line + 1, endline - 1);
-            else
+            } else {
                 cursrcdir = std::string(line, endline - 1);
-            if (cursrcdir[0] != '/')
+            }
+            if (cursrcdir[0] != '/') {
                 cursrcdir = std::string("/") + cursrcdir;
-            while (cursrcdir.length() > 1 && cursrcdir[cursrcdir.length() - 1] == '/' && cursrcdir[cursrcdir.length() - 2] == '/')
+            }
+            while (cursrcdir.length() > 1
+                   && cursrcdir[cursrcdir.length() - 1] == '/'
+                   && cursrcdir[cursrcdir.length() - 2] == '/') {
                 cursrcdir = cursrcdir.substr(0, cursrcdir.length() - 1);
-            if (cursrcdir[cursrcdir.length() - 1] != '/')
+            }
+            if (cursrcdir[cursrcdir.length() - 1] != '/') {
                 cursrcdir += '/';
+            }
             curdstsubdir = cursrcdir;
             assert(curdstsubdir.back() == '/');
             continue;
@@ -973,28 +986,32 @@ static int construct_jail(dev_t jaildev, std::string& str) {
         int flags = base_flags;
         if (endline[-1] == ']') {
             // skip ' [FLAGS]'
-            for (--endline; line < endline && endline[-1] != '['; --endline)
-                /* do nothing */;
-            if (line == endline)
+            for (--endline; line < endline && endline[-1] != '['; --endline) {
+                // do nothing
+            }
+            if (line == endline) {
                 continue;
+            }
             const char* opts = endline;
             do {
                 --endline;
             } while (line < endline && isspace((unsigned char) endline[-1]));
             // parse flags
-            while (1) {
-                while (isspace((unsigned char) *opts) || *opts == ';')
+            while (true) {
+                while (isspace((unsigned char) *opts) || *opts == ';') {
                     ++opts;
-                if (*opts == ']')
+                }
+                if (*opts == ']') {
                     break;
+                }
                 // read first option word
                 const char* optstart = opts;
                 opts = opt_wordskip(opts + 1);
                 // process option
                 bool want_bind = false;
-                if (opt_eq(optstart, opts, "cp", 2))
+                if (opt_eq(optstart, opts, "cp", 2)) {
                     flags |= FLAG_CP;
-                else if (opt_eq(optstart, opts, "bind", 4)) {
+                } else if (opt_eq(optstart, opts, "bind", 4)) {
                     flags |= FLAG_BIND;
                     want_bind = true;
                 } else if (opt_eq(optstart, opts, "bind-ro", 7)) {
@@ -1002,40 +1019,46 @@ static int construct_jail(dev_t jaildev, std::string& str) {
                     want_bind = true;
                 }
                 if (want_bind) {
-                    while (isspace((unsigned char) *opts))
+                    while (isspace((unsigned char) *opts)) {
                         ++opts;
+                    }
                     const char* tagstart = opts;
                     opts = opt_wordskip(opts);
                     bind_tag = std::string(tagstart, opts);
 
-                    while (isspace((unsigned char) *opts))
+                    while (isspace((unsigned char) *opts)) {
                         ++opts;
+                    }
                     tagstart = opts;
                     opts = opt_wordskip(opts);
                     bind_files = std::string(tagstart, opts);
                 }
                 // skip to next option word
-                while (*opts != ']' && *opts != ';')
+                while (*opts != ']' && *opts != ';') {
                     ++opts;
+                }
             }
         }
 
         std::string src, dst;
         const char* arrow = (const char*) memmem(line, endline - line, " <- ", 4);
-        if (arrow)
+        if (arrow) {
             src = std::string(arrow + 4, endline);
-        else if (line[0] == '/')
+        } else if (line[0] == '/') {
             src = std::string(line, endline);
-        else
+        } else {
             src = cursrcdir + std::string(line, endline);
-        if (!arrow)
+        }
+        if (!arrow) {
             arrow = endline;
+        }
         dst = curdstsubdir + std::string(line + (line[0] == '/'), arrow);
 
         // act on flags
         if (flags & (FLAG_BIND | FLAG_BIND_RO)) {
-            if (!bind_tag.empty() && !bind_files.empty())
+            if (!bind_tag.empty() && !bind_files.empty()) {
                 fix_jail_bind_src(jaildev, src, bind_tag, bind_files);
+            }
             mountslot ms(src.c_str(), "none",
                          flags & FLAG_BIND_RO ? "bind,rec,unbindable,ro" : "bind,rec,unbindable");
             ms.wanted = true;
@@ -1043,8 +1066,9 @@ static int construct_jail(dev_t jaildev, std::string& str) {
             mount_table[src] = ms;
             v_ensuredir(dstroot + dst, 0555, true);
             handle_mount(src, dstroot + dst, false);
-        } else
+        } else {
             handle_copy(src, dst, flags, jaildev);
+        }
     }
 
     return exit_value;
@@ -1310,16 +1334,19 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
     while (last_pos != dir.length()) {
         // extract component
         size_t next_pos = last_pos;
-        while (next_pos && next_pos < dir.length() && dir[next_pos] != '/')
+        while (next_pos && next_pos < dir.length() && dir[next_pos] != '/') {
             ++next_pos;
-        if (!next_pos)
+        }
+        if (!next_pos) {
             ++next_pos;
+        }
         parent = dir.substr(0, last_pos);
         component = dir.substr(last_pos, next_pos - last_pos);
         std::string thisdir = dir.substr(0, next_pos);
         last_pos = next_pos;
-        while (last_pos != dir.length() && dir[last_pos] == '/')
+        while (last_pos != dir.length() && dir[last_pos] == '/') {
             ++last_pos;
+        }
 
         // check whether we are below the permission directory
         bool allowed_here = !permdir.empty()
@@ -1327,12 +1354,14 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
             && dir.substr(0, permdir.length()) == permdir;
 
         // open it and swap it in
-        if (parentfd >= 0)
+        if (parentfd >= 0) {
             close(parentfd);
+        }
         parentfd = fd;
         fd = openat(parentfd, component.c_str(), O_PATH | O_CLOEXEC | O_NOFOLLOW);
-        if (fd == -1 && !allowed_here && errno == ENOENT)
+        if (fd == -1 && !allowed_here && errno == ENOENT) {
             break;
+        }
         if ((fd == -1 && dryrunning)
             || (fd == -1 && allowed_here && errno == ENOENT
                 && (action == do_add || action == do_run))) {
@@ -1353,31 +1382,34 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
                 continue;
             }
         }
-        if (fd == -1 && errno == ENOENT && action == do_rm && doforce)
+        if (fd == -1 && errno == ENOENT && action == do_rm && doforce) {
             exit(0);
-        else if (fd == -1) {
+        } else if (fd == -1) {
             fprintf(stderr, "%s: %s\n", thisdir.c_str(), strerror(errno));
             exit(1);
         }
 
         // stat it
         struct stat s;
-        if (fstat(fd, &s) != 0)
+        if (fstat(fd, &s) != 0) {
             perror_die(thisdir);
+        }
         if (!S_ISDIR(s.st_mode)) {
             errno = ENOTDIR;
             perror_die(thisdir);
         } else if (!allowed_here && last_pos != dir.length()) {
-            if (s.st_uid != ROOT)
+            if (s.st_uid != ROOT) {
                 die("%s: Not owned by root\n", thisdir.c_str());
-            else if ((s.st_gid != ROOT && (s.st_mode & S_IWGRP))
-                     || (s.st_mode & S_IWOTH))
+            } else if ((s.st_gid != ROOT && (s.st_mode & S_IWGRP))
+                       || (s.st_mode & S_IWOTH)) {
                 die("%s: Writable by non-root\n", thisdir.c_str());
+            }
         }
         dev = s.st_dev;
     }
-    if (fd >= 0)
+    if (fd >= 0) {
         close(fd);
+    }
 }
 
 void jaildirinfo::check() {
@@ -1391,8 +1423,9 @@ void jaildirinfo::chown_home() {
     int dirfd = openat(parentfd, (component + "/home").c_str(),
                        O_CLOEXEC | O_NOFOLLOW);
     struct stat dirst;
-    if (dirfd == -1 || fstat(dirfd, &dirst) != 0)
+    if (dirfd == -1 || fstat(dirfd, &dirst) != 0) {
         perror_die(dirbuf);
+    }
     chown_recursive(dirfd, dirbuf, ROOT, ROOT, true, dirst.st_dev);
 }
 
@@ -1401,10 +1434,12 @@ void jaildirinfo::chown_recursive(const std::string& dir,
     std::string dirbuf = path_endslash(dir);
     int dirfd = open(dir.c_str(), O_CLOEXEC | O_NOFOLLOW);
     struct stat dirst;
-    if (dirfd == -1 || fstat(dirfd, &dirst) != 0)
+    if (dirfd == -1 || fstat(dirfd, &dirst) != 0) {
         perror_die(dirbuf);
-    if (x_fchown(dirfd, owner, group, dirbuf))
+    }
+    if (x_fchown(dirfd, owner, group, dirbuf)) {
         exit(exit_value);
+    }
     chown_recursive(dirfd, dirbuf, owner, group, false, dirst.st_dev);
 }
 
@@ -1422,10 +1457,11 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
         while (struct passwd* pw = getpwent()) {
             std::string name;
             if (pw->pw_dir && strncmp(pw->pw_dir, "/home/", 6) == 0
-                && strchr(pw->pw_dir + 6, '/') == NULL)
+                && strchr(pw->pw_dir + 6, '/') == NULL) {
                 name = pw->pw_dir + 6;
-            else
+            } else {
                 name = pw->pw_name;
+            }
             (*home_map)[name] = ug_t(pw->pw_uid, pw->pw_gid);
         }
     }
@@ -2482,11 +2518,12 @@ int main(int argc, char** argv) {
         // INCLUDING MY HOME DIRECTORY
         jaildir.dir = path_endslash(jaildir.dir);
         populate_mount_table();
-        for (auto it = mount_table.begin(); it != mount_table.end(); ++it)
+        for (auto it = mount_table.begin(); it != mount_table.end(); ++it) {
             if (it->first.length() >= jaildir.dir.length()
                 && memcmp(it->first.data(), jaildir.dir.data(),
                           jaildir.dir.length()) == 0)
                 handle_umount(it);
+        }
         // remove the jail
         jaildir.remove();
         exit(0);
@@ -2494,8 +2531,9 @@ int main(int argc, char** argv) {
 
     // check skeleton directory
     if (!jaildir.skeletondir.empty()) {
-        if (v_ensuredir(jaildir.skeletondir, 0755, true) < 0)
+        if (v_ensuredir(jaildir.skeletondir, 0755, true) < 0) {
             perror_die(jaildir.skeletondir);
+        }
         linkdir = path_noendslash(jaildir.skeletondir);
     }
 
@@ -2508,25 +2546,29 @@ int main(int argc, char** argv) {
         uid_t want_owner = action == do_add ? caller_owner : jailuser.owner_;
         gid_t want_group = action == do_add ? caller_group : jailuser.group_;
         if (r < 0
-            || (r > 0 && x_lchown(jailhome.c_str(), want_owner, want_group)))
+            || (r > 0 && x_lchown(jailhome.c_str(), want_owner, want_group))) {
             perror_die(jailhome);
+        }
         // also create in skeleton, but ignore errors
         if (!linkdir.empty()) {
             (void) v_ensuredir(linkdir + "/home", 0755, true);
             std::string linkhome = linkdir + jailuser.owner_home_;
             r = v_ensuredir(linkhome, 0700, true);
-            if (r > 0)
+            if (r > 0) {
                 x_lchown(linkhome.c_str(), jailuser.owner_, jailuser.group_);
+            }
         }
     }
 
     // set ownership
-    if (chown_home)
+    if (chown_home) {
         jaildir.chown_home();
+    }
     for (const auto& f : chown_user_args) {
-        if (!jailconf.allow_jail(f))
+        if (!jailconf.allow_jail(f)) {
             die("%s: --chown-user disabled by /etc/pa-jail.conf\n%s",
                 f.c_str(), jailconf.allowance_dir_fail_message().c_str());
+        }
         jaildir.chown_recursive(f, jailuser.owner_, jailuser.group_);
     }
 
@@ -2536,8 +2578,9 @@ int main(int argc, char** argv) {
     assert(dstroot != "/");
     if (!manifest.empty()) {
         mode_t old_umask = umask(0);
-        if (construct_jail(jaildir.dev, manifest) != 0)
+        if (construct_jail(jaildir.dev, manifest) != 0) {
             exit(1);
+        }
         umask(old_umask);
     }
 
