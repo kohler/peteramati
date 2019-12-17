@@ -10,9 +10,10 @@ Student code containers are stored in a directory called the _jail_.
 Restrictions on the jail directory aim to prevent accidental misconfiguration
 from dumping student code all over your filesystem.
 
-The jail directory is specified as an absolute pathname. It can contain no
-special characters—only letters, numbers, and characters in `-._~`. There must
-be no symbolic links in the path.
+The jail directory is an absolute pathname. It can contain no special
+characters—only letters, numbers, and characters in `-._~`. There must be no
+symbolic links in the path, and the directory and the all its parents must be
+owned by root and writable only by root.
 
 The jail directory must also be _enabled_ by the `/etc/pa-jail.conf`
 configuration file. That file looks like this:

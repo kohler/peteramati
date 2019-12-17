@@ -14,10 +14,10 @@ identified by `repoid` and by `url`.
 
 Peteramati stores student repositories in Git as remotes. Peteramati
 initializes up to 16 bare repositories in `PADIR/repo`, subdirectories `repo0`
-through `repof`; call these the *cache repositories*. Each student repository
-is a remote in one cache repository, identified by its `cacheid`. For
-instance, `repoid` 200 will show up as a remote `repo200` in cache repository
-`repo/repof`.
+through `repof`, which are called *cache repositories*. Each student
+repository is a remote in one cache repository, identified by its `cacheid`.
+For instance, `repoid` 200 will show up as a remote `repo200` in cache
+repository `repo/repof`.
 
 Handout repositories are cloned in every cache repository, to facilitate `git
 diff`.
