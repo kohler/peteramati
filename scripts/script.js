@@ -2449,7 +2449,15 @@ function pa_fix_note_links() {
 
     var dg = $(this).closest(".pa-grade-range-block").find(".pa-grade")[0];
     if (dg) {
-        pa_compute_landmark_range_grade.call(dg, true);
+        var sum = pa_compute_landmark_range_grade.call(dg);
+        if (!hasClass(dg, "pa-grade-pinned")) {
+            sum = sum === null ? "" : sum.toString();
+            var $gv = $(dg).find(".pa-gradevalue");
+            if ($gv.val() !== sum) {
+                console.log(["i change to", sum]);
+                $gv.val(sum).change();
+            }
+        }
     }
 }
 
@@ -2521,6 +2529,7 @@ function pa_render_note(note, transition) {
     }
 
     pa_fix_note_links.call(tr);
+
     if (transition) {
         $td.find(".pa-notecontent").hide().slideDown(80);
     } else {
@@ -2647,23 +2656,26 @@ function unedit(tr, always) {
     if (!$tr.length
         || (!always
             && $text.length
-            && !text_eq(note[1], $text.val().replace(/\s+$/, ""))))
+            && !text_eq(note[1], $text.val().replace(/\s+$/, "")))) {
         return false;
-    $tr.removeClass("editing");
-    $tr.find(":focus").blur();
-    pa_render_note.call($tr[0], note, true);
-
-    var click_tr = anal_tr();
-    if (click_tr)
-        capture(click_tr, true);
-    return true;
+    } else {
+        $tr.removeClass("editing");
+        $tr.find(":focus").blur();
+        pa_render_note.call($tr[0], note, true);
+        var click_tr = anal_tr();
+        if (click_tr) {
+            capture(click_tr, true);
+        }
+        return true;
+    }
 }
 
 function make_submit(anal) {
     return function () {
         var $f = $(this);
-        if ($f.prop("outstanding"))
+        if ($f.prop("outstanding")) {
             return false;
+        }
         $f.prop("outstanding", true);
         var $tr = $f.closest(".pa-dl");
         $f.find(".ajaxsave61").remove();
@@ -3161,14 +3173,9 @@ function pa_gradeentry() {
     return gi.entries[e.getAttribute("data-pa-grade")];
 }
 
-handle_ui.on("pa-grade", function (event) {
-    event.preventDefault();
-    if (this.getAttribute("data-outstanding")) {
-        return;
-    }
-
-    var self = this, $f = $(self);
-    self.setAttribute("data-outstanding", "1");
+(function () {
+function save_grade(self) {
+    var $f = $(self);
     $f.find(".pa-gradediffers, .pa-save-message").remove();
     var $pd = $f.find(".pa-pd").first(),
         $gd = $pd.find(".pa-gradedesc");
@@ -3194,19 +3201,33 @@ handle_ui.on("pa-grade", function (event) {
         }
     });
 
-    $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f[0])), {
-        type: "POST", cache: false, data: {grades: g, oldgrades: og},
-        success: function (data) {
-            self.removeAttribute("data-outstanding");
-            if (data.ok) {
-                $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
-                $(self).closest(".pa-psetinfo").data("pa-gradeinfo", data).each(pa_loadgrades);
-            } else {
-                $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
+    $f.data("paOutstandingPromise", new Promise(function (resolve, reject) {
+        $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f[0])), {
+            type: "POST", cache: false, data: {grades: g, oldgrades: og},
+            success: function (data) {
+                $f.removeData("paOutstandingPromise");
+                if (data.ok) {
+                    $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
+                    $(self).closest(".pa-psetinfo").data("pa-gradeinfo", data).each(pa_loadgrades);
+                    resolve(self);
+                } else {
+                    $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
+                    reject(self);
+                }
             }
-        }
-    });
+        });
+    }));
+}
+handle_ui.on("pa-grade", function (event) {
+    event.preventDefault();
+    var p = $(this).data("paOutstandingPromise");
+    if (p) {
+        p.then(save_grade);
+    } else {
+        save_grade(this);
+    }
 });
+})();
 
 function hoturl_gradeparts(e, args) {
     var p = e.closest(".pa-psetinfo"), v;
@@ -3393,16 +3414,19 @@ function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
     }
 }
 
-function pa_compute_landmark_range_grade(edit) {
+function pa_compute_landmark_range_grade() {
     var gr = this.closest(".pa-grade"),
         title = $(gr).find(".pa-pt").html(),
-        sum = 0.0;
+        sum = null;
 
     pa_process_landmark_range.call(this, function (tr, lna, lnb) {
         var note = pa_note(tr), m, gch;
         if (note[1]
             && ((m = /^[\s✓→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:]?(?:\s|$)/.exec(note[1]))
                 || (m = /^[\s✓→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:]?(?:\s|$)/.exec(note[1])))) {
+            if (sum === null) {
+                sum = 0.0;
+            }
             sum += parseFloat(m[2]);
             gch = title + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]);
         }
@@ -3413,16 +3437,22 @@ function pa_compute_landmark_range_grade(edit) {
         gch ? $nd.html(gch) : $nd.remove();
     }, ".pa-gw");
 
-    var $gnv = $(this).find(".pa-gradenotesvalue");
-    if (!$gnv.length) {
-        $gnv = $('<div class="pa-gradenotesvalue"></div>').appendTo($(this).find(".pa-pd"));
+    var $gnv = $(this).find(".pa-notes-grade");
+    if (sum === null) {
+        $gnv.remove();
+        this.removeAttribute("data-pa-notes-grade");
+    } else {
+        if (!$gnv.length) {
+            $gnv = $('<div class="pa-notes-grade"></div>');
+            var e = this.lastChild.firstChild;
+            while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
+                e = e.nextSibling;
+            }
+            this.lastChild.insertBefore($gnv[0], e);
+        }
+        $gnv.text("Notes grade " + sum);
+        this.setAttribute("data-pa-notes-grade", sum);
     }
-    $gnv.text("Notes grade " + sum);
-
-    if (edit && !hasClass(gr, "pa-grade-pinned")) {
-        $(gr).find(".pa-gradevalue").val(sum).change();
-    }
-
     return sum;
 }
 
