@@ -1054,6 +1054,7 @@ static int construct_jail(dev_t jaildev, std::string& str) {
 
 struct pajailconf {
     pajailconf();
+    pajailconf(const std::string& str);
 
     bool allow_jail(const std::string& dir) const {
         return allows_type("jail", dir);
@@ -1071,8 +1072,8 @@ struct pajailconf {
             return std::string();
     }
 private:
-    char buf[8192];
-    size_t len;
+    char buf_[8192];
+    size_t len_;
     mutable std::string allowance_dir_;
 
     std::pair<const char*, const char*> take_word(size_t& pos) const;
@@ -1087,34 +1088,49 @@ static bool writable_only_by_root(const struct stat& st) {
 
 pajailconf::pajailconf() {
     int fd = open("/etc/pa-jail.conf", O_RDONLY | O_NOFOLLOW);
-    if (fd == -1)
+    if (fd == -1) {
         perror_die("/etc/pa-jail.conf");
+    }
 
     struct stat st;
-    if (fstat(fd, &st) != 0)
+    if (fstat(fd, &st) != 0) {
         perror_die("/etc/pa-jail.conf");
-    else if (!writable_only_by_root(st))
+    } else if (!writable_only_by_root(st)) {
         die("/etc/pa-jail.conf: Writable by non-root\n");
+    }
 
-    ssize_t nr = read(fd, buf, sizeof(buf));
-    if (nr < 0)
+    ssize_t nr = read(fd, buf_, sizeof(buf_));
+    if (nr < 0) {
         perror_die("/etc/pa-jail.conf");
-    else if (nr == 0)
+    } else if (nr == 0) {
         die("/etc/pa-jail.conf: Empty file\n");
-    else if (nr == sizeof(buf))
-        die("/etc/pa-jail.conf: Too big, max %zu bytes\n", sizeof(buf));
-    len = nr;
+    } else if (nr == sizeof(buf_)) {
+        die("/etc/pa-jail.conf: Too big, max %zu bytes\n", sizeof(buf_));
+    }
+    len_ = nr;
 
     close(fd);
 }
 
+pajailconf::pajailconf(const std::string& s) {
+    if (s.length() >= sizeof(buf_)) {
+        die("pajailconf: String too big, max %zu bytes\n", sizeof(buf_));
+    }
+    memcpy(buf_, s.data(), s.length());
+    len_ = s.length();
+}
+
 std::pair<const char*, const char*> pajailconf::take_word(size_t& pos) const {
-    while (pos < len && buf[pos] != '\n' && isspace((unsigned char) buf[pos]))
+    while (pos < len_
+           && buf_[pos] != '\n'
+           && isspace((unsigned char) buf_[pos])) {
         ++pos;
-    const char* a = &buf[pos];
-    while (pos < len && !isspace((unsigned char) buf[pos]))
+    }
+    const char* a = &buf_[pos];
+    while (pos < len_ && !isspace((unsigned char) buf_[pos])) {
         ++pos;
-    return std::make_pair(a, &buf[pos]);
+    }
+    return std::make_pair(a, &buf_[pos]);
 }
 
 static bool check_action(const std::pair<const char*, const char*>& action,
@@ -1128,11 +1144,14 @@ static std::string dirmatch_prefix(const std::string& pattern,
     // return the prefix of `dir` that has the same number of slashes as
     // `pattern`
     size_t slcount = 0, slpos = 0;
-    while ((slpos = pattern.find('/', slpos)) != std::string::npos)
+    while ((slpos = pattern.find('/', slpos)) != std::string::npos) {
         ++slcount, ++slpos;
+    }
     slpos = 0;
-    while (slcount > 0 && (slpos = dir.find('/', slpos)) != std::string::npos)
+    while (slcount > 0
+           && (slpos = dir.find('/', slpos)) != std::string::npos) {
         --slcount, ++slpos;
+    }
     return dir.substr(0, slpos);
 }
 
@@ -1147,44 +1166,46 @@ bool pajailconf::allows_type(const char* type, const std::string& dir) const {
     int allowed_globally = -1, allowed_locally = -1;
     allowance_dir_ = std::string();
 
-    while (pos < len) {
+    while (pos < len_) {
         auto action = take_word(pos);
         auto arg = take_word(pos);
-        while (pos < len && buf[pos] != '\n')
+        while (pos < len_ && buf_[pos] != '\n') {
             take_word(pos);
-        while (pos < len && buf[pos] == '\n')
+        }
+        while (pos < len_ && buf_[pos] == '\n') {
             ++pos;
+        }
 
         // check action
         if (action.second - action.first < (ssize_t) typelen
-            || memcmp(action.second - typelen, type, typelen) != 0)
+            || memcmp(action.second - typelen, type, typelen) != 0) {
             continue;
-        bool allowed;
+        }
+        int allowed;
         if (check_action(action, "disable", typelen)
-            || check_action(action, "no", typelen))
-            allowed = false;
-        else if (check_action(action, "enable", typelen)
-                 || check_action(action, "allow", typelen))
-            allowed = true;
-        else
-            continue;
-
-        // global allowance
-        if (arg.first == arg.second) {
-            allowed_globally = allowed;
-            if (!allowed)
-                allowed_locally = allowed;
-            allowance_dir_ = std::string();
+            || check_action(action, "no", typelen)) {
+            allowed = 0;
+        } else if (check_action(action, "enable", typelen)
+                   || check_action(action, "allow", typelen)) {
+            allowed = 1;
+        } else {
             continue;
         }
 
-        // check subdirectory match
-        if (arg.first != arg.second && arg.first[0] != '/')
-            continue;
-        std::string pattern = path_endslash(std::string(arg.first, arg.second));
-        if (check_dirmatch_prefix(pattern, dir)) {
-            allowed_locally = allowed;
-            allowance_dir_ = dirmatch_prefix(pattern, dir);
+        if (arg.first == arg.second) {
+            // global allowance
+            allowed_globally = allowed;
+            if (!allowed) {
+                allowed_locally = allowed;
+            }
+            allowance_dir_ = std::string();
+        } else if (arg.first[0] == '/') {
+            // check subdirectory match
+            std::string pattern = path_endslash(std::string(arg.first, arg.second));
+            if (check_dirmatch_prefix(pattern, dir)) {
+                allowed_locally = allowed;
+                allowance_dir_ = dirmatch_prefix(pattern, dir);
+            }
         }
     }
 
@@ -2420,14 +2441,13 @@ int main(int argc, char** argv) {
     // check the jail directory
     // - no special characters
     // - path has no symlinks
-    // - at least one permdir has a file `pa-jail.conf` owned by root
-    //   and writable only by root, that contains `enablejail`
+    // - `/etc/pa-jail.conf` is owned by root, writable only by root
+    // - `/etc/pa-jail.conf` enables the jail directory and does not disable
+    //   the jail directory
     // - everything above that dir is owned by by root and writable only by
     //   root
-    // - no permdir has a file `pa-jail.conf` not owned by root,
-    //   writable by other than root, or containing `disablejail`
-    // - stuff below the dir containing the allowing `pa-jail.conf`
-    //   dynamically created if necessary
+    // - stuff below the allowed jail directory dynamically created as
+    //   necessary
     // - try to eliminate TOCTTOU
     pajailconf jailconf;
     jaildirinfo jaildir(argv[optind], linkarg, action, jailconf);
@@ -2525,8 +2545,9 @@ int main(int argc, char** argv) {
     jaildir.parentfd = -1;
 
     // maybe execute a command in the jail
-    if (optind + 2 < argc)
+    if (optind + 2 < argc) {
         jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, inputfd, timeout, foreground);
+    }
 
     // close timing file if appropriate
     if (timingfd != -1) {
