@@ -1082,10 +1082,13 @@ struct pajailconf {
     pajailconf(const std::string& str);
 
     bool allow_jail(const std::string& dir) const {
-        return allows_type("jail", dir);
+        return allows_type("jail", dir, false);
+    }
+    bool allow_jail_subdir(const std::string& dir) const {
+        return allows_type("jail", dir, true);
     }
     bool allow_skeleton(const std::string& dir) const {
-        return allows_type("skeleton", dir);
+        return allows_type("skeleton", dir, false);
     }
     const std::string& treedir() const {
         return treedir_;
@@ -1104,7 +1107,7 @@ private:
     mutable std::string allowance_pattern_;
 
     std::pair<const char*, const char*> take_word(size_t& pos) const;
-    bool allows_type(const char* type, std::string dir) const;
+    bool allows_type(const char* type, std::string dir, bool superdir) const;
     void set_treedir(std::string pattern, const std::string& dir, bool is_explicit) const;
 };
 
@@ -1170,30 +1173,30 @@ static bool check_action(const std::pair<const char*, const char*>& action,
 }
 
 static bool check_dirmatch(const std::string& pattern,
-                           const std::string& str) {
+                           std::string str,
+                           bool superdir = false,
+                           std::string* store_superdir = nullptr) {
+    if (superdir) {
+        size_t patslashpos = 0, strslashpos = 0;
+        while (true) {
+            patslashpos = pattern.find('/', patslashpos);
+            if (patslashpos == std::string::npos) {
+                str = str.substr(0, strslashpos);
+                if (store_superdir) {
+                    *store_superdir = str;
+                }
+                break;
+            }
+            ++patslashpos;
+            strslashpos = str.find('/', strslashpos);
+            if (strslashpos == std::string::npos) {
+                return false;
+            }
+            ++strslashpos;
+        }
+    }
     return fnmatch(pattern.c_str(), str.c_str(),
                    FNM_PATHNAME | FNM_PERIOD) == 0;
-}
-
-static std::string check_superdirmatch(const std::string& pattern,
-                                       const std::string& str) {
-    size_t patslashpos = 0, strslashpos = 0;
-    while (true) {
-        patslashpos = pattern.find('/', patslashpos);
-        if (patslashpos == std::string::npos) {
-            if (check_dirmatch(pattern, str.substr(0, strslashpos))) {
-                return str.substr(0, strslashpos);
-            } else {
-                return std::string();
-            }
-        }
-        ++patslashpos;
-        strslashpos = str.find('/', strslashpos);
-        if (strslashpos == std::string::npos) {
-            return std::string();
-        }
-        ++strslashpos;
-    }
 }
 
 void pajailconf::set_treedir(std::string pattern,
@@ -1204,14 +1207,16 @@ void pajailconf::set_treedir(std::string pattern,
         && memcmp(pattern.data() + pattern.length() - 3, "/*/", 3) == 0) {
         pattern = pattern.substr(0, pattern.length() - 2);
     }
-    std::string superdir = check_superdirmatch(pattern, str);
-    if (!superdir.empty()
+    std::string superdir;
+    if (check_dirmatch(pattern, str, true, &superdir)
         && (treedir_.empty() || treedir_.length() > superdir.length())) {
         treedir_ = superdir;
     }
 }
 
-bool pajailconf::allows_type(const char* type, std::string dir) const {
+bool pajailconf::allows_type(const char* type,
+                             std::string dir,
+                             bool superdir) const {
     size_t pos = 0, typelen = strlen(type);
     int allowed_globally = -1, allowed_locally = -1;
     allowance_pattern_ = treedir_ = std::string();
@@ -1255,9 +1260,7 @@ bool pajailconf::allows_type(const char* type, std::string dir) const {
         } else if (arg.first[0] == '/') {
             // check subdirectory match
             auto pattern = path_endslash(std::string(arg.first, arg.second));
-            if (allowed > 0
-                ? check_dirmatch(pattern, dir)
-                : !check_superdirmatch(pattern, dir).empty()) {
+            if (check_dirmatch(pattern, dir, superdir || allowed <= 0)) {
                 allowed_locally = allowed;
                 allowance_pattern_ = pattern;
                 if (allowed > 0) {
@@ -1282,6 +1285,8 @@ struct pajailconf_tester {
         assert(!jc.allow_jail("/jails/"));
         assert(!jc.allow_jail("/jails/runa/runb"));
         assert(!jc.allow_jail("/jails/runa/runb/"));
+        assert(jc.allow_jail_subdir("/jails/runa/runb"));
+        assert(jc.allow_jail_subdir("/jails/runa/runb/"));
         assert(jc.allow_jail("/jails/runa"));
         assert(jc.treedir() == "/jails/runa/");
         assert(jc.allow_jail("/jails/runa/"));
@@ -2466,15 +2471,15 @@ int main(int argc, char** argv) {
     while (1) {
         while ((ch = getopt_long(argc, argv, shortoptions_action[(int) action],
                                  longoptions_action[(int) action], NULL)) != -1) {
-            if (ch == 'V')
+            if (ch == 'V') {
                 verbose = true;
-            else if (ch == 'S')
+            } else if (ch == 'S') {
                 linkarg = optarg;
-            else if (ch == 'n')
+            } else if (ch == 'n') {
                 verbose = dryrun = true;
-            else if (ch == 'f' && action == do_rm)
+            } else if (ch == 'f' && action == do_rm) {
                 doforce = true;
-            else if (ch == 'f') {
+            } else if (ch == 'f') {
                 manifest += file_get_contents(optarg, 2);
                 if (!manifest.empty() && manifest.back() != '\n')
                     manifest.push_back('\n');
@@ -2482,55 +2487,59 @@ int main(int argc, char** argv) {
                 manifest += optarg;
                 if (!manifest.empty() && manifest.back() != '\n')
                     manifest.push_back('\n');
-            } else if (ch == 'p')
+            } else if (ch == 'p') {
                 pidfilename = optarg;
-            else if (ch == 'i')
+            } else if (ch == 'i') {
                 inputarg = optarg;
-            else if (ch == ARG_ONLCR)
+            } else if (ch == ARG_ONLCR) {
                 no_onlcr = false;
-            else if (ch == ARG_NO_ONLCR)
+            } else if (ch == ARG_NO_ONLCR) {
                 no_onlcr = true;
-            else if (ch == 'g')
+            } else if (ch == 'g') {
                 foreground = true;
-            else if (ch == 'h')
+            } else if (ch == 'h') {
                 chown_home = true;
-            else if (ch == 'q')
+            } else if (ch == 'q') {
                 quiet = true;
-            else if (ch == 'u')
+            } else if (ch == 'u') {
                 chown_user_args.push_back(optarg);
-            else if (ch == 'T') {
+            } else if (ch == 'T') {
                 char* end;
                 timeout = strtod(optarg, &end);
                 if (end == optarg || *end != 0)
                     usage();
             } else if(ch == 't' && action == do_run) {
                 timingfilename = optarg;
-            } else /* if (ch == 'H') */
+            } else { /* if (ch == 'H') */
                 usage(action);
+            }
         }
-        if (action != do_start)
+        if (action != do_start) {
             break;
-        if (optind == argc)
+        }
+        if (optind == argc) {
             usage();
-        else if (strcmp(argv[optind], "rm") == 0)
+        } else if (strcmp(argv[optind], "rm") == 0) {
             action = do_rm;
-        else if (strcmp(argv[optind], "mv") == 0)
+        } else if (strcmp(argv[optind], "mv") == 0) {
             action = do_mv;
-        else if (strcmp(argv[optind], "init") == 0
-                 || strcmp(argv[optind], "add") == 0)
+        } else if (strcmp(argv[optind], "init") == 0
+                   || strcmp(argv[optind], "add") == 0) {
             action = do_add;
-        else if (strcmp(argv[optind], "run") == 0)
+        } else if (strcmp(argv[optind], "run") == 0) {
             action = do_run;
-        else
+        } else {
             usage();
+        }
         argc -= optind;
         argv += optind;
         optind = 1;
     }
 
     // check arguments
-    if (action == do_run && optind + 2 >= argc)
+    if (action == do_run && optind + 2 >= argc) {
         action = do_add;
+    }
     if ((action == do_rm && optind + 1 != argc)
         || (action == do_mv && optind + 2 != argc)
         || (action == do_add && optind != argc - 1 && optind + 2 != argc)
@@ -2538,15 +2547,18 @@ int main(int argc, char** argv) {
         || (action == do_rm && (!linkarg.empty() || !manifest.empty() || !inputarg.empty()))
         || (action == do_mv && (!linkarg.empty() || !manifest.empty() || !inputarg.empty()))
         || !argv[optind][0]
-        || (action == do_mv && !argv[optind+1][0]))
+        || (action == do_mv && !argv[optind+1][0])) {
         usage();
-    if (verbose && !dryrun)
+    }
+    if (verbose && !dryrun) {
         verbosefile = stderr;
+    }
 
     // parse user
     jailownerinfo jailuser;
-    if ((action == do_add || action == do_run) && optind + 1 < argc)
+    if ((action == do_add || action == do_run) && optind + 1 < argc) {
         jailuser.init(argv[optind + 1]);
+    }
 
     // open infile non-blocking as current user
     // if it is a named FIFO, open it read-write so we never get EOF
@@ -2554,16 +2566,19 @@ int main(int argc, char** argv) {
     if (!inputarg.empty() && !dryrun) {
         struct stat st;
         int mode = O_RDONLY;
-        if (stat(inputarg.c_str(), &st) == 0 && S_ISFIFO(st.st_mode))
+        if (stat(inputarg.c_str(), &st) == 0 && S_ISFIFO(st.st_mode)) {
             mode = O_RDWR;
+        }
         inputfd = open(inputarg.c_str(), mode | O_CLOEXEC | O_NONBLOCK);
-        if (inputfd == -1)
+        if (inputfd == -1) {
             perror_die(inputarg);
+        }
     }
 
     // open pidfile as current user
-    if (!pidfilename.empty() && verbose)
+    if (!pidfilename.empty() && verbose) {
         fprintf(verbosefile, "touch %s\n", pidfilename.c_str());
+    }
     if (!pidfilename.empty() && !dryrun) {
         pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
         if (pidfd == -1)
@@ -2572,8 +2587,9 @@ int main(int argc, char** argv) {
     }
 
     // create timing file as current user
-    if (!timingfilename.empty() && verbose)
+    if (!timingfilename.empty() && verbose) {
         fprintf(verbosefile, "touch %s\n", timingfilename.c_str());
+    }
     if (!timingfilename.empty() && !dryrun) {
         timingfd = open(timingfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
         if (timingfd == -1)
@@ -2584,10 +2600,12 @@ int main(int argc, char** argv) {
     // so that the system processes will execute as root
     caller_owner = getuid();
     caller_group = getgid();
-    if (!dryrun && setresgid(ROOT, ROOT, ROOT) < 0)
+    if (!dryrun && setresgid(ROOT, ROOT, ROOT) < 0) {
         perror_die("setresgid");
-    if (!dryrun && setresuid(ROOT, ROOT, ROOT) < 0)
+    }
+    if (!dryrun && setresuid(ROOT, ROOT, ROOT) < 0) {
         perror_die("setresuid");
+    }
 
     // check the jail directory
     // - no special characters
@@ -2606,23 +2624,28 @@ int main(int argc, char** argv) {
     // move the sandbox if asked
     if (action == do_mv) {
         std::string newpath = check_filename(absolute(argv[optind + 1]));
-        if (newpath.empty() || newpath[0] != '/')
+        if (newpath.empty() || newpath[0] != '/') {
             die("%s: Bad characters in move destination\n", argv[optind + 1]);
+        }
 
         // allow second argument to be a directory
         struct stat s;
-        if (stat(newpath.c_str(), &s) == 0 && S_ISDIR(s.st_mode))
+        if (stat(newpath.c_str(), &s) == 0 && S_ISDIR(s.st_mode)) {
             newpath = path_endslash(newpath) + jaildir.component;
+        }
 
         // check jail allowance
-        if (!jailconf.allow_jail(newpath))
+        if (!jailconf.allow_jail(newpath)) {
             die("%s: Destination jail disabled by /etc/pa-jail.conf\n%s",
                 newpath.c_str(), jailconf.disable_message().c_str());
+        }
 
-        if (verbose)
+        if (verbose) {
             fprintf(verbosefile, "mv %s%s %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str());
-        if (!dryrun && renameat(jaildir.parentfd, jaildir.component.c_str(), jaildir.parentfd, newpath.c_str()) != 0)
+        }
+        if (!dryrun && renameat(jaildir.parentfd, jaildir.component.c_str(), jaildir.parentfd, newpath.c_str()) != 0) {
             die("mv %s%s %s: %s\n", jaildir.parent.c_str(), jaildir.component.c_str(), newpath.c_str(), strerror(errno));
+        }
         exit(0);
     }
 
@@ -2653,8 +2676,9 @@ int main(int argc, char** argv) {
 
     // create the home directory
     if (!jailuser.owner_home_.empty()) {
-        if (v_ensuredir(jaildir.dir + "/home", 0755, true) < 0)
+        if (v_ensuredir(jaildir.dir + "/home", 0755, true) < 0) {
             perror_die(jaildir.dir + "/home");
+        }
         std::string jailhome = jaildir.dir + jailuser.owner_home_;
         int r = v_ensuredir(jailhome, 0700, true);
         uid_t want_owner = action == do_add ? caller_owner : jailuser.owner_;
@@ -2679,8 +2703,8 @@ int main(int argc, char** argv) {
         jaildir.chown_home();
     }
     for (const auto& f : chown_user_args) {
-        if (!jailconf.allow_jail(f)) {
-            die("%s: --chown-user disabled by /etc/pa-jail.conf\n%s",
+        if (!jailconf.allow_jail_subdir(f)) {
+            die("%s: --chown-user directory disabled by /etc/pa-jail.conf\n%s",
                 f.c_str(), jailconf.disable_message().c_str());
         }
         jaildir.chown_recursive(f, jailuser.owner_, jailuser.group_);
