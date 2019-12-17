@@ -2513,9 +2513,9 @@ function pa_render_note(note, transition) {
     t += '"></div></div>';
     $td.append(t);
 
-    if (!note[4])
+    if (!note[4]) {
         $td.find(".pa-note").addClass("format0").text(note[1]);
-    else {
+    } else {
         var r = render_text(note[4], note[1]);
         $td.find(".pa-note").addClass("format" + (r.format || 0)).html(r.content);
     }
@@ -3401,8 +3401,8 @@ function pa_compute_landmark_range_grade(edit) {
     pa_process_landmark_range.call(this, function (tr, lna, lnb) {
         var note = pa_note(tr), m, gch;
         if (note[1]
-            && ((m = /^\s*(\(?\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;]?(?:\s|$)/.exec(note[1]))
-                || (m = /^\s*(\(?)(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;]?(?:\s|$)/.exec(note[1])))) {
+            && ((m = /^[\s✓→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:]?(?:\s|$)/.exec(note[1]))
+                || (m = /^[\s✓→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:]?(?:\s|$)/.exec(note[1])))) {
             sum += parseFloat(m[2]);
             gch = title + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]);
         }
