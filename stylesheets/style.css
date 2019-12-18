@@ -729,6 +729,9 @@ button:disabled, button:disabled:hover,
 	border-color: #c5c5c5;
 	background: rgba(222, 222, 222, 0.5);
 }
+.pa-runstop {
+	margin-left: 0.5em;
+}
 .aabig button, .aabig .btn {
 	padding: 4px 9px 4px;
 	min-height: 31px;

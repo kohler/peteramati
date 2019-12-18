@@ -4405,7 +4405,7 @@ function pa_run(button, opt) {
 
         if (data && data.status == "working") {
             if (!$("#pa-runstop-" + category).length)
-                $("<button id=\"pa-runstop-" + category + "\" class=\"pa-runstop\" type=\"button\">Stop</button>")
+                $("<button id=\"pa-runstop-" + category + "\" class=\"btn btn-danger pa-runstop\" type=\"button\">Stop</button>")
                     .click(stop).appendTo("#pa-runout-" + category + " > h3");
         } else
             $("#pa-runstop-" + category).remove();
