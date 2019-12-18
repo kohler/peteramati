@@ -2510,8 +2510,7 @@ function render_form($tr, note, transition) {
         '<div class="aabut"><button class="btn-primary" type="submit">Save comment</button></div>' +
         '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
     if (!$pi[0].hasAttribute("data-pa-user-can-view-grades")) {
-        ++labelctr;
-        t += '<div class="aabut"><input type="checkbox" id="pa-linenotecb' + labelctr + '" name="iscomment" value="1" /> <label for="pa-linenotecb' + labelctr + '">Show immediately</label></div>';
+        t += '<div class="aabut"><label><input type="checkbox" name="iscomment" value="1">Show immediately</label></div>';
     }
     var $form = $(t + '</div></form>').appendTo($td);
 
@@ -2655,7 +2654,7 @@ window.pa_save_note = function (text) {
     if (editing) {
         var f = $(this).find("form")[0];
         data = {note: f.note.value};
-        if (f.iscomment.checked) {
+        if (f.iscomment && f.iscomment.checked) {
             data.iscomment = 1;
         }
         $(f).find(".pa-save-message").remove();
