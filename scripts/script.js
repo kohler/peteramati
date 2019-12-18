@@ -3438,7 +3438,7 @@ function pa_compute_landmark_range_grade(allow_save) {
         $gnv.remove();
     } else {
         if (!$gnv.length) {
-            $gnv = $('<div class="pa-notes-grade"></div>');
+            $gnv = $('<a class="ui pa-notes-grade" href=""></a>');
             var e = this.lastChild.firstChild;
             while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
                 e = e.nextSibling;
@@ -3460,6 +3460,13 @@ function pa_compute_landmark_range_grade(allow_save) {
 
     return sum;
 }
+
+handle_ui.on("pa-notes-grade", function () {
+    var $gv = $(this).closest(".pa-grade").find(".pa-gradevalue");
+    if ($gv.length) {
+        $gv.val($gv.attr("data-pa-notes-grade")).change();
+    }
+});
 
 
 function fold61(sel, arrowholder, direction) {

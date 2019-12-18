@@ -2546,8 +2546,14 @@ table.hidegrades .pa-gradenote {
 	color: #777777;
 }
 .pa-notes-grade {
+	display: block;
+	text-decoration: inherit;
 	font-size: smaller;
 	color: #999999;
+}
+.pa-notes-grade:hover {
+	color: #c45500;
+	text-decoration: underline;
 }
 a.fold61 {
 	color: inherit;
