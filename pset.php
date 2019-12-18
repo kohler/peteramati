@@ -758,12 +758,9 @@ if ($Pset->gitless) {
     if (!empty($diff)) {
         echo "<hr>\n";
         echo '<div class="pa-diffset pa-with-diffbar">';
-        PsetView::echo_pa_diffbar();
-        if ($Info->can_edit_grades()
-            && !$Pset->has_grade_landmark_range) {
-            echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
-                '<div class="pa-gradebox pa-ps need-pa-gradelist"></div>',
-                '</div><div class="pa-dg">';
+        PsetView::echo_pa_diffbar($Info->can_edit_grades());
+        if ($Info->can_edit_grades() && !$Pset->has_grade_landmark_range) {
+            PsetView::echo_pa_sidebar_gradelist();
         }
         foreach ($diff as $file => $dinfo) {
             $open = $lnorder->file_has_notes($file)
@@ -774,9 +771,8 @@ if ($Pset->gitless) {
                         || !$lnorder->has_linenotes_in_diff));
             $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
         }
-        if ($Info->can_edit_grades()
-            && !$Pset->has_grade_landmark_range) {
-            echo '</div></div>';
+        if ($Info->can_edit_grades() && !$Pset->has_grade_landmark_range) {
+            PsetView::echo_close_pa_sidebar_gradelist();
         }
         echo '</div>';
     }

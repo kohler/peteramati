@@ -81,15 +81,24 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
             && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m)) {
             $diff[$onlyfiles[0]] = $diff[$onlyfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
         }
+        $want_grades = $pset->has_grade_landmark;
 
-        foreach ($diff as $file => $dinfo) {
-            $info->echo_file_diff($file, $dinfo, $lnorder,
-                ["open" => true, "id_by_user" => true,
-                 "no_heading" => count($qreq->files) == 1]);
+        if (!empty($diff)) {
+            if ($info->can_edit_grades() && !$pset->has_grade_landmark_range) {
+                PsetView::echo_pa_sidebar_gradelist();
+                $want_grades = true;
+            }
+            foreach ($diff as $file => $dinfo) {
+                $info->echo_file_diff($file, $dinfo, $lnorder,
+                    ["open" => true, "id_by_user" => true,
+                     "no_heading" => count($qreq->files) == 1]);
+            }
+            if ($info->can_edit_grades() && !$pset->has_grade_landmark_range) {
+                PsetView::echo_close_pa_sidebar_gradelist();
+            }
         }
 
-        $want_grades = $pset->has_grade_landmark;
-        $all_viewed_gradeentries += $info->viewed_gradeentries;
+        $all_viewed_gradeentries += $info->viewed_gradeentries; // XXX off if want all grades
     } else {
         echo '<div class="pa-gradelist',
             ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
@@ -115,7 +124,7 @@ if ($Pset->grade_script) {
 echo "<div class=\"pa-psetinfo pa-diffset pa-with-diffbar\" data-pa-gradeinfo=\"",
      htmlspecialchars(json_encode($Pset->gradeentry_json($Me->isPC))),
      "\">";
-PsetView::echo_pa_diffbar();
+PsetView::echo_pa_diffbar(true);
 
 if (trim((string) $Qreq->users) === "") {
     $want = [];

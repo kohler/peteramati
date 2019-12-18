@@ -1519,10 +1519,21 @@ class PsetView {
         echo '</div></div></div>';
     }
 
-    static function echo_pa_diffbar() {
+    static function echo_pa_diffbar($prefer_hide_left) {
         echo '<div class="pa-diffbar"><div class="pa-diffbar-file pa-diffbar-top hidden"></div>',
             '<div class="pa-diffbar-buttons"><a href="" class="ui pa-diff-toggle-hide-left btn btn-primary">±</a></div>',
             '</div>';
+        if ($prefer_hide_left) {
+            Ht::stash_script('$(".pa-diff-toggle-hide-left").click()');
+        }
+    }
+    static function echo_pa_sidebar_gradelist() {
+        echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
+            '<div class="pa-gradebox pa-ps need-pa-gradelist"></div>',
+            '</div><div class="pa-dg">';
+    }
+    static function echo_close_pa_sidebar_gradelist() {
+        echo '</div></div>';
     }
 }
 
