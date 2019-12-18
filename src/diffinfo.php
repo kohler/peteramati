@@ -94,8 +94,7 @@ class DiffInfo implements Iterator {
             && $this->_diff[$this->_diffsz - 4] === ' '
             && $this->_diff[$this->_diffsz - 8] === ' '
             && $this->_diff[$this->_diffsz - 12] === ' ') {
-            array_push($this->_diff, "@", $this->_diff[$this->_diffsz - 3] + 1,
-                       $this->_diff[$this->_diffsz - 2] + 1, "");
+            array_push($this->_diff, "@", null, null, "");
             $this->_diffsz += 4;
         }
     }
@@ -227,21 +226,25 @@ class DiffInfo implements Iterator {
         }
 
         $splice = [];
-        if ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] >= $linea_lx - 1
+        if ($lx >= 0 && $lx < $this->_diffsz
+            && $this->_diff[$lx + 1] >= $linea_lx - 1
             && $rx < $this->_diffsz && $this->_diff[$rx + 1] <= $linea_rx) {
-            for ($i = $this->_diff[$lx + 1] + 1; $i < $this->_diff[$rx + 1]; ++$i) {
+            $linea_rx = $this->_diff[$rx + 1];
+            for ($i = $this->_diff[$lx + 1] + 1; $i < $linea_rx; ++$i) {
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             }
             array_splice($this->_diff, $lx + 4, $rx - $lx - 4, $splice);
             $this->fix_context($lx);
-        } else if ($lx >= 0 && $lx < $this->_diffsz && $this->_diff[$lx + 1] >= $linea_lx - 1) {
+        } else if ($lx >= 0 && $lx < $this->_diffsz
+                   && $this->_diff[$lx + 1] >= $linea_lx - 1) {
             for ($i = $this->_diff[$lx + 1] + 1; $i < $linea_rx; ++$i) {
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             }
             array_splice($this->_diff, $lx + 4, 0, $splice);
             $this->fix_context($lx);
         } else if ($rx < $this->_diffsz && $this->_diff[$rx + 1] <= $linea_rx) {
-            for ($i = $linea_lx; $i < $this->_diff[$rx + 1]; ++$i) {
+            $linea_rx = $this->_diff[$rx + 1];
+            for ($i = $linea_lx; $i < $linea_rx; ++$i) {
                 array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
             }
             array_splice($this->_diff, $rx, 0, $splice);
@@ -255,6 +258,14 @@ class DiffInfo implements Iterator {
             array_splice($this->_diff, $l, 0, $splice);
         }
         $this->_diffsz = count($this->_diff);
+
+        // remove last context line if appropriate
+        if ($linea_rx === count($lines)
+            && $this->_diffsz > 0 && $this->_diff[$this->_diffsz - 4] === "@") {
+            $this->_diffsz -= 4;
+            array_splice($this->_diff, $this->_diffsz, 4);
+        }
+
         return true;
     }
 
