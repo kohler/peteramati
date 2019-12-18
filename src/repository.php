@@ -246,7 +246,7 @@ class Repository {
             shell_exec("cd $repodir && git init --shared");
         }
         $descriptors = [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]];
-        $proc = proc_open("cd $repodir && $command", $descriptors, $pipes, $repodir);
+        $proc = proc_open($command, $descriptors, $pipes, $repodir);
         stream_set_blocking($pipes[1], false);
         stream_set_blocking($pipes[2], false);
         $stdout = $stderr = "";
@@ -476,7 +476,7 @@ class Repository {
             $d = "$ConfSitePATH/repo/tmprepo.$Now$suffix";
             if (mkdir($d, 0770))
                 break;
-            $suffix = $suffix ? "_" . substr($suffix, 1) + 1 : "_1";
+            $suffix = $suffix ? "_" . (substr($suffix, 1) + 1) : "_1";
         }
         $answer = shell_exec("cd $d && git init >/dev/null && git remote add origin $ConfSitePATH/repo/repo{$this->cacheid} >/dev/null && echo yes");
         return ($answer == "yes\n" ? $d : null);
