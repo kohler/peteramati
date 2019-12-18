@@ -224,6 +224,10 @@ this format.
 
     The name shown for the grade entry.
 
+* `type`: string
+
+* `round`: string
+
 * `max`: number
 
     The maximum number of points for this entry.
@@ -252,15 +256,10 @@ this format.
     increasing `position`, and second by the order they appear in
     `psets.json`. Negative `position` entries appear first.
 
-* `landmark`: string, like "FILENAME:LINE"
+* `landmark`: string, like "FILENAME:LINE" or "FILENAME:LINE1:LINE:LINE2"
 
     If set, then in diff display, a text box for grade entry will be placed
     underneath line FILENAME:LINE from the handout code.
-
-* `landmark_range`: string, like "FILENAME:LINE1-LINE2"
-
-    If set, then provide a link to grade all submissions for this entry on a
-    single page.
 
 ### More problem set components
 

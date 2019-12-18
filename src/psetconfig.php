@@ -761,6 +761,7 @@ class GradeEntryConfig {
     public $name;
     public $title;
     public $type;
+    public $round;
     public $options;
     public $max;
     public $visible;
@@ -826,6 +827,18 @@ class GradeEntryConfig {
             }
         }
         $this->type = $type;
+
+        if ($this->type === null && isset($g->round)) {
+            $round = Pset::cstr($loc, $g, "round");
+            if ($round === "none") {
+                $round = null;
+            } else if ($round === "up" || $round === "down" || $round === "round") {
+                // nada
+            } else {
+                throw new PsetConfigException("unknown grade entry round", $loc);
+            }
+            $this->round = $round;
+        }
 
         if ($this->type === "text" || $this->type === "select") {
             $this->no_total = true;
@@ -1004,6 +1017,9 @@ class GradeEntryConfig {
             if ($this->type === "select") {
                 $gej["options"] = $this->options;
             }
+        }
+        if ($this->round) {
+            $gej["round"] = $this->round;
         }
         if ($this->max && ($pcview || $this->max_visible)) {
             $gej["max"] = $this->max;
