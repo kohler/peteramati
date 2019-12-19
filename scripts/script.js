@@ -2846,9 +2846,9 @@ function expand(evt) {
             if (data.ok && data.data) {
                 var lines = data.data.replace(/\n$/, "").split("\n");
                 for (var i = lines.length - 1; i >= 0; --i) {
-                    var t = '<div class="pa-dl pa-gc"><div class="pa-da">' +
-                        (paline + i) + '</div><div class="pa-db">' +
-                        (pbline + i) + '</div><div class="pa-dd"></div></div>';
+                    var t = '<div class="pa-dl pa-gc"><div class="pa-da" data-landmark="' +
+                        (paline + i) + '"></div><div class="pa-db" data-landmark="' +
+                        (pbline + i) + '"></div><div class="pa-dd"></div></div>';
                     $(t).insertAfter(contextrow).find(".pa-dd").text(lines[i]);
                 }
                 $(contextrow).remove();
@@ -3292,7 +3292,7 @@ function pa_resolve_grade() {
     }
     $(this).html(pa_render_grade_entry(ge, gi.editable));
     pa_show_grade.call($(this).find(".pa-grade")[0], gi);
-    if (ge.landmark_range && hasClass(this, "pa-gradebox")) {
+    if (ge.landmark_range && this.closest(".pa-gradebox")) {
         // XXX maybe calling compute_landmark_range_grade too often
         pa_compute_landmark_range_grade.call(this.firstChild, ge);
     }
