@@ -3515,9 +3515,10 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
 
     var gv = $(this).find(".pa-gradevalue")[0];
     if (gv) {
-        var sums = sum === null ? "" : "" + sum;
+        var sums = sum === null ? "" : "" + sum, gval;
         if (allow_save
-            && $(gv).val() == gv.getAttribute("data-pa-notes-grade")) {
+            && (gval = $(gv).val()) == gv.getAttribute("data-pa-notes-grade")
+            && sums != gval) {
             $(gv).val(sums).change();
         }
         gv.setAttribute("data-pa-notes-grade", sums);
@@ -3551,7 +3552,8 @@ handle_ui.on("pa-notes-grade", function (event) {
         }
     } else if (event.type === "click") {
         var $gv = $(this).closest(".pa-grade").find(".pa-gradevalue");
-        if ($gv.length) {
+        if ($gv.length
+            && $gv.val() != $gv.attr("data-pa-notes-grade")) {
             $gv.val($gv.attr("data-pa-notes-grade")).change();
         }
         event.preventDefault();
