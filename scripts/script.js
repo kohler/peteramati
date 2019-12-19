@@ -3300,9 +3300,9 @@ function pa_resolve_grade() {
         var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
         for (var i = 0; i < lb.length; ++i) {
             if (typeof lb[i] === "string") {
-                $(this).find(".pa-pd").append(lb[i]);
+                $(this).find(".pa-pd").first().append(lb[i]);
             } else if (lb[i].className) {
-                $(this).find(".pa-pd").append('<button type="button" class="btn uix uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
+                $(this).find(".pa-pd").first().append('<button type="button" class="btn uix uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
             }
         }
     }
@@ -3508,7 +3508,7 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
             while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
                 e = e.nextSibling;
             }
-            this.lastChild.insertBefore($gnv[0], e);
+            this.firstChild.nextSibling.insertBefore($gnv[0], e);
         }
         $gnv.text("Notes grade " + sum);
     }
