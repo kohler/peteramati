@@ -1280,18 +1280,45 @@ class PsetView {
             && !$this->is_handout_commit()
             && $dinfo->is_handout_commit_a()
             && !$no_grades) {
+            $rangeg = [];
             foreach ($this->pset->grades() as $g) {
                 if ($g->landmark_range_file === $file) {
-                    $la = PsetViewLineAnno::ensure($lineanno, "a" . $g->landmark_range_first);
-                    $la->grade_first[] = $g;
-                    $la = PsetViewLineAnno::ensure($lineanno, "a" . ($g->landmark_range_last + 1));
-                    $la->grade_last[] = $g;
-                    $has_grade_range = true;
+                    $rangeg[] = $g;
                 }
                 if ($g->landmark_file === $file) {
                     $la = PsetViewLineAnno::ensure($lineanno, "a" . $g->landmark_line);
                     $la->grade_entries[] = $g;
                 }
+            }
+            if (!empty($rangeg)) {
+                uasort($rangeg, function ($a, $b) {
+                    if ($a->landmark_range_first < $b->landmark_range_last) {
+                        return -1;
+                    } else {
+                        return $a->landmark_range_first == $b->landmark_range_last ? 0 : 1;
+                    }
+                });
+                for ($i = 0; $i !== count($rangeg); ) {
+                    $first = $rangeg[$i]->landmark_range_first;
+                    $last = $rangeg[$i]->landmark_range_last;
+                    for ($j = $i + 1;
+                         $j !== count($rangeg) && $rangeg[$j]->landmark_range_first < $last;
+                         ++$j) {
+                        $last = max($last, $rangeg[$j]->landmark_range_last);
+                    }
+                    $la1 = PsetViewLineAnno::ensure($lineanno, "a" . $first);
+                    $la2 = PsetViewLineAnno::ensure($lineanno, "a" . ($last + 1));
+                    foreach ($this->pset->grades() as $g) {
+                        if ($g->landmark_range_file === $file
+                            && $g->landmark_range_first >= $first
+                            && $g->landmark_range_last <= $last) {
+                            $la1->grade_first[] = $g;
+                            $la2->grade_last[] = $g;
+                        }
+                    }
+                    $i = $j;
+                }
+                $has_grade_range = true;
             }
         }
         if ($this->pset->has_transfer_warnings
@@ -1382,9 +1409,7 @@ class PsetView {
         $ala = $aln && isset($lineanno[$aln]) ? $lineanno[$aln] : null;
 
         if ($ala && ($ala->grade_first || $ala->grade_last)) {
-            $end_grade_range = $ala->grade_last
-                && $curanno->grade_first
-                && array_search($curanno->grade_first, $ala->grade_last) !== false;
+            $end_grade_range = $ala->grade_last && $curanno->grade_first;
             $start_grade_range = $ala->grade_first
                 && (!$curanno->grade_first || $end_grade_range);
             if ($start_grade_range || $end_grade_range) {
@@ -1392,14 +1417,17 @@ class PsetView {
                 $curanno->grade_first = null;
             }
             if ($start_grade_range) {
-                $g = $curanno->grade_first = $ala->grade_first[0];
-                echo '<div class="pa-dg pa-with-sidebar pa-grade-range-block"><div class="pa-sidebar">',
-                    '<div class="pa-gradebox pa-ps need-pa-grade" data-pa-grade="', $g->key, '"';
-                if ($g->landmark_buttons) {
-                    echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode_browser($g->landmark_buttons)), '"';
+                $curanno->grade_first = $ala->grade_first;
+                echo '<div class="pa-dg pa-with-sidebar pa-grade-range-block"><div class="pa-sidebar"><div class="pa-gradebox pa-ps">';
+                foreach ($curanno->grade_first as $g) {
+                    echo '<div class="need-pa-grade" data-pa-grade="', $g->key, '"';
+                    if ($g->landmark_buttons) {
+                        echo ' data-pa-landmark-buttons="', htmlspecialchars(json_encode_browser($g->landmark_buttons)), '"';
+                    }
+                    echo '></div>';
+                    $this->viewed_gradeentries[$g->key] = true;
                 }
-                echo '></div></div><div class="pa-dg">';
-                $this->viewed_gradeentries[$g->key] = true;
+                echo '</div></div><div class="pa-dg">';
             } else if ($end_grade_range) {
                 echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar"></div><div class="pa-dg">';
             }
@@ -1450,7 +1478,7 @@ class PsetView {
         if ($ala) {
             foreach ($ala->grade_entries ? : [] as $g) {
                 echo '<div class="pa-dl pa-gn';
-                if ($curanno->grade_first === $g) {
+                if ($curanno->grade_first && in_array($g, $curanno->grade_first)) {
                     echo ' pa-no-sidebar';
                 }
                 echo '"><div class="pa-graderow">',
