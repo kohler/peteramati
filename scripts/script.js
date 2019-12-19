@@ -3473,8 +3473,8 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
     pa_process_landmark_range.call(this, function (tr, lna, lnb) {
         var note = pa_note(tr), m, gch;
         if (note[1]
-            && ((m = /^[\s✓→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:]?(?:\s|$)/.exec(note[1]))
-                || (m = /^[\s✓→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:]?(?:\s|$)/.exec(note[1])))) {
+            && ((m = /^[\s❮→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:]?(?:\s|$)/.exec(note[1]))
+                || (m = /^[\s❮→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:]?(?:\s|$)/.exec(note[1])))) {
             if (sum === null) {
                 sum = 0.0;
             }
