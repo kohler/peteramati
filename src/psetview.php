@@ -1219,19 +1219,29 @@ class PsetView {
 
         if ($lnorder) {
             $onlyfiles = Repository::fix_diff_files(get($args, "onlyfiles"));
-            // expand diff to include fake files
             foreach ($lnorder->fileorder() as $fn => $order) {
-                if (isset($diff[$fn])
-                    || !($diffc = $this->pset->find_diffconfig($fn))
-                    || !$diffc->fileless
-                    || ($onlyfiles && !get($onlyfiles, $fn))) {
-                    continue;
+                if (isset($diff[$fn])) {
+                    // expand diff to include notes
+                    $di = $diff[$fn];
+                    foreach ($lnorder->file($fn) as $lineid => $note) {
+                        if (!$di->contains_lineid($lineid)) {
+                            $l = (int) substr($lineid, 1);
+                            $di->expand_line($lineid[0], $l - 2, $l + 3);
+                        }
+                    }
+
+                } else {
+                    // expand diff to include fake files
+                    if (($diffc = $this->pset->find_diffconfig($fn))
+                        && $diffc->fileless
+                        && (!$onlyfiles || get($onlyfiles, $fn))) {
+                        $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
+                        foreach ($lnorder->file($fn) as $note) {
+                            $diffi->add("Z", "", (int) substr($note->lineid, 1), "");
+                        }
+                        uasort($diff, "DiffInfo::compare");
+                    }
                 }
-                $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
-                foreach ($lnorder->file($fn) as $note) {
-                    $diffi->add("Z", "", (int) substr($note->lineid, 1), "");
-                }
-                uasort($diff, "DiffInfo::compare");
             }
 
             // add diff to linenotes
