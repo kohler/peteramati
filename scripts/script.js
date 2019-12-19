@@ -341,7 +341,7 @@ jQuery.fn.extend({
             }
             x = x && x.tagName ? x : window;
             var w = $(x).geometry();
-            if (p.top < w.top + (opts.marginTop || 0)) {
+            if (p.top < w.top + (opts.marginTop || 0) || opts.atTop) {
                 var pos = Math.max(p.top - (opts.marginTop || 0), 0);
                 if (x === window) {
                     x.scrollTo(x.scrollX, pos);
