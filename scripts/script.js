@@ -673,19 +673,20 @@ var key_map = {"Spacebar": " ", "Esc": "Escape"},
     };
 function event_key(evt) {
     var x;
-    if (typeof evt === "string")
+    if (typeof evt === "string") {
         return evt;
-    if ((x = evt.key) != null)
+    } else if ((x = evt.key) != null) {
         return key_map[x] || x;
-    if ((x = evt.charCode))
+    } else if ((x = evt.charCode)) {
         return charCode_map[x] || String.fromCharCode(x);
-    if ((x = evt.keyCode)) {
+    } else if ((x = evt.keyCode)) {
         if (keyCode_map[x])
             return keyCode_map[x];
         else if ((x >= 48 && x <= 57) || (x >= 65 && x <= 90))
             return String.fromCharCode(x);
+    } else {
+        return "";
     }
-    return "";
 }
 event_key.printable = function (evt) {
     return !nonprintable_map[event_key(evt)]
@@ -933,8 +934,9 @@ handle_ui.on = function (className, callback) {
 handle_ui.trigger = function (className, event) {
     var c = callbacks[className];
     if (c) {
-        if (typeof event === "string")
+        if (typeof event === "string") {
             event = $.Event(event); // XXX IE8: `new Event` is not supported
+        }
         for (var j = 0; j < c.length; ++j) {
             c[j].call(this, event);
         }
@@ -2483,6 +2485,34 @@ function pa_render_note(note, transition) {
     return tr;
 }
 
+// pa_api_conditioner
+
+var pa_api_conditioner = (function () {
+var outstanding = 0, waiting = [];
+
+function post_ajax(url, data, method, resolve) {
+    return function () {
+        ++outstanding;
+        $.ajax(url, {
+            data: data, method: method || "POST", cache: false, dataType: "json",
+            success: function (data) {
+                resolve(data);
+                --outstanding;
+                waiting.length && waiting.shift()();
+            }
+        });
+    };
+}
+
+return function (url, data, method) {
+    return new Promise(function (resolve, reject) {
+        var f = post_ajax(url, data, method, resolve);
+        outstanding < 5 ? f() : waiting.push(f);
+    });
+};
+
+})();
+
 
 // pa_linenote
 (function ($) {
@@ -2672,32 +2702,30 @@ window.pa_save_note = function (text) {
 
     grb && grb.setAttribute("data-pa-notes-outstanding", +grb.getAttribute("data-pa-notes-outstanding") + 1);
     return new Promise(function (resolve, reject) {
-        $.ajax(hoturl_post("api/linenote", hoturl_gradeparts(pi, {
-            file: file, line: lineid, oldversion: (note && note[3]) || 0
-        })), {
-            data: data,
-            method: "POST", cache: false, dataType: "json",
-            success: function (data) {
-                removeClass(self, "pa-outstanding");
-                if (data && data.ok) {
-                    removeClass(self, "pa-save-failed");
-                    note = data.linenotes[file];
-                    note = note && note[lineid];
-                    pa_set_note(self, note);
-                    if (editing) {
-                        $(self).find(".pa-save-message").html("Saved");
-                        unedit(self);
-                    } else {
-                        pa_render_note.call(self, note);
-                    }
-                    resolve(self);
+        pa_api_conditioner(
+            hoturl_post("api/linenote", hoturl_gradeparts(pi, {
+                file: file, line: lineid, oldversion: (note && note[3]) || 0
+            })), data
+        ).then(function (data) {
+            removeClass(self, "pa-outstanding");
+            if (data && data.ok) {
+                removeClass(self, "pa-save-failed");
+                note = data.linenotes[file];
+                note = note && note[lineid];
+                pa_set_note(self, note);
+                if (editing) {
+                    $(self).find(".pa-save-message").html("Saved");
+                    unedit(self);
                 } else {
-                    addClass(self, "pa-save-failed");
-                    editing && $(self).find(".pa-save-message").html('<strong class="err">' + escape_entities(data.error || "Failed") + '</strong>');
-                    reject(self);
+                    pa_render_note.call(self, note);
                 }
-                grb && resolve_grade_range(grb);
+                resolve(self);
+            } else {
+                addClass(self, "pa-save-failed");
+                editing && $(self).find(".pa-save-message").html('<strong class="err">' + escape_entities(data.error || "Failed") + '</strong>');
+                reject(self);
             }
+            grb && resolve_grade_range(grb);
         });
     });
 }
@@ -3203,18 +3231,17 @@ function save_grade(self) {
     });
 
     $f.data("paOutstandingPromise", new Promise(function (resolve, reject) {
-        $.ajax(hoturl_post("api/grade", hoturl_gradeparts($f[0])), {
-            type: "POST", cache: false, data: {grades: g, oldgrades: og},
-            success: function (data) {
-                $f.removeData("paOutstandingPromise");
-                if (data.ok) {
-                    $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
-                    $(self).closest(".pa-psetinfo").data("pa-gradeinfo", data).each(pa_loadgrades);
-                    resolve(self);
-                } else {
-                    $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
-                    reject(self);
-                }
+        pa_api_conditioner(hoturl_post("api/grade", hoturl_gradeparts($f[0])),
+            {grades: g, oldgrades: og})
+        .then(function (data) {
+            $f.removeData("paOutstandingPromise");
+            if (data.ok) {
+                $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
+                $(self).closest(".pa-psetinfo").data("pa-gradeinfo", data).each(pa_loadgrades);
+                resolve(self);
+            } else {
+                $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
+                reject(self);
             }
         });
     }));
@@ -3657,14 +3684,12 @@ function pa_beforeunload(evt) {
 
 function pa_fetchgrades() {
     var p = this.closest(".pa-psetinfo");
-    $.ajax(hoturl("api/grade", hoturl_gradeparts(p)), {
-        type: "GET", cache: false, dataType: "json",
-        success: function (data) {
+    pa_api_conditioner(hoturl("api/grade", hoturl_gradeparts(p)), null, "GET")
+        .then(function (data) {
             if (data && data.ok) {
                 $(p).data("pa-gradeinfo", data).each(pa_loadgrades);
             }
-        }
-    });
+        });
 }
 
 function setgrader61(button) {
@@ -6560,15 +6585,13 @@ function pa_render_pset_table(pconf, data) {
         if (!any) {
             next();
         } else if (gdialog_su.length === 1) {
-            $.ajax(hoturl_post("api/grade", url_gradeparts(gdialog_su[0])), {
-                type: "POST", cache: false,
-                data: byuid[gdialog_su[0].uid],
-                success: function (rv) {
-                    gdialog_store_start(rv);
-                    if (rv.ok) {
-                        grade_update(make_umap(), rv, rv.order);
-                        next();
-                    }
+            pa_api_conditioner(hoturl_post("api/grade", url_gradeparts(gdialog_su[0])),
+                byuid[gdialog_su[0].uid])
+            .then(function (rv) {
+                gdialog_store_start(rv);
+                if (rv.ok) {
+                    grade_update(make_umap(), rv, rv.order);
+                    next();
                 }
             });
         } else {
@@ -6578,20 +6601,18 @@ function pa_render_pset_table(pconf, data) {
                     byuid[gdialog_su[i].uid].commit_is_grade = 1;
                 }
             }
-            $.ajax(hoturl_post("api/multigrade", {pset: pconf.key}), {
-                type: "POST", cache: false,
-                data: {us: JSON.stringify(byuid)},
-                success: function (rv) {
-                    gdialog_store_start(rv);
-                    if (rv.ok) {
-                        var umap = make_umap();
-                        for (var i in rv.us) {
-                            grade_update(umap, rv.us[i], rv.order);
-                        }
-                        next();
+            pa_api_conditioner(hoturl_post("api/multigrade", {pset: pconf.key}),
+                {us: JSON.stringify(byuid)})
+            .then(function (rv) {
+                gdialog_store_start(rv);
+                if (rv.ok) {
+                    var umap = make_umap();
+                    for (var i in rv.us) {
+                        grade_update(umap, rv.us[i], rv.order);
                     }
+                    next();
                 }
-            })
+            });
         }
     }
     function gdialog_traverse() {
