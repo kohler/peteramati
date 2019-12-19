@@ -938,7 +938,9 @@ handle_ui.trigger = function (className, event) {
             event = $.Event(event); // XXX IE8: `new Event` is not supported
         }
         for (var j = 0; j < c.length; ++j) {
-            c[j].call(this, event);
+            if (!event.isImmediatePropagationStopped()) {
+                c[j].call(this, event);
+            }
         }
     }
 };
@@ -3299,16 +3301,40 @@ function pa_resolve_grade() {
         for (var i = 0; i < lb.length; ++i) {
             if (typeof lb[i] === "string") {
                 $(this).find(".pa-pd").append(lb[i]);
-            } else {
-                var t = '<button type="button" class="btn ui';
-                if (lb[i].className)
-                    t += ' ' + lb[i].className;
-                t += '">' + lb[i].title + '</button>';
-                $(this).find(".pa-pd").append(t);
+            } else if (lb[i].className) {
+                $(this).find(".pa-pd").append('<button type="button" class="btn uix uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
             }
         }
     }
 }
+
+handle_ui.on("pa-grade-button", function (event) {
+    if (event.type === "keydown") {
+        var k = event_key(event), gr;
+        if (event.ctrlKey
+            && (k === "n" || k === "N" || k === "p" || k === "P" || k === "A")
+            && (gr = this.closest(".pa-grade"))) {
+            var gradekey = gr.getAttribute("data-pa-grade"),
+                buttons = $(".pa-grade[data-pa-grade=" + gradekey + "] .pa-grade-button[data-pa-grade-button=" + this.getAttribute("data-pa-grade-button") + "]").filter(":visible"),
+                i = buttons.toArray().indexOf(this);
+            if (i >= 0) {
+                if (k === "n" || k === "N" || k === "p" || k === "P") {
+                    var delta = k === "n" || k === "N" ? 1 : buttons.length - 1,
+                        button = buttons[(i + delta) % buttons.length],
+                        dg = button.closest(".pa-dg");
+                    dg && $(dg).scrollIntoView({marginTop: 24, atTop: true});
+                    button.focus();
+                    $(button).scrollIntoView();
+                } else {
+                    buttons.click();
+                }
+                event.preventDefault();
+            }
+        }
+    } else if (event.type === "click") {
+        handle_ui.trigger.call(this, this.getAttribute("data-pa-grade-button"), event);
+    }
+});
 
 function pa_resolve_gradelist() {
     removeClass(this, "need-pa-gradelist");
@@ -3477,7 +3503,7 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
         $gnv.remove();
     } else {
         if (!$gnv.length) {
-            $gnv = $('<a class="ui pa-notes-grade" href=""></a>');
+            $gnv = $('<a class="uix uikd pa-notes-grade" href=""></a>');
             var e = this.lastChild.firstChild;
             while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
                 e = e.nextSibling;
@@ -3500,10 +3526,35 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
     return sum;
 }
 
-handle_ui.on("pa-notes-grade", function () {
-    var $gv = $(this).closest(".pa-grade").find(".pa-gradevalue");
-    if ($gv.length) {
-        $gv.val($gv.attr("data-pa-notes-grade")).change();
+handle_ui.on("pa-notes-grade", function (event) {
+    if (event.type === "keydown") {
+        var k = event_key(event), gr;
+        if (event.ctrlKey
+            && (k === "n" || k === "N" || k === "p" || k === "P" || k === "A")
+            && (gr = this.closest(".pa-grade"))) {
+            var gradekey = gr.getAttribute("data-pa-grade"),
+                links = $(".pa-grade[data-pa-grade=" + gradekey + "] .pa-notes-grade").filter(":visible"),
+                i = links.toArray().indexOf(this);
+            if (i >= 0) {
+                if (k === "n" || k === "N" || k === "p" || k === "P") {
+                    var delta = k === "n" || k === "N" ? 1 : links.length - 1,
+                        link = links[(i + delta) % links.length],
+                        dg = link.closest(".pa-dg");
+                    dg && $(dg).scrollIntoView({marginTop: 24, atTop: true});
+                    link.focus();
+                    $(link).scrollIntoView();
+                } else {
+                    links.click();
+                }
+                event.preventDefault();
+            }
+        }
+    } else if (event.type === "click") {
+        var $gv = $(this).closest(".pa-grade").find(".pa-gradevalue");
+        if ($gv.length) {
+            $gv.val($gv.attr("data-pa-notes-grade")).change();
+        }
+        event.preventDefault();
     }
 });
 
