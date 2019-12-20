@@ -155,8 +155,9 @@ foreach ($all_viewed_gradeentries as $gkey => $x) {
     $gradeentry = $Pset->all_grades[$gkey];
     if ($gradeentry->landmark_buttons) {
         foreach ($gradeentry->landmark_buttons as $lb) {
-            if (is_object($lb) && isset($lb->summary_className))
+            if (is_object($lb) && isset($lb->summary_className)) {
                 echo '<button type="button" class="ui btn ', $lb->summary_className, '" data-pa-class="', $lb->className, '">Summarize ', $lb->title, '</button>';
+            }
         }
     }
 }
