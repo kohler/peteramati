@@ -3012,12 +3012,13 @@ function pa_render_grade_entry(ge, options) {
             livecl = live ? 'uich ' : '',
             id = "pa-ge" + ++pa_render_grade_entry.id_counter;
         t = (live ? '<form class="ui-submit ' : '<div class="');
-        if (ge.visible === false)
+        if (ge.visible === false) {
             t += 'pa-p-hidden ';
+        }
         t += 'pa-grade pa-p" data-pa-grade="' + name +
             '"><label class="pa-pt" for="' + id + '">' + title + '</label>';
         if (ge.type === "text") {
-            t += '<div class="pa-pd"><textarea class="' + livecl + 'pa-pd pa-gradevalue" name="' + name +
+            t += '<div class="pa-pd"><textarea class="' + livecl + 'pa-pd pa-gradevalue need-autogrow" name="' + name +
                 '" id="' + id + '"></textarea></div>';
         } else if (ge.type === "select") {
             t += '<div class="pa-pd"><span class="select"><select class="' + livecl + 'pa-gradevalue" name="' + name + '" id="' + id + '"><option value="">None</option>';
@@ -3291,6 +3292,7 @@ function pa_resolve_grade() {
         return;
     }
     $(this).html(pa_render_grade_entry(ge, gi.editable));
+    $(this).find(".need-autogrow").autogrow();
     pa_show_grade.call($(this).find(".pa-grade")[0], gi);
     if (ge.landmark_range && this.closest(".pa-gradebox")) {
         // XXX maybe calling compute_landmark_range_grade too often
@@ -3364,6 +3366,7 @@ function pa_resolve_gradelist() {
         ch = ch.nextSibling;
         this.removeChild(e);
     }
+    $(this).find(".need-autogrow").autogrow();
 }
 
 $(function () {
@@ -7036,6 +7039,7 @@ function make_input_autogrower($self) {
 $.fn.autogrow = function () {
     this.each(function () {
         var $self = $(this), f = $self.data("autogrower");
+        removeClass(this, "need-autogrow");
         if (!f) {
             if (this.tagName === "TEXTAREA") {
                 f = make_textarea_autogrower($self);
@@ -7066,4 +7070,4 @@ $.fn.unautogrow = function () {
 };
 })(jQuery);
 
-$(function () { $(".need-autogrow").autogrow().removeClass("need-autogrow"); });
+$(function () { $(".need-autogrow").autogrow(); });
