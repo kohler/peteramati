@@ -2203,7 +2203,8 @@ td.mhcb {
 	margin-bottom: 0.5rem;
 }
 .pa-pset-hidden > .pa-grp-hidden {
-	padding: 0 24px;
+	padding-top: 0;
+	padding-bottom: 0;
 }
 .pa-inf:first-child, .pa-inf-error:first-child, .pa-gradeabovemax {
 	padding-top: 4px;
