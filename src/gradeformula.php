@@ -46,7 +46,7 @@ class GradeFormula {
             if ($e !== null) {
                 $e = new GradeFormula($m[1], [$e]);
             }
-        } else if (preg_match('{\A(\w+)\.(\w+)(.*)\z}s', $t, $m)) {
+        } else if (preg_match('{\A(\w+)\s*\.\s*(\w+)(.*)\z}s', $t, $m)) {
             if (($pset = $conf->pset_by_key_or_title($m[1]))
                 && ($ge = $pset->gradelike_by_key($m[2]))) {
                 $e = new GradeFormula("g", [$pset, $ge]);
