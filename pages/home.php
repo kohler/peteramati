@@ -944,7 +944,7 @@ function show_pset($pset, $user) {
     if ($pset->gitless_grades && $Me == $user && !$pset->partner
         && !$pset->contact_grade_for($user))
         return;
-    echo "<hr/>\n";
+    echo "<hr>\n";
     $user_can_view = $user->can_view_pset($pset);
     if (!$user_can_view)
         echo '<div class="pa-pset-hidden">';

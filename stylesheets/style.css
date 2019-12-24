@@ -2175,6 +2175,8 @@ td.mhcb {
 	padding: 0.5rem 24px;
 }
 .pa-pset-hidden > .pa-p-hidden {
+	margin-left: 0;
+	margin-right: 0;
 	padding: 0;
 }
 .pa-p-hidden + .pa-p-hidden {
