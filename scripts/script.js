@@ -2946,7 +2946,7 @@ var pa_grade_types = {
     formula: {
         type: "formula",
         text: function (v) {
-            return v + "";
+            return (v === null ? "" : v.toFixed(1));
         }
     },
     text: {

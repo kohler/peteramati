@@ -795,7 +795,7 @@ class Contact {
                     }
                 }
             }
-            $this->_gcache[$k][$i] = $x === null ? $x : round($x * 10.0) / 10.0;
+            $this->_gcache[$k][$i] = $x === null ? $x : round($x * 10.0) / 10;
         }
         return $this->_gcache[$k][$i];
     }
