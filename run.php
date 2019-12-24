@@ -20,7 +20,7 @@ function user_pset_info() {
     if (($Commit = $Qreq->newcommit) == null) {
         $Commit = $Qreq->commit;
     }
-    if (!$Info->set_hash($Commit)) {
+    if (!$Pset->gitless && !$Info->set_hash($Commit)) {
         quit(!$Info->repo ? "No repository" : "Commit $Commit isn’t connected to this repository");
     }
     return $Info;
@@ -134,17 +134,18 @@ if ($Me->isPC && $Qreq->runmany && $Qreq->post_ok()) {
 
 // repo
 $Info = user_pset_info();
-$Repo = $Info->repo;
 
 // can we run this?
-if (!$Repo) {
-    quit("No repository to run");
-} else if (!$Info->commit()) {
-    quit("No commit to run");
-} else if ($Qreq->run === null || !$Qreq->post_ok()) {
+if ($Qreq->run === null || !$Qreq->post_ok()) {
     quit("Permission error");
-} else if (!$Info->can_view_repo_contents()) {
-    quit("Unconfirmed repository");
+} else if ($Runner->command) {
+    if (!$Repo) {
+        quit("No repository to run");
+    } else if (!$Info->commit()) {
+        quit("No commit to run");
+    } else if (!$Info->can_view_repo_contents()) {
+        quit("Unconfirmed repository");
+    }
 }
 
 // we’re gonna run it; check permission
@@ -169,10 +170,10 @@ if ($Qreq->ensure) {
 }
 
 // check runnability
-if (!$Pset->run_dirpattern) {
+if ($Runner->command && !$Pset->run_dirpattern) {
     quit("Configuration error (run_dirpattern)");
 }
-if (!$Pset->run_jailfiles) {
+if ($Runner->command && !$Pset->run_jailfiles) {
     quit("Configuration error (run_jailfiles)");
 }
 
@@ -198,6 +199,8 @@ if (!$Runner->command && $Runner->eval) {
 try {
     if ($Rstate->is_recent_job_running()) {
         quit("Recent job still running");
+    } else if ($Info->pset->gitless) {
+        quit("Nothing to do");
     }
     session_write_close();
 

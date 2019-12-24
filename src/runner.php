@@ -10,6 +10,7 @@ class RunnerState {
     public $conf;
     public $info;
     public $repo;
+    public $repoid;
     public $pset;
     public $runner;
 
@@ -35,25 +36,30 @@ class RunnerState {
         $this->conf = $info->conf;
         $this->info = $info;
         $this->repo = $info->repo;
+        $this->repoid = $this->repo ? $this->repo->repoid : null;
         $this->pset = $info->pset;
         $this->runner = $runner;
+        assert(!$runner->command || $this->repoid);
 
-        $this->logdir = $ConfSitePATH . "/log/run" . $this->repo->cacheid
-            . ".pset" . $this->pset->id;
-        if (!is_dir($this->logdir)) {
-            $old_umask = umask(0);
-            if (!mkdir($this->logdir, 02770, true))
-                throw new RunnerException("Cannot create log directory");
-            umask($old_umask);
+        if (!$this->pset->gitless) {
+            $this->logdir = $ConfSitePATH . "/log/run" . $this->repo->cacheid
+                . ".pset" . $this->pset->id;
+            if (!is_dir($this->logdir)) {
+                $old_umask = umask(0);
+                if (!mkdir($this->logdir, 02770, true))
+                    throw new RunnerException("Cannot create log directory");
+                umask($old_umask);
+            }
         }
 
-        if ($checkt)
+        if ($checkt) {
             $this->set_checkt($checkt);
+        }
     }
 
     function expand($x) {
         if (strpos($x, '${') !== false) {
-            $x = str_replace('${REPOID}', $this->repo->repoid, $x);
+            $x = str_replace('${REPOID}', $this->repoid, $x);
             $x = str_replace('${PSET}', $this->pset->id, $x);
             $x = str_replace('${CONFDIR}', "conf/", $x);
             $x = str_replace('${SRCDIR}', "src/", $x);
@@ -67,7 +73,7 @@ class RunnerState {
 
     function running_checkts() {
         if ($this->_running_checkts === null) {
-            $logfs = glob($this->logdir . "/repo" . $this->repo->repoid
+            $logfs = glob($this->logdir . "/repo" . $this->repoid
                           . ".pset" . $this->pset->id . ".*.log.pid");
             $this->_running_checkts = [];
             foreach ($logfs as $f) {
@@ -82,7 +88,7 @@ class RunnerState {
 
     function logged_checkts() {
         if ($this->_logged_checkts === null) {
-            $logfs = glob($this->logdir . "/repo" . $this->repo->repoid
+            $logfs = glob($this->logdir . "/repo" . $this->repoid
                           . ".pset" . $this->pset->id . ".*.log");
             $this->_logged_checkts = [];
             foreach ($logfs as $f) {
@@ -228,7 +234,7 @@ class RunnerState {
 
     function generic_json() {
         return (object) [
-            "ok" => true, "repoid" => $this->repo->repoid,
+            "ok" => true, "repoid" => $this->repoid,
             "pset" => $this->pset->urlkey, "timestamp" => $this->checkt
         ];
     }
@@ -336,7 +342,7 @@ class RunnerState {
         // print json to first line
         $runsettings = $this->info->commit_info("runsettings");
         $json = (object) [
-            "repoid" => $this->repo->repoid, "pset" => $this->pset->urlkey,
+            "repoid" => $this->repoid, "pset" => $this->pset->urlkey,
             "timestamp" => $this->checkt, "hash" => $this->info->commit_hash(),
             "runner" => $this->runner->name
         ];
@@ -505,7 +511,7 @@ class RunnerState {
             where q.queueid={$this->queueid} group by q.queueid");
         $queue = $result->fetch_object();
         Dbl::free($result);
-        if ($queue && $queue->repoid == $this->repo->repoid)
+        if ($queue && $queue->repoid == $this->repoid)
             return $queue;
         else
             return null;
@@ -551,7 +557,7 @@ class RunnerState {
                 && $this->runner->nconcurrent > 0)
                 $nconcurrent = $this->runner->nconcurrent;
             $this->conf->qe("insert into ExecutionQueue set queueclass=?, repoid=?, insertat=?, updateat=?, runat=0, status=0, nconcurrent=?, psetid=?, runnername=?, bhash=?",
-                  $this->runner->queue, $this->repo->repoid,
+                  $this->runner->queue, $this->repoid,
                   $Now, $Now, $nconcurrent,
                   $this->pset->id, $this->runner->name,
                   hex2bin($this->info->commit_hash()));
@@ -645,7 +651,7 @@ class RunnerState {
         }
 
         if ($answer->status !== "working" && $this->queueid > 0)
-            $this->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repo->repoid);
+            $this->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repoid);
         if ($answer->status === "done") {
             $viewer = $this->info->viewer;
             if ($viewer->can_run($this->pset, $this->runner, $this->info->user)

@@ -529,8 +529,6 @@ function runmany($qreq) {
     global $Conf, $Me;
     if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled) {
         return $Conf->errorMsg("No such pset");
-    } else if ($pset->gitless) {
-        return $Conf->errorMsg("Pset has no repository");
     }
     $users = [];
     foreach (qreq_users($qreq) as $user) {
@@ -1322,9 +1320,8 @@ function show_pset_table($sset) {
         $anonymous = !!$Qreq->anonymous;
     }
 
-    $checkbox = $sset->viewer->privChair
-        || (!$pset->gitless && $pset->runners)
-        || $sset->viewer->isPC;
+    $checkbox = $sset->viewer->isPC
+        || (!$pset->gitless && $pset->runners);
 
     $rows = array();
     $incomplete = array();
@@ -1462,20 +1459,19 @@ function show_pset_table($sset) {
             '</span>';
     }
 
-    if (!$pset->gitless) {
-        $sel = ["__run_group" => ["optgroup", "Run"]];
-        $esel = ["__ensure_group" => ["optgroup", "Ensure"]];
-        foreach ($pset->runners as $r) {
-            if ($sset->viewer->can_run($pset, $r)) {
-                $sel[$r->name] = htmlspecialchars($r->title);
-                $esel[$r->name . ".ensure"] = htmlspecialchars($r->title);
-            }
+    $sel = ["__run_group" => ["optgroup", "Run"]];
+    $esel = ["__ensure_group" => ["optgroup", "Ensure"]];
+    foreach ($pset->runners as $r) {
+        if ($sset->viewer->can_run($pset, $r)) {
+            $sel[$r->name] = htmlspecialchars($r->title);
+            $esel[$r->name . ".ensure"] = htmlspecialchars($r->title);
         }
-        if (count($sel) > 1)
-            echo '<span class="nb" style="padding-right:2em">',
-                Ht::select("runner", $sel + $esel),
-                ' &nbsp;', Ht::submit("runmany", "Run all"),
-                '</span>';
+    }
+    if (count($sel) > 1) {
+        echo '<span class="nb" style="padding-right:2em">',
+            Ht::select("runner", $sel + $esel),
+            ' &nbsp;', Ht::submit("runmany", "Run all"),
+            '</span>';
     }
 
     if ($checkbox) {
