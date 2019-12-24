@@ -2182,6 +2182,9 @@ td.mhcb {
 .pa-p-hidden + .pa-p-hidden {
 	margin-top: -1rem;
 }
+.pa-pset-hidden > .pa-p-hidden + .pa-p-hidden {
+	margin-top: 0;
+}
 .pa-pset-hidden.in-modal {
 	background-color: #e8e8e8;
 	color: #777777;
