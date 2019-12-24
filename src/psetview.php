@@ -660,10 +660,12 @@ class PsetView {
                 foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
                     ++$this->n_visible_grades;
                     if (($ag && get($ag, $ge->key) !== null)
-                        || ($g && get($g, $ge->key) !== null))
+                        || ($g && get($g, $ge->key) !== null)) {
                         ++$this->n_set_grades;
-                    if (!$ge->no_total)
+                    }
+                    if (!$ge->no_total) {
                         ++$this->n_visible_in_total;
+                    }
                 }
             }
         }
@@ -686,14 +688,18 @@ class PsetView {
         $g = get($notes, "grades");
         foreach ($this->pset->visible_grades_in_total($this->pc_view) as $ge) {
             $gv = $g ? get($g, $ge->key) : null;
-            if ($gv === null && $ag)
+            if ($gv === null && $ag) {
                 $gv = get($ag, $ge->key);
-            if ($gv)
+            }
+            if ($gv) {
                 $total += $gv;
-            if ($gv && !$ge->is_extra)
+            }
+            if ($gv && !$ge->is_extra) {
                 $total_noextra += $gv;
-            if (!$ge->is_extra && $ge->max && $ge->max_visible)
+            }
+            if (!$ge->is_extra && $ge->max && $ge->max_visible) {
                 $maxtotal += $ge->max;
+            }
         }
         return [$total, $maxtotal, $total_noextra];
     }
@@ -715,7 +721,7 @@ class PsetView {
     }
 
 
-    function grading_info($key = null) {
+    function grade_info($key = null) {
         $this->ensure_grade();
         if ($key && $this->grade_notes) {
             return get($this->grade_notes, $key);
@@ -726,7 +732,7 @@ class PsetView {
 
     function current_info($key = null) {
         if ($this->pset->gitless_grades || $this->hash === null) {
-            return $this->grading_info($key);
+            return $this->grade_info($key);
         } else {
             return $this->commit_info($key);
         }
@@ -745,25 +751,30 @@ class PsetView {
 
     function current_line_note($file, $lineid) {
         $ln = $this->current_info("linenotes");
-        if ($ln)
+        if ($ln) {
             $ln = get($ln, $file);
-        if ($ln)
+        }
+        if ($ln) {
             $ln = get($ln, $lineid);
-        if ($ln)
+        }
+        if ($ln) {
             return LineNote::make_json($file, $lineid, $ln);
-        else
+        } else {
             return new LineNote($file, $lineid);
+        }
     }
 
     function current_grade_entry($k, $type = null) {
         $gn = $this->current_info();
         $grade = null;
         if ((!$type || $type == "autograde") && isset($gn->autogrades)
-            && property_exists($gn->autogrades, $k))
+            && property_exists($gn->autogrades, $k)) {
             $grade = $gn->autogrades->$k;
+        }
         if ((!$type || $type == "grade") && isset($gn->grades)
-            && property_exists($gn->grades, $k))
+            && property_exists($gn->grades, $k)) {
             $grade = $gn->grades->$k;
+        }
         return $grade;
     }
 
@@ -835,11 +846,11 @@ class PsetView {
     function change_grader($grader) {
         if (is_object($grader))
             $grader = $grader->contactId;
-        if ($this->pset->gitless_grades)
+        if ($this->pset->gitless_grades) {
             $q = Dbl::format_query
                 ("insert into ContactGrade (cid,pset,gradercid) values (?, ?, ?) on duplicate key update gradercid=values(gradercid)",
                  $this->user->contactId, $this->pset->id, $grader);
-        else {
+        } else {
             assert(!!$this->hash);
             if (!$this->repo_grade || $this->repo_grade->gradebhash === null)
                 $q = Dbl::format_query
@@ -853,21 +864,23 @@ class PsetView {
                      $this->repo->repoid, $this->branchid, $this->pset->id, $this->repo_grade->gradebhash);
             $this->update_commit_info(array("gradercid" => $grader));
         }
-        if ($q)
+        if ($q) {
             $this->conf->qe_raw($q);
+        }
         $this->clear_grade();
     }
 
     function mark_grading_commit() {
-        if ($this->pset->gitless_grades)
+        if ($this->pset->gitless_grades) {
             $this->conf->qe("insert into ContactGrade set cid=?, pset=?, gradercid=? on duplicate key update gradercid=gradercid",
                     $this->user->contactId, $this->pset->psetid,
                     $this->viewer->contactId);
-        else {
+        } else {
             assert(!!$this->hash);
             $grader = $this->commit_info("gradercid");
-            if (!$grader)
-                $grader = $this->grading_info("gradercid");
+            if (!$grader) {
+                $grader = $this->grade_info("gradercid");
+            }
             $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
                     $this->repo->repoid, $this->branchid, $this->pset->psetid,
                     $this->hash ? hex2bin($this->hash) : null, $grader ? : null);
@@ -877,10 +890,11 @@ class PsetView {
     }
 
     function set_hidden_grades($hidegrade) {
-        if ($this->pset->gitless_grades)
+        if ($this->pset->gitless_grades) {
             $this->conf->qe("update ContactGrade set hidegrade=? where cid=? and pset=?", $hidegrade, $this->user->contactId, $this->pset->psetid);
-        else
+        } else {
             $this->conf->qe("update RepositoryGrade set hidegrade=? where repoid=? and branchid=? and pset=?", $hidegrade, $this->repo->repoid, $this->branchid, $this->pset->psetid);
+        }
         $this->clear_grade();
     }
 

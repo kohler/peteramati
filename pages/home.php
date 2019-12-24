@@ -527,15 +527,18 @@ if ($Me->isPC && $Qreq->post_ok() && $Qreq->setgrader)
 
 function runmany($qreq) {
     global $Conf, $Me;
-    if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled)
+    if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled) {
         return $Conf->errorMsg("No such pset");
-    else if ($pset->gitless)
+    } else if ($pset->gitless) {
         return $Conf->errorMsg("Pset has no repository");
+    }
     $users = [];
-    foreach (qreq_users($qreq) as $user)
+    foreach (qreq_users($qreq) as $user) {
         $users[] = $Me->user_linkpart($user);
-    if (empty($users))
+    }
+    if (empty($users)) {
         return $Conf->errorMsg("No users selected.");
+    }
     $args = ["pset" => $pset->urlkey, "run" => $qreq->runner, "runmany" => 1, "users" => join(" ", $users)];
     if (str_ends_with($qreq->runner, ".ensure")) {
         $args["run"] = substr($qreq->runner, 0, -7);
@@ -1315,8 +1318,9 @@ function show_pset_table($sset) {
 
     // load students
     $anonymous = $pset->anonymous;
-    if ($Qreq->anonymous !== null && $sset->viewer->privChair)
+    if ($Qreq->anonymous !== null && $sset->viewer->privChair) {
         $anonymous = !!$Qreq->anonymous;
+    }
 
     $checkbox = $sset->viewer->privChair
         || (!$pset->gitless && $pset->runners)
@@ -1474,8 +1478,9 @@ function show_pset_table($sset) {
                 '</span>';
     }
 
-    if ($checkbox)
+    if ($checkbox) {
         echo "</form>\n";
+    }
 
     if ($Profile) {
         $t2 = microtime(true);

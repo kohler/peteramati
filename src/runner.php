@@ -160,12 +160,15 @@ class RunnerState {
     private function overlayfiles() {
         global $ConfSitePATH;
         $f = $this->runner->overlay;
-        if (!isset($f))
+        if (!isset($f)) {
             $f = $this->pset->run_overlay;
-        if ($f === null || $f === "" || $f === [])
+        }
+        if ($f === null || $f === "" || $f === []) {
             return [];
-        if (is_string($f))
+        }
+        if (is_string($f)) {
             $f = [$f];
+        }
         for ($i = 0; $i !== count($f); ) {
             if ($f[$i] === "") {
                 array_splice($f, $i, 1);
@@ -200,24 +203,26 @@ class RunnerState {
 
 
     function set_checkt($checkt) {
-        if (is_int($checkt) && $checkt > 0)
+        if (is_int($checkt) && $checkt > 0) {
             $this->checkt = $checkt;
-        else if (ctype_digit($checkt))
+        } else if (ctype_digit($checkt)) {
             $this->checkt = intval($checkt);
-        else if (preg_match(',\.(\d+)\.log(?:\.lock|\.pid)?\z,', $checkt, $m))
+        } else if (preg_match(',\.(\d+)\.log(?:\.lock|\.pid)?\z,', $checkt, $m)) {
             $this->checkt = intval($m[1]);
-        else
+        } else {
             $this->checkt = null;
+        }
         return $this->checkt !== null;
     }
 
     function set_queueid($queueid) {
-        if (is_int($queueid) && $queueid > 0)
+        if (is_int($queueid) && $queueid > 0) {
             $this->queueid = $queueid;
-        else if (ctype_digit($queueid))
+        } else if (ctype_digit($queueid)) {
             $this->queueid = intval($queueid);
-        else
+        } else {
             $this->queueid = null;
+        }
         return $this->queueid !== null;
     }
 
