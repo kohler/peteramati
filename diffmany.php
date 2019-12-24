@@ -27,7 +27,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     global $Me, $psetinfo_idx, $all_viewed_gradeentries;
     ++$psetinfo_idx;
     $info = PsetView::make($pset, $user, $Me);
-    if (!$info->repo)
+    if (!$pset->gitless && !$info->repo)
         return;
     $info->set_hash(false);
     echo '<div id="pa-psetinfo', $psetinfo_idx,
