@@ -139,7 +139,7 @@ $Info = user_pset_info();
 if ($Qreq->run === null || !$Qreq->post_ok()) {
     quit("Permission error");
 } else if ($Runner->command) {
-    if (!$Repo) {
+    if (!$Info->repo) {
         quit("No repository to run");
     } else if (!$Info->commit()) {
         quit("No commit to run");
