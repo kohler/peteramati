@@ -5993,7 +5993,7 @@ function pa_render_pset_table(pconf, data) {
                     grade_titles.push(t);
                     var m = t.match(/^(p)(?:art\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i);
                     m = m || t.match(/^(q)(?:uestion\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i);
-                    m = m || t.match(/^[\s:]*()(\S{1,3}[\d.]*)\S*[\s:]*/);
+                    m = m || t.match(/^[\s:]*()(\S{1,3}[\d.]*)[^\s\d]*[\s:]*/);
                     if (!m) {
                         grade_abbr.push(":" + grade_keys.length);
                     } else {
@@ -6007,7 +6007,7 @@ function pa_render_pset_table(pconf, data) {
                                 pabbr[grade_abbr[abbrx[0]]] = [abbrx[0], m[2]];
                                 pabbr[abbr] = abbrx = true;
                             }
-                            if ((m = rest.match(/^(\S{1,3}[\d.]*)\S*[\s:]*(.*)$/))) {
+                            if ((m = rest.match(/^(\S{1,3}[\d.]*)[^\s\d]*[\s:]*(.*)$/))) {
                                 abbr += m[1];
                                 rest = m[2];
                             } else {
