@@ -4,8 +4,9 @@
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
-if ($Me->is_empty())
+if ($Me->is_empty()) {
     $Me->escape();
+}
 global $User, $Pset, $Info, $Qreq;
 
 function quit($err = null) {
@@ -16,10 +17,12 @@ function quit($err = null) {
 function user_pset_info() {
     global $Conf, $User, $Me, $Pset, $Info, $Qreq;
     $Info = PsetView::make($Pset, $User, $Me);
-    if (($Commit = $Qreq->newcommit) == null)
+    if (($Commit = $Qreq->newcommit) == null) {
         $Commit = $Qreq->commit;
-    if (!$Info->set_hash($Commit))
+    }
+    if (!$Info->set_hash($Commit)) {
         quit(!$Info->repo ? "No repository" : "Commit $Commit isn’t connected to this repository");
+    }
     return $Info;
 }
 
@@ -28,8 +31,9 @@ ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/
 // user, pset, runner
 $User = $Me;
 if ($Qreq->u !== null
-    && !($User = ContactView::prepare_user($Qreq->u)))
+    && !($User = ContactView::prepare_user($Qreq->u))) {
     json_exit(["ok" => false]);
+}
 assert($User == $Me || $Me->isPC);
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
@@ -37,19 +41,25 @@ $Pset = ContactView::find_pset_redirect($Qreq->pset);
 // XXX this should be under `api`
 if ($Qreq->flag && $Qreq->post_ok() && user_pset_info()) {
     $flags = (array) $Info->current_info("flags");
-    if ($Qreq->flagid && !isset($flags["t" . $Qreq->flagid]))
+    if ($Qreq->flagid && !isset($flags["t" . $Qreq->flagid])) {
         json_exit(["ok" => false, "error" => "No such flag"]);
-    if (!$Qreq->flagid)
+    }
+    if (!$Qreq->flagid) {
         $Qreq->flagid = "t" . $Now;
+    }
     $flag = get($flags, $Qreq->flagid, []);
-    if (!get($flag, "uid"))
+    if (!get($flag, "uid")) {
         $flag["uid"] = $Me->contactId;
-    if (!get($flag, "started"))
+    }
+    if (!get($flag, "started")) {
         $flag["started"] = $Now;
-    if (get($flag, "started", $Qreq->flagid) != $Now)
+    }
+    if (get($flag, "started", $Qreq->flagid) != $Now) {
         $flag["updated"] = $Now;
-    if ($Qreq->flagreason)
+    }
+    if ($Qreq->flagreason) {
         $flag["conversation"][] = [$Now, $Me->contactId, $Qreq->flagreason];
+    }
     $updates = ["flags" => [$Qreq->flagid => $flag]];
     $Info->update_current_info($updates);
     json_exit(["ok" => true]);
@@ -58,36 +68,41 @@ if ($Qreq->flag && $Qreq->post_ok() && user_pset_info()) {
 // XXX this should be under `api`
 if ($Qreq->resolveflag && $Qreq->post_ok() && user_pset_info()) {
     $flags = (array) $Info->current_info("flags");
-    if (!$Qreq->flagid || !isset($flags[$Qreq->flagid]))
+    if (!$Qreq->flagid || !isset($flags[$Qreq->flagid])) {
         json_exit(["ok" => false, "error" => "No such flag"]);
-    if (get($flags[$Qreq->flagid], "resolved"))
+    }
+    if (get($flags[$Qreq->flagid], "resolved")) {
         json_exit(["ok" => true]);
+    }
     $updates = ["flags" => [$Qreq->flagid => ["resolved" => [$Now, $Me->contactId]]]];
     $Info->update_current_info($updates);
     json_exit(["ok" => true]);
 }
 
 $Runner = null;
-foreach ($Pset->runners as $r)
+foreach ($Pset->runners as $r) {
     if ($r->name == $Qreq->run)
         $Runner = $r;
+}
 $RunMany = $Me->isPC && $Qreq->runmany && $Qreq->post_ok();
-if (!$Runner)
+if (!$Runner) {
     quit("No such command");
-else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
-    if (!$Me->isPC && !$Runner->visible)
+} else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
+    if (!$Me->isPC && !$Runner->visible) {
         quit("Command reserved for TFs");
-    else if ($Runner->disabled)
+    } else if ($Runner->disabled) {
         quit("Command disabled");
-    else
+    } else {
         quit("Can’t run command right now");
+    }
 }
 
 // magic multi-runner
 if ($Me->isPC && $Qreq->runmany && $Qreq->post_ok()) {
     $t = $Pset->title;
-    if ($Qreq->ensure)
+    if ($Qreq->ensure) {
         $t .= " Ensure";
+    }
     $t .= " " . $Runner->title;
     $Conf->header(htmlspecialchars($t), "home");
 
@@ -96,8 +111,9 @@ if ($Me->isPC && $Qreq->runmany && $Qreq->post_ok()) {
         '<div class="f-contain">',
         Ht::hidden("u", ""),
         Ht::hidden("pset", $Pset->urlkey);
-    if ($Qreq->ensure)
+    if ($Qreq->ensure) {
         echo Ht::hidden("ensure", 1);
+    }
     echo Ht::hidden("run", $Runner->name, ["id" => "runmany61", "data-pa-run-category" => $Runner->category_argument()]),
         '</div></form>';
 
@@ -121,26 +137,29 @@ $Info = user_pset_info();
 $Repo = $Info->repo;
 
 // can we run this?
-if (!$Repo)
+if (!$Repo) {
     quit("No repository to run");
-else if (!$Info->commit())
+} else if (!$Info->commit()) {
     quit("No commit to run");
-else if ($Qreq->run === null || !$Qreq->post_ok())
+} else if ($Qreq->run === null || !$Qreq->post_ok()) {
     quit("Permission error");
-else if (!$Info->can_view_repo_contents())
+} else if (!$Info->can_view_repo_contents()) {
     quit("Unconfirmed repository");
+}
 
 // we’re gonna run it; check permission
-if (!$Me->can_run($Pset, $Runner, $User))
+if (!$Me->can_run($Pset, $Runner, $User)) {
     quit("You can’t run that command");
+}
 
 // extract request info
 $Rstate = new RunnerState($Info, $Runner);
 $Rstate->set_queueid($Qreq->get("queueid"));
 
 // recent or checkup
-if ($Qreq->check)
+if ($Qreq->check) {
     json_exit($Rstate->check($Qreq));
+}
 
 // ensure
 if ($Qreq->ensure) {
@@ -150,15 +169,18 @@ if ($Qreq->ensure) {
 }
 
 // check runnability
-if (!$Pset->run_dirpattern)
+if (!$Pset->run_dirpattern) {
     quit("Configuration error (run_dirpattern)");
-if (!$Pset->run_jailfiles)
+}
+if (!$Pset->run_jailfiles) {
     quit("Configuration error (run_jailfiles)");
+}
 
 // queue
 $Queue = $Rstate->make_queue();
-if ($Queue && !$Queue->runnable)
+if ($Queue && !$Queue->runnable) {
     json_exit(["onqueue" => true, "queueid" => $Queue->queueid, "nahead" => $Queue->nahead, "headage" => ($Queue->head_runat ? $Now - $Queue->head_runat : null)]);
+}
 
 
 // maybe eval
@@ -174,8 +196,9 @@ if (!$Runner->command && $Runner->eval) {
 
 // otherwise run
 try {
-    if ($Rstate->is_recent_job_running())
+    if ($Rstate->is_recent_job_running()) {
         quit("Recent job still running");
+    }
     session_write_close();
 
     // run
