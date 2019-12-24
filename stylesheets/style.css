@@ -2174,6 +2174,12 @@ td.mhcb {
 	margin-right: -24px;
 	padding: 0.5rem 24px;
 }
+.in-modal > .pa-p-hidden {
+	margin-left: -1rem;
+	margin-right: -1rem;
+	padding-left: 1rem;
+	padding-right: 1rem;
+}
 .pa-pset-hidden > .pa-p-hidden {
 	margin-left: 0;
 	margin-right: 0;
