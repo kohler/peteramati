@@ -24,6 +24,7 @@ class Pset {
     public $psetid;
     public $key;
     public $urlkey;
+    public $nonnumeric_key;
 
     public $title;
     public $group;
@@ -124,6 +125,7 @@ class Pset {
             throw new PsetConfigException("pset key cannot end with `{$m[0]}`", "key");
         }
         $this->key = $pk;
+        $this->nonnumeric_key = ctype_digit($pk) ? "pset" . $pk : $pk;
 
         // url keys
         $urlkey = get($p, "urlkey");
@@ -240,6 +242,9 @@ class Pset {
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         } else {
             $this->grades = self::position_sort("grades", $this->all_grades);
+        }
+        foreach (array_values($this->grades) as $i => $ge) {
+            $ge->pcview_index = $i;
         }
         $this->grades_visible = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible_college = self::cdate($p, "grades_visible_college", "show_grades_to_college");
@@ -781,6 +786,7 @@ class GradeEntryConfig {
     public $no_total;
     public $is_extra;
     public $position;
+    public $pcview_index;
     public $landmark_file;
     public $landmark_line;
     public $landmark_range_file;

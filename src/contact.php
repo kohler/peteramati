@@ -752,7 +752,7 @@ class Contact {
             if ($ge->key === "late_hours") {
                 return get($this->_gcache[$pset->id], "late_hours", null);
             } else {
-                return get($this->_gcache[$pset->id]["grades"], $ge->pos, null);
+                return get($this->_gcache[$pset->id]["grades"], $ge->pcview_index, null);
             }
         } else {
             return null;

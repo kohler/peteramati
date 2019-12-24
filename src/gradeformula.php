@@ -3,7 +3,7 @@
 // HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
-class GradeFormula {
+class GradeFormula implements JsonSerializable {
     private $_op;
     private $_a;
 
@@ -37,7 +37,7 @@ class GradeFormula {
         } else if (preg_match('{\A(\d+\.?\d*|\.\d+)(.*)\z}s', $t, $m)) {
             $t = $m[2];
             $e = new GradeFormula("n", (float) $m[1]);
-        } else if (preg_match('{\A(?:pi|π|m_pi)(.*)\z}si', $t, $m)) {
+        } else if (preg_match('{\A(?:pi|π|m_pi)\b(.*)\z}si', $t, $m)) {
             $t = $m[2];
             $e = new GradeFormula("n", (float) M_PI);
         } else if (preg_match('{\A(log10|log|ln|lg|exp)\b(.*)\z}s', $t, $m)) {
@@ -49,6 +49,7 @@ class GradeFormula {
         } else if (preg_match('{\A(\w+)\s*\.\s*(\w+)(.*)\z}s', $t, $m)) {
             if (($pset = $conf->pset_by_key_or_title($m[1]))
                 && ($ge = $pset->gradelike_by_key($m[2]))) {
+                $t = $m[3];
                 $e = new GradeFormula("g", [$pset, $ge]);
             } else {
                 return null;
@@ -169,6 +170,25 @@ class GradeFormula {
             return log($vs[0]) / log(2);
         case "exp":
             return exp($vs[0]);
+        }
+    }
+
+    function jsonSerialize() {
+        switch ($this->_op) {
+        case "n":
+            return $this->_a;
+        case "g":
+            return $this->_a[0]->nonnumeric_key . "." . $this->_a[1]->key;
+        case "gpt":
+            return $this->_a[0]->nonnumeric_key . ($this->_a[1] ? "_noextra" : "") . ($this->_a[2] ? "" : "_norm");
+        case "ggt":
+            return $this->_a[0] . ($this->_a[1] ? "_noextra" : "") . ($this->_a[2] ? "_raw" : "");
+        default:
+            $x = [$this->_op];
+            foreach ($this->_a as $a) {
+                $x[] = is_number($a) ? $a : $a->jsonSerialize();
+            }
+            return $x;
         }
     }
 }
