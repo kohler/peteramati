@@ -23,6 +23,7 @@ class Contact {
     public $contactDbId = 0;
     private $cid;               // for forward compatibility
     public $conf;
+    public $student_set;
 
     public $firstName = "";
     public $lastName = "";
@@ -45,6 +46,7 @@ class Contact {
     private $creationTime;
     private $updateTime;
     private $lastLogin;
+    public $gradeUpdateTime;
 
     public $disabled = false;
     private $_disabled;
@@ -72,6 +74,7 @@ class Contact {
     // $contactLinks -- property_exists() is meaningful
     private $repos = [];
     private $partners = [];
+    private $_gcache = [];
 
     // Roles
     const ROLE_PC = 1;
@@ -152,9 +155,10 @@ class Contact {
         if (isset($user->disabled))
             $this->disabled = !!$user->disabled;
         foreach (["defaultWatch", "passwordTime", "passwordUseTime",
-                  "updateTime", "creationTime"] as $k)
+                  "updateTime", "creationTime", "gradeUpdateTime"] as $k) {
             if (isset($user->$k))
                 $this->$k = (int) $user->$k;
+        }
         if (property_exists($user, "contactTags"))
             $this->contactTags = $user->contactTags;
         else
@@ -194,26 +198,34 @@ class Contact {
     private function db_load() {
         $this->contactId = $this->cid = (int) $this->contactId;
         $this->contactDbId = (int) $this->contactDbId;
-        if ($this->unaccentedName === "")
+        if ($this->unaccentedName === "") {
             $this->unaccentedName = Text::unaccented_name($this->firstName, $this->lastName);
+        }
         self::set_sorter($this, $this->conf);
         $this->password = (string) $this->password;
-        if (isset($this->disabled))
+        if (isset($this->disabled)) {
             $this->disabled = !!$this->disabled;
-        foreach (["defaultWatch", "passwordTime"] as $k)
+        }
+        foreach (["defaultWatch", "passwordTime", "gradeUpdateTime"] as $k) {
             $this->$k = (int) $this->$k;
-        if (isset($this->activity_at))
+        }
+        if (isset($this->activity_at)) {
             $this->activity_at = (int) $this->activity_at;
-        else if (isset($this->lastLogin))
+        } else if (isset($this->lastLogin)) {
             $this->activity_at = (int) $this->lastLogin;
-        if (isset($this->extension))
+        }
+        if (isset($this->extension)) {
             $this->extension = !!$this->extension;
-        if (isset($this->contactImageId))
+        }
+        if (isset($this->contactImageId)) {
             $this->contactImageId = (int) $this->contactImageId;
-        if (isset($this->roles))
+        }
+        if (isset($this->roles)) {
             $this->assign_roles((int) $this->roles);
-        if (!$this->isPC && $this->conf->opt("disableNonPC"))
+        }
+        if (!$this->isPC && $this->conf->opt("disableNonPC")) {
             $this->disabled = true;
+        }
         $this->username = $this->github_username ? : $this->seascode_username;
     }
 
@@ -229,8 +241,9 @@ class Contact {
         if ($name === "cid")
             $this->contactId = $this->cid = $value;
         else {
-            if (!self::$allow_nonexistent_properties && $name !== "contactLinks")
+            if (!self::$allow_nonexistent_properties && $name !== "contactLinks") {
                 error_log(caller_landmark(1) . ": writing nonexistent property $name");
+            }
             $this->$name = $value;
         }
     }
@@ -610,51 +623,60 @@ class Contact {
         return $branchid ? $this->conf->branch($branchid) : null;
     }
 
-    private function adjust_links($type, $pset) {
-        if ($type == LINK_REPO)
+    private function adjust_links($type, $psetid) {
+        if ($type == LINK_REPO) {
             $this->repos = array();
-        else if ($type == LINK_PARTNER)
+        } else if ($type == LINK_PARTNER) {
             $this->partners = array();
-        if ($type === LINK_REPO || $type === LINK_BRANCH)
-            $this->conf->invalidate_grades($pset);
+        }
+        if ($type === LINK_REPO || $type === LINK_BRANCH) {
+            $this->invalidate_grades($psetid);
+        }
     }
 
-    function clear_links($type, $pset = 0, $nolog = false) {
-        unset($this->links[$type][$pset]);
-        $this->adjust_links($type, $pset);
-        if ($this->conf->qe("delete from ContactLink where cid=? and type=? and pset=?", $this->contactId, $type, $pset)) {
-            if (!$nolog)
-                $this->conf->log("Clear links [$type,$pset]", $this);
+    function clear_links($type, $psetid = 0, $nolog = false) {
+        unset($this->links[$type][$psetid]);
+        $this->adjust_links($type, $psetid);
+        if ($this->conf->qe("delete from ContactLink where cid=? and type=? and pset=?", $this->contactId, $type, $psetid)) {
+            if (!$nolog) {
+                $this->conf->log("Clear links [$type,$psetid]", $this);
+            }
             return true;
-        } else
+        } else {
             return false;
+        }
     }
 
-    function set_link($type, $pset, $link) {
-        if ($this->links === null)
+    function set_link($type, $psetid, $link) {
+        if ($this->links === null) {
             $this->load_links();
-        $this->clear_links($type, $pset, false);
-        $this->links[$type][$pset] = [$link];
-        if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $pset, $link)) {
-            $this->conf->log("Set links [$type,$pset,$link]", $this);
+        }
+        $this->clear_links($type, $psetid, false);
+        $this->links[$type][$psetid] = [$link];
+        if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $psetid, $link)) {
+            $this->conf->log("Set links [$type,$psetid,$link]", $this);
             return true;
-        } else
+        } else {
             return false;
+        }
     }
 
-    function add_link($type, $pset, $value) {
-        assert($type !== LINK_BRANCH);
-        if ($this->links === null)
+    function add_link($type, $psetid, $value) {
+        assert($type !== LINK_REPO && $type !== LINK_BRANCH);
+        if ($this->links === null) {
             $this->load_links();
-        if (!isset($this->links[$type][$pset]))
-            $this->links[$type][$pset] = array();
-        if (!in_array($value, $this->links[$type][$pset])) {
-            $this->links[$type][$pset][] = $value;
-            if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $pset, $value)) {
-                $this->conf->log("Add link [$type,$pset,$value]", $this);
+        }
+        if (!isset($this->links[$type][$psetid])) {
+            $this->links[$type][$psetid] = array();
+        }
+        if (!in_array($value, $this->links[$type][$psetid])) {
+            $this->links[$type][$psetid][] = $value;
+            if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $psetid, $value)) {
+                $this->conf->log("Add link [$type,$psetid,$value]", $this);
                 return true;
-            } else
+            } else {
                 return false;
+            }
         }
         return true;
     }
@@ -664,20 +686,23 @@ class Contact {
         if (!array_key_exists($pset, $this->repos)) {
             $this->repos[$pset] = null;
             $repoid = $this->link(LINK_REPO, $pset);
-            if ($repoid && (!$repo || $repo->repoid != $repoid))
+            if ($repoid && (!$repo || $repo->repoid != $repoid)) {
                 $repo = Repository::find_id($repoid, $this->conf);
-            if ($repoid && $repo)
+            }
+            if ($repoid && $repo) {
                 $this->repos[$pset] = $repo;
+            }
         }
         return $this->repos[$pset];
     }
 
     function set_repo($pset, $repo) {
         $pset = is_object($pset) ? $pset->psetid : $pset;
-        if ($repo)
+        if ($repo) {
             $this->set_link(LINK_REPO, $pset, $repo->repoid);
-        else
+        } else {
             $this->clear_links(LINK_REPO, $pset);
+        }
         $this->repos[$pset] = $repo;
         return true;
     }
@@ -687,8 +712,9 @@ class Contact {
         if (!array_key_exists($pset, $this->partners)) {
             $this->partners[$pset] = null;
             $pcid = $this->link(LINK_PARTNER, $pset);
-            if ($pcid && (!$partner || $partner->contactId != $pcid))
+            if ($pcid && (!$partner || $partner->contactId != $pcid)) {
                 $partner = $this->conf->user_by_id($pcid);
+            }
             if ($pcid && $partner) {
                 if ($this->is_anonymous)
                     $partner->set_anonymous(true);
@@ -696,6 +722,82 @@ class Contact {
             }
         }
         return $this->partners[$pset];
+    }
+
+
+    function invalidate_grades($psetid) {
+        global $Now;
+        $this->conf->qe("delete from Settings where name=? or name=?",
+                        "__gradets.p$psetid", "__gradets.pp$psetid");
+        $this->conf->qe("update ContactInfo set gradeUpdateTime=? where contactId=?",
+                        $Now, $this->contactId);
+        $this->gradeUpdateTime = $Now;
+        $this->_gcache = [];
+    }
+
+    private function ensure_gcache(Pset $pset) {
+        if (!array_key_exists($pset->id, $this->_gcache)) {
+            if ($this->student_set) {
+                $info = $this->student_set->info_at($this->contactId, $pset);
+            } else {
+                $info = PsetView::make($pset, $this, $this->conf->site_contact());
+            }
+            $this->_gcache[$pset->id] = $info->grade_json(true, true);
+        }
+    }
+
+    function gcache_entry(Pset $pset, GradeEntryConfig $ge) {
+        $this->ensure_gcache($pset);
+        if (isset($this->_gcache[$pset->id])) {
+            if ($ge->key === "late_hours") {
+                return get($this->_gcache[$pset->id], "late_hours", null);
+            } else {
+                return get($this->_gcache[$pset->id]["grades"], $ge->pos, null);
+            }
+        } else {
+            return null;
+        }
+    }
+
+    function gcache_total(Pset $pset, $noextra, $raw) {
+        $this->ensure_gcache($pset);
+        if (isset($this->_gcache[$pset->id])) {
+            $v = get($this->_gcache[$pset->id], "total", null);
+            if ($v !== null && $noextra && isset($this->_gcache[$pset->id]["total_noextra"])) {
+                $v = $this->_gcache[$pset->id]["total_noextra"];
+            }
+            if ($v !== null && !$raw) {
+                $v = round(($v * 1000.0) / $pset->max_grade(true)) / 10;
+            }
+            return $v;
+        } else {
+            return null;
+        }
+    }
+
+    function gcache_group_total($group, $noextra, $raw) {
+        $k = "\$g\$group";
+        if (!array_key_exists($k, $this->_gcache)) {
+            $this->_gcache[$k] = [false, false, false, false];
+        }
+        $i = ($noextra ? 1 : 0) | ($raw ? 2 : 0);
+        if ($this->_gcache[$k][$i] === false) {
+            $gw = $this->conf->group_weight($group);
+            $x = null;
+            foreach ($this->conf->psets() as $p) {
+                if (!$p->disabled && $p->group === $group) {
+                    $v = $this->gcache_total($p, $noextra, $raw);
+                    if ($v !== null) {
+                        if (!$raw) {
+                            $v *= $p->group_weight / $gw;
+                        }
+                        $x = ($x === null ? 0.0 : $x) + $v;
+                    }
+                }
+            }
+            $this->_gcache[$k][$i] = $x === null ? $x : round($x * 10.0) / 10.0;
+        }
+        return $this->_gcache[$k][$i];
     }
 
 

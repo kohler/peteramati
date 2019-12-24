@@ -2943,6 +2943,12 @@ var pa_grade_types = {
             return v + "";
         }
     },
+    formula: {
+        type: "formula",
+        text: function (v) {
+            return v + "";
+        }
+    },
     text: {
         type: "text",
         text: function (v) {
@@ -3007,7 +3013,8 @@ var pa_grade_types = {
 
 function pa_render_grade_entry(ge, options) {
     var t, name = ge.key, title = ge.title ? escape_entities(ge.title) : name;
-    if (options === true || (options && options.editable)) {
+    if ((options === true || (options && options.editable))
+        && ge.type !== "formula") {
         var live = options === true || options.live,
             livecl = live ? 'uich ' : '',
             id = "pa-ge" + ++pa_render_grade_entry.id_counter;
@@ -3037,10 +3044,11 @@ function pa_render_grade_entry(ge, options) {
             t += '<div class="pa-pd"><span class="pa-gradewidth">' +
                 '<input type="text" class="' + livecl + 'pa-gradevalue" name="' + name +
                 '" id="' + id + '"></span> <span class="pa-gradedesc">';
-            if (ge.type === "letter")
+            if (ge.type === "letter") {
                 t += 'letter grade';
-            else if (ge.max)
+            } else if (ge.max) {
                 t += 'of ' + ge.max;
+            }
             t += '</span></div>';
         }
         t += live ? '</form>' : '</div>';

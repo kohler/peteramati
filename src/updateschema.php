@@ -464,6 +464,9 @@ function updateSchema($conf) {
     if ($conf->sversion == 130
         && $conf->ql("delete from Settings where name like 'gradejson_%'"))
         $conf->update_schema_version(131);
+    if ($conf->sversion == 131
+        && $conf->ql("alter table ContactInfo add `gradeUpdateTime` bigint(11) NOT NULL DEFAULT '0'"))
+        $conf->update_schema_version(132);
 
     $conf->ql("delete from Settings where name='__schema_lock'");
 }

@@ -68,7 +68,8 @@ class Conf {
     private $_psets = [];
     private $_psets_by_urlkey = [];
     private $_psets_sorted = false;
-    private $_group_weights;
+    private $_group_weights = [];
+    private $_group_weight_defaults = [];
     private $_grouped_psets;
     private $_group_has_extra;
 
@@ -95,10 +96,12 @@ class Conf {
 
     function __construct($options, $make_dsn) {
         // unpack dsn, connect to database, load current settings
-        if ($make_dsn && ($this->dsn = Dbl::make_dsn($options)))
+        if ($make_dsn && ($this->dsn = Dbl::make_dsn($options))) {
             list($this->dblink, $options["dbName"]) = Dbl::connect_dsn($this->dsn);
-        if (!isset($options["confid"]))
+        }
+        if (!isset($options["confid"])) {
             $options["confid"] = get($options, "dbName");
+        }
         $this->opt = $options;
         $this->dbname = $options["dbName"];
         if ($this->dblink && !Dbl::$default_dblink) {
@@ -108,8 +111,9 @@ class Conf {
         if ($this->dblink) {
             Dbl::$landmark_sanitizer = "/^(?:Dbl::|Conf::q|call_user_func)/";
             $this->load_settings();
-        } else
+        } else {
             $this->crosscheck_options();
+        }
     }
 
 
@@ -148,7 +152,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 131) {
+        if ($this->sversion < 132) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -497,14 +501,6 @@ class Conf {
         if ($this->_gsettings_loaded !== true)
             $this->_gsettings_loaded[$name] = true;
         return $change;
-    }
-
-
-    function invalidate_grades($pset) {
-        if (is_object($pset))
-            $pset = $pset->id;
-        $this->qe("delete from Settings where name=? or name=?",
-                  "__gradets.p$pset", "__gradets.pp$pset");
     }
 
 
@@ -1762,14 +1758,25 @@ class Conf {
 
 
     function register_pset(Pset $pset) {
-        if (isset($this->_psets[$pset->id]))
+        if (isset($this->_psets[$pset->id])) {
             throw new Exception("pset id `{$pset->id}` reused");
+        }
         $this->_psets[$pset->id] = $pset;
-        if (isset($this->_psets_by_urlkey[$pset->urlkey]))
+        if (isset($this->_psets_by_urlkey[$pset->urlkey])) {
             throw new Exception("pset urlkey `{$pset->urlkey}` reused");
+        }
         $this->_psets_by_urlkey[$pset->urlkey] = $pset;
+        if (!$pset->disabled && $pset->group) {
+            if (!isset($this->_group_weights[$pset->group])) {
+                $this->_group_weights[$pset->group] = $pset->group_weight;
+                $this->_group_weight_defaults[$pset->group] = $pset->group_weight_default;
+            } else if ($this->_group_weight_defaults[$pset->group] === $pset->group_weight_default) {
+                $this->_group_weights[$pset->group] += $pset->group_weight;
+            } else {
+                throw new Exception("pset group `{$pset->group}` has not all group weights set");
+            }
+        }
         $this->_psets_sorted = false;
-        $this->_group_weights = null;
     }
 
     function psets() {
@@ -1815,12 +1822,6 @@ class Conf {
     }
 
     function group_weight($group) {
-        if ($this->_group_weights === null) {
-            $this->_group_weights = [];
-            foreach ($this->psets() as $pset)
-                if (!$pset->disabled && $pset->group)
-                    $this->_group_weights[$pset->group] = get($this->_group_weights, $pset->group, 0.0) + $pset->group_weight;
-        }
         return get($this->_group_weights, $group, 0.0);
     }
 

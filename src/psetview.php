@@ -66,21 +66,22 @@ class PsetView {
         return $info;
     }
 
-    static function make_from_set(StudentSet $sset, Contact $user) {
-        $info = new PsetView($sset->pset, $user, $sset->viewer);
-        if (($pcid = $user->link(LINK_PARTNER, $info->pset->id)))
-            $info->partner = $user->partner($info->pset->id, $sset->user($pcid));
-        if (!$info->pset->gitless) {
-            $info->repo = $user->repo($info->pset->id, $sset->repo($user));
-            $info->branchid = $user->branchid($info->pset);
+    static function make_from_set_at(StudentSet $sset, Contact $user, Pset $pset) {
+        $info = new PsetView($pset, $user, $sset->viewer);
+        if (($pcid = $user->link(LINK_PARTNER, $pset->id))) {
+            $info->partner = $user->partner($pset->id, $sset->user($pcid));
+        }
+        if (!$pset->gitless) {
+            $info->repo = $user->repo($pset->id, $sset->repo_at($user, $pset));
+            $info->branchid = $user->branchid($pset);
             $info->branch = $info->branchid ? $info->conf->branch($info->branchid) : null;
         }
 
-        $info->contact_grade = $sset->contact_grade($user);
-        if ($info->pset->gitless_grades) {
+        $info->contact_grade = $sset->contact_grade_at($user, $pset);
+        if ($pset->gitless_grades) {
             $info->grade = $info->contact_grade;
         } else if ($info->repo) {
-            $info->repo_grade = $sset->repo_grade_with_notes($user);
+            $info->repo_grade = $sset->repo_grade_with_notes_at($user, $pset);
         }
         $info->analyze_grade();
         return $info;
@@ -361,8 +362,9 @@ class PsetView {
             $this->repo_grade->hasactiveflags = $record->hasactiveflags;
             $this->repo_grade->notesversion = $record->notesversion;
             $this->grade_notes = $record->notes;
-            if (isset($updates["grades"]) || isset($updates["autogrades"]))
-                $this->conf->invalidate_grades($this->pset);
+            if (isset($updates["grades"]) || isset($updates["autogrades"])) {
+                $this->user->invalidate_grades($this->pset->id);
+            }
         }
     }
 
@@ -413,8 +415,9 @@ class PsetView {
             $this->grade_notes = $record->notes;
         }
         $this->can_view_grades = $this->user_can_view_grades = null;
-        if (isset($updates["grades"]) || isset($updates["autogrades"]))
-            $this->conf->invalidate_grades($this->pset);
+        if (isset($updates["grades"]) || isset($updates["autogrades"])) {
+            $this->user->invalidate_grades($this->pset->id);
+        }
     }
 
     function update_current_info($updates, $reset_keys = false) {
@@ -884,7 +887,7 @@ class PsetView {
             $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, gradercid=?, placeholder=0 on duplicate key update gradebhash=values(gradebhash), gradercid=values(gradercid), placeholder=0",
                     $this->repo->repoid, $this->branchid, $this->pset->psetid,
                     $this->hash ? hex2bin($this->hash) : null, $grader ? : null);
-            $this->conf->invalidate_grades($this->pset);
+            $this->user->invalidate_grades($this->pset->id);
         }
         $this->clear_grade();
     }
@@ -1088,25 +1091,46 @@ class PsetView {
     }
 
 
-    function grade_json($no_entries = false) {
+    function ensure_formula() {
+        if ($this->pset->has_formula) {
+            $notes = $this->current_info();
+            $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
+            if (!isset($notes->formula_at)
+                || $notes->formula_at !== $t) {
+                $u = ["formula_at" => $t, "formula" => []];
+                foreach ($this->pset->grades() as $ge) {
+                    if (($f = $ge->formula($this->conf))) {
+                        $u["formula"][$ge->key] = $f->evaluate($this->user);
+                    }
+                }
+                $this->update_current_info($u);
+            }
+        }
+    }
+
+    function grade_json($no_entries = false, $override_view = false) {
         $this->ensure_grade();
-        if (!$this->can_view_grades()) {
+        if (!$override_view && !$this->can_view_grades()) {
             return null;
         }
+        $this->ensure_formula();
+        $pc_view = $override_view || $this->pc_view;
 
-        $notes = $this->current_info();
         if ($no_entries) {
             $result = [];
         } else {
             $result = $this->pset->gradeentry_json($this->pc_view);
         }
         $result["uid"] = $this->user->contactId;
+
+        $notes = $this->current_info();
         $agx = get($notes, "autogrades");
         $gx = get($notes, "grades");
+        $fgx = $this->pset->has_formula ? get($notes, "formula") : null;
         if ($agx || $gx || $this->is_grading_commit()) {
             $g = $ag = [];
             $total = $total_noextra = 0;
-            foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
+            foreach ($this->pset->visible_grades($pc_view) as $ge) {
                 $key = $ge->key;
                 $gv = null;
                 if ($agx) {
@@ -1118,6 +1142,9 @@ class PsetView {
                     if ($gx->$key === false)
                         $gv = null;
                 }
+                if ($ge->formula && property_exists($fgx, $key)) {
+                    $gv = $fgx->$key;
+                }
                 $g[] = $gv;
                 if (!$ge->no_total && $gv) {
                     $total += $gv;
@@ -1127,7 +1154,7 @@ class PsetView {
                 }
             }
             $result["grades"] = $g;
-            if ($this->pc_view && !empty($ag)) {
+            if ($pc_view && !empty($ag)) {
                 $result["autogrades"] = $ag;
             }
             $result["total"] = round_grade($total);
@@ -1151,7 +1178,7 @@ class PsetView {
         }
 
         // maybe hide extra-credits that are missing
-        if (!$this->pc_view) {
+        if (!$pc_view) {
             $gi = 0;
             $deleted = false;
             foreach ($this->pset->visible_grades($this->pc_view) as $ge) {

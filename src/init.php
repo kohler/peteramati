@@ -313,8 +313,9 @@ function load_pset_info() {
                 object_replace_recursive($locinfo, $x);
             }
             $locp = $locinfo->$pk;
-            if (isset($locinfo->_defaults))
+            if (isset($locinfo->_defaults)) {
                 object_merge_recursive($locp, $locinfo->_defaults);
+            }
             // - lookup exception path in landmark object
             $path = $exception instanceof PsetConfigException ? $exception->path : array();
             for ($pathpos = 0; $pathpos < count($path) && $locp && !is_string($locp); ++$pathpos) {
@@ -322,10 +323,11 @@ function load_pset_info() {
                 $locp = is_array($locp) ? $locp[$component] : $locp->$component;
             }
             // - report error
-            if (is_object($locp) && get($locp, "__LANDMARK__"))
+            if (is_object($locp) && get($locp, "__LANDMARK__")) {
                 $locp = $locp->__LANDMARK__;
-            else if (!is_string($locp))
+            } else if (!is_string($locp)) {
                 $locp = $locinfo->$pk->__LANDMARK__;
+            }
             Multiconference::fail_message($locp . ": Configuration error: " . $exception->getMessage());
         }
     }

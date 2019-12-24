@@ -28,6 +28,7 @@ class Pset {
     public $title;
     public $group;
     public $group_weight;
+    public $group_weight_default = false;
 
     public $disabled;
     public $admin_disabled;
@@ -66,6 +67,7 @@ class Pset {
     public $has_extra = false;
     public $has_grade_landmark = false;
     public $has_grade_landmark_range = false;
+    public $has_formula = false;
     private $_max_grade = [null, null, null, null];
     public $grade_script;
     private $_late_hours;
@@ -118,7 +120,7 @@ class Pset {
             throw new PsetConfigException("numeric pset key disagrees with `psetid`", "key");
         } else if (!preg_match('{\A[^_./&;#][^/&;#]*\z}', $pk)) {
             throw new PsetConfigException("pset key format error", "key");
-        } else if (preg_match('{(_rank|_noextra|_norm)\z}', $pk, $m)) {
+        } else if (preg_match('{(?:_rank|_noextra|_norm|_raw)\z}', $pk, $m)) {
             throw new PsetConfigException("pset key cannot end with `{$m[0]}`", "key");
         }
         $this->key = $pk;
@@ -146,6 +148,7 @@ class Pset {
         $this->group_weight = self::cnum($p, "weight", "group_weight");
         if ($this->group_weight === null) {
             $this->group_weight = 1.0;
+            $this->group_weight_default = true;
         }
         $this->group_weight = (float) $this->group_weight;
 
@@ -213,13 +216,22 @@ class Pset {
             foreach ((array) $p->grades as $k => $v) {
                 $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v);
                 if (get($this->all_grades, $g->key)
-                    || $g->key === "late_hours")
+                    || $g->key === "late_hours") {
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
+                }
                 $this->all_grades[$g->key] = $g;
-                if ($g->landmark_file || $g->landmark_range_file)
+                if ($g->landmark_file || $g->landmark_range_file) {
                     $this->has_grade_landmark = true;
-                if ($g->landmark_range_file)
+                }
+                if ($g->landmark_range_file) {
                     $this->has_grade_landmark_range = true;
+                }
+                if ($g->formula) {
+                    $this->has_formula = true;
+                }
+                if ($g->is_extra) {
+                    $this->has_extra = true;
+                }
             }
         } else if ($grades) {
             throw new PsetConfigException("`grades` format error`", "grades");
@@ -228,10 +240,6 @@ class Pset {
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         } else {
             $this->grades = self::position_sort("grades", $this->all_grades);
-        }
-        foreach ($this->grades as $g) {
-            if ($g->is_extra)
-                $this->has_extra = true;
         }
         $this->grades_visible = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible_college = self::cdate($p, "grades_visible_college", "show_grades_to_college");
@@ -763,6 +771,8 @@ class GradeEntryConfig {
     public $type;
     public $round;
     public $options;
+    public $formula;
+    private $_formula = false;
     public $max;
     public $visible;
     private $_visible_defaulted = false;
@@ -822,6 +832,10 @@ class GradeEntryConfig {
                        && is_array($g->options)) {
                 // XXX check components are strings all different
                 $this->options = $g->options;
+            } else if ($type === "formula"
+                       && isset($g->formula)
+                       && is_string($g->formula)) {
+                $this->formula = $g->formula;
             } else {
                 throw new PsetConfigException("unknown grade entry type", $loc);
             }
@@ -840,7 +854,10 @@ class GradeEntryConfig {
             $this->round = $round;
         }
 
-        if ($this->type === "text" || $this->type === "select") {
+        if ($this->type === "text" || $this->type === "select" || $this->type === "formula") {
+            if (isset($g->no_total) && $g->no_total) {
+                throw new PsetConfigException("grade entry type {$this->type} cannot be in total", $loc);
+            }
             $this->no_total = true;
         } else {
             $this->no_total = Pset::cbool($loc, $g, "no_total");
@@ -861,15 +878,17 @@ class GradeEntryConfig {
         }
         if (isset($g->visible)) {
             $this->visible = Pset::cbool($loc, $g, "visible");
+        } else if (isset($g->hidden)) {
+            $this->visible = !Pset::cbool($loc, $g, "hidden");
         } else if (isset($g->hide)) {
-            $this->visible = !Pset::cbool($loc, $g, "hide");
+            $this->visible = !Pset::cbool($loc, $g, "hide"); // XXX
         } else {
             $this->visible = $this->_visible_defaulted = true;
         }
         if (isset($g->max_visible)) {
             $this->max_visible = Pset::cbool($loc, $g, "max_visible");
         } else if (isset($g->hide_max)) {
-            $this->max_visible = !Pset::cbool($loc, $g, "hide_max");
+            $this->max_visible = !Pset::cbool($loc, $g, "hide_max"); // XXX
         } else {
             $this->max_visible = $this->_max_visible_defaulted = true;
         }
@@ -953,6 +972,9 @@ class GradeEntryConfig {
 
 
     function parse_value($v) {
+        if ($this->type === "formula") {
+            return false;
+        }
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
         } else if (is_string($v)) {
@@ -1005,6 +1027,18 @@ class GradeEntryConfig {
         } else {
             return abs($v1 - $v2) >= 0.0001;
         }
+    }
+
+    function formula(Conf $conf) {
+        if ($this->_formula === false) {
+            $this->_formula = null;
+            if (($t = $this->formula)
+                && ($f = GradeFormula::parse($conf, $t, 0))
+                && trim($t) === "") {
+                $this->_formula = $f;
+            }
+        }
+        return $this->_formula;
     }
 
     function json($pcview, $pos = null) {

@@ -63,12 +63,15 @@ if (!$Me->is_empty()
         redirectSelf();
 }
 
-if (!$Me->is_empty() && $Qreq->set_repo !== null)
+if (!$Me->is_empty() && $Qreq->set_repo !== null) {
     ContactView::set_repo_action($User, $Qreq);
-if (!$Me->is_empty() && $Qreq->set_branch !== null)
+}
+if (!$Me->is_empty() && $Qreq->set_branch !== null) {
     ContactView::set_branch_action($User, $Qreq);
-if ($Qreq->set_partner !== null)
+}
+if ($Qreq->set_partner !== null) {
     ContactView::set_partner_action($User, $Qreq);
+}
 
 if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
     && $Me->isPC
@@ -411,8 +414,9 @@ function download_psets_report($request) {
     usort($students, function ($a, $b) {
         return strcasecmp($a->name, $b->name);
     });
-    foreach ($students as $s)
+    foreach ($students as $s) {
         $csv->add($s);
+    }
     $csv->download_headers("gradereport.csv");
     $csv->download();
     exit;
@@ -920,22 +924,33 @@ function render_grades($pset, $gi, $s) {
     foreach ($pset->numeric_grades() as $ge) {
         $k = $ge->key;
         $gv = $ggv = $agv = "";
-        if ($gi && isset($gi->grades))
+        if ($gi && isset($gi->grades)) {
             $ggv = get($gi->grades, $k);
-        if ($gi && isset($gi->autogrades))
+        }
+        if ($gi && isset($gi->autogrades)) {
             $agv = get($gi->autogrades, $k);
-        if ($ggv !== null && $ggv !== "")
+        }
+        if ($ge->formula && $gi && isset($gi->formula)) {
+            $ggv = get($gi->formula, $k);
+        }
+        if ($ggv !== null && $ggv !== "") {
             $gv = $ggv;
-        else if ($agv !== null && $agv !== "")
+        } else if ($agv !== null && $agv !== "") {
             $gv = $agv;
-        if ($gv != "" && !$ge->no_total)
+        }
+        if ($gv != "" && !$ge->no_total) {
             $total += $gv;
-        if ($gv === "" && !$ge->is_extra && $s
-            && $Me->contactId == $s->gradercid)
+        }
+        if ($gv === ""
+            && !$ge->is_extra
+            && $s
+            && $Me->contactId == $s->gradercid) {
             $s->incomplete = "grade missing";
+        }
         $gvarr[] = $gv;
-        if ($ggv && $agv && $ggv != $agv)
+        if ($ggv && $agv && $ggv != $agv) {
             $different[$k] = true;
+        }
     }
     return (object) ["allv" => $gvarr,  "totalv" => round_grade($total), "differentk" => $different];
 }
@@ -1223,6 +1238,9 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     }
 
     if ($pset->grades()) {
+        if ($pset->has_formula) {
+            $info->ensure_formula();
+        }
         $gi = $info->current_info();
 
         if (!$pset->gitless_grades) {
