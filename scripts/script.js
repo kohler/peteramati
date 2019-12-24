@@ -6466,7 +6466,7 @@ function pa_render_pset_table(pconf, data) {
                 else
                     return -user_compare(a, b);
             });
-        } else if ((m = /^grade(\d+)$/.exec(f))) {
+        } else if ((m = /^grade(\d+)$/.exec(f)) && grade_entries[+m[1]]) {
             var gidx = +m[1],
                 fwd = grade_entries[gidx].type && pa_grade_types[grade_entries[gidx].type].sort === "forward",
                 erev = fwd ? -rev : rev;
