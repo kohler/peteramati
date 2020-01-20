@@ -287,7 +287,7 @@ class Repository {
         //$limitarg = $limit ? " -n$limit" : "";
         $limitarg = "";
         $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
-        preg_match_all(',^(\S+)\s+(\S+)\s+(.*)$,m', $result, $ms, PREG_SET_ORDER);
+        preg_match_all('/^(\S+)\s+(\S+)\s+(.*)$/m', $result, $ms, PREG_SET_ORDER);
         foreach ($ms as $m) {
             if (!isset($this->_commits[$m[2]])) {
                 $this->_commits[$m[2]] = new CommitRecord((int) $m[1], $m[2], $m[3], $head);
@@ -301,13 +301,15 @@ class Repository {
     function commits(Pset $pset = null, $branch = null) {
         $dir = "";
         if ($pset && $pset->directory_noslash !== ""
-            && !get($this->_truncated_psetdir, $pset->psetid))
+            && !get($this->_truncated_psetdir, $pset->psetid)) {
             $dir = $pset->directory_noslash;
+        }
         $branch = $branch ? : "master";
 
         $key = "$dir/$branch";
-        if (isset($this->_commit_lists[$key]))
+        if (isset($this->_commit_lists[$key])) {
             return $this->_commit_lists[$key];
+        }
 
         // XXX should gitrun once, not multiple times
         $list = [];
@@ -317,7 +319,10 @@ class Repository {
             $this->load_commits_from_head($list, $h, $dir);
         }
 
-        if (!$list && $dir !== "" && $pset && isset($pset->test_file)
+        if (!$list
+            && $dir !== ""
+            && $pset
+            && isset($pset->test_file)
             && !isset($this->_truncated_psetdir[$pset->psetid])) {
             $this->_truncated_psetdir[$pset->psetid] =
                 !!$this->ls_files("%REPO%/$branch", $pset->test_file);
