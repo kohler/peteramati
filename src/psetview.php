@@ -637,7 +637,8 @@ class PsetView {
     }
 
     function can_edit_grades() {
-        return $this->viewer !== $this->user;
+        return $this->can_view_grades()
+            && $this->viewer !== $this->user;
     }
 
 

@@ -75,9 +75,6 @@ class API_Grade {
         if (($err = $api->prepare_grading_commit($info))) {
             return $err;
         }
-        if (!$info->can_view_grades() || !$user->isPC) {
-            return ["ok" => false, "error" => "Permission error."];
-        }
         // XXX match commit with grading commit
         if ($qreq->method() === "POST") {
             if (!check_post($qreq)) {
@@ -117,6 +114,8 @@ class API_Grade {
             } else if (!empty($v)) {
                 $info->update_grade_info($v);
             }
+        } else if (!$info->can_view_grades()) {
+            return ["ok" => false, "error" => "Permission error."];
         }
         $j = (array) $info->grade_json();
         $j["ok"] = true;
