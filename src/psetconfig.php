@@ -1139,7 +1139,7 @@ class RunnerConfig {
         }
 
         $this->disabled = Pset::cbool($loc, $rs, "disabled");
-        $this->visible = Pset::cbool($loc, $rs, "visible", "show_to_students");
+        $this->visible = Pset::cdate_or_grades($loc, $rs, "visible", "show_to_students");
         $this->output_visible = Pset::cdate_or_grades($loc, $rs, "output_visible", "show_output_to_students", "show_results_to_students");
         $this->timeout = Pset::cinterval($loc, $rs, "timeout", "run_timeout");
         $this->xterm_js = Pset::cbool($loc, $rs, "xterm_js");
