@@ -66,7 +66,9 @@ if ($Qreq->download
     && check_post()) {
     $dl = get($Info->pset->downloads, $Qreq->download);
     if (!$dl
-        || (!$dl->visible && $Info->viewer === $Info->user)) {
+        || ($Info->viewer === $Info->user
+            && (!$dl->visible
+                || (is_int($dl->visible) && $dl->visible > $Now)))) {
         header("HTTP/1.0 404 Not Found");
         exit;
     }

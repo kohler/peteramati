@@ -370,8 +370,11 @@ class ContactView {
         global $Conf, $Me, $Now, $Qreq;
         $n = 0;
         foreach ($info->pset->downloads as $dl) {
-            if ($info->user == $info->viewer && !$dl->visible)
+            if ($info->user == $info->viewer
+                && (!$dl->visible
+                    || (is_int($dl->visible) && $dl->visible > $Now))) {
                 continue;
+            }
             if (!$n)
                 echo '<hr><h2>downloads</h2>';
             ++$n;

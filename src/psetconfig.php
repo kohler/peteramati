@@ -619,11 +619,11 @@ class Pset {
             foreach ($ps as $p) {
                 if (isset($p->$x)) {
                     $v = call_user_func($callable, $p->$x);
-                    if (is_array($v) && $v[0])
+                    if (is_array($v) && $v[0]) {
                         return $v[1];
-                    else if (!is_array($v) && $v)
+                    } else if (!is_array($v) && $v) {
                         return $p->$x;
-                    else {
+                    } else {
                         $errormsg = is_array($v) ? $v[1] : "format error";
                         throw new PsetConfigException("`$x` $errormsg", $format, $x);
                     }
@@ -764,7 +764,7 @@ class DownloadEntryConfig {
         }
         $this->timed = Pset::cbool($loc, $g, "timed");
         $this->position = Pset::cnum($loc, $g, "position");
-        $this->visible = Pset::cbool($loc, $g, "visible");
+        $this->visible = Pset::cdate($loc, $g, "visible");
         $this->timeout = Pset::cinterval($loc, $g, "timeout");
     }
 }
