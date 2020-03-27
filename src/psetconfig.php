@@ -56,6 +56,7 @@ class Pset {
     public $deadline;
     public $deadline_college;
     public $deadline_extension;
+    public $obscure_late_hours = false;
 
     public $all_grades = [];
     public $grades;
@@ -211,6 +212,7 @@ class Pset {
         if (!$this->deadline) {
             $this->deadline = $this->deadline_college ? : $this->deadline_extension;
         }
+        $this->obscure_late_hours = self::cbool($p, "obscure_late_hours");
 
         // grades
         $grades = get($p, "grades");

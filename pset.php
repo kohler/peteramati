@@ -410,7 +410,10 @@ function echo_commit($info) {
                            . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->latest_hash())) . "\">see diff</a>)</span>.");
     }
     $lhd = $info->late_hours_data();
-    if ($lhd && isset($lhd->hours) && $lhd->hours > 0) {
+    if ($lhd
+        && isset($lhd->hours)
+        && $lhd->hours > 0
+        && ($info->viewer->isPC || !$pset->obscure_late_hours)) {
         $extra = array();
         if (isset($lhd->timestamp)) {
             $extra[] = "commit at " . $info->conf->printableTimestamp($lhd->timestamp);
@@ -419,7 +422,7 @@ function echo_commit($info) {
             $extra[] = "deadline " . $info->conf->printableTimestamp($lhd->deadline);
         }
         $extra = count($extra) ? ' <span style="font-weight:normal">(' . join(", ", $extra) . ')</span>' : "";
-        $remarks[] = array(true, "This commit uses " . plural($lhd->hours, "late hour") . $extra . ".");
+        $remarks[] = array(!$pset->obscure_late_hours, "This commit uses " . plural($lhd->hours, "late hour") . $extra . ".");
     }
     if (($info->is_latest_commit() || $info->viewer->isPC)
         && $pset->handout_repo_url) {
@@ -543,7 +546,10 @@ function echo_all_grades($info) {
 
     $lhd = $info->late_hours_data();
     if ($lhd && $info->can_view_grades() && !$info->can_edit_grades()) {
-        if ((isset($lhd->hours) && $lhd->hours > 0) || $has_grades) {
+        if ($has_grades
+            || (isset($lhd->hours)
+                && $lhd->hours > 0
+                && !$info->pset->obscure_late_hours)) {
             ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>');
         }
     } else if ($info->can_edit_grades() && $info->pset->late_hours_entry()) {

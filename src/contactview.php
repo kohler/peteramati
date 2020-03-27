@@ -576,11 +576,12 @@ class ContactView {
 
     static function echo_repo_grade_commit_group(PsetView $info) {
         list($user, $repo) = array($info->user, $info->repo);
-        if ($info->pset->gitless_grades)
+        if ($info->pset->gitless_grades) {
             return;
-        else if (!$info->user_can_view_repo_contents()
-                 || !$info->grading_hash())
+        } else if (!$info->user_can_view_repo_contents()
+                   || !$info->grading_hash()) {
             return self::echo_repo_last_commit_group($info, false);
+        }
         // XXX should check can_view_grades here
 
         $value = "";
@@ -592,10 +593,18 @@ class ContactView {
         }
 
         $notes = array();
-        if ($ginfo && $ginfo->commitat)
+        if ($ginfo && $ginfo->commitat) {
             $notes[] = "committed " . ago($ginfo->commitat);
-        if (($lh = $info->late_hours()) && $lh > 0)
-            $notes[] = '<strong class="overdue">' . plural($lh, "late hour") . ' used</strong>';
+        }
+        if (($lh = $info->late_hours())
+            && $lh > 0
+            && (!$info->pset->obscure_late_hours || $info->can_view_grades())) {
+            $t = plural($lh, "late hour") . " used";
+            if (!$info->pset->obscure_late_hours) {
+                $t = '<strong class="overdue">' . $t . '</strong>';
+            }
+            $notes[] = $t;
+        }
 
         self::echo_group("grading commit", $value, array(join(", ", $notes)));
     }

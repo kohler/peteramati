@@ -202,6 +202,10 @@ others are shown to users in different contexts.
 
     The time at which the problem set is due.
 
+* `obscure_late_hours`: boolean
+
+    If true, then do not highlight when a commit is past the deadline.
+
 Grades
 ------
 
