@@ -1551,8 +1551,16 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $MicroNow = microtime(true);
     foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset)) {
-            if (!$sset)
-                $sset = new StudentSet($Me);
+            if (!$sset) {
+                $flags = 0;
+                if ($Qreq->extension) {
+                    $flags |= StudentSet::EXTENSION;
+                }
+                if ($Qreq->college) {
+                    $flags |= StudentSet::COLLEGE;
+                }
+                $sset = new StudentSet($Me, $flags);
+            }
             $sset->set_pset($pset);
             echo $sep;
             show_pset_table($sset);
