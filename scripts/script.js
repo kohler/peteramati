@@ -1,5 +1,5 @@
 // script.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2019 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 var siteurl, siteurl_base_path,
@@ -26,8 +26,9 @@ function serialize_object(x) {
         return "";
 }
 
-if (!window.JSON || !window.JSON.parse)
+if (!window.JSON || !window.JSON.parse) {
     window.JSON = {parse: $.parseJSON};
+}
 
 var hasClass, addClass, removeClass, toggleClass, classList;
 if ("classList" in document.createElement("span")
@@ -706,7 +707,7 @@ return event_key;
 function event_modkey(evt) {
     return (evt.shiftKey ? 1 : 0) + (evt.ctrlKey ? 2 : 0) + (evt.altKey ? 4 : 0) + (evt.metaKey ? 8 : 0);
 }
-event_modkey.SHIFT = 1;
+event_modkey.SHIFT = 1; // NB values matter
 event_modkey.CTRL = 2;
 event_modkey.ALT = 4;
 event_modkey.META = 8;
@@ -4243,8 +4244,28 @@ function pa_run(button, opt) {
         addClass(thepre[0].parentElement, "pa-run-xterm-js");
         thexterm = new Terminal({cols: terminal_char_width(80, 132), rows: 25});
         thexterm.open(thepre[0]);
-        thexterm.attachCustomKeyEventHandler(function(e) {
-            write(e.key);
+        thexterm.attachCustomKeyEventHandler(function (e) {
+            if (e.type === "keydown") {
+                var key = event_key(e), mod = event_modkey(e);
+                if (key === "Enter" && !mod) {
+                    key = "\r";
+                } else if (key === "Escape" && !mod) {
+                    key = "\x1B";
+                } else if (key === "Backspace" && !mod) {
+                    key = "\x08";
+                } else if (key >= "a"
+                           && key <= "z"
+                           && (mod & 0xE) === event_modkey.CTRL) {
+                    key = String.fromCharCode(key.charCodeAt(0) - 96);
+                } else if (key.length !== 1
+                           || (mod & 0xE) !== 0
+                           || !event_key.printable(e)) {
+                    key = "";
+                }
+                if (key !== "") {
+                    write(key);
+                }
+            }
             return false;
         });
     }
