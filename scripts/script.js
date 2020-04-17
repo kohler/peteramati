@@ -2519,7 +2519,7 @@ return function (url, data, method) {
 
 // pa_linenote
 (function ($) {
-var labelctr = 0, curanal, down_event, scrolled_at;
+var labelctr = 0, curanal, down_event, scrolled_x, scrolled_y, scrolled_at;
 
 function render_form($tr, note, transition) {
     $tr.removeClass("hidden").addClass("editing");
@@ -2573,12 +2573,21 @@ function anal_tr() {
     }
 }
 
+function set_scrolled_at(evt) {
+    if (evt && evt.pageX != null) {
+        scrolled_at = evt.timeStamp;
+        scrolled_x = evt.screenX;
+        scrolled_y = evt.screenY;
+    }
+}
+
 function arrowcapture(evt) {
     var key, modkey;
     if ((evt.type === "mousemove"
          && scrolled_at
-         && evt.timeStamp - scrolled_at <= 200)
-        || (evt.type === "keydown"
+         && ((Math.abs(evt.screenX - scrolled_x) <= 1 && Math.abs(evt.screenY - scrolled_y) <= 1)
+             || evt.timeStamp - scrolled_at <= 200))
+        || ((evt.type === "keydown" || evt.type === "keyup")
             && event_key.modifier(evt))) {
         return;
     } else if (evt.type !== "keydown"
@@ -2605,10 +2614,10 @@ function arrowcapture(evt) {
 
     curanal = pa_diff_locate(tr);
     evt.preventDefault();
+    set_scrolled_at(evt);
     if (key === "Enter") {
         make_linenote();
     } else {
-        scrolled_at = evt.timeStamp;
         var wdb = tr.closest(".pa-with-diffbar")
         $(tr).addClass("live").scrollIntoView(wdb ? {marginTop: wdb.firstChild.offsetHeight} : null);
     }
@@ -2798,6 +2807,7 @@ function make_linenote(event) {
     } else {
         $tr = $(pa_render_note.call(curanal.tr));
     }
+    set_scrolled_at(event);
     if ($tr.hasClass("editing")) {
         if (unedit($tr[0])) {
             event && event.stopPropagation();
