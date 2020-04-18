@@ -2270,7 +2270,7 @@ td.mhcb {
 	overflow: hidden;
 	white-space: nowrap;
 }
-.gt-rownumber, .gt-username, .gt-name, .gt-name2, .gt-grader,
+.gt-rownumber, .gt-username, .gt-name, .gt-grader,
 .gt-notes, .gt-grade, .gt-ngrades, .gt-total,
 .gt-conversation, .gt-repo, .gt-pset, .gt-at {
 	padding-right: 0.75rem;
@@ -2290,7 +2290,7 @@ tr.gtrow-partner {
 .gt-highlight {
 	color: red;
 }
-.gt-anonymous .gt-name {
+.gt-anonymous .nonanon {
 	display: none;
 }
 
@@ -2798,17 +2798,19 @@ textarea.pa-gradevalue {
 	stroke: #ccddff;
 	stroke-width: 3;
 }
+.pa-gg-anno-name {
+	font-size: 0.8rem;
+}
 .pa-gg-mark {
 	stroke: #ffffff;
 	stroke-width: 1;
 }
-.pa-gg-mark-main {
-	stroke: #ffffff;
+.hl-main {
 	stroke-width: 2;
 	fill: #ff5522;
+	color: #ff5522;
 }
-.pa-gg-mark-hover {
-	stroke: #ffffff;
+.hl-hover {
 	stroke-width: 1.5;
 	fill: #ff5522;
 	stroke-linejoin: bevel;
@@ -2819,20 +2821,25 @@ textarea.pa-gradevalue {
 .pa-gg-hover-text {
 	fill: white;
 }
-.pa-gg-mark-h00 {
-	fill: #f3ee26;
+.hl-h00 {
+	fill: #424cff;
+	color: #424cff;
 }
-.pa-gg-mark-h01 {
-	fill: #fdc329;
+.hl-h01 {
+	fill: #6ea6ff;
+	color: #6ea6ff;
 }
-.pa-gg-mark-h02 {
-	fill: #ee7b51;
+.hl-h02 {
+	fill: #4ea812;
+	color: #4ea812;
 }
-.pa-gg-mark-h03 {
-	fill: #dd5d65;
+.hl-h03 {
+	fill: #507027;
+	color: #507027;
 }
-.pa-gg-mark-h04 {
-	fill: #be3983;
+.hl-h04 {
+	fill: #1b600b;
+	color: #1b600b;
 }
 .pa-gg-cdf, .pa-gg-pdf {
 	stroke: #222222;

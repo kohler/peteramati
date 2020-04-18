@@ -11,12 +11,12 @@ $Conf->header("Overview", "home", ["body_class" => "want-grgraph-hash"]);
 
 echo '<form class="pa-grade-overview">';
 echo '<div class="pa-grade-overview-users"><div class="pa-grade-overview-users-inner">',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="93.5-" data-pa-highlight-type="h00">A</label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="90-93.5" data-pa-highlight-type="h01">A-</label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="86.5-90" data-pa-highlight-type="h02">B+</label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="83.5-86.5" data-pa-highlight-type="h03">B</label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="80-83.5" data-pa-highlight-type="h04">B-</label> ',
-    '<table class="pap" id="pa-overview-table"></table>',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="93.5-" data-pa-highlight-type="h00"><strong class="hl-h00">A</strong></label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="90-93.5" data-pa-highlight-type="h01"><strong class="hl-h01">A-</strong></label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="86.5-90" data-pa-highlight-type="h02"><strong class="hl-h02">B+</strong></label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="83.5-86.5" data-pa-highlight-type="h03"><strong class="hl-h03">B</strong></label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="80-83.5" data-pa-highlight-type="h04"><strong class="hl-h04">B-</strong></label> ',
+    '<table class="pap gtable" id="pa-overview-table"></table>',
     '</div></div>';
 echo '<div class="pa-gradegrid">';
 $any_anonymous = false;

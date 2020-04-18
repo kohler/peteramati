@@ -5601,7 +5601,7 @@ PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
 };
 PAGradeGraph.prototype.typed_annotation = function (klass) {
     var dot = mksvg("circle");
-    dot.setAttribute("class", "pa-gg-mark pa-gg-mark-" + (klass || "main"));
+    dot.setAttribute("class", "pa-gg-mark hl-" + (klass || "main"));
     dot.setAttribute("r", !klass || klass === "main" ? 5 : 3.5);
     return dot;
 };
@@ -5681,7 +5681,7 @@ PAGradeGraph.prototype.highlight_users = function () {
         }
 
         var el = this.gg.firstChild, elnext;
-        var klass = "pa-gg-mark pa-gg-mark-" + type;
+        var klass = "pa-gg-mark hl-" + type;
         while (el && (!hasClass(el, "pa-gg-mark") || el.className.animVal < klass)) {
             el = el.nextSibling;
         }
@@ -5741,8 +5741,8 @@ PAGradeGraph.prototype.hover = function () {
                 pt = hotcrp_graph.closestPoint(p, loc, pt);
             }
             if (pt.pathNode) {
-                var hlpt = closer_mark(that.gg.querySelectorAll(".pa-gg-mark-main"), pt, 36)
-                    || closer_mark(that.gg.querySelectorAll(".pa-gg-mark:not(.pa-gg-mark-main)"), pt, 25);
+                var hlpt = closer_mark(that.gg.querySelectorAll(".pa-gg-mark.hl-main"), pt, 36)
+                    || closer_mark(that.gg.querySelectorAll(".pa-gg-mark:not(.hl-main)"), pt, 25);
                 if (hlpt) {
                     pt = hlpt;
                     if (xfmt === "%.0r" || xfmt === "%.1f") {
@@ -5754,7 +5754,7 @@ PAGradeGraph.prototype.hover = function () {
         var ha = that.hoveranno;
         if (pt.pathNode) {
             if (!ha) {
-                ha = that.hoveranno = [that.star_annotation([4, 10], null, null, "pa-gg-mark pa-gg-mark-hover")];
+                ha = that.hoveranno = [that.star_annotation([4, 10], null, null, "pa-gg-mark hl-hover")];
                 that.gg.appendChild(ha[0]);
 
                 var e = mksvg("path");
@@ -5773,9 +5773,18 @@ PAGradeGraph.prototype.hover = function () {
                 ha.push(e);
 
                 e = mksvg("text");
+                e.appendChild(document.createTextNode(""));
                 e.setAttribute("class", "pa-gg-hover-text");
                 e.setAttribute("y", that.xdh + 3);
                 that.gx.appendChild(e);
+                ha.push(e);
+
+                e = mksvg("text");
+                e.appendChild(document.createTextNode(""));
+                e.setAttribute("class", "pa-gg-anno-name");
+                e.setAttribute("text-anchor", "end");
+                e.setAttribute("dx", -8);
+                that.gg.appendChild(e);
                 ha.push(e);
 
                 if (that.yl) {
@@ -5794,6 +5803,7 @@ PAGradeGraph.prototype.hover = function () {
                     ha.push(e);
 
                     e = mksvg("text");
+                    e.appendChild(document.createTextNode(""));
                     e.setAttribute("class", "pa-gg-hover-text");
                     e.setAttribute("x", -8);
                     that.gy.appendChild(e);
@@ -5804,35 +5814,41 @@ PAGradeGraph.prototype.hover = function () {
 
             ha[1].setAttribute("transform", "translate(" + pt[0] + ",0)");
             ha[3].setAttribute("x", pt[0]);
-            if (ha[3].firstChild) {
-                ha[3].removeChild(ha[3].firstChild);
-            }
-            ha[3].appendChild(document.createTextNode(sprintf(xfmt, that.unxax(pt[0]))));
+            ha[3].firstChild.data = sprintf(xfmt, that.unxax(pt[0]));
             var bb = ha[3].getBBox();
             ha[2].setAttribute("x", pt[0] - bb.width / 2 - 2);
             ha[2].setAttribute("width", bb.width + 4);
 
+            var table, name;
+            if (pt.pathNode.hasAttribute("data-pa-uid")
+                && (table = $(".gtable").data("paTable"))
+                && (name = table.name_text(pt.pathNode.getAttribute("data-pa-uid")))) {
+                ha[4].firstChild.data = name;
+                ha[4].setAttribute("x", pt[0]);
+                ha[4].setAttribute("y", pt[1]);
+            } else {
+                ha[4].firstChild.data = "";
+            }
+
             if (that.yl) {
-                ha[4].setAttribute("transform", "translate(0," + pt[1] + ")");
-                ha[6].setAttribute("y", pt[1] + 0.25 * that.xdh);
-                if (ha[6].firstChild) {
-                    ha[6].removeChild(ha[6].firstChild);
-                }
-                ha[6].appendChild(document.createTextNode(sprintf(that.yfmt, that.unyax(pt[1]) * that.ymax)));
-                bb = ha[6].getBBox();
-                ha[5].setAttribute("x", -bb.width - 10);
-                ha[5].setAttribute("y", pt[1] - (that.xdh + 2) / 2);
-                ha[5].setAttribute("width", bb.width + 4);
+                ha[5].setAttribute("transform", "translate(0," + pt[1] + ")");
+                ha[7].setAttribute("y", pt[1] + 0.25 * that.xdh);
+                ha[7].firstChild.data = sprintf(that.yfmt, that.unyax(pt[1]) * that.ymax);
+                bb = ha[7].getBBox();
+                ha[6].setAttribute("x", -bb.width - 10);
+                ha[6].setAttribute("y", pt[1] - (that.xdh + 2) / 2);
+                ha[6].setAttribute("width", bb.width + 4);
             }
         } else if (ha) {
             that.gg.removeChild(ha[0]);
             that.gx.removeChild(ha[1]);
             that.gx.removeChild(ha[2]);
             that.gx.removeChild(ha[3]);
+            that.gg.removeChild(ha[4]);
             if (that.yl) {
-                that.gy.removeChild(ha[4]);
                 that.gy.removeChild(ha[5]);
                 that.gy.removeChild(ha[6]);
+                that.gy.removeChild(ha[7]);
             }
             that.hoveranno = null;
         }
@@ -6030,6 +6046,8 @@ function pa_draw_gradecdf($graph) {
         var t = title.length ? " (" + title.join(", ") + ")" : "";
         this.innerHTML = "grade statistics" + t;
     });
+
+    gi.highlight_users();
 }
 
 handle_ui.on("js-grgraph-flip", function () {
@@ -6770,6 +6788,13 @@ function pa_render_pset_table(pconf, data) {
     function render_display_name(s, is2) {
         var t = escape_entities(is2 && anonymous ? s.anon_username || "?" : render_name(s, displaying_last_first));
         return is2 ? render_student_link(t, s) : t;
+    }
+    function render_name_text(s) {
+        if (s) {
+            return (anonymous ? s.anon_username : render_name(s, displaying_last_first)) || "?";
+        } else {
+            return "[none]";
+        }
     }
     function render_checkbox_name(s) {
         var u = anonymous ? s.anon_username || s.username : s.username;
@@ -7528,6 +7553,13 @@ function pa_render_pset_table(pconf, data) {
 
     initialize();
     render();
+
+    $j.data("paTable", {
+        name_text: function (uid) {
+            var spos = $j.find("tr[data-pa-uid=" + uid + "]").attr("data-pa-spos");
+            return spos ? render_name_text(dmap[spos]) : null;
+        }
+    });
 }
 
 
@@ -7544,8 +7576,9 @@ handle_ui.on("js-repositories", function (event) {
                     i && (t += ", ");
                     t += "<a href=\"" + escape_entities(r.url) + "\">" + escape_entities(r.name) + "</a>";
                 }
-            } else if (data.repositories)
+            } else if (data.repositories) {
                 t = "No repositories";
+            }
             $("<div style=\"font-size:medium;font-weight:normal\"></div>").html(t).insertAfter(self);
         }
     });
