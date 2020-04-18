@@ -7,13 +7,15 @@ require_once("src/initweb.php");
 if ($Me->is_empty() || !$Me->isPC)
     $Me->escape();
 
-$Conf->header("Overview", "home");
+$Conf->header("Overview", "home", ["body_class" => "want-grgraph-hash"]);
 
 echo '<form class="pa-grade-overview">';
 echo '<div class="pa-grade-overview-users"><div class="pa-grade-overview-users-inner">',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="93.5-">A</label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="93.5-" data-pa-highlight-type="h00">A</label> ',
     '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="90-93.5" data-pa-highlight-type="h01">A-</label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="86.5-90" data-pa-highlight-type="h10">B+</label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="86.5-90" data-pa-highlight-type="h02">B+</label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="83.5-86.5" data-pa-highlight-type="h03">B</label> ',
+    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="80-83.5" data-pa-highlight-type="h04">B-</label> ',
     '<table class="pap" id="pa-overview-table"></table>',
     '</div></div>';
 echo '<div class="pa-gradegrid">';
@@ -43,7 +45,7 @@ $college = $Qreq->college || $Qreq->all || !$Qreq->extension;
 $extension = $Qreq->extension || $Qreq->all;
 foreach ($Sset->users() as $u) {
     if ($u->extension ? $extension : $college)
-        $sj[] = StudentSet::json_basics($u, false);
+        $sj[] = StudentSet::json_basics($u, $any_anonymous);
 }
 $jd = ["id" => "overview",
        "checkbox" => true,

@@ -2786,6 +2786,7 @@ textarea.pa-gradevalue {
 
 .pa-gg-axis {
 	font-size: 0.8rem;
+	pointer-events: none;
 }
 .pa-gg-xaxis {
 	text-anchor: middle;
@@ -2793,24 +2794,45 @@ textarea.pa-gradevalue {
 .pa-gg-yaxis {
 	text-anchor: end;
 }
-.pa-gg-mark-total {
+.pa-gg-anno-total {
 	stroke: #ccddff;
 	stroke-width: 3;
 }
-.pa-gg-mark-grade {
+.pa-gg-mark {
+	stroke: #ffffff;
+	stroke-width: 1;
+}
+.pa-gg-mark-main {
 	stroke: #ffffff;
 	stroke-width: 2;
 	fill: #ff5522;
 }
-.pa-gg-mark-grade.pa-gg-highlight-h00, .pa-gg-mark-grade.pa-gg-highlight-h01 {
-	stroke-width: 1;
-	fill: #00cc00;
-	r: 2.5;
+.pa-gg-mark-hover {
+	stroke: #ffffff;
+	stroke-width: 1.5;
+	fill: #ff5522;
+	stroke-linejoin: bevel;
 }
-.pa-gg-mark-grade.pa-gg-highlight-h10, .pa-gg-mark-grade.pa-gg-highlight-h11 {
-	stroke-width: 1;
-	fill: #ff99ff;
-	r: 2.5;
+.pa-gg-hover-box {
+	fill: rgba(0, 0, 0, 0.8);
+}
+.pa-gg-hover-text {
+	fill: white;
+}
+.pa-gg-mark-h00 {
+	fill: #f3ee26;
+}
+.pa-gg-mark-h01 {
+	fill: #fdc329;
+}
+.pa-gg-mark-h02 {
+	fill: #ee7b51;
+}
+.pa-gg-mark-h03 {
+	fill: #dd5d65;
+}
+.pa-gg-mark-h04 {
+	fill: #be3983;
 }
 .pa-gg-cdf, .pa-gg-pdf {
 	stroke: #222222;

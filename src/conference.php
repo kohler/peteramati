@@ -1415,8 +1415,8 @@ class Conf {
         $this->opt["javascripts"][] = $file;
     }
 
-    private function header_head($title) {
-        global $Me, $ConfSitePATH;
+    private function header_head($title, $id, $options) {
+        global $Me, $ConfSitePATH, $Now;
         echo "<!DOCTYPE html>
 <html lang=\"en\">
 <head>
@@ -1462,6 +1462,12 @@ class Conf {
         if ($title)
             echo $title, " - ";
         echo htmlspecialchars($this->short_name), "</title>\n";
+
+        // <body>
+        echo "</head>\n<body", ($id ? " id=\"$id\"" : "");
+        if (isset($options["body_class"]))
+            echo ' class="', $options["body_class"], '"';
+        echo " onload=\"hotcrp_load()\" data-now=\"$Now\">\n";
 
         // jQuery
         $stash = Ht::unstash();
@@ -1517,10 +1523,15 @@ class Conf {
         foreach ($this->opt("scripts", []) as $file)
             Ht::stash_html($this->make_script_file($file) . "\n");
 
-        echo $stash, Ht::unstash(), "</head>\n";
+        $this->encoded_session_list(); // clear cookie if set
+
+        // initial load (JS's timezone offsets are negative of PHP's)
+        Ht::stash_script("hotcrp_load.time(" . (-date("Z", $Now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
+
+        echo $stash, Ht::unstash();
     }
 
-    function header($title, $id = "", $actionBar = null, $showTitle = true) {
+    function header($title, $id = "", $options = []) {
         global $ConfSitePATH, $Me, $Now;
         if ($this->headerPrinted)
             return;
@@ -1528,19 +1539,12 @@ class Conf {
         // <head>
         if ($title === "Home")
             $title = "";
-        $this->header_head($title);
-        $this->encoded_session_list(); // clear cookie if set
-
-        // <body>
-        echo "<body", ($id ? " id=\"$id\"" : ""), " onload=\"hotcrp_load()\" data-now=\"$Now\">\n";
-
-        // initial load (JS's timezone offsets are negative of PHP's)
-        Ht::stash_script("hotcrp_load.time(" . (-date("Z", $Now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
+        $this->header_head($title, $id, $options);
 
         echo "<div id='prebody'>\n";
 
         echo "<div id='header'>\n<div id='header_left_conf'><h1>";
-        if ($title && $showTitle && ($title == "Home" || $title == "Sign in"))
+        if ($title && ($title == "Home" || $title == "Sign in"))
             echo "<a class='qq' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
         else
             echo "<a class='uu' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
@@ -1582,8 +1586,6 @@ class Conf {
         echo '<div id="maindeadline" style="display:none"></div></div>', "\n";
 
         echo "  <hr class=\"c\" />\n";
-
-        echo $actionBar;
 
         echo "</div>\n<div id=\"initialmsgs\">\n";
         if (($x = $this->opt("maintenance")))

@@ -505,7 +505,7 @@ function commajoin(a, joinword) {
 }
 
 function sprintf(fmt) {
-    var words = fmt.split(/(%(?:%|-?(?:\d*|\*?)(?:\.\d*)?[sdefgoxX]))/), wordno, word,
+    var words = fmt.split(/(%(?:%|-?(?:\d*|\*?)(?:\.\d*)?[sdefgroxX]))/), wordno, word,
         arg, argno, conv, pad, t = "";
     for (wordno = 0, argno = 1; wordno != words.length; ++wordno) {
         word = words[wordno];
@@ -522,31 +522,38 @@ function sprintf(fmt) {
                 arg = arguments[argno];
                 ++argno;
             }
-            if (conv[4] >= "e" && conv[4] <= "g" && conv[3] == null)
+            if (conv[4] >= "e" && conv[4] <= "g" && conv[3] == null) {
                 conv[3] = 6;
-            if (conv[4] == "g") {
+            }
+            if (conv[4] === "g") {
                 arg = Number(arg).toPrecision(conv[3]).toString();
                 arg = arg.replace(/\.(\d*[1-9])?0+(|e.*)$/,
                                   function (match, p1, p2) {
                                       return (p1 == null ? "" : "." + p1) + p2;
                                   });
-            } else if (conv[4] == "f")
+            } else if (conv[4] === "f") {
                 arg = Number(arg).toFixed(conv[3]);
-            else if (conv[4] == "e")
+            } else if (conv[4] === "e") {
                 arg = Number(arg).toExponential(conv[3]);
-            else if (conv[4] == "d")
+            } else if (conv[4] === "r") {
+                arg = Number(arg).toFixed(+(conv[3] || 0));
+                if (+(conv[3] || 0))
+                    arg = arg.replace(/\.?0*$/, "");
+            } else if (conv[4] === "d") {
                 arg = Math.floor(arg);
-            else if (conv[4] == "o")
+            } else if (conv[4] === "o") {
                 arg = Math.floor(arg).toString(8);
-            else if (conv[4] == "x")
+            } else if (conv[4] === "x") {
                 arg = Math.floor(arg).toString(16);
-            else if (conv[4] == "X")
+            } else if (conv[4] === "X") {
                 arg = Math.floor(arg).toString(16).toUpperCase();
+            }
             arg = arg.toString();
             if (conv[2] !== "" && conv[2] !== "0") {
                 pad = conv[2].charAt(0) === "0" ? "0" : " ";
-                while (arg.length < parseInt(conv[2], 10))
+                while (arg.length < parseInt(conv[2], 10)) {
                     arg = conv[1] ? arg + pad : pad + arg;
+                }
             }
             t += arg;
         }
@@ -4850,6 +4857,293 @@ function mksvg(tag) {
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
 }
 
+var hotcrp_graph = (function () {
+var PATHSEG_ARGMAP = {
+    m: 2, M: 2, z: 0, Z: 0, l: 2, L: 2, h: 1, H: 1, v: 1, V: 1, c: 6, C: 6,
+    s: 4, S: 4, q: 4, Q: 4, t: 2, T: 2, a: 7, A: 7, b: 1, B: 1
+};
+var normalized_path_cache = {}, normalized_path_cache_size = 0;
+
+function svg_path_number_of_items(s) {
+    if (s instanceof SVGPathElement)
+        s = s.getAttribute("d");
+    if (normalized_path_cache[s])
+        return normalized_path_cache[s].length;
+    else
+        return s.replace(/[^A-DF-Za-df-z]+/g, "").length;
+}
+
+function make_svg_path_parser(s) {
+    if (s instanceof SVGPathElement)
+        s = s.getAttribute("d");
+    s = s.split(/([a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)/);
+    var i = 1, e = s.length, next_cmd;
+    return function () {
+        var a = null, m, ch;
+        while (i < e) {
+            ch = s[i];
+            if (ch >= "A") {
+                if (a)
+                    break;
+                a = [ch];
+                next_cmd = ch;
+                if (ch === "m" || ch === "M" || ch === "z" || ch === "Z")
+                    next_cmd = (ch === "m" || ch === "z" ? "l" : "L");
+            } else {
+                if (!a && next_cmd)
+                    a = [next_cmd];
+                else if (!a || a.length === PATHSEG_ARGMAP[a[0]] + 1)
+                    break;
+                a.push(+ch);
+            }
+            i += 2;
+        }
+        return a;
+    };
+}
+
+var normalize_path_complaint = false;
+function normalize_svg_path(s) {
+    if (s instanceof SVGPathElement)
+        s = s.getAttribute("d");
+    if (normalized_path_cache[s])
+        return normalized_path_cache[s];
+
+    var res = [],
+        cx = 0, cy = 0, cx0 = 0, cy0 = 0, copen = false,
+        cb = 0, sincb = 0, coscb = 1,
+        i, dx, dy,
+        parser = make_svg_path_parser(s), a, ch, preva;
+    while ((a = parser())) {
+        ch = a[0];
+        // special commands: bearing, closepath
+        if (ch === "b" || ch === "B") {
+            cb = ch === "b" ? cb + a[1] : a[1];
+            coscb = Math.cos(cb);
+            sincb = Math.sin(cb);
+            continue;
+        } else if (ch === "z" || ch === "Z") {
+            preva = res.length ? res[res.length - 1] : null;
+            if (copen) {
+                if (cx != cx0 || cy != cy0)
+                    res.push(["L", cx0, cy0]);
+                res.push(["Z"]);
+                copen = false;
+            }
+            cx = cx0, cy = cy0;
+            continue;
+        }
+
+        // normalize command 1: remove horiz/vert
+        if (PATHSEG_ARGMAP[ch] == 1) {
+            if (a.length == 1)
+                a = ["L"]; // all data is missing
+            else if (ch === "h")
+                a = ["l", a[1], 0];
+            else if (ch === "H")
+                a = ["L", a[1], cy];
+            else if (ch === "v")
+                a = ["l", 0, a[1]];
+            else if (ch === "V")
+                a = ["L", cx, a[1]];
+        }
+
+        // normalize command 2: relative -> absolute
+        ch = a[0];
+        if (ch >= "a" && !cb) {
+            for (i = ch !== "a" ? 1 : 6; i < a.length; i += 2) {
+                a[i] += cx;
+                a[i+1] += cy;
+            }
+        } else if (ch >= "a") {
+            if (ch === "a")
+                a[3] += cb;
+            for (i = ch !== "a" ? 1 : 6; i < a.length; i += 2) {
+                dx = a[i], dy = a[i + 1];
+                a[i] = cx + dx * coscb + dy * sincb;
+                a[i+1] = cy + dx * sincb + dy * coscb;
+            }
+        }
+        ch = a[0] = ch.toUpperCase();
+
+        // normalize command 3: use cx0,cy0 for missing data
+        while (a.length < PATHSEG_ARGMAP[ch] + 1)
+            a.push(cx0, cy0);
+
+        // normalize command 4: shortcut -> full
+        if (ch === "S") {
+            dx = dy = 0;
+            if (preva && preva[0] === "C")
+                dx = cx - preva[3], dy = cy - preva[4];
+            a = ["C", cx + dx, cy + dy, a[1], a[2], a[3], a[4]];
+            ch = "C";
+        } else if (ch === "T") {
+            dx = dy = 0;
+            if (preva && preva[0] === "Q")
+                dx = cx - preva[1], dy = cy - preva[2];
+            a = ["Q", cx + dx, cy + dy, a[1], a[2]];
+            ch = "Q";
+        }
+
+        // process command
+        if (!copen && ch !== "M") {
+            res.push(["M", cx, cy]);
+            copen = true;
+        }
+        if (ch === "M") {
+            cx0 = a[1];
+            cy0 = a[2];
+            copen = false;
+        } else if (ch === "L")
+            res.push(["L", cx, cy, a[1], a[2]]);
+        else if (ch === "C")
+            res.push(["C", cx, cy, a[1], a[2], a[3], a[4], a[5], a[6]]);
+        else if (ch === "Q")
+            res.push(["C", cx, cy,
+                      cx + 2 * (a[1] - cx) / 3, cy + 2 * (a[2] - cy) / 3,
+                      a[3] + 2 * (a[1] - a[3]) / 3, a[4] + 2 * (a[2] - a[4]) / 3,
+                      a[3], a[4]]);
+        else {
+            // XXX should render "A" as a bezier
+            if (++normalize_path_complaint == 1)
+                log_jserror("bad normalize_svg_path " + ch);
+            res.push(a);
+        }
+
+        preva = a;
+        cx = a[a.length - 2];
+        cy = a[a.length - 1];
+    }
+
+    if (normalized_path_cache_size >= 1000) {
+        normalized_path_cache = {};
+        normalized_path_cache_size = 0;
+    }
+    normalized_path_cache[s] = res;
+    ++normalized_path_cache_size;
+    return res;
+}
+
+function pathNodeMayBeNearer(pathNode, point, dist) {
+    function oob(l, t, r, b) {
+        return l - point[0] >= dist || point[0] - r >= dist
+            || t - point[1] >= dist || point[1] - b >= dist;
+    }
+    // check bounding rectangle of path
+    if ("clientX" in point) {
+        var bounds = pathNode.getBoundingClientRect(),
+            dx = point[0] - point.clientX, dy = point[1] - point.clientY;
+        if (bounds && oob(bounds.left + dx, bounds.top + dy,
+                          bounds.right + dx, bounds.bottom + dy)) {
+            return false;
+        }
+    }
+    // check path
+    var npsl = normalize_svg_path(pathNode);
+    var l, t, r, b;
+    for (var i = 0; i < npsl.length; ++i) {
+        var item = npsl[i];
+        if (item[0] === "L") {
+            l = Math.min(item[1], item[3]);
+            t = Math.min(item[2], item[4]);
+            r = Math.max(item[1], item[3]);
+            b = Math.max(item[2], item[4]);
+        } else if (item[0] === "C") {
+            l = Math.min(item[1], item[3], item[5], item[7]);
+            t = Math.min(item[2], item[4], item[6], item[8]);
+            r = Math.max(item[1], item[3], item[5], item[7]);
+            b = Math.max(item[2], item[4], item[6], item[8]);
+        } else if (item[0] === "Z" || item[0] === "M") {
+            continue;
+        } else {
+            return true;
+        }
+        if (!oob(l, t, r, b)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function closestPoint(pathNode, point, inbest) {
+    // originally from Mike Bostock http://bl.ocks.org/mbostock/8027637
+    if (inbest && !pathNodeMayBeNearer(pathNode, point, inbest.distance)) {
+        return inbest;
+    }
+
+    var pathLength = pathNode.getTotalLength(),
+        precision = Math.max(pathLength / svg_path_number_of_items(pathNode) * .125, 3),
+        best, bestLength, bestDistance2 = Infinity;
+
+    function check(pLength) {
+        var p = pathNode.getPointAtLength(pLength);
+        var dx = point[0] - p.x, dy = point[1] - p.y, d2 = dx * dx + dy * dy;
+        if (d2 < bestDistance2) {
+            best = [p.x, p.y];
+            best.pathNode = pathNode;
+            bestLength = pLength;
+            bestDistance2 = d2;
+            return true;
+        } else
+            return false;
+    }
+
+    // linear scan for coarse approximation
+    for (var sl = 0; sl <= pathLength; sl += precision)
+        check(sl);
+
+    // binary search for precise estimate
+    precision *= .5;
+    while (precision > .5) {
+        if (!((sl = bestLength - precision) >= 0 && check(sl))
+            && !((sl = bestLength + precision) <= pathLength && check(sl)))
+            precision *= .5;
+    }
+
+    if (best) {
+        best.distance = Math.sqrt(bestDistance2);
+        best.pathLength = bestLength;
+    }
+    if (best && (!inbest || inbest.distance >= best.distance - 0.01)) {
+        return best;
+    } else {
+        return inbest;
+    }
+}
+
+function tangentAngle(pathNode, length) {
+    var length0 = Math.max(0, length - 0.25);
+    if (length0 == length)
+        length += 0.25;
+    var p0 = pathNode.getPointAtLength(length0),
+        p1 = pathNode.getPointAtLength(length);
+    return Math.atan2(p1.y - p0.y, p1.x - p0.x);
+}
+
+function event_to_point(element, event) {
+    // also borrowed from D3
+    var svg = element.ownerSVGElement || element, point;
+    if (svg.createSVGPoint) {
+        point = svg.createSVGPoint();
+        point.x = event.clientX;
+        point.y = event.clientY;
+        point = point.matrixTransform(element.getScreenCTM().inverse());
+    } else {
+        var rect = element.getBoundingClientRect();
+        point = {x: event.clientX - rect.left - element.clientLeft,
+                 y: event.clientY - rect.top - element.clientTop};
+    }
+    var result = [point.x, point.y];
+    result.clientX = event.clientX;
+    result.clientY = event.clientY;
+    return result;
+}
+
+return {closestPoint: closestPoint, tangentAngle: tangentAngle,
+        event_to_point: event_to_point};
+})();
+
+
 function PAIntervals() {
     this.is = [];
 }
@@ -4915,12 +5209,15 @@ function PAGradeGraph(parent, d, plot_type) {
     this.svg.setAttribute("preserveAspectRatio", "none");
     this.svg.setAttribute("width", this.tw);
     this.svg.setAttribute("height", this.th);
+    this.svg.setAttribute("overflow", "visible");
     this.svg.appendChild(this.gg);
     this.gx.setAttribute("class", "pa-gg-axis pa-gg-xaxis");
     this.svg.appendChild(this.gx);
     this.gy.setAttribute("class", "pa-gg-axis pa-gg-yaxis");
     this.svg.appendChild(this.gy);
     this.maxp = 0;
+    this.hoveranno = null;
+    this.hoveron = false;
     $parent.html(this.svg);
 
     var digits = mksvg("text");
@@ -4940,7 +5237,11 @@ function PAGradeGraph(parent, d, plot_type) {
         var h = this.th - this.mt - Math.max(this.mb, Math.ceil(this.xdh / 2));
         if (h > this.xdh) {
             var minyaxis = $parent.hasClass("pa-grgraph-min-yaxis");
-            this.yfmt = minyaxis ? "%d%%" : "%d";
+            if (minyaxis) {
+                this.yfmt = "%.0r%%";
+            } else {
+                this.yfmt = "%.0r";
+            }
             var labelcap = h / this.xdh;
             this.ymax = 100;
             if (labelcap > 15)
@@ -4988,10 +5289,23 @@ function PAGradeGraph(parent, d, plot_type) {
     this.yax = function (y) {
         return gh - y * gh;
     };
+    this.unxax = function (ax) {
+        return (ax / xfactor) + xmin;
+    };
+    this.unyax = function (ay) {
+        return -(ay - gh) / gh;
+    };
     if (d.entry && d.entry.type) {
         var gt = pa_grade_types[d.entry.type];
         if (gt && gt.tics)
             this.xtics = gt.tics.call(gt);
+    }
+    if (this.max - this.min > 900) {
+        this.xfmt = "%.0r";
+    } else if (this.max - this.min > 10) {
+        this.xfmt = "%.1r";
+    } else {
+        this.xfmt = "%.3r";
     }
 
     this.gg.setAttribute("transform", "translate(" + this.ml + "," + this.mt + ")");
@@ -5285,11 +5599,29 @@ PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
         return path;
     }
 };
-PAGradeGraph.prototype.default_annotation = function (klass) {
+PAGradeGraph.prototype.typed_annotation = function (klass) {
     var dot = mksvg("circle");
-    dot.setAttribute("class", klass || "pa-gg-mark-grade");
-    dot.setAttribute("r", 5);
+    dot.setAttribute("class", "pa-gg-mark pa-gg-mark-" + (klass || "main"));
+    dot.setAttribute("r", !klass || klass === "main" ? 5 : 3.5);
     return dot;
+};
+PAGradeGraph.prototype.star_annotation = function (rs, start, n, klass) {
+    if (start == null) {
+        start = Math.PI / 2;
+    }
+    if (n == null) {
+        n = 5;
+    }
+    var star = mksvg("path");
+    star.setAttribute("class", klass);
+    var d = ["M"], cos = Math.cos, sin = Math.sin, delta = Math.PI / n;
+    for (var i = 0; i < 2 * n; ++i) {
+        d.push(rs[i & 1] * cos(start), " ", rs[i & 1] * sin(start), i ? " " : "L");
+        start += delta;
+    }
+    d.push("z");
+    star.setAttribute("d", d.join(""));
+    return star;
 };
 PAGradeGraph.prototype.annotate_last_curve = function (x, elt, after) {
     if (this.last_curve) {
@@ -5297,7 +5629,7 @@ PAGradeGraph.prototype.annotate_last_curve = function (x, elt, after) {
         if (yv === null && this.cutoff)
             yv = this.yax(this.cutoff);
         if (yv !== null) {
-            elt = elt || this.default_annotation();
+            elt = elt || this.typed_annotation();
             elt.setAttribute("transform", "translate(" + xv + "," + yv + ")");
             this.gg.insertBefore(elt, after || null);
             return true;
@@ -5329,9 +5661,9 @@ PAGradeGraph.prototype.highlight_users = function () {
         if (attrs[i].name.startsWith("data-pa-highlight")) {
             var type;
             if (attrs[i].name === "data-pa-highlight")
-                type = "pa-gg-highlight-main";
+                type = "main";
             else
-                type = "pa-gg" + attrs[i].name.substring(7);
+                type = attrs[i].name.substring(18);
             desired[type] = attrs[i].value;
             this.last_highlight[type] = this.last_highlight[type] || "";
         }
@@ -5349,8 +5681,8 @@ PAGradeGraph.prototype.highlight_users = function () {
         }
 
         var el = this.gg.firstChild, elnext;
-        var klass = "pa-gg-mark-grade " + type;
-        while (el && (!hasClass(el, "pa-gg-mark-grade") || el.className.animVal < klass)) {
+        var klass = "pa-gg-mark pa-gg-mark-" + type;
+        while (el && (!hasClass(el, "pa-gg-mark") || el.className.animVal < klass)) {
             el = el.nextSibling;
         }
 
@@ -5368,7 +5700,7 @@ PAGradeGraph.prototype.highlight_users = function () {
         for (var i = 0; i !== uidx.length; ++i) {
             if (uidm[uidx[i]] === 1
                 && (x = this.user_x(uidx[i])) != null) {
-                var e = this.default_annotation(klass);
+                var e = this.typed_annotation(type);
                 e.setAttribute("data-pa-uid", uidx[i]);
                 this.annotate_last_curve(x, e, el);
             }
@@ -5376,6 +5708,138 @@ PAGradeGraph.prototype.highlight_users = function () {
 
         this.last_highlight[type] = uids;
     }
+};
+PAGradeGraph.prototype.hover = function () {
+    var that = this;
+    function closer_mark(hlpaths, pt, bestDistance2) {
+        var hlpt = null;
+        for (var hlp of hlpaths) {
+            var m = hlp.getAttribute("transform").match(/^translate\(([-+\d.]+),([-+\d.]+)\)$/);
+            if (m) {
+                var dx = +m[1] - pt[0], dy = +m[2] - pt[1],
+                    distance2 = dx * dx + dy * dy;
+                if (distance2 < bestDistance2) {
+                    hlpt = [+m[1], +m[2]];
+                    hlpt.pathNode = hlp;
+                    bestDistance2 = distance2;
+                }
+            }
+        }
+        hlpt && (hlpt.distance = Math.sqrt(bestDistance2));
+        return hlpt;
+    }
+    function handle(event) {
+        var pt = {distance: 20}, xfmt = that.xfmt;
+        if (event.type !== "mousemove")
+            that.hoveron = event.type !== "mouseleave";
+        if (that.hoveron) {
+            var loc = hotcrp_graph.event_to_point(that.svg, event),
+                paths = that.gg.querySelectorAll(".pa-gg-pdf, .pa-gg-cdf");
+            loc[0] -= that.ml;
+            loc[1] -= that.mt;
+            for (var p of paths) {
+                pt = hotcrp_graph.closestPoint(p, loc, pt);
+            }
+            if (pt.pathNode) {
+                var hlpt = closer_mark(that.gg.querySelectorAll(".pa-gg-mark-main"), pt, 36)
+                    || closer_mark(that.gg.querySelectorAll(".pa-gg-mark:not(.pa-gg-mark-main)"), pt, 25);
+                if (hlpt) {
+                    pt = hlpt;
+                    if (xfmt === "%.0r" || xfmt === "%.1f") {
+                        xfmt = "%.2r";
+                    }
+                }
+            }
+        }
+        var ha = that.hoveranno;
+        if (pt.pathNode) {
+            if (!ha) {
+                ha = that.hoveranno = [that.star_annotation([4, 10], null, null, "pa-gg-mark pa-gg-mark-hover")];
+                that.gg.appendChild(ha[0]);
+
+                var e = mksvg("path");
+                e.setAttribute("d", "M0,0v5");
+                e.setAttribute("fill", "none");
+                e.setAttribute("stroke", "black");
+                that.gx.appendChild(e);
+                ha.push(e);
+
+                e = mksvg("rect");
+                e.setAttribute("class", "pa-gg-hover-box");
+                e.setAttribute("y", 5);
+                e.setAttribute("height", that.xdh + 1.5);
+                e.setAttribute("rx", 3);
+                that.gx.appendChild(e);
+                ha.push(e);
+
+                e = mksvg("text");
+                e.setAttribute("class", "pa-gg-hover-text");
+                e.setAttribute("y", that.xdh + 3);
+                that.gx.appendChild(e);
+                ha.push(e);
+
+                if (that.yl) {
+                    e = mksvg("path");
+                    e.setAttribute("d", "M-5,0h5");
+                    e.setAttribute("fill", "none");
+                    e.setAttribute("stroke", "black");
+                    that.gy.appendChild(e);
+                    ha.push(e);
+
+                    e = mksvg("rect");
+                    e.setAttribute("class", "pa-gg-hover-box");
+                    e.setAttribute("height", that.xdh + 1);
+                    e.setAttribute("rx", 3);
+                    that.gy.appendChild(e);
+                    ha.push(e);
+
+                    e = mksvg("text");
+                    e.setAttribute("class", "pa-gg-hover-text");
+                    e.setAttribute("x", -8);
+                    that.gy.appendChild(e);
+                    ha.push(e);
+                }
+            }
+            ha[0].setAttribute("transform", "translate(" + pt[0] + "," + pt[1] + ")");
+
+            ha[1].setAttribute("transform", "translate(" + pt[0] + ",0)");
+            ha[3].setAttribute("x", pt[0]);
+            if (ha[3].firstChild) {
+                ha[3].removeChild(ha[3].firstChild);
+            }
+            ha[3].appendChild(document.createTextNode(sprintf(xfmt, that.unxax(pt[0]))));
+            var bb = ha[3].getBBox();
+            ha[2].setAttribute("x", pt[0] - bb.width / 2 - 2);
+            ha[2].setAttribute("width", bb.width + 4);
+
+            if (that.yl) {
+                ha[4].setAttribute("transform", "translate(0," + pt[1] + ")");
+                ha[6].setAttribute("y", pt[1] + 0.25 * that.xdh);
+                if (ha[6].firstChild) {
+                    ha[6].removeChild(ha[6].firstChild);
+                }
+                ha[6].appendChild(document.createTextNode(sprintf(that.yfmt, that.unyax(pt[1]) * that.ymax)));
+                bb = ha[6].getBBox();
+                ha[5].setAttribute("x", -bb.width - 10);
+                ha[5].setAttribute("y", pt[1] - (that.xdh + 2) / 2);
+                ha[5].setAttribute("width", bb.width + 4);
+            }
+        } else if (ha) {
+            that.gg.removeChild(ha[0]);
+            that.gx.removeChild(ha[1]);
+            that.gx.removeChild(ha[2]);
+            that.gx.removeChild(ha[3]);
+            if (that.yl) {
+                that.gy.removeChild(ha[4]);
+                that.gy.removeChild(ha[5]);
+                that.gy.removeChild(ha[6]);
+            }
+            that.hoveranno = null;
+        }
+    }
+    this.svg.addEventListener("mouseenter", handle, false);
+    this.svg.addEventListener("mousemove", handle, false);
+    this.svg.addEventListener("mouseleave", handle, false);
 };
 
 
@@ -5472,7 +5936,7 @@ function pa_draw_gradecdf($graph) {
         total.setAttribute("y1", gi.yax(0));
         total.setAttribute("x2", gi.xax(gi.total));
         total.setAttribute("y2", gi.yax(1));
-        total.setAttribute("class", "pa-gg-mark-total");
+        total.setAttribute("class", "pa-gg-anno-total");
         gi.gg.appendChild(total);
     }
 
@@ -5524,6 +5988,8 @@ function pa_draw_gradecdf($graph) {
 
     if ($graph[0].hasAttribute("data-pa-highlight"))
         gi.highlight_users();
+
+    gi.hover();
 
     // summary
     $graph.find(".statistics").each(function () {
@@ -5580,6 +6046,137 @@ handle_ui.on("js-grgraph-flip", function () {
     }
 });
 
+function pa_parse_hash(hash) {
+    hash = hash.replace(/^[^#]*/, "");
+    var regex = /([^#=\/]+)[=\/]?([^\/]*)/g, m, h = {};
+    while ((m = regex.exec(hash))) {
+        h[m[1]] = decodeURIComponent(m[2].replace(/\+/g, " "));
+    }
+    return h;
+}
+
+function pa_unparse_hash(h) {
+    var a = [];
+    for (var k in h) {
+        if (h[k] === null || h[k] === undefined || h[k] === "") {
+            a.push(k);
+        } else {
+            a.push(k + "=" + encodeURIComponent(h[k]).replace(/%20/g, "+"));
+        }
+    }
+    a.sort();
+    return a.length ? "#" + a.join("/") : "";
+}
+
+function pa_update_hash(changes) {
+    var h = pa_parse_hash(location.hash);
+    for (var k in changes) {
+        if (changes[k] === null || changes[k] === undefined) {
+            delete h[k];
+        } else {
+            h[k] = changes[k];
+        }
+    }
+    var newhash = pa_unparse_hash(h);
+    if (newhash !== location.hash) {
+        push_history_state(location.origin + location.pathname + location.search + newhash);
+    }
+}
+
+(function () {
+var hashy = hasClass(document.body, "want-grgraph-hash");
+
+function update(where, color, attr) {
+    var key = "data-pa-highlight" + (color === "main" ? "" : "-" + color);
+    attr = attr || "";
+    $(where).find(".pa-grgraph").each(function () {
+        var old_attr = this.getAttribute(key) || "", that = this;
+        if (old_attr !== attr
+            && (color === "main" || this.getAttribute("data-pa-pset") !== "course")) {
+            attr ? this.setAttribute(key, attr) : this.removeAttribute(key);
+            window.requestAnimationFrame(function () {
+                var gg = $(that).data("paGradeGraph");
+                gg && gg.highlight_users();
+            });
+        }
+    });
+}
+
+function course_xcdf() {
+    var xcdf = null;
+    $(".pa-grgraph[data-pa-pset=course]").each(function () {
+        var d = $(this).data("paGradeData");
+        if (d && d.all && d.all.xcdf) {
+            xcdf = d.all.xcdf;
+            return false;
+        }
+    })
+    return xcdf;
+}
+
+function update_course(str, tries) {
+    var ranges = {}, colors = {}, any = false;
+    for (var range of str.match(/[-\d.]+/g) || []) {
+        ranges[range] = true;
+    }
+    $(".js-grgraph-highlight-course").each(function () {
+        var range = this.getAttribute("data-pa-highlight-range") || "90-100",
+            color = this.getAttribute("data-pa-highlight-type") || "h00",
+            min, max, m;
+        colors[color] = colors[color] || [];
+        if ((this.checked = !!ranges[range])) {
+            if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-([-+]?(?:\d+\.?\d*|\.\d))(\.?)$/))) {
+                colors[color].push(+m[1], +m[2] + (m[3] ? 0.00001 : 0));
+                any = true;
+            } else if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-$/))) {
+                colors[color].push(+m[1], Infinity);
+                any = true;
+            } else {
+                throw new Error("bad range");
+            }
+        }
+    });
+    var xcdf;
+    if (!any) {
+        for (var color in colors)
+            update(document.body, color, "");
+    } else if ((xcdf = course_xcdf())) {
+        for (var color in colors) {
+            var ranges = colors[color], a = [];
+            if (ranges.length) {
+                for (var i = 0; i !== xcdf.length; i += 2) {
+                    for (var j = 0; j !== ranges.length; j += 2) {
+                        if (xcdf[i] >= ranges[j] && xcdf[i] < ranges[j + 1]) {
+                            Array.prototype.push.apply(a, xcdf[i + 1]);
+                            break;
+                        }
+                    }
+                }
+                a.sort();
+            }
+            update(document.body, color, a.join(" "));
+        }
+    } else {
+        setTimeout(function () {
+            update_course(pa_parse_hash(location.hash).hr || "", tries + 1);
+        }, 8 << Math.max(tries, 230));
+    }
+}
+
+function update_hash(href) {
+    var h = pa_parse_hash(href);
+    update(document.body, "main", h.hs || "");
+    $("input[type=checkbox].js-grgraph-highlight").prop("checked", false);
+    for (var uid of (h.hs || "").match(/\d+/g) || []) {
+        $("tr[data-pa-uid=" + uid + "] input[type=checkbox].js-grgraph-highlight").prop("checked", true);
+    }
+    update_course(h.hr || "", 0);
+    $(".js-grgraph-highlight-course").prop("checked", false);
+    for (var range of (h.hr || "").match(/[-\d.]+/g) || []) {
+        $(".js-grgraph-highlight-course[data-pa-highlight-range=\"" + range + "\"]").prop("checked", true);
+    }
+}
+
 handle_ui.on("js-grgraph-highlight", function (event) {
     if (event.type !== "change")
         return;
@@ -5587,67 +6184,46 @@ handle_ui.on("js-grgraph-highlight", function (event) {
         $cb = $(this).closest("form").find("input[type=checkbox]"),
         a = [];
     $(this).closest("form").find("input[type=checkbox]").each(function () {
-        var $tr;
+        var tr;
         if (this.getAttribute("data-range-type") === rt
             && this.checked
-            && ($tr = $(this).closest("tr"))
-            && $tr[0].hasAttribute("data-pa-uid"))
-            a.push(+$tr[0].getAttribute("data-pa-uid"));
+            && (tr = this.closest("tr"))
+            && tr.hasAttribute("data-pa-uid"))
+            a.push(+tr.getAttribute("data-pa-uid"));
     });
-    a.sort();
-    var attr = a.length ? a.join(" ") : null;
-    $(this).closest("form").find(".pa-grgraph").each(function () {
-        if (attr === null)
-            this.removeAttribute("data-pa-highlight");
-        else
-            this.setAttribute("data-pa-highlight", attr);
-        var gg = $(this).data("paGradeGraph");
-        gg && window.requestAnimationFrame(function () {
-            gg.highlight_users();
-        });
-    });
+    a.sort(function (x, y) { return x - y; });
+    if (hashy) {
+        pa_update_hash({hs: a.length ? a.join(" ") : null});
+        update(document.body, "main", a.join(" "));
+    } else {
+        update(this.closest("form"), "main", a.join(" "));
+    }
 });
 
 handle_ui.on("js-grgraph-highlight-course", function (event) {
-    var want = null,
-        range = this.getAttribute("data-pa-highlight-range") || "90-100",
-        color = this.getAttribute("data-pa-highlight-type") || "h00",
-        min, max, m;
-    if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-([-+]?(?:\d+\.?\d*|\.\d))(\.?)$/))) {
-        min = +m[1];
-        max = +m[2] + (m[3] ? 0.00001 : 0);
-    } else if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-$/))) {
-        min = +m[1];
-        max = Infinity;
-    } else {
-        throw new Error("bad range");
-    }
-
-    if (this.checked) {
-        $(".pa-grgraph[data-pa-pset=course]").each(function () {
-            var d = $(this).data("paGradeData");
-            var as = [];
-            if (d && d.all && d.all.xcdf) {
-                var xcdf = d.all.xcdf;
-                for (var i = 0; i !== xcdf.length; i += 2)
-                    if (xcdf[i] >= min && xcdf[i] < max)
-                        Array.prototype.push.apply(as, xcdf[i + 1]);
-            }
-            as.sort();
-            want = as.length ? as.join(" ") : null;
-        });
-    }
-    if (want === null)
-        $(".pa-grgraph[data-pa-pset!=course]").removeAttr("data-pa-highlight-" + color);
-    else
-        $(".pa-grgraph[data-pa-pset!=course]").attr("data-pa-highlight-" + color, want);
-    window.requestAnimationFrame(function () {
-        $(".pa-grgraph").each(function () {
-            var gg = $(this).data("paGradeGraph");
-            gg && gg.highlight_users();
-        });
+    var a = [];
+    $(".js-grgraph-highlight-course").each(function () {
+        if (this.checked)
+            a.push(this.getAttribute("data-pa-highlight-range"));
     });
+    if (hashy) {
+        pa_update_hash({hr: a.length ? a.join(" ") : null});
+    }
+    update_course(a.join(" "), 0);
 });
+
+
+if (hashy) {
+    $(window).on("popstate", function (event) {
+        var state = (event.originalEvent || event).state;
+        state && state.href && update_hash(state.href);
+    }).on("hashchange", function (event) {
+        update_hash(location.href);
+    });
+    $(function () { update_hash(location.href); });
+}
+})();
+
 
 $(function () {
 var delta = document.body.getAttribute("data-now") - ((new Date).getTime() / 1000);
