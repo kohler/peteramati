@@ -1794,11 +1794,11 @@ class Conf {
     }
 
     function pset_by_id($id) {
-        return get($this->_psets, $id);
+        return $this->_psets[$id] ?? null;
     }
 
     function pset_by_key($key) {
-        if (($p = get($this->_psets_by_urlkey, $key))) {
+        if (($p = $this->_psets_by_urlkey[$key] ?? null)) {
             return $p;
         }
         foreach ($this->_psets as $p) {
@@ -1809,8 +1809,11 @@ class Conf {
     }
 
     function pset_by_key_or_title($key) {
-        if (($p = get($this->_psets_by_urlkey, $key))) {
+        if (($p = $this->_psets_by_urlkey[$key] ?? null)) {
             return $p;
+        } else if (str_starts_with($key, "pset")
+                   && ctype_digit(substr($key, 4))) {
+            return $this->_psets[(int) substr($key, 4)] ?? null;
         }
         $tm = null;
         foreach ($this->_psets as $p) {
