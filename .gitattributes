@@ -1,2 +1,3 @@
 scripts/*.min.js -diff
 scripts/*.map -diff
+scripts/xterm.js -diff
