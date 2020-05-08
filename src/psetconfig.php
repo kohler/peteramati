@@ -120,10 +120,14 @@ class Pset {
         }
         if (ctype_digit($pk) && intval($pk) !== $p->psetid) {
             throw new PsetConfigException("numeric pset key disagrees with `psetid`", "key");
-        } else if (!preg_match('{\A[^_./&;#][^/&;#]*\z}', $pk)) {
+        } else if (!preg_match('/\A[^_.\/&;#][^\/&;#]*\z/', $pk)) {
             throw new PsetConfigException("pset key format error", "key");
-        } else if (preg_match('{(?:_rank|_noextra|_norm|_raw)\z}', $pk, $m)) {
+        } else if (preg_match('/(?:_rank|_noextra|_norm|_raw)\z/', $pk, $m)) {
             throw new PsetConfigException("pset key cannot end with `{$m[0]}`", "key");
+        } else if (str_starts_with($pk, "pset")
+                   && ctype_digit(substr($pk, 4))
+                   && substr($pk, 4) != $p->psetid) {
+            throw new PsetConfigException("pset key `psetNNN` requires that `NNN` is the psetid");
         }
         $this->key = $pk;
         $this->nonnumeric_key = ctype_digit($pk) ? "pset" . $pk : $pk;
