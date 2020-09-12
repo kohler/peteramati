@@ -247,7 +247,7 @@ class GitHub_RepositorySite extends RepositorySite {
         } else if (!preg_match('/\A[0-9a-f]{40,}\s+/', $answer)) {
             $ms && $ms->error_at("working", $this->expand_message("repo_unreadable", $ms->user));
             $status = 0;
-        } else if (!preg_match('/^[0-9a-f]{40,}\s+refs\/heads\/' . $this->conf->main_branch . '/m', $answer)) {
+        } else if (!preg_match('/^[0-9a-f]{40,}\s+refs\/heads\/' . $this->conf->default_main_branch . '/m', $answer)) {
             $ms && $ms->error_at("working", $this->expand_message("repo_nomaster", $ms->user));
             $status = 0;
         } else {
