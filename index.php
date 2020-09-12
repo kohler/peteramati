@@ -12,15 +12,17 @@ function choose_page($page) {
         $page = Navigation::set_page($xpage ? : "index");
     }
     $i = strlen($page) - 4;
-    if ($i > 0 && substr($page, $i) === ".php")
+    if ($i > 0 && substr($page, $i) === ".php") {
         $page = substr($page, 0, $i);
-    if ($page === "index")
+    }
+    if ($page === "index") {
         return null;
+    }
     if (is_readable($page . ".php")
         /* The following is paranoia (currently can't happen): */
-        && strpos($page, "/") === false)
+        && strpos($page, "/") === false) {
         return $page . ".php";
-    else if ($page === "images" || $page === "scripts" || $page === "stylesheets") {
+    } else if ($page === "images" || $page === "scripts" || $page === "stylesheets") {
         $_GET["file"] = $page . Navigation::path();
         return "cacheable.php";
     } else {
@@ -29,7 +31,8 @@ function choose_page($page) {
     }
 }
 
-if (($page = choose_page(Navigation::page())))
+if (($page = choose_page(Navigation::page()))) {
     include $page;
-else
+} else {
     require_once("pages/home.php");
+}

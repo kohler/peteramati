@@ -6,8 +6,9 @@
 require_once("src/initweb.php");
 
 // access only allowed through index.php
-if (!$Conf)
-    exit();
+if (!$Conf) {
+    exit;
+}
 
 global $Qreq, $MicroNow;
 ContactView::set_path_request(array("/u"));
@@ -21,13 +22,16 @@ if (isset($_REQUEST["email"]) && isset($_REQUEST["password"])) {
     $_REQUEST["signin"] = defval($_REQUEST, "signin", "go");
 }
 // CSRF protection: ignore unvalidated signin/signout for known users
-if (!$Me->is_empty() && !$Qreq->post_ok())
+if (!$Me->is_empty() && !$Qreq->post_ok()) {
     unset($_REQUEST["signout"]);
+}
 if ($Me->has_email()
-    && (!$Qreq->post_ok() || strcasecmp($Me->email, trim($Qreq->email)) == 0))
+    && (!$Qreq->post_ok() || strcasecmp($Me->email, trim($Qreq->email)) == 0)) {
     unset($_REQUEST["signin"]);
-if (!isset($_REQUEST["email"]) || !isset($_REQUEST["action"]))
+}
+if (!isset($_REQUEST["email"]) || !isset($_REQUEST["action"])) {
     unset($_REQUEST["signin"]);
+}
 // signout
 if (isset($_REQUEST["signout"])) {
     $Me = LoginHelper::logout($Me, true);
@@ -47,10 +51,12 @@ if ($Conf->opt("httpAuthLogin")) {
 // set interesting user
 $User = null;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u)))
+    && !($User = ContactView::prepare_user($Qreq->u))) {
     redirectSelf(array("u" => null));
-if (!$Me->isPC || !$User)
+}
+if (!$Me->isPC || !$User) {
     $User = $Me;
+}
 
 // check problem set openness
 if (!$Me->is_empty()
@@ -59,8 +65,9 @@ if (!$Me->is_empty()
     && $Qreq->post_ok()
     && ($repoclass = RepositorySite::$sitemap[$Qreq->reposite])
     && in_array($repoclass, RepositorySite::site_classes($Conf), true)) {
-    if ($repoclass::save_username($User, $Qreq->username))
+    if ($repoclass::save_username($User, $Qreq->username)) {
         redirectSelf();
+    }
 }
 
 if (!$Me->is_empty() && $Qreq->set_repo !== null) {
@@ -110,7 +117,7 @@ function collect_pset_info(&$students, $sset, $entries) {
 
     foreach ($sset as $info) {
         $s = $info->user;
-        $ss = get($students, $s->username);
+        $ss = $students[$s->username] ?? null;
         if (!$ss && $s->is_anonymous) {
             $students[$s->username] = $ss = (object)
                 array("username" => $s->username,
@@ -163,14 +170,15 @@ function set_ranks(&$students, &$selection, $key, $round = false) {
         }
     }
     uasort($students, function ($a, $b) use ($key) {
-            $av = get($a, $key);
-            $bv = get($b, $key);
-            if (!$av)
+            $av = $a->$key ?? null;
+            $bv = $b->$key ?? null;
+            if (!$av) {
                 return $bv ? 1 : -1;
-            else if (!$bv)
+            } else if (!$bv) {
                 return $av ? -1 : 1;
-            else
+            } else {
                 return $av < $bv ? 1 : -1;
+            }
         });
     $rank = $key . "_rank";
     $relrank = $key . "_rank_norm";
@@ -179,8 +187,8 @@ function set_ranks(&$students, &$selection, $key, $round = false) {
     $rr = 100.0;
     $lastval = null;
     foreach ($students as $s) {
-        if (get($s, $key) != $lastval) {
-            $lastval = get($s, $key);
+        if (($s->$key ?? null) != $lastval) {
+            $lastval = $s->$key ?? null;
             $r = $i;
             $rr = round(($nstudents + 1 - $i) * 100.0 / $nstudents);
         }
@@ -344,25 +352,28 @@ function download_psets_report($request) {
     $anonymous = null;
     $ssflags = StudentSet::ENROLLED;
     foreach (explode(" ", strtolower($report)) as $rep) {
-        if ($rep === "college")
+        if ($rep === "college") {
             $ssflags |= StudentSet::COLLEGE;
-        else if ($rep === "extension")
+        } else if ($rep === "extension") {
             $ssflags |= StudentSet::EXTENSION;
-        else if ($rep === "nonanonymous")
+        } else if ($rep === "nonanonymous") {
             $anonymous = false;
+        }
     }
     $sset = new StudentSet($Me, $ssflags);
 
     $sel_pset = null;
-    if (get($request, "pset")
-        && !($sel_pset = $Conf->pset_by_key($request["pset"])))
+    if (($request["pset"] ?? null)
+        && !($sel_pset = $Conf->pset_by_key($request["pset"]))) {
         return $Conf->errorMsg("No such pset");
+    }
 
     $students = [];
-    if (isset($request["fields"]))
+    if (isset($request["fields"])) {
         $selection = explode(",", $request["fields"]);
-    else
+    } else {
         $selection = ["name", "username", "anon_username", "email", "huid", "extension", "npartners"];
+    }
 
     $grouped_psets = $sel_pset ? ["" => [$pset]] : $Conf->pset_groups();
 
@@ -390,7 +401,7 @@ function download_psets_report($request) {
     $example->nstudents = count($students);
 
     if (!$sel_pset) {
-        foreach (get($PsetInfo, "_report_summaries", []) as $fname => $formula) {
+        foreach ($PsetInfo->_report_summaries ?? [] as $fname => $formula) {
             $fexpr = parse_formula($Conf, $formula, $example, 0);
             if ($fexpr !== null && trim($formula) === "") {
                 foreach ($students as $s) {
@@ -422,8 +433,9 @@ function download_psets_report($request) {
     exit;
 }
 
-if ($Me->isPC && $Qreq->post_ok() && $Qreq->report)
+if ($Me->isPC && $Qreq->post_ok() && $Qreq->report) {
     download_psets_report($Qreq);
+}
 
 
 function qreq_usernames(Qrequest $qreq) {
@@ -438,16 +450,18 @@ function qreq_usernames(Qrequest $qreq) {
     if (empty($users) && ($sl = $Conf->session_list())) {
         $by_id = [];
         $result = $Conf->qe("select contactId, email, github_username, anon_username from ContactInfo where contactId?a", $sl->ids);
-        while (($row = $result->fetch_row()))
+        while (($row = $result->fetch_row())) {
             $by_id[$row[0]] = $row;
+        }
         Dbl::free($result);
 
         $anonymous = !!$qreq->anonymous;
-        foreach ($sl->ids as $id)
+        foreach ($sl->ids as $id) {
             if (isset($by_id[$id])) {
                 $u = $by_id[$id];
                 $users[] = $anonymous ? $u[3] : ($u[2] ? : $u[1]);
             }
+        }
     }
     return $users;
 }
@@ -464,42 +478,47 @@ function qreq_users(Qrequest $qreq) {
 
 function set_grader(Qrequest $qreq) {
     global $Conf, $Me;
-    if (!($pset = $Conf->pset_by_key($qreq->pset)))
+    if (!($pset = $Conf->pset_by_key($qreq->pset))) {
         return $Conf->errorMsg("No such pset");
-    else if ($pset->gitless)
+    } else if ($pset->gitless) {
         return $Conf->errorMsg("Pset has no repository");
+    }
 
     // collect grader weights
     $graderw = [];
     foreach ($Conf->pc_members_and_admins() as $pcm) {
         if ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC)) {
-            if (in_array($pcm->email, ["cassels@college.harvard.edu", "tnguyenhuy@college.harvard.edu", "skandaswamy@college.harvard.edu"]))
+            if (in_array($pcm->email, ["cassels@college.harvard.edu", "tnguyenhuy@college.harvard.edu", "skandaswamy@college.harvard.edu"])) {
                 $graderw[$pcm->contactId] = 1.0 / 1.5;
-            else if ($pcm->email === "yihehuang@g.harvard.edu")
+            } else if ($pcm->email === "yihehuang@g.harvard.edu") {
                 continue;
-            else
+            } else {
                 $graderw[$pcm->contactId] = 1.0;
+            }
             continue;
         }
         if (strcasecmp($pcm->email, $qreq->grader) == 0
             || $qreq->grader === "__random__"
-            || ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC)))
+            || ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC))) {
             $graderw[$pcm->contactId] = 1.0;
+        }
     }
 
     // enumerate grader positions
     $graderp = [];
-    foreach ($graderw as $cid => $w)
+    foreach ($graderw as $cid => $w) {
         if ($w > 0)
             $graderp[$cid] = 0.0;
+    }
     if (!$qreq->grader || empty($graderp))
         return $Conf->errorMsg("No grader");
 
     foreach (qreq_users($qreq) as $user) {
         // XXX check if can_set_grader
         $info = PsetView::make($pset, $user, $Me);
-        if ($info->repo)
+        if ($info->repo) {
             $info->repo->refresh(2700, true);
+        }
         if (!$info->set_hash(null)) {
             error_log("cannot set_hash for $user->email");
             continue;
@@ -513,8 +532,9 @@ function set_grader(Qrequest $qreq) {
             if ($gpos === null || $gpos == $pos) {
                 $gs[] = $cid;
                 $gpos = $pos;
-            } else
+            } else {
                 break;
+            }
         }
         // account for grader
         $g = $gs[mt_rand(0, count($gs) - 1)];
@@ -525,8 +545,9 @@ function set_grader(Qrequest $qreq) {
     redirectSelf();
 }
 
-if ($Me->isPC && $Qreq->post_ok() && $Qreq->setgrader)
+if ($Me->isPC && $Qreq->post_ok() && $Qreq->setgrader) {
     set_grader($Qreq);
+}
 
 
 function runmany($qreq) {
@@ -550,19 +571,21 @@ function runmany($qreq) {
     redirectSelf();
 }
 
-if ($Me->isPC && $Qreq->post_ok() && $Qreq->runmany)
+if ($Me->isPC && $Qreq->post_ok() && $Qreq->runmany) {
     runmany($Qreq);
+}
 
 
 function older_enabled_repo_same_handout($pset) {
     $result = false;
     foreach ($pset->conf->psets() as $p) {
-        if ($p->id == $pset->id)
+        if ($p->id == $pset->id) {
             break;
-        else if (!$p->disabled
-                 && !$p->gitless
-                 && $p->handout_repo_url === $pset->handout_repo_url)
+        } else if (!$p->disabled
+                   && !$p->gitless
+                   && $p->handout_repo_url === $pset->handout_repo_url) {
             $result = $p;
+        }
     }
     return $result;
 }
@@ -607,15 +630,17 @@ function doaction(Qrequest $qreq) {
     if ($hiddengrades !== null) {
         foreach (qreq_users($qreq) as $user) {
             $info = PsetView::make($pset, $user, $Me);
-            if ($info->grading_hash())
+            if ($info->grading_hash()) {
                 $info->set_hidden_grades($hiddengrades);
+            }
         }
     }
     redirectSelf();
 }
 
-if ($Me->isPC && $Qreq->post_ok() && $Qreq->doaction)
+if ($Me->isPC && $Qreq->post_ok() && $Qreq->doaction) {
     doaction($Qreq);
+}
 
 
 function psets_json_diff_from($original, $update) {
@@ -625,8 +650,9 @@ function psets_json_diff_from($original, $update) {
         if (is_object($vo) && is_object($vu)) {
             if (!($vu = psets_json_diff_from($vo, $vu)))
                 continue;
-        } else if ($vo === $vu)
+        } else if ($vo === $vu) {
             continue;
+        }
         $res = $res ? : (object) array();
         $res->$k = $vu;
     }
@@ -649,8 +675,9 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
 
 function forward_pset_links($conf, $pset, $from_pset) {
     $links = [LINK_REPO, LINK_REPOVIEW, LINK_BRANCH];
-    if ($pset->partner && $from_pset->partner)
+    if ($pset->partner && $from_pset->partner) {
         array_push($links, LINK_PARTNER, LINK_BACKPARTNER);
+    }
     $conf->qe("insert into ContactLink (cid, type, pset, link)
         select l.cid, l.type, ?, l.link from ContactLink l where l.pset=? and l.type?a",
               $pset->id, $from_pset->id, $links);
@@ -659,8 +686,9 @@ function forward_pset_links($conf, $pset, $from_pset) {
 function reconfig($qreq) {
     global $Conf, $Me;
     if (!($pset = $Conf->pset_by_key($qreq->pset))
-        || $pset->admin_disabled)
+        || $pset->admin_disabled) {
         return $Conf->errorMsg("No such pset");
+    }
     $psetkey = $pset->key;
 
     $json = load_psets_json(true);
@@ -670,36 +698,42 @@ function reconfig($qreq) {
     $o = (object) array();
     $o->disabled = $o->visible = $o->grades_visible = null;
     $state = get($_POST, "state");
-    if ($state === "disabled")
+    if ($state === "disabled") {
         $o->disabled = true;
-    else if ($old_pset->disabled)
+    } else if ($old_pset->disabled) {
         $o->disabled = false;
-    if ($state === "visible" || $state === "grades_visible")
+    }
+    if ($state === "visible" || $state === "grades_visible") {
         $o->visible = true;
-    else if (!$old_pset->disabled && $old_pset->visible)
+    } else if (!$old_pset->disabled && $old_pset->visible) {
         $o->visible = false;
-    if ($state === "grades_visible")
+    }
+    if ($state === "grades_visible") {
         $o->grades_visible = true;
-    else if ($state === "visible" && $old_pset->grades_visible)
+    } else if ($state === "visible" && $old_pset->grades_visible) {
         $o->grades_visible = false;
+    }
 
-    if (get($_POST, "frozen") === "yes")
+    if (get($_POST, "frozen") === "yes") {
         $o->frozen = true;
-    else
+    } else {
         $o->frozen = ($old_pset->frozen ? false : null);
+    }
 
-    if (get($_POST, "anonymous") === "yes")
+    if (get($_POST, "anonymous") === "yes") {
         $o->anonymous = true;
-    else
+    } else {
         $o->anonymous = ($old_pset->anonymous ? false : null);
+    }
 
     if (($pset->disabled || !$pset->visible)
         && (!$pset->disabled || (isset($o->disabled) && !$o->disabled))
         && ($pset->visible || (isset($o->visible) && $o->visible))
         && !$pset->gitless
         && !$Conf->fetch_ivalue("select exists (select * from ContactLink where pset=?)", $pset->id)
-        && ($older_pset = older_enabled_repo_same_handout($pset)))
+        && ($older_pset = older_enabled_repo_same_handout($pset))) {
         forward_pset_links($Conf, $pset, $older_pset);
+    }
 
     save_config_overrides($psetkey, $o, $json);
 }
@@ -1025,21 +1059,25 @@ if (!$Me->is_empty() && $User->is_student()) {
 function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     global $Conf, $Me, $Now, $Profile;
     $j = $s ? StudentSet::json_basics($s, $anonymous) : [];
-    if (($gcid = get($row->notes, "gradercid")))
+    if (($gcid = get($row->notes, "gradercid"))) {
         $j["gradercid"] = $gcid;
-    else if ($row->main_gradercid)
+    } else if ($row->main_gradercid) {
         $j["gradercid"] = $row->main_gradercid;
+    }
     $j["psetid"] = $pset->id;
     $j["hash"] = bin2hex($row->bhash);
-    if ($row->gradebhash === $row->bhash && $row->bhash !== null)
+    if ($row->gradebhash === $row->bhash && $row->bhash !== null) {
         $j["is_grade"] = true;
-    if ($row->haslinenotes)
+    }
+    if ($row->haslinenotes) {
         $j["has_notes"] = true;
+    }
     if ($row->conversation) {
-        if (strlen($row->conversation) < 40)
+        if (strlen($row->conversation) < 40) {
             $j["conversation"] = $row->conversation;
-        else
+        } else {
             $j["conversation_pfx"] = UnicodeHelper::utf8_word_prefix($row->conversation, 40);
+        }
     }
     if ($row->notes) {
         $garr = render_grades($pset, $row->notes, null);
@@ -1048,15 +1086,17 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     $time = 0;
     if ($row->notes && isset($row->notes->flags)) {
         foreach ((array) $row->notes->flags as $k => $v) {
-            if ($k[0] === "t" && ctype_digit(substr($k, 1)))
+            if ($k[0] === "t" && ctype_digit(substr($k, 1))) {
                 $thistime = +substr($k, 1);
-            else
+            } else {
                 $thistime = get($v, "at", 0);
+            }
             $time = max($time, $thistime);
         }
     }
-    if ($time)
+    if ($time) {
         $j["at"] = $time;
+    }
     return $j;
 }
 
@@ -1082,8 +1122,9 @@ function show_regrades($result, $all) {
         }
     }
     Dbl::free($result);
-    if (empty($flags))
+    if (empty($flags)) {
         return;
+    }
 
     // 2. load repouids and branches
     $repouids = $branches = $rgwanted = [];
@@ -1139,8 +1180,9 @@ function show_regrades($result, $all) {
     $any_anonymous = $any_nonanonymous = false;
     $jx = [];
     foreach ($flagrows as $row) {
-        if (!$row->repocids)
+        if (!$row->repocids) {
             continue;
+        }
         $pset = $Conf->pset_by_id($row->pset);
         $anon = $anonymous === null ? $pset->anonymous : $anonymous;
         $any_anonymous = $any_anonymous || $anon;
@@ -1156,19 +1198,28 @@ function show_regrades($result, $all) {
         usort($partners, "Contact::compare");
 
         $j = render_regrade_row($pset, $partners[0], $row, $anon);
-        for ($i = 1; $i < count($partners); ++$i)
+        for ($i = 1; $i < count($partners); ++$i) {
             $j["partners"][] = render_regrade_row($pset, $partners[$i], $row, $anon);
+        }
         $j["pos"] = count($jx);
         $jx[] = $j;
-        if (isset($j["total"]))
+        if (isset($j["total"])) {
             ++$nintotal;
+        }
     }
     echo '<table class="gtable" id="pa-pset-flagged"></table></div>', "\n";
-    $jd = ["id" => "flagged", "flagged_commits" => true, "anonymous" => true, "has_nonanonymous" => $any_nonanonymous];
-    if ($Me->privChair)
+    $jd = [
+        "id" => "flagged",
+        "flagged_commits" => true,
+        "anonymous" => true,
+        "has_nonanonymous" => $any_nonanonymous
+    ];
+    if ($Me->privChair) {
         $jd["can_override_anonymous"] = true;
-    if ($nintotal)
+    }
+    if ($nintotal) {
         $jd["need_total"] = 1;
+    }
     echo Ht::unstash(), '<script>$("#pa-pset-flagged").each(function(){pa_render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 }
 
@@ -1180,14 +1231,15 @@ function show_pset_actions($pset) {
                      "invisible" => "Hidden",
                      "visible" => "Visible without grades",
                      "grades_visible" => "Visible with grades");
-    if ($pset->disabled)
+    if ($pset->disabled) {
         $state = "disabled";
-    else if (!$pset->visible)
+    } else if (!$pset->visible) {
         $state = "invisible";
-    else if (!$pset->grades_visible)
+    } else if (!$pset->grades_visible) {
         $state = "visible";
-    else
+    } else {
         $state = "grades_visible";
+    }
     echo Ht::select("state", $options, $state);
 
     echo '<span class="pa-if-visible"> &nbsp;<span class="barsep">·</span>&nbsp; ',
@@ -1222,12 +1274,13 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         if ($t0 - $MicroNow < 0.2
             && $pset->student_can_view_grades($info->user->extension)) {
             $gh = $info->update_grading_hash(function ($info, $placeholder_at) use ($t0) {
-                if ($placeholder_at && $placeholder_at < $t0 - 3600)
+                if ($placeholder_at && $placeholder_at < $t0 - 3600) {
                     return rand(0, 2) == 0;
-                else if ($placeholder_at < $t0 - 600 && !$info->user->dropped)
+                } else if ($placeholder_at < $t0 - 600 && !$info->user->dropped) {
                     return rand(0, 10) == 0;
-                else
+                } else {
                     return false;
+                }
             });
         } else {
             $gh = $info->grading_hash();
@@ -1308,8 +1361,9 @@ function show_pset_table($sset) {
     $pset = $sset->pset;
     echo '<div id="', $pset->urlkey, '">';
     echo "<h3>", htmlspecialchars($pset->title), "</h3>";
-    if ($sset->viewer->privChair)
+    if ($sset->viewer->privChair) {
         show_pset_actions($pset);
+    }
     if ($pset->disabled) {
         echo "</div>\n";
         return;
@@ -1529,10 +1583,11 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
 
     $pctable = [];
     foreach ($Conf->pc_members_and_admins() as $pc) {
-        if (($pc->nickname || $pc->firstName) && !$pc->nicknameAmbiguous)
+        if (($pc->nickname || $pc->firstName) && !$pc->nicknameAmbiguous) {
             $pctable[$pc->contactId] = $pc->nickname ? : $pc->firstName;
-        else
+        } else {
             $pctable[$pc->contactId] = Text::name_text($pc);
+        }
     }
     $Conf->stash_hotcrp_pc($Me);
 
@@ -1542,8 +1597,9 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     if (edb_nrows($result)) {
         echo $sep;
         show_regrades($result, $allflags);
-        if ($Profile)
+        if ($Profile) {
             echo "<div>Δt ", sprintf("%.06f", microtime(true) - $t0), "</div>";
+        }
         $sep = "<hr />\n";
     }
 

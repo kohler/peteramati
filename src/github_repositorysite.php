@@ -123,9 +123,10 @@ class GitHub_RepositorySite extends RepositorySite {
         global $Me;
         // does it contain odd characters?
         $username = trim((string) $username);
-        if ($username == "") {
-            if ($Me->privChair)
+        if ($username === "") {
+            if ($Me->privChair) {
                 return $user->change_username("github", null);
+            }
             return Conf::msg_error("Empty username.");
         }
         if (preg_match('_[@,;:~/\[\](){}\\<>&#=\\000-\\027]_', $username)) {

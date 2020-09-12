@@ -1203,56 +1203,65 @@ class Contact {
         // at least one login every 90 days is marked as activity
         if (!$this->activity_at || $this->activity_at <= $Now - 7776000
             || (($cdbu = $this->contactdb_user())
-                && (!$cdbu->activity_at || $cdbu->activity_at <= $Now - 7776000)))
+                && (!$cdbu->activity_at || $cdbu->activity_at <= $Now - 7776000))) {
             $this->mark_activity();
+        }
     }
 
     function mark_activity() {
         global $Now;
         if (!$this->activity_at || $this->activity_at < $Now) {
             $this->activity_at = $Now;
-            if ($this->contactId && !$this->is_anonymous_user())
+            if ($this->contactId && !$this->is_anonymous_user()) {
                 $this->conf->ql("update ContactInfo set lastLogin=$Now where contactId=$this->contactId");
-            if ($this->contactDbId)
+            }
+            if ($this->contactDbId) {
                 Dbl::ql(self::contactdb(), "update ContactInfo set activity_at=$Now where contactDbId=$this->contactDbId");
+            }
         }
     }
 
     function log_activity($text, $paperId = null) {
         $this->mark_activity();
-        if (!$this->is_anonymous_user())
+        if (!$this->is_anonymous_user()) {
             $this->conf->log($text, $this, $paperId);
+        }
     }
 
     function log_activity_for($user, $text, $paperId = null) {
         $this->mark_activity();
-        if (!$this->is_anonymous_user())
+        if (!$this->is_anonymous_user()) {
             $this->conf->log($text . " by $this->email", $user, $paperId);
+        }
     }
 
     function change_username($prefix, $username) {
         assert($prefix === "github" || $prefix === "seascode");
         $k = $prefix . "_username";
         $this->$k = $username;
-        if ($this->conf->qe("update ContactInfo set $k=? where contactId=?", $username, $this->contactId))
+        if ($this->conf->qe("update ContactInfo set $k=? where contactId=?", $username, $this->contactId)) {
             $this->conf->log("Set $k to $username", $this);
+        }
         return true;
     }
 
 
     function link_repo($html, $url) {
-        if ($this->is_anonymous)
-            return '<a href="#" onclick=\'return pa_anonymize_linkto(' . htmlspecialchars(json_encode($url)) . ',event)\'>' . $html . '</a>';
-        else
+        if ($this->is_anonymous) {
+            return '<a href="" onclick=\'return pa_anonymize_linkto(' . htmlspecialchars(json_encode($url)) . ',event)\'>' . $html . '</a>';
+        } else {
             return '<a href="' . htmlspecialchars($url) . '">' . $html . '</a>';
+        }
     }
 
     function can_set_repo($pset, $user = null) {
         global $Now;
-        if (is_string($pset) || is_int($pset))
+        if (is_string($pset) || is_int($pset)) {
             $pset = $this->conf->pset_by_id($pset);
-        if ($this->privChair)
+        }
+        if ($this->privChair) {
             return true;
+        }
         $is_pc = $user && $user != $this && $this->isPC;
         return $pset && $this->has_account_here()
             && (!isset($pset->repo_edit_deadline)
@@ -1270,44 +1279,50 @@ class Contact {
         // does it contain odd characters?
         $partner = trim($partner);
         $pc = $this->conf->user_by_whatever($partner);
-        if (!$pc && ($partner == "" || strcasecmp($partner, "none") == 0))
+        if (!$pc && ($partner == "" || strcasecmp($partner, "none") == 0)) {
             $pc = $this;
-        else if (!$pc || !$pc->contactId)
+        } else if (!$pc || !$pc->contactId) {
             return Conf::msg_error("I can’t find someone with email/username " . htmlspecialchars($partner) . ". Check your spelling.");
+        }
 
-        foreach ($this->links(LINK_PARTNER, $pset) as $link)
+        foreach ($this->links(LINK_PARTNER, $pset) as $link) {
             $this->conf->qe("delete from ContactLink where cid=? and type=? and pset=? and link=?", $link, LINK_BACKPARTNER, $pset, $this->contactId);
-        if ($pc->contactId == $this->contactId)
+        }
+        if ($pc->contactId == $this->contactId) {
             return $this->clear_links(LINK_PARTNER, $pset);
-        else
+        } else {
             return $this->set_link(LINK_PARTNER, $pset, $pc->contactId)
                 && $this->conf->qe("insert into ContactLink set cid=?, type=?, pset=?, link=?",
                                    $pc->contactId, LINK_BACKPARTNER, $pset, $this->contactId);
+        }
     }
 
     static private function _file_glob_to_regex($x, $prefix) {
-        $x = str_replace(array('\*', '\?', '\[', '\]', '\-', '_'),
-                         array('[^/]*', '[^/]', '[', ']', '-', '\_'),
+        $x = str_replace(['\*', '\?', '\[', '\]', '\-', '_'],
+                         ['[^/]*', '[^/]', '[', ']', '-', '\_'],
                          preg_quote($x));
-        if ($x === "")
+        if ($x === "") {
             return "";
-        else if (strpos($x, "/") === false) {
-            if ($prefix)
+        } else if (strpos($x, "/") === false) {
+            if ($prefix) {
                 return '|\A' . preg_quote($prefix) . '/' . $x;
-            else
+            } else {
                 return '|' . $x;
+            }
         } else {
-            if ($prefix)
+            if ($prefix) {
                 return '|\A' . preg_quote($prefix) . '/' . $x . '\z';
-            else
+            } else {
                 return '|\A' . $x . '\z';
+            }
         }
     }
 
     private static function file_ignore_regex(Pset $pset, Repository $repo) {
         global $Conf, $Now;
-        if ($pset && get($pset, "file_ignore_regex"))
+        if ($pset && $pset->file_ignore_regex) {
             return $pset->file_ignore_regex;
+        }
         $regex = '.*\.swp|.*~|#.*#|.*\.core|.*\.dSYM|.*\.o|core.*\z|.*\.backup|tags|tags\..*|typescript';
         if ($pset && $Conf->setting("__gitignore_pset{$pset->id}_at", 0) < $Now - 900) {
             $hrepo = $pset->handout_repo($repo);
@@ -1320,14 +1335,18 @@ class Contact {
             $Conf->save_setting("__gitignore_pset{$pset->id}_at", $Now);
             $Conf->save_setting("gitignore_pset{$pset->id}", 1, $result);
         }
-        if ($pset && ($result = $Conf->setting_data("gitignore_pset{$pset->id}")))
-            foreach (preg_split('/\s+/', $Conf->setting_data("gitignore_pset$pset->id")) as $x)
+        if ($pset && ($result = $Conf->setting_data("gitignore_pset{$pset->id}"))) {
+            foreach (preg_split('/\s+/', $Conf->setting_data("gitignore_pset$pset->id")) as $x) {
                 $regex .= self::_file_glob_to_regex($x, $pset->directory_noslash);
+            }
+        }
         if ($pset && ($xarr = $pset->ignore)) {
-            if (!is_array($xarr))
+            if (!is_array($xarr)) {
                 $xarr = preg_split('/\s+/', $xarr);
-            foreach ($xarr as $x)
+            }
+            foreach ($xarr as $x) {
                 $regex .= self::_file_glob_to_regex($x, false);
+            }
         }
         return $regex;
     }
@@ -1335,13 +1354,15 @@ class Contact {
     function can_view_repo_contents(Repository $repo, $branch = null, $cached = false) {
         if (!$this->conf->opt("restrictRepoView")
             || $this->isPC
-            || $repo->is_handout)
+            || $repo->is_handout) {
             return true;
+        }
         $allowed = get($repo->viewable_by, $this->contactId);
         if ($allowed === null) {
             $allowed = in_array($repo->repoid, $this->links(LINK_REPOVIEW));
-            if (!$allowed && $cached)
+            if (!$allowed && $cached) {
                 return false;
+            }
             if (!$allowed) {
                 $users = $repo->author_emails();
                 $allowed = isset($users[strtolower($this->email)]);
@@ -1349,8 +1370,9 @@ class Contact {
                     $users = $repo->author_emails(null, $branch);
                     $allowed = isset($users[strtolower($this->email)]);
                 }
-                if ($allowed)
+                if ($allowed) {
                     $this->add_link(LINK_REPOVIEW, 0, $repo->repoid);
+                }
             }
             $repo->viewable_by[$this->contactId] = $allowed;
         }
@@ -1414,47 +1436,55 @@ class Contact {
     }
 
     function can_run(Pset $pset, RunnerConfig $runner = null, $user = null) {
-        if (!$runner || $runner->disabled)
+        if (!$runner || $runner->disabled) {
             return false;
-        if ($this->isPC && (!$user || $user !== $this))
+        } else if ($this->isPC && (!$user || $user !== $this)) {
             return true;
-        return $runner->visible && $this->show_setting_on($runner->visible, $pset);
+        } else {
+            return $runner->visible && $this->show_setting_on($runner->visible, $pset);
+        }
     }
 
     function can_view_run(Pset $pset, RunnerConfig $runner, $user = null) {
-        if ($runner->disabled)
+        if ($runner->disabled) {
             return false;
-        if ($this->isPC && (!$user || $user !== $this))
+        } else if ($this->isPC && (!$user || $user !== $this)) {
             return true;
-        return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
-            || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset));
+        } else {
+            return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
+                || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset));
+        }
     }
 
     function can_view_transferred_warnings(Pset $pset, RunnerConfig $runner, $user = null) {
-        if ($runner->disabled)
+        if ($runner->disabled) {
             return false;
-        if ($this->isPC && (!$user || $user !== $this))
+        } else if ($this->isPC && (!$user || $user !== $this)) {
             return true;
-        return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
-            || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset))
-            || ($runner->transfer_warnings === "grades" && $this->show_setting_on($runner->transfer_warnings, $pset));
+        } else {
+            return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
+                || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset))
+                || ($runner->transfer_warnings === "grades" && $this->show_setting_on($runner->transfer_warnings, $pset));
+        }
     }
 
     function user_linkpart(Contact $user = null, $is_anonymous = false) {
-        $user = $user ? : $this;
-        if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous)))
+        $user = $user ?? $this;
+        if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous))) {
             return $user->anon_username;
-        else if ($this->isPC || get($_SESSION, "last_actas"))
+        } else if ($this->isPC || get($_SESSION, "last_actas")) {
             return $user->username ? : $user->email;
-        else
+        } else {
             return null;
+        }
     }
 
     function user_idpart(Contact $user = null) {
-        $user = $user ? $user : $this;
-        if (!$this->isPC && !get($_SESSION, "last_actas"))
+        $user = $user ?? $this;
+        if (!$this->isPC && !get($_SESSION, "last_actas")) {
             return null;
-        else
+        } else {
             return $user->github_username ? : ($user->seascode_username ? : $user->huid);
+        }
     }
 }
