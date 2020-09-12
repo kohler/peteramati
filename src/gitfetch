@@ -21,7 +21,7 @@ if [ ! -d "$GIT_REPOCACHE" -o -z "$GIT_USERNAME" -o -z "$GIT_PASSWORD" ]; then
     usage 1
 fi
 
-force= refresh= username= url= repo= types=
+force= refresh= username= url= repo= types= mainbranch=
 while true; do
     case "$1" in
     -f|--f|--fo|--for|--forc|--force)
@@ -34,6 +34,8 @@ while true; do
         repo=y; types="1$types"; shift;;
     --url)
         url=y; types="1$types"; shift;;
+    -m)
+        mainbranch="$2"; shift 2;;
     -*)
         usage 1;;
     *)
@@ -172,7 +174,7 @@ find_distinct_heads () {
 
 update=
 if [ $gitfetch_status = 0 ]; then
-    cur_head=`cat .git/refs/remotes/repo$repoid/master`
+    cur_head=`cat .git/refs/remotes/repo$repoid/$mainbranch`
     tags="`git tag -l "repo$repoid.snap*" | sort -r`"
     last_tag=`echo $tags | tr ' ' '\n' | head -n 1`
     last_tag_head=`test -n "$last_tag" && cat .git/refs/tags/$last_tag`

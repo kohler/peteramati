@@ -369,7 +369,7 @@ class Repository {
 
         // not found yet
         // check if all commits are loaded
-        if (!isset($this->_commit_lists["/master"])) {
+        if (!isset($this->_commit_lists["/{$this->conf->default_main_branch}"])) {
             $this->commits();
             return $this->connected_commit($hash);
         }

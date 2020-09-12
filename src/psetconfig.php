@@ -191,7 +191,7 @@ class Pset {
         if (!$this->handout_repo_url && !$this->gitless) {
             throw new PsetConfigException("`handout_repo_url` missing");
         }
-        $this->handout_branch = self::cstr($p, "handout_branch", "handout_repo_branch");
+        $this->handout_branch = self::cstr($p, "handout_branch", "handout_repo_branch") ?? $this->main_branch;
         $this->handout_hash = self::cstr($p, "handout_hash", "handout_commit_hash");
         $this->handout_warn_hash = self::cstr($p, "handout_warn_hash");
         $this->repo_guess_patterns = self::cstr_array($p, "repo_guess_patterns", "repo_transform_patterns");

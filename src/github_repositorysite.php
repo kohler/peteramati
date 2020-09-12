@@ -244,10 +244,10 @@ class GitHub_RepositorySite extends RepositorySite {
         $answer = join("\n", $output);
         if ($status >= 124) { // timeout
             $status = -1;
-        } else if (!preg_match('{\A[0-9a-f]{40,}\s+}', $answer)) {
+        } else if (!preg_match('/\A[0-9a-f]{40,}\s+/', $answer)) {
             $ms && $ms->error_at("working", $this->expand_message("repo_unreadable", $ms->user));
             $status = 0;
-        } else if (!preg_match('{^[0-9a-f]{40,}\s+refs/heads/master}m', $answer)) {
+        } else if (!preg_match('/^[0-9a-f]{40,}\s+refs\/heads\/' . $this->conf->main_branch . '/m', $answer)) {
             $ms && $ms->error_at("working", $this->expand_message("repo_nomaster", $ms->user));
             $status = 0;
         } else {
@@ -265,6 +265,7 @@ class GitHub_RepositorySite extends RepositorySite {
         putenv("GIT_USERNAME=$id");
         putenv("GIT_PASSWORD=$token");
         $command = escapeshellarg("$ConfSitePATH/src/gitfetch")
+            . " -m " . escapeshellarg($this->conf->default_main_branch)
             . " $repoid $cacheid " . escapeshellarg($this->https_url())
             . " 1>&2" . ($foreground ? "" : " &");
         shell_exec($command);

@@ -441,12 +441,11 @@ function echo_commit($info) {
             } else {
                 // they don't have the latest updates
                 $cmd = "git pull handout";
-                if ($pset->handout_hash)
+                if ($pset->handout_hash) {
                     $cmd .= " " . htmlspecialchars($pset->handout_hash);
-                else if ($pset->handout_branch)
+                } else {
                     $cmd .= " " . htmlspecialchars($pset->handout_branch);
-                else
-                    $cmd .= " " . htmlspecialchars($pset->main_branch);
+                }
                 $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
             }
         } else if ($last_handout) {
