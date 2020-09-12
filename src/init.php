@@ -333,10 +333,13 @@ function load_pset_info() {
     }
 
     // read message data
-    if (!get($PsetInfo, "_messagedefs")) {
+    if ($PsetInfo->_defaults->main_branch ?? null) {
+        $Conf->set_default_main_branch($PsetInfo->_defaults->main_branch);
+    }
+    if (!($PsetInfo->_messagedefs ?? null)) {
         $PsetInfo->_messagedefs = (object) array();
     }
-    if (!get($PsetInfo->_messagedefs, "SYSTEAM")) {
+    if (!($PsetInfo->_messagedefs->SYSTEAM ?? null)) {
         $PsetInfo->_messagedefs->SYSTEAM = "cs61-staff";
     }
     foreach ($PsetInfo->_messagedefs as $k => $v) {
@@ -344,7 +347,7 @@ function load_pset_info() {
     }
 
     // also create log/ and repo/ directories
-    foreach (array("$ConfSitePATH/log", "$ConfSitePATH/repo") as $d) {
+    foreach (["$ConfSitePATH/log", "$ConfSitePATH/repo"] as $d) {
         if (!is_dir($d) && !mkdir($d, 02770, true)) {
             $e = error_get_last();
             Multiconference::fail_message("`$d` missing and cannot be created (" . $e["message"] . ").");

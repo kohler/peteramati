@@ -49,24 +49,27 @@ class Repository {
 
     function __construct(Conf $conf = null) {
         global $Conf;
-        $conf = $conf ? : $Conf;
+        $conf = $conf ?? $Conf;
         $this->conf = $conf;
-        if (isset($this->repoid))
+        if (isset($this->repoid)) {
             $this->db_load();
+        }
     }
 
     private function db_load() {
         $this->repoid = (int) $this->repoid;
         $this->open = (int) $this->open;
         $this->opencheckat = (int) $this->opencheckat;
-        if ($this->snapat !== null)
+        if ($this->snapat !== null) {
             $this->snapat = (int) $this->snapat;
+        }
         $this->snapcheckat = (int) $this->snapcheckat;
         $this->working = (int) $this->working;
         $this->snapcommitat = (int) $this->snapcommitat;
         $this->analyzedsnapat = (int) $this->analyzedsnapat;
-        if ($this->notes !== null)
+        if ($this->notes !== null) {
             $this->notes = json_decode($this->notes, true);
+        }
         $this->reposite = RepositorySite::make($this->url, $this->conf);
     }
 
@@ -304,7 +307,7 @@ class Repository {
             && !get($this->_truncated_psetdir, $pset->psetid)) {
             $dir = $pset->directory_noslash;
         }
-        $branch = $branch ? : "master";
+        $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
 
         $key = "$dir/$branch";
         if (isset($this->_commit_lists[$key])) {
@@ -385,7 +388,7 @@ class Repository {
         $limit = $limit ? " -n$limit" : "";
         $users = [];
         $heads = explode(" ", $this->heads);
-        $heads[0] = "%REPO%/" . ($branch ? : "master");
+        $heads[0] = "%REPO%/" . ($branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch));
         foreach ($heads as $h) {
             $result = $this->gitrun("git log$limit --simplify-merges --format=%ae " . escapeshellarg($h) . $dir);
             foreach (explode("\n", $result) as $line) {

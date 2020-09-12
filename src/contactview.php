@@ -344,7 +344,7 @@ class ContactView {
 
         if ($editable) {
             $xvalue = $branch;
-            $js = ["style" => "width:32em", "placeholder" => "master"];
+            $js = ["style" => "width:32em", "placeholder" => $pset->main_branch];
             if (isset($Qreq->set_branch)
                 && $Qreq->pset === $pset->urlkey
                 && isset($Qreq->branch)) {
@@ -352,15 +352,17 @@ class ContactView {
                 $js["class"] = "error";
             }
             $value = Ht::entry("branch", $xvalue, $js) . " " . Ht::submit("Save");
-        } else if ($user->is_anonymous)
-            $value = $branch && $branch !== "master" ? "[anonymous]" : "master";
-        else
-            $value = htmlspecialchars($branch ? : "master");
+        } else if ($user->is_anonymous) {
+            $value = $branch && $branch !== $pset->main_branch ? "[anonymous]" : $pset->main_branch;
+        } else {
+            $value = htmlspecialchars($branch ?? $pset->main_branch);
+        }
 
         // edit
-        if ($editable)
+        if ($editable) {
             echo Ht::form($Conf->selfurl(null, ["set_branch" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 '<div class="f-contain">';
+        }
         self::echo_group("branch", $value, []);
         if ($editable)
             echo "</div></form>\n";
@@ -491,7 +493,7 @@ class ContactView {
         if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $branch))
             return Conf::msg_error("That branch contains funny characters. Remove them.");
 
-        if ($branch === "" || $branch === "master")
+        if ($branch === "" || $branch === $pset->main_branch)
             $user->clear_links(LINK_BRANCH, $pset->id);
         else
             $user->set_link(LINK_BRANCH, $pset->id, $Conf->ensure_branch($branch), $branch);
@@ -500,20 +502,20 @@ class ContactView {
 
     static function echo_repo_last_commit_group(PsetView $info, $commitgroup) {
         global $Me, $Conf;
-        list($user, $repo) = array($info->user, $info->repo);
-        if ($info->pset->gitless)
+        list($user, $repo, $pset) = [$info->user, $info->repo, $info->pset];
+        if ($pset->gitless)
             return;
-        $branch = $user->branch_name($info->pset) ? : "master";
+        $branch = $user->branch_name($pset) ?? $pset->main_branch;
 
         $snaphash = $snapcommitline = $snapcommitat = null;
         if ($repo && !$info->user_can_view_repo_contents()) {
             $value = "(unconfirmed repository)";
-        } else if ($repo && $repo->snaphash && $branch === "master") {
+        } else if ($repo && $repo->snaphash && $branch === $pset->main_branch) {
             $snaphash = $repo->snaphash;
             $snapcommitline = $repo->snapcommitline;
             $snapcommitat = $repo->snapcommitat;
         } else if ($repo && $repo->snapat) {
-            $c = $repo->latest_commit($info->pset, $branch);
+            $c = $repo->latest_commit($pset, $branch);
             if ($c) {
                 $snaphash = $c->hash;
                 $snapcommitline = $c->subject;

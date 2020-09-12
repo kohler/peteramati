@@ -52,6 +52,7 @@ class Conf {
     public $sort_by_last;
     public $opt;
     public $opt_override = null;
+    public $default_main_branch;
 
     public $validate_timeout;
     public $validate_overall_timeout;
@@ -344,6 +345,10 @@ class Conf {
         $this->sort_by_last = $sort_by_last;
         $this->default_format = (int) get($this->opt, "defaultFormat");
         $this->_api_map = null;
+    }
+
+    function set_default_main_branch($b) {
+        $this->default_main_branch = $b;
     }
 
 

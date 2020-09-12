@@ -1311,10 +1311,12 @@ class Contact {
         $regex = '.*\.swp|.*~|#.*#|.*\.core|.*\.dSYM|.*\.o|core.*\z|.*\.backup|tags|tags\..*|typescript';
         if ($pset && $Conf->setting("__gitignore_pset{$pset->id}_at", 0) < $Now - 900) {
             $hrepo = $pset->handout_repo($repo);
+            $branch = $pset->handout_branch;
             $result = "";
-            if ($pset->directory_slash !== "")
-                $result .= $repo->gitrun("git show repo{$hrepo->repoid}/master:" . escapeshellarg($pset->directory_slash) . ".gitignore 2>/dev/null");
-            $result .= $repo->gitrun("git show repo{$hrepo->repoid}/master:.gitignore 2>/dev/null");
+            if ($pset->directory_slash !== "") {
+                $result .= $repo->gitrun("git show repo{$hrepo->repoid}/{$branch}:" . escapeshellarg($pset->directory_slash) . ".gitignore 2>/dev/null");
+            }
+            $result .= $repo->gitrun("git show repo{$hrepo->repoid}/{$branch}:.gitignore 2>/dev/null");
             $Conf->save_setting("__gitignore_pset{$pset->id}_at", $Now);
             $Conf->save_setting("gitignore_pset{$pset->id}", 1, $result);
         }
@@ -1343,7 +1345,7 @@ class Contact {
             if (!$allowed) {
                 $users = $repo->author_emails();
                 $allowed = isset($users[strtolower($this->email)]);
-                if (!$allowed && $branch && $branch !== "master") {
+                if (!$allowed && $branch && $branch !== $this->conf->main_branch) {
                     $users = $repo->author_emails(null, $branch);
                     $allowed = isset($users[strtolower($this->email)]);
                 }

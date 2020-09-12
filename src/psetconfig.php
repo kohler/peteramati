@@ -43,6 +43,7 @@ class Pset {
     public $partner_repo;
     public $hide_comments = false;
 
+    public $main_branch = "master";
     public $handout_repo_url;
     public $handout_branch;
     public $handout_hash;
@@ -185,6 +186,7 @@ class Pset {
         $this->hide_comments = self::cbool($p, "hide_comments");
 
         // directory
+        $this->main_branch = self::cstr($p, "main_branch") ?? "master";
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");
         if (!$this->handout_repo_url && !$this->gitless) {
             throw new PsetConfigException("`handout_repo_url` missing");
