@@ -465,9 +465,9 @@ class ContactView {
         }
 
         // if !working, complain
-        if (!$working && !$ms->has_problem())
+        if (!$working && !$ms->has_problem()) {
             return Conf::msg_error("Can’t access the repository “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
-        else if (!$working) {
+        } else if (!$working) {
             $msgs = join("<br />", $ms->messages()) ? : "Repository unreachable at the moment.";
             return Conf::msg_error($msgs);
         }
