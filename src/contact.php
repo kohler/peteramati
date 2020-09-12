@@ -22,7 +22,9 @@ class Contact {
     public $contactId = 0;
     public $contactDbId = 0;
     private $cid;               // for forward compatibility
+    /** @var Conf */
     public $conf;
+    /** @var StudentSet */
     public $student_set;
 
     public $firstName = "";
@@ -70,8 +72,10 @@ class Contact {
     public $incomplete = false;
     public $viewable_by;
 
+    /** @var ?array<int,array<int,list<int>>> */
     private $links;
-    // $contactLinks -- property_exists() is meaningful
+    /** @var ?string */
+    private $contactLinks;
     private $repos = [];
     private $partners = [];
     private $_gcache = [];
@@ -96,18 +100,18 @@ class Contact {
 
     public function __construct($trueuser = null, Conf $conf = null) {
         global $Conf;
-        $this->conf = $conf ? : $Conf;
-        if ($trueuser)
+        $this->conf = $conf ?? $Conf;
+        if ($trueuser) {
             $this->merge($trueuser);
-        else if ($this->contactId || $this->contactDbId)
+        } else if ($this->contactId || $this->contactDbId) {
             $this->db_load();
-        else if ($this->conf->opt("disableNonPC"))
+        } else if ($this->conf->opt("disableNonPC")) {
             $this->disabled = true;
+        }
     }
 
-    static function fetch($result, Conf $conf = null) {
-        global $Conf;
-        $conf = $conf ? : $Conf;
+    /** @return ?Contact */
+    static function fetch($result, Conf $conf) {
         $user = $result ? $result->fetch_object("Contact", [null, $conf]) : null;
         if ($user && !is_int($user->contactId)) {
             $user->conf = $conf;
@@ -120,78 +124,98 @@ class Contact {
         if (is_array($user))
             $user = (object) $user;
         if (!isset($user->dsn) || $user->dsn == $this->conf->dsn) {
-            if (isset($user->contactId))
+            if (isset($user->contactId)) {
                 $this->contactId = $this->cid = (int) $user->contactId;
+            }
             //else if (isset($user->cid))
             //    $this->contactId = $this->cid = (int) $user->cid;
         }
-        if (isset($user->contactDbId))
+        if (isset($user->contactDbId)) {
             $this->contactDbId = (int) $user->contactDbId;
-        if (isset($user->firstName) && isset($user->lastName))
+        }
+        if (isset($user->firstName) && isset($user->lastName)) {
             $name = $user;
-        else
+        } else {
             $name = Text::analyze_name($user);
+        }
         $this->firstName = get_s($name, "firstName");
         $this->lastName = get_s($name, "lastName");
         $this->nickname = get_s($name, "nickname");
-        if (isset($user->unaccentedName))
+        if (isset($user->unaccentedName)) {
             $this->unaccentedName = $user->unaccentedName;
-        else if (isset($name->unaccentedName))
+        } else if (isset($name->unaccentedName)) {
             $this->unaccentedName = $name->unaccentedName;
-        else
+        } else {
             $this->unaccentedName = Text::unaccented_name($name);
-        foreach (array("email", "preferredEmail", "affiliation") as $k)
+        }
+        foreach (["email", "preferredEmail", "affiliation"] as $k) {
             if (isset($user->$k))
                 $this->$k = simplify_whitespace($user->$k);
+        }
         if (isset($user->collaborators)) {
             $this->collaborators = "";
-            foreach (preg_split('/[\r\n]+/', $user->collaborators) as $c)
+            foreach (preg_split('/[\r\n]+/', $user->collaborators) as $c) {
                 if (($c = simplify_whitespace($c)) !== "")
                     $this->collaborators .= "$c\n";
+            }
         }
         self::set_sorter($this, $this->conf);
-        if (isset($user->password))
+        if (isset($user->password)) {
             $this->password = (string) $user->password;
-        if (isset($user->disabled))
+        }
+        if (isset($user->disabled)) {
             $this->disabled = !!$user->disabled;
+        }
         foreach (["defaultWatch", "passwordTime", "passwordUseTime",
                   "updateTime", "creationTime", "gradeUpdateTime"] as $k) {
             if (isset($user->$k))
                 $this->$k = (int) $user->$k;
         }
-        if (property_exists($user, "contactTags"))
+        if (property_exists($user, "contactTags")) {
             $this->contactTags = $user->contactTags;
-        else
+        } else {
             $this->contactTags = false;
-        if (isset($user->activity_at))
+        }
+        if (isset($user->activity_at)) {
             $this->activity_at = (int) $user->activity_at;
-        else if (isset($user->lastLogin))
+        } else if (isset($user->lastLogin)) {
             $this->activity_at = (int) $user->lastLogin;
-        if (isset($user->extension))
+        }
+        if (isset($user->extension)) {
             $this->extension = !!$user->extension;
-        if (isset($user->seascode_username))
+        }
+        if (isset($user->seascode_username)) {
             $this->seascode_username = $user->seascode_username;
-        if (isset($user->github_username))
+        }
+        if (isset($user->github_username)) {
             $this->github_username = $user->github_username;
-        if (isset($user->anon_username))
+        }
+        if (isset($user->anon_username)) {
             $this->anon_username = $user->anon_username;
-        if (isset($user->contactImageId))
+        }
+        if (isset($user->contactImageId)) {
             $this->contactImageId = (int) $user->contactImageId;
+        }
         if (isset($user->roles) || isset($user->isPC) || isset($user->isAssistant)
             || isset($user->isChair)) {
             $roles = (int) get($user, "roles");
-            if (get($user, "isPC"))
+            if ($user->isPC ?? false) {
                 $roles |= self::ROLE_PC;
-            if (get($user, "isAssistant"))
+            }
+            if ($user->isAssistant ?? false) {
                 $roles |= self::ROLE_ADMIN;
-            if (get($user, "isChair"))
+            }
+            if ($user->isChair ?? false) {
                 $roles |= self::ROLE_CHAIR;
+            }
             $this->assign_roles($roles);
         }
-        if (!$this->isPC && $this->conf->opt("disableNonPC"))
+        if (!$this->isPC && $this->conf->opt("disableNonPC")) {
             $this->disabled = true;
-        if (isset($user->is_site_contact))
+        }
+        if (isset($user->is_site_contact)) {
             $this->is_site_contact = $user->is_site_contact;
+        }
         $this->username = $this->github_username ? : $this->seascode_username;
     }
 
@@ -238,10 +262,10 @@ class Contact {
     }
 
     function __set($name, $value) {
-        if ($name === "cid")
+        if ($name === "cid") {
             $this->contactId = $this->cid = $value;
-        else {
-            if (!self::$allow_nonexistent_properties && $name !== "contactLinks") {
+        } else {
+            if (!self::$allow_nonexistent_properties) {
                 error_log(caller_landmark(1) . ": writing nonexistent property $name");
             }
             $this->$name = $value;
@@ -270,21 +294,25 @@ class Contact {
         }
         list($first, $middle) = Text::split_first_middle($c->firstName);
         if ($sort_by_last) {
-            if (($m = Text::analyze_von($c->lastName)))
+            if (($m = Text::analyze_von($c->lastName))) {
                 $c->sorter = "$m[1] $first $m[0]";
-            else
+            } else {
                 $c->sorter = "$c->lastName $first";
-        } else
+            }
+        } else {
             $c->sorter = "$first $c->lastName";
+        }
         $c->sorter = trim($c->sorter . " " . $c->username . " " . $c->email);
-        if (preg_match('/[\x80-\xFF]/', $c->sorter))
+        if (preg_match('/[\x80-\xFF]/', $c->sorter)) {
             $c->sorter = UnicodeHelper::deaccent($c->sorter);
+        }
     }
 
     static function compare($a, $b) {
         return strnatcasecmp($a->sorter, $b->sorter);
     }
 
+    /** @return Contact */
     static function site_contact() {
         global $Opt;
         if (!get($Opt, "contactEmail") || $Opt["contactEmail"] == "you@example.com") {
@@ -312,6 +340,7 @@ class Contact {
 
     // initialization
 
+    /** @return Contact */
     private function actas_user($x) {
         assert(!self::$true_user || self::$true_user === $this);
 
@@ -332,9 +361,10 @@ class Contact {
 
         // new account must exist
         $u = $this->conf->user_by_email($email);
-        return $u ? : $this;
+        return $u ?? $this;
     }
 
+    /** @return Contact */
     function activate($qreq, $signin = false) {
         global $Now, $Qreq;
         $qreq = $qreq ? : $Qreq;
@@ -377,10 +407,11 @@ class Contact {
         global $Me;
         if ($this->contactId == $Me->contactId) {
             self::$active_forceShow = $this->privChair && $on;
-            if (self::$active_forceShow)
+            if (self::$active_forceShow) {
                 $_GET["forceShow"] = $_POST["forceShow"] = $_REQUEST["forceShow"] = 1;
-            else
+            } else {
                 unset($_GET["forceShow"], $_POST["forceShow"], $_REQUEST["forceShow"]);
+            }
         }
     }
 
@@ -411,17 +442,19 @@ class Contact {
     }
 
     function is_disabled() {
-        if ($this->_disabled === null)
+        if ($this->_disabled === null) {
             $this->_disabled = $this->disabled
                 || (!$this->isPC && $this->conf->opt("disableNonPC"));
+        }
         return $this->_disabled;
     }
 
     function can_enable() {
-        if (!$this->isPC && $this->conf->opt("disableNonPC"))
+        if (!$this->isPC && $this->conf->opt("disableNonPC")) {
             return false;
-        else
+        } else {
             return $this->disabled || $this->password === "";
+        }
     }
 
     function has_email() {
@@ -464,24 +497,27 @@ class Contact {
     }
 
     function has_tag($t) {
-        if (($this->roles & self::ROLE_PC) && strcasecmp($t, "pc") == 0)
+        if (($this->roles & self::ROLE_PC) && strcasecmp($t, "pc") == 0) {
             return true;
-        if ($this->contactTags)
+        } else if ($this->contactTags) {
             return stripos($this->contactTags, " $t#") !== false;
-        if ($this->contactTags === false) {
+        } else if ($this->contactTags === false) {
             trigger_error(caller_landmark(1, "/^Conf::/") . ": Contact $this->email contactTags missing");
             $this->contactTags = null;
+        } else {
+            return false;
         }
-        return false;
     }
 
     function tag_value($t) {
-        if (($this->roles & self::ROLE_PC) && strcasecmp($t, "pc") == 0)
+        if (($this->roles & self::ROLE_PC) && strcasecmp($t, "pc") == 0) {
             return 0.0;
-        if ($this->contactTags
-            && ($p = stripos($this->contactTags, " $t#")) !== false)
+        } if ($this->contactTags
+              && ($p = stripos($this->contactTags, " $t#")) !== false) {
             return (float) substr($this->contactTags, $p + strlen($t) + 2);
-        return false;
+        } else {
+            return false;
+        }
     }
 
     static function roles_all_contact_tags($roles, $tags) {
@@ -513,27 +549,32 @@ class Contact {
     function escape() {
         global $Qreq;
         if ($Qreq->ajax || $Qreq->latestcommit) {
-            if ($this->is_empty())
+            if ($this->is_empty()) {
                 json_exit(["ok" => false, "loggedout" => true]);
-            else
+            } else {
                 json_exit(["ok" => false, "error" => "You don’t have permission to access that page."]);
+            }
         }
 
         if ($this->is_empty()) {
             // Preserve post values across session expiration.
             $x = array();
-            if (Navigation::path())
+            if (Navigation::path()) {
                 $x["__PATH__"] = preg_replace(",^/+,", "", Navigation::path());
-            if ($Qreq->anchor)
+            }
+            if ($Qreq->anchor) {
                 $x["anchor"] = $Qreq->anchor;
+            }
             $url = $this->conf->selfurl($Qreq, [], Conf::HOTURL_RAW | Conf::HOTURL_SITE_RELATIVE);
             $_SESSION["login_bounce"] = array($this->conf->dsn, $url, Navigation::page(), $_POST);
-            if (check_post())
+            if (check_post()) {
                 error_go(false, "You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.");
-            else
+            } else {
                 error_go(false, "You must sign in to access that page.");
-        } else
+            }
+        } else {
             error_go(false, "You don’t have permission to access that page.");
+        }
     }
 
     function save() {
@@ -557,13 +598,16 @@ class Contact {
         if ($inserting) {
             $this->creationTime = $Now;
             $q .= ", creationTime=$Now";
-        } else
+        } else {
             $q .= " where contactId=" . $this->contactId;
+        }
         $result = $this->conf->qe_apply($q, $qv);
-        if (!$result)
+        if (!$result) {
             return $result;
-        if ($inserting)
+        }
+        if ($inserting) {
             $this->contactId = $this->cid = $result->insert_id;
+        }
 
         // add to contact database
         if ($this->conf->opt("contactdb_dsn") && ($cdb = self::contactdb())) {
@@ -573,8 +617,9 @@ class Contact {
                 && ($cdb_user = self::contactdb_find_by_email($this->email))
                 && !$cdb_user->password
                 && !$cdb_user->disable_shared_password
-                && !$this->conf->opt("contactdb_noPasswords"))
+                && !$this->conf->opt("contactdb_noPasswords")) {
                 $cdb_user->change_password($this->password_plaintext, true, 0);
+            }
         }
 
         return $result;
@@ -586,43 +631,57 @@ class Contact {
 
     private function load_links() {
         $this->links = [1 => [], 2 => [], 3 => [], 4 => [], 5 => []];
-        if (!property_exists($this, "contactLinks"))
+        if ($this->contactLinks === null) {
             $this->contactLinks = $this->conf->fetch_value("select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=?", $this->contactId);
-        foreach (explode(",", (string) $this->contactLinks) as $l) {
+        }
+        foreach (explode(",", $this->contactLinks ?? "") as $l) {
             if ($l !== "") {
                 $a = explode(" ", $l);
                 $this->links[(int) $a[0]][(int) $a[1]][] = (int) $a[2];
             }
         }
-        unset($this->contactLinks);
+        $this->contactLinks = null;
     }
 
+    /** @param int $type
+     * @param int $pset
+     * @return ?int */
     function link($type, $pset = 0) {
-        if ($this->links === null)
+        if ($this->links === null) {
             $this->load_links();
-        $l = get($this->links[$type], $pset);
-        return $l !== null && count($l) == 1 ? $l[0] : null;
+        }
+        $l = $this->links[$type][$pset] ?? null;
+        return $l !== null && count($l) === 1 ? $l[0] : null;
     }
 
+    /** @param int $type
+     * @param int $pset
+     * @return list<int> */
     function links($type, $pset = 0) {
-        if ($this->links === null)
+        if ($this->links === null) {
             $this->load_links();
+        }
         $pset = is_object($pset) ? $pset->psetid : $pset;
-        return get($this->links[$type], $pset, []);
+        return $this->links[$type][$pset] ?? [];
     }
 
+    /** @return int */
     function branchid(Pset $pset) {
-        if ($this->links === null)
+        if ($this->links === null) {
             $this->load_links();
-        $l = get($this->links[LINK_BRANCH], $pset->id);
-        return $l !== null && count($l) == 1 && !$pset->no_branch ? $l[0] : 0;
+        }
+        $l = $this->links[LINK_BRANCH][$pset->id] ?? null;
+        return $l !== null && count($l) === 1 && !$pset->no_branch ? $l[0] : 0;
     }
 
+    /** @return string */
     function branch_name(Pset $pset) {
         $branchid = $this->branchid($pset);
-        return $branchid ? $this->conf->branch($branchid) : null;
+        return $branchid ? $this->conf->branch($branchid) : $pset->main_branch;
     }
 
+    /** @param int $type
+     * @param int $psetid */
     private function adjust_links($type, $psetid) {
         if ($type == LINK_REPO) {
             $this->repos = array();
@@ -634,6 +693,9 @@ class Contact {
         }
     }
 
+    /** @param int $type
+     * @param int $psetid
+     * @return bool */
     function clear_links($type, $psetid = 0, $nolog = false) {
         unset($this->links[$type][$psetid]);
         $this->adjust_links($type, $psetid);
@@ -647,6 +709,10 @@ class Contact {
         }
     }
 
+    /** @param int $type
+     * @param int $psetid
+     * @param int $link
+     * @return bool */
     function set_link($type, $psetid, $link) {
         if ($this->links === null) {
             $this->load_links();
@@ -661,6 +727,10 @@ class Contact {
         }
     }
 
+    /** @param int $type
+     * @param int $psetid
+     * @param int $value
+     * @return bool */
     function add_link($type, $psetid, $value) {
         assert($type !== LINK_REPO && $type !== LINK_BRANCH);
         if ($this->links === null) {
@@ -681,6 +751,8 @@ class Contact {
         return true;
     }
 
+    /** @param int $pset
+     * @return ?Repository */
     function repo($pset, Repository $repo = null) {
         $pset = is_object($pset) ? $pset->id : $pset;
         if (!array_key_exists($pset, $this->repos)) {
@@ -696,6 +768,9 @@ class Contact {
         return $this->repos[$pset];
     }
 
+    /** @param int $pset
+     * @param ?Repository $repo
+     * @return bool */
     function set_repo($pset, $repo) {
         $pset = is_object($pset) ? $pset->psetid : $pset;
         if ($repo) {
@@ -707,6 +782,8 @@ class Contact {
         return true;
     }
 
+    /** @param int $pset
+     * @return ?Contact */
     function partner($pset, Contact $partner = null) {
         $pset = is_object($pset) ? $pset->id : $pset;
         if (!array_key_exists($pset, $this->partners)) {
@@ -725,6 +802,7 @@ class Contact {
     }
 
 
+    /** @param int $psetid */
     function invalidate_grades($psetid) {
         global $Now;
         $this->conf->qe("delete from Settings where name=? or name=?",
@@ -750,9 +828,9 @@ class Contact {
         $this->ensure_gcache($pset);
         if (isset($this->_gcache[$pset->id])) {
             if ($ge->key === "late_hours") {
-                return get($this->_gcache[$pset->id], "late_hours", null);
+                return $this->_gcache[$pset->id]["late_hours"] ?? null;
             } else {
-                return get($this->_gcache[$pset->id]["grades"], $ge->pcview_index, null);
+                return $this->_gcache[$pset->id]["grades"][$ge->pcview_index] ?? null;
             }
         } else {
             return null;
@@ -827,8 +905,9 @@ class Contact {
 
     private function load_by_query($where) {
         $result = $this->conf->q_raw("select ContactInfo.* from ContactInfo where $where");
-        if (($row = $result ? $result->fetch_object() : null))
+        if (($row = $result ? $result->fetch_object() : null)) {
             $this->merge($row);
+        }
         Dbl::free($result);
         return !!$row;
     }

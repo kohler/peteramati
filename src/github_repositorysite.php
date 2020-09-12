@@ -74,20 +74,24 @@ class GitHub_RepositorySite extends RepositorySite {
     const MAINURL = "https://github.com/";
     static function make_url($url, Conf $conf) {
         $url = preg_replace('/\s*\/\s*/', '/', $url);
-        if (preg_match('/\A(?:github(?:\.com)?[:\/])?\/*([^\/:@]+\/[^\/:@]+?)(?:\.git|)\z/i', $url, $m))
+        if (preg_match('/\A(?:github(?:\.com)?[:\/])?\/*([^\/:@]+\/[^\/:@]+?)(?:\.git|)\z/i', $url, $m)) {
             return new GitHub_RepositorySite("git@github.com:" . $m[1], $m[1], $conf);
-        if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)github.com(?::/*|/+)([^/]+?/[^/]+?)(?:\.git|)\z_i', $url, $m))
+        } else if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)github.com(?::/*|/+)([^/]+?/[^/]+?)(?:\.git|)\z_i', $url, $m)) {
             return new GitHub_RepositorySite("git@github.com:" . $m[1], $m[1], $conf);
-        return null;
+        } else {
+            return null;
+        }
     }
     static function sniff_url($url) {
-        if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)github.com(?::/*|/+)(.*?)(?:\.git|)\z_i', $url, $m))
+        if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)github.com(?::/*|/+)(.*?)(?:\.git|)\z_i', $url, $m)) {
             return 2;
-        else if (preg_match('_\A(?:github(?:\.com)?)(?::/*|/+)([^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m))
+        } else if (preg_match('_\A(?:github(?:\.com)?)(?::/*|/+)([^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m)) {
             return 2;
-        else if (preg_match('_\A/*([^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m))
+        } else if (preg_match('_\A/*([^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m)) {
             return 1;
-        return 0;
+        } else {
+            return 0;
+        }
     }
     static function home_link($html) {
         return Ht::link($html, self::MAINURL);
@@ -119,24 +123,33 @@ class GitHub_RepositorySite extends RepositorySite {
                                 . "  " . Ht::submit("Save"), $notes);
         echo "</div></form>";
     }
+    /** @param string $username
+     * @return bool */
     static function save_username(Contact $user, $username) {
         global $Me;
-        // does it contain odd characters?
         $username = trim((string) $username);
+
+        // empty?
         if ($username === "") {
             if ($Me->privChair) {
                 return $user->change_username("github", null);
+            } else {
+                Conf::msg_error("Empty username.");
+                return false;
             }
-            return Conf::msg_error("Empty username.");
-        }
-        if (preg_match('_[@,;:~/\[\](){}\\<>&#=\\000-\\027]_', $username)) {
-            return Conf::msg_error("The username “" . htmlspecialchars($username) . "” contains funny characters. Remove them.");
         }
 
-        // is it in use?
+        // weird?
+        if (preg_match('_[@,;:~/\[\](){}\\<>&#=\\000-\\027]_', $username)) {
+            Conf::msg_error("The username “" . htmlspecialchars($username) . "” contains funny characters. Remove them.");
+            return false;
+        }
+
+        // in use?
         $x = $user->conf->fetch_value("select contactId from ContactInfo where github_username=?", $username);
         if ($x && $x != $user->contactId) {
-            return Conf::msg_error("That username is already in use.");
+            Conf::msg_error("That username is already in use.");
+            return false;
         }
 
         // is it valid? XXX GitHub API
@@ -157,12 +170,15 @@ class GitHub_RepositorySite extends RepositorySite {
             || !$gql->j
             || !isset($gql->j->data)) {
             error_log(json_encode($gql));
-            return Conf::msg_error("Error contacting the GitHub API. Maybe try again?");
+            Conf::msg_error("Error contacting the GitHub API. Maybe try again?");
+            return false;
         } else if (!isset($gql->j->data->user)) {
-            return Conf::msg_error("That user doesn’t exist. Check your spelling and try again.");
+            Conf::msg_error("That user doesn’t exist. Check your spelling and try again.");
+            return false;
         } else if (!isset($gql->j->data->user->organization)) {
             if ($user->conf->opt("githubRequireOrganizationMembership")) {
-                return Conf::msg_error("That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . ", which manages the class. Follow the link to register with the class, or contact course staff.");
+                Conf::msg_error("That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . ", which manages the class. Follow the link to register with the class, or contact course staff.");
+                return false;
             }
         } else if ($staff_team
                    && $user->is_student()
@@ -172,7 +188,8 @@ class GitHub_RepositorySite extends RepositorySite {
                                 function ($node) use ($username) {
                                     return strcasecmp($username, $node->login) === 0;
                                 })) {
-            return Conf::msg_error("That user is a member of the course staff.");
+            Conf::msg_error("That user is a member of the course staff.");
+            return false;
         }
 
         return $user->change_username("github", $username);

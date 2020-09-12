@@ -343,7 +343,7 @@ class ContactView {
         $branch = $user->branch_name($pset);
 
         if ($editable) {
-            $xvalue = $branch;
+            $xvalue = $branch === $pset->main_branch ? null : $branch;
             $js = ["style" => "width:32em", "placeholder" => $pset->main_branch];
             if (isset($Qreq->set_branch)
                 && $Qreq->pset === $pset->urlkey
@@ -355,7 +355,7 @@ class ContactView {
         } else if ($user->is_anonymous) {
             $value = $branch && $branch !== $pset->main_branch ? "[anonymous]" : $pset->main_branch;
         } else {
-            $value = htmlspecialchars($branch ?? $pset->main_branch);
+            $value = htmlspecialchars($branch);
         }
 
         // edit
@@ -364,8 +364,9 @@ class ContactView {
                 '<div class="f-contain">';
         }
         self::echo_group("branch", $value, []);
-        if ($editable)
+        if ($editable) {
             echo "</div></form>\n";
+        }
     }
 
     static function echo_downloads_group(PsetView $info) {
@@ -402,7 +403,7 @@ class ContactView {
                 if ($info->repo
                     && !$info->pset->gitless
                     && ($h = $info->maybe_commit_hash() ? : $info->grading_hash())
-                    && ($ls = $info->recent_commits($h))) {
+                    && ($ls = $info->connected_commit($h))) {
                     echo '" data-pa-commit-at="', $ls->commitat;
                 }
             }
@@ -488,19 +489,23 @@ class ContactView {
         if (!($Me->has_account_here()
               && $qreq->post_ok()
               && ($pset = $Conf->pset_by_key($qreq->pset))
-              && !$pset->no_branch))
+              && !$pset->no_branch)) {
             return;
-        if (!$Me->can_set_repo($pset, $user))
+        }
+        if (!$Me->can_set_repo($pset, $user)) {
             return Conf::msg_error("You can’t edit repository information for that problem set now.");
+        }
 
         $branch = trim($qreq->branch);
-        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $branch))
+        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $branch)) {
             return Conf::msg_error("That branch contains funny characters. Remove them.");
+        }
 
-        if ($branch === "" || $branch === $pset->main_branch)
+        if ($branch === "" || $branch === $pset->main_branch) {
             $user->clear_links(LINK_BRANCH, $pset->id);
-        else
+        } else {
             $user->set_link(LINK_BRANCH, $pset->id, $Conf->ensure_branch($branch), $branch);
+        }
         redirectSelf();
     }
 
@@ -509,7 +514,7 @@ class ContactView {
         list($user, $repo, $pset) = [$info->user, $info->repo, $info->pset];
         if ($pset->gitless)
             return;
-        $branch = $user->branch_name($pset) ?? $pset->main_branch;
+        $branch = $user->branch_name($pset);
 
         $snaphash = $snapcommitline = $snapcommitat = null;
         if ($repo && !$info->user_can_view_repo_contents()) {
@@ -591,10 +596,7 @@ class ContactView {
         // XXX should check can_view_grades here
 
         $value = "";
-        $ginfo = $info->grading_commit();
-        if ($ginfo) {
-            if (!is_object($ginfo))
-                error_log(json_encode($ginfo) . " not an object, " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
+        if (($ginfo = $info->grading_commit())) {
             $value = substr($ginfo->hash, 0, 7) . " " . htmlspecialchars($ginfo->subject);
         }
 

@@ -410,6 +410,7 @@ function prefix_commajoin($what, $prefix, $joinword = "and") {
 function numrangejoin($range) {
     $a = [];
     $format = null;
+    $intval = $first = $last = 0;
     foreach ($range as $current) {
         if ($format !== null
             && sprintf($format, $intval + 1) === (string) $current) {
@@ -417,10 +418,11 @@ function numrangejoin($range) {
             $last = $current;
             continue;
         } else {
-            if ($format !== null && $first === $last)
+            if ($format !== null && $first === $last) {
                 $a[] = $first;
-            else if ($format !== null)
+            } else if ($format !== null){
                 $a[] = $first . "–" . substr($last, $plen);
+            }
             if ($current !== "" && ctype_digit($current)) {
                 $format = "%0" . strlen($current) . "d";
                 $plen = 0;
@@ -437,35 +439,40 @@ function numrangejoin($range) {
             }
         }
     }
-    if ($format !== null && $first === $last)
+    if ($format !== null && $first === $last) {
         $a[] = $first;
-    else if ($format !== null)
+    } else if ($format !== null) {
         $a[] = $first . "–" . substr($last, $plen);
+    }
     return commajoin($a);
 }
 
 function pluralx($n, $what) {
-    if (is_array($n))
+    if (is_array($n)) {
         $n = count($n);
-    return $n == 1 ? $what : pluralize($what);
+    }
+    return $n === 1 ? $what : pluralize($what);
 }
 
 function pluralize($what) {
-    if ($what == "this")
+    if ($what === "this") {
         return "these";
-    else if ($what == "has")
+    } else if ($what === "has") {
         return "have";
-    else if ($what == "is")
+    } else if ($what === "is") {
         return "are";
-    else if (str_ends_with($what, ")") && preg_match('/\A(.*?)(\s*\([^)]*\))\z/', $what, $m))
+    } else if (str_ends_with($what, ")")
+               && preg_match('/\A(.*?)(\s*\([^)]*\))\z/', $what, $m)) {
         return pluralize($m[1]) . $m[2];
-    else if (preg_match('/\A.*?(?:s|sh|ch|[bcdfgjklmnpqrstvxz]y)\z/', $what)) {
-        if (substr($what, -1) == "y")
+    } else if (preg_match('/\A.*?(?:s|sh|ch|[bcdfgjklmnpqrstvxz]y)\z/', $what)) {
+        if (substr($what, -1) === "y") {
             return substr($what, 0, -1) . "ies";
-        else
+        } else {
             return $what . "es";
-    } else
+        }
+    } else {
         return $what . "s";
+    }
 }
 
 function plural($n, $what) {
@@ -474,24 +481,28 @@ function plural($n, $what) {
 
 function ordinal($n) {
     $x = $n;
-    if ($x > 100)
+    if ($x > 100) {
         $x = $x % 100;
-    if ($x > 20)
+    }
+    if ($x > 20) {
         $x = $x % 10;
+    }
     return $n . ($x < 1 || $x > 3 ? "th" : ($x == 1 ? "st" : ($x == 2 ? "nd" : "rd")));
 }
 
 function tabLength($text, $all) {
     $len = 0;
-    for ($i = 0; $i < strlen($text); $i++)
-        if ($text[$i] == ' ')
-            $len++;
-        else if ($text[$i] == '\t')
+    for ($i = 0; $i < strlen($text); $i++) {
+        if ($text[$i] === ' ') {
+            ++$len;
+        } else if ($text[$i] === '\t') {
             $len += 8 - ($len % 8);
-        else if (!$all)
+        } else if (!$all) {
             break;
-        else
-            $len++;
+        } else {
+            ++$len;
+        }
+    }
     return $len;
 }
 

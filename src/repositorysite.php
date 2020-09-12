@@ -71,7 +71,7 @@ class RepositorySite {
     static private function chair_error($error) {
         global $Me;
         if ($Me && $Me->privChair) {
-            $Me->conf->errorMsg($s);
+            $Me->conf->errorMsg($error);
         }
         return -1;
     }
@@ -87,7 +87,7 @@ class RepositorySite {
         if (!$clientid || !$token) {
             return self::chair_error("Missing OAuth client ID and/or token.");
         } else if (!ctype_alnum($token)) {
-            return $this->chair_error("Bad OAuth token.");
+            return self::chair_error("Bad OAuth token.");
         }
         putenv("GIT_USERNAME=$clientid");
         putenv("GIT_PASSWORD=$token");

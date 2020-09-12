@@ -7,11 +7,16 @@ class RunnerException extends Exception {
 }
 
 class RunnerState {
+    /** @var Conf */
     public $conf;
+    /** @var PsetView */
     public $info;
+    /** @var Repository */
     public $repo;
     public $repoid;
+    /** @var Pset */
     public $pset;
+    /** @var RunnerConfig */
     public $runner;
 
     public $logdir;
@@ -46,8 +51,9 @@ class RunnerState {
                 . ".pset" . $this->pset->id;
             if (!is_dir($this->logdir)) {
                 $old_umask = umask(0);
-                if (!mkdir($this->logdir, 02770, true))
+                if (!mkdir($this->logdir, 02770, true)) {
                     throw new RunnerException("Cannot create log directory");
+                }
                 umask($old_umask);
             }
         }
@@ -103,25 +109,31 @@ class RunnerState {
 
     function job_status($checkt, $answer = null) {
         global $Now;
-        if (!$checkt)
+        if (!$checkt) {
             return false;
-        if (!$answer)
+        }
+        if (!$answer) {
             $answer = (object) [];
+        }
         $logfn = $this->info->runner_logfile($checkt);
         $lockfn = $logfn . ".pid";
         $pid_data = @file_get_contents($lockfn);
-        if (ctype_digit(trim($pid_data))
-            && !posix_kill(trim($pid_data), 0)
-            && posix_get_last_error() == 3 /* ESRCH */)
+        $pid_digit = ctype_digit(trim($pid_data));
+        if ($pid_digit
+            && !posix_kill((int) trim($pid_data), 0)
+            && posix_get_last_error() === 3 /* ESRCH */) {
             $pid_data = "dead\n";
+            $pid_digit = false;
+        }
         if ($pid_data === false || $pid_data === "0\n") {
             $answer->done = true;
             $answer->status = "done";
-        } else if ($pid_data === "" || ctype_digit(trim($pid_data))) {
+        } else if ($pid_data === "" || $pid_digit) {
             $answer->done = false;
             $answer->status = "working";
-            if ($Now - $checkt > 600)
+            if ($Now - $checkt > 600) {
                 $answer->status = "old";
+            }
         } else {
             $answer->done = true;
             $answer->status = "dead";
@@ -348,8 +360,9 @@ class RunnerState {
         ];
         if ($runsettings) {
             $json->settings = [];
-            foreach ($runsettings as $k => $v)
+            foreach ($runsettings as $k => $v) {
                 $json->settings[$k] = $v;
+            }
         }
         fwrite($this->logstream, "++ " . json_encode($json) . "\n");
 
@@ -493,8 +506,8 @@ class RunnerState {
                 $sh[] = "$k=" . escapeshellarg($v) . "\n";
             }
         }
-        file_put_contents($this->jailhomedir . "/config.mk", join("", $mk), true);
-        file_put_contents($this->jailhomedir . "/config.sh", join("", $sh), true);
+        file_put_contents($this->jailhomedir . "/config.mk", join("", $mk));
+        file_put_contents($this->jailhomedir . "/config.sh", join("", $sh));
     }
 
 
@@ -566,14 +579,16 @@ class RunnerState {
             $this->conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $this->queueid);
         $queue = $this->load_queue();
 
-        $qconf = get(get($PsetInfo, "_queues", []), $this->runner->queue);
-        if (!$qconf)
+        $qconf = $PsetInfo->_queues[$this->runner->queue] ?? null;
+        if (!$qconf) {
             $qconf = (object) ["nconcurrent" => 1];
-        $nconcurrent = get($qconf, "nconcurrent", 1000);
+        }
+        $nconcurrent = $qconf->nconcurrent ?? 1000;
         if ($this->runner->nconcurrent > 0
-            && $this->runner->nconcurrent < $nconcurrent)
+            && $this->runner->nconcurrent < $nconcurrent) {
             $nconcurrent = $this->runner->nconcurrent;
-        if (get($queue, "ahead_nconcurrent") > 0
+        }
+        if (($queue->ahead_nconcurrent ?? 0) > 0
             && $queue->ahead_nconcurrent < $nconcurrent)
             $nconcurrent = $queue->ahead_nconcurrent;
 
@@ -586,8 +601,9 @@ class RunnerState {
                 }
                 $this->clean_queue($qconf);
                 $queue = $this->load_queue();
-            } else
+            } else {
                 break;
+            }
         }
 
         // if we get here we can actually run
@@ -599,10 +615,11 @@ class RunnerState {
     function evaluate($answer) {
         global $ConfSitePATH;
         if (isset($this->runner->require)
-            && $this->runner->require[0] === "/")
+            && $this->runner->require[0] === "/") {
             require_once($this->runner->require);
-        else if (isset($this->runner->require))
+        } else if (isset($this->runner->require)) {
             require_once($ConfSitePATH . "/" . $this->runner->require);
+        }
         $answer->result = call_user_func($this->runner->eval, $this->info);
     }
 
@@ -621,16 +638,19 @@ class RunnerState {
                     && $s->hash === $this->info->commit_hash()) {
                     $checkt = $t;
                     break;
-                } else if ($n >= 200)
+                } else if ($n >= 200) {
                     break;
+                }
                 ++$n;
             }
-            if (!$checkt)
+            if (!$checkt) {
                 return (object) ["ok" => false, "run_empty" => true, "error" => "No logs yet", "error_html" => "No logs yet"];
+            }
         } else {
             $checkt = cvtint($qreq->check);
-            if ($checkt <= 0)
+            if ($checkt <= 0) {
                 return (object) ["ok" => false, "error" => "Invalid “check” argument", "error_html" => "Invalid “check” argument"];
+            }
         }
         $this->set_checkt($checkt);
 
@@ -650,13 +670,15 @@ class RunnerState {
             }
         }
 
-        if ($answer->status !== "working" && $this->queueid > 0)
+        if ($answer->status !== "working" && $this->queueid > 0) {
             $this->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repoid);
+        }
         if ($answer->status === "done") {
             $viewer = $this->info->viewer;
             if ($viewer->can_run($this->pset, $this->runner, $this->info->user)
-                && $this->runner->eval)
+                && $this->runner->eval) {
                 $this->evaluate($answer);
+            }
         }
 
         return $answer;
@@ -664,9 +686,11 @@ class RunnerState {
 
 
     function cleanup() {
-        if ($this->lockfile)
+        if ($this->lockfile) {
             unlink($this->lockfile);
-        if ($this->lockfile && $this->inputfifo)
+        }
+        if ($this->lockfile && $this->inputfifo) {
             unlink($this->inputfifo);
+        }
     }
 }

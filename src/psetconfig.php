@@ -19,6 +19,7 @@ class PsetConfigException extends Exception {
 }
 
 class Pset {
+    /** @var Conf */
     public $conf;
     public $id;
     public $psetid;
@@ -59,7 +60,9 @@ class Pset {
     public $deadline_extension;
     public $obscure_late_hours = false;
 
+    /** @var array<string,GradeEntryConfig> */
     public $all_grades = [];
+    /** @var array<string,GradeEntryConfig> */
     public $grades;
     public $grades_visible;
     public $grades_visible_college;
@@ -77,7 +80,9 @@ class Pset {
 
     public $downloads = [];
 
-    public $all_runners = array();
+    /** @var array<string,RunnerConfig> */
+    public $all_runners = [];
+    /** @var array<string,RunnerConfig> */
     public $runners;
     public $run_username;
     public $run_dirpattern;
@@ -90,11 +95,15 @@ class Pset {
     public $has_transfer_warnings;
     public $has_xterm_js;
 
+    /** @var list<DiffConfig> */
     public $diffs = [];
     public $ignore;
     private $_file_ignore_regex;
+    /** @var ?list<DiffConfig> */
     private $_extra_diffs;
+    /** @var ?list<DiffConfig> */
     private $_all_diffs;
+    /** @var array<string,DiffConfig> */
     private $_file_diffinfo = [];
 
     public $config_signature;
@@ -115,7 +124,7 @@ class Pset {
         if (!isset($p->key) && (string) $pk === "") {
             $pk = $p->psetid;
         } else if (isset($p->key) && $pk !== null && (string) $p->key !== (string) $pk) {
-            throw new PsetConfigException("pset key disagrees with `key`");
+            throw new PsetConfigException("pset key disagrees with `key`", "key");
         } else if (isset($p->key)) {
             $pk = $p->key;
         }
@@ -128,7 +137,7 @@ class Pset {
         } else if (str_starts_with($pk, "pset")
                    && ctype_digit(substr($pk, 4))
                    && substr($pk, 4) != $p->psetid) {
-            throw new PsetConfigException("pset key `psetNNN` requires that `NNN` is the psetid");
+            throw new PsetConfigException("pset key `psetNNN` requires that `NNN` is the psetid", "key");
         }
         $this->key = $pk;
         $this->nonnumeric_key = ctype_digit($pk) ? "pset" . $pk : $pk;
@@ -181,7 +190,7 @@ class Pset {
         if ((string) $this->partner_repo === "" || $this->partner_repo === "same") {
             $this->partner_repo = null;
         } else if ($this->partner_repo !== "different") {
-            throw new PsetConfigException("`partner_repo` should be \"same\" or \"different\"");
+            throw new PsetConfigException("`partner_repo` should be \"same\" or \"different\"", "partner_repo");
         }
         $this->hide_comments = self::cbool($p, "hide_comments");
 
@@ -189,7 +198,7 @@ class Pset {
         $this->main_branch = self::cstr($p, "main_branch") ?? "master";
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");
         if (!$this->handout_repo_url && !$this->gitless) {
-            throw new PsetConfigException("`handout_repo_url` missing");
+            throw new PsetConfigException("`handout_repo_url` missing", "handout_repo_url");
         }
         $this->handout_branch = self::cstr($p, "handout_branch", "handout_repo_branch") ?? $this->main_branch;
         $this->handout_hash = self::cstr($p, "handout_hash", "handout_commit_hash");
@@ -221,11 +230,11 @@ class Pset {
         $this->obscure_late_hours = self::cbool($p, "obscure_late_hours");
 
         // grades
-        $grades = get($p, "grades");
+        $grades = $p->grades ?? null;
         if (is_array($grades) || is_object($grades)) {
             foreach ((array) $p->grades as $k => $v) {
                 $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v);
-                if (get($this->all_grades, $g->key)
+                if (isset($this->all_grades[$g->key])
                     || $g->key === "late_hours") {
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
                 }
@@ -246,7 +255,7 @@ class Pset {
         } else if ($grades) {
             throw new PsetConfigException("`grades` format error`", "grades");
         }
-        if (get($p, "grade_order")) {
+        if ($p->grade_order ?? null) {
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         } else {
             $this->grades = self::position_sort("grades", $this->all_grades);
@@ -297,24 +306,27 @@ class Pset {
         $this->downloads = self::position_sort("downloads", $this->downloads);
 
         // runners
-        $runners = get($p, "runners");
-        $default_runner = get($p, "default_runner");
+        $runners = $p->runners ?? null;
+        $default_runner = $p->default_runner ?? null;
         $this->has_transfer_warnings = $this->has_xterm_js = false;
         if (is_array($runners) || is_object($runners)) {
             foreach ((array) $p->runners as $k => $v) {
                 $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v, $default_runner);
-                if (get($this->all_runners, $r->name))
+                if (isset($this->all_runners[$r->name])) {
                     throw new PsetConfigException("runner `$r->name` reused", "runners", $k);
+                }
                 $this->all_runners[$r->name] = $r;
-                if ($r->transfer_warnings)
+                if ($r->transfer_warnings) {
                     $this->has_transfer_warnings = true;
-                if ($r->xterm_js)
+                }
+                if ($r->xterm_js) {
                     $this->has_xterm_js = true;
+                }
             }
         } else if ($runners) {
             throw new PsetConfigException("`runners` format error", "runners");
         }
-        if (get($p, "runner_order")) {
+        if ($p->runner_order ?? false) {
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
         } else {
             $this->runners = self::position_sort("runners", $this->all_runners);
@@ -334,8 +346,9 @@ class Pset {
         // diffs
         $diffs = get($p, "diffs");
         if (is_array($diffs) || is_object($diffs)) {
-            foreach (self::make_config_array($p->diffs) as $k => $v)
+            foreach (self::make_config_array($p->diffs) as $k => $v) {
                 $this->diffs[] = new DiffConfig($k, $v);
+            }
         } else if ($diffs) {
             throw new PsetConfigException("`diffs` format error", "diffs");
         }
@@ -350,14 +363,15 @@ class Pset {
     static function compare(Pset $a, Pset $b) {
         $adl = $a->deadline_college ? : $a->deadline;
         $bdl = $b->deadline_college ? : $b->deadline;
-        if (!$adl != !$bdl)
+        if (!$adl != !$bdl) {
             return $adl ? -1 : 1;
-        else if ($adl != $bdl)
+        } else if ($adl != $bdl) {
             return $adl < $bdl ? -1 : 1;
-        else if (($cmp = strcasecmp($a->title, $b->title)))
+        } else if (($cmp = strcasecmp($a->title, $b->title))) {
             return $cmp;
-        else
+        } else {
             return $a->id < $b->id ? -1 : 1;
+        }
     }
 
 
@@ -369,72 +383,91 @@ class Pset {
 
     function student_can_view_grades($extension = null) {
         global $Now;
-        if ($extension === null)
+        if ($extension === null) {
             $dl = $this->grades_visible;
-        else if ($extension)
+        } else if ($extension) {
             $dl = $this->grades_visible_extension;
-        else
+        } else {
             $dl = $this->grades_visible_college;
+        }
         return $this->student_can_view() && $dl && ($dl === true || $dl <= $Now);
     }
 
 
+    /** @return ?Repository */
     function handout_repo(Repository $inrepo = null) {
         return $this->conf->handout_repo($this, $inrepo);
     }
 
-    function handout_commits($hash = null) {
-        return $this->conf->handout_commits($this, $hash);
+    /** @return array<string,CommitRecord> */
+    function handout_commits() {
+        return $this->conf->handout_commits($this);
     }
 
+    /** @return ?CommitRecord */
+    function handout_commit($hash) {
+        return $this->conf->handout_commit($this, $hash);
+    }
+
+    /** @return ?array<string,CommitRecord> */
     function handout_commits_from($hash) {
         return $this->conf->handout_commits_from($this, $hash);
     }
 
+    /** @return ?CommitRecord */
     function latest_handout_commit() {
         return $this->conf->latest_handout_commit($this);
     }
 
+    /** @param CommitRecord $commit
+     * @return bool */
     function is_handout($commit) {
         if ($commit->_is_handout_pset !== $this) {
             $commit->_is_handout_pset = $this;
-            $commit->_is_handout = !!$this->handout_commits($commit->hash);
+            $commit->_is_handout = !!$this->handout_commit($commit->hash);
         }
         return $commit->_is_handout;
     }
 
 
+    /** @return array<string,GradeEntryConfig> */
     function grades() {
         return $this->grades;
     }
 
+    /** @return ?GradeEntryConfig */
     function gradelike_by_key($key) {
-        if (isset($this->all_grades[$key]))
+        if (isset($this->all_grades[$key])) {
             return $this->all_grades[$key];
-        else if ($key === "late_hours")
+        } else if ($key === "late_hours") {
             return $this->late_hours_entry();
-        else
+        } else {
             return null;
+        }
     }
 
+    /** @return array<string,GradeEntryConfig> */
     function numeric_grades() {
         return array_filter($this->grades, function ($ge) {
             return $ge->type !== "text";
         });
     }
 
+    /** @return array<string,GradeEntryConfig> */
     function visible_grades($pcview) {
         return $pcview ? $this->grades : array_filter($this->grades, function ($ge) {
             return $ge->visible;
         });
     }
 
+    /** @return array<string,GradeEntryConfig> */
     function visible_grades_in_total($pcview) {
         return array_filter($this->grades, function ($ge) use ($pcview) {
             return ($pcview || $ge->visible) && !$ge->no_total;
         });
     }
 
+    /** @return GradeEntryConfig */
     function late_hours_entry() {
         return $this->_late_hours;
     }
@@ -466,8 +499,9 @@ class Pset {
                     $maxtotal += $ge->max;
             }
         }
-        if ($maxtotal)
+        if ($maxtotal) {
             $max["total"] = $maxtotal;
+        }
         return (object) ["nentries" => $count, "maxgrades" => (object) $max];
     }
 
@@ -490,9 +524,9 @@ class Pset {
         return $j;
     }
 
-
+    /** @param Contact $student */
     function contact_grade_for($student) {
-        $cid = is_object($student) ? $student->contactId : $sstudent;
+        $cid = $student->contactId;
         $result = $this->conf->qe("select * from ContactGrade where cid=? and pset=?", $cid, $this->psetid);
         $cg = edb_orow($result);
         if ($cg && $cg->notes) {
@@ -522,18 +556,20 @@ class Pset {
         $x = str_replace(array('\*', '\?', '\[', '\]', '\-', '_'),
                          array('[^/]*', '[^/]', '[', ']', '-', '\_'),
                          preg_quote($x));
-        if ($x === "")
+        if ($x === "") {
             return "";
-        else if (strpos($x, "/") === false) {
-            if ($prefix)
+        } else if (strpos($x, "/") === false) {
+            if ($prefix) {
                 return '|\A' . preg_quote($prefix) . '/' . $x;
-            else
+            } else {
                 return '|' . $x;
+            }
         } else {
-            if ($prefix)
+            if ($prefix) {
                 return '|\A' . preg_quote($prefix) . '/' . $x . '\z';
-            else
+            } else {
                 return '|\A' . $x . '\z';
+            }
         }
     }
 
@@ -545,21 +581,25 @@ class Pset {
         if ($this->conf->setting("__gitignore_pset{$this->id}_at", 0) < $Now - 900) {
             $hrepo = $this->handout_repo();
             $result = "";
-            if ($this->directory_slash !== "")
+            if ($this->directory_slash !== "") {
                 $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/master:" . escapeshellarg($this->directory_slash) . ".gitignore 2>/dev/null");
+            }
             $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/master:.gitignore 2>/dev/null");
             $this->conf->save_setting("__gitignore_pset{$this->id}_at", $Now);
             $this->conf->save_setting("gitignore_pset{$this->id}", 1, $result);
         }
         if (($result = $this->conf->setting_data("gitignore_pset{$this->id}"))) {
-            foreach (preg_split('/\s+/', $result) as $x)
+            foreach (preg_split('/\s+/', $result) as $x) {
                 $regex .= self::_file_glob_to_regex($x, $this->directory_noslash);
+            }
         }
         if (($xarr = $this->ignore)) {
-            if (!is_array($xarr))
+            if (!is_array($xarr)) {
                 $xarr = preg_split('/\s+/', $xarr);
-            foreach ($xarr as $x)
+            }
+            foreach ($xarr as $x) {
                 $regex .= self::_file_glob_to_regex($x, false);
+            }
         }
         return ($this->_file_ignore_regex = $regex);
     }
@@ -568,17 +608,21 @@ class Pset {
     function all_diffconfig() {
         if ($this->_all_diffs === null) {
             $this->_all_diffs = $this->diffs;
-            if (($regex = $this->file_ignore_regex()))
+            if (($regex = $this->file_ignore_regex())) {
                 $this->_all_diffs[] = new DiffConfig($regex, (object) array("ignore" => true, "match_priority" => -10));
-            foreach ((array) $this->_extra_diffs as $d)
+            }
+            foreach ($this->_extra_diffs ?? [] as $d) {
                 $this->_all_diffs[] = $d;
+            }
         }
         return $this->_all_diffs;
     }
 
+    /** @return ?DiffConfig */
     function find_diffconfig($filename) {
-        if (array_key_exists($filename, $this->_file_diffinfo))
+        if (array_key_exists($filename, $this->_file_diffinfo)) {
             return $this->_file_diffinfo[$filename];
+        }
         $diffinfo = null;
         foreach ($this->all_diffconfig() as $d) {
             if (preg_match('{(?:\A|/)(?:' . $d->regex . ')(?:/|\z)}', $filename))
@@ -598,10 +642,11 @@ class Pset {
             foreach ($files as $f) {
                 if (str_starts_with($f, $this->directory_slash)
                     || str_starts_with($f, "./")
-                    || str_starts_with($f, "../"))
+                    || str_starts_with($f, "../")) {
                     return $files;
-                else
+                } else {
                     $pfiles[] = $this->directory_slash . $f;
+                }
             }
             return $pfiles;
         }
@@ -1278,30 +1323,33 @@ function is_string_or_string_array($x) {
 }
 
 function check_date($x) {
-    if (is_bool($x) || is_int($x))
+    if (is_bool($x) || is_int($x)) {
         return true;
-    else if (is_string($x) && ($d = parse_time($x)))
-        return array(true, $d);
-    else if (is_string($x))
-        return array(false, "date parse error");
-    else
+    } else if (is_string($x) && ($d = parse_time($x))) {
+        return [true, $d];
+    } else if (is_string($x)) {
+        return [false, "date parse error"];
+    } else {
         return false;
+    }
 }
 
 function check_date_or_grades($x) {
-    if ($x === "grades")
-        return array(true, $x);
-    else
+    if ($x === "grades") {
+        return [true, $x];
+    } else {
         return check_date($x);
+    }
 }
 
 function check_interval($x) {
-    if (is_int($x) || is_float($x))
+    if (is_int($x) || is_float($x)) {
         return true;
-    else if (is_string($x)
-             && preg_match(',\A(\d+(?:\.\d*)?|\.\d+)(?:$|\s*)([smhd]?)\z,', strtolower($x), $m)) {
+    } else if (is_string($x)
+               && preg_match(',\A(\d+(?:\.\d*)?|\.\d+)(?:$|\s*)([smhd]?)\z,', strtolower($x), $m)) {
         $mult = array("" => 1, "s" => 1, "m" => 60, "h" => 3600, "d" => 86400);
-        return array(true, $m[1] * $mult[$m[2]]);
-    } else
+        return [true, $m[1] * $mult[$m[2]]];
+    } else {
         return false;
+    }
 }

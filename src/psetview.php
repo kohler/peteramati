@@ -4,15 +4,25 @@
 // See LICENSE for open-source distribution terms
 
 class PsetView {
+    /** @var Conf */
     public $conf;
+    /** @var Pset */
     public $pset;
+    /** @var Contact */
     public $user;
+    /** @var Contact */
     public $viewer;
+    /** @var bool */
     public $pc_view;
+    /** @var ?Repository */
     public $repo;
+    /** @var ?Contact */
     public $partner;
+    /** @var ?string */
     public $branch;
+    /** @var ?int */
     public $branchid;
+    /** @var ?bool */
     private $partner_same;
 
     private $grade = false;         // either ContactGrade or RepositoryGrade+CommitNotes
@@ -121,14 +131,11 @@ class PsetView {
         }
         if ($reqhash) {
             $c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch);
+        } else if (($gh = $this->grading_hash())) {
+            $this->hash = $gh;
+            return $this->hash;
         } else {
-            $gh = $this->grading_hash();
-            if ($gh) {
-                $this->hash = $gh;
-                return $this->hash;
-            } else {
-                $c = $this->latest_commit();
-            }
+            $c = $this->latest_commit();
         }
         if ($c) {
             $this->hash = $c->hash;
@@ -161,12 +168,14 @@ class PsetView {
         return $this->hash;
     }
 
+    /** @return ?CommitRecord */
     function commit() {
-        if ($this->hash === null)
+        if ($this->hash === null) {
             error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $this->viewer->email);
+        }
         assert($this->hash !== null);
         if ($this->hash) {
-            return $this->recent_commits($this->hash);
+            return $this->connected_commit($this->hash);
         } else {
             return false;
         }
@@ -176,13 +185,21 @@ class PsetView {
         return $this->pset->gitless_grades || $this->commit();
     }
 
-    function recent_commits($hash = null) {
-        if (!$this->repo) {
-            return $hash ? null : [];
-        } else if (!$hash) {
+    /** @return array<string,CommitRecord> */
+    function recent_commits() {
+        if ($this->repo) {
             return $this->repo->commits($this->pset, $this->branch);
         } else {
+            return [];
+        }
+    }
+
+    /** @return ?CommitRecord */
+    function connected_commit($hash) {
+        if ($this->repo) {
             return $this->repo->connected_commit($hash, $this->pset, $this->branch);
+        } else {
+            return null;
         }
     }
 
@@ -226,7 +243,7 @@ class PsetView {
 
     function base_handout_commit() {
         if ($this->pset->handout_hash
-            && ($c = $this->pset->handout_commits($this->pset->handout_hash))) {
+            && ($c = $this->pset->handout_commit($this->pset->handout_hash))) {
             return $c;
         } else if (($c = $this->derived_handout_commit())) {
             return $c;
@@ -256,17 +273,20 @@ class PsetView {
     }
 
     function commit_info($key = null) {
-        if ($this->commit_record === false)
+        if ($this->commit_record === false) {
             $this->commit_record();
-        if ($key && $this->commit_notes)
-            return get($this->commit_notes, $key);
-        else
+        }
+        if ($key && $this->commit_notes) {
+            return $this->commit_notes->$key ?? null;
+        } else {
             return $this->commit_notes;
+        }
     }
 
     function tabwidth() {
-        if ($this->tabwidth === false)
+        if ($this->tabwidth === false) {
             $this->tabwidth = $this->commit_info("tabwidth") ? : 4;
+        }
         return $this->tabwidth;
     }
 
@@ -275,11 +295,12 @@ class PsetView {
             && isset($j->grades) && is_object($j->grades)
             && isset($j->autogrades) && is_object($j->autogrades)) {
             foreach ($j->autogrades as $k => $v) {
-                if (get($j->grades, $k) === $v)
+                if (($j->grades->$k ?? null) === $v)
                     unset($j->grades->$k);
             }
-            if (!count(get_object_vars($j->grades)))
+            if (!count(get_object_vars($j->grades))) {
                 unset($j->grades);
+            }
         }
     }
 
@@ -287,8 +308,9 @@ class PsetView {
         $x = 0;
         if ($j && isset($j->linenotes))
             foreach ($j->linenotes as $fn => $fnn) {
-                foreach ($fnn as $ln => $n)
+                foreach ($fnn as $ln => $n) {
                     $x |= (is_array($n) && $n[0] ? HASNOTES_COMMENT : HASNOTES_GRADE);
+                }
             }
         return $x;
     }
@@ -298,10 +320,12 @@ class PsetView {
     }
 
     static function notes_hasactiveflags($j) {
-        if ($j && isset($j->flags))
-            foreach ($j->flags as $f)
-                if (!get($f, "resolved"))
+        if ($j && isset($j->flags)) {
+            foreach ($j->flags as $f) {
+                if (!($f->resolved ?? false))
                     return 1;
+            }
+        }
         return 0;
     }
 
@@ -428,10 +452,11 @@ class PsetView {
     }
 
     function update_grade_info($updates, $reset_keys = false) {
-        if ($this->pset->gitless || $this->pset->gitless_grades)
+        if ($this->pset->gitless || $this->pset->gitless_grades) {
             $this->update_user_info($updates, $reset_keys);
-        else
+        } else {
             $this->update_commit_info($updates, $reset_keys);
+        }
     }
 
 
@@ -439,13 +464,15 @@ class PsetView {
         return array_unique($this->user->links(LINK_BACKPARTNER, $this->pset->id));
     }
 
+    /** @return bool */
     function partner_same() {
         if ($this->partner_same === null) {
             $bp = $this->backpartners();
-            if ($this->partner)
-                $this->partner_same = count($bp) == 1 && $this->partner->contactId == $bp[0];
-            else
+            if ($this->partner) {
+                $this->partner_same = count($bp) === 1 && $this->partner->contactId === $bp[0];
+            } else {
                 $this->partner_same = empty($bp);
+            }
         }
         return $this->partner_same;
     }
@@ -460,10 +487,12 @@ class PsetView {
             $this->repo_grade = null;
         }
         if ($this->repo_grade) {
-            if ($this->repo_grade->gradebhash !== null)
+            if ($this->repo_grade->gradebhash !== null) {
                 $this->repo_grade->gradehash = bin2hex($this->repo_grade->gradebhash);
-            if ($this->repo_grade->bhash !== null)
+            }
+            if ($this->repo_grade->bhash !== null) {
                 $this->repo_grade->hash = bin2hex($this->repo_grade->bhash);
+            }
         }
         if (!$this->pset->gitless_grades) {
             $this->grade = $this->repo_grade;
@@ -475,7 +504,7 @@ class PsetView {
         if ($this->grade_notes
             && $this->repo_grade
             && $this->grade->gradercid
-            && !get($this->grade_notes, "gradercid")) {
+            && !($this->grade_notes->gradercid ?? null)) {
             $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
         }
         $this->n_visible_grades = null;
@@ -526,26 +555,29 @@ class PsetView {
     }
 
     function grading_hash() {
-        if ($this->pset->gitless_grades)
-            return false;
-        $this->ensure_grade();
-        if ($this->repo_grade)
-            return $this->repo_grade->gradehash;
+        if (!$this->pset->gitless_grades) {
+            $this->ensure_grade();
+            if ($this->repo_grade) {
+                return $this->repo_grade->gradehash;
+            }
+        }
         return false;
     }
 
     function update_grading_hash($update_chance = false) {
-        if ($this->pset->gitless_grades)
-            return false;
-        $this->ensure_grade();
-        if ((!$this->repo_grade || $this->repo_grade->gradebhash === null)
-            && $update_chance
-            && ($update_chance === true
-                || (is_callable($update_chance) && call_user_func($update_chance, $this, $this->_repo_grade_placeholder_at))
-                || (is_float($update_chance) && rand(0, 999999999) < 1000000000 * $update_chance)))
-            $this->update_placeholder_repo_grade();
-        if ($this->repo_grade)
-            return $this->repo_grade->gradehash;
+        if (!$this->pset->gitless_grades) {
+            $this->ensure_grade();
+            if ((!$this->repo_grade || $this->repo_grade->gradebhash === null)
+                && $update_chance
+                && ($update_chance === true
+                    || (is_callable($update_chance) && call_user_func($update_chance, $this, $this->_repo_grade_placeholder_at))
+                    || (is_float($update_chance) && rand(0, 999999999) < 1000000000 * $update_chance))) {
+                $this->update_placeholder_repo_grade();
+            }
+            if ($this->repo_grade) {
+                return $this->repo_grade->gradehash;
+            }
+        }
         return false;
     }
 
@@ -565,20 +597,23 @@ class PsetView {
         }
     }
 
+    /** @return ?CommitRecord */
     function grading_commit() {
-        if ($this->pset->gitless_grades)
-            return false;
-        $this->ensure_grade();
-        if ($this->repo_grade)
-            return $this->recent_commits($this->repo_grade->gradehash);
-        return false;
+        if (!$this->pset->gitless_grades) {
+            $this->ensure_grade();
+            if ($this->repo_grade) {
+                return $this->connected_commit($this->repo_grade->gradehash);
+            }
+        }
+        return null;
     }
 
     function repo_grade() {
-        if ($this->pset->gitless_grades)
+        if ($this->pset->gitless_grades) {
             return false;
-        else
+        } else {
             return $this->repo_grade;
+        }
     }
 
     function is_grading_commit() {
@@ -659,12 +694,12 @@ class PsetView {
             $this->n_visible_grades = $this->n_set_grades = $this->n_visible_in_total = 0;
             if ($this->can_view_grades() && $this->ensure_grade()) {
                 $notes = $this->current_info();
-                $ag = get($notes, "autogrades");
-                $g = get($notes, "grades");
+                $ag = $notes->autogrades ?? null;
+                $g = $notes->grades ?? null;
                 foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
                     ++$this->n_visible_grades;
-                    if (($ag && get($ag, $ge->key) !== null)
-                        || ($g && get($g, $ge->key) !== null)) {
+                    if (($ag && ($ag->{$ge->key} ?? null) !== null)
+                        || ($g && ($g->{$ge->key} ?? null) !== null)) {
                         ++$this->n_set_grades;
                     }
                     if (!$ge->no_total) {
@@ -688,12 +723,12 @@ class PsetView {
     function grade_total() {
         $total = $total_noextra = $maxtotal = 0;
         $notes = $this->current_info();
-        $ag = get($notes, "autogrades");
-        $g = get($notes, "grades");
+        $ag = $notes->autogrades ?? null;
+        $g = $notes->grades ?? null;
         foreach ($this->pset->visible_grades_in_total($this->pc_view) as $ge) {
-            $gv = $g ? get($g, $ge->key) : null;
+            $gv = $g ? $g->{$ge->key} ?? null : null;
             if ($gv === null && $ag) {
-                $gv = get($ag, $ge->key);
+                $gv = $ag->{$ge->key} ?? null;
             }
             if ($gv) {
                 $total += $gv;
@@ -728,7 +763,7 @@ class PsetView {
     function grade_info($key = null) {
         $this->ensure_grade();
         if ($key && $this->grade_notes) {
-            return get($this->grade_notes, $key);
+            return $this->grade_notes->$key ?? null;
         } else {
             return $this->grade_notes;
         }
@@ -747,19 +782,22 @@ class PsetView {
         if (!$this->contact_grade || !$this->contact_grade->notes) {
             return null;
         } else if ($key) {
-            return get($this->contact_grade->notes, $key);
+            return $this->contact_grade->notes->$key ?? null;
         } else {
             return $this->contact_grade->notes;
         }
     }
 
+    /** @param string $file
+     * @param string $lineid
+     * @return LineNote */
     function current_line_note($file, $lineid) {
         $ln = $this->current_info("linenotes");
         if ($ln) {
-            $ln = get($ln, $file);
+            $ln = $ln->$file ?? null;
         }
         if ($ln) {
-            $ln = get($ln, $lineid);
+            $ln = $ln->$lineid ?? null;
         }
         if ($ln) {
             return LineNote::make_json($file, $lineid, $ln);
@@ -799,7 +837,7 @@ class PsetView {
         if (!$timestamp
             && !$this->pset->gitless
             && ($h = $this->hash ? : $this->grading_hash())
-            && ($ls = $this->recent_commits($h))) {
+            && ($ls = $this->connected_commit($h))) {
             $timestamp = $ls->commitat;
         }
 
@@ -1209,6 +1247,7 @@ class PsetView {
     }
 
 
+    /** @return LineNotesOrder */
     function viewable_line_notes() {
         if ($this->viewer->can_view_comments($this->pset)) {
             return new LineNotesOrder($this->commit_info("linenotes"), $this->can_view_grades(), $this->pc_view);
@@ -1217,6 +1256,7 @@ class PsetView {
         }
     }
 
+    /** @return LineNotesOrder */
     function empty_line_notes() {
         return new LineNotesOrder(null, $this->can_view_grades(), $this->pc_view);
     }

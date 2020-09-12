@@ -265,7 +265,7 @@ if ($Me->isPC && ($sl = $Conf->session_list())
         from ContactInfo where contactId?a",
         [$p > 0 ? $sl->ids[$p - 1] : -1, $p < count($sl->ids) - 1 ? $sl->ids[$p + 1] : -1]);
     $links = [null, null];
-    while ($result && ($s = Contact::fetch($result)))
+    while ($result && ($s = Contact::fetch($result, $Conf)))
         $links[$p > 0 && $sl->ids[$p - 1] == $s->contactId ? 0 : 1] = $s;
     echo "<div class=\"has-hotlist\" style=\"color:gray;float:right\"",
         " data-hotlist=\"", htmlspecialchars(json_encode_browser($sl)), "\">",
@@ -285,6 +285,7 @@ $u = $Me->user_linkpart($User);
 
 // Per-pset
 
+/** @param PsetView $info */
 function echo_grade_cdf($info) {
     global $Qreq;
     echo '<div id="pa-grade-statistics" class="pa-grgraph pa-grade-statistics hidden';
@@ -305,6 +306,7 @@ function echo_grade_cdf($info) {
     Ht::stash_script("\$(\"#pa-grade-statistics\").each(pa_gradecdf)");
 }
 
+/** @param PsetView $info */
 function echo_commit($info) {
     global $Qreq, $TABWIDTH, $WDIFF;
     $conf = $info->conf;
@@ -318,8 +320,9 @@ function echo_commit($info) {
     $curhead = $grouphead = null;
     foreach ($info->recent_commits() as $k) {
         // visually separate older heads
-        if ($curhead === null)
+        if ($curhead === null) {
             $curhead = $k->fromhead;
+        }
         if ($curhead !== $k->fromhead && !$pset->is_handout($k)) {
             if (!$grouphead) {
                 $sel["from.$k->fromhead"] = (object) [
@@ -332,8 +335,9 @@ function echo_commit($info) {
         }
         // actual option
         $x = UnicodeHelper::utf8_prefix($k->subject, 72);
-        if (strlen($x) != strlen($k->subject))
+        if (strlen($x) !== strlen($k->subject)) {
             $x .= "...";
+        }
         $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
         $bhashes[] = hex2bin($k->hash);
     }
@@ -344,17 +348,20 @@ function echo_commit($info) {
     $result = $info->conf->qe("select bhash, haslinenotes, hasflags, hasactiveflags
         from CommitNotes where pset=? and bhash?a and (haslinenotes or hasflags)",
         $pset->psetid, $bhashes);
-    while (($row = edb_row($result))) {
+    while (($row = $result->fetch_row())) {
         $hex = bin2hex($row[0]);
         $f = "";
-        if ($row[1] & $notesflag)
+        if ($row[1] & $notesflag) {
             $f .= "♪";
-        if ($row[3])
+        }
+        if ($row[3]) {
             $f .= "⚑";
-        else if ($row[2])
+        } else if ($row[2]) {
             $f .= "⚐";
-        if ($f !== "")
+        }
+        if ($f !== "") {
             $sel[bin2hex($row[0])] .= "  $f";
+        }
     }
     Dbl::free($result);
 
@@ -467,6 +474,7 @@ function echo_commit($info) {
     echo "</div></form>\n";
 }
 
+/** @param PsetView $info */
 function echo_grader($info) {
     $gradercid = $info->gradercid();
     if ($info->is_grading_commit()
@@ -506,32 +514,39 @@ function echo_grader($info) {
                 . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", array("onchange" => "setgrader61(this)"));
             $value_post = "<span class=\"ajaxsave61\"></span></div></form>";
         } else {
-            if (isset($pcm[$gradercid]))
+            if (isset($pcm[$gradercid])) {
                 $value = Text::name_html($pcm[$gradercid]);
-            else
+            } else {
                 $value = "???";
+            }
         }
-        if ($info->viewer->privChair)
+        if ($info->viewer->privChair) {
             $value .= "&nbsp;" . become_user_link($gpc);
+        }
         ContactView::echo_group("grader", $value . $value_post);
     }
 }
 
+/** @param PsetView $info */
 function echo_grade_cdf_here($info) {
-    if ($info->can_view_grade_statistics())
+    if ($info->can_view_grade_statistics()) {
         echo_grade_cdf($info);
+    }
 }
 
+/** @param PsetView $info */
 function echo_all_grades($info) {
-    if ($info->is_handout_commit())
+    if ($info->is_handout_commit()) {
         return;
+    }
 
     $has_grades = $info->has_assigned_grades();
     if ($info->can_view_grades()
         && ($has_grades || $info->can_edit_grades())) {
         if ($info->pset->grade_script && $info->can_edit_grades()) {
-            foreach ($info->pset->grade_script as $gs)
+            foreach ($info->pset->grade_script as $gs) {
                 Ht::stash_html($info->conf->make_script_file($gs));
+            }
         }
         echo '<div class="pa-gradelist want-pa-landmark-links',
             ($info->can_edit_grades() ? " editable" : " noneditable"),
@@ -558,13 +573,15 @@ function echo_all_grades($info) {
             Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
                       ["class" => "uich pa-gradevalue"]),
             '</span> <span class="pa-gradedesc"></span>';
-        if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours)
+        if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours) {
             echo '<span class="pa-gradediffers">auto-late hours is ', htmlspecialchars($lhd->autohours), '</span>';
+        }
         echo '</div></form>';
     }
 }
 
 
+/** @param PsetView $info */
 function show_pset($info) {
     echo "<hr>\n";
     if ($info->can_edit_grades() && get($info->pset, "gitless_grades"))
@@ -803,8 +820,9 @@ if ($Pset->gitless) {
 echo "</div>\n";
 
 
-if (!$Pset->gitless)
+if (!$Pset->gitless) {
     Ht::stash_script("pa_checklatest()", "pa_checklatest");
+}
 
 echo "<div class='clear'></div>\n";
 $Conf->footer();

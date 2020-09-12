@@ -8,7 +8,9 @@ class CommitRecord {
     public $hash;
     public $subject;
     public $fromhead;
+    /** @var ?bool */
     public $_is_handout;
+    /** @var ?Pset */
     public $_is_handout_pset;
     const HANDOUTHEAD = "*handout*";
     function __construct($commitat, $hash, $subject, $fromhead = null) {
@@ -20,6 +22,7 @@ class CommitRecord {
 }
 
 class Repository {
+    /** var Conf */
     public $conf;
 
     public $repoid;
@@ -42,9 +45,12 @@ class Repository {
     public $viewable_by = [];
     public $_truncated_hashes = [];
     public $_truncated_psetdir = [];
+    /** @var array<string,CommitRecord> */
     private $_commits = [];
+    /** @var array<string,array<string,CommitRecord>> */
     private $_commit_lists = [];
 
+    /** @var list<array{string,string,list<string>,int}> */
     static private $_file_contents = [];
 
     function __construct(Conf $conf = null) {
@@ -283,10 +289,12 @@ class Repository {
             return false;
     }
 
+    /** @param array<string,CommitRecord> &$list */
     private function load_commits_from_head(&$list, $head, $directory) {
         $dirarg = "";
-        if ((string) $directory !== "")
+        if ((string) $directory !== "") {
             $dirarg = " -- " . escapeshellarg($directory);
+        }
         //$limitarg = $limit ? " -n$limit" : "";
         $limitarg = "";
         $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
@@ -301,6 +309,7 @@ class Repository {
         }
     }
 
+    /** @return array<string,CommitRecord> */
     function commits(Pset $pset = null, $branch = null) {
         $dir = "";
         if ($pset && $pset->directory_noslash !== ""
@@ -536,8 +545,9 @@ class Repository {
             return [$files => true];
         } else {
             $xfiles = [];
-            foreach ($files as $f)
+            foreach ($files as $f) {
                 $xfiles[$f] = true;
+            }
             return $xfiles;
         }
     }
@@ -647,7 +657,7 @@ class Repository {
                 && !$no_full
                 && $diffconfig->full
                 && ($fname = $diffconfig->exact_filename()) !== false
-                && (!$onlyfiles || get($onlyfiles, $pset->directory_slash . $fname))) {
+                && (!$onlyfiles || ($onlyfiles[$pset->directory_slash . $fname] ?? false))) {
                 $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg($fname));
                 $di = new DiffInfo("{$pset->directory_slash}{$fname}", $diffconfig);
                 $diffs[$di->filename] = $di;
@@ -678,8 +688,7 @@ class Repository {
                     continue;
                 }
                 // skip files that aren't allowed
-                if ($onlyfiles
-                    && !get($onlyfiles, $truncpfx . $line)) {
+                if ($onlyfiles && !($onlyfiles[$truncpfx . $line] ?? false)) {
                     continue;
                 }
                 // skip ignored files, unless user requested them
@@ -688,7 +697,7 @@ class Repository {
                 if ($diffconfig
                     && !$ignore_diffconfig
                     && ($diffconfig->ignore || $diffconfig->boring)
-                    && (!$needfiles || !get($needfiles, $file))) {
+                    && (!$needfiles || !($needfiles[$file] ?? false))) {
                     if (!$diffconfig->ignore) {
                         $di->finish_unloaded();
                         $diffs[$file] = $di;
@@ -743,6 +752,7 @@ class Repository {
     }
 
 
+    /** @return list<string> */
     function content_lines($hash, $filename) {
         foreach (self::$_file_contents as $x) {
             if ($x[0] === $hash && $x[1] === $filename) {

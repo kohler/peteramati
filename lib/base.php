@@ -34,26 +34,31 @@ function preg_matchpos($pattern, $subject) {
 }
 
 function cleannl($text) {
-    if (substr($text, 0, 3) === "\xEF\xBB\xBF")
+    if (substr($text, 0, 3) === "\xEF\xBB\xBF") {
         $text = substr($text, 3);
+    }
     if (strpos($text, "\r") !== false) {
         $text = str_replace("\r\n", "\n", $text);
         $text = strtr($text, "\r", "\n");
     }
-    if ($text !== "" && $text[strlen($text) - 1] !== "\n")
+    if ($text !== "" && $text[strlen($text) - 1] !== "\n") {
         $text .= "\n";
+    }
     return $text;
 }
 
 function space_join(/* $str_or_array, ... */) {
     $t = "";
-    foreach (func_get_args() as $arg)
+    foreach (func_get_args() as $arg) {
         if (is_array($arg)) {
-            foreach ($arg as $x)
+            foreach ($arg as $x) {
                 if ($x !== "" && $x !== false && $x !== null)
                     $t .= ($t === "" ? "" : " ") . $x;
-        } else if ($arg !== "" && $arg !== false && $arg !== null)
+            }
+        } else if ($arg !== "" && $arg !== false && $arg !== null) {
             $t .= ($t === "" ? "" : " ") . $arg;
+        }
+    }
     return $t;
 }
 
@@ -85,15 +90,18 @@ if (!function_exists("mac_os_roman_to_utf8")) {
 }
 
 function convert_to_utf8($str) {
-    if (substr($str, 0, 3) === "\xEF\xBB\xBF")
+    if (substr($str, 0, 3) === "\xEF\xBB\xBF") {
         $str = substr($str, 3);
-    if (is_valid_utf8($str))
+    }
+    if (is_valid_utf8($str)) {
         return $str;
+    }
     $pfx = substr($str, 0, 5000);
-    if (substr_count($pfx, "\r") > 1.5 * substr_count($pfx, "\n"))
+    if (substr_count($pfx, "\r") > 1.5 * substr_count($pfx, "\n")) {
         return mac_os_roman_to_utf8($str);
-    else
+    } else {
         return windows_1252_to_utf8($str);
+    }
 }
 
 function simplify_whitespace($x) {
@@ -102,12 +110,16 @@ function simplify_whitespace($x) {
     return trim(preg_replace('/(?:[\x00-\x20\x7F]|\xC2[\x80-\xA0]|\xE2\x80[\x80-\x8A\xA8\xA9\xAF]|\xE2\x81\x9F|\xE3\x80\x80)+/', " ", $x));
 }
 
+/** @param false|string $prefix
+ * @param string $text
+ * @return string */
 function prefix_word_wrap($prefix, $text, $indent = 18, $totWidth = 75) {
     if (is_int($indent)) {
         $indentlen = $indent;
         $indent = str_pad("", $indent);
-    } else
+    } else {
         $indentlen = strlen($indent);
+    }
 
     $out = "";
     if ($prefix !== false) {
@@ -115,28 +127,36 @@ function prefix_word_wrap($prefix, $text, $indent = 18, $totWidth = 75) {
             $out .= $text[0];
             $text = substr($text, 1);
         }
-    } else if (($line = UnicodeHelper::utf8_line_break($text, $totWidth)) !== false)
+    } else if (($line = UnicodeHelper::utf8_line_break($text, $totWidth)) !== false) {
         $out .= $line . "\n";
+    }
 
-    while (($line = UnicodeHelper::utf8_line_break($text, $totWidth - $indentlen)) !== false)
+    while (($line = UnicodeHelper::utf8_line_break($text, $totWidth - $indentlen)) !== false) {
         $out .= $indent . preg_replace('/^\pZ+/u', '', $line) . "\n";
+    }
 
-    if ($prefix === false)
+    if ($prefix === false) {
         /* skip */;
-    else if (strlen($prefix) <= $indentlen) {
+    } else if (strlen($prefix) <= $indentlen) {
         $prefix = str_pad($prefix, $indentlen, " ", STR_PAD_LEFT);
         $out = $prefix . substr($out, $indentlen);
-    } else
+    } else {
         $out = $prefix . "\n" . $out;
+    }
 
-    if (!str_ends_with($out, "\n"))
+    if (!str_ends_with($out, "\n")) {
         $out .= "\n";
+    }
     return $out;
 }
 
+/** @param string $text
+ * @param int $totWidth
+ * @param bool $multi_center */
 function center_word_wrap($text, $totWidth = 75, $multi_center = false) {
-    if (strlen($text) <= $totWidth && !preg_match('/[\200-\377]/', $text))
+    if (strlen($text) <= $totWidth && !preg_match('/[\200-\377]/', $text)) {
         return str_pad($text, (int) (($totWidth + strlen($text)) / 2), " ", STR_PAD_LEFT) . "\n";
+    }
     $out = "";
     while (($line = UnicodeHelper::utf8_line_break($text, $totWidth)) !== false) {
         $linelen = UnicodeHelper::utf8_glyphlen($line);
@@ -150,12 +170,13 @@ function count_words($text) {
 }
 
 function friendly_boolean($x) {
-    if (is_bool($x))
+    if (is_bool($x)) {
         return $x;
-    else if (is_string($x) || is_int($x))
+    } else if (is_string($x) || is_int($x)) {
         return filter_var($x, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-    else
+    } else {
         return null;
+    }
 }
 
 interface Abbreviator {
@@ -196,25 +217,35 @@ function rfc2822_words_quote($words) {
 
 // encoders and decoders
 
+/** @param string $text
+ * @return string */
 function html_id_encode($text) {
-    $x = preg_split('_([^-a-zA-Z0-9])_', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
-    for ($i = 1; $i < count($x); $i += 2)
+    $x = preg_split('/([^-a-zA-Z0-9])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+    for ($i = 1; $i < count($x); $i += 2) {
         $x[$i] = "_" . dechex(ord($x[$i]));
+    }
     return join("", $x);
 }
 
+/** @param string $text
+ * @return string */
 function html_id_decode($text) {
-    $x = preg_split(',(_[0-9A-Fa-f][0-9A-Fa-f]),', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
-    for ($i = 1; $i < count($x); $i += 2)
+    $x = preg_split('/(_[0-9A-Fa-f][0-9A-Fa-f])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+    for ($i = 1; $i < count($x); $i += 2) {
         $x[$i] = chr(hexdec(substr($x[$i], 1)));
+    }
     return join("", $x);
 }
 
+/** @param string $text
+ * @return string */
 function base64url_encode($text) {
     return rtrim(strtr(base64_encode($text), '+/', '-_'), '=');
 }
 
-function base64url_decode($data) {
+/** @param string $text
+ * @return string */
+function base64url_decode($text) {
     return base64_decode(strtr($text, '-_', '+/'));
 }
 

@@ -156,8 +156,8 @@ class API_Grade {
                 }
                 $commit = null;
                 if (($hash = get($ugs[$uid], "commit"))) {
-                    $commit = $info->pset->handout_commits($hash)
-                        ? : $info->repo->connected_commit($hash, $info->pset, $info->branch);
+                    $commit = $info->pset->handout_commit($hash)
+                        ?? $info->repo->connected_commit($hash, $info->pset, $info->branch);
                 }
                 if (!$commit) {
                     $errno = max($errno, $hash ? 3 : 4);

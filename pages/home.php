@@ -1009,12 +1009,14 @@ function show_pset($pset, $user) {
     echo "</a></h2>";
     ContactView::echo_partner_group($info);
     ContactView::echo_repo_group($info);
-    if ($info->repo)
+    if ($info->repo) {
         $info->repo->refresh(30);
-    if ($info->grading_hash())
+    }
+    if ($info->grading_hash()) {
         ContactView::echo_repo_grade_commit_group($info);
-    else
+    } else {
         ContactView::echo_repo_last_commit_group($info, true);
+    }
     if ($info->can_view_grades() && $info->has_assigned_grades()) {
         $tm = $info->grade_total();
         $t = "<strong>" . $tm[0] . "</strong> / " . $tm[1];

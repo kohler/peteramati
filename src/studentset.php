@@ -4,11 +4,15 @@
 // See LICENSE for open-source distribution terms
 
 class StudentSet implements Iterator, Countable {
+    /** @var Conf */
     public $conf;
+    /** @var Contact */
     public $viewer;
+    /** @var ?Pset */
     public $pset;
     private $_psetid;
     private $_anonymous;
+    /** @var array<int,Contact> */
     private $_u = [];
     private $_ua;
     private $_upos;
@@ -43,7 +47,7 @@ class StudentSet implements Iterator, Countable {
             $ed[] = "dropped";
         }
         $ed = $ed ? join(" or ", $ed) : "true";
-        $result = $this->conf->qe("select *, (select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId) contactLinks from ContactInfo where ($ce) and ($ed)");
+        $result = $this->conf->qe("select *, coalesce((select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId),'') contactLinks from ContactInfo where ($ce) and ($ed)");
         while (($u = Contact::fetch($result, $this->conf))) {
             $this->_u[$u->contactId] = $u;
             $u->student_set = $this;

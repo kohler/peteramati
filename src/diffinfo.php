@@ -4,26 +4,44 @@
 // See LICENSE for open-source distribution terms
 
 class DiffInfo implements Iterator {
+    /** @var string */
     public $filename;
+    /** @var bool */
     public $binary = false;
+    /** @var bool */
     public $truncated = false;
+    /** @var ?string */
     public $title;
+    /** @var bool */
     public $fileless = false;
+    /** @var bool */
     public $boring = false;
+    /** @var bool */
     private $_boring_set = false;
+    /** @var bool */
     public $hide_if_anonymous = false;
+    /** @var float */
     public $position = 0.0;
+    /** @var bool */
     public $removed = false;
+    /** @var bool */
     public $loaded = true;
+    /** @var list<int|string|null> */
     private $_diff = [];
+    /** @var int */
     private $_diffsz = 0;
     private $_dflags;
     private $_itpos;
 
+    /** @var ?Repository */
     private $_repoa;
+    /** @var ?Pset */
     private $_pset;
+    /** @var ?string */
     private $_hasha;
+    /** @var ?string */
     private $_filenamea;
+    /** @var ?bool */
     private $_hasha_hrepo;
 
     const MAXLINES = 8000;
@@ -31,6 +49,7 @@ class DiffInfo implements Iterator {
 
     const LINE_NONL = 1;
 
+    /** @param string $filename */
     function __construct($filename, DiffConfig $diffconfig = null) {
         $this->filename = $filename;
         if ($diffconfig) {
@@ -105,13 +124,15 @@ class DiffInfo implements Iterator {
     }
 
 
+    /** @return bool */
     function is_empty() {
         return $this->_diffsz === 0;
     }
 
+    /** @return bool */
     function is_handout_commit_a() {
         if ($this->_hasha_hrepo === null) {
-            $this->_hasha_hrepo = $this->_pset && $this->_pset->handout_commits($this->_hasha);
+            $this->_hasha_hrepo = $this->_pset && $this->_pset->handout_commit($this->_hasha);
         }
         return $this->_hasha_hrepo;
     }

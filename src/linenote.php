@@ -1,14 +1,19 @@
 <?php
 
 class LineNote implements JsonUpdatable {
+    /** @var string */
     public $file;
+    /** @var string */
     public $lineid;
+    /** @var bool */
     public $iscomment = false;
     public $note;
     public $users = [];
     public $version;
     public $format;
 
+    /** @param string $file
+     * @param string $lineid */
     function __construct($file, $lineid) {
         $this->file = $file;
         $this->lineid = $lineid;
@@ -45,11 +50,13 @@ class LineNote implements JsonUpdatable {
         return $ln;
     }
 
+    /** @return bool */
     function is_empty() {
         return (string) $this->note === "";
     }
 
 
+    /** @return string */
     function render_line_link_html(Pset $pset = null) {
         $f = $this->file;
         if ($pset && str_starts_with($f, $pset->directory_slash)) {

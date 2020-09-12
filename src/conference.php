@@ -66,9 +66,12 @@ class Conf {
 
     private $usertimeId = 1;
 
+    /** @var array<int,Pset> */
     private $_psets = [];
+    /** @var array<string,Pset> */
     private $_psets_by_urlkey = [];
     private $_psets_sorted = false;
+    /** @var array<string,float> */
     private $_group_weights = [];
     private $_group_weight_defaults = [];
     private $_grouped_psets;
@@ -78,8 +81,11 @@ class Conf {
     private $_pc_members_cache = null;
     private $_pc_tags_cache = null;
     private $_pc_members_and_admins_cache = null;
+    /** @var array<int,Repository> */
     private $_handout_repos = [];
+    /** @var array<int,array<string,CommitRecord>> */
     private $_handout_commits = [];
+    /** @var array<int,?CommitRecord> */
     private $_handout_latest_commit = [];
     private $_api_map = null;
     private $_repository_site_classes = null;
@@ -101,7 +107,7 @@ class Conf {
             list($this->dblink, $options["dbName"]) = Dbl::connect_dsn($this->dsn);
         }
         if (!isset($options["confid"])) {
-            $options["confid"] = get($options, "dbName");
+            $options["confid"] = $options["dbName"] ?? null;
         }
         $this->opt = $options;
         $this->dbname = $options["dbName"];
@@ -145,7 +151,7 @@ class Conf {
                 $this->settingTexts[$row[0]] = $row[2];
             if (substr($row[0], 0, 4) == "opt.") {
                 $okey = substr($row[0], 4);
-                $this->opt_override[$okey] = get($this->opt, $okey);
+                $this->opt_override[$okey] = $this->opt[$okey] ?? null;
                 $this->opt[$okey] = ($row[2] === null ? (int) $row[1] : $row[2]);
             }
         }
@@ -179,12 +185,12 @@ class Conf {
             if (!isset($this->settingTexts["conf_key"])
                 && ($key = random_bytes(32)) !== false)
                 $this->save_setting("conf_key", 1, $key);
-            $this->opt["conferenceKey"] = get($this->settingTexts, "conf_key", "");
+            $this->opt["conferenceKey"] = $this->settingTexts["conf_key"] ?? "";
         }
 
         // set capability key
-        if (!get($this->settings, "cap_key")
-            && !get($this->opt, "disableCapabilities")
+        if (!($this->settings["cap_key"] ?? null)
+            && !($this->opt["disableCapabilities"] ?? null)
             && !(($key = random_bytes(16)) !== false
                  && ($key = base64_encode($key))
                  && $this->save_setting("cap_key", 1, $key)))
@@ -277,26 +283,6 @@ class Conf {
             $this->opt["scriptAssetsUrl"] = $this->opt["assetsUrl"];
         Ht::$img_base = $this->opt["assetsUrl"] . "images/";
 
-        // set docstore
-        if (get($this->opt, "docstore") === true)
-            $this->opt["docstore"] = "docs";
-        else if (!get($this->opt, "docstore") && get($this->opt, "filestore")) { // backwards compat
-            $this->opt["docstore"] = $this->opt["filestore"];
-            if ($this->opt["docstore"] === true)
-                $this->opt["docstore"] = "filestore";
-            $this->opt["docstoreSubdir"] = get($this->opt, "filestoreSubdir");
-        }
-        if (get($this->opt, "docstore") && $this->opt["docstore"][0] !== "/")
-            $this->opt["docstore"] = $ConfSitePATH . "/" . $this->opt["docstore"];
-        $this->_docstore = false;
-        if (($fdir = get($this->opt, "docstore"))) {
-            $fpath = $fdir;
-            $use_subdir = get($this->opt, "docstoreSubdir");
-            if ($use_subdir && ($use_subdir === true || $use_subdir > 0))
-                $fpath .= "/%" . ($use_subdir === true ? 2 : $use_subdir) . "h";
-            $this->_docstore = [$fdir, $fpath . "/%h%x"];
-        }
-
         // handle timezone
         if (function_exists("date_default_timezone_set")) {
             if (isset($this->opt["timezone"])) {
@@ -310,7 +296,7 @@ class Conf {
         $this->_date_format_initialized = false;
 
         // set safePasswords
-        if (!get($this->opt, "safePasswords")
+        if (!($this->opt["safePasswords"] ?? null)
             || (is_int($this->opt["safePasswords"]) && $this->opt["safePasswords"] < 1))
             $this->opt["safePasswords"] = 0;
         else if ($this->opt["safePasswords"] === true)
@@ -319,10 +305,10 @@ class Conf {
             $this->opt["contactdb_safePasswords"] = $this->opt["safePasswords"];
 
         // set validate timeouts
-        $this->validate_timeout = (float) get($this->opt, "validateTimeout", 5);
+        $this->validate_timeout = (float) ($this->opt["validateTimeout"] ?? 5);
         if ($this->validate_timeout <= 0)
             $this->validate_timeout = 5;
-        $this->validate_overall_timeout = (float) get($this->opt, "validateOverallTimeout", 15);
+        $this->validate_overall_timeout = (float) ($this->opt["validateOverallTimeout"] ?? 15);
         if ($this->validate_overall_timeout <= 0)
             $this->validate_overall_timeout = 5;
 
@@ -339,11 +325,11 @@ class Conf {
         if (in_array("harvardseas", $this->_repository_site_classes))
             $this->_username_classes |= self::USERNAME_HARVARDSEAS;
 
-        $sort_by_last = !!get($this->opt, "sortByLastName");
+        $sort_by_last = !!($this->opt["sortByLastName"] ?? false);
         if (!$this->sort_by_last != !$sort_by_last)
             $this->_pc_members_cache = $this->_pc_members_and_admins_cache = null;
         $this->sort_by_last = $sort_by_last;
-        $this->default_format = (int) get($this->opt, "defaultFormat");
+        $this->default_format = (int) ($this->opt["defaultFormat"] ?? 0);
         $this->_api_map = null;
     }
 
@@ -357,21 +343,23 @@ class Conf {
     }
 
     function setting($name, $defval = null) {
-        return get($this->settings, $name, $defval);
+        return $this->settings[$name] ?? $defval;
     }
 
     function setting_data($name, $defval = false) {
-        $x = get($this->settingTexts, $name, $defval);
-        if ($x && is_object($x) && isset($this->settingTexts[$name]))
+        $x = $this->settingTexts[$name] ?? $defval;
+        if ($x && is_object($x) && isset($this->settingTexts[$name])) {
             $x = $this->settingTexts[$name] = json_encode_db($x);
+        }
         return $x;
     }
 
     function setting_json($name, $defval = false) {
-        $x = get($this->settingTexts, $name, $defval);
+        $x = $this->settingTexts[$name] ?? $defval;
         if ($x && is_string($x) && isset($this->settingTexts[$name])
-            && is_object(($x = json_decode($x))))
+            && is_object(($x = json_decode($x)))) {
             $this->settingTexts[$name] = $x;
+        }
         return $x;
     }
 
@@ -395,10 +383,11 @@ class Conf {
         }
         if ($change && str_starts_with($name, "opt.")) {
             $oname = substr($name, 4);
-            if ($value === null && $data === null)
-                $this->opt[$oname] = get($this->opt_override, $oname);
-            else
+            if ($value === null && $data === null) {
+                $this->opt[$oname] = $this->opt_override[$oname] ?? null;
+            } else {
                 $this->opt[$oname] = $data === null ? $value : $data;
+            }
         }
         return $change;
     }
@@ -464,18 +453,20 @@ class Conf {
 
     function gsetting_data($name, $defval = false) {
         $this->ensure_gsetting($name);
-        $x = get($this->_gsettings_data, $name, $defval);
-        if ($x && is_object($x) && isset($this->_gsettings_data[$name]))
+        $x = $this->_gsettings_data[$name] ?? $defval;
+        if ($x && is_object($x) && isset($this->_gsettings_data[$name])) {
             $x = $this->_gsettings_data[$name] = json_encode_db($x);
+        }
         return $x;
     }
 
     function gsetting_json($name, $defval = false) {
         $this->ensure_gsetting($name);
-        $x = get($this->_gsettings_data, $name, $defval);
+        $x = $this->_gsettings_data[$name] ?? $defval;
         if ($x && is_string($x) && isset($this->_gsettings_data[$name])
-            && is_object(($x = json_decode($x))))
+            && is_object(($x = json_decode($x)))) {
             $this->_gsettings_data[$name] = $x;
+        }
         return $x;
     }
 
@@ -503,14 +494,15 @@ class Conf {
                 $change = true;
             }
         }
-        if ($this->_gsettings_loaded !== true)
+        if ($this->_gsettings_loaded !== true) {
             $this->_gsettings_loaded[$name] = true;
+        }
         return $change;
     }
 
 
     function opt($name, $defval = null) {
-        return get($this->opt, $name, $defval);
+        return $this->opt[$name] ?? $defval;
     }
 
     function set_opt($name, $value) {
@@ -608,17 +600,11 @@ class Conf {
     // name
 
     function full_name() {
-        if ($this->short_name && $this->short_name != $this->long_name)
+        if ($this->short_name && $this->short_name != $this->long_name) {
             return $this->long_name . " (" . $this->short_name . ")";
-        else
+        } else {
             return $this->long_name;
-    }
-
-
-    // documents
-
-    function docstore() {
-        return $this->_docstore;
+        }
     }
 
 
@@ -713,7 +699,7 @@ class Conf {
         }
         $result = $this->qe_apply("select * from ContactInfo where " . join(" or ", $q), $qv);
         $users = [];
-        while (($user = Contact::fetch($result))) {
+        while (($user = Contact::fetch($result, $this))) {
             $users[] = $user;
         }
         Dbl::free($result);
@@ -924,7 +910,7 @@ class Conf {
             if (!isset($this->opt["dateFormatLong"]) && isset($this->opt["dateFormat"]))
                 $this->opt["dateFormatLong"] = $this->opt["dateFormat"];
             if (!isset($this->opt["dateFormat"]))
-                $this->opt["dateFormat"] = get($this->opt, "time24hour") ? "j M Y H:i:s" : "j M Y g:i:sa";
+                $this->opt["dateFormat"] = ($this->opt["time24hour"] ?? null) ? "j M Y H:i:s" : "j M Y g:i:sa";
             if (!isset($this->opt["dateFormatLong"]))
                 $this->opt["dateFormatLong"] = "l " . $this->opt["dateFormat"];
             if (!isset($this->opt["dateFormatObscure"]))
@@ -932,7 +918,7 @@ class Conf {
             if (!isset($this->opt["timestampFormat"]))
                 $this->opt["timestampFormat"] = $this->opt["dateFormat"];
             if (!isset($this->opt["dateFormatSimplifier"]))
-                $this->opt["dateFormatSimplifier"] = get($this->opt, "time24hour") ? "/:00(?!:)/" : "/:00(?::00|)(?= ?[ap]m)/";
+                $this->opt["dateFormatSimplifier"] = ($this->opt["time24hour"] ?? null) ? "/:00(?!:)/" : "/:00(?::00|)(?= ?[ap]m)/";
             if (!isset($this->opt["dateFormatTimezone"]))
                 $this->opt["dateFormatTimezone"] = null;
             $this->_date_format_initialized = true;
@@ -1039,24 +1025,27 @@ class Conf {
 
     function settingsAfter($name) {
         global $Now;
-        $t = get($this->settings, $name);
+        $t = $this->settings[$name] ?? null;
         return $t !== null && $t > 0 && $t <= $Now;
     }
     function deadlinesAfter($name, $grace = null) {
         global $Now;
-        $t = get($this->settings, $name);
-        if ($t !== null && $t > 0 && $grace && ($g = get($this->settings, $grace)))
+        $t = $this->settings[$name] ?? null;
+        if ($t !== null && $t > 0 && $grace && ($g = get($this->settings, $grace))) {
             $t += $g;
+        }
         return $t !== null && $t > 0 && $t <= $Now;
     }
     function deadlinesBetween($name1, $name2, $grace = null) {
         global $Now;
-        $t = get($this->settings, $name1);
-        if (($t === null || $t <= 0 || $t > $Now) && $name1)
+        $t = $this->settings[$name1] ?? null;
+        if (($t === null || $t <= 0 || $t > $Now) && $name1) {
             return false;
-        $t = get($this->settings, $name2);
-        if ($t !== null && $t > 0 && $grace && ($g = get($this->settings, $grace)))
+        }
+        $t = $this->settings[$name2] ?? null;
+        if ($t !== null && $t > 0 && $grace && ($g = $this->settings[$grace] ?? null)) {
             $t += $g;
+        }
         return $t === null || $t <= 0 || $t >= $Now;
     }
 
@@ -1126,11 +1115,13 @@ class Conf {
         self::$g->msg($text, $minimal ? "xconfirm" : "confirm");
     }
 
+    /** @return false */
     function errorMsg($text, $minimal = false) {
         $this->msg($text, $minimal ? "xmerror" : "merror");
         return false;
     }
 
+    /** @return false */
     static public function msg_error($text, $minimal = false) {
         self::$g->msg($text, $minimal ? "xmerror" : "merror");
         return false;
@@ -1304,7 +1295,7 @@ class Conf {
 
         $x = [];
         foreach ($qreq as $k => $v) {
-            $ak = get(self::$selfurl_safe, $k);
+            $ak = self::$selfurl_safe[$k] ?? null;
             if ($ak === true)
                 $ak = $k;
             if ($ak
@@ -1399,7 +1390,7 @@ class Conf {
             $post = "";
             if (($mtime = @filemtime("$ConfSitePATH/$url")) !== false)
                 $post = "mtime=$mtime";
-            if (get($this->opt, "strictJavascript") && !$no_strict)
+            if (($this->opt["strictJavascript"] ?? null) && !$no_strict)
                 $url = $this->opt["scriptAssetsUrl"] . "cacheable.php?file=" . urlencode($url)
                     . "&strictjs=1" . ($post ? "&$post" : "");
             else
@@ -1476,7 +1467,7 @@ class Conf {
 
         // jQuery
         $stash = Ht::unstash();
-        $jqueryVersion = get($this->opt, "jqueryVersion", "1.12.4");
+        $jqueryVersion = $this->opt["jqueryVersion"] ?? "1.12.4";
         $integrity = null;
         if (isset($this->opt["jqueryUrl"]))
             $jquery = $this->opt["jqueryUrl"];
@@ -1525,8 +1516,9 @@ class Conf {
             Ht::stash_html($this->make_script_file("scripts/script.js") . "\n");
 
         // other scripts
-        foreach ($this->opt("scripts", []) as $file)
+        foreach ($this->opt("scripts", []) as $file) {
             Ht::stash_html($this->make_script_file($file) . "\n");
+        }
 
         $this->encoded_session_list(); // clear cookie if set
 
@@ -1566,7 +1558,7 @@ class Conf {
             }
 
             // "act as" link
-            if (($actas = get($_SESSION, "last_actas"))
+            if (($actas = $_SESSION["last_actas"] ?? null)
                 && (($Me->privChair && strcasecmp($actas, $Me->email) !== 0)
                     || Contact::$true_user)) {
                 // Link becomes true user if not currently chair.
@@ -1798,10 +1790,14 @@ class Conf {
         return array_reverse($this->psets(), true);
     }
 
+    /** @param int $id
+     * @return ?Pset */
     function pset_by_id($id) {
         return $this->_psets[$id] ?? null;
     }
 
+    /** @param string $key
+     * @return ?Pset */
     function pset_by_key($key) {
         if (($p = $this->_psets_by_urlkey[$key] ?? null)) {
             return $p;
@@ -1813,6 +1809,8 @@ class Conf {
         return null;
     }
 
+    /** @param string $key
+     * @return ?Pset */
     function pset_by_key_or_title($key) {
         if (($p = $this->_psets_by_urlkey[$key] ?? null)) {
             return $p;
@@ -1831,8 +1829,10 @@ class Conf {
         return $tm;
     }
 
+    /** @param string $group
+     * @return float */
     function group_weight($group) {
-        return get($this->_group_weights, $group, 0.0);
+        return $this->_group_weights[$group] ?? 0.0;
     }
 
     function pset_groups() {
@@ -1860,12 +1860,12 @@ class Conf {
     }
 
     function pset_group($group) {
-        return get($this->pset_groups(), $group, []);
+        return ($this->pset_groups())[$group] ?? [];
     }
 
     function pset_group_has_extra($group) {
         $this->pset_groups();
-        return get($this->_group_has_extra, $group, false);
+        return $this->_group_has_extra[$group] ?? false;
     }
 
 
@@ -1876,7 +1876,7 @@ class Conf {
             return null;
         if ($this->opt("noGitTransport") && substr($url, 0, 6) === "git://")
             $url = "ssh://git@" . substr($url, 6);
-        $hrepo = get($this->_handout_repos, $url);
+        $hrepo = $this->_handout_repos[$url] ?? null;
         if (!$hrepo && ($hrepo = Repository::find_or_create_url($url, $this))) {
             $hrepo->is_handout = true;
             $this->_handout_repos[$url] = $hrepo;
@@ -1889,10 +1889,10 @@ class Conf {
             if (!$hset) {
                 $save = $hset = (object) array();
             }
-            if (!($hme = get($hset, $hrepoid))) {
+            if (!($hme = $hset->$hrepoid ?? null)) {
                 $save = $hme = $hset->$hrepoid = (object) array();
             }
-            if ((int) get($hme, $cacheid) + 300 < $Now
+            if ((int) ($hme->$cacheid ?? 0) + 300 < $Now
                 && !$this->opt("disableRemote")) {
                 $save = $hme->$cacheid = $Now;
                 $hrepo->reposite->gitfetch($hrepo->repoid, $cacheid, false);
@@ -1916,9 +1916,9 @@ class Conf {
         if (!$hset) {
             $hset = (object) [];
         }
-        if (get($hset, "snaphash") !== $hrepo->snaphash
-            || (int) get($hset, "snaphash_at") + 300 < $Now
-            || !get($hset, "commits")) {
+        if (($hset->snaphash ?? null) !== $hrepo->snaphash
+            || (int) ($hset->snaphash_at ?? 0) + 300 < $Now
+            || !($hset->commits ?? null)) {
             $hset->snaphash = $hrepo->snaphash;
             $hset->snaphash_at = $Now;
             $hset->commits = [];
@@ -1937,25 +1937,30 @@ class Conf {
         $this->_handout_latest_commit[$pset->id] = current($commits);
     }
 
-    function handout_commits(Pset $pset, $hash = null) {
-        global $Now;
+    /** @return array<string,CommitRecord> */
+    function handout_commits(Pset $pset) {
         if (!array_key_exists($pset->id, $this->_handout_commits)) {
             $this->populate_handout_commits($pset);
         }
-        $commits = $this->_handout_commits[$pset->id];
-        if (!$hash) {
-            return $commits;
-        } else if (strlen($hash) === 40 || strlen($hash) === 64) {
-            return get($commits, $hash);
+        return $this->_handout_commits[$pset->id];
+    }
+
+    /** @return ?CommitRecord */
+    function handout_commit(Pset $pset, $hash) {
+        $commits = $this->handout_commits($pset);
+        if (strlen($hash) === 40 || strlen($hash) === 64) {
+            return $commits[$hash] ?? null;
         } else {
             $matches = [];
-            foreach ($commits as $h => $c)
+            foreach ($commits as $h => $c) {
                 if (str_starts_with($h, $hash))
                     $matches[] = $c;
+            }
             return count($matches) === 1 ? $matches[0] : null;
         }
     }
 
+    /** @return ?array<string,CommitRecord> */
     function handout_commits_from(Pset $pset, $hash) {
         global $Now;
         if (!array_key_exists($pset->id, $this->_handout_commits)) {
@@ -1974,11 +1979,12 @@ class Conf {
         return count($matches) === 1 ? $list : null;
     }
 
+    /** @return ?CommitRecord */
     function latest_handout_commit(Pset $pset) {
         if (!array_key_exists($pset->id, $this->_handout_latest_commit)) {
             $this->populate_handout_commits($pset);
         }
-        return get($this->_handout_latest_commit, $pset->id);
+        return $this->_handout_latest_commit[$pset->id] ?? null;
     }
 
 
@@ -1994,7 +2000,7 @@ class Conf {
     }
 
     function branch($branchid) {
-        return get($this->branch_map(), $branchid);
+        return ($this->branch_map())[$branchid] ?? null;
     }
 
     function ensure_branch($branch) {
@@ -2019,34 +2025,42 @@ class Conf {
     private function call_api($uf, Contact $user, Qrequest $qreq, APIData $api) {
         if (!$uf)
             return ["ok" => false, "error" => "API function not found."];
-        if (!get($uf, "get") && !check_post($qreq))
+        if (!($uf->get ?? null) && !check_post($qreq))
             return ["ok" => false, "error" => "Missing credentials."];
-        $need_hash = !!get($uf, "hash");
-        $need_repo = !!get($uf, "repo");
-        $need_pset = $need_repo || $need_hash || !!get($uf, "pset");
-        $need_user = !!get($uf, "user");
-        if ($need_user && !$api->user)
+        $need_hash = !!($uf->hash ?? false);
+        $need_repo = !!($uf->repo ?? false);
+        $need_pset = $need_repo || $need_hash || !!($uf->pset ?? false);
+        $need_user = !!($uf->user ?? false);
+        if ($need_user && !$api->user) {
             return ["ok" => false, "error" => "Missing user."];
-        if ($need_pset && !$api->pset)
+        }
+        if ($need_pset && !$api->pset) {
             return ["ok" => false, "error" => "Missing pset."];
-        if ($need_repo && !$api->repo)
+        }
+        if ($need_repo && !$api->repo) {
             return ["ok" => false, "error" => "Missing repository."];
+        }
         if ($need_hash) {
             $api->commit = $this->check_api_hash($api->hash, $api);
-            if (!$api->commit)
+            if (!$api->commit) {
                 return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
+            }
         }
-        if (($req = get($uf, "require")))
-            foreach (expand_includes($req) as $f)
+        if (($req = $uf->require ?? [])) {
+            foreach (expand_includes($req) as $f) {
                 require_once $f;
+            }
+        }
         return call_user_func($uf->callback, $user, $qreq, $api, $uf);
     }
     function check_api_hash($input_hash, APIData $api) {
-        if (!$input_hash)
+        if (!$input_hash) {
             return null;
-        $commit = $api->pset->handout_commits($input_hash);
-        if (!$commit && $api->repo)
+        }
+        $commit = $api->pset->handout_commit($input_hash);
+        if (!$commit && $api->repo) {
             $commit = $api->repo->connected_commit($input_hash, $api->pset, $api->branch);
+        }
         return $commit;
     }
     function _add_api_json($fj) {
@@ -2073,34 +2087,42 @@ class Conf {
             expand_json_includes_callback($olist, [$this, "_add_api_json"]);
     }
     function has_api($fn) {
-        if ($this->_api_map === null)
+        if ($this->_api_map === null) {
             $this->fill_api_map();
+        }
         return isset($this->_api_map[$fn]);
     }
     function api($fn) {
-        if ($this->_api_map === null)
+        if ($this->_api_map === null) {
             $this->fill_api_map();
-        $uf = get($this->_api_map, $fn);
+        }
+        $uf = $this->_api_map[$fn] ?? null;
         if ($uf && is_string($uf)) {
             $space = strpos($uf, " ");
             $flags = (int) substr($uf, 0, $space);
             $uf = $this->_api_map[$fn] = (object) ["callback" => substr($uf, $space + 1)];
-            if ($flags & 1)
+            if ($flags & 1) {
                 $uf->get = true;
-            if ($flags & 2)
+            }
+            if ($flags & 2) {
                 $uf->pset = true;
-            if ($flags & 4)
+            }
+            if ($flags & 4) {
                 $uf->repo = true;
-            if ($flags & 8)
+            }
+            if ($flags & 8) {
                 $uf->hash = true;
-            if ($flags & 16)
+            }
+            if ($flags & 16) {
                 $uf->user = true;
+            }
         }
         return $uf;
     }
     function call_api_exit($uf, Contact $user, Qrequest $qreq, APIData $info) {
-        if (is_string($uf))
+        if (is_string($uf)) {
             $uf = $this->api($uf);
+        }
         if ($uf && get($uf, "redirect") && $qreq->redirect
             && preg_match('@\A(?![a-z]+:|/).+@', $qreq->redirect)) {
             try {

@@ -34,6 +34,7 @@ class LineNotesOrder {
         }
     }
 
+    /** @return bool */
     function is_empty() {
         return empty($this->lnseq);
     }
@@ -44,7 +45,7 @@ class LineNotesOrder {
         return isset($this->ln[$file]);
     }
     function file($file) {
-        return get($this->ln, $file, []);
+        return $this->ln[$file] ?? [];
     }
 
     function set_diff($diff) {
@@ -110,12 +111,12 @@ class LineNotesOrder {
     function compare($a, $b) {
         if ($a->file != $b->file) {
             return $this->fileorder[$a->file] - $this->fileorder[$b->file];
-        } else if (!$this->diff || !get($this->diff, $a->file)) {
+        } else if (!$this->diff || !isset($this->diff[$a->file])) {
             return strcmp($a->lineid, $b->lineid);
         } else if ($a->lineid[0] === $b->lineid[0]) {
             return (int) substr($a->lineid, 1) - (int) substr($b->lineid, 1);
         }
-        $to = get($this->totalorder, $a->file);
+        $to = $this->totalorder[$a->file] ?? null;
         if (!$to) {
             $to = ["a0" => 0];
             $n = 0;
