@@ -1345,7 +1345,7 @@ class Contact {
             if (!$allowed) {
                 $users = $repo->author_emails();
                 $allowed = isset($users[strtolower($this->email)]);
-                if (!$allowed && $branch && $branch !== $this->conf->main_branch) {
+                if (!$allowed && $branch && $branch !== $this->conf->default_main_branch) {
                     $users = $repo->author_emails(null, $branch);
                     $allowed = isset($users[strtolower($this->email)]);
                 }

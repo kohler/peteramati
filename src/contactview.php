@@ -418,14 +418,16 @@ class ContactView {
         global $Conf, $Me, $ConfSitePATH;
         if (!($Me->has_account_here()
               && $qreq->post_ok()
-              && ($pset = $Conf->pset_by_key($qreq->pset))))
+              && ($pset = $Conf->pset_by_key($qreq->pset)))) {
             return;
-        if (!$Me->can_set_repo($pset, $user))
+        }
+        if (!$Me->can_set_repo($pset, $user)) {
             return Conf::msg_error("You can’t edit repository information for that problem set now.");
+        }
 
         // clean up repo url
         $repo_url = trim($qreq->repo);
-        if ($pset->repo_guess_patterns)
+        if ($pset->repo_guess_patterns) {
             for ($i = 0; $i + 1 < count($pset->repo_guess_patterns); $i += 2) {
                 $x = preg_replace('`' . str_replace("`", "\\`", $pset->repo_guess_patterns[$i]) . '`s',
                                   $pset->repo_guess_patterns[$i + 1],
@@ -435,10 +437,12 @@ class ContactView {
                     break;
                 }
             }
+        }
 
         // does it contain odd characters?
-        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $repo_url))
+        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $repo_url)) {
             return Conf::msg_error("That repository contains funny characters. Remove them.");
+        }
 
         // record interested repositories
         $try_classes = [];
