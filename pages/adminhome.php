@@ -22,7 +22,7 @@ function admin_home_messages($conf) {
         $m[] = $errmarker . "This PHP installation lacks support for the GD library, so HotCRP cannot generate score charts (as backup for browsers that don’t support &lt;canvas&gt;). You should update your PHP installation. For example, on Ubuntu Linux, install the <code>php5-gd</code> package.";
     $result = $conf->qx("show variables like 'max_allowed_packet'");
     $max_file_size = ini_get_bytes("upload_max_filesize");
-    if (($row = edb_row($result))
+    if (($row = $result->fetch_row())
         && $row[1] < $max_file_size
         && !@$Opt["dbNoPapers"])
         $m[] = $errmarker . "MySQL’s <code>max_allowed_packet</code> setting, which is " . htmlspecialchars($row[1]) . "&nbsp;bytes, is less than the PHP upload file limit, which is $max_file_size&nbsp;bytes.  You should update <code>max_allowed_packet</code> in the system-wide <code>my.cnf</code> file or the system may not be able to handle large papers.";
@@ -48,10 +48,11 @@ function admin_home_messages($conf) {
     if ($conf->setting("pcrev_assigntime", 0) > $conf->setting("pcrev_informtime", 0)) {
         $assigntime = $conf->setting("pcrev_assigntime");
         $result = $conf->qe("select paperId from PaperReview where reviewType>" . REVIEW_PC . " and timeRequested>timeRequestNotified and reviewSubmitted is null and reviewNeedsSubmit!=0 limit 1");
-        if (edb_nrows($result))
+        if ($result->num_rows) {
             $m[] = "PC review assignments have changed. You may want to <a href=\"" . hoturl("mail", "template=newpcrev") . "\">send mail about the new assignments</a>. <a href=\"" . hoturl_post("index", "clearnewpcrev=$assigntime") . "\">(Clear&nbsp;this&nbsp;message)</a>";
-        else
+        } else {
             $conf->save_setting("pcrev_informtime", $assigntime);
+        }
     }
 
     if (count($m))

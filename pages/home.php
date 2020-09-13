@@ -764,37 +764,38 @@ if ($Me->privChair
         $who = $Qreq->reset_password;
     }
     if ($who_user !== null) {
-        $users = edb_first_columns(Dbl::qe("select contactId from ContactInfo where email=?", $who_user));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where email=?", $who_user);
     } else if ($who === "college") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension");
     } else if ($who === "college-empty") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension and password=''"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension and password=''");
     } else if ($who === "college-nologin") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension and lastLogin=0"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and not extension and lastLogin=0");
     } else if ($who === "extension") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension");
     } else if ($who === "extension-empty") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension and password=''"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension and password=''");
     } else if ($who === "extension-nologin") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension and lastLogin=0"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")=0 and extension and lastLogin=0");
     } else if ($who === "ta") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0");
     } else if ($who === "ta-empty") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0 and password=''"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0 and password=''");
     } else if ($who === "ta-nologin") {
-        $users = edb_first_columns(Dbl::qe_raw("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0 and lastLogin=0"));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where (roles&" . Contact::ROLE_PCLIKE . ")!=0 and lastLogin=0");
     } else {
-        $users = edb_first_columns(Dbl::qe("select contactId from ContactInfo where email like ?", $who));
+        $users = Dbl::fetch_first_columns("select contactId from ContactInfo where email like ?", $who);
     }
     if (empty($users)) {
         $Conf->warnMsg("No users match “" . htmlspecialchars($who) . "”.");
     } else {
-        if (isset($Qreq->enable_user))
+        if (isset($Qreq->enable_user)) {
             UserActions::enable($users, $Me);
-        else if (isset($Qreq->reset_password))
+        } else if (isset($Qreq->reset_password)) {
             UserActions::reset_password($users, $Me, isset($Qreq->ifempty) && $Qreq->ifempty);
-        else
+        } else {
             UserActions::send_account_info($users, $Me);
+        }
         redirectSelf();
     }
 }
@@ -1107,7 +1108,7 @@ function show_regrades($result, $all) {
 
     // 1. load commit notes
     $flagrows = $uids = $psets = [];
-    while (($row = edb_orow($result))) {
+    while (($row = $result->fetch_object())) {
         $row->notes = json_decode($row->notes);
         $flags = (array) get($row->notes, "flags");
         $any = false;
@@ -1131,7 +1132,7 @@ function show_regrades($result, $all) {
     // 2. load repouids and branches
     $repouids = $branches = $rgwanted = [];
     $result = $Conf->qe("select cid, type, pset, link from ContactLink where (type=" . LINK_REPO . " or type=" . LINK_BRANCH . ") and pset?a", array_keys($psets));
-    while (($row = edb_row($result))) {
+    while (($row = $result->fetch_row())) {
         if ($row[1] == LINK_REPO) {
             $repouids[$row[3] . "," . $row[2]][] = (int) $row[0];
             $rgwanted[] = "(repoid={$row[3]} and pset={$row[2]})";
@@ -1144,7 +1145,7 @@ function show_regrades($result, $all) {
     // 3. load RepositoryGrades
     $rgs = [];
     $result = $Conf->qe("select * from RepositoryGrade where " . join(" or ", $rgwanted));
-    while (($row = edb_orow($result))) {
+    while (($row = $result->fetch_object())) {
         $rgs["{$row->repoid},{$row->pset},{$row->branchid}"] = $row;
     }
     Dbl::free($result);
@@ -1596,7 +1597,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $allflags = !!$Qreq->allflags;
     $field = $allflags ? "hasflags" : "hasactiveflags";
     $result = Dbl::qe("select *, null as main_gradercid, null as gradebhash, null as repocids, null as conversation from CommitNotes where $field=1");
-    if (edb_nrows($result)) {
+    if ($result->num_rows) {
         echo $sep;
         show_regrades($result, $allflags);
         if ($Profile) {

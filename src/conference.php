@@ -737,7 +737,7 @@ class Conf {
 
     function user_id_by_email($email) {
         $result = $this->qe("select contactId from ContactInfo where email=?", trim($email));
-        $row = edb_row($result);
+        $row = $result->fetch_row();
         Dbl::free($result);
         return $row ? (int) $row[0] : false;
     }

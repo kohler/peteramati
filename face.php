@@ -18,7 +18,7 @@ if (isset($Qreq->imageid)) {
         && ($User === $Me || $Me->isPC)
         && $Qreq->imageid
         && ($result = Dbl::qe("select mimetype, `data` from ContactImage where contactId=? and contactImageId=?", $User->contactId, $Qreq->imageid))
-        && ($row = edb_row($result))) {
+        && ($row = $result->fetch_row())) {
         header("Content-Type: $row[0]");
         header("Cache-Control: public, max-age=31557600");
         header("Expires: " . gmdate("D, d M Y H:i:s", Conf::$now + 31557600) . " GMT");

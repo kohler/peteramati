@@ -55,8 +55,9 @@ if (isset($arg["e"])) {
 $q = "select contactId, dropped from ContactInfo where " . join(" and ", $where);
 $result = $Conf->qe($q);
 $users = array();
-while (($row = edb_orow($result)))
+while (($row = $result->fetch_object())) {
     $users[] = $row;
+}
 Dbl::free($result);
 
 if (count($users) > 1)

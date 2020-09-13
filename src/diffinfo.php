@@ -101,7 +101,8 @@ class DiffInfo implements Iterator {
     }
 
     function finish() {
-        if ($this->_diffsz === 4 && str_starts_with($this->_diff[3], "B")) {
+        $n = $this->_diffsz;
+        if ($n === 4 && str_starts_with($this->_diff[3], "B")) {
             $this->binary = true;
         }
         if ($this->binary && !$this->_boring_set) {
@@ -109,14 +110,14 @@ class DiffInfo implements Iterator {
         }
         if ($this->binary
             ? preg_match('_ and /dev/null differ$_', $this->_diff[3])
-            : $this->_diffsz && $this->_diff[$this->_diffsz - 2] === 0) {
+            : $n >= 4 && $this->_diff[$n - 2] === 0) {
             $this->removed = true;
         }
         // add `@@` context line at end of diff to allow expanding file
-        if ($this->_diffsz > 12
-            && $this->_diff[$this->_diffsz - 4] === ' '
-            && $this->_diff[$this->_diffsz - 8] === ' '
-            && $this->_diff[$this->_diffsz - 12] === ' ') {
+        if ($n >= 16
+            && $this->_diff[$n - 4] === ' '
+            && $this->_diff[$n - 8] === ' '
+            && $this->_diff[$n - 12] === ' ') {
             array_push($this->_diff, "@", null, null, "");
             $this->_diffsz += 4;
         }

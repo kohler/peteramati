@@ -7,7 +7,7 @@ function _update_schema_haslinenotes($conf) {
     $conf->ql("lock tables CommitNotes write");
     $hashes = array(array(), array(), array(), array());
     $result = $conf->ql("select hash, notes from CommitNotes");
-    while (($row = edb_row($result))) {
+    while (($row = $result->fetch_row())) {
         $x = PsetView::notes_haslinenotes(json_decode($row[1]));
         $hashes[$x][] = $row[0];
     }
@@ -30,7 +30,7 @@ function _update_schema_regrade_flags(Conf $conf) {
     $result = $conf->ql("select rgr.*, u.cid from RepositoryGradeRequest rgr
         left join (select link, pset, min(cid) cid
                    from ContactLink where type=" . LINK_REPO . " group by link, pset) u on (u.link=rgr.repoid)");
-    while (($row = edb_orow($result)))
+    while (($row = $result->fetch_object()))
         if ($row->cid && ($u = $conf->user_by_id($row->cid))
             && ($pset = $conf->pset_by_id($row->pset))) {
             $info = PsetView::make($pset, $u, $u);
@@ -48,7 +48,7 @@ function _update_schema_hasflags(Conf $conf) {
     $result = $conf->ql("select * from CommitNotes");
     $queries = [];
     $qv = [];
-    while (($row = edb_orow($result))) {
+    while (($row = $result->fetch_object())) {
         if ($row->notes && ($n = json_decode($row->notes)) && isset($n->flags) && count((array) $n->flags)) {
             $queries[] = "update CommitNotes set hasflags=1 where hash=? and pset=?";
             array_push($qv, $row->hash, $row->pset);
@@ -65,7 +65,7 @@ function _update_schema_linenotes(Conf $conf) {
     $result = $conf->ql("select * from CommitNotes where notes like '%linenotes%'");
     $queries = [];
     $qv = [];
-    while (($row = edb_orow($result)))
+    while (($row = $result->fetch_object()))
         if (($n = json_decode($row->notes)) && isset($n->linenotes)) {
             foreach ($n->linenotes as $file => $linemap) {
                 foreach ($linemap as $lineid => &$note)

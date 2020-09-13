@@ -14,7 +14,7 @@ if (isset($Qreq->fromlog)
     && ctype_digit($Qreq->fromlog)
     && $Me->privChair) {
     $result = $Conf->qe("select * from MailLog where mailId=" . $Qreq->fromlog);
-    if (($row = edb_orow($result))) {
+    if (($row = $result->fetch_object())) {
         foreach (array("recipients", "q", "t", "cc", "replyto", "subject", "emailBody") as $field)
             if (isset($row->$field) && !isset($Qreq[$field]))
                 $Qreq[$field] = $row->$field;
@@ -339,10 +339,10 @@ class MailSender {
                                     "contactId" => array(), "fake" => 1);
         $last_prep = $fake_prep;
         $nrows_done = 0;
-        $nrows_left = edb_nrows($result);
+        $nrows_left = $result->num_rows;
         $nwarnings = 0;
         $preperrors = array();
-        while (($row = edb_orow($result))) {
+        while (($row = $result->fetch_object())) {
             ++$nrows_done;
 
             $contact = new Contact($row);
@@ -399,7 +399,7 @@ class MailSender {
 $result = $Conf->q("select outcome, count(paperId), max(leadContactId), max(shepherdContactId) from Paper group by outcome");
 $noutcome = array();
 $anyLead = $anyShepherd = false;
-while (($row = edb_row($result))) {
+while (($row = $result->fetch_row())) {
     $noutcome[$row[0]] = $row[1];
     if ($row[2])
         $anyLead = true;
@@ -562,10 +562,10 @@ echo "  <tr><td class='mhnp'>Subject:</td><td class='mhdp'>",
 
 if ($Me->privChair) {
     $result = $Conf->qe("select * from MailLog order by mailId desc limit 18");
-    if (edb_nrows($result)) {
+    if ($result->num_rows) {
         echo "<div style='padding-top:12px'>",
             "<strong>Recent mails:</strong>\n";
-        while (($row = edb_orow($result))) {
+        while (($row = $result->fetch_object())) {
             echo "<div class='mhdd'><div style='position:relative;overflow:hidden'>",
                 "<div style='position:absolute;white-space:nowrap'><a class='q' href=\"", hoturl("mail", "fromlog=" . $row->mailId), "\">", htmlspecialchars($row->subject), " &ndash; <span class='dim'>", htmlspecialchars($row->emailBody), "</span></a></div>",
                 "<br /></div></div>\n";

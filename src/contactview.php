@@ -214,7 +214,7 @@ class ContactView {
             $backpartners[] = -1;
             $result = $Conf->qe("select " . ($user->is_anonymous ? "anon_username" : "email") . " from ContactInfo where contactId ?a", $backpartners);
             $p = array();
-            while (($row = edb_row($result)))
+            while (($row = $result->fetch_row()))
                 if ($Me->isPC)
                     $p[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $row[0])) . '">' . htmlspecialchars($row[0]) . '</a>';
                 else

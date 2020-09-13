@@ -50,10 +50,12 @@ if (empty($where))
     $where[] = "true";
 $result = Dbl::qe("select contactId, email, firstName, lastName, huid from ContactInfo where " . join(" and ", $where));
 $rows = array();
-while (($row = edb_orow($result)))
+while (($row = $result->fetch_object())) {
     $rows[] = $row;
-if ($limit)
+}
+if ($limit) {
     shuffle($rows);
+}
 Dbl::free($result);
 
 

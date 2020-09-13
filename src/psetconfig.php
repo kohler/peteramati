@@ -78,6 +78,7 @@ class Pset {
     public $grade_script;
     private $_late_hours;
 
+    /** @var array<string,DownloadEntryConfig> */
     public $downloads = [];
 
     /** @var array<string,RunnerConfig> */
@@ -292,12 +293,13 @@ class Pset {
         }
 
         // downloads
-        $downloads = get($p, "downloads");
+        $downloads = $p->downloads ?? null;
         if (is_array($downloads) || is_object($downloads)) {
-            foreach ((array) $p->downloads as $k => $v) {
+            foreach ((array) $downloads as $k => $v) {
                 $g = new DownloadEntryConfig(is_int($k) ? $k + 1 : $k, $v);
-                if (get($this->downloads, $g->key))
+                if ($this->downloads[$g->key] ?? null) {
                     throw new PsetConfigException("download `$g->key` reused", "downloads", $k);
+                }
                 $this->downloads[$g->key] = $g;
             }
         } else if ($downloads) {
@@ -533,7 +535,7 @@ class Pset {
     function contact_grade_for($student) {
         $cid = $student->contactId;
         $result = $this->conf->qe("select * from ContactGrade where cid=? and pset=?", $cid, $this->psetid);
-        $cg = edb_orow($result);
+        $cg = $result->fetch_object();
         if ($cg && $cg->notes) {
             $cg->notes = json_decode($cg->notes);
         }
@@ -544,7 +546,7 @@ class Pset {
     function commit_notes($bhash) {
         assert(!$this->gitless);
         $result = $this->conf->qe("select * from CommitNotes where pset=? and bhash=?", $this->psetid, strlen($bhash) === 40 ? hex2bin($bhash) : $bhash);
-        $cn = edb_orow($result);
+        $cn = $result->fetch_object();
         if ($cn && $cn->notes) {
             $cn->notes = json_decode($cn->notes);
         }
@@ -764,12 +766,13 @@ class Pset {
             ++$i;
         }
         uasort($xp, function ($a, $b) {
-            if ($a[0] != $b[0])
+            if ($a[0] != $b[0]) {
                 return $a[0] < $b[0] ? -1 : 1;
-            else if ($a[1] != $b[1])
+            } else if ($a[1] != $b[1]) {
                 return $a[1] < $b[1] ? -1 : 1;
-            else
+            } else {
                 return 0;
+            }
         });
         $y = [];
         foreach (array_keys($xp) as $k) {
@@ -781,12 +784,15 @@ class Pset {
 
 
 class DownloadEntryConfig {
+    /** @var string */
     public $key;
-    /** @deprecated */
-    public $name;
+    /** @var string */
     public $title;
+    /** @var string */
     public $file;
+    /** @var string */
     public $filename;
+    /** @var bool */
     public $timed;
     public $timeout;
     /** @var ?float */
@@ -810,7 +816,6 @@ class DownloadEntryConfig {
             || $this->key[0] === "_") {
             throw new PsetConfigException("download entry key format error", $loc);
         }
-        $this->name = $this->key;
         $this->title = Pset::cstr($loc, $g, "title");
         if ((string) $this->title === "") {
             $this->title = $this->key;
