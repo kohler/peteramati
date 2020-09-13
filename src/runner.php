@@ -579,7 +579,7 @@ class RunnerState {
             $this->conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $this->queueid);
         $queue = $this->load_queue();
 
-        $qconf = $PsetInfo->_queues[$this->runner->queue] ?? null;
+        $qconf = $PsetInfo->_queues->{$this->runner->queue} ?? null;
         if (!$qconf) {
             $qconf = (object) ["nconcurrent" => 1];
         }

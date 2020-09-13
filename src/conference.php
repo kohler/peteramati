@@ -2004,9 +2004,12 @@ class Conf {
         return ($this->branch_map())[$branchid] ?? null;
     }
 
+    /** @param ?string $branch
+     * @return ?int */
     function ensure_branch($branch) {
-        if ((string) $branch === "" || $branch === "master")
+        if ($branch === null || $branch === "") {
             return null;
+        }
         $key = array_search($branch, $this->branch_map(), true);
         if ($key === false) {
             $this->qe("insert into Branch set branch=?", $branch);
