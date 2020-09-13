@@ -68,7 +68,7 @@ if ($Qreq->download
     if (!$dl
         || ($Info->viewer === $Info->user
             && (!$dl->visible
-                || (is_int($dl->visible) && $dl->visible > $Now)))) {
+                || (is_int($dl->visible) && $dl->visible > Conf::$now)))) {
         header("HTTP/1.0 404 Not Found");
         exit;
     }
@@ -86,7 +86,7 @@ if ($Qreq->download
     if ($dl->timed) {
         $dls = $Info->user_info("downloaded_at") ? : [];
         $old_dls = $dls ? get($dls, $dl->key, []) : [];
-        $old_dls[] = ($Info->viewer === $Info->user ? [$Now] : [$Now, $Info->viewer->contactId]);
+        $old_dls[] = ($Info->viewer === $Info->user ? [Conf::$now] : [Conf::$now, $Info->viewer->contactId]);
         $Info->update_user_info(["downloaded_at" => [$dl->key => $old_dls]]);
     }
     session_write_close();
@@ -138,20 +138,20 @@ function upload_grades($pset, $text, $fname) {
     global $Conf, $Me;
     assert($pset->gitless_grades);
     $csv = new CsvParser($text);
-    $csv->set_header($csv->next());
+    $csv->set_header($csv->next_list());
     $errors = [];
-    while (($line = $csv->next())) {
-        if (($who = get($line, "email")) && $who !== "-") {
+    while (($line = $csv->next_row())) {
+        if (($who = $line["email"]) && $who !== "-") {
             $user = $Conf->user_by_email($who);
-        } else if (($who = get($line, "github_username")) && $who !== "-") {
+        } else if (($who = $line["github_username"]) && $who !== "-") {
             $user = $Conf->user_by_whatever($who, Conf::USERNAME_GITHUB);
-        } else if (($who = get($line, "seascode_username")) && $who !== "-") {
+        } else if (($who = $line["seascode_username"]) && $who !== "-") {
             $user = $Conf->user_by_whatever($who, Conf::USERNAME_HARVARDSEAS);
-        } else if (($who = get($line, "huid")) && $who !== "-") {
+        } else if (($who = $line["huid"]) && $who !== "-") {
             $user = $Conf->user_by_whatever($who, Conf::USERNAME_HUID);
-        } else if (($who = get($line, "username")) && $who !== "-") {
+        } else if (($who = $line["username"]) && $who !== "-") {
             $user = $Conf->user_by_whatever($who, Conf::USERNAME_USERNAME);
-        } else if (($who = get($line, "name"))) {
+        } else if (($who = $line["name"])) {
             list($first, $last) = Text::split_name($who);
             $user = $Conf->user_by_query("firstName like '?s%' and lastName=?", [$first, $last]);
             if ($user && $user->firstName != $first

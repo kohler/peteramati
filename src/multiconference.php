@@ -82,7 +82,7 @@ class Multiconference {
                 echo "{\"error\":\"unconfigured installation\"}\n";
         } else {
             if (!$Conf)
-                $Conf = Conf::$g = new Conf($Opt, false);
+                $Conf = Conf::$main = new Conf($Opt, false);
             if ($Opt["shortName"] == "__invalid__")
                 $Opt["shortName"] = "HotCRP";
             $Me = null;

@@ -43,7 +43,7 @@ if ($Me === false)
 
 // Initialize user
 function initialize_user() {
-    global $Conf, $Me, $Now, $Qreq;
+    global $Conf, $Me, $Qreq;
 
     // set up session
     if (isset($Conf->opt["sessionHandler"])) {
@@ -98,7 +98,7 @@ function initialize_user() {
 
     // if bounced through login, add post data
     if (isset($_SESSION["login_bounce"][4])
-        && $_SESSION["login_bounce"][4] <= $Now)
+        && $_SESSION["login_bounce"][4] <= Conf::$now)
         unset($_SESSION["login_bounce"]);
 
     if (!$Me->is_empty()
@@ -142,6 +142,3 @@ if (isset($_SESSION["redirect_error"])) {
     $Error = $_SESSION["redirect_error"];
     unset($_SESSION["redirect_error"]);
 }
-
-
-Ht::$default_button_class = "btn";

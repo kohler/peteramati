@@ -134,6 +134,7 @@ class API_Grade {
             return ["ok" => false, "error" => "Missing credentials."];
         }
 
+        $info = null;
         $infos = [];
         $errno = 0;
         foreach (array_keys($ugs) as $uid) {
@@ -170,14 +171,15 @@ class API_Grade {
                 }
             }
             if (!$info->can_view_grades()
-                || ($ispost && !$info->can_edit_grades()))
+                || ($ispost && !$info->can_edit_grades())) {
                 return ["ok" => false, "error" => "Permission error."];
-            else if ($ispost && $info->is_handout_commit())
+            } else if ($ispost && $info->is_handout_commit()) {
                 $errno = max($errno, 1);
+            }
             $infos[$u->contactId] = $info;
         }
 
-        if ($errno === 5) {
+        if ($info === null || $errno === 5) {
             return ["ok" => false, "error" => "Missing repository."];
         } else if ($errno === 4) {
             return ["ok" => false, "error" => "Disconnected commit."];
@@ -200,10 +202,11 @@ class API_Grade {
             }
             if (!empty($errf)) {
                 reset($errf);
-                if (isset($errf["!invalid"]))
+                if (isset($errf["!invalid"])) {
                     return ["ok" => false, "error" => "Invalid request."];
-                else
+                } else {
                     return ["ok" => false, "error" => (count($errf) === 1 ? current($errf) : "Invalid grades."), "errf" => $errf];
+                }
             }
 
             // assign grades

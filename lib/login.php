@@ -4,7 +4,6 @@
 
 class LoginHelper {
     static function logout(Contact $user, $explicit) {
-        global $Now;
         if (isset($_SESSION)) {
             $_SESSION = [];
             session_commit();
@@ -36,7 +35,7 @@ class LoginHelper {
         }
 
         // if user is still valid, OK
-        if ($Me->has_account_here())
+        if ($user->has_account_here())
             return;
 
         // check HTTP auth
@@ -62,7 +61,6 @@ class LoginHelper {
     }
 
     static function login_redirect(Conf $conf, Qrequest $qreq) {
-        global $Now;
         $external_login = $conf->external_login();
 
         // In all cases, we need to look up the account information

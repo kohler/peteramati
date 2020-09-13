@@ -25,7 +25,7 @@ class CS61Mailer extends Mailer {
     function reset($recipient = null, $row = null, $rest = array()) {
         global $Me, $Opt;
         $this->recipient = $recipient;
-        $this->permissionContact = defval($rest, "permissionContact", $recipient);
+        $this->permissionContact = $rest["permissionContact"] ?? $recipient;
         foreach (array("width", "sensitivity", "reason", "adminupdate", "notes",
                        "capability", "pset") as $k)
             $this->$k = @$rest[$k];
@@ -216,89 +216,12 @@ class CS61Mailer extends Mailer {
 
 
     static function send_to($recipient, $template, $rest = array()) {
-        if (!defval($recipient, "disabled")) {
+        if (!($recipient["disabled"] ?? false)) {
             $mailer = new CS61Mailer($recipient, null, $rest);
             if (($prep = $mailer->make_preparation($template, $rest)))
                 self::send_preparation($prep);
         }
     }
-
-    static function send_contacts($template, $row, $rest = array()) {
-        global $Conf, $Me;
-
-        $result = $Conf->qe("select ContactInfo.contactId,
-                firstName, lastName, email, preferredEmail, password, roles, disabled,
-                conflictType, 0 myReviewType
-                from ContactInfo join PaperConflict using (contactId)
-                where paperId=$row->paperId and conflictType>=" . CONFLICT_AUTHOR . "
-                group by ContactInfo.contactId");
-
-        // must set the current conflict type in $row for each contact
-        $contact_info_map = $row->replace_contact_info_map(null);
-
-        $contacts = array();
-        while (($contact = edb_orow($result))) {
-            $row->assign_contact_info($contact, $contact->contactId);
-            self::send_to(Contact::make($contact), $template, $row, $rest);
-            $contacts[] = Text::user_html($contact);
-        }
-
-        $row->replace_contact_info_map($contact_info_map);
-        if ($Me->allow_administer($row) && !$row->has_author($Me)
-            && count($contacts)) {
-            $endmsg = (isset($rest["infoMsg"]) ? ", " . $rest["infoMsg"] : ".");
-            if (isset($rest["infoNames"]) && $Me->allow_administer($row))
-                $contactsmsg = pluralx($contacts, "contact") . ", " . commajoin($contacts);
-            else
-                $contactsmsg = "contact(s)";
-            $Conf->infoMsg("Sent email to paper #{$row->paperId}’s $contactsmsg$endmsg");
-        }
-    }
-
-    static function send_reviewers($template, $row, $rest = array()) {
-        global $Conf, $Me, $Opt;
-
-        $result = $Conf->qe("select ContactInfo.contactId,
-                firstName, lastName, email, preferredEmail, password, roles, disabled,
-                conflictType, reviewType myReviewType
-                from ContactInfo
-                join PaperReview on (PaperReview.contactId=ContactInfo.contactId and PaperReview.paperId=$row->paperId)
-                left join PaperConflict on (PaperConflict.contactId=ContactInfo.contactId and PaperConflict.paperId=$row->paperId)
-                group by ContactInfo.contactId");
-
-        if (!isset($rest["cc"]) && isset($Opt["emailCc"]))
-            $rest["cc"] = $Opt["emailCc"];
-        else if (!isset($rest["cc"]))
-            $rest["cc"] = Text::user_email_to(Contact::site_contact());
-
-        // must set the current conflict type in $row for each contact
-        $contact_info_map = $row->replace_contact_info_map(null);
-
-        $contacts = array();
-        while (($contact = edb_orow($result))) {
-            $row->assign_contact_info($contact, $contact->contactId);
-            self::send_to(Contact::make($contact), $template, $row, $rest);
-            $contacts[] = Text::user_html($contact);
-        }
-
-        $row->replace_contact_info_map($contact_info_map);
-        if ($Me->allow_administer($row) && !$row->has_author($Me)
-            && count($contacts)) {
-            $endmsg = (isset($rest["infoMsg"]) ? ", " . $rest["infoMsg"] : ".");
-            $Conf->infoMsg("Sent email to paper #{$row->paperId}’s " . pluralx($contacts, "reviewer") . ", " . commajoin($contacts) . $endmsg);
-        }
-    }
-
-    static function send_manager($template, $row, $rest = array()) {
-        global $Conf;
-        if ($row
-            && $row->managerContactId
-            && ($c = $Conf->user_by_id($row->managerContactId)))
-            self::send_to($c, $template, $row, $rest);
-        else
-            self::send_to(Contact::site_contact(), $template, $row, $rest);
-    }
-
 }
 
 // load mail templates, including local ones if any

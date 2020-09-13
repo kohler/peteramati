@@ -4,17 +4,21 @@
 // See LICENSE for open-source distribution terms
 
 class LineNotesOrder {
-    private $diff = null;
-    private $fileorder = [];
-    private $ln;
+    /** @var array<string,array<string,LineNote>> */
+    private $ln = [];
+    /** @var list<LineNote> */
     private $lnseq = [];
+    /** @var array<string,int> */
+    private $fileorder = [];
+    /** @var ?array<string,DiffInfo> */
+    private $diff = [];
     /** @var ?array<string,int> */
     private $lnorder;
+    /** @var ?array<string,array<string,int>> */
     private $totalorder;
     public $has_linenotes_in_diff = false;
 
     function __construct($linenotes, $seegradenotes, $editnotes) {
-        $this->ln = [];
         foreach ($linenotes ? : [] as $file => $notelist) {
             $fln = [];
             foreach ($notelist as $lineid => $note) {
@@ -39,16 +43,22 @@ class LineNotesOrder {
     function is_empty() {
         return empty($this->lnseq);
     }
+    /** @return array<string,int> */
     function fileorder() {
         return $this->fileorder;
     }
+    /** @param string $file
+     * @return bool */
     function file_has_notes($file) {
         return isset($this->ln[$file]);
     }
+    /** @param string $file
+     * @return array<string,LineNote> */
     function file($file) {
         return $this->ln[$file] ?? [];
     }
 
+    /** @param array<string,DiffInfo> $diff */
     function set_diff($diff) {
         $this->diff = $diff;
         $this->lnorder = null;
@@ -74,22 +84,28 @@ class LineNotesOrder {
                 $this->fileorder[$file] = count($this->fileorder) + 1;
         }
     }
+    /** @return array<string,int> */
     private function ensure_lnorder() {
         if ($this->lnorder === null) {
-            $this->totalorder = [];
+            $this->lnorder = $this->totalorder = [];
             usort($this->lnseq, [$this, "compare"]);
             foreach ($this->lnseq as $i => $note) {
                 $this->lnorder[$note->lineid . "_" . $note->file] = $i;
             }
         }
+        return $this->lnorder;
     }
+    /** @return list<LineNote> */
     function seq() {
         $this->ensure_lnorder();
         return $this->lnseq;
     }
+    /** @param string $file
+     * @param string $lineid
+     * @return ?LineNote */
     function get_next($file, $lineid) {
         $this->ensure_lnorder();
-        $seq = $this->lnorder[$lineid . "_" . $file];
+        $seq = $this->lnorder[$lineid . "_" . $file] ?? null;
         while ($seq !== null && $seq !== count($this->lnseq) - 1) {
             ++$seq;
             if (!$this->lnseq[$seq]->is_empty()) {
@@ -98,9 +114,12 @@ class LineNotesOrder {
         }
         return null;
     }
+    /** @param string $file
+     * @param string $lineid
+     * @return ?LineNote */
     function get_prev($file, $lineid) {
         $this->ensure_lnorder();
-        $seq = $this->lnorder[$lineid . "_" . $file];
+        $seq = $this->lnorder[$lineid . "_" . $file] ?? null;
         while ($seq !== null && $seq !== 0) {
             --$seq;
             if (!$this->lnseq[$seq]->is_empty()) {
@@ -109,6 +128,9 @@ class LineNotesOrder {
         }
         return null;
     }
+    /** @param LineNote $a
+     * @param LineNote $b
+     * @return int */
     function compare($a, $b) {
         if ($a->file != $b->file) {
             return $this->fileorder[$a->file] - $this->fileorder[$b->file];

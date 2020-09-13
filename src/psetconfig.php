@@ -376,13 +376,11 @@ class Pset {
 
 
     function student_can_view() {
-        global $Now;
         $dl = $this->visible;
-        return !$this->disabled && $dl && ($dl === true || $dl <= $Now);
+        return !$this->disabled && $dl && ($dl === true || $dl <= Conf::$now);
     }
 
     function student_can_view_grades($extension = null) {
-        global $Now;
         if ($extension === null) {
             $dl = $this->grades_visible;
         } else if ($extension) {
@@ -390,7 +388,7 @@ class Pset {
         } else {
             $dl = $this->grades_visible_college;
         }
-        return $this->student_can_view() && $dl && ($dl === true || $dl <= $Now);
+        return $this->student_can_view() && $dl && ($dl === true || $dl <= Conf::$now);
     }
 
 
@@ -453,14 +451,16 @@ class Pset {
         });
     }
 
-    /** @return array<string,GradeEntryConfig> */
+    /** @param bool $pcview
+     * @return array<string,GradeEntryConfig> */
     function visible_grades($pcview) {
         return $pcview ? $this->grades : array_filter($this->grades, function ($ge) {
             return $ge->visible;
         });
     }
 
-    /** @return array<string,GradeEntryConfig> */
+    /** @param bool $pcview
+     * @return array<string,GradeEntryConfig> */
     function visible_grades_in_total($pcview) {
         return array_filter($this->grades, function ($ge) use ($pcview) {
             return ($pcview || $ge->visible) && !$ge->no_total;
@@ -472,6 +472,9 @@ class Pset {
         return $this->_late_hours;
     }
 
+    /** @param bool $pcview
+     * @param bool $include_extra
+     * @return int|float */
     function max_grade($pcview, $include_extra = false) {
         $i = ($pcview ? 1 : 0) | ($include_extra ? 2 : 0);
         if (!isset($this->_max_grade[$i])) {
@@ -505,6 +508,8 @@ class Pset {
         return (object) ["nentries" => $count, "maxgrades" => (object) $max];
     }
 
+    /** @param bool $pcview
+     * @return array{entries:array<int,object>,order:list<string>,maxtotal?:int|float} */
     function gradeentry_json($pcview) {
         $ej = $order = [];
         $count = $maxtotal = 0;
@@ -574,18 +579,18 @@ class Pset {
     }
 
     function file_ignore_regex() {
-        global $Now;
-        if (isset($this->_file_ignore_regex))
+        if (isset($this->_file_ignore_regex)) {
             return $this->_file_ignore_regex;
+        }
         $regex = self::basic_file_ignore_regex();
-        if ($this->conf->setting("__gitignore_pset{$this->id}_at", 0) < $Now - 900) {
+        if ($this->conf->setting("__gitignore_pset{$this->id}_at", 0) < Conf::$now - 900) {
             $hrepo = $this->handout_repo();
             $result = "";
             if ($this->directory_slash !== "") {
                 $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/master:" . escapeshellarg($this->directory_slash) . ".gitignore 2>/dev/null");
             }
             $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/master:.gitignore 2>/dev/null");
-            $this->conf->save_setting("__gitignore_pset{$this->id}_at", $Now);
+            $this->conf->save_setting("__gitignore_pset{$this->id}_at", Conf::$now);
             $this->conf->save_setting("gitignore_pset{$this->id}", 1, $result);
         }
         if (($result = $this->conf->setting_data("gitignore_pset{$this->id}"))) {
@@ -777,12 +782,16 @@ class Pset {
 
 class DownloadEntryConfig {
     public $key;
+    /** @deprecated */
+    public $name;
     public $title;
     public $file;
     public $filename;
     public $timed;
     public $timeout;
+    /** @var ?float */
     public $position;
+    /** @var null|bool|int|'grades' */
     public $visible;
 
     function __construct($name, $g) {
@@ -1350,8 +1359,8 @@ function check_interval($x) {
         return true;
     } else if (is_string($x)
                && preg_match(',\A(\d+(?:\.\d*)?|\.\d+)(?:$|\s*)([smhd]?)\z,', strtolower($x), $m)) {
-        $mult = array("" => 1, "s" => 1, "m" => 60, "h" => 3600, "d" => 86400);
-        return [true, $m[1] * $mult[$m[2]]];
+        $mult = ["" => 1, "s" => 1, "m" => 60, "h" => 3600, "d" => 86400];
+        return [true, floatval($m[1]) * $mult[$m[2]]];
     } else {
         return false;
     }

@@ -21,7 +21,7 @@ if (isset($Qreq->imageid)) {
         && ($row = edb_row($result))) {
         header("Content-Type: $row[0]");
         header("Cache-Control: public, max-age=31557600");
-        header("Expires: " . gmdate("D, d M Y H:i:s", $Now + 31557600) . " GMT");
+        header("Expires: " . gmdate("D, d M Y H:i:s", Conf::$now + 31557600) . " GMT");
         if (!$zlib_output_compression)
             header("Content-Length: " . strlen($row[1]));
         print $row[1];

@@ -244,7 +244,7 @@ class ContactView {
     }
 
     static function echo_repo_group(PsetView $info, $full = false) {
-        global $Conf, $Me, $Now, $Qreq;
+        global $Conf, $Me, $Qreq;
         if ($info->pset->gitless)
             return;
         list($user, $pset, $partner, $repo) =
@@ -283,7 +283,8 @@ class ContactView {
         }
 
         // check repo
-        $ms = new MessageSet($user);
+        $ms = new MessageSet;
+        $ms->user = $user;
         if ($repo) {
             $repo->check_working($ms);
             $repo->check_open($ms);
@@ -309,8 +310,8 @@ class ContactView {
         }
         $prefixes = ["", "WARNING: ", "ERROR: "];
         $notes = array_map(function ($m) use ($prefixes) {
-            return [$m[2] > 0, $prefixes[$m[2]] . $m[1]];
-        }, $ms->messages(true));
+            return [$m->status > 0, $prefixes[max($m->status, 0)] . $m->message];
+        }, $ms->message_list());
         if ($repo && $repo->truncated_psetdir($pset)) {
             $notes[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for us to grade and harder for you to get pset updates."];
         }
@@ -336,7 +337,7 @@ class ContactView {
     }
 
     static function echo_branch_group(PsetView $info) {
-        global $Conf, $Me, $Now, $Qreq;
+        global $Conf, $Me, $Qreq;
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
         $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
@@ -370,12 +371,12 @@ class ContactView {
     }
 
     static function echo_downloads_group(PsetView $info) {
-        global $Conf, $Me, $Now, $Qreq;
+        global $Conf, $Me, $Qreq;
         $n = 0;
         foreach ($info->pset->downloads as $dl) {
             if ($info->user == $info->viewer
                 && (!$dl->visible
-                    || (is_int($dl->visible) && $dl->visible > $Now))) {
+                    || (is_int($dl->visible) && $dl->visible > Conf::$now))) {
                 continue;
             }
             if (!$n)
@@ -459,7 +460,8 @@ class ContactView {
             return Conf::msg_error("Invalid repository URL “" . htmlspecialchars($repo_url) . "”.");
 
         // check repositories
-        $ms = new MessageSet($user);
+        $ms = new MessageSet;
+        $ms->user = $user;
         foreach ($try_classes as $sitek) {
             $reposite = $sitek::make_url($repo_url, $user->conf);
             if ($reposite && $reposite->validate_working($ms) > 0) {
@@ -478,7 +480,7 @@ class ContactView {
         if (!$ms->has_problem()) {
             Conf::msg_error("Can’t access the repository “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
         } else {
-            $msgs = join("<br />", $ms->messages()) ? : "Repository unreachable at the moment.";
+            $msgs = join("<br />", $ms->message_texts()) ? : "Repository unreachable at the moment.";
             Conf::msg_error($msgs);
         }
     }

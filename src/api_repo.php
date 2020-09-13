@@ -15,11 +15,13 @@ class API_Repo {
         } else if (!$user->can_view_repo_contents($api->repo, $api->branch)) {
             return ["hash" => false, "error" => "Unconfirmed repository."];
         } else {
-            $j = clone $c;
-            unset($j->fromhead);
-            $j->snaphash = $api->repo->snaphash;
-            $j->snapcheckat = $api->repo->snapcheckat;
-            return $j;
+            return [
+                "hash" => $c->hash,
+                "subject" => $c->subject,
+                "commitat" => $c->commitat,
+                "snaphash" => $api->repo->snaphash,
+                "snapcheckat" => $api->repo->snapcheckat
+            ];
         }
     }
 

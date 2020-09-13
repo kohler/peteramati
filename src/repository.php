@@ -90,6 +90,7 @@ class Repository {
     /** @return ?Repository */
     static function fetch($result, Conf $conf) {
         $repo = $result ? $result->fetch_object("Repository", [$conf]) : null;
+        '@phan-var-force ?Repository $repo';
         if ($repo && !is_int($repo->repoid)) {
             $repo->conf = $conf;
             $repo->db_load();
@@ -103,14 +104,13 @@ class Repository {
         $result = $conf->qe("select * from Repository where url=?", $url);
         $repo = Repository::fetch($result, $conf);
         Dbl::free($result);
-        if ($repo)
+        if ($repo) {
             return $repo;
+        }
         $repo_hash = substr(sha1($url), 10, 1);
         $now = time();
         $result = $conf->qe("insert into Repository set url=?, cacheid=?, working=?, open=?, opencheckat=?", $url, $repo_hash, $now, -1, 0);
-        if (!$result)
-            return false;
-        return self::find_id($conf->dblink->insert_id, $conf);
+        return $result ? self::find_id($conf->dblink->insert_id, $conf) : null;
     }
 
     /** param string $url
@@ -122,7 +122,7 @@ class Repository {
         return $repo;
     }
 
-    /** param int $repoid
+    /** @param int $repoid
      * @return ?Repository */
     static function find_id($repoid, Conf $conf) {
         $result = $conf->qe("select * from Repository where repoid=?", $repoid);
@@ -155,11 +155,11 @@ class Repository {
     static private $validate_time_used = 0;
 
     function refresh($delta, $foreground = false) {
-        global $ConfSitePATH, $Now;
-        if ((!$this->snapcheckat || $this->snapcheckat + $delta <= $Now)
+        global $ConfSitePATH;
+        if ((!$this->snapcheckat || $this->snapcheckat + $delta <= Conf::$now)
             && !$this->conf->opt("disableRemote")) {
-            $this->conf->qe("update Repository set snapcheckat=? where repoid=?", $Now, $this->repoid);
-            $this->snapcheckat = $Now;
+            $this->conf->qe("update Repository set snapcheckat=? where repoid=?", Conf::$now, $this->repoid);
+            $this->snapcheckat = Conf::$now;
             if ($foreground) {
                 set_time_limit(30);
             }
@@ -179,52 +179,55 @@ class Repository {
         return $r;
     }
     function check_open(MessageSet $ms = null) {
-        global $Now;
         // Recheck repository openness after a day for closed repositories,
         // and after 30 seconds for open or failed-check repositories.
-        if ($Now - $this->opencheckat > ($this->open == 0 ? 86400 : 30)) {
+        if (Conf::$now - $this->opencheckat > ($this->open == 0 ? 86400 : 30)) {
             $open = $this->validate_open($ms);
-            if ($open != $this->open || $Now != $this->opencheckat) {
+            if ($open != $this->open || Conf::$now != $this->opencheckat) {
                 if ($this->repoid > 0)
                     $this->conf->qe("update Repository set `open`=?, opencheckat=? where repoid=?",
-                        $open, $Now, $this->repoid);
+                        $open, Conf::$now, $this->repoid);
                 $this->open = $open;
-                $this->opencheckat = $Now;
+                $this->opencheckat = Conf::$now;
             }
         }
-        if ($this->open < 0 && $ms && $ms->user->isPC && !$ms->has_problem())
+        if ($this->open < 0 && $ms && $ms->user->isPC && !$ms->has_problem()) {
             $ms->warning_at("open", Messages::$main->expand_html("repo_toopublic_timeout", $this->reposite->message_defs($ms->user)));
-        if ($this->open > 0 && $ms && !$ms->has_problem())
+        }
+        if ($this->open > 0 && $ms && !$ms->has_problem()) {
             $ms->error_at("open", Messages::$main->expand_html("repo_toopublic", $this->reposite->message_defs($ms->user)));
+        }
         return $this->open;
     }
 
     static private $working_cache = [];
     function validate_working(MessageSet $ms = null) {
-        if (isset(self::$working_cache[$this->url]))
+        if (isset(self::$working_cache[$this->url])) {
             return self::$working_cache[$this->url];
-        if (self::$validate_time_used >= self::VALIDATE_TOTAL_TIMEOUT)
+        } else if (self::$validate_time_used >= self::VALIDATE_TOTAL_TIMEOUT) {
             return -1;
+        }
         $before = microtime(true);
         self::$working_cache[$this->url] = $r = $this->reposite->validate_working($ms);
         self::$validate_time_used += microtime(true) - $before;
         return $r;
     }
     function check_working(MessageSet $ms = null) {
-        global $Now;
         $working = $this->working;
         if ($working == 0) {
             $working = $this->validate_working($ms);
             if ($working > 0) {
-                $this->working = $Now;
+                $this->working = Conf::$now;
                 if ($this->repoid > 0)
-                    $this->conf->qe("update Repository set working=? where repoid=?", $Now, $this->repoid);
+                    $this->conf->qe("update Repository set working=? where repoid=?", Conf::$now, $this->repoid);
             }
         }
-        if ($working < 0 && $ms && $ms->user->isPC && !$ms->has_problem_at("working"))
+        if ($working < 0 && $ms && $ms->user->isPC && !$ms->has_problem_at("working")) {
             $ms->warning_at("working", Messages::$main->expand_html("repo_working_timeout", $this->reposite->message_defs($ms->user)));
-        if ($working == 0 && $ms && !$ms->has_problem_at("working"))
+        }
+        if ($working == 0 && $ms && !$ms->has_problem_at("working")) {
             $ms->error_at("working", Messages::$main->expand_html("repo_unreadable", $this->reposite->message_defs($ms->user)));
+        }
         return $working > 0;
     }
 
@@ -232,14 +235,14 @@ class Repository {
         return $this->reposite->validate_ownership($this, $user, $partner, $ms);
     }
     function check_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
-        global $Now;
         list($when, $ownership) = [0, -1];
         $always = $this->reposite->validate_ownership_always();
-        if ($this->notes && isset($this->notes["owner." . $user->contactId]))
+        if ($this->notes && isset($this->notes["owner." . $user->contactId])) {
             list($when, $ownership) = $this->notes["owner." . $user->contactId];
-        if ($Now - $when > ($ownership > 0 ? 86400 : 30) || $always) {
+        }
+        if (Conf::$now - $when > ($ownership > 0 ? 86400 : 30) || $always) {
             $ownership = $this->validate_ownership($user, $partner, $ms);
-            if (!$always)
+            if (!$always) {
                 Dbl::compare_and_swap($user->conf->dblink,
                     "select notes from Repository where repoid=?", [$this->repoid],
                     function ($value) use ($user, $ownership) {
@@ -249,10 +252,11 @@ class Repository {
                         return json_encode_db($value);
                     },
                     "update Repository set notes=?{desired} where notes?{expected}e and repoid=?", [$this->repoid]);
+            }
         }
-        if ($ownership == 0 && $ms && !$ms->has_problem_at("ownership"))
+        if ($ownership == 0 && $ms && !$ms->has_problem_at("ownership")) {
             $ms->warning_at("ownership", $this->expand_message("repo_notowner", $ms->user));
-
+        }
         return $ownership;
     }
 
@@ -504,12 +508,12 @@ class Repository {
 
 
     private function _temp_repo_clone() {
-        global $Now, $ConfSitePATH;
+        global $ConfSitePATH;
         assert(isset($this->repoid) && isset($this->cacheid));
         $suffix = "";
         $suffixn = 0;
         while (true) {
-            $d = "$ConfSitePATH/repo/tmprepo.$Now$suffix";
+            $d = "$ConfSitePATH/repo/tmprepo." . Conf::$now . $suffix;
             if (mkdir($d, 0770)) {
                 break;
             }
@@ -557,6 +561,8 @@ class Repository {
     }
 
 
+    /** @param null|string|list<string>|array<string,true> $files
+     * @return null|array<string,true> */
     static function fix_diff_files($files) {
         if ($files === null || empty($files)) {
             return null;
@@ -573,6 +579,7 @@ class Repository {
         }
     }
 
+    /** @param array<string,DiffInfo> $diffargs */
     private function parse_diff($diffargs, Pset $pset, $hasha_arg, $hashb_arg, $options) {
         $command = "git diff";
         if ($options["wdiff"] ?? false) {
@@ -639,7 +646,6 @@ class Repository {
     /** @return array<string,DiffInfo> */
     function diff(Pset $pset, CommitRecord $commita, CommitRecord $commitb, $options = null) {
         $options = (array) $options;
-        assert($pset); // code remains for `!$pset`; maybe revive it?
         $diffs = [];
 
         $repodir = $truncpfx = "";

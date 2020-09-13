@@ -8,12 +8,8 @@ if ($Me->is_empty())
     $Me->escape();
 global $User, $Pset, $Info, $Commit, $Qreq;
 
-function quit($err = null) {
-    global $Conf;
-    json_exit(["error" => true, "message" => $err]);
-}
-
-function user_pset_info() {
+/** @return PsetView */
+function raw_user_pset_info() {
     global $Conf, $User, $Pset, $Me, $Info, $Commit, $Qreq;
     $Info = PsetView::make($Pset, $User, $Me);
     if (($Commit = $Qreq->newcommit) == null)
@@ -37,7 +33,7 @@ assert($User == $Me || $Me->isPC);
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // repo
-$Info = user_pset_info();
+$Info = raw_user_pset_info();
 $Repo = $Info->repo;
 $Commit = $Info->commit_hash();
 if (!$Repo || !$Commit || !$Info->can_view_repo_contents() || !$Qreq->file)

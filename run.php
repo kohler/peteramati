@@ -45,20 +45,20 @@ if ($Qreq->flag && $Qreq->post_ok() && user_pset_info()) {
         json_exit(["ok" => false, "error" => "No such flag"]);
     }
     if (!$Qreq->flagid) {
-        $Qreq->flagid = "t" . $Now;
+        $Qreq->flagid = "t" . Conf::$now;
     }
     $flag = get($flags, $Qreq->flagid, []);
     if (!get($flag, "uid")) {
         $flag["uid"] = $Me->contactId;
     }
     if (!get($flag, "started")) {
-        $flag["started"] = $Now;
+        $flag["started"] = Conf::$now;
     }
-    if (get($flag, "started", $Qreq->flagid) != $Now) {
-        $flag["updated"] = $Now;
+    if (get($flag, "started", $Qreq->flagid) != Conf::$now) {
+        $flag["updated"] = Conf::$now;
     }
     if ($Qreq->flagreason) {
-        $flag["conversation"][] = [$Now, $Me->contactId, $Qreq->flagreason];
+        $flag["conversation"][] = [Conf::$now, $Me->contactId, $Qreq->flagreason];
     }
     $updates = ["flags" => [$Qreq->flagid => $flag]];
     $Info->update_current_info($updates);
@@ -74,7 +74,7 @@ if ($Qreq->resolveflag && $Qreq->post_ok() && user_pset_info()) {
     if (get($flags[$Qreq->flagid], "resolved")) {
         json_exit(["ok" => true]);
     }
-    $updates = ["flags" => [$Qreq->flagid => ["resolved" => [$Now, $Me->contactId]]]];
+    $updates = ["flags" => [$Qreq->flagid => ["resolved" => [Conf::$now, $Me->contactId]]]];
     $Info->update_current_info($updates);
     json_exit(["ok" => true]);
 }
@@ -180,7 +180,7 @@ if ($Runner->command && !$Pset->run_jailfiles) {
 // queue
 $Queue = $Rstate->make_queue();
 if ($Queue && !$Queue->runnable) {
-    json_exit(["onqueue" => true, "queueid" => $Queue->queueid, "nahead" => $Queue->nahead, "headage" => ($Queue->head_runat ? $Now - $Queue->head_runat : null)]);
+    json_exit(["onqueue" => true, "queueid" => $Queue->queueid, "nahead" => $Queue->nahead, "headage" => ($Queue->head_runat ? Conf::$now - $Queue->head_runat : null)]);
 }
 
 

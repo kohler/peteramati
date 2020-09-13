@@ -183,11 +183,10 @@ class API_GradeStatistics {
     }
 
     static function run(Contact $user, Qrequest $qreq, APIData $api) {
-        global $Now;
         $pset = $api->pset;
         $gsv = $pset->grade_statistics_visible;
         if (!$user->isPC
-            && !($gsv === true || (is_int($gsv) && $gsv <= $Now))) {
+            && !($gsv === true || (is_int($gsv) && $gsv <= Conf::$now))) {
             $info = PsetView::make($api->pset, $api->user, $user);
             if (!$info->user_can_view_grade_statistics())
                 return ["error" => "Grades are not visible now"];
@@ -198,7 +197,7 @@ class API_GradeStatistics {
         if ($gradets < @filemtime(__FILE__))
             $gradets = 0;
         if ($gradets
-            && $gradets >= $Now - 7200
+            && $gradets >= Conf::$now - 7200
             && isset($_SERVER["HTTP_IF_NONE_MATCH"])
             && $_SERVER["HTTP_IF_NONE_MATCH"] === "\"" . md5($pset->config_signature . "." . $gradets) . "\"") {
             header("HTTP/1.0 304 Not Modified");
@@ -209,9 +208,9 @@ class API_GradeStatistics {
         if (!$gradets
             || !($r = $pset->conf->gsetting_json("__gradestat$suffix"))) {
             $r = self::compute($pset, $user->isPC);
-            $gradets = $Now;
-            $pset->conf->save_setting("__gradets$suffix", $Now);
-            $pset->conf->save_gsetting("__gradestat$suffix", $Now, $r);
+            $gradets = Conf::$now;
+            $pset->conf->save_setting("__gradets$suffix", Conf::$now);
+            $pset->conf->save_gsetting("__gradestat$suffix", Conf::$now, $r);
         }
 
         $r->ok = true;

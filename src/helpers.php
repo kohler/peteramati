@@ -30,21 +30,20 @@ function &array_ensure(&$arr, $key, $val) {
 }
 
 function ago($t) {
-    global $Now;
-    if ($t + 60 >= $Now)
+    if ($t + 60 >= Conf::$now)
         return "less than a minute ago";
-    else if ($t + 7200 >= $Now)
-        return plural((int)(($Now - $t) / 60 + 0.5), "minute") . " ago";
-    else if ($t + 259200 >= $Now)
-        return plural((int)(($Now - $t) / 3600 + 0.5), "hour") . " ago";
+    else if ($t + 7200 >= Conf::$now)
+        return plural((int)((Conf::$now - $t) / 60 + 0.5), "minute") . " ago";
+    else if ($t + 259200 >= Conf::$now)
+        return plural((int)((Conf::$now - $t) / 3600 + 0.5), "hour") . " ago";
     else
-        return plural((int)(($Now - $t) / 86400 + 0.5), "day") . " ago";
+        return plural((int)((Conf::$now - $t) / 86400 + 0.5), "day") . " ago";
 }
 
 function parse_time($d, $reference = null) {
-    global $Now, $Opt;
+    global $Opt;
     if ($reference === null)
-        $reference = $Now;
+        $reference = Conf::$now;
     if (!isset($Opt["dateFormatTimezoneRemover"])
         && function_exists("timezone_abbreviations_list")) {
         $mytz = date_default_timezone_get();
@@ -89,14 +88,6 @@ function rcvtint(&$value, $default = -1) {
     return (isset($value) ? cvtint($value, $default) : $default);
 }
 
-if (!function_exists("json_encode") || !function_exists("json_decode"))
-    require_once("$ConfSitePATH/lib/json.php");
-
-if (!function_exists("json_last_error_msg")) {
-    function json_last_error_msg() {
-        return "unknown JSON error";
-    }
-}
 
 interface JsonUpdatable extends JsonSerializable {
     public function jsonIsReplacement();
@@ -410,7 +401,7 @@ function prefix_commajoin($what, $prefix, $joinword = "and") {
 function numrangejoin($range) {
     $a = [];
     $format = null;
-    $intval = $first = $last = 0;
+    $intval = $first = $last = $plen = 0;
     foreach ($range as $current) {
         if ($format !== null
             && sprintf($format, $intval + 1) === (string) $current) {
@@ -420,7 +411,7 @@ function numrangejoin($range) {
         } else {
             if ($format !== null && $first === $last) {
                 $a[] = $first;
-            } else if ($format !== null){
+            } else if ($format !== null) {
                 $a[] = $first . "–" . substr($last, $plen);
             }
             if ($current !== "" && ctype_digit($current)) {
@@ -512,124 +503,6 @@ function ini_get_bytes($varname, $value = null) {
     return (int) ceil(floatval($val) * (1 << (+strpos(".kmg", $last) * 10)));
 }
 
-function whyNotText($whyNot, $action) {
-    global $Conf;
-    if (!is_array($whyNot))
-        $whyNot = array($whyNot => 1);
-    $paperId = (isset($whyNot['paperId']) ? $whyNot['paperId'] : -1);
-    $reviewId = (isset($whyNot['reviewId']) ? $whyNot['reviewId'] : -1);
-    $thisPaper = ($paperId < 0 ? "this paper" : "paper #$paperId");
-    $text = '';
-    if (isset($whyNot['invalidId'])) {
-        $x = $whyNot['invalidId'] . "Id";
-        $xid = (isset($whyNot[$x]) ? " \"" . $whyNot[$x] . "\"" : "");
-        $text .= "Invalid " . $whyNot['invalidId'] . " number" . htmlspecialchars($xid) . ". ";
-    }
-    if (isset($whyNot['noPaper']))
-        $text .= "No such paper" . ($paperId < 0 ? "" : " #$paperId") . ". ";
-    if (isset($whyNot['noReview']))
-        $text .= "No such review" . ($reviewId < 0 ? "" : " #$reviewId") . ". ";
-    if (isset($whyNot['dbError']))
-        $text .= $whyNot['dbError'] . " ";
-    if (isset($whyNot['permission']))
-        $text .= "You don’t have permission to $action $thisPaper. ";
-    if (isset($whyNot['withdrawn']))
-        $text .= ucfirst($thisPaper) . " has been withdrawn. ";
-    if (isset($whyNot['notWithdrawn']))
-        $text .= ucfirst($thisPaper) . " has not been withdrawn. ";
-    if (isset($whyNot['notSubmitted']))
-        $text .= ucfirst($thisPaper) . " was never officially submitted. ";
-    if (isset($whyNot['notAccepted']))
-        $text .= ucfirst($thisPaper) . " was not accepted for publication. ";
-    if (isset($whyNot["decided"]))
-        $text .= "The review process for $thisPaper has completed. ";
-    if (isset($whyNot['updateSubmitted']))
-        $text .= ucfirst($thisPaper) . " has already been submitted and can no longer be updated. ";
-    if (isset($whyNot['notUploaded']))
-        $text .= ucfirst($thisPaper) . " can’t be submitted because you haven’t yet uploaded the paper itself. Upload the paper and try again. ";
-    if (isset($whyNot['reviewNotSubmitted']))
-        $text .= "This review is not yet ready for others to see. ";
-    if (isset($whyNot['reviewNotComplete']))
-        $text .= "Your own review for $thisPaper is not complete, so you can’t view other people’s reviews. ";
-    if (isset($whyNot['responseNotReady']))
-        $text .= "The authors&rsquo; response for $thisPaper is not yet ready for reviewers to view. ";
-    if (isset($whyNot['reviewsOutstanding']))
-        $text .= "You will get access to the reviews once you complete <a href=\"" . hoturl("search", "q=&amp;t=r") . "\">your assigned reviews for other papers</a>.  If you can’t complete your reviews, please let the conference organizers know via the “Refuse review” links. ";
-    if (isset($whyNot['reviewNotAssigned']))
-        $text .= "You are not assigned to review $thisPaper. ";
-    if (isset($whyNot['deadline'])) {
-        $dname = $whyNot['deadline'];
-        if ($dname[0] == "s")
-            $start = $Conf->setting("sub_open", -1);
-        else if ($dname[0] == "p" || $dname[0] == "e")
-            $start = $Conf->setting("rev_open", -1);
-        else
-            $start = 1;
-        $end = $Conf->setting($dname, -1);
-        $now = time();
-        if ($start <= 0)
-            $text .= "You can’t $action $thisPaper yet. ";
-        else if ($start > 0 && $now < $start)
-            $text .= "You can’t $action $thisPaper until " . $Conf->printableTime($start, "span") . ". ";
-        else if ($end > 0 && $now > $end) {
-            if ($dname == "sub_reg")
-                $text .= "The paper registration deadline has passed. ";
-            else if ($dname == "sub_update")
-                $text .= "The deadline to update papers has passed. ";
-            else if ($dname == "sub_sub")
-                $text .= "The paper submission deadline has passed. ";
-            else if ($dname == "extrev_hard")
-                $text .= "The external review deadline has passed. ";
-            else if ($dname == "pcrev_hard")
-                $text .= "The PC review deadline has passed. ";
-            else
-                $text .= "The deadline to $action $thisPaper has passed. ";
-            $text .= "It was " . $Conf->printableTime($end, "span") . ". ";
-        } else if ($dname == "au_seerev") {
-            if ($Conf->setting("au_seerev") == AU_SEEREV_YES)
-                $text .= "Authors who are also reviewers can’t see reviews for their papers while they still have <a href='" . hoturl("search", "t=rout&amp;q=") . "'>incomplete reviews</a> of their own. ";
-            else
-                $text .= "Authors can’t view paper reviews at the moment. ";
-        } else
-            $text .= "You can’t $action $thisPaper at the moment. ";
-        $text .= "(<a class='nw' href='" . hoturl("deadlines") . "'>View deadlines</a>) ";
-    }
-    if (isset($whyNot['override']) && $whyNot['override'])
-        $text .= "“Override deadlines” can override this restriction. ";
-    if (isset($whyNot['blindSubmission']))
-        $text .= "Submission to this conference is blind. ";
-    if (isset($whyNot['author']))
-        $text .= "You aren’t a contact for $thisPaper. ";
-    if (isset($whyNot['conflict']))
-        $text .= "You have a conflict with $thisPaper. ";
-    if (isset($whyNot['externalReviewer']))
-        $text .= "External reviewers may not view other reviews for the papers they review. ";
-    if (isset($whyNot['differentReviewer']))
-        $text .= "You didn’t write this review, so you can’t change it. ";
-    if (isset($whyNot['reviewToken']))
-        $text .= "If you know a valid review token, enter it above to edit that review. ";
-    // finish it off
-    if (isset($whyNot['chairMode']))
-        $text .= "(<a class='nw' href=\"" . $Conf->selfurl(null, ["forceShow" => 1]) . "\">" . ucfirst($action) . " the paper anyway</a>) ";
-    if (isset($whyNot['forceShow']))
-        $text .= "(<a class='nw' href=\"". $Conf->selfurl(null, ["forceShow" => 1]) . "\">Override conflict</a>) ";
-    if ($text && $action == "view")
-        $text .= "Enter a paper number above, or <a href='" . hoturl("search", "q=") . "'>list the papers you can view</a>. ";
-    return rtrim($text);
-}
-
-
-if (!function_exists("random_bytes")) {
-    function random_bytes($length) {
-        $x = @file_get_contents("/dev/urandom", false, null, 0, $length);
-        if (($x === false || $x === "")
-            && function_exists("openssl_random_pseudo_bytes")) {
-            $x = openssl_random_pseudo_bytes($length, $strong);
-            $x = $strong ? $x : false;
-        }
-        return $x === "" ? false : $x;
-    }
-}
 
 function hotcrp_random_password($length = 14) {
     $bytes = random_bytes($length + 10);

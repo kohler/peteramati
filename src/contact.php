@@ -366,7 +366,7 @@ class Contact {
 
     /** @return Contact */
     function activate($qreq, $signin = false) {
-        global $Now, $Qreq;
+        global $Qreq;
         $qreq = $qreq ? : $Qreq;
         $this->activated_ = true;
 
@@ -578,7 +578,6 @@ class Contact {
     }
 
     function save() {
-        global $Now;
         $this->trim();
         $inserting = !$this->contactId;
         $qf = $qv = array();
@@ -596,8 +595,8 @@ class Contact {
         $q = ($inserting ? "insert into" : "update")
             . " ContactInfo set " . join(", ", $qf);
         if ($inserting) {
-            $this->creationTime = $Now;
-            $q .= ", creationTime=$Now";
+            $this->creationTime = Conf::$now;
+            $q .= ", creationTime=" . Conf::$now;
         } else {
             $q .= " where contactId=" . $this->contactId;
         }
@@ -804,12 +803,11 @@ class Contact {
 
     /** @param int $psetid */
     function invalidate_grades($psetid) {
-        global $Now;
         $this->conf->qe("delete from Settings where name=? or name=?",
                         "__gradets.p$psetid", "__gradets.pp$psetid");
         $this->conf->qe("update ContactInfo set gradeUpdateTime=? where contactId=?",
-                        $Now, $this->contactId);
-        $this->gradeUpdateTime = $Now;
+                        Conf::$now, $this->contactId);
+        $this->gradeUpdateTime = Conf::$now;
         $this->_gcache = [];
     }
 
@@ -923,20 +921,19 @@ class Contact {
     }
 
     private function _create_password($cdbu, Contact_Update $cu) {
-        global $Now;
         if ($cdbu && ($cdbu = $cdbu->contactdb_user())
             && $cdbu->allow_contactdb_password()) {
             $cu->qv["password"] = $this->password = "";
             $cu->qv["passwordTime"] = $this->passwordTime = $cdbu->passwordTime;
         } else if (!$this->conf->external_login()) {
             $cu->qv["password"] = $this->password = self::random_password();
-            $cu->qv["passwordTime"] = $this->passwordTime = $Now;
+            $cu->qv["passwordTime"] = $this->passwordTime = Conf::$now;
         } else
             $cu->qv["password"] = $this->password = "";
     }
 
     static function create(Conf $conf, $reg, $send = false) {
-        global $Me, $Now;
+        global $Me;
         if (is_array($reg))
             $reg = (object) $reg;
         assert(is_string($reg->email));
@@ -1160,13 +1157,12 @@ class Contact {
     }
 
     function check_password($input) {
-        global $Now;
         assert(!$this->conf->external_login());
         if (($this->contactId && $this->disabled)
             || !self::valid_password($input))
             return false;
         // update passwordUseTime once a month
-        $update_use_time = $Now - 31 * 86400;
+        $update_use_time = Conf::$now - 31 * 86400;
 
         $cdbu = $this->contactdb_user();
         $cdbok = false;
@@ -1179,8 +1175,8 @@ class Contact {
                 $cdbu->password = $hash;
             }
             if ($cdbu->passwordUseTime <= $update_use_time) {
-                Dbl::ql(self::contactdb(), "update ContactInfo set passwordUseTime=? where contactDbId=?", $Now, $cdbu->contactDbId);
-                $cdbu->passwordUseTime = $Now;
+                Dbl::ql(self::contactdb(), "update ContactInfo set passwordUseTime=? where contactDbId=?", Conf::$now, $cdbu->contactDbId);
+                $cdbu->passwordUseTime = Conf::$now;
             }
         }
 
@@ -1193,8 +1189,8 @@ class Contact {
                 $this->password = $hash;
             }
             if ($this->passwordUseTime <= $update_use_time) {
-                $this->conf->ql("update ContactInfo set passwordUseTime=? where contactId=?", $Now, $this->contactId);
-                $this->passwordUseTime = $Now;
+                $this->conf->ql("update ContactInfo set passwordUseTime=? where contactId=?", Conf::$now, $this->contactId);
+                $this->passwordUseTime = Conf::$now;
             }
         }
 
@@ -1205,7 +1201,6 @@ class Contact {
     const CHANGE_PASSWORD_NO_CDB = 2;
 
     function change_password($old, $new, $flags) {
-        global $Now;
         assert(!$this->conf->external_login());
         if ($new === null)
             $new = self::random_password();
@@ -1223,7 +1218,7 @@ class Contact {
                 $hash = $this->hash_password($hash, true);
             $cdbu->password = $hash;
             if (!$old || $old !== $new)
-                $cdbu->passwordTime = $Now;
+                $cdbu->passwordTime = Conf::$now;
             Dbl::ql(self::contactdb(), "update ContactInfo set password=?, passwordTime=? where contactDbId=?", $cdbu->password, $cdbu->passwordTime, $cdbu->contactDbId);
             if ($this->contactId && $this->password) {
                 $this->password = "";
@@ -1238,7 +1233,7 @@ class Contact {
                 $hash = $this->hash_password($hash, false);
             $this->password = $hash;
             if (!$old || $old !== $new)
-                $this->passwordTime = $Now;
+                $this->passwordTime = Conf::$now;
             $this->conf->ql("update ContactInfo set password=?, passwordTime=? where contactId=?", $this->password, $this->passwordTime, $this->contactId);
         }
     }
@@ -1266,7 +1261,8 @@ class Contact {
 
         $mailer = new CS61Mailer($this, null, $rest);
         $prep = $mailer->make_preparation($template, $rest);
-        if ($prep->sendable || !$sensitive
+        if ($prep->sendable
+            || !$sensitive
             || $this->conf->opt("debugShowSensitiveEmail")) {
             Mailer::send_preparation($prep);
             return $template;
@@ -1278,24 +1274,22 @@ class Contact {
 
 
     function mark_login() {
-        global $Now;
         // at least one login every 90 days is marked as activity
-        if (!$this->activity_at || $this->activity_at <= $Now - 7776000
+        if (!$this->activity_at || $this->activity_at <= Conf::$now - 7776000
             || (($cdbu = $this->contactdb_user())
-                && (!$cdbu->activity_at || $cdbu->activity_at <= $Now - 7776000))) {
+                && (!$cdbu->activity_at || $cdbu->activity_at <= Conf::$now - 7776000))) {
             $this->mark_activity();
         }
     }
 
     function mark_activity() {
-        global $Now;
-        if (!$this->activity_at || $this->activity_at < $Now) {
-            $this->activity_at = $Now;
+        if (!$this->activity_at || $this->activity_at < Conf::$now) {
+            $this->activity_at = Conf::$now;
             if ($this->contactId && !$this->is_anonymous_user()) {
-                $this->conf->ql("update ContactInfo set lastLogin=$Now where contactId=$this->contactId");
+                $this->conf->ql("update ContactInfo set lastLogin=" . Conf::$now . " where contactId=$this->contactId");
             }
             if ($this->contactDbId) {
-                Dbl::ql(self::contactdb(), "update ContactInfo set activity_at=$Now where contactDbId=$this->contactDbId");
+                Dbl::ql(self::contactdb(), "update ContactInfo set activity_at=" . Conf::$now . " where contactDbId=$this->contactDbId");
             }
         }
     }
@@ -1333,8 +1327,10 @@ class Contact {
         }
     }
 
+    /** @param Pset $pset
+     * @param ?Contact $user
+     * @return bool */
     function can_set_repo($pset, $user = null) {
-        global $Now;
         if (is_string($pset) || is_int($pset)) {
             $pset = $this->conf->pset_by_id($pset);
         }
@@ -1342,12 +1338,9 @@ class Contact {
             return true;
         }
         $is_pc = $user && $user != $this && $this->isPC;
-        return $pset && $this->has_account_here()
-            && (!isset($pset->repo_edit_deadline)
-                || $pset->repo_edit_deadline === false
-                || (is_int($pset->repo_edit_deadline)
-                    && $pset->repo_edit_deadline >= $Now))
-            && (!$user || $user == $this || $is_pc)
+        return $pset
+            && $this->has_account_here()
+            && (!$user || $user === $this || $is_pc)
             && ($is_pc || !$pset->frozen || !$this->show_setting_on($pset->frozen, $pset));
     }
 
@@ -1374,60 +1367,6 @@ class Contact {
                 && $this->conf->qe("insert into ContactLink set cid=?, type=?, pset=?, link=?",
                                    $pc->contactId, LINK_BACKPARTNER, $pset, $this->contactId);
         }
-    }
-
-    static private function _file_glob_to_regex($x, $prefix) {
-        $x = str_replace(['\*', '\?', '\[', '\]', '\-', '_'],
-                         ['[^/]*', '[^/]', '[', ']', '-', '\_'],
-                         preg_quote($x));
-        if ($x === "") {
-            return "";
-        } else if (strpos($x, "/") === false) {
-            if ($prefix) {
-                return '|\A' . preg_quote($prefix) . '/' . $x;
-            } else {
-                return '|' . $x;
-            }
-        } else {
-            if ($prefix) {
-                return '|\A' . preg_quote($prefix) . '/' . $x . '\z';
-            } else {
-                return '|\A' . $x . '\z';
-            }
-        }
-    }
-
-    private static function file_ignore_regex(Pset $pset, Repository $repo) {
-        global $Conf, $Now;
-        if ($pset && $pset->file_ignore_regex) {
-            return $pset->file_ignore_regex;
-        }
-        $regex = '.*\.swp|.*~|#.*#|.*\.core|.*\.dSYM|.*\.o|core.*\z|.*\.backup|tags|tags\..*|typescript';
-        if ($pset && $Conf->setting("__gitignore_pset{$pset->id}_at", 0) < $Now - 900) {
-            $hrepo = $pset->handout_repo($repo);
-            $branch = $pset->handout_branch;
-            $result = "";
-            if ($pset->directory_slash !== "") {
-                $result .= $repo->gitrun("git show repo{$hrepo->repoid}/{$branch}:" . escapeshellarg($pset->directory_slash) . ".gitignore 2>/dev/null");
-            }
-            $result .= $repo->gitrun("git show repo{$hrepo->repoid}/{$branch}:.gitignore 2>/dev/null");
-            $Conf->save_setting("__gitignore_pset{$pset->id}_at", $Now);
-            $Conf->save_setting("gitignore_pset{$pset->id}", 1, $result);
-        }
-        if ($pset && ($result = $Conf->setting_data("gitignore_pset{$pset->id}"))) {
-            foreach (preg_split('/\s+/', $Conf->setting_data("gitignore_pset$pset->id")) as $x) {
-                $regex .= self::_file_glob_to_regex($x, $pset->directory_noslash);
-            }
-        }
-        if ($pset && ($xarr = $pset->ignore)) {
-            if (!is_array($xarr)) {
-                $xarr = preg_split('/\s+/', $xarr);
-            }
-            foreach ($xarr as $x) {
-                $regex .= self::_file_glob_to_regex($x, false);
-            }
-        }
-        return $regex;
     }
 
     function can_view_repo_contents(Repository $repo, $branch = null, $cached = false) {
@@ -1477,9 +1416,8 @@ class Contact {
     }
 
     private function show_setting_on($setting, Pset $pset) {
-        global $Now;
         return $setting === true
-            || (is_int($setting) && $setting >= $Now)
+            || (is_int($setting) && $setting >= Conf::$now)
             || ($setting === "grades" && $this->xxx_can_view_grades($pset));
     }
 

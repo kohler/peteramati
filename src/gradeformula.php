@@ -36,10 +36,10 @@ class GradeFormula implements JsonSerializable {
             }
         } else if (preg_match('/\A(\d+\.?\d*|\.\d+)(.*)\z/s', $t, $m)) {
             $t = $m[2];
-            $e = new GradeFormula("n", (float) $m[1]);
+            $e = new Number_GradeFormula((float) $m[1]);
         } else if (preg_match('/\A(?:pi|π|m_pi)\b(.*)\z/si', $t, $m)) {
             $t = $m[1];
-            $e = new GradeFormula("n", (float) M_PI);
+            $e = new Number_GradeFormula((float) M_PI);
         } else if (preg_match('/\A(log10|log|ln|lg|exp)\b(.*)\z/s', $t, $m)) {
             $t = $m[2];
             $e = self::parse($conf, $t, 12);
@@ -120,11 +120,6 @@ class GradeFormula implements JsonSerializable {
     }
 
     function evaluate(Contact $student) {
-        switch ($this->_op) {
-        case "n":
-            return $this->_a;
-        }
-
         $vs = [];
         foreach ($this->_a as $e) {
             $v = $e->evaluate($student);
@@ -161,19 +156,30 @@ class GradeFormula implements JsonSerializable {
     }
 
     function jsonSerialize() {
-        switch ($this->_op) {
-        case "n":
-            return $this->_a;
-        default:
-            $x = [$this->_op];
-            foreach ($this->_a as $a) {
-                $x[] = is_number($a) ? $a : $a->jsonSerialize();
-            }
-            return $x;
+        $x = [$this->_op];
+        foreach ($this->_a as $a) {
+            $x[] = is_number($a) ? $a : $a->jsonSerialize();
         }
+        return $x;
     }
 }
 
+
+class Number_GradeFormula extends GradeFormula {
+    /** @var float */
+    private $v;
+
+    function __construct($v)  {
+        parent::__construct("n", []);
+        $this->v = $v;
+    }
+    function evaluate(Contact $student) {
+        return $this->v;
+    }
+    function jsonSerialize() {
+        return $this->v;
+    }
+}
 
 class GradeEntry_GradeFormula extends GradeFormula {
     /** @var Pset */

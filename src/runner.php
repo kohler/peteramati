@@ -108,7 +108,6 @@ class RunnerState {
     }
 
     function job_status($checkt, $answer = null) {
-        global $Now;
         if (!$checkt) {
             return false;
         }
@@ -131,7 +130,7 @@ class RunnerState {
         } else if ($pid_data === "" || $pid_digit) {
             $answer->done = false;
             $answer->status = "working";
-            if ($Now - $checkt > 600) {
+            if (Conf::$now - $checkt > 600) {
                 $answer->status = "old";
             }
         } else {
@@ -220,12 +219,14 @@ class RunnerState {
     }
 
 
+    /** @param int|string $checkt
+     * @return bool */
     function set_checkt($checkt) {
         if (is_int($checkt) && $checkt > 0) {
             $this->checkt = $checkt;
         } else if (ctype_digit($checkt)) {
             $this->checkt = intval($checkt);
-        } else if (preg_match(',\.(\d+)\.log(?:\.lock|\.pid)?\z,', $checkt, $m)) {
+        } else if (preg_match('/\.(\d+)\.log(?:\.lock|\.pid)?\z/', (string) $checkt, $m)) {
             $this->checkt = intval($m[1]);
         } else {
             $this->checkt = null;
@@ -233,6 +234,8 @@ class RunnerState {
         return $this->checkt !== null;
     }
 
+    /** @param int|string $queueid
+     * @return bool */
     function set_queueid($queueid) {
         if (is_int($queueid) && $queueid > 0) {
             $this->queueid = $queueid;
@@ -425,10 +428,9 @@ class RunnerState {
     }
 
     private function remove_old_jails() {
-        global $Now;
         while (is_dir($this->jaildir)) {
-            $Now = time();
-            $newdir = $this->jaildir . "~." . gmstrftime("%Y%m%dT%H%M%S", $Now);
+            Conf::set_current_time(time());
+            $newdir = $this->jaildir . "~." . gmstrftime("%Y%m%dT%H%M%S", Conf::$now);
             if ($this->run_and_log("jail/pa-jail mv " . escapeshellarg($this->jaildir) . " " . escapeshellarg($newdir)))
                 throw new RunnerException("Can’t remove old jail");
 
@@ -438,7 +440,7 @@ class RunnerState {
     }
 
     private function checkout_code() {
-        global $ConfSitePATH, $Now;
+        global $ConfSitePATH;
 
         $checkoutdir = $clonedir = $this->jailhomedir . "/repo";
         if ($this->repo->truncated_psetdir($this->pset)
@@ -452,7 +454,7 @@ class RunnerState {
         $repodir = $ConfSitePATH . "/repo/repo" . $this->repo->cacheid;
 
         // need a branch to check out a specific commit
-        $branch = "jailcheckout_$Now";
+        $branch = "jailcheckout_" . Conf::$now;
         if ($this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch $branch " . $this->info->commit_hash()))
             throw new RunnerException("Can’t create branch for checkout");
 
@@ -512,12 +514,11 @@ class RunnerState {
 
 
     private function load_queue() {
-        global $Now;
         if ($this->queueid === null)
             return null;
         $result = $this->conf->qe("select q.*,
                 count(fq.queueid) nahead,
-                min(if(fq.runat>0,fq.runat,$Now)) as head_runat,
+                min(if(fq.runat>0,fq.runat," . Conf::$now . ")) as head_runat,
                 min(fq.nconcurrent) as ahead_nconcurrent
             from ExecutionQueue q
             left join ExecutionQueue fq on (fq.queueclass=q.queueclass and fq.queueid<q.queueid)
@@ -531,7 +532,6 @@ class RunnerState {
     }
 
     private function clean_queue($qconf) {
-        global $Now;
         assert($this->queueid !== null);
         $runtimeout = isset($qconf->runtimeout) ? $qconf->runtimeout : 300;
         $result = $this->conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $this->runner->queue, $this->queueid);
@@ -550,17 +550,17 @@ class RunnerState {
             if (($row->lockfile
                  && !file_exists($row->lockfile))
                 || ($row->runat <= 0
-                    && $row->updateat < $Now - 30)
+                    && $row->updateat < Conf::$now - 30)
                 || ($runtimeout
                     && $row->runat > 0
-                    && $row->runat < $Now - $runtimeout))
+                    && $row->runat < Conf::$now - $runtimeout))
                 $this->conf->qe("delete from ExecutionQueue where queueid=?", $row->queueid);
         }
         Dbl::free($result);
     }
 
     function make_queue() {
-        global $Now, $PsetInfo;
+        global $PsetInfo;
         if (!isset($this->runner->queue))
             return null;
 
@@ -570,13 +570,14 @@ class RunnerState {
                 && $this->runner->nconcurrent > 0)
                 $nconcurrent = $this->runner->nconcurrent;
             $this->conf->qe("insert into ExecutionQueue set queueclass=?, repoid=?, insertat=?, updateat=?, runat=0, status=0, nconcurrent=?, psetid=?, runnername=?, bhash=?",
-                  $this->runner->queue, $this->repoid,
-                  $Now, $Now, $nconcurrent,
-                  $this->pset->id, $this->runner->name,
-                  hex2bin($this->info->commit_hash()));
+                    $this->runner->queue, $this->repoid,
+                    Conf::$now, Conf::$now, $nconcurrent,
+                    $this->pset->id, $this->runner->name,
+                    hex2bin($this->info->commit_hash()));
             $this->queueid = $this->conf->dblink->insert_id;
         } else
-            $this->conf->qe("update ExecutionQueue set updateat=? where queueid=?", $Now, $this->queueid);
+            $this->conf->qe("update ExecutionQueue set updateat=? where queueid=?",
+                    Conf::$now, $this->queueid);
         $queue = $this->load_queue();
 
         $qconf = $PsetInfo->_queues->{$this->runner->queue} ?? null;
@@ -614,11 +615,12 @@ class RunnerState {
 
     function evaluate($answer) {
         global $ConfSitePATH;
-        if (isset($this->runner->require)
-            && $this->runner->require[0] === "/") {
-            require_once($this->runner->require);
-        } else if (isset($this->runner->require)) {
-            require_once($ConfSitePATH . "/" . $this->runner->require);
+        if (isset($this->runner->require)) {
+            if ($this->runner->require[0] === "/") {
+                require_once($this->runner->require);
+            } else {
+                require_once($ConfSitePATH . "/" . $this->runner->require);
+            }
         }
         $answer->result = call_user_func($this->runner->eval, $this->info);
     }

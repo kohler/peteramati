@@ -22,58 +22,17 @@ define("HASNOTES_ANY", 3);
 
 global $OK;
 $OK = 1;
-global $Now, $ConfSitePATH;
-$Now = time();
-$ConfSitePATH = null;
 
 
-// set $ConfSitePATH (path to conference site)
-function set_path_variables() {
-    global $ConfSitePATH;
-    if (!isset($ConfSitePATH)) {
-        $ConfSitePATH = substr(__FILE__, 0, strrpos(__FILE__, "/"));
-        while ($ConfSitePATH !== "" && !file_exists("$ConfSitePATH/src/init.php"))
-            $ConfSitePATH = substr($ConfSitePATH, 0, strrpos($ConfSitePATH, "/"));
-        if ($ConfSitePATH === "")
-            $ConfSitePATH = "/var/www/html";
-    }
-    require_once("$ConfSitePATH/lib/navigation.php");
-}
-set_path_variables();
-
-
-// Load code
-class SiteLoader {
-    static $map = [
-        "CapabilityManager" => "src/capability.php",
-        "CsvGenerator" => "lib/csv.php",
-        "CsvParser" => "lib/csv.php",
-        "GitHubResponse" => "src/github_repositorysite.php",
-        "LoginHelper" => "lib/login.php",
-        "MimeText" => "lib/mailer.php",
-        "Pset" => "src/psetconfig.php",
-        "RunnerState" => "src/runner.php",
-        "ZipDocument" => "lib/documenthelper.php"
-    ];
-}
-
-spl_autoload_register(function ($class_name) {
-    global $ConfSitePATH;
-    $f = null;
-    if (isset(SiteLoader::$map[$class_name]))
-        $f = SiteLoader::$map[$class_name];
-    if (!$f)
-        $f = strtolower($class_name) . ".php";
-    foreach (expand_includes($f, ["autoload" => true]) as $fx)
-        require_once($fx);
-});
-
-require_once("$ConfSitePATH/lib/base.php");
-require_once("$ConfSitePATH/lib/redirect.php");
-require_once("$ConfSitePATH/lib/dbl.php");
-require_once("$ConfSitePATH/src/helpers.php");
-require_once("$ConfSitePATH/src/conference.php");
-require_once("$ConfSitePATH/src/contact.php");
+require_once("siteloader.php");
+require_once(SiteLoader::find("lib/navigation.php"));
+require_once(SiteLoader::find("lib/base.php"));
+require_once(SiteLoader::find("lib/redirect.php"));
+require_once(SiteLoader::find("lib/dbl.php"));
+require_once(SiteLoader::find("src/helpers.php"));
+require_once(SiteLoader::find("src/conference.php"));
+require_once(SiteLoader::find("src/contact.php"));
+Conf::set_current_time(time());
 
 
 // Set locale to C (so that, e.g., strtolower() on UTF-8 data doesn't explode)
@@ -82,67 +41,14 @@ setlocale(LC_CTYPE, "C");
 
 
 // Set up conference options (also used in mailer.php)
-function expand_includes($files, $expansions = array()) {
-    global $Opt, $ConfSitePATH;
-    if (!is_array($files))
-        $files = array($files);
-    $confname = get($Opt, "confid") ? : get($Opt, "dbName");
-    $expansions["confid"] = $expansions["confname"] = $confname;
-    $expansions["siteclass"] = get($Opt, "siteclass");
-
-    if (isset($expansions["autoload"]) && strpos($files[0], "/") === false)
-        $includepath = [$ConfSitePATH . "/src/", $ConfSitePATH . "/lib/"];
-    else
-        $includepath = [$ConfSitePATH . "/"];
-    if (isset($Opt["includepath"]) && is_array($Opt["includepath"])) {
-        foreach ($Opt["includepath"] as $i)
-            if ($i)
-                $includepath[] = str_ends_with($i, "/") ? $i : $i . "/";
-    }
-
-    $results = array();
-    foreach ($files as $f) {
-        if (strpos((string) $f, '$') !== false) {
-            foreach ($expansions as $k => $v)
-                if ($v !== false && $v !== null)
-                    $f = preg_replace(',\$\{' . $k . '\}|\$' . $k . '\b,', $v, $f);
-                else if (preg_match(',\$\{' . $k . '\}|\$' . $k . '\b,', $f)) {
-                    $f = "";
-                    break;
-                }
-        }
-        if ((string) $f === "")
-            continue;
-        $matches = [];
-        $ignore_not_found = $globby = false;
-        if (str_starts_with($f, "?")) {
-            $ignore_not_found = true;
-            $f = substr($f, 1);
-        }
-        if (preg_match(',[\[\]\*\?\{\}],', $f))
-            $ignore_not_found = $globby = true;
-        foreach ($f[0] === "/" ? array("") : $includepath as $idir) {
-            $e = $idir . $f;
-            if ($globby)
-                $matches = glob($f, GLOB_BRACE);
-            else if (is_readable($e))
-                $matches = [$e];
-            if (!empty($matches))
-                break;
-        }
-        $results = array_merge($results, $matches);
-        if (empty($matches) && !$ignore_not_found)
-            $results[] = $f[0] === "/" ? $f : $includepath[0] . $f;
-    }
-    return $results;
-}
 
 function read_included_options(&$files) {
     global $Opt;
-    if (is_string($files))
+    if (is_string($files)) {
         $files = [$files];
+    }
     for ($i = 0; $i != count($files); ++$i) {
-        foreach (expand_includes($files[$i]) as $f)
+        foreach (SiteLoader::expand_includes($files[$i]) as $f)
             if (!@include $f)
                 $Opt["missing"][] = $f;
     }
@@ -153,24 +59,27 @@ function expand_json_includes_callback($includelist, $callback, $extra_arg = nul
     foreach (is_array($includelist) ? $includelist : [$includelist] as $k => $str) {
         $expandable = null;
         if (is_string($str)) {
-            if (str_starts_with($str, "@"))
+            if (str_starts_with($str, "@")) {
                 $expandable = substr($str, 1);
-            else if (!preg_match('/\A[\s\[\{]/', $str))
+            } else if (!preg_match('/\A[\s\[\{]/', $str)) {
                 $expandable = $str;
+            }
         }
         if ($expandable) {
-            foreach (expand_includes($expandable) as $f)
+            foreach (SiteLoader::expand_includes($expandable) as $f) {
                 if (($x = file_get_contents($f)))
                     $includes[] = [$x, $f];
-        } else
+            }
+        } else {
             $includes[] = [$str, "entry $k"];
+        }
     }
     foreach ($includes as $xentry) {
         list($entry, $landmark) = $xentry;
         if (is_string($entry)) {
-            if (($x = json_decode($entry)) !== false)
+            if (($x = json_decode($entry)) !== false) {
                 $entry = $x;
-            else {
+            } else {
                 if (json_last_error()) {
                     Json::decode($entry);
                     error_log("$landmark: Invalid JSON. " . Json::last_error_msg());
@@ -178,8 +87,12 @@ function expand_json_includes_callback($includelist, $callback, $extra_arg = nul
                 continue;
             }
         }
-        if (is_object($entry) && !$no_validate
-            && !isset($entry->id) && !isset($entry->factory) && !isset($entry->factory_class) && !isset($entry->callback)) {
+        if (is_object($entry)
+            && !$no_validate
+            && !isset($entry->id)
+            && !isset($entry->factory)
+            && !isset($entry->factory_class)
+            && !isset($entry->callback)) {
             $entry = get_object_vars($entry);
         }
         foreach (is_array($entry) ? $entry : [$entry] as $obj) {
@@ -229,7 +142,7 @@ if (get($Opt, "memoryLimit")) {
 // Create the conference
 global $Conf;
 if (!$Conf) {
-    $Conf = Conf::$g = new Conf($Opt, true);
+    $Conf = Conf::$main = new Conf($Opt, true);
 }
 if (!$Conf->dblink) {
     Multiconference::fail_bad_database();
@@ -240,7 +153,7 @@ if (!$Conf->dblink) {
 function psets_json_data($exclude_overrides, &$mtime) {
     global $Conf;
     $datamap = array();
-    $fnames = expand_includes($Conf->opt("psetsConfig"),
+    $fnames = SiteLoader::expand_includes($Conf->opt("psetsConfig"),
                               ["CONFID" => $Conf->opt("confid") ? : $Conf->dbname,
                                "HOSTTYPE" => $Conf->opt("hostType", "")]);
     foreach ($fnames as $fname) {

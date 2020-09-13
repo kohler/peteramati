@@ -18,8 +18,8 @@ $Profile = $Me && $Me->privChair && $Qreq->profile;
 // signin links
 // auto-signin when email & password set
 if (isset($_REQUEST["email"]) && isset($_REQUEST["password"])) {
-    $_REQUEST["action"] = defval($_REQUEST, "action", "login");
-    $_REQUEST["signin"] = defval($_REQUEST, "signin", "go");
+    $_REQUEST["action"] = $_REQUEST["action"] ?? "login";
+    $_REQUEST["signin"] = $_REQUEST["signin"] ?? "go";
 }
 // CSRF protection: ignore unvalidated signin/signout for known users
 if (!$Me->is_empty() && !$Qreq->post_ok()) {
@@ -85,7 +85,7 @@ if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
     && $User->is_student()
     && $Qreq->post_ok()) {
     $Conf->qe("update ContactInfo set dropped=? where contactId=?",
-              isset($Qreq->set_drop) ? $Now : 0, $User->contactId);
+              isset($Qreq->set_drop) ? Conf::$now : 0, $User->contactId);
     $Conf->qe("delete from Settings where name like '__gradets.%'");
     redirectSelf();
 }
@@ -660,14 +660,14 @@ function psets_json_diff_from($original, $update) {
 }
 
 function save_config_overrides($psetkey, $overrides, $json = null) {
-    global $Conf, $Now, $Qreq;
+    global $Conf, $Qreq;
 
     $dbjson = $Conf->setting_json("psets_override") ? : (object) array();
     $all_overrides = (object) array();
     $all_overrides->$psetkey = $overrides;
     object_replace_recursive($dbjson, $all_overrides);
     $dbjson = psets_json_diff_from($json ? : load_psets_json(true), $dbjson);
-    $Conf->save_setting("psets_override", $Now, $dbjson);
+    $Conf->save_setting("psets_override", Conf::$now, $dbjson);
 
     unset($_GET["pset"], $_REQUEST["pset"], $Qreq->pset);
     redirectSelf(array("anchor" => $psetkey));
@@ -1059,7 +1059,7 @@ if (!$Me->is_empty() && $User->is_student()) {
 }
 
 function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
-    global $Conf, $Me, $Now, $Profile;
+    global $Conf, $Me, $Profile;
     $j = $s ? StudentSet::json_basics($s, $anonymous) : [];
     if (($gcid = get($row->notes, "gradercid"))) {
         $j["gradercid"] = $gcid;
@@ -1103,7 +1103,7 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
 }
 
 function show_regrades($result, $all) {
-    global $Conf, $Me, $Qreq, $Now;
+    global $Conf, $Me, $Qreq;
 
     // 1. load commit notes
     $flagrows = $uids = $psets = [];
@@ -1228,7 +1228,7 @@ function show_regrades($result, $all) {
 function show_pset_actions($pset) {
     global $Conf;
 
-    echo Ht::form_div(hoturl_post("index", array("pset" => $pset->urlkey, "reconfig" => 1)), ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
+    echo Ht::form(hoturl_post("index", array("pset" => $pset->urlkey, "reconfig" => 1)), ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
     $options = array("disabled" => "Disabled",
                      "invisible" => "Hidden",
                      "visible" => "Visible without grades",
@@ -1259,7 +1259,7 @@ function show_pset_actions($pset) {
         echo Ht::button("Grade report", ["onclick" => "window.location=\"" . hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]) . "\""]);
     }
 
-    echo "</div></form>";
+    echo "</form>";
     echo Ht::unstash_script("$('.need-pa-pset-actions').each(pa_pset_actions)");
 }
 
@@ -1358,7 +1358,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
 }
 
 function show_pset_table($sset) {
-    global $Now, $Profile, $Qreq;
+    global $Profile, $Qreq;
 
     $pset = $sset->pset;
     echo '<div id="', $pset->urlkey, '">';

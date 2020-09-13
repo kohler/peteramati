@@ -145,6 +145,7 @@ class PsetView {
         return $this->hash;
     }
 
+    /** @param false|string $reqhash */
     function force_set_hash($reqhash) {
         assert($reqhash === false || strlen($reqhash) === 40);
         if ($this->hash !== $reqhash) {
@@ -157,6 +158,7 @@ class PsetView {
         $this->force_set_hash($commit->hash);
     }
 
+    /** @return bool */
     function has_commit_set() {
         return $this->hash !== null;
     }
@@ -179,10 +181,11 @@ class PsetView {
         if ($this->hash) {
             return $this->connected_commit($this->hash);
         } else {
-            return false;
+            return null;
         }
     }
 
+    /** @return bool */
     function can_have_grades() {
         return $this->pset->gitless_grades || $this->commit();
     }
@@ -584,7 +587,6 @@ class PsetView {
     }
 
     function update_placeholder_repo_grade() {
-        global $Now;
         assert(!$this->pset->gitless_grades
                && (!$this->repo_grade || $this->repo_grade->gradebhash === null));
         $c = $this->latest_commit();
@@ -593,7 +595,7 @@ class PsetView {
             || $this->_repo_grade_placeholder_bhash !== $h) {
             $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, placeholder=1, placeholder_at=? on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
                     $this->repo->repoid, $this->branchid, $this->pset->id,
-                    $c ? hex2bin($c->hash) : null, $Now);
+                    $c ? hex2bin($c->hash) : null, Conf::$now);
             $this->clear_grade();
             $this->ensure_grade();
         }
@@ -659,11 +661,10 @@ class PsetView {
     }
 
     function user_can_view_grade_statistics() {
-        global $Now;
         // also see API_GradeStatistics
         $gsv = $this->pset->grade_statistics_visible;
         return $gsv === true
-            || (is_int($gsv) && $gsv <= $Now)
+            || (is_int($gsv) && $gsv <= Conf::$now)
             || ($gsv !== false && $this->user_can_view_grades());
     }
 
@@ -1267,6 +1268,9 @@ class PsetView {
         return new LineNotesOrder(null, $this->can_view_grades(), $this->pc_view);
     }
 
+    /** @param ?CommitRecord $commita
+     * @param ?CommitRecord $commitb
+     * @return array<string,DiffInfo> */
     function diff($commita, $commitb, LineNotesOrder $lnorder = null, $args = []) {
         if (!$this->added_diffinfo) {
             if (($rs = $this->commit_info("runsettings"))
@@ -1325,7 +1329,7 @@ class PsetView {
                         && (!$onlyfiles || get($onlyfiles, $fn))) {
                         $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
                         foreach ($lnorder->file($fn) as $note) {
-                            $diffi->add("Z", "", (int) substr($note->lineid, 1), "");
+                            $diffi->add("Z", null, (int) substr($note->lineid, 1), "");
                         }
                         uasort($diff, "DiffInfo::compare");
                     }
@@ -1348,19 +1352,20 @@ class PsetView {
         return htmlspecialchars($t);
     }
 
+    /** @param string $file */
     function echo_file_diff($file, DiffInfo $dinfo, LineNotesOrder $lnorder, $args) {
         if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
             || ($dinfo->is_empty() && $dinfo->loaded)) {
             return;
         }
 
-        $this->_diff_tabwidth = get($args, "tabwidth", $this->tabwidth());
+        $this->_diff_tabwidth = $args["tabwidth"] ?? $this->tabwidth();
         $this->_diff_lnorder = $lnorder;
-        $open = !!get($args, "open");
-        $only_content = get($args, "only_content");
-        $no_heading = get($args, "no_heading") || $only_content;
-        $id_by_user = !!get($args, "id_by_user");
-        $no_grades = get($args, "only_diff") || $only_content;
+        $open = !!($args["open"] ?? false);
+        $only_content = !!($args["only_content"] ?? false);
+        $no_heading = ($args["no_heading"] ?? false) || $only_content;
+        $id_by_user = !!($args["id_by_user"] ?? false);
+        $no_grades = ($args["only_diff"] ?? false) || $only_content;
 
         $fileid = html_id_encode($file);
         if ($id_by_user) {
@@ -1488,6 +1493,8 @@ class PsetView {
         }
     }
 
+    /** @param array{string,?int,?int,string,?int} $l
+    * @param array<string,LineNote> $linenotes */
     private function echo_line_diff($l, $linenotes, $lineanno, $curanno) {
         if ($l[0] === "@") {
             $cx = strlen($l[3]) > 76 ? substr($l[3], 0, 76) . "..." : $l[3];
@@ -1623,7 +1630,7 @@ class PsetView {
             $pcmembers = $this->conf->pc_members_and_admins();
             $autext = [];
             foreach ($note->users as $au) {
-                if (($p = get($pcmembers, $au))) {
+                if (($p = $pcmembers[$au] ?? null)) {
                     if ($p->nicknameAmbiguous)
                         $autext[] = Text::name_html($p);
                     else

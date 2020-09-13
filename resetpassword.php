@@ -50,7 +50,7 @@ if (isset($_POST["go"]) && check_post()) {
         $log_acct->log_activity("Password reset via " . substr($resetcap, 0, 8) . "...");
         $Conf->confirmMsg("Your password has been changed. You may now sign in to the conference site.");
         $capmgr->delete($capdata);
-        $Conf->save_session("password_reset", (object) array("time" => $Now, "email" => $Acct->email, "password" => $_POST["password"]));
+        $Conf->save_session("password_reset", (object) array("time" => Conf::$now, "email" => $Acct->email, "password" => $_POST["password"]));
         go(hoturl("index"));
     }
     $password_class = " error";

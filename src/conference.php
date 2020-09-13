@@ -4,21 +4,24 @@
 // See LICENSE for open-source distribution terms
 
 class APIData {
+    /** @var Conf */
     public $conf;
+    /** @var Contact */
     public $user;
+    /** @var ?Pset */
     public $pset;
+    /** @var ?Repository*/
     public $repo;
     public $branch;
     public $hash;
     public $commit;
     public $at;
     function __construct(Contact $user, Pset $pset = null, Repository $repo = null) {
-        global $Now;
         $this->conf = $user->conf;
         $this->user = $user;
         $this->pset = $pset;
         $this->repo = $repo;
-        $this->at = $Now;
+        $this->at = Conf::$now;
     }
     function prepare_grading_commit($info) {
         if (!$this->pset->gitless_grades) {
@@ -97,7 +100,10 @@ class Conf {
     const USERNAME_USERNAME = 16;
     private $_username_classes = 0;
 
-    static public $g = null;
+    /** @var Conf */
+    static public $main;
+    /** @var int */
+    static public $now;
 
     static public $hoturl_defaults = null;
 
@@ -123,14 +129,23 @@ class Conf {
         }
     }
 
+    /** @param int $t */
+    static function set_current_time($t) {
+        global $Now;
+        $Now = Conf::$now = $t;
+    }
+
+    /** @param int $advance_past */
+    static function advance_current_time($advance_past) {
+        self::set_current_time(max(Conf::$now, $advance_past + 1));
+    }
+
 
     //
     // Initialization functions
     //
 
     function load_settings() {
-        global $Now;
-
         // load settings from database
         $this->settings = [];
         $this->settingTexts = [];
@@ -197,12 +212,12 @@ class Conf {
             $this->opt["disableCapabilities"] = true;
 
         // GC old capabilities
-        if (defval($this->settings, "__capability_gc", 0) < $Now - 86400) {
+        if (($this->settings["__capability_gc"] ?? 0) < Conf::$now - 86400) {
             foreach (array($this->dblink, Contact::contactdb()) as $db)
                 if ($db)
-                    Dbl::ql($db, "delete from Capability where timeExpires>0 and timeExpires<$Now");
-            $this->q_raw("insert into Settings (name, value) values ('__capability_gc', $Now) on duplicate key update value=values(value)");
-            $this->settings["__capability_gc"] = $Now;
+                    Dbl::ql($db, "delete from Capability where timeExpires>0 and timeExpires<" . Conf::$now);
+            $this->q_raw("insert into Settings (name, value) values ('__capability_gc', " . Conf::$now . ") on duplicate key update value=values(value)");
+            $this->settings["__capability_gc"] = Conf::$now;
         }
 
         $this->crosscheck_settings();
@@ -947,9 +962,8 @@ class Conf {
         return $d;
     }
     function parse_time($d, $reference = null) {
-        global $Now;
         if ($reference === null)
-            $reference = $Now;
+            $reference = Conf::$now;
         if (!isset($this->opt["dateFormatTimezoneRemover"])
             && function_exists("timezone_abbreviations_list")) {
             $mytz = date_default_timezone_get();
@@ -1014,7 +1028,7 @@ class Conf {
     }
 
     function printableTimeSetting($what, $useradjust = false, $preadjust = null) {
-        return $this->printableTime(defval($this->settings, $what, 0), $useradjust, $preadjust);
+        return $this->printableTime($this->settings[$what] ?? 0, $useradjust, $preadjust);
     }
     function printableDeadlineSetting($what, $useradjust = false, $preadjust = null) {
         if (!isset($this->settings[$what]) || $this->settings[$what] <= 0)
@@ -1024,29 +1038,26 @@ class Conf {
     }
 
     function settingsAfter($name) {
-        global $Now;
         $t = $this->settings[$name] ?? null;
-        return $t !== null && $t > 0 && $t <= $Now;
+        return $t !== null && $t > 0 && $t <= Conf::$now;
     }
     function deadlinesAfter($name, $grace = null) {
-        global $Now;
         $t = $this->settings[$name] ?? null;
-        if ($t !== null && $t > 0 && $grace && ($g = get($this->settings, $grace))) {
+        if ($t !== null && $t > 0 && $grace && ($g = $this->settings[$grace] ?? null)) {
             $t += $g;
         }
-        return $t !== null && $t > 0 && $t <= $Now;
+        return $t !== null && $t > 0 && $t <= Conf::$now;
     }
     function deadlinesBetween($name1, $name2, $grace = null) {
-        global $Now;
         $t = $this->settings[$name1] ?? null;
-        if (($t === null || $t <= 0 || $t > $Now) && $name1) {
+        if (($t === null || $t <= 0 || $t > Conf::$now) && $name1) {
             return false;
         }
         $t = $this->settings[$name2] ?? null;
         if ($t !== null && $t > 0 && $grace && ($g = $this->settings[$grace] ?? null)) {
             $t += $g;
         }
-        return $t === null || $t <= 0 || $t >= $Now;
+        return $t === null || $t <= 0 || $t >= Conf::$now;
     }
 
     function repository_site_classes() {
@@ -1085,7 +1096,7 @@ class Conf {
             ensure_session();
             $_SESSION[$this->dsn]["msgs"][] = [$text, $type];
         } else if ($type[0] == "x") {
-            echo Ht::xmsg($text, $type);
+            echo Ht::msg($text, $type);
         } else {
             echo "<div class=\"$type\">$text</div>";
         }
@@ -1096,7 +1107,7 @@ class Conf {
     }
 
     static public function msg_info($text, $minimal = false) {
-        self::$g->msg($text, $minimal ? "xinfo" : "info");
+        self::$main->msg($text, $minimal ? "xinfo" : "info");
     }
 
     function warnMsg($text, $minimal = false) {
@@ -1104,7 +1115,7 @@ class Conf {
     }
 
     static public function msg_warning($text, $minimal = false) {
-        self::$g->msg($text, $minimal ? "xwarning" : "warning");
+        self::$main->msg($text, $minimal ? "xwarning" : "warning");
     }
 
     function confirmMsg($text, $minimal = false) {
@@ -1112,7 +1123,7 @@ class Conf {
     }
 
     static public function msg_confirm($text, $minimal = false) {
-        self::$g->msg($text, $minimal ? "xconfirm" : "confirm");
+        self::$main->msg($text, $minimal ? "xconfirm" : "confirm");
     }
 
     /** @return false */
@@ -1123,14 +1134,14 @@ class Conf {
 
     /** @return false */
     static public function msg_error($text, $minimal = false) {
-        self::$g->msg($text, $minimal ? "xmerror" : "merror");
+        self::$main->msg($text, $minimal ? "xmerror" : "merror");
         return false;
     }
 
     static public function msg_debugt($text) {
         if (is_object($text) || is_array($text) || $text === null || $text === false || $text === true)
             $text = json_encode_browser($text);
-        self::$g->msg(Ht::pre_text_wrap($text), "merror");
+        self::$main->msg(Ht::pre_text_wrap($text), "merror");
         return false;
     }
 
@@ -1256,7 +1267,7 @@ class Conf {
                 $t = substr($t, $lexpect);
             }
         }
-        if (($flags & self::HOTURL_ABSOLUTE) || $this !== Conf::$g)
+        if (($flags & self::HOTURL_ABSOLUTE) || $this !== Conf::$main)
             return $this->opt("paperSite") . "/" . $t;
         else {
             $siteurl = $nav->site_path_relative;
@@ -1315,7 +1326,6 @@ class Conf {
 
 
     function encoded_session_list() {
-        global $Now;
         if ($this->_session_list === false) {
             $this->_session_list = null;
 
@@ -1331,10 +1341,10 @@ class Conf {
             $found_text = null;
             if ($found) {
                 $found_text = $_COOKIE[$found];
-                setcookie($found, "", $Now - 86400, Navigation::site_path());
+                setcookie($found, "", Conf::$now - 86400, Navigation::site_path());
                 for ($i = 1; isset($_COOKIE["{$found}_{$i}"]); ++$i) {
                     $found_text .= $_COOKIE["{$found}_{$i}"];
-                    setcookie("{$found}_{$i}", "", $Now - 86400, Navigation::site_path());
+                    setcookie("{$found}_{$i}", "", Conf::$now - 86400, Navigation::site_path());
                 }
             }
 
@@ -1412,7 +1422,7 @@ class Conf {
     }
 
     private function header_head($title, $id, $options) {
-        global $Me, $ConfSitePATH, $Now;
+        global $Me, $ConfSitePATH;
         echo "<!DOCTYPE html>
 <html lang=\"en\">
 <head>
@@ -1463,7 +1473,7 @@ class Conf {
         echo "</head>\n<body", ($id ? " id=\"$id\"" : "");
         if (isset($options["body_class"]))
             echo ' class="', $options["body_class"], '"';
-        echo " onload=\"hotcrp_load()\" data-now=\"$Now\">\n";
+        echo " onload=\"hotcrp_load()\" data-now=\"", Conf::$now, "\">\n";
 
         // jQuery
         $stash = Ht::unstash();
@@ -1523,13 +1533,13 @@ class Conf {
         $this->encoded_session_list(); // clear cookie if set
 
         // initial load (JS's timezone offsets are negative of PHP's)
-        Ht::stash_script("hotcrp_load.time(" . (-date("Z", $Now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
+        Ht::stash_script("hotcrp_load.time(" . (-date("Z", Conf::$now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
 
         echo $stash, Ht::unstash();
     }
 
     function header($title, $id = "", $options = []) {
-        global $ConfSitePATH, $Me, $Now;
+        global $ConfSitePATH, $Me;
         if ($this->headerPrinted)
             return;
 
@@ -1674,7 +1684,7 @@ class Conf {
                     && !isset($values["error"]))
                     $values["error"] = $msg[1];
                 if ($div)
-                    $t .= Ht::xmsg($msg[0], $msg[1]);
+                    $t .= Ht::msg($msg[0], $msg[1]);
                 else
                     $t .= "<span class=\"$msg[0]\">$msg[1]</span>";
             }
@@ -1870,7 +1880,7 @@ class Conf {
 
 
     function handout_repo(Pset $pset, Repository $inrepo = null) {
-        global $Now, $ConfSitePATH;
+        global $ConfSitePATH;
         $url = $pset->handout_repo_url;
         if (!$url)
             return null;
@@ -1892,9 +1902,9 @@ class Conf {
             if (!($hme = $hset->$hrepoid ?? null)) {
                 $save = $hme = $hset->$hrepoid = (object) array();
             }
-            if ((int) ($hme->$cacheid ?? 0) + 300 < $Now
+            if ((int) ($hme->$cacheid ?? 0) + 300 < Conf::$now
                 && !$this->opt("disableRemote")) {
-                $save = $hme->$cacheid = $Now;
+                $save = $hme->$cacheid = Conf::$now;
                 $hrepo->reposite->gitfetch($hrepo->repoid, $cacheid, false);
             }
             if ($save) {
@@ -1905,7 +1915,6 @@ class Conf {
     }
 
     private function populate_handout_commits(Pset $pset) {
-        global $Now;
         if (!($hrepo = $this->handout_repo($pset))) {
             $this->_handout_commits[$pset->id] = [];
             return;
@@ -1917,10 +1926,10 @@ class Conf {
             $hset = (object) [];
         }
         if (($hset->snaphash ?? null) !== $hrepo->snaphash
-            || (int) ($hset->snaphash_at ?? 0) + 300 < $Now
+            || (int) ($hset->snaphash_at ?? 0) + 300 < Conf::$now
             || !($hset->commits ?? null)) {
             $hset->snaphash = $hrepo->snaphash;
-            $hset->snaphash_at = $Now;
+            $hset->snaphash_at = Conf::$now;
             $hset->commits = [];
             foreach ($hrepo->commits($pset, $pset->handout_branch) as $c) {
                 $hset->commits[] = [$c->hash, $c->commitat, $c->subject];
@@ -1962,7 +1971,6 @@ class Conf {
 
     /** @return ?array<string,CommitRecord> */
     function handout_commits_from(Pset $pset, $hash) {
-        global $Now;
         if (!array_key_exists($pset->id, $this->_handout_commits)) {
             $this->populate_handout_commits($pset);
         }

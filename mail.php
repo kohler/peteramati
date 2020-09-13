@@ -446,7 +446,7 @@ else
 if (isset($Qreq->replyto) && $Me->privChair)
     $Qreq->replyto = simplify_whitespace($Qreq->replyto);
 else
-    $Qreq->replyto = defval($Opt, "emailReplyTo", "");
+    $Qreq->replyto = $Opt["emailReplyTo"] ?? "";
 
 
 // Check or send
@@ -487,8 +487,9 @@ echo Ht::form_div(hoturl_post("mail", "check=1")),
 $tmpl = array();
 foreach ($mailTemplates as $k => $v) {
     if (isset($v["mailtool_name"])
-        && ($Me->privChair || defval($v, "mailtool_pc")))
-        $tmpl[$k] = defval($v, "mailtool_priority", 100);
+        && ($Me->privChair || ($v["mailtool_pc"] ?? false))) {
+        $tmpl[$k] = $v["mailtool_priority"] ?? 100;
+    }
 }
 asort($tmpl);
 foreach ($tmpl as $k => &$v) {

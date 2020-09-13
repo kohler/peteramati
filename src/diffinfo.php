@@ -71,6 +71,10 @@ class DiffInfo implements Iterator {
         $this->_hasha_hrepo = $hasha_hrepo;
     }
 
+    /** @param string $ch
+     * @param ?int $linea
+     * @param ?int $lineb
+     * @param string $text */
     function add($ch, $linea, $lineb, $text) {
         if ($this->truncated) {
             /* do nothing */
@@ -137,6 +141,7 @@ class DiffInfo implements Iterator {
         return $this->_hasha_hrepo;
     }
 
+    /** @return int */
     function max_lineno() {
         $l = $this->_diffsz;
         $max = 0;
@@ -155,14 +160,19 @@ class DiffInfo implements Iterator {
         return $max;
     }
 
+    /** @param int $i
+     * @return ?array{string,?int,?int,string} */
     function entry($i) {
         if ($i >= 0 && $i < ($this->_diffsz >> 2)) {
             return array_slice($this->_diff, $i << 2, 4);
         } else {
-            return false;
+            return null;
         }
     }
 
+    /** @param int $off
+     * @param int $line
+     * @return int */
     private function line_lower_bound($off, $line) {
         $l = 0;
         $r = $this->_diffsz;
@@ -181,11 +191,15 @@ class DiffInfo implements Iterator {
         return $l;
     }
 
+    /** @param int $linea
+     * @return bool */
     function contains_linea($linea) {
         $l = $this->line_lower_bound(1, $linea);
         return $l < $this->_diffsz && $this->_diff[$l] !== "@";
     }
 
+    /** @param string $lineid
+     * @return bool */
     function contains_lineid($lineid) {
         assert($lineid[0] === "a" || $lineid[0] === "b");
         $l = $this->line_lower_bound($lineid[0] === "a" ? 1 : 2, (int) substr($lineid, 1));
@@ -211,14 +225,24 @@ class DiffInfo implements Iterator {
         }
     }
 
+    /** @param int $linea_lx
+     * @param int $linea_rx
+     * @return bool */
     function expand_linea($linea_lx, $linea_rx) {
         return $this->expand_line(1, $linea_lx, $linea_rx);
     }
 
+    /** @param int $lineb_lx
+     * @param int $lineb_rx
+     * @return bool */
     function expand_lineb($lineb_lx, $lineb_rx) {
         return $this->expand_line(2, $lineb_lx, $lineb_rx);
     }
 
+    /** @param 'a'|'b'|1|2 $off
+     * @param int $line_lx
+     * @param int $line_rx
+     * @return bool */
     function expand_line($off, $line_lx, $line_rx) {
         if ($off === "a" || $off === "b") {
             $off = ($off === "a" ? 1 : 2);
@@ -318,6 +342,9 @@ class DiffInfo implements Iterator {
         return true;
     }
 
+    /** @param int $linea_lx
+     * @param int $linea_rx
+     * @return DiffInfo */
     function restrict_linea($linea_lx, $linea_rx) {
         $l = $this->line_lower_bound(1, $linea_lx);
         $r = $this->line_lower_bound(1, $linea_rx);
@@ -352,6 +379,9 @@ class DiffInfo implements Iterator {
     }
 
 
+    /** @param DiffInfo $a
+     * @param DiffInfo $b
+     * @return int */
     static function compare($a, $b) {
         if ($a->position != $b->position) {
             return $a->position < $b->position ? -1 : 1;
@@ -361,6 +391,7 @@ class DiffInfo implements Iterator {
     }
 
 
+    /** @return array{string,?int,?int,string,?int} */
     function current() {
         $x = array_slice($this->_diff, $this->_itpos, 4);
         if ($this->_dflags !== null && isset($this->_dflags[$this->_itpos])) {
@@ -368,6 +399,7 @@ class DiffInfo implements Iterator {
         }
         return $x;
     }
+    /** @return int */
     function key() {
         return $this->_itpos >> 2;
     }
@@ -377,6 +409,7 @@ class DiffInfo implements Iterator {
     function rewind() {
         $this->_itpos = 0;
     }
+    /** @return bool */
     function valid() {
         return $this->_itpos < $this->_diffsz;
     }

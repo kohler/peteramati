@@ -38,7 +38,7 @@ if (@$_POST["update"] && check_post()) {
         $roles |= Contact::ROLE_ADMIN;
     $ck[] = "roles=$roles";
 
-    Dbl::qe_apply("update ContactInfo set " . join($ck, ",") . " where contactId=" . $User->contactId, $cv);
+    Dbl::qe_apply("update ContactInfo set " . join(",", $ck) . " where contactId=" . $User->contactId, $cv);
 
     redirectSelf();
 }
@@ -71,7 +71,7 @@ echo '<hr>';
 echo '<table class="pltable" style="margin-top:1em"><tbody class="pltable pltable_alternate">';
 
 echo '<tr><td class="pl pls">Roles</td><td class="pl">';
-echo Ht::radio("pctype", "chair", $User->roles & Contact::ROLE_CHAIR),
+echo Ht::radio("pctype", "chair", !!($User->roles & Contact::ROLE_CHAIR)),
     "&nbsp;", Ht::label("Course instructor"), "<br>";
 echo Ht::radio("pctype", "pc", ($User->roles & Contact::ROLE_PC) && !($User->roles & Contact::ROLE_CHAIR)),
     "&nbsp;", Ht::label("Course staff"), "<br>";

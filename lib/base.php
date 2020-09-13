@@ -437,17 +437,10 @@ function make_qreq() {
                 $errors[] = $err;
         }
     }
-    if (!empty($errors) && Conf::$g)
+    if (!empty($errors) && Conf::$main)
         Conf::msg_error("<div class=\"parseerr\"><p>" . join("</p>\n<p>", $errors) . "</p></div>");
 
     return $qreq;
-}
-
-function defval($var, $idx, $defval = null) {
-    if (is_array($var))
-        return (isset($var[$idx]) ? $var[$idx] : $defval);
-    else
-        return (isset($var->$idx) ? $var->$idx : $defval);
 }
 
 /** @param mixed $a */
@@ -550,7 +543,7 @@ function debug_string_backtrace() {
         return "#" . ($m[1] - 1);
     }, (new Exception)->getTraceAsString());
     if ($ConfSitePATH) {
-        $s = str_replace($ConfSitePATH, "[" . (Conf::$g ? Conf::$g->dbname : "Peteramati") . "]", $s);
+        $s = str_replace($ConfSitePATH, "[" . (Conf::$main ? Conf::$main->dbname : "Peteramati") . "]", $s);
     }
     return substr($s, strpos($s, "\n") + 1);
 }
