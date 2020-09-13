@@ -87,6 +87,7 @@ class Repository {
         $this->reposite = RepositorySite::make($this->url, $this->conf);
     }
 
+    /** @return ?Repository */
     static function fetch($result, Conf $conf) {
         $repo = $result ? $result->fetch_object("Repository", [$conf]) : null;
         if ($repo && !is_int($repo->repoid)) {
@@ -96,6 +97,8 @@ class Repository {
         return $repo;
     }
 
+    /** @param string $url
+     * @return ?Repository */
     static function find_or_create_url($url, Conf $conf) {
         $result = $conf->qe("select * from Repository where url=?", $url);
         $repo = Repository::fetch($result, $conf);
@@ -110,6 +113,8 @@ class Repository {
         return self::find_id($conf->dblink->insert_id, $conf);
     }
 
+    /** param string $url
+     * @return Repository */
     static function make_url($url, Conf $conf) {
         $repo = new Repository($conf);
         $repo->url = $url;
@@ -117,6 +122,8 @@ class Repository {
         return $repo;
     }
 
+    /** param int $repoid
+     * @return ?Repository */
     static function find_id($repoid, Conf $conf) {
         $result = $conf->qe("select * from Repository where repoid=?", $repoid);
         $repo = Repository::fetch($result, $conf);

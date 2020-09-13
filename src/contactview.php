@@ -459,29 +459,28 @@ class ContactView {
             return Conf::msg_error("Invalid repository URL “" . htmlspecialchars($repo_url) . "”.");
 
         // check repositories
-        $working = false;
         $ms = new MessageSet($user);
         foreach ($try_classes as $sitek) {
             $reposite = $sitek::make_url($repo_url, $user->conf);
             if ($reposite && $reposite->validate_working($ms) > 0) {
-                $working = true;
-                break;
+                $repo = Repository::find_or_create_url($reposite->url, $user->conf);
+                if ($repo) {
+                    $repo->check_open();
+                }
+                if ($user->set_repo($pset->id, $repo)) {
+                    redirectSelf();
+                }
+                return;
             }
         }
 
         // if !working, complain
-        if (!$working && !$ms->has_problem()) {
-            return Conf::msg_error("Can’t access the repository “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
-        } else if (!$working) {
+        if (!$ms->has_problem()) {
+            Conf::msg_error("Can’t access the repository “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
+        } else {
             $msgs = join("<br />", $ms->messages()) ? : "Repository unreachable at the moment.";
-            return Conf::msg_error($msgs);
+            Conf::msg_error($msgs);
         }
-
-        // store repo
-        $repo = Repository::find_or_create_url($reposite->url, $user->conf);
-        $repo && $repo->check_open();
-        if ($user->set_repo($pset, $repo))
-            redirectSelf();
     }
 
     static function set_branch_action($user, $qreq) {
@@ -516,7 +515,7 @@ class ContactView {
             return;
         $branch = $user->branch_name($pset);
 
-        $snaphash = $snapcommitline = $snapcommitat = null;
+        $snaphash = $snapcommitline = $snapcommitat = $value = null;
         if ($repo && !$info->user_can_view_repo_contents()) {
             $value = "(unconfirmed repository)";
         } else if ($repo && $repo->snaphash && $branch === $pset->main_branch) {
@@ -529,8 +528,9 @@ class ContactView {
                 $snaphash = $c->hash;
                 $snapcommitline = $c->subject;
                 $snapcommitat = $c->commitat;
-            } else
+            } else {
                 $value = "(no such branch)";
+            }
         } else if ($repo) {
             $value = "(checking)";
         } else {
@@ -581,8 +581,9 @@ class ContactView {
             Ht::stash_script("pa_checklatest()", "pa_checklatest");
         }
         self::echo_group("last commit", $value, $notes);
-        if ($commitgroup)
+        if ($commitgroup) {
             echo "</div>";
+        }
     }
 
     static function echo_repo_grade_commit_group(PsetView $info) {

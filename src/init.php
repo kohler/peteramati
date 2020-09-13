@@ -53,7 +53,6 @@ class SiteLoader {
         "MimeText" => "lib/mailer.php",
         "Pset" => "src/psetconfig.php",
         "RunnerState" => "src/runner.php",
-        "XlsxGenerator" => "lib/xlsx.php",
         "ZipDocument" => "lib/documenthelper.php"
     ];
 }

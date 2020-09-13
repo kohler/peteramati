@@ -34,27 +34,27 @@ class GradeFormula implements JsonSerializable {
             if ($e !== null && $op === "-") {
                 $e = new GradeFormula("neg", [$e]);
             }
-        } else if (preg_match('{\A(\d+\.?\d*|\.\d+)(.*)\z}s', $t, $m)) {
+        } else if (preg_match('/\A(\d+\.?\d*|\.\d+)(.*)\z/s', $t, $m)) {
             $t = $m[2];
             $e = new GradeFormula("n", (float) $m[1]);
-        } else if (preg_match('{\A(?:pi|π|m_pi)\b(.*)\z}si', $t, $m)) {
-            $t = $m[2];
+        } else if (preg_match('/\A(?:pi|π|m_pi)\b(.*)\z/si', $t, $m)) {
+            $t = $m[1];
             $e = new GradeFormula("n", (float) M_PI);
-        } else if (preg_match('{\A(log10|log|ln|lg|exp)\b(.*)\z}s', $t, $m)) {
+        } else if (preg_match('/\A(log10|log|ln|lg|exp)\b(.*)\z/s', $t, $m)) {
             $t = $m[2];
             $e = self::parse($conf, $t, 12);
             if ($e !== null) {
                 $e = new GradeFormula($m[1], [$e]);
             }
-        } else if (preg_match('{\A(\w+)\s*\.\s*(\w+)(.*)\z}s', $t, $m)) {
+        } else if (preg_match('/\A(\w+)\s*\.\s*(\w+)(.*)\z/s', $t, $m)) {
             if (($pset = $conf->pset_by_key_or_title($m[1]))
                 && ($ge = $pset->gradelike_by_key($m[2]))) {
                 $t = $m[3];
-                $e = new GradeFormula("g", [$pset, $ge]);
+                $e = new GradeEntry_GradeFormula($pset, $ge);
             } else {
                 return null;
             }
-        } else if (preg_match('{\A(\w+)(.*)\z}s', $t, $m)) {
+        } else if (preg_match('/\A(\w+)(.*)\z/s', $t, $m)) {
             $t = $m[2];
             $k = $m[1];
             $kbase = $k;
@@ -77,11 +77,11 @@ class GradeFormula implements JsonSerializable {
             if (($pset = $conf->pset_by_key_or_title($kbase))) {
                 $noextra = $noextra && $pset->has_extra;
                 $raw = $raw === null || $raw;
-                $e = new GradeFormula("gpt", [$pset, $noextra, $raw]);
+                $e = new PsetTotal_GradeFormula($pset, $noextra, $raw);
             } else if ($conf->pset_group($kbase)) {
                 $noextra = $noextra && $conf->pset_group_has_extra($kbase);
                 $raw = $raw !== null && $raw;
-                $e = new GradeFormula("ggt", [$kbase, $noextra, $raw]);
+                $e = new PsetGroupTotal_GradeFormula($kbase, $noextra, $raw);
             } else {
                 return null;
             }
@@ -95,7 +95,7 @@ class GradeFormula implements JsonSerializable {
 
         while (true) {
             $t = ltrim($t);
-            if (preg_match('{\A(\+|-|\*\*?|/|%)(.*)\z}s', $t, $m)) {
+            if (preg_match('/\A(\+|-|\*\*?|\/|%)(.*)\z/s', $t, $m)) {
                 $op = $m[1];
                 if ($op === "**") {
                     $prec = 13;
@@ -120,22 +120,9 @@ class GradeFormula implements JsonSerializable {
     }
 
     function evaluate(Contact $student) {
-        // error_log("{$this->_op} {$student->contactId} " . json_encode($this->_a));
-        $x = $this->xevaluate($student);
-        // error_log("= $x");
-        return $x;
-    }
-
-    private function xevaluate(Contact $student) {
         switch ($this->_op) {
         case "n":
             return $this->_a;
-        case "g":
-            return (float) $student->gcache_entry($this->_a[0], $this->_a[1]);
-        case "gpt":
-            return $student->gcache_total($this->_a[0], $this->_a[1], $this->_a[2]);
-        case "ggt":
-            return $student->gcache_group_total($this->_a[0], $this->_a[1], $this->_a[2]);
         }
 
         $vs = [];
@@ -177,12 +164,6 @@ class GradeFormula implements JsonSerializable {
         switch ($this->_op) {
         case "n":
             return $this->_a;
-        case "g":
-            return $this->_a[0]->nonnumeric_key . "." . $this->_a[1]->key;
-        case "gpt":
-            return $this->_a[0]->nonnumeric_key . ($this->_a[1] ? "_noextra" : "") . ($this->_a[2] ? "" : "_norm");
-        case "ggt":
-            return $this->_a[0] . ($this->_a[1] ? "_noextra" : "") . ($this->_a[2] ? "_raw" : "");
         default:
             $x = [$this->_op];
             foreach ($this->_a as $a) {
@@ -190,5 +171,69 @@ class GradeFormula implements JsonSerializable {
             }
             return $x;
         }
+    }
+}
+
+
+class GradeEntry_GradeFormula extends GradeFormula {
+    /** @var Pset */
+    private $pset;
+    /** @var GradeEntryConfig */
+    private $ge;
+
+    function __construct($pset, $ge) {
+        parent::__construct("g", []);
+        $this->pset = $pset;
+        $this->ge = $ge;
+    }
+    function evaluate(Contact $student) {
+        return (float) $student->gcache_entry($this->pset, $this->ge);
+    }
+    function jsonSerialize() {
+        return $this->pset->nonnumeric_key . "." . $this->ge->key;
+    }
+}
+
+class PsetTotal_GradeFormula extends GradeFormula {
+    /** @var Pset */
+    private $pset;
+    /** @var bool */
+    private $noextra;
+    /** @var bool */
+    private $norm;
+
+    function __construct($pset, $noextra, $norm) {
+        parent::__construct("gpt", []);
+        $this->pset = $pset;
+        $this->noextra = $noextra;
+        $this->norm = $norm;
+    }
+    function evaluate(Contact $student) {
+        return $student->gcache_total($this->pset, $this->noextra, $this->norm);
+    }
+    function jsonSerialize() {
+        return $this->pset->nonnumeric_key . ($this->noextra ? "_noextra" : "") . ($this->norm ? "" : "_norm");
+    }
+}
+
+class PsetGroupTotal_GradeFormula extends GradeFormula {
+    /** @var string */
+    private $group;
+    /** @var bool */
+    private $noextra;
+    /** @var bool */
+    private $norm;
+
+    function __construct($group, $noextra, $norm) {
+        parent::__construct("ggt", []);
+        $this->group = $group;
+        $this->noextra = $noextra;
+        $this->norm = $norm;
+    }
+    function evaluate(Contact $student) {
+        return $student->gcache_group_total($this->group, $this->noextra, $this->norm);
+    }
+    function jsonSerialize() {
+        return $this->group . ($this->noextra ? "_noextra" : "") . ($this->norm ? "_raw" : "");
     }
 }
