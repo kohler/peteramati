@@ -4,15 +4,23 @@
 // See LICENSE for open-source distribution terms
 
 class CommitRecord {
+    /** @var int */
     public $commitat;
+    /** @var string */
     public $hash;
+    /** @var string */
     public $subject;
+    /** @var ?string */
     public $fromhead;
     /** @var ?bool */
     public $_is_handout;
     /** @var ?Pset */
     public $_is_handout_pset;
     const HANDOUTHEAD = "*handout*";
+    /** @param int $commitat
+     * @param string $hash
+     * @param string $subject
+     * @param ?string $fromhead */
     function __construct($commitat, $hash, $subject, $fromhead = null) {
         $this->commitat = $commitat;
         $this->hash = $hash;
@@ -241,8 +249,9 @@ class Repository {
         return $ownership;
     }
 
+    /** @return bool */
     function truncated_psetdir(Pset $pset) {
-        return get($this->_truncated_psetdir, $pset->id);
+        return $this->_truncated_psetdir[$pset->id] ?? false;
     }
 
 
@@ -312,8 +321,9 @@ class Repository {
     /** @return array<string,CommitRecord> */
     function commits(Pset $pset = null, $branch = null) {
         $dir = "";
-        if ($pset && $pset->directory_noslash !== ""
-            && !get($this->_truncated_psetdir, $pset->psetid)) {
+        if ($pset
+            && $pset->directory_noslash !== ""
+            && !($this->_truncated_psetdir[$pset->psetid] ?? false)) {
             $dir = $pset->directory_noslash;
         }
         $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
@@ -437,9 +447,10 @@ class Repository {
         foreach (glob("$ConfSitePATH/repo/repo$this->cacheid/.git/refs/tags/repo{$this->repoid}.snap*") as $snapfile) {
             $time = substr($snapfile, strrpos($snapfile, ".snap") + 5);
             if (strcmp($time, $timematch) <= 0
-                || !preg_match('/\A(\d\d\d\d)(\d\d)(\d\d)\.(\d\d)(\d\d)(\d\d)\z/', $time, $m))
+                || !preg_match('/\A(\d\d\d\d)(\d\d)(\d\d)\.(\d\d)(\d\d)(\d\d)\z/', $time, $m)) {
                 continue;
-            $snaptime = gmmktime($m[4], $m[5], $m[6], $m[2], $m[3], $m[1]);
+            }
+            $snaptime = gmmktime((int) $m[4], (int) $m[5], (int) $m[6], (int) $m[2], (int) $m[3], (int) $m[1]);
             $analyzed_snaptime = max($snaptime, $analyzed_snaptime);
             $head = file_get_contents($snapfile);
             $result = $this->gitrun("git log -n20000 --simplify-merges --format=%H " . escapeshellarg($head));
@@ -489,11 +500,14 @@ class Repository {
         global $Now, $ConfSitePATH;
         assert(isset($this->repoid) && isset($this->cacheid));
         $suffix = "";
-        while (1) {
+        $suffixn = 0;
+        while (true) {
             $d = "$ConfSitePATH/repo/tmprepo.$Now$suffix";
-            if (mkdir($d, 0770))
+            if (mkdir($d, 0770)) {
                 break;
-            $suffix = $suffix ? "_" . (substr($suffix, 1) + 1) : "_1";
+            }
+            ++$suffixn;
+            $suffix = "_" . $suffixn;
         }
         $answer = shell_exec("cd $d && git init >/dev/null && git remote add origin $ConfSitePATH/repo/repo{$this->cacheid} >/dev/null && echo yes");
         return ($answer == "yes\n" ? $d : null);
@@ -554,7 +568,7 @@ class Repository {
 
     private function parse_diff($diffargs, Pset $pset, $hasha_arg, $hashb_arg, $options) {
         $command = "git diff";
-        if (get($options, "wdiff")) {
+        if ($options["wdiff"] ?? false) {
             $command .= " -w";
         }
         $command .= " {$hasha_arg} {$hashb_arg} --";
@@ -615,6 +629,7 @@ class Repository {
         }
     }
 
+    /** @return array<string,DiffInfo> */
     function diff(Pset $pset, CommitRecord $commita, CommitRecord $commitb, $options = null) {
         $options = (array) $options;
         assert($pset); // code remains for `!$pset`; maybe revive it?
@@ -623,10 +638,11 @@ class Repository {
         $repodir = $truncpfx = "";
         if ($pset->directory_noslash !== "") {
             $psetdir = escapeshellarg($pset->directory_noslash);
-            if ($this->truncated_psetdir($pset))
+            if ($this->truncated_psetdir($pset)) {
                 $truncpfx = $pset->directory_noslash . "/";
-            else
+            } else {
                 $repodir = $psetdir . "/";
+            }
         } else {
             $psetdir = null;
         }
@@ -647,9 +663,9 @@ class Repository {
         $hashb_arg = escapeshellarg($hashb);
 
         $ignore_diffconfig = $pset->is_handout($commita) && $pset->is_handout($commitb);
-        $no_full = get($options, "no_full");
-        $needfiles = self::fix_diff_files(get($options, "needfiles"));
-        $onlyfiles = self::fix_diff_files(get($options, "onlyfiles"));
+        $no_full = $options["no_full"] ?? false;
+        $needfiles = self::fix_diff_files($options["needfiles"] ?? null);
+        $onlyfiles = self::fix_diff_files($options["onlyfiles"] ?? null);
 
         // read "full" files
         foreach ($pset->all_diffconfig() as $diffconfig) {
@@ -684,7 +700,7 @@ class Repository {
                     && !$ignore_diffconfig
                     && !$no_full
                     && $diffconfig->full
-                    && get($diffs, $file)) {
+                    && ($diffs[$file] ?? null)) {
                     continue;
                 }
                 // skip files that aren't allowed

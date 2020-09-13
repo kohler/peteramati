@@ -1013,6 +1013,7 @@ class GradeEntryConfig {
         return $ge;
     }
 
+    /** @return array{string,int,?int,?int} */
     static private function clean_landmark($g, $k) {
         if (!isset($g->$k)) {
             return null;
@@ -1021,10 +1022,12 @@ class GradeEntryConfig {
         if (is_string($x)
             && preg_match('{\A(.*?):(\d+)(:\d+|)(:\d+|)\z}', $x, $m)) {
             $x = [$m[1], intval($m[2])];
-            if ($m[3] !== "")
+            if ($m[3] !== "") {
                 $x[] = intval(substr($m[3], 1));
-            if ($m[4] !== "")
+            }
+            if ($m[4] !== "") {
                 $x[] = intval(substr($m[4], 1));
+            }
         }
         return $x;
     }

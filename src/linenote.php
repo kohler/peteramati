@@ -21,11 +21,11 @@ class LineNote implements JsonUpdatable {
 
     static function make_json($file, $lineid, $x) {
         $ln = new LineNote($file, $lineid);
-        if (is_object($x) && property_exists($x, 0)) {
+        if (is_object($x) && property_exists($x, "0")) {
             $x_in = $x;
             $x = [];
-            for ($i = 0; property_exists($x_in, $i); ++$i) {
-                $x[] = $x_in->$i;
+            for ($i = 0; property_exists($x_in, (string) $i); ++$i) {
+                $x[] = $x_in->{(string) $i};
             }
         }
         if (is_int($x) || $x === null) {

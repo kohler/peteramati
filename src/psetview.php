@@ -48,7 +48,9 @@ class PsetView {
     const ERROR_NOTRUN = 1;
     const ERROR_LOGMISSING = 2;
     public $last_runner_error;
+    /** @var array<string,array<int,list<string>>> */
     private $transferred_warnings;
+    /** @var array<string,float> */
     private $transferred_warnings_priority;
     public $viewed_gradeentries = [];
 
@@ -966,6 +968,10 @@ class PsetView {
         }
     }
 
+    /** @param ?string $file
+     * @param ?int $line
+     * @param string $text
+     * @param float $priority */
     private function transfer_one_warning($file, $line, $text, $priority) {
         if ($file !== null && $text !== "") {
             $loc = "$file:$line";
@@ -980,7 +986,7 @@ class PsetView {
                 $this->transferred_warnings_priority[$loc] = $priority;
             }
             if ($this->transferred_warnings_priority[$loc] == $priority) {
-                $this->transferred_warnings[$file][$line][] .= $text;
+                $this->transferred_warnings[$file][$line][] = $text;
             }
         }
     }
@@ -999,7 +1005,7 @@ class PsetView {
                 if ($file && $m[3] === "note:") {
                     if (strpos($sda, "in expansion of macro") !== false) {
                         $file = $m[1];
-                        $line = $m[2];
+                        $line = (int) $m[2];
                     }
                 } else {
                     if (!$in_instantiation) {
@@ -1008,7 +1014,7 @@ class PsetView {
                     }
                     if ($in_instantiation !== 2 || $this_instantiation) {
                         $file = $m[1];
-                        $line = $m[2];
+                        $line = (int) $m[2];
                     }
                 }
                 $text .= $s . "\n";

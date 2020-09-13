@@ -8,8 +8,9 @@ class LineNotesOrder {
     private $fileorder = [];
     private $ln;
     private $lnseq = [];
-    private $lnorder = null;
-    private $totalorder = null;
+    /** @var ?array<string,int> */
+    private $lnorder;
+    private $totalorder;
     public $has_linenotes_in_diff = false;
 
     function __construct($linenotes, $seegradenotes, $editnotes) {
