@@ -1992,8 +1992,9 @@ class Conf {
         if ($this->_branch_map === null) {
             $this->_branch_map = [];
             $result = $this->qe("select branchid, branch from Branch");
-            while (($row = $result->fetch_row()))
+            while (($row = $result->fetch_row())) {
                 $this->_branch_map[+$row[0]] = $row[1];
+            }
             Dbl::free($result);
         }
         return $this->_branch_map;

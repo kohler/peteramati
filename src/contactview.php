@@ -504,7 +504,7 @@ class ContactView {
         if ($branch === "" || $branch === $pset->main_branch) {
             $user->clear_links(LINK_BRANCH, $pset->id);
         } else {
-            $user->set_link(LINK_BRANCH, $pset->id, $Conf->ensure_branch($branch), $branch);
+            $user->set_link(LINK_BRANCH, $pset->id, $Conf->ensure_branch($branch));
         }
         redirectSelf();
     }
