@@ -7,7 +7,7 @@ class UserActions {
     static private function modify_password_mail($where, $dopassword, $sendtype, $ids) {
         global $Conf;
         $j = (object) array("ok" => true);
-        $result = $Conf->qe_raw("select * from ContactInfo where $where and contactId" . sql_in_numeric_set($ids));
+        $result = $Conf->qe("select * from ContactInfo where $where and contactId?a", $ids);
         while (($Acct = Contact::fetch($result, $Conf))) {
             if ($dopassword)
                 $Acct->change_password(null, null, Contact::CHANGE_PASSWORD_PLAINTEXT | Contact::CHANGE_PASSWORD_NO_CDB);
@@ -21,7 +21,7 @@ class UserActions {
 
     static function disable($ids, $contact) {
         global $Conf;
-        $result = Dbl::qe("update ContactInfo set disabled=1 where contactId" . sql_in_numeric_set($ids) . " and contactId!=" . $contact->contactId);
+        $result = Dbl::qe("update ContactInfo set disabled=1 where contactId?a and contactId!=?", $ids, $contact->contactId);
         if ($result && $result->affected_rows)
             return (object) array("ok" => true);
         else if ($result)
@@ -32,8 +32,8 @@ class UserActions {
 
     static function enable($ids, $contact) {
         global $Conf;
-        $result = $Conf->qe_raw("update ContactInfo set disabled=1 where contactId" . sql_in_numeric_set($ids) . " and password='' and contactId!=" . $contact->contactId);
-        $result = Dbl::qe("update ContactInfo set disabled=0 where contactId" . sql_in_numeric_set($ids) . " and contactId!=" . $contact->contactId);
+        $result = $Conf->qe("update ContactInfo set disabled=1 where contactId?a and password='' and contactId!=?", $ids, $contact->contactId);
+        $result = $Conf->qe("update ContactInfo set disabled=0 where contactId?a and contactId!=?", $ids, $contact->contactId);
         if ($result && $result->affected_rows)
             return self::modify_password_mail("password='' and contactId!=" . $contact->contactId, true, "create", $ids);
         else if ($result)

@@ -896,13 +896,13 @@ Sign in to tell us about your code.";
     if (isset($Qreq->email)) {
         echo "value=\"", htmlspecialchars($Qreq->email), "\" ";
     }
-    echo ">", Ht::render_messages_at("email"), "</div>
+    echo ">", Ht::render_feedback_at("email"), "</div>
 </div>
 <div class=\"", Ht::control_class("password", "f-i fx"), "\">
   <div class=\"f-c\">Password</div>
   <div class=\"f-e\"><input",
         ($passwordFocus ? " id='login_d'" : ""),
-        " type='password' class='textlite' name='password' size='36' tabindex='1' value=''>", Ht::render_messages_at("password"), "</div>
+        " type='password' class='textlite' name='password' size='36' tabindex='1' value=''>", Ht::render_feedback_at("password"), "</div>
 </div>\n";
     if ($Conf->opt("ldapLogin")) {
         echo "<input type='hidden' name='action' value='login' />\n";
