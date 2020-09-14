@@ -401,7 +401,8 @@ function prefix_commajoin($what, $prefix, $joinword = "and") {
 function numrangejoin($range) {
     $a = [];
     $format = null;
-    $intval = $first = $last = $plen = 0;
+    $intval = $plen = 0;
+    $first = $last = "0";
     foreach ($range as $current) {
         if ($format !== null
             && sprintf($format, $intval + 1) === (string) $current) {
@@ -409,10 +410,8 @@ function numrangejoin($range) {
             $last = $current;
             continue;
         } else {
-            if ($format !== null && $first === $last) {
-                $a[] = $first;
-            } else if ($format !== null) {
-                $a[] = $first . "–" . substr($last, $plen);
+            if ($format !== null) {
+                $a[] = $first === $last ? $first : $first . "–" . substr($last, $plen);
             }
             if ($current !== "" && ctype_digit($current)) {
                 $format = "%0" . strlen($current) . "d";
@@ -497,9 +496,11 @@ function tabLength($text, $all) {
     return $len;
 }
 
+/** @param string $varname */
 function ini_get_bytes($varname, $value = null) {
     $val = trim($value !== null ? $value : ini_get($varname));
     $last = strlen($val) ? strtolower($val[strlen($val) - 1]) : ".";
+    /** @phan-suppress-next-line PhanParamSuspiciousOrder */
     return (int) ceil(floatval($val) * (1 << (+strpos(".kmg", $last) * 10)));
 }
 

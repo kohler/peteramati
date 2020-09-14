@@ -265,18 +265,23 @@ if ($Me->isPC && ($sl = $Conf->session_list())
         huid, anon_username, github_username, seascode_username, extension
         from ContactInfo where contactId?a",
         [$p > 0 ? $sl->ids[$p - 1] : -1, $p < count($sl->ids) - 1 ? $sl->ids[$p + 1] : -1]);
+    /** @var array{?Contact,?Contact} */
     $links = [null, null];
-    while ($result && ($s = Contact::fetch($result, $Conf)))
+    while ($result && ($s = Contact::fetch($result, $Conf))) {
         $links[$p > 0 && $sl->ids[$p - 1] == $s->contactId ? 0 : 1] = $s;
+    }
     echo "<div class=\"has-hotlist\" style=\"color:gray;float:right\"",
         " data-hotlist=\"", htmlspecialchars(json_encode_browser($sl)), "\">",
         "<h3 style=\"margin-top:0\">";
-    if ($links[0])
+    if ($links[0]) {
         echo session_list_link($sl, $p - 1, true, $Me, $links[0]);
-    if ($links[0] && $links[1])
+    }
+    if ($links[0] && $links[1]) {
         echo ' · ';
-    if ($links[1])
+    }
+    if ($links[1]) {
         echo session_list_link($sl, $p + 1, false, $Me, $links[1]);
+    }
     echo "</h3></div>";
 }
 

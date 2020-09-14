@@ -4,20 +4,20 @@
 // See LICENSE for open-source distribution terms
 
 class Series {
-    public $n;
-    public $sum;
-    public $sumsq;
-    public $series;
+    /** @var int */
+    public $n = 0;
+    /** @var float */
+    public $sum = 0.0;
+    /** @var float */
+    public $sumsq = 0.0;
+    /** @var array<int,int|float> */
+    public $series = [];
     public $cdf;
-    private $calculated;
+    private $calculated = false;
     private $median;
 
-    function __construct() {
-        $this->n = $this->sum = $this->sumsq = 0;
-        $this->byg = $this->series = array();
-        $this->calculated = false;
-    }
-
+    /** @param int $cid
+     * @param int|float $g */
     function add($cid, $g) {
         $this->series[$cid] = $g;
         $this->n += 1;
@@ -29,7 +29,7 @@ class Series {
     function calculate() {
         if (!$this->calculated) {
             asort($this->series);
-            $this->cdf = array();
+            $this->cdf = [];
             $this->median = false;
             $lastg = false;
             $subtotal = 0;
@@ -37,19 +37,21 @@ class Series {
             $halfn = (int) ($this->n / 2);
             foreach ($this->series as $g) {
                 if ($i === $halfn) {
-                    if ($this->n % 2 == 0)
+                    if ($this->n % 2 === 0) {
                         $this->median = ($lastg + $g) / 2.0;
-                    else
+                    } else {
                         $this->median = $g;
+                    }
                 }
 
                 ++$i;
-                if ($g !== $lastg) {
+                if ($i === 1 || $g !== $lastg) {
                     $this->cdf[] = $lastg = $g;
                     $this->cdf[] = $i;
                     $cdfi += 2;
-                } else
+                } else {
                     $this->cdf[$cdfi - 1] = $i;
+                }
             }
             $this->calculated = true;
         }
@@ -71,8 +73,9 @@ class Series {
                 $xcdf[$cdfi - 1][] = $cid;
             }
             $r->xcdf = $xcdf;
-        } else
+        } else {
             $r->cdf = $this->cdf;
+        }
         if ($this->n != 0) {
             $r->mean = $this->mean();
             $r->median = $this->median;
@@ -91,10 +94,11 @@ class Series {
     }
 
     function stddev() {
-        if ($this->n > 1)
+        if ($this->n > 1) {
             return sqrt(($this->sumsq - $this->sum * $this->sum / $this->n) / ($this->n - 1));
-        else
-            return $this->n ? 0 : false;
+        } else {
+            return $this->n ? 0.0 : false;
+        }
     }
 
     static function truncate_summary_below($r, $cutoff) {
@@ -113,41 +117,49 @@ class API_GradeStatistics {
     static function compute(Pset $pset, $pcview) {
         $series = new Series;
         $xseries = $noextra_series = $xnoextra_series = null;
-        if ($pset->has_extra)
+        if ($pset->has_extra) {
             $noextra_series = new Series;
-        if ($pset->separate_extension_grades)
+        }
+        if ($pset->separate_extension_grades) {
             $xseries = new Series;
-        if ($xseries && $noextra_series)
+        }
+        if ($xseries && $noextra_series) {
             $xnoextra_series = new Series;
+        }
         $has_extra = $has_xextra = false;
 
-        if (is_int($pset->grades_visible))
+        if (is_int($pset->grades_visible)) {
             $notdropped = "(not c.dropped or c.dropped<$pset->grades_visible)";
-        else
+        } else {
             $notdropped = "not c.dropped";
+        }
         $q = "select c.contactId, cn.notes, c.extension from ContactInfo c\n";
-        if ($pset->gitless_grades)
+        if ($pset->gitless_grades) {
             $q .= "\t\tjoin ContactGrade cn on (cn.cid=c.contactId and cn.pset={$pset->id})";
-        else
+        } else {
             $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset={$pset->id})
                 join RepositoryGrade rg on (rg.repoid=l.link and rg.pset={$pset->id} and not rg.placeholder)
                 join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)\n";
+        }
         $result = $pset->conf->qe_raw($q . " where $notdropped");
         while (($row = $result->fetch_row())) {
             if (($g = ContactView::pset_grade(json_decode($row[1]), $pset))) {
                 $cid = +$row[0];
                 $series->add($cid, $g->total);
-                if ($xseries && $row[2])
+                if ($xseries && $row[2]) {
                     $xseries->add($cid, $g->total);
+                }
                 if ($noextra_series) {
                     $noextra_series->add($cid, $g->total_noextra);
-                    if ($g->total_noextra != $g->total)
+                    if ($g->total_noextra != $g->total) {
                         $has_extra = true;
+                    }
                 }
                 if ($xnoextra_series && $row[2]) {
                     $xnoextra_series->add($cid, $g->total_noextra);
-                    if ($g->total_noextra != $g->total)
+                    if ($g->total_noextra != $g->total) {
                         $has_xextra = true;
+                    }
                 }
             }
         }
@@ -155,22 +167,28 @@ class API_GradeStatistics {
 
         $r = (object) ["pset" => $pset->urlkey, "psetid" => $pset->id,
                        "all" => $series->summary($pcview)];
-        if ($xseries && $xseries->n)
+        if ($xseries && $xseries->n) {
             $r->extension = $xseries->summary($pcview);
-        if ($has_extra)
+        }
+        if ($has_extra) {
             $r->noextra = $noextra_series->summary($pcview);
-        if ($has_xextra)
+        }
+        if ($has_xextra) {
             $r->extension_noextra = $xnoextra_series->summary($pcview);
+        }
 
         $pgj = $pset->gradeinfo_json($pcview);
         if ($pgj && isset($pgj->maxgrades->total)) {
             $r->maxtotal = $r->all->maxtotal = $pgj->maxgrades->total;
-            if (isset($r->extension))
+            if (isset($r->extension)) {
                 $r->extension->maxtotal = $pgj->maxgrades->total;
-            if (isset($r->noextra))
+            }
+            if (isset($r->noextra)) {
                 $r->noextra->maxtotal = $pgj->maxgrades->total;
-            if (isset($r->extension_noextra))
+            }
+            if (isset($r->extension_noextra)) {
                 $r->extension_noextra->maxtotal = $pgj->maxgrades->total;
+            }
         }
 
         $ge = $pset->visible_grades_in_total($pcview);
@@ -219,12 +237,15 @@ class API_GradeStatistics {
         if (!$user->isPC && $pset->grade_cdf_cutoff) {
             $r->cutoff = $pset->grade_cdf_cutoff;
             Series::truncate_summary_below($r->all, $pset->grade_cdf_cutoff);
-            if (isset($r->extension))
+            if (isset($r->extension)) {
                 Series::truncate_summary_below($r->extension, $pset->grade_cdf_cutoff);
-            if (isset($r->noextra))
+            }
+            if (isset($r->noextra)) {
                 Series::truncate_summary_below($r->noextra, $pset->grade_cdf_cutoff);
-            if (isset($r->extension_noextra))
+            }
+            if (isset($r->extension_noextra)) {
                 Series::truncate_summary_below($r->extension_noextra, $pset->grade_cdf_cutoff);
+            }
         }
 
         header("Cache-Control: max-age=30,must-revalidate,private");
