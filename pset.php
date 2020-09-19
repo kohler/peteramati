@@ -397,30 +397,32 @@ function echo_commit($info) {
         . ($fold_viewoptions ? '&#x25B6;' : '&#x25BC;')
         . '</span>&nbsp;options</a><span style="padding-left:1em"'
         . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
-    foreach (array(2, 4, 8) as $i)
+    foreach ([2, 4, 8] as $i) {
         $value .= '&nbsp;<a href="' . $info->conf->selfurl($Qreq, ["tab" => $i]) . '"'
             . ($TABWIDTH == $i ? " class=\"q\"><strong>$i</strong>" : '>' . $i)
             . '</a>';
+    }
     $value .= '<span style="padding-left:1em">wdiff:';
-    foreach (array("no", "yes") as $i => $t)
+    foreach (["no", "yes"] as $i => $t) {
         $value .= '&nbsp;<a href="' . $info->conf->selfurl($Qreq, ["wdiff" => $i]) . '"'
             . (!$WDIFF == !$i ? " class=\"q\"><strong>$t</strong>" : '>' . $t)
             . '</a>';
+    }
     $value .= '</span></span></div>';
 
     // warnings
     $remarks = array();
     if (!$info->grading_hash() && $info->pc_view && !$pset->gitless_grades) {
-        $remarks[] = array(true, "No commit has been marked for grading.");
+        $remarks[] = [true, "No commit has been marked for grading."];
     } else if (!$info->is_grading_commit() && $info->grading_hash()) {
-        $remarks[] = array(true, "This is not "
-                           . "<a class=\"uu\" href=\"" . $info->hoturl("pset", array("commit" => $info->grading_hash())) . "\">the commit currently marked for grading</a>"
-                           . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->grading_hash())) . "\">see diff</a>)</span>.");
+        $remarks[] = [true, "This is not "
+                      . "<a class=\"uu\" href=\"" . $info->hoturl("pset", array("commit" => $info->grading_hash())) . "\">the commit currently marked for grading</a>"
+                      . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->grading_hash())) . "\">see diff</a>)</span>."];
     }
     if (!$info->is_latest_commit()) {
-        $remarks[] = array(true, "This is not "
-                           . "<a class=\"uu\" href=\"" . $info->hoturl("pset", array("commit" => $info->latest_hash())) . "\">the latest commit</a>"
-                           . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->latest_hash())) . "\">see diff</a>)</span>.");
+        $remarks[] = [true, "This is not "
+                      . "<a class=\"uu\" href=\"" . $info->hoturl("pset", array("commit" => $info->latest_hash())) . "\">the latest commit</a>"
+                      . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->latest_hash())) . "\">see diff</a>)</span>."];
     }
     $lhd = $info->late_hours_data();
     if ($lhd
@@ -435,7 +437,7 @@ function echo_commit($info) {
             $extra[] = "deadline " . $info->conf->printableTimestamp($lhd->deadline);
         }
         $extra = count($extra) ? ' <span style="font-weight:normal">(' . join(", ", $extra) . ')</span>' : "";
-        $remarks[] = array(!$pset->obscure_late_hours, "This commit uses " . plural($lhd->hours, "late hour") . $extra . ".");
+        $remarks[] = [!$pset->obscure_late_hours, "This commit uses " . plural($lhd->hours, "late hour") . $extra . "."];
     }
     if (($info->is_latest_commit() || $info->viewer->isPC)
         && $pset->handout_repo_url) {
@@ -459,16 +461,16 @@ function echo_commit($info) {
                 } else {
                     $cmd .= " " . htmlspecialchars($pset->handout_branch);
                 }
-                $remarks[] = array(true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates.");
+                $remarks[] = [true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates."];
             }
         } else if ($last_handout) {
-            $remarks[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.<br>This <em>somewhat dangerous</em> command will merge your repository with ours; make a backup of your Git repository before trying it:<br><pre>git pull --allow-unrelated-histories \"" . htmlspecialchars($pset->handout_repo_url) . "\" --no-edit &amp;&amp; git push</pre>"];
+            $remarks[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.<br>This <em>somewhat dangerous</em> command will merge your repository with ours; back up your Git repository before trying it:<br><pre>git pull --allow-unrelated-histories \"" . htmlspecialchars($pset->handout_repo_url) . "\" --no-edit &amp;&amp; git push</pre>"];
         } else if (!$last_handout && $info->viewer->isPC) {
             $handout_files = $pset->handout_repo()->ls_files($pset->handout_branch);
             if (!count($handout_files))
-                $remarks[] = array(true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", contains no files; perhaps handout_repo_url is misconfigured.");
+                $remarks[] = [true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", contains no files; perhaps handout_repo_url is misconfigured."];
             else
-                $remarks[] = array(true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", does not contain problem set code yet.");
+                $remarks[] = [true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", does not contain problem set code yet."];
         }
     }
 

@@ -511,16 +511,19 @@ class ContactView {
     }
 
     static function echo_repo_last_commit_group(PsetView $info, $commitgroup) {
-        global $Me, $Conf;
+        global $Me;
         list($user, $repo, $pset) = [$info->user, $info->repo, $info->pset];
-        if ($pset->gitless)
+        if ($pset->gitless) {
             return;
+        }
         $branch = $user->branch_name($pset);
 
         $snaphash = $snapcommitline = $snapcommitat = $value = null;
         if ($repo && !$info->user_can_view_repo_contents()) {
             $value = "(unconfirmed repository)";
-        } else if ($repo && $repo->snaphash && $branch === $pset->main_branch) {
+        } else if ($repo
+                   && $repo->snaphash
+                   && $branch === $info->conf->default_main_branch) {
             $snaphash = $repo->snaphash;
             $snapcommitline = $repo->snapcommitline;
             $snapcommitat = $repo->snapcommitat;
@@ -545,11 +548,13 @@ class ContactView {
         $notes = array();
         if ($repo && $info->can_view_repo_contents() && $repo->snapat) {
             $n = "";
-            if ($snapcommitat)
+            if ($snapcommitat) {
                 $n = "committed " . ago($snapcommitat) . ", ";
+            }
             $n .= "fetched " . ago($repo->snapat) . ", last checked " . ago($repo->snapcheckat);
-            if ($Me->privChair)
+            if ($Me->privChair) {
                 $n .= " <small style=\"padding-left:1em;font-size:70%\">group " . $repo->cacheid . ", repo" . $repo->repoid . "</small>";
+            }
             $notes[] = $n;
         }
         if ($repo && !$info->user_can_view_repo_contents()) {
@@ -577,8 +582,9 @@ class ContactView {
 
         if ($commitgroup) {
             echo "<div class=\"pa-commitcontainer\" data-pa-pset=\"", htmlspecialchars($info->pset->urlkey);
-            if ($repo && $repo->snaphash && $info->can_view_repo_contents())
-                echo "\" data-pa-commit=\"", $repo->snaphash;
+            if ($snaphash) {
+                echo "\" data-pa-commit=\"", $snaphash;
+            }
             echo "\">";
             Ht::stash_script("pa_checklatest()", "pa_checklatest");
         }

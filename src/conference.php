@@ -25,11 +25,13 @@ class APIData {
     }
     function prepare_grading_commit($info) {
         if (!$this->pset->gitless_grades) {
-            if (!$this->repo)
+            if (!$this->repo) {
                 return ["ok" => false, "error" => "Missing repository."];
+            }
             $this->commit = $this->conf->check_api_hash($this->hash, $this);
-            if (!$this->commit)
+            if (!$this->commit) {
                 return ["ok" => false, "error" => ($this->hash ? "Disconnected commit." : "Missing commit.")];
+            }
             $info->force_set_hash($this->commit->hash);
         }
         return false;

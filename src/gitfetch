@@ -179,7 +179,11 @@ if [ $gitfetch_status = 0 ]; then
     last_tag=`echo $tags | tr ' ' '\n' | head -n 1`
     last_tag_head=`test -n "$last_tag" && cat .git/refs/tags/$last_tag`
     new_head=
-    update="snaphash='$cur_head', working=$snaptime, $update"
+    if [ -z "$cur_head" -o "$cur_head" = 0000000000000000000000000000000000000000 ]; then
+        update="snaphash=null, working=$snaptime, $update"
+    else
+        update="snaphash='$cur_head', working=$snaptime, $update"
+    fi
     if [ -n "$cur_head" -a "$last_tag_head" != "$cur_head" ]; then
         git tag "repo$repoid.snap$snapnow" $cur_head
         update="snapat='$snaptime', $update"

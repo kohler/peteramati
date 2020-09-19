@@ -5,18 +5,24 @@
 require_once("src/initweb.php");
 
 // parse request
-if ($Qreq->base !== null)
+if ($Qreq->base !== null) {
     $Conf->set_siteurl($Qreq->base);
-if ($Qreq->path_front() && substr($Qreq->path_front(), 0, 1) === "~")
+}
+if ($Qreq->path_front()
+    && substr($Qreq->path_front(), 0, 1) === "~") {
     $Qreq->u = substr(urldecode($Qreq->shift_path()), 1);
-if (($x = $Qreq->shift_path()))
-    $Qreq->fn = urldecode($x);
+}
 if (($x = $Qreq->shift_path())) {
-    if (!$Qreq->pset)
+    $Qreq->fn = urldecode($x);
+}
+if (($x = $Qreq->shift_path())) {
+    if (!$Qreq->pset) {
         $Qreq->pset = urldecode($x);
+    }
     if (($x = $Qreq->shift_path())) {
-        if (!$Qreq->commit)
+        if (!$Qreq->commit) {
             $Qreq->commit = urldecode($x);
+        }
     }
 }
 
@@ -31,10 +37,11 @@ if ($Qreq->pset && !($api->pset = $Conf->pset_by_key($Qreq->pset))) {
     json_exit(["ok" => false, "error" => "No such pset."]);
 }
 if ($api->pset && $api->pset->disabled) {
-    if ($Me->isPC)
+    if ($Me->isPC) {
         json_exit(["ok" => false, "error" => "Pset disabled."]);
-    else
+    } else {
         json_exit(["ok" => false, "error" => "No such pset."]);
+    }
 } else if ($api->pset && !$api->pset->visible && !$Me->isPC) {
     json_exit(["ok" => false, "error" => "No such pset."]);
 }
