@@ -2162,7 +2162,6 @@ td.mhcb {
 .pa-plist {
 	margin-bottom: 1rem;
 }
-.pa-gradelist.noneditable > .pa-p,
 .pa-gradelist.pa-pset-hidden > .pa-p:last-child,
 .pa-grp-hidden > .pa-p {
 	margin-bottom: 0;
@@ -2760,7 +2759,7 @@ span.pa-gradewidth {
 input.pa-gradevalue {
 	min-width: 3rem;
 }
-.editable span.pa-gradevalue, input.pa-gradevalue, span.pa-gradewidth {
+input.pa-gradevalue, span.pa-gradewidth {
 	width: 6rem;
 }
 textarea.pa-gradevalue {
@@ -3164,10 +3163,14 @@ a.help {
 	z-index: 60;
 	pointer-events: none;
 }
+.modal-dialog-wide {
+	max-width: 80vw;
+}
 .modal-dialog-centered {
 	margin: 5vh auto;
 	position: relative;
 	display: flex;
+	justify-content: center;
 }
 .modal-content {
 	border: 1px solid rgba(0, 0, 0, 0.6);
@@ -3176,6 +3179,9 @@ a.help {
 	padding: 0.75em 1em;
 	background: #fbfbfa;
 	pointer-events: auto;
+}
+.modal-dialog-wide > .modal-content {
+	min-width: max(15em,40vw);
 }
 
 .popup-actions {

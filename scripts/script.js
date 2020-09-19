@@ -7406,7 +7406,7 @@ function pa_render_pset_table(pconf, data) {
             hc.push('<strong class="gt-name-email"></strong>');
         hc.push('<div class="pa-messages"></div>');
 
-        hc.push('<div class="pa-gradelist in-modal editable">', '</div>');
+        hc.push('<div class="pa-gradelist in-modal">', '</div>');
         for (var i = 0; i !== grade_entries.length; ++i) {
             hc.push(pa_render_grade_entry(grade_entries[i], {editable: true, live: false}));
         }
@@ -7417,6 +7417,7 @@ function pa_render_pset_table(pconf, data) {
         hc.push('<button type="button" name="prev" class="btnl">&lt;</button>');
         hc.push('<button type="button" name="next" class="btnl">&gt;</button>');
         $gdialog = hc.show(false);
+        $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
 
         var checked_spos = $j.find(".papsel:checked").toArray().map(function (x) {
                 return x.parentElement.parentElement.getAttribute("data-pa-spos");
