@@ -859,16 +859,19 @@ if ($Me->privChair && (!$User || $User === $Me)) {
 
 if ($Me->isPC && $User === $Me) {
     $a = [];
-    foreach ($Conf->psets_newest_first() as $pset)
+    foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset) && !$pset->disabled)
             $a[] = '<a href="#' . $pset->urlkey . '">' . htmlspecialchars($pset->title) . '</a>';
-    if (!empty($a))
+    }
+    if (!empty($a)) {
         echo '<div class="home-pset-links"><h4>', join(" • ", $a), '</h4></div>';
+    }
 }
 
 // Home message
-if (($v = $Conf->setting_data("homemsg")))
+if (($v = $Conf->setting_data("homemsg"))) {
     $Conf->infoMsg($v);
+}
 
 
 // Sign in
@@ -931,21 +934,26 @@ Sign in to tell us about your code.";
 if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
     echo "<div id='homeinfo'>";
     $u = $Me->user_linkpart($User);
-    if ($User !== $Me && !$User->is_anonymous && $User->contactImageId)
+    if ($User !== $Me && !$User->is_anonymous && $User->contactImageId) {
         echo '<img class="pa-face float-left" src="' . hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
+    }
     echo '<h2 class="homeemail"><a class="q" href="',
-        hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
-    if ($Me->privChair)
+        hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+    if ($Me->privChair) {
         echo "&nbsp;", become_user_link($User);
+    }
     echo '</h2>';
-    if (!$User->is_anonymous && $User !== $Me)
+    if (!$User->is_anonymous && $User !== $Me) {
         echo '<h3>', Text::user_html($User), '</h3>';
+    }
 
-    if (!$User->is_anonymous)
+    if (!$User->is_anonymous) {
         RepositorySite::echo_username_forms($User);
+    }
 
-    if ($User->dropped)
+    if ($User->dropped) {
         ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
+    }
 
     echo '<hr class="c" />', "</div>\n";
 }
@@ -992,21 +1000,27 @@ function render_grades($pset, $gi, $s) {
 
 function show_pset($pset, $user) {
     global $Me;
-    if ($pset->gitless_grades && $Me == $user && !$pset->partner
-        && !$pset->contact_grade_for($user))
+    if ($pset->gitless_grades
+        && $Me === $user
+        && !$pset->partner
+        && !$pset->contact_grade_for($user)
+        && !$pset->student_can_edit_grades()) {
         return;
+    }
     echo "<hr>\n";
     $user_can_view = $user->can_view_pset($pset);
-    if (!$user_can_view)
+    if (!$user_can_view) {
         echo '<div class="pa-pset-hidden">';
+    }
     $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($user)]);
     echo "<h2><a class=\"btn\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
         htmlspecialchars($pset->title), "</a>";
     $info = PsetView::make($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
     $user_see_grade = $info->user_can_view_grades();
-    if ($user_see_grade && $info->has_assigned_grades())
+    if ($user_see_grade && $info->has_assigned_grades()) {
         echo ' <a class="gradesready" href="', $pseturl, '">(grade ready)</a>';
+    }
     echo "</a></h2>";
     ContactView::echo_partner_group($info);
     ContactView::echo_repo_group($info);
@@ -1021,16 +1035,20 @@ function show_pset($pset, $user) {
     if ($info->can_view_grades() && $info->has_assigned_grades()) {
         $tm = $info->grade_total();
         $t = "<strong>" . $tm[0] . "</strong> / " . $tm[1];
-        if (!$user_see_grade)
+        if (!$user_see_grade) {
             echo '<div class="pa-grp-hidden">';
+        }
         ContactView::echo_group("grade", $t);
-        if (!$user_see_grade)
+        if (!$user_see_grade) {
             echo '</div>';
+        }
     }
-    if ($info->repo && $user_can_view)
+    if ($info->repo && $user_can_view) {
         ContactView::echo_group("", '<strong><a href="' . $pseturl . '">view code</a></strong>');
-    if (!$user_can_view)
+    }
+    if (!$user_can_view) {
         echo '</div>';
+    }
     echo "\n";
 }
 

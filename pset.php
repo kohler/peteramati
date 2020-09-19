@@ -11,8 +11,9 @@ global $User, $Pset, $Info, $Qreq;
 
 $User = $Me;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u)))
+    && !($User = ContactView::prepare_user($Qreq->u))) {
     redirectSelf(array("u" => null));
+}
 assert($User == $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
 
@@ -550,8 +551,8 @@ function echo_all_grades($info) {
 
     $has_grades = $info->has_assigned_grades();
     if ($info->can_view_grades()
-        && ($has_grades || $info->can_edit_grades())) {
-        if ($info->pset->grade_script && $info->can_edit_grades()) {
+        && ($has_grades || $info->can_edit_grades_any())) {
+        if ($info->pset->grade_script && $info->can_edit_grades_any()) {
             foreach ($info->pset->grade_script as $gs) {
                 Ht::stash_html($info->conf->make_script_file($gs));
             }
@@ -566,14 +567,14 @@ function echo_all_grades($info) {
     }
 
     $lhd = $info->late_hours_data();
-    if ($lhd && $info->can_view_grades() && !$info->can_edit_grades()) {
+    if ($lhd && $info->can_view_grades() && !$info->can_edit_grades_staff()) {
         if ($has_grades
             || (isset($lhd->hours)
                 && $lhd->hours > 0
                 && !$info->pset->obscure_late_hours)) {
             ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>');
         }
-    } else if ($info->can_edit_grades() && $info->pset->late_hours_entry()) {
+    } else if ($info->can_edit_grades_staff() && $info->pset->late_hours_entry()) {
         echo '<form class="ui-submit pa-grade pa-p" data-pa-grade="late_hours">',
             '<label class="pa-pt" for="pa-lh">late hours</label>',
             '<div class="pa-pd"><span class="pa-gradewidth">',
@@ -591,20 +592,21 @@ function echo_all_grades($info) {
 /** @param PsetView $info */
 function show_pset($info) {
     echo "<hr>\n";
-    if ($info->can_edit_grades() && get($info->pset, "gitless_grades"))
+    if ($info->pset->gitless_grades && $info->can_edit_grades_staff()) {
         echo '<div style="float:right"><button type="button" onclick="jQuery(\'#upload\').show()">upload</button></div>';
+    }
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);
-    ContactView::echo_repo_group($info, $info->can_edit_grades());
+    ContactView::echo_repo_group($info, $info->can_edit_grades_any());
     ContactView::echo_repo_last_commit_group($info, false);
     ContactView::echo_downloads_group($info);
 }
 
 show_pset($Info);
 
-if ($Info->can_edit_grades()) {
+if ($Info->can_edit_grades_staff()) {
     echo '<div id="upload" style="display:none"><hr/>',
-        Ht::form($Info->hoturl_post("pset", array("uploadgrades" => 1))),
+        Ht::form($Info->hoturl_post("pset", ["uploadgrades" => 1])),
         '<div class="f-contain">',
         '<input type="file" name="file">',
         Ht::submit("Upload"),
@@ -789,8 +791,8 @@ if ($Pset->gitless) {
     if (!empty($diff)) {
         echo "<hr>\n";
         echo '<div class="pa-diffset pa-with-diffbar">';
-        PsetView::echo_pa_diffbar($Info->can_edit_grades());
-        if ($Info->can_edit_grades() && !$Pset->has_grade_landmark_range) {
+        PsetView::echo_pa_diffbar($Info->can_edit_grades_any());
+        if ($Info->can_edit_grades_any() && !$Pset->has_grade_landmark_range) {
             PsetView::echo_pa_sidebar_gradelist();
         }
         foreach ($diff as $file => $dinfo) {
@@ -802,7 +804,7 @@ if ($Pset->gitless) {
                         || !$lnorder->has_linenotes_in_diff));
             $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
         }
-        if ($Info->can_edit_grades() && !$Pset->has_grade_landmark_range) {
+        if ($Info->can_edit_grades_any() && !$Pset->has_grade_landmark_range) {
             PsetView::echo_close_pa_sidebar_gradelist();
         }
         echo '</div>';

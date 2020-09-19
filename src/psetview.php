@@ -549,8 +549,9 @@ class PsetView {
             $this->load_grade();
             if ($this->repo_grade
                 && $this->repo_grade->gradebhash !== null
-                && $this->hash === null)
+                && $this->hash === null) {
                 $this->hash = bin2hex($this->repo_grade->gradebhash);
+            }
         }
         return $this->grade;
     }
@@ -621,37 +622,43 @@ class PsetView {
     }
 
     function is_grading_commit() {
-        if ($this->pset->gitless_grades)
+        if ($this->pset->gitless_grades) {
             return true;
-        $this->ensure_grade();
-        return $this->hash
-            && $this->repo_grade
-            && $this->hash === $this->repo_grade->gradehash;
+        } else {
+            $this->ensure_grade();
+            return $this->hash
+                && $this->repo_grade
+                && $this->hash === $this->repo_grade->gradehash;
+        }
     }
 
     private function contact_can_view_grades(Contact $user) {
-        if ($user->isPC && $user !== $this->user)
-            return $user->can_view_pset($this->pset);
-        if (!$this->pset->student_can_view() || $user !== $this->user)
+        if ($user !== $this->user) {
+            return $user->isPC && $user->can_view_pset($this->pset);
+        } else if (!$this->pset->student_can_view()
+                   || (!$this->pset->gitless_grades
+                       && (!$this->repo || !$this->user_can_view_repo_contents()))) {
             return false;
-        $this->ensure_grade();
-        return $this->grade
-            && $this->grade->hidegrade <= 0
-            && ($this->grade->hidegrade < 0
-                || $this->pset->student_can_view_grades($user->extension))
-            && ($this->pset->gitless_grades
-                || ($this->repo && $this->user_can_view_repo_contents()));
+        } else if (($g = $this->ensure_grade())) {
+            return $g->hidegrade <= 0
+                && ($g->hidegrade < 0
+                    || $this->pset->student_can_view_grades($user->extension));
+        } else {
+            return $this->pset->student_can_edit_grades($user->extension);
+        }
     }
 
     function can_view_grades() {
-        if ($this->can_view_grades === null)
+        if ($this->can_view_grades === null) {
             $this->can_view_grades = $this->contact_can_view_grades($this->viewer);
+        }
         return $this->can_view_grades;
     }
 
     function user_can_view_grades() {
-        if ($this->user_can_view_grades === null)
+        if ($this->user_can_view_grades === null) {
             $this->user_can_view_grades = $this->contact_can_view_grades($this->user);
+        }
         return $this->user_can_view_grades;
     }
 
@@ -674,9 +681,13 @@ class PsetView {
                 && $this->user_can_view_grade_statistics());
     }
 
-    function can_edit_grades() {
+    function can_edit_grades_staff() {
+        return $this->can_view_grades() && $this->viewer !== $this->user;
+    }
+
+    function can_edit_grades_any() {
         return $this->can_view_grades()
-            && $this->viewer !== $this->user;
+            && ($this->viewer !== $this->user || $this->pset->student_can_edit_grades($this->user->extension));
     }
 
 
@@ -1219,7 +1230,7 @@ class PsetView {
                 $result["auto_late_hours"] = $lhd->autohours;
             }
         }
-        if ($this->can_edit_grades()) {
+        if ($this->can_edit_grades_staff()) {
             $result["editable"] = true;
         }
 

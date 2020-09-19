@@ -43,7 +43,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     if ($info->user_can_view_grades()) {
         echo '" data-pa-user-can-view-grades="yes';
     }
-    if ($info->can_edit_grades()
+    if ($info->can_edit_grades_staff()
         || ($info->can_view_grades() && $info->is_current_grades())) {
         echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(true)));
     }
@@ -84,7 +84,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         $want_grades = $pset->has_grade_landmark;
 
         if (!empty($diff)) {
-            if ($info->can_edit_grades() && !$pset->has_grade_landmark_range) {
+            if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
                 PsetView::echo_pa_sidebar_gradelist();
                 $want_grades = true;
             }
@@ -93,7 +93,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
                     ["open" => true, "id_by_user" => true,
                      "no_heading" => count($qreq->files) == 1]);
             }
-            if ($info->can_edit_grades() && !$pset->has_grade_landmark_range) {
+            if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
                 PsetView::echo_close_pa_sidebar_gradelist();
             }
         }

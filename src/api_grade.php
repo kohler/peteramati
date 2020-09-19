@@ -4,7 +4,7 @@
 // See LICENSE for open-source distribution terms
 
 class API_Grade {
-    static private function parse_full_grades($pset, $x, &$errf) {
+    static private function parse_full_grades($pset, $x, &$errf, $can_edit) {
         if (is_string($x)) {
             $x = json_decode($x, true);
             if (!is_array($x)) {
@@ -18,8 +18,11 @@ class API_Grade {
             foreach ($x as $k => &$v) {
                 if (($ge = $pset->gradelike_by_key($k))) {
                     $v = $ge->parse_value($v);
-                    if ($v === false && !isset($errf[$k]))
+                    if ($v === false && !isset($errf[$k])) {
                         $errf[$k] = $ge->parse_value_error();
+                    } else if (!$can_edit && !$ge->student_can_edit()) {
+                        $errf[$k] = "Permission error.";
+                    }
                 }
             }
             return $x;
@@ -55,8 +58,8 @@ class API_Grade {
         }
         if (array_key_exists("late_hours", $g)) { // XXX separate permission check?
             $curlhd = $info->late_hours_data() ? : (object) [];
-            $lh = get($curlhd, "hours", 0);
-            $alh = get($curlhd, "autohours", $lh);
+            $lh = $curlhd->hours ?? 0;
+            $alh = $curlhd->autohours ?? $lh;
             if ($og["late_hours"] !== null
                 && abs($og["late_hours"] - $lh) >= 0.0001) {
                 $errf["late_hours"] = true;
@@ -81,8 +84,6 @@ class API_Grade {
                 return ["ok" => false, "error" => "Missing credentials."];
             } else if ($info->is_handout_commit()) {
                 return ["ok" => false, "error" => "Cannot set grades on handout commit."];
-            } else if (!$info->can_edit_grades()) {
-                return ["ok" => false, "error" => "Permission error."];
             } else if (!$info->pset->gitless_grades
                        && $qreq->commit_is_grade
                        && $info->grading_hash() !== $info->commit_hash()) {
@@ -92,9 +93,9 @@ class API_Grade {
             // parse grade elements
             $qreq->allow_a("grades", "autogrades", "oldgrades");
             $errf = [];
-            $g = self::parse_full_grades($info->pset, $qreq->grades, $errf);
-            $ag = self::parse_full_grades($info->pset, $qreq->autogrades, $errf);
-            $og = self::parse_full_grades($info->pset, $qreq->oldgrades, $errf);
+            $g = self::parse_full_grades($info->pset, $qreq->grades, $errf, $info->can_edit_grades_any());
+            $ag = self::parse_full_grades($info->pset, $qreq->autogrades, $errf, $info->can_edit_grades_any());
+            $og = self::parse_full_grades($info->pset, $qreq->oldgrades, $errf, true);
             if (!empty($errf)) {
                 if (isset($errf["!invalid"])) {
                     return ["ok" => false, "error" => "Invalid request."];
@@ -156,7 +157,7 @@ class API_Grade {
                     continue;
                 }
                 $commit = null;
-                if (($hash = get($ugs[$uid], "commit"))) {
+                if (($hash = $ugs[$uid]->commit ?? null)) {
                     $commit = $info->pset->handout_commit($hash)
                         ?? $info->repo->connected_commit($hash, $info->pset, $info->branch);
                 }
@@ -165,13 +166,13 @@ class API_Grade {
                     continue;
                 }
                 $info->force_set_hash($commit->hash);
-                if (get($ugs[$uid], "commit_is_grade")
+                if (($ugs[$uid]->commit_is_grade ?? false)
                     && $commit->hash !== $info->grading_hash()) {
                     $errno = max($errno, 2);
                 }
             }
             if (!$info->can_view_grades()
-                || ($ispost && !$info->can_edit_grades())) {
+                || ($ispost && !$info->can_edit_grades_staff())) {
                 return ["ok" => false, "error" => "Permission error."];
             } else if ($ispost && $info->is_handout_commit()) {
                 $errno = max($errno, 1);
@@ -196,9 +197,9 @@ class API_Grade {
             // parse grade elements
             $g = $ag = $og = $errf = [];
             foreach ($ugs as $uid => $gx) {
-                $g[$uid] = self::parse_full_grades($api->pset, get($gx, "grades"), $errf);
-                $ag[$uid] = self::parse_full_grades($api->pset, get($gx, "autogrades"), $errf);
-                $og[$uid] = self::parse_full_grades($api->pset, get($gx, "oldgrades"), $errf);
+                $g[$uid] = self::parse_full_grades($api->pset, $gx->grades ?? null, $errf, true);
+                $ag[$uid] = self::parse_full_grades($api->pset, $gx->autogrades ?? null, $errf, true);
+                $og[$uid] = self::parse_full_grades($api->pset, $gx->oldgrades ?? null, $errf, true);
             }
             if (!empty($errf)) {
                 reset($errf);

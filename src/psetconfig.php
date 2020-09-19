@@ -21,10 +21,20 @@ class PsetConfigException extends Exception {
 class Pset {
     /** @var Conf */
     public $conf;
+    /** @var int
+     * @readonly */
     public $id;
+    /** @var int
+     * @readonly */
     public $psetid;
+    /** @var string
+     * @readonly */
     public $key;
+    /** @var string
+     * @readonly */
     public $urlkey;
+    /** @var string
+     * @readonly */
     public $nonnumeric_key;
 
     public $title;
@@ -32,9 +42,13 @@ class Pset {
     public $group_weight;
     public $group_weight_default = false;
 
+    /** @var bool */
     public $disabled;
+    /** @var bool */
     public $admin_disabled;
+    /** @var bool */
     public $visible;
+    /** @var bool */
     public $frozen;
     public $partner;
     public $no_branch;
@@ -49,7 +63,7 @@ class Pset {
     public $handout_branch;
     public $handout_hash;
     public $handout_warn_hash;
-    public $repo_guess_patterns = array();
+    public $repo_guess_patterns = [];
     public $directory;
     public $directory_slash;
     public $directory_noslash;
@@ -64,18 +78,31 @@ class Pset {
     public $all_grades = [];
     /** @var array<string,GradeEntryConfig> */
     public $grades;
+    /** @var bool */
     public $grades_visible;
+    /** @var bool */
     public $grades_visible_college;
+    /** @var bool */
     public $grades_visible_extension;
+    /** @var bool */
     public $grade_statistics_visible;
+    /** @var ?float */
     public $grade_cdf_cutoff;
+    /** @var bool */
     public $separate_extension_grades;
+    /** @var bool */
     public $has_extra = false;
+    /** @var bool */
     public $has_grade_landmark = false;
+    /** @var bool */
     public $has_grade_landmark_range = false;
+    /** @var bool */
     public $has_formula = false;
+    /** @var bool */
+    private $has_student_editable_grades = false;
     private $_max_grade = [null, null, null, null];
     public $grade_script;
+    /** @var GradeEntryConfig */
     private $_late_hours;
 
     /** @var array<string,DownloadEntryConfig> */
@@ -252,6 +279,9 @@ class Pset {
                 if ($g->is_extra) {
                     $this->has_extra = true;
                 }
+                if ($g->visible && $g->student_editable) {
+                    $this->has_student_editable_grades = true;
+                }
             }
         } else if ($grades) {
             throw new PsetConfigException("`grades` format error`", "grades");
@@ -377,11 +407,13 @@ class Pset {
     }
 
 
+    /** @return bool */
     function student_can_view() {
         $dl = $this->visible;
         return !$this->disabled && $dl && ($dl === true || $dl <= Conf::$now);
     }
 
+    /** @return bool */
     function student_can_view_grades($extension = null) {
         if ($extension === null) {
             $dl = $this->grades_visible;
@@ -391,6 +423,20 @@ class Pset {
             $dl = $this->grades_visible_college;
         }
         return $this->student_can_view() && $dl && ($dl === true || $dl <= Conf::$now);
+    }
+
+    /** @return bool */
+    function student_can_edit_grades($extension = null) {
+        if (!$this->has_student_editable_grades
+            && !$this->student_can_view_grades($extension)) {
+            return false;
+        } else {
+            foreach ($this->grades as $ge) {
+                if ($ge->student_can_edit())
+                    return true;
+            }
+            return false;
+        }
     }
 
 
@@ -493,6 +539,7 @@ class Pset {
         return $this->_max_grade[$i];
     }
 
+    /** @param bool $pcview */
     function gradeinfo_json($pcview) {
         $max = [];
         $count = $maxtotal = 0;
@@ -500,8 +547,9 @@ class Pset {
             ++$count;
             if ($ge->max && ($pcview || $ge->max_visible)) {
                 $max[$ge->key] = $ge->max;
-                if (!$ge->is_extra && !$ge->no_total)
+                if (!$ge->is_extra && !$ge->no_total) {
                     $maxtotal += $ge->max;
+                }
             }
         }
         if ($maxtotal) {
@@ -542,7 +590,6 @@ class Pset {
         Dbl::free($result);
         return $cg;
     }
-
     function commit_notes($bhash) {
         assert(!$this->gitless);
         $result = $this->conf->qe("select * from CommitNotes where pset=? and bhash=?", $this->psetid, strlen($bhash) === 40 ? hex2bin($bhash) : $bhash);
@@ -837,22 +884,41 @@ class DownloadEntryConfig {
 }
 
 class GradeEntryConfig {
+    /** @var string */
     public $key;
+    /** @var string */
     public $name;
+    /** @var string */
     public $title;
+    /** @var string */
+    public $edit_description;
+    /** @var string */
     public $type;
+    /** @var ?string */
     public $round;
     public $options;
+    /** @var ?string */
     public $formula;
+    /** @var null|false|GradeFormula */
     private $_formula = false;
     public $max;
+    /** @var bool */
     public $visible;
+    /** @var bool */
     private $_visible_defaulted = false;
+    /** @var bool */
+    public $student_editable;
+    /** @var bool */
     public $max_visible;
+    /** @var bool */
     private $_max_visible_defaulted = false;
+    /** @var bool */
     public $no_total;
+    /** @var bool */
     public $is_extra;
+    /** @var float */
     public $position;
+    /** @var ?int */
     public $pcview_index;
     public $landmark_file;
     public $landmark_line;
@@ -892,13 +958,14 @@ class GradeEntryConfig {
         if ((string) $this->title === "") {
             $this->title = $this->key;
         }
+        $this->edit_description = Pset::cstr($loc, $g, "edit_description");
 
         $type = null;
         if (isset($g->type)) {
             $type = Pset::cstr($loc, $g, "type");
             if ($type === "number") {
                 $type = null;
-            } else if ($type === "text" || $type === "checkbox" || $type === "letter") {
+            } else if (in_array($type, ["text", "checkbox", "letter", "section"], true)) {
                 // nada
             } else if ($type === "select"
                        && isset($g->options)
@@ -927,8 +994,8 @@ class GradeEntryConfig {
             $this->round = $round;
         }
 
-        if ($this->type === "text" || $this->type === "select" || $this->type === "formula") {
-            if (isset($g->no_total) && $g->no_total) {
+        if (in_array($this->type, ["text", "select", "formula", "section"], true)) {
+            if (isset($g->no_total) && !$g->no_total) {
                 throw new PsetConfigException("grade entry type {$this->type} cannot be in total", $loc);
             }
             $this->no_total = true;
@@ -938,13 +1005,9 @@ class GradeEntryConfig {
 
         $this->max = Pset::cnum($loc, $g, "max");
         if ($this->type === "checkbox") {
-            if ($this->max === null) {
-                throw new PsetConfigException("checkbox grade entry requires max", $loc);
-            }
+            $this->max = $this->max ?? 1;
         } else if ($this->type === "letter") {
-            if ($this->max === null) {
-                $this->max = 100;
-            }
+            $this->max = $this->max ?? 100;
             if ((float) $this->max !== 100.0) {
                 throw new PsetConfigException("letter grade entry requires max 100", $loc);
             }
@@ -966,6 +1029,7 @@ class GradeEntryConfig {
             $this->max_visible = $this->_max_visible_defaulted = true;
         }
         $this->is_extra = Pset::cbool($loc, $g, "is_extra");
+        $this->student_editable = Pset::cbool($loc, $g, "student_editable");
 
         $this->position = Pset::cnum($loc, $g, "position");
         if ($this->position === null && isset($g->priority)) {
@@ -1080,6 +1144,7 @@ class GradeEntryConfig {
         return false;
     }
 
+    /** @return string */
     function parse_value_error() {
         if ($this->type === null) {
             return "Number expected.";
@@ -1090,6 +1155,7 @@ class GradeEntryConfig {
         }
     }
 
+    /** @return bool */
     function value_differs($v1, $v2) {
         if ($this->type === "checkbox"
             && (int) $v1 === 0
@@ -1105,6 +1171,7 @@ class GradeEntryConfig {
         }
     }
 
+    /** @return ?GradeFormula */
     function formula(Conf $conf) {
         if ($this->_formula === false) {
             $this->_formula = null;
@@ -1115,6 +1182,11 @@ class GradeEntryConfig {
             }
         }
         return $this->_formula;
+    }
+
+    /** @return bool */
+    function student_can_edit() {
+        return $this->visible && $this->student_editable;
     }
 
     function json($pcview, $pos = null) {
@@ -1148,6 +1220,12 @@ class GradeEntryConfig {
         }
         if (!$this->visible) {
             $gej["visible"] = false;
+        }
+        if ($this->student_editable)  {
+            $gej["student_editable"] = true;
+        }
+        if (($pcview || $this->student_editable) && $this->edit_description) {
+            $gej["edit_description"] = $this->edit_description;
         }
         return $gej;
     }

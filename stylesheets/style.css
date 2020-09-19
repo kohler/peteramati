@@ -2130,6 +2130,9 @@ td.mhcb {
 	flex-grow: 1;
 	font-weight: bold;
 }
+.pa-pdesc {
+	width: 100%;
+}
 .pa-pd {
 	min-width: 168px;
 	width: calc(100% - 168px);
@@ -2151,6 +2154,9 @@ td.mhcb {
 .pa-ps .pa-pd {
 	min-width: initial;
 	width: auto;
+}
+.pa-p-section {
+	margin-top: 2rem;
 }
 
 .pa-gradelist {

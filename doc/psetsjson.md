@@ -230,7 +230,11 @@ this format.
 
 * `type`: string
 
+    null, `"number"`, `"text"`, `"checkbox"`, `"letter"`, `"select"`, or `"formula"`
+
 * `round`: string
+
+    null, `"none"`, `"up"`, `"down"`, or `"round"`
 
 * `max`: number
 
@@ -245,6 +249,10 @@ this format.
 
     If set explicitly to false, then students cannot see the value of `max`
     (graders can). Defaults to true.
+
+* `student_editable`: boolean
+
+    If true, then students can edit this grade.
 
 * `is_extra`: boolean
 

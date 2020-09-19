@@ -2995,6 +2995,10 @@ var pa_grade_types = {
         },
         justify: "center"
     },
+    section: {
+        type: "section",
+        text: function (v) { return ""; }
+    },
     letter: (function () {
         var lm = {
             98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-",
@@ -3029,19 +3033,24 @@ var pa_grade_types = {
     })()
 };
 
-function pa_render_grade_entry(ge, options) {
+function pa_render_grade_entry(ge, editable, live) {
     var t, name = ge.key, title = ge.title ? escape_entities(ge.title) : name;
-    if ((options === true || (options && options.editable))
-        && ge.type !== "formula") {
-        var live = options === true || options.live,
-            livecl = live ? 'uich ' : '',
+    if ((editable || ge.student_editable) && ge.type !== "formula") {
+        live = live !== false;
+        var livecl = live ? 'uich ' : '',
             id = "pa-ge" + ++pa_render_grade_entry.id_counter;
-        t = (live ? '<form class="ui-submit ' : '<div class="');
-        if (ge.visible === false) {
-            t += 'pa-p-hidden ';
+        t = (live ? '<form class="ui-submit ' : '<div class="') + 'pa-grade pa-p';
+        if (ge.type === "section") {
+            t += ' pa-p-section';
         }
-        t += 'pa-grade pa-p" data-pa-grade="' + name +
+        if (ge.visible === false) {
+            t += ' pa-p-hidden';
+        }
+        t += '" data-pa-grade="' + name +
             '"><label class="pa-pt" for="' + id + '">' + title + '</label>';
+        if (ge.edit_description) {
+            t += '<div class="pa-pdesc">' + escape_entities(ge.edit_description) + '</div>';
+        }
         if (ge.type === "text") {
             t += '<div class="pa-pd"><textarea class="' + livecl + 'pa-pd pa-gradevalue need-autogrow" name="' + name +
                 '" id="' + id + '"></textarea></div>';
@@ -3056,8 +3065,13 @@ function pa_render_grade_entry(ge, options) {
             t += '<div class="pa-pd"><span class="pa-gradewidth">' +
                 '<input type="checkbox" class="' + (live ? 'ui ' : '') +
                 'pa-gradevalue" name="' + name + '" id="' + id + '" value="' +
-                ge.max + '"></span> <span class="pa-gradedesc">of ' + ge.max +
-                ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span></div>';
+                ge.max + '"></span>';
+            if (editable) {
+                t += ' <span class="pa-gradedesc">of ' + ge.max +
+                    ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>';
+            }
+            t += '</div>';
+        } else if (ge.type === "section") {
         } else {
             t += '<div class="pa-pd"><span class="pa-gradewidth">' +
                 '<input type="text" class="' + livecl + 'pa-gradevalue" name="' + name +
@@ -3071,7 +3085,11 @@ function pa_render_grade_entry(ge, options) {
         }
         t += live ? '</form>' : '</div>';
     } else {
-        t = '<div class="pa-grade pa-p" data-pa-grade="' + name + '">' +
+        t = '<div class="pa-grade pa-p';
+        if (ge.type === "section") {
+            t += ' pa-p-section';
+        }
+        t += '" data-pa-grade="' + name + '">' +
             '<div class="pa-pt">' + title + '</div>';
         if (ge.type === "text") {
             t += '<div class="pa-pd pa-gradevalue"></div>';
@@ -3176,7 +3194,7 @@ function pa_set_grade(ge, g, ag, options) {
         if ($v.text() !== gt) {
             $v.text(gt);
         }
-        toggleClass(this, "hidden", gt === "" && !ge.max);
+        toggleClass(this, "hidden", gt === "" && !ge.max && ge.type !== "section");
     }
 
     // maybe add landmark reference
@@ -3403,7 +3421,9 @@ $(function () {
 function pa_render_total(gi, tm) {
     var t = '<div class="pa-total pa-p', ne = 0;
     for (var k in gi.entries) {
-        if (gi.entries[k].type !== "text" && gi.entries[k].type !== "select")
+        if (gi.entries[k].type !== "text"
+            && gi.entries[k].type !== "select"
+            && gi.entries[k].type !== "section")
             ++ne;
     }
     if (ne <= 1) {
@@ -4734,8 +4754,9 @@ return {add: add, load: load};
 
 
 function pa_gradeinfo_total(gi, noextra) {
-    if (typeof gi === "string")
+    if (typeof gi === "string") {
         gi = JSON.parse(gi);
+    }
     var total = 0, maxtotal = 0;
     for (var i = 0; i < gi.order.length; ++i) {
         var k = gi.order[i];
@@ -7408,7 +7429,7 @@ function pa_render_pset_table(pconf, data) {
 
         hc.push('<div class="pa-gradelist in-modal">', '</div>');
         for (var i = 0; i !== grade_entries.length; ++i) {
-            hc.push(pa_render_grade_entry(grade_entries[i], {editable: true, live: false}));
+            hc.push(pa_render_grade_entry(grade_entries[i], true, false));
         }
         hc.pop();
         hc.push_actions();
