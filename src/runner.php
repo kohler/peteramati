@@ -66,10 +66,10 @@ class RunnerState {
     function expand($x) {
         if (strpos($x, '${') !== false) {
             $x = str_replace('${REPOID}', $this->repoid, $x);
-            $x = str_replace('${PSET}', $this->pset->id, $x);
+            $x = str_replace('${PSET}', (string) $this->pset->id, $x);
             $x = str_replace('${CONFDIR}', "conf/", $x);
             $x = str_replace('${SRCDIR}', "src/", $x);
-            $x = str_replace('${HOSTTYPE}', $this->conf->opt("hostType", ""), $x);
+            $x = str_replace('${HOSTTYPE}', $this->conf->opt("hostType") ?? "", $x);
             $x = str_replace('${COMMIT}', $this->info->commit_hash(), $x);
             $x = str_replace('${HASH}', $this->info->commit_hash(), $x);
         }

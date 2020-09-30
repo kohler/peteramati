@@ -44,7 +44,7 @@ function set_session_name(Conf $conf) {
         $_COOKIE[$sn] = $_COOKIE[$upgrade_sn];
         hotcrp_setcookie($upgrade_sn, "", [
             "expires" => time() - 3600, "path" => "/",
-            "domain" => $conf->opt("sessionUpgradeDomain", $domain ? : ""),
+            "domain" => $conf->opt("sessionUpgradeDomain") ?? ($domain ? : ""),
             "secure" => !!$secure
         ]);
     }
@@ -71,7 +71,7 @@ function set_session_name(Conf $conf) {
         $params["domain"] = $domain;
     }
     $params["httponly"] = true;
-    if (($samesite = $conf->opt("sessionSameSite", "Lax"))) {
+    if (($samesite = $conf->opt("sessionSameSite") ?? "Lax")) {
         $params["samesite"] = $samesite;
     }
     if (PHP_VERSION_ID >= 70300) {

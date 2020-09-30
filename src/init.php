@@ -141,8 +141,8 @@ if (get($Opt, "memoryLimit")) {
 
 // Create the conference
 global $Conf;
-if (!$Conf) {
-    $Conf = Conf::$main = new Conf($Opt, true);
+if (!Conf::$main) {
+    Conf::set_main_instance(new Conf($Opt, true));
 }
 if (!$Conf->dblink) {
     Multiconference::fail_bad_database();
@@ -155,7 +155,7 @@ function psets_json_data($exclude_overrides, &$mtime) {
     $datamap = array();
     $fnames = SiteLoader::expand_includes($Conf->opt("psetsConfig"),
                               ["CONFID" => $Conf->opt("confid") ? : $Conf->dbname,
-                               "HOSTTYPE" => $Conf->opt("hostType", "")]);
+                               "HOSTTYPE" => $Conf->opt("hostType") ?? ""]);
     foreach ($fnames as $fname) {
         $datamap[$fname] = @file_get_contents($fname);
         $mtime = max($mtime, @filemtime($fname));
@@ -289,7 +289,7 @@ function load_pset_info() {
 load_pset_info();
 
 putenv("GIT_REPOCACHE=$ConfSitePATH/repo");
-if ($Conf->opt("mysql", null) !== null) {
+if ($Conf->opt("mysql") !== null) {
     putenv("MYSQL=" . $Conf->opt("mysql"));
 }
 if (!$Conf->opt("disableRemote")

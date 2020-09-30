@@ -432,10 +432,10 @@ function echo_commit($info) {
         && ($info->viewer->isPC || !$pset->obscure_late_hours)) {
         $extra = array();
         if (isset($lhd->timestamp)) {
-            $extra[] = "commit at " . $info->conf->printableTimestamp($lhd->timestamp);
+            $extra[] = "commit at " . $info->conf->unparse_time($lhd->timestamp);
         }
         if (isset($lhd->deadline)) {
-            $extra[] = "deadline " . $info->conf->printableTimestamp($lhd->deadline);
+            $extra[] = "deadline " . $info->conf->unparse_time($lhd->deadline);
         }
         $extra = count($extra) ? ' <span style="font-weight:normal">(' . join(", ", $extra) . ')</span>' : "";
         $remarks[] = [!$pset->obscure_late_hours, "This commit uses " . plural($lhd->hours, "late hour") . $extra . "."];

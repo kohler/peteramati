@@ -1062,7 +1062,7 @@ class Contact {
     // obsolete
     private function password_hmac_key($keyid) {
         if ($keyid === null)
-            $keyid = $this->conf->opt("passwordHmacKeyid", 0);
+            $keyid = $this->conf->opt("passwordHmacKeyid") ?? 0;
         $key = $this->conf->opt("passwordHmacKey.$keyid");
         if (!$key && $keyid == 0)
             $key = $this->conf->opt("passwordHmacKey");
@@ -1112,9 +1112,9 @@ class Contact {
 
     private function preferred_password_keyid($iscdb) {
         if ($iscdb)
-            return $this->conf->opt("contactdb_passwordHmacKeyid", 0);
+            return $this->conf->opt("contactdb_passwordHmacKeyid") ?? 0;
         else
-            return $this->conf->opt("passwordHmacKeyid", 0);
+            return $this->conf->opt("passwordHmacKeyid") ?? 0;
     }
 
     private function check_password_encryption($hash, $iscdb) {

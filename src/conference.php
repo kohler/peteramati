@@ -39,10 +39,14 @@ class APIData {
 }
 
 class Conf {
-    public $dblink = null;
+    /** @var ?mysqli */
+    public $dblink;
 
+    /** @var array<string,int> */
     private $settings;
+    /** @var array<string,null|string|object> */
     private $settingTexts;
+    /** @var int */
     public $sversion;
     private $_gsettings = [];
     private $_gsettings_data = [];
@@ -51,17 +55,24 @@ class Conf {
     public $dbname;
     public $dsn = null;
 
+    /** @var string */
     public $short_name;
+    /** @var string */
     public $long_name;
+    /** @var int */
+    public $default_format;
+    /** @var string */
     public $download_prefix;
     public $sort_by_last;
+    /** @var array<string,mixed> */
     public $opt;
-    public $opt_override = null;
+    /** @var array<string,mixed> */
+    public $opt_override;
+    /** @var ?string */
     public $default_main_branch;
 
     public $validate_timeout;
     public $validate_overall_timeout;
-    public $default_format;
 
     private $save_messages = true;
     var $headerPrinted = false;
@@ -82,7 +93,10 @@ class Conf {
     private $_grouped_psets;
     private $_group_has_extra;
 
+    /** @var bool */
     private $_date_format_initialized = false;
+    /** @var ?DateTimeZone */
+    private $_dtz;
     private $_pc_members_cache = null;
     private $_pc_tags_cache = null;
     private $_pc_members_and_admins_cache = null;
@@ -164,8 +178,9 @@ class Conf {
         $result = $this->q_raw("select name, value, data from Settings");
         while ($result && ($row = $result->fetch_row())) {
             $this->settings[$row[0]] = (int) $row[1];
-            if ($row[2] !== null)
+            if ($row[2] !== null) {
                 $this->settingTexts[$row[0]] = $row[2];
+            }
             if (substr($row[0], 0, 4) == "opt.") {
                 $okey = substr($row[0], 4);
                 $this->opt_override[$okey] = $this->opt[$okey] ?? null;
@@ -200,8 +215,9 @@ class Conf {
         // set conferenceKey
         if (!isset($this->opt["conferenceKey"])) {
             if (!isset($this->settingTexts["conf_key"])
-                && ($key = random_bytes(32)) !== false)
+                && ($key = random_bytes(32)) !== false) {
                 $this->save_setting("conf_key", 1, $key);
+            }
             $this->opt["conferenceKey"] = $this->settingTexts["conf_key"] ?? "";
         }
 
@@ -238,37 +254,42 @@ class Conf {
             && (!isset($this->opt["shortName"]) || $this->opt["shortName"] == "")) {
             $this->opt["shortNameDefaulted"] = true;
             $this->opt["longName"] = $this->opt["shortName"] = $confid;
-        } else if (!isset($this->opt["longName"]) || $this->opt["longName"] == "")
+        } else if (!isset($this->opt["longName"]) || $this->opt["longName"] == "") {
             $this->opt["longName"] = $this->opt["shortName"];
-        else if (!isset($this->opt["shortName"]) || $this->opt["shortName"] == "")
+        } else if (!isset($this->opt["shortName"]) || $this->opt["shortName"] == "") {
             $this->opt["shortName"] = $this->opt["longName"];
-        if (!isset($this->opt["downloadPrefix"]) || $this->opt["downloadPrefix"] == "")
+        }
+        if (!isset($this->opt["downloadPrefix"]) || $this->opt["downloadPrefix"] == "") {
             $this->opt["downloadPrefix"] = $confid . "-";
+        }
         $this->short_name = $this->opt["shortName"];
         $this->long_name = $this->opt["longName"];
 
         // expand ${confid}, ${confshortname}
-        foreach (array("sessionName", "downloadPrefix", "conferenceSite",
-                       "paperSite", "defaultPaperSite", "contactName",
-                       "contactEmail", "docstore") as $k)
+        foreach (["sessionName", "downloadPrefix", "conferenceSite",
+                  "paperSite", "defaultPaperSite", "contactName",
+                  "contactEmail", "docstore"] as $k) {
             if (isset($this->opt[$k]) && is_string($this->opt[$k])
-                && strpos($this->opt[$k], "$") !== false) {
+                && strpos($this->opt[$k], "\$") !== false) {
                 $this->opt[$k] = preg_replace(',\$\{confid\}|\$confid\b,', $confid, $this->opt[$k]);
                 $this->opt[$k] = preg_replace(',\$\{confshortname\}|\$confshortname\b,', $this->short_name, $this->opt[$k]);
             }
+        }
         $this->download_prefix = $this->opt["downloadPrefix"];
 
-        foreach (array("emailFrom", "emailSender", "emailCc", "emailReplyTo") as $k)
+        foreach (["emailFrom", "emailSender", "emailCc", "emailReplyTo"] as $k) {
             if (isset($this->opt[$k]) && is_string($this->opt[$k])
-                && strpos($this->opt[$k], "$") !== false) {
-                $this->opt[$k] = preg_replace(',\$\{confid\}|\$confid\b,', $confid, $this->opt[$k]);
+                && strpos($this->opt[$k], "\$") !== false) {
+                $this->opt[$k] = preg_replace('/\$\{confid\}|\$confid\b/', $confid, $this->opt[$k]);
                 if (strpos($this->opt[$k], "confshortname") !== false) {
                     $v = rfc2822_words_quote($this->short_name);
-                    if ($v[0] === "\"" && strpos($this->opt[$k], "\"") !== false)
+                    if ($v[0] === "\"" && strpos($this->opt[$k], "\"") !== false) {
                         $v = substr($v, 1, strlen($v) - 2);
-                    $this->opt[$k] = preg_replace(',\$\{confshortname\}|\$confshortname\b,', $v, $this->opt[$k]);
+                    }
+                    $this->opt[$k] = preg_replace('/\$\{confshortname\}|\$confshortname\b/', $v, $this->opt[$k]);
                 }
             }
+        }
 
         // remove final slash from $Opt["paperSite"]
         if (!isset($this->opt["paperSite"]) || $this->opt["paperSite"] === "") {
@@ -282,117 +303,157 @@ class Conf {
         }
 
         // option name updates (backwards compatibility)
-        foreach (array("assetsURL" => "assetsUrl",
-                       "jqueryURL" => "jqueryUrl", "jqueryCDN" => "jqueryCdn",
-                       "disableCSV" => "disableCsv") as $kold => $knew)
-            if (isset($this->opt[$kold]) && !isset($this->opt[$knew]))
+        foreach (["assetsURL" => "assetsUrl",
+                  "jqueryURL" => "jqueryUrl", "jqueryCDN" => "jqueryCdn",
+                  "disableCSV" => "disableCsv"] as $kold => $knew) {
+            if (isset($this->opt[$kold]) && !isset($this->opt[$knew])) {
                 $this->opt[$knew] = $this->opt[$kold];
+            }
+        }
 
         // set assetsUrl and scriptAssetsUrl
-        if (!isset($this->opt["scriptAssetsUrl"]) && isset($_SERVER["HTTP_USER_AGENT"])
-            && strpos($_SERVER["HTTP_USER_AGENT"], "MSIE") !== false)
+        if (!isset($this->opt["scriptAssetsUrl"])
+            && isset($_SERVER["HTTP_USER_AGENT"])
+            && strpos($_SERVER["HTTP_USER_AGENT"], "MSIE") !== false) {
             $this->opt["scriptAssetsUrl"] = Navigation::siteurl();
-        if (!isset($this->opt["assetsUrl"]))
-            $this->opt["assetsUrl"] = Navigation::siteurl();
-        if ($this->opt["assetsUrl"] !== "" && !str_ends_with($this->opt["assetsUrl"], "/"))
-            $this->opt["assetsUrl"] .= "/";
-        if (!isset($this->opt["scriptAssetsUrl"]))
-            $this->opt["scriptAssetsUrl"] = $this->opt["assetsUrl"];
-        Ht::$img_base = $this->opt["assetsUrl"] . "images/";
-
-        // handle timezone
-        if (function_exists("date_default_timezone_set")) {
-            if (isset($this->opt["timezone"])) {
-                if (!date_default_timezone_set($this->opt["timezone"])) {
-                    self::msg_error("Timezone option “" . htmlspecialchars($this->opt["timezone"]) . "” is invalid; falling back to “America/New_York”.");
-                    date_default_timezone_set("America/New_York");
-                }
-            } else if (!ini_get("date.timezone") && !getenv("TZ"))
-                date_default_timezone_set("America/New_York");
         }
-        $this->_date_format_initialized = false;
+        if (!isset($this->opt["assetsUrl"])) {
+            $this->opt["assetsUrl"] = (string) Navigation::siteurl();
+        }
+        if ($this->opt["assetsUrl"] !== ""
+            && !str_ends_with($this->opt["assetsUrl"], "/")) {
+            $this->opt["assetsUrl"] .= "/";
+        }
+        if (!isset($this->opt["scriptAssetsUrl"])) {
+            $this->opt["scriptAssetsUrl"] = $this->opt["assetsUrl"];
+        }
 
         // set safePasswords
         if (!($this->opt["safePasswords"] ?? null)
-            || (is_int($this->opt["safePasswords"]) && $this->opt["safePasswords"] < 1))
+            || (is_int($this->opt["safePasswords"]) && $this->opt["safePasswords"] < 1)) {
             $this->opt["safePasswords"] = 0;
-        else if ($this->opt["safePasswords"] === true)
+        } else if ($this->opt["safePasswords"] === true) {
             $this->opt["safePasswords"] = 1;
-        if (!isset($this->opt["contactdb_safePasswords"]))
+        }
+        if (!isset($this->opt["contactdb_safePasswords"])) {
             $this->opt["contactdb_safePasswords"] = $this->opt["safePasswords"];
+        }
 
         // set validate timeouts
         $this->validate_timeout = (float) ($this->opt["validateTimeout"] ?? 5);
-        if ($this->validate_timeout <= 0)
+        if ($this->validate_timeout <= 0) {
             $this->validate_timeout = 5;
+        }
         $this->validate_overall_timeout = (float) ($this->opt["validateOverallTimeout"] ?? 15);
-        if ($this->validate_overall_timeout <= 0)
+        if ($this->validate_overall_timeout <= 0) {
             $this->validate_overall_timeout = 5;
+        }
 
         // repository site classes
         $this->_repository_site_classes = ["github"];
         if (isset($this->opt["repositorySites"])) {
             $x = $this->opt["repositorySites"];
-            if (is_array($x) || (is_string($x) && ($x = json_decode($x)) && is_array($x)))
+            if (is_array($x)
+                || (is_string($x) && ($x = json_decode($x)) && is_array($x))) {
                 $this->_repository_site_classes = $x;
+            }
         }
         $this->_username_classes = 0;
-        if (in_array("github", $this->_repository_site_classes))
+        if (in_array("github", $this->_repository_site_classes)) {
             $this->_username_classes |= self::USERNAME_GITHUB;
-        if (in_array("harvardseas", $this->_repository_site_classes))
+        }
+        if (in_array("harvardseas", $this->_repository_site_classes)) {
             $this->_username_classes |= self::USERNAME_HARVARDSEAS;
+        }
 
         $sort_by_last = !!($this->opt["sortByLastName"] ?? false);
-        if (!$this->sort_by_last != !$sort_by_last)
+        if (!$this->sort_by_last != !$sort_by_last) {
             $this->_pc_members_cache = $this->_pc_members_and_admins_cache = null;
+        }
         $this->sort_by_last = $sort_by_last;
         $this->default_format = (int) ($this->opt["defaultFormat"] ?? 0);
         $this->_api_map = null;
+        $this->_date_format_initialized = false;
+        $this->_dtz = null;
     }
 
+    function crosscheck_globals() {
+        Ht::$img_base = $this->opt["assetsUrl"] . "images/";
+
+        if (isset($this->opt["timezone"])) {
+            if (!date_default_timezone_set($this->opt["timezone"])) {
+                self::msg_error("Timezone option “" . htmlspecialchars($this->opt["timezone"]) . "” is invalid; falling back to “America/New_York”.");
+                date_default_timezone_set("America/New_York");
+            }
+        } else if (!ini_get("date.timezone") && !getenv("TZ")) {
+            date_default_timezone_set("America/New_York");
+        }
+    }
+
+    static function set_main_instance(Conf $conf) {
+        global $Conf;
+        $Conf = Conf::$main = $conf;
+        $conf->crosscheck_globals();
+    }
+
+
+    /** @param string $b */
     function set_default_main_branch($b) {
         $this->default_main_branch = $b;
     }
 
 
+    /** @return bool */
     function has_setting($name) {
         return isset($this->settings[$name]);
     }
 
+    /** @param string $name
+     * @return ?int */
     function setting($name, $defval = null) {
         return $this->settings[$name] ?? $defval;
     }
 
-    function setting_data($name, $defval = false) {
-        $x = $this->settingTexts[$name] ?? $defval;
+    /** @param string $name
+     * @return ?string */
+    function setting_data($name) {
+        $x = $this->settingTexts[$name] ?? null;
         if ($x && is_object($x) && isset($this->settingTexts[$name])) {
             $x = $this->settingTexts[$name] = json_encode_db($x);
         }
         return $x;
     }
 
-    function setting_json($name, $defval = false) {
-        $x = $this->settingTexts[$name] ?? $defval;
-        if ($x && is_string($x) && isset($this->settingTexts[$name])
-            && is_object(($x = json_decode($x)))) {
-            $this->settingTexts[$name] = $x;
+    /** @param string $name
+     * @return ?object */
+    function setting_json($name) {
+        $x = $this->settingTexts[$name] ?? null;
+        if ($x && is_string($x) && is_object(($o = json_decode($x)))) {
+            $this->settingTexts[$name] = $o;
+            return $o;
+        } else {
+            return $x;
         }
-        return $x;
     }
 
-    private function __save_setting($name, $value, $data = null) {
+    /** @param string $name
+     * @param ?int $value */
+    function __save_setting($name, $value, $data = null) {
         $change = false;
         if ($value === null && $data === null) {
-            if ($this->qe("delete from Settings where name=?", $name)) {
+            $result = $this->qe("delete from Settings where name=?", $name);
+            if (!Dbl::is_error($result)) {
                 unset($this->settings[$name], $this->settingTexts[$name]);
                 $change = true;
             }
         } else {
             $value = (int) $value;
             $dval = $data;
-            if (is_array($dval) || is_object($dval))
+            if (is_array($dval) || is_object($dval)) {
                 $dval = json_encode_db($dval);
-            if ($this->qe("insert into Settings set name=?, value=?, data=? on duplicate key update value=values(value), data=values(data)", $name, $value, $dval)) {
+            }
+            $result = $this->qe("insert into Settings set name=?, value=?, data=? on duplicate key update value=values(value), data=values(data)", $name, $value, $dval);
+            if (!Dbl::is_error($result)) {
                 $this->settings[$name] = $value;
                 $this->settingTexts[$name] = $data;
                 $change = true;
@@ -409,17 +470,21 @@ class Conf {
         return $change;
     }
 
+    /** @param string $name
+     * @param ?int $value */
     function save_setting($name, $value, $data = null) {
         $change = $this->__save_setting($name, $value, $data);
         if ($change) {
             $this->crosscheck_settings();
-            if (str_starts_with($name, "opt."))
+            if (str_starts_with($name, "opt.")) {
                 $this->crosscheck_options();
+            }
         }
         return $change;
     }
 
 
+    /** @param ?string $name */
     function load_gsetting($name) {
         if ($name === null || $name === "") {
             $this->_gsettings_loaded = true;
@@ -427,8 +492,9 @@ class Conf {
             $where = "true";
             $qv = [];
         } else if (($dot = strpos($name, ".")) === false) {
-            if ($this->_gsettings_loaded !== true)
+            if ($this->_gsettings_loaded !== true) {
                 $this->_gsettings_loaded[$name] = true;
+            }
             $filter = function ($k) use ($name) {
                 return substr($k, 0, strlen($name)) !== $name
                     || ($k !== $name && $k[strlen($name)] !== ".");
@@ -436,8 +502,9 @@ class Conf {
             $where = "name=? or (name>=? and name<=?)";
             $qv = [$name, $name . ".", $name . "/"];
         } else {
-            if ($this->_gsettings_loaded !== true)
+            if ($this->_gsettings_loaded !== true) {
                 $this->_gsettings_loaded[$name] = true;
+            }
             $filter = function ($k) use ($name) {
                 return $k !== $name;
             };
@@ -454,6 +521,7 @@ class Conf {
         Dbl::free($result);
     }
 
+    /** @param ?string $name */
     function ensure_gsetting($name) {
         if ($this->_gsettings_loaded !== true
             && !isset($this->_gsettings_loaded[$name])
@@ -463,23 +531,29 @@ class Conf {
         }
     }
 
-    function gsetting($name, $defval = null) {
+    /** @param string $name
+     * @return ?int */
+    function gsetting($name) {
         $this->ensure_gsetting($name);
-        return isset($this->_gsettings[$name]) ? $this->_gsettings[$name] : $defval;
+        return $this->_gsettings[$name] ?? null;
     }
 
-    function gsetting_data($name, $defval = false) {
+    /** @param string $name
+     * @return ?string */
+    function gsetting_data($name) {
         $this->ensure_gsetting($name);
-        $x = $this->_gsettings_data[$name] ?? $defval;
+        $x = $this->_gsettings_data[$name] ?? null;
         if ($x && is_object($x) && isset($this->_gsettings_data[$name])) {
             $x = $this->_gsettings_data[$name] = json_encode_db($x);
         }
         return $x;
     }
 
-    function gsetting_json($name, $defval = false) {
+    /** @param string $name
+     * @return ?object */
+    function gsetting_json($name) {
         $this->ensure_gsetting($name);
-        $x = $this->_gsettings_data[$name] ?? $defval;
+        $x = $this->_gsettings_data[$name] ?? null;
         if ($x && is_string($x) && isset($this->_gsettings_data[$name])
             && is_object(($x = json_decode($x)))) {
             $this->_gsettings_data[$name] = $x;
@@ -487,25 +561,32 @@ class Conf {
         return $x;
     }
 
+    /** @param string $name
+     * @param ?int $value
+     * @param ?string $data
+     * @return bool */
     function save_gsetting($name, $value, $data = null) {
         $change = false;
         if ($value === null && $data === null) {
-            if ($this->qe("delete from GroupSettings where name=?", $name)) {
+            $result = $this->qe("delete from GroupSettings where name=?", $name);
+            if (!Dbl::is_error($result)) {
                 unset($this->_gsettings[$name], $this->_gsettings_data[$name]);
                 $change = true;
             }
         } else {
             $value = (int) $value;
             $dval = $data;
-            if (is_array($dval) || is_object($dval))
+            if (is_array($dval) || is_object($dval)) {
                 $dval = json_encode_db($dval);
+            }
             if (strlen($dval) > 32700) {
                 $odval = $dval;
                 $dval = null;
             } else {
                 $odval = null;
             }
-            if ($this->qe("insert into GroupSettings set name=?, value=?, data=?, dataOverflow=? on duplicate key update value=values(value), data=values(data), dataOverflow=values(dataOverflow)", $name, $value, $dval, $odval)) {
+            $result = $this->qe("insert into GroupSettings set name=?, value=?, data=?, dataOverflow=? on duplicate key update value=values(value), data=values(data), dataOverflow=values(dataOverflow)", $name, $value, $dval, $odval);
+            if (!Dbl::is_error($result)) {
                 $this->_gsettings[$name] = $value;
                 $this->_gsettings_data[$name] = isset($odval) ? $odval : $dval;
                 $change = true;
@@ -518,8 +599,10 @@ class Conf {
     }
 
 
-    function opt($name, $defval = null) {
-        return $this->opt[$name] ?? $defval;
+    /** @param string $name
+     * @return mixed */
+    function opt($name) {
+        return $this->opt[$name] ?? null;
     }
 
     function set_opt($name, $value) {
@@ -899,144 +982,243 @@ class Conf {
 
     // times
 
-    function printableInterval($amt) {
-        if ($amt > 259200 /* 3 days */) {
-            $amt = ceil($amt / 86400);
-            $what = "day";
-        } else if ($amt > 28800 /* 8 hours */) {
-            $amt = ceil($amt / 3600);
-            $what = "hour";
-        } else if ($amt > 3600 /* 1 hour */) {
-            $amt = ceil($amt / 1800) / 2;
-            $what = "hour";
-        } else if ($amt > 180) {
-            $amt = ceil($amt / 60);
-            $what = "minute";
-        } else if ($amt > 0) {
-            $amt = ceil($amt);
-            $what = "second";
-        } else
-            return "past";
-        return plural($amt, $what);
+    /** @return DateTimeZone */
+    function timezone() {
+        if ($this->_dtz === null) {
+            $this->_dtz = timezone_open($this->opt["timezone"] ?? date_default_timezone_get());
+        }
+        return $this->_dtz;
     }
-
-    private function _dateFormat($type) {
+    /** @param string $format
+     * @param int|float $t
+     * @return string */
+    private function _date_format($format, $t) {
+        if ($this !== self::$main && !$this->_dtz && isset($this->opt["timezone"])) {
+            $this->timezone();
+        }
+        if ($this->_dtz) {
+            $dt = new DateTime("@" . (int) $t);
+            $dt->setTimeZone($this->_dtz);
+            return $dt->format($format);
+        } else {
+            return date($format, $t);
+        }
+    }
+    /** @param string $type
+     * @param int|float $t
+     * @return string */
+    private function _date_unparse($type, $t) {
         if (!$this->_date_format_initialized) {
-            if (!isset($this->opt["time24hour"]) && isset($this->opt["time24Hour"]))
+            if (!isset($this->opt["time24hour"]) && isset($this->opt["time24Hour"])) {
                 $this->opt["time24hour"] = $this->opt["time24Hour"];
-            if (!isset($this->opt["dateFormatLong"]) && isset($this->opt["dateFormat"]))
+            }
+            if (!isset($this->opt["dateFormatLong"]) && isset($this->opt["dateFormat"])) {
                 $this->opt["dateFormatLong"] = $this->opt["dateFormat"];
-            if (!isset($this->opt["dateFormat"]))
-                $this->opt["dateFormat"] = ($this->opt["time24hour"] ?? null) ? "j M Y H:i:s" : "j M Y g:i:sa";
-            if (!isset($this->opt["dateFormatLong"]))
+            }
+            if (!isset($this->opt["dateFormat"])) {
+                $this->opt["dateFormat"] = ($this->opt["time24hour"] ?? false) ? "j M Y H:i:s" : "j M Y g:i:sa";
+            }
+            if (!isset($this->opt["dateFormatLong"])) {
                 $this->opt["dateFormatLong"] = "l " . $this->opt["dateFormat"];
-            if (!isset($this->opt["dateFormatObscure"]))
+            }
+            if (!isset($this->opt["dateFormatObscure"])) {
                 $this->opt["dateFormatObscure"] = "j M Y";
-            if (!isset($this->opt["timestampFormat"]))
+            }
+            if (!isset($this->opt["timestampFormat"])) {
                 $this->opt["timestampFormat"] = $this->opt["dateFormat"];
-            if (!isset($this->opt["dateFormatSimplifier"]))
-                $this->opt["dateFormatSimplifier"] = ($this->opt["time24hour"] ?? null) ? "/:00(?!:)/" : "/:00(?::00|)(?= ?[ap]m)/";
-            if (!isset($this->opt["dateFormatTimezone"]))
-                $this->opt["dateFormatTimezone"] = null;
+            }
+            if (!isset($this->opt["dateFormatSimplifier"])) {
+                $this->opt["dateFormatSimplifier"] = ($this->opt["time24hour"] ?? false) ? "/:00(?!:)/" : "/:00(?::00|)(?= ?[ap]m)/";
+            }
             $this->_date_format_initialized = true;
         }
-        if ($type == "timestamp")
-            return $this->opt["timestampFormat"];
-        else if ($type == "obscure")
-            return $this->opt["dateFormatObscure"];
-        else if ($type)
-            return $this->opt["dateFormatLong"];
-        else
-            return $this->opt["dateFormat"];
+        if ($type === "timestamp") {
+            $f = $this->opt["timestampFormat"];
+        } else if ($type === "obscure") {
+            $f = $this->opt["dateFormatObscure"];
+        } else if ($type === "long") {
+            $f = $this->opt["dateFormatLong"];
+        } else if ($type === "zone") {
+            $f = "T";
+        } else {
+            $f = $this->opt["dateFormat"];
+        }
+        return $this->_date_format($f, $t);
+    }
+    /** @param int|float $value
+     * @return string */
+    private function _unparse_timezone($value) {
+        $z = $this->opt["dateFormatTimezone"] ?? null;
+        if ($z === null) {
+            $z = $this->_date_unparse("zone", $value);
+            if ($z === "-12") {
+                $z = "AoE";
+            } else if ($z && ($z[0] === "+" || $z[0] === "-")) {
+                $z = "UTC" . $z;
+            }
+        }
+        return $z;
     }
 
+    /** @param int $value
+     * @param bool $include_zone
+     * @return string */
     function parseableTime($value, $include_zone) {
-        $f = $this->_dateFormat(false);
-        $d = date($f, $value);
-        if ($this->opt["dateFormatSimplifier"])
+        $d = $this->_date_unparse("short", $value);
+        if ($this->opt["dateFormatSimplifier"]) {
             $d = preg_replace($this->opt["dateFormatSimplifier"], "", $d);
-        if ($include_zone) {
-            if ($this->opt["dateFormatTimezone"] === null)
-                $d .= " " . date("T", $value);
-            else if ($this->opt["dateFormatTimezone"])
-                $d .= " " . $this->opt["dateFormatTimezone"];
+        }
+        if ($include_zone && ($z = $this->_unparse_timezone($value))) {
+            $d .= " $z";
         }
         return $d;
     }
+    /** @param string $d
+     * @param ?int $reference
+     * @return int|float|false */
     function parse_time($d, $reference = null) {
-        if ($reference === null)
-            $reference = Conf::$now;
-        if (!isset($this->opt["dateFormatTimezoneRemover"])
-            && function_exists("timezone_abbreviations_list")) {
-            $mytz = date_default_timezone_get();
+        $reference = $reference ?? Conf::$now;
+        if (!isset($this->opt["dateFormatTimezoneRemover"])) {
             $x = array();
-            foreach (timezone_abbreviations_list() as $tzname => $tzinfo) {
-                foreach ($tzinfo as $tz)
-                    if ($tz["timezone_id"] == $mytz)
-                        $x[] = preg_quote($tzname);
+            if (function_exists("timezone_abbreviations_list")) {
+                $mytz = date_default_timezone_get();
+                foreach (timezone_abbreviations_list() as $tzname => $tzinfo) {
+                    foreach ($tzinfo as $tz) {
+                        if ($tz["timezone_id"] == $mytz) {
+                            $x[] = preg_quote($tzname);
+                        }
+                    }
+                }
             }
-            if (count($x) == 0)
-                $x[] = preg_quote(date("T", $reference));
+            if (empty($x)) {
+                $x[] = preg_quote($this->_unparse_timezone($reference));
+            }
             $this->opt["dateFormatTimezoneRemover"] =
                 "/(?:\\s|\\A)(?:" . join("|", $x) . ")(?:\\s|\\z)/i";
         }
-        if ($this->opt["dateFormatTimezoneRemover"])
+        if ($this->opt["dateFormatTimezoneRemover"]) {
             $d = preg_replace($this->opt["dateFormatTimezoneRemover"], " ", $d);
-        $d = preg_replace('/\butc([-+])/i', 'GMT$1', $d);
-        return strtotime($d, $reference);
+        }
+        if (preg_match('/\A(.*)\b(utc(?=[-+])|aoe(?=\s|\z))(.*)\z/i', $d, $m)) {
+            if (strcasecmp($m[2], "aoe") === 0) {
+                $d = strtotime($m[1] . "GMT-1200" . $m[3], $reference);
+                if ($d !== false
+                    && $d % 86400 == 43200
+                    && ($dx = strtotime($m[1] . " T23:59:59 GMT-1200" . $m[3], $reference)) === $d + 86399) {
+                    return $dx;
+                } else {
+                    return $d;
+                }
+            } else {
+                return strtotime($m[1] . "GMT" . $m[3], $reference);
+            }
+        } else {
+            return strtotime($d, $reference);
+        }
     }
 
-    function _printableTime($value, $type, $useradjust, $preadjust = null) {
-        if ($value <= 0)
+    // NB must return HTML-safe plaintext
+    /** @param int $timestamp */
+    private function _unparse_time($timestamp, $type) {
+        if ($timestamp <= 0) {
             return "N/A";
-        $t = date($this->_dateFormat($type), $value);
-        if ($this->opt["dateFormatSimplifier"])
-            $t = preg_replace($this->opt["dateFormatSimplifier"], "", $t);
-        if ($type !== "obscure") {
-            if ($this->opt["dateFormatTimezone"] === null)
-                $t .= " " . date("T", $value);
-            else if ($this->opt["dateFormatTimezone"])
-                $t .= " " . $this->opt["dateFormatTimezone"];
         }
-        if ($preadjust)
-            $t .= $preadjust;
-        if ($useradjust) {
-            $sp = strpos($useradjust, " ");
-            $t .= "<$useradjust class=\"usertime\" id=\"usertime$this->usertimeId\" style=\"display:none\"></" . ($sp ? substr($useradjust, 0, $sp) : $useradjust) . ">";
-            Ht::stash_script("setLocalTime('usertime$this->usertimeId',$value)");
-            ++$this->usertimeId;
+        $t = $this->_date_unparse($type, $timestamp);
+        if ($this->opt["dateFormatSimplifier"]) {
+            $t = preg_replace($this->opt["dateFormatSimplifier"], "", $t);
+        }
+        if ($type !== "obscure" && ($z = $this->_unparse_timezone($timestamp))) {
+            $t .= " $z";
         }
         return $t;
     }
-    function printableTime($value, $useradjust = false, $preadjust = null) {
-        return $this->_printableTime($value, true, $useradjust, $preadjust);
-    }
-    function printableTimestamp($value, $useradjust = false, $preadjust = null) {
-        return $this->_printableTime($value, "timestamp", $useradjust, $preadjust);
-    }
+    /** @param int|float|null $timestamp
+     * @return ?int */
     function obscure_time($timestamp) {
-        if ($timestamp !== null)
+        if ($timestamp !== null) {
             $timestamp = (int) ($timestamp + 0.5);
+        }
         if ($timestamp > 0) {
             $offset = 0;
-            if (($zone = timezone_open(date_default_timezone_get())))
+            if (($zone = $this->timezone())) {
                 $offset = $zone->getOffset(new DateTime("@$timestamp"));
+            }
             $timestamp += 43200 - ($timestamp + $offset) % 86400;
         }
         return $timestamp;
     }
-    function unparse_time_log($value) {
-        return date("d/M/Y:H:i:s O", $value);
+    /** @param int $timestamp */
+    function unparse_time_long($timestamp) {
+        return $this->_unparse_time($timestamp, "long");
     }
-
-    function printableTimeSetting($what, $useradjust = false, $preadjust = null) {
-        return $this->printableTime($this->settings[$what] ?? 0, $useradjust, $preadjust);
+    /** @param int $timestamp */
+    function unparse_time($timestamp) {
+        return $this->_unparse_time($timestamp, "timestamp");
     }
-    function printableDeadlineSetting($what, $useradjust = false, $preadjust = null) {
-        if (!isset($this->settings[$what]) || $this->settings[$what] <= 0)
-            return "No deadline";
-        else
-            return "Deadline: " . $this->printableTime($this->settings[$what], $useradjust, $preadjust);
+    /** @param int $timestamp */
+    function unparse_time_obscure($timestamp) {
+        return $this->_unparse_time($timestamp, "obscure");
+    }
+    /** @param int $timestamp */
+    function unparse_time_point($timestamp) {
+        return $this->_date_format("j M Y", $timestamp);
+    }
+    /** @param int $timestamp */
+    function unparse_time_log($timestamp) {
+        return $this->_date_format("d/M/Y:H:i:s O", $timestamp);
+    }
+    /** @param int $timestamp */
+    function unparse_time_iso($timestamp) {
+        return $this->_date_format("Ymd\\THis", $timestamp);
+    }
+    /** @param int $timestamp
+     * @param int $now */
+    function unparse_time_relative($timestamp, $now = 0, $format = 0) {
+        $d = abs($timestamp - ($now ? : Conf::$now));
+        if ($d >= 5227200) {
+            if (!($format & 1)) {
+                return ($format & 8 ? "on " : "") . $this->_date_unparse("obscure", $timestamp);
+            }
+            $unit = 5;
+        } else if ($d >= 259200) {
+            $unit = 4;
+        } else if ($d >= 28800) {
+            $unit = 3;
+        } else if ($d >= 3630) {
+            $unit = 2;
+        } else if ($d >= 180.5) {
+            $unit = 1;
+        } else if ($d >= 1) {
+            $unit = 0;
+        } else {
+            return "now";
+        }
+        $units = [1, 60, 1800, 3600, 86400, 604800];
+        $x = $units[$unit];
+        $d = ceil(($d - $x / 2) / $x);
+        if ($unit === 2) {
+            $d /= 2;
+        }
+        if ($format & 4) {
+            $d .= substr("smhhdw", $unit, 1);
+        } else {
+            $unit_names = ["second", "minute", "hour", "hour", "day", "week"];
+            $d .= " " . $unit_names[$unit] . ($d == 1 ? "" : "s");
+        }
+        if ($format & 2) {
+            return $d;
+        } else {
+            return $timestamp < ($now ? : Conf::$now) ? $d . " ago" : "in " . $d;
+        }
+    }
+    /** @param int $timestamp */
+    function unparse_usertime_span($timestamp) {
+        return '<span class="usertime hidden need-usertime" data-time="' . $timestamp . '"></span>';
+    }
+    /** @param string $name */
+    function unparse_setting_time($name) {
+        $t = $this->settings[$name] ?? 0;
+        return $this->unparse_time_long($t);
     }
 
     function settingsAfter($name) {
@@ -1414,12 +1596,12 @@ class Conf {
     }
 
     function add_stylesheet($file) {
-        $this->opt["stylesheets"] = mkarray($this->opt("stylesheets", []));
+        $this->opt["stylesheets"] = mkarray($this->opt("stylesheets") ?? []);
         $this->opt["stylesheets"][] = $file;
     }
 
     function add_javascript($file) {
-        $this->opt["javascripts"] = mkarray($this->opt("javascripts", []));
+        $this->opt["javascripts"] = mkarray($this->opt("javascripts") ?? []);
         $this->opt["javascripts"][] = $file;
     }
 
@@ -1431,14 +1613,14 @@ class Conf {
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
 <meta name=\"google\" content=\"notranslate\" />\n";
 
-        echo $this->opt("fontScript", "");
+        echo $this->opt("fontScript") ?? "";
 
         echo $this->make_css_link("stylesheets/style.css"), "\n";
         if ($this->opt("mobileStylesheet")) {
             echo '<meta name="viewport" content="width=device-width, initial-scale=1">', "\n";
             echo $this->make_css_link("stylesheets/mobile.css", "screen and (max-width: 768px)"), "\n";
         }
-        foreach (mkarray($this->opt("stylesheets", [])) as $css)
+        foreach (mkarray($this->opt("stylesheets") ?? []) as $css)
             echo $this->make_css_link($css), "\n";
 
         // favicon
@@ -1496,7 +1678,7 @@ class Conf {
             Ht::stash_html($this->make_script_file("//code.jquery.com/jquery-migrate-3.0.0.min.js", true));
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
-        foreach (mkarray($this->opt("javascripts", [])) as $scriptfile)
+        foreach (mkarray($this->opt("javascripts") ?? []) as $scriptfile)
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
 
         // Javascript settings to set before script.js
@@ -1528,7 +1710,7 @@ class Conf {
             Ht::stash_html($this->make_script_file("scripts/script.js") . "\n");
 
         // other scripts
-        foreach ($this->opt("scripts", []) as $file) {
+        foreach ($this->opt("scripts") ?? [] as $file) {
             Ht::stash_html($this->make_script_file($file) . "\n");
         }
 
@@ -1617,9 +1799,10 @@ class Conf {
         global $Me, $ConfSitePATH;
         echo "</div>\n", // class='body'
             "<div id='footer'>\n";
-        $footy = $this->opt("extraFooter", "");
-        if (false)
+        $footy = $this->opt("extraFooter") ?? "";
+        if (false) {
             $footy .= "<a href='http://read.seas.harvard.edu/~kohler/hotcrp/'>HotCRP</a> Conference Management Software";
+        }
         if (!$this->opt("noFooterVersion")) {
             if ($Me && $Me->privChair) {
                 if (is_dir("$ConfSitePATH/.git")) {
@@ -1650,9 +1833,9 @@ class Conf {
                     $j->emailpos = strlen(htmlspecialchars($r->name)) + 1;
             }
             if (!$pcm->nameAmbiguous && ($pcm->nickname || $pcm->firstName)) {
-                if ($pcm->nicknameAmbiguous)
+                if ($pcm->nicknameAmbiguous) {
                     $j->nicklen = strlen(htmlspecialchars($r->name));
-                else {
+                } else {
                     $nick = htmlspecialchars($pcm->nickname ? : $pcm->firstName);
                     if (str_starts_with($j->name, $nick))
                         $j->nicklen = strlen($nick);

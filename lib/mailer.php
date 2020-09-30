@@ -56,7 +56,7 @@ class Mailer {
     static function eol() {
         global $Conf;
         if (self::$eol === null) {
-            if (($x = $Conf->opt("postfixMailer", null)) === null)
+            if (($x = $Conf->opt("postfixMailer")) === null)
                 $x = $Conf->opt("postfixEOL");
             if (!$x)
                 self::$eol = "\r\n";
@@ -180,7 +180,7 @@ class Mailer {
 
         if ($what == "%LOGINNOTICE%") {
             if ($Conf->opt("disableCapabilities"))
-                return $this->expand($Conf->opt("mailtool_loginNotice", " To sign in, either click the link below or paste it into your web browser's location field.\n\n%LOGINURL%"), $isbool);
+                return $this->expand($Conf->opt("mailtool_loginNotice") ?? " To sign in, either click the link below or paste it into your web browser's location field.\n\n%LOGINURL%", $isbool);
             else
                 return "";
         }
@@ -396,10 +396,12 @@ class Mailer {
         global $Conf, $mailTemplates;
         $m = $mailTemplates[$templateName];
         if (!$default && $Conf) {
-            if (($t = $Conf->setting_data("mailsubj_" . $templateName, false)) !== false)
+            if (($t = $Conf->setting_data("mailsubj_" . $templateName)) !== null) {
                 $m["subject"] = $t;
-            if (($t = $Conf->setting_data("mailbody_" . $templateName, false)) !== false)
+            }
+            if (($t = $Conf->setting_data("mailbody_" . $templateName)) !== null) {
                 $m["body"] = $t;
+            }
         }
         return $m;
     }
@@ -498,7 +500,7 @@ class Mailer {
 
     static function send_preparation($prep) {
         global $Conf;
-        if ($Conf->opt("internalMailer", null) === null)
+        if ($Conf->opt("internalMailer") === null)
             $Conf->set_opt("internalMailer", strncasecmp(PHP_OS, "WIN", 3) != 0);
         $headers = $prep->headers;
         $eol = self::eol();
@@ -512,7 +514,7 @@ class Mailer {
 
         // set sendmail parameters
         $extra = $Conf->opt("sendmailParam");
-        if (($sender = $Conf->opt("emailSender", null)) !== null) {
+        if (($sender = $Conf->opt("emailSender")) !== null) {
             @ini_set("sendmail_from", $sender);
             if ($extra === null)
                 $extra = "-f" . escapeshellarg($sender);

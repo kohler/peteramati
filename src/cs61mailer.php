@@ -64,10 +64,11 @@ class CS61Mailer extends Mailer {
         $len = strlen($what);
         if ($len > 12 && substr($what, 0, 10) == "%DEADLINE(" && substr($what, $len - 2) == ")%") {
             $inner = substr($what, 10, $len - 12);
-            if ($isbool)
+            if ($isbool) {
                 return $Conf->setting($inner) > 0;
-            else
-                return $Conf->printableTimeSetting($inner);
+            } else {
+                return $Conf->unparse_setting_time($inner);
+            }
         }
 
         if ($what == "%AUTHORVIEWCAPABILITY%" && @$Opt["disableCapabilities"])
