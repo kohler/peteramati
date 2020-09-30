@@ -2295,7 +2295,7 @@ tr.gtrow-partner {
 .gt-highlight {
 	color: red;
 }
-.gt-anonymous .nonanon {
+.gt-anonymous .gt-name {
 	display: none;
 }
 
