@@ -1420,7 +1420,7 @@ function is_string_or_string_array($x) {
 function check_date($x) {
     if (is_bool($x) || is_int($x)) {
         return true;
-    } else if (is_string($x) && ($d = parse_time($x))) {
+    } else if (is_string($x) && ($d = Conf::$main->parse_time($x))) {
         return [true, $d];
     } else if (is_string($x)) {
         return [false, "date parse error"];

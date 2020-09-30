@@ -40,30 +40,6 @@ function ago($t) {
         return plural((int)((Conf::$now - $t) / 86400 + 0.5), "day") . " ago";
 }
 
-function parse_time($d, $reference = null) {
-    global $Opt;
-    if ($reference === null)
-        $reference = Conf::$now;
-    if (!isset($Opt["dateFormatTimezoneRemover"])
-        && function_exists("timezone_abbreviations_list")) {
-        $mytz = date_default_timezone_get();
-        $x = array();
-        foreach (timezone_abbreviations_list() as $tzname => $tzinfo) {
-            foreach ($tzinfo as $tz)
-                if ($tz["timezone_id"] == $mytz)
-                    $x[] = preg_quote($tzname);
-        }
-        if (count($x) == 0)
-            $x[] = preg_quote(date("T", $reference));
-        $Opt["dateFormatTimezoneRemover"] =
-            "/(?:\\s|\\A)(?:" . join("|", $x) . ")(?:\\s|\\z)/i";
-    }
-    if (@$Opt["dateFormatTimezoneRemover"])
-        $d = preg_replace($Opt["dateFormatTimezoneRemover"], " ", $d);
-    $d = preg_replace('/\butc([-+])/i', 'GMT$1', $d);
-    return strtotime($d, $reference);
-}
-
 
 // string helpers
 
