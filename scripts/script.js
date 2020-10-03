@@ -3407,6 +3407,11 @@ return function () {
             continue;
         } else if (d.tagName === "OL" || d.tagName === "UL") {
             d = fix_list_item(d);
+        } else if (d.tagName === "P"
+                   && d.firstChild.nodeType === 1
+                   && d.firstChild.tagName === "IMG"
+                   && d.firstChild === d.lastChild) {
+            addClass(d, "image-container");
         }
 
         var lp = document.createElement("div");

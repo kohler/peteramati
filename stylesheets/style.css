@@ -2446,6 +2446,22 @@ tr.gtrow-partner {
 .pa-dr p {
 	max-width: 800px;
 }
+.pa-dr p.image-container {
+	max-width: 95%;
+}
+.pa-dr img {
+	max-width: 100%;
+	max-height: 80vh;
+}
+.pa-dr table {
+	border: 1px solid silver;
+	border-collapse: collapse;
+	margin-bottom: 1rem;
+}
+.pa-dr td, .pa-dr th {
+	padding: 0.5em;
+	border: 1px solid silver;
+}
 
 .pa-with-sidebar {
 	display: flex;
