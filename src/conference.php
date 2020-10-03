@@ -1578,21 +1578,45 @@ class Conf {
         return $t . '" />';
     }
 
+    /** @param non-empty-string $url
+     * @return string */
     function make_script_file($url, $no_strict = false, $integrity = null) {
-        global $ConfSitePATH;
         if (str_starts_with($url, "scripts/")) {
             $post = "";
-            if (($mtime = @filemtime("$ConfSitePATH/$url")) !== false)
+            if (($mtime = @filemtime(SiteLoader::find($url))) !== false) {
                 $post = "mtime=$mtime";
-            if (($this->opt["strictJavascript"] ?? null) && !$no_strict)
+            }
+            if (($this->opt["strictJavascript"] ?? false) && !$no_strict) {
                 $url = $this->opt["scriptAssetsUrl"] . "cacheable.php?file=" . urlencode($url)
                     . "&strictjs=1" . ($post ? "&$post" : "");
-            else
+            } else {
                 $url = $this->opt["scriptAssetsUrl"] . $url . ($post ? "?$post" : "");
-            if ($this->opt["scriptAssetsUrl"] === Navigation::siteurl())
+            }
+            if ($this->opt["scriptAssetsUrl"] === Navigation::siteurl()) {
                 return Ht::script_file($url);
+            }
         }
         return Ht::script_file($url, ["crossorigin" => "anonymous", "integrity" => $integrity]);
+    }
+
+    private function make_jquery_script_file($jqueryVersion) {
+        $integrity = null;
+        if ($this->opt("jqueryCdn")) {
+            if ($jqueryVersion === "3.5.1") {
+                $integrity = "sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2";
+            } else if ($jqueryVersion === "3.4.1") {
+                $integrity = "sha384-vk5WoKIaW/vJyUAd9n/wmopsmNhiy+L2Z+SBxGYnUkunIxVxAv/UtMOhba/xskxh";
+            } else if ($jqueryVersion === "3.3.1") {
+                $integrity = "sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=";
+            } else if ($jqueryVersion === "1.12.4") {
+                $integrity = "sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=";
+            }
+            $jquery = "//code.jquery.com/jquery-{$jqueryVersion}.min.js";
+        } else {
+            $jquery = "scripts/jquery-{$jqueryVersion}.min.js";
+        }
+        '@phan-var non-empty-string $jquery';
+        return $this->make_script_file($jquery, true, $integrity);
     }
 
     function add_stylesheet($file) {
@@ -1661,25 +1685,25 @@ class Conf {
 
         // jQuery
         $stash = Ht::unstash();
-        $jqueryVersion = $this->opt["jqueryVersion"] ?? "1.12.4";
-        $integrity = null;
-        if (isset($this->opt["jqueryUrl"]))
-            $jquery = $this->opt["jqueryUrl"];
-        else if ($this->opt("jqueryCdn")) {
-            $jquery = "//code.jquery.com/jquery-{$jqueryVersion}.min.js";
-            if ($jqueryVersion === "1.12.4")
-                $integrity = "sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=";
-            else if ($jqueryVersion === "3.1.1")
-                $integrity = "sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=";
-        } else
-            $jquery = "scripts/jquery-{$jqueryVersion}.min.js";
-        Ht::stash_html($this->make_script_file($jquery, true, $integrity) . "\n");
-        if ($this->opt("jqueryMigrate"))
-            Ht::stash_html($this->make_script_file("//code.jquery.com/jquery-migrate-3.0.0.min.js", true));
+        if (isset($this->opt["jqueryUrl"])) {
+            Ht::stash_html($this->make_script_file($this->opt["jqueryUrl"], true) . "\n");
+        } else {
+            $jqueryVersion = $this->opt["jqueryVersion"] ?? "3.5.1";
+            if ($jqueryVersion[0] === "3") {
+                Ht::stash_html("<!--[if lt IE 9]>" . $this->make_jquery_script_file("1.12.4") . "<![endif]-->\n");
+                Ht::stash_html("<![if !IE|gte IE 9]>" . $this->make_jquery_script_file($jqueryVersion) . "<![endif]>\n");
+            } else {
+                Ht::stash_html($this->make_jquery_script_file($jqueryVersion) . "\n");
+            }
+        }
+        if ($this->opt("jqueryMigrate")) {
+            Ht::stash_html($this->make_script_file("//code.jquery.com/jquery-migrate-3.0.0.js", true));
+        }
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
-        foreach (mkarray($this->opt("javascripts") ?? []) as $scriptfile)
+        foreach (mkarray($this->opt("javascripts") ?? []) as $scriptfile) {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
+        }
 
         // Javascript settings to set before script.js
         $nav = Navigation::get();
