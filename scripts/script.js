@@ -3254,6 +3254,210 @@ function pa_grade_entry() {
     return gi.entries[e.getAttribute("data-pa-grade")];
 }
 
+
+var pa_filediff_markdown = (function () {
+var md;
+
+function render_map(map) {
+    if (map[0] + 1 === map[1]) {
+        return String(map[1]);
+    } else {
+        return (map[0] + 1) + "-" + map[1];
+    }
+}
+
+function add_landmark(tokens, idx, options, env, self) {
+    var token = tokens[idx];
+    if (token.map && token.level === 0) {
+        token.attrSet("data-landmark", render_map(token.map));
+    }
+    return self.renderToken(tokens, idx, options, env);
+}
+
+function add_landmark_1(tokens, idx, options, env, self) {
+    var token = tokens[idx];
+    if (token.map && token.level <= 1) {
+        token.attrSet("data-landmark", render_map(token.map));
+    }
+    return self.renderToken(tokens, idx, options, env);
+}
+
+function fix_landmark_html(html, token) {
+    if (token.map && token.level === 0) {
+        var lm = " data-landmark=\"" + render_map(token.map) + "\"",
+            sp = html.indexOf(" "),
+            gt = html.indexOf(">");
+        if (sp > 0 && sp < gt) {
+            gt = sp;
+        }
+        html = html.substring(0, gt) + lm + html.substring(gt);
+    }
+    return html;
+}
+
+function modify_landmark(base) {
+    if (!base) {
+        return add_landmark;
+    } else {
+        return function (tokens, idx, options, env, self) {
+            var token = tokens[idx];
+            return fix_landmark_html(base(tokens, idx, options, env, self), token);
+        };
+    }
+}
+
+function modify_landmark_fence(base) {
+    return function (tokens, idx, options, env, self) {
+        var token = tokens[idx];
+        if (token.info && token.info.indexOf(" ") >= 0) {
+            token.content = token.info + "\n" + token.content;
+            token.info = "";
+        }
+        return fix_landmark_html(base(tokens, idx, options, env, self), token);
+    };
+}
+
+function make_markdownit() {
+    if (!md) {
+        md = markdownit();
+        for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
+                       "bullet_list_open", "table_open", "blockquote_open",
+                       "hr", "image", "code_block"]) {
+            md.renderer.rules[x] = modify_landmark(md.renderer.rules[x]);
+        }
+        md.renderer.rules.fence = modify_landmark_fence(md.renderer.rules.fence);
+        md.renderer.rules.list_item_open = add_landmark_1;
+    }
+    return md;
+}
+
+function fix_list_item(d) {
+    var dc;
+    while ((dc = d.firstChild) && dc.nodeType !== 1) {
+        d.removeChild(dc);
+    }
+    if (dc && dc.hasAttribute("data-landmark")) {
+        while (dc.nextSibling && dc.nextSibling.nodeType !== 1) {
+            d.removeChild(dc.nextSibling);
+        }
+        if (dc.nextSibling) {
+            if (d.tagName === "OL") {
+                if (!dc.hasAttribute("value")) {
+                    dc.value = d.start;
+                }
+                d.start = dc.value + 1;
+            }
+            var nd = document.createElement(d.tagName);
+            nd.appendChild(d.removeChild(dc));
+            d = nd;
+        }
+        d.setAttribute("data-landmark", dc.getAttribute("data-landmark"));
+    }
+    return d;
+}
+
+return function () {
+    // collect content
+    var e = this.firstChild, l = [], lineno = 1, this_lineno;
+    while (e) {
+        var n = e.nextSibling;
+        if (hasClass(e, "pa-gr")) {
+            this.removeChild(e);
+        } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
+            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
+            while (lineno < this_lineno) {
+                l.push("\n");
+                ++lineno;
+            }
+            l.push(e.lastChild.textContent);
+            if (!hasClass(e.lastChild, "pa-dnonl")) {
+                l.push("\n");
+            }
+            ++lineno;
+            addClass(e, "hidden");
+        }
+        e = n;
+    }
+    // render to markdown
+    var dx = document.createElement("div"), d, dc;
+    dx.innerHTML = make_markdownit().render(l.join(""));
+    // split up and insert into order
+    e = this.firstChild;
+    while ((d = dx.firstChild)) {
+        if (d.nodeType !== 1) {
+            dx.removeChild(d);
+            continue;
+        } else if (d.tagName === "OL" || d.tagName === "UL") {
+            d = fix_list_item(d);
+        }
+
+        var lp = document.createElement("div");
+        lp.className = "pa-dl pa-gr";
+        var la = document.createElement("div");
+        la.className = "pa-da";
+        var lb = document.createElement("div");
+        lb.className = "pa-db";
+
+        var lm = d.getAttribute("data-landmark");
+        if (lm) {
+            var l1 = parseInt(lm),
+                dash = lm.indexOf("-"),
+                l2 = dash >= 0 ? parseInt(lm.substring(dash + 1)) : l1;
+            while (e) {
+                if ((hasClass(e, "pa-gi") || hasClass(e, "pa-gc"))
+                    && +e.firstChild.nextSibling.getAttribute("data-landmark") >= l1) {
+                    break;
+                }
+                e = e.nextSibling;
+            }
+            lb.setAttribute("data-landmark", l2);
+            var klass = 0;
+            while (e) {
+                if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
+                    if (+e.firstChild.nextSibling.getAttribute("data-landmark") >= l2) {
+                        break;
+                    }
+                    klass |= hasClass(e, "pa-gi") ? 1 : 2;
+                }
+                e = e.nextSibling;
+            }
+            lp.className += klass === 2 ? " pa-gc" : " pa-gi";
+        }
+
+        var lr = document.createElement("div");
+        lr.className = "pa-dr";
+        if (d === dx.firstChild) {
+            dx.removeChild(d);
+        }
+        lr.appendChild(d);
+        while (dx.firstChild && dx.firstChild.nodeType !== 1) {
+            lr.appendChild(dx.removeChild(dx.firstChild));
+        }
+
+        lp.appendChild(la);
+        lp.appendChild(lb);
+        lp.appendChild(lr);
+        this.insertBefore(lp, e);
+    }
+};
+
+})();
+
+
+function pa_filediff_unmarkdown() {
+    var e = this.firstChild, l = [], lineno = 1, this_lineno;
+    while (e) {
+        var n = e.nextSibling;
+        if (hasClass(e, "pa-gr")) {
+            this.removeChild(e);
+        } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
+            removeClass(e, "hidden");
+        }
+        e = n;
+    }
+}
+
+
 (function () {
 function save_grade(self) {
     var $f = $(self);

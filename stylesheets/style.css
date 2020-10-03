@@ -2411,6 +2411,18 @@ tr.gtrow-partner {
 	}
 }
 
+.pa-dr h1, .pa-dr h2, .pa-dr h3, .pa-dr h4, .pa-dr h5, .pa-dr h6 {
+	display: block;
+	margin-top: 0;
+	margin-bottom: 1rem;
+}
+.pa-dr pre, .pa-dr blockquote, .pa-dr ol, .pa-dr ul {
+	margin-top: 0;
+}
+.pa-dr p {
+	max-width: 800px;
+}
+
 .pa-with-sidebar {
 	display: flex;
 	flex-direction: row-reverse;
