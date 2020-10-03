@@ -2758,14 +2758,13 @@ a.fold61:hover {
 
 span.pa-gradewidth {
 	min-width: 3rem;
+	width: 6rem;
 	padding-right: 6px;
 	margin-right: 0.5rem;
 	display: inline-block;
 }
-input.pa-gradevalue {
+input.pa-gradewidth {
 	min-width: 3rem;
-}
-input.pa-gradevalue, span.pa-gradewidth {
 	width: 6rem;
 }
 textarea.pa-gradevalue {

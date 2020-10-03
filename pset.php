@@ -579,7 +579,7 @@ function echo_all_grades($info) {
             '<label class="pa-pt" for="pa-lh">late hours</label>',
             '<div class="pa-pd"><span class="pa-gradewidth">',
             Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
-                      ["class" => "uich pa-gradevalue"]),
+                      ["class" => "uich pa-gradevalue pa-gradewidth"]),
             '</span> <span class="pa-gradedesc"></span>';
         if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours) {
             echo '<span class="pa-gradediffers">auto-late hours is ', htmlspecialchars($lhd->autohours), '</span>';

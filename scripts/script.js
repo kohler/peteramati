@@ -3074,7 +3074,7 @@ function pa_render_grade_entry(ge, editable, live) {
         } else if (ge.type === "section") {
         } else {
             t += '<div class="pa-pd"><span class="pa-gradewidth">' +
-                '<input type="text" class="' + livecl + 'pa-gradevalue" name="' + name +
+                '<input type="text" class="' + livecl + 'pa-gradevalue pa-gradewidth" name="' + name +
                 '" id="' + id + '"></span> <span class="pa-gradedesc">';
             if (ge.type === "letter") {
                 t += 'letter grade';
@@ -3107,8 +3107,10 @@ function pa_render_grade_entry(ge, editable, live) {
 pa_render_grade_entry.id_counter = 0;
 
 function pa_grade_uncheckbox() {
+    var v = this.checked, ge = pa_grade_entry.call(this);
     this.type = "text";
-    this.className = (hasClass(this, "ui") ? "uich " : "") + "pa-gradevalue";
+    this.value = v ? ge.max : "";
+    this.className = (hasClass(this, "ui") ? "uich " : "") + "pa-gradevalue pa-gradewidth";
     $(this.closest(".pa-pd")).find(".pa-grade-uncheckbox").remove();
 }
 handle_ui.on("pa-grade-uncheckbox", function () {
@@ -3116,7 +3118,10 @@ handle_ui.on("pa-grade-uncheckbox", function () {
 });
 
 function pa_grade_recheckbox() {
+    var v = this.value.trim(), ge = pa_grade_entry.call(this);
     this.type = "checkbox";
+    this.checked = v !== "" && v !== "0";
+    this.value = ge.max;
     this.className = (hasClass(this, "uich") ? "ui " : "") + "pa-gradevalue";
     $(this.closest(".pa-pd")).find(".pa-gradedesc").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
 }
