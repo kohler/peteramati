@@ -1363,7 +1363,8 @@ class PsetView {
         return htmlspecialchars($t);
     }
 
-    /** @param string $file */
+    /** @param string $file
+     * @param array $args */
     function echo_file_diff($file, DiffInfo $dinfo, LineNotesOrder $lnorder, $args) {
         if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
             || ($dinfo->is_empty() && $dinfo->loaded)) {
@@ -1377,6 +1378,7 @@ class PsetView {
         $no_heading = ($args["no_heading"] ?? false) || $only_content;
         $id_by_user = !!($args["id_by_user"] ?? false);
         $no_grades = ($args["only_diff"] ?? false) || $only_content;
+        $hide_left = ($args["hide_left"] ?? false) && !$only_content && !$dinfo->removed;
 
         $fileid = html_id_encode($file);
         if ($id_by_user) {
@@ -1446,20 +1448,35 @@ class PsetView {
         }
 
         if (!$no_heading) {
-            echo '<h3><a class="qq ui pa-unfold-file-diff" href=""><span class="foldarrow">',
+            echo '<h3 class="pa-fileref" data-pa-fileid="', $tabid, '"><a class="qq ui pa-unfold-file-diff" href=""><span class="foldarrow">',
                 ($open ? "&#x25BC;" : "&#x25B6;"),
                 "</span>", htmlspecialchars($dinfo->title ? : $file), "</a>";
+            $bts = [];
+            $bts[] = '<a href="" class="ui pa-diff-toggle-hide-left btn'
+                . ($hide_left ? "" : " btn-primary")
+                . ' need-tooltip" aria-label="Toggle diff view">±</a>';
+            if (!$dinfo->removed && $dinfo->markdown_allowed) {
+                $bts[] = '<button class="btn ui pa-diff-toggle-markdown need-tooltip'
+                    . ($dinfo->markdown ? " btn-primary" : "")
+                    . ' aria-label="Toggle Markdown"><span class="icon-markdown"></span></button>';
+            }
             if (!$dinfo->fileless && !$dinfo->removed) {
                 $rawfile = $file;
                 if ($this->repo->truncated_psetdir($this->pset)
                     && str_starts_with($rawfile, $this->pset->directory_slash)) {
                     $rawfile = substr($rawfile, strlen($this->pset->directory_slash));
                 }
-                echo '<a style="display:inline-block;margin-left:2em;font-weight:normal" href="', $this->hoturl("raw", ["file" => $rawfile]), '">[Raw]</a>';
+                $bts[] = '<a href="' . $this->hoturl("raw", ["file" => $rawfile]) . '" class="btn need-tooltip" aria-label="Download"><span class="icon-download"></span></a>';
+            }
+            if (!empty($bts)) {
+                echo '<div class="hdr-actions btnbox">', join("", $bts), '</div>';
             }
             echo '</h3>';
         }
         echo '<div id="', $tabid, '" class="pa-filediff need-pa-observe-diff';
+        if ($hide_left) {
+            echo " pa-hide-left";
+        }
         if ($this->pc_view) {
             echo " uim pa-editablenotes live";
         }
@@ -1498,9 +1515,12 @@ class PsetView {
             echo '</div></div>';
         }
         echo "</div>\n";
-        if ($this->need_format && !$only_content) {
+        if (!$only_content && $this->need_format) {
             echo "<script>render_text.on_page()</script>\n";
             $this->need_format = false;
+        }
+        if (!$only_content && $dinfo->markdown) {
+            echo '<script>pa_filediff_markdown.call(document.getElementById("', $tabid, '"))</script>';
         }
     }
 
@@ -1663,13 +1683,8 @@ class PsetView {
         echo '</div></div></div>';
     }
 
-    static function echo_pa_diffbar($prefer_hide_left) {
-        echo '<div class="pa-diffbar"><div class="pa-diffbar-file pa-diffbar-top hidden"></div>',
-            '<div class="pa-diffbar-buttons"><a href="" class="ui pa-diff-toggle-hide-left btn btn-primary">±</a></div>',
-            '</div>';
-        if ($prefer_hide_left) {
-            Ht::stash_script('$(".pa-diff-toggle-hide-left").click()');
-        }
+    static function echo_pa_diffbar() {
+        echo '<div class="pa-diffbar"><div class="pa-diffbar-file pa-diffbar-top hidden"></div></div>';
     }
     static function echo_pa_sidebar_gradelist() {
         echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',

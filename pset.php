@@ -21,8 +21,9 @@ $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // load user repo and current commit
 $Info = PsetView::make($Pset, $User, $Me);
-if (($commit = $Qreq->newcommit) == null)
+if (($commit = $Qreq->newcommit) == null) {
     $commit = $Qreq->commit;
+}
 if (!$Info->set_hash($commit) && $commit && $Info->repo) {
     $Conf->errorMsg("Commit " . htmlspecialchars($commit) . " isn’t connected to this repository.");
     redirectSelf(array("newcommit" => null, "commit" => null));
@@ -791,8 +792,9 @@ if ($Pset->gitless) {
     if (!empty($diff)) {
         echo "<hr>\n";
         echo '<div class="pa-diffset pa-with-diffbar">';
-        PsetView::echo_pa_diffbar($Info->can_edit_grades_any());
-        if ($Info->can_edit_grades_any() && !$Pset->has_grade_landmark_range) {
+        $can_edit_grades = $Info->can_edit_grades_any();
+        PsetView::echo_pa_diffbar();
+        if ($can_edit_grades && !$Pset->has_grade_landmark_range) {
             PsetView::echo_pa_sidebar_gradelist();
         }
         foreach ($diff as $file => $dinfo) {
@@ -802,7 +804,9 @@ if ($Pset->gitless) {
                         || !$Info->can_view_grades()
                         || !$Info->is_grading_commit()
                         || !$lnorder->has_linenotes_in_diff));
-            $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open]);
+            $Info->echo_file_diff($file, $dinfo, $lnorder, [
+                "open" => $open, "hide_left" => $can_edit_grades
+            ]);
         }
         if ($Info->can_edit_grades_any() && !$Pset->has_grade_landmark_range) {
             PsetView::echo_close_pa_sidebar_gradelist();

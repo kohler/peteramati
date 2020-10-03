@@ -102,6 +102,12 @@ h3 {
 	margin-top: 0;
 	margin-bottom: 1rem;
 }
+.hdr-actions {
+	display: inline-block;
+	margin-left: 1.5rem;
+	font-size: 1rem;
+	font-weight: normal;
+}
 
 /* Tab bar */
 #header_left a {
@@ -417,6 +423,24 @@ div.merror p, div.info p, div.warning p, div.confirm p, div.help p {
 	width: fit-content;
 	margin: 0 1rem 0.25rem 0;
 	padding: 0.25em 0.5em 0.25em 1em;
+}
+
+.btn-licon {
+	padding: 1px 4px;
+	font-size: 120%;
+}
+.icon-markdown {
+	display: inline-block;
+	content: url("data:image/svg+xml,%3Csvg viewBox='0 0 162 73' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 70V2h20l20 25L64 2h20v68H64V31L44 56 24 31v39zm125 0L99 37h20V2h20v35h20z'/%3E%3C/svg%3E");
+	width: 1.553em;
+	height: 0.7em;
+}
+.icon-download {
+	display: inline-block;
+	content: url("data:image/svg+xml,%3Csvg width='32' height='32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14.7 3.5h3.6L18 17l5.5-6.5 3 3-10 9-10-9 3-3L15 17z' fill='%23333'/%3E%3Cpath d='M31 23.3c0 2.7-2 4.2-4 4.2H5c-2 0-4-1.5-4-4V18h2.5v5c0 1.5 1 2 2.5 2h20c1.5 0 2.5-.5 2.5-2v-5H31v5.3z' fill='%23333'/%3E%3C/svg%3E");
+	width: 1em;
+	height: 1em;
+	vertical-align: -0.15em;
 }
 
 
@@ -2548,6 +2572,12 @@ table.hidegrades .pa-gradenote {
 }
 .pa-gi, .pa-gisamp {
 	background-color: #ddffdd;
+}
+.pa-hide-left > .pa-gd {
+	display: none;
+}
+.pa-hide-left > .pa-gi {
+	background-color: #f0fff0;
 }
 .pa-note-entry {
 	width: 99%;

@@ -1325,18 +1325,33 @@ class RunnerConfig {
 }
 
 class DiffConfig {
+    /** @var string */
     public $regex;
+    /** @var float */
     public $match_priority;
+    /** @var string */
     public $title;
+    /** @var float */
     public $position;
+    /** @var bool */
     public $fileless;
+    /** @var bool */
     public $full;
+    /** @var bool */
     public $collate;
+    /** @var bool */
     public $ignore;
+    /** @var bool */
     public $boring;
+    /** @var bool */
     public $gradable;
+    /** @var bool */
     public $hide_if_anonymous;
+    /** @var null|bool|'allowed' */
+    public $markdown;
 
+    /** @param string $regex
+     * @param object $d */
     function __construct($regex, $d) {
         $loc = array("diffs", $regex);
         if (!is_object($d)) {
@@ -1359,6 +1374,17 @@ class DiffConfig {
         $this->boring = Pset::cbool($loc, $d, "boring");
         $this->gradable = Pset::cbool($loc, $d, "gradable", "gradeable");
         $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
+        if (isset($d->markdown)) {
+            if (is_bool($d->markdown)) {
+                $this->markdown = $d->markdown;
+            } else if ($d->markdown === "yes" || $d->markdown === "no") {
+                $this->markdown = $d->markdown === "yes";
+            } else if ($d->markdown === "allowed") {
+                $this->markdown = "allowed";
+            } else {
+                throw new PsetConfigException("`markdown` diff format error", $loc);
+            }
+        }
     }
 
     static function combine(DiffConfig $a = null, DiffConfig $b = null) {

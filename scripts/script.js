@@ -2879,16 +2879,17 @@ function expand(evt) {
 handle_ui.on("pa-gx", expand);
 })($);
 
-handle_ui.on("pa-diff-toggle-hide-left", function () {
-    var $x = $("head .style-hide-left"), show = $x.length;
-    if (show) {
-        $x.remove();
+handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
+    var f = pa_resolve_fileref(this), show = hasClass(f, "pa-hide-left");
+    if (evt.metaKey) {
+        $(".pa-diff-toggle-hide-left").each(function () {
+            toggleClass(pa_resolve_fileref(this), "pa-hide-left", !show);
+            toggleClass(this, "btn-primary", show);
+        });
     } else {
-        var styles = $('<style class="style-hide-left"></style>').appendTo("head")[0].sheet;
-        styles.insertRule('.pa-gd { display: none; }');
-        styles.insertRule('.pa-gi { background-color: #f0fff0; }');
+        toggleClass(f, "pa-hide-left", !show);
+        toggleClass(this, "btn-primary", show);
     }
-    toggleClass(this, "btn-primary", show);
 });
 
 var pa_observe_diff = (function () {
@@ -3254,6 +3255,23 @@ function pa_grade_entry() {
     return gi.entries[e.getAttribute("data-pa-grade")];
 }
 
+handle_ui.on("pa-diff-toggle-markdown", function (evt) {
+    var f = pa_resolve_fileref(this), show = !hasClass(f, "pa-markdown");
+    if (evt.metaKey) {
+        $(".pa-diff-toggle-markdown").each(function () {
+            var f2 = pa_resolve_fileref(this), shown = hasClass(f2, "pa-markdown");
+            if (show && !shown) {
+                pa_filediff_markdown.call(f2);
+            } else if (!show && shown) {
+                pa_filediff_unmarkdown.call(f2);
+            }
+            toggleClass(this, "btn-primary", show);
+        });
+    } else {
+        (show ? pa_filediff_markdown : pa_filediff_unmarkdown).call(f);
+        toggleClass(this, "btn-primary", show);
+    }
+});
 
 var pa_filediff_markdown = (function () {
 var md;
@@ -3439,6 +3457,7 @@ return function () {
         lp.appendChild(lr);
         this.insertBefore(lp, e);
     }
+    addClass(this, "pa-markdown");
 };
 
 })();
@@ -3455,6 +3474,7 @@ function pa_filediff_unmarkdown() {
         }
         e = n;
     }
+    removeClass(this, "pa-markdown");
 }
 
 
@@ -3885,15 +3905,20 @@ function pa_loadfilediff(filee, callback) {
 }
 
 
+function pa_resolve_fileref(e) {
+    var fd = e.closest(".pa-filediff");
+    return fd || document.getElementById(e.closest(".pa-fileref").getAttribute("data-pa-fileid"));
+}
+
 handle_ui.on("pa-unfold-file-diff", function (evt) {
     if (evt.metaKey) {
         $(".pa-unfold-file-diff").each(function () {
-            fold61(this.parentElement.nextSibling, this, false);
+            fold61(pa_resolve_fileref(this), this, false);
         });
     } else {
-        var self = this, filee = this.parentElement.nextSibling;
-        pa_loadfilediff(filee, function () {
-            fold61(filee, self);
+        var self = this, f = pa_resolve_fileref(this);
+        pa_loadfilediff(f, function () {
+            fold61(f, self);
         });
     }
     return false;

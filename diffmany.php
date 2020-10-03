@@ -27,8 +27,9 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     global $Me, $psetinfo_idx, $all_viewed_gradeentries;
     ++$psetinfo_idx;
     $info = PsetView::make($pset, $user, $Me);
-    if (!$pset->gitless && !$info->repo)
+    if (!$pset->gitless && !$info->repo) {
         return;
+    }
     $info->set_hash(false);
     echo '<div id="pa-psetinfo', $psetinfo_idx,
         '" class="pa-psetinfo pa-diffcontext',
@@ -90,7 +91,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
             }
             foreach ($diff as $file => $dinfo) {
                 $info->echo_file_diff($file, $dinfo, $lnorder,
-                    ["open" => true, "id_by_user" => true,
+                    ["open" => true, "id_by_user" => true, "hide_left" => true,
                      "no_heading" => count($qreq->files) == 1]);
             }
             if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
