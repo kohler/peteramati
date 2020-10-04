@@ -1640,12 +1640,14 @@ class Conf {
         echo $this->opt("fontScript") ?? "";
 
         echo $this->make_css_link("stylesheets/style.css"), "\n";
+        echo $this->make_css_link("stylesheets/github.css"), "\n";
         if ($this->opt("mobileStylesheet")) {
             echo '<meta name="viewport" content="width=device-width, initial-scale=1">', "\n";
             echo $this->make_css_link("stylesheets/mobile.css", "screen and (max-width: 768px)"), "\n";
         }
-        foreach (mkarray($this->opt("stylesheets") ?? []) as $css)
+        foreach (mkarray($this->opt("stylesheets") ?? []) as $css) {
             echo $this->make_css_link($css), "\n";
+        }
 
         // favicon
         $favicon = $this->opt("favicon");
@@ -1701,6 +1703,7 @@ class Conf {
         }
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
+        Ht::stash_html($this->make_script_file("scripts/highlight.min.js", true) . "\n");
         foreach (mkarray($this->opt("javascripts") ?? []) as $scriptfile) {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
         }

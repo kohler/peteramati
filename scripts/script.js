@@ -3337,7 +3337,17 @@ function modify_landmark_fence(base) {
 
 function make_markdownit() {
     if (!md) {
-        md = markdownit();
+        md = markdownit({
+            highlight: function (str, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(lang, str).value;
+                    } catch (ex) {
+                    }
+                }
+                return "";
+            }
+        });
         for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
                        "bullet_list_open", "table_open", "blockquote_open",
                        "hr", "image", "code_block"]) {
