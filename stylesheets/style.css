@@ -269,6 +269,9 @@ form {
 .float-left {
 	float: left;
 }
+.ml-0 {
+	margin-left: 0 !important;
+}
 
 
 /* body */
@@ -2827,6 +2830,9 @@ span.pa-gradewidth {
 input.pa-gradewidth {
 	min-width: 3rem;
 	width: 6rem;
+}
+.pa-gradevalue {
+	margin-left: 0;
 }
 textarea.pa-gradevalue {
 	vertical-align: top;
