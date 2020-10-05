@@ -891,7 +891,7 @@ Sign in to tell us about your code.";
 <input type='hidden' name='cookie' value='1' />
 <div class=\"", Ht::control_class("email", "f-ii"), "\">
   <div class=\"f-c\"><span class='fx2'>",
-    ($Conf->opt("ldapLogin") ? "Username" : "Email/username/HUID"),
+    ($Conf->opt("ldapLogin") ? "Username" : "Email/username"),
     "</span><span class='fn2'>Email</span></div>
   <div class=\"f-e\"><input",
     ($passwordFocus ? "" : " id='login_d'"),
