@@ -177,6 +177,9 @@ span.nb {
 .childfold, .js-foldup {
 	cursor: pointer;
 }
+a.btn {
+	cursor: default;
+}
 .wait, body.wait input, body.wait button {
 	cursor: wait !important;
 }

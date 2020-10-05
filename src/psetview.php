@@ -1458,7 +1458,7 @@ class PsetView {
             if (!$dinfo->removed && $dinfo->markdown_allowed) {
                 $bts[] = '<button class="btn ui pa-diff-toggle-markdown need-tooltip'
                     . ($dinfo->markdown ? " btn-primary" : "")
-                    . ' aria-label="Toggle Markdown"><span class="icon-markdown"></span></button>';
+                    . '" aria-label="Toggle Markdown"><span class="icon-markdown"></span></button>';
             }
             if (!$dinfo->fileless && !$dinfo->removed) {
                 $rawfile = $file;
