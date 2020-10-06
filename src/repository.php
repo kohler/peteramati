@@ -155,7 +155,6 @@ class Repository {
     static private $validate_time_used = 0;
 
     function refresh($delta, $foreground = false) {
-        global $ConfSitePATH;
         if ((!$this->snapcheckat || $this->snapcheckat + $delta <= Conf::$now)
             && !$this->conf->opt("disableRemote")) {
             $this->conf->qe("update Repository set snapcheckat=? where repoid=?", Conf::$now, $this->repoid);
@@ -267,9 +266,8 @@ class Repository {
 
 
     function gitrun($command, $want_stderr = false) {
-        global $ConfSitePATH;
         $command = str_replace("%REPO%", "repo" . $this->repoid, $command);
-        $repodir = "$ConfSitePATH/repo/repo$this->cacheid";
+        $repodir = SiteLoader::$root . "/repo/repo$this->cacheid";
         if (!file_exists("$repodir/.git/config")) {
             is_dir($repodir) || mkdir($repodir, 0770);
             shell_exec("cd $repodir && git init --shared");
@@ -318,6 +316,10 @@ class Repository {
         //$limitarg = $limit ? " -n$limit" : "";
         $limitarg = "";
         $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
+        if (empty($this->_commits[$m[2]])) {
+            $this->refresh(30, true);
+            $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
+        }
         preg_match_all('/^(\S+)\s+(\S+)\s+(.*)$/m', $result, $ms, PREG_SET_ORDER);
         foreach ($ms as $m) {
             if (!isset($this->_commits[$m[2]])) {
@@ -447,7 +449,6 @@ class Repository {
 
 
     function analyze_snapshots() {
-        global $ConfSitePATH;
         if ($this->snapat <= $this->analyzedsnapat)
             return;
         $timematch = " ";
@@ -455,7 +456,7 @@ class Repository {
             $timematch = gmstrftime("%Y%m%d.%H%M%S", $this->analyzedsnapat);
         $qv = [];
         $analyzed_snaptime = 0;
-        foreach (glob("$ConfSitePATH/repo/repo$this->cacheid/.git/refs/tags/repo{$this->repoid}.snap*") as $snapfile) {
+        foreach (glob(SiteLoader::$root . "/repo/repo$this->cacheid/.git/refs/tags/repo{$this->repoid}.snap*") as $snapfile) {
             $time = substr($snapfile, strrpos($snapfile, ".snap") + 5);
             if (strcmp($time, $timematch) <= 0
                 || !preg_match('/\A(\d\d\d\d)(\d\d)(\d\d)\.(\d\d)(\d\d)(\d\d)\z/', $time, $m)) {
@@ -501,27 +502,27 @@ class Repository {
             $list = [];
             $this->load_commits_from_head($list, "repo{$this->repoid}.snap" . gmstrftime("%Y%m%d.%H%M%S", $match->snapshot), "");
         }
-        if (!array_key_exists($hash, $this->_commits))
+        if (!array_key_exists($hash, $this->_commits)) {
             $this->_commits[$hash] = null;
+        }
         return $this->_commits[$hash];
     }
 
 
     private function _temp_repo_clone() {
-        global $ConfSitePATH;
         assert(isset($this->repoid) && isset($this->cacheid));
         $suffix = "";
         $suffixn = 0;
         while (true) {
-            $d = "$ConfSitePATH/repo/tmprepo." . Conf::$now . $suffix;
+            $d = SiteLoader::$root . "/repo/tmprepo." . Conf::$now . $suffix;
             if (mkdir($d, 0770)) {
                 break;
             }
             ++$suffixn;
             $suffix = "_" . $suffixn;
         }
-        $answer = shell_exec("cd $d && git init >/dev/null && git remote add origin $ConfSitePATH/repo/repo{$this->cacheid} >/dev/null && echo yes");
-        return ($answer == "yes\n" ? $d : null);
+        $answer = shell_exec("cd $d && git init >/dev/null && git remote add origin " . SiteLoader::$root . "/repo/repo{$this->cacheid} >/dev/null && echo yes");
+        return ($answer === "yes\n" ? $d : null);
     }
 
     private function prepare_truncated_hash(Pset $pset, $hash) {
