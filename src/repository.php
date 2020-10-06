@@ -316,7 +316,7 @@ class Repository {
         //$limitarg = $limit ? " -n$limit" : "";
         $limitarg = "";
         $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
-        if (empty($this->_commits[$m[2]])) {
+        if ($result === "") {
             $this->refresh(30, true);
             $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
         }
