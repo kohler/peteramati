@@ -1638,7 +1638,8 @@ class PsetView {
         if ((string) $note->note === "") {
             echo ' hidden';
         }
-        echo '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render_json($this->can_view_note_authors()))),
+        echo '" data-landmark="', $note->lineid,
+            '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render_json($this->can_view_note_authors()))),
             '"><div class="pa-notebox">';
         if ((string) $note->note === "") {
             echo '</div></div>';

@@ -2313,38 +2313,51 @@ function pa_diff_traverse(tr, down, flags) {
 }
 
 // pa_diff_locate(tr, down)
-//    Like `pa_diff_traverse(tr, down, 1)`. Returns `null` if the target
+//    Analyze a click on `tr`. Returns `null` if the target
 //    is a <textarea> or <a>.
 function pa_diff_locate(tr, down) {
     if (!tr
         || tr.tagName === "TEXTAREA"
-        || tr.tagName === "A"
-        || !(tr = pa_diff_traverse(tr, down, 1))) {
-        return null;
-    }
-    var table = tr.closest(".pa-filediff");
-    if (!table) {
+        || tr.tagName === "A") {
         return null;
     }
 
-    var file = table.getAttribute("data-pa-file"),
-        user = table.getAttribute("data-pa-file-user"),
-        aline = +tr.firstChild.getAttribute("data-landmark"),
-        bline = +tr.firstChild.nextSibling.getAttribute("data-landmark"),
-        result = {
-            ufile: file, file: file, aline: aline, bline: bline,
-            lineid: bline ? "b" + bline : "a" + aline, tr: tr
-        };
+    var thisline = tr.closest(".pa-dl"),
+        nearline = pa_diff_traverse(tr, down, 1),
+        filediff;
+    if (!nearline || !(filediff = nearline.closest(".pa-filediff"))) {
+        return null;
+    }
+
+    var file = filediff.getAttribute("data-pa-file"),
+        result = {ufile: file, file: file, tr: nearline},
+        user = filediff.getAttribute("data-pa-file-user");
     if (user) {
-        result.ufile = user + "-" + result.file;
+        result.ufile = user + "-" + file;
     }
-    var next_tr = tr.nextSibling;
-    while (next_tr
-           && (next_tr.nodeType !== Node.ELEMENT_NODE || hasClass(next_tr, "pa-gn"))) {
-        next_tr = next_tr.nextSibling;
+
+    var lm;
+    if (thisline
+        && (lm = thisline.getAttribute("data-landmark"))
+        && /^[ab]\d+$/.test(lm)) {
+        result[lm.charAt(0) + "line"] = +lm.substring(1);
+        result.lineid = lm;
+    } else {
+        result.aline = +nearline.firstChild.getAttribute("data-landmark");
+        result.bline = +nearline.firstChild.nextSibling.getAttribute("data-landmark");
+        result.lineid = result.bline ? "b" + result.bline : "a" + result.aline;
     }
-    if (next_tr && hasClass(next_tr, "pa-gw")) {
-        result.notetr = next_tr;
+
+    if (thisline && hasClass(thisline, "pa-gw")) {
+        result.notetr = thisline;
+    } else {
+        do {
+            nearline = nearline.nextSibling;
+        } while (nearline
+                 && (nearline.nodeType !== Node.ELEMENT_NODE || hasClass(nearline, "pa-gn")));
+        if (nearline && hasClass(nearline, "pa-gw")) {
+            result.notetr = nearline;
+        }
     }
     return result;
 }
