@@ -301,10 +301,11 @@ class Repository {
 
     function rev_parse($arg) {
         $x = $this->gitrun("git rev-parse --verify " . escapeshellarg($arg), true);
-        if ($x->status == 0 && $x->stdout)
+        if ($x->status == 0 && $x->stdout) {
             return trim($x->stdout);
-        else
+        } else {
             return false;
+        }
     }
 
     /** @param array<string,CommitRecord> &$list */
