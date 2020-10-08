@@ -346,7 +346,7 @@ function evaluate_formula($student, $formula) {
 }
 
 function download_psets_report($request) {
-    global $Conf, $Me, $PsetInfo;
+    global $Conf, $Me;
     $where = array();
     $report = $request["report"];
     $anonymous = null;
@@ -401,7 +401,7 @@ function download_psets_report($request) {
     $example->nstudents = count($students);
 
     if (!$sel_pset) {
-        foreach ($PsetInfo->_report_summaries ?? [] as $fname => $formula) {
+        foreach ($Conf->config->_report_summaries ?? [] as $fname => $formula) {
             $fexpr = parse_formula($Conf, $formula, $example, 0);
             if ($fexpr !== null && trim($formula) === "") {
                 foreach ($students as $s) {

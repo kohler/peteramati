@@ -125,7 +125,7 @@ if ($Pset->grade_script) {
 echo "<div class=\"pa-psetinfo pa-diffset pa-with-diffbar\" data-pa-gradeinfo=\"",
      htmlspecialchars(json_encode($Pset->gradeentry_json($Me->isPC))),
      "\">";
-PsetView::echo_pa_diffbar(true);
+PsetView::echo_pa_diffbar();
 
 if (trim((string) $Qreq->users) === "") {
     $want = [];

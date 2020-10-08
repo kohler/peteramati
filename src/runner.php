@@ -560,27 +560,29 @@ class RunnerState {
     }
 
     function make_queue() {
-        global $PsetInfo;
-        if (!isset($this->runner->queue))
+        if (!isset($this->runner->queue)) {
             return null;
+        }
 
         if ($this->queueid === null) {
             $nconcurrent = null;
             if (isset($this->runner->nconcurrent)
-                && $this->runner->nconcurrent > 0)
+                && $this->runner->nconcurrent > 0) {
                 $nconcurrent = $this->runner->nconcurrent;
+            }
             $this->conf->qe("insert into ExecutionQueue set queueclass=?, repoid=?, insertat=?, updateat=?, runat=0, status=0, nconcurrent=?, psetid=?, runnername=?, bhash=?",
                     $this->runner->queue, $this->repoid,
                     Conf::$now, Conf::$now, $nconcurrent,
                     $this->pset->id, $this->runner->name,
                     hex2bin($this->info->commit_hash()));
             $this->queueid = $this->conf->dblink->insert_id;
-        } else
+        } else {
             $this->conf->qe("update ExecutionQueue set updateat=? where queueid=?",
                     Conf::$now, $this->queueid);
+        }
         $queue = $this->load_queue();
 
-        $qconf = $PsetInfo->_queues->{$this->runner->queue} ?? null;
+        $qconf = $this->conf->config->_queues->{$this->runner->queue} ?? null;
         if (!$qconf) {
             $qconf = (object) ["nconcurrent" => 1];
         }

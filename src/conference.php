@@ -68,6 +68,9 @@ class Conf {
     public $opt;
     /** @var array<string,mixed> */
     public $opt_override;
+
+    /** @var object */
+    public $config;
     /** @var ?string */
     public $default_main_branch;
 
@@ -402,6 +405,40 @@ class Conf {
         $conf->crosscheck_globals();
     }
 
+
+    /** @param object $config */
+    function set_config($config) {
+        assert(isset($config->_defaults));
+        assert($this->config === null);
+        $this->config = $config;
+
+        // parse psets
+        foreach (get_object_vars($config) as $pk => $p) {
+            if (!str_starts_with($pk, "_")
+                && is_object($p)
+                && isset($p->psetid)) {
+                object_merge_recursive($p, $config->_defaults);
+                try {
+                    $pset = new Pset($this, $pk, $p);
+                    $this->register_pset($pset);
+                } catch (PsetConfigException $exception) {
+                    $exception->key = $pk;
+                    throw $exception;
+                }
+            }
+        }
+
+        // extract defaults
+        if ($config->_defaults->main_branch ?? null) {
+            $this->set_default_main_branch($config->_defaults->main_branch);
+        }
+        if (!($config->_messagedefs ?? null)) {
+            $config->_messagedefs = (object) array();
+        }
+        if (!($config->_messagedefs->SYSTEAM ?? null)) {
+            $config->_messagedefs->SYSTEAM = "cs61-staff";
+        }
+    }
 
     /** @param string $b */
     function set_default_main_branch($b) {

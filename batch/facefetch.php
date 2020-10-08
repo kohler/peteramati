@@ -16,8 +16,9 @@ if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {
 }
 
 $facefetch_urlpattern = get($Opt, "facefetch_urlpattern");
-if (get($PsetInfo, "_facefetch_urlpattern"))
-    $facefetch_urlpattern = $PsetInfo->_facefetch_urlpattern;
+if ($Conf->config->_facefetch_urlpattern ?? null) {
+    $facefetch_urlpattern = $Conf->config->_facefetch_urlpattern;
+}
 if (!$facefetch_urlpattern) {
     fwrite(STDERR, 'Need `_facefetch_urlpattern` configuration option.' . "\n");
     exit(1);
@@ -25,9 +26,10 @@ if (!$facefetch_urlpattern) {
 if (is_string($facefetch_urlpattern))
     $facefetch_urlpattern = [$facefetch_urlpattern];
 
-$fetchscript = get($PsetInfo, "_facefetch_script");
-if (count($arg["_"]))
+$fetchscript = $Conf->config->_facefetch_script ?? null;
+if (count($arg["_"])) {
     $fetchscript = $arg["_"][0];
+}
 if (!$fetchscript) {
     fwrite(STDERR, "Need `_facefetch_script` configuration option or argument.\n");
     exit(1);

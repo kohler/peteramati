@@ -150,6 +150,7 @@ if (!$Conf->dblink) {
 
 
 // Extract problem set information
+/** @return array<string,string> */
 function psets_json_data($exclude_overrides, &$mtime) {
     global $Conf;
     $datamap = array();
@@ -168,13 +169,14 @@ function psets_json_data($exclude_overrides, &$mtime) {
     return $datamap;
 }
 
+/** @return object */
 function load_psets_json($exclude_overrides) {
     $mtime = 0;
     $datamap = psets_json_data($exclude_overrides, $mtime);
     if (empty($datamap)) {
         Multiconference::fail_message("\$Opt[\"psetsConfig\"] is not set correctly.");
     }
-    $json = (object) array("_defaults" => (object) array());
+    $json = (object) ["_defaults" => (object) []];
     foreach ($datamap as $fname => $data) {
         if ($data === false) {
             Multiconference::fail_message("$fname: Required configuration file cannot be read.");
@@ -194,7 +196,7 @@ function load_psets_json($exclude_overrides) {
 }
 
 function load_pset_info() {
-    global $ConfSitePATH, $Conf, $PsetInfo, $PsetOverrides;
+    global $ConfSitePATH, $Conf, $PsetOverrides;
     // read initial messages
     Messages::$main = new Messages;
     $x = json_decode(file_get_contents("$ConfSitePATH/src/messages.json"));
@@ -203,58 +205,44 @@ function load_pset_info() {
     }
 
     // read psets
-    $PsetInfo = load_psets_json(false);
-
-    // parse psets
-    foreach ($PsetInfo as $pk => $p) {
-        if (!is_object($p) || !isset($p->psetid)) {
-            continue;
-        }
-        object_merge_recursive($p, $PsetInfo->_defaults);
-
-        try {
-            $pset = new Pset($Conf, $pk, $p);
-            $Conf->register_pset($pset);
-        } catch (Exception $exception) {
-            // Want to give a good error message, so discover where the error is.
+    try {
+        $Conf->set_config(load_psets_json(false));
+    } catch (Exception $exception) {
+        // Want to give a good error message, so discover where the error is.
+        if ($exception instanceof PsetConfigException
+            && $exception->key) {
             // - create pset landmark object
-            $locinfo = (object) array();
+            $locinfo = (object) [];
             $mtime = 0;
             foreach (psets_json_data(false, $mtime) as $fname => $data) {
                 $x = Json::decode_landmarks($data, $fname);
                 object_replace_recursive($locinfo, $x);
             }
-            $locp = $locinfo->$pk;
+            // - read location  information
+            $locp = $locinfo->{$exception->key};
             if (isset($locinfo->_defaults)) {
                 object_merge_recursive($locp, $locinfo->_defaults);
             }
             // - lookup exception path in landmark object
-            $path = $exception instanceof PsetConfigException ? $exception->path : array();
-            for ($pathpos = 0; $pathpos < count($path) && $locp && !is_string($locp); ++$pathpos) {
-                $component = $path[$pathpos];
-                $locp = is_array($locp) ? $locp[$component] : $locp->$component;
+            foreach ($exception->path as $component) {
+                if ($locp && !is_string($locp)) {
+                    $locp = is_array($locp) ? $locp[$component] : $locp->$component;
+                }
             }
             // - report error
-            if (is_object($locp) && get($locp, "__LANDMARK__")) {
+            if (is_object($locp) && ($locp->__LANDMARK__ ?? null)) {
                 $locp = $locp->__LANDMARK__;
             } else if (!is_string($locp)) {
-                $locp = $locinfo->$pk->__LANDMARK__;
+                $locp = $locinfo->{$exception->key}->__LANDMARK__;
             }
-            Multiconference::fail_message($locp . ": Configuration error: " . $exception->getMessage());
+            $locp .= ": ";
+        } else {
+            $locp = "";
         }
+        Multiconference::fail_message($locp . "Configuration error: " . $exception->getMessage());
     }
 
-    // read message data
-    if ($PsetInfo->_defaults->main_branch ?? null) {
-        $Conf->set_default_main_branch($PsetInfo->_defaults->main_branch);
-    }
-    if (!($PsetInfo->_messagedefs ?? null)) {
-        $PsetInfo->_messagedefs = (object) array();
-    }
-    if (!($PsetInfo->_messagedefs->SYSTEAM ?? null)) {
-        $PsetInfo->_messagedefs->SYSTEAM = "cs61-staff";
-    }
-    foreach ($PsetInfo->_messagedefs as $k => $v) {
+    foreach ($Conf->config->_messagedefs as $k => $v) {
         Messages::$main->define($k, $v);
     }
 
@@ -277,6 +265,7 @@ function load_pset_info() {
             while (($row = Dbl::fetch_first_row(Dbl::qe("select contactId from ContactInfo where anon_username is null limit 1")))) {
                 Dbl::q("update ContactInfo set anon_username='[anon" . sprintf("%08u", mt_rand(1, 99999999)) . "]' where contactId=?", $row[0]);
             }
+            break;
         }
     }
 

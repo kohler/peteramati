@@ -4,15 +4,19 @@
 // See LICENSE for open-source distribution terms
 
 class PsetConfigException extends Exception {
+    /** @var list */
     public $path;
+    /** @var ?string */
+    public $key;
 
-    function __construct($msg, $path) {
-        $this->path = array();
-        foreach (func_get_args() as $i => $x) {
-            if ($i && is_array($x))
+    function __construct($msg, ...$path) {
+        $this->path = [];
+        foreach ($path as $x) {
+            if (is_array($x)) {
                 $this->path = array_merge($this->path, $x);
-            else if ($i && $x !== false && $x !== null)
+            } else if ($x !== false && $x !== null) {
                 $this->path[] = $x;
+            }
         }
         parent::__construct($msg);
     }
