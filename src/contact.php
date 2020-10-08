@@ -1426,7 +1426,7 @@ class Contact {
 
     function xxx_can_view_grades(Pset $pset) {
         return $this->can_view_pset($pset)
-            && ($this->isPC || $pset->student_can_view_grades($this->extension));
+            && ($this->isPC || $pset->student_can_view_grades());
     }
 
     function can_view_grader(Pset $pset, Contact $user = null) {

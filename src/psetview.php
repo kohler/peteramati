@@ -644,12 +644,14 @@ class PsetView {
                    || (!$this->pset->gitless_grades
                        && (!$this->repo || !$this->user_can_view_repo_contents()))) {
             return false;
+        } else if ($this->pset->student_can_edit_grades()) {
+            return true;
         } else if (($g = $this->ensure_grade())) {
             return $g->hidegrade <= 0
                 && ($g->hidegrade < 0
-                    || $this->pset->student_can_view_grades($user->extension));
+                    || $this->pset->student_can_view_grades());
         } else {
-            return $this->pset->student_can_edit_grades($user->extension);
+            return false;
         }
     }
 
@@ -692,7 +694,7 @@ class PsetView {
 
     function can_edit_grades_any() {
         return $this->can_view_grades()
-            && ($this->viewer !== $this->user || $this->pset->student_can_edit_grades($this->user->extension));
+            && ($this->viewer !== $this->user || $this->pset->student_can_edit_grades());
     }
 
 
@@ -720,7 +722,7 @@ class PsetView {
                     if (($ag && ($ag->{$ge->key} ?? null) !== null)
                         || ($g && ($g->{$ge->key} ?? null) !== null)) {
                         ++$this->n_nonempty_grades;
-                        if (!$ge->student_editable) {
+                        if (!$ge->student) {
                             ++$this->n_nonempty_assigned_grades;
                         }
                     }

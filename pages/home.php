@@ -1296,7 +1296,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     // are any commits committed?
     if (!$pset->gitless_grades && $info->repo) {
         if ($t0 - $MicroNow < 0.2
-            && $pset->student_can_view_grades($info->user->extension)) {
+            && $pset->student_can_view_grades()) {
             $gh = $info->update_grading_hash(function ($info, $placeholder_at) use ($t0) {
                 if ($placeholder_at && $placeholder_at < $t0 - 3600) {
                     return rand(0, 2) == 0;

@@ -63,6 +63,8 @@ class Pset {
     public $admin_disabled;
     /** @var bool */
     public $visible;
+    /** @var int */
+    public $visible_at;
     /** @var bool */
     public $frozen;
     public $partner;
@@ -95,10 +97,8 @@ class Pset {
     public $grades;
     /** @var bool */
     public $grades_visible;
-    /** @var bool */
-    public $grades_visible_college;
-    /** @var bool */
-    public $grades_visible_extension;
+    /** @var int */
+    public $grades_visible_at;
     /** @var bool */
     public $grade_statistics_visible;
     /** @var ?float */
@@ -217,7 +217,9 @@ class Pset {
         if (($this->admin_disabled = self::cbool($p, "admin_disabled", "ui_disabled"))) {
             $this->disabled = true;
         }
-        $this->visible = self::cdate($p, "visible", "show_to_students");
+        $v = self::cdate($p, "visible", "show_to_students");
+        $this->visible = $v === true || (is_int($v) && $v > 0 && $v <= Conf::$now);
+        $this->visible_at = is_int($v) ? $v : 0;
         $this->frozen = self::cdate($p, "frozen", "freeze");
         $this->partner = self::cbool($p, "partner");
         $this->no_branch = self::cbool($p, "no_branch");
@@ -295,7 +297,7 @@ class Pset {
                 if ($g->is_extra) {
                     $this->has_extra = true;
                 }
-                if ($g->visible && $g->student_editable) {
+                if ($g->visible && $g->student) {
                     $this->has_student_editable_grades = true;
                 }
             }
@@ -310,21 +312,9 @@ class Pset {
         foreach (array_values($this->grades) as $i => $ge) {
             $ge->pcview_index = $i;
         }
-        $this->grades_visible = self::cdate($p, "grades_visible", "show_grades_to_students");
-        $this->grades_visible_college = self::cdate($p, "grades_visible_college", "show_grades_to_college");
-        if ($this->grades_visible_college === null) {
-            $this->grades_visible_college = $this->grades_visible;
-        }
-        $this->grades_visible_extension = self::cdate($p, "grades_visible_extension", "show_grades_to_extension");
-        if ($this->grades_visible_extension === null) {
-            $this->grades_visible_extension = $this->grades_visible;
-        }
-        if ($this->grades_visible === null) {
-            if ($this->grades_visible_college === null)
-                $this->grades_visible = $this->grades_visible_college;
-            else
-                $this->grades_visible = $this->grades_visible_extension;
-        }
+        $gv = self::cdate($p, "grades_visible", "show_grades_to_students");
+        $this->grades_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
+        $this->grades_visible_at = is_int($gv) ? $gv : 0;
         $this->grade_statistics_visible = self::cdate_or_grades($p, "grade_statistics_visible", "grade_cdf_visible");
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
@@ -445,34 +435,19 @@ class Pset {
 
     /** @return bool */
     function student_can_view() {
-        $dl = $this->visible;
-        return !$this->disabled && $dl && ($dl === true || $dl <= Conf::$now);
+        return !$this->disabled && $this->visible;
     }
 
     /** @return bool */
-    function student_can_view_grades($extension = null) {
-        if ($extension === null) {
-            $dl = $this->grades_visible;
-        } else if ($extension) {
-            $dl = $this->grades_visible_extension;
-        } else {
-            $dl = $this->grades_visible_college;
-        }
-        return $this->student_can_view() && $dl && ($dl === true || $dl <= Conf::$now);
+    function student_can_view_grades() {
+        return $this->student_can_view()
+            && ($this->has_student_editable_grades || $this->grades_visible);
     }
 
     /** @return bool */
-    function student_can_edit_grades($extension = null) {
-        if (!$this->has_student_editable_grades
-            && !$this->student_can_view_grades($extension)) {
-            return false;
-        } else {
-            foreach ($this->grades as $ge) {
-                if ($ge->student_can_edit())
-                    return true;
-            }
-            return false;
-        }
+    function student_can_edit_grades() {
+        return $this->student_can_view()
+            && $this->has_student_editable_grades;
     }
 
 
@@ -538,17 +513,31 @@ class Pset {
     /** @param bool $pcview
      * @return array<string,GradeEntryConfig> */
     function visible_grades($pcview) {
-        return $pcview ? $this->grades : array_filter($this->grades, function ($ge) {
-            return $ge->visible;
-        });
+        if ($pcview) {
+            return $this->grades;
+        } else if (!$this->disabled && $this->visible) {
+            $g = [];
+            foreach ($this->grades as $k => $ge) {
+                if ($ge->visible && ($this->grades_visible || $ge->student)) {
+                    $g[$k] = $ge;
+                }
+            }
+            return $g;
+        } else {
+            return [];
+        }
     }
 
     /** @param bool $pcview
      * @return array<string,GradeEntryConfig> */
     function visible_grades_in_total($pcview) {
-        return array_filter($this->grades, function ($ge) use ($pcview) {
-            return ($pcview || $ge->visible) && !$ge->no_total;
-        });
+        $g = [];
+        foreach ($this->visible_grades($pcview) as $k => $ge) {
+            if (!$ge->no_total) {
+                $g[$k] = $ge;
+            }
+        }
+        return $g;
     }
 
     /** @return GradeEntryConfig */
@@ -937,13 +926,14 @@ class GradeEntryConfig {
     public $formula;
     /** @var null|false|GradeFormula */
     private $_formula = false;
+    /** @var null|int|float */
     public $max;
+    /** @var bool */
+    public $student;
     /** @var bool */
     public $visible;
     /** @var bool */
     private $_visible_defaulted = false;
-    /** @var bool */
-    public $student_editable;
     /** @var bool */
     public $max_visible;
     /** @var bool */
@@ -1072,7 +1062,7 @@ class GradeEntryConfig {
             $this->max_visible = $this->_max_visible_defaulted = true;
         }
         $this->is_extra = Pset::cbool($loc, $g, "is_extra");
-        $this->student_editable = Pset::cbool($loc, $g, "student_editable");
+        $this->student = Pset::cbool($loc, $g, "student", "student_editable");
 
         $this->position = Pset::cnum($loc, $g, "position");
         if ($this->position === null && isset($g->priority)) {
@@ -1229,7 +1219,7 @@ class GradeEntryConfig {
 
     /** @return bool */
     function student_can_edit() {
-        return $this->visible && $this->student_editable;
+        return $this->visible && $this->student;
     }
 
     function json($pcview, $pos = null) {
@@ -1264,10 +1254,10 @@ class GradeEntryConfig {
         if (!$this->visible) {
             $gej["visible"] = false;
         }
-        if ($this->student_editable)  {
-            $gej["student_editable"] = true;
+        if ($this->student)  {
+            $gej["student"] = true;
         }
-        if (($pcview || $this->student_editable) && $this->edit_description) {
+        if (($pcview || $this->student) && $this->edit_description) {
             $gej["edit_description"] = $this->edit_description;
         }
         return $gej;

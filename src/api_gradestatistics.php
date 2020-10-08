@@ -128,8 +128,8 @@ class API_GradeStatistics {
         }
         $has_extra = $has_xextra = false;
 
-        if (is_int($pset->grades_visible)) {
-            $notdropped = "(not c.dropped or c.dropped<$pset->grades_visible)";
+        if ($pset->grades_visible_at) {
+            $notdropped = "(not c.dropped or c.dropped<$pset->grades_visible_at)";
         } else {
             $notdropped = "not c.dropped";
         }

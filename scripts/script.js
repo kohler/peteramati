@@ -3142,7 +3142,7 @@ pa_add_grade_type("letter", function (v) { return lm[v] || v + ""; },
 function pa_render_grade_entry(ge, editable, live) {
     var t, name = ge.key, title = ge.title ? escape_entities(ge.title) : name,
         typeinfo = pa_grade_types[ge.type || "numeric"];
-    if ((editable || ge.student_editable) && typeinfo.entry) {
+    if ((editable || ge.student) && typeinfo.entry) {
         live = live !== false;
         var opts = {editable: editable, live_class: live ? "uich " : ""},
             id = "pa-ge" + ++pa_render_grade_entry.id_counter;
