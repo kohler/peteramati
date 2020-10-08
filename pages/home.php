@@ -1469,7 +1469,7 @@ function show_pset_table($sset) {
         "id" => $pset->id,
         "checkbox" => $checkbox,
         "anonymous" => $anonymous,
-        "grades" => $pset->gradeentry_json(true),
+        "grades" => new GradeExport($pset, true),
         "gitless" => $pset->gitless,
         "gitless_grades" => $pset->gitless_grades,
         "key" => $pset->urlkey,

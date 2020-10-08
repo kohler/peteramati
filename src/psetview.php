@@ -999,6 +999,11 @@ class PsetView {
         }
     }
 
+    private function reset_transferred_warnings() {
+        $this->transferred_warnings = [];
+        $this->transferred_warnings_priority = [];
+    }
+
     /** @param ?string $file
      * @param ?int $line
      * @param string $text
@@ -1093,14 +1098,14 @@ class PsetView {
     }
 
     private function transfer_warnings() {
-        $this->transferred_warnings = [];
+        $this->reset_transferred_warnings();
 
         // collect warnings from runner output
         foreach ($this->pset->runners as $runner) {
             if ($runner->transfer_warnings
                 && $this->viewer->can_view_transferred_warnings($this->pset, $runner, $this->user)
                 && ($output = $this->runner_output_for($runner))) {
-                $this->transfer_warning_lines(explode("\n", $output), $runner->transfer_warnings_priority ? : 0);
+                $this->transfer_warning_lines(explode("\n", $output), $runner->transfer_warnings_priority ?? 0.0);
             }
         }
 
@@ -1184,6 +1189,7 @@ class PsetView {
         }
     }
 
+    /** @return ?array */
     function grade_json($no_entries = false, $override_view = false) {
         $this->ensure_grade();
         if (!$override_view && !$this->can_view_grades()) {
@@ -1192,12 +1198,9 @@ class PsetView {
         $this->ensure_formula();
         $pc_view = $override_view || $this->pc_view;
 
-        if ($no_entries) {
-            $result = [];
-        } else {
-            $result = $this->pset->gradeentry_json($this->pc_view);
-        }
-        $result["uid"] = $this->user->contactId;
+        $gexp = new GradeExport($this->pset, $pc_view);
+        $gexp->uid = $this->user->contactId;
+        $gexp->include_entries = !$no_entries;
 
         $notes = $this->current_info();
         $agx = get($notes, "autogrades");
@@ -1229,58 +1232,34 @@ class PsetView {
                     }
                 }
             }
-            $result["grades"] = $g;
+            $gexp->grades = $g;
             if ($pc_view && !empty($ag)) {
-                $result["autogrades"] = $ag;
+                $gexp->autogrades = $ag;
             }
-            $result["total"] = round_grade($total);
+            $gexp->total = round_grade($total);
             if ($total != $total_noextra) {
-                $result["total_noextra"] = round_grade($total_noextra);
+                $gexp->total_noextra = round_grade($total_noextra);
             }
         }
         if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
-            $result["grading_hash"] = $this->grading_hash();
+            $gexp->grading_hash = $this->grading_hash();
         }
         if (($lhd = $this->late_hours_data())) {
             if (isset($lhd->hours)) {
-                $result["late_hours"] = $lhd->hours;
+                $gexp->late_hours = $lhd->hours;
             }
             if (isset($lhd->autohours) && $lhd->autohours !== $lhd->hours) {
-                $result["auto_late_hours"] = $lhd->autohours;
+                $gexp->auto_late_hours = $lhd->autohours;
             }
         }
         if ($this->can_edit_grades_staff()) {
-            $result["editable"] = true;
+            $gexp->editable = true;
         }
-
         // maybe hide extra-credits that are missing
         if (!$pc_view) {
-            $gi = 0;
-            $deleted = false;
-            foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
-                if ($ge->is_extra
-                    && !$ge->max_visible
-                    && (!isset($result["grades"])
-                        || $result["grades"][$gi] === null)) {
-                    unset($result["entries"][$ge->key]);
-                    $result["order"][$gi] = null;
-                    $deleted = true;
-                }
-                ++$gi;
-            }
-            if ($deleted) {
-                for ($gi = count($result["order"]) - 1;
-                     $gi >= 0 && !isset($result["order"][$gi]);
-                     --$gi) {
-                     array_pop($result["order"]);
-                     if (isset($result["grades"])) {
-                         array_pop($result["grades"]);
-                     }
-                }
-            }
+            $gexp->strip_absent_extra();
         }
-
-        return $result;
+        return $gexp->jsonSerialize();
     }
 
 

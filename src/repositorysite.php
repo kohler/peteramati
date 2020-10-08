@@ -5,6 +5,7 @@
 
 class RepositorySite {
     public $url;
+    public $siteclass;
     static public $sitemap = ["github" => "GitHub_RepositorySite", "harvardseas" => "HarvardSEAS_RepositorySite"];
 
     static function is_primary(Repository $repo = null) {
@@ -102,8 +103,8 @@ class RepositorySite {
 }
 
 class Bad_RepositorySite extends RepositorySite {
-    public $siteclass = "unknown";
     function __construct($url) {
         $this->url = $url;
+        $this->siteclass = "__unknown__";
     }
 }

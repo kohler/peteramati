@@ -583,27 +583,6 @@ class Pset {
         return (object) ["nentries" => $count, "maxgrades" => (object) $max];
     }
 
-    /** @param bool $pcview
-     * @return array{entries:array<int,object>,order:list<string>,maxtotal?:int|float} */
-    function gradeentry_json($pcview) {
-        $ej = $order = [];
-        $count = $maxtotal = 0;
-        foreach ($this->visible_grades($pcview) as $ge) {
-            $ej[$ge->key] = $ge->json($pcview, $count);
-            $order[] = $ge->key;
-            ++$count;
-            if ($ge->max && !$ge->is_extra && !$ge->no_total
-                && ($pcview || $ge->max_visible)) {
-                $maxtotal += $ge->max;
-            }
-        }
-        $j = ["entries" => $ej, "order" => $order];
-        if ($maxtotal) {
-            $j["maxtotal"] = $maxtotal;
-        }
-        return $j;
-    }
-
     /** @param Contact $student */
     function contact_grade_for($student) {
         $cid = $student->contactId;

@@ -12,9 +12,10 @@ class GitHubResponse implements JsonSerializable {
     public $j;
     function __construct($url) {
         $this->url = $url;
+        $this->siteclass = "github";
     }
     function jsonSerialize() {
-        return $this->j ? : ["status" => $this->status, "content" => $this->content];
+        return $this->j ?? ["status" => $this->status, "content" => $this->content];
     }
     function run_post(Conf $conf, $content_type, $content, $header = "") {
         if (is_array($content) || is_object($content)) {

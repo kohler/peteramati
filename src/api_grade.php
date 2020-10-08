@@ -227,7 +227,7 @@ class API_Grade {
                 }
             }
         }
-        $j = (array) $api->pset->gradeentry_json(true);
+        $j = (new GradeExport($api->pset, true))->jsonSerialize();
         $j["ok"] = true;
         $j["us"] = [];
         foreach ($infos as $uid => $info) {
