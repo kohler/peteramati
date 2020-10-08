@@ -39,9 +39,14 @@ class PsetView {
     private $commit_notes = false;
     private $tabwidth = false;
     private $derived_handout_commit;
+    /** @var ?int */
     private $n_visible_grades;
+    /** @var ?int */
     private $n_visible_in_total;
-    private $n_set_grades;
+    /** @var ?int */
+    private $n_nonempty_grades;
+    /** @var ?int */
+    private $n_nonempty_assigned_grades;
     private $need_format = false;
     private $added_diffinfo = false;
 
@@ -127,7 +132,7 @@ class PsetView {
     function set_hash($reqhash) {
         $this->hash = false;
         $this->commit_record = $this->commit_notes = $this->derived_handout_commit = $this->tabwidth = false;
-        $this->n_visible_grades = null;
+        $this->n_visible_grades = $this->n_visible_in_total = $this->n_nonempty_grades = $this->n_nonempty_assigned_grades = null;
         if (!$this->repo) {
             return false;
         }
@@ -512,7 +517,7 @@ class PsetView {
             && !($this->grade_notes->gradercid ?? null)) {
             $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
         }
-        $this->n_visible_grades = null;
+        $this->n_visible_grades = $this->n_visible_in_total = $this->n_nonempty_grades = $this->n_nonempty_assigned_grades = null;
     }
 
     private function load_contact_grade() {
@@ -705,7 +710,7 @@ class PsetView {
 
     private function ensure_n_visible_grades() {
         if ($this->n_visible_grades === null) {
-            $this->n_visible_grades = $this->n_set_grades = $this->n_visible_in_total = 0;
+            $this->n_visible_grades = $this->n_visible_in_total = $this->n_nonempty_grades = $this->n_nonempty_assigned_grades = 0;
             if ($this->can_view_grades() && $this->ensure_grade()) {
                 $notes = $this->current_info();
                 $ag = $notes->autogrades ?? null;
@@ -714,7 +719,10 @@ class PsetView {
                     ++$this->n_visible_grades;
                     if (($ag && ($ag->{$ge->key} ?? null) !== null)
                         || ($g && ($g->{$ge->key} ?? null) !== null)) {
-                        ++$this->n_set_grades;
+                        ++$this->n_nonempty_grades;
+                        if (!$ge->student_editable) {
+                            ++$this->n_nonempty_assigned_grades;
+                        }
                     }
                     if (!$ge->no_total) {
                         ++$this->n_visible_in_total;
@@ -724,16 +732,25 @@ class PsetView {
         }
     }
 
-    function has_assigned_grades() {
+    /** @return bool */
+    function has_nonempty_grades() {
         $this->ensure_n_visible_grades();
-        return $this->n_set_grades > 0;
+        return $this->n_nonempty_grades > 0;
     }
 
+    /** @return bool */
+    function has_nonempty_assigned_grades() {
+        $this->ensure_n_visible_grades();
+        return $this->n_nonempty_assigned_grades !== 0;
+    }
+
+    /** @return bool */
     function needs_total() {
         $this->ensure_n_visible_grades();
         return $this->n_visible_in_total > 1;
     }
 
+    /** @return array{int|float,int|float,int|float} */
     function grade_total() {
         $total = $total_noextra = $maxtotal = 0;
         $notes = $this->current_info();

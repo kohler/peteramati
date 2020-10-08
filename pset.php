@@ -550,7 +550,7 @@ function echo_all_grades($info) {
         return;
     }
 
-    $has_grades = $info->has_assigned_grades();
+    $has_grades = $info->has_nonempty_grades();
     if ($info->can_view_grades()
         && ($has_grades || $info->can_edit_grades_any())) {
         if ($info->pset->grade_script && $info->can_edit_grades_any()) {

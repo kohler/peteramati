@@ -136,7 +136,7 @@ function collect_pset_info(&$students, $sset, $entries) {
                       "npartners" => 0);
         }
 
-        if ($info->has_assigned_grades()) {
+        if ($info->has_nonempty_assigned_grades()) {
             list($total, $max, $total_noextra) = $info->grade_total();
             report_set($ss, $pset->key, $total, $total_noextra, 100.0 / $max);
 
@@ -1019,7 +1019,7 @@ function show_pset($pset, $user) {
     $info = PsetView::make($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
     $user_see_grade = $info->user_can_view_grades();
-    if ($user_see_grade && $info->has_assigned_grades()) {
+    if ($user_see_grade && $info->has_nonempty_assigned_grades()) {
         echo ' <a class="gradesready" href="', $pseturl, '">(grade ready)</a>';
     }
     echo "</a></h2>";
@@ -1033,7 +1033,9 @@ function show_pset($pset, $user) {
     } else {
         ContactView::echo_repo_last_commit_group($info, true);
     }
-    if ($info->can_view_grades() && $info->has_assigned_grades()) {
+    if ($info->can_view_grades()
+        && $info->has_nonempty_assigned_grades()
+        && $info->needs_total()) {
         $tm = $info->grade_total();
         $t = "<strong>" . $tm[0] . "</strong> / " . $tm[1];
         if (!$user_see_grade) {
