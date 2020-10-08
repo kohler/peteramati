@@ -576,14 +576,15 @@ if ($Me->isPC && $Qreq->post_ok() && $Qreq->runmany) {
 }
 
 
+/** @return ?Pset */
 function older_enabled_repo_same_handout($pset) {
     $result = false;
     foreach ($pset->conf->psets() as $p) {
-        if ($p->id == $pset->id) {
-            break;
-        } else if (!$p->disabled
-                   && !$p->gitless
-                   && $p->handout_repo_url === $pset->handout_repo_url) {
+        if ($p !== $pset
+            && !$p->disabled
+            && !$p->gitless
+            && $p->handout_repo_url === $pset->handout_repo_url
+            && (!$result || $result->deadline < $p->deadline)) {
             $result = $p;
         }
     }
@@ -1541,8 +1542,9 @@ function show_pset_table($sset) {
         $actions["defaultgrades"] = "Default grades";
         if (!$pset->gitless) {
             $actions["clearrepo"] = "Clear repo";
-            if (older_enabled_repo_same_handout($pset))
+            if (older_enabled_repo_same_handout($pset)) {
                 $actions["copyrepo"] = "Adopt previous repo";
+            }
         }
     }
     if (!empty($actions)) {
