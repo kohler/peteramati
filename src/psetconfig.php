@@ -49,6 +49,9 @@ class Pset {
     /** @var bool
      * @readonly */
     public $weight_default = false;
+    /** @var float
+     * @readonly */
+    public $position;
 
     /** @var bool */
     public $disabled;
@@ -204,6 +207,7 @@ class Pset {
             $this->weight_default = true;
         }
         $this->weight = (float) $this->weight;
+        $this->position = (float) (Pset::cnum($p, "position") ?? 0.0);
 
         $this->disabled = self::cbool($p, "disabled");
         if (($this->admin_disabled = self::cbool($p, "admin_disabled", "ui_disabled"))) {
@@ -401,12 +405,32 @@ class Pset {
     }
 
     static function compare(Pset $a, Pset $b) {
+        if ($a->position != $b->position) {
+            return $a->position < $b->position ? -1 : 1;
+        }
         $adl = $a->deadline_college ? : $a->deadline;
         $bdl = $b->deadline_college ? : $b->deadline;
         if (!$adl != !$bdl) {
             return $adl ? -1 : 1;
         } else if ($adl != $bdl) {
             return $adl < $bdl ? -1 : 1;
+        } else if (($cmp = strcasecmp($a->title, $b->title))) {
+            return $cmp;
+        } else {
+            return $a->id < $b->id ? -1 : 1;
+        }
+    }
+
+    static function compare_newest_first(Pset $a, Pset $b) {
+        if ($a->position != $b->position) {
+            return $a->position < $b->position ? -1 : 1;
+        }
+        $adl = $a->deadline_college ? : $a->deadline;
+        $bdl = $b->deadline_college ? : $b->deadline;
+        if (!$adl != !$bdl) {
+            return $adl ? -1 : 1;
+        } else if ($adl != $bdl) {
+            return $adl < $bdl ? 1 : -1;
         } else if (($cmp = strcasecmp($a->title, $b->title))) {
             return $cmp;
         } else {

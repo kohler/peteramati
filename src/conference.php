@@ -88,6 +88,8 @@ class Conf {
     private $_psets_by_urlkey = [];
     /** @var bool */
     private $_psets_sorted = false;
+    /** @var ?list<Pset> */
+    private $_psets_newest_first;
     /** @var array<string,float> */
     private $_category_weight = [];
     /** @var array<string,bool> */
@@ -2002,8 +2004,10 @@ class Conf {
             }
         }
         $this->_psets_sorted = false;
+        $this->_psets_newest_first = null;
     }
 
+    /** @return array<int,Pset> */
     function psets() {
         if (!$this->_psets_sorted) {
             uasort($this->_psets, "Pset::compare");
@@ -2012,8 +2016,13 @@ class Conf {
         return $this->_psets;
     }
 
+    /** @return list<Pset> */
     function psets_newest_first() {
-        return array_reverse($this->psets(), true);
+        if ($this->_psets_newest_first === null) {
+            $this->_psets_newest_first = array_values($this->_psets);
+            uasort($this->_psets_newest_first, "Pset::compare_newest_first");
+        }
+        return $this->_psets_newest_first;
     }
 
     /** @param int $id
