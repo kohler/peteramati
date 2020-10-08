@@ -844,27 +844,31 @@ class Contact {
         }
     }
 
-    function gcache_group_total($group, $noextra, $raw) {
+    /** @param string $group
+     * @param bool $noextra
+     * @param bool $raw
+     * @return ?float */
+    function gcache_category_total($group, $noextra, $raw) {
         $k = "\$g\$group";
         if (!array_key_exists($k, $this->_gcache)) {
             $this->_gcache[$k] = [false, false, false, false];
         }
         $i = ($noextra ? 1 : 0) | ($raw ? 2 : 0);
         if ($this->_gcache[$k][$i] === false) {
-            $gw = $this->conf->group_weight($group);
+            $gw = $this->conf->category_weight($group);
             $x = null;
             foreach ($this->conf->psets() as $p) {
-                if (!$p->disabled && $p->group === $group) {
+                if (!$p->disabled && $p->category === $group) {
                     $v = $this->gcache_total($p, $noextra, $raw);
                     if ($v !== null) {
                         if (!$raw) {
-                            $v *= $p->group_weight / $gw;
+                            $v *= $p->weight / $gw;
                         }
                         $x = ($x === null ? 0.0 : $x) + $v;
                     }
                 }
             }
-            $this->_gcache[$k][$i] = $x === null ? $x : round($x * 10.0) / 10;
+            $this->_gcache[$k][$i] = $x === null ? null : round($x * 10.0) / 10;
         }
         return $this->_gcache[$k][$i];
     }

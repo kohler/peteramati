@@ -37,10 +37,18 @@ class Pset {
      * @readonly */
     public $nonnumeric_key;
 
+    /** @var string
+     * @readonly */
     public $title;
-    public $group;
-    public $group_weight;
-    public $group_weight_default = false;
+    /** @var ?string
+     * @readonly */
+    public $category;
+    /** @var float
+     * @readonly */
+    public $weight;
+    /** @var bool
+     * @readonly */
+    public $weight_default = false;
 
     /** @var bool */
     public $disabled;
@@ -189,13 +197,13 @@ class Pset {
         if ((string) $this->title === "") {
             $this->title = $this->key;
         }
-        $this->group = self::cstr($p, "category", "group");
-        $this->group_weight = self::cnum($p, "weight", "group_weight");
-        if ($this->group_weight === null) {
-            $this->group_weight = 1.0;
-            $this->group_weight_default = true;
+        $this->category = self::cstr($p, "category", "group");
+        $this->weight = self::cnum($p, "weight", "group_weight");
+        if ($this->weight === null) {
+            $this->weight = 1.0;
+            $this->weight_default = true;
         }
-        $this->group_weight = (float) $this->group_weight;
+        $this->weight = (float) $this->weight;
 
         $this->disabled = self::cbool($p, "disabled");
         if (($this->admin_disabled = self::cbool($p, "admin_disabled", "ui_disabled"))) {

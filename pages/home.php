@@ -109,10 +109,10 @@ function collect_pset_info(&$students, $sset, $entries) {
 
     $pset = $sset->pset;
     $grp = null;
-    if ($pset->group && $pset->group_weight) {
-        $grp = $pset->group;
+    if ($pset->category && $pset->weight) {
+        $grp = $pset->category;
         $max = $pset->max_grade(true);
-        $factor = (100.0 * $pset->group_weight) / ($max * $Conf->group_weight($grp));
+        $factor = (100.0 * $pset->weight) / ($max * $Conf->category_weight($grp));
     }
 
     foreach ($sset as $info) {
@@ -258,8 +258,8 @@ function parse_formula($conf, &$t, $example, $minprec) {
             if (($pset = $conf->pset_by_key_or_title($kbase))) {
                 $noextra = $noextra && $pset->has_extra;
                 $kbase = $pset->key;
-            } else if ($conf->pset_group($kbase)) {
-                $noextra = $noextra && $conf->pset_group_has_extra($kbase);
+            } else if ($conf->pset_category($kbase)) {
+                $noextra = $noextra && $conf->pset_category_has_extra($kbase);
             } else {
                 return null;
             }
@@ -375,7 +375,7 @@ function download_psets_report($request) {
         $selection = ["name", "username", "anon_username", "email", "huid", "extension", "npartners"];
     }
 
-    $grouped_psets = $sel_pset ? ["" => [$pset]] : $Conf->pset_groups();
+    $grouped_psets = $sel_pset ? ["" => [$pset]] : $Conf->pset_categories();
 
     foreach ($grouped_psets as $grp => $psets) {
         foreach ($psets as $pset) {
@@ -392,7 +392,7 @@ function download_psets_report($request) {
     foreach ($grouped_psets as $grp => $psets) {
         if ($grp !== "") {
             set_ranks($students, $selection, $grp, true);
-            if ($Conf->pset_group_has_extra($grp)) {
+            if ($Conf->pset_category_has_extra($grp)) {
                 set_ranks($students, $selection, "{$grp}_noextra", true);
             }
         }

@@ -509,7 +509,7 @@ function echo_grader($info) {
                 foreach ($info->conf->psets_newest_first() as $xpset) {
                     if ($xpset === $info->pset) {
                         $seen_pset = true;
-                    } else if ($seen_pset && $xpset->group === $info->pset->group) {
+                    } else if ($seen_pset && $xpset->category === $info->pset->category) {
                         $xinfo = PsetView::make($xpset, $info->user, $info->viewer);
                         if (($xcid = $xinfo->gradercid())
                             && ($pcm = get($info->conf->pc_members_and_admins(), $xcid))) {

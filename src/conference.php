@@ -86,12 +86,16 @@ class Conf {
     private $_psets = [];
     /** @var array<string,Pset> */
     private $_psets_by_urlkey = [];
+    /** @var bool */
     private $_psets_sorted = false;
     /** @var array<string,float> */
-    private $_group_weights = [];
-    private $_group_weight_defaults = [];
-    private $_grouped_psets;
-    private $_group_has_extra;
+    private $_category_weight = [];
+    /** @var array<string,bool> */
+    private $_category_weight_default = [];
+    /** @var array<string,list<Pset>> */
+    private $_psets_by_category;
+    /** @var array<string,bool> */
+    private $_category_has_extra;
 
     /** @var bool */
     private $_date_format_initialized = false;
@@ -1987,14 +1991,14 @@ class Conf {
             throw new Exception("pset urlkey `{$pset->urlkey}` reused");
         }
         $this->_psets_by_urlkey[$pset->urlkey] = $pset;
-        if (!$pset->disabled && $pset->group) {
-            if (!isset($this->_group_weights[$pset->group])) {
-                $this->_group_weights[$pset->group] = $pset->group_weight;
-                $this->_group_weight_defaults[$pset->group] = $pset->group_weight_default;
-            } else if ($this->_group_weight_defaults[$pset->group] === $pset->group_weight_default) {
-                $this->_group_weights[$pset->group] += $pset->group_weight;
+        if (!$pset->disabled && $pset->category) {
+            if (!isset($this->_category_weight[$pset->category])) {
+                $this->_category_weight[$pset->category] = $pset->weight;
+                $this->_category_weight_default[$pset->category] = $pset->weight_default;
+            } else if ($this->_category_weight_default[$pset->category] === $pset->weight_default) {
+                $this->_category_weight[$pset->category] += $pset->weight;
             } else {
-                throw new Exception("pset group `{$pset->group}` has not all group weights set");
+                throw new Exception("pset category `{$pset->category}` has not all group weights set");
             }
         }
         $this->_psets_sorted = false;
@@ -2053,24 +2057,25 @@ class Conf {
 
     /** @param string $group
      * @return float */
-    function group_weight($group) {
-        return $this->_group_weights[$group] ?? 0.0;
+    function category_weight($group) {
+        return $this->_category_weight[$group] ?? 0.0;
     }
 
-    function pset_groups() {
-        if ($this->_grouped_psets === null) {
-            $this->_grouped_psets = [];
-            $this->_group_has_extra = [];
+    /** @return array<string,list<Pset>> */
+    function psets_by_category() {
+        if ($this->_psets_by_category === null) {
+            $this->_psets_by_category = [];
+            $this->_category_has_extra = [];
             foreach ($this->psets() as $pset) {
                 if (!$pset->disabled) {
-                    $group = $pset->group ? : "";
-                    $this->_grouped_psets[$group][] = $pset;
+                    $category = $pset->category ?? "";
+                    $this->_psets_by_category[$category][] = $pset;
                     if ($pset->has_extra) {
-                        $this->_group_has_extra[$group] = true;
+                        $this->_category_has_extra[$category] = true;
                     }
                 }
             }
-            uksort($this->_grouped_psets, function ($a, $b) {
+            uksort($this->_psets_by_category, function ($a, $b) {
                 if ($a === "") {
                     return 1;
                 } else {
@@ -2078,26 +2083,32 @@ class Conf {
                 }
             });
         }
-        return $this->_grouped_psets;
+        return $this->_psets_by_category;
     }
 
-    function pset_group($group) {
-        return ($this->pset_groups())[$group] ?? [];
+    /** @param string $category
+     * @return list<Pset> */
+    function pset_category($category) {
+        return ($this->psets_by_category())[$category] ?? [];
     }
 
-    function pset_group_has_extra($group) {
-        $this->pset_groups();
-        return $this->_group_has_extra[$group] ?? false;
+    /** @param string $category
+     * return bool */
+    function pset_category_has_extra($category) {
+        $this->psets_by_category();
+        return $this->_category_has_extra[$category] ?? false;
     }
 
 
     function handout_repo(Pset $pset, Repository $inrepo = null) {
         global $ConfSitePATH;
         $url = $pset->handout_repo_url;
-        if (!$url)
+        if (!$url) {
             return null;
-        if ($this->opt("noGitTransport") && substr($url, 0, 6) === "git://")
+        }
+        if ($this->opt("noGitTransport") && substr($url, 0, 6) === "git://") {
             $url = "ssh://git@" . substr($url, 6);
+        }
         $hrepo = $this->_handout_repos[$url] ?? null;
         if (!$hrepo && ($hrepo = Repository::find_or_create_url($url, $this))) {
             $hrepo->is_handout = true;

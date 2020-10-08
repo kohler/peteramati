@@ -78,10 +78,10 @@ class GradeFormula implements JsonSerializable {
                 $noextra = $noextra && $pset->has_extra;
                 $raw = $raw === null || $raw;
                 $e = new PsetTotal_GradeFormula($pset, $noextra, $raw);
-            } else if ($conf->pset_group($kbase)) {
-                $noextra = $noextra && $conf->pset_group_has_extra($kbase);
+            } else if ($conf->pset_category($kbase)) {
+                $noextra = $noextra && $conf->pset_category_has_extra($kbase);
                 $raw = $raw !== null && $raw;
-                $e = new PsetGroupTotal_GradeFormula($kbase, $noextra, $raw);
+                $e = new PsetCategoryTotal_GradeFormula($kbase, $noextra, $raw);
             } else {
                 return null;
             }
@@ -222,24 +222,24 @@ class PsetTotal_GradeFormula extends GradeFormula {
     }
 }
 
-class PsetGroupTotal_GradeFormula extends GradeFormula {
+class PsetCategoryTotal_GradeFormula extends GradeFormula {
     /** @var string */
-    private $group;
+    private $category;
     /** @var bool */
     private $noextra;
     /** @var bool */
     private $norm;
 
-    function __construct($group, $noextra, $norm) {
+    function __construct($category, $noextra, $norm) {
         parent::__construct("ggt", []);
-        $this->group = $group;
+        $this->category = $category;
         $this->noextra = $noextra;
         $this->norm = $norm;
     }
     function evaluate(Contact $student) {
-        return $student->gcache_group_total($this->group, $this->noextra, $this->norm);
+        return $student->gcache_category_total($this->category, $this->noextra, $this->norm);
     }
     function jsonSerialize() {
-        return $this->group . ($this->noextra ? "_noextra" : "") . ($this->norm ? "_raw" : "");
+        return $this->category . ($this->noextra ? "_noextra" : "") . ($this->norm ? "_raw" : "");
     }
 }
