@@ -5092,18 +5092,15 @@ function pa_gradeinfo_total(gi, noextra) {
     if (typeof gi === "string") {
         gi = JSON.parse(gi);
     }
-    var total = 0, maxtotal = 0;
+    var total = 0;
     for (var i = 0; i < gi.order.length; ++i) {
         var k = gi.order[i];
         var ge = k ? gi.entries[k] : null;
-        if (ge && ge.in_total && (!noextra || !ge.is_extra)) {
+        if (ge && ge.in_total && (!noextra || !ge.is_extra))
             total += (gi.grades && gi.grades[i]) || 0;
-            if (!ge.is_extra)
-                maxtotal += ge.max || 0;
-        }
     }
     return [Math.round(total * 1000) / 1000,
-            Math.round(maxtotal * 1000) / 1000];
+            Math.round(gi.maxtotal * 1000) / 1000];
 }
 
 

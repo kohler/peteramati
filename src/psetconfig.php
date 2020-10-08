@@ -99,6 +99,8 @@ class Pset {
     public $grades_visible;
     /** @var int */
     public $grades_visible_at;
+    /** @var ?int */
+    public $grades_total;
     /** @var bool */
     public $grade_statistics_visible;
     /** @var ?float */
@@ -312,6 +314,7 @@ class Pset {
         foreach (array_values($this->grades) as $i => $ge) {
             $ge->pcview_index = $i;
         }
+        $this->grades_total = self::cnum($p, "grades_total");
         $gv = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->grades_visible_at = is_int($gv) ? $gv : 0;
@@ -577,7 +580,9 @@ class Pset {
                 }
             }
         }
-        if ($maxtotal) {
+        if ($this->grades_total !== null) {
+            $max["total"] = $this->grades_total;
+        } else if ($maxtotal > 0) {
             $max["total"] = $maxtotal;
         }
         return (object) ["nentries" => $count, "maxgrades" => (object) $max];
