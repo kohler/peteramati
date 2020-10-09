@@ -3360,7 +3360,7 @@ handle_ui.on("pa-diff-toggle-markdown", function (evt) {
 });
 
 var pa_filediff_markdown = (function () {
-var md;
+var md, mdcontext;
 
 function render_map(map) {
     if (map[0] + 1 === map[1]) {
@@ -3421,6 +3421,24 @@ function modify_landmark_fence(base) {
     };
 }
 
+function modify_landmark_image(base) {
+    return function (tokens, idx, options, env, self) {
+        var token = tokens[idx],
+            srci = token.attrIndex("src"),
+            m = token.attrs[srci][1].match(/^https:\/\/github\.com\/([^\/]+\/[^\/]+)\/(?:blob|raw)\/([^\/]+)\/(.*)$/),
+            pi, m2;
+        if (m
+            && mdcontext
+            && (pi = mdcontext.closest(".pa-psetinfo"))
+            && (m2 = (pi.getAttribute("data-pa-repourl") || "").match(/^(?:https:\/\/github\.com\/|git@github\.com:)(.*?)\/?$/))
+            && m2[1] == m[1]
+            && pi.getAttribute("data-pa-branch") == m[2]) {
+            token.attrs[srci][1] = siteurl + "~" + encodeURIComponent(peteramati_uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + m[3];
+        }
+        return fix_landmark_html(base(tokens, idx, options, env, self), token);
+    };
+}
+
 function make_markdownit() {
     if (!md) {
         md = markdownit({
@@ -3436,10 +3454,11 @@ function make_markdownit() {
         });
         for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
                        "bullet_list_open", "table_open", "blockquote_open",
-                       "hr", "image", "code_block"]) {
+                       "hr", "code_block"]) {
             md.renderer.rules[x] = modify_landmark(md.renderer.rules[x]);
         }
         md.renderer.rules.fence = modify_landmark_fence(md.renderer.rules.fence);
+        md.renderer.rules.image = modify_landmark_image(md.renderer.rules.image);
         md.renderer.rules.list_item_open = add_landmark_1;
     }
     return md;
@@ -3494,7 +3513,9 @@ return function () {
     }
     // render to markdown
     var dx = document.createElement("div"), d, dc;
+    mdcontext = this;
     dx.innerHTML = make_markdownit().render(l.join(""));
+    mdcontext = null;
     // split up and insert into order
     e = this.firstChild;
     while ((d = dx.firstChild)) {

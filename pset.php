@@ -618,7 +618,9 @@ if ($Info->can_edit_grades_staff()) {
 echo "<hr>\n";
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey);
 if (!$Pset->gitless && $Info->maybe_commit_hash()) {
-    echo '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
+    echo '" data-pa-repourl="', htmlspecialchars($Info->repo->url),
+        '" data-pa-branch="', htmlspecialchars($Info->branch ?? $Conf->default_main_branch),
+        '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
 }
 if (!$Pset->gitless && $Pset->directory) {
     echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
