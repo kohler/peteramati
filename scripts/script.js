@@ -3412,10 +3412,14 @@ function modify_landmark(base) {
 
 function modify_landmark_fence(base) {
     return function (tokens, idx, options, env, self) {
-        var token = tokens[idx];
+        var token = tokens[idx], m;
         if (token.info && token.info.indexOf(" ") >= 0) {
-            token.content = token.info + "\n" + token.content;
-            token.info = "";
+            if ((m = token.info.match(/^ *([-a-z+]+) *$/))) {
+                token.info = m[1];
+            } else {
+                token.content = token.info + "\n" + token.content;
+                token.info = "";
+            }
         }
         return fix_landmark_html(base(tokens, idx, options, env, self), token);
     };
