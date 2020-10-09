@@ -1037,7 +1037,10 @@ function show_pset($pset, $user) {
         && $info->has_nonempty_assigned_grades()
         && $info->needs_total()) {
         $tm = $info->grade_total();
-        $t = "<strong>" . $tm[0] . "</strong> / " . $tm[1];
+        $t = "<strong>" . $tm[0] . "</strong>";
+        if ($tm[1]) {
+            $t .= " / " . $tm[1];
+        }
         if (!$user_see_grade) {
             echo '<div class="pa-grp-hidden">';
         }
