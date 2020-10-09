@@ -774,7 +774,7 @@ class PsetView {
                 $maxtotal += $ge->max;
             }
         }
-        return [$total, $maxtotal, $total_noextra];
+        return [$total, $this->pset->grades_total ?? $maxtotal, $total_noextra];
     }
 
     function gradercid() {
