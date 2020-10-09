@@ -42,8 +42,7 @@ class GradeExport implements JsonSerializable {
         $si = [];
         foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
             if ($ge->is_extra
-                && !$ge->max_visible
-                && ($this->grades[$gi] ?? null) === null) {
+                && ($this->grades[$gi] ?? 0) == 0) {
                 $si[] = $gi;
             }
             ++$gi;

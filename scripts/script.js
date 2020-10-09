@@ -2991,18 +2991,18 @@ function pa_render_editable_entry(id, opts) {
     return t + '</span></div>';
 }
 
-pa_add_grade_type("numeric", function (v) { return v + ""; },
+pa_add_grade_type("numeric", function (v) { return v == null ? "" : v + ""; },
     pa_render_editable_entry);
 
-pa_add_grade_type("formula", function (v) { return v === null ? "" : v.toFixed(1); });
+pa_add_grade_type("formula", function (v) { return v == null ? "" : v.toFixed(1); });
 
-pa_add_grade_type("text", function (v) { return v; },
+pa_add_grade_type("text", function (v) { return v == null ? "" : v; },
     function (id, opts) {
         return '<div class="pa-pd"><textarea class="' + opts.live_class + 'pa-pd pa-gradevalue need-autogrow" name="' + this.key + '" id="' + id + '"></textarea></div>';
     },
     { justify: "left", sort: "forward" });
 
-pa_add_grade_type("select", function (v) { return v; },
+pa_add_grade_type("select", function (v) { return v == null ? "" : v; },
     function (id, opts) {
         var t = '<div class="pa-pd"><span class="select"><select class="' + opts.live_class + 'pa-gradevalue" name="' + this.key + '" id="' + id + '"><option value="">None</option>';
         for (var i = 0; i !== this.options.length; ++i) {
@@ -3015,8 +3015,8 @@ pa_add_grade_type("select", function (v) { return v; },
 
 pa_add_grade_type("checkbox", function (v, nopretty) {
         if (v == null || v === 0)
-            return "";
-        else if (v == this.max && !nopretty)
+            return "–";
+        else if (v == (this.max || 1) && !nopretty)
             return "✓";
         else
             return v + "";
@@ -3051,8 +3051,8 @@ pa_add_grade_type("checkbox", function (v, nopretty) {
 
 pa_add_grade_type("checkboxes", function (v, nopretty) {
         if (v == null || v === 0)
-            return "";
-        else if (v > 0 && v <= this.max && Math.abs(v - Math.round(v)) < 0.05 && !nopretty)
+            return "–";
+        else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05 && !nopretty)
             return "✓".repeat(Math.round(v));
         else
             return v + "";
@@ -3113,7 +3113,7 @@ var lm = {
     98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-",
     78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"
 };
-pa_add_grade_type("letter", function (v) { return lm[v] || v + ""; },
+pa_add_grade_type("letter", function (v) { return v == null ? "" : lm[v] || v + ""; },
     function (id, opts) {
         opts.max_text = "letter grade";
         return pa_render_editable_entry.call(this, id, opts);
@@ -3282,7 +3282,7 @@ function pa_set_grade(ge, g, ag, options) {
             }
         }
     } else {
-        gt = g == null ? "" : typeinfo.text.call(ge, g, false);
+        gt = typeinfo.text.call(ge, g, false);
         if ($v.text() !== gt) {
             $v.text(gt);
         }

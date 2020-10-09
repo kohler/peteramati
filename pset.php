@@ -5,8 +5,9 @@
 
 require_once("src/initweb.php");
 ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"));
-if ($Me->is_empty())
+if ($Me->is_empty()) {
     $Me->escape();
+}
 global $User, $Pset, $Info, $Qreq;
 
 $User = $Me;
@@ -40,8 +41,9 @@ if (isset($Qreq->setgrader)
         if ($pcm->email === $_POST["grader"])
             $grader = $pcm->contactId;
     }
-    if (!$grader && $_POST["grader"] !== "none")
+    if (!$grader && $_POST["grader"] !== "none") {
         json_exit(["ok" => false, "error" => "No such grader"]);
+    }
     $Info->change_grader($grader);
     json_exit(["ok" => null, "grader_email" => $_POST["grader"]]);
 }
@@ -50,18 +52,23 @@ if (isset($Qreq->setcommit)
     && check_post()
     && $Info->can_have_grades()
     && $Me->isPC
-    && $Me != $User)
+    && $Me != $User) {
     $Info->mark_grading_commit();
-if (isset($Qreq->setcommit))
+}
+if (isset($Qreq->setcommit)) {
     go($Info->hoturl("pset"));
+}
 
 // maybe set partner/repo
-if ($Qreq->set_partner)
+if ($Qreq->set_partner) {
     ContactView::set_partner_action($User, $Qreq);
-if ($Qreq->set_repo)
+}
+if ($Qreq->set_repo) {
     ContactView::set_repo_action($User, $Qreq);
-if ($Qreq->set_branch)
+}
+if ($Qreq->set_branch) {
     ContactView::set_branch_action($User, $Qreq);
+}
 
 // maybe download file
 if ($Qreq->download
@@ -169,8 +176,9 @@ function upload_grades($pset, $text, $fname) {
         } else
             $errors[] = htmlspecialchars($fname) . ":" . $csv->lineno() . ": unknown user " . htmlspecialchars($who);
     }
-    if (!empty($errors))
+    if (!empty($errors)) {
         $Conf->errorMsg(join("<br />\n", $errors));
+    }
     return true;
 }
 

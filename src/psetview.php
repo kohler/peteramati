@@ -455,10 +455,11 @@ class PsetView {
     }
 
     function update_current_info($updates, $reset_keys = false) {
-        if ($this->pset->gitless)
+        if ($this->pset->gitless) {
             $this->update_user_info($updates, $reset_keys);
-        else
+        } else {
             $this->update_commit_info($updates, $reset_keys);
+        }
     }
 
     function update_grade_info($updates, $reset_keys = false) {
@@ -542,7 +543,7 @@ class PsetView {
                     left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)
                     where rg.repoid=? and rg.branchid=? and rg.pset=?",
                     $this->repo->repoid, $this->branchid, $this->pset->id);
-                $this->repo_grade = $result ? $result->fetch_object() : null;
+                $this->repo_grade = $result->fetch_object();
                 Dbl::free($result);
             }
         }
