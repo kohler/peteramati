@@ -742,7 +742,7 @@ class Pset {
         for (++$i; $i < count($args); ++$i) {
             $x = $args[$i];
             foreach ($ps as $p) {
-                if (($pv = $p->$x ?? null)) {
+                if (($pv = $p->$x ?? null) !== null) {
                     $v = call_user_func($callable, $pv);
                     '@phan-var-force bool|array{bool,mixed} $v';
                     if (is_array($v) && $v[0]) {
