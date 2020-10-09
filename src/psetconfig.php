@@ -75,11 +75,18 @@ class Pset {
     public $partner_repo;
     public $hide_comments = false;
 
+    /** @var string */
     public $main_branch = "master";
+    /** @var ?string */
     public $handout_repo_url;
+    /** @var ?string */
     public $handout_branch;
+    /** @var ?string */
     public $handout_hash;
+    /** @var ?string */
     public $handout_warn_hash;
+    /** @var ?bool */
+    public $handout_warn_merge;
     public $repo_guess_patterns = [];
     public $directory;
     public $directory_slash;
@@ -251,7 +258,8 @@ class Pset {
         $this->handout_branch = self::cstr($p, "handout_branch", "handout_repo_branch") ?? $this->main_branch;
         $this->handout_hash = self::cstr($p, "handout_hash", "handout_commit_hash");
         $this->handout_warn_hash = self::cstr($p, "handout_warn_hash");
-        $this->repo_guess_patterns = self::cstr_array($p, "repo_guess_patterns", "repo_transform_patterns");
+        $this->handout_warn_merge = self::cbool($p, "handout_warn_merge");
+        $this->repo_guess_patterns = self::cstr_list($p, "repo_guess_patterns", "repo_transform_patterns");
         $this->directory = $this->directory_slash = "";
         if (isset($p->directory) && is_string($p->directory)) {
             $this->directory = $p->directory;
@@ -374,7 +382,7 @@ class Pset {
         }
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
         $this->run_username = self::cstr($p, "run_username");
-        $this->run_overlay = self::cstr_or_str_array($p, "run_overlay");
+        $this->run_overlay = self::cstr_or_str_list($p, "run_overlay");
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
         $this->run_xterm_js = self::cbool($p, "run_xterm_js");
         $this->run_timeout = self::cinterval($p, "run_timeout");
@@ -394,7 +402,7 @@ class Pset {
             throw new PsetConfigException("`diffs` format error", "diffs");
         }
         if (($ignore = get($p, "ignore"))) {
-            $this->ignore = self::cstr_or_str_array($p, "ignore");
+            $this->ignore = self::cstr_or_str_list($p, "ignore");
         }
 
         $this->config_signature = self::cstr($p, "config_signature");
@@ -730,69 +738,83 @@ class Pset {
             ++$i;
         }
         $ps = is_object($args[$i]) ? [$args[$i]] : $args[$i];
+        $warn = false;
         for (++$i; $i < count($args); ++$i) {
             $x = $args[$i];
             foreach ($ps as $p) {
-                if (isset($p->$x)) {
-                    $v = call_user_func($callable, $p->$x);
+                if (($pv = $p->$x ?? null)) {
+                    $v = call_user_func($callable, $pv);
+                    '@phan-var-force bool|array{bool,mixed} $v';
                     if (is_array($v) && $v[0]) {
                         return $v[1];
-                    } else if (!is_array($v) && $v) {
-                        return $p->$x;
+                    } else if ($v === true) {
+                        return $pv;
                     } else {
                         $errormsg = is_array($v) ? $v[1] : "format error";
                         throw new PsetConfigException("`$x` $errormsg", $format, $x);
                     }
                 }
             }
+            $warn = $x;
         }
         return null;
     }
 
-    static function cbool(/* ... */) {
-        return self::ccheck("is_bool", func_get_args());
+    /** @return ?bool */
+    static function cbool(...$args) {
+        return self::ccheck("is_bool", $args);
     }
 
-    static function cint(/* ... */) {
-        return self::ccheck("is_int", func_get_args());
+    /** @return ?int */
+    static function cint(...$args) {
+        return self::ccheck("is_int", $args);
     }
 
-    static function cnum(/* ... */) {
-        return self::ccheck("is_number", func_get_args());
+    /** @return null|int|float */
+    static function cnum(...$args) {
+        return self::ccheck("is_number", $args);
     }
 
-    static function cstr(/* ... */) {
-        return self::ccheck("is_string", func_get_args());
+    /** @return ?string */
+    static function cstr(...$args) {
+        return self::ccheck("is_string", $args);
     }
 
-    static function cstr_array(/* ... */) {
-        return self::ccheck("is_string_array", func_get_args());
+    /** @return ?list<string> */
+    static function cstr_list(...$args) {
+        return self::ccheck("is_string_list", $args);
     }
 
-    static function cstr_or_str_array(/* ... */) {
-        return self::ccheck("is_string_or_string_array", func_get_args());
+    /** @return null|string|list<string> */
+    static function cstr_or_str_list(...$args) {
+        return self::ccheck("is_string_or_string_list", $args);
     }
 
-    static function cdate(/* ... */) {
-        return self::ccheck("check_date", func_get_args());
+    /** @return null|bool|int|float */
+    static function cdate(...$args) {
+        return self::ccheck("check_date", $args);
     }
 
-    static function cdate_or_grades(/* ... */) {
-        return self::ccheck("check_date_or_grades", func_get_args());
+    /** @return null|bool|int|float|'grades' */
+    static function cdate_or_grades(...$args) {
+        return self::ccheck("check_date_or_grades", $args);
     }
 
-    static function cinterval(/* ... */) {
-        return self::ccheck("check_interval", func_get_args());
+    /** @return null|int|float */
+    static function cinterval(...$args) {
+        return self::ccheck("check_interval", $args);
     }
 
     private static function make_config_array($x) {
         if (is_array($x)) {
             $y = array();
-            foreach ($x as $i => $v)
+            foreach ($x as $i => $v) {
                 $y[$i + 1] = $v;
+            }
             return $y;
-        } else
+        } else {
             return get_object_vars($x);
+        }
     }
 
     private static function reorder_config($what, $a, $order) {
@@ -1326,7 +1348,7 @@ class RunnerConfig {
         if ($this->position === null && isset($r->priority)) {
             $this->position = -Pset::cnum($loc, $r, "priority");
         }
-        $this->overlay = Pset::cstr_or_str_array($loc, $rs, "overlay");
+        $this->overlay = Pset::cstr_or_str_list($loc, $rs, "overlay");
         if (isset($r->timed_replay)
             ? is_number($r->timed_replay)
             : $defr && isset($defr->timed_replay) && is_number($defr->timed_replay)) {
@@ -1449,15 +1471,8 @@ class DiffConfig {
 }
 
 
-function is_string_array($x) {
-    return is_array($x)
-        && array_reduce($x, function ($carry, $item) {
-               return $carry && is_string($item);
-           }, true);
-}
-
-function is_string_or_string_array($x) {
-    return is_string($x) || is_string_array($x);
+function is_string_or_string_list($x) {
+    return is_string($x) || is_string_list($x);
 }
 
 function check_date($x) {

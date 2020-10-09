@@ -1,14 +1,15 @@
 <?php
 // contactview.php -- HotCRP helper class for user related printouts
-// Peteramati is Copyright (c) 2006-2019 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class ContactView {
     static function set_path_request($paths) {
         global $Conf, $Qreq;
         $path = Navigation::path();
-        if ($path === "")
+        if ($path === "") {
             return;
+        }
         $x = explode("/", $path);
         if (count($x) && $x[count($x) - 1] === "")
             array_pop($x);
@@ -312,7 +313,9 @@ class ContactView {
         $notes = array_map(function ($m) use ($prefixes) {
             return [$m->status > 0, $prefixes[max($m->status, 0)] . $m->message];
         }, $ms->message_list());
-        if ($repo && $repo->truncated_psetdir($pset)) {
+        if ($repo
+            && $pset->handout_warn_merge !== false
+            && $repo->truncated_psetdir($pset)) {
             $notes[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for us to grade and harder for you to get pset updates."];
         }
         if (!$repo) {

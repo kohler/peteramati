@@ -465,14 +465,15 @@ function echo_commit($info) {
                 }
                 $remarks[] = [true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates."];
             }
-        } else if ($last_handout) {
+        } else if ($last_handout && $pset->handout_warn_merge !== false) {
             $remarks[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for you to get pset updates.<br>This <em>somewhat dangerous</em> command will merge your repository with ours; back up your Git repository before trying it:<br><pre>git pull --allow-unrelated-histories \"" . htmlspecialchars($pset->handout_repo_url) . "\" --no-edit &amp;&amp; git push</pre>"];
         } else if (!$last_handout && $info->viewer->isPC) {
             $handout_files = $pset->handout_repo()->ls_files($pset->handout_branch);
-            if (!count($handout_files))
+            if (!count($handout_files)) {
                 $remarks[] = [true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", contains no files; perhaps handout_repo_url is misconfigured."];
-            else
+            } else {
                 $remarks[] = [true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", does not contain problem set code yet."];
+            }
         }
     }
 

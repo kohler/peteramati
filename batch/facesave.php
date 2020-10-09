@@ -8,12 +8,15 @@ require_once("$ConfSitePATH/src/init.php");
 require_once("$ConfSitePATH/lib/getopt.php");
 
 $arg = getopt_rest($argv, "hn:e:a", array("help", "name:", "email:", "all"));
-if (isset($arg["email"]) && !isset($arg["e"]))
+if (isset($arg["email"]) && !isset($arg["e"])) {
     $arg["e"] = $arg["email"];
-if (isset($arg["name"]) && !isset($arg["n"]))
+}
+if (isset($arg["name"]) && !isset($arg["n"])) {
     $arg["n"] = $arg["name"];
-if (isset($arg["all"]) && !isset($arg["a"]))
+}
+if (isset($arg["all"]) && !isset($arg["a"])) {
     $arg["a"] = $arg["all"];
+}
 if (isset($arg["h"]) || isset($arg["help"])
     || (!isset($arg["e"]) && !isset($arg["n"]))
     || count($arg["_"]) != 1) {
@@ -38,7 +41,7 @@ if ($content_type !== Mimetype::JPG_TYPE && $content_type !== Mimetype::PNG_TYPE
 }
 
 
-$where = [];
+$where = $argdesc = [];
 if (isset($arg["n"])) {
     if (strpos($arg["n"], ",") !== false || strpos($arg["n"], " ") !== false) {
         list($f, $l) = Text::split_name($arg["n"]);
@@ -46,11 +49,14 @@ if (isset($arg["n"])) {
     } else {
         $where[] = "(firstName like '" . sqlq_for_like($arg["n"]) . "%' or lastName like '" . sqlq_for_like($arg["n"]) . "')";
     }
-    $argdesc = "name " . $arg["n"];
+    $argdesc[] = "name " . $arg["n"];
 }
 if (isset($arg["e"])) {
     $where[] = "email like '" . sqlq_for_like($arg["e"]) . "'";
-    $argdesc = "email " . $arg["e"];
+    $argdesc[] = "email " . $arg["e"];
+}
+if (empty($argdesc)) {
+    $argdesc[] = "all";
 }
 $q = "select contactId, dropped from ContactInfo where " . join(" and ", $where);
 $result = $Conf->qe($q);
@@ -60,13 +66,16 @@ while (($row = $result->fetch_object())) {
 }
 Dbl::free($result);
 
-if (count($users) > 1)
-    $users = array_filter($users, function ($u) { return !$u->dropped; });
 if (count($users) > 1) {
-    fwrite(STDERR, "$argdesc ambiguous, " . count($users) . " matches\n");
-    exit(1);
-} else if (empty($users)) {
-    fwrite(STDERR, "$argdesc unknown, 0 matches\n");
+    $users = array_filter($users, function ($u) { return !$u->dropped; });
+}
+if (count($users) !== 1) {
+    $t = "user " . join("+", $argdesc);
+    if (empty($users)) {
+        fwrite(STDERR, "$t unknown, 0 matches\n");
+    } else {
+        fwrite(STDERR, "$t ambiguous, " . count($users) . " matches\n");
+    }
     exit(1);
 }
 $cid = $users[0]->contactId;
@@ -86,10 +95,11 @@ else {
     }
 }
 
-if (is_string($worked))
+if (is_string($worked)) {
     fwrite(STDERR, strlen($image_data) . "B " . $content_type . " ($worked)\n");
-else if ($worked)
+} else if ($worked) {
     fwrite(STDERR, strlen($image_data) . "B " . $content_type . "\n");
-else
+} else {
     fwrite(STDERR, "failed\n");
+}
 exit($worked ? 0 : 1);
