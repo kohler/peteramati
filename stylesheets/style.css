@@ -2544,12 +2544,6 @@ tr.gtrow-partner {
 		transform: rotate(360deg);
 	}
 }
-.live .pa-gi:hover, .pa-dl.live {
-	background-color: #f8eec7;
-}
-.pa-gx:hover {
-	background-color: #e8e8f8;
-}
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-noteref, .pa-gradeboxref, .pa-warnbox {
 	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
@@ -2600,6 +2594,12 @@ table.hidegrades .pa-gradenote {
 }
 .pa-hide-left > .pa-gi {
 	background-color: #f0fff0;
+}
+.live .pa-gi:hover, .pa-dl.live {
+	background-color: #f8eec7;
+}
+.pa-gx:hover {
+	background-color: #e8e8f8;
 }
 .pa-note-entry {
 	width: 99%;
