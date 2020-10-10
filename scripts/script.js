@@ -2971,11 +2971,9 @@ jQuery.fn.extend({
 
 var pa_grade_types = {};
 
-function pa_add_grade_type(name, text, entry, rest) {
-    rest = rest || {};
+function pa_add_grade_type(name, rest) {
     rest.type = name;
-    rest.text = rest.text || text;
-    rest.entry = rest.entry || entry;
+    rest.tcell = rest.tcell || rest.text;
     pa_grade_types[name] = rest;
 }
 
@@ -2991,19 +2989,27 @@ function pa_render_editable_entry(id, opts) {
     return t + '</span></div>';
 }
 
-pa_add_grade_type("numeric", function (v) { return v == null ? "" : v + ""; },
-    pa_render_editable_entry);
+pa_add_grade_type("numeric", {
+    text: function (v) { return v == null ? "" : v + ""; },
+    entry: pa_render_editable_entry
+});
 
-pa_add_grade_type("formula", function (v) { return v == null ? "" : v.toFixed(1); });
+pa_add_grade_type("formula", {
+    text: function (v) { return v == null ? "" : v.toFixed(1); }
+});
 
-pa_add_grade_type("text", function (v) { return v == null ? "" : v; },
-    function (id, opts) {
+pa_add_grade_type("text", {
+    text: function (v) { return v == null ? "" : v; },
+    entry: function (id, opts) {
         return '<div class="pa-pd"><textarea class="' + opts.live_class + 'pa-pd pa-gradevalue need-autogrow" name="' + this.key + '" id="' + id + '"></textarea></div>';
     },
-    { justify: "left", sort: "forward" });
+    justify: "left",
+    sort: "forward"
+});
 
-pa_add_grade_type("select", function (v) { return v == null ? "" : v; },
-    function (id, opts) {
+pa_add_grade_type("select", {
+    text: function (v) { return v == null ? "" : v; },
+    entry: function (id, opts) {
         var t = '<div class="pa-pd"><span class="select"><select class="' + opts.live_class + 'pa-gradevalue" name="' + this.key + '" id="' + id + '"><option value="">None</option>';
         for (var i = 0; i !== this.options.length; ++i) {
             var n = escape_entities(this.options[i]);
@@ -3011,9 +3017,12 @@ pa_add_grade_type("select", function (v) { return v == null ? "" : v; },
         }
         return t + '</select></span></div>';
     },
-    { justify: "left", sort: "forward" });
+    justify: "left",
+    sort: "forward"
+});
 
-pa_add_grade_type("checkbox", function (v, nopretty) {
+pa_add_grade_type("checkbox", {
+    text: function (v, nopretty) {
         if (v == null || v === 0)
             return "–";
         else if (v == (this.max || 1) && !nopretty)
@@ -3021,7 +3030,15 @@ pa_add_grade_type("checkbox", function (v, nopretty) {
         else
             return v + "";
     },
-    function (id, opts) {
+    tcell: function (v, nopretty) {
+        if (v == null || v === 0)
+            return "";
+        else if (v == (this.max || 1) && !nopretty)
+            return "✓";
+        else
+            return v + "";
+    },
+    entry: function (id, opts) {
         var t = '<div class="pa-pd"><span class="pa-gradewidth">' +
             '<input type="checkbox" class="' + (opts.live_class ? 'ui ' : '') +
             'pa-gradevalue ml-0" name="' + this.key + '" id="' + id + '" value="' +
@@ -3032,49 +3049,58 @@ pa_add_grade_type("checkbox", function (v, nopretty) {
         }
         return t + '</div>';
     },
-    {
-        justify: "center",
-        reflect_value: function (elt, v, opts) {
-            var want_checkbox = v == null || v === "" || v === 0 || v === this.max;
-            if (!want_checkbox && elt.type === "checkbox") {
-                pa_grade_uncheckbox.call(elt);
-            } else if (want_checkbox && elt.type !== "checkbox" && opts.reset) {
-                pa_grade_recheckbox.call(elt);
-            }
-            if (elt.type === "checkbox") {
-                elt.checked = !!v;
-                elt.indeterminate = opts.mixed;
-            } else if (elt.value !== v && (opts.reset || !$(elt).is(":focus")))
-                elt.value = v;
+    justify: "center",
+    reflect_value: function (elt, v, opts) {
+        var want_checkbox = v == null || v === "" || v === 0 || v === this.max;
+        if (!want_checkbox && elt.type === "checkbox") {
+            pa_grade_uncheckbox.call(elt);
+        } else if (want_checkbox && elt.type !== "checkbox" && opts.reset) {
+            pa_grade_recheckbox.call(elt);
         }
-    });
+        if (elt.type === "checkbox") {
+            elt.checked = !!v;
+            elt.indeterminate = opts.mixed;
+        } else if (elt.value !== v && (opts.reset || !$(elt).is(":focus")))
+            elt.value = v;
+    }
+});
 
-pa_add_grade_type("checkboxes", function (v, nopretty) {
-        if (v == null || v === 0)
-            return "–";
-        else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05 && !nopretty)
-            return "✓".repeat(Math.round(v));
-        else
-            return v + "";
-    },
-    function (id, opts) {
-        var t = '<div class="pa-pd"><span class="pa-gradewidth">' +
-            '<input type="hidden" class="' + opts.live_class + 'pa-gradevalue" name="' + this.key + '">';
-        for (var i = 0; i < this.max; ++i) {
-            t += '<input type="checkbox" class="' + (opts.live_class ? 'ui js-checkboxes-grade ' : '') +
-                'ml-0" name="' + this.key + ':' + i + '" value="1"';
-            if (i === this.max - 1)
-                t += ' id="' + id + '"';
-            t += '>';
-        }
-        t += '</span>';
-        if (opts.editable) {
-            t += ' <span class="pa-gradedesc">of ' + this.max +
-                ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>';
-        }
-        return t + '</div>';
-    },
-    {
+(function () {
+function make_checkboxlike(str) {
+    return {
+        text: function (v, nopretty) {
+            if (v == null || v === 0)
+                return "–";
+            else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05 && !nopretty)
+                return str.repeat(Math.round(v));
+            else
+                return v + "";
+        },
+        tcell: function (v, nopretty) {
+            if (v == null || v === 0)
+                return "";
+            else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05 && !nopretty)
+                return str.repeat(Math.round(v));
+            else
+                return v + "";
+        },
+        entry: function (id, opts) {
+            var t = '<div class="pa-pd"><span class="pa-gradewidth">' +
+                '<input type="hidden" class="' + opts.live_class + 'pa-gradevalue" name="' + this.key + '">';
+            for (var i = 0; i < this.max; ++i) {
+                t += '<input type="checkbox" class="' + (opts.live_class ? 'ui js-checkboxes-grade ' : '') +
+                    'ml-0" name="' + this.key + ':' + i + '" value="1"';
+                if (i === this.max - 1)
+                    t += ' id="' + id + '"';
+                t += '>';
+            }
+            t += '</span>';
+            if (opts.editable) {
+                t += ' <span class="pa-gradedesc">of ' + this.max +
+                    ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>';
+            }
+            return t + '</div>';
+        },
         justify: "left",
         reflect_value: function (elt, v, opts) {
             var want_checkbox = v == null || v === "" || v === 0
@@ -3095,7 +3121,12 @@ pa_add_grade_type("checkboxes", function (v, nopretty) {
                 }
             });
         }
-    });
+    };
+}
+
+pa_add_grade_type("checkboxes", make_checkboxlike("✓"));
+pa_add_grade_type("stars", make_checkboxlike("⭐"));
+
 handle_ui.on("js-checkboxes-grade", function () {
     var colon = this.name.indexOf(":"),
         name = this.name.substring(0, colon),
@@ -3104,39 +3135,42 @@ handle_ui.on("js-checkboxes-grade", function () {
     elt.value = this.checked ? num + 1 : num;
     $(elt.closest("form")).submit();
 });
+})();
 
-pa_add_grade_type("section", function () { return ""; },
-    function () { return ""; });
+pa_add_grade_type("section", {
+    text: function () { return ""; },
+    entry: function () { return ""; }
+});
 
 (function () {
 var lm = {
     98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-",
     78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"
 };
-pa_add_grade_type("letter", function (v) { return v == null ? "" : lm[v] || v + ""; },
-    function (id, opts) {
+pa_add_grade_type("letter", {
+    text: function (v) { return v == null ? "" : lm[v] || v + ""; },
+    entry: function (id, opts) {
         opts.max_text = "letter grade";
         return pa_render_editable_entry.call(this, id, opts);
     },
-    {
-        justify: "left",
-        tics: function () {
-            var a = [];
-            for (var g in lm) {
-                if (lm[g].length === 1)
-                    a.push({x: g, text: lm[g]});
-            }
-            for (var g in lm) {
-                if (lm[g].length === 2)
-                    a.push({x: g, text: lm[g], label_space: 5});
-            }
-            for (var g in lm) {
-                if (lm[g].length === 2)
-                    a.push({x: g, text: lm[g].substring(1), label_space: 2, notic: true});
-            }
-            return a;
+    justify: "left",
+    tics: function () {
+        var a = [];
+        for (var g in lm) {
+            if (lm[g].length === 1)
+                a.push({x: g, text: lm[g]});
         }
-    });
+        for (var g in lm) {
+            if (lm[g].length === 2)
+                a.push({x: g, text: lm[g], label_space: 5});
+        }
+        for (var g in lm) {
+            if (lm[g].length === 2)
+                a.push({x: g, text: lm[g].substring(1), label_space: 2, notic: true});
+        }
+        return a;
+    }
+});
 })();
 
 function pa_render_grade_entry(ge, editable, live) {
@@ -6884,21 +6918,16 @@ function pa_render_pset_table(pconf, data) {
                 return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '" scope="col">' + this.gabbr + '</th>';
             },
             td: function (s, rownum, text) {
-                var gr = s.grades[this.gidx];
-                if (gr == null) {
-                    gr = "";
-                }
-                if (gr !== "" && this.gtype) {
-                    gr = escape_entities(pa_grade_types[this.gtype].text.call(this.ge, gr));
-                }
+                var gr = s.grades[this.gidx],
+                    gt = escape_entities(this.typeinfo.tcell.call(this.ge, gr));
                 if (text) {
-                    return gr;
+                    return gt;
                 } else {
                     var t = '<td class="' + this.klass;
                     if (s.highlight_grades && s.highlight_grades[this.gkey]) {
                         t += " gt-highlight";
                     }
-                    return t + '">' + gr + '</td>';
+                    return t + '">' + gt + '</td>';
                 }
             },
             tw: function () {
@@ -6907,7 +6936,7 @@ function pa_render_pset_table(pconf, data) {
                 if (this.justify === "right") {
                     this.klass += " r";
                 }
-                if (this.gtype === "select") {
+                if (this.typeinfo.type === "select") {
                     this.klass += " gt-el";
                     for (var i = 0; i !== this.ge.options.length; ++i)
                         w = Math.max(w, this.ge.options[i].length);
@@ -7079,7 +7108,8 @@ function pa_render_pset_table(pconf, data) {
                 col.push("total");
             }
             for (i = 0; i !== grade_keys.length; ++i) {
-                var gtype = grade_entries[i].type;
+                var gt = grade_entries[i].type,
+                    typeinfo = pa_grade_types[gt || "numeric"];
                 grade_entries[i].colpos = col.length;
                 col.push({
                     type: "grade",
@@ -7087,8 +7117,8 @@ function pa_render_pset_table(pconf, data) {
                     gkey: grade_keys[i],
                     gabbr: grade_abbr[i],
                     ge: grade_entries[i],
-                    gtype: gtype,
-                    justify: pa_grade_types[gtype || "numeric"].justify || "right"
+                    typeinfo: typeinfo,
+                    justify: typeinfo.justify || "right"
                 });
             }
             if (need_ngrades) {

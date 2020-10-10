@@ -997,7 +997,7 @@ class GradeEntryConfig {
             $type = Pset::cstr($loc, $g, "type");
             if ($type === "number") {
                 $type = null;
-            } else if (in_array($type, ["text", "checkbox", "checkboxes", "letter", "section"], true)) {
+            } else if (in_array($type, ["text", "checkbox", "checkboxes", "stars", "letter", "section"], true)) {
                 // nada
             } else if ($type === "select"
                        && isset($g->options)
@@ -1038,12 +1038,12 @@ class GradeEntryConfig {
         $this->max = Pset::cnum($loc, $g, "max");
         if ($this->type === "checkbox") {
             $this->max = $this->max ?? 1;
-        } else if ($this->type === "checkboxes") {
+        } else if ($this->type === "checkboxes" || $this->type === "stars") {
             $this->max = $this->max ?? 1;
             if ($this->max != (int) $this->max
                 || $this->max < 1
                 || $this->max > 10) {
-                throw new PsetConfigException("checkboxes grade entry requires max 1–10", $loc);
+                throw new PsetConfigException("{$this->type} grade entry requires max 1–10", $loc);
             }
         } else if ($this->type === "letter") {
             $this->max = $this->max ?? 100;
@@ -1196,7 +1196,7 @@ class GradeEntryConfig {
 
     /** @return bool */
     function value_differs($v1, $v2) {
-        if (($this->type === "checkbox" || $this->type === "checkboxes")
+        if (($this->type === "checkbox" || $this->type === "checkboxes" || $this->type === "stars")
             && (int) $v1 === 0
             && (int) $v2 === 0) {
             return false;
