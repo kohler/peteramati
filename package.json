@@ -1,0 +1,9 @@
+{
+    "url": "https://github.com/kohler/peteramati/issues",
+    "email": "ekohler@gmail.com",
+    "repository": "github:kohler/peteramati",
+    "dependencies": {
+        "markdown-it": "latest",
+        "markdown-it-katexx": "^3.2.0"
+    }
+}
