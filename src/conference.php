@@ -1607,18 +1607,29 @@ class Conf {
     }
 
 
-    function make_css_link($url, $media = null) {
-        global $ConfSitePATH;
+    /** @param non-empty-string $url
+     * @return string */
+    function make_css_link($url, $media = null, $integrity = null) {
+        if (str_starts_with($url, "<meta") || str_starts_with($url, "<link")) {
+            return $url;
+        }
         $t = '<link rel="stylesheet" type="text/css" href="';
-        if (str_starts_with($url, "stylesheets/")
-            || !preg_match(',\A(?:https?:|/),i', $url))
+        $absolute = preg_match('/\A(?:https:?:|\/)/i', $url);
+        if (!$absolute) {
             $t .= $this->opt["assetsUrl"];
-        $t .= $url;
-        if (($mtime = @filemtime("$ConfSitePATH/$url")) !== false)
+        }
+        $t .= htmlspecialchars($url);
+        if (!$absolute && ($mtime = @filemtime(SiteLoader::find($url))) !== false) {
             $t .= "?mtime=$mtime";
-        if ($media)
+        }
+        if ($media) {
             $t .= '" media="' . $media;
-        return $t . '" />';
+        }
+        $t .= '" crossorigin="anonymous';
+        if ($integrity) {
+            $t .= '" integrity="' . $integrity;
+        }
+        return $t . '">';
     }
 
     /** @param non-empty-string $url
@@ -1688,6 +1699,7 @@ class Conf {
             echo '<meta name="viewport" content="width=device-width, initial-scale=1">', "\n";
             echo $this->make_css_link("stylesheets/mobile.css", "screen and (max-width: 768px)"), "\n";
         }
+        echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css", null, "sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X");
         foreach (mkarray($this->opt("stylesheets") ?? []) as $css) {
             echo $this->make_css_link($css), "\n";
         }
@@ -1747,6 +1759,8 @@ class Conf {
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/highlight.min.js", true) . "\n");
+        Ht::stash_html($this->make_script_file("scripts/markdown-it-katexx.min.js", true) . "\n");
+        Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.js" integrity="sha384-g7c+Jr9ZivxKLnZTDUhnkOnsh30B4H0rpLUpJ4jAIKs4fnJI+sEnkvrMWph2EDg4" crossorigin="anonymous"></script>');
         foreach (mkarray($this->opt("javascripts") ?? []) as $scriptfile) {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
         }
@@ -1769,15 +1783,18 @@ class Conf {
         }
         Ht::stash_script("assetsurl=" . json_encode_browser($this->opt["assetsUrl"]) . ";");
         $huser = (object) array();
-        if ($Me && $Me->email)
+        if ($Me && $Me->email) {
             $huser->email = $Me->email;
-        if ($Me && $Me->is_pclike())
+        }
+        if ($Me && $Me->is_pclike()) {
             $huser->is_pclike = true;
+        }
         Ht::stash_script("hotcrp_user=" . json_encode_browser($huser));
 
         // script.js
-        if (!$this->opt("noDefaultScript"))
+        if (!$this->opt("noDefaultScript")) {
             Ht::stash_html($this->make_script_file("scripts/script.js") . "\n");
+        }
 
         // other scripts
         foreach ($this->opt("scripts") ?? [] as $file) {

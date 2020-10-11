@@ -2203,7 +2203,17 @@ render_text.add_format({
         return pa_render_terminal(text);
     }
 })
-})(window.markdownit());
+})(window.markdownit({
+    highlight: function (str, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+            try {
+                return hljs.highlight(lang, str).value;
+            } catch (ex) {
+            }
+        }
+        return "";
+    }
+}).use(markdownit_katex));
 
 $(render_text.on_page);
 
@@ -3489,7 +3499,7 @@ function make_markdownit() {
                 }
                 return "";
             }
-        });
+        }).use(markdownit_katex);
         for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
                        "bullet_list_open", "table_open", "blockquote_open",
                        "hr", "code_block"]) {
