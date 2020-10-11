@@ -443,20 +443,6 @@ function make_qreq() {
     return $qreq;
 }
 
-/** @param mixed $a */
-function array_to_object_recursive($a) {
-    if (is_array($a) && is_associative_array($a)) {
-        $o = (object) array();
-        foreach ($a as $k => $v) {
-            if ($k !== "")
-                $o->$k = array_to_object_recursive($v);
-        }
-        return $o;
-    } else {
-        return $a;
-    }
-}
-
 function object_replace($a, $b) {
     foreach (is_object($b) ? get_object_vars($b) : $b as $k => $v) {
         if ($v === null) {
@@ -482,11 +468,18 @@ function object_replace_recursive($a, $b) {
 }
 
 function object_merge_recursive($a, $b) {
-    foreach (get_object_vars($b) as $k => $v)
-        if (!property_exists($a, $k))
-            $a->$k = $v;
-        else if (is_object($a->$k) && is_object($v))
+    foreach (get_object_vars($b) as $k => $v) {
+        if (!property_exists($a, $k)) {
+            if (is_object($v)) {
+                $x = $a->$k = (object) [];
+                object_merge_recursive($x, $v);
+            } else {
+                $a->$k = $v;
+            }
+        } else if (is_object($a->$k) && is_object($v)) {
             object_merge_recursive($a->$k, $v);
+        }
+    }
 }
 
 function json_object_replace($j, $updates, $nullable = false) {

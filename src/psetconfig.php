@@ -195,7 +195,7 @@ class Pset {
         $this->nonnumeric_key = ctype_digit($pk) ? "pset" . $pk : $pk;
 
         // url keys
-        $urlkey = get($p, "urlkey");
+        $urlkey = $p->urlkey ?? null;
         if (is_string($urlkey) && preg_match(self::URLKEY_REGEX, $urlkey)) {
             $this->urlkey = $urlkey;
         } else if (is_int($urlkey)) {
@@ -329,7 +329,7 @@ class Pset {
         $this->grade_statistics_visible = self::cdate_or_grades($p, "grade_statistics_visible", "grade_cdf_visible");
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
-        $this->grade_script = get($p, "grade_script");
+        $this->grade_script = $p->grade_script ?? null;
         if (is_string($this->grade_script)) {
             $this->grade_script = [$this->grade_script];
         }
@@ -393,7 +393,7 @@ class Pset {
         $this->run_binddir = self::cstr($p, "run_binddir");
 
         // diffs
-        $diffs = get($p, "diffs");
+        $diffs = $p->diffs ?? null;
         if (is_array($diffs) || is_object($diffs)) {
             foreach (self::make_config_array($p->diffs) as $k => $v) {
                 $this->diffs[] = new DiffConfig($k, $v);
@@ -401,7 +401,7 @@ class Pset {
         } else if ($diffs) {
             throw new PsetConfigException("`diffs` format error", "diffs");
         }
-        if (($ignore = get($p, "ignore"))) {
+        if (($ignore = $p->ignore ?? null)) {
             $this->ignore = self::cstr_or_str_list($p, "ignore");
         }
 

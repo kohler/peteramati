@@ -223,8 +223,14 @@ function load_pset_info() {
             if (isset($locinfo->_defaults)) {
                 object_merge_recursive($locp, $locinfo->_defaults);
             }
+            if ($locp && isset($locp->group) && is_string($locp->group)) {
+                $g = "_defaults_" . $locp->group;
+                if (isset($locinfo->$g)) {
+                    object_merge_recursive($locp, $locinfo->$g);
+                }
+            }
             // - lookup exception path in landmark object
-            foreach ($exception->path as $component) {
+            foreach ($exception->path as $i => $component) {
                 if ($locp && !is_string($locp)) {
                     $locp = is_array($locp) ? $locp[$component] : $locp->$component;
                 }

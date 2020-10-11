@@ -418,6 +418,12 @@ class Conf {
                 && is_object($p)
                 && isset($p->psetid)) {
                 object_merge_recursive($p, $config->_defaults);
+                if (isset($p->group) && is_string($p->group)) {
+                    $g = "_defaults_" . $p->group;
+                    if (isset($config->$g)) {
+                        object_merge_recursive($p, $config->$g);
+                    }
+                }
                 try {
                     $pset = new Pset($this, $pk, $p);
                     $this->register_pset($pset);
