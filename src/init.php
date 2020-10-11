@@ -220,14 +220,14 @@ function load_pset_info() {
             }
             // - read location  information
             $locp = $locinfo->{$exception->key};
-            if (isset($locinfo->_defaults)) {
-                object_merge_recursive($locp, $locinfo->_defaults);
-            }
             if ($locp && isset($locp->group) && is_string($locp->group)) {
                 $g = "_defaults_" . $locp->group;
                 if (isset($locinfo->$g)) {
                     object_merge_recursive($locp, $locinfo->$g);
                 }
+            }
+            if (isset($locinfo->_defaults)) {
+                object_merge_recursive($locp, $locinfo->_defaults);
             }
             // - lookup exception path in landmark object
             foreach ($exception->path as $i => $component) {
