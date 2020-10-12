@@ -432,6 +432,12 @@ class ContactView {
 
         // clean up repo url
         $repo_url = trim($qreq->repo);
+        if ($repo_url === "") {
+            $user->set_repo($pset->id, null);
+            redirectSelf();
+        }
+
+        // extend it to full url
         if ($pset->repo_guess_patterns) {
             for ($i = 0; $i + 1 < count($pset->repo_guess_patterns); $i += 2) {
                 $x = preg_replace('`' . str_replace("`", "\\`", $pset->repo_guess_patterns[$i]) . '`s',
@@ -456,11 +462,13 @@ class ContactView {
             if ($sniff == 2) {
                 $try_classes = [$sitek];
                 break;
-            } else if ($sniff)
+            } else if ($sniff) {
                 $try_classes[] = $sitek;
+            }
         }
-        if (empty($try_classes))
+        if (empty($try_classes)) {
             return Conf::msg_error("Invalid repository URL “" . htmlspecialchars($repo_url) . "”.");
+        }
 
         // check repositories
         $ms = new MessageSet;
