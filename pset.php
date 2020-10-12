@@ -627,7 +627,7 @@ echo "<hr>\n";
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey);
 if (!$Pset->gitless && $Info->maybe_commit_hash()) {
     echo '" data-pa-repourl="', htmlspecialchars($Info->repo->url),
-        '" data-pa-branch="', htmlspecialchars($Info->branch ?? $Conf->default_main_branch),
+        '" data-pa-branch="', htmlspecialchars($Info->branch()),
         '" data-pa-hash="', htmlspecialchars($Info->commit_hash());
 }
 if (!$Pset->gitless && $Pset->directory) {

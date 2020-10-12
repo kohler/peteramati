@@ -104,6 +104,11 @@ class PsetView {
         return $info;
     }
 
+    /** @return string */
+    function branch() {
+        return $this->branch ?? $this->pset->main_branch;
+    }
+
     function connected_hash($hash) {
         $c = $this->repo ? $this->repo->connected_commit($hash, $this->pset, $this->branch) : null;
         return $c ? $c->hash : false;
