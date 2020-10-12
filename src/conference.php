@@ -77,8 +77,10 @@ class Conf {
     public $validate_timeout;
     public $validate_overall_timeout;
 
-    private $save_messages = true;
-    var $headerPrinted = false;
+    private $_header_printed = false;
+    /** @var ?list<array{string,string}> */
+    private $_save_msgs;
+    /** @var ?array<string,array<int,true>> */
     private $_save_logs = false;
     private $_session_list = false;
     public $_session_handler;
@@ -1318,19 +1320,27 @@ class Conf {
     // Message routines
     //
 
+    /** @param string|list<string> $text
+     * @param int|string $type */
     function msg($text, $type) {
         if (PHP_SAPI == "cli") {
-            if ($type === "xmerror" || $type === "merror")
+            if (is_array($text)) {
+                $text = join("\n", $text);
+            }
+            if ($type === "xmerror" || $type === "merror" || $type === 2) {
                 fwrite(STDERR, "$text\n");
-            else if ($type === "xwarning" || $type === "warning"
-                     || !defined("HOTCRP_TESTHARNESS"))
+            } else if ($type === "xwarning" || $type === "warning"
+                       || !defined("HOTCRP_TESTHARNESS")) {
                 fwrite(STDOUT, "$text\n");
-        } else if ($this->save_messages) {
-            ensure_session();
-            $_SESSION[$this->dsn]["msgs"][] = [$text, $type];
-        } else if ($type[0] == "x") {
+            }
+        } else if (!$this->_header_printed) {
+            $this->_save_msgs[] = [$text, $type];
+        } else if (is_int($type) || $type[0] === "x") {
             echo Ht::msg($text, $type);
         } else {
+            if (is_array($text)) {
+                $text = '<div class="multimessage">' . join("", array_map(function ($x) { return '<div class="mmm">' . $x . '</div>'; }, $text)) . '</div>';
+            }
             echo "<div class=\"$type\">$text</div>";
         }
     }
@@ -1558,6 +1568,17 @@ class Conf {
     }
 
 
+    function transfer_messages_to_session() {
+        if ($this->_save_msgs) {
+            ensure_session();
+            foreach ($this->_save_msgs as $m) {
+                $_SESSION[$this->dsn]["msgs"][] = $m;
+            }
+            $this->_save_msgs = null;
+        }
+    }
+
+
     function encoded_session_list() {
         if ($this->_session_list === false) {
             $this->_session_list = null;
@@ -1776,8 +1797,19 @@ class Conf {
         Ht::stash_script("siteurl=" . json_encode_browser($nav->site_path_relative)
             . ";siteurl_base_path=" . json_encode_browser($nav->base_path)
             . ";siteurl_suffix=\"" . $nav->php_suffix . "\"");
+        $p = "";
+        if (($x = $this->opt("sessionDomain"))) {
+            $p .= "; Domain=" . $x;
+        }
+        if ($this->opt("sessionSecure")) {
+            $p .= "; Secure";
+        }
+        if (($samesite = $this->opt("sessionSameSite") ?? "Lax")) {
+            $p .= "; SameSite=" . $samesite;
+        }
         if (session_id() !== "")
-            Ht::stash_script("siteurl_postvalue=\"" . post_value() . "\"");
+            Ht::stash_script("siteurl_postvalue=" . json_encode_browser(post_value()));
+        Ht::stash_script("siteurl_cookie_params=" . json_encode_browser($p));
         if (($list = $this->encoded_session_list()))
             Ht::stash_script("hotcrp_list=" . json_encode_browser($list) . ";");
         if (self::$hoturl_defaults) {
@@ -1817,7 +1849,7 @@ class Conf {
 
     function header($title, $id = "", $options = []) {
         global $ConfSitePATH, $Me;
-        if ($this->headerPrinted)
+        if ($this->_header_printed)
             return;
 
         // <head>
@@ -1872,19 +1904,43 @@ class Conf {
         echo "  <hr class=\"c\" />\n";
 
         echo "</div>\n<div id=\"initialmsgs\">\n";
-        if (($x = $this->opt("maintenance")))
-            echo "<div class=\"merror\"><strong>The site is down for maintenance.</strong> ", (is_string($x) ? $x : "Please check back later."), "</div>";
-        $this->save_messages = false;
+        if (($x = $this->opt("maintenance"))) {
+            echo Ht::msg(is_string($x) ? $x : "<strong>The site is down for maintenance.</strong> Please check back later.", 2);
+        }
         if (($msgs = $this->session("msgs"))
             && !empty($msgs)) {
             $this->save_session("msgs", null);
-            foreach ($msgs as $m)
+            foreach ($msgs as $m) {
                 $this->msg($m[0], $m[1]);
+            }
             echo "<div id=\"initialmsgspacer\"></div>";
+        }
+        if ($this->_save_msgs) {
+            foreach ($this->_save_msgs as $m) {
+                $this->msg($m[0], $m[1]);
+            }
+            $this->_save_msgs = null;
+        }
+        if (isset($_COOKIE["hotcrpmessage"])) {
+            $message = json_decode(rawurldecode($_COOKIE["hotcrpmessage"]));
+            if (is_array($message)) {
+                if (count($message) === 2
+                    && (is_int($message[1]) || $message[1] === "confirm")) {
+                    $message = [$message];
+                }
+                foreach ($message as $m) {
+                    if (is_array($m)
+                        && (is_int($m[1]) || $m[1] === "confirm")
+                        && ($t = CleanHTML::basic_clean_all($m[0])) !== false) {
+                        $this->msg($t, $m[1]);
+                    }
+                }
+                hotcrp_setcookie("hotcrpmessage", "", ["expires" => Conf::$now - 3600]);
+            }
         }
         echo "</div>\n";
 
-        $this->headerPrinted = true;
+        $this->_header_printed = true;
         echo "</div>\n<div class='body'>\n";
     }
 

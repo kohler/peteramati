@@ -1,7 +1,6 @@
 <?php
 // helpers.php -- HotCRP non-class helper functions
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
-// See LICENSE for open-source distribution terms
+// Copyright (c) 2006-2020 Eddie Kohler; see LICENSE.
 
 function defappend(&$var, $str) {
     if (!isset($var))
@@ -16,11 +15,13 @@ function arrayappend(&$var, $value) {
         $var = array($value);
 }
 
+/** @return array */
 function mkarray($value) {
-    if (is_array($value))
+    if (is_array($value)) {
         return $value;
-    else
+    } else {
         return array($value);
+    }
 }
 
 function &array_ensure(&$arr, $key, $val) {
@@ -43,20 +44,26 @@ function ago($t) {
 
 // string helpers
 
+/** @param null|int|string $value
+ * @return int */
 function cvtint($value, $default = -1) {
     $v = trim((string) $value);
     if (is_numeric($v)) {
         $ival = intval($v);
-        if ($ival == floatval($v))
+        if ($ival == floatval($v)) {
             return $ival;
+        }
     }
     return $default;
 }
 
+/** @param null|int|float|string $value
+ * @return int|float */
 function cvtnum($value, $default = -1) {
     $v = trim((string) $value);
-    if (is_numeric($v))
+    if (is_numeric($v)) {
         return floatval($v);
+    }
     return $default;
 }
 
@@ -122,13 +129,12 @@ function hoturl_add_raw($url, $component) {
 }
 
 function hoturl($page, $param = null) {
-    global $Conf;
-    return $Conf->hoturl($page, $param);
+    return Conf::$main->hoturl($page, $param);
 }
 
+/** @deprecated */
 function hoturl_post($page, $param = null) {
-    global $Conf;
-    return $Conf->hoturl($page, $param, Conf::HOTURL_POST);
+    return Conf::$main->hoturl($page, $param, Conf::HOTURL_POST);
 }
 
 
@@ -161,7 +167,9 @@ function redirectSelf($param = []) {
 }
 
 class JsonResult {
+    /** @var ?int */
     public $status;
+    /** @var array<string,mixed> */
     public $content;
     public $has_messages = false;
 
@@ -236,8 +244,11 @@ class JsonResult {
 }
 
 class JsonResultException extends Exception {
+    /** @var JsonResult */
     public $result;
+    /** @var bool */
     static public $capturing = false;
+    /** @param JsonResult $j */
     function __construct($j) {
         $this->result = $j;
     }
@@ -317,33 +328,28 @@ function rm_rf_tempdir($tempdir) {
 }
 
 function clean_tempdirs() {
-    $dir = null;
-    if (function_exists("sys_get_temp_dir"))
-        $dir = sys_get_temp_dir();
-    if (!$dir)
-        $dir = "/tmp";
-    while (substr($dir, -1) == "/")
+    $dir = sys_get_temp_dir() ? : "/";
+    while (substr($dir, -1) === "/") {
         $dir = substr($dir, 0, -1);
+    }
     $dirh = opendir($dir);
     $now = time();
-    while (($fname = readdir($dirh)) !== false)
+    while (($fname = readdir($dirh)) !== false) {
         if (preg_match('/\Ahotcrptmp\d+\z/', $fname)
             && is_dir("$dir/$fname")
             && ($mtime = @filemtime("$dir/$fname")) !== false
             && $mtime < $now - 1800)
             rm_rf_tempdir("$dir/$fname");
+    }
     closedir($dirh);
 }
 
 function tempdir($mode = 0700) {
-    $dir = null;
-    if (function_exists("sys_get_temp_dir"))
-        $dir = sys_get_temp_dir();
-    if (!$dir)
-        $dir = "/tmp";
-    while (substr($dir, -1) == "/")
+    $dir = sys_get_temp_dir() ? : "/";
+    while (substr($dir, -1) === "/") {
         $dir = substr($dir, 0, -1);
-    for ($i = 0; $i < 100; $i++) {
+    }
+    for ($i = 0; $i !== 100; $i++) {
         $path = $dir . "/hotcrptmp" . mt_rand(0, 9999999);
         if (mkdir($path, $mode)) {
             register_shutdown_function("rm_rf_tempdir", $path);
@@ -358,14 +364,15 @@ function tempdir($mode = 0700) {
 function commajoin($what, $joinword = "and") {
     $what = array_values($what);
     $c = count($what);
-    if ($c == 0)
+    if ($c == 0) {
         return "";
-    else if ($c == 1)
+    } else if ($c == 1) {
         return $what[0];
-    else if ($c == 2)
+    } else if ($c == 2) {
         return $what[0] . " " . $joinword . " " . $what[1];
-    else
+    } else {
         return join(", ", array_slice($what, 0, -1)) . ", " . $joinword . " " . $what[count($what) - 1];
+    }
 }
 
 function prefix_commajoin($what, $prefix, $joinword = "and") {
@@ -376,33 +383,33 @@ function prefix_commajoin($what, $prefix, $joinword = "and") {
 
 function numrangejoin($range) {
     $a = [];
-    $format = null;
+    $format = $first = $last = null;
     $intval = $plen = 0;
-    $first = $last = "0";
     foreach ($range as $current) {
-        if ($format !== null
-            && sprintf($format, $intval + 1) === (string) $current) {
-            ++$intval;
-            $last = $current;
-            continue;
-        } else {
-            if ($format !== null) {
-                $a[] = $first === $last ? $first : $first . "–" . substr($last, $plen);
-            }
-            if ($current !== "" && ctype_digit($current)) {
-                $format = "%0" . strlen($current) . "d";
-                $plen = 0;
-                $first = $last = $current;
-                $intval = intval($current);
-            } else if (preg_match('/\A(\D*)(\d+)\z/', $current, $m)) {
-                $format = str_replace("%", "%%", $m[1]) . "%0" . strlen($m[2]) . "d";
-                $plen = strlen($m[1]);
-                $first = $last = $current;
-                $intval = intval($m[2]);
+        if ($format !== null) {
+            if (sprintf($format, $intval + 1) === (string) $current) {
+                ++$intval;
+                $last = $current;
+                continue;
+            } else if ($first === $last) {
+                $a[] = $first;
             } else {
-                $format = null;
-                $a[] = $current;
+                $a[] = $first . "–" . substr($last, $plen);
             }
+        }
+        if ($current !== "" && ctype_digit($current)) {
+            $format = "%0" . strlen((string) $current) . "d";
+            $plen = 0;
+            $first = $last = $current;
+            $intval = intval($current);
+        } else if (preg_match('/\A(\D*)(\d+)\z/', $current, $m)) {
+            $format = str_replace("%", "%%", $m[1]) . "%0" . strlen($m[2]) . "d";
+            $plen = strlen($m[1]);
+            $first = $last = $current;
+            $intval = intval($m[2]);
+        } else {
+            $format = null;
+            $a[] = $current;
         }
     }
     if ($format !== null && $first === $last) {
@@ -458,7 +465,7 @@ function ordinal($n) {
 
 function tabLength($text, $all) {
     $len = 0;
-    for ($i = 0; $i < strlen($text); $i++) {
+    for ($i = 0; $i < strlen($text); ++$i) {
         if ($text[$i] === ' ') {
             ++$len;
         } else if ($text[$i] === '\t') {
@@ -481,25 +488,42 @@ function ini_get_bytes($varname, $value = null) {
 }
 
 
+// Aims to return a random password string with at least
+// `$length * 5` bits of entropy.
 function hotcrp_random_password($length = 14) {
-    $bytes = random_bytes($length + 10);
-    if ($bytes === false) {
-        $bytes = "";
-        while (strlen($bytes) < $length)
-            $bytes .= sha1(opt("conferenceKey") . pack("V", mt_rand()));
-    }
-
-    $l = "a e i o u y a e i o u y a e i o u y a e i o u y a e i o u y b c d g h j k l m n p r s t u v w trcrbrfrthdrchphwrstspswprslcl2 3 4 5 6 7 8 9 - @ _ + = ";
+    // XXX it is possible to correctly account for loss of entropy due
+    // to use of consonant pairs; I have only estimated
+    $bytes = random_bytes($length + 12);
+    $blen = strlen($bytes) * 8;
+    $bneed = $length * 5;
     $pw = "";
-    $nvow = 0;
-    for ($i = 0;
-         $i < strlen($bytes) &&
-             strlen($pw) < $length + max(0, ($nvow - 3) / 3);
-         ++$i) {
-        $x = ord($bytes[$i]) % (strlen($l) / 2);
-        if ($x < 30)
-            ++$nvow;
-        $pw .= rtrim(substr($l, 2 * $x, 2));
+    for ($b = 0; $bneed > 0 && $b + 8 <= $blen; ) {
+        $bidx = $b >> 3;
+        $codeword = (ord($bytes[$bidx]) << ($b & 7)) & 255;
+        if (($b & 7) > 0) {
+            $codeword |= ord($bytes[$bidx + 1]) >> (8 - ($b & 7));
+        }
+        if ($codeword < 0x60) {
+            $t = "aeiouy";
+            $pw .= $t[($codeword >> 4) & 0x7];
+            $bneed -= 4; // log2(3/8 * 1/6)
+            $b += 4;
+        } else if ($codeword < 0xC0) {
+            $t = "bcdghjklmnprstvw";
+            $pw .= $t[($codeword >> 1) & 0xF];
+            $bneed -= 5.415; // log2(3/8 * 1/16)
+            $b += 7;
+        } else if ($codeword < 0xE0) {
+            $t = "trcrbrfrthdrchphwrstspswprslclz";
+            $pw .= substr($t, $codeword & 0x1E, 2);
+            $bneed -= 6.415; // log2(1/8 * 1/16 * [fudge] ~1.5)
+            $b += 7;
+        } else {
+            $t = "23456789";
+            $pw .= $t[($codeword >> 2) & 0x7];
+            $bneed -= 6; // log2(1/8 * 1/8)
+            $b += 6;
+        }
     }
     return $pw;
 }
@@ -508,10 +532,12 @@ function hotcrp_random_password($length = 14) {
 function encode_token($x, $format = "") {
     $s = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     $t = "";
-    if (is_int($x))
+    if (is_int($x)) {
         $format = "V";
-    if ($format)
+    }
+    if ($format) {
         $x = pack($format, $x);
+    }
     $i = 0;
     $have = 0;
     $n = 0;
@@ -525,10 +551,11 @@ function encode_token($x, $format = "") {
         $n >>= 5;
         $have -= 5;
     }
-    if ($format == "V")
+    if ($format === "V") {
         return preg_replace('/(\AA|[^A])A*\z/', '$1', $t);
-    else
+    } else {
         return $t;
+    }
 }
 
 function decode_token($x, $format = "") {
@@ -538,15 +565,16 @@ function decode_token($x, $format = "") {
     $x = trim(strtoupper($x));
     for ($i = 0; $i < strlen($x); ++$i) {
         $o = ord($x[$i]);
-        if ($o >= 48 && $o <= 90 && ($out = ord($map[$o - 48])) >= 48)
+        if ($o >= 48 && $o <= 90 && ($out = ord($map[$o - 48])) >= 48) {
             $o = $out - 48;
-        else if ($o == 46 /*.*/ || $o == 34 /*"*/)
+        } else if ($o === 46 /*.*/ || $o === 34 /*"*/) {
             continue;
-        else
+        } else {
             return false;
+        }
         $n += $o << $have;
         $have += 5;
-        while ($have >= 8 || ($n && $i == strlen($x) - 1)) {
+        while ($have >= 8 || ($n && $i === strlen($x) - 1)) {
             $t .= chr($n & 255);
             $n >>= 8;
             $have -= 8;
@@ -555,10 +583,11 @@ function decode_token($x, $format = "") {
     if ($format == "V") {
         $x = unpack("Vx", $t . "\x00\x00\x00\x00\x00\x00\x00");
         return $x["x"];
-    } else if ($format)
+    } else if ($format) {
         return unpack($format, $t);
-    else
+    } else {
         return $t;
+    }
 }
 
 function git_refname_is_full_hash($refname) {

@@ -535,8 +535,8 @@ function debug_string_backtrace() {
     $s = preg_replace_callback('/^\#(\d+)/m', function ($m) {
         return "#" . ($m[1] - 1);
     }, (new Exception)->getTraceAsString());
-    if ($ConfSitePATH) {
-        $s = str_replace($ConfSitePATH, "[" . (Conf::$main ? Conf::$main->dbname : "Peteramati") . "]", $s);
+    if (SiteLoader::$root) {
+        $s = str_replace(SiteLoader::$root, "[" . (Conf::$main ? Conf::$main->dbname : "Peteramati") . "]", $s);
     }
     return substr($s, strpos($s, "\n") + 1);
 }

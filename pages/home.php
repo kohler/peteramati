@@ -567,7 +567,7 @@ function runmany($qreq) {
         $args["run"] = substr($qreq->runner, 0, -7);
         $args["ensure"] = 1;
     }
-    go(hoturl_post("run", $args));
+    Navigation::redirect(hoturl_post("run", $args));
     redirectSelf();
 }
 
@@ -622,11 +622,11 @@ function doaction(Qrequest $qreq) {
     } else if (str_starts_with($qreq->action, "grademany_")) {
         $g = $pset->all_grades[substr($qreq->action, 10)];
         assert($g && !!$g->landmark_range_file);
-        go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
+        Navigation::redirect(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
     } else if (str_starts_with($qreq->action, "diffmany_")) {
-        go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
+        Navigation::redirect(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
     } else if ($qreq->action === "diffmany") {
-        go(hoturl_post("diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
+        Navigation::redirect(hoturl_post("diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
     }
     if ($hiddengrades !== null) {
         foreach (qreq_users($qreq) as $user) {
@@ -1461,7 +1461,7 @@ function show_pset_table($sset) {
     }
 
     if ($checkbox) {
-        echo Ht::form(hoturl_post("index", array("pset" => $pset->urlkey, "save" => 1)));
+        echo Ht::form(hoturl_post("index", ["pset" => $pset->urlkey, "save" => 1]));
         if ($pset->anonymous)
             echo Ht::hidden("anonymous", $anonymous ? 1 : 0);
     }
