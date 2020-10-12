@@ -588,12 +588,13 @@ class Repository {
             $command .= " -w";
         }
         $command .= " {$hasha_arg} {$hashb_arg} --";
-        foreach ($diffargs as $fn => $di) {
+        foreach ($diffargs as $fn => $dix) {
             $command .= " " . escapeshellarg(quotemeta($fn));
         }
         $result = $this->gitrun($command);
         $alineno = $blineno = null;
         $di = null;
+        '@phan-var-force ?DiffInfo $di';
         $pos = 0;
         $len = strlen($result);
         while (true) {

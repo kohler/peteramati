@@ -75,20 +75,20 @@ class GitHub_RepositorySite extends RepositorySite {
     const MAINURL = "https://github.com/";
     static function make_url($url, Conf $conf) {
         $url = preg_replace('/\s*\/\s*/', '/', $url);
-        if (preg_match('/\A(?:github(?:\.com)?[:\/])?\/*([^\/:@]+\/[^\/:@]+?)(?:\.git|)\z/i', $url, $m)) {
+        if (preg_match('/\A(?:github(?:\.com|)[:\/])?\/*([^\/:@]+\/[^\/:@]+?)(?:\.git|)\z/i', $url, $m)) {
             return new GitHub_RepositorySite("git@github.com:" . $m[1], $m[1], $conf);
-        } else if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)github.com(?::/*|/+)([^/]+?/[^/]+?)(?:\.git|)\z_i', $url, $m)) {
+        } else if (preg_match('/\A(?:https?:\/\/|git:\/\/|ssh:\/\/(?:git@|)|git@|)github\.com(?::\/*|\/+)([^\/]+?\/[^\/]+?)(?:\.git|)\z/i', $url, $m)) {
             return new GitHub_RepositorySite("git@github.com:" . $m[1], $m[1], $conf);
         } else {
             return null;
         }
     }
     static function sniff_url($url) {
-        if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)github.com(?::/*|/+)(.*?)(?:\.git|)\z_i', $url, $m)) {
+        if (preg_match('/\A(?:https?:\/\/|git:\/\/|ssh:\/\/(?:git@)?|git@|)github.com(?::\/*|\/+)(.*?)(?:\.git|)\z/i', $url, $m)) {
             return 2;
-        } else if (preg_match('_\A(?:github(?:\.com)?)(?::/*|/+)([^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m)) {
+        } else if (preg_match('/\A(?:github(?:\.com)?)(?::\/*|\/+)([^\/:@]+\/[^\/:@]+?)(?:\.git|)\z/i', $url, $m)) {
             return 2;
-        } else if (preg_match('_\A/*([^/:@]+/[^/:@]+?)(?:\.git|)\z_i', $url, $m)) {
+        } else if (preg_match('/\A\/*([^\/:@]+\/[^\/:@]+?)(?:\.git|)\z/i', $url, $m)) {
             return 1;
         } else {
             return 0;

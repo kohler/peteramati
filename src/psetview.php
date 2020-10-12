@@ -572,6 +572,7 @@ class PsetView {
         return $this->pset->gitless_grades || $this->grading_commit();
     }
 
+    /** @return ?non-empty-string */
     function grading_hash() {
         if (!$this->pset->gitless_grades) {
             $this->ensure_grade();
@@ -579,7 +580,7 @@ class PsetView {
                 return $this->repo_grade->gradehash;
             }
         }
-        return false;
+        return null;
     }
 
     function update_grading_hash($update_chance = false) {
