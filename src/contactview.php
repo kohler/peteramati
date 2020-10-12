@@ -522,30 +522,29 @@ class ContactView {
         $branch = $user->branch_name($pset);
 
         $snaphash = $snapcommitline = $snapcommitat = $value = null;
-        if ($repo && !$info->user_can_view_repo_contents()) {
-            $value = "(unconfirmed repository)";
-        } else if ($repo
-                   && $repo->snaphash
-                   && $branch === $info->conf->default_main_branch) {
-            $snaphash = $repo->snaphash;
-            $snapcommitline = $repo->snapcommitline;
-            $snapcommitat = $repo->snapcommitat;
-        } else if ($repo && $repo->snapat) {
-            $c = $repo->latest_commit($pset, $branch);
-            if ($c) {
+        if ($repo) {
+            if ($repo->snaphash && $branch === $info->conf->default_main_branch) {
+                $snaphash = $repo->snaphash;
+                $snapcommitline = $repo->snapcommitline;
+                $snapcommitat = $repo->snapcommitat;
+            } else if ($repo->snapat && ($c = $repo->latest_commit($pset, $branch))) {
                 $snaphash = $c->hash;
                 $snapcommitline = $c->subject;
                 $snapcommitat = $c->commitat;
+            }
+        }
+        if ($repo && !$info->user_can_view_repo_contents()) {
+            $value = "(unconfirmed repository)";
+        } else if ($snaphash) {
+            $value = substr($snaphash, 0, 7) . " " . htmlspecialchars($snapcommitline);
+        } else {
+            if (!$repo) {
+                $value = "(no repo yet)";
+            } else if (!$repo->snapat) {
+                $value = "(checking)";
             } else {
                 $value = "(no such branch)";
             }
-        } else if ($repo) {
-            $value = "(checking)";
-        } else {
-            $value = "(no repo yet)";
-        }
-        if ($snaphash) {
-            $value = substr($snaphash, 0, 7) . " " . htmlspecialchars($snapcommitline);
         }
 
         $notes = array();
