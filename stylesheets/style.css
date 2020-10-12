@@ -2446,6 +2446,10 @@ tr.gtrow-partner {
 	margin-top: 0;
 	margin-bottom: 1rem;
 }
+.pa-dr pre {
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
 .pa-dr pre, .pa-dr blockquote, .pa-dr ol, .pa-dr ul {
 	margin-top: 0;
 }

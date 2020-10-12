@@ -3470,18 +3470,46 @@ function modify_landmark_fence(base) {
 }
 
 function modify_landmark_image(base) {
+    function fix(pi, file) {
+        return siteurl + "~" + encodeURIComponent(peteramati_uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + file;
+    }
     return function (tokens, idx, options, env, self) {
         var token = tokens[idx],
             srci = token.attrIndex("src"),
-            m = token.attrs[srci][1].match(/^https:\/\/github\.com\/([^\/]+\/[^\/]+)\/(?:blob|raw)\/([^\/]+)\/(.*)$/),
-            pi, m2;
-        if (m
+            src = token.attrs[srci][1],
+            pi, m, m2;
+        if (peteramati_uservalue
             && mdcontext
-            && (pi = mdcontext.closest(".pa-psetinfo"))
-            && (m2 = (pi.getAttribute("data-pa-repourl") || "").match(/^(?:https:\/\/github\.com\/|git@github\.com:)(.*?)\/?$/))
-            && m2[1] == m[1]
-            && pi.getAttribute("data-pa-branch") == m[2]) {
-            token.attrs[srci][1] = siteurl + "~" + encodeURIComponent(peteramati_uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + m[3];
+            && (pi = mdcontext.closest(".pa-psetinfo"))) {
+            if (!/\/\//.test(src)) {
+                var fileref = mdcontext.closest(".pa-filediff"),
+                    dir = fileref && fileref.hasAttribute("data-pa-file") ? fileref.getAttribute("data-pa-file").replace(/^(.*)\/[^\/]*$/, '$1') : "";
+                while (true) {
+                    if (src.startsWith("./")) {
+                        src = src.substring(2).replace(/^\/+/, "");
+                    } else if (src.startsWith("../") && dir !== "") {
+                        src = src.substring(3).replace(/^\/+/, "");
+                        dir = dir.replace(/(?:^|\/)[^\/]+\/*$/, "");
+                    } else if (src.startsWith("../") || src.startsWith("/")) {
+                        src = null;
+                        break;
+                    } else if ((m = src.match(/(^|\/+)[^\/]+\/\.\.(?:\/+|$)(.*)$/))) {
+                        src = m[1] + m[2];
+                    } else {
+                        break;
+                    }
+                }
+                if (src) {
+                    token.attrs[srci][1] = fix(pi, dir ? dir + "/" + src : src);
+                } else {
+                    token.attrs[srci][1] = "data:image/jpg,";
+                }
+            } if ((m = src.match(/^https:\/\/github\.com\/([^\/]+\/[^\/]+)\/(?:blob|raw)\/([^\/]+)\/(.*)$/))
+                  && (m2 = (pi.getAttribute("data-pa-repourl") || "").match(/^(?:https:\/\/github\.com\/|git@github\.com:)(.*?)\/?$/))
+                  && m2[1] == m[1]
+                  && pi.getAttribute("data-pa-branch") == m[2]) {
+                token.attrs[srci][1] = fix(pi, m[3]);
+            }
         }
         return fix_landmark_html(base(tokens, idx, options, env, self), token);
     };
