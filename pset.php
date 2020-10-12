@@ -15,7 +15,7 @@ if (isset($Qreq->u)
     && !($User = ContactView::prepare_user($Qreq->u))) {
     redirectSelf(array("u" => null));
 }
-assert($User == $Me || $Me->isPC);
+assert($User === $Me || $Me->isPC);
 Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
@@ -229,70 +229,46 @@ $xsep = ' <span class="barsep">&nbsp;·&nbsp;</span> ';
 
 // Top: user info
 
-function session_list_position($sl, $info) {
-    global $Qreq;
-    $p = array_search($info->user->contactId, $sl->ids);
-    if ($p !== false && isset($sl->psetids)) {
-        $reqcommit = $Qreq->commit;
-        $x = $p;
-        while (isset($sl->ids[$x])
-               && ($sl->ids[$x] !== $info->user->contactId
-                   || $sl->psetids[$x] !== $info->pset->id
-                   || ($sl->hashes[$x] !== "x"
-                       ? $sl->hashes[$x] !== substr($reqcommit, 0, strlen($sl->hashes[$x]))
-                       : !$reqcommit || $info->is_grading_commit())))
-            ++$x;
-        if (isset($sl->ids[$x]))
-            $p = $x;
+function session_list_link($where, PsetView $info, $isprev) {
+    $x = [];
+    if (preg_match('/\A~(.*?)\/pset\/(.*?)(\/[0-9a-f]+|)\z/', $where, $m)) {
+        $p = $info->conf->pset_by_key($m[2]) ?? $info->pset;
+        $t = htmlspecialchars(urldecode($m[1])) . " @" . htmlspecialchars($p->title);
+        $x = ["pset" => $p->urlkey, "u" => urldecode($m[1])];
+        if ($m[3] !== "") {
+            $t .= substr($m[3], 0, 8);
+            $x["commit"] = substr($m[3], 1);
+        }
+    } else if ($where[0] === "~" && strpos($where, "/") === false) {
+        $where = urldecode(substr($where, 1));
+        $t = htmlspecialchars($where);
+        $x = ["pset" => $info->pset->urlkey, "u" => $where];
+    } else {
+        return "";
     }
-    return $p;
-}
-
-function session_list_link($sl, $pos, $isprev, Contact $me, Contact $user) {
-    global $Conf, $Pset;
-    $pset = $Pset;
-    if (isset($sl->psetids) && isset($sl->psetids[$pos])
-        && ($p = $Conf->pset_by_id($sl->psetids[$pos])))
-        $pset = $p;
-    $u = $me->user_linkpart($user, $pset->anonymous && !!get($sl, "anon"));
-    $x = ["pset" => $pset->urlkey, "u" => $u];
-    if (isset($sl->hashes) && isset($sl->hashes[$pos])
-        && $sl->hashes[$pos] !== "x")
-        $x["commit"] = $sl->hashes[$pos];
-    $t = htmlspecialchars($x["u"]);
-    if (isset($sl->psetids))
-        $t .= " @" . htmlspecialchars($pset->title);
-    if (isset($x["commit"]))
-        $t .= "/" . $x["commit"];
-    return '<a href="' . hoturl("pset", $x) . '">'
+    return '<a href="' . hoturl("pset", $x) . '" class="track">'
         . ($isprev ? "« " : "") . $t . ($isprev ? "" : " »") . '</a>';
 }
 
-if ($Me->isPC && ($sl = $Conf->session_list())
-    && ($p = session_list_position($sl, $Info)) !== false
-    && ($p > 0 || $p < count($sl->ids) - 1)) {
-    $result = $Conf->qe("select contactId, firstName, lastName, email,
-        huid, anon_username, github_username, seascode_username, extension
-        from ContactInfo where contactId?a",
-        [$p > 0 ? $sl->ids[$p - 1] : -1, $p < count($sl->ids) - 1 ? $sl->ids[$p + 1] : -1]);
-    /** @var array{?Contact,?Contact} */
-    $links = [null, null];
-    while ($result && ($s = Contact::fetch($result, $Conf))) {
-        $links[$p > 0 && $sl->ids[$p - 1] == $s->contactId ? 0 : 1] = $s;
+function echo_session_list_links(PsetView $info) {
+    $sl = $info->conf->session_list();
+    if ($sl) {
+        if ($sl->prev ?? null) {
+            echo session_list_link($sl->prev, $info, true);
+        }
+        if (($sl->prev ?? null) && ($sl->next ?? null)) {
+            echo ' · ';
+        }
+        if ($sl->next ?? null) {
+            echo session_list_link($sl->next, $info, false);
+        }
     }
-    echo "<div class=\"has-hotlist\" style=\"color:gray;float:right\"",
-        " data-hotlist=\"", htmlspecialchars(json_encode_browser($sl)), "\">",
-        "<h3 style=\"margin-top:0\">";
-    if ($links[0]) {
-        echo session_list_link($sl, $p - 1, true, $Me, $links[0]);
-    }
-    if ($links[0] && $links[1]) {
-        echo ' · ';
-    }
-    if ($links[1]) {
-        echo session_list_link($sl, $p + 1, false, $Me, $links[1]);
-    }
-    echo "</h3></div>";
+}
+
+if ($Me->isPC && $Conf->session_list()) {
+    echo '<div class="pa-list-links">';
+    echo_session_list_links($Info);
+    echo '</div>';
 }
 
 ContactView::echo_heading($User);

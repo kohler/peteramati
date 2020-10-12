@@ -1166,13 +1166,16 @@ class PsetView {
 
 
     function hoturl_args($args = null) {
-        $xargs = array("pset" => $this->pset->urlkey,
-                       "u" => $this->viewer->user_linkpart($this->user));
-        if ($this->hash)
+        $xargs = ["pset" => $this->pset->urlkey,
+                  "u" => $this->viewer->user_linkpart($this->user)];
+        if ($this->hash) {
             $xargs["commit"] = $this->commit_hash();
-        if ($args)
-            foreach ((array) $args as $k => $v)
+        }
+        if ($args) {
+            foreach ((array) $args as $k => $v) {
                 $xargs[$k] = $v;
+            }
+        }
         return $xargs;
     }
 

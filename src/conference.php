@@ -82,6 +82,7 @@ class Conf {
     private $_save_msgs;
     /** @var ?array<string,array<int,true>> */
     private $_save_logs = false;
+    /** @var false|null|array<string,mixed> */
     private $_session_list = false;
     public $_session_handler;
 
@@ -1579,58 +1580,43 @@ class Conf {
     }
 
 
-    function encoded_session_list() {
-        if ($this->_session_list === false) {
-            $this->_session_list = null;
-
-            $found = null;
-            foreach ($_COOKIE as $k => $v) {
-                if (($k === "hotlist-info" && $found === null)
-                    || (str_starts_with($k, "hotlist-info-")
-                        && strpos($k, "_") === false
-                        && ($found === null || strnatcmp($k, $found) > 0)))
-                    $found = $k;
-            }
-
-            $found_text = null;
-            if ($found) {
-                $found_text = $_COOKIE[$found];
-                setcookie($found, "", Conf::$now - 86400, Navigation::site_path());
-                for ($i = 1; isset($_COOKIE["{$found}_{$i}"]); ++$i) {
-                    $found_text .= $_COOKIE["{$found}_{$i}"];
-                    setcookie("{$found}_{$i}", "", Conf::$now - 86400, Navigation::site_path());
-                }
-            }
-
-            if ($found_text) {
-                $j = json_decode($found_text);
-                if ($j === null)
-                    $j = json_decode(str_replace("'", ",", $found_text));
-                if (is_object($j) && isset($j->ids))
-                    $this->_session_list = $j;
-            }
+    private function _try_session_list($k) {
+        global $Qreq;
+        $t = $_COOKIE[$k];
+        $sp = strpos($t, " ");
+        if ($sp > 0 && ($x = json_decode(substr($t, $sp + 1)))) {
+            $l = $x;
+        } else {
+            $l = (object) [];
         }
-        return $this->_session_list;
+        $l->id = $sp > 0 ? substr($t, 0, $sp) : $t;
+        if (!isset($l->cur)
+            || (Navigation::page() === "pset"
+                && $Qreq->u
+                && $Qreq->pset
+                && ($l->cur === "~" . urlencode($Qreq->u) . "/pset/" . $Qreq->pset
+                    || ($Qreq->commit
+                        && $l->cur === "~" . urlencode($Qreq->u) . "/pset/" . $Qreq->pset . "/" . $Qreq->commit)))) {
+            return $this->_session_list = $l;
+        } else {
+            return null;
+        }
     }
 
     function session_list() {
-        if (($j = $this->encoded_session_list())) {
-            if (isset($j->ids)
-                && is_string($j->ids)
-                && preg_match('/\A[\s\d\']*\z/', $j->ids))
-                $j->ids = array_map(function ($x) { return (int) $x; },
-                                    preg_split('/[\s\']+/', $j->ids));
-            if (isset($j->psetids)
-                && is_string($j->psetids)
-                && preg_match('/\A[\s\d\']*\z/', $j->psetids))
-                $j->psetids = array_map(function ($x) { return (int) $x; },
-                                        preg_split('/[\s\']+/', $j->psetids));
-            if (isset($j->hashes)
-                && is_string($j->hashes)
-                && preg_match('/\A[\sA-Fa-fx\d\']*\z/', $j->hashes))
-                $j->hashes = preg_split('/[\s\']+/', $j->hashes);
+        if ($this->_session_list === false) {
+            $this->_session_list = null;
+            $found = null;
+            foreach ($_COOKIE as $k => $v) {
+                if (str_starts_with($k, "hotlist-info-")
+                    && strpos($k, "_") === false
+                    && ($found === null || strnatcmp($k, $found) > 0)
+                    && $this->_try_session_list($k)) {
+                    $found = $k;
+                }
+            }
         }
-        return $j;
+        return $this->_session_list;
     }
 
 
@@ -1710,6 +1696,20 @@ class Conf {
         $this->opt["javascripts"][] = $file;
     }
 
+    function set_cookie($name, $value, $expires_at) {
+        $opt = [
+            "expires" => $expires_at, "path" => Navigation::site_path(),
+            "domain" => $this->opt("sessionDomain") ?? "",
+            "secure" => $this->opt("sessionSecure") ?? false
+        ];
+        if (($samesite = $this->opt("sessionSameSite") ?? "Lax")) {
+            $opt["samesite"] = $samesite;
+        }
+        if (!hotcrp_setcookie($name, $value, $opt)) {
+            error_log(debug_string_backtrace());
+        }
+    }
+
     private function header_head($title, $id, $options) {
         global $Me, $ConfSitePATH;
         echo "<!DOCTYPE html>
@@ -1763,8 +1763,17 @@ class Conf {
 
         // <body>
         echo "</head>\n<body", ($id ? " id=\"$id\"" : "");
-        if (isset($options["body_class"]))
-            echo ' class="', $options["body_class"], '"';
+        $slist = $this->session_list();
+        if (($options["body_class"] ?? null) || $slist) {
+            echo ' class="', $options["body_class"] ?? "";
+            if ($slist) {
+                echo isset($options["body_class"]) ? " " : "", "has-hotlist";
+            }
+            echo '"';
+        }
+        if ($slist) {
+            echo ' data-hotlist="', htmlspecialchars($slist->id), '"';
+        }
         echo " onload=\"hotcrp_load()\" data-now=\"", Conf::$now, "\">\n";
 
         // jQuery
@@ -1810,8 +1819,6 @@ class Conf {
         if (session_id() !== "")
             Ht::stash_script("siteurl_postvalue=" . json_encode_browser(post_value()));
         Ht::stash_script("siteurl_cookie_params=" . json_encode_browser($p));
-        if (($list = $this->encoded_session_list()))
-            Ht::stash_script("hotcrp_list=" . json_encode_browser($list) . ";");
         if (self::$hoturl_defaults) {
             $urldefaults = [];
             foreach (self::$hoturl_defaults as $k => $v) {
@@ -1838,8 +1845,6 @@ class Conf {
         foreach ($this->opt("scripts") ?? [] as $file) {
             Ht::stash_html($this->make_script_file($file) . "\n");
         }
-
-        $this->encoded_session_list(); // clear cookie if set
 
         // initial load (JS's timezone offsets are negative of PHP's)
         Ht::stash_script("hotcrp_load.time(" . (-date("Z", Conf::$now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
@@ -1935,7 +1940,7 @@ class Conf {
                         $this->msg($t, $m[1]);
                     }
                 }
-                hotcrp_setcookie("hotcrpmessage", "", ["expires" => Conf::$now - 3600]);
+                $this->set_cookie("hotcrpmessage", "", Conf::$now - 3600);
             }
         }
         echo "</div>\n";

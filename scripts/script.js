@@ -2221,56 +2221,165 @@ $(render_text.on_page);
 // list management, conflict management
 (function ($) {
 var cookie_set_at;
-function set_cookie(info) {
-    if (info) {
-        cookie_set_at = (new Date).getTime();
-        var p = ";max-age=20", m;
-        if (siteurl && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
-            p += "; path=" + m[1];
-        if (typeof info === "object")
-            info = JSON.stringify(info);
-        if (info.indexOf("'") < 0)
-            info = info.replace(/,/g, "'");
-        info = encodeURIComponent(info);
-        var pos = 0, suffix = 0;
-        while (pos + 3000 < info.length) {
-            var epos = pos + 3000;
-            if (info.charAt(epos - 1) === "%")
-                --epos;
-            else if (info.charAt(epos - 2) === "%")
-                epos -= 2;
-            document.cookie = "hotlist-info-" + cookie_set_at + (suffix ? "_" + suffix : "") + "=" + info.substring(pos, epos) + p;
-            pos = epos;
-            ++suffix;
-        }
-        document.cookie = "hotlist-info-" + cookie_set_at + (suffix ? "_" + suffix : "") + "=" + info.substring(pos) + p;
+function update_digest(info) {
+    var add = typeof info === "string" ? 1 : 0,
+        digests = wstorage.site_json(false, "list_digests") || [],
+        found = -1, now = now_msec();
+    for (var i = 0; i < digests.length; ++i) {
+        var digest = digests[i];
+        if (digest[add] === info)
+            found = i;
+        else if (digest[2] < now - 30000) {
+            digests.splice(i, 1);
+            --i;
+        } else if (now <= digest[0])
+            now = digest[0] + 1;
     }
+    if (found >= 0)
+        digests[found][2] = now;
+    else if (add) {
+        digests.push([now, info, now]);
+        found = digests.length - 1;
+    }
+    wstorage.site(false, "list_digests", digests);
+    if (found >= 0)
+        return digests[found][1 - add];
+    else
+        return false;
 }
-function is_listable(href) {
-    return /(?:^|\/)pset(?:|\.php)(?:$|\/)/.test(href.substring(siteurl.length));
+function make_digest(info) {
+    var digest = update_digest(info);
+    return digest ? "list" + digest : info;
 }
-function add_list() {
-    var href = this.getAttribute(this.tagName === "FORM" ? "action" : "href");
+function resolve_digest(info) {
+    var xinfo, m;
+    if ((m = /^list(\d+)(?=\s|$)/.exec(info))
+        && (xinfo = update_digest(+m[1])))
+        return xinfo;
+    else
+        return info;
+}
+function set_prevnext(info, sitehref) {
+    var m = /(?:^|\/)(~[^\/]+)\/pset(?:|\.php)\/([^\/]+)((?:\/[0-9a-f]+)?)(?=[\/?#]|$)/.exec(sitehref), want1, want2;
+    if (m) {
+        info = JSON.parse(info);
+        if (!info.pset) {
+            want2 = m[1] + "/pset/" + m[2];
+            want1 = want2 + m[3];
+        } else if (info.pset === m[2]) {
+            want1 = want2 = m[1];
+        } else {
+            return "";
+        }
+        var idx = info.items.indexOf(want1);
+        if (idx < 0 && want2 !== want1)
+            idx = info.items.indexOf(want2);
+        if (idx >= 0) {
+            return " " + JSON.stringify({
+                cur: m[1] + "/pset/" + m[2],
+                prev: idx === 0 ? null : info.items[idx-1],
+                next: idx === info.items.length - 1 ? null : info.items[idx+1]
+            });
+        }
+    }
+    return "";
+}
+function set_cookie(info, sitehref) {
+    info = resolve_digest(info);
+    var digest = make_digest(info);
+    if (sitehref && /(?:^|\/)pset(?:|\.php)\//.test(sitehref))
+        digest += set_prevnext(info, sitehref);
+    cookie_set_at = now_msec();
+    var p = "; Max-Age=20", m;
+    if (siteurl && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
+        p += "; Path=" + m[1];
+    document.cookie = "hotlist-info-" + cookie_set_at + "=" + encodeURIComponent(digest) + siteurl_cookie_params + p;
+}
+function is_listable(sitehref) {
+    return /(?:^|\/)pset(?:|\.php)(?:$|\/)/.test(sitehref);
+}
+function find_hotlist(e) {
+    var hl, $hl;
+    if ((hl = e.closest(".has-hotlist")))
+        return hl;
+    else if (e.tagName === "FORM"
+             && ($hl = $(e).find(".has-hotlist")).length === 1)
+        return $hl[0];
+    else
+        return null;
+}
+function handle_list(e, href) {
+    var hl, sitehref;
     if (href
         && href.substring(0, siteurl.length) === siteurl
-        && (this.tagName === "FORM" || is_listable(href))) {
-        var $hl = $(this).closest(".has-hotlist");
-        if ($hl.length === 0 && this.tagName === "FORM")
-            $hl = $(this).find(".has-hotlist");
-        if ($hl.length === 1)
-            set_cookie($hl[0].getAttribute("data-hotlist"));
+        && is_listable((sitehref = href.substring(siteurl.length)))
+        && (hl = e.closest(".has-hotlist"))) {
+        var info = hl.getAttribute("data-hotlist");
+        if (!info) {
+            var event = jQuery.Event("pa-hotlist");
+            $(hl).trigger(event);
+            info = event.hotlist;
+            if (info && typeof info !== "string")
+                info = JSON.stringify(info);
+        }
+        info && set_cookie(info, sitehref);
     }
 }
 function unload_list() {
-    if (hotcrp_list && (!cookie_set_at || cookie_set_at + 10 < (new Date).getTime()))
-        set_cookie(hotcrp_list);
+    var hl = document.body.getAttribute("data-hotlist");
+    if (hl && (!cookie_set_at || cookie_set_at + 3 < now_msec()))
+        set_cookie(hl, location.href);
 }
-function prepare() {
-    $(document).on("click", "a", add_list);
-    $(document).on("submit", "form", add_list);
-hotcrp_list && $(window).on("beforeunload", unload_list);
+
+function default_click(evt) {
+    var base = location.href;
+    if (location.hash) {
+        base = base.substring(0, base.length - location.hash.length);
+    }
+    if (this.href.substring(0, base.length + 1) === base + "#") {
+        if (jump_hash(this.href)) {
+            push_history_state(this.href);
+            evt.preventDefault();
+        }
+        return true;
+    } else if (after_outstanding()) {
+        after_outstanding(make_link_callback(this));
+        return true;
+    } else {
+        return false;
+    }
 }
-prepare();
+
+$(document).on("click", "a", function (evt) {
+    if (!hasClass(this, "ui")) {
+        if (!event_key.is_default_a(evt)
+            || this.target
+            || !default_click.call(this, evt)) {
+            handle_list(this, this.getAttribute("href"));
+        }
+    }
+});
+
+$(document).on("submit", "form", function (evt) {
+    if (hasClass(this, "ui-submit")) {
+        handle_ui.call(this, evt);
+    } else {
+        handle_list(this, this.getAttribute("action"));
+    }
+});
+
+$(window).on("beforeunload", unload_list);
+
+$(function () {
+    // resolve list digests
+    $(".has-hotlist").each(function () {
+        var info = this.getAttribute("data-hotlist");
+        if (info && info.startsWith("list") && (info = resolve_digest(info))) {
+            this.setAttribute("data-hotlist", info);
+        }
+    });
+});
+
 })(jQuery);
 
 
@@ -6844,7 +6953,7 @@ function pa_render_pset_table(pconf, data) {
         pset: {
             th: '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>',
             td: function (s) {
-                return '<td class="gt-pset"><a href="' + escaped_href(s) + '">' +
+                return '<td class="gt-pset"><a href="' + escaped_href(s) + '" class="track">' +
                    escape_entities(peteramati_psets[s.psetid].title) +
                    (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>';
             },
@@ -6999,9 +7108,9 @@ function pa_render_pset_table(pconf, data) {
                 if (!s.repo)
                     txt = '';
                 else if (anonymous)
-                    txt = '<a href="#" onclick="return pa_anonymize_linkto(' + escape_entities(JSON.stringify(s.repo)) + ',event)">repo</a>';
+                    txt = '<a href="" onclick="return pa_anonymize_linkto(' + escape_entities(JSON.stringify(s.repo)) + ',event)">repo</a>';
                 else
-                    txt = '<a href="' + escape_entities(s.repo) + '">repo</a>';
+                    txt = '<a class="track" href="' + escape_entities(s.repo) + '">repo</a>';
                 if (s.repo_broken)
                     txt += ' <strong class="err">broken</strong>';
                 if (s.repo_unconfirmed)
@@ -7209,8 +7318,8 @@ function pa_render_pset_table(pconf, data) {
         return escape_entities(hoturl("pset", url_gradeparts(s)));
     }
     function render_student_link(t, s) {
-        return '<a href="' + escaped_href(s) +
-            (s.dropped ? '" class="gt-dropped' : '') + '">' + t + '</a>';
+        return '<a href="'.concat(escaped_href(s), '" class="track',
+            s.dropped ? ' gt-dropped">' : '">', t, '</a>');
     }
     function render_username_td(s) {
         var un;
@@ -7226,9 +7335,9 @@ function pa_render_pset_table(pconf, data) {
     function render_name(s, last_first) {
         if (s.first != null && s.last != null) {
             if (last_first)
-                return s.last + ", " + s.first;
+                return s.last.concat(", ", s.first);
             else
-                return s.first + " " + s.last;
+                return s.first.concat(" ", s.last);
         } else if (s.first != null) {
             return s.first;
         } else if (s.last != null) {
@@ -7264,31 +7373,19 @@ function pa_render_pset_table(pconf, data) {
         return p.__nickname;
     }
 
-    function set_hotlist($b) {
-        var j = {sort: sort.f}, i, l, p;
-        if (anonymous)
-            j.anon = true;
-        l = [];
-        for (i = 0; i < data.length; ++i)
-            l.push(data[i].uid);
-        j.ids = l.join("'");
-        if (flagged) {
-            p = [];
-            l = [];
-            for (i = 0; i < data.length; ++i) {
-                p.push(data[i].psetid);
-                if (data[i].is_grade) {
-                    l.push("x");
-                } else if (data[i].hash) {
-                    l.push(data[i].hash.substr(0, 7));
-                } else {
-                    l.push("");
-                }
+    function make_hotlist(event) {
+        var j = [];
+        for (var i = 0; i < data.length; ++i) {
+            var s = data[i],
+                t = "~".concat(encodeURIComponent(ukey(s)));
+            if (flagged) {
+                t = t.concat("/pset/", peteramati_psets[s.psetid].urlkey);
+                if (s.hash)
+                    t = t.concat("/", s.hash);
             }
-            j.psetids = p.join("'");
-            j.hashes = l.join("'");
+            j.push(t);
         }
-        $b.attr("data-hotlist", JSON.stringify(j));
+        event.hotlist = {pset: flagged ? null : pconf.key, items: j};
     }
     function make_rmap($j) {
         var rmap = {}, tr = $j.find("tbody")[0].firstChild, last = null;
@@ -7355,7 +7452,6 @@ function pa_render_pset_table(pconf, data) {
     function resort() {
         resort_table($j);
         $overlay && resort_table($overlay);
-        set_hotlist($j.children("tbody"));
         slist_input && assign_slist();
         wstorage.site(true, "pa-pset" + pconf.id + "-table", JSON.stringify(sort));
     }
@@ -8006,7 +8102,6 @@ function pa_render_pset_table(pconf, data) {
         if (a.length !== 0) {
             $(a.join('')).appendTo(tbody);
         }
-        set_hotlist($(tbody));
         slist_input && assign_slist();
 
         if (tfixed && window.IntersectionObserver) {
@@ -8023,6 +8118,7 @@ function pa_render_pset_table(pconf, data) {
             return spos ? render_name_text(dmap[spos]) : null;
         }
     });
+    $j.children("tbody").on("pa-hotlist", make_hotlist);
 }
 
 

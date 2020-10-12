@@ -123,6 +123,15 @@ td.spanner {
 
 
 /* generic horizontal styles */
+:link, :visited, .btn-link, a.ui {
+	color: #004daa;
+}
+.track:visited {
+	color: #660099;
+}
+a:hover, a.ui:hover, .btn-link:hover {
+	color: #c45500;
+}
 a.q, a.u, a.qx {
 	color: black;
 }
@@ -1114,7 +1123,6 @@ select.has-warning {
 	border: 1px solid #855c04;
 }
 
-
 div.helpside {
 	float: right;
 	width: 20%;
@@ -1184,11 +1192,11 @@ textarea[name=comment] {
 	min-height: 5em;
 }
 
-div.prevpaperlink, table.floatleft {
+table.floatleft {
 	float: left;
 	margin: 0;
 }
-div.nextpaperlink, div.floatright {
+div.floatright {
 	float: right;
 	margin: 0;
 }
@@ -1198,12 +1206,6 @@ h2 {
 	font-size: larger;
 }
 
-tr.pt_actions td, tr.pt_outcome td {
-	white-space: nowrap;
-}
-tr.pt_paper input {
-	margin-top: 4px;
-}
 span.author, span.conflict {
 	font-weight: bold;
 	color: #ff0000;
@@ -1228,17 +1230,6 @@ tr.pt_topics td.entry, tr.pt_actions td,
 td.plholder, tr.rev_actions td.entry, tr.pt_reviews td.entry,
 tr.pt_conflict_ass td.entry, tr.propass td.entry {
 	vertical-align: top;
-}
-span.asspref, span.asspref1, span.asspref-1 {
-	font-size: 69%;
-	font-weight: normal;
-	white-space: nowrap;
-}
-span.asspref1 {
-	color: #008000;
-}
-span.asspref-1 {
-	color: #800000;
 }
 
 .pctbname, .pctbname-1, .pctbname-2, .pctbname-3,
@@ -2145,6 +2136,11 @@ td.mhcb {
 
 
 /* peteramati */
+.pa-list-links {
+	float: right;
+	color: gray;
+	font-weight: 500;
+}
 .pa-p {
 	display: flex;
 	align-items: baseline;
