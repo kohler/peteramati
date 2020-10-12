@@ -213,33 +213,39 @@ class PsetView {
         }
     }
 
+    /** @return ?CommitRecord */
     function latest_commit() {
         $cs = $this->repo ? $this->repo->commits($this->pset, $this->branch) : [];
         reset($cs);
         return current($cs);
     }
 
+    /** @return ?non-empty-string */
     function latest_hash() {
         $lc = $this->latest_commit();
-        return $lc ? $lc->hash : false;
+        return $lc ? $lc->hash : null;
     }
 
+    /** @return bool */
     function is_latest_commit() {
         return $this->hash && $this->hash === $this->latest_hash();
     }
 
+    /** @return ?CommitRecord */
     function derived_handout_commit() {
         if ($this->derived_handout_commit === false) {
             $this->derived_handout_commit = null;
             $hbases = $this->pset->handout_commits();
             $seen_hash = !$this->hash;
             foreach ($this->recent_commits() as $c) {
-                if ($c->hash === $this->hash)
+                if ($c->hash === $this->hash) {
                     $seen_hash = true;
+                }
                 if (isset($hbases[$c->hash])) {
                     $this->derived_handout_commit = $c;
-                    if ($seen_hash)
+                    if ($seen_hash) {
                         break;
+                    }
                 }
             }
         }

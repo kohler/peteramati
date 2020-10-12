@@ -426,13 +426,13 @@ function echo_commit($info) {
         $remarks[] = [true, "No commit has been marked for grading."];
     } else if (!$info->is_grading_commit() && $info->grading_hash()) {
         $remarks[] = [true, "This is not "
-                      . "<a class=\"uu\" href=\"" . $info->hoturl("pset", array("commit" => $info->grading_hash())) . "\">the commit currently marked for grading</a>"
-                      . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->grading_hash())) . "\">see diff</a>)</span>."];
+                      . "<a class=\"uu\" href=\"" . $info->hoturl("pset", ["commit" => $info->grading_hash()]) . "\">the commit currently marked for grading</a>"
+                      . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", ["commit1" => $info->grading_hash()]) . "\">see diff</a>)</span>."];
     }
     if (!$info->is_latest_commit()) {
         $remarks[] = [true, "This is not "
-                      . "<a class=\"uu\" href=\"" . $info->hoturl("pset", array("commit" => $info->latest_hash())) . "\">the latest commit</a>"
-                      . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", array("commit1" => $info->latest_hash())) . "\">see diff</a>)</span>."];
+                      . "<a class=\"uu\" href=\"" . $info->hoturl("pset", ["commit" => $info->latest_hash()]) . "\">the latest commit</a>"
+                      . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", ["commit1" => $info->latest_hash()]) . "\">see diff</a>)</span>."];
     }
     $lhd = $info->late_hours_data();
     if ($lhd

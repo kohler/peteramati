@@ -6,7 +6,7 @@
 class CommitRecord {
     /** @var int */
     public $commitat;
-    /** @var string */
+    /** @var non-empty-string */
     public $hash;
     /** @var string */
     public $subject;
@@ -18,7 +18,7 @@ class CommitRecord {
     public $_is_handout_pset;
     const HANDOUTHEAD = "*handout*";
     /** @param int $commitat
-     * @param string $hash
+     * @param non-empty-string $hash
      * @param string $subject
      * @param ?string $fromhead */
     function __construct($commitat, $hash, $subject, $fromhead = null) {
