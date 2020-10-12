@@ -439,30 +439,15 @@ if ($Me->isPC && $Qreq->post_ok() && $Qreq->report) {
 
 
 function qreq_usernames(Qrequest $qreq) {
-    global $Conf;
     $users = [];
     foreach ($qreq as $k => $v) {
-        if (substr($k, 0, 4) === "s61_"
+        if (substr($k, 0, 2) === "s:"
             && $v
-            && ($uname = urldecode(substr($k, 4))))
+            && ($uname = urldecode(substr($k, 2))))
             $users[] = $uname;
     }
-    if (empty($users) && ($sl = $Conf->session_list())) {
-        $by_id = [];
-        $result = $Conf->qe("select contactId, email, github_username, anon_username from ContactInfo where contactId?a", $sl->ids);
-        while (($row = $result->fetch_row())) {
-            $by_id[$row[0]] = $row;
-        }
-        Dbl::free($result);
-
-        $anonymous = !!$qreq->anonymous;
-        foreach ($sl->ids as $id) {
-            if (isset($by_id[$id])) {
-                $u = $by_id[$id];
-                $users[] = $anonymous ? $u[3] : ($u[2] ? : $u[1]);
-            }
-        }
-    }
+    if (empty($users) && $qreq->slist)
+        $users = preg_split('/\s+/', $qreq->slist, -1, PREG_SPLIT_NO_EMPTY);
     return $users;
 }
 

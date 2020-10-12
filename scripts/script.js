@@ -6811,7 +6811,7 @@ function pa_anonymize_linkto(link, event) {
 
 function pa_render_pset_table(pconf, data) {
     var $j = $(this), table_width = 0, dmap = [],
-        $overlay = null, username_col, name_col,
+        $overlay = null, username_col, name_col, slist_input,
         $gdialog, dialog_su,
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
@@ -7183,6 +7183,10 @@ function pa_render_pset_table(pconf, data) {
                 name_col = col[i];
             }
         }
+        if ($j[0].closest("form")) {
+            slist_input = $('<input name="slist" type="hidden" value="">')[0];
+            $j.after(slist_input);
+        }
     }
 
     function ukey(s) {
@@ -7246,7 +7250,7 @@ function pa_render_pset_table(pconf, data) {
     }
     function render_checkbox_name(s) {
         var u = anonymous ? s.anon_username || s.username : s.username;
-        return "s61_" + encodeURIComponent(u).replace(/\./g, "%2E");
+        return "s:" + encodeURIComponent(u).replace(/\./g, "%2E");
     }
     function grader_name(p) {
         if (!p.__nickname) {
@@ -7304,16 +7308,17 @@ function pa_render_pset_table(pconf, data) {
             rmap = make_rmap($j),
             i, j, trn = 0, was_boringness = false,
             last = tb.firstChild;
-        for (i = 0; i < data.length; ++i) {
+        for (i = 0; i !== data.length; ++i) {
+            var s = data[i];
             while ((j = last) && j.className === "gt-boring") {
                 last = last.nextSibling;
                 tb.removeChild(j);
             }
-            if (data[i].boringness !== was_boringness && was_boringness !== false) {
+            if (s.boringness !== was_boringness && was_boringness !== false) {
                 tb.insertBefore($('<tr class="gt-boring"><td colspan="' + ncol + '"><hr></td></tr>')[0], last);
             }
-            was_boringness = data[i].boringness;
-            var tr = rmap[data[i]._spos];
+            was_boringness = s.boringness;
+            var tr = rmap[s._spos];
             for (j = 0; j < tr.length; ++j) {
                 if (last !== tr[j])
                     tb.insertBefore(tr[j], last);
@@ -7340,10 +7345,18 @@ function pa_render_pset_table(pconf, data) {
             });
         }
     }
+    function assign_slist() {
+        var j = [];
+        for (var i = 0; i !== data.length; ++i) {
+            j.push(ukey(data[i]));
+        }
+        slist_input.value = j.join(" ");
+    }
     function resort() {
         resort_table($j);
         $overlay && resort_table($overlay);
         set_hotlist($j.children("tbody"));
+        slist_input && assign_slist();
         wstorage.site(true, "pa-pset" + pconf.id + "-table", JSON.stringify(sort));
     }
     function make_umap() {
@@ -7994,6 +8007,7 @@ function pa_render_pset_table(pconf, data) {
             $(a.join('')).appendTo(tbody);
         }
         set_hotlist($(tbody));
+        slist_input && assign_slist();
 
         if (tfixed && window.IntersectionObserver) {
             make_overlay_observer();
