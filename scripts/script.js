@@ -2341,10 +2341,6 @@ function default_click(evt) {
         base = base.substring(0, base.length - location.hash.length);
     }
     if (this.href.substring(0, base.length + 1) === base + "#") {
-        if (jump_hash(this.href)) {
-            push_history_state(this.href);
-            evt.preventDefault();
-        }
         return true;
     } else if (after_outstanding()) {
         after_outstanding(make_link_callback(this));
