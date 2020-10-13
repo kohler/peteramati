@@ -5565,7 +5565,7 @@ function normalize_svg_path(s) {
             preva = res.length ? res[res.length - 1] : null;
             if (copen) {
                 if (cx != cx0 || cy != cy0)
-                    res.push(["L", cx0, cy0]);
+                    res.push(["L", cx, cy, cx0, cy0]);
                 res.push(["Z"]);
                 copen = false;
             }
@@ -5626,23 +5626,24 @@ function normalize_svg_path(s) {
 
         // process command
         if (!copen && ch !== "M") {
-            res.push(["M", cx, cy]);
+            if (res.length !== 0 && res[res.length - 1][0] !== "Z")
+                res.push(["M"]);
             copen = true;
         }
         if (ch === "M") {
             cx0 = a[1];
             cy0 = a[2];
             copen = false;
-        } else if (ch === "L")
+        } else if (ch === "L") {
             res.push(["L", cx, cy, a[1], a[2]]);
-        else if (ch === "C")
+        } else if (ch === "C") {
             res.push(["C", cx, cy, a[1], a[2], a[3], a[4], a[5], a[6]]);
-        else if (ch === "Q")
+        } else if (ch === "Q") {
             res.push(["C", cx, cy,
                       cx + 2 * (a[1] - cx) / 3, cy + 2 * (a[2] - cy) / 3,
                       a[3] + 2 * (a[1] - a[3]) / 3, a[4] + 2 * (a[2] - a[4]) / 3,
                       a[3], a[4]]);
-        else {
+        } else {
             // XXX should render "A" as a bezier
             if (++normalize_path_complaint == 1)
                 log_jserror("bad normalize_svg_path " + ch);
