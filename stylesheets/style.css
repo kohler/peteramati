@@ -2449,6 +2449,9 @@ tr.gtrow-partner {
 .pa-dr pre, .pa-dr blockquote, .pa-dr ol, .pa-dr ul {
 	margin-top: 0;
 }
+.pa-dr pre.partial {
+	margin-bottom: 0;
+}
 .pa-dr > p,
 .pa-dr > h1, .pa-dr > h2, .pa-dr > h3, .pa-dr > h4, .pa-dr > h5, .pa-dr > h6,
 .pa-dr > ul, .pa-dr > ol {

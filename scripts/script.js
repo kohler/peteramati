@@ -87,7 +87,11 @@ if (!String.prototype.endsWith) {
         return this.substring(this_len - search.length, this_len) === search;
     };
 }
-
+if (!String.prototype.trimStart) {
+    String.prototype.trimStart = function () {
+        return this.replace(/^[\s\uFEFF\xA0]+/, '');
+    };
+}
 
 
 
@@ -2207,7 +2211,7 @@ render_text.add_format({
     highlight: function (str, lang) {
         if (lang && hljs.getLanguage(lang)) {
             try {
-                return hljs.highlight(lang, str).value;
+                return hljs.highlight(lang, str, true).value;
             } catch (ex) {
             }
         }
@@ -2473,7 +2477,9 @@ function pa_diff_locate(tr, down) {
         do {
             nearline = nearline.nextSibling;
         } while (nearline
-                 && (nearline.nodeType !== Node.ELEMENT_NODE || hasClass(nearline, "pa-gn")));
+                 && (nearline.nodeType !== Node.ELEMENT_NODE
+                     || hasClass(nearline, "pa-gn")
+                     || !nearline.offsetParent));
         if (nearline && hasClass(nearline, "pa-gw")) {
             result.notetr = nearline;
         }
@@ -2557,12 +2563,27 @@ function pa_render_note(note, transition) {
             tr = tr.parentElement;
         }
         var ntr = tr.nextSibling;
-        while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE || hasClass(ntr, "pa-gn"))) {
+        while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE
+                       || hasClass(ntr, "pa-gn"))) {
             tr = ntr;
             ntr = ntr.nextSibling;
         }
         $tr = $('<div class="pa-dl pa-gw"><div class="pa-notebox"></div></div>').insertAfter(tr);
         tr = $tr[0];
+        var tp = pa_diff_traverse(tr, false, 1), lineid, e, lm, dash;
+        if (tp) {
+            if (hasClass(tp, "pa-gd")) {
+                lineid = "a" + tp.firstChild.getAttribute("data-landmark");
+            } else if (hasClass(tp, "pa-gr")
+                       && (e = tp.lastChild.firstChild)
+                       && (lm = e.getAttribute("data-landmark"))
+                       && (dash = lm.indexOf("-")) >= 0) {
+                lineid = "b" + lm.substring(dash + 1);
+            } else {
+                lineid = "b" + tp.firstChild.nextSibling.getAttribute("data-landmark");
+            }
+            tr.setAttribute("data-landmark", lineid);
+        }
     }
     if (arguments.length == 0) {
         return tr;
@@ -2706,7 +2727,9 @@ function render_form($tr, note, transition) {
 function anal_tr() {
     var elt;
     if (curanal && (elt = pa_ensureline(curanal.ufile, curanal.lineid))) {
-        return elt.closest(".pa-dl");
+        for (elt = elt.closest(".pa-dl"); elt && !elt.offsetParent; )
+            elt = elt.previousSibling;
+        return elt;
     } else {
         return null;
     }
@@ -2827,7 +2850,9 @@ window.pa_save_note = function (text) {
         file = table.getAttribute("data-pa-file"),
         tr = pa_diff_traverse(this, false, 1),
         data, lineid;
-    if (hasClass(tr, "pa-gd")) {
+    if (this.hasAttribute("data-landmark")) {
+        lineid = this.getAttribute("data-landmark");
+    } else if (hasClass(tr, "pa-gd")) {
         lineid = "a" + tr.firstChild.getAttribute("data-landmark");
     } else {
         lineid = "b" + tr.firstChild.nextSibling.getAttribute("data-landmark");
@@ -3630,7 +3655,7 @@ function make_markdownit() {
             highlight: function (str, lang) {
                 if (lang && hljs.getLanguage(lang)) {
                     try {
-                        return hljs.highlight(lang, str).value;
+                        return hljs.highlight(lang, str, true).value;
                     } catch (ex) {
                     }
                 }
@@ -3674,6 +3699,57 @@ function fix_list_item(d) {
     return d;
 }
 
+function split_pre(e, at, original, newlines) {
+    e.splitText(at);
+    while (e.tagName !== "PRE") {
+        var p = e.parentNode;
+        if (e !== p.lastChild) {
+            var pp = document.createElement(p.tagName);
+            p.className && (pp.className = p.className);
+            while (pp.lastChild !== e) {
+                pp.appendChild(p.firstChild);
+            }
+            e = pp;
+            if (p.parentNode) {
+                p.parentNode.insertBefore(pp, p);
+            }
+        } else {
+            e = p;
+        }
+    }
+    if (e !== original) {
+        addClass(e, "partial");
+        var fl = original.getAttribute("data-landmark").split("-");
+        e.setAttribute("data-landmark", fl[0] + "-" + (+fl[0] + newlines - 1));
+        original.setAttribute("data-landmark", (+fl[0] + newlines) + "-" + fl[1]);
+    }
+    return e;
+}
+
+function fix_pre(d) {
+    if (d && d.hasAttribute("data-landmark")) {
+        var e = d.firstChild, n, p, m;
+        while (e !== d) {
+            if (e.nodeType === 3) {
+                if ((p = e.textContent.indexOf("\n")) >= 0) {
+                    return split_pre(e, p + 1, d, 1);
+                }
+                n = e.nextSibling;
+            } else if (e.nodeType === 1) {
+                n = e.firstChild || e.nextSibling;
+            } else {
+                n = e.nextSibling;
+            }
+            while (!n && e !== d) {
+                if ((e = e.parentNode) === d)
+                    return d;
+                n = e.nextSibling;
+            }
+            e = n;
+        }
+    }
+}
+
 return function () {
     // collect content
     var e = this.firstChild, l = [], lineno = 1, this_lineno;
@@ -3709,6 +3785,8 @@ return function () {
             continue;
         } else if (d.tagName === "OL" || d.tagName === "UL") {
             d = fix_list_item(d);
+        } else if (d.tagName === "PRE") {
+            d = fix_pre(d);
         } else if (d.tagName === "P"
                    && d.firstChild.nodeType === 1
                    && d.firstChild.tagName === "IMG"
@@ -3725,7 +3803,7 @@ return function () {
 
         var lm = d.getAttribute("data-landmark");
         if (lm) {
-            var l1 = parseInt(lm),
+            var l1 = parseInt(lm) + (d.tagName === "PRE"),
                 dash = lm.indexOf("-"),
                 l2 = dash >= 0 ? parseInt(lm.substring(dash + 1)) : l1;
             while (e) {
@@ -3735,16 +3813,16 @@ return function () {
                 }
                 e = e.nextSibling;
             }
-            lb.setAttribute("data-landmark", l2);
-            var klass = 0;
-            while (e) {
-                if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-                    if (+e.firstChild.nextSibling.getAttribute("data-landmark") >= l2) {
+            lb.setAttribute("data-landmark", l1);
+            var klass = 0, ee = e;
+            while (ee) {
+                if (hasClass(ee, "pa-gi") || hasClass(ee, "pa-gc")) {
+                    if (+ee.firstChild.nextSibling.getAttribute("data-landmark") >= l2) {
                         break;
                     }
-                    klass |= hasClass(e, "pa-gi") ? 1 : 2;
+                    klass |= hasClass(ee, "pa-gi") ? 1 : 2;
                 }
-                e = e.nextSibling;
+                ee = ee.nextSibling;
             }
             lp.className += klass === 2 ? " pa-gc" : " pa-gi";
         }
@@ -6071,7 +6149,7 @@ PAGradeGraph.prototype.append_pdf = function (kde, klass) {
         }
         data.push("C", x1, y1, x2, y2, xs[i2], ys[i2]);
     }
-    for (i = 0; i !== bins.length; ++i) {
+    for (var i = 0; i !== bins.length; ++i) {
         var x = xax(this.min + i * kde.binwidth),
             y = yax(bins[i] * nrdy);
         if (i === 0) {
