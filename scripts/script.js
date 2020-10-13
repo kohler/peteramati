@@ -5633,36 +5633,35 @@ function closestPoint(pathNode, point, inbest) {
     }
 
     var pathLength = pathNode.getTotalLength(),
-        precision = Math.max(pathLength / svg_path_number_of_items(pathNode) * .125, 3),
-        best, bestLength, bestDistance2 = Infinity;
+        precision = Math.max(pathLength / svg_path_number_of_items(pathNode) / 8, 3),
+        best, bestLength, bestDistance2 = Infinity, sl;
 
     function check(pLength) {
-        var p = pathNode.getPointAtLength(pLength);
-        var dx = point[0] - p.x, dy = point[1] - p.y, d2 = dx * dx + dy * dy;
+        var p = pathNode.getPointAtLength(pLength),
+            dx = point[0] - p.x, dy = point[1] - p.y, d2 = dx * dx + dy * dy;
         if (d2 < bestDistance2) {
             best = [p.x, p.y];
-            best.pathNode = pathNode;
             bestLength = pLength;
             bestDistance2 = d2;
-            return true;
-        } else
-            return false;
+        }
     }
 
     // linear scan for coarse approximation
-    for (var sl = 0; sl <= pathLength; sl += precision)
+    for (sl = 0; sl <= pathLength; sl += precision)
         check(sl);
 
     // binary search for precise estimate
-    precision *= .5;
-    while (precision > .5) {
-        if (!((sl = bestLength - precision) >= 0 && check(sl))
-            && !((sl = bestLength + precision) <= pathLength && check(sl)))
-            precision *= .5;
-    }
+    do {
+        sl = bestLength - precision / 2;
+        sl >= 0 && check(sl);
+        sl += precision;
+        sl <= pathLength && check(sl);
+        precision /= 2;
+    } while (precision > 0.5);
 
     if (best) {
         best.distance = Math.sqrt(bestDistance2);
+        best.pathNode = pathNode;
         best.pathLength = bestLength;
     }
     if (best && (!inbest || inbest.distance >= best.distance - 0.01)) {
