@@ -6315,7 +6315,7 @@ PAGradeGraph.prototype.hover = function () {
         var ha = that.hoveranno;
         if (pt.pathNode) {
             if (!ha) {
-                ha = that.hoveranno = [that.star_annotation([4, 10], null, null, "pa-gg-mark hl-hover")];
+                ha = that.hoveranno = [that.star_annotation([4, 10], null, null, "pa-gg-hover-mark")];
                 that.gg.appendChild(ha[0]);
 
                 var e = mksvg("path");

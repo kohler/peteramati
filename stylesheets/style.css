@@ -2883,7 +2883,8 @@ textarea.pa-gradevalue {
 	fill: #ff5522;
 	color: #ff5522;
 }
-.hl-hover {
+.pa-gg-hover-mark {
+	stroke: #ffffff;
 	stroke-width: 1.5;
 	fill: #ff5522;
 	stroke-linejoin: bevel;
