@@ -5677,7 +5677,7 @@ function pathNodeMayBeNearer(pathNode, point, dist) {
     // check path
     var npsl = normalize_svg_path(pathNode);
     var l, t, r, b;
-    for (var i = 0; i < npsl.length; ++i) {
+    for (var i = 0; i !== npsl.length; ++i) {
         var item = npsl[i];
         if (item[0] === "L") {
             l = Math.min(item[1], item[3]);
@@ -5701,6 +5701,64 @@ function pathNodeMayBeNearer(pathNode, point, dist) {
     return false;
 }
 
+function path_x_distance2_buckets(pathNode, point) {
+    var npsl = normalize_svg_path(pathNode);
+    function pdist(l, t, r, b) {
+        var xd = point[0] < l ? l - point[0] : (point[0] > r ? point[0] - r : 0),
+            yd = point[1] < t ? t - point[1] : (point[1] > b ? point[1] - b : 0);
+        return Math.max(xd, yd);
+    }
+    var xmin = Infinity, xmax = -Infinity, width = 24, i, item;
+    for (i = 0; i !== npsl.length; ++i) {
+        item = npsl[i];
+        if (item[0] === "L") {
+            xmin = Math.min(xmin, item[1], item[3]);
+            xmax = Math.max(xmax, item[1], item[3]);
+        } else if (item[0] === "C") {
+            xmin = Math.min(xmin, item[1], item[3], item[5], item[7]);
+            xmax = Math.max(xmax, item[1], item[3], item[5], item[7]);
+        }
+    }
+    xmin -= width;
+    xmax += width;
+    var n = Math.max(Math.ceil((xmax - xmin) / width), 1),
+        a = new Array(n + 1),
+        l, t, r, b, d, j;
+    a.fill(Infinity);
+    for (i = 0; i !== npsl.length; ++i) {
+        item = npsl[i];
+        if (item[0] === "L") {
+            l = Math.min(item[1], item[3]);
+            t = Math.min(item[2], item[4]);
+            r = Math.max(item[1], item[3]);
+            b = Math.max(item[2], item[4]);
+        } else if (item[0] === "C") {
+            l = Math.min(item[1], item[3], item[5], item[7]);
+            t = Math.min(item[2], item[4], item[6], item[8]);
+            r = Math.max(item[1], item[3], item[5], item[7]);
+            b = Math.max(item[2], item[4], item[6], item[8]);
+        } else {
+            continue;
+        }
+        d = pdist(l, t, r, b);
+        l = Math.floor((l - xmin) / width);
+        r = Math.ceil((r - xmin) / width);
+        while (l <= r) {
+            a[l] = Math.min(a[l], d);
+            ++l;
+        }
+    }
+    for (i = 0; i !== a.length; ++i) {
+        if (a[i] < Infinity)
+            a[i] = a[i] * a[i];
+    }
+    a.xmin = xmin;
+    a.xmax = xmax;
+    a.width = width;
+    a.point = point;
+    return a;
+}
+
 function closestPoint(pathNode, point, inbest) {
     // originally from Mike Bostock http://bl.ocks.org/mbostock/8027637
     if (inbest && !pathNodeMayBeNearer(pathNode, point, inbest.distance)) {
@@ -5708,29 +5766,51 @@ function closestPoint(pathNode, point, inbest) {
     }
 
     var pathLength = pathNode.getTotalLength(),
-        precision = Math.max(pathLength / svg_path_number_of_items(pathNode) / 8, 3),
-        best, bestLength, bestDistance2 = Infinity, sl;
+        pathSegments = svg_path_number_of_items(pathNode),
+        precision = Math.max(pathLength / pathSegments / 8, 4),
+        best, bestLength, sl,
+        bestDistance2 = inbest ? (inbest.distance + 0.01) * (inbest.distance + 0.01) : Infinity;
 
     function check(pLength) {
         var p = pathNode.getPointAtLength(pLength),
-            dx = point[0] - p.x, dy = point[1] - p.y, d2 = dx * dx + dy * dy;
+            dx = point[0] - p.x, dy = point[1] - p.y,
+            d2 = dx * dx + dy * dy;
         if (d2 < bestDistance2) {
             best = [p.x, p.y];
             bestLength = pLength;
             bestDistance2 = d2;
         }
+        return p;
     }
 
-    // linear scan for coarse approximation
-    for (sl = 0; sl <= pathLength; sl += precision)
-        check(sl);
+    if (pathSegments > 20) {
+        // big-step/small-step
+        var xdb = path_x_distance2_buckets(pathNode, point),
+            xmin = xdb.xmin, width = xdb.width, p, xx;
+        for (sl = 0; sl < pathLength; ) {
+            p = check(sl);
+            xx = Math.floor((p.x - xmin) / width);
+            if (xdb[xx] > bestDistance2
+                && xdb[xx-1] > bestDistance2
+                && xdb[xx+1] > bestDistance2)
+                sl += width;
+            else
+                sl += precision;
+        }
+    } else {
+        // linear scan for coarse approximation
+        for (sl = 0; sl < pathLength; sl += precision)
+            check(sl);
+    }
+    // edge condition: always check both ends
+    check(pathLength);
 
     // binary search for precise estimate
     do {
         sl = bestLength - precision / 2;
-        sl >= 0 && check(sl);
+        sl > 0 && check(sl);
         sl += precision;
-        sl <= pathLength && check(sl);
+        sl < pathLength && check(sl);
         precision /= 2;
     } while (precision > 0.5);
 
@@ -5739,7 +5819,7 @@ function closestPoint(pathNode, point, inbest) {
         best.pathNode = pathNode;
         best.pathLength = bestLength;
     }
-    if (best && (!inbest || inbest.distance >= best.distance - 0.01)) {
+    if (best && (!inbest || best.distance <= inbest.distance + 0.01)) {
         return best;
     } else {
         return inbest;
