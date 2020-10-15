@@ -203,8 +203,7 @@ class API_GradeStatistics {
     static function run(Contact $user, Qrequest $qreq, APIData $api) {
         $pset = $api->pset;
         $gsv = $pset->grade_statistics_visible;
-        if (!$user->isPC
-            && !($gsv === true || (is_int($gsv) && $gsv <= Conf::$now))) {
+        if (!$user->isPC && $gsv !== 1) {
             $info = PsetView::make($api->pset, $api->user, $user);
             if (!$info->user_can_view_grade_statistics())
                 return ["error" => "Grades are not visible now"];

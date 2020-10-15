@@ -690,9 +690,9 @@ class PsetView {
     function user_can_view_grade_statistics() {
         // also see API_GradeStatistics
         $gsv = $this->pset->grade_statistics_visible;
-        return $gsv === true
-            || (is_int($gsv) && $gsv <= Conf::$now)
-            || ($gsv !== false && $this->user_can_view_grades());
+        return $gsv === 1
+            || ($gsv === 2 && $this->user_can_view_grades())
+            || ($gsv > 2 && $gsv <= Conf::$now);
     }
 
     function can_view_grade_statistics_graph() {

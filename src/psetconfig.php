@@ -108,7 +108,7 @@ class Pset {
     public $grades_visible_at;
     /** @var ?int */
     public $grades_total;
-    /** @var bool */
+    /** @var int */
     public $grade_statistics_visible;
     /** @var ?float */
     public $grade_cdf_cutoff;
@@ -326,7 +326,16 @@ class Pset {
         $gv = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->grades_visible_at = is_int($gv) ? $gv : 0;
-        $this->grade_statistics_visible = self::cdate_or_grades($p, "grade_statistics_visible", "grade_cdf_visible");
+        $gsv = self::cdate_or_grades($p, "grade_statistics_visible", "grade_cdf_visible");
+        if ($gsv === true) {
+            $this->grade_statistics_visible = 1;
+        } else if (($gsv ?? "grades") === "grades") {
+            $this->grade_statistics_visible = 2;
+        } else if ($gsv === false || $gsv <= 0 || $gsv > 2) {
+            $this->grade_statistics_visible = (int) $gsv;
+        } else {
+            throw new PsetConfigException("`grade_statistics_visible` format error", "grade_statistics_visible");
+        }
         $this->grade_cdf_cutoff = self::cnum($p, "grade_cdf_cutoff");
         $this->separate_extension_grades = self::cbool($p, "separate_extension_grades");
         $this->grade_script = $p->grade_script ?? null;
