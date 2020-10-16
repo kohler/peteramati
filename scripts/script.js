@@ -3533,6 +3533,25 @@ handle_ui.on("pa-diff-toggle-markdown", function (evt) {
     }
 });
 
+function pa_hljs_line(s, tags) {
+    var t = tags.length ? tags.join("").concat(s) : s,
+        m = s.match(/<[^>]*>/g), i;
+    if (m) {
+        for (i = 0; i !== m.length; ++i) {
+            if (m[i].charAt(1) === "/") {
+                tags.pop();
+            } else {
+                tags.push(m[i]);
+            }
+        }
+    }
+    for (i = tags.length - 1; i >= 0; --i) {
+        var sp = tags[i].indexOf(" ");
+        t = t.concat('</', tags[i].substr(1, sp < 0 ? -1 : sp - 1), '>');
+    }
+    return t;
+}
+
 var pa_filediff_markdown = (function () {
 var md, mdcontext;
 
@@ -3584,21 +3603,6 @@ function modify_landmark(base) {
     }
 }
 
-function modify_landmark_fence(base) {
-    return function (tokens, idx, options, env, self) {
-        var token = tokens[idx], m;
-        if (token.info && token.info.indexOf(" ") >= 0) {
-            if ((m = token.info.match(/^ *([-a-z+]+) *$/))) {
-                token.info = m[1];
-            } else {
-                token.content = token.info + "\n" + token.content;
-                token.info = "";
-            }
-        }
-        return fix_landmark_html(base(tokens, idx, options, env, self), token);
-    };
-}
-
 function modify_landmark_image(base) {
     function fix(pi, file) {
         return siteurl + "~" + encodeURIComponent(peteramati_uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + file;
@@ -3645,25 +3649,77 @@ function modify_landmark_image(base) {
     };
 }
 
+function render_landmark_fence(md) {
+    return function (tokens, idx, options, env, self) {
+        var token = tokens[idx], xtoken = token,
+            info = token.info ? md.utils.unescapeAll(token.info) : "",
+            lang, content, highlighted = false, i, xattrs, m;
+        if (info && info.indexOf(" ") >= 0) {
+            if ((m = info.match(/^ *([-a-z+]+) *$/))) {
+                info = m[1];
+            } else {
+                token.content = info + "\n" + token.content;
+                token.map && (token.map[0] -= 1);
+                info = "";
+            }
+        }
+        lang = info ? info.trim().split(/\s+/g)[0] : "";
+
+        if (lang && hljs.getLanguage(lang)) {
+            try {
+                content = hljs.highlight(lang, token.content, true).value;
+                highlighted = true;
+            } catch (ex) {
+            }
+        }
+        highlighted || (content = md.utils.escapeHtml(token.content));
+
+        if (info) {
+            i = token.attrIndex("class");
+            xtoken = {attrs: token.attrs ? token.attrs.slice() : []};
+            if (i < 0) {
+                xtoken.attrs.push(["class", options.langPrefix + lang]);
+            } else {
+                xtoken.attrs[i][1] += " " + options.langPrefix + lang;
+            }
+        }
+        xattrs = '><code'.concat(self.renderAttrs(xtoken), '>');
+
+        if (token.map && token.level === 0) {
+            // split into lines, assign landmarks
+            var x = content.split(/\n/), y = [], ln0 = token.map[0] + 2;
+            x[x.length - 1] === "" && x.pop();
+            var xl = x.length;
+            if (highlighted) {
+                var tags = [];
+                for (i = 0; i !== xl; ++i) {
+                    y.push('<pre data-landmark="', ln0 + i,
+                           i + 1 !== xl ? '" class="partial"' : '"',
+                           xattrs, pa_hljs_line(x[i], tags), "\n</code></pre>");
+                }
+            } else {
+                for (i = 0; i !== xl; ++i) {
+                    y.push('<pre data-landmark="', ln0 + i,
+                           i + 1 !== xl ? '" class="partial"' : '"',
+                           xattrs, x[i], "\n</code></pre>");
+                }
+            }
+            return y.join("");
+        } else {
+            return '<pre'.concat(xattrs, content, '</code></pre>');
+        }
+    };
+}
+
 function make_markdownit() {
     if (!md) {
-        md = markdownit({
-            highlight: function (str, lang) {
-                if (lang && hljs.getLanguage(lang)) {
-                    try {
-                        return hljs.highlight(lang, str, true).value;
-                    } catch (ex) {
-                    }
-                }
-                return "";
-            }
-        }).use(markdownit_katex);
+        md = markdownit().use(markdownit_katex);
         for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
                        "bullet_list_open", "table_open", "blockquote_open",
-                       "hr", "code_block"]) {
+                       "hr"]) {
             md.renderer.rules[x] = modify_landmark(md.renderer.rules[x]);
         }
-        md.renderer.rules.fence = modify_landmark_fence(md.renderer.rules.fence);
+        md.renderer.rules.fence = md.renderer.rules.code_block = render_landmark_fence(md);
         md.renderer.rules.image = modify_landmark_image(md.renderer.rules.image);
         md.renderer.rules.list_item_open = add_landmark_1;
     }
@@ -3693,57 +3749,6 @@ function fix_list_item(d) {
         d.setAttribute("data-landmark", dc.getAttribute("data-landmark"));
     }
     return d;
-}
-
-function split_pre(e, at, original, newlines) {
-    e.splitText(at);
-    while (e.tagName !== "PRE") {
-        var p = e.parentNode;
-        if (e !== p.lastChild) {
-            var pp = document.createElement(p.tagName);
-            p.className && (pp.className = p.className);
-            while (pp.lastChild !== e) {
-                pp.appendChild(p.firstChild);
-            }
-            e = pp;
-            if (p.parentNode) {
-                p.parentNode.insertBefore(pp, p);
-            }
-        } else {
-            e = p;
-        }
-    }
-    if (e !== original) {
-        addClass(e, "partial");
-        var fl = original.getAttribute("data-landmark").split("-");
-        e.setAttribute("data-landmark", fl[0] + "-" + (+fl[0] + newlines - 1));
-        original.setAttribute("data-landmark", (+fl[0] + newlines) + "-" + fl[1]);
-    }
-    return e;
-}
-
-function fix_pre(d) {
-    if (d && d.hasAttribute("data-landmark")) {
-        var e = d.firstChild, n, p, m;
-        while (e !== d) {
-            if (e.nodeType === 3) {
-                if ((p = e.textContent.indexOf("\n")) >= 0) {
-                    return split_pre(e, p + 1, d, 1);
-                }
-                n = e.nextSibling;
-            } else if (e.nodeType === 1) {
-                n = e.firstChild || e.nextSibling;
-            } else {
-                n = e.nextSibling;
-            }
-            while (!n && e !== d) {
-                if ((e = e.parentNode) === d)
-                    return d;
-                n = e.nextSibling;
-            }
-            e = n;
-        }
-    }
 }
 
 return function () {
@@ -3781,8 +3786,6 @@ return function () {
             continue;
         } else if (d.tagName === "OL" || d.tagName === "UL") {
             d = fix_list_item(d);
-        } else if (d.tagName === "PRE") {
-            d = fix_pre(d);
         } else if (d.tagName === "P"
                    && d.firstChild.nodeType === 1
                    && d.firstChild.tagName === "IMG"
@@ -3799,7 +3802,7 @@ return function () {
 
         var lm = d.getAttribute("data-landmark");
         if (lm) {
-            var l1 = parseInt(lm) + (d.tagName === "PRE"),
+            var l1 = parseInt(lm),
                 dash = lm.indexOf("-"),
                 l2 = dash >= 0 ? parseInt(lm.substring(dash + 1)) : l1;
             while (e) {
