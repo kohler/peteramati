@@ -1487,6 +1487,7 @@ class PsetView {
             }
             echo '</h3>';
         }
+
         echo '<div id="', $tabid, '" class="pa-filediff need-pa-observe-diff';
         if ($hide_left) {
             echo " pa-hide-left";
@@ -1509,12 +1510,20 @@ class PsetView {
             $maxline = max(1000, $dinfo->max_lineno()) - 1;
             echo " pa-line-digits-", ceil(log10($maxline));
         }
-        if ($id_by_user) {
-            echo '" data-pa-file-user="', htmlspecialchars($this->user->username);
+        if ($dinfo->highlight) {
+            echo " need-highlight";
         }
-        echo '" data-pa-file="', htmlspecialchars($file), "\"";
+        echo '"';
+
+        if ($id_by_user) {
+            echo ' data-pa-file-user="', htmlspecialchars($this->user->username), '"';
+        }
+        echo ' data-pa-file="', htmlspecialchars($file), '"';
         if ($this->conf->default_format) {
             echo ' data-default-format="', $this->conf->default_format, '"';
+        }
+        if ($dinfo->language) {
+            echo ' data-language="', htmlspecialchars($dinfo->language), '"';
         }
         echo ">";
         if ($has_grade_range) {

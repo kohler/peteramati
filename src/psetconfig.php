@@ -700,15 +700,15 @@ class Pset {
 
     /** @return ?DiffConfig */
     function find_diffconfig($filename) {
-        if (array_key_exists($filename, $this->_file_diffinfo)) {
-            return $this->_file_diffinfo[$filename];
+        if (!array_key_exists($filename, $this->_file_diffinfo)) {
+            $diffinfo = null;
+            foreach ($this->all_diffconfig() as $d) {
+                if (preg_match('{(?:\A|/)(?:' . $d->regex . ')(?:/|\z)}', $filename))
+                    $diffinfo = DiffConfig::combine($diffinfo, $d);
+            }
+            $this->_file_diffinfo[$filename] = $diffinfo;
         }
-        $diffinfo = null;
-        foreach ($this->all_diffconfig() as $d) {
-            if (preg_match('{(?:\A|/)(?:' . $d->regex . ')(?:/|\z)}', $filename))
-                $diffinfo = DiffConfig::combine($diffinfo, $d);
-        }
-        return ($this->_file_diffinfo[$filename] = $diffinfo);
+        return $this->_file_diffinfo[$filename];
     }
 
     function maybe_prefix_directory($files) {
@@ -812,6 +812,11 @@ class Pset {
     /** @return null|int|float */
     static function cinterval(...$args) {
         return self::ccheck("check_interval", $args);
+    }
+
+    /** @return null|int */
+    static function cyes_no_allowed(...$args) {
+        return self::ccheck("check_yes_no_allowed", $args);
     }
 
     private static function make_config_array($x) {
@@ -1395,8 +1400,12 @@ class DiffConfig {
     public $gradable;
     /** @var bool */
     public $hide_if_anonymous;
-    /** @var null|bool|'allowed' */
+    /** @var ?int */
     public $markdown;
+    /** @var ?int */
+    public $highlight;
+    /** @var ?string */
+    public $language;
 
     /** @param string $regex
      * @param object $d */
@@ -1422,46 +1431,39 @@ class DiffConfig {
         $this->boring = Pset::cbool($loc, $d, "boring");
         $this->gradable = Pset::cbool($loc, $d, "gradable", "gradeable");
         $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
-        if (isset($d->markdown)) {
-            if (is_bool($d->markdown)) {
-                $this->markdown = $d->markdown;
-            } else if ($d->markdown === "yes" || $d->markdown === "no") {
-                $this->markdown = $d->markdown === "yes";
-            } else if ($d->markdown === "allowed") {
-                $this->markdown = "allowed";
-            } else {
-                throw new PsetConfigException("`markdown` diff format error", $loc);
-            }
-        }
+        $this->markdown = Pset::cyes_no_allowed($loc, $d, "markdown");
+        $this->highlight = Pset::cyes_no_allowed($loc, $d, "highlight");
+        $this->language = Pset::cstr($loc, $d, "language");
     }
 
+    /** @return ?DiffConfig */
     static function combine(DiffConfig $a = null, DiffConfig $b = null) {
-        if (!$a && !$b)
-            return false;
-        if (!$a || !$b)
-            return $a ? : $b;
-        if ($a->match_priority > $b->match_priority) {
-            $x = clone $a;
-            $y = $b;
+        if (!$a && !$b) {
+            return null;
+        } else if (!$a || !$b) {
+            return $a ?? $b;
         } else {
-            $x = clone $b;
-            $y = $a;
+            if ($a->match_priority > $b->match_priority) {
+                $x = clone $a;
+                $y = $b;
+            } else {
+                $x = clone $b;
+                $y = $a;
+            }
+            $x->title = $x->title ?? $y->title;
+            $x->position = $x->position ?? $y->position;
+            $x->fileless = $x->fileless ?? $y->fileless;
+            $x->full = $x->full ?? $y->full;
+            $x->collate = $x->collate ?? $y->collate;
+            $x->ignore = $x->ignore ?? $y->ignore;
+            $x->boring = $x->boring ?? $y->boring;
+            $x->gradable = $x->gradable ?? $y->gradable;
+            $x->hide_if_anonymous = $x->hide_if_anonymous ?? $y->hide_if_anonymous;
+            $x->markdown = $x->markdown ?? $y->markdown;
+            $x->highlight = $x->highlight ?? $y->highlight;
+            $x->language = $x->language ?? $y->language;
+            return $x;
         }
-        if ($x->title === null)
-            $x->title = $y->title;
-        if ($x->position === null)
-            $x->position = $y->position;
-        if ($x->fileless === null)
-            $x->fileless = $y->fileless;
-        if ($x->full === null)
-            $x->full = $y->full;
-        if ($x->collate === null)
-            $x->collate = $y->collate;
-        if ($x->ignore === null)
-            $x->ignore = $y->ignore;
-        if ($x->boring === null)
-            $x->boring = $y->boring;
-        return $x;
     }
 
 
@@ -1511,6 +1513,18 @@ function check_interval($x) {
                && preg_match(',\A(\d+(?:\.\d*)?|\.\d+)(?:$|\s*)([smhd]?)\z,', strtolower($x), $m)) {
         $mult = ["" => 1, "s" => 1, "m" => 60, "h" => 3600, "d" => 86400];
         return [true, floatval($m[1]) * $mult[$m[2]]];
+    } else {
+        return false;
+    }
+}
+
+function check_yes_no_allowed($x) {
+    if ($x === "yes" || $x === true) {
+        return [true, 2];
+    } else if ($x === "no" || $x === false) {
+        return [true, 0];
+    } else if ($x === "allowed") {
+        return [true, 1];
     } else {
         return false;
     }

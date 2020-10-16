@@ -3752,6 +3752,8 @@ function fix_list_item(d) {
 }
 
 return function () {
+    if (hasClass(this, "pa-markdown") || hasClass(this, "pa-highlight"))
+        return;
     // collect content
     var e = this.firstChild, l = [], lineno = 1, this_lineno;
     while (e) {
@@ -3860,6 +3862,84 @@ function pa_filediff_unmarkdown() {
     }
     removeClass(this, "pa-markdown");
 }
+
+
+function pa_filediff_highlight() {
+    // compute language
+    var file = this.getAttribute("data-pa-file"), lang;
+    if (!(lang = this.getAttribute("data-language"))) {
+        if (/\.(?:cc|cpp|hh|hpp|c\+\+|h\+\+|C|H)$/.test(file)) {
+            lang = "c++";
+        } else if (/\.(?:c|h)$/.test(file)) {
+            lang = "c";
+        }
+        lang && this.setAttribute("data-language", lang);
+    }
+    if (!lang || !hljs.getLanguage(lang)
+        || hasClass(this, "pa-highlight")
+        || hasClass(this, "pa-markdown"))
+        return;
+    // collect content
+    var e = this.firstChild, l = [], lineno = 1, this_lineno;
+    while (e) {
+        if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
+            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
+            while (lineno < this_lineno) {
+                l.push("\n");
+                ++lineno;
+            }
+            l.push(e.lastChild.textContent);
+            if (!hasClass(e.lastChild, "pa-dnonl")) {
+                l.push("\n");
+            }
+            ++lineno;
+        }
+        e = e.nextSibling;
+    }
+    // highlight
+    var hl;
+    try {
+        hl = hljs.highlight(lang, l.join(""), true).value.split("\n");
+    } catch (exc) {
+        return;
+    }
+    // replace content with highlight
+    e = this.firstChild;
+    var tags = [], langclass = "language-" + lang;
+    while (e) {
+        if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
+            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
+            var et = e.lastChild;
+            et.setAttribute("data-pa-text", et.textContent);
+            et.innerHTML = pa_hljs_line(hl[this_lineno - 1], tags);
+            addClass(et, langclass);
+        }
+        e = e.nextSibling;
+    }
+    addClass(this, "pa-highlight");
+}
+
+function pa_filediff_unhighlight() {
+    // compute language
+    var lang = this.getAttribute("data-language"),
+        langclass = lang ? "language-" + lang : "",
+        e = this.firstChild, et;
+    while (e) {
+        if ((et = e.lastChild)
+            && et.hasAttribute("data-pa-text")
+            && (!langclass || hasClass(et, langclass))) {
+            et.innerText = et.getAttribute("data-pa-text");
+            et.removeAttribute("data-pa-text");
+            langclass && removeClass(et, langclass);
+        }
+        e = e.nextSibling;
+    }
+    removeClass(this, "pa-highlight");
+}
+
+jQuery(function () {
+    $(".pa-filediff.need-highlight:not(.need-load)").each(pa_filediff_highlight);
+});
 
 
 (function () {

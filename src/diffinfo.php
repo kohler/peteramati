@@ -23,6 +23,12 @@ class DiffInfo implements Iterator {
     /** @var bool */
     public $markdown_allowed;
     /** @var bool */
+    public $highlight;
+    /** @var bool */
+    public $highlight_allowed;
+    /** @var ?string */
+    public $language;
+    /** @var bool */
     public $hide_if_anonymous = false;
     /** @var float */
     public $position = 0.0;
@@ -64,9 +70,14 @@ class DiffInfo implements Iterator {
             $this->hide_if_anonymous = !!$diffconfig->hide_if_anonymous;
             $this->position = (float) $diffconfig->position;
             if (isset($diffconfig->markdown)) {
-                $this->markdown = $diffconfig->markdown === true;
-                $this->markdown_allowed = $diffconfig->markdown !== false;
+                $this->markdown = $diffconfig->markdown === 2;
+                $this->markdown_allowed = $diffconfig->markdown !== 0;
             }
+            if (isset($diffconfig->highlight)) {
+                $this->highlight = $diffconfig->highlight === 2;
+                $this->highlight_allowed = $diffconfig->highlight !== 0;
+            }
+            $this->language = $diffconfig->language;
         }
         if (!isset($this->markdown)) {
             $this->markdown = $this->markdown_allowed = str_ends_with($filename, ".md");
