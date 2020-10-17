@@ -84,10 +84,10 @@ class Multiconference {
             if (!$Conf)
                 $Conf = Conf::$main = new Conf($Opt, false);
             if ($Opt["shortName"] == "__invalid__")
-                $Opt["shortName"] = "HotCRP";
+                $Opt["shortName"] = "Peteramati";
             $Me = null;
             header("HTTP/1.1 404 Not Found");
-            $Conf->header("HotCRP Error", "");
+            $Conf->header("Peteramati Error", "");
             foreach ($errors as $i => &$e)
                 $e = ($i ? "<div class=\"hint\">" : "<p>") . htmlspecialchars($e) . ($i ? "</div>" : "</p>");
             echo join("", $errors);
@@ -104,15 +104,15 @@ class Multiconference {
         else if (get($Opt, "multiconference"))
             $errors[] = "The “" . $Opt["confid"] . "” conference does not exist. Check your URL to make sure you spelled it correctly.";
         else if (!get($Opt, "loaded"))
-            $errors[] = "HotCRP has been installed, but not yet configured. You must run `lib/createdb.sh` to create a database for your conference. See `README.md` for further guidance.";
+            $errors[] = "Peteramati has been installed, but not yet configured. You must run `lib/createdb.sh` to create a database. See `README.md` for further guidance.";
         else
-            $errors[] = "HotCRP was unable to load. A system administrator must fix this problem.";
+            $errors[] = "Peteramati was unable to load. A system administrator must fix this problem.";
         if (!get($Opt, "loaded") && defined("HOTCRP_OPTIONS"))
-            $errors[] = "Error: Unable to load options file `" . HOTCRP_OPTIONS . "`";
+            $errors[] = "Error: Unable to load options file `" . HOTCRP_OPTIONS . "`.";
         else if (!get($Opt, "loaded"))
-            $errors[] = "Error: Unable to load options file";
+            $errors[] = "Error: Unable to load options file.";
         if (get($Opt, "missing"))
-            $errors[] = "Error: Unable to load options from " . commajoin($Opt["missing"]);
+            $errors[] = "Error: Unable to load options from " . commajoin($Opt["missing"]) . ".";
         self::fail_message($errors);
     }
 

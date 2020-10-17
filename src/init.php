@@ -102,45 +102,51 @@ function expand_json_includes_callback($includelist, $callback, $extra_arg = nul
     }
 }
 
-global $Opt;
-if (!$Opt) {
-    $Opt = array();
-}
-if (!get($Opt, "loaded")) {
-    if (defined("HOTCRP_OPTIONS")) {
-        if ((@include HOTCRP_OPTIONS) !== false)
+function read_main_options() {
+    global $Opt;
+    if (!$Opt) {
+        $Opt = [];
+    }
+    if (!($Opt["loaded"] ?? false)) {
+        if (defined("HOTCRP_OPTIONS")) {
+            $options = HOTCRP_OPTIONS;
+        } else {
+            $options = SiteLoader::$root . "/conf/options.php";
+        }
+        if ((include $options) !== false) {
             $Opt["loaded"] = true;
-    } else if ((@include "$ConfSitePATH/conf/options.php") !== false
-               || (@include "$ConfSitePATH/conf/options.inc") !== false
-               || (@include "$ConfSitePATH/Code/options.inc") !== false) {
-        $Opt["loaded"] = true;
+        } else {
+            $Opt["missing"][] = $options;
+        }
+        if (get($Opt, "multiconference")) {
+            Multiconference::init();
+        }
+        if (get($Opt, "include")) {
+            read_included_options($Opt["include"]);
+        }
     }
-    if (get($Opt, "multiconference")) {
-        Multiconference::init();
+    if (!($Opt["loaded"] ?? false) || ($Opt["missing"] ?? false)) {
+        Multiconference::fail_bad_options();
     }
-    if (get($Opt, "include")) {
-        read_included_options($Opt["include"]);
+
+    // Respond to main options
+    if ($Opt["dbLogQueries"] ?? false) {
+        Dbl::log_queries($Opt["dbLogQueries"]);
     }
-}
-if (!get($Opt, "loaded") || get($Opt, "missing")) {
-    Multiconference::fail_bad_options();
-}
-if (get($Opt, "dbLogQueries")) {
-    Dbl::log_queries($Opt["dbLogQueries"]);
+    // Allow lots of memory
+    if (!($Opt["memoryLimit"] ?? false) && ini_get_bytes("memory_limit") < (128 << 20)) {
+        $Opt["memoryLimit"] = "128M";
+    }
+    if ($Opt["memoryLimit"] ?? false) {
+        ini_set("memory_limit", $Opt["memoryLimit"]);
+    }
 }
 
-
-// Allow lots of memory
-if (!get($Opt, "memoryLimit") && ini_get_bytes("memory_limit") < (128 << 20)) {
-    $Opt["memoryLimit"] = "128M";
-}
-if (get($Opt, "memoryLimit")) {
-    ini_set("memory_limit", $Opt["memoryLimit"]);
-}
+read_main_options();
 
 
 // Create the conference
-global $Conf;
+global $Conf, $Opt;
 if (!Conf::$main) {
     Conf::set_main_instance(new Conf($Opt, true));
 }
