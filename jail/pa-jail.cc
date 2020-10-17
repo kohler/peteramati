@@ -440,35 +440,42 @@ mountslot::mountslot(const char* fsname_, const char* type_, const char* mopt)
         const char* ok_first = mopt + strspn(mopt, ",");
         const char* ok_last = ok_first + strcspn(ok_first, ",=");
         const char* ov_last = ok_last + strcspn(ok_last, ",");
-        if (const mountarg* ma = find_mountarg(ok_first, ok_last - ok_first))
+        if (const mountarg* ma = find_mountarg(ok_first, ok_last - ok_first)) {
             opts |= ma->value;
-        else if (ok_first != ov_last)
+        } else if (ok_first != ov_last) {
             data += (data.empty() ? "" : ",") + std::string(ok_first, ov_last);
+        }
         mopt = ov_last;
     }
 }
 
 std::string mountslot::debug_mountopts_args(unsigned long opts) const {
     std::string arg;
-    if (!(opts & MFLAG(RDONLY)))
+    if (!(opts & MFLAG(RDONLY))) {
         arg = "rw";
+    }
     const mountarg* ma = mountargs;
     const mountarg* ma_last = ma + sizeof(mountargs) / sizeof(mountargs[0]);
-    for (; ma != ma_last; ++ma)
+    for (; ma != ma_last; ++ma) {
         if (ma->value && (opts & ma->value) && ma->unparse)
             arg += (arg.empty() ? "" : ",") + std::string(ma->name);
-    if (!data.empty())
+    }
+    if (!data.empty()) {
         arg += (arg.empty() ? "" : ",") + data;
+    }
 #ifdef MS_BIND
     std::string start = opts & MS_REC ? " --rbind " : " --bind ";
-    if ((opts & MS_BIND) && arg == "rw")
+    if ((opts & MS_BIND) && arg == "rw") {
         return start;
-    if (opts & MS_BIND)
+    } else if (opts & MS_BIND) {
         return start + "-o " + arg;
+    }
 #endif
-    if (!arg.empty())
+    if (!arg.empty()) {
         return " -o " + arg;
-    return arg;
+    } else {
+        return arg;
+    }
 }
 
 std::string mountslot::debug_mount_command(std::string dst, unsigned long opts) const {
@@ -478,10 +485,11 @@ std::string mountslot::debug_mount_command(std::string dst, unsigned long opts) 
 void mountslot::add_mountopt(const char* inopt) {
     int inopt_len = strcspn(inopt, ",=");
     if (const mountarg* ma = find_mountarg(inopt, inopt_len)) {
-        if (ma->value)
+        if (ma->value) {
             opts |= ma->value;
-        else
+        } else {
             opts &= ~MFLAG(RDONLY);
+        }
     } else {
         const char* mopt = data.c_str();
         while (*mopt) {
@@ -494,8 +502,9 @@ void mountslot::add_mountopt(const char* inopt) {
                 data = std::string(data.data(), mopt)
                     + std::string(ov_last, data.data() + data.length());
                 mopt = data.c_str() + offset;
-            } else
+            } else {
                 mopt = ov_last;
+            }
         }
         data += (data.empty() ? "" : ",") + std::string(inopt);
     }
@@ -529,10 +538,12 @@ bool mountslot::mountable(std::string src, std::string dst) const {
 }
 
 int mountslot::x_mount(std::string dst, unsigned long opts) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "%s\n", debug_mount_command(dst, opts).c_str());
-    if (dryrun)
+    }
+    if (dryrun) {
         return 0;
+    }
     return mount(fsname.c_str(), dst.c_str(), type.c_str(), opts, mount_data());
 }
 
