@@ -326,7 +326,9 @@ while (defined($_ = <STDIN>)) {
         $cwd{$tidhead{$pid}} = resolve($1, $pid);
         print STDERR "CHDIR ", $tidhead{$pid}, " $cwd{$tidhead{$pid}}\n"
             if $verbose;
-    } elsif (/^\d*\s*(access|chdir|chmod|exec[a-z]+|lstat|open|openat|readlink|stat\d*|statfs|truncate|unlink|unlinkat|utimensat)\(\s*"(.*?)".*\)\s*=\s*([0-9]|-1 \S+)/s) {
+    } elsif (/^\d*\s*(access|chdir|chmod|exec[a-z]+|getcwd|lstat|open|readlink|stat\d*|statfs|truncate|unlink)\(\s*"(.*?)".*\)\s*=\s*([0-9]|-1 \S+)/s) {
+        addfile(resolve($2, $pid), $1, 0) if $3 ne "-1 ENOENT";
+    } elsif (/^\d*\s*(faccessat|newfstatat|openat|unlinkat|utimensat)\(AT_FDCWD,\s*"(.*?)".*\)\s*=\s*([0-9]|-1 \S+)/s) {
         addfile(resolve($2, $pid), $1, 0) if $3 ne "-1 ENOENT";
     } elsif ($verbose && !/^\d*\s*(?:wait4|exit_group|vfork|arch_prctl|mkdir|---|\+\+\+)/) {
         print STDERR "CONFUSION ", $_;
