@@ -519,22 +519,25 @@ static std::vector<std::string> delayed_mounts;
 
 bool mountslot::mountable(std::string src, std::string dst) const {
     if ((src == "/proc" && type == "proc")
-        || (src == "/dev/pts" && type == "devpts"))
+        || (src == "/dev/pts" && type == "devpts")) {
         return mount_status == 2;
-    else if ((src == "/tmp" && type == "tmpfs")
-             || (src == "/run" && type == "tmpfs"))
+    } else if (src == "/tmp" && type == "tmpfs") {
         return mount_status != 1;
-    else if ((src == "/sys" && type == "sysfs")
-             || (src == "/dev" && type == "udev")
-             || wanted) {
+    } else if (src == "/run" && type == "tmpfs") {
+        return false;
+    } else if ((src == "/sys" && type == "sysfs")
+               || (src == "/dev" && type == "udev")
+               || wanted) {
         if (mount_status == 1) {
             delayed_mounts.push_back(src);
             delayed_mounts.push_back(dst);
             return false;
-        } else
+        } else {
             return true;
-    } else
+        }
+    } else {
         return false;
+    }
 }
 
 int mountslot::x_mount(std::string dst, unsigned long opts) {
