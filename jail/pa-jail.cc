@@ -536,6 +536,10 @@ static int mount_status = 0; // 0: add, 1: run pre-fork, 2: in child
 static std::vector<std::string> delayed_mounts;
 
 bool mountslot::mountable(std::string src, std::string dst) const {
+    if (verbose && false) {
+        fprintf(verbosefile, "-checkmount %s %s type=%s status=%d wanted=%d-\n",
+                src.c_str(), dst.c_str(), type.c_str(), mount_status, wanted ? 1 : 0);
+    }
     if ((src == "/proc" && type == "proc")
         || (src == "/dev/pts" && type == "devpts")) {
         return mount_status == 2;
@@ -684,7 +688,7 @@ static int handle_umount(const mount_table_type::iterator& it) {
 
 static int handle_copy(std::string src, std::string subdst,
                        int flags, dev_t jaildev);
-static int construct_jail(dev_t jaildev, std::string& str);
+static int construct_jail(dev_t jaildev, std::string& str, bool nomount);
 
 static void handle_symlink_dst(std::string dst, std::string src,
                                std::string lnk, dev_t jaildev)
@@ -937,22 +941,26 @@ static std::string file_get_contents(std::string fname, int errorness) {
     FILE* f;
     if (fname == "-") {
         f = stdin;
-        if (isatty(STDIN_FILENO))
+        if (isatty(STDIN_FILENO)) {
             return file_get_contents_error("stdin: Is a tty", errorness);
+        }
     } else {
         f = fopen(fname.c_str(), "r");
-        if (!f)
+        if (!f) {
             return file_get_contents_error(fname + ": " + strerror(errno), errorness);
+        }
     }
     std::string contents;
     while (!feof(f) && !ferror(f)) {
         char buf[BUFSIZ];
         size_t n = fread(buf, 1, BUFSIZ, f);
-        if (n > 0)
+        if (n > 0) {
             contents.append(buf, n);
+        }
     }
-    if (ferror(f))
+    if (ferror(f)) {
         return file_get_contents_error(fname + ": " + strerror(errno), errorness);
+    }
     fclose(f);
     return contents;
 }
@@ -961,16 +969,18 @@ static void fix_jail_bind_src(dev_t jaildev,
                               std::string src, std::string want_tag,
                               std::string want_files) {
     std::string srcx = path_endslash(src) + ".pa-jail-bindtag";
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "test %s = `cat %s`\n", shell_quote(want_tag).c_str(), shell_quote(srcx).c_str());
+    }
     std::string got_tag = file_get_contents(srcx, 0);
-    while (!got_tag.empty() && isspace((unsigned char) got_tag.back()))
+    while (!got_tag.empty() && isspace((unsigned char) got_tag.back())) {
         got_tag.pop_back();
+    }
     if (got_tag != want_tag) {
         std::string contents = file_get_contents(want_files, 2);
         std::string old_dstroot = dstroot;
         dstroot = path_noendslash(src);
-        construct_jail(jaildev, contents);
+        construct_jail(jaildev, contents, true);
         dstroot = old_dstroot;
         if (verbose) {
             fprintf(verbosefile, "echo %s > %s\n", shell_quote(want_tag).c_str(), srcx.c_str());
@@ -987,7 +997,7 @@ static void fix_jail_bind_src(dev_t jaildev,
     }
 }
 
-static int construct_jail(dev_t jaildev, std::string& str) {
+static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
     // prepare root
     if (x_chmod(dstroot.c_str(), 0755)
         || x_lchown(dstroot.c_str(), 0, 0)) {
@@ -1071,7 +1081,7 @@ static int construct_jail(dev_t jaildev, std::string& str) {
                 const char* optstart = opts;
                 opts = opt_wordskip(opts + 1);
                 // process option
-                bool want = 0;
+                int want = 0;
                 if (opt_eq(optstart, opts, "cp", 2)) {
                     flags |= FLAG_CP;
                 } else if (opt_eq(optstart, opts, "bind", 4)) {
@@ -1138,24 +1148,28 @@ static int construct_jail(dev_t jaildev, std::string& str) {
 
         // act on flags
         if (flags & (FLAG_BIND | FLAG_BIND_RO)) {
-            if (flags & FLAG_MOUNT) {
-                fprintf(stderr, "%s: [mount] option ignored\n", src.c_str());
+            if (!nomount) {
+                if (flags & FLAG_MOUNT) {
+                    fprintf(stderr, "%s: [mount] option ignored\n", src.c_str());
+                }
+                if (!bind_tag.empty() && !bind_files.empty()) {
+                    fix_jail_bind_src(jaildev, src, bind_tag, bind_files);
+                }
+                mountslot ms(src.c_str(), "none",
+                             flags & FLAG_BIND_RO ? "bind,rec,unbindable,ro" : "bind,rec,unbindable");
+                ms.wanted = true;
+                mount_table[src] = ms;
+                v_ensuredir(dstroot + dst, 0555, true);
+                handle_mount(src, dstroot + dst, false);
             }
-            if (!bind_tag.empty() && !bind_files.empty()) {
-                fix_jail_bind_src(jaildev, src, bind_tag, bind_files);
-            }
-            mountslot ms(src.c_str(), "none",
-                         flags & FLAG_BIND_RO ? "bind,rec,unbindable,ro" : "bind,rec,unbindable");
-            ms.wanted = true;
-            mount_table[src] = ms;
-            v_ensuredir(dstroot + dst, 0555, true);
-            handle_mount(src, dstroot + dst, false);
         } else if (flags & FLAG_MOUNT) {
-            mountslot ms(src.c_str(), mount_dst.c_str(), mount_args.c_str());
-            ms.wanted = true;
-            mount_table[src] = ms;
-            v_ensuredir(dstroot + dst, 0555, true);
-            handle_mount(src, dstroot + dst, false);
+            if (!nomount) {
+                mountslot ms(src.c_str(), mount_dst.c_str(), mount_args.c_str());
+                ms.wanted = true;
+                mount_table[src] = ms;
+                v_ensuredir(dstroot + dst, 0555, true);
+                handle_mount(src, dstroot + dst, false);
+            }
         } else {
             handle_copy(src, dst, flags, jaildev);
         }
@@ -2807,7 +2821,7 @@ int main(int argc, char** argv) {
     assert(dstroot != "/");
     if (!manifest.empty()) {
         mode_t old_umask = umask(0);
-        if (construct_jail(jaildir.dev, manifest) != 0) {
+        if (construct_jail(jaildir.dev, manifest, false) != 0) {
             exit(1);
         }
         umask(old_umask);

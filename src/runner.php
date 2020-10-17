@@ -168,11 +168,32 @@ class RunnerState {
         return false;
     }
 
+    /** @return ?string */
     private function jailfiles() {
         $f = $this->pset->run_jailfiles ? : $this->conf->opt("run_jailfiles");
-        return $f ? $this->expand($f) : false;
+        return $f ? $this->expand($f) : null;
     }
 
+    /** @return list<string> */
+    private function jailmanifest() {
+        $f = $this->pset->run_jailmanifest;
+        if ($f === null || $f === "" || $f === []) {
+            return [];
+        }
+        if (is_string($f)) {
+            $f = preg_split('/\r\n|\r|\n/', $f);
+        }
+        for ($i = 0; $i !== count($f); ) {
+            if ($f[$i] === "") {
+                array_splice($f, $i, 1);
+            } else {
+                ++$i;
+            }
+        }
+        return $f;
+    }
+
+    /** @return list<string> */
     private function overlayfiles() {
         $f = $this->runner->overlay;
         if (!isset($f)) {
@@ -198,13 +219,14 @@ class RunnerState {
         return $f;
     }
 
+    /** @return int */
     function environment_timestamp() {
         $t = 0;
-        if (($f = $this->jailfiles()))
+        if (($f = $this->jailfiles())) {
             $t = max($t, (int) @filemtime($f));
-        if (($fs = $this->overlayfiles())) {
-            foreach ($fs as $f)
-                $t = max($t, (int) @filemtime($f));
+        }
+        foreach ($this->overlayfiles() as $f) {
+            $t = max($t, (int) @filemtime($f));
         }
         return $t;
     }
@@ -369,8 +391,9 @@ class RunnerState {
 
         // create jail
         $this->remove_old_jails();
-        if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username)))
+        if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username))) {
             throw new RunnerException("Can’t initialize jail");
+        }
 
         // check out code
         $this->checkout_code();
@@ -387,8 +410,9 @@ class RunnerState {
 
         $skeletondir = $this->pset->run_skeletondir ? : $this->conf->opt("run_skeletondir");
         $binddir = $this->pset->run_binddir ? : $this->conf->opt("run_binddir");
-        if ($skeletondir && $binddir && !is_dir("$skeletondir/proc"))
+        if ($skeletondir && $binddir && !is_dir("$skeletondir/proc")) {
             $binddir = false;
+        }
         $jfiles = $this->jailfiles();
 
         if ($skeletondir && $binddir) {
@@ -396,27 +420,37 @@ class RunnerState {
             $contents = "/ <- " . $skeletondir . " [bind-ro";
             if ($jfiles
                 && !preg_match('/[\s\];]/', $jfiles)
-                && ($jhash = hash_file("sha256", $jfiles)) !== false)
+                && ($jhash = hash_file("sha256", $jfiles)) !== false) {
                 $contents .= " $jhash $jfiles";
+            }
             $contents .= "]\n"
-                . $this->userhome . " <- " . $this->jailhomedir . " [bind]\n";
+                . $this->userhome . " <- " . $this->jailhomedir . " [bind]";
             $command .= " -u" . escapeshellarg($this->jailhomedir)
                 . " -F" . escapeshellarg($contents);
             $homedir = $binddir;
         } else if ($jfiles) {
             $command .= " -h -f" . escapeshellarg($jfiles);
-            if ($skeletondir)
+            if ($skeletondir) {
                 $command .= " -S" . escapeshellarg($skeletondir);
+            }
             $homedir = $this->jaildir;
-        } else
+        } else {
             throw new RunnerException("Missing jail population configuration");
+        }
 
-        if ($this->runner->timeout > 0)
+        $jmanifest = $this->jailmanifest();
+        if ($jmanifest) {
+            $command .= " -F" . escapeshellarg(join("\n", $jmanifest));
+        }
+
+        if ($this->runner->timeout > 0) {
             $command .= " -T" . $this->runner->timeout;
-        else if ($this->runner->timeout == null && $this->pset->run_timeout > 0)
+        } else if ($this->runner->timeout == null && $this->pset->run_timeout > 0) {
             $command .= " -T" . $this->pset->run_timeout;
-        if ($this->inputfifo)
+        }
+        if ($this->inputfifo) {
             $command .= " -i" . escapeshellarg($this->inputfifo);
+        }
         $command .= " " . escapeshellarg($homedir)
             . " " . escapeshellarg($this->username)
             . " TERM=xterm-256color"

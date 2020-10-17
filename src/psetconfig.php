@@ -136,15 +136,27 @@ class Pset {
     public $all_runners = [];
     /** @var array<string,RunnerConfig> */
     public $runners;
+    /** @var ?string */
     public $run_username;
+    /** @var ?string */
     public $run_dirpattern;
+    /** @var null|string|list<string> */
     public $run_overlay;
+    /** @var ?string */
     public $run_skeletondir;
+    /** @var ?string */
     public $run_jailfiles;
+    /** @var null|string|list<string> */
+    public $run_jailmanifest;
+    /** @var ?string */
     public $run_binddir;
+    /** @var ?float */
     public $run_timeout;
+    /** @var ?bool */
     public $run_xterm_js;
+    /** @var bool */
     public $has_transfer_warnings;
+    /** @var bool */
     public $has_xterm_js;
 
     /** @var list<DiffConfig> */
@@ -393,6 +405,7 @@ class Pset {
         $this->run_username = self::cstr($p, "run_username");
         $this->run_overlay = self::cstr_or_str_list($p, "run_overlay");
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
+        $this->run_jailmanifest = self::cstr_or_str_list($p, "run_jailmanifest");
         $this->run_xterm_js = self::cbool($p, "run_xterm_js");
         $this->run_timeout = self::cinterval($p, "run_timeout");
         if ($this->run_timeout === null) { // default run_timeout is 10m
