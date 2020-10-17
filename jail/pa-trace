@@ -3,6 +3,7 @@ use POSIX;
 use Fcntl;
 use File::Basename;
 use Getopt::Long qw(:config bundling no_ignore_case require_order);
+use Cwd;
 my $DTRUSS = -x "/usr/bin/dtruss";
 
 sub usage (;$) {
@@ -143,7 +144,7 @@ if (@ARGV > 0 && $ARGV[0] =~ /\A-/) {
         $y . "(?:/|\\z)";
     } @excludes;
 
-my(%files, %allfiles, %execfiles);
+my(%files, %allfiles, %execfiles, %dotdotmaps);
 
 if (defined($jailfile) && open(FOO, "<", $jailfile)) {
     while (<FOO>) {
@@ -171,11 +172,33 @@ sub shquote ($) {
     return $t;
 }
 
+opendir(MAINDIR, ".");
+
+
+sub check_dotdot ($$) {
+    my($super, $entry) = @_;
+    my($dir) = $super . $entry;
+    if (!exists($dotdotmaps{$dir})) {
+	if (!-d $dir) {
+	    $dotdotmaps{$dir} = undef;
+	} elsif (!-l $dir) {
+	    $dotdotmaps{$dir} = $super;
+	} else {
+	    chdir("$dir/..");
+	    $x = cwd();
+	    chdir(MAINDIR);
+	    $x =~ s/\/+\z//;
+	    $dotdotmaps{$dir} = "$x/";
+	}
+    }
+    $dotdotmaps{$dir};
+}
+
 sub addfile ($$$) {
     my($inf, $op, $always) = @_;
     my($isexec) = substr($op, 0, 4) eq "exec";
     my($f, $first_line, $t, $lnk);
-    $inf =~ s,/+,/,g;
+    $inf =~ s/\/+/\//g;
     return if exists($allfiles{$inf}) && (!$isexec || exists($execfiles{$inf}));
     return if $op eq "exec.optional" && !-f $inf;
     return if $op eq "optional" && !-e $inf;
@@ -183,13 +206,9 @@ sub addfile ($$$) {
 
     $f = $inf;
     $f =~ s,/\.(?:=/|\z),,g;
-    while ($f =~ m,\A(.*?/)([^./][^/]*?|[.][^./]|[.][.][^/]+?)/\.\.(/.*|)\z,
-           && -d "$1$2"
-           && (!-l "$1$2"
-               || (defined($lnk = readlink("$1$2"))
-                   && $lnk !~ m,/,
-                   && -d "$1$lnk" && !-l "$1$lnk"))) {
-        $f = $1 . substr($3, 1);
+    while ($f =~ m,\A(.*?/)([^./][^/]*?|[.][^./][^/]*|[.][.][^/]+)/\.\.(/.*|)\z,
+           && defined(($lnk = check_dotdot($1, $2)))) {
+        $f = $lnk . substr($3, 1);
     }
     $f =~ s,/\z,,;
     return if $f eq "";
