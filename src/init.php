@@ -202,10 +202,10 @@ function load_psets_json($exclude_overrides) {
 }
 
 function load_pset_info() {
-    global $ConfSitePATH, $Conf, $PsetOverrides;
+    global $Conf, $PsetOverrides;
     // read initial messages
     Messages::$main = new Messages;
-    $x = json_decode(file_get_contents("$ConfSitePATH/src/messages.json"));
+    $x = json_decode(file_get_contents(SiteLoader::$root . "/src/messages.json"));
     foreach ($x as $j) {
         Messages::$main->add($j);
     }
@@ -259,13 +259,13 @@ function load_pset_info() {
     }
 
     // also create log/ and repo/ directories
-    foreach (["$ConfSitePATH/log", "$ConfSitePATH/repo"] as $d) {
+    foreach ([SiteLoader::$root . "/log", SiteLoader::$root . "/repo"] as $d) {
         if (!is_dir($d) && !mkdir($d, 02770, true)) {
             $e = error_get_last();
             Multiconference::fail_message("`$d` missing and cannot be created (" . $e["message"] . ").");
         }
         if (!file_exists("$d/.htaccess")
-            && ($x = file_get_contents("$ConfSitePATH/src/.htaccess")) !== false
+            && ($x = file_get_contents(SiteLoader::$root . "/src/.htaccess")) !== false
             && file_put_contents("$d/.htaccess", $x) != strlen($x)) {
             Multiconference::fail_message("Error creating `$d/.htaccess`");
         }
@@ -289,11 +289,11 @@ function load_pset_info() {
 
 load_pset_info();
 
-putenv("GIT_REPOCACHE=$ConfSitePATH/repo");
+putenv("GIT_REPOCACHE=" . SiteLoader::$root . "/repo");
 if ($Conf->opt("mysql") !== null) {
     putenv("MYSQL=" . $Conf->opt("mysql"));
 }
 if (!$Conf->opt("disableRemote")
-    && !is_executable("$ConfSitePATH/jail/pa-timeout")) {
+    && !is_executable(SiteLoader::$root . "/jail/pa-timeout")) {
     $Conf->set_opt("disableRemote", "The `pa-timeout` program has not been built. Run `cd DIR/jail; make` to access remote repositories.");
 }

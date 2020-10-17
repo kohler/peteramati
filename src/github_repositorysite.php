@@ -275,7 +275,6 @@ class GitHub_RepositorySite extends RepositorySite {
         return $status;
     }
     function gitfetch($repoid, $cacheid, $foreground) {
-        global $ConfSitePATH;
         if (!($id = $this->conf->opt("githubOAuthClientId"))
             || !($token = $this->conf->opt("githubOAuthToken"))
             || !ctype_alnum($token)) {
@@ -283,7 +282,7 @@ class GitHub_RepositorySite extends RepositorySite {
         }
         putenv("GIT_USERNAME=$id");
         putenv("GIT_PASSWORD=$token");
-        $command = escapeshellarg("$ConfSitePATH/src/gitfetch")
+        $command = escapeshellarg(SiteLoader::$root . "/src/gitfetch")
             . " -m " . escapeshellarg($this->conf->default_main_branch)
             . " $repoid $cacheid " . escapeshellarg($this->https_url())
             . " 1>&2" . ($foreground ? "" : " &");

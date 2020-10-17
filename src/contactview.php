@@ -420,7 +420,7 @@ class ContactView {
     }
 
     static function set_repo_action($user, $qreq) {
-        global $Conf, $Me, $ConfSitePATH;
+        global $Conf, $Me;
         if (!($Me->has_account_here()
               && $qreq->post_ok()
               && ($pset = $Conf->pset_by_key($qreq->pset)))) {
@@ -497,7 +497,7 @@ class ContactView {
     }
 
     static function set_branch_action($user, $qreq) {
-        global $Conf, $Me, $ConfSitePATH;
+        global $Conf, $Me;
         if (!($Me->has_account_here()
               && $qreq->post_ok()
               && ($pset = $Conf->pset_by_key($qreq->pset))

@@ -988,8 +988,7 @@ class PsetView {
 
 
     function runner_logfile($checkt) {
-        global $ConfSitePATH;
-        return $ConfSitePATH . "/log/run" . $this->repo->cacheid
+        return SiteLoader::$root . "/log/run" . $this->repo->cacheid
             . ".pset" . $this->pset->id . "/repo" . $this->repo->repoid
             . ".pset" . $this->pset->id . "." . $checkt . ".log";
     }

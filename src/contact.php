@@ -1342,7 +1342,6 @@ class Contact {
     }
 
     function set_partner($pset, $partner) {
-        global $ConfSitePATH;
         $pset = is_object($pset) ? $pset->psetid : $pset;
 
         // does it contain odd characters?

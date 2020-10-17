@@ -37,7 +37,6 @@ class RunnerState {
     private $_running_checkts;
 
     function __construct(PsetView $info, RunnerConfig $runner, $checkt = null) {
-        global $ConfSitePATH;
         $this->conf = $info->conf;
         $this->info = $info;
         $this->repo = $info->repo;
@@ -47,7 +46,7 @@ class RunnerState {
         assert(!$runner->command || $this->repoid);
 
         if (!$this->pset->gitless) {
-            $this->logdir = $ConfSitePATH . "/log/run" . $this->repo->cacheid
+            $this->logdir = SiteLoader::$root . "/log/run" . $this->repo->cacheid
                 . ".pset" . $this->pset->id;
             if (!is_dir($this->logdir)) {
                 $old_umask = umask(0);
@@ -175,7 +174,6 @@ class RunnerState {
     }
 
     private function overlayfiles() {
-        global $ConfSitePATH;
         $f = $this->runner->overlay;
         if (!isset($f)) {
             $f = $this->pset->run_overlay;
@@ -191,7 +189,7 @@ class RunnerState {
                 array_splice($f, $i, 1);
             } else {
                 if ($f[$i][0] !== "/") {
-                    $f[$i] = $ConfSitePATH . "/" . $f[$i];
+                    $f[$i] = SiteLoader::$root . "/" . $f[$i];
                 }
                 $f[$i] = $this->expand($f[$i]);
                 ++$i;
@@ -293,11 +291,10 @@ class RunnerState {
     }
 
     function write($data) {
-        global $ConfSitePATH;
         if (!$this->checkt)
             return false;
         $logfn = $this->info->runner_logfile($this->checkt);
-        $proc = proc_open("$ConfSitePATH/jail/pa-writefifo " . escapeshellarg($logfn . ".in"),
+        $proc = proc_open(SiteLoader::$root . "/jail/pa-writefifo " . escapeshellarg($logfn . ".in"),
                           [["pipe", "r"]], $pipes);
         if ($pipes[0]) {
             fwrite($pipes[0], $data);
@@ -310,7 +307,6 @@ class RunnerState {
 
 
     function start($queue) {
-        global $ConfSitePATH;
         assert($this->checkt === null && $this->logfile === null);
 
         // collect user information
@@ -327,15 +323,17 @@ class RunnerState {
         $this->userhome = preg_replace(',/+\z,', '', $this->userhome);
 
         $this->jaildir = preg_replace(',/+\z,', '', $this->expand($this->pset->run_dirpattern));
-        if (!$this->jaildir)
+        if (!$this->jaildir) {
             throw new RunnerException("Bad run_dirpattern");
+        }
 
         $this->jailhomedir = $this->jaildir . "/" . preg_replace(',\A/+,', '', $this->userhome);
 
-        if (!chdir($ConfSitePATH))
+        if (!chdir(SiteLoader::$root)) {
             throw new RunnerException("Can’t cd to main directory");
-        if (!is_executable("jail/pa-jail"))
+        } else if (!is_executable("jail/pa-jail")) {
             throw new RunnerException("The pa-jail program has not been compiled");
+        }
 
         // create logfile and lockfile
         $this->checkt = time();
@@ -440,18 +438,18 @@ class RunnerState {
     }
 
     private function checkout_code() {
-        global $ConfSitePATH;
-
         $checkoutdir = $clonedir = $this->jailhomedir . "/repo";
         if ($this->repo->truncated_psetdir($this->pset)
-            && $this->pset->directory_noslash !== "")
+            && $this->pset->directory_noslash !== "") {
             $clonedir .= "/" . $this->pset->directory_noslash;
+        }
 
         fwrite($this->logstream, "++ mkdir $checkoutdir\n");
-        if (!mkdir($clonedir, 0777, true))
+        if (!mkdir($clonedir, 0777, true)) {
             throw new RunnerException("Can’t initialize user repo in jail");
+        }
 
-        $repodir = $ConfSitePATH . "/repo/repo" . $this->repo->cacheid;
+        $repodir = SiteLoader::$root . "/repo/repo" . $this->repo->cacheid;
 
         // need a branch to check out a specific commit
         $branch = "jailcheckout_" . Conf::$now;
@@ -616,12 +614,11 @@ class RunnerState {
 
 
     function evaluate($answer) {
-        global $ConfSitePATH;
         if (isset($this->runner->require)) {
             if ($this->runner->require[0] === "/") {
                 require_once($this->runner->require);
             } else {
-                require_once($ConfSitePATH . "/" . $this->runner->require);
+                require_once(SiteLoader::$root . "/" . $this->runner->require);
             }
         }
         $answer->result = call_user_func($this->runner->eval, $this->info);

@@ -258,8 +258,6 @@ class Conf {
     }
 
     private function crosscheck_options() {
-        global $ConfSitePATH;
-
         // set longName, downloadPrefix, etc.
         $confid = $this->opt["confid"];
         if ((!isset($this->opt["longName"]) || $this->opt["longName"] == "")
@@ -1305,7 +1303,6 @@ class Conf {
 
 
     function cacheableImage($name, $alt, $title = null, $class = null, $style = null) {
-        global $ConfSitePATH;
         $t = "<img src=\"" . Navigation::siteurl() . "images/$name\" alt=\"$alt\"";
         if ($title)
             $t .= " title=\"$title\"";
@@ -1711,7 +1708,7 @@ class Conf {
     }
 
     private function header_head($title, $id, $options) {
-        global $Me, $ConfSitePATH;
+        global $Me;
         echo "<!DOCTYPE html>
 <html lang=\"en\">
 <head>
@@ -1853,7 +1850,7 @@ class Conf {
     }
 
     function header($title, $id = "", $options = []) {
-        global $ConfSitePATH, $Me;
+        global $Me;
         if ($this->_header_printed)
             return;
 
@@ -1950,7 +1947,7 @@ class Conf {
     }
 
     function footer() {
-        global $Me, $ConfSitePATH;
+        global $Me;
         echo "</div>\n", // class='body'
             "<div id='footer'>\n";
         $footy = $this->opt("extraFooter") ?? "";
@@ -1959,9 +1956,9 @@ class Conf {
         }
         if (!$this->opt("noFooterVersion")) {
             if ($Me && $Me->privChair) {
-                if (is_dir("$ConfSitePATH/.git")) {
+                if (is_dir(SiteLoader::$root . "/.git")) {
                     $args = array();
-                    exec("export GIT_DIR=" . escapeshellarg($ConfSitePATH) . "/.git; git rev-parse HEAD 2>/dev/null", $args);
+                    exec("export GIT_DIR=" . escapeshellarg(SiteLoader::$root) . "/.git; git rev-parse HEAD 2>/dev/null", $args);
                     if (count($args) == 2 && $args[0] != $args[1])
                         $footy .= " [" . substr($args[0], 0, 7) . "...]";
                 }
@@ -2231,7 +2228,6 @@ class Conf {
 
 
     function handout_repo(Pset $pset, Repository $inrepo = null) {
-        global $ConfSitePATH;
         $url = $pset->handout_repo_url;
         if (!$url) {
             return null;

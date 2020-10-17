@@ -531,7 +531,6 @@ function assert_callback() {
 //assert_options(ASSERT_CALLBACK, "assert_callback");
 
 function debug_string_backtrace() {
-    global $ConfSitePATH;
     $s = preg_replace_callback('/^\#(\d+)/m', function ($m) {
         return "#" . ($m[1] - 1);
     }, (new Exception)->getTraceAsString());

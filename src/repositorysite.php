@@ -78,7 +78,7 @@ class RepositorySite {
     }
     static function run_remote_oauth(Conf $conf, $clientid, $token,
                                      $gitcommand, &$output) {
-        global $ConfSitePATH, $Me;
+        global $Me;
         if ($conf->opt("disableRemote")) {
             if (is_string($conf->opt("disableRemote"))) {
                 self::chair_error(htmlspecialchars($conf->opt("disableRemote")));
@@ -92,7 +92,7 @@ class RepositorySite {
         }
         putenv("GIT_USERNAME=$clientid");
         putenv("GIT_PASSWORD=$token");
-        $command = "$ConfSitePATH/jail/pa-timeout " . $conf->validate_timeout
+        $command = SiteLoader::$root . "/jail/pa-timeout " . $conf->validate_timeout
             . " git -c credential.helper= -c " . escapeshellarg("credential.helper=!f() { echo username=\$GIT_USERNAME; echo password=\$GIT_PASSWORD; }; f")
             . " " . $gitcommand;
         exec($command, $output, $status);
