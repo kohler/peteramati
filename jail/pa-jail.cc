@@ -43,9 +43,10 @@
 
 #define ROOT 0
 
-#define FLAG_CP 1        // copy even if source is symlink
-#define FLAG_BIND 2
-#define FLAG_BIND_RO 4
+#define FLAG_CP       1        // copy even if source is symlink
+#define FLAG_BIND     2
+#define FLAG_BIND_RO  4
+#define FLAG_MOUNT    8
 
 #ifndef O_PATH
 #define O_PATH 0
@@ -120,32 +121,36 @@ void perror_die(const std::string& message) {
 // pathname helpers
 
 static std::string path_endslash(const std::string& path) {
-    if (path.empty() || path.back() != '/')
+    if (path.empty() || path.back() != '/') {
         return path + "/";
-    else
+    } else {
         return path;
+    }
 }
 
 static std::string path_noendslash(std::string path) {
-    while (path.length() > 1 && path.back() == '/')
+    while (path.length() > 1 && path.back() == '/') {
         path = path.substr(0, path.length() - 1);
+    }
     return path;
 }
 
 // returns a non-empty path that ends in slash
 static std::string path_parentdir(const std::string& path) {
     size_t npos = path.length();
-    while (npos > 1 && path[npos - 1] == '/')
+    while (npos > 1 && path[npos - 1] == '/') {
         --npos;
-    while (npos > 1 && path[npos - 1] != '/')
+    }
+    while (npos > 1 && path[npos - 1] != '/') {
         --npos;
+    }
     return path.substr(0, npos);
 }
 
 static std::string shell_quote(const std::string& argument) {
     std::string quoted;
     size_t last = 0;
-    for (size_t pos = 0; pos != argument.length(); ++pos)
+    for (size_t pos = 0; pos != argument.length(); ++pos) {
         if ((pos == 0 && argument[pos] == '~')
             || !(isalnum((unsigned char) argument[pos])
                  || argument[pos] == '_'
@@ -153,16 +158,18 @@ static std::string shell_quote(const std::string& argument) {
                  || argument[pos] == '~'
                  || argument[pos] == '.'
                  || argument[pos] == '/')) {
-            if (quoted.empty())
+            if (quoted.empty()) {
                 quoted = "'";
+            }
             if (argument[pos] == '\'') {
                 quoted += argument.substr(last, pos - last) + "'\\''";
                 last = pos + 1;
             }
         }
-    if (quoted.empty())
+    }
+    if (quoted.empty()) {
         return argument;
-    else {
+    } else {
         quoted += argument.substr(last) + "'";
         return quoted;
     }
@@ -174,10 +181,11 @@ static const char* uid_to_name(uid_t u) {
     static char buf[128];
     if (u != old_uid) {
         old_uid = u;
-        if (struct passwd *pw = getpwuid(u))
+        if (struct passwd *pw = getpwuid(u)) {
             snprintf(buf, sizeof(buf), "%s", pw->pw_name);
-        else
+        } else {
             snprintf(buf, sizeof(buf), "%u", (unsigned) u);
+        }
     }
     return buf;
 }
@@ -187,54 +195,64 @@ static const char* gid_to_name(gid_t g) {
     static char buf[128];
     if (g != old_gid) {
         old_gid = g;
-        if (struct group *gr = getgrgid(g))
+        if (struct group *gr = getgrgid(g)) {
             snprintf(buf, sizeof(buf), "%s", gr->gr_name);
-        else
+        } else {
             snprintf(buf, sizeof(buf), "%u", (unsigned) g);
+        }
     }
     return buf;
 }
 
 
 static int v_fchmod(int fd, mode_t mode, const std::string& pathname) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "chmod 0%o %s\n", mode, pathname.c_str());
+    }
     return dryrun ? 0 : fchmod(fd, mode);
 }
 
 static int x_lchown(const char* path, uid_t owner, gid_t group) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "chown -h %s:%s %s\n", uid_to_name(owner), gid_to_name(group), path);
-    if (!dryrun && lchown(path, owner, group) != 0)
+    }
+    if (!dryrun && lchown(path, owner, group) != 0) {
         return perror_fail("chown %s: %s\n", path);
+    }
     return 0;
 }
 
 static int x_lchownat(int fd, const char* component, uid_t owner, gid_t group, const std::string& dirpath) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "chown -h %s:%s %s%s\n", uid_to_name(owner), gid_to_name(group), dirpath.c_str(), component);
-    if (!dryrun && fchownat(fd, component, owner, group, AT_SYMLINK_NOFOLLOW) != 0)
+    }
+    if (!dryrun && fchownat(fd, component, owner, group, AT_SYMLINK_NOFOLLOW) != 0) {
         return perror_fail("chown %s: %s\n", (dirpath + component).c_str());
+    }
     return 0;
 }
 
 static int x_fchown(int fd, uid_t owner, gid_t group, const std::string& path) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "chown -h %s:%s %s\n", uid_to_name(owner), gid_to_name(group), path.c_str());
-    if (!dryrun && fchown(fd, owner, group) != 0)
+    }
+    if (!dryrun && fchown(fd, owner, group) != 0) {
         return perror_fail("chown %s: %s\n", path.c_str());
+    }
     return 0;
 }
 
 static int v_mkdir(const char* pathname, mode_t mode) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "mkdir -m 0%o %s\n", mode, pathname);
+    }
     return dryrun ? 0 : mkdir(pathname, mode);
 }
 
 static int v_mkdirat(int dirfd, const char* component, mode_t mode, const std::string& pathname) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "mkdir -m 0%o %s\n", mode, pathname.c_str());
+    }
     return dryrun ? 0 : mkdirat(dirfd, component, mode);
 }
 
@@ -556,8 +574,9 @@ static mount_table_type mount_table;
 
 static int populate_mount_table() {
     static bool mount_table_populated = false;
-    if (mount_table_populated)
+    if (mount_table_populated) {
         return 0;
+    }
     mount_table_populated = true;
 #if __linux__
     FILE* f = setmntent("/proc/mounts", "r");
@@ -595,8 +614,9 @@ int umount(const char* dir) {
 static int handle_mount(std::string src, std::string dst, bool in_child) {
     auto it = mount_table.find(src);
     if (it == mount_table.end()
-        || !it->second.mountable(src, dst))
+        || !it->second.mountable(src, dst)) {
         return 0;
+    }
 
     auto dit = mount_table.find(dst);
     if (dit != mount_table.end()
@@ -604,18 +624,21 @@ static int handle_mount(std::string src, std::string dst, bool in_child) {
         && dit->second.type == it->second.type
         && dit->second.opts == it->second.opts
         && dit->second.data == it->second.data
-        && !in_child)
+        && !in_child) {
         // already mounted
         return 0;
+    }
 
     auto xit = dst_table.find(dst);
     if (xit != dst_table.end()
-        && xit->second > 1)
+        && xit->second > 1) {
         return 0;
+    }
     dst_table[dst] = 2;
 
-    if (in_child)
+    if (in_child) {
         v_ensuredir(dst, 0555, true);
+    }
 
     mountslot msx(it->second);
 #if __linux__
@@ -623,32 +646,38 @@ static int handle_mount(std::string src, std::string dst, bool in_child) {
         msx.add_mountopt("newinstance");
         msx.add_mountopt("ptmxmode=0666");
     }
-    if ((msx.opts & MS_BIND) && in_child)
+    if ((msx.opts & MS_BIND) && in_child) {
         msx.add_mountopt("slave");
+    }
 #endif
     int r = msx.x_mount(dst, msx.opts);
     // if in child, try one more time with remount
-    if (!dryrun && r != 0 && errno == EBUSY && in_child)
+    if (!dryrun && r != 0 && errno == EBUSY && in_child) {
         r = msx.x_mount(dst, msx.opts | MS_REMOUNT);
+    }
 #if __linux__
     // if bind mount, need to remount as slave
-    if (r == 0 && (msx.opts & MS_BIND))
+    if (r == 0 && (msx.opts & MS_BIND)) {
         r = msx.x_mount(dst, msx.opts | MS_REMOUNT);
+    }
 #endif
-    if (r != 0)
+    if (r != 0) {
         return perror_fail("%s: %s\n", msx.debug_mount_command(dst, msx.opts).c_str());
+    }
     return 0;
 }
 
 static int handle_umount(const mount_table_type::iterator& it) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "umount -i -n %s\n", it->first.c_str());
+    }
     if (!dryrun && umount(it->first.c_str()) != 0) {
         fprintf(stderr, "umount %s: %s\n", it->first.c_str(), strerror(errno));
         exit(1);
     }
-    if (dryrun)
+    if (dryrun) {
         dst_table[it->first.c_str()] = 3;
+    }
     return 0;
 }
 
@@ -661,15 +690,16 @@ static void handle_symlink_dst(std::string dst, std::string src,
                                std::string lnk, dev_t jaildev)
 {
     std::string root = dstroot;
-    if (!linkdir.empty() && dst.substr(0, dstroot.length()) != dstroot)
+    if (!linkdir.empty() && dst.substr(0, dstroot.length()) != dstroot) {
         root = linkdir;
+    }
 
     // expand `lnk` into `dst`
     if (lnk[0] == '/') {
         src = lnk;
         dst = root + lnk;
     } else {
-        while (1) {
+        while (true) {
             if (src.length() == 1) {
             give_up:
                 return;
@@ -677,42 +707,51 @@ static void handle_symlink_dst(std::string dst, std::string src,
             size_t srcslash = src.rfind('/', src.length() - 2),
                 dstslash = dst.rfind('/', dst.length() - 2);
             if (srcslash == std::string::npos || dstslash == std::string::npos
-                || dstslash < root.length())
+                || dstslash < root.length()) {
                 goto give_up;
+            }
             src = src.substr(0, srcslash + 1);
             dst = dst.substr(0, dstslash + 1);
             if (lnk.length() > 3 && lnk[0] == '.' && lnk[1] == '.'
-                && lnk[2] == '/')
+                && lnk[2] == '/') {
                 lnk = lnk.substr(3);
-            else
+            } else {
                 break;
+            }
         }
         src += lnk;
         dst += lnk;
     }
 
-    if (dst.substr(root.length(), 6) != "/proc/")
+    if (dst.substr(root.length(), 6) != "/proc/") {
         handle_copy(src, dst.substr(root.length()), 0, jaildev);
+    }
 }
 
 static int x_rm_f(const std::string &dst) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "rm -f %s\n", dst.c_str());
-    if (dryrun)
+    }
+    if (dryrun) {
         return 0;
+    }
     int r = unlink(dst.c_str());
-    if (r == -1 && errno != ENOENT)
+    if (r == -1 && errno != ENOENT) {
         return perror_fail("rm %s: %s\n", dst.c_str());
+    }
     return 0;
 }
 
 static int x_cp_p(const std::string& src, const std::string& dst) {
-    if (x_rm_f(dst))
+    if (x_rm_f(dst)) {
         return 1;
-    if (verbose)
+    }
+    if (verbose) {
         fprintf(verbosefile, "cp -p %s %s\n", src.c_str(), dst.c_str());
-    if (dryrun)
+    }
+    if (dryrun) {
         return 0;
+    }
 
     pid_t child = fork();
     if (child == 0) {
@@ -721,16 +760,18 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
         };
         execv("/bin/cp", (char**) args);
         exit(1);
-    } else if (child < 0)
+    } else if (child < 0) {
         return perror_fail("%s: %s\n", "fork");
+    }
 
     int status = x_waitpid(child, 0).second;
-    if (status == 0)
+    if (status == 0) {
         return 0;
-    else if (status != -1)
+    } else if (status != -1) {
         return perror_fail("/bin/cp %s: Bad exit status\n", dst.c_str());
-    else
+    } else {
         return perror_fail("/bin/cp %s: Did not exit\n", dst.c_str());
+    }
 }
 
 static inline int stat_mtimes_same(const struct stat& st1, const struct stat& st2) {
@@ -825,14 +866,17 @@ static int handle_copy(std::string src, std::string subdst,
 
     // do not end in slash. lstat() on a symlink path actually follows the
     // symlink if the path ends in slash
-    while (src.length() > 1 && src.back() == '/')
+    while (src.length() > 1 && src.back() == '/') {
         src = src.substr(0, src.length() - 1);
-    while (subdst.length() > 1 && subdst.back() == '/')
+    }
+    while (subdst.length() > 1 && subdst.back() == '/') {
         subdst = subdst.substr(0, subdst.length() - 1);
+    }
 
     std::string dst = dstroot + subdst;
-    if (dst_table.find(dst) != dst_table.end())
+    if (dst_table.find(dst) != dst_table.end()) {
         return 1;
+    }
     dst_table[dst] = 1;
 
     struct stat ss;
@@ -845,23 +889,28 @@ static int handle_copy(std::string src, std::string subdst,
             int r = handle_copy(path_noendslash(path_parentdir(src)),
                                 last_parentdir.substr(dstroot.length()),
                                 0, jaildev);
-            if (r != 0)
+            if (r != 0) {
                 return r;
+            }
         }
     }
 
-    if (lstat(src.c_str(), &ss) != 0)
+    if (lstat(src.c_str(), &ss) != 0) {
         return perror_fail("lstat %s: %s\n", src.c_str());
+    }
 
     // set up skeleton directory version
-    if (!linkdir.empty())
+    if (!linkdir.empty()) {
         do_copy(linkdir + subdst, src, ss, true, jaildev);
+    }
 
-    if (do_copy(dst, src, ss, !(flags & FLAG_CP), jaildev))
+    if (do_copy(dst, src, ss, !(flags & FLAG_CP), jaildev)) {
         return 1;
+    }
 
-    if (S_ISDIR(ss.st_mode))
+    if (S_ISDIR(ss.st_mode)) {
         return handle_mount(src, dst, false);
+    }
     return 0;
 }
 
@@ -951,7 +1000,7 @@ static int construct_jail(dev_t jaildev, std::string& str) {
 
     // Read a line at a time
     std::string cursrcdir("/"), curdstsubdir("/");
-    std::string bind_tag, bind_files;
+    std::string bind_tag, bind_files, mount_dst, mount_args;
     int base_flags = 0;
 
     const char* pos = str.data(), *endpos = pos + str.length();
@@ -1022,17 +1071,20 @@ static int construct_jail(dev_t jaildev, std::string& str) {
                 const char* optstart = opts;
                 opts = opt_wordskip(opts + 1);
                 // process option
-                bool want_bind = false;
+                bool want = 0;
                 if (opt_eq(optstart, opts, "cp", 2)) {
                     flags |= FLAG_CP;
                 } else if (opt_eq(optstart, opts, "bind", 4)) {
                     flags |= FLAG_BIND;
-                    want_bind = true;
+                    want = FLAG_BIND;
                 } else if (opt_eq(optstart, opts, "bind-ro", 7)) {
                     flags |= FLAG_BIND_RO;
-                    want_bind = true;
+                    want = FLAG_BIND;
+                } else if (opt_eq(optstart, opts, "mount", 5)) {
+                    flags |= FLAG_MOUNT;
+                    want = FLAG_MOUNT;
                 }
-                if (want_bind) {
+                if (want == FLAG_BIND) {
                     while (isspace((unsigned char) *opts)) {
                         ++opts;
                     }
@@ -1046,6 +1098,22 @@ static int construct_jail(dev_t jaildev, std::string& str) {
                     tagstart = opts;
                     opts = opt_wordskip(opts);
                     bind_files = std::string(tagstart, opts);
+                } else if (want == FLAG_MOUNT) {
+                    while (isspace((unsigned char) *opts)) {
+                        ++opts;
+                    }
+                    const char* mountstart = opts;
+                    opts = opt_wordskip(opts);
+                    mount_dst = std::string(mountstart, opts);
+
+                    while (isspace((unsigned char) *opts)) {
+                        ++opts;
+                    }
+                    mountstart = opts;
+                    while (*opts != ']' && *opts != ';') {
+                        ++opts;
+                    }
+                    mount_args = std::string(mountstart, opts);
                 }
                 // skip to next option word
                 while (*opts != ']' && *opts != ';') {
@@ -1070,13 +1138,21 @@ static int construct_jail(dev_t jaildev, std::string& str) {
 
         // act on flags
         if (flags & (FLAG_BIND | FLAG_BIND_RO)) {
+            if (flags & FLAG_MOUNT) {
+                fprintf(stderr, "%s: [mount] option ignored\n", src.c_str());
+            }
             if (!bind_tag.empty() && !bind_files.empty()) {
                 fix_jail_bind_src(jaildev, src, bind_tag, bind_files);
             }
             mountslot ms(src.c_str(), "none",
                          flags & FLAG_BIND_RO ? "bind,rec,unbindable,ro" : "bind,rec,unbindable");
             ms.wanted = true;
-            populate_mount_table();
+            mount_table[src] = ms;
+            v_ensuredir(dstroot + dst, 0555, true);
+            handle_mount(src, dstroot + dst, false);
+        } else if (flags & FLAG_MOUNT) {
+            mountslot ms(src.c_str(), mount_dst.c_str(), mount_args.c_str());
+            ms.wanted = true;
             mount_table[src] = ms;
             v_ensuredir(dstroot + dst, 0555, true);
             handle_mount(src, dstroot + dst, false);
@@ -1964,8 +2040,9 @@ int jailownerinfo::exec_go() {
         perror_die("mount --make-rslave /");
 
     populate_mount_table();     // ensure we know how to mount /proc
-    for (size_t i = 0; i != delayed_mounts.size(); i += 2)
+    for (size_t i = 0; i != delayed_mounts.size(); i += 2) {
         handle_mount(delayed_mounts[i], delayed_mounts[i+1], true);
+    }
     handle_mount("/proc", jaildir_->dir + "proc", true);
     handle_mount("/dev/pts", jaildir_->dir + "dev/pts", true);
     handle_mount("/tmp", jaildir_->dir + "tmp", true);
