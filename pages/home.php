@@ -952,25 +952,21 @@ function render_grades($pset, $gi, $s) {
     $garr = $gvarr = $different = [];
     foreach ($pset->numeric_grades() as $ge) {
         $k = $ge->key;
-        $gv = $ggv = $agv = "";
+        $gv = $ggv = $agv = null;
         if ($gi && isset($gi->grades)) {
-            $ggv = get($gi->grades, $k);
+            $ggv = $gi->grades->$k ?? null;
         }
         if ($gi && isset($gi->autogrades)) {
-            $agv = get($gi->autogrades, $k);
+            $agv = $gi->autogrades->$k ?? null;
         }
         if ($ge->formula && $gi && isset($gi->formula)) {
-            $ggv = get($gi->formula, $k);
+            $ggv = $gi->formula->$k ?? null;
         }
-        if ($ggv !== null && $ggv !== "") {
-            $gv = $ggv;
-        } else if ($agv !== null && $agv !== "") {
-            $gv = $agv;
-        }
-        if ($gv != "" && !$ge->no_total) {
+        $gv = $ggv ?? $agv;
+        if ($gv !== null && !$ge->no_total) {
             $total += $gv;
         }
-        if ($gv === ""
+        if ($gv === null
             && !$ge->is_extra
             && $s
             && $Me->contactId == $s->gradercid) {
