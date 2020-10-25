@@ -3119,9 +3119,9 @@ function pa_add_grade_type(name, rest) {
 }
 
 function pa_render_editable_entry(id, opts) {
-    var t = '<div class="pa-pd"><span class="pa-gradewidth">' +
-        '<input type="text" class="' + opts.live_class + 'pa-gradevalue pa-gradewidth" name="' +
-        this.key + '" id="' + id + '"></span> <span class="pa-gradedesc">';
+    var t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="text" class="'
+        .concat(opts.live_class, 'pa-gradevalue pa-gradewidth" name="',
+                this.key, '" id="', id, '"></span> <span class="pa-gradedesc">');
     if (opts.max_text) {
         t += opts.max_text;
     } else if (this.max) {
@@ -3142,7 +3142,8 @@ pa_add_grade_type("formula", {
 pa_add_grade_type("text", {
     text: function (v) { return v == null ? "" : v; },
     entry: function (id, opts) {
-        return '<div class="pa-pd"><textarea class="' + opts.live_class + 'pa-pd pa-gradevalue need-autogrow" name="' + this.key + '" id="' + id + '"></textarea></div>';
+        return '<div class="pa-pd"><textarea class="'
+            .concat(opts.live_class, 'pa-pd pa-gradevalue need-autogrow" name="', this.key, '" id="', id, '"></textarea></div>');
     },
     justify: "left",
     sort: "forward"
@@ -3151,10 +3152,11 @@ pa_add_grade_type("text", {
 pa_add_grade_type("select", {
     text: function (v) { return v == null ? "" : v; },
     entry: function (id, opts) {
-        var t = '<div class="pa-pd"><span class="select"><select class="' + opts.live_class + 'pa-gradevalue" name="' + this.key + '" id="' + id + '"><option value="">None</option>';
+        var t = '<div class="pa-pd"><span class="select"><select class="'
+            .concat(opts.live_class, 'pa-gradevalue" name="', this.key, '" id="', id, '"><option value="">None</option>');
         for (var i = 0; i !== this.options.length; ++i) {
             var n = escape_entities(this.options[i]);
-            t += '<option value="' + n + '">' + n + '</option>';
+            t = t.concat('<option value="', n, '">', n, '</option>');
         }
         return t + '</select></span></div>';
     },
@@ -3180,13 +3182,10 @@ pa_add_grade_type("checkbox", {
             return v + "";
     },
     entry: function (id, opts) {
-        var t = '<div class="pa-pd"><span class="pa-gradewidth">' +
-            '<input type="checkbox" class="' + (opts.live_class ? 'ui ' : '') +
-            'pa-gradevalue ml-0" name="' + this.key + '" id="' + id + '" value="' +
-            this.max + '"></span>';
+        var t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="checkbox" class="'
+            .concat((opts.live_class ? 'ui ' : ''), 'pa-gradevalue ml-0" name="', this.key, '" id="', id, '" value="', this.max, '"></span>');
         if (opts.editable) {
-            t += ' <span class="pa-gradedesc">of ' + this.max +
-                ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>';
+            t = t.concat(' <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
         }
         return t + '</div>';
     },
@@ -3226,11 +3225,12 @@ function make_checkboxlike(str) {
                 return v + "";
         },
         entry: function (id, opts) {
-            var t = '<div class="pa-pd"><span class="pa-gradewidth">' +
-                '<input type="hidden" class="' + opts.live_class + 'pa-gradevalue" name="' + this.key + '">';
+            var t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="hidden" class="'
+                .concat(opts.live_class, 'pa-gradevalue" name="', this.key, '">');
             for (var i = 0; i < this.max; ++i) {
-                t += '<input type="checkbox" class="' + (opts.live_class ? 'ui js-checkboxes-grade ' : '') +
-                    'ml-0" name="' + this.key + ':' + i + '" value="1"';
+                t = t.concat('<input type="checkbox" class="',
+                    opts.live_class ? 'ui js-checkboxes-grade ' : '',
+                    'ml-0" name="', this.key, ':', i, '" value="1"');
                 if (i === this.max - 1)
                     t += ' id="' + id + '"';
                 t += '>';
