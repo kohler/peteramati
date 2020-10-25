@@ -1461,9 +1461,14 @@ class PsetView {
         }
 
         if (!$no_heading) {
-            echo '<h3 class="pa-fileref" data-pa-fileid="', $tabid, '"><a class="qq ui pa-unfold-file-diff" href=""><span class="foldarrow">',
+            echo '<div class="pa-dg pa-with-fixed">',
+                '<h3 class="pa-fileref" data-pa-fileid="', $tabid, '"><a class="qq ui pa-unfold-file-diff" href=""><span class="foldarrow">',
                 ($open ? "&#x25BC;" : "&#x25B6;"),
-                "</span>", htmlspecialchars($dinfo->title ? : $file), "</a>";
+                "</span>";
+            if ($args["diffcontext"] ?? false) {
+                echo '<span class="pa-fileref-context">', $args["diffcontext"], '</span>';
+            }
+            echo htmlspecialchars($dinfo->title ? : $file), "</a>";
             $bts = [];
             $bts[] = '<a href="" class="ui pa-diff-toggle-hide-left btn'
                 . ($hide_left ? "" : " btn-primary")
@@ -1535,6 +1540,9 @@ class PsetView {
         }
         if ($has_grade_range) {
             echo '</div></div>';
+        }
+        if (!$no_heading) {
+            echo '</div>';
         }
         echo "</div>\n";
         if (!$only_content && $this->need_format) {
@@ -1706,9 +1714,6 @@ class PsetView {
         echo '</div></div></div>';
     }
 
-    static function echo_pa_diffbar() {
-        echo '<div class="pa-diffbar"><div class="pa-diffbar-file pa-diffbar-top hidden"></div></div>';
-    }
     static function echo_pa_sidebar_gradelist() {
         echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
             '<div class="pa-gradebox pa-ps need-pa-gradelist"></div>',

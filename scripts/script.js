@@ -2776,8 +2776,8 @@ function arrowcapture(evt) {
     if (key === "Enter") {
         make_linenote();
     } else {
-        var wdb = tr.closest(".pa-with-diffbar")
-        $(tr).addClass("live").scrollIntoView(wdb ? {marginTop: wdb.firstChild.offsetHeight} : null);
+        var wf = tr.closest(".pa-with-fixed");
+        $(tr).addClass("live").scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
     }
     return true;
 }
@@ -3045,6 +3045,7 @@ handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
     }
 });
 
+/*
 var pa_observe_diff = (function () {
 var observers = new WeakMap;
 function make_observer_fn(ds) {
@@ -3090,7 +3091,7 @@ return function () {
 };
 })();
 $(pa_observe_diff);
-
+*/
 
 
 jQuery.fn.extend({
@@ -3653,7 +3654,7 @@ function render_landmark_fence(md) {
     return function (tokens, idx, options, env, self) {
         var token = tokens[idx], xtoken = token,
             info = token.info ? md.utils.unescapeAll(token.info) : "",
-            lang, content, highlighted = false, i, xattrs, m;
+            lang, lango, content, highlighted = false, i, xattrs, m;
         if (info && info.indexOf(" ") >= 0) {
             if ((m = info.match(/^ *([-a-z+]+) *$/))) {
                 info = m[1];

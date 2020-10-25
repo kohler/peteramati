@@ -2325,21 +2325,20 @@ tr.gtrow-partner {
 	display: none;
 }
 
-.pa-diffbar {
+.pa-fileref-context {
+	font-weight: 500;
+}
+.pa-fileref {
 	position: sticky;
 	z-index: 1;
 	top: 0;
 	padding: 4px 24px;
-	margin: 0 -24px 0.5rem -24px;
-	background: #f3f3ff;
+	margin: 0 0 0.5rem -24px;
 	display: flex;
 	align-items: baseline;
-	font-size: smaller;
-	font-weight: 500;
+	background: #fff;
 }
-.pa-diffbar-file {
-	flex: 1 1 auto;
-}
+
 .pa-filediff {
 	margin-bottom: 1.5rem;
 }
@@ -2552,7 +2551,8 @@ tr.gtrow-partner {
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-noteref, .pa-gradeboxref, .pa-warnbox {
 	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
-	line-height: 1.5;
+	line-height: 1.65;
+	font-size: 87.5%;
 }
 .pa-note {
 	overflow-wrap: break-word;

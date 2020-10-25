@@ -5,8 +5,9 @@
 
 require_once("src/initweb.php");
 ContactView::set_path_request(["/p"]);
-if ($Me->is_empty() || !$Me->isPC)
+if ($Me->is_empty() || !$Me->isPC) {
     $Me->escape();
+}
 global $Pset, $Qreq, $psetinfo_idx, $all_viewed_gradeentries;
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
@@ -31,10 +32,11 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         return;
     }
     $info->set_hash(false);
+    $linkpart_html = htmlspecialchars($Me->user_linkpart($user));
     echo '<div id="pa-psetinfo', $psetinfo_idx,
         '" class="pa-psetinfo pa-diffcontext',
         '" data-pa-pset="', htmlspecialchars($pset->urlkey),
-        '" data-pa-user="', htmlspecialchars($Me->user_linkpart($user));
+        '" data-pa-user="', $linkpart_html;
     if (!$pset->gitless && $info->commit_hash()) {
         echo '" data-pa-hash="', htmlspecialchars($info->commit_hash());
     }
@@ -92,7 +94,8 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
             foreach ($diff as $file => $dinfo) {
                 $info->echo_file_diff($file, $dinfo, $lnorder,
                     ["open" => true, "id_by_user" => true, "hide_left" => true,
-                     "no_heading" => count($qreq->files) == 1]);
+                     "no_heading" => count($qreq->files) == 1,
+                     "diffcontext" => $linkpart_html . "/"]);
             }
             if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
                 PsetView::echo_close_pa_sidebar_gradelist();
@@ -122,10 +125,9 @@ if ($Pset->grade_script) {
     foreach ($Pset->grade_script as $gs)
         Ht::stash_html($Conf->make_script_file($gs));
 }
-echo "<div class=\"pa-psetinfo pa-diffset pa-with-diffbar\" data-pa-gradeinfo=\"",
+echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
      htmlspecialchars(json_encode(new GradeExport($Pset, $Me->isPC))),
      "\">";
-PsetView::echo_pa_diffbar();
 
 if (trim((string) $Qreq->users) === "") {
     $want = [];
