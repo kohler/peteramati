@@ -2148,7 +2148,7 @@ int jailownerinfo::exec_go() {
             {
                 struct winsize ws;
                 ioctl(ptyslave, TIOCGWINSZ, &ws);
-                ws.ws_row = 24;
+                ws.ws_row = 25;
                 ws.ws_col = 80;
                 ioctl(ptyslave, TIOCSWINSZ, &ws);
             }
