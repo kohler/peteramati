@@ -1218,9 +1218,9 @@ class PsetView {
         $gexp->include_entries = !$no_entries;
 
         $notes = $this->current_info();
-        $agx = get($notes, "autogrades");
-        $gx = get($notes, "grades");
-        $fgx = $this->pset->has_formula ? get($notes, "formula") : null;
+        $agx = $notes->autogrades ?? null;
+        $gx = $notes->grades ?? null;
+        $fgx = $this->pset->has_formula ? $notes->formula ?? null : null;
         if ($agx || $gx || $this->is_grading_commit()) {
             $g = $ag = [];
             $total = $total_noextra = 0;
