@@ -181,7 +181,7 @@ class MailSender {
             echo '<div class="fn2 warning">Scroll down to send the prepared mail once the page finishes loading.</div>',
                 "</div>\n";
         }
-        echo Ht::unstash_script("fold('mail',0,2)");
+        echo Ht::unstash_script("\$pa.fold('mail',0,2)");
         $this->started = true;
     }
 
@@ -189,13 +189,13 @@ class MailSender {
         global $Conf;
         if (!$this->started)
             $this->echo_prologue();
-        $s = "\$\$('mailcount').innerHTML=\"" . round(100 * $nrows_done / max(1, $nrows_left)) . "% done.\";";
+        $s = "document.getElementById('mailcount').innerHTML=\"" . round(100 * $nrows_done / max(1, $nrows_left)) . "% done.\";";
         if (!$this->sending) {
             $m = plural($this->mcount, "mail") . ", "
                 . plural($this->mrecipients, "recipient");
             if (count($this->mpapers) != 0)
                 $m .= ", " . plural($this->mpapers, "paper");
-            $s .= "\$\$('mailinfo').innerHTML=\"<span class='barsep'>·</span>" . $m . "\";";
+            $s .= "document.getElementById('mailinfo').innerHTML=\"<span class='barsep'>·</span>" . $m . "\";";
         }
         if (!$this->sending && $this->groupable)
             $s .= "\$('.mail_groupable').show();";
@@ -254,9 +254,9 @@ class MailSender {
                 echo "<td class='mhx'></td>";
             else {
                 ++$this->cbcount;
-                echo '<td class="mhcb"><input type="checkbox" class="cb" name="', $cbkey,
+                echo '<td class="mhcb"><input type="checkbox" class="cb uic js-range-click" name="', $cbkey,
                     '" value="1" checked="checked" data-range-type="mhcb" id="psel', $this->cbcount,
-                    '" onclick="rangeclick(event,this)" /></td>';
+                    '" /></td>';
             }
             echo '<td class="mhnp">', $k, ":</td>",
                 '<td class="mhdp">', $vh, "</td></tr>\n";
@@ -373,7 +373,7 @@ class MailSender {
                 $this->echo_prologue();
                 $nwarnings = $mailer->nwarnings();
                 echo "<div id='foldmailwarn$nwarnings' class='hidden'><div class='warning'>", join("<br />", $mailer->warnings()), "</div></div>";
-                echo Ht::unstash_script("\$\$('mailwarnings').innerHTML = \$\$('foldmailwarn$nwarnings').innerHTML;");
+                echo Ht::unstash_script("document.getElementById('mailwarnings').innerHTML = document.getElementById('foldmailwarn$nwarnings').innerHTML;");
             }
         }
 
@@ -387,7 +387,7 @@ class MailSender {
         else if (!$this->sending)
             $this->echo_actions();
         echo "</div></form>";
-        echo Ht::unstash_script("fold('mail', null);");
+        echo Ht::unstash_script("\$pa.fold('mail', null);");
         $Conf->footer();
         exit;
     }

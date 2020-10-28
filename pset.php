@@ -45,7 +45,7 @@ if (isset($Qreq->setgrader)
         json_exit(["ok" => false, "error" => "No such grader"]);
     }
     $Info->change_grader($grader);
-    json_exit(["ok" => null, "grader_email" => $_POST["grader"]]);
+    json_exit(["ok" => true, "grader_email" => $_POST["grader"]]);
 }
 if (isset($Qreq->setcommit)
     && isset($Qreq->grade)
@@ -295,7 +295,7 @@ function echo_grade_cdf($info) {
         echo '<div class="plot" style="width:350px;height:200px"></div>';
     }
     echo '<div class="statistics"></div></div>';
-    Ht::stash_script("\$(\"#pa-grade-statistics\").each(pa_gradecdf)");
+    Ht::stash_script("\$(\"#pa-grade-statistics\").each(\$pa.gradecdf)");
 }
 
 /** @param PsetView $info */
@@ -368,8 +368,7 @@ function echo_commit($info) {
     } else {
         $key = "this commit";
     }
-    $value = Ht::select("newcommit", $sel, $info->commit_hash(),
-                        array("onchange" => "jQuery(this).closest('form').submit()"));
+    $value = Ht::select("newcommit", $sel, $info->commit_hash(), ["class" => "uich pa-pset-setcommit"]);
     if ($info->pc_view) {
         $x = $info->is_grading_commit() ? "" : "font-weight:bold";
         $value .= " " . Ht::submit("grade", "Grade", array("style" => $x));
@@ -377,8 +376,8 @@ function echo_commit($info) {
 
     // view options
     $fold_viewoptions = !isset($Qreq->tab) && !isset($Qreq->wdiff);
-    $value .= '<div class="viewoptions61">'
-        . '<a class="q" href="#" onclick="return fold61(this.nextSibling,this.parentNode)">'
+    $value .= '<div class="pa-viewoptions">'
+        . '<a class="q ui pa-show-viewoptions" href="">'
         . '<span class="foldarrow">'
         . ($fold_viewoptions ? '&#x25B6;' : '&#x25BC;')
         . '</span>&nbsp;options</a><span style="padding-left:1em"'
@@ -506,7 +505,7 @@ function echo_grader($info) {
             }
 
             $value = Ht::form($info->hoturl_post("pset", array("setgrader" => 1)))
-                . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", array("onchange" => "setgrader61(this)"));
+                . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", ["class" => "uich pa-pset-setgrader"]);
             $value_post = "<span class=\"ajaxsave61\"></span></div></form>";
         } else {
             if (isset($pcm[$gradercid])) {
@@ -545,9 +544,9 @@ function echo_all_grades($info) {
         }
         echo '<div class="pa-gradelist want-pa-landmark-links',
             ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
-        Ht::stash_script('$(".pa-psetinfo").first().data("pa-gradeinfo", ' . json_encode_browser($info->grade_json()) . ').each(pa_loadgrades);');
+        Ht::stash_script('$(".pa-psetinfo").first().data("pa-gradeinfo", ' . json_encode_browser($info->grade_json()) . ').each($pa.loadgrades);');
         if ($info->pset->has_grade_landmark) {
-            Ht::stash_script('$(function(){$(".pa-psetinfo").each(pa_loadgrades)})');
+            Ht::stash_script('$(function(){$(".pa-psetinfo").each($pa.loadgrades)})');
         }
         echo Ht::unstash();
     }
@@ -579,7 +578,7 @@ function echo_all_grades($info) {
 function show_pset($info) {
     echo "<hr>\n";
     if ($info->pset->gitless_grades && $info->can_edit_grades_staff()) {
-        echo '<div style="float:right"><button type="button" onclick="jQuery(\'#upload\').show()">upload</button></div>';
+        echo '<div style="float:right"><button type="button" class="ui pa-pset-upload-grades">upload</button></div>';
     }
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);
@@ -640,7 +639,6 @@ if ($Pset->gitless) {
                 $b = Ht::button(htmlspecialchars($r->title),
                                 array("value" => $r->name,
                                       "class" => "btn pa-runner",
-                                      "onclick" => "pa_run(this)",
                                       "data-pa-run-category" => $r->category_argument(),
                                       "data-pa-run-grade" => isset($r->eval) ? "true" : null));
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
@@ -652,11 +650,8 @@ if ($Pset->gitless) {
     }
     if (count($runnerbuttons) && $Me->isPC && $Me != $User && $last_run) {
         $runnerbuttons[] = " &nbsp;"
-            . Ht::button("+",
-                         array("class" => "btn pa-runner",
-                               "style" => "font-weight:bold",
-                               "name" => "define",
-                               "onclick" => "pa_runsetting.add()"));
+            . Ht::button("+", ["class" => "btn ui pa-runconfig ui font-weight-bold",
+                               "name" => "define"]);
     }
     if ((($Me->isPC && $Me != $User) || $Me == $User)
         && !$Info->is_handout_commit()) {
@@ -678,13 +673,13 @@ if ($Pset->gitless) {
             }
             if (!$resolved) {
                 $x .= '<span style="display:inline-block;margin-left:1em">'
-                    . Ht::button("Resolve", ["name" => "resolveflag", "onclick" => "flag61(this)", "data-flagid" => $k])
+                    . Ht::button("Resolve", ["name" => "resolveflag", "class" => "ui pa-flag", "data-flagid" => $k])
                     . '</span>';
             }
             $runnerbuttons[] = $x . "<br />";
         }
         if ($all_resolved) {
-            $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "onclick" => "flag61(this)", "name" => "flag"]);
+            $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "class" => "ui pa-flag", "name" => "flag"]);
         }
     }
     if (!empty($runnerbuttons)) {
@@ -697,10 +692,10 @@ if ($Pset->gitless) {
                 '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
             // XXX always using grading commit's settings?
             if (($runsettings = $Info->commit_info("runsettings"))) {
-                echo '<script>pa_runsetting.load(', json_encode_browser($runsettings), ')</script>';
+                echo '<script>$pa.load_runsettings(', json_encode_browser($runsettings), ')</script>';
             }
         }
-        Ht::stash_script("jQuery('button.pa-runner').prop('disabled',false)");
+        Ht::stash_script("\$('button.pa-runner').prop('disabled',false)");
     }
 
     // print current grader
@@ -746,17 +741,16 @@ if ($Pset->gitless) {
             continue;
         }
         if (!$any_runners) {
-            echo '<div class="pa-run-outlist">';
+            echo '<div class="pa-runoutlist">';
             $any_runners = true;
         }
 
         $runcategories[$r->category] = true;
-        echo '<div id="pa-runout-' . $r->category . '" class="pa-run-out';
+        echo '<div id="pa-runout-' . $r->category . '" class="pa-runout';
         if (!$rj || !isset($rj->timestamp)) {
             echo ' hidden';
         }
-        echo '"><h3><a class="fold61" href="#" onclick="',
-            "return runfold61('{$r->category}')", '">',
+        echo '"><h3><a class="qq ui pa-show-run" href="">',
             '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($r->output_title), '</a></h3>',
             '<div class="pa-run pa-run-short hidden" id="pa-run-', $r->category, '"';
@@ -800,7 +794,7 @@ if ($Pset->gitless) {
         echo '</div>';
     }
 
-    Ht::stash_script('$(window).on("beforeunload",pa_beforeunload)');
+    Ht::stash_script('$(window).on("beforeunload",$pa.beforeunload)');
 } else {
     if ($Pset->gitless_grades) {
         echo_grade_cdf_here($Info);
@@ -820,7 +814,7 @@ echo "</div>\n";
 
 
 if (!$Pset->gitless) {
-    Ht::stash_script("pa_checklatest()", "pa_checklatest");
+    Ht::stash_script("\$pa.checklatest()", "pa_checklatest");
 }
 
 echo "<div class='clear'></div>\n";

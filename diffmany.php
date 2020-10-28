@@ -165,6 +165,6 @@ foreach ($all_viewed_gradeentries as $gkey => $x) {
     }
 }
 
-Ht::stash_script('$(window).on("beforeunload",pa_beforeunload)');
+Ht::stash_script('$(window).on("beforeunload",$pa.beforeunload)');
 echo "</div><div class='clear'></div>\n";
 $Conf->footer();

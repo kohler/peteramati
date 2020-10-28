@@ -2648,13 +2648,6 @@ table.hidegrades .pa-gradenote {
 	color: #c45500;
 	text-decoration: underline;
 }
-a.fold61 {
-	color: inherit;
-	text-decoration: inherit;
-}
-a.fold61:hover {
-	text-decoration: underline;
-}
 .foldarrow {
 	display: inline-block;
 	font-size: 80%;
@@ -2724,7 +2717,7 @@ a.fold61:hover {
 	white-space: pre-wrap;
 	color: #440000;
 }
-.pa-runner {
+.pa-runner, .pa-runconfig {
 	font-size: 9pt;
 	font-weight: 500;
 }
@@ -2736,7 +2729,7 @@ a.fold61:hover {
 	height: 32em;
 	margin-bottom: 1.5rem;
 }
-.pa-run-outlist {
+.pa-runoutlist {
 	margin-top: 1.5rem;
 }
 .pa-run-short {
@@ -2821,7 +2814,7 @@ a.fold61:hover {
 .pa-runrange-speed-fast {
 	padding-left: 0.5rem;
 }
-.viewoptions61 {
+.pa-viewoptions {
 	display: inline-block;
 	margin-left: 2em;
 }

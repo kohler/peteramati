@@ -596,7 +596,7 @@ class ContactView {
                 echo "\" data-pa-commit=\"", $snaphash;
             }
             echo "\">";
-            Ht::stash_script("pa_checklatest()", "pa_checklatest");
+            Ht::stash_script("\$pa.checklatest()", "pa_checklatest");
         }
         self::echo_group("last commit", $value, $notes);
         if ($commitgroup) {

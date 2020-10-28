@@ -37,7 +37,7 @@ foreach ($Conf->psets() as $pset) {
     }
 }
 echo '</div></form>';
-Ht::stash_script("\$(\".pa-grgraph\").each(pa_gradecdf);\$(window).on(\"resize\",function(){\$(\".pa-grgraph\").each(pa_gradecdf)})");
+Ht::stash_script("\$(\".pa-grgraph\").each(\$pa.gradecdf);\$(window).on(\"resize\",function(){\$(\".pa-grgraph\").each(\$pa.gradecdf)})");
 
 $Sset = new StudentSet($Me);
 $sj = [];
@@ -51,9 +51,9 @@ $jd = ["id" => "overview",
        "checkbox" => true,
        "anonymous" => $any_anonymous,
        "can_override_anonymous" => $any_anonymous,
-       "col" => [["type" => "checkbox", "className" => "uix uich js-range-click js-grgraph-highlight"], "rownumber", "name2"]];
+       "col" => [["type" => "checkbox", "className" => "uic uich js-range-click js-grgraph-highlight"], "rownumber", "name2"]];
 echo Ht::unstash(),
-    '<script>$("#pa-overview-table").each(function(){pa_render_pset_table.call(this,',
+    '<script>$("#pa-overview-table").each(function(){\$pa.render_pset_table.call(this,',
     json_encode_browser($jd), ',', json_encode_browser($sj), ')})</script>';
 echo '<hr class="c">';
 $Conf->footer();

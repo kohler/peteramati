@@ -120,6 +120,6 @@ if ($diff) {
     echo '</div>';
 }
 
-Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",pa_beforeunload)');
+Ht::stash_script('$(".pa-note-entry").autogrow();jQuery(window).on("beforeunload",$pa.beforeunload)');
 echo "</div><hr class=\"c\" />\n";
 $Conf->footer();

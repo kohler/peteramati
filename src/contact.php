@@ -1318,7 +1318,7 @@ class Contact {
 
     function link_repo($html, $url) {
         if ($this->is_anonymous) {
-            return '<a href="" onclick=\'return pa_anonymize_linkto(' . htmlspecialchars(json_encode($url)) . ',event)\'>' . $html . '</a>';
+            return '<a href="" data-pa-link="' . htmlspecialchars($url) . '" class="ui pa-anonymized-link">' . $html . '</a>';
         } else {
             return '<a href="' . htmlspecialchars($url) . '">' . $html . '</a>';
         }

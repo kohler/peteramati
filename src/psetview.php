@@ -1546,11 +1546,11 @@ class PsetView {
         }
         echo "</div>\n";
         if (!$only_content && $this->need_format) {
-            echo "<script>render_text.on_page()</script>\n";
+            echo "<script>\$pa.render_text_page()</script>\n";
             $this->need_format = false;
         }
         if (!$only_content && $dinfo->markdown) {
-            echo '<script>pa_filediff_markdown.call(document.getElementById("', $tabid, '"))</script>';
+            echo '<script>$pa.filediff_markdown.call(document.getElementById("', $tabid, '"))</script>';
         }
     }
 

@@ -375,7 +375,7 @@ function download_psets_report($request) {
         $selection = ["name", "username", "anon_username", "email", "huid", "extension", "npartners"];
     }
 
-    $grouped_psets = $sel_pset ? ["" => [$pset]] : $Conf->pset_categories();
+    $grouped_psets = $sel_pset ? ["" => [$sel_pset]] : $Conf->pset_categories();
 
     foreach ($grouped_psets as $grp => $psets) {
         foreach ($psets as $pset) {
@@ -398,7 +398,7 @@ function download_psets_report($request) {
         }
     }
 
-    $example->nstudents = count($students);
+    $example = (object) ["nstudents" => count($students)];
 
     if (!$sel_pset) {
         foreach ($Conf->config->_report_summaries ?? [] as $fname => $formula) {
@@ -426,7 +426,7 @@ function download_psets_report($request) {
         return strcasecmp($a->name, $b->name);
     });
     foreach ($students as $s) {
-        $csv->add($s);
+        $csv->add_row(get_object_vars($s));
     }
     $csv->download_headers("gradereport.csv");
     $csv->download();
@@ -897,22 +897,19 @@ Sign in to tell us about your code.";
         echo "<input type='hidden' name='action' value='login' />\n";
     } else {
         echo "<div class='f-i'>\n  ",
-            Ht::radio("action", "login", true, array("id" => "signin_action_login", "tabindex" => 2, "onclick" => "fold('logingroup',false);fold('logingroup',false,2);\$\$('signin').value='Sign in'")),
+            Ht::radio("action", "login", true, ["id" => "signin_action_login", "tabindex" => 2, "class" => "uic pa-signin-radio"]),
         "&nbsp;", Ht::label("<b>Sign me in</b>"), "<br />\n";
-        echo Ht::radio("action", "forgot", false, array("tabindex" => 2, "onclick" => "fold('logingroup',true);fold('logingroup',false,2);\$\$('signin').value='Reset password'")),
+        echo Ht::radio("action", "forgot", false, ["tabindex" => 2, "class" => "uic pa-signin-radio"]),
             "&nbsp;", Ht::label("I forgot my password"), "<br />\n";
         if (!$Conf->opt("disableNewUsers"))
-            echo Ht::radio("action", "new", false, array("id" => "signin_action_new", "tabindex" => 2, "onclick" => "fold('logingroup',true);fold('logingroup',true,2);\$\$('signin').value='Create account'")),
+            echo Ht::radio("action", "new", false, ["id" => "signin_action_new", "tabindex" => 2, "class" => "uic pa-signin-radio"]),
                 "&nbsp;", Ht::label("Create an account"), "<br />\n";
         Ht::stash_script("jQuery('#homeacct input[name=action]:checked').click()");
         echo "\n</div>\n";
     }
-    echo "<div class='f-i'>
-  <input class='b' type='submit' value='Sign in' name='signin' id='signin' tabindex='1' />
-</div>
-</div></form>
-<hr class='home' /></div>\n";
-    Ht::stash_script("crpfocus(\"login\", null, 2)");
+    echo '<div class="f-i"><button class="btn btn-primary" type="submit" name="signin" id="signin" tabindex="1" value="1">Sign in</button></div></div></form>',
+        '<hr class="home"></div>', "\n";
+    Ht::stash_script("\$pa.crpfocus(\"login\", null, 2)");
 }
 
 
@@ -1228,7 +1225,7 @@ function show_regrades($result, $all) {
     if ($nintotal) {
         $jd["need_total"] = 1;
     }
-    echo Ht::unstash(), '<script>$("#pa-pset-flagged").each(function(){pa_render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
+    echo Ht::unstash(), '<script>$("#pa-pset-flagged").each(function(){$pa.render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 }
 
 function show_pset_actions($pset) {
@@ -1262,11 +1259,11 @@ function show_pset_actions($pset) {
 
     if (!$pset->disabled) {
         echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
-        echo Ht::button("Grade report", ["onclick" => "window.location=\"" . hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]) . "\""]);
+        echo Ht::link("Grade report", hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]), ["class" => "btn"]);
     }
 
     echo "</form>";
-    echo Ht::unstash_script("$('.need-pa-pset-actions').each(pa_pset_actions)");
+    echo Ht::unstash_script("$('.need-pa-pset-actions').each(\$pa.pset_actions)");
 }
 
 function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
@@ -1478,7 +1475,7 @@ function show_pset_table($sset) {
     if ($grades_visible) {
         $jd["grades_visible"] = true;
     }
-    echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){pa_render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
+    echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){$pa.render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 
     if ($sset->viewer->privChair && !$pset->gitless_grades) {
         $sel = array("none" => "N/A");

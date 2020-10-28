@@ -1508,9 +1508,9 @@ class Conf {
                 $t = substr($t, $lexpect);
             }
         }
-        if (($flags & self::HOTURL_ABSOLUTE) || $this !== Conf::$main)
+        if (($flags & self::HOTURL_ABSOLUTE) || $this !== Conf::$main) {
             return $this->opt("paperSite") . "/" . $t;
-        else {
+        } else {
             $siteurl = $nav->site_path_relative;
             if ($need_site_path && $siteurl === "")
                 $siteurl = $nav->site_path;
@@ -1732,19 +1732,21 @@ class Conf {
         $favicon = $this->opt("favicon");
         if ($favicon) {
             if (strpos($favicon, "://") === false && $favicon[0] != "/") {
-                if ($this->opt["assetsUrl"] && substr($favicon, 0, 7) === "images/")
+                if ($this->opt["assetsUrl"] && substr($favicon, 0, 7) === "images/") {
                     $favicon = $this->opt["assetsUrl"] . $favicon;
-                else
+                } else {
                     $favicon = Navigation::siteurl() . $favicon;
+                }
             }
-            if (substr($favicon, -4) == ".png")
+            if (substr($favicon, -4) == ".png") {
                 echo "<link rel=\"icon\" type=\"image/png\" href=\"$favicon\" />\n";
-            else if (substr($favicon, -4) == ".ico")
+            } else if (substr($favicon, -4) == ".ico") {
                 echo "<link rel=\"shortcut icon\" href=\"$favicon\" />\n";
-            else if (substr($favicon, -4) == ".gif")
+            } else if (substr($favicon, -4) == ".gif") {
                 echo "<link rel=\"icon\" type=\"image/gif\" href=\"$favicon\" />\n";
-            else
+            } else {
                 echo "<link rel=\"icon\" href=\"$favicon\" />\n";
+            }
         }
 
         // title
@@ -1771,7 +1773,7 @@ class Conf {
         if ($slist) {
             echo ' data-hotlist="', htmlspecialchars($slist->id), '"';
         }
-        echo " onload=\"hotcrp_load()\" data-now=\"", Conf::$now, "\">\n";
+        echo " onload=\"\$pa.onload()\" data-now=\"", Conf::$now, "\">\n";
 
         // jQuery
         $stash = Ht::unstash();
@@ -1800,38 +1802,39 @@ class Conf {
 
         // Javascript settings to set before script.js
         $nav = Navigation::get();
-        Ht::stash_script("siteurl=" . json_encode_browser($nav->site_path_relative)
-            . ";siteurl_base_path=" . json_encode_browser($nav->base_path)
-            . ";siteurl_suffix=\"" . $nav->php_suffix . "\"");
-        $p = "";
+        $siteinfo = [
+            "site_relative" => $nav->site_path_relative,
+            "base" => $nav->base_path,
+            "suffix" => $nav->php_suffix,
+            "assets" => $this->opt["assetsUrl"],
+            "cookie_params" => "",
+            "user" => []
+        ];
+        if (session_id() !== "") {
+            $siteinfo["postvalue"] = post_value();
+        }
         if (($x = $this->opt("sessionDomain"))) {
-            $p .= "; Domain=" . $x;
+            $siteinfo["cookie_params"] .= "; Domain=" . $x;
         }
         if ($this->opt("sessionSecure")) {
-            $p .= "; Secure";
+            $siteinfo["cookie_params"] .= "; Secure";
         }
-        if (($samesite = $this->opt("sessionSameSite") ?? "Lax")) {
-            $p .= "; SameSite=" . $samesite;
+        if (($x = $this->opt("sessionSameSite") ?? "Lax")) {
+            $siteinfo["cookie_params"] .= "; SameSite=" . $x;
         }
-        if (session_id() !== "")
-            Ht::stash_script("siteurl_postvalue=" . json_encode_browser(post_value()));
-        Ht::stash_script("siteurl_cookie_params=" . json_encode_browser($p));
         if (self::$hoturl_defaults) {
-            $urldefaults = [];
+            $siteinfo["defaults"] = [];
             foreach (self::$hoturl_defaults as $k => $v) {
-                $urldefaults[$k] = urldecode($v);
+                $siteinfo["defaults"][$k] = urldecode($v);
             }
-            Ht::stash_script("siteurl_defaults=" . json_encode_browser($urldefaults) . ";");
         }
-        Ht::stash_script("assetsurl=" . json_encode_browser($this->opt["assetsUrl"]) . ";");
-        $huser = (object) array();
         if ($Me && $Me->email) {
-            $huser->email = $Me->email;
+            $siteinfo["user"]["email"] = $Me->email;
         }
         if ($Me && $Me->is_pclike()) {
-            $huser->is_pclike = true;
+            $siteinfo["user"]["is_pclike"] = true;
         }
-        Ht::stash_script("hotcrp_user=" . json_encode_browser($huser));
+        Ht::stash_script("window.siteinfo=" . json_encode_browser($siteinfo) . ";");
 
         // script.js
         if (!$this->opt("noDefaultScript")) {
@@ -1844,7 +1847,7 @@ class Conf {
         }
 
         // initial load (JS's timezone offsets are negative of PHP's)
-        Ht::stash_script("hotcrp_load.time(" . (-date("Z", Conf::$now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
+        Ht::stash_script("\$pa.onload.time(" . (-date("Z", Conf::$now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
 
         echo $stash, Ht::unstash();
     }
@@ -1971,8 +1974,9 @@ class Conf {
     }
 
     function stash_hotcrp_pc(Contact $user) {
-        if (!Ht::mark_stash("hotcrp_pc"))
+        if (!Ht::mark_stash("hotcrp_pc")) {
             return;
+        }
         $hpcj = $list = [];
         foreach ($this->pc_members_and_admins() as $pcm) {
             $hpcj[$pcm->contactId] = $j = (object) ["name" => Text::name_html($pcm), "email" => $pcm->email];
@@ -1999,9 +2003,10 @@ class Conf {
             $list[] = $pcm->contactId;
         }
         $hpcj["__order__"] = $list;
-        if ($this->sort_by_last)
+        if ($this->sort_by_last) {
             $hpcj["__sort__"] = "last";
-        Ht::stash_script("hotcrp_pc=" . json_encode_browser($hpcj) . ";");
+        }
+        Ht::stash_script("window.siteinfo.pc=" . json_encode_browser($hpcj) . ";");
     }
 
     function output_ajax($values = null, $div = false) {

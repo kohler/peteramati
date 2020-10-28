@@ -126,7 +126,7 @@ if ($Me->isPC && $Qreq->runmany && $Qreq->post_ok()) {
         htmlspecialchars($Qreq->users),
         '</div>';
 
-    Ht::stash_script('runmany61()');
+    Ht::stash_script('$pa.runmany()');
     echo '<div class="clear"></div>', "\n";
     $Conf->footer();
     exit;

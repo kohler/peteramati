@@ -2,10 +2,7 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-var siteurl, siteurl_base_path,
-    siteurl_postvalue, siteurl_suffix, siteurl_defaults,
-    siteurl_absolute_base, siteurl_cookie_params, assetsurl,
-    hotcrp_paperid, hotcrp_list, hotcrp_status, hotcrp_user,
+var siteinfo,
     peteramati_uservalue, peteramati_psets,
     hotcrp_want_override_conflict;
 
@@ -243,8 +240,8 @@ $(document).ajaxError(function (event, jqxhr, settings, httperror) {
     }
     if (!data || !data.user_error) {
         var msg = url_absolute(settings.url) + " API failure: ";
-        if (hotcrp_user && hotcrp_user.email)
-            msg += "user " + hotcrp_user.email + ", ";
+        if (siteinfo.user && siteinfo.user.email)
+            msg += "user " + siteinfo.user.email + ", ";
         msg += jqxhr.status;
         if (httperror)
             msg += ", " + httperror;
@@ -762,13 +759,13 @@ wstorage.json = function (is_session, key) {
     return x ? JSON.parse(x) : false;
 };
 wstorage.site = function (is_session, key, value) {
-    if (siteurl_base_path !== "/")
-        key = siteurl_base_path + key;
+    if (siteinfo.base !== "/")
+        key = siteinfo.base + key;
     return wstorage(is_session, key, value);
 };
 wstorage.site_json = function (is_session, key) {
-    if (siteurl_base_path !== "/")
-        key = siteurl_base_path + key;
+    if (siteinfo.base !== "/")
+        key = siteinfo.base + key;
     return wstorage.json(is_session, key);
 };
 
@@ -815,12 +812,12 @@ function hoturl_clean(x, page_component) {
 
 function hoturl(page, options) {
     var k, v, t, a, m, x, anchor = "", want_forceShow;
-    if (siteurl == null || siteurl_suffix == null) {
-        siteurl = siteurl_suffix = "";
-        log_jserror("missing siteurl");
+    if (siteinfo.site_relative == null || siteinfo.suffix == null) {
+        siteinfo.site_relative = siteinfo.suffix = "";
+        log_jserror("missing siteinfo");
     }
 
-    x = {pt: "", t: page + siteurl_suffix};
+    x = {pt: "", t: page + siteinfo.suffix};
     if (typeof options === "string") {
         if ((m = options.match(/^(.*?)(#.*)$/))) {
             options = m[1];
@@ -844,7 +841,7 @@ function hoturl(page, options) {
         hoturl_clean(x, /^t=(\w+)$/);
     } else if (page.substr(0, 3) === "api") {
         if (page.length > 3) {
-            x.t = "api" + siteurl_suffix;
+            x.t = "api" + siteinfo.suffix;
             x.v.push("fn=" + page.substr(4));
         }
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
@@ -864,16 +861,16 @@ function hoturl(page, options) {
         && hoturl_clean_find(x.v, /^forceShow=/) < 0)
         x.v.push("forceShow=1");
 
-    if (siteurl_defaults)
-        x.v.push(serialize_object(siteurl_defaults));
+    if (siteinfo.defaults)
+        x.v.push(serialize_object(siteinfo.defaults));
     if (x.v.length)
         x.t += "?" + x.v.join("&");
-    return siteurl + x.pt + x.t + anchor;
+    return siteinfo.site_relative + x.pt + x.t + anchor;
 }
 
 function hoturl_post(page, options) {
     options = serialize_object(options);
-    options += (options ? "&" : "") + "post=" + siteurl_postvalue;
+    options += (options ? "&" : "") + "post=" + siteinfo.postvalue;
     return hoturl(page, options);
 }
 
@@ -898,9 +895,9 @@ function url_absolute(url, loc) {
 }
 
 function hoturl_absolute_base() {
-    if (!siteurl_absolute_base)
-        siteurl_absolute_base = url_absolute(siteurl_base_path);
-    return siteurl_absolute_base;
+    if (!siteinfo.absolute_base)
+        siteinfo.absolute_base = url_absolute(siteinfo.base);
+    return siteinfo.absolute_base;
 }
 
 
@@ -958,7 +955,7 @@ handle_ui.trigger = function (className, event) {
 };
 return handle_ui;
 })($);
-$(document).on("click", ".ui, .uix", handle_ui);
+$(document).on("click", ".ui, .uic", handle_ui);
 $(document).on("change", ".uich", handle_ui);
 $(document).on("keydown", ".uikd", handle_ui);
 $(document).on("input", ".uii", handle_ui);
@@ -1992,31 +1989,93 @@ function fold(which, dofold, foldtype) {
     return false;
 }
 
-function foldup(e, event, opts) {
-    var dofold = false, attr, m, foldnum;
-    while (e && (!e.id || e.id.substr(0, 4) != "fold")
-           && (!e.getAttribute || !e.getAttribute("hotcrp_fold")))
-        e = e.parentNode;
-    if (!e)
-        return true;
-    if (typeof opts === "number")
+function foldup(event, opts) {
+    var e = this, dofold = false, m, x;
+    if (typeof opts === "number") {
         opts = {n: opts};
-    else if (!opts)
+    } else if (!opts) {
         opts = {};
-    foldnum = opts.n || 0;
-    if (!foldnum && (m = e.className.match(/\bfold(\d*)[oc]\b/)))
-        foldnum = m[1];
-    dofold = !(new RegExp("\\bfold" + (foldnum ? foldnum : "") + "c\\b")).test(e.className);
-    if ("f" in opts && !!opts.f == !dofold)
-        return false;
-    if (opts.s)
-        jQuery.get(hoturl("sessionvar", "j=1&var=" + opts.s + "&val=" + (dofold ? 1 : 0)));
-    event && event.stopPropagation();
-    m = fold(e, dofold, foldnum);
-    if ((attr = e.getAttribute(dofold ? "onfold" : "onunfold")))
-        (new Function("foldnum", attr)).call(e, opts);
-    return m;
+    }
+    if (this.tagName === "DIV"
+        && event
+        && event.target.closest("a")
+        && !opts.required) {
+        return;
+    }
+    if (!("n" in opts)
+        && e.hasAttribute("data-fold-target")
+        && (m = e.getAttribute("data-fold-target").match(/^(\D[^#]*$|.*(?=#)|)#?(\d*)([cou]?)$/))) {
+        if (m[1] !== "") {
+            e = document.getElementById(m[1]);
+        }
+        opts.n = parseInt(m[2]) || 0;
+        if (!("f" in opts) && m[3] !== "") {
+            if (m[3] === "u" && this.tagName === "INPUT" && this.type === "checkbox") {
+                opts.f = this.checked;
+            } else {
+                opts.f = m[3] === "c";
+            }
+        }
+    }
+    var foldname = "fold" + (opts.n || "");
+    while (e
+           && (!e.id || e.id.substr(0, 4) != "fold")
+           && !hasClass(e, "has-fold")
+           && (opts.n == null
+               || (!hasClass(e, foldname + "c")
+                   && !hasClass(e, foldname + "o")))) {
+        e = e.parentNode;
+    }
+    if (!e) {
+        return true;
+    }
+    if (opts.n == null) {
+        x = classList(e);
+        for (var i = 0; i !== x.length; ++i) {
+            if (x[i].substring(0, 4) === "fold"
+                && (m = x[i].match(/^fold(\d*)[oc]$/))
+                && (opts.n == null || +m[1] < opts.n)) {
+                opts.n = +m[1];
+                foldname = "fold" + (opts.n || "");
+            }
+        }
+    }
+    if (!("f" in opts)
+        && (this.tagName === "INPUT" || this.tagName === "SELECT")) {
+        var value = null;
+        if (this.type === "checkbox") {
+            opts.f = !this.checked;
+        } else if (this.type === "radio") {
+            if (!this.checked)
+                return true;
+            value = this.value;
+        } else if (this.type === "select-one") {
+            value = this.selectedIndex < 0 ? "" : this.options[this.selectedIndex].value;
+        }
+        if (value !== null) {
+            var values = (e.getAttribute("data-" + foldname + "-values") || "").split(/\s+/);
+            opts.f = values.indexOf(value) < 0;
+        }
+    }
+    dofold = !hasClass(e, foldname + "c");
+    if (!("f" in opts) || !opts.f !== dofold) {
+        opts.f = dofold;
+        fold(e, dofold, opts.n || 0);
+        $(e).trigger(opts.f ? "fold" : "unfold", opts);
+    }
+    if (this.hasAttribute("aria-expanded")) {
+        this.setAttribute("aria-expanded", dofold ? "false" : "true");
+    }
+    if (event
+        && typeof event === "object"
+        && event.type === "click"
+        && !hasClass(event.target, "uic")) {
+        event.stopPropagation();
+        event.preventDefault(); // needed for expanders despite handle_ui!
+    }
 }
+
+handle_ui.on("js-foldup", foldup);
 
 function crpfocus(id, subfocus, seltype) {
     var selt = $$(id);
@@ -2294,9 +2353,9 @@ function set_cookie(info, sitehref) {
         digest += set_prevnext(info, sitehref);
     cookie_set_at = now_msec();
     var p = "; Max-Age=20", m;
-    if (siteurl && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
+    if (siteinfo.site_relative && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
         p += "; Path=" + m[1];
-    document.cookie = "hotlist-info-" + cookie_set_at + "=" + encodeURIComponent(digest) + siteurl_cookie_params + p;
+    document.cookie = "hotlist-info-" + cookie_set_at + "=" + encodeURIComponent(digest) + siteinfo.cookie_params + p;
 }
 function is_listable(sitehref) {
     return /(?:^|\/)pset(?:|\.php)(?:$|\/)/.test(sitehref);
@@ -2314,8 +2373,8 @@ function find_hotlist(e) {
 function handle_list(e, href) {
     var hl, sitehref;
     if (href
-        && href.substring(0, siteurl.length) === siteurl
-        && is_listable((sitehref = href.substring(siteurl.length)))
+        && href.startsWith(siteinfo.site_relative)
+        && is_listable((sitehref = href.substring(siteinfo.site_relative.length)))
         && (hl = e.closest(".has-hotlist"))) {
         var info = hl.getAttribute("data-hotlist");
         if (!info) {
@@ -2387,6 +2446,36 @@ function setmailpsel(sel) {
     fold("psel", !!sel.value.match(/^(?:pc$|pc:|all$)/), 9);
     fold("psel", !sel.value.match(/^new.*rev$/), 10);
 }
+
+
+handle_ui.on("pa-show-viewoptions", function () {
+    fold61(this.nextSibling, this.parentNode);
+});
+
+handle_ui.on("pa-pset-upload-grades", function () {
+    $("#upload").show();
+});
+
+handle_ui.on("pa-pset-setcommit", function () {
+    this.closest("form").submit();
+});
+
+handle_ui.on("pa-signin-radio", function (event) {
+    if (this.value === "login") {
+        fold("logingroup", false);
+        fold("logingroup", false, 2);
+        $$("signin").value = "Sign in";
+    } else if (this.value === "forgot") {
+        fold("logingroup", true);
+        fold("logingroup", false, 2);
+        $$("signin").value = "Reset password";
+    } else if (this.value === "new") {
+        fold("logingroup", true);
+        fold("logingroup", true, 2);
+        $$("signin").value = "Create account";
+    }
+});
+
 
 // pa_diff_traverse(tr, down, flags)
 //    Find the diff line (pa-d[idc]) near `tr` in the direction of `down`.
@@ -2607,7 +2696,7 @@ function pa_render_note(note, transition) {
         var authorids = $.isArray(note[2]) ? note[2] : [note[2]];
         var authors = [];
         for (var i in authorids) {
-            var p = hotcrp_pc[authorids[i]];
+            var p = siteinfo.pc[authorids[i]];
             if (p) {
                 if (p.nick)
                     authors.push(p.nick);
@@ -3606,7 +3695,7 @@ function modify_landmark(base) {
 
 function modify_landmark_image(base) {
     function fix(pi, file) {
-        return siteurl + "~" + encodeURIComponent(peteramati_uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + file;
+        return siteinfo.site_relative + "~" + encodeURIComponent(peteramati_uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + file;
     }
     return function (tokens, idx, options, env, self) {
         var token = tokens[idx],
@@ -4042,7 +4131,7 @@ function pa_resolve_grade() {
             if (typeof lb[i] === "string") {
                 $(this).find(".pa-pd").first().append(lb[i]);
             } else if (lb[i].className) {
-                $(this).find(".pa-pd").first().append('<button type="button" class="btn uix uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
+                $(this).find(".pa-pd").first().append('<button type="button" class="btn uic uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
             }
         }
     }
@@ -4246,7 +4335,7 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
         $gnv.remove();
     } else {
         if (!$gnv.length) {
-            $gnv = $('<a class="uix uikd pa-notes-grade" href=""></a>');
+            $gnv = $('<a class="uic uikd pa-notes-grade" href=""></a>');
             var e = this.lastChild.firstChild;
             while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
                 e = e.nextSibling;
@@ -4334,16 +4423,18 @@ function sb() {
     window.scroll(wp.x, Math.max(0, wp.y, dh - wp.h));
 }
 
-function runfold61(name) {
-    var therun = document.getElementById("pa-run-" + name), thebutton;
+handle_ui.on("pa-show-run", function () {
+    var parent = this.closest(".pa-runout"),
+        name = parent.id.substring(10),
+        therun = document.getElementById("pa-run-" + name),
+        thebutton;
     if (therun.dataset.paTimestamp && !$(therun).is(":visible")) {
         thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
         pa_run(thebutton, {unfold: true});
     } else {
         fold61(therun, jQuery("#pa-runout-" + name));
     }
-    return false;
-}
+});
 
 function pa_loadfilediff(filee, callback) {
     if (hasClass(filee, "need-load")) {
@@ -4493,31 +4584,31 @@ function pa_fetchgrades() {
         });
 }
 
-function setgrader61(button) {
-    var form = jQuery(button).closest("form");
-    jQuery.ajax(form.attr("action"), {
-        data: form.serializeWith({}),
+handle_ui.on("pa-pset-setgrader", function () {
+    var $form = $(this.closest("form"));
+    jQuery.ajax($form[0].getAttribute("action"), {
+        data: $form.serializeWith({}),
         type: "POST", cache: false,
         dataType: "json",
         success: function (data) {
             var a;
-            form.find(".ajaxsave61").html(data.ok ? "Saved" : "<span class='error'>Error: " + data.error + "</span>");
-            if (data.ok && (a = form.find("a.actas")).length)
+            $form.find(".ajaxsave61").html(data.ok ? "Saved" : "<span class='error'>Error: " + data.error + "</span>");
+            if (data.ok && (a = $form.find("a.actas")).length)
                 a.attr("href", a.attr("href").replace(/actas=[^&;]+/, "actas=" + encodeURIComponent(data.grader_email)));
         },
         error: function () {
-            form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
+            $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
         }
     });
-}
+});
 
-function flag61(button) {
-    var $b = $(button), $form = $b.closest("form");
-    if (button.name == "flag" && !$form.find("[name=flagreason]").length) {
+function pa_flag() {
+    var $b = $(this), $form = $b.closest("form");
+    if (this.name == "flag" && !$form.find("[name=flagreason]").length) {
         $b.before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" /> &nbsp;</span>');
         $form.find("[name=flagreason]").on("keypress", make_onkey("Enter", function () { $b.click(); })).autogrow()[0].focus();
         $b.html("OK");
-    } else if (button.name == "flag") {
+    } else if (this.name == "flag") {
         $.ajax($form.attr("action"), {
             data: $form.serializeWith({flag: 1}),
             type: "POST", cache: false,
@@ -4532,7 +4623,7 @@ function flag61(button) {
                 $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
             }
         });
-    } else if (button.name == "resolveflag") {
+    } else if (this.name == "resolveflag") {
         $.ajax($form.attr("action"), {
             data: $form.serializeWith({resolveflag: 1, flagid: $b.attr("data-flagid")}),
             type: "POST", cache: false,
@@ -4547,6 +4638,8 @@ function flag61(button) {
         })
     }
 }
+
+handle_ui.on("pa-flag", pa_flag);
 
 window.pa_render_terminal = (function () {
 var styleset = {
@@ -4778,7 +4871,7 @@ return function (container, string, options) {
             if (prefix.length)
                 addlinepart(node, prefix);
             var anchor = "Lb" + line + "_" + html_id_encode(file);
-            var a = $("<a href=\"#" + anchor + "\" class=\"uu uix pa-goto\"></a>");
+            var a = $("<a href=\"#" + anchor + "\" class=\"uu uic pa-goto\"></a>");
             a.text(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;
@@ -5367,6 +5460,10 @@ function pa_run(button, opt) {
     return false;
 }
 
+handle_ui.on("pa-runner", function () {
+    pa_run(this);
+});
+
 function runmany61() {
     var $manybutton = jQuery("#runmany61");
     var $f = $manybutton.closest("form");
@@ -5390,7 +5487,7 @@ function runmany61() {
         jQuery("#runmany61_who").text(user);
         $f.find("[name='u']").val(user);
         jQuery("#runmany61_users").text(users.join(" "));
-        var $x = jQuery("<a href=\"" + siteurl + "~" + encodeURIComponent(user) + "/pset/" + $f.find("[name='pset']").val() + "\" class=\"q ansib ansifg7\"></a>");
+        var $x = jQuery("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(user) + "/pset/" + $f.find("[name='pset']").val() + "\" class=\"q ansib ansifg7\"></a>");
         $x.text(user);
         pa_run($manybutton[0], {noclear: true, headline: $x[0]});
     }
@@ -5419,12 +5516,11 @@ function add(name, value) {
     var $j = $("#pa-runsettings"), num = $j.find(".n").length;
     while ($j.find("[data-runsetting-num=" + num + "]").length)
         ++num;
-    var $x = $("<div class=\"pa-p\" data-runsetting-num=\"" + num + "\"><div class=\"pa-pt\"></div><div class=\"pa-pd\"><input name=\"n" + num + "\" class=\"n\" size=\"30\" placeholder=\"Name\"> &nbsp; <input name=\"v" + num + "\" class=\"v\" size=\"40\" placeholder=\"Value\"></div></div>");
+    var $x = $("<div class=\"pa-p\" data-runsetting-num=\"" + num + "\"><div class=\"pa-pt\"></div><div class=\"pa-pd\"><input name=\"n" + num + "\" class=\"uich pa-runconfig ignore-diff n\" size=\"30\" placeholder=\"Name\"> &nbsp; <input name=\"v" + num + "\" class=\"uich pa-runconfig ignore-diff v\" size=\"40\" placeholder=\"Value\"></div></div>");
     if (name) {
         $x.find(".n").val(name);
         $x.find(".v").val(value);
     }
-    $x.find("input").on("change", save);
     $j.append($x);
     if (!name)
         $x.find(".n").focus();
@@ -5447,6 +5543,14 @@ function load(j) {
         if ($($n[i]).attr("data-outstanding"))
             $("[data-runsetting-num=" + $($n[i]).attr("name").substr(1) + "]").remove();
 }
+
+handle_ui.on("pa-runconfig", function (event) {
+    if (this.name === "define") {
+        add();
+    } else {
+        save();
+    }
+});
 
 return {add: add, load: load};
 })(jQuery);
@@ -7148,13 +7252,14 @@ function pa_pset_actions() {
     $f.removeClass("need-pa-pset-actions");
 }
 
-function pa_anonymize_linkto(link, event) {
-    if (event && event.metaKey)
+handle_ui.on("pa-anonymized-link", function (event) {
+    var link = this.getAttribute("data-pa-link");
+    if (event && event.metaKey) {
         window.open(link);
-    else
+    } else {
         window.location = link;
-    return false;
-}
+    }
+});
 
 function pa_render_pset_table(pconf, data) {
     var $j = $(this), table_width = 0, dmap = [],
@@ -7177,7 +7282,7 @@ function pa_render_pset_table(pconf, data) {
                 return rownum == "" ? '<td></td>' :
                     '<td class="gt-checkbox"><input type="checkbox" name="' +
                     render_checkbox_name(s) + '" value="1" class="' +
-                    (this.className || "uix js-range-click papsel") + '" data-range-type="s61"></td>';
+                    (this.className || "uic js-range-click papsel") + '" data-range-type="s61"></td>';
             },
             tw: 1.5
         },
@@ -7251,8 +7356,8 @@ function pa_render_pset_table(pconf, data) {
             th: '<th class="gt-grader l plsortable" data-pa-sort="grader" scope="col">Grader</th>',
             td: function (s) {
                 var t = s.gradercid ? "???" : "";
-                if (s.gradercid && hotcrp_pc[s.gradercid])
-                    t = grader_name(hotcrp_pc[s.gradercid]);
+                if (s.gradercid && siteinfo.pc[s.gradercid])
+                    t = grader_name(siteinfo.pc[s.gradercid]);
                 return '<td class="gt-grader">' + t + '</td>';
             },
             tw: 6
@@ -7346,7 +7451,7 @@ function pa_render_pset_table(pconf, data) {
                 if (!s.repo)
                     txt = '';
                 else if (anonymous)
-                    txt = '<a href="" onclick="return pa_anonymize_linkto(' + escape_entities(JSON.stringify(s.repo)) + ',event)">repo</a>';
+                    txt = '<a href="" data-pa-link="' + escape_entities(s.repo) + '" class="ui pa-anonymized-link">repo</a>';
                 else
                     txt = '<a class="track" href="' + escape_entities(s.repo) + '">repo</a>';
                 if (s.repo_broken)
@@ -7812,8 +7917,8 @@ function pa_render_pset_table(pconf, data) {
         return a._sort_user < b._sort_user ? -sort.rev : (a._sort_user == b._sort_user ? 0 : sort.rev);
     }
     function grader_compare(a, b) {
-        var ap = a.gradercid ? hotcrp_pc[a.gradercid] : null;
-        var bp = b.gradercid ? hotcrp_pc[b.gradercid] : null;
+        var ap = a.gradercid ? siteinfo.pc[a.gradercid] : null;
+        var bp = b.gradercid ? siteinfo.pc[b.gradercid] : null;
         var ag = (ap && grader_name(ap)) || "~~~";
         var bg = (bp && grader_name(bp)) || "~~~";
         if (ag != bg)
@@ -8516,3 +8621,19 @@ $.fn.unautogrow = function () {
 })(jQuery);
 
 $(function () { $(".need-autogrow").autogrow(); });
+
+var $pa = {
+    beforeunload: pa_beforeunload,
+    checklatest: pa_checklatest,
+    crpfocus: crpfocus, // XXX
+    filediff_markdown: pa_filediff_markdown,
+    fold: fold,
+    gradecdf: pa_gradecdf,
+    onload: hotcrp_load,
+    loadgrades: pa_loadgrades,
+    load_runsettings: pa_runsetting.load,
+    pset_actions: pa_pset_actions,
+    render_text_page: render_text.on_page,
+    render_pset_table: pa_render_pset_table,
+    runmany: runmany61
+};
