@@ -9,7 +9,7 @@ function choose_page($page) {
     if ($page !== "" && $page[0] === "~") {
         $xpage = Navigation::path_component(0, true);
         Navigation::set_path("/" . $page . Navigation::path_suffix(1));
-        $page = Navigation::set_page($xpage ? : "index");
+        $page = Navigation::set_page($xpage ?? "index");
     }
     $i = strlen($page) - 4;
     if ($i > 0 && substr($page, $i) === ".php") {

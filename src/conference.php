@@ -404,6 +404,9 @@ class Conf {
         global $Conf;
         $Conf = Conf::$main = $conf;
         $conf->crosscheck_globals();
+        if (!in_array("Conf::transfer_main_messages_to_session", Navigation::$redirect_callbacks ?? [], true)) {
+            Navigation::$redirect_callbacks[] = "Conf::transfer_main_messages_to_session";
+        }
     }
 
 
@@ -1576,6 +1579,12 @@ class Conf {
         }
     }
 
+    static function transfer_main_messages_to_session() {
+        if (self::$main) {
+            self::$main->transfer_messages_to_session();
+        }
+    }
+
 
     private function _try_session_list($k) {
         global $Qreq;
@@ -1651,8 +1660,9 @@ class Conf {
                 $post = "mtime=$mtime";
             }
             if (($this->opt["strictJavascript"] ?? false) && !$no_strict) {
-                $url = $this->opt["scriptAssetsUrl"] . "cacheable.php?file=" . urlencode($url)
-                    . "&strictjs=1" . ($post ? "&$post" : "");
+                $url = $this->opt["scriptAssetsUrl"] . "cacheable.php/"
+                    . str_replace("%2F", "/", urlencode($url))
+                    . "?strictjs=1" . ($post ? "&$post" : "");
             } else {
                 $url = $this->opt["scriptAssetsUrl"] . $url . ($post ? "?$post" : "");
             }
