@@ -53,7 +53,7 @@ $jd = ["id" => "overview",
        "can_override_anonymous" => $any_anonymous,
        "col" => [["type" => "checkbox", "className" => "uic uich js-range-click js-grgraph-highlight"], "rownumber", "name2"]];
 echo Ht::unstash(),
-    '<script>$("#pa-overview-table").each(function(){\$pa.render_pset_table.call(this,',
+    '<script>$("#pa-overview-table").each(function(){$pa.render_pset_table.call(this,',
     json_encode_browser($jd), ',', json_encode_browser($sj), ')})</script>';
 echo '<hr class="c">';
 $Conf->footer();

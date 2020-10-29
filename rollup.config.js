@@ -7,6 +7,7 @@ export default [{
         format: "iife",
         sourcemap: true,
         sourcemapExcludeSources: true,
-        plugins: [terser()]
+        plugins: [terser()],
+        name: "$pa"
     }
 }];

@@ -1,65 +1,33 @@
-// script.js -- Peteramati JavaScript library
+// main.js -- Peteramati JavaScript library
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
+import * as svgutil from "./svgpathutil.js";
+import IntervalSeq from "./intervalseq.js";
+import {
+    hasClass, addClass, removeClass, toggleClass, classList, handle_ui,
+    fold61, ImmediatePromise
+    } from "./ui.js";
+import {
+    hoturl, hoturl_post, hoturl_absolute_base, url_absolute, hoturl_gradeparts
+    } from "./hoturl.js";
+import "./ui-pset.js";
+import {
+    escape_entities, unescape_entities, urlencode, urldecode,
+    text_to_html, regexp_quote, html_id_encode
+    } from "./encoders.js";
+import { Bubble, tooltip } from "./tooltip.js";
+import { filediff_load } from "./diff.js";
+import { filediff_markdown } from "./diff-markdown.js";
+
 function $$(id) {
     return document.getElementById(id);
-}
-
-function serialize_object(x) {
-    if (typeof x === "string")
-        return x;
-    else if (x) {
-        var k, v, a = [];
-        for (k in x)
-            if ((v = x[k]) != null)
-                a.push(encodeURIComponent(k) + "=" + encodeURIComponent(v));
-        return a.join("&");
-    } else
-        return "";
 }
 
 if (!window.JSON || !window.JSON.parse) {
     window.JSON = {parse: $.parseJSON};
 }
 
-var hasClass, addClass, removeClass, toggleClass, classList;
-if ("classList" in document.createElement("span")
-    && !/MSIE|rv:11\.0/.test(navigator.userAgent || "")) {
-    hasClass = function (e, k) {
-        var l = e.classList;
-        return l && l.contains(k);
-    };
-    addClass = function (e, k) {
-        e.classList.add(k);
-    };
-    removeClass = function (e, k) {
-        e.classList.remove(k);
-    };
-    toggleClass = function (e, k, v) {
-        e.classList.toggle(k, v);
-    };
-    classList = function (e) {
-        return e.classList;
-    };
-} else {
-    hasClass = function (e, k) {
-        return $(e).hasClass(k);
-    };
-    addClass = function (e, k) {
-        $(e).addClass(k);
-    };
-    removeClass = function (e, k) {
-        $(e).removeClass(k);
-    };
-    toggleClass = function (e, k, v) {
-        $(e).toggleClass(k, v);
-    };
-    classList = function (e) {
-        var k = $.trim(e.className);
-        return k === "" ? [] : k.split(/\s+/);
-    };
-}
 if (!Element.prototype.closest) {
     Element.prototype.closest = function (s) {
         return $(this).closest(s)[0];
@@ -85,91 +53,6 @@ if (!String.prototype.trimStart) {
         return this.replace(/^[\s\uFEFF\xA0]+/, '');
     };
 }
-
-
-
-function bind_append(f, args) {
-    return function () {
-        var a = Array.prototype.slice.call(arguments);
-        a.push.apply(a, args);
-        return f.apply(this, a);
-    };
-}
-
-// callback combination
-function add_callback(cb1, cb2) {
-    if (cb1 && cb2)
-        return function () {
-            cb1.apply(this, arguments);
-            cb2.apply(this, arguments);
-        };
-    else
-        return cb1 || cb2;
-}
-
-
-// promises
-function HPromise(executor) {
-    this.state = -1;
-    this.c = [];
-    if (executor) {
-        try {
-            executor(this._resolver(1), this._resolver(0));
-        } catch (e) {
-            this._resolver(0)(e);
-        }
-    }
-}
-HPromise.prototype._resolver = function (state) {
-    var self = this;
-    return function (value) {
-        if (self.state === -1) {
-            self.state = state;
-            self.value = value;
-            self._resolve();
-        }
-    };
-};
-HPromise.prototype.then = function (yes, no) {
-    var next = new HPromise;
-    this.c.push([no, yes, next]);
-    if (this.state === 0 || this.state === 1)
-        this._resolve();
-    return next;
-};
-HPromise.prototype._resolve = function () {
-    var i, x, ss = this.state, s, v, f;
-    this.state = 2;
-    for (i in this.c) {
-        x = this.c[i];
-        s = ss;
-        v = this.value;
-        f = x[s];
-        if ($.isFunction(f)) {
-            try {
-                v = f(v);
-            } catch (e) {
-                s = 0;
-                v = e;
-            }
-        }
-        x[2]._resolver(s)(v);
-    }
-    this.c = [];
-    this.state = ss;
-};
-HPromise.resolve = function (value) {
-    var p = new HPromise;
-    p.value = value;
-    p.state = 1;
-    return p;
-};
-HPromise.reject = function (reason) {
-    var p = new HPromise;
-    p.value = reason;
-    p.state = 0;
-    return p;
-};
 
 
 // error logging
@@ -355,6 +238,18 @@ jQuery.fn.extend({
             }
         }
         return this;
+    },
+    serializeWith: function(data) {
+        var s = this.serialize(), i, sep;
+        if (s != null && data) {
+            sep = s.length && s[s.length - 1] != "&" ? "&" : "";
+            for (i in data)
+                if (data[i] != null) {
+                    s += sep + encodeURIComponent(i) + "=" + encodeURIComponent(data[i]);
+                    sep = "&";
+                }
+        }
+        return s;
     }
 });
 
@@ -395,67 +290,12 @@ if ("pushState" in window.history) {
 
 
 // text transformation
-var escape_entities = (function () {
-    var re = /[&<>\"']/g;
-    var rep = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "\'": "&#39;"};
-    return function (s) {
-        if (s === null || typeof s === "number")
-            return s;
-        return s.replace(re, function (match) { return rep[match]; });
-    };
-})();
-
-var unescape_entities = (function () {
-    var re = /&.*?;/g, rep = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&apos;": "'", "&#039;": "'"};
-    return function (s) {
-        if (s === null || typeof s === "number")
-            return s;
-        return s.replace(re, function (match) { return rep[match]; });
-    };
-})();
-
-var urlencode = (function () {
-    var re = /%20|[!~*'()]/g;
-    var rep = {"%20": "+", "!": "%21", "~": "%7E", "*": "%2A", "'": "%27", "(": "%28", ")": "%29"};
-    return function (s) {
-        if (s === null || typeof s === "number")
-            return s;
-        return encodeURIComponent(s).replace(re, function (match) { return rep[match]; });
-    };
-})();
-
-var urldecode = function (s) {
-    if (s === null || typeof s === "number")
-        return s;
-    return decodeURIComponent(s.replace(/\+/g, "%20"));
-};
-
-function text_to_html(text) {
-    var n = document.createElement("div");
-    n.appendChild(document.createTextNode(text));
-    return n.innerHTML;
-}
-
 function text_eq(a, b) {
     if (a === b)
         return true;
     a = (a == null ? "" : a).replace(/\r\n?/g, "\n");
     b = (b == null ? "" : b).replace(/\r\n?/g, "\n");
     return a === b;
-}
-
-function regexp_quote(s) {
-    return String(s).replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1').replace(/\x08/g, '\\x08');
-}
-
-function html_id_encode(s) {
-    return encodeURIComponent(s).replace(/[^-A-Za-z0-9%]/g, function (s) {
-        return "_" + s.charCodeAt(0).toString(16);
-    }).replace(/%../g, function (m) { return "_" + m.substr(1).toLowerCase(); });
-}
-
-function html_id_decode(s) {
-    return decodeURIComponent(s.replace(/_/g, "%"));
 }
 
 function plural_noun(n, what) {
@@ -765,133 +605,6 @@ wstorage.site_json = function (is_session, key) {
 };
 
 
-// hoturl
-function hoturl_add(url, component) {
-    var hash = url.indexOf("#");
-    if (hash >= 0) {
-        component += url.substring(hash);
-        url = url.substring(0, hash);
-    }
-    return url + (url.indexOf("?") < 0 ? "?" : "&") + component;
-}
-
-function hoturl_clean_before(x, page_component, prefix) {
-    if (x.first !== false && x.v.length) {
-        for (var i = 0; i < x.v.length; ++i) {
-            var m = page_component.exec(x.v[i]);
-            if (m) {
-                x.pt += prefix + m[1] + "/";
-                x.v.splice(i, 1);
-                x.first = m[1];
-                return;
-            }
-        }
-        x.first = false;
-    }
-}
-
-function hoturl_clean(x, page_component) {
-    if (x.last !== false && x.v.length) {
-        for (var i = 0; i < x.v.length; ++i) {
-            var m = page_component.exec(x.v[i]);
-            if (m) {
-                x.t += "/" + m[1];
-                x.v.splice(i, 1);
-                x.last = m[1];
-                return;
-            }
-        }
-        x.last = false;
-    }
-}
-
-function hoturl(page, options) {
-    var k, v, t, a, m, x, anchor = "", want_forceShow;
-    if (siteinfo.site_relative == null || siteinfo.suffix == null) {
-        siteinfo.site_relative = siteinfo.suffix = "";
-        log_jserror("missing siteinfo");
-    }
-
-    x = {pt: "", t: page + siteinfo.suffix};
-    if (typeof options === "string") {
-        if ((m = options.match(/^(.*?)(#.*)$/))) {
-            options = m[1];
-            anchor = m[2];
-        }
-        x.v = options.split(/&/);
-    } else {
-        x.v = [];
-        for (k in options) {
-            v = options[k];
-            if (v == null)
-                /* skip */;
-            else if (k === "anchor")
-                anchor = "#" + v;
-            else
-                x.v.push(encodeURIComponent(k) + "=" + encodeURIComponent(v));
-        }
-    }
-
-    if (page === "help") {
-        hoturl_clean(x, /^t=(\w+)$/);
-    } else if (page.substr(0, 3) === "api") {
-        if (page.length > 3) {
-            x.t = "api" + siteinfo.suffix;
-            x.v.push("fn=" + page.substr(4));
-        }
-        hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
-        hoturl_clean(x, /^fn=(\w+)$/);
-        hoturl_clean(x, /^pset=([^?&#]+)$/);
-        hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
-        want_forceShow = true;
-    } else if (page === "index") {
-        hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
-    } else if (page === "pset" || page === "run") {
-        hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
-        hoturl_clean(x, /^pset=([^?&#]+)$/);
-        hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
-    }
-
-    if (siteinfo.defaults)
-        x.v.push(serialize_object(siteinfo.defaults));
-    if (x.v.length)
-        x.t += "?" + x.v.join("&");
-    return siteinfo.site_relative + x.pt + x.t + anchor;
-}
-
-function hoturl_post(page, options) {
-    options = serialize_object(options);
-    options += (options ? "&" : "") + "post=" + siteinfo.postvalue;
-    return hoturl(page, options);
-}
-
-function url_absolute(url, loc) {
-    var x = "", m;
-    loc = loc || window.location.href;
-    if (!/^\w+:\/\//.test(url)
-        && (m = loc.match(/^(\w+:)/)))
-        x = m[1];
-    if (x && !/^\/\//.test(url)
-        && (m = loc.match(/^\w+:(\/\/[^\/]+)/)))
-        x += m[1];
-    if (x && !/^\//.test(url)
-        && (m = loc.match(/^\w+:\/\/[^\/]+(\/[^?#]*)/))) {
-        x = (x + m[1]).replace(/\/[^\/]+$/, "/");
-        while (url.substring(0, 3) === "../") {
-            x = x.replace(/\/[^\/]*\/$/, "/");
-            url = url.substring(3);
-        }
-    }
-    return x + url;
-}
-
-function hoturl_absolute_base() {
-    if (!siteinfo.absolute_base)
-        siteinfo.absolute_base = url_absolute(siteinfo.base);
-    return siteinfo.absolute_base;
-}
-
-
 // render_xmsg
 function render_xmsg(status, msg) {
     if (typeof msg === "string")
@@ -906,52 +619,6 @@ function render_xmsg(status, msg) {
         status = ["info", "warning", "error"][status];
     return '<div class="msg msg-' + status + '">' + msg + '</div>';
 }
-
-
-// ui
-var handle_ui = (function ($) {
-var callbacks = {};
-function handle_ui(event) {
-    var e = event.target;
-    if ((e && (hasClass(e, "ui") || hasClass(e, "ui-submit")))
-        || (this.tagName === "A" && hasClass(this, "ui"))) {
-        event.preventDefault();
-    }
-    var k = classList(this);
-    for (var i = 0; i < k.length; ++i) {
-        var c = callbacks[k[i]];
-        if (c) {
-            for (var j = 0; j < c.length; ++j) {
-                c[j].call(this, event);
-            }
-        }
-    }
-}
-handle_ui.on = function (className, callback) {
-    callbacks[className] = callbacks[className] || [];
-    callbacks[className].push(callback);
-};
-handle_ui.trigger = function (className, event) {
-    var c = callbacks[className];
-    if (c) {
-        if (typeof event === "string") {
-            event = $.Event(event); // XXX IE8: `new Event` is not supported
-        }
-        for (var j = 0; j < c.length; ++j) {
-            if (!event.isImmediatePropagationStopped()) {
-                c[j].call(this, event);
-            }
-        }
-    }
-};
-return handle_ui;
-})($);
-$(document).on("click", ".ui, .uic", handle_ui);
-$(document).on("change", ".uich", handle_ui);
-$(document).on("keydown", ".uikd", handle_ui);
-$(document).on("input", ".uii", handle_ui);
-$(document).on("unfold", ".ui-unfold", handle_ui);
-$(document).on("mouseup mousedown", ".uim", handle_ui);
 
 
 // differences and focusing
@@ -1183,523 +850,6 @@ $(function () {
         handle_ui.trigger.call(this, "js-range-click", "updaterange");
     });
 });
-
-
-// bubbles and tooltips
-var make_bubble = (function () {
-var capdir = ["Top", "Right", "Bottom", "Left"],
-    lcdir = ["top", "right", "bottom", "left"],
-    szdir = ["height", "width"],
-    SPACE = 8;
-
-function cssborder(dir, suffix) {
-    return "border" + capdir[dir] + suffix;
-}
-
-function cssbc(dir) {
-    return cssborder(dir, "Color");
-}
-
-var roundpixel = Math.round;
-if (window.devicePixelRatio && window.devicePixelRatio > 1)
-    roundpixel = (function (dpr) {
-        return function (x) { return Math.round(x * dpr) / dpr; };
-    })(window.devicePixelRatio);
-
-function to_rgba(c) {
-    var m = c.match(/^rgb\((.*)\)$/);
-    return m ? "rgba(" + m[1] + ", 1)" : c;
-}
-
-function make_model(color) {
-    return $('<div class="bubble hidden' + color + '"><div class="bubtail bubtail0' + color + '"></div></div>').appendTo(document.body);
-}
-
-function calculate_sizes(color) {
-    var $model = make_model(color), tail = $model.children(), ds, x;
-    var sizes = [tail.width(), tail.height()];
-    for (ds = 0; ds < 4; ++ds) {
-        sizes[lcdir[ds]] = 0;
-        if ((x = $model.css("margin" + capdir[ds])) && (x = parseFloat(x)))
-            sizes[lcdir[ds]] = x;
-    }
-    $model.remove();
-    return sizes;
-}
-
-return function (content, bubopt) {
-    if (!bubopt && content && typeof content === "object") {
-        bubopt = content;
-        content = bubopt.content;
-    } else if (!bubopt)
-        bubopt = {};
-    else if (typeof bubopt === "string")
-        bubopt = {color: bubopt};
-
-    var nearpos = null, dirspec = bubopt.dir, dir = null,
-        color = bubopt.color ? " " + bubopt.color : "";
-
-    var bubdiv = $('<div class="bubble' + color + '" style="margin:0"><div class="bubtail bubtail0' + color + '" style="width:0;height:0"></div><div class="bubcontent"></div><div class="bubtail bubtail1' + color + '" style="width:0;height:0"></div></div>')[0];
-    document.body.appendChild(bubdiv);
-    if (bubopt["pointer-events"])
-        $(bubdiv).css({"pointer-events": bubopt["pointer-events"]});
-    var bubch = bubdiv.childNodes;
-    var sizes = null;
-    var divbw = null;
-
-    function change_tail_direction() {
-        var bw = [0, 0, 0, 0], trw = sizes[1], trh = sizes[0] / 2;
-        divbw = parseFloat($(bubdiv).css(cssborder(dir, "Width")));
-        divbw !== divbw && (divbw = 0); // eliminate NaN
-        bw[dir^1] = bw[dir^3] = trh + "px";
-        bw[dir^2] = trw + "px";
-        bubch[0].style.borderWidth = bw.join(" ");
-        bw[dir^1] = bw[dir^3] = trh + "px";
-        bw[dir^2] = trw + "px";
-        bubch[2].style.borderWidth = bw.join(" ");
-
-        for (var i = 1; i <= 3; ++i)
-            bubch[0].style[lcdir[dir^i]] = bubch[2].style[lcdir[dir^i]] = "";
-        bubch[0].style[lcdir[dir]] = (-trw - divbw) + "px";
-        // Offset the inner triangle so that the border width in the diagonal
-        // part of the tail, is visually similar to the border width
-        var trdelta = (divbw / trh) * Math.sqrt(trw * trw + trh * trh);
-        bubch[2].style[lcdir[dir]] = (-trw - divbw + trdelta) + "px";
-
-        for (i = 0; i < 3; i += 2)
-            bubch[i].style.borderLeftColor = bubch[i].style.borderRightColor =
-            bubch[i].style.borderTopColor = bubch[i].style.borderBottomColor = "transparent";
-
-        var yc = to_rgba($(bubdiv).css("backgroundColor")).replace(/([\d.]+)\)/, function (s, p1) {
-            return (0.75 * p1 + 0.25) + ")";
-        });
-        bubch[0].style[cssbc(dir^2)] = $(bubdiv).css(cssbc(dir));
-        bubch[2].style[cssbc(dir^2)] = yc;
-    }
-
-    function constrainmid(nearpos, wpos, ds, ds2) {
-        var z0 = nearpos[lcdir[ds]], z1 = nearpos[lcdir[ds^2]],
-            z = (1 - ds2) * z0 + ds2 * z1;
-        z = Math.max(z, Math.min(z1, wpos[lcdir[ds]] + SPACE));
-        return Math.min(z, Math.max(z0, wpos[lcdir[ds^2]] - SPACE));
-    }
-
-    function constrain(za, wpos, bpos, ds, ds2, noconstrain) {
-        var z0 = wpos[lcdir[ds]], z1 = wpos[lcdir[ds^2]],
-            bdim = bpos[szdir[ds&1]],
-            z = za - ds2 * bdim;
-        if (!noconstrain && z < z0 + SPACE)
-            z = Math.min(za - sizes[0], z0 + SPACE);
-        else if (!noconstrain && z + bdim > z1 - SPACE)
-            z = Math.max(za + sizes[0] - bdim, z1 - SPACE - bdim);
-        return z;
-    }
-
-    function bpos_wconstraint(wpos, ds) {
-        var xw = Math.max(ds === 3 ? 0 : nearpos.left - wpos.left,
-                          ds === 1 ? 0 : wpos.right - nearpos.right);
-        if ((ds === "h" || ds === 1 || ds === 3) && xw > 100)
-            return Math.min(wpos.width, xw) - 3*SPACE;
-        else
-            return wpos.width - 3*SPACE;
-    }
-
-    function make_bpos(wpos, ds) {
-        var $b = $(bubdiv);
-        $b.css("maxWidth", "");
-        var bg = $b.geometry(true);
-        var wconstraint = bpos_wconstraint(wpos, ds);
-        if (wconstraint < bg.width) {
-            $b.css("maxWidth", wconstraint);
-            bg = $b.geometry(true);
-        }
-        // bpos[D] is the furthest position in direction D, assuming
-        // the bubble was placed on that side. E.g., bpos[0] is the
-        // top of the bubble, assuming the bubble is placed over the
-        // reference.
-        var bpos = [nearpos.top - sizes.bottom - bg.height - sizes[0],
-                    nearpos.right + sizes.left + bg.width + sizes[0],
-                    nearpos.bottom + sizes.top + bg.height + sizes[0],
-                    nearpos.left - sizes.right - bg.width - sizes[0]];
-        bpos.width = bg.width;
-        bpos.height = bg.height;
-        bpos.wconstraint = wconstraint;
-        return bpos;
-    }
-
-    function remake_bpos(bpos, wpos, ds) {
-        var wconstraint = bpos_wconstraint(wpos, ds);
-        if ((wconstraint < bpos.wconstraint && wconstraint < bpos.width)
-            || (wconstraint > bpos.wconstraint && bpos.width >= bpos.wconstraint))
-            bpos = make_bpos(wpos, ds);
-        return bpos;
-    }
-
-    function parse_dirspec(dirspec, pos) {
-        var res;
-        if (dirspec.length > pos
-            && (res = "0123trblnesw".indexOf(dirspec.charAt(pos))) >= 0)
-            return res % 4;
-        return -1;
-    }
-
-    function csscornerradius(corner, index) {
-        var divbr = $(bubdiv).css("border" + corner + "Radius"), pos;
-        if (!divbr)
-            return 0;
-        if ((pos = divbr.indexOf(" ")) > -1)
-            divbr = index ? divbr.substring(pos + 1) : divbr.substring(0, pos);
-        return parseFloat(divbr);
-    }
-
-    function constrainradius(x, bpos, ds) {
-        var x0, x1;
-        if (ds & 1) {
-            x0 = csscornerradius(capdir[0] + capdir[ds], 1);
-            x1 = csscornerradius(capdir[2] + capdir[ds], 1);
-        } else {
-            x0 = csscornerradius(capdir[ds] + capdir[3], 1);
-            x1 = csscornerradius(capdir[ds] + capdir[1], 1);
-        }
-        return Math.min(Math.max(x, x0), bpos[szdir[(ds&1)^1]] - x1 - sizes[0]);
-    }
-
-    function show() {
-        if (!sizes)
-            sizes = calculate_sizes(color);
-
-        // parse dirspec
-        if (dirspec == null)
-            dirspec = "r";
-        var noflip = /!/.test(dirspec),
-            noconstrain = /\*/.test(dirspec),
-            dsx = dirspec.replace(/[^a0-3neswtrblhv]/, ""),
-            ds = parse_dirspec(dsx, 0),
-            ds2 = parse_dirspec(dsx, 1);
-        if (ds >= 0 && ds2 >= 0 && (ds2 & 1) != (ds & 1))
-            ds2 = (ds2 === 1 || ds2 === 2 ? 1 : 0);
-        else
-            ds2 = 0.5;
-        if (ds < 0)
-            ds = /^[ahv]$/.test(dsx) ? dsx : "a";
-
-        var wpos = $(window).geometry();
-        var bpos = make_bpos(wpos, dsx);
-
-        if (ds === "a") {
-            if (bpos.height + sizes[0] > Math.max(nearpos.top - wpos.top, wpos.bottom - nearpos.bottom)) {
-                ds = "h";
-                bpos = remake_bpos(bpos, wpos, ds);
-            } else
-                ds = "v";
-        }
-
-        var wedge = [wpos.top + 3*SPACE, wpos.right - 3*SPACE,
-                     wpos.bottom - 3*SPACE, wpos.left + 3*SPACE];
-        if ((ds === "v" || ds === 0 || ds === 2) && !noflip && ds2 < 0
-            && bpos[2] > wedge[2] && bpos[0] < wedge[0]
-            && (bpos[3] >= wedge[3] || bpos[1] <= wedge[1])) {
-            ds = "h";
-            bpos = remake_bpos(bpos, wpos, ds);
-        }
-        if ((ds === "v" && bpos[2] > wedge[2] && bpos[0] > wedge[0])
-            || (ds === 0 && !noflip && bpos[2] > wpos.bottom
-                && wpos.top - bpos[0] < bpos[2] - wpos.bottom)
-            || (ds === 2 && (noflip || bpos[0] >= wpos.top + SPACE)))
-            ds = 2;
-        else if (ds === "v" || ds === 0 || ds === 2)
-            ds = 0;
-        else if ((ds === "h" && bpos[3] - wpos.left < wpos.right - bpos[1])
-                 || (ds === 1 && !noflip && bpos[3] < wpos.left)
-                 || (ds === 3 && (noflip || bpos[1] <= wpos.right - SPACE)))
-            ds = 3;
-        else
-            ds = 1;
-        bpos = remake_bpos(bpos, wpos, ds);
-
-        if (ds !== dir) {
-            dir = ds;
-            change_tail_direction();
-        }
-
-        var x, y, xa, ya, d;
-        var divbw = parseFloat($(bubdiv).css(cssborder(ds & 1 ? 0 : 3, "Width")));
-        if (ds & 1) {
-            ya = constrainmid(nearpos, wpos, 0, ds2);
-            y = constrain(ya, wpos, bpos, 0, ds2, noconstrain);
-            d = constrainradius(roundpixel(ya - y - sizes[0] / 2 - divbw), bpos, ds);
-            bubch[0].style.top = bubch[2].style.top = d + "px";
-
-            if (ds == 1)
-                x = nearpos.left - sizes.right - bpos.width - sizes[1] - 1;
-            else
-                x = nearpos.right + sizes.left + sizes[1];
-        } else {
-            xa = constrainmid(nearpos, wpos, 3, ds2);
-            x = constrain(xa, wpos, bpos, 3, ds2, noconstrain);
-            d = constrainradius(roundpixel(xa - x - sizes[0] / 2 - divbw), bpos, ds);
-            bubch[0].style.left = bubch[2].style.left = d + "px";
-
-            if (ds == 0)
-                y = nearpos.bottom + sizes.top + sizes[1];
-            else
-                y = nearpos.top - sizes.bottom - bpos.height - sizes[1] - 1;
-        }
-
-        bubdiv.style.left = roundpixel(x) + "px";
-        bubdiv.style.top = roundpixel(y) + "px";
-        bubdiv.style.visibility = "visible";
-    }
-
-    function remove() {
-        bubdiv && bubdiv.parentElement.removeChild(bubdiv);
-        bubdiv = null;
-    }
-
-    var bubble = {
-        near: function (epos, reference) {
-            var i, off;
-            if (typeof epos === "string" || epos.tagName || epos.jquery) {
-                epos = $(epos);
-                if (dirspec == null && epos[0])
-                    dirspec = epos[0].getAttribute("data-tooltip-dir");
-                epos = epos.geometry(true);
-            }
-            for (i = 0; i < 4; ++i)
-                if (!(lcdir[i] in epos) && (lcdir[i ^ 2] in epos))
-                    epos[lcdir[i]] = epos[lcdir[i ^ 2]];
-            if (reference && (reference = $(reference)) && reference.length
-                && reference[0] != window)
-                epos = geometry_translate(epos, reference.geometry());
-            nearpos = epos;
-            show();
-            return bubble;
-        },
-        at: function (x, y, reference) {
-            return bubble.near({top: y, left: x}, reference);
-        },
-        dir: function (dir) {
-            dirspec = dir;
-            return bubble;
-        },
-        remove: remove,
-        color: function (newcolor) {
-            newcolor = newcolor ? " " + newcolor : "";
-            if (color !== newcolor) {
-                color = newcolor;
-                bubdiv.className = "bubble" + color;
-                bubch[0].className = "bubtail bubtail0" + color;
-                bubch[2].className = "bubtail bubtail1" + color;
-                dir = sizes = null;
-                nearpos && show();
-            }
-            return bubble;
-        },
-        html: function (content) {
-            var n = bubch[1];
-            if (content === undefined)
-                return n.innerHTML;
-            if (typeof content === "string"
-                && content === n.innerHTML
-                && bubdiv.style.visibility === "visible")
-                return bubble;
-            nearpos && $(bubdiv).css({maxWidth: "", left: "", top: ""});
-            if (typeof content === "string")
-                n.innerHTML = content;
-            else {
-                while (n.childNodes.length)
-                    n.removeChild(n.childNodes[0]);
-                if (content && content.jquery)
-                    content.appendTo(n);
-                else
-                    n.appendChild(content);
-            }
-            nearpos && show();
-            return bubble;
-        },
-        text: function (text) {
-            if (text === undefined)
-                return $(bubch[1]).text();
-            else
-                return bubble.html(text ? text_to_html(text) : text);
-        },
-        content_node: function () {
-            return bubch[1].firstChild;
-        },
-        hover: function (enter, leave) {
-            $(bubdiv).hover(enter, leave);
-            return bubble;
-        },
-        removeOn: function (jq, event) {
-            if (arguments.length > 1)
-                $(jq).on(event, remove);
-            else if (bubdiv)
-                $(bubdiv).on(jq, remove);
-            return bubble;
-        },
-        self: function () {
-            return bubdiv ? $(bubdiv) : null;
-        },
-        outerHTML: function () {
-            return bubdiv ? bubdiv.outerHTML : null;
-        }
-    };
-
-    content && bubble.html(content);
-    return bubble;
-};
-})();
-
-
-var tooltip = (function ($) {
-var builders = {};
-
-function prepare_info(elt, info) {
-    var xinfo = elt.getAttribute("data-tooltip-info");
-    if (xinfo) {
-        if (typeof xinfo === "string" && xinfo.charAt(0) === "{")
-            xinfo = JSON.parse(xinfo);
-        else if (typeof xinfo === "string")
-            xinfo = {builder: xinfo};
-        info = $.extend(xinfo, info);
-    }
-    if (info.builder && builders[info.builder])
-        info = builders[info.builder].call(elt, info) || info;
-    if (info.dir == null || elt.hasAttribute("data-tooltip-dir"))
-        info.dir = elt.getAttribute("data-tooltip-dir") || "v";
-    if (info.type == null || elt.hasAttribute("data-tooltip-type"))
-        info.type = elt.getAttribute("data-tooltip-type");
-    if (info.className == null || elt.hasAttribute("data-tooltip-class"))
-        info.className = elt.getAttribute("data-tooltip-class") || "dark";
-    if (elt.hasAttribute("data-tooltip"))
-        info.content = elt.getAttribute("data-tooltip");
-    else if (info.content == null && elt.hasAttribute("aria-label"))
-        info.content = elt.getAttribute("aria-label");
-    else if (info.content == null && elt.hasAttribute("title"))
-        info.content = elt.getAttribute("title");
-    return info;
-}
-
-function show_tooltip(info) {
-    if (window.disable_tooltip) {
-        return null;
-    }
-
-    var $self = $(this);
-    info = prepare_info($self[0], $.extend({}, info || {}));
-    info.element = this;
-
-    var tt, bub = null, to = null, near = null,
-        refcount = 0, content = info.content;
-
-    function erase() {
-        to = clearTimeout(to);
-        bub && bub.remove();
-        $self.removeData("tooltipState");
-        if (window.global_tooltip === tt) {
-            window.global_tooltip = null;
-        }
-    }
-
-    function show_bub() {
-        if (content && !bub) {
-            bub = make_bubble(content, {color: "tooltip " + info.className, dir: info.dir});
-            near = info.near || info.element;
-            bub.near(near).hover(tt.enter, tt.exit);
-        } else if (content) {
-            bub.html(content);
-        } else if (bub) {
-            bub && bub.remove();
-            bub = near = null;
-        }
-    }
-
-    function complete(new_content) {
-        if (new_content instanceof HPromise) {
-            new_content.then(complete);
-        } else {
-            var tx = window.global_tooltip;
-            content = new_content;
-            if (tx
-                && tx._element === info.element
-                && tx.html() === content
-                && !info.done) {
-                tt = tx;
-            } else {
-                tx && tx.erase();
-                $self.data("tooltipState", tt);
-                show_bub();
-                window.global_tooltip = tt;
-            }
-        }
-    }
-
-    tt = {
-        enter: function () {
-            to = clearTimeout(to);
-            ++refcount;
-            return tt;
-        },
-        exit: function () {
-            var delay = info.type === "focus" ? 0 : 200;
-            to = clearTimeout(to);
-            if (--refcount == 0 && info.type !== "sticky")
-                to = setTimeout(erase, delay);
-            return tt;
-        },
-        erase: erase,
-        _element: $self[0],
-        html: function (new_content) {
-            if (new_content === undefined) {
-                return content;
-            } else {
-                content = new_content;
-                show_bub();
-                return tt;
-            }
-        },
-        text: function (new_text) {
-            return tt.html(escape_entities(new_text));
-        },
-        near: function () {
-            return near;
-        }
-    };
-
-    complete(content);
-    info.done = true;
-    return tt;
-}
-
-function ttenter() {
-    var tt = $(this).data("tooltipState") || show_tooltip.call(this);
-    tt && tt.enter();
-}
-
-function ttleave() {
-    var tt = $(this).data("tooltipState");
-    tt && tt.exit();
-}
-
-function tooltip() {
-    removeClass(this, "need-tooltip");
-    var tt = this.getAttribute("data-tooltip-type");
-    if (tt === "focus")
-        $(this).on("focus", ttenter).on("blur", ttleave);
-    else
-        $(this).hover(ttenter, ttleave);
-}
-tooltip.erase = function () {
-    var tt = this === tooltip ? window.global_tooltip : $(this).data("tooltipState");
-    tt && tt.erase();
-};
-tooltip.add_builder = function (name, f) {
-    builders[name] = f;
-};
-
-$(function () { $(".need-tooltip").each(tooltip); });
-return tooltip;
-})($);
 
 
 // HtmlCollector
@@ -2143,7 +1293,7 @@ function setajaxcheck(elt, rv) {
     else
         elt.style.outline = "5px solid red";
     if (rv && rv.error)
-        make_bubble(rv.error, "errorbubble").near(elt).removeOn(elt, "input change click hide");
+        Bubble(rv.error, "errorbubble").near(elt).removeOn(elt, "input change click hide");
 }
 
 function link_urls(t) {
@@ -3111,19 +2261,6 @@ function expand(evt) {
 handle_ui.on("pa-gx", expand);
 })($);
 
-handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
-    var f = pa_resolve_fileref(this), show = hasClass(f, "pa-hide-left");
-    if (evt.metaKey) {
-        $(".pa-diff-toggle-hide-left").each(function () {
-            toggleClass(pa_resolve_fileref(this), "pa-hide-left", !show);
-            toggleClass(this, "btn-primary", show);
-        });
-    } else {
-        toggleClass(f, "pa-hide-left", !show);
-        toggleClass(this, "btn-primary", show);
-    }
-});
-
 /*
 var pa_observe_diff = (function () {
 var observers = new WeakMap;
@@ -3171,22 +2308,6 @@ return function () {
 })();
 $(pa_observe_diff);
 */
-
-
-jQuery.fn.extend({
-    serializeWith: function(data) {
-        var s = this.serialize(), i, sep;
-        if (s != null && data) {
-            sep = s.length && s[s.length - 1] != "&" ? "&" : "";
-            for (i in data)
-                if (data[i] != null) {
-                    s += sep + encodeURIComponent(i) + "=" + encodeURIComponent(data[i]);
-                    sep = "&";
-                }
-        }
-        return s;
-    }
-});
 
 
 var pa_grade_types = {};
@@ -3596,431 +2717,6 @@ function pa_grade_entry() {
     return gi.entries[e.getAttribute("data-pa-grade")];
 }
 
-handle_ui.on("pa-diff-toggle-markdown", function (evt) {
-    var f = pa_resolve_fileref(this), show = !hasClass(f, "pa-markdown");
-    if (evt.metaKey) {
-        $(".pa-diff-toggle-markdown").each(function () {
-            var f2 = pa_resolve_fileref(this), shown = hasClass(f2, "pa-markdown");
-            if (show && !shown) {
-                pa_filediff_markdown.call(f2);
-            } else if (!show && shown) {
-                pa_filediff_unmarkdown.call(f2);
-            }
-            toggleClass(this, "btn-primary", show);
-        });
-    } else {
-        (show ? pa_filediff_markdown : pa_filediff_unmarkdown).call(f);
-        toggleClass(this, "btn-primary", show);
-    }
-});
-
-function pa_hljs_line(s, tags) {
-    var t = tags.length ? tags.join("").concat(s) : s,
-        m = s.match(/<[^>]*>/g), i;
-    if (m) {
-        for (i = 0; i !== m.length; ++i) {
-            if (m[i].charAt(1) === "/") {
-                tags.pop();
-            } else {
-                tags.push(m[i]);
-            }
-        }
-    }
-    for (i = tags.length - 1; i >= 0; --i) {
-        var sp = tags[i].indexOf(" ");
-        t = t.concat('</', tags[i].substr(1, sp < 0 ? -1 : sp - 1), '>');
-    }
-    return t;
-}
-
-var pa_filediff_markdown = (function () {
-var md, mdcontext;
-
-function render_map(map) {
-    if (map[0] + 1 === map[1]) {
-        return String(map[1]);
-    } else {
-        return (map[0] + 1) + "-" + map[1];
-    }
-}
-
-function add_landmark(tokens, idx, options, env, self) {
-    var token = tokens[idx];
-    if (token.map && token.level === 0) {
-        token.attrSet("data-landmark", render_map(token.map));
-    }
-    return self.renderToken(tokens, idx, options, env);
-}
-
-function add_landmark_1(tokens, idx, options, env, self) {
-    var token = tokens[idx];
-    if (token.map && token.level <= 1) {
-        token.attrSet("data-landmark", render_map(token.map));
-    }
-    return self.renderToken(tokens, idx, options, env);
-}
-
-function fix_landmark_html(html, token) {
-    if (token.map && token.level === 0) {
-        var lm = " data-landmark=\"" + render_map(token.map) + "\"",
-            sp = html.indexOf(" "),
-            gt = html.indexOf(">");
-        if (sp > 0 && sp < gt) {
-            gt = sp;
-        }
-        html = html.substring(0, gt) + lm + html.substring(gt);
-    }
-    return html;
-}
-
-function modify_landmark(base) {
-    if (!base) {
-        return add_landmark;
-    } else {
-        return function (tokens, idx, options, env, self) {
-            var token = tokens[idx];
-            return fix_landmark_html(base(tokens, idx, options, env, self), token);
-        };
-    }
-}
-
-function modify_landmark_image(base) {
-    function fix(pi, file) {
-        return siteinfo.site_relative + "~" + encodeURIComponent(peteramati_uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + file;
-    }
-    return function (tokens, idx, options, env, self) {
-        var token = tokens[idx],
-            srci = token.attrIndex("src"),
-            src = token.attrs[srci][1],
-            pi, m, m2;
-        if (peteramati_uservalue
-            && mdcontext
-            && (pi = mdcontext.closest(".pa-psetinfo"))) {
-            if (!/\/\//.test(src)) {
-                var fileref = mdcontext.closest(".pa-filediff"),
-                    dir = fileref && fileref.hasAttribute("data-pa-file") ? fileref.getAttribute("data-pa-file").replace(/^(.*)\/[^\/]*$/, '$1') : "";
-                while (true) {
-                    if (src.startsWith("./")) {
-                        src = src.substring(2).replace(/^\/+/, "");
-                    } else if (src.startsWith("../") && dir !== "") {
-                        src = src.substring(3).replace(/^\/+/, "");
-                        dir = dir.replace(/(?:^|\/)[^\/]+\/*$/, "");
-                    } else if (src.startsWith("../") || src.startsWith("/")) {
-                        src = null;
-                        break;
-                    } else if ((m = src.match(/(^|\/+)[^\/]+\/\.\.(?:\/+|$)(.*)$/))) {
-                        src = m[1] + m[2];
-                    } else {
-                        break;
-                    }
-                }
-                if (src) {
-                    token.attrs[srci][1] = fix(pi, dir ? dir + "/" + src : src);
-                } else {
-                    token.attrs[srci][1] = "data:image/jpg,";
-                }
-            } if ((m = src.match(/^https:\/\/github\.com\/([^\/]+\/[^\/]+)\/(?:blob|raw)\/([^\/]+)\/(.*)$/))
-                  && (m2 = (pi.getAttribute("data-pa-repourl") || "").match(/^(?:https:\/\/github\.com\/|git@github\.com:)(.*?)\/?$/))
-                  && m2[1] == m[1]
-                  && pi.getAttribute("data-pa-branch") == m[2]) {
-                token.attrs[srci][1] = fix(pi, m[3]);
-            }
-        }
-        return fix_landmark_html(base(tokens, idx, options, env, self), token);
-    };
-}
-
-function render_landmark_fence(md) {
-    return function (tokens, idx, options, env, self) {
-        var token = tokens[idx], xtoken = token,
-            info = token.info ? md.utils.unescapeAll(token.info) : "",
-            lang, lango, content, highlighted = false, i, xattrs, m;
-        if (info && info.indexOf(" ") >= 0) {
-            if ((m = info.match(/^ *([-a-z+]+) *$/))) {
-                info = m[1];
-            } else {
-                token.content = info + "\n" + token.content;
-                token.map && (token.map[0] -= 1);
-                info = "";
-            }
-        }
-        lang = info ? info.trim().split(/\s+/g)[0] : "";
-
-        if (lang && hljs.getLanguage(lang)) {
-            try {
-                content = hljs.highlight(lang, token.content, true).value;
-                highlighted = true;
-            } catch (ex) {
-            }
-        }
-        highlighted || (content = md.utils.escapeHtml(token.content));
-
-        if (info) {
-            i = token.attrIndex("class");
-            xtoken = {attrs: token.attrs ? token.attrs.slice() : []};
-            if (i < 0) {
-                xtoken.attrs.push(["class", options.langPrefix + lang]);
-            } else {
-                xtoken.attrs[i][1] += " " + options.langPrefix + lang;
-            }
-        }
-        xattrs = '><code'.concat(self.renderAttrs(xtoken), '>');
-
-        if (token.map && token.level === 0) {
-            // split into lines, assign landmarks
-            var x = content.split(/\n/), y = [], ln0 = token.map[0] + 2;
-            x[x.length - 1] === "" && x.pop();
-            var xl = x.length;
-            if (highlighted) {
-                var tags = [];
-                for (i = 0; i !== xl; ++i) {
-                    y.push('<pre data-landmark="', ln0 + i,
-                           i + 1 !== xl ? '" class="partial"' : '"',
-                           xattrs, pa_hljs_line(x[i], tags), "\n</code></pre>");
-                }
-            } else {
-                for (i = 0; i !== xl; ++i) {
-                    y.push('<pre data-landmark="', ln0 + i,
-                           i + 1 !== xl ? '" class="partial"' : '"',
-                           xattrs, x[i], "\n</code></pre>");
-                }
-            }
-            return y.join("");
-        } else {
-            return '<pre'.concat(xattrs, content, '</code></pre>');
-        }
-    };
-}
-
-function make_markdownit() {
-    if (!md) {
-        md = markdownit().use(markdownit_katex);
-        for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
-                       "bullet_list_open", "table_open", "blockquote_open",
-                       "hr"]) {
-            md.renderer.rules[x] = modify_landmark(md.renderer.rules[x]);
-        }
-        md.renderer.rules.fence = md.renderer.rules.code_block = render_landmark_fence(md);
-        md.renderer.rules.image = modify_landmark_image(md.renderer.rules.image);
-        md.renderer.rules.list_item_open = add_landmark_1;
-    }
-    return md;
-}
-
-function fix_list_item(d) {
-    var dc;
-    while ((dc = d.firstChild) && dc.nodeType !== 1) {
-        d.removeChild(dc);
-    }
-    if (dc && dc.hasAttribute("data-landmark")) {
-        while (dc.nextSibling && dc.nextSibling.nodeType !== 1) {
-            d.removeChild(dc.nextSibling);
-        }
-        if (dc.nextSibling) {
-            if (d.tagName === "OL") {
-                if (!dc.hasAttribute("value")) {
-                    dc.value = d.start;
-                }
-                d.start = dc.value + 1;
-            }
-            var nd = document.createElement(d.tagName);
-            nd.appendChild(d.removeChild(dc));
-            d = nd;
-        }
-        d.setAttribute("data-landmark", dc.getAttribute("data-landmark"));
-    }
-    return d;
-}
-
-return function () {
-    if (hasClass(this, "pa-markdown") || hasClass(this, "pa-highlight"))
-        return;
-    // collect content
-    var e = this.firstChild, l = [], lineno = 1, this_lineno;
-    while (e) {
-        var n = e.nextSibling;
-        if (hasClass(e, "pa-gr")) {
-            this.removeChild(e);
-        } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
-            while (lineno < this_lineno) {
-                l.push("\n");
-                ++lineno;
-            }
-            l.push(e.lastChild.textContent);
-            if (!hasClass(e.lastChild, "pa-dnonl")) {
-                l.push("\n");
-            }
-            ++lineno;
-            addClass(e, "hidden");
-        }
-        e = n;
-    }
-    // render to markdown
-    var dx = document.createElement("div"), d, dc;
-    mdcontext = this;
-    dx.innerHTML = make_markdownit().render(l.join(""));
-    mdcontext = null;
-    // split up and insert into order
-    e = this.firstChild;
-    while ((d = dx.firstChild)) {
-        if (d.nodeType !== 1) {
-            dx.removeChild(d);
-            continue;
-        } else if (d.tagName === "OL" || d.tagName === "UL") {
-            d = fix_list_item(d);
-        } else if (d.tagName === "P"
-                   && d.firstChild.nodeType === 1
-                   && d.firstChild.tagName === "IMG"
-                   && d.firstChild === d.lastChild) {
-            addClass(d, "image-container");
-        }
-
-        var lp = document.createElement("div");
-        lp.className = "pa-dl pa-gr";
-        var la = document.createElement("div");
-        la.className = "pa-da";
-        var lb = document.createElement("div");
-        lb.className = "pa-db";
-
-        var lm = d.getAttribute("data-landmark");
-        if (lm) {
-            var l1 = parseInt(lm),
-                dash = lm.indexOf("-"),
-                l2 = dash >= 0 ? parseInt(lm.substring(dash + 1)) : l1;
-            while (e) {
-                if ((hasClass(e, "pa-gi") || hasClass(e, "pa-gc"))
-                    && +e.firstChild.nextSibling.getAttribute("data-landmark") >= l1) {
-                    break;
-                }
-                e = e.nextSibling;
-            }
-            lb.setAttribute("data-landmark", l1);
-            var klass = 0, ee = e;
-            while (ee) {
-                if (hasClass(ee, "pa-gi") || hasClass(ee, "pa-gc")) {
-                    if (+ee.firstChild.nextSibling.getAttribute("data-landmark") >= l2) {
-                        break;
-                    }
-                    klass |= hasClass(ee, "pa-gi") ? 1 : 2;
-                }
-                ee = ee.nextSibling;
-            }
-            lp.className += klass === 2 ? " pa-gc" : " pa-gi";
-        }
-
-        var lr = document.createElement("div");
-        lr.className = "pa-dr";
-        if (d === dx.firstChild) {
-            dx.removeChild(d);
-        }
-        lr.appendChild(d);
-        while (dx.firstChild && dx.firstChild.nodeType !== 1) {
-            lr.appendChild(dx.removeChild(dx.firstChild));
-        }
-
-        lp.appendChild(la);
-        lp.appendChild(lb);
-        lp.appendChild(lr);
-        this.insertBefore(lp, e);
-    }
-    addClass(this, "pa-markdown");
-};
-
-})();
-
-
-function pa_filediff_unmarkdown() {
-    var e = this.firstChild, l = [], lineno = 1, this_lineno;
-    while (e) {
-        var n = e.nextSibling;
-        if (hasClass(e, "pa-gr")) {
-            this.removeChild(e);
-        } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            removeClass(e, "hidden");
-        }
-        e = n;
-    }
-    removeClass(this, "pa-markdown");
-}
-
-
-function pa_filediff_highlight() {
-    // compute language
-    var file = this.getAttribute("data-pa-file"), lang;
-    if (!(lang = this.getAttribute("data-language"))) {
-        if (/\.(?:cc|cpp|hh|hpp|c\+\+|h\+\+|C|H)$/.test(file)) {
-            lang = "c++";
-        } else if (/\.(?:c|h)$/.test(file)) {
-            lang = "c";
-        }
-        lang && this.setAttribute("data-language", lang);
-    }
-    if (!lang || !hljs.getLanguage(lang)
-        || hasClass(this, "pa-highlight")
-        || hasClass(this, "pa-markdown"))
-        return;
-    // collect content
-    var e = this.firstChild, l = [], lineno = 1, this_lineno;
-    while (e) {
-        if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
-            while (lineno < this_lineno) {
-                l.push("\n");
-                ++lineno;
-            }
-            l.push(e.lastChild.textContent);
-            if (!hasClass(e.lastChild, "pa-dnonl")) {
-                l.push("\n");
-            }
-            ++lineno;
-        }
-        e = e.nextSibling;
-    }
-    // highlight
-    var hl;
-    try {
-        hl = hljs.highlight(lang, l.join(""), true).value.split("\n");
-    } catch (exc) {
-        return;
-    }
-    // replace content with highlight
-    e = this.firstChild;
-    var tags = [], langclass = "language-" + lang;
-    while (e) {
-        if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
-            var et = e.lastChild;
-            et.setAttribute("data-pa-text", et.textContent);
-            et.innerHTML = pa_hljs_line(hl[this_lineno - 1], tags);
-            addClass(et, langclass);
-        }
-        e = e.nextSibling;
-    }
-    addClass(this, "pa-highlight");
-}
-
-function pa_filediff_unhighlight() {
-    // compute language
-    var lang = this.getAttribute("data-language"),
-        langclass = lang ? "language-" + lang : "",
-        e = this.firstChild, et;
-    while (e) {
-        if ((et = e.lastChild)
-            && et.hasAttribute("data-pa-text")
-            && (!langclass || hasClass(et, langclass))) {
-            et.innerText = et.getAttribute("data-pa-text");
-            et.removeAttribute("data-pa-text");
-            langclass && removeClass(et, langclass);
-        }
-        e = e.nextSibling;
-    }
-    removeClass(this, "pa-highlight");
-}
-
-jQuery(function () {
-    $(".pa-filediff.need-highlight:not(.need-load)").each(pa_filediff_highlight);
-});
 
 
 (function () {
@@ -4077,20 +2773,6 @@ handle_ui.on("pa-grade", function (event) {
     }
 });
 })();
-
-function hoturl_gradeparts(e, args) {
-    var p = e.closest(".pa-psetinfo"), v;
-    args = args || {};
-    v = p.getAttribute("data-pa-user");
-    args.u = v || peteramati_uservalue;
-    if ((v = p.getAttribute("data-pa-pset"))) {
-        args.pset = v;
-    }
-    if ((v = p.getAttribute("data-pa-hash"))) {
-        args.commit = v;
-    }
-    return args;
-}
 
 function pa_show_grade(gi) {
     gi = gi || pa_gradeinfo.call(this);
@@ -4384,36 +3066,6 @@ handle_ui.on("pa-notes-grade", function (event) {
 });
 
 
-function fold61(sel, arrowholder, direction) {
-    var j = $(sel);
-    if (direction != null)
-        direction = !direction;
-    j.toggleClass("hidden", direction);
-    if (arrowholder)
-        $(arrowholder).find("span.foldarrow").html(
-            j.hasClass("hidden") ? "&#x25B6;" : "&#x25BC;"
-        );
-    return false;
-}
-
-function sb() {
-    var wp, de, dde, e, dh;
-    de = document;
-    dde = de.documentElement;
-    if (window.innerWidth) {
-        wp = {x: window.pageXOffset, y: window.pageYOffset,
-              h: window.innerHeight};
-    } else {
-        e = (dde && dde.clientWidth ? dde : document.body);
-        wp = {x: e.scrollLeft, y: e.scrollTop, h: e.clientHeight};
-    }
-    dh = Math.max(de.scrollHeight || 0, de.offsetHeight || 0);
-    if (dde) {
-        dh = Math.max(dh, dde.clientHeight || 0, dde.scrollHeight || 0, dde.offsetHeight || 0);
-    }
-    window.scroll(wp.x, Math.max(0, wp.y, dh - wp.h));
-}
-
 handle_ui.on("pa-show-run", function () {
     var parent = this.closest(".pa-runout"),
         name = parent.id.substring(10),
@@ -4427,52 +3079,8 @@ handle_ui.on("pa-show-run", function () {
     }
 });
 
-function pa_loadfilediff(filee, callback) {
-    if (hasClass(filee, "need-load")) {
-        var p = filee.closest(".pa-psetinfo");
-        $.ajax(hoturl("api/filediff", hoturl_gradeparts(filee)), {
-            type: "GET", cache: false, dataType: "json",
-            data: {
-                "file": html_id_decode(filee.id.substr(8)),
-                "base_hash": p.getAttribute("data-pa-base-hash"),
-                "hash": p.getAttribute("data-pa-hash")
-            },
-            success: function (data) {
-                if (data.ok && data.content_html) {
-                    var $h = $(data.content_html);
-                    $(filee).html($h.html());
-                }
-                removeClass(filee, "need-load");
-                callback();
-            }
-        });
-    } else {
-        callback();
-    }
-}
 
-
-function pa_resolve_fileref(e) {
-    var fd = e.closest(".pa-filediff");
-    return fd || document.getElementById(e.closest(".pa-fileref").getAttribute("data-pa-fileid"));
-}
-
-handle_ui.on("pa-unfold-file-diff", function (evt) {
-    if (evt.metaKey) {
-        $(".pa-unfold-file-diff").each(function () {
-            fold61(pa_resolve_fileref(this), this, false);
-        });
-    } else {
-        var self = this, f = pa_resolve_fileref(this);
-        pa_loadfilediff(f, function () {
-            fold61(f, self);
-        });
-    }
-    return false;
-});
-
-
-function pa_ensureline_callback(filename, lineid, callback) {
+function pa_ensureline_promise(filename, lineid) {
     // decode arguments: either (lineref) or (filename, lineid)
     if (lineid == null) {
         if (filename instanceof Node) {
@@ -4480,7 +3088,7 @@ function pa_ensureline_callback(filename, lineid, callback) {
         }
         var m = filename.match(/^#?L([ab]\d+)_(.*)$/);
         if (!m) {
-            return $(null);
+            return Promise.reject(null);
         }
         filename = m[2];
         lineid = m[1];
@@ -4491,7 +3099,7 @@ function pa_ensureline_callback(filename, lineid, callback) {
                 node = node.parentElement;
             }
             if (!node) {
-                return $(null);
+                return Promise.reject(null);
             }
             filename = node.getAttribute("data-pa-file");
             if (node.hasAttribute("data-pa-file-user")) {
@@ -4505,53 +3113,50 @@ function pa_ensureline_callback(filename, lineid, callback) {
     var lineref = "L" + lineid + "_" + filename;
     var e = document.getElementById(lineref);
     if (e) {
-        callback(e);
-        return;
+        return new ImmediatePromise(e);
     }
 
     // create link
     var filee = document.getElementById("pa-file-" + filename);
-    if (!filee) {
-        callback(false);
-        return;
-    }
-
-    function try_file() {
-        var $tds = $(filee).find(".pa-d" + lineid.charAt(0));
-        var lineno = lineid.substr(1);
-        // XXX expand
-        for (var i = 0; i < $tds.length; ++i) {
-            if ($tds[i].getAttribute("data-landmark") === lineno) {
-                $tds[i].id = lineref;
-                callback($tds[i]);
-                return;
+    if (filee) {
+        return filediff_load(filee).then(_ => {
+            // look for present line
+            const $tds = $(filee).find(".pa-d" + lineid.charAt(0)),
+                lineno = lineid.substr(1);
+            for (let i = 0; i < $tds.length; ++i) {
+                if ($tds[i].getAttribute("data-landmark") === lineno) {
+                    $tds[i].id = lineref;
+                    return $tds[i].id;
+                }
             }
-        }
-        callback(false);
+            // XXX missing: expand context lines
+            // look for absent line with present linenote
+            const $dls = $(filee).find(".pa-dl[data-landmark='" + lineid + "']");
+            if ($dls.length)
+                return $dls[0];
+            // give up
+            throw null;
+        });
+    } else {
+        return Promise.reject(null);
     }
-
-    pa_loadfilediff(filee, try_file);
 }
 
 function pa_ensureline(filename, lineid) {
     var e = null;
-    pa_ensureline_callback(filename, lineid, function (ee) {
-        ee && (e = ee);
-    });
+    pa_ensureline_promise(filename, lineid).then(ee => e = ee);
     return e;
 }
 
 handle_ui.on("pa-goto", function () {
     $(".pa-line-highlight").removeClass("pa-line-highlight");
-    pa_ensureline_callback(this, null, function (ref) {
-        if (ref) {
-            $(ref).closest(".pa-filediff").removeClass("hidden");
-            $e = $(ref).closest(".pa-dl");
-            $e.addClass("pa-line-highlight");
-            window.scrollTo(0, Math.max($e.geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
-            push_history_state(this.href);
-        }
-    });
+    pa_ensureline_promise(this, null).then(ref => {
+        $(ref).closest(".pa-filediff").removeClass("hidden");
+        let $e = $(ref).closest(".pa-dl");
+        $e.addClass("pa-line-highlight");
+        window.scrollTo(0, Math.max($e.geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
+        push_history_state(this.href);
+    }, null);
 });
 
 function pa_beforeunload(evt) {
@@ -4593,7 +3198,7 @@ handle_ui.on("pa-pset-setgrader", function () {
     });
 });
 
-function pa_flag() {
+handle_ui.on("pa-flag", function () {
     var $b = $(this), $form = $b.closest("form");
     if (this.name == "flag" && !$form.find("[name=flagreason]").length) {
         $b.before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" /> &nbsp;</span>');
@@ -4628,9 +3233,7 @@ function pa_flag() {
             }
         })
     }
-}
-
-handle_ui.on("pa-flag", pa_flag);
+});
 
 var pa_render_terminal = (function () {
 var styleset = {
@@ -5585,26 +4188,6 @@ function pa_cdfmax(d) {
     return cdf.length ? cdf[cdf.length - 2] : 0;
 }
 
-function path_y_at_x(x) {
-    var l = 0, r = this.getTotalLength(), m, pt;
-    if (l != r) {
-        while (r - l > 0.5) {
-            m = l + (r - l) / 2;
-            pt = this.getPointAtLength(m);
-            if (pt.x >= x + 0.25)
-                r = m;
-            else if (pt.x >= x - 0.25)
-                return pt.y;
-            else
-                l = m;
-        }
-        pt = this.getPointAtLength(r === m ? l : r);
-        if (pt.x >= x - 0.25 && pt.x <= x + 0.25)
-            return pt.y;
-    }
-    return null;
-}
-
 function pa_gradecdf_findy(d, x) {
     var cdf = pa_cdf(d), l = 0, r = cdf.length;
     while (l < r) {
@@ -5671,411 +4254,6 @@ function mksvg(tag) {
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
 }
 
-var hotcrp_graph = (function () {
-var PATHSEG_ARGMAP = {
-    m: 2, M: 2, z: 0, Z: 0, l: 2, L: 2, h: 1, H: 1, v: 1, V: 1, c: 6, C: 6,
-    s: 4, S: 4, q: 4, Q: 4, t: 2, T: 2, a: 7, A: 7, b: 1, B: 1
-};
-var normalized_path_cache = {}, normalized_path_cache_size = 0;
-
-function svg_path_number_of_items(s) {
-    if (s instanceof SVGPathElement)
-        s = s.getAttribute("d");
-    if (normalized_path_cache[s])
-        return normalized_path_cache[s].length;
-    else
-        return s.replace(/[^A-DF-Za-df-z]+/g, "").length;
-}
-
-function make_svg_path_parser(s) {
-    if (s instanceof SVGPathElement)
-        s = s.getAttribute("d");
-    s = s.split(/([a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)/);
-    var i = 1, e = s.length, next_cmd;
-    return function () {
-        var a = null, m, ch;
-        while (i < e) {
-            ch = s[i];
-            if (ch >= "A") {
-                if (a)
-                    break;
-                a = [ch];
-                next_cmd = ch;
-                if (ch === "m" || ch === "M" || ch === "z" || ch === "Z")
-                    next_cmd = (ch === "m" || ch === "z" ? "l" : "L");
-            } else {
-                if (!a && next_cmd)
-                    a = [next_cmd];
-                else if (!a || a.length === PATHSEG_ARGMAP[a[0]] + 1)
-                    break;
-                a.push(+ch);
-            }
-            i += 2;
-        }
-        return a;
-    };
-}
-
-var normalize_path_complaint = false;
-function normalize_svg_path(s) {
-    if (s instanceof SVGPathElement)
-        s = s.getAttribute("d");
-    if (normalized_path_cache[s])
-        return normalized_path_cache[s];
-
-    var res = [],
-        cx = 0, cy = 0, cx0 = 0, cy0 = 0, copen = false,
-        cb = 0, sincb = 0, coscb = 1,
-        i, dx, dy,
-        parser = make_svg_path_parser(s), a, ch, preva;
-    while ((a = parser())) {
-        ch = a[0];
-        // special commands: bearing, closepath
-        if (ch === "b" || ch === "B") {
-            cb = ch === "b" ? cb + a[1] : a[1];
-            coscb = Math.cos(cb);
-            sincb = Math.sin(cb);
-            continue;
-        } else if (ch === "z" || ch === "Z") {
-            preva = res.length ? res[res.length - 1] : null;
-            if (copen) {
-                if (cx != cx0 || cy != cy0)
-                    res.push(["L", cx, cy, cx0, cy0]);
-                res.push(["Z"]);
-                copen = false;
-            }
-            cx = cx0, cy = cy0;
-            continue;
-        }
-
-        // normalize command 1: remove horiz/vert
-        if (PATHSEG_ARGMAP[ch] == 1) {
-            if (a.length == 1)
-                a = ["L"]; // all data is missing
-            else if (ch === "h")
-                a = ["l", a[1], 0];
-            else if (ch === "H")
-                a = ["L", a[1], cy];
-            else if (ch === "v")
-                a = ["l", 0, a[1]];
-            else if (ch === "V")
-                a = ["L", cx, a[1]];
-        }
-
-        // normalize command 2: relative -> absolute
-        ch = a[0];
-        if (ch >= "a" && !cb) {
-            for (i = ch !== "a" ? 1 : 6; i < a.length; i += 2) {
-                a[i] += cx;
-                a[i+1] += cy;
-            }
-        } else if (ch >= "a") {
-            if (ch === "a")
-                a[3] += cb;
-            for (i = ch !== "a" ? 1 : 6; i < a.length; i += 2) {
-                dx = a[i], dy = a[i + 1];
-                a[i] = cx + dx * coscb + dy * sincb;
-                a[i+1] = cy + dx * sincb + dy * coscb;
-            }
-        }
-        ch = a[0] = ch.toUpperCase();
-
-        // normalize command 3: use cx0,cy0 for missing data
-        while (a.length < PATHSEG_ARGMAP[ch] + 1)
-            a.push(cx0, cy0);
-
-        // normalize command 4: shortcut -> full
-        if (ch === "S") {
-            dx = dy = 0;
-            if (preva && preva[0] === "C")
-                dx = cx - preva[3], dy = cy - preva[4];
-            a = ["C", cx + dx, cy + dy, a[1], a[2], a[3], a[4]];
-            ch = "C";
-        } else if (ch === "T") {
-            dx = dy = 0;
-            if (preva && preva[0] === "Q")
-                dx = cx - preva[1], dy = cy - preva[2];
-            a = ["Q", cx + dx, cy + dy, a[1], a[2]];
-            ch = "Q";
-        }
-
-        // process command
-        if (!copen && ch !== "M") {
-            if (res.length !== 0 && res[res.length - 1][0] !== "Z")
-                res.push(["M"]);
-            copen = true;
-        }
-        if (ch === "M") {
-            cx0 = a[1];
-            cy0 = a[2];
-            copen = false;
-        } else if (ch === "L") {
-            res.push(["L", cx, cy, a[1], a[2]]);
-        } else if (ch === "C") {
-            res.push(["C", cx, cy, a[1], a[2], a[3], a[4], a[5], a[6]]);
-        } else if (ch === "Q") {
-            res.push(["C", cx, cy,
-                      cx + 2 * (a[1] - cx) / 3, cy + 2 * (a[2] - cy) / 3,
-                      a[3] + 2 * (a[1] - a[3]) / 3, a[4] + 2 * (a[2] - a[4]) / 3,
-                      a[3], a[4]]);
-        } else {
-            // XXX should render "A" as a bezier
-            if (++normalize_path_complaint == 1)
-                log_jserror("bad normalize_svg_path " + ch);
-            res.push(a);
-        }
-
-        preva = a;
-        cx = a[a.length - 2];
-        cy = a[a.length - 1];
-    }
-
-    if (normalized_path_cache_size >= 1000) {
-        normalized_path_cache = {};
-        normalized_path_cache_size = 0;
-    }
-    normalized_path_cache[s] = res;
-    ++normalized_path_cache_size;
-    return res;
-}
-
-function pathNodeMayBeNearer(pathNode, point, dist) {
-    function oob(l, t, r, b) {
-        return l - point[0] >= dist || point[0] - r >= dist
-            || t - point[1] >= dist || point[1] - b >= dist;
-    }
-    // check bounding rectangle of path
-    if ("clientX" in point) {
-        var bounds = pathNode.getBoundingClientRect(),
-            dx = point[0] - point.clientX, dy = point[1] - point.clientY;
-        if (bounds && oob(bounds.left + dx, bounds.top + dy,
-                          bounds.right + dx, bounds.bottom + dy)) {
-            return false;
-        }
-    }
-    // check path
-    var npsl = normalize_svg_path(pathNode);
-    var l, t, r, b;
-    for (var i = 0; i !== npsl.length; ++i) {
-        var item = npsl[i];
-        if (item[0] === "L") {
-            l = Math.min(item[1], item[3]);
-            t = Math.min(item[2], item[4]);
-            r = Math.max(item[1], item[3]);
-            b = Math.max(item[2], item[4]);
-        } else if (item[0] === "C") {
-            l = Math.min(item[1], item[3], item[5], item[7]);
-            t = Math.min(item[2], item[4], item[6], item[8]);
-            r = Math.max(item[1], item[3], item[5], item[7]);
-            b = Math.max(item[2], item[4], item[6], item[8]);
-        } else if (item[0] === "Z" || item[0] === "M") {
-            continue;
-        } else {
-            return true;
-        }
-        if (!oob(l, t, r, b)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function path_x_distance2_buckets(pathNode, point) {
-    var npsl = normalize_svg_path(pathNode);
-    function pdist(l, t, r, b) {
-        var xd = point[0] < l ? l - point[0] : (point[0] > r ? point[0] - r : 0),
-            yd = point[1] < t ? t - point[1] : (point[1] > b ? point[1] - b : 0);
-        return Math.max(xd, yd);
-    }
-    var xmin = Infinity, xmax = -Infinity, width = 24, i, item;
-    for (i = 0; i !== npsl.length; ++i) {
-        item = npsl[i];
-        if (item[0] === "L") {
-            xmin = Math.min(xmin, item[1], item[3]);
-            xmax = Math.max(xmax, item[1], item[3]);
-        } else if (item[0] === "C") {
-            xmin = Math.min(xmin, item[1], item[3], item[5], item[7]);
-            xmax = Math.max(xmax, item[1], item[3], item[5], item[7]);
-        }
-    }
-    xmin -= width;
-    xmax += width;
-    var n = Math.max(Math.ceil((xmax - xmin) / width), 1),
-        a = new Array(n + 1),
-        l, t, r, b, d, j;
-    a.fill(Infinity);
-    for (i = 0; i !== npsl.length; ++i) {
-        item = npsl[i];
-        if (item[0] === "L") {
-            l = Math.min(item[1], item[3]);
-            t = Math.min(item[2], item[4]);
-            r = Math.max(item[1], item[3]);
-            b = Math.max(item[2], item[4]);
-        } else if (item[0] === "C") {
-            l = Math.min(item[1], item[3], item[5], item[7]);
-            t = Math.min(item[2], item[4], item[6], item[8]);
-            r = Math.max(item[1], item[3], item[5], item[7]);
-            b = Math.max(item[2], item[4], item[6], item[8]);
-        } else {
-            continue;
-        }
-        d = pdist(l, t, r, b);
-        l = Math.floor((l - xmin) / width);
-        r = Math.ceil((r - xmin) / width);
-        while (l <= r) {
-            a[l] = Math.min(a[l], d);
-            ++l;
-        }
-    }
-    for (i = 0; i !== a.length; ++i) {
-        if (a[i] < Infinity)
-            a[i] = a[i] * a[i];
-    }
-    a.xmin = xmin;
-    a.xmax = xmax;
-    a.width = width;
-    a.point = point;
-    return a;
-}
-
-function closestPoint(pathNode, point, inbest) {
-    // originally from Mike Bostock http://bl.ocks.org/mbostock/8027637
-    if (inbest && !pathNodeMayBeNearer(pathNode, point, inbest.distance)) {
-        return inbest;
-    }
-
-    var pathLength = pathNode.getTotalLength(),
-        pathSegments = svg_path_number_of_items(pathNode),
-        precision = Math.max(pathLength / pathSegments / 8, 4),
-        best, bestLength, sl,
-        bestDistance2 = inbest ? (inbest.distance + 0.01) * (inbest.distance + 0.01) : Infinity;
-
-    function check(pLength) {
-        var p = pathNode.getPointAtLength(pLength),
-            dx = point[0] - p.x, dy = point[1] - p.y,
-            d2 = dx * dx + dy * dy;
-        if (d2 < bestDistance2) {
-            best = [p.x, p.y];
-            bestLength = pLength;
-            bestDistance2 = d2;
-        }
-        return p;
-    }
-
-    if (pathSegments > 20) {
-        // big-step/small-step
-        var xdb = path_x_distance2_buckets(pathNode, point),
-            xmin = xdb.xmin, width = xdb.width, p, xx;
-        for (sl = 0; sl < pathLength; ) {
-            p = check(sl);
-            xx = Math.floor((p.x - xmin) / width);
-            if (xdb[xx] > bestDistance2
-                && xdb[xx-1] > bestDistance2
-                && xdb[xx+1] > bestDistance2)
-                sl += width;
-            else
-                sl += precision;
-        }
-    } else {
-        // linear scan for coarse approximation
-        for (sl = 0; sl < pathLength; sl += precision)
-            check(sl);
-    }
-    // edge condition: always check both ends
-    check(pathLength);
-
-    // binary search for precise estimate
-    do {
-        sl = bestLength - precision / 2;
-        sl > 0 && check(sl);
-        sl += precision;
-        sl < pathLength && check(sl);
-        precision /= 2;
-    } while (precision > 0.5);
-
-    if (best) {
-        best.distance = Math.sqrt(bestDistance2);
-        best.pathNode = pathNode;
-        best.pathLength = bestLength;
-    }
-    if (best && (!inbest || best.distance <= inbest.distance + 0.01)) {
-        return best;
-    } else {
-        return inbest;
-    }
-}
-
-function tangentAngle(pathNode, length) {
-    var length0 = Math.max(0, length - 0.25);
-    if (length0 == length)
-        length += 0.25;
-    var p0 = pathNode.getPointAtLength(length0),
-        p1 = pathNode.getPointAtLength(length);
-    return Math.atan2(p1.y - p0.y, p1.x - p0.x);
-}
-
-function event_to_point(element, event) {
-    // also borrowed from D3
-    var svg = element.ownerSVGElement || element, point;
-    if (svg.createSVGPoint) {
-        point = svg.createSVGPoint();
-        point.x = event.clientX;
-        point.y = event.clientY;
-        point = point.matrixTransform(element.getScreenCTM().inverse());
-    } else {
-        var rect = element.getBoundingClientRect();
-        point = {x: event.clientX - rect.left - element.clientLeft,
-                 y: event.clientY - rect.top - element.clientTop};
-    }
-    var result = [point.x, point.y];
-    result.clientX = event.clientX;
-    result.clientY = event.clientY;
-    return result;
-}
-
-return {closestPoint: closestPoint, tangentAngle: tangentAngle,
-        event_to_point: event_to_point};
-})();
-
-
-function PAIntervals() {
-    this.is = [];
-}
-PAIntervals.prototype.lower = function (x) {
-    var is = this.is, l = 0, r = is.length;
-    while (l < r) {
-        var m = l + ((r - l) >> 2) * 2;
-        if (is[m] > x)
-            r = m;
-        else if (x > is[m + 1])
-            l = m + 2;
-        else /* is[m] <= x <= is[m + 1] */
-            return m;
-    }
-    return l;
-};
-PAIntervals.prototype.contains = function (x) {
-    var is = this.is, i = this.lower(x);
-    return i < is.length && x >= is[i];
-};
-PAIntervals.prototype.overlaps = function (lo, hi) {
-    var is = this.is, i = this.lower(lo);
-    return i < is.length && hi >= is[i];
-};
-PAIntervals.prototype.add = function (lo, hi) {
-    var is = this.is, i = this.lower(lo);
-    if (i >= is.length || lo < is[i])
-        is.splice(i, 0, lo, lo);
-    var j = i;
-    while (j + 2 < is.length && hi >= is[j + 2])
-        j += 2;
-    if (j !== i)
-        is.splice(i + 1, j - i);
-    is[i + 1] = Math.max(is[i + 1], hi);
-};
-PAIntervals.prototype.clear = function () {
-    this.is = [];
-};
 
 function PAGradeGraph(parent, d, plot_type) {
     var $parent = $(parent);
@@ -6278,8 +4456,8 @@ PAGradeGraph.prototype.numeric_xaxis = function () {
 };
 PAGradeGraph.prototype.xtics_xaxis = function () {
     // determine number
-    var label_restrictions = new PAIntervals,
-        tic_restrictions = new PAIntervals,
+    var label_restrictions = new IntervalSeq,
+        tic_restrictions = new IntervalSeq,
         d = [];
 
     for (i = 0; i !== this.xtics.length; ++i) {
@@ -6473,7 +4651,7 @@ PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
         if (yc) {
             xv = this.xax(xcdf[i]);
             if (ispdf) {
-                yv = path_y_at_x.call(this.last_curve, xv);
+                yv = svgutil.eval_function_path.call(this.last_curve, xv);
             } else {
                 yv = this.yax(cdfy * nr);
             }
@@ -6519,7 +4697,7 @@ PAGradeGraph.prototype.star_annotation = function (rs, start, n, klass) {
 };
 PAGradeGraph.prototype.annotate_last_curve = function (x, elt, after) {
     if (this.last_curve) {
-        var xv = this.xax(x), yv = path_y_at_x.call(this.last_curve, xv);
+        var xv = this.xax(x), yv = svgutil.eval_function_path.call(this.last_curve, xv);
         if (yv === null && this.cutoff)
             yv = this.yax(this.cutoff);
         if (yv !== null) {
@@ -6627,12 +4805,12 @@ PAGradeGraph.prototype.hover = function () {
         if (event.type !== "mousemove")
             that.hoveron = event.type !== "mouseleave";
         if (that.hoveron) {
-            var loc = hotcrp_graph.event_to_point(that.svg, event),
+            var loc = svgutil.event_to_point(that.svg, event),
                 paths = that.gg.querySelectorAll(".pa-gg-pdf, .pa-gg-cdf");
             loc[0] -= that.ml;
             loc[1] -= that.mt;
             for (var p of paths) {
-                pt = hotcrp_graph.closestPoint(p, loc, pt);
+                pt = svgutil.closest_point(p, loc, pt);
             }
             if (pt.pathNode) {
                 var hlpt = closer_mark(that.gg.querySelectorAll(".pa-gg-mark.hl-main"), pt, 36)
@@ -7208,25 +5386,6 @@ function pa_checklatest() {
         setTimeout(docheck, 2000);
     }
 }
-
-handle_ui.on("js-repoclip", function () {
-    var node = document.createTextNode(this.getAttribute("data-pa-repo"));
-    var bub = make_bubble(node, {color: "tooltip", dir: "t"});
-    bub.near(this);
-    var range = document.createRange();
-    range.selectNode(node);
-    window.getSelection().removeAllRanges();
-    window.getSelection().addRange(range);
-    var worked;
-    try {
-        worked = document.execCommand("copy");
-    } catch (err) {
-    }
-    window.getSelection().removeAllRanges();
-    bub.remove();
-    if (global_tooltip && global_tooltip.elt == this)
-        global_tooltip.text(this.getAttribute("data-pa-repo"));
-});
 
 function pa_pset_actions() {
     var $f = $(this);
@@ -8456,29 +6615,6 @@ function pa_render_pset_table(pconf, data) {
 }
 
 
-handle_ui.on("js-repositories", function (event) {
-    var self = this;
-    $.ajax(hoturl("api", {fn: "repositories", u: this.getAttribute("data-pa-user")}), {
-        method: "POST", cache: false,
-        success: function (data) {
-            var t = "Error loading repositories";
-            if (data.repositories && data.repositories.length) {
-                t = "Repositories: ";
-                for (var i = 0; i < data.repositories.length; ++i) {
-                    var r = data.repositories[i];
-                    i && (t += ", ");
-                    t += "<a href=\"" + escape_entities(r.url) + "\">" + escape_entities(r.name) + "</a>";
-                }
-            } else if (data.repositories) {
-                t = "No repositories";
-            }
-            $("<div style=\"font-size:medium;font-weight:normal\"></div>").html(t).insertAfter(self);
-        }
-    });
-    event.preventDefault();
-});
-
-
 // autogrowing text areas; based on https://github.com/jaz303/jquery-grab-bag
 function textarea_shadow($self, width) {
     return jQuery("<div></div>").css({
@@ -8617,7 +6753,7 @@ window.$pa = {
     beforeunload: pa_beforeunload,
     checklatest: pa_checklatest,
     crpfocus: crpfocus, // XXX
-    filediff_markdown: pa_filediff_markdown,
+    filediff_markdown: filediff_markdown,
     fold: fold,
     gradecdf: pa_gradecdf,
     onload: hotcrp_load,

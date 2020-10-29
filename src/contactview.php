@@ -275,7 +275,7 @@ class ContactView {
         else
             $value = htmlspecialchars($repo_url ? $repo_url : "(none)");
         if ($repo_url) {
-            $value .= ' <button class="btn ui js-repoclip need-tooltip" data-pa-repo="' . htmlspecialchars($repo->ssh_url()) . '"';
+            $value .= ' <button class="btn ui js-copy-repo need-tooltip" data-pa-repo="' . htmlspecialchars($repo->ssh_url()) . '"';
             if ($user->is_anonymous)
                 $value .= ' data-tooltip="[anonymous]"';
             else
