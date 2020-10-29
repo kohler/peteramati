@@ -8,7 +8,11 @@ class API_Repo {
         if (!$api->repo) {
             return ["hash" => false];
         }
-        $api->repo->refresh(30);
+        $fresh = 30;
+        if ($qreq->fresh !== null && ctype_digit($qreq->fresh)) {
+            $fresh = max((int) $qreq->fresh, 10);
+        }
+        $api->repo->refresh($fresh, !!$qreq->sync);
         $c = $api->repo->latest_commit($api->pset, $api->branch);
         if (!$c) {
             return ["hash" => false];

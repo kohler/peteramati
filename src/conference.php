@@ -1810,7 +1810,7 @@ class Conf {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
         }
 
-        // Javascript settings to set before script.js
+        // Javascript settings to set before pa.js
         $nav = Navigation::get();
         $siteinfo = [
             "site_relative" => $nav->site_path_relative,
@@ -1846,9 +1846,9 @@ class Conf {
         }
         Ht::stash_script("window.siteinfo=" . json_encode_browser($siteinfo) . ";");
 
-        // script.js
+        // pa.js
         if (!$this->opt("noDefaultScript")) {
-            Ht::stash_html($this->make_script_file("scripts/script.js") . "\n");
+            Ht::stash_html($this->make_script_file("scripts/pa.min.js") . "\n");
         }
 
         // other scripts

@@ -2,9 +2,16 @@
     "url": "https://github.com/kohler/peteramati/issues",
     "email": "ekohler@gmail.com",
     "repository": "github:kohler/peteramati",
+    "scripts": {
+        "build": "rollup -c"
+    },
     "dependencies": {
         "markdown-it": "latest",
         "markdown-it-katexx": "^3.2.0",
         "uglify-js": "^3.11.1"
+    },
+    "devDependencies": {
+        "rollup": "^2.32",
+        "rollup-plugin-terser": "^7"
     }
 }

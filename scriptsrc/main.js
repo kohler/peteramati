@@ -2,10 +2,6 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-var siteinfo,
-    peteramati_uservalue, peteramati_psets,
-    hotcrp_want_override_conflict;
-
 function $$(id) {
     return document.getElementById(id);
 }
@@ -191,10 +187,9 @@ function log_jserror(errormsg, error, noconsole) {
         errormsg.colno = error.columnNumber;
     if (error && error.stack)
         errormsg.stack = error.stack;
-    if (errormsg.lineno == null || errormsg.lineno > 1)
-        $.ajax(hoturl_post("api/jserror"), {
-            global: false, method: "POST", cache: false, data: errormsg
-        });
+    $.ajax(hoturl_post("api/jserror"), {
+        global: false, method: "POST", cache: false, data: errormsg
+    });
     if (error && !noconsole && typeof console === "object" && console.error)
         console.error(errormsg.error);
 }
@@ -856,10 +851,6 @@ function hoturl(page, options) {
         hoturl_clean(x, /^pset=([^?&#]+)$/);
         hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
     }
-
-    if (hotcrp_want_override_conflict && want_forceShow
-        && hoturl_clean_find(x.v, /^forceShow=/) < 0)
-        x.v.push("forceShow=1");
 
     if (siteinfo.defaults)
         x.v.push(serialize_object(siteinfo.defaults));
@@ -1888,9 +1879,9 @@ function popup_near(elt, anchor) {
 
 
 // initialization
-window.setLocalTime = (function () {
+var set_local_time = (function () {
 var servhr24, showdifference = false;
-function setLocalTime(elt, servtime) {
+function set_local_time(elt, servtime) {
     var d, s;
     if (elt && typeof elt == "string")
         elt = $$(elt);
@@ -1909,12 +1900,12 @@ function setLocalTime(elt, servtime) {
         }
     }
 }
-setLocalTime.initialize = function (servzone, hr24) {
+set_local_time.initialize = function (servzone, hr24) {
     servhr24 = hr24;
     // print local time if server time is in a different time zone
     showdifference = Math.abs((new Date).getTimezoneOffset() - servzone) >= 60;
 };
-return setLocalTime;
+return set_local_time;
 })();
 
 
@@ -1929,7 +1920,7 @@ function hotcrp_load(arg) {
         hotcrp_onload.push(arg);
 }
 hotcrp_load.time = function (servzone, hr24) {
-    setLocalTime.initialize(servzone, hr24);
+    set_local_time.initialize(servzone, hr24);
 };
 hotcrp_load.opencomment = function () {
     if (location.hash.match(/^\#?commentnew$/))
@@ -2163,7 +2154,7 @@ function link_urls(t) {
 }
 
 // text rendering
-window.render_text = (function () {
+var render_text = (function () {
 function render0(text) {
     return link_urls(escape_entities(text));
 }
@@ -2800,7 +2791,7 @@ function render_form($tr, note, transition) {
     $form.find("input[name=iscomment]").prop("checked", !!(note && note[0]));
     $form.find("button[name=cancel]").click(cancel);
     $form.on("submit", function () {
-        window.pa_save_note.call(this.closest(".pa-dl"));
+        pa_save_note.call(this.closest(".pa-dl"));
     });
     if (transition) {
         $ta.focus();
@@ -2916,7 +2907,7 @@ function resolve_grade_range(grb) {
     }
 }
 
-window.pa_save_note = function (text) {
+var pa_save_note = function (text) {
     if (!hasClass(this, "pa-gw")) {
         throw new Error("!");
     }
@@ -4641,7 +4632,7 @@ function pa_flag() {
 
 handle_ui.on("pa-flag", pa_flag);
 
-window.pa_render_terminal = (function () {
+var pa_render_terminal = (function () {
 var styleset = {
     "0": false, "1": {b: true}, "2": {f: true}, "3": {i: true},
     "4": {u: true}, "5": {bl: true}, "7": {rv: true}, "8": {x: true},
@@ -8622,7 +8613,7 @@ $.fn.unautogrow = function () {
 
 $(function () { $(".need-autogrow").autogrow(); });
 
-var $pa = {
+window.$pa = {
     beforeunload: pa_beforeunload,
     checklatest: pa_checklatest,
     crpfocus: crpfocus, // XXX
