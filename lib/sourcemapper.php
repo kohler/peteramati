@@ -47,7 +47,7 @@ class SourceMapper {
     /** @var array{int,int,int,int,int} */
     private $c = [0, 0, 0, 0, 0];
     function __construct($x) {
-        $this->filename = $x->file;
+        $this->file = $x->file;
         $this->sources = $x->sources;
         $this->names = $x->names;
         $this->mappings = $x->mappings;
@@ -96,12 +96,12 @@ class SourceMapper {
             $sline = isset($x[2]) ? ($this->c[2] += $x[2]) : 0;
             $scol = isset($x[3]) ? ($this->c[3] += $x[3]) : 0;
             $name = isset($x[4]) ? ($this->c[4] += $x[4]) : null;
-            $this->spos[] = ($source << 56) | ($sline << 32) | $scol;
+            $this->sloc[] = ($source << 56) | ($sline << 32) | $scol;
             $this->nameidx[] = $name;
-            $this->glineoff[$nl] = count($this->spos);
+            $this->glineoff[$nl] = count($this->sloc);
             if ($pos !== strlen($m)) {
                 if ($ch === ";") {
-                    $this->glineoff[] = count($this->spos);
+                    $this->glineoff[] = count($this->sloc);
                     $this->c[0] = 0;
                 }
                 ++$pos;
@@ -148,10 +148,10 @@ class SourceMapper {
         while ($offset >= count($this->gcol) && $this->scan()) {
         }
         if ($offset >= 0 && $offset < count($this->gcol)) {
-            $spos = $this->spos[$offset];
+            $sloc = $this->sloc[$offset];
             $name = isset($this->nameidx[$offset]) ? $this->names[$this->nameidx[$offset]] ?? null : null;
-            return new SourceLocation($this->sources[($spos >> 56) & 255],
-                ($spos >> 32) & 0xFFF, $spos & 0xFFFFFFFF, $name, $offset);
+            return new SourceLocation($this->sources[($sloc >> 56) & 255],
+                ($sloc >> 32) & 0xFFF, $sloc & 0xFFFFFFFF, $name, $offset);
         } else {
             return null;
         }
