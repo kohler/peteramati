@@ -1462,7 +1462,7 @@ class PsetView {
 
         if (!$no_heading) {
             echo '<div class="pa-dg pa-with-fixed">',
-                '<h3 class="pa-fileref" data-pa-fileid="', $tabid, '"><a class="qq ui pa-unfold-file-diff" href=""><span class="foldarrow">',
+                '<h3 class="pa-fileref" data-pa-fileid="', $tabid, '"><a class="qq ui pa-diff-unfold" href=""><span class="foldarrow">',
                 ($open ? "&#x25BC;" : "&#x25B6;"),
                 "</span>";
             if ($args["diffcontext"] ?? false) {

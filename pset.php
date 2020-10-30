@@ -750,7 +750,7 @@ if ($Pset->gitless) {
         if (!$rj || !isset($rj->timestamp)) {
             echo ' hidden';
         }
-        echo '"><h3><a class="qq ui pa-show-run" href="">',
+        echo '"><h3><a class="qq ui pa-run-show" href="">',
             '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($r->output_title), '</a></h3>',
             '<div class="pa-run pa-run-short hidden" id="pa-run-', $r->category, '"';

@@ -4,12 +4,14 @@
 
 import * as svgutil from "./svgpathutil.js";
 import IntervalSeq from "./intervalseq.js";
+import { wstorage, sprintf, strftime } from "./utils.js";
 import {
     hasClass, addClass, removeClass, toggleClass, classList, handle_ui,
     fold61, ImmediatePromise
     } from "./ui.js";
 import {
-    hoturl, hoturl_post, hoturl_absolute_base, url_absolute, hoturl_gradeparts
+    hoturl, hoturl_post, hoturl_absolute_base, url_absolute, hoturl_gradeparts,
+    api_conditioner
     } from "./hoturl.js";
 import "./ui-pset.js";
 import {
@@ -17,8 +19,11 @@ import {
     text_to_html, regexp_quote, html_id_encode
     } from "./encoders.js";
 import { Bubble, tooltip } from "./tooltip.js";
-import { filediff_load } from "./diff.js";
+import { linediff_find } from "./diff.js";
 import { filediff_markdown } from "./diff-markdown.js";
+import { run } from "./run.js";
+import { terminal_render } from "./run-terminal.js";
+import { run_settings_load } from "./run-settings.js";
 
 function $$(id) {
     return document.getElementById(id);
@@ -340,63 +345,6 @@ function commajoin(a, joinword) {
         return a.slice(0, l - 1).join(", ") + ", " + joinword + " " + a[l - 1];
 }
 
-function sprintf(fmt) {
-    var words = fmt.split(/(%(?:%|-?(?:\d*|\*?)(?:\.\d*)?[sdefgroxX]))/), wordno, word,
-        arg, argno, conv, pad, t = "";
-    for (wordno = 0, argno = 1; wordno != words.length; ++wordno) {
-        word = words[wordno];
-        if (word.charAt(0) != "%")
-            t += word;
-        else if (word.charAt(1) == "%")
-            t += "%";
-        else {
-            arg = arguments[argno];
-            ++argno;
-            conv = word.match(/^%(-?)(\d*|\*?)(?:|[.](\d*))(\w)/);
-            if (conv[2] == "*") {
-                conv[2] = arg.toString();
-                arg = arguments[argno];
-                ++argno;
-            }
-            if (conv[4] >= "e" && conv[4] <= "g" && conv[3] == null) {
-                conv[3] = 6;
-            }
-            if (conv[4] === "g") {
-                arg = Number(arg).toPrecision(conv[3]).toString();
-                arg = arg.replace(/\.(\d*[1-9])?0+(|e.*)$/,
-                                  function (match, p1, p2) {
-                                      return (p1 == null ? "" : "." + p1) + p2;
-                                  });
-            } else if (conv[4] === "f") {
-                arg = Number(arg).toFixed(conv[3]);
-            } else if (conv[4] === "e") {
-                arg = Number(arg).toExponential(conv[3]);
-            } else if (conv[4] === "r") {
-                arg = Number(arg).toFixed(+(conv[3] || 0));
-                if (+(conv[3] || 0))
-                    arg = arg.replace(/\.?0*$/, "");
-            } else if (conv[4] === "d") {
-                arg = Math.floor(arg);
-            } else if (conv[4] === "o") {
-                arg = Math.floor(arg).toString(8);
-            } else if (conv[4] === "x") {
-                arg = Math.floor(arg).toString(16);
-            } else if (conv[4] === "X") {
-                arg = Math.floor(arg).toString(16).toUpperCase();
-            }
-            arg = arg.toString();
-            if (conv[2] !== "" && conv[2] !== "0") {
-                pad = conv[2].charAt(0) === "0" ? "0" : " ";
-                while (arg.length < parseInt(conv[2], 10)) {
-                    arg = conv[1] ? arg + pad : pad + arg;
-                }
-            }
-            t += arg;
-        }
-    }
-    return t;
-}
-
 function now_msec() {
     return (new Date).getTime();
 }
@@ -404,79 +352,6 @@ function now_msec() {
 function now_sec() {
     return now_msec() / 1000;
 }
-
-var strftime = (function () {
-    function pad(num, str, n) {
-        str += num.toString();
-        return str.length <= n ? str : str.substring(str.length - n);
-    }
-    function unparse_q(d, alt, is24) {
-        if (is24 && alt && !d.getSeconds())
-            return strftime("%H:%M", d);
-        else if (is24)
-            return strftime("%H:%M:%S", d);
-        else if (alt && d.getSeconds())
-            return strftime("%#l:%M:%S%P", d);
-        else if (alt && d.getMinutes())
-            return strftime("%#l:%M%P", d);
-        else if (alt)
-            return strftime("%#l%P", d);
-        else
-            return strftime("%I:%M:%S %p", d);
-    }
-    var unparsers = {
-        a: function (d) { return (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])[d.getDay()]; },
-        A: function (d) { return (["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])[d.getDay()]; },
-        d: function (d) { return pad(d.getDate(), "0", 2); },
-        e: function (d, alt) { return pad(d.getDate(), alt ? "" : " ", 2); },
-        u: function (d) { return d.getDay() || 7; },
-        w: function (d) { return d.getDay(); },
-        b: function (d) { return (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])[d.getMonth()]; },
-        B: function (d) { return (["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])[d.getMonth()]; },
-        h: function (d) { return unparsers.b(d); },
-        m: function (d) { return pad(d.getMonth() + 1, "0", 2); },
-        y: function (d) { return d.getFullYear() % 100; },
-        Y: function (d) { return d.getFullYear(); },
-        H: function (d) { return pad(d.getHours(), "0", 2); },
-        k: function (d, alt) { return pad(d.getHours(), alt ? "" : " ", 2); },
-        I: function (d) { return pad(d.getHours() % 12 || 12, "0", 2); },
-        l: function (d, alt) { return pad(d.getHours() % 12 || 12, alt ? "" : " ", 2); },
-        M: function (d) { return pad(d.getMinutes(), "0", 2); },
-        X: function (d) { return strftime("%#e %b %Y %#q", d); },
-        p: function (d) { return d.getHours() < 12 ? "AM" : "PM"; },
-        P: function (d) { return d.getHours() < 12 ? "am" : "pm"; },
-        q: function (d, alt) { return unparse_q(d, alt, strftime.is24); },
-        r: function (d, alt) { return unparse_q(d, alt, false); },
-        R: function (d, alt) { return unparse_q(d, alt, true); },
-        S: function (d) { return pad(d.getSeconds(), "0", 2); },
-        T: function (d) { return strftime("%H:%M:%S", d); },
-        /* XXX z Z */
-        D: function (d) { return strftime("%m/%d/%y", d); },
-        F: function (d) { return strftime("%Y-%m-%d", d); },
-        s: function (d) { return Math.floor(d.getTime() / 1000); },
-        n: function (d) { return "\n"; },
-        t: function (d) { return "\t"; },
-        "%": function (d) { return "%"; }
-    };
-    function strftime(fmt, d) {
-        var words = fmt.split(/(%#?\S)/), wordno, word, alt, f, t = "";
-        if (d == null)
-            d = new Date;
-        else if (typeof d == "number")
-            d = new Date(d * 1000);
-        for (wordno = 0; wordno != words.length; ++wordno) {
-            word = words[wordno];
-            alt = word.charAt(1) == "#";
-            if (word.charAt(0) == "%"
-                && (f = unparsers[word.charAt(1 + alt)]))
-                t += f(d, alt);
-            else
-                t += word;
-        }
-        return t;
-    };
-    return strftime;
-})();
 
 
 // events
@@ -564,45 +439,6 @@ function make_onkey(key, f) {
         }
     };
 }
-
-
-// localStorage
-var wstorage = function () { return false; };
-try {
-    if (window.localStorage && window.JSON)
-        wstorage = function (is_session, key, value) {
-            try {
-                var s = is_session ? window.sessionStorage : window.localStorage;
-                if (typeof key === "undefined")
-                    return !!s;
-                else if (typeof value === "undefined")
-                    return s.getItem(key);
-                else if (value === null)
-                    return s.removeItem(key);
-                else if (typeof value === "object")
-                    return s.setItem(key, JSON.stringify(value));
-                else
-                    return s.setItem(key, value);
-            } catch (err) {
-                return false;
-            }
-        };
-} catch (err) {
-}
-wstorage.json = function (is_session, key) {
-    var x = wstorage(is_session, key);
-    return x ? JSON.parse(x) : false;
-};
-wstorage.site = function (is_session, key, value) {
-    if (siteinfo.base !== "/")
-        key = siteinfo.base + key;
-    return wstorage(is_session, key, value);
-};
-wstorage.site_json = function (is_session, key) {
-    if (siteinfo.base !== "/")
-        key = siteinfo.base + key;
-    return wstorage.json(is_session, key);
-};
 
 
 // render_xmsg
@@ -1403,7 +1239,7 @@ render_text.add_format({
 render_text.add_format({
     format: 2,
     render: function (text) {
-        return pa_render_terminal(text);
+        return terminal_render(text);
     }
 })
 })(window.markdownit({
@@ -1602,19 +1438,21 @@ handle_ui.on("pa-pset-setcommit", function () {
 });
 
 handle_ui.on("pa-signin-radio", function (event) {
+    let v;
     if (this.value === "login") {
         fold("logingroup", false);
         fold("logingroup", false, 2);
-        $$("signin").value = "Sign in";
+        v = "Sign in";
     } else if (this.value === "forgot") {
         fold("logingroup", true);
         fold("logingroup", false, 2);
-        $$("signin").value = "Reset password";
+        v = "Reset password";
     } else if (this.value === "new") {
         fold("logingroup", true);
         fold("logingroup", true, 2);
-        $$("signin").value = "Create account";
+        v = "Create account";
     }
+    document.getElementById("signin").value = v;
 });
 
 
@@ -1738,7 +1576,7 @@ function pa_fix_note_links() {
 
     function note_anchor(tr) {
         var anal = pa_diff_locate(tr), td;
-        if (anal && (td = pa_ensureline(anal.ufile, anal.lineid))) {
+        if (anal && (td = linediff_find(anal.ufile, anal.lineid))) {
             return "#" + td.id;
         } else {
             return "";
@@ -1873,35 +1711,6 @@ function pa_render_note(note, transition) {
     return tr;
 }
 
-// pa_api_conditioner
-
-var pa_api_conditioner = (function () {
-var outstanding = 0, waiting = [];
-
-function post_ajax(url, data, method, resolve) {
-    return function () {
-        ++outstanding;
-        $.ajax(url, {
-            data: data, method: method || "POST", cache: false, dataType: "json",
-            success: function (data) {
-                resolve(data);
-                --outstanding;
-                waiting.length && waiting.shift()();
-            }
-        });
-    };
-}
-
-return function (url, data, method) {
-    return new Promise(function (resolve, reject) {
-        var f = post_ajax(url, data, method, resolve);
-        outstanding < 5 ? f() : waiting.push(f);
-    });
-};
-
-})();
-
-
 // pa_linenote
 (function ($) {
 var labelctr = 0, curanal, down_event, scrolled_x, scrolled_y, scrolled_at;
@@ -1951,7 +1760,7 @@ function render_form($tr, note, transition) {
 
 function anal_tr() {
     var elt;
-    if (curanal && (elt = pa_ensureline(curanal.ufile, curanal.lineid))) {
+    if (curanal && (elt = linediff_find(curanal.ufile, curanal.lineid))) {
         for (elt = elt.closest(".pa-dl"); elt && !elt.offsetParent; )
             elt = elt.previousSibling;
         return elt;
@@ -2103,7 +1912,7 @@ var pa_save_note = function (text) {
 
     grb && grb.setAttribute("data-pa-notes-outstanding", +grb.getAttribute("data-pa-notes-outstanding") + 1);
     return new Promise(function (resolve, reject) {
-        pa_api_conditioner(
+        api_conditioner(
             hoturl_post("api/linenote", hoturl_gradeparts(pi, {
                 file: file, line: lineid, oldversion: (note && note[3]) || 0
             })), data
@@ -2664,7 +2473,7 @@ function pa_set_grade(ge, g, ag, options) {
         && this.parentElement
         && hasClass(this.parentElement, "want-pa-landmark-links")) {
         var m = /^(.*):(\d+)$/.exec(ge.landmark),
-            $line = $(pa_ensureline(m[1], "a" + m[2])),
+            $line = $(linediff_find(m[1], "a" + m[2])),
             want_gbr = "";
         if ($line.length) {
             var $pi = $(this).closest(".pa-psetinfo"),
@@ -2748,7 +2557,7 @@ function save_grade(self) {
     });
 
     $f.data("paOutstandingPromise", new Promise(function (resolve, reject) {
-        pa_api_conditioner(hoturl_post("api/grade", hoturl_gradeparts($f[0])),
+        api_conditioner(hoturl_post("api/grade", hoturl_gradeparts($f[0])),
             {grades: g, oldgrades: og})
         .then(function (data) {
             $f.removeData("paOutstandingPromise");
@@ -3066,98 +2875,19 @@ handle_ui.on("pa-notes-grade", function (event) {
 });
 
 
-handle_ui.on("pa-show-run", function () {
+handle_ui.on("pa-run-show", function () {
     var parent = this.closest(".pa-runout"),
         name = parent.id.substring(10),
         therun = document.getElementById("pa-run-" + name),
         thebutton;
     if (therun.dataset.paTimestamp && !$(therun).is(":visible")) {
         thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
-        pa_run(thebutton, {unfold: true});
+        run(thebutton, {unfold: true});
     } else {
         fold61(therun, jQuery("#pa-runout-" + name));
     }
 });
 
-
-function pa_ensureline_promise(filename, lineid) {
-    // decode arguments: either (lineref) or (filename, lineid)
-    if (lineid == null) {
-        if (filename instanceof Node) {
-            filename = filename.hash;
-        }
-        var m = filename.match(/^#?L([ab]\d+)_(.*)$/);
-        if (!m) {
-            return Promise.reject(null);
-        }
-        filename = m[2];
-        lineid = m[1];
-    } else {
-        if (filename instanceof Node) {
-            var node = filename;
-            while (node && !node.hasAttribute("data-pa-file")) {
-                node = node.parentElement;
-            }
-            if (!node) {
-                return Promise.reject(null);
-            }
-            filename = node.getAttribute("data-pa-file");
-            if (node.hasAttribute("data-pa-file-user")) {
-                filename = node.getAttribute("data-pa-file-user") + "-" + filename;
-            }
-        }
-        filename = html_id_encode(filename);
-    }
-
-    // check lineref
-    var lineref = "L" + lineid + "_" + filename;
-    var e = document.getElementById(lineref);
-    if (e) {
-        return new ImmediatePromise(e);
-    }
-
-    // create link
-    var filee = document.getElementById("pa-file-" + filename);
-    if (filee) {
-        return filediff_load(filee).then(_ => {
-            // look for present line
-            const $tds = $(filee).find(".pa-d" + lineid.charAt(0)),
-                lineno = lineid.substr(1);
-            for (let i = 0; i < $tds.length; ++i) {
-                if ($tds[i].getAttribute("data-landmark") === lineno) {
-                    $tds[i].id = lineref;
-                    return $tds[i].id;
-                }
-            }
-            // XXX missing: expand context lines
-            // look for absent line with present linenote
-            const $dls = $(filee).find(".pa-dl[data-landmark='" + lineid + "']");
-            if ($dls.length)
-                return $dls[0];
-            // give up
-            throw null;
-        });
-    } else {
-        return Promise.reject(null);
-    }
-}
-
-function pa_ensureline(filename, lineid) {
-    var e = null;
-    pa_ensureline_promise(filename, lineid).then(ee => e = ee);
-    return e;
-}
-
-handle_ui.on("pa-goto", function () {
-    $(".pa-line-highlight").removeClass("pa-line-highlight");
-    pa_ensureline_promise(this, null).then(ref => {
-        $(ref).closest(".pa-filediff").removeClass("hidden");
-        let $e = $(ref).closest(".pa-dl");
-        $e.addClass("pa-line-highlight");
-        window.scrollTo(0, Math.max($e.geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
-        push_history_state(this.href);
-    }, null);
-});
 
 function pa_beforeunload(evt) {
     var ok = true;
@@ -3168,16 +2898,6 @@ function pa_beforeunload(evt) {
     });
     if (!ok)
         return (event.returnValue = "You have unsaved notes. You will lose them if you leave the page now.");
-}
-
-function pa_fetchgrades() {
-    var p = this.closest(".pa-psetinfo");
-    pa_api_conditioner(hoturl("api/grade", hoturl_gradeparts(p)), null, "GET")
-        .then(function (data) {
-            if (data && data.ok) {
-                $(p).data("pa-gradeinfo", data).each(pa_loadgrades);
-            }
-        });
 }
 
 handle_ui.on("pa-pset-setgrader", function () {
@@ -3235,827 +2955,8 @@ handle_ui.on("pa-flag", function () {
     }
 });
 
-var pa_render_terminal = (function () {
-var styleset = {
-    "0": false, "1": {b: true}, "2": {f: true}, "3": {i: true},
-    "4": {u: true}, "5": {bl: true}, "7": {rv: true}, "8": {x: true},
-    "9": {s: true}, "21": {du: true}, "22": {b: false, f: false},
-    "23": {i: false}, "24": {u: false}, "25": {bl: false}, "27": {rv: false},
-    "28": {x: false}, "29": {s: false}, "30": {fg: 0}, "31": {fg: 1},
-    "32": {fg: 2}, "33": {fg: 3}, "34": {fg: 4}, "35": {fg: 5},
-    "36": {fg: 6}, "37": {fg: 7}, "38": "fg", "39": {fg: false},
-    "40": {bg: 0}, "41": {bg: 1}, "42": {bg: 2}, "43": {bg: 3},
-    "44": {bg: 4}, "45": {bg: 5}, "46": {bg: 6}, "47": {bg: 7},
-    "48": "bg", "49": {bg: false}, "90": {fg: 8}, "91": {fg: 9},
-    "92": {fg: 10}, "93": {fg: 11}, "94": {fg: 12}, "95": {fg: 13},
-    "96": {fg: 14}, "97": {fg: 15},
-    "100": {bg: 8}, "101": {bg: 9}, "102": {bg: 10}, "103": {bg: 11},
-    "104": {bg: 12}, "105": {bg: 13}, "106": {bg: 14}, "107": {bg: 15}
-};
-var styleback = {
-    "b": 1, "f": 2, "i": 3, "u": 4, "bl": 5, "rv": 7, "x": 8, "s": 9,
-    "du": 21
-};
-
-function parse_styles(dst, style) {
-    var a;
-    if (arguments.length === 1) {
-        style = dst;
-        dst = null;
-    }
-    if (!style || style === "\x1b[m" || style === "\x1b[0m")
-        return null;
-    if (style.charAt(0) === "\x1b")
-        a = style.substring(2, style.length - 1).split(";");
-    else
-        a = style.split(";");
-    for (var i = 0; i < a.length; ++i) {
-        var cmp = styleset[parseInt(a[i])];
-        if (cmp === false)
-            dst = null;
-        else if (!cmp)
-            /* do nothing */;
-        else if (typeof cmp === "object") {
-            for (var j in cmp) {
-                if (cmp[j] !== false) {
-                    dst = dst || {};
-                    dst[j] = cmp[j];
-                } else if (dst)
-                    delete dst[j];
-            }
-        } else if (cmp === "fg" || cmp === "bg") {
-            var r, g, b;
-            dst = dst || {};
-            if (i + 4 < a.length && parseInt(a[i+1]) === 2) {
-                r = parseInt(a[i+2]);
-                g = parseInt(a[i+3]);
-                b = parseInt(a[i+4]);
-                if (r <= 255 && g <= 255 && b <= 255)
-                    dst[cmp] = [r, g, b];
-            } else if (i + 2 < a.length && parseInt(a[i+1]) === 5) {
-                var c = parseInt(a[i+1]);
-                if (c <= 15)
-                    dst[cmp] = c;
-                else if (c <= 0xe7) {
-                    b = (c - 16) % 6;
-                    g = ((c - 16 - b) / 6) % 6;
-                    r = (c - 16 - b - 6 * g) / 36;
-                    dst[cmp] = [r * 51, g * 51, b * 51];
-                } else if (c <= 255) {
-                    b = Math.round((c - 0xe8) * 255 / 23);
-                    dst[cmp] = [b, b, b];
-                }
-            }
-        }
-    }
-    return dst && $.isEmptyObject(dst) ? null : dst;
-}
-
-function unparse_styles(dst) {
-    if (!dst)
-        return "\x1b[m";
-    var a = [];
-    for (var key in styleback)
-        if (dst[key])
-            a.push(styleback[key]);
-    if (dst.fg) {
-        if (typeof dst.fg === "number")
-            a.push(dst.fg < 8 ? 30 + dst.fg : 90 + dst.fg - 8);
-        else
-            a.push(38, 2, dst.fg[0], dst.fg[1], dst.fg[2]);
-    }
-    if (dst.bg) {
-        if (typeof dst.bg === "number")
-            a.push(dst.bg < 8 ? 40 + dst.bg : 100 + dst.bg - 8);
-        else
-            a.push(48, 2, dst.bg[0], dst.bg[1], dst.bg[2]);
-    }
-    return "\x1b[" + a.join(";") + "m";
-}
-
-function style_text(text, style) {
-    if (typeof text === "string")
-        text = document.createTextNode(text);
-    else if (text instanceof jQuery)
-        text = text[0];
-    if (!style || style === "\x1b[m"
-        || (typeof style === "string" && !(style = parse_styles(style))))
-        return text;
-    var node = document.createElement("span");
-    var cl = [];
-    for (var key in styleback)
-        if (style[key])
-            cl.push("ansi" + key);
-    if (style.fg) {
-        if (typeof style.fg === "number")
-            cl.push("ansifg" + style.fg);
-        else
-            node.styles.foregroundColor = sprintf("#%02x%02x%02x", style.fg[0], style.fg[1], style.fg[2]);
-    }
-    if (style.bg) {
-        if (typeof style.bg === "number")
-            cl.push("ansibg" + style.bg);
-        else
-            node.styles.backgroundColor = sprintf("#%02x%02x%02x", style.bg[0], style.bg[1], style.bg[2]);
-    }
-    if (cl.length)
-        node.className = cl.join(" ");
-    node.appendChild(text);
-    return node;
-}
-
-return function (container, string, options) {
-    var return_html = false;
-    if (typeof container === "string") {
-        options = string;
-        string = container;
-        container = document.createElement("div");
-        return_html = true;
-    }
-
-    if (options && options.clear) {
-        container.removeAttribute("data-pa-terminal-style");
-        container.removeAttribute("data-pa-outputpart");
-        while (container.firstChild)
-            container.removeChild(container.firstChild);
-    }
-
-    var styles = container.getAttribute("data-pa-terminal-style"),
-        fragment = null;
-
-    function addlinepart(node, text) {
-        node.appendChild(style_text(text, styles));
-    }
-
-    function addfragment(node) {
-        if (!fragment)
-            fragment = document.createDocumentFragment();
-        fragment.appendChild(node);
-    }
-
-    function ansi_combine(a1, a2) {
-        if (/^\x1b\[[\d;]*m$/.test(a2))
-            return unparse_styles(parse_styles(parse_styles(null, a1), a2));
-        else
-            return a1;
-    }
-
-    function ends_with(str, chr) {
-        return str !== "" && str.charAt(str.length - 1) === chr;
-    }
-
-    function clean_cr(line) {
-        var lineend = /\n$/.test(line);
-        if (lineend && line.indexOf("\r") === line.length - 1)
-            return line.substring(0, line.length - 2) + "\n";
-        var curstyle = styles || "\x1b[m",
-            parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/),
-            partno, i, m, r = [];
-        for (partno = 0; partno < parts.length; ++partno) {
-            var g = [], glen = 0, clearafter = null;
-            var lsplit = parts[partno].split(/(\x1b\[[\d;]*m|\x1b\[0?K)/);
-            for (var j = 0; j < lsplit.length; j += 2) {
-                if (lsplit[j] !== "") {
-                    g.push(curstyle, lsplit[j]);
-                    glen += lsplit[j].length;
-                }
-                if (j + 1 < lsplit.length) {
-                    if (ends_with(lsplit[j + 1], "K"))
-                        clearafter = glen;
-                    else
-                        curstyle = ansi_combine(curstyle, lsplit[j + 1]);
-                }
-            }
-            // glen: number of characters to overwrite
-            var rpos = 0;
-            while (rpos < r.length && glen >= r[rpos + 1].length) {
-                glen -= r[rpos + 1].length;
-                rpos += 2;
-            }
-            while (rpos < r.length && glen < r[rpos + 1].length && clearafter === null) {
-                g.push(r[rpos], r[rpos + 1].substr(glen));
-                glen = 0;
-                rpos += 2;
-            }
-            r = g;
-        }
-        r.push(curstyle);
-        lineend && r.push("\n");
-        return r.join("");
-    }
-
-    function find_filediff(file) {
-        return $(".pa-filediff").filter(function () {
-            return this.getAttribute("data-pa-file") === file;
-        });
-    }
-
-    function add_file_link(node, prefix, file, line, link) {
-        var m;
-        while ((m = file.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
-            styles = ansi_combine(styles, m[1]);
-            file = m[2];
-        }
-        var filematch = find_filediff(file);
-        if (!filematch.length && options && options.directory) {
-            file = options.directory + file;
-            filematch = find_filediff(file);
-        }
-        if (filematch.length) {
-            if (prefix.length)
-                addlinepart(node, prefix);
-            var anchor = "Lb" + line + "_" + html_id_encode(file);
-            var a = $("<a href=\"#" + anchor + "\" class=\"uu uic pa-goto\"></a>");
-            a.text(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
-            addlinepart(node, a);
-            return true;
-        }
-        return false;
-    }
-
-    function render_line(line, node) {
-        var m, filematch, a, i, x, isnew = !node, displaylen = 0;
-        if (isnew)
-            node = document.createElement("span");
-
-        if (/\r/.test(line))
-            line = clean_cr(line);
-
-        while ((m = line.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
-            styles = ansi_combine(styles, m[1]);
-            line = m[2];
-        }
-
-        if (((m = line.match(/^([ \t]*)([^:\s]+):(\d+)(?=:)/))
-             || (m = line.match(/^([ \t]*)file \"(.*?)\", line (\d+)/i)))
-            && add_file_link(node, m[1], m[2], m[3], m[0])) {
-            displaylen = m[0].length;
-            line = line.substr(displaylen);
-        }
-
-        var render;
-        while (line !== "") {
-            render = line;
-            if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
-                if (m[1] === "") {
-                    styles = ansi_combine(styles, m[2]);
-                    line = m[3];
-                    continue;
-                }
-                render = m[1];
-            }
-            if (displaylen + render.length > 133
-                || (displaylen + render.length == 133 && render.charAt(132) !== "\n")) {
-                render = render.substr(0, 132 - displaylen);
-                addlinepart(node, render);
-                node.className = "pa-rl-continues";
-                isnew && addfragment(node);
-                node = document.createElement("span");
-                isnew = true;
-                displaylen = 0;
-            } else {
-                addlinepart(node, render);
-                displaylen += render.length;
-            }
-            line = line.substr(render.length);
-        }
-        isnew && addfragment(node);
-    }
-
-    // hide newline on last line
-    var lines, lastfull;
-    if (typeof string === "string") {
-        lines = string.split(/^/m);
-        if (lines.length && lines[lines.length - 1] === "")
-            lines.pop();
-        lastfull = lines.length && ends_with(lines[lines.length - 1], "\n");
-    } else {
-        lines = [];
-        lastfull = true;
-        fragment = string;
-    }
-
-    var node = container.lastChild, cursor = null;
-    if (node
-        && node.lastChild
-        && hasClass(node.lastChild, "pa-runcursor")) {
-        cursor = node.lastChild;
-        node.removeChild(cursor);
-    }
-
-    if (node
-        && (string = node.getAttribute("data-pa-outputpart")) !== null
-        && string !== ""
-        && lines.length) {
-        while (node.firstChild)
-            node.removeChild(node.firstChild);
-        lines[0] = string + lines[0];
-        node.removeAttribute("data-pa-outputpart");
-    } else {
-        if (node && (lines.length || fragment)) {
-            node.appendChild(document.createTextNode("\n"));
-            node.removeAttribute("data-pa-outputpart");
-        }
-        node = null;
-    }
-
-    var laststyles = styles, i, j, last;
-    for (i = 0; i < lines.length; i = j) {
-        laststyles = styles;
-        last = lines[i];
-        for (j = i + 1; !ends_with(last, "\n") && j < lines.length; ++j)
-            last += lines[j];
-        if (j == lines.length && lastfull)
-            last = last.substring(0, last.length - 1);
-        render_line(last, i ? null : node);
-    }
-
-    if (options && options.cursor && !container.lastChild && !fragment)
-        addfragment("");
-
-    if (fragment)
-        container.appendChild(fragment);
-
-    var len = container.childNodes.length;
-    if (len >= 4000) {
-        i = container.firstChild;
-        while (i.tagName === "DIV" && i.className === "pa-rl-group") {
-            i = i.nextSibling;
-            --len;
-        }
-        var div = null, divlen = 0;
-        while (i && (j = i.nextSibling)) {
-            if (!div
-                || (divlen >= 4000 && len >= 2000)) {
-                div = document.createElement("div");
-                div.className = "pa-rl-group";
-                container.insertBefore(div, i);
-                divlen = 0;
-            }
-            container.removeChild(i);
-            div.appendChild(i);
-            i = j;
-            ++divlen;
-            --len;
-        }
-    }
-
-    if (options && options.cursor) {
-        if (!cursor) {
-            cursor = document.createElement("span");
-            cursor.className = "pa-runcursor";
-        }
-        container.lastChild.appendChild(cursor);
-    }
-
-    if (!lastfull && container.lastChild) {
-        styles = laststyles;
-        container.lastChild.setAttribute("data-pa-outputpart", last);
-    }
-
-    if (styles != null)
-        container.setAttribute("data-pa-terminal-style", styles);
-    else
-        container.removeAttribute("data-pa-terminal-style");
-
-    if (return_html)
-        return container.innerHTML;
-};
-})();
-
-function pa_run(button, opt) {
-    var $f = $(button).closest("form"),
-        category = button.getAttribute("data-pa-run-category") || button.value,
-        directory = $(button).closest(".pa-psetinfo").attr("data-pa-directory"),
-        therun = document.getElementById("pa-run-" + category),
-        thepre = $(therun).find("pre"),
-        thexterm,
-        checkt;
-
-    if (typeof opt !== "object")
-        opt = {};
-    if (opt.unfold && therun.dataset.paTimestamp)
-        checkt = +therun.dataset.paTimestamp;
-    else {
-        if ($f.prop("outstanding"))
-            return true;
-        $f.find("button").prop("disabled", true);
-        $f.prop("outstanding", true);
-    }
-    delete therun.dataset.paTimestamp;
-
-    fold61(therun, jQuery("#pa-runout-" + category).removeClass("hidden"), true);
-    if (!checkt && !opt.noclear) {
-        thepre.html("");
-        addClass(thepre[0].parentElement, "pa-run-short");
-        thepre[0].removeAttribute("data-pa-terminal-style");
-        $(therun).children(".pa-runrange").remove();
-    } else if (therun.lastChild)
-        $(therun.lastChild).find("span.pa-runcursor").remove();
-
-    function terminal_char_width(min, max) {
-        var x = $('<span style="position:absolute">0</span>').appendTo(thepre),
-            w = Math.trunc(thepre.width() / x.width() / 1.33);
-        x.remove();
-        return Math.max(min, Math.min(w, max));
-    }
-
-    if (therun.dataset.paXtermJs
-        && therun.dataset.paXtermJs !== "false"
-        && window.Terminal) {
-        removeClass(thepre[0].parentElement, "pa-run-short");
-        addClass(thepre[0].parentElement, "pa-run-xterm-js");
-        thexterm = new Terminal({cols: terminal_char_width(80, 132), rows: 25});
-        thexterm.open(thepre[0]);
-        thexterm.attachCustomKeyEventHandler(function (e) {
-            if (e.type === "keydown") {
-                var key = event_key(e), mod = event_modkey(e);
-                if (key === "Enter" && !mod) {
-                    key = "\r";
-                } else if (key === "Escape" && !mod) {
-                    key = "\x1B";
-                } else if (key === "Backspace" && !mod) {
-                    key = "\x08";
-                } else if (key >= "a"
-                           && key <= "z"
-                           && (mod & 0xE) === event_modkey.CTRL) {
-                    key = String.fromCharCode(key.charCodeAt(0) - 96);
-                } else if (key.length !== 1
-                           || (mod & 0xE) !== 0
-                           || !event_key.printable(e)) {
-                    key = "";
-                }
-                if (key !== "") {
-                    write(key);
-                }
-            }
-            return false;
-        });
-    }
-
-    function scroll_therun() {
-        if (!thexterm
-            && (hasClass(therun, "pa-run-short")
-                || therun.hasAttribute("data-pa-runbottom")))
-            requestAnimationFrame(function () {
-                if (therun.scrollHeight > therun.clientHeight)
-                    removeClass(therun, "pa-run-short");
-                if (therun.hasAttribute("data-pa-runbottom"))
-                    therun.scrollTop = Math.max(therun.scrollHeight - therun.clientHeight, 0);
-            });
-    }
-
-    if (!therun.hasAttribute("data-pa-opened")) {
-        therun.setAttribute("data-pa-opened", "true");
-        if (!thexterm) {
-            therun.setAttribute("data-pa-runbottom", "true");
-            therun.addEventListener("scroll", function () {
-                requestAnimationFrame(function () {
-                    if (therun.scrollTop + therun.clientHeight >= therun.scrollHeight - 10)
-                        therun.setAttribute("data-pa-runbottom", "true");
-                    else
-                        therun.removeAttribute("data-pa-runbottom");
-                });
-            });
-            scroll_therun();
-        }
-    }
-
-    var ibuffer = "", // initial buffer; holds data before any results arrive
-        offset = -1, backoff = 50, queueid = null, times = null;
-
-    function hide_cursor() {
-        if (thexterm)
-            thexterm.write("\x1b[?25l"); // “hide cursor” escape
-        else if (therun.lastChild)
-            $(therun.lastChild).find(".pa-runcursor").remove();
-    }
-
-    function done() {
-        $f.find("button").prop("disabled", false);
-        $f.prop("outstanding", false);
-        hide_cursor();
-        if (button.hasAttribute("data-pa-run-grade")) {
-            pa_fetchgrades.call(button.closest(".pa-psetinfo"));
-        }
-    }
-
-    function append(str) {
-        if (thexterm)
-            thexterm.write(str);
-        else
-            pa_render_terminal(thepre[0], str, {cursor: true, directory: directory});
-    }
-
-    function append_html(html) {
-        if (typeof html === "string")
-            html = $(html)[0];
-        if (thexterm) {
-            if (window.console)
-                console.log("xterm.js cannot render " + html);
-        } else
-            pa_render_terminal(thepre[0], html, {cursor: true});
-    }
-
-    function append_data(str, data) {
-        if (ibuffer !== null) { // haven't started generating output
-            ibuffer += str;
-            var pos = ibuffer.indexOf("\n\n");
-            if (pos < 0)
-                return; // not ready yet
-
-            str = ibuffer.substr(pos + 2);
-            ibuffer = null;
-
-            var tsmsg = "";
-            if (data && data.timestamp) {
-                tsmsg = "...started " + strftime("%l:%M:%S%P %e %b %Y", new Date(data.timestamp * 1000));
-            }
-
-            if (thexterm) {
-                if (tsmsg !== "")
-                    tsmsg = "\x1b[3;1;38;5;86m" + tsmsg + "\x1b[m\r\n";
-                if (!opt.noclear)
-                    tsmsg = "\x1bc" + tsmsg;
-                str = tsmsg + str;
-            } else {
-                if (!opt.noclear)
-                    thepre.html("");
-                if (tsmsg !== "")
-                    append_html("<span class=\"pa-runtime\">" + tsmsg + "</span>");
-            }
-        }
-        if (str !== "")
-            append(str);
-    }
-
-    function parse_times(times) {
-        var a = [0, 0], p = 0;
-        while (p < times.length) {
-            var c = times.indexOf(",", p);
-            if (c < 0)
-                break;
-            var n = times.indexOf("\n", c + 1);
-            if (n < 0)
-                n = times.length;
-            a.push(+times.substring(p, c), +times.substring(c + 1, n));
-            p = n + 1;
-        }
-        return a;
-    }
-
-    function append_timed(data, at_end) {
-        var erange, etime, ebutton, espeed,
-            tpos, tstart, tlast, timeout, running, factor;
-        if (times)
-            return;
-        times = data.time_data;
-        if (typeof times === "string")
-            times = parse_times(times);
-        factor = data.time_factor;
-        if (times.length > 2) {
-            erange = $('<div class="pa-runrange"><button type="button" class="pa-runrange-play"></button><input type="range" class="pa-runrange-range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span><span class="pa-runrange-speed-slow" title="Slow">🐢</span><input type="range" class="pa-runrange-speed" min="0.1" max="10" step="0.1"><span class="pa-runrange-speed-fast" title="Fast">🐇</span></div>').prependTo(therun);
-            etime = erange[0].lastChild;
-            ebutton = erange[0].firstChild;
-            erange = ebutton.nextSibling;
-            etime = erange.nextSibling;
-            espeed = etime.nextSibling.nextSibling;
-            erange.addEventListener("input", function (event) {
-                running = false;
-                addClass(ebutton, "paused");
-                f(+this.value);
-            }, false);
-            ebutton.addEventListener("click", function (event) {
-                if (hasClass(ebutton, "paused")) {
-                    removeClass(ebutton, "paused");
-                    running = true;
-                    tstart = (new Date).getTime();
-                    if (tlast < times[times.length - 2])
-                        tstart -= tlast / factor;
-                    f(null);
-                } else {
-                    addClass(ebutton, "paused");
-                    running = false;
-                }
-            }, false);
-            espeed.addEventListener("input", function (event) {
-                factor = +this.value;
-                wstorage.site(false, "pa-runspeed-" + category, [factor, (new Date).getTime()]);
-                if (running) {
-                    tstart = (new Date).getTime() - tlast / factor;
-                    f(null);
-                }
-            }, false);
-        }
-        if ((tpos = wstorage.site_json(false, "pa-runspeed-" + category))
-            && tpos[1] >= (new Date).getTime() - 86400000)
-            factor = tpos[0];
-        if (factor < 0.1 || factor > 10)
-            factor = 1;
-        if (espeed)
-            espeed.value = factor;
-        data = {data: data.data, timestamp: data.timestamp};
-
-        function set_time() {
-            if (erange) {
-                erange.value = tlast;
-                etime.innerHTML = sprintf("%d:%02d.%03d", Math.trunc(tlast / 60000), Math.trunc(tlast / 1000) % 60, Math.trunc(tlast) % 1000);
-            }
-        }
-
-        function f(time) {
-            if (time === null) {
-                if (running)
-                    time = ((new Date).getTime() - tstart) * factor;
-                else
-                    return;
-            }
-            var npos = tpos;
-            if (npos >= times.length || time < times[npos])
-                npos = 0;
-            if (npos + 2 < times.length && time >= times[npos]) {
-                var rpos = times.length;
-                while (npos < rpos) {
-                    var m = npos + (((rpos - npos) >> 1) & ~1);
-                    if (time <= times[m])
-                        rpos = m;
-                    else
-                        npos = m + 2;
-                }
-            }
-            while (npos < times.length && time >= times[npos])
-                npos += 2;
-            tlast = time;
-
-            if (npos < tpos) {
-                ibuffer = "";
-                tpos = 0;
-            }
-
-            var str = data.data;
-            append_data(str.substring(tpos < times.length ? times[tpos + 1] : str.length,
-                                      npos < times.length ? times[npos + 1] : str.length),
-                        data);
-            scroll_therun();
-            set_time();
-
-            tpos = npos;
-            if (timeout)
-                timeout = clearTimeout(timeout);
-            if (running) {
-                if (tpos < times.length)
-                    timeout = setTimeout(f, Math.min(100, (times[tpos] - (tpos ? times[tpos - 2] : 0)) / factor), null);
-                else {
-                    if (ebutton)
-                        addClass(ebutton, "paused");
-                    hide_cursor();
-                }
-            }
-        }
-
-        if (at_end) {
-            tpos = times.length;
-            tlast = times[tpos - 2];
-            running = false;
-            ebutton && addClass(ebutton, "paused");
-            set_time();
-        } else {
-            tpos = 0;
-            tlast = 0;
-            tstart = (new Date).getTime();
-            running = true;
-            if (times.length)
-                f(null);
-        }
-    }
-
-    function succeed(data) {
-        var x, t;
-
-        if (queueid)
-            thepre.find("span.pa-runqueue").remove();
-        if (data && data.onqueue) {
-            queueid = data.queueid;
-            t = "On queue, " + data.nahead + (data.nahead == 1 ? " job" : " jobs") + " ahead";
-            if (data.headage) {
-                if (data.headage < 10)
-                    x = data.headage;
-                else
-                    x = Math.round(data.headage / 5 + 0.5) * 5;
-                t += ", oldest began about " + x + (x == 1 ? " second" : " seconds") + " ago";
-            }
-            thepre[0].insertBefore(($("<span class='pa-runqueue'>" + t + "</span>"))[0], thepre[0].lastChild);
-            setTimeout(send, 10000);
-            return;
-        }
-
-        if (data && data.status == "working") {
-            if (!$("#pa-runstop-" + category).length)
-                $("<button id=\"pa-runstop-" + category + "\" class=\"btn btn-danger pa-runstop\" type=\"button\">Stop</button>")
-                    .click(stop).appendTo("#pa-runout-" + category + " > h3");
-        } else
-            $("#pa-runstop-" + category).remove();
-
-        if (!data || !data.ok) {
-            x = "Unknown error";
-            if (data && data.loggedout) {
-                x = "You have been logged out (perhaps due to inactivity). Please reload this page.";
-            } else if (data) {
-                if (data.error_text)
-                    x = data.error_text;
-                else if (data.error && data.error !== true)
-                    x = data.error;
-                else if (data.message)
-                    x = data.message;
-            }
-            append("\x1b[1;3;31m" + x + "\x1b[m\r\n");
-            scroll_therun();
-            return done();
-        }
-
-        checkt = checkt || data.timestamp;
-        if (data.data && data.offset < offset)
-            data.data = data.data.substring(offset - data.offset);
-        if (data.data) {
-            offset = data.lastoffset;
-            if (data.done && data.time_data != null && ibuffer === "") {
-                // Parse timing data
-                append_timed(data);
-                return;
-            }
-
-            append_data(data.data, data);
-            backoff = 100;
-        }
-        if (data.result) {
-            if (ibuffer !== null)
-                append_data("\n\n", data);
-            append_data(data.result, data);
-        }
-        if (!data.data && !data.result)
-            backoff = Math.min(backoff * 2, 500);
-
-        scroll_therun();
-        if (data.status == "old")
-            setTimeout(send, 2000);
-        else if (!data.done)
-            setTimeout(send, backoff);
-        else {
-            done();
-            if (data.timed && !hasClass(therun.firstChild, "pa-runrange"))
-                send({offset: 0}, succeed_add_times);
-        }
-    }
-
-    function succeed_add_times(data) {
-        if (data.data && data.done && data.time_data != null)
-            append_timed(data, true);
-    }
-
-    function send(args, success) {
-        var a = {};
-        if (!$f[0].run)
-            a.run = category;
-        a.offset = offset;
-        checkt && (a.check = checkt);
-        queueid && (a.queueid = queueid);
-        args && $.extend(a, args);
-        jQuery.ajax($f.attr("action"), {
-            data: $f.serializeWith(a),
-            type: "POST", cache: false, dataType: "json",
-            success: success || succeed, timeout: 30000,
-            error: function () {
-                $f.find(".ajaxsave61").html("Failed");
-                $f.prop("outstanding", false);
-            }
-        });
-    }
-
-    function stop() {
-        send({stop: 1});
-    }
-
-    function write(value) {
-        send({write: value});
-    }
-
-    if (opt.headline && opt.noclear && !thexterm && thepre[0].firstChild)
-        append("\n\n");
-    if (opt.headline && opt.headline instanceof Node)
-        append_html(opt.headline);
-    else if (opt.headline)
-        append("\x1b[1;37m" + opt.headline + "\x1b[m\n");
-    if (opt.unfold && therun.getAttribute("data-pa-content"))
-        append(therun.getAttribute("data-pa-content"));
-    therun.removeAttribute("data-pa-content");
-    scroll_therun();
-
-    send();
-    return false;
-}
-
 handle_ui.on("pa-runner", function () {
-    pa_run(this);
+    run(this);
 });
 
 function runmany61() {
@@ -4083,71 +2984,10 @@ function runmany61() {
         jQuery("#runmany61_users").text(users.join(" "));
         var $x = jQuery("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(user) + "/pset/" + $f.find("[name='pset']").val() + "\" class=\"q ansib ansifg7\"></a>");
         $x.text(user);
-        pa_run($manybutton[0], {noclear: true, headline: $x[0]});
+        run($manybutton[0], {noclear: true, headline: $x[0]});
     }
     setTimeout(runmany61, 10);
 }
-
-
-var pa_runsetting = (function ($) {
-
-function save() {
-    var $j = $("#pa-runsettings .pa-p"), j = {}, i, k, v;
-    for (i = 0; i != $j.length; ++i) {
-        k = $.trim($($j[i]).find(".n").val());
-        v = $.trim($($j[i]).find(".v").val());
-        if (k != "")
-            j[k] = v;
-    }
-    $.ajax($j.closest("form").attr("action"), {
-        data: {runsettings: j},
-        type: "POST", cache: false,
-        dataType: "json"
-    });
-}
-
-function add(name, value) {
-    var $j = $("#pa-runsettings"), num = $j.find(".n").length;
-    while ($j.find("[data-runsetting-num=" + num + "]").length)
-        ++num;
-    var $x = $("<div class=\"pa-p\" data-runsetting-num=\"" + num + "\"><div class=\"pa-pt\"></div><div class=\"pa-pd\"><input name=\"n" + num + "\" class=\"uich pa-runconfig ignore-diff n\" size=\"30\" placeholder=\"Name\"> &nbsp; <input name=\"v" + num + "\" class=\"uich pa-runconfig ignore-diff v\" size=\"40\" placeholder=\"Value\"></div></div>");
-    if (name) {
-        $x.find(".n").val(name);
-        $x.find(".v").val(value);
-    }
-    $j.append($x);
-    if (!name)
-        $x.find(".n").focus();
-}
-
-function load(j) {
-    var $j = $("#pa-runsettings"), $n = $j.find(".n"), i, x;
-    $n.attr("data-outstanding", "1");
-    for (x in j) {
-        for (i = 0; i != $n.length && $.trim($($n[0]).val()) != x; ++i)
-            /* nada */;
-        if (i == $n.length)
-            add(x, j[x]);
-        else if ($.trim($j.find("[name=v" + i + "]").val()) != j[x]) {
-            $j.find("[name=v" + i + "]").val(j[x]);
-            $($n[i]).removeAttr("data-outstanding");
-        }
-    }
-    for (i = 0; i != $n.length; ++i)
-        if ($($n[i]).attr("data-outstanding"))
-            $("[data-runsetting-num=" + $($n[i]).attr("name").substr(1) + "]").remove();
-}
-
-handle_ui.on("pa-runconfig", function (event) {
-    if (this.name === "define") {
-        add();
-    } else {
-        save();
-    }
-});
-
-return {add: add, load: load};
-})(jQuery);
 
 
 function pa_gradeinfo_total(gi, noextra) {
@@ -6331,7 +5171,7 @@ function pa_render_pset_table(pconf, data) {
         if (!any) {
             next();
         } else if (gdialog_su.length === 1) {
-            pa_api_conditioner(hoturl_post("api/grade", url_gradeparts(gdialog_su[0])),
+            api_conditioner(hoturl_post("api/grade", url_gradeparts(gdialog_su[0])),
                 byuid[gdialog_su[0].uid])
             .then(function (rv) {
                 gdialog_store_start(rv);
@@ -6347,7 +5187,7 @@ function pa_render_pset_table(pconf, data) {
                     byuid[gdialog_su[i].uid].commit_is_grade = 1;
                 }
             }
-            pa_api_conditioner(hoturl_post("api/multigrade", {pset: pconf.key}),
+            api_conditioner(hoturl_post("api/multigrade", {pset: pconf.key}),
                 {us: JSON.stringify(byuid)})
             .then(function (rv) {
                 gdialog_store_start(rv);
@@ -6758,7 +5598,7 @@ window.$pa = {
     gradecdf: pa_gradecdf,
     onload: hotcrp_load,
     loadgrades: pa_loadgrades,
-    load_runsettings: pa_runsetting.load,
+    load_runsettings: run_settings_load,
     pset_actions: pa_pset_actions,
     render_text_page: render_text.on_page,
     render_pset_table: pa_render_pset_table,

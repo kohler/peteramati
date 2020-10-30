@@ -153,3 +153,27 @@ export function hoturl_absolute_base() {
         siteinfo.absolute_base = url_absolute(siteinfo.base);
     return siteinfo.absolute_base;
 }
+
+
+let outstanding = 0, waiting = [];
+
+function post_ajax(url, data, method, resolve) {
+    return function () {
+        ++outstanding;
+        $.ajax(url, {
+            data: data, method: method || "POST", cache: false, dataType: "json",
+            success: function (data) {
+                resolve(data);
+                --outstanding;
+                waiting.length && waiting.shift()();
+            }
+        });
+    };
+}
+
+export function api_conditioner(url, data, method) {
+    return new Promise(function (resolve, reject) {
+        var f = post_ajax(url, data, method, resolve);
+        outstanding < 5 ? f() : waiting.push(f);
+    });
+}
