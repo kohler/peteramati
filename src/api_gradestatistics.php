@@ -12,8 +12,11 @@ class Series {
     public $sumsq = 0.0;
     /** @var array<int,int|float> */
     public $series = [];
+    /** @var list<int|float> */
     public $cdf;
+    /** @var bool */
     private $calculated = false;
+    /** @var null|int|float */
     private $median;
 
     /** @param int $cid
@@ -30,7 +33,7 @@ class Series {
         if (!$this->calculated) {
             asort($this->series);
             $this->cdf = [];
-            $this->median = false;
+            $this->median = null;
             $lastg = false;
             $subtotal = 0;
             $i = $cdfi = 0;
@@ -59,22 +62,9 @@ class Series {
 
     function summary($pcview = false) {
         $this->calculate();
-        $r = (object) ["n" => $this->n];
+        $r = (object) ["n" => $this->n, "cdf" => $this->cdf];
         if ($pcview) {
-            $xcdf = [];
-            $lastg = false;
-            $cdfi = 0;
-            foreach ($this->series as $cid => $g) {
-                if ($g !== $lastg) {
-                    $xcdf[] = $lastg = $g;
-                    $xcdf[] = [];
-                    $cdfi += 2;
-                }
-                $xcdf[$cdfi - 1][] = $cid;
-            }
-            $r->xcdf = $xcdf;
-        } else {
-            $r->cdf = $this->cdf;
+            $r->cdfu = array_keys($this->series);
         }
         if ($this->n != 0) {
             $r->mean = $this->mean();
@@ -84,15 +74,18 @@ class Series {
         return $r;
     }
 
+    /** @return ?float */
     function mean() {
-        return $this->n ? $this->sum / $this->n : false;
+        return $this->n ? $this->sum / $this->n : null;
     }
 
+    /** @return null|int|float */
     function median() {
         $this->calculate();
         return $this->median;
     }
 
+    /** @return ?float */
     function stddev() {
         if ($this->n > 1) {
             return sqrt(($this->sumsq - $this->sum * $this->sum / $this->n) / ($this->n - 1));
@@ -200,30 +193,38 @@ class API_GradeStatistics {
         return $r;
     }
 
+    static private function etag(Pset $pset, Contact $user, $ts) {
+        $mid = $user->isPC ? "-pc-" : ".";
+        return "\"" . md5("{$pset->config_signature}{$mid}{$ts}") . "\"";
+    }
+
     static function run(Contact $user, Qrequest $qreq, APIData $api) {
         $pset = $api->pset;
         $gsv = $pset->grade_statistics_visible;
         if (!$user->isPC && $gsv !== 1) {
             $info = PsetView::make($api->pset, $api->user, $user);
-            if (!$info->user_can_view_grade_statistics())
+            if (!$info->user_can_view_grade_statistics()) {
                 return ["error" => "Grades are not visible now"];
+            }
         }
 
         $suffix = ($user->isPC ? ".pp" : ".p") . $pset->id;
         $gradets = $pset->conf->setting("__gradets$suffix");
-        if ($gradets < @filemtime(__FILE__))
+        if ($gradets < @filemtime(__FILE__)) {
             $gradets = 0;
+        }
         if ($gradets
             && $gradets >= Conf::$now - 7200
             && isset($_SERVER["HTTP_IF_NONE_MATCH"])
-            && $_SERVER["HTTP_IF_NONE_MATCH"] === "\"" . md5($pset->config_signature . "." . $gradets) . "\"") {
+            && $_SERVER["HTTP_IF_NONE_MATCH"] === self::etag($pset, $user, $gradets)) {
             header("HTTP/1.0 304 Not Modified");
             header("Cache-Control: max-age=30,must-revalidate,private");
             exit;
         }
 
         if (!$gradets
-            || !($r = $pset->conf->gsetting_json("__gradestat$suffix"))) {
+            || !($r = $pset->conf->gsetting_json("__gradestat$suffix"))
+            || ($user->isPC && isset($r->all->xcdf))) {
             $r = self::compute($pset, $user->isPC);
             $gradets = Conf::$now;
             $pset->conf->save_setting("__gradets$suffix", Conf::$now);
@@ -231,8 +232,9 @@ class API_GradeStatistics {
         }
 
         $r->ok = true;
-        if (!$user->isPC && !$user->extension)
+        if (!$user->isPC && !$user->extension) {
             unset($r->extension, $r->extension_noextra);
+        }
         if (!$user->isPC && $pset->grade_cdf_cutoff) {
             $r->cutoff = $pset->grade_cdf_cutoff;
             Series::truncate_summary_below($r->all, $pset->grade_cdf_cutoff);
@@ -248,7 +250,7 @@ class API_GradeStatistics {
         }
 
         header("Cache-Control: max-age=30,must-revalidate,private");
-        header("ETag: \"" . md5($pset->config_signature . "." . $gradets) . "\"");
+        header("ETag: " . self::etag($pset, $user, $gradets));
         return $r;
     }
 }

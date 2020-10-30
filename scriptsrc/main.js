@@ -3005,30 +3005,16 @@ function pa_gradeinfo_total(gi, noextra) {
 }
 
 
-function pa_cdf(d) {
-    if (!d.cdf && d.xcdf) {
-        var xcdf = d.xcdf, cdf = [], i = 0, y = 0;
-        while (i < xcdf.length) {
-            y += xcdf[i+1].length;
-            cdf.push(xcdf[i], y);
-            i += 2;
-        }
-        d.cdf = cdf;
-    }
-    return d.cdf;
+function pa_cdfmin(d) {
+    return d.cdf.length ? d.cdf[0] : 0;
 }
 
-function pa_cdfmin(d) {
-    var cdf = d.cdf || d.xcdf;
-    return cdf.length ? cdf[0] : 0;
-}
 function pa_cdfmax(d) {
-    var cdf = d.cdf || d.xcdf;
-    return cdf.length ? cdf[cdf.length - 2] : 0;
+    return d.cdf.length ? d.cdf[d.cdf.length - 2] : 0;
 }
 
 function pa_gradecdf_findy(d, x) {
-    var cdf = pa_cdf(d), l = 0, r = cdf.length;
+    var cdf = d.cdf, l = 0, r = cdf.length;
     while (l < r) {
         var m = l + ((r - l) >> 2) * 2;
         if (cdf[m] >= x)
@@ -3054,7 +3040,7 @@ function pa_gradecdf_kde(d, gi, hfrac, nbins) {
     for (i = 0; i !== nbins + 1; ++i) {
         bins.push(0);
     }
-    var cdf = pa_cdf(d), dx = (maxg - ming) / nbins, idx = 1 / dx;
+    var cdf = d.cdf, dx = (maxg - ming) / nbins, idx = 1 / dx;
     for (i = 0; i < cdf.length; i += 2) {
         var y = cdf[i+1] - (i === 0 ? 0 : cdf[i-1]);
         var x1 = Math.floor((cdf[i] - ming - H) * idx);
@@ -3370,7 +3356,7 @@ PAGradeGraph.prototype.container = function () {
     return $(this.svg).closest(".pa-grgraph")[0];
 };
 PAGradeGraph.prototype.append_cdf = function (d, klass) {
-    var cdf = pa_cdf(d), data = [], nr = 1 / d.n,
+    var cdf = d.cdf, data = [], nr = 1 / d.n,
         cutoff = this.cutoff || 0, i = 0, x;
     if (cutoff) {
         while (i < cdf.length && cdf[i+1] < cutoff * d.n) {
@@ -3469,30 +3455,30 @@ PAGradeGraph.prototype.remove_if = function (predicate) {
     }
 };
 PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
-    if (!this.last_curve || !this.last_curve_data.xcdf)
+    if (!this.last_curve || !this.last_curve_data.cdfu)
         return null;
     var ispdf = hasClass(this.last_curve, "pa-gg-pdf"),
-        xcdf = this.last_curve_data.xcdf, data = [], nr, nrgh,
-        i, xv, yv, cdfy = 0, cids, j, yc;
+        cdf = this.last_curve_data.cdf,
+        cdfu = this.last_curve_data.cdfu,
+        data = [], nr, nrgh,
+        i, ui, xv, yv, j, yc;
     if (ispdf) {
         nr = 0.9 / (this.maxp * d.n);
     } else {
         nr = 1 / d.n;
     }
     nrgh = nr * this.gh;
-    for (i = 0; i < xcdf.length; i += 2) {
-        cids = xcdf[i + 1];
-        cdfy += cids.length;
-        for (j = yc = 0; j < cids.length; ++j) {
-            if (predicate(cids[j], d))
+    for (i = ui = 0; i !== cdf.length; i += 2) {
+        for (yc = 0; ui !== cdf[i + 1]; ++ui) {
+            if (predicate(cdfu[ui], d))
                 ++yc;
         }
         if (yc) {
-            xv = this.xax(xcdf[i]);
+            xv = this.xax(cdf[i]);
             if (ispdf) {
                 yv = svgutil.eval_function_path.call(this.last_curve, xv);
             } else {
-                yv = this.yax(cdfy * nr);
+                yv = this.yax(cdf[i+1] * nr);
             }
             if (yv != null)
                 data.push("M", xv, ",", yv, "v", yc * nrgh);
@@ -3549,21 +3535,22 @@ PAGradeGraph.prototype.annotate_last_curve = function (x, elt, after) {
     return false;
 };
 PAGradeGraph.prototype.user_x = function (uid) {
-    if (!this.last_curve_data.xcdf)
+    if (!this.last_curve_data.cdfu)
         return undefined;
     if (!this.last_curve_data.ucdf) {
-        var xcdf = this.last_curve_data.xcdf,
-            ucdf = this.last_curve_data.ucdf = {};
-        for (var i = 0; i !== xcdf.length; i += 2) {
-            var uids = xcdf[i + 1];
-            for (var j = 0; j !== uids.length; ++j)
-                ucdf[uids[j]] = xcdf[i];
+        var cdf = this.last_curve_data.cdf,
+            cdfu = this.last_curve_data.cdfu,
+            ucdf = this.last_curve_data.ucdf = {}, i, ui;
+        for (i = ui = 0; ui !== cdfu.length; ++ui) {
+            while (ui >= cdf[i + 1])
+                i += 2;
+            ucdf[cdfu[ui]] = cdf[i];
         }
     }
     return this.last_curve_data.ucdf[uid];
 };
 PAGradeGraph.prototype.highlight_users = function () {
-    if (!this.last_curve || !this.last_curve_data.xcdf)
+    if (!this.last_curve || !this.last_curve_data.cdfu)
         return;
 
     this.last_highlight = this.last_highlight || {};
@@ -4032,15 +4019,15 @@ function update(where, color, attr) {
 }
 
 function course_xcdf() {
-    var xcdf = null;
+    var xd = null;
     $(".pa-grgraph[data-pa-pset=course]").each(function () {
         var d = $(this).data("paGradeData");
-        if (d && d.all && d.all.xcdf) {
-            xcdf = d.all.xcdf;
+        if (d && d.all && d.all.cdfu) {
+            xd = d.all;
             return false;
         }
     })
-    return xcdf;
+    return xd;
 }
 
 function update_course(str, tries) {
@@ -4065,18 +4052,19 @@ function update_course(str, tries) {
             }
         }
     });
-    var xcdf;
+    var xd;
     if (!any) {
         for (var color in colors)
             update(document.body, color, "");
-    } else if ((xcdf = course_xcdf())) {
+    } else if ((xd = course_xcdf())) {
         for (var color in colors) {
             var ranges = colors[color], a = [];
             if (ranges.length) {
-                for (var i = 0; i !== xcdf.length; i += 2) {
+                for (var i = 0; i !== xd.cdf.length; i += 2) {
                     for (var j = 0; j !== ranges.length; j += 2) {
-                        if (xcdf[i] >= ranges[j] && xcdf[i] < ranges[j + 1]) {
-                            Array.prototype.push.apply(a, xcdf[i + 1]);
+                        if (xd.cdf[i] >= ranges[j] && xd.cdf[i] < ranges[j+1]) {
+                            var ui0 = i ? xd.cdf[i-1] : 0;
+                            Array.prototype.push.apply(a, xd.cdfu.slice(ui0, xd.cdf[i+1]));
                             break;
                         }
                     }
