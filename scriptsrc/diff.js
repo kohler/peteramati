@@ -109,19 +109,19 @@ export function linediff_find(filename, lineid) {
 handle_ui.on("pa-diff-unfold", function (evt) {
     if (evt.metaKey) {
         $(".pa-diff-unfold").each(function () {
-            fold61(resolve_fileref(this), this, false);
+            fold61(fileref_resolve(this), this, false);
         });
     } else {
-        filediff_load(resolve_fileref(this)).then(f => fold61(f, this));
+        filediff_load(fileref_resolve(this)).then(f => fold61(f, this));
     }
     return false;
 });
 
 handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
-    var f = resolve_fileref(this), show = hasClass(f, "pa-hide-left");
+    var f = fileref_resolve(this), show = hasClass(f, "pa-hide-left");
     if (evt.metaKey) {
         $(".pa-diff-toggle-hide-left").each(function () {
-            toggleClass(resolve_fileref(this), "pa-hide-left", !show);
+            toggleClass(fileref_resolve(this), "pa-hide-left", !show);
             toggleClass(this, "btn-primary", show);
         });
     } else {

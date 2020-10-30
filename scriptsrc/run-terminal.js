@@ -4,6 +4,7 @@
 
 import { html_id_encode } from "./encoders.js";
 import { sprintf } from "./utils.js";
+import { hasClass } from "./ui.js";
 
 const styleset = {
     "0": false, "1": {b: true}, "2": {f: true}, "3": {i: true},

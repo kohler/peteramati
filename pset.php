@@ -638,7 +638,7 @@ if ($Pset->gitless) {
             if ($Me->can_run($Pset, $r, $User)) {
                 $b = Ht::button(htmlspecialchars($r->title),
                                 array("value" => $r->name,
-                                      "class" => "btn pa-runner",
+                                      "class" => "btn ui pa-runner",
                                       "data-pa-run-category" => $r->category_argument(),
                                       "data-pa-run-grade" => isset($r->eval) ? "true" : null));
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
