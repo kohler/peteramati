@@ -15,8 +15,7 @@ import {
     } from "./hoturl.js";
 import "./ui-pset.js";
 import {
-    escape_entities, unescape_entities, urlencode, urldecode,
-    text_to_html, regexp_quote, html_id_encode
+    escape_entities, unescape_entities, text_to_html
     } from "./encoders.js";
 import { Bubble, tooltip } from "./tooltip.js";
 import { linediff_find } from "./diff.js";

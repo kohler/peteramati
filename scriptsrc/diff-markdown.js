@@ -2,8 +2,11 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { resolve_fileref } from "./diff.js";
+import { fileref_resolve } from "./diff.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
+
+let md, mdcontext;
+
 
 function hljs_line(s, tags) {
     var t = tags.length ? tags.join("").concat(s) : s,
@@ -23,8 +26,6 @@ function hljs_line(s, tags) {
     }
     return t;
 }
-
-let md, mdcontext;
 
 function render_map(map) {
     if (map[0] + 1 === map[1]) {
@@ -407,10 +408,10 @@ function filediff_unhighlight() {
 
 
 handle_ui.on("pa-diff-toggle-markdown", function (evt) {
-    var f = pa_resolve_fileref(this), show = !hasClass(f, "pa-markdown");
+    var f = fileref_resolve(this), show = !hasClass(f, "pa-markdown");
     if (evt.metaKey) {
         $(".pa-diff-toggle-markdown").each(function () {
-            var f2 = pa_resolve_fileref(this), shown = hasClass(f2, "pa-markdown");
+            var f2 = fileref_resolve(this), shown = hasClass(f2, "pa-markdown");
             if (show && !shown) {
                 filediff_markdown.call(f2);
             } else if (!show && shown) {
