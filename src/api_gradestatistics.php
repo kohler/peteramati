@@ -158,29 +158,26 @@ class API_GradeStatistics {
         }
         Dbl::free($result);
 
-        $r = (object) ["pset" => $pset->urlkey, "psetid" => $pset->id,
-                       "all" => $series->summary($pcview)];
+        $r = (object) [
+            "pset" => $pset->urlkey,
+            "psetid" => $pset->id,
+            "series" => ["all" => $series->summary($pcview)]
+        ];
         if ($xseries && $xseries->n) {
-            $r->extension = $xseries->summary($pcview);
+            $r->series["extension"] = $xseries->summary($pcview);
         }
         if ($has_extra) {
-            $r->noextra = $noextra_series->summary($pcview);
+            $r->series["noextra"] = $noextra_series->summary($pcview);
         }
         if ($has_xextra) {
-            $r->extension_noextra = $xnoextra_series->summary($pcview);
+            $r->series["extension_noextra"] = $xnoextra_series->summary($pcview);
         }
 
         $pgj = $pset->gradeinfo_json($pcview);
         if ($pgj && isset($pgj->maxgrades->total)) {
-            $r->maxtotal = $r->all->maxtotal = $pgj->maxgrades->total;
-            if (isset($r->extension)) {
-                $r->extension->maxtotal = $pgj->maxgrades->total;
-            }
-            if (isset($r->noextra)) {
-                $r->noextra->maxtotal = $pgj->maxgrades->total;
-            }
-            if (isset($r->extension_noextra)) {
-                $r->extension_noextra->maxtotal = $pgj->maxgrades->total;
+            $r->maxtotal = $pgj->maxgrades->total;
+            foreach ($r->series as $s) {
+                $s->maxtotal = $pgj->maxgrades->total;
             }
         }
 
@@ -194,8 +191,8 @@ class API_GradeStatistics {
     }
 
     static private function etag(Pset $pset, Contact $user, $ts) {
-        $mid = $user->isPC ? "-pc-" : ".";
-        return "\"" . md5("{$pset->config_signature}{$mid}{$ts}") . "\"";
+        $pfx = $user->isPC ? "t1-" : ($user->extension ? "x1-" : "c1-");
+        return "\"" . md5("{$pfx}{$pset->config_signature}-{$ts}") . "\"";
     }
 
     static function run(Contact $user, Qrequest $qreq, APIData $api) {
@@ -223,8 +220,7 @@ class API_GradeStatistics {
         }
 
         if (!$gradets
-            || !($r = $pset->conf->gsetting_json("__gradestat$suffix"))
-            || ($user->isPC && isset($r->all->xcdf))) {
+            || !($r = $pset->conf->gsetting_json("__gradestat$suffix"))) {
             $r = self::compute($pset, $user->isPC);
             $gradets = Conf::$now;
             $pset->conf->save_setting("__gradets$suffix", Conf::$now);
@@ -233,19 +229,12 @@ class API_GradeStatistics {
 
         $r->ok = true;
         if (!$user->isPC && !$user->extension) {
-            unset($r->extension, $r->extension_noextra);
+            unset($r->series["extension"], $r->series["extension_noextra"]);
         }
         if (!$user->isPC && $pset->grade_cdf_cutoff) {
             $r->cutoff = $pset->grade_cdf_cutoff;
-            Series::truncate_summary_below($r->all, $pset->grade_cdf_cutoff);
-            if (isset($r->extension)) {
-                Series::truncate_summary_below($r->extension, $pset->grade_cdf_cutoff);
-            }
-            if (isset($r->noextra)) {
-                Series::truncate_summary_below($r->noextra, $pset->grade_cdf_cutoff);
-            }
-            if (isset($r->extension_noextra)) {
-                Series::truncate_summary_below($r->extension_noextra, $pset->grade_cdf_cutoff);
+            foreach ($r->series as $s) {
+                Series::truncate_summary_below($s, $pset->grade_cdf_cutoff);
             }
         }
 

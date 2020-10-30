@@ -2,8 +2,6 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import * as svgutil from "./svgpathutil.js";
-import IntervalSeq from "./intervalseq.js";
 import { wstorage, sprintf, strftime } from "./utils.js";
 import {
     hasClass, addClass, removeClass, toggleClass, classList, handle_ui,
@@ -23,6 +21,8 @@ import { filediff_markdown } from "./diff-markdown.js";
 import { run } from "./run.js";
 import { terminal_render } from "./run-terminal.js";
 import { run_settings_load } from "./run-settings.js";
+import { GradeKde, GradeStats } from "./gradestats.js";
+import { GradeGraph } from "./gradegraph.js";
 
 function $$(id) {
     return document.getElementById(id);
@@ -2118,7 +2118,7 @@ $(pa_observe_diff);
 */
 
 
-var pa_grade_types = {};
+var pa_grade_types = window.pa_grade_types = {};
 
 function pa_add_grade_type(name, rest) {
     rest.type = name;
@@ -3005,65 +3005,6 @@ function pa_gradeinfo_total(gi, noextra) {
 }
 
 
-function pa_cdfmin(d) {
-    return d.cdf.length ? d.cdf[0] : 0;
-}
-
-function pa_cdfmax(d) {
-    return d.cdf.length ? d.cdf[d.cdf.length - 2] : 0;
-}
-
-function pa_gradecdf_findy(d, x) {
-    var cdf = d.cdf, l = 0, r = cdf.length;
-    while (l < r) {
-        var m = l + ((r - l) >> 2) * 2;
-        if (cdf[m] >= x)
-            r = m;
-        else
-            l = m + 2;
-    }
-    return cdf[l+1];
-}
-
-function pa_gradecdf_kde(d, gi, hfrac, nbins) {
-    var maxg = gi.max, ming = gi.min,
-        H = (maxg - ming) * hfrac, iH = 1 / H;
-    function epanechnikov(x) {
-        if (x >= -H && x <= H) {
-            x *= iH;
-            return 0.75 * iH * (1 - x * x);
-        } else {
-            return 0;
-        }
-    }
-    var bins = [], i;
-    for (i = 0; i !== nbins + 1; ++i) {
-        bins.push(0);
-    }
-    var cdf = d.cdf, dx = (maxg - ming) / nbins, idx = 1 / dx;
-    for (i = 0; i < cdf.length; i += 2) {
-        var y = cdf[i+1] - (i === 0 ? 0 : cdf[i-1]);
-        var x1 = Math.floor((cdf[i] - ming - H) * idx);
-        var x2 = Math.ceil((cdf[i] - ming + H) * idx);
-        while (x1 < x2) {
-            var x = Math.max(-1, Math.min(nbins + 1, x1));
-            if (x >= 0 && x <= nbins) {
-                bins[x] += epanechnikov(x1 * dx - cdf[i] + ming) * y;
-            }
-            ++x1;
-        }
-    }
-    var maxp = 0;
-    if (d.n) {
-        var nr = 1 / d.n;
-        for (i = 0; i !== nbins + 1; ++i) {
-            bins[i] *= nr;
-            maxp = Math.max(maxp, bins[i]);
-        }
-    }
-    return {data: d, kde: bins, maxp: maxp, binwidth: dx};
-}
-
 /*function pa_gradecdf_kdepath(kde, xax, yax) {
     var data = [], bins = kde.kde, nrdy = 0.9 / kde.maxp;
     for (i = 0; i !== bins.length; ++i) {
@@ -3080,683 +3021,6 @@ function mksvg(tag) {
 }
 
 
-function PAGradeGraph(parent, d, plot_type) {
-    var $parent = $(parent);
-
-    var dd = plot_type.indexOf("noextra") >= 0 ? d.noextra : d.all;
-    var ddmin = pa_cdfmin(dd);
-    var xmin = xmin < 0 ? xmin - 1 : 0;
-    if (d.entry && d.entry.type === "letter")
-        xmin = Math.min(65, ddmin < 0 ? ddmin : Math.max(ddmin - 5, 0));
-    this.min = xmin;
-    this.max = pa_cdfmax(dd);
-    if (d.maxtotal)
-        this.max = Math.max(this.max, d.maxtotal);
-    this.total = d.maxtotal;
-    this.cutoff = d.cutoff;
-
-    this.svg = mksvg("svg");
-    this.gg = mksvg("g");
-    this.gx = mksvg("g");
-    this.gy = mksvg("g");
-    this.xl = this.xt = true;
-    this.yl = this.yt = plot_type.substring(0, 3) !== "pdf";
-    this.tw = $parent.width();
-    this.th = $parent.height();
-    this.svg.setAttribute("preserveAspectRatio", "none");
-    this.svg.setAttribute("width", this.tw);
-    this.svg.setAttribute("height", this.th);
-    this.svg.setAttribute("overflow", "visible");
-    this.svg.appendChild(this.gg);
-    this.gx.setAttribute("class", "pa-gg-axis pa-gg-xaxis");
-    this.svg.appendChild(this.gx);
-    this.gy.setAttribute("class", "pa-gg-axis pa-gg-yaxis");
-    this.svg.appendChild(this.gy);
-    this.maxp = 0;
-    this.hoveranno = null;
-    this.hoveron = false;
-    $parent.html(this.svg);
-
-    var digits = mksvg("text");
-    digits.appendChild(document.createTextNode("888"));
-    this.gx.appendChild(digits);
-    var domr = digits.getBBox();
-    this.xdw = domr.width / 3;
-    this.xdh = domr.height;
-    this.gx.removeChild(digits);
-
-    this.xlw = this.xdw * (Math.floor(Math.log10(this.max)) + 1);
-
-    this.mt = Math.ceil(Math.max(this.yl ? this.xdh / 2 : 0, 2));
-    this.mr = Math.ceil(this.xl ? this.xlw / 2 : 0);
-    this.mb = (this.xt ? 5 : 0) + (this.xl ? this.xdh + 3 : 0);
-    if (this.yl) {
-        var h = this.th - this.mt - Math.max(this.mb, Math.ceil(this.xdh / 2));
-        if (h > this.xdh) {
-            var minyaxis = $parent.hasClass("pa-grgraph-min-yaxis");
-            if (minyaxis) {
-                this.yfmt = "%.0r%%";
-            } else {
-                this.yfmt = "%.0r";
-            }
-            var labelcap = h / this.xdh;
-            this.ymax = 100;
-            if (labelcap > 15)
-                this.ylu = 10;
-            else if (labelcap > 5)
-                this.ylu = 25;
-            else if (labelcap > 3)
-                this.ylu = 50;
-            else
-                this.ylu = 100;
-            this.ml = (this.yt ? 5 : 0) + 5 + (minyaxis ? 4.2 : 3) * this.xdw;
-
-            if (!$parent.hasClass("pa-grgraph-min-yaxis")) {
-                this.yltext = mksvg("text");
-                this.yltext.appendChild(document.createTextNode("% of grades"));
-                this.gy.appendChild(this.yltext);
-                domr = this.yltext.getBBox();
-                if (domr.width <= 0.875 * h) {
-                    this.ml += this.xdw * 0.5 + this.xdh;
-                } else {
-                    this.gy.removeText(this.yltext);
-                    this.yltext = null;
-                }
-            }
-
-            this.mb = Math.max(this.mb, Math.ceil(this.xdh / 2));
-        } else {
-            this.yl = false;
-            this.ml = 0;
-            this.mt = 2;
-        }
-    } else {
-        this.ml = this.yt ? 5 : 0;
-    }
-    if (this.xl) {
-        this.ml = Math.max(this.ml, Math.ceil(this.xdw / 2));
-    }
-
-    this.gw = this.tw - this.ml - this.mr;
-    var gh = this.gh = this.th - this.mt - this.mb;
-    var xfactor = this.gw / (this.max - this.min);
-    this.xax = function (x) {
-        return (x - xmin) * xfactor;
-    };
-    this.yax = function (y) {
-        return gh - y * gh;
-    };
-    this.unxax = function (ax) {
-        return (ax / xfactor) + xmin;
-    };
-    this.unyax = function (ay) {
-        return -(ay - gh) / gh;
-    };
-    if (d.entry && d.entry.type) {
-        var gt = pa_grade_types[d.entry.type];
-        if (gt && gt.tics)
-            this.xtics = gt.tics.call(gt);
-    }
-    if (this.max - this.min > 900) {
-        this.xfmt = "%.0r";
-    } else if (this.max - this.min > 10) {
-        this.xfmt = "%.1r";
-    } else {
-        this.xfmt = "%.3r";
-    }
-
-    this.gg.setAttribute("transform", "translate(" + this.ml + "," + this.mt + ")");
-    this.gx.setAttribute("transform", "translate(" + this.ml + "," + (this.mt + this.gh + (this.xt ? 2 : -5)) + ")");
-    this.gy.setAttribute("transform", "translate(" + (this.ml + (this.yt ? -2 : 5)) + "," + this.mt + ")");
-}
-PAGradeGraph.prototype.numeric_xaxis = function () {
-    // determine number
-    var ndigit_max = Math.floor(Math.log10(this.max)) + 1,
-        labelw = this.xdw * (ndigit_max + 0.5),
-        labelcap = this.gw / labelw;
-
-    var unitbase = Math.pow(10, Math.max(0, ndigit_max - 2)),
-        nunits = (this.max - this.min) / unitbase,
-        unit;
-    if (labelcap > nunits * 4 && unitbase > 1)
-        unit = unitbase / 2;
-    else if (labelcap > nunits * 2)
-        unit = unitbase;
-    else if (labelcap > nunits * (unitbase <= 1 ? 0.75 : 1))
-        unit = 2 * unitbase;
-    else if (unitbase > 1 && labelcap > nunits * 0.6)
-        unit = 2.5 * unitbase;
-    else if (labelcap > nunits * 0.3)
-        unit = 5 * unitbase;
-    else
-        unit = 10 * unitbase;
-
-    var x = Math.floor(this.min / unit) * unit,
-        d = [], total_done = false, e;
-    while (x < this.max + unit) {
-        var xx = x, draw = this.xl;
-        if (this.total) {
-            if (xx > this.total
-                && xx - unit < this.total
-                && !total_done) {
-                xx = this.total;
-                x -= unit;
-            }
-            if (xx == this.total)
-                total_done = true;
-        }
-        x += unit;
-        if (xx < this.min)
-            continue;
-        if (xx > this.max)
-            xx = this.max;
-
-        var xxv = this.xax(xx);
-        d.push("M", xxv, ",0v5");
-
-        if ((this.total
-             && xx != this.total
-             && Math.abs(xxv - this.xax(this.total)) < labelw)
-            || (xx != this.max
-                && xx != this.total
-                && Math.abs(xxv - this.xax(this.max)) < labelw))
-            draw = false;
-
-        if (draw) {
-            e = mksvg("text");
-            e.appendChild(document.createTextNode(xx));
-            e.setAttribute("x", xxv);
-            e.setAttribute("y", this.xdh + 3);
-            this.gx.appendChild(e);
-        }
-    }
-
-    if (this.xt) {
-        e = mksvg("path");
-        e.setAttribute("d", d.join(""));
-        e.setAttribute("fill", "none");
-        e.setAttribute("stroke", "black");
-        this.gx.appendChild(e);
-    }
-};
-PAGradeGraph.prototype.xtics_xaxis = function () {
-    // determine number
-    var label_restrictions = new IntervalSeq,
-        tic_restrictions = new IntervalSeq,
-        d = [];
-
-    for (i = 0; i !== this.xtics.length; ++i) {
-        xt = this.xtics[i];
-        if (xt.x < this.min || xt.x > this.max)
-            continue;
-        var xxv = this.xax(xt.x);
-        if (xt.notic || !tic_restrictions.contains(xxv)) {
-            if (!xt.notic) {
-                d.push("M", xxv, ",0v5");
-                tic_restrictions.add(xxv - 3, xxv + 3);
-            }
-
-            if (this.xl && xt.text) {
-                var lw = this.xdw * (xt.label_space || xt.text.length + 0.5) * 0.5;
-                if (!label_restrictions.overlaps(xxv - lw, xxv + lw)) {
-                    var e = mksvg("text");
-                    e.appendChild(document.createTextNode(xt.text));
-                    e.setAttribute("x", xxv);
-                    e.setAttribute("y", this.xdh + 3);
-                    this.gx.appendChild(e);
-                    lw = this.xdw * (xt.text.length + 0.5) * 0.5;
-                    label_restrictions.add(xxv - lw, xxv + lw);
-                }
-            }
-        }
-    }
-
-    if (this.xt) {
-        e = mksvg("path");
-        e.setAttribute("d", d.join(""));
-        e.setAttribute("fill", "none");
-        e.setAttribute("stroke", "black");
-        this.gx.appendChild(e);
-    }
-};
-PAGradeGraph.prototype.xaxis = function () {
-    if (this.xtics)
-        this.xtics_xaxis();
-    else
-        this.numeric_xaxis();
-};
-PAGradeGraph.prototype.yaxis = function () {
-    var y = 0, d = [], e;
-    while (y <= this.ymax && this.yl) {
-        e = mksvg("text");
-        e.appendChild(document.createTextNode(sprintf(this.yfmt, y)));
-        e.setAttribute("x", -8);
-        e.setAttribute("y", this.yax(y / this.ymax) + 0.25 * this.xdh);
-        this.gy.appendChild(e);
-
-        d.push("M-5,", this.yax(y / this.ymax), "h5");
-
-        y += this.ylu;
-    }
-
-    if (this.yt) {
-        e = mksvg("path");
-        e.setAttribute("d", d.join(""));
-        e.setAttribute("fill", "none");
-        e.setAttribute("stroke", "black");
-        this.gy.appendChild(e);
-    }
-
-    if (this.yltext) {
-        this.yltext.setAttribute("transform", "translate(" + (-this.ml + this.xdh) + "," + this.yax(0.5) + ") rotate(-90)");
-        this.yltext.setAttribute("text-anchor", "middle");
-    }
-};
-PAGradeGraph.prototype.container = function () {
-    return $(this.svg).closest(".pa-grgraph")[0];
-};
-PAGradeGraph.prototype.append_cdf = function (d, klass) {
-    var cdf = d.cdf, data = [], nr = 1 / d.n,
-        cutoff = this.cutoff || 0, i = 0, x;
-    if (cutoff) {
-        while (i < cdf.length && cdf[i+1] < cutoff * d.n) {
-            i += 2;
-        }
-    }
-    for (; i < cdf.length; i += 2) {
-        if (data.length !== 0) {
-            x = Math.max(0, cdf[i] - Math.min(1, cdf[i] - cdf[i - 2]) / 2);
-            data.push("H", this.xax(x));
-        } else
-            data.push("M", this.xax(Math.max(0, cdf[i] - 0.5)), ",", this.yax(cutoff));
-        data.push("V", this.yax(cdf[i+1] * nr));
-    }
-    if (data.length !== 0)
-        data.push("H", this.xax(cdf[cdf.length-2] + 0.5));
-    var path = mksvg("path");
-    path.setAttribute("d", data.join(""));
-    path.setAttribute("fill", "none");
-    path.setAttribute("class", klass);
-    this.gg.appendChild(path);
-    this.last_curve = path;
-    this.last_curve_data = d;
-    return path;
-};
-PAGradeGraph.prototype.append_pdf = function (kde, klass) {
-    if (kde.maxp === 0)
-        return null;
-    var data = [], bins = kde.kde, nrdy = 0.9 / this.maxp,
-        xax = this.xax, yax = this.yax;
-    // adapted from d3-shape by Mike Bostock
-    var xs = [0, 0, 0, 0], ys = [0, 0, 0, 0],
-        la = [0, 0, 0, 0], la2 = [0, 0, 0, 0],
-        epsilon = 1e-6;
-    function point(i2) {
-        var i0 = (i2 + 2) % 4, i1 = (i2 + 3) % 4, i3 = (i2 + 1) % 4;
-        var x1 = xs[i1], y1 = ys[i1], x2 = xs[i2], y2 = ys[i2];
-        if (la[i1] > epsilon) {
-            var a = 2 * la2[i1] + 3 * la[i1] * la[i2] + la2[i2],
-                n = 3 * la[i1] * (la[i1] + la[i2]);
-            x1 = (x1 * a - xs[i0] * la2[i2] + xs[i2] * la2[i1]) / n;
-            y1 = (y1 * a - ys[i0] * la2[i2] + ys[i2] * la2[i1]) / n;
-        }
-        if (la[i3] > epsilon) {
-            var b = 2 * la2[i3] + 3 * la[i3] * la[i2] + la2[i2],
-                m = 3 * la[i3] * (la[i3] + la[i2]);
-            x2 = (x2 * b - xs[i3] * la2[i2] + xs[i1] * la2[i3]) / m;
-            y2 = (y2 * b - ys[i3] * la2[i2] + ys[i1] * la2[i3]) / m;
-        }
-        data.push("C", x1, y1, x2, y2, xs[i2], ys[i2]);
-    }
-    for (var i = 0; i !== bins.length; ++i) {
-        var x = xax(this.min + i * kde.binwidth),
-            y = yax(bins[i] * nrdy);
-        if (i === 0) {
-            data.push("M", x, y);
-            xs[3] = xs[0] = x;
-            ys[3] = ys[0] = y;
-        } else {
-            var i1 = (i + 3) % 4, i2 = i % 4;
-            xs[i2] = x;
-            ys[i2] = y;
-
-            var dx = xs[i1] - x, dy = ys[i1] - y;
-            la2[i2] = Math.sqrt(dx * dx + dy * dy);
-            la[i2] = Math.sqrt(la2[i2]);
-            if (i > 1)
-                point(i1);
-
-            if (i === bins.length - 1) {
-                var i3 = (i + 1) % 4;
-                xs[i3] = x;
-                ys[i3] = y;
-                la2[i3] = 0;
-                la[i3] = 0;
-                point(i2);
-            }
-        }
-    }
-    var path = mksvg("path");
-    path.setAttribute("d", data.join(" "));
-    path.setAttribute("fill", "none");
-    path.setAttribute("class", klass);
-    this.gg.appendChild(path);
-    this.last_curve = path;
-    this.last_curve_data = kde.data;
-    return path;
-};
-PAGradeGraph.prototype.remove_if = function (predicate) {
-    var e = this.gg.firstChild;
-    while (e) {
-        var next = e.nextSibling;
-        if (predicate.call(e))
-            this.gg.removeChild(e);
-        e = next;
-    }
-};
-PAGradeGraph.prototype.highlight_last_curve = function (d, predicate, klass) {
-    if (!this.last_curve || !this.last_curve_data.cdfu)
-        return null;
-    var ispdf = hasClass(this.last_curve, "pa-gg-pdf"),
-        cdf = this.last_curve_data.cdf,
-        cdfu = this.last_curve_data.cdfu,
-        data = [], nr, nrgh,
-        i, ui, xv, yv, j, yc;
-    if (ispdf) {
-        nr = 0.9 / (this.maxp * d.n);
-    } else {
-        nr = 1 / d.n;
-    }
-    nrgh = nr * this.gh;
-    for (i = ui = 0; i !== cdf.length; i += 2) {
-        for (yc = 0; ui !== cdf[i + 1]; ++ui) {
-            if (predicate(cdfu[ui], d))
-                ++yc;
-        }
-        if (yc) {
-            xv = this.xax(cdf[i]);
-            if (ispdf) {
-                yv = svgutil.eval_function_path.call(this.last_curve, xv);
-            } else {
-                yv = this.yax(cdf[i+1] * nr);
-            }
-            if (yv != null)
-                data.push("M", xv, ",", yv, "v", yc * nrgh);
-        }
-    }
-    if (!data.length)
-        return null;
-    else {
-        var path = mksvg("path");
-        path.setAttribute("d", data.join(""));
-        path.setAttribute("fill", "none");
-        path.setAttribute("class", klass);
-        this.gg.appendChild(path);
-        addClass(this.gg, "pa-gg-has-hl");
-        return path;
-    }
-};
-PAGradeGraph.prototype.typed_annotation = function (klass) {
-    var dot = mksvg("circle");
-    dot.setAttribute("class", "pa-gg-mark hl-" + (klass || "main"));
-    dot.setAttribute("r", !klass || klass === "main" ? 5 : 3.5);
-    return dot;
-};
-PAGradeGraph.prototype.star_annotation = function (rs, start, n, klass) {
-    if (start == null) {
-        start = Math.PI / 2;
-    }
-    if (n == null) {
-        n = 5;
-    }
-    var star = mksvg("path");
-    star.setAttribute("class", klass);
-    var d = ["M"], cos = Math.cos, sin = Math.sin, delta = Math.PI / n;
-    for (var i = 0; i < 2 * n; ++i) {
-        d.push(rs[i & 1] * cos(start), " ", rs[i & 1] * sin(start), i ? " " : "L");
-        start += delta;
-    }
-    d.push("z");
-    star.setAttribute("d", d.join(""));
-    return star;
-};
-PAGradeGraph.prototype.annotate_last_curve = function (x, elt, after) {
-    if (this.last_curve) {
-        var xv = this.xax(x), yv = svgutil.eval_function_path.call(this.last_curve, xv);
-        if (yv === null && this.cutoff)
-            yv = this.yax(this.cutoff);
-        if (yv !== null) {
-            elt = elt || this.typed_annotation();
-            elt.setAttribute("transform", "translate(" + xv + "," + yv + ")");
-            this.gg.insertBefore(elt, after || null);
-            return true;
-        }
-    }
-    return false;
-};
-PAGradeGraph.prototype.user_x = function (uid) {
-    if (!this.last_curve_data.cdfu)
-        return undefined;
-    if (!this.last_curve_data.ucdf) {
-        var cdf = this.last_curve_data.cdf,
-            cdfu = this.last_curve_data.cdfu,
-            ucdf = this.last_curve_data.ucdf = {}, i, ui;
-        for (i = ui = 0; ui !== cdfu.length; ++ui) {
-            while (ui >= cdf[i + 1])
-                i += 2;
-            ucdf[cdfu[ui]] = cdf[i];
-        }
-    }
-    return this.last_curve_data.ucdf[uid];
-};
-PAGradeGraph.prototype.highlight_users = function () {
-    if (!this.last_curve || !this.last_curve_data.cdfu)
-        return;
-
-    this.last_highlight = this.last_highlight || {};
-    var attrs = this.container().attributes, desired = {}, x;
-    for (var i = 0; i !== attrs.length; ++i) {
-        if (attrs[i].name.startsWith("data-pa-highlight")) {
-            var type;
-            if (attrs[i].name === "data-pa-highlight")
-                type = "main";
-            else
-                type = attrs[i].name.substring(18);
-            desired[type] = attrs[i].value;
-            this.last_highlight[type] = this.last_highlight[type] || "";
-        }
-    }
-
-    for (var type in this.last_highlight) {
-        var uids = desired[type] || "";
-        if (this.last_highlight[type] === uids)
-            continue;
-
-        var uidm = {}, uidx = uids.split(/\s+/), x;
-        for (var i = 0; i !== uidx.length; ++i) {
-            if (uidx[i] !== "")
-                uidm[uidx[i]] = 1;
-        }
-
-        var el = this.gg.firstChild, elnext;
-        var klass = "pa-gg-mark hl-" + type;
-        while (el && (!hasClass(el, "pa-gg-mark") || el.className.animVal < klass)) {
-            el = el.nextSibling;
-        }
-
-        while (el && el.className.animVal === klass) {
-            elnext = el.nextSibling;
-            var uid = +el.getAttribute("data-pa-uid");
-            if (uidm[uid]) {
-                uidm[uid] = 2;
-            } else {
-                this.gg.removeChild(el);
-            }
-            el = elnext;
-        }
-
-        for (var i = 0; i !== uidx.length; ++i) {
-            if (uidm[uidx[i]] === 1
-                && (x = this.user_x(uidx[i])) != null) {
-                var e = this.typed_annotation(type);
-                e.setAttribute("data-pa-uid", uidx[i]);
-                this.annotate_last_curve(x, e, el);
-            }
-        }
-
-        this.last_highlight[type] = uids;
-    }
-};
-PAGradeGraph.prototype.hover = function () {
-    var that = this;
-    function closer_mark(hlpaths, pt, bestDistance2) {
-        var hlpt = null;
-        for (var hlp of hlpaths) {
-            var m = hlp.getAttribute("transform").match(/^translate\(([-+\d.]+),([-+\d.]+)\)$/);
-            if (m) {
-                var dx = +m[1] - pt[0], dy = +m[2] - pt[1],
-                    distance2 = dx * dx + dy * dy;
-                if (distance2 < bestDistance2) {
-                    hlpt = [+m[1], +m[2]];
-                    hlpt.pathNode = hlp;
-                    bestDistance2 = distance2;
-                }
-            }
-        }
-        hlpt && (hlpt.distance = Math.sqrt(bestDistance2));
-        return hlpt;
-    }
-    function handle(event) {
-        var pt = {distance: 20}, xfmt = that.xfmt;
-        if (event.type !== "mousemove")
-            that.hoveron = event.type !== "mouseleave";
-        if (that.hoveron) {
-            var loc = svgutil.event_to_point(that.svg, event),
-                paths = that.gg.querySelectorAll(".pa-gg-pdf, .pa-gg-cdf");
-            loc[0] -= that.ml;
-            loc[1] -= that.mt;
-            for (var p of paths) {
-                pt = svgutil.closest_point(p, loc, pt);
-            }
-            if (pt.pathNode) {
-                var hlpt = closer_mark(that.gg.querySelectorAll(".pa-gg-mark.hl-main"), pt, 36)
-                    || closer_mark(that.gg.querySelectorAll(".pa-gg-mark:not(.hl-main)"), pt, 25);
-                if (hlpt) {
-                    pt = hlpt;
-                    if (xfmt === "%.0r" || xfmt === "%.1f") {
-                        xfmt = "%.2r";
-                    }
-                }
-            }
-        }
-        var ha = that.hoveranno;
-        if (pt.pathNode) {
-            if (!ha) {
-                ha = that.hoveranno = [that.star_annotation([4, 10], null, null, "pa-gg-hover-mark")];
-                that.gg.appendChild(ha[0]);
-
-                var e = mksvg("path");
-                e.setAttribute("d", "M0,0v5");
-                e.setAttribute("fill", "none");
-                e.setAttribute("stroke", "black");
-                that.gx.appendChild(e);
-                ha.push(e);
-
-                e = mksvg("rect");
-                e.setAttribute("class", "pa-gg-hover-box");
-                e.setAttribute("y", 5);
-                e.setAttribute("height", that.xdh + 1.5);
-                e.setAttribute("rx", 3);
-                that.gx.appendChild(e);
-                ha.push(e);
-
-                e = mksvg("text");
-                e.appendChild(document.createTextNode(""));
-                e.setAttribute("class", "pa-gg-hover-text");
-                e.setAttribute("y", that.xdh + 3);
-                that.gx.appendChild(e);
-                ha.push(e);
-
-                e = mksvg("text");
-                e.appendChild(document.createTextNode(""));
-                e.setAttribute("class", "pa-gg-anno-name");
-                e.setAttribute("text-anchor", "end");
-                e.setAttribute("dx", -8);
-                that.gg.appendChild(e);
-                ha.push(e);
-
-                if (that.yl) {
-                    e = mksvg("path");
-                    e.setAttribute("d", "M-5,0h5");
-                    e.setAttribute("fill", "none");
-                    e.setAttribute("stroke", "black");
-                    that.gy.appendChild(e);
-                    ha.push(e);
-
-                    e = mksvg("rect");
-                    e.setAttribute("class", "pa-gg-hover-box");
-                    e.setAttribute("height", that.xdh + 1);
-                    e.setAttribute("rx", 3);
-                    that.gy.appendChild(e);
-                    ha.push(e);
-
-                    e = mksvg("text");
-                    e.appendChild(document.createTextNode(""));
-                    e.setAttribute("class", "pa-gg-hover-text");
-                    e.setAttribute("x", -8);
-                    that.gy.appendChild(e);
-                    ha.push(e);
-                }
-            }
-            ha[0].setAttribute("transform", "translate(" + pt[0] + "," + pt[1] + ")");
-
-            ha[1].setAttribute("transform", "translate(" + pt[0] + ",0)");
-            ha[3].setAttribute("x", pt[0]);
-            ha[3].firstChild.data = sprintf(xfmt, that.unxax(pt[0]));
-            var bb = ha[3].getBBox();
-            ha[2].setAttribute("x", pt[0] - bb.width / 2 - 2);
-            ha[2].setAttribute("width", bb.width + 4);
-
-            var table, name;
-            if (pt.pathNode.hasAttribute("data-pa-uid")
-                && (table = $(".gtable").data("paTable"))
-                && (name = table.name_text(pt.pathNode.getAttribute("data-pa-uid")))) {
-                ha[4].firstChild.data = name;
-                ha[4].setAttribute("x", pt[0]);
-                ha[4].setAttribute("y", pt[1]);
-            } else {
-                ha[4].firstChild.data = "";
-            }
-
-            if (that.yl) {
-                ha[5].setAttribute("transform", "translate(0," + pt[1] + ")");
-                ha[7].setAttribute("y", pt[1] + 0.25 * that.xdh);
-                ha[7].firstChild.data = sprintf(that.yfmt, that.unyax(pt[1]) * that.ymax);
-                bb = ha[7].getBBox();
-                ha[6].setAttribute("x", -bb.width - 10);
-                ha[6].setAttribute("y", pt[1] - (that.xdh + 2) / 2);
-                ha[6].setAttribute("width", bb.width + 4);
-            }
-        } else if (ha) {
-            that.gg.removeChild(ha[0]);
-            that.gx.removeChild(ha[1]);
-            that.gx.removeChild(ha[2]);
-            that.gx.removeChild(ha[3]);
-            that.gg.removeChild(ha[4]);
-            if (that.yl) {
-                that.gy.removeChild(ha[5]);
-                that.gy.removeChild(ha[6]);
-                that.gy.removeChild(ha[7]);
-            }
-            that.hoveranno = null;
-        }
-    }
-    this.svg.addEventListener("mouseenter", handle, false);
-    this.svg.addEventListener("mousemove", handle, false);
-    this.svg.addEventListener("mouseleave", handle, false);
-};
-
-
 function pa_draw_gradecdf($graph) {
     var d = $graph.data("paGradeData");
     if (!d) {
@@ -3771,14 +3035,14 @@ function pa_draw_gradecdf($graph) {
 
     // compute plot types
     var plot_types = [];
-    if (d.extension && $pi.length && user_extension) {
+    if (d.series.extension && $pi.length && user_extension) {
         plot_types.push("cdf-extension", "pdf-extension");
     }
     plot_types.push("cdf", "pdf");
-    if (d.extension && !$pi.length) {
+    if (d.series.extension && !$pi.length) {
         plot_types.push("cdf-extension", "pdf-extension");
     }
-    if (d.noextra) {
+    if (d.series.noextra) {
         plot_types.push("cdf-noextra", "pdf-noextra");
     }
     plot_types.push("all");
@@ -3824,16 +3088,16 @@ function pa_draw_gradecdf($graph) {
     var want_extension = plot_type.indexOf("-extension") >= 0
         || (want_all && user_extension && d.extension);
     var want_noextra = plot_type.indexOf("-noextra") >= 0
-        || (want_all && d.noextra && !want_extension);
+        || (want_all && d.series.noextra && !want_extension);
 
     // maxes
     var datamax = 0;
     if (want_noextra)
-        datamax = Math.max(datamax, pa_cdfmax(d.noextra));
+        datamax = Math.max(datamax, d.series.noextra.max());
     if (want_extension)
-        datamax = Math.max(datamax, pa_cdfmax(d.extension));
+        datamax = Math.max(datamax, d.series.extension.max());
     if (want_all || (!want_noextra && !want_extension))
-        datamax = Math.max(datamax, pa_cdfmax(d.all));
+        datamax = Math.max(datamax, d.series.all.max());
     var max = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
 
     $graph.removeClass("hidden");
@@ -3841,7 +3105,7 @@ function pa_draw_gradecdf($graph) {
     if (!$plot.length)
         $plot = $graph;
 
-    var gi = new PAGradeGraph($plot[0], d, plot_type);
+    var gi = new GradeGraph($plot[0], d, plot_type);
     $graph.data("paGradeGraph", gi);
 
     if (gi.total && gi.total < gi.max) {
@@ -3855,13 +3119,13 @@ function pa_draw_gradecdf($graph) {
     }
 
     // series
-    var kde_nbins = Math.ceil((gi.max - gi.min) / 2), kde_hfactor = 0.08, kdes = [];
+    var kde_nbins = Math.ceil((gi.max - gi.min) / 2), kde_hfactor = 0.08, kdes = {};
     if (plot_type === "pdf-extension")
-        kdes.extension = pa_gradecdf_kde(d.extension, gi, kde_hfactor, kde_nbins);
+        kdes.extension = new GradeKde(d.series.extension, gi, kde_hfactor, kde_nbins);
     if (plot_type === "pdf-noextra")
-        kdes.noextra = pa_gradecdf_kde(d.noextra, gi, kde_hfactor, kde_nbins);
+        kdes.noextra = new GradeKde(d.series.noextra, gi, kde_hfactor, kde_nbins);
     if (plot_type === "pdf")
-        kdes.main = pa_gradecdf_kde(d.all, gi, kde_hfactor, kde_nbins);
+        kdes.main = new GradeKde(d.series.all, gi, kde_hfactor, kde_nbins);
     for (var i in kdes)
         gi.maxp = Math.max(gi.maxp, kdes[i].maxp);
 
@@ -3871,12 +3135,12 @@ function pa_draw_gradecdf($graph) {
         gi.append_pdf(kdes.main, "pa-gg-pdf");
     if (plot_type === "pdf-extension")
         gi.append_pdf(kdes.extension, "pa-gg-pdf pa-gg-extension");
-    if (plot_type === "cdf-noextra" || (plot_type === "all" && d.noextra))
-        gi.append_cdf(d.noextra, "pa-gg-cdf pa-gg-noextra");
+    if (plot_type === "cdf-noextra" || (plot_type === "all" && d.series.noextra))
+        gi.append_cdf(d.series.noextra, "pa-gg-cdf pa-gg-noextra");
     if (plot_type === "cdf" || plot_type === "all")
-        gi.append_cdf(d.all, "pa-gg-cdf");
-    if (plot_type === "cdf-extension" || (plot_type === "all" && d.extension && user_extension))
-        gi.append_cdf(d.extension, "pa-gg-cdf pa-gg-extension");
+        gi.append_cdf(d.series.all, "pa-gg-cdf");
+    if (plot_type === "cdf-extension" || (plot_type === "all" && d.series.extension && user_extension))
+        gi.append_cdf(d.series.extension, "pa-gg-cdf pa-gg-extension");
 
     // cutoff
     if (d.cutoff && plot_type.substring(0, 3) !== "pdf") {
@@ -3907,7 +3171,7 @@ function pa_draw_gradecdf($graph) {
 
     // summary
     $graph.find(".statistics").each(function () {
-        var dd = gi.last_curve_data, x = [];
+        var dd = gi.last_curve_series, x = [];
         if (dd && dd.mean)
             x.push("mean " + dd.mean.toFixed(1));
         if (dd && dd.median)
@@ -3916,7 +3180,7 @@ function pa_draw_gradecdf($graph) {
             x.push("stddev " + dd.stddev.toFixed(1));
         x = [x.join(", ")];
         if (dd && total != null) {
-            var y = pa_gradecdf_findy(dd, total);
+            var y = dd.count_at(total);
             if (dd.cutoff && y < dd.cutoff * dd.n)
                 x.push("≤" + Math.round(dd.cutoff * 100) + " %ile");
             else
@@ -4022,8 +3286,8 @@ function course_xcdf() {
     var xd = null;
     $(".pa-grgraph[data-pa-pset=course]").each(function () {
         var d = $(this).data("paGradeData");
-        if (d && d.all && d.all.cdfu) {
-            xd = d.all;
+        if (d && d.series.all && d.series.all.cdfu) {
+            xd = d.series.all;
             return false;
         }
     })
@@ -4174,8 +3438,8 @@ function pa_gradecdf() {
     jQuery.ajax(hoturl_post("api/gradestatistics", p ? {pset: p} : {}), {
         type: "GET", cache: true, dataType: "json",
         success: function (d) {
-            if (d.all) {
-                $(self).data("paGradeData", d);
+            if (d.series && d.series.all) {
+                $(self).data("paGradeData", new GradeStats(d));
                 pa_draw_gradecdf($(self));
             }
         }
