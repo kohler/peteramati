@@ -136,7 +136,7 @@ class ContactView {
             && !$user->is_anonymous
             && $user->github_username
             && $Me->conf->opt("githubOrganization")) {
-            echo ' <a class="q small ui js-repositories need-tooltip" href="" data-tooltip="List repositories" data-pa-user="' . htmlspecialchars($user->github_username) . '">®</a>';
+            echo ' <a class="q small ui js-repo-list need-tooltip" href="" data-tooltip="List repositories" data-pa-user="' . htmlspecialchars($user->github_username) . '">®</a>';
         }
         echo '</h2>';
 
@@ -275,7 +275,7 @@ class ContactView {
         else
             $value = htmlspecialchars($repo_url ? $repo_url : "(none)");
         if ($repo_url) {
-            $value .= ' <button class="btn ui js-copy-repo need-tooltip" data-pa-repo="' . htmlspecialchars($repo->ssh_url()) . '"';
+            $value .= ' <button class="btn ui js-repo-copy need-tooltip" data-pa-repo="' . htmlspecialchars($repo->ssh_url()) . '"';
             if ($user->is_anonymous)
                 $value .= ' data-tooltip="[anonymous]"';
             else

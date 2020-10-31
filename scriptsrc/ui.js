@@ -97,27 +97,3 @@ export function fold61(sel, arrowholder, direction) {
         );
     return false;
 }
-
-
-export class ImmediatePromise {
-    constructor(value) {
-        this.value = value;
-    }
-    then(executor) {
-        try {
-            return new ImmediatePromise(executor(this.value));
-        } catch (e) {
-            return Promise.reject(e);
-        }
-    }
-    catch(executor) {
-        return this;
-    }
-    finally(executor) {
-        try {
-            executor();
-        } catch (e) {
-        }
-        return this;
-    }
-}

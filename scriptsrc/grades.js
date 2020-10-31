@@ -2,7 +2,8 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { hoturl, hoturl_gradeparts, api_conditioner } from "./hoturl.js";
+import { hoturl, hoturl_gradeparts } from "./hoturl.js";
+import { api_conditioner } from "./xhr.js";
 
 export function grades_fetch() {
     var p = this.closest(".pa-psetinfo");

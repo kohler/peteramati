@@ -84,8 +84,7 @@ export class GradeStats {
         this.entry = d.entry || null;
         this.series = {};
         for (let i in d.series) {
-            if (typeof d.series[i] === "object" && d.series[i].cdf)
-                this.series[i] = new GradeSeries(d.series[i]);
+            this.series[i] = new GradeSeries(d.series[i]);
         }
     }
 }

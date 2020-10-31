@@ -3,24 +3,28 @@
 // See LICENSE for open-source distribution terms
 
 import { wstorage, sprintf, strftime } from "./utils.js";
+import { log_jserror } from "./utils-errors.js";
 import {
     hasClass, addClass, removeClass, toggleClass, classList, handle_ui,
-    fold61, ImmediatePromise
+    fold61
     } from "./ui.js";
+import { event_key, event_modkey } from "./ui-key.js";
 import {
-    hoturl, hoturl_post, hoturl_absolute_base, url_absolute, hoturl_gradeparts,
-    api_conditioner
+    hoturl, hoturl_post, hoturl_absolute_base, url_absolute, hoturl_gradeparts
     } from "./hoturl.js";
-import "./ui-pset.js";
-import {
-    escape_entities, unescape_entities, text_to_html
-    } from "./encoders.js";
+import { api_conditioner } from "./xhr.js";
+import "./ui-autogrow.js";
+import "./ui-range.js";
+import "./ui-sessionlist.js";
+import { escape_entities } from "./encoders.js";
 import { Bubble, tooltip } from "./tooltip.js";
+import "./pset.js";
 import { linediff_find, linediff_traverse, linediff_locate } from "./diff.js";
 import { filediff_markdown } from "./diff-markdown.js";
 import "./diff-expand.js";
+import { render_text } from "./render.js";
+import "./render-terminal.js";
 import { run } from "./run.js";
-import { terminal_render } from "./run-terminal.js";
 import { run_settings_load } from "./run-settings.js";
 import { GradeKde, GradeStats } from "./gradestats.js";
 import { GradeGraph } from "./gradegraph.js";
@@ -29,174 +33,14 @@ function $$(id) {
     return document.getElementById(id);
 }
 
-if (!window.JSON || !window.JSON.parse) {
-    window.JSON = {parse: $.parseJSON};
-}
-
-if (!Element.prototype.closest) {
-    Element.prototype.closest = function (s) {
-        return $(this).closest(s)[0];
-    };
-}
-
-if (!String.prototype.startsWith) {
-    String.prototype.startsWith = function (search, pos) {
-        pos = !pos || pos < 0 ? 0 : +pos;
-        return this.substring(pos, pos + search.length) === search;
-    };
-}
-if (!String.prototype.endsWith) {
-    String.prototype.endsWith = function (search, this_len) {
-        if (this_len === undefined || this_len > this.length) {
-            this_len = this.length;
-        }
-        return this.substring(this_len - search.length, this_len) === search;
-    };
-}
-if (!String.prototype.trimStart) {
-    String.prototype.trimStart = function () {
-        return this.replace(/^[\s\uFEFF\xA0]+/, '');
-    };
-}
-
-
-// error logging
-function log_jserror(errormsg, error, noconsole) {
-    if (!error && errormsg instanceof Error) {
-        error = errormsg;
-        errormsg = {"error": error.toString()};
-    } else if (typeof errormsg === "string")
-        errormsg = {"error": errormsg};
-    if (error && error.fileName && !errormsg.url)
-        errormsg.url = error.fileName;
-    if (error && error.lineNumber && !errormsg.lineno)
-        errormsg.lineno = error.lineNumber;
-    if (error && error.columnNumber && !errormsg.colno)
-        errormsg.colno = error.columnNumber;
-    if (error && error.stack)
-        errormsg.stack = error.stack;
-    $.ajax(hoturl_post("api/jserror"), {
-        global: false, method: "POST", cache: false, data: errormsg
-    });
-    if (error && !noconsole && typeof console === "object" && console.error)
-        console.error(errormsg.error);
-}
-
-(function () {
-    var old_onerror = window.onerror, nerrors_logged = 0;
-    window.onerror = function (errormsg, url, lineno, colno, error) {
-        if ((url || !lineno) && ++nerrors_logged <= 10) {
-            var x = {error: errormsg, url: url, lineno: lineno};
-            if (colno)
-                x.colno = colno;
-            log_jserror(x, error, true);
-        }
-        return old_onerror ? old_onerror.apply(this, arguments) : false;
-    };
-})();
-
-function jqxhr_error_message(jqxhr, status, errormsg) {
-    if (status === "parsererror")
-        return "Internal error: bad response from server.";
-    else if (errormsg)
-        return errormsg.toString();
-    else if (status === "timeout")
-        return "Connection timed out.";
-    else if (status)
-        return "Failed [" + status + "].";
-    else
-        return "Failed.";
-}
-
-var after_outstanding = (function () {
-var outstanding = 0, after = [];
-
-$(document).ajaxError(function (event, jqxhr, settings, httperror) {
-    if (jqxhr.readyState != 4)
-        return;
-    var data;
-    if (jqxhr.responseText && jqxhr.responseText.charAt(0) === "{") {
-        try {
-            data = JSON.parse(jqxhr.responseText);
-        } catch (e) {
-        }
-    }
-    if (!data || !data.user_error) {
-        var msg = url_absolute(settings.url) + " API failure: ";
-        if (siteinfo.user && siteinfo.user.email)
-            msg += "user " + siteinfo.user.email + ", ";
-        msg += jqxhr.status;
-        if (httperror)
-            msg += ", " + httperror;
-        if (jqxhr.responseText)
-            msg += ", " + jqxhr.responseText.substring(0, 100);
-        log_jserror(msg);
-    }
-});
-
-$(document).ajaxComplete(function (event, jqxhr, settings) {
-    if (settings.trackOutstanding && --outstanding === 0) {
-        while (after.length)
-            after.shift()();
-    }
-});
-
-$.ajaxPrefilter(function (options, originalOptions, jqxhr) {
-    if (options.global === false)
-        return;
-    var f = options.success;
-    function onerror(jqxhr, status, errormsg) {
-        if (f) {
-            var rjson;
-            if (/application\/json/.test(jqxhr.getResponseHeader("Content-Type") || "")
-                && jqxhr.responseText) {
-                try {
-                    rjson = JSON.parse(jqxhr.responseText);
-                } catch (e) {
-                }
-            }
-            if (!rjson
-                || typeof rjson !== "object"
-                || rjson.ok !== false)
-                rjson = {ok: false};
-            if (!rjson.error)
-                rjson.error = jqxhr_error_message(jqxhr, status, errormsg);
-            f(rjson, jqxhr, status);
-        }
-    }
-    if (!options.error)
-        options.error = onerror;
-    else if ($.isArray(options.error))
-        options.error.push(onerror);
-    else
-        options.error = [options.error, onerror];
-    if (options.timeout == null)
-        options.timeout = 10000;
-    if (options.dataType == null)
-        options.dataType = "json";
-    if (options.trackOutstanding)
-        ++outstanding;
-});
-
-return function (f) {
-    if (f === undefined)
-        return outstanding > 0;
-    else if (outstanding > 0)
-        after.push(f);
-    else
-        f();
-};
-})();
-
-
 // geometry
-jQuery.fn.extend({
+$.fn.extend({
     geometry: function (outer) {
         var g, d;
         if (this[0] == window) {
             g = {left: this.scrollLeft(), top: this.scrollTop()};
         } else if (this.length == 1 && this[0].getBoundingClientRect) {
-            g = jQuery.extend({}, this[0].getBoundingClientRect());
+            g = $.extend({}, this[0].getBoundingClientRect());
             if ((d = window.pageXOffset))
                 g.left += d, g.right += d;
             if ((d = window.pageYOffset))
@@ -259,9 +103,10 @@ jQuery.fn.extend({
 });
 
 function geometry_translate(g, dx, dy) {
-    if (typeof dx === "object")
+    if (typeof dx === "object") {
         dy = dx.top, dx = dx.left;
-    g = jQuery.extend({}, g);
+    }
+    g = $.extend({}, g);
     g.top += dy;
     g.right += dx;
     g.bottom += dy;
@@ -355,80 +200,6 @@ function now_sec() {
 
 
 // events
-var event_key = (function () {
-var key_map = {"Spacebar": " ", "Esc": "Escape"},
-    charCode_map = {"9": "Tab", "13": "Enter", "27": "Escape"},
-    keyCode_map = {
-        "9": "Tab", "13": "Enter", "16": "ShiftLeft", "17": "ControlLeft",
-        "18": "AltLeft", "20": "CapsLock", "27": "Escape", "33": "PageUp",
-        "34": "PageDown", "37": "ArrowLeft", "38": "ArrowUp", "39": "ArrowRight",
-        "40": "ArrowDown", "91": "OSLeft", "92": "OSRight", "93": "OSRight",
-        "224": "OSLeft", "225": "AltRight"
-    },
-    nonprintable_map = {
-        "Alt": 2,
-        "AltLeft": 2,
-        "AltRight": 2,
-        "CapsLock": 2,
-        "Control": 2,
-        "ControlLeft": 2,
-        "ControlRight": 2,
-        "Meta": 2,
-        "OSLeft": 2,
-        "OSRight": 2,
-        "Shift": 2,
-        "ShiftLeft": 2,
-        "ShiftRight": 2,
-        "ArrowLeft": 1,
-        "ArrowRight": 1,
-        "ArrowUp": 1,
-        "ArrowDown": 1,
-        "Backspace": 1,
-        "Enter": 1,
-        "Escape": 1,
-        "PageUp": 1,
-        "PageDown": 1,
-        "Tab": 1
-    };
-function event_key(evt) {
-    var x;
-    if (typeof evt === "string") {
-        return evt;
-    } else if ((x = evt.key) != null) {
-        return key_map[x] || x;
-    } else if ((x = evt.charCode)) {
-        return charCode_map[x] || String.fromCharCode(x);
-    } else if ((x = evt.keyCode)) {
-        if (keyCode_map[x])
-            return keyCode_map[x];
-        else if ((x >= 48 && x <= 57) || (x >= 65 && x <= 90))
-            return String.fromCharCode(x);
-    } else {
-        return "";
-    }
-}
-event_key.printable = function (evt) {
-    return !nonprintable_map[event_key(evt)]
-        && (typeof evt === "string" || !(evt.ctrlKey || evt.metaKey));
-};
-event_key.modifier = function (evt) {
-    return nonprintable_map[event_key(evt)] > 1;
-};
-event_key.is_default_a = function (evt, a) {
-    return !evt.shiftKey && !evt.metaKey && !evt.ctrlKey
-        && evt.button == 0
-        && (!a || !hasClass("ui", a));
-};
-return event_key;
-})();
-
-function event_modkey(evt) {
-    return (evt.shiftKey ? 1 : 0) + (evt.ctrlKey ? 2 : 0) + (evt.altKey ? 4 : 0) + (evt.metaKey ? 8 : 0);
-}
-event_modkey.SHIFT = 1; // NB values matter
-event_modkey.CTRL = 2;
-event_modkey.ALT = 4;
-event_modkey.META = 8;
 
 function make_onkey(key, f) {
     return function (evt) {
@@ -563,129 +334,6 @@ function refocus_within(elt) {
         }
     }
 }
-
-
-// rangeclick
-handle_ui.on("js-range-click", function (event) {
-    if (event.type === "change")
-        return;
-
-    var $f = $(this).closest("form"),
-        rangeclick_state = $f[0].jsRangeClick || {},
-        kind = this.getAttribute("data-range-type") || this.name;
-    $f[0].jsRangeClick = rangeclick_state;
-
-    var key = false;
-    if (event.type === "keydown" && !event_modkey(event))
-        key = event_key(event);
-    if (rangeclick_state.__clicking__
-        || (event.type === "updaterange" && rangeclick_state["__update__" + kind])
-        || (event.type === "keydown" && key !== "ArrowDown" && key !== "ArrowUp"))
-        return;
-
-    // find checkboxes and groups of this type
-    var cbs = [], cbgs = [];
-    $f.find("input.js-range-click").each(function () {
-        var tkind = this.getAttribute("data-range-type") || this.name;
-        if (kind === tkind) {
-            cbs.push(this);
-            if (hasClass(this, "is-range-group"))
-                cbgs.push(this);
-        }
-    });
-
-    // find positions
-    var lastelt = rangeclick_state[kind], thispos, lastpos, i;
-    for (i = 0; i !== cbs.length; ++i) {
-        if (cbs[i] === this)
-            thispos = i;
-        if (cbs[i] === lastelt)
-            lastpos = i;
-    }
-
-    if (key) {
-        if (thispos !== 0 && key === "ArrowUp")
-            --thispos;
-        else if (thispos < cbs.length - 1 && key === "ArrowDown")
-            ++thispos;
-        $(cbs[thispos]).focus().scrollIntoView();
-        event.preventDefault();
-        return;
-    }
-
-    // handle click
-    var group = false, single_group = false, j;
-    if (event.type === "click") {
-        rangeclick_state.__clicking__ = true;
-
-        if (hasClass(this, "is-range-group")) {
-            i = 0;
-            j = cbs.length - 1;
-            group = this.getAttribute("data-range-group");
-        } else {
-            rangeclick_state[kind] = this;
-            if (event.shiftKey && lastelt) {
-                if (lastpos <= thispos) {
-                    i = lastpos;
-                    j = thispos - 1;
-                } else {
-                    i = thispos + 1;
-                    j = lastpos;
-                }
-            } else {
-                i = 1;
-                j = 0;
-                single_group = this.getAttribute("data-range-group");
-            }
-        }
-
-        while (i <= j) {
-            if (cbs[i].checked !== this.checked
-                && !hasClass(cbs[i], "is-range-group")
-                && (!group || cbs[i].getAttribute("data-range-group") === group))
-                $(cbs[i]).trigger("click");
-            ++i;
-        }
-
-        delete rangeclick_state.__clicking__;
-    } else if (event.type === "updaterange") {
-        rangeclick_state["__updated__" + kind] = true;
-    }
-
-    // update groups
-    for (j = 0; j !== cbgs.length; ++j) {
-        group = cbgs[j].getAttribute("data-range-group");
-        if (single_group && group !== single_group)
-            continue;
-
-        var state = null;
-        for (i = 0; i !== cbs.length; ++i) {
-            if (cbs[i].getAttribute("data-range-group") === group
-                && !hasClass(cbs[i], "is-range-group")) {
-                if (state === null)
-                    state = cbs[i].checked;
-                else if (state !== cbs[i].checked) {
-                    state = 2;
-                    break;
-                }
-            }
-        }
-
-        if (state === 2) {
-            cbgs[j].indeterminate = true;
-            cbgs[j].checked = true;
-        } else {
-            cbgs[j].indeterminate = false;
-            cbgs[j].checked = state;
-        }
-    }
-});
-
-$(function () {
-    $(".is-range-group").each(function () {
-        handle_ui.trigger.call(this, "js-range-click", "updaterange");
-    });
-});
 
 
 // HtmlCollector
@@ -1054,22 +702,6 @@ function foldup(event, opts) {
 
 handle_ui.on("js-foldup", foldup);
 
-function crpfocus(id, subfocus, seltype) {
-    var selt = $$(id);
-    if (selt && subfocus)
-        selt.className = selt.className.replace(/links[0-9]*/, 'links' + subfocus);
-    var felt = $$(id + (subfocus ? subfocus : "") + "_d");
-    if (felt && !(felt.type == "text" && felt.value && seltype == 1))
-        felt.focus();
-    if (felt && felt.type == "text" && seltype == 3 && felt.select)
-        felt.select();
-    if ((selt || felt) && window.event)
-        window.event.returnValue = false;
-    if (seltype && seltype >= 1)
-        window.scroll(0, 0);
-    return !(selt || felt);
-}
-
 function make_link_callback(elt) {
     return function () {
         window.location = elt.href;
@@ -1132,291 +764,6 @@ function setajaxcheck(elt, rv) {
         Bubble(rv.error, "errorbubble").near(elt).removeOn(elt, "input change click hide");
 }
 
-function link_urls(t) {
-    var re = /((?:https?|ftp):\/\/(?:[^\s<>\"&]|&amp;)*[^\s<>\"().,:;&])([\"().,:;]*)(?=[\s<>&]|$)/g;
-    return t.replace(re, function (m, a, b) {
-        return '<a href="' + a + '" rel="noreferrer">' + a + '</a>' + b;
-    });
-}
-
-// text rendering
-var render_text = (function () {
-function render0(text) {
-    return link_urls(escape_entities(text));
-}
-
-var default_format = 0, renderers = {"0": {format: 0, render: render0}};
-
-function lookup(format) {
-    var r, p;
-    if (format && (r = renderers[format]))
-        return r;
-    if (format
-        && typeof format === "string"
-        && (p = format.indexOf(".")) > 0
-        && (r = renderers[format.substring(0, p)]))
-        return r;
-    if (format == null)
-        format = default_format;
-    return renderers[format] || renderers[0];
-}
-
-function do_render(format, is_inline, a) {
-    var r = lookup(format);
-    if (r.format)
-        try {
-            var f = (is_inline && r.render_inline) || r.render;
-            return {
-                format: r.formatClass || r.format,
-                content: f.apply(this, a)
-            };
-        } catch (e) {
-            log_jserror("do_render format " + r.format + ": " + e.toString(), e);
-        }
-    return {format: 0, content: render0(a[0])};
-}
-
-function render_text(format, text /* arguments... */) {
-    var a = [text], i;
-    for (i = 2; i < arguments.length; ++i)
-        a.push(arguments[i]);
-    return do_render.call(this, format, false, a);
-}
-
-function render_inline(format, text /* arguments... */) {
-    var a = [text], i;
-    for (i = 2; i < arguments.length; ++i)
-        a.push(arguments[i]);
-    return do_render.call(this, format, true, a);
-}
-
-function on() {
-    var $j = $(this), format = this.getAttribute("data-format"),
-        content = this.getAttribute("data-content") || $j.text(), args = null, f, i;
-    if ((i = format.indexOf(".")) > 0) {
-        var a = format.split(/\./);
-        format = a[0];
-        args = {};
-        for (i = 1; i < a.length; ++i)
-            args[a[i]] = true;
-    }
-    if (this.tagName == "DIV")
-        f = render_text.call(this, format, content, args);
-    else
-        f = render_inline.call(this, format, content, args);
-    if (f.format)
-        $j.html(f.content);
-    var s = $.trim(this.className.replace(/(?:^| )(?:need-format|format\d+)(?= |$)/g, " "));
-    this.className = s + (s ? " format" : "format") + (f.format || 0);
-    if (f.format)
-        $j.trigger("renderText", f);
-}
-
-$.extend(render_text, {
-    add_format: function (x) {
-        x.format && (renderers[x.format] = x);
-    },
-    format: function (format) {
-        return lookup(format);
-    },
-    set_default_format: function (format) {
-        default_format = format;
-    },
-    inline: render_inline,
-    on: on,
-    on_page: function () { $(".need-format").each(on); }
-});
-return render_text;
-})();
-
-(function (md) {
-render_text.add_format({
-    format: 1,
-    render: function (text) {
-        return md.render(text);
-    }
-});
-render_text.add_format({
-    format: 2,
-    render: function (text) {
-        return terminal_render(text);
-    }
-})
-})(window.markdownit({
-    highlight: function (str, lang) {
-        if (lang && hljs.getLanguage(lang)) {
-            try {
-                return hljs.highlight(lang, str, true).value;
-            } catch (ex) {
-            }
-        }
-        return "";
-    }
-}).use(markdownit_katex));
-
-$(render_text.on_page);
-
-
-// list management, conflict management
-(function ($) {
-var cookie_set_at;
-function update_digest(info) {
-    var add = typeof info === "string" ? 1 : 0,
-        digests = wstorage.site_json(false, "list_digests") || [],
-        found = -1, now = now_msec();
-    for (var i = 0; i < digests.length; ++i) {
-        var digest = digests[i];
-        if (digest[add] === info)
-            found = i;
-        else if (digest[2] < now - 30000) {
-            digests.splice(i, 1);
-            --i;
-        } else if (now <= digest[0])
-            now = digest[0] + 1;
-    }
-    if (found >= 0)
-        digests[found][2] = now;
-    else if (add) {
-        digests.push([now, info, now]);
-        found = digests.length - 1;
-    }
-    wstorage.site(false, "list_digests", digests);
-    if (found >= 0)
-        return digests[found][1 - add];
-    else
-        return false;
-}
-function make_digest(info) {
-    var digest = update_digest(info);
-    return digest ? "list" + digest : info;
-}
-function resolve_digest(info) {
-    var xinfo, m;
-    if ((m = /^list(\d+)(?=\s|$)/.exec(info))
-        && (xinfo = update_digest(+m[1])))
-        return xinfo;
-    else
-        return info;
-}
-function set_prevnext(info, sitehref) {
-    var m = /(?:^|\/)(~[^\/]+)\/pset(?:|\.php)\/([^\/]+)((?:\/[0-9a-f]+)?)(?=[\/?#]|$)/.exec(sitehref), want1, want2;
-    if (m) {
-        info = JSON.parse(info);
-        if (!info.pset) {
-            want2 = m[1] + "/pset/" + m[2];
-            want1 = want2 + m[3];
-        } else if (info.pset === m[2]) {
-            want1 = want2 = m[1];
-        } else {
-            return "";
-        }
-        var idx = info.items.indexOf(want1);
-        if (idx < 0 && want2 !== want1)
-            idx = info.items.indexOf(want2);
-        if (idx >= 0) {
-            return " " + JSON.stringify({
-                cur: m[1] + "/pset/" + m[2],
-                prev: idx === 0 ? null : info.items[idx-1],
-                next: idx === info.items.length - 1 ? null : info.items[idx+1]
-            });
-        }
-    }
-    return "";
-}
-function set_cookie(info, sitehref) {
-    info = resolve_digest(info);
-    var digest = make_digest(info);
-    if (sitehref && /(?:^|\/)pset(?:|\.php)\//.test(sitehref))
-        digest += set_prevnext(info, sitehref);
-    cookie_set_at = now_msec();
-    var p = "; Max-Age=20", m;
-    if (siteinfo.site_relative && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base())))
-        p += "; Path=" + m[1];
-    document.cookie = "hotlist-info-" + cookie_set_at + "=" + encodeURIComponent(digest) + siteinfo.cookie_params + p;
-}
-function is_listable(sitehref) {
-    return /(?:^|\/)pset(?:|\.php)(?:$|\/)/.test(sitehref);
-}
-function find_hotlist(e) {
-    var hl, $hl;
-    if ((hl = e.closest(".has-hotlist")))
-        return hl;
-    else if (e.tagName === "FORM"
-             && ($hl = $(e).find(".has-hotlist")).length === 1)
-        return $hl[0];
-    else
-        return null;
-}
-function handle_list(e, href) {
-    var hl, sitehref;
-    if (href
-        && href.startsWith(siteinfo.site_relative)
-        && is_listable((sitehref = href.substring(siteinfo.site_relative.length)))
-        && (hl = e.closest(".has-hotlist"))) {
-        var info = hl.getAttribute("data-hotlist");
-        if (!info) {
-            var event = jQuery.Event("pa-hotlist");
-            $(hl).trigger(event);
-            info = event.hotlist;
-            if (info && typeof info !== "string")
-                info = JSON.stringify(info);
-        }
-        info && set_cookie(info, sitehref);
-    }
-}
-function unload_list() {
-    var hl = document.body.getAttribute("data-hotlist");
-    if (hl && (!cookie_set_at || cookie_set_at + 3 < now_msec()))
-        set_cookie(hl, location.href);
-}
-
-function default_click(evt) {
-    var base = location.href;
-    if (location.hash) {
-        base = base.substring(0, base.length - location.hash.length);
-    }
-    if (this.href.substring(0, base.length + 1) === base + "#") {
-        return true;
-    } else if (after_outstanding()) {
-        after_outstanding(make_link_callback(this));
-        return true;
-    } else {
-        return false;
-    }
-}
-
-$(document).on("click", "a", function (evt) {
-    if (!hasClass(this, "ui")) {
-        if (!event_key.is_default_a(evt)
-            || this.target
-            || !default_click.call(this, evt)) {
-            handle_list(this, this.getAttribute("href"));
-        }
-    }
-});
-
-$(document).on("submit", "form", function (evt) {
-    if (hasClass(this, "ui-submit")) {
-        handle_ui.call(this, evt);
-    } else {
-        handle_list(this, this.getAttribute("action"));
-    }
-});
-
-$(window).on("beforeunload", unload_list);
-
-$(function () {
-    // resolve list digests
-    $(".has-hotlist").each(function () {
-        var info = this.getAttribute("data-hotlist");
-        if (info && info.startsWith("list") && (info = resolve_digest(info))) {
-            this.setAttribute("data-hotlist", info);
-        }
-    });
-});
-
-})(jQuery);
-
 
 // mail
 function setmailpsel(sel) {
@@ -1425,16 +772,8 @@ function setmailpsel(sel) {
 }
 
 
-handle_ui.on("pa-show-viewoptions", function () {
-    fold61(this.nextSibling, this.parentNode);
-});
-
 handle_ui.on("pa-pset-upload-grades", function () {
     $("#upload").show();
-});
-
-handle_ui.on("pa-pset-setcommit", function () {
-    this.closest("form").submit();
 });
 
 handle_ui.on("pa-signin-radio", function (event) {
@@ -2738,20 +2077,6 @@ handle_ui.on("pa-notes-grade", function (event) {
 });
 
 
-handle_ui.on("pa-run-show", function () {
-    var parent = this.closest(".pa-runout"),
-        name = parent.id.substring(10),
-        therun = document.getElementById("pa-run-" + name),
-        thebutton;
-    if (therun.dataset.paTimestamp && !$(therun).is(":visible")) {
-        thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
-        run(thebutton, {unfold: true});
-    } else {
-        fold61(therun, jQuery("#pa-runout-" + name));
-    }
-});
-
-
 function pa_beforeunload(evt) {
     var ok = true;
     $(".pa-gw textarea").each(function () {
@@ -2763,89 +2088,30 @@ function pa_beforeunload(evt) {
         return (event.returnValue = "You have unsaved notes. You will lose them if you leave the page now.");
 }
 
-handle_ui.on("pa-pset-setgrader", function () {
-    var $form = $(this.closest("form"));
-    jQuery.ajax($form[0].getAttribute("action"), {
-        data: $form.serializeWith({}),
-        type: "POST", cache: false,
-        dataType: "json",
-        success: function (data) {
-            var a;
-            $form.find(".ajaxsave61").html(data.ok ? "Saved" : "<span class='error'>Error: " + data.error + "</span>");
-            if (data.ok && (a = $form.find("a.actas")).length)
-                a.attr("href", a.attr("href").replace(/actas=[^&;]+/, "actas=" + encodeURIComponent(data.grader_email)));
-        },
-        error: function () {
-            $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
-        }
-    });
-});
-
-handle_ui.on("pa-flag", function () {
-    var $b = $(this), $form = $b.closest("form");
-    if (this.name == "flag" && !$form.find("[name=flagreason]").length) {
-        $b.before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" /> &nbsp;</span>');
-        $form.find("[name=flagreason]").on("keypress", make_onkey("Enter", function () { $b.click(); })).autogrow()[0].focus();
-        $b.html("OK");
-    } else if (this.name == "flag") {
-        $.ajax($form.attr("action"), {
-            data: $form.serializeWith({flag: 1}),
-            type: "POST", cache: false,
-            dataType: "json",
-            success: function (data) {
-                if (data && data.ok) {
-                    $form.find(".flagreason").remove();
-                    $b.replaceWith("<strong>Flagged</strong>");
-                }
-            },
-            error: function () {
-                $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
-            }
-        });
-    } else if (this.name == "resolveflag") {
-        $.ajax($form.attr("action"), {
-            data: $form.serializeWith({resolveflag: 1, flagid: $b.attr("data-flagid")}),
-            type: "POST", cache: false,
-            dataType: "json",
-            success: function (data) {
-                if (data && data.ok)
-                    $b.replaceWith("<strong>Resolved</strong>");
-            },
-            error: function () {
-                $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
-            }
-        })
-    }
-});
-
-handle_ui.on("pa-runner", function () {
-    run(this);
-});
-
 function runmany61() {
-    var $manybutton = jQuery("#runmany61");
+    var $manybutton = $("#runmany61");
     var $f = $manybutton.closest("form");
     if (!$f.prop("unload61")) {
-        jQuery(window).on("beforeunload", function () {
-            if ($f.prop("outstanding") || jQuery("#runmany61_users").text())
+        $(window).on("beforeunload", function () {
+            if ($f.prop("outstanding") || $("#runmany61_users").text())
                 return "Several server requests are outstanding.";
         });
         $f.prop("unload61", "1");
     }
     if (!$f.prop("outstanding")) {
-        var users = jQuery("#runmany61_users").text().split(/[\s,;]+/);
+        var users = $("#runmany61_users").text().split(/[\s,;]+/);
         var user;
         while (!user && users.length)
             user = users.shift();
         if (!user) {
-            jQuery("#runmany61_who").text("<done>");
-            jQuery("#runmany61_users").text("");
+            $("#runmany61_who").text("<done>");
+            $("#runmany61_users").text("");
             return;
         }
-        jQuery("#runmany61_who").text(user);
+        $("#runmany61_who").text(user);
         $f.find("[name='u']").val(user);
-        jQuery("#runmany61_users").text(users.join(" "));
-        var $x = jQuery("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(user) + "/pset/" + $f.find("[name='pset']").val() + "\" class=\"q ansib ansifg7\"></a>");
+        $("#runmany61_users").text(users.join(" "));
+        var $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(user) + "/pset/" + $f.find("[name='pset']").val() + "\" class=\"q ansib ansifg7\"></a>");
         $x.text(user);
         run($manybutton[0], {noclear: true, headline: $x[0]});
     }
@@ -3299,7 +2565,7 @@ $(".pa-download-timed").each(function () {
 
 function pa_gradecdf() {
     var self = this, p = self.getAttribute("data-pa-pset");
-    jQuery.ajax(hoturl_post("api/gradestatistics", p ? {pset: p} : {}), {
+    $.ajax(hoturl_post("api/gradestatistics", p ? {pset: p} : {}), {
         type: "GET", cache: true, dataType: "json",
         success: function (d) {
             if (d.series && d.series.all) {
@@ -3315,7 +2581,7 @@ function pa_checklatest() {
 
     function checkdata(d) {
         if (d && d.hash && d.hash !== hash && (!d.snaphash || d.snaphash !== hash)) {
-            jQuery(".pa-commitcontainer .pa-pd").first().append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: peteramati_uservalue, pset: pset, commit: d.hash}) + "\">Load them</a></div>");
+            $(".pa-commitcontainer .pa-pd").first().append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: peteramati_uservalue, pset: pset, commit: d.hash}) + "\">Load them</a></div>");
             clearTimeout(timeout);
         }
     }
@@ -3330,14 +2596,14 @@ function pa_checklatest() {
             timeout = setTimeout(docheck, (now - start) * 1.25);
         else
             timeout = null;
-        jQuery.ajax(hoturl_post("api/latestcommit", {u: peteramati_uservalue, pset: pset}), {
+        $.ajax(hoturl_post("api/latestcommit", {u: peteramati_uservalue, pset: pset}), {
                 type: "GET", cache: false, dataType: "json", success: checkdata
             });
     }
 
-    pset = jQuery(".pa-commitcontainer").first().attr("data-pa-pset");
+    pset = $(".pa-commitcontainer").first().attr("data-pa-pset");
     if (pset) {
-        hash = jQuery(".pa-commitcontainer").first().attr("data-pa-commit");
+        hash = $(".pa-commitcontainer").first().attr("data-pa-commit");
         setTimeout(docheck, 2000);
     }
 }
@@ -4570,144 +3836,9 @@ function pa_render_pset_table(pconf, data) {
 }
 
 
-// autogrowing text areas; based on https://github.com/jaz303/jquery-grab-bag
-function textarea_shadow($self, width) {
-    return jQuery("<div></div>").css({
-        position:    'absolute',
-        top:         -10000,
-        left:        -10000,
-        width:       width || $self.width(),
-        fontSize:    $self.css('fontSize'),
-        fontFamily:  $self.css('fontFamily'),
-        fontWeight:  $self.css('fontWeight'),
-        lineHeight:  $self.css('lineHeight'),
-        resize:      'none',
-        'word-wrap': 'break-word',
-        whiteSpace:  'pre-wrap'
-    }).appendTo(document.body);
-}
-
-(function ($) {
-var autogrowers = null;
-function resizer() {
-    for (var i = autogrowers.length - 1; i >= 0; --i)
-        autogrowers[i]();
-}
-function remover($self, shadow) {
-    var f = $self.data("autogrower");
-    $self.removeData("autogrower");
-    shadow && shadow.remove();
-    for (var i = autogrowers.length - 1; i >= 0; --i)
-        if (autogrowers[i] === f) {
-            autogrowers[i] = autogrowers[autogrowers.length - 1];
-            autogrowers.pop();
-        }
-}
-function make_textarea_autogrower($self) {
-    var shadow, minHeight, lineHeight;
-    return function (event) {
-        if (event === false)
-            return remover($self, shadow);
-        var width = $self.width();
-        if (width <= 0)
-            return;
-        if (!shadow) {
-            shadow = textarea_shadow($self, width);
-            minHeight = $self.height();
-            lineHeight = shadow.text("!").height();
-        }
-
-        // Did enter get pressed?  Resize in this keydown event so that the flicker doesn't occur.
-        var val = $self[0].value;
-        if (event && event.type == "keydown" && event.keyCode === 13)
-            val += "\n";
-        shadow.css("width", width).text(val + "...");
-
-        var wh = Math.max($(window).height() - 4 * lineHeight, 4 * lineHeight);
-        $self.height(Math.min(wh, Math.max(shadow.height(), minHeight)));
-    };
-}
-function make_input_autogrower($self) {
-    var shadow;
-    return function (event) {
-        if (event === false) {
-            return remover($self, shadow);
-        }
-        var width = 0, ws;
-        try {
-            width = $self.outerWidth();
-        } catch (e) { // IE11 is annoying here
-        }
-        if (width <= 0) {
-            return;
-        }
-        if (!shadow) {
-            shadow = textarea_shadow($self, width);
-            var p = $self.css(["paddingRight", "paddingLeft", "borderLeftWidth", "borderRightWidth"]);
-            shadow.css({
-                width: "auto",
-                display: "table-cell",
-                paddingLeft: p.paddingLeft,
-                paddingLeft: (parseFloat(p.paddingRight) + parseFloat(p.paddingLeft) + parseFloat(p.borderLeftWidth) + parseFloat(p.borderRightWidth)) + "px"
-            });
-            ws = $self.css(["minWidth", "maxWidth"]);
-            if (ws.minWidth === "0px") {
-                $self.css("minWidth", width + "px");
-            }
-            if (ws.maxWidth === "none" && !$self.hasClass("wide")) {
-                $self.css("maxWidth", "640px");
-            }
-        }
-        shadow.text($self[0].value + "  ");
-        ws = $self.css(["minWidth", "maxWidth"]);
-        var outerWidth = Math.min(shadow.outerWidth(), $(window).width()),
-            maxWidth = parseFloat(ws.maxWidth);
-        if (maxWidth === maxWidth) { // i.e., isn't NaN
-            outerWidth = Math.min(outerWidth, maxWidth);
-        }
-        $self.outerWidth(Math.max(outerWidth, parseFloat(ws.minWidth)));
-    };
-}
-$.fn.autogrow = function () {
-    this.each(function () {
-        var $self = $(this), f = $self.data("autogrower");
-        removeClass(this, "need-autogrow");
-        if (!f) {
-            if (this.tagName === "TEXTAREA") {
-                f = make_textarea_autogrower($self);
-            } else if (this.tagName === "INPUT" && this.type === "text") {
-                f = make_input_autogrower($self);
-            }
-            if (f) {
-                $self.data("autogrower", f).on("change input", f);
-                if (!autogrowers) {
-                    autogrowers = [];
-                    $(window).resize(resizer);
-                }
-                autogrowers.push(f);
-            }
-        }
-        if (f && $self.val() !== "") {
-            f();
-        }
-    });
-    return this;
-};
-$.fn.unautogrow = function () {
-    this.each(function () {
-        var f = $(this).data("autogrower");
-        f && f(false);
-    });
-    return this;
-};
-})(jQuery);
-
-$(function () { $(".need-autogrow").autogrow(); });
-
 window.$pa = {
     beforeunload: pa_beforeunload,
     checklatest: pa_checklatest,
-    crpfocus: crpfocus, // XXX
     filediff_markdown: filediff_markdown,
     fold: fold,
     gradecdf: pa_gradecdf,

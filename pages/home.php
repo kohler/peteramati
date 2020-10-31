@@ -798,7 +798,7 @@ if ($Me->privChair)
 // Sidebar
 echo "<div class='homeside'>";
 echo "<noscript><div class='homeinside'>",
-    "<strong>HotCRP requires Javascript.</strong> ",
+    "<strong>Javascript required.</strong> ",
     "Many features will work without Javascript, but not all.<br />",
     "<a style='font-size:smaller' href='http://read.seas.harvard.edu/~kohler/hotcrp/'>Report bad compatibility problems</a></div></noscript>";
 echo "</div>\n";
@@ -862,36 +862,30 @@ if (($v = $Conf->setting_data("homemsg"))) {
 
 // Sign in
 if ($Me->is_empty() || isset($_REQUEST["signin"])) {
-    echo "<div class='homegrp'>
-This is the ", htmlspecialchars($Conf->long_name), " turnin site.
-Sign in to tell us about your code.";
+    echo '<div class="homegrp">',
+        'This is the ', htmlspecialchars($Conf->long_name), ' turnin site.
+Sign in to tell us about your code.';
     if ($Conf->opt("conferenceSite")) {
         echo " For general information about ", htmlspecialchars($Conf->short_name), ", see <a href=\"", htmlspecialchars($Conf->opt("conferenceSite")), "\">the conference site</a>.";
     }
     $passwordFocus = Ht::problem_status_at("email") === 0 && Ht::problem_status_at("password") !== 0;
     echo "</div>
 <hr class='home' />
-<div class='homegrp' id='homeacct'>\n",
+<div class='homegrp' id='homeaccount'>\n",
         Ht::form(hoturl_post("index")),
         "<div class='f-contain foldo fold2o' id='logingroup'>
 <input type='hidden' name='cookie' value='1' />
 <div class=\"", Ht::control_class("email", "f-ii"), "\">
   <div class=\"f-c\"><span class='fx2'>",
     ($Conf->opt("ldapLogin") ? "Username" : "Email/username"),
-    "</span><span class='fn2'>Email</span></div>
-  <div class=\"f-e\"><input",
-    ($passwordFocus ? "" : " id='login_d'"),
-    " type='text' class='textlite' name='email' size='36' tabindex='1' ";
-    if (isset($Qreq->email)) {
-        echo "value=\"", htmlspecialchars($Qreq->email), "\" ";
-    }
-    echo ">", Ht::render_feedback_at("email"), "</div>
+    "</span><span class='fn2'>Email</span></div><div class=\"f-e\">",
+    Ht::entry("email", $Qreq->email, ["size" => 36, "tabindex" => 1, "autofocus" => !$passwordFocus, "autocomplete" => "email"]),
+    Ht::render_feedback_at("email"), "</div>
 </div>
 <div class=\"", Ht::control_class("password", "f-i fx"), "\">
-  <div class=\"f-c\">Password</div>
-  <div class=\"f-e\"><input",
-        ($passwordFocus ? " id='login_d'" : ""),
-        " type='password' class='textlite' name='password' size='36' tabindex='1' value=''>", Ht::render_feedback_at("password"), "</div>
+  <div class=\"f-c\">Password</div><div class=\"f-e\">",
+    Ht::password("password", "", ["size" => 36, "tabindex" => 1, "autofocus" => $passwordFocus, "autocomplete" => "current-password"]),
+    Ht::render_feedback_at("password"), "</div>
 </div>\n";
     if ($Conf->opt("ldapLogin")) {
         echo "<input type='hidden' name='action' value='login' />\n";
@@ -904,12 +898,11 @@ Sign in to tell us about your code.";
         if (!$Conf->opt("disableNewUsers"))
             echo Ht::radio("action", "new", false, ["id" => "signin_action_new", "tabindex" => 2, "class" => "uic pa-signin-radio"]),
                 "&nbsp;", Ht::label("Create an account"), "<br />\n";
-        Ht::stash_script("jQuery('#homeacct input[name=action]:checked').click()");
+        Ht::stash_script("\$('#homeaccount input[name=action]:checked').click()");
         echo "\n</div>\n";
     }
     echo '<div class="f-i"><button class="btn btn-primary" type="submit" name="signin" id="signin" tabindex="1" value="1">Sign in</button></div></div></form>',
         '<hr class="home"></div>', "\n";
-    Ht::stash_script("\$pa.crpfocus(\"login\", null, 2)");
 }
 
 

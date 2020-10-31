@@ -2,6 +2,9 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
+import { log_jserror } from "./utils-errors.js";
+
+
 export function eval_function_path(x) {
     var l = 0, r = this.getTotalLength(), m, pt;
     if (l != r) {

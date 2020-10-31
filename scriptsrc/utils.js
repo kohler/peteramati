@@ -2,7 +2,6 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-// localStorage
 export let wstorage = function () { return false; };
 try {
     if (window.localStorage && window.JSON)
@@ -105,18 +104,19 @@ function pad(num, str, n) {
 }
 
 function unparse_q(d, alt, is24) {
-    if (is24 && alt && !d.getSeconds())
+    if (is24 && alt && !d.getSeconds()) {
         return strftime("%H:%M", d);
-    else if (is24)
+    } else if (is24) {
         return strftime("%H:%M:%S", d);
-    else if (alt && d.getSeconds())
+    } else if (alt && d.getSeconds()) {
         return strftime("%#l:%M:%S%P", d);
-    else if (alt && d.getMinutes())
+    } else if (alt && d.getMinutes()) {
         return strftime("%#l:%M%P", d);
-    else if (alt)
+    } else if (alt) {
         return strftime("%#l%P", d);
-    else
+    } else {
         return strftime("%I:%M:%S %p", d);
+    }
 }
 
 const unparsers = {
@@ -170,4 +170,60 @@ export function strftime(fmt, d) {
             t += word;
     }
     return t;
+}
+
+if (!window.JSON || !window.JSON.parse) {
+    window.JSON = {parse: $.parseJSON};
+}
+
+if (!Element.prototype.closest) {
+    Element.prototype.closest = function (s) {
+        return $(this).closest(s)[0];
+    };
+}
+
+if (!String.prototype.startsWith) {
+    String.prototype.startsWith = function (search, pos) {
+        pos = !pos || pos < 0 ? 0 : +pos;
+        return this.substring(pos, pos + search.length) === search;
+    };
+}
+
+if (!String.prototype.endsWith) {
+    String.prototype.endsWith = function (search, this_len) {
+        if (this_len === undefined || this_len > this.length) {
+            this_len = this.length;
+        }
+        return this.substring(this_len - search.length, this_len) === search;
+    };
+}
+
+if (!String.prototype.trimStart) {
+    String.prototype.trimStart = function () {
+        return this.replace(/^[\s\uFEFF\xA0]+/, '');
+    };
+}
+
+
+export class ImmediatePromise {
+    constructor(value) {
+        this.value = value;
+    }
+    then(executor) {
+        try {
+            return new ImmediatePromise(executor(this.value));
+        } catch (e) {
+            return Promise.reject(e);
+        }
+    }
+    catch(executor) {
+        return this;
+    }
+    finally(executor) {
+        try {
+            executor();
+        } catch (e) {
+        }
+        return this;
+    }
 }

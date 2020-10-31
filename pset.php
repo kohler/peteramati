@@ -368,7 +368,7 @@ function echo_commit($info) {
     } else {
         $key = "this commit";
     }
-    $value = Ht::select("newcommit", $sel, $info->commit_hash(), ["class" => "uich pa-pset-setcommit"]);
+    $value = Ht::select("newcommit", $sel, $info->commit_hash(), ["class" => "uich js-pset-setcommit"]);
     if ($info->pc_view) {
         $x = $info->is_grading_commit() ? "" : "font-weight:bold";
         $value .= " " . Ht::submit("grade", "Grade", array("style" => $x));
@@ -377,7 +377,7 @@ function echo_commit($info) {
     // view options
     $fold_viewoptions = !isset($Qreq->tab) && !isset($Qreq->wdiff);
     $value .= '<div class="pa-viewoptions">'
-        . '<a class="q ui pa-show-viewoptions" href="">'
+        . '<a class="q ui js-pset-viewoptions" href="">'
         . '<span class="foldarrow">'
         . ($fold_viewoptions ? '&#x25B6;' : '&#x25BC;')
         . '</span>&nbsp;options</a><span style="padding-left:1em"'
@@ -505,7 +505,7 @@ function echo_grader($info) {
             }
 
             $value = Ht::form($info->hoturl_post("pset", array("setgrader" => 1)))
-                . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", ["class" => "uich pa-pset-setgrader"]);
+                . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", ["class" => "uich js-pset-setgrader"]);
             $value_post = "<span class=\"ajaxsave61\"></span></div></form>";
         } else {
             if (isset($pcm[$gradercid])) {
@@ -578,7 +578,7 @@ function echo_all_grades($info) {
 function show_pset($info) {
     echo "<hr>\n";
     if ($info->pset->gitless_grades && $info->can_edit_grades_staff()) {
-        echo '<div style="float:right"><button type="button" class="ui pa-pset-upload-grades">upload</button></div>';
+        echo '<div style="float:right"><button type="button" class="ui js-pset-upload-grades">upload</button></div>';
     }
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);
@@ -673,13 +673,13 @@ if ($Pset->gitless) {
             }
             if (!$resolved) {
                 $x .= '<span style="display:inline-block;margin-left:1em">'
-                    . Ht::button("Resolve", ["name" => "resolveflag", "class" => "ui pa-flag", "data-flagid" => $k])
+                    . Ht::button("Resolve", ["name" => "resolveflag", "class" => "ui js-pset-flag", "data-flagid" => $k])
                     . '</span>';
             }
             $runnerbuttons[] = $x . "<br />";
         }
         if ($all_resolved) {
-            $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "class" => "ui pa-flag", "name" => "flag"]);
+            $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "class" => "ui js-pset-flag", "name" => "flag"]);
         }
     }
     if (!empty($runnerbuttons)) {

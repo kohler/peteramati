@@ -3,8 +3,8 @@
 // See LICENSE for open-source distribution terms
 
 import { wstorage, sprintf, strftime } from "./utils.js";
-import { hasClass, addClass, removeClass, fold61 } from "./ui.js";
-import { terminal_render } from "./run-terminal.js";
+import { hasClass, addClass, removeClass, fold61, handle_ui } from "./ui.js";
+import { render_terminal } from "./render-terminal.js";
 import { grades_fetch } from "./grades.js";
 
 export function run(button, opt) {
@@ -125,28 +125,33 @@ export function run(button, opt) {
     }
 
     function append(str) {
-        if (thexterm)
+        if (thexterm) {
             thexterm.write(str);
-        else
-            terminal_render(thepre[0], str, {cursor: true, directory: directory});
+        } else {
+            render_terminal(thepre[0], str, {cursor: true, directory: directory});
+        }
     }
 
     function append_html(html) {
-        if (typeof html === "string")
+        if (typeof html === "string") {
             html = $(html)[0];
+        }
         if (thexterm) {
-            if (window.console)
+            if (window.console) {
                 console.log("xterm.js cannot render " + html);
-        } else
-            terminal_render(thepre[0], html, {cursor: true});
+            }
+        } else {
+            render_terminal(thepre[0], html, {cursor: true});
+        }
     }
 
     function append_data(str, data) {
         if (ibuffer !== null) { // haven't started generating output
             ibuffer += str;
             var pos = ibuffer.indexOf("\n\n");
-            if (pos < 0)
+            if (pos < 0) {
                 return; // not ready yet
+            }
 
             str = ibuffer.substr(pos + 2);
             ibuffer = null;
@@ -157,31 +162,38 @@ export function run(button, opt) {
             }
 
             if (thexterm) {
-                if (tsmsg !== "")
+                if (tsmsg !== "") {
                     tsmsg = "\x1b[3;1;38;5;86m" + tsmsg + "\x1b[m\r\n";
-                if (!opt.noclear)
+                }
+                if (!opt.noclear) {
                     tsmsg = "\x1bc" + tsmsg;
+                }
                 str = tsmsg + str;
             } else {
-                if (!opt.noclear)
+                if (!opt.noclear) {
                     thepre.html("");
-                if (tsmsg !== "")
+                }
+                if (tsmsg !== "") {
                     append_html("<span class=\"pa-runtime\">" + tsmsg + "</span>");
+                }
             }
         }
-        if (str !== "")
+        if (str !== "") {
             append(str);
+        }
     }
 
     function parse_times(times) {
         var a = [0, 0], p = 0;
         while (p < times.length) {
             var c = times.indexOf(",", p);
-            if (c < 0)
+            if (c < 0) {
                 break;
+            }
             var n = times.indexOf("\n", c + 1);
-            if (n < 0)
+            if (n < 0) {
                 n = times.length;
+            }
             a.push(+times.substring(p, c), +times.substring(c + 1, n));
             p = n + 1;
         }
@@ -191,11 +203,13 @@ export function run(button, opt) {
     function append_timed(data, at_end) {
         var erange, etime, ebutton, espeed,
             tpos, tstart, tlast, timeout, running, factor;
-        if (times)
+        if (times) {
             return;
+        }
         times = data.time_data;
-        if (typeof times === "string")
+        if (typeof times === "string") {
             times = parse_times(times);
+        }
         factor = data.time_factor;
         if (times.length > 2) {
             erange = $('<div class="pa-runrange"><button type="button" class="pa-runrange-play"></button><input type="range" class="pa-runrange-range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span><span class="pa-runrange-speed-slow" title="Slow">🐢</span><input type="range" class="pa-runrange-speed" min="0.1" max="10" step="0.1"><span class="pa-runrange-speed-fast" title="Fast">🐇</span></div>').prependTo(therun);
@@ -232,12 +246,15 @@ export function run(button, opt) {
             }, false);
         }
         if ((tpos = wstorage.site_json(false, "pa-runspeed-" + category))
-            && tpos[1] >= (new Date).getTime() - 86400000)
+            && tpos[1] >= (new Date).getTime() - 86400000) {
             factor = tpos[0];
-        if (factor < 0.1 || factor > 10)
+        }
+        if (factor < 0.1 || factor > 10) {
             factor = 1;
-        if (espeed)
+        }
+        if (espeed) {
             espeed.value = factor;
+        }
         data = {data: data.data, timestamp: data.timestamp};
 
         function set_time() {
@@ -267,8 +284,9 @@ export function run(button, opt) {
                         npos = m + 2;
                 }
             }
-            while (npos < times.length && time >= times[npos])
+            while (npos < times.length && time >= times[npos]) {
                 npos += 2;
+            }
             tlast = time;
 
             if (npos < tpos) {
@@ -284,12 +302,13 @@ export function run(button, opt) {
             set_time();
 
             tpos = npos;
-            if (timeout)
+            if (timeout) {
                 timeout = clearTimeout(timeout);
+            }
             if (running) {
-                if (tpos < times.length)
+                if (tpos < times.length) {
                     timeout = setTimeout(f, Math.min(100, (times[tpos] - (tpos ? times[tpos - 2] : 0)) / factor), null);
-                else {
+                } else {
                     if (ebutton)
                         addClass(ebutton, "paused");
                     hide_cursor();
@@ -308,24 +327,27 @@ export function run(button, opt) {
             tlast = 0;
             tstart = (new Date).getTime();
             running = true;
-            if (times.length)
+            if (times.length) {
                 f(null);
+            }
         }
     }
 
     function succeed(data) {
         var x, t;
 
-        if (queueid)
+        if (queueid) {
             thepre.find("span.pa-runqueue").remove();
+        }
         if (data && data.onqueue) {
             queueid = data.queueid;
             t = "On queue, " + data.nahead + (data.nahead == 1 ? " job" : " jobs") + " ahead";
             if (data.headage) {
-                if (data.headage < 10)
+                if (data.headage < 10) {
                     x = data.headage;
-                else
+                } else {
                     x = Math.round(data.headage / 5 + 0.5) * 5;
+                }
                 t += ", oldest began about " + x + (x == 1 ? " second" : " seconds") + " ago";
             }
             thepre[0].insertBefore(($("<span class='pa-runqueue'>" + t + "</span>"))[0], thepre[0].lastChild);
@@ -334,23 +356,26 @@ export function run(button, opt) {
         }
 
         if (data && data.status == "working") {
-            if (!$("#pa-runstop-" + category).length)
+            if (!$("#pa-runstop-" + category).length) {
                 $("<button id=\"pa-runstop-" + category + "\" class=\"btn btn-danger pa-runstop\" type=\"button\">Stop</button>")
                     .click(stop).appendTo("#pa-runout-" + category + " > h3");
-        } else
+            }
+        } else {
             $("#pa-runstop-" + category).remove();
+        }
 
         if (!data || !data.ok) {
             x = "Unknown error";
             if (data && data.loggedout) {
                 x = "You have been logged out (perhaps due to inactivity). Please reload this page.";
             } else if (data) {
-                if (data.error_text)
+                if (data.error_text) {
                     x = data.error_text;
-                else if (data.error && data.error !== true)
+                } else if (data.error && data.error !== true) {
                     x = data.error;
-                else if (data.message)
+                } else if (data.message) {
                     x = data.message;
+                }
             }
             append("\x1b[1;3;31m" + x + "\x1b[m\r\n");
             scroll_therun();
@@ -358,8 +383,9 @@ export function run(button, opt) {
         }
 
         checkt = checkt || data.timestamp;
-        if (data.data && data.offset < offset)
+        if (data.data && data.offset < offset) {
             data.data = data.data.substring(offset - data.offset);
+        }
         if (data.data) {
             offset = data.lastoffset;
             if (data.done && data.time_data != null && ibuffer === "") {
@@ -372,34 +398,38 @@ export function run(button, opt) {
             backoff = 100;
         }
         if (data.result) {
-            if (ibuffer !== null)
+            if (ibuffer !== null) {
                 append_data("\n\n", data);
+            }
             append_data(data.result, data);
         }
         if (!data.data && !data.result)
             backoff = Math.min(backoff * 2, 500);
 
         scroll_therun();
-        if (data.status == "old")
+        if (data.status == "old") {
             setTimeout(send, 2000);
-        else if (!data.done)
+        } else if (!data.done) {
             setTimeout(send, backoff);
-        else {
+        } else {
             done();
-            if (data.timed && !hasClass(therun.firstChild, "pa-runrange"))
+            if (data.timed && !hasClass(therun.firstChild, "pa-runrange")) {
                 send({offset: 0}, succeed_add_times);
+            }
         }
     }
 
     function succeed_add_times(data) {
-        if (data.data && data.done && data.time_data != null)
+        if (data.data && data.done && data.time_data != null) {
             append_timed(data, true);
+        }
     }
 
     function send(args, success) {
         var a = {};
-        if (!$f[0].run)
+        if (!$f[0].run) {
             a.run = category;
+        }
         a.offset = offset;
         checkt && (a.check = checkt);
         queueid && (a.queueid = queueid);
@@ -423,17 +453,38 @@ export function run(button, opt) {
         send({write: value});
     }
 
-    if (opt.headline && opt.noclear && !thexterm && thepre[0].firstChild)
+    if (opt.headline && opt.noclear && !thexterm && thepre[0].firstChild) {
         append("\n\n");
-    if (opt.headline && opt.headline instanceof Node)
+    }
+    if (opt.headline && opt.headline instanceof Node) {
         append_html(opt.headline);
-    else if (opt.headline)
+    } else if (opt.headline) {
         append("\x1b[1;37m" + opt.headline + "\x1b[m\n");
-    if (opt.unfold && therun.getAttribute("data-pa-content"))
+    }
+    if (opt.unfold && therun.getAttribute("data-pa-content")) {
         append(therun.getAttribute("data-pa-content"));
+    }
     therun.removeAttribute("data-pa-content");
     scroll_therun();
 
     send();
     return false;
 }
+
+
+handle_ui.on("pa-runner", function () {
+    run(this);
+});
+
+handle_ui.on("pa-run-show", function () {
+    var parent = this.closest(".pa-runout"),
+        name = parent.id.substring(10),
+        therun = document.getElementById("pa-run-" + name),
+        thebutton;
+    if (therun.dataset.paTimestamp && !$(therun).is(":visible")) {
+        thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
+        run(thebutton, {unfold: true});
+    } else {
+        fold61(therun, jQuery("#pa-runout-" + name));
+    }
+});

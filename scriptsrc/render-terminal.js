@@ -1,10 +1,12 @@
-// run-terminal.js -- Peteramati JavaScript library
+// render-terminal.js -- Peteramati JavaScript library
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 import { html_id_encode } from "./encoders.js";
 import { sprintf } from "./utils.js";
 import { hasClass } from "./ui.js";
+import { render_text } from "./render.js";
+
 
 const styleset = {
     "0": false, "1": {b: true}, "2": {f: true}, "3": {i: true},
@@ -139,7 +141,7 @@ function filediff_find(file) {
     });
 }
 
-export function terminal_render(container, string, options) {
+export function render_terminal(container, string, options) {
     var return_html = false;
     if (typeof container === "string") {
         options = string;
@@ -295,8 +297,9 @@ export function terminal_render(container, string, options) {
     var lines, lastfull;
     if (typeof string === "string") {
         lines = string.split(/^/m);
-        if (lines.length && lines[lines.length - 1] === "")
+        if (lines.length && lines[lines.length - 1] === "") {
             lines.pop();
+        }
         lastfull = lines.length && ends_with(lines[lines.length - 1], "\n");
     } else {
         lines = [];
@@ -316,8 +319,9 @@ export function terminal_render(container, string, options) {
         && (string = node.getAttribute("data-pa-outputpart")) !== null
         && string !== ""
         && lines.length) {
-        while (node.firstChild)
+        while (node.firstChild) {
             node.removeChild(node.firstChild);
+        }
         lines[0] = string + lines[0];
         node.removeAttribute("data-pa-outputpart");
     } else {
@@ -332,18 +336,22 @@ export function terminal_render(container, string, options) {
     for (i = 0; i < lines.length; i = j) {
         laststyles = styles;
         last = lines[i];
-        for (j = i + 1; !ends_with(last, "\n") && j < lines.length; ++j)
+        for (j = i + 1; !ends_with(last, "\n") && j < lines.length; ++j) {
             last += lines[j];
-        if (j == lines.length && lastfull)
+        }
+        if (j == lines.length && lastfull) {
             last = last.substring(0, last.length - 1);
+        }
         render_line(last, i ? null : node);
     }
 
-    if (options && options.cursor && !container.lastChild && !fragment)
+    if (options && options.cursor && !container.lastChild && !fragment) {
         addfragment("");
+    }
 
-    if (fragment)
+    if (fragment) {
         container.appendChild(fragment);
+    }
 
     var len = container.childNodes.length;
     if (len >= 4000) {
@@ -382,11 +390,20 @@ export function terminal_render(container, string, options) {
         container.lastChild.setAttribute("data-pa-outputpart", last);
     }
 
-    if (styles != null)
+    if (styles != null) {
         container.setAttribute("data-pa-terminal-style", styles);
-    else
+    } else {
         container.removeAttribute("data-pa-terminal-style");
+    }
 
-    if (return_html)
+    if (return_html) {
         return container.innerHTML;
+    }
 }
+
+render_text.add_format({
+    format: 2,
+    render: function (text) {
+        return render_terminal(text);
+    }
+});

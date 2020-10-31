@@ -530,7 +530,7 @@ body#revpref table.pltable, body#accounts table.ppltable {
 	margin: 0.8em 0 0;
 }
 #homelist h4, #homerev h4, #homeau h4,
-#homeacct h4, #homeactivity h4 {
+#homeaccount h4, #homeactivity h4 {
 	display: inline;
 }
 #homelist h4 {
@@ -553,7 +553,7 @@ body#revpref table.pltable, body#accounts table.ppltable {
 	padding: 0.5em 1em 0.75em 0.75em;
 	margin: 0 0 0.5em 1em;
 }
-#homeacct {
+#homeaccount {
 	margin: 1em 0 0;
 }
 .homeside ul {
@@ -1025,7 +1025,7 @@ div.f-i:first-child {
 div.f-i:last-child {
 	margin-bottom: 0;
 }
-div#homeacct div.f-ii, div#homeacct div.f-i {
+div#homeaccount div.f-ii, div#homeaccount div.f-i {
 	clear: none;
 }
 div.f-ii {
