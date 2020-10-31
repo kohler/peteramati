@@ -106,6 +106,101 @@ export function linediff_find(filename, lineid) {
     return e;
 }
 
+// linediff_traverse(tr, down, flags)
+//    Find the diff line (pa-d[idc]) near `tr` in the direction of `down`.
+//    If `down === null`, look up *starting* from `tr`.
+//    Flags: 1 means stay within the current file; otherwise traverse
+//    between files. 2 means return all lines.
+export function linediff_traverse(tr, down, flags) {
+    tr = tr.closest(".pa-dl, .pa-dg, .pa-filediff");
+    var tref = tr ? tr.parentElement : null, direction;
+    if (down == null) {
+        down = false;
+        direction = "previousSibling";
+    } else {
+        direction = down ? "nextSibling" : "previousSibling";
+        if (hasClass(tr, "pa-dl")) {
+            tr = tr[direction];
+        }
+    }
+    while (true) {
+        while (!tr && tref) {
+            if ((flags & 1) && hasClass(tref, "pa-filediff")) {
+                return null;
+            }
+            tr = tref[direction];
+            tref = tref.parentElement;
+        }
+        if (!tr) {
+            return null;
+        } else if (tr.nodeType !== Node.ELEMENT_NODE) {
+            tr = tr[direction];
+        } else if (hasClass(tr, "pa-dl")
+                   && ((flags & 2) || / pa-g[idc]/.test(tr.className))
+                   && tr.offsetParent) {
+            return tr;
+        } else if (hasClass(tr, "pa-dg") || hasClass(tr, "pa-filediff")) {
+            tref = tr;
+            tr = tref[down ? "firstChild" : "lastChild"];
+        } else {
+            tr = tr[direction];
+        }
+    }
+}
+
+// linediff_locate(tr, down)
+//    Analyze a click on `tr`. Returns `null` if the target
+//    is a <textarea> or <a>.
+export function linediff_locate(tr, down) {
+    if (!tr
+        || tr.tagName === "TEXTAREA"
+        || tr.tagName === "A") {
+        return null;
+    }
+
+    var thisline = tr.closest(".pa-dl"),
+        nearline = linediff_traverse(tr, down, 1),
+        filediff;
+    if (!nearline || !(filediff = nearline.closest(".pa-filediff"))) {
+        return null;
+    }
+
+    var file = filediff.getAttribute("data-pa-file"),
+        result = {ufile: file, file: file, tr: nearline},
+        user = filediff.getAttribute("data-pa-file-user");
+    if (user) {
+        result.ufile = user + "-" + file;
+    }
+
+    var lm;
+    if (thisline
+        && (lm = thisline.getAttribute("data-landmark"))
+        && /^[ab]\d+$/.test(lm)) {
+        result[lm.charAt(0) + "line"] = +lm.substring(1);
+        result.lineid = lm;
+    } else {
+        result.aline = +nearline.firstChild.getAttribute("data-landmark");
+        result.bline = +nearline.firstChild.nextSibling.getAttribute("data-landmark");
+        result.lineid = result.bline ? "b" + result.bline : "a" + result.aline;
+    }
+
+    if (thisline && hasClass(thisline, "pa-gw")) {
+        result.notetr = thisline;
+    } else {
+        do {
+            nearline = nearline.nextSibling;
+        } while (nearline
+                 && (nearline.nodeType !== Node.ELEMENT_NODE
+                     || hasClass(nearline, "pa-gn")
+                     || !nearline.offsetParent));
+        if (nearline && hasClass(nearline, "pa-gw")) {
+            result.notetr = nearline;
+        }
+    }
+    return result;
+}
+
+
 handle_ui.on("pa-diff-unfold", function (evt) {
     if (evt.metaKey) {
         $(".pa-diff-unfold").each(function () {

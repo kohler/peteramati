@@ -16,8 +16,9 @@ import {
     escape_entities, unescape_entities, text_to_html
     } from "./encoders.js";
 import { Bubble, tooltip } from "./tooltip.js";
-import { linediff_find } from "./diff.js";
+import { linediff_find, linediff_traverse, linediff_locate } from "./diff.js";
 import { filediff_markdown } from "./diff-markdown.js";
+import "./diff-expand.js";
 import { run } from "./run.js";
 import { terminal_render } from "./run-terminal.js";
 import { run_settings_load } from "./run-settings.js";
@@ -1455,100 +1456,6 @@ handle_ui.on("pa-signin-radio", function (event) {
 });
 
 
-// pa_diff_traverse(tr, down, flags)
-//    Find the diff line (pa-d[idc]) near `tr` in the direction of `down`.
-//    If `down === null`, look up *starting* from `tr`.
-//    Flags: 1 means stay within the current file; otherwise traverse
-//    between files. 2 means return all lines.
-function pa_diff_traverse(tr, down, flags) {
-    tr = tr.closest(".pa-dl, .pa-dg, .pa-filediff");
-    var tref = tr ? tr.parentElement : null, direction;
-    if (down == null) {
-        down = false;
-        direction = "previousSibling";
-    } else {
-        direction = down ? "nextSibling" : "previousSibling";
-        if (hasClass(tr, "pa-dl")) {
-            tr = tr[direction];
-        }
-    }
-    while (true) {
-        while (!tr && tref) {
-            if ((flags & 1) && hasClass(tref, "pa-filediff")) {
-                return null;
-            }
-            tr = tref[direction];
-            tref = tref.parentElement;
-        }
-        if (!tr) {
-            return null;
-        } else if (tr.nodeType !== Node.ELEMENT_NODE) {
-            tr = tr[direction];
-        } else if (hasClass(tr, "pa-dl")
-                   && ((flags & 2) || / pa-g[idc]/.test(tr.className))
-                   && tr.offsetParent) {
-            return tr;
-        } else if (hasClass(tr, "pa-dg") || hasClass(tr, "pa-filediff")) {
-            tref = tr;
-            tr = tref[down ? "firstChild" : "lastChild"];
-        } else {
-            tr = tr[direction];
-        }
-    }
-}
-
-// pa_diff_locate(tr, down)
-//    Analyze a click on `tr`. Returns `null` if the target
-//    is a <textarea> or <a>.
-function pa_diff_locate(tr, down) {
-    if (!tr
-        || tr.tagName === "TEXTAREA"
-        || tr.tagName === "A") {
-        return null;
-    }
-
-    var thisline = tr.closest(".pa-dl"),
-        nearline = pa_diff_traverse(tr, down, 1),
-        filediff;
-    if (!nearline || !(filediff = nearline.closest(".pa-filediff"))) {
-        return null;
-    }
-
-    var file = filediff.getAttribute("data-pa-file"),
-        result = {ufile: file, file: file, tr: nearline},
-        user = filediff.getAttribute("data-pa-file-user");
-    if (user) {
-        result.ufile = user + "-" + file;
-    }
-
-    var lm;
-    if (thisline
-        && (lm = thisline.getAttribute("data-landmark"))
-        && /^[ab]\d+$/.test(lm)) {
-        result[lm.charAt(0) + "line"] = +lm.substring(1);
-        result.lineid = lm;
-    } else {
-        result.aline = +nearline.firstChild.getAttribute("data-landmark");
-        result.bline = +nearline.firstChild.nextSibling.getAttribute("data-landmark");
-        result.lineid = result.bline ? "b" + result.bline : "a" + result.aline;
-    }
-
-    if (thisline && hasClass(thisline, "pa-gw")) {
-        result.notetr = thisline;
-    } else {
-        do {
-            nearline = nearline.nextSibling;
-        } while (nearline
-                 && (nearline.nodeType !== Node.ELEMENT_NODE
-                     || hasClass(nearline, "pa-gn")
-                     || !nearline.offsetParent));
-        if (nearline && hasClass(nearline, "pa-gw")) {
-            result.notetr = nearline;
-        }
-    }
-    return result;
-}
-
 function pa_note(elt) {
     var note = elt.getAttribute("data-pa-note");
     if (typeof note === "string" && note !== "") {
@@ -1574,7 +1481,7 @@ function pa_fix_note_links() {
     }
 
     function note_anchor(tr) {
-        var anal = pa_diff_locate(tr), td;
+        var anal = linediff_locate(tr), td;
         if (anal && (td = linediff_find(anal.ufile, anal.lineid))) {
             return "#" + td.id;
         } else {
@@ -1632,7 +1539,7 @@ function pa_render_note(note, transition) {
         }
         $tr = $('<div class="pa-dl pa-gw"><div class="pa-notebox"></div></div>').insertAfter(tr);
         tr = $tr[0];
-        var tp = pa_diff_traverse(tr, false, 1), lineid, e, lm, dash;
+        var tp = linediff_traverse(tr, false, 1), lineid, e, lm, dash;
         if (tp) {
             if (hasClass(tp, "pa-gd")) {
                 lineid = "a" + tp.firstChild.getAttribute("data-landmark");
@@ -1801,13 +1708,13 @@ function arrowcapture(evt) {
     }
     if (key === "ArrowDown" || key === "ArrowUp") {
         removeClass(tr, "live");
-        tr = pa_diff_traverse(tr, key === "ArrowDown", 0);
+        tr = linediff_traverse(tr, key === "ArrowDown", 0);
         if (!tr) {
             return;
         }
     }
 
-    curanal = pa_diff_locate(tr);
+    curanal = linediff_locate(tr);
     evt.preventDefault();
     set_scrolled_at(evt);
     if (key === "Enter") {
@@ -1881,7 +1788,7 @@ var pa_save_note = function (text) {
         pi = table.closest(".pa-psetinfo"),
         grb = this.closest(".pa-grade-range-block"),
         file = table.getAttribute("data-pa-file"),
-        tr = pa_diff_traverse(this, false, 1),
+        tr = linediff_traverse(this, false, 1),
         data, lineid;
     if (this.hasAttribute("data-landmark")) {
         lineid = this.getAttribute("data-landmark");
@@ -1966,7 +1873,7 @@ function pa_linenote(event) {
         || dl.matches(".pa-gn, .pa-gx")) {
         return;
     }
-    var anal = pa_diff_locate(event.target),
+    var anal = linediff_locate(event.target),
         t = now_msec();
     if (event.type === "mousedown" && anal) {
         if (curanal
@@ -2025,49 +1932,6 @@ handle_ui.on("pa-editablenotes", pa_linenote);
 
 })($);
 
-
-// pa_expandcontext
-(function ($) {
-
-function expand(evt) {
-    var contextrow = evt.currentTarget;
-    var panal = pa_diff_locate(contextrow, false);
-    while (panal && !panal.bline) {
-        panal = pa_diff_locate(panal.tr, false);
-    }
-    var nanal = pa_diff_locate(contextrow, true);
-    if (!panal && !nanal) {
-        return;
-    }
-    var paline = panal ? panal.aline + 1 : 1;
-    var pbline = panal ? panal.bline + 1 : 1;
-    var lbline = nanal ? nanal.bline : 0;
-    if (nanal && nanal.aline <= 1) {
-        return;
-    }
-    var args = {file: (panal || nanal).file, fromline: pbline};
-    if (lbline) {
-        args.linecount = lbline - pbline;
-    }
-    $.ajax(hoturl("api/blob", hoturl_gradeparts(this, args)), {
-        success: function (data) {
-            if (data.ok && data.data) {
-                var lines = data.data.replace(/\n$/, "").split("\n");
-                for (var i = lines.length - 1; i >= 0; --i) {
-                    var t = '<div class="pa-dl pa-gc"><div class="pa-da" data-landmark="' +
-                        (paline + i) + '"></div><div class="pa-db" data-landmark="' +
-                        (pbline + i) + '"></div><div class="pa-dd"></div></div>';
-                    $(t).insertAfter(contextrow).find(".pa-dd").text(lines[i]);
-                }
-                $(contextrow).remove();
-            }
-        }
-    });
-    return true;
-}
-
-handle_ui.on("pa-gx", expand);
-})($);
 
 /*
 var pa_observe_diff = (function () {
@@ -2758,7 +2622,7 @@ function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
         lnfirst = +m[1];
         lnlast = +m[2];
     }
-    while ((tr = pa_diff_traverse(tr, true, 3))) {
+    while ((tr = linediff_traverse(tr, true, 3))) {
         var td = tr.firstChild;
         if (td.hasAttribute("data-landmark")) {
             lna = +td.getAttribute("data-landmark");
