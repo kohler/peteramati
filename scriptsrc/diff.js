@@ -84,14 +84,15 @@ function linediff_find_promise(filename, lineid) {
             for (let i = 0; i < $tds.length; ++i) {
                 if ($tds[i].getAttribute("data-landmark") === lineno) {
                     $tds[i].id = lineref;
-                    return $tds[i].id;
+                    return $tds[i];
                 }
             }
             // XXX missing: expand context lines
             // look for absent line with present linenote
             const $dls = $(filee).find(".pa-dl[data-landmark='" + lineid + "']");
-            if ($dls.length)
+            if ($dls.length) {
                 return $dls[0];
+            }
             // give up
             throw null;
         });

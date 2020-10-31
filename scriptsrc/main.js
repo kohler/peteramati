@@ -1006,8 +1006,9 @@ function render_form($tr, note, transition) {
 function anal_tr() {
     var elt;
     if (curanal && (elt = linediff_find(curanal.ufile, curanal.lineid))) {
-        for (elt = elt.closest(".pa-dl"); elt && !elt.offsetParent; )
+        for (elt = elt.closest(".pa-dl"); elt && !elt.offsetParent; ) {
             elt = elt.previousSibling;
+        }
         return elt;
     } else {
         return null;
