@@ -2,6 +2,9 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
+import { removeClass } from "./ui.js";
+
+
 // based on https://github.com/jaz303/jquery-grab-bag
 let autogrowers = null;
 

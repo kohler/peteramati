@@ -102,7 +102,7 @@ function linediff_find_promise(filename, lineid) {
 
 export function linediff_find(filename, lineid) {
     var e = null;
-    linediff_find_promise(filename, lineid).then(ee => e = ee, null);
+    linediff_find_promise(filename, lineid).then((ee => e = ee), null);
     return e;
 }
 

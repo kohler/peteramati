@@ -2,9 +2,6 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { log_jserror } from "./utils-errors.js";
-
-
 function serialize_object(x) {
     if (typeof x === "string")
         return x;
@@ -61,7 +58,6 @@ export function hoturl(page, options) {
     var k, v, t, a, m, x, anchor = "", want_forceShow;
     if (siteinfo.site_relative == null || siteinfo.suffix == null) {
         siteinfo.site_relative = siteinfo.suffix = "";
-        log_jserror("missing siteinfo");
     }
 
     x = {pt: "", t: page + siteinfo.suffix};
