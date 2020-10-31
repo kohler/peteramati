@@ -4,15 +4,20 @@
 // See LICENSE for open-source distribution terms
 
 class GitHubResponse implements JsonSerializable {
+    /** @var string */
     public $url;
+    /** @var int */
     public $status = 509;
+    /** @var string */
     public $status_text;
+    /** @var array<string,string> */
     public $headers = [];
+    /** @var ?string */
     public $content;
+    /** @var mixed */
     public $j;
     function __construct($url) {
         $this->url = $url;
-        $this->siteclass = "github";
     }
     function jsonSerialize() {
         return $this->j ?? ["status" => $this->status, "content" => $this->content];
@@ -63,13 +68,14 @@ class GitHubResponse implements JsonSerializable {
 }
 
 class GitHub_RepositorySite extends RepositorySite {
+    /** @var Conf */
     public $conf;
     public $base;
-    public $siteclass = "github";
     function __construct($url, $base, Conf $conf) {
         $this->url = $url;
         $this->base = $base;
         $this->conf = $conf;
+        $this->siteclass = "github";
     }
 
     const MAINURL = "https://github.com/";
@@ -114,7 +120,7 @@ class GitHub_RepositorySite extends RepositorySite {
         global $Me;
         if (!$first && !$user->github_username)
             return;
-        echo Ht::form(hoturl_post("index", array("set_username" => 1, "u" => $Me->user_linkpart($user), "reposite" => "github"))),
+        echo Ht::form($user->conf->hoturl_post("index", array("set_username" => 1, "u" => $Me->user_linkpart($user), "reposite" => "github"))),
             '<div class="f-contain">';
         $notes = array();
         if (!$user->github_username)

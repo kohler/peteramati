@@ -989,11 +989,23 @@ function show_pset($pset, $user) {
         htmlspecialchars($pset->title), "</a>";
     $info = PsetView::make($pset, $user, $Me);
     $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
-    $user_see_grade = $info->user_can_view_grades();
-    if ($user_see_grade && $info->has_nonempty_assigned_grades()) {
-        echo ' <a class="gradesready" href="', $pseturl, '">(grade ready)</a>';
+    if (($user_see_grade = $info->user_can_view_grades())) {
+        $x = [];
+        $c = null;
+        if ($info->needs_student_grades()) {
+            $x[] = "data missing";
+            $c = "gradesmissing";
+        }
+        if ($info->has_nonempty_assigned_grades()) {
+            $x[] = "grade ready";
+            $c = "gradesready";
+        }
+        if ($x) {
+            echo ' <a class="', $c, '" href="', $pseturl, '">(', join(", ", $x), ')</a>';
+        }
     }
-    echo "</a></h2>";
+    echo "</h2>";
+    ContactView::echo_deadline_group($info);
     ContactView::echo_partner_group($info);
     ContactView::echo_repo_group($info);
     if ($info->repo) {

@@ -44,6 +44,8 @@ class PsetView {
     /** @var ?int */
     private $n_visible_in_total;
     /** @var ?int */
+    private $n_student_grades;
+    /** @var ?int */
     private $n_nonempty_grades;
     /** @var ?int */
     private $n_nonempty_assigned_grades;
@@ -134,10 +136,19 @@ class PsetView {
         return null;
     }
 
+    /** @param ?int $n */
+    private function set_grade_counts($n) {
+        $this->n_visible_grades = $n;
+        $this->n_visible_in_total = $n;
+        $this->n_student_grades = $n;
+        $this->n_nonempty_grades = $n;
+        $this->n_nonempty_assigned_grades = $n;
+    }
+
     function set_hash($reqhash) {
         $this->hash = false;
         $this->commit_record = $this->commit_notes = $this->derived_handout_commit = $this->tabwidth = false;
-        $this->n_visible_grades = $this->n_visible_in_total = $this->n_nonempty_grades = $this->n_nonempty_assigned_grades = null;
+        $this->set_grade_counts(null);
         if (!$this->repo) {
             return false;
         }
@@ -529,7 +540,7 @@ class PsetView {
             && !($this->grade_notes->gradercid ?? null)) {
             $this->update_commit_info_at($this->grade->gradehash, ["gradercid" => $this->grade->gradercid]);
         }
-        $this->n_visible_grades = $this->n_visible_in_total = $this->n_nonempty_grades = $this->n_nonempty_assigned_grades = null;
+        $this->set_grade_counts(null);
     }
 
     private function load_contact_grade() {
@@ -725,13 +736,18 @@ class PsetView {
 
     private function ensure_n_visible_grades() {
         if ($this->n_visible_grades === null) {
-            $this->n_visible_grades = $this->n_visible_in_total = $this->n_nonempty_grades = $this->n_nonempty_assigned_grades = 0;
-            if ($this->can_view_grades() && $this->ensure_grade()) {
+            $can_view = $this->can_view_grades();
+            $can_view && $this->ensure_grade();
+            $this->set_grade_counts(0);
+            if ($can_view) {
                 $notes = $this->current_info();
                 $ag = $notes->autogrades ?? null;
                 $g = $notes->grades ?? null;
                 foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
                     ++$this->n_visible_grades;
+                    if ($ge->student) {
+                        ++$this->n_student_grades;
+                    }
                     if (($ag && ($ag->{$ge->key} ?? null) !== null)
                         || ($g && ($g->{$ge->key} ?? null) !== null)) {
                         ++$this->n_nonempty_grades;
@@ -757,6 +773,14 @@ class PsetView {
     function has_nonempty_assigned_grades() {
         $this->ensure_n_visible_grades();
         return $this->n_nonempty_assigned_grades !== 0;
+    }
+
+    /** @return bool */
+    function needs_student_grades()  {
+        $this->ensure_n_visible_grades();
+        return $this->n_student_grades !== 0
+            && ($this->n_nonempty_grades === 0
+                || $this->n_nonempty_grades === $this->n_nonempty_assigned_grades);
     }
 
     /** @return bool */
@@ -789,6 +813,7 @@ class PsetView {
         return [$total, $this->pset->grades_total ?? $maxtotal, $total_noextra];
     }
 
+    /** @return int */
     function gradercid() {
         $this->ensure_grade();
         if ($this->pset->gitless_grades) {
@@ -797,10 +822,11 @@ class PsetView {
                    && $this->hash === $this->repo_grade->gradehash) {
             return $this->repo_grade->gradercid;
         } else {
-            return $this->commit_info("gradercid") ? : 0;
+            return $this->commit_info("gradercid") ?? 0;
         }
     }
 
+    /** @return bool */
     function can_edit_line_note($file, $lineid) {
         return $this->pc_view;
     }
@@ -866,16 +892,21 @@ class PsetView {
         return $grade;
     }
 
+    /** @return null|int|float */
+    function deadline() {
+        if (!$this->user->extension && $this->pset->deadline_college) {
+            return $this->pset->deadline_college;
+        } else if ($this->user->extension && $this->pset->deadline_extension) {
+            return $this->pset->deadline_extension;
+        } else {
+            return $this->pset->deadline;
+        }
+    }
+
     function late_hours_data() {
         $cinfo = $this->current_info();
 
-        $deadline = $this->pset->deadline;
-        if (!$this->user->extension && $this->pset->deadline_college) {
-            $deadline = $this->pset->deadline_college;
-        } else if ($this->user->extension && $this->pset->deadline_extension) {
-            $deadline = $this->pset->deadline_extension;
-        }
-        if (!$deadline) {
+        if (!($deadline = $this->deadline())) {
             return null;
         }
 
@@ -1179,11 +1210,11 @@ class PsetView {
     }
 
     function hoturl($base, $args = null) {
-        return hoturl($base, $this->hoturl_args($args));
+        return $this->conf->hoturl($base, $this->hoturl_args($args));
     }
 
     function hoturl_post($base, $args = null) {
-        return hoturl_post($base, $this->hoturl_args($args));
+        return $this->conf->hoturl_post($base, $this->hoturl_args($args));
     }
 
 

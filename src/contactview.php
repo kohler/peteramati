@@ -175,60 +175,76 @@ class ContactView {
         echo "</div></div>\n";
     }
 
+    static function echo_deadline_group(PsetView $info) {
+        if (($dl = $info->deadline()) && $dl > Conf::$now) {
+            self::echo_group("deadline", $info->conf->unparse_time($dl));
+        }
+    }
+
     static function echo_partner_group(PsetView $info) {
         global $Conf, $Me;
         list($user, $pset, $partner) =
             array($info->user, $info->pset, $info->partner);
-        if (!$pset->partner)
+        if (!$pset->partner) {
             return;
+        }
 
         // collect values
         $partner_email = "";
-        if ($user->is_anonymous && $partner)
+        if ($user->is_anonymous && $partner) {
             $partner_email = $partner->anon_username;
-        else if ($partner)
+        } else if ($partner) {
             $partner_email = $partner->email;
+        }
         $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
 
         $title = "partner";
-        if ($Me->isPC && $partner)
+        if ($Me->isPC && $partner) {
             $title = '<a href="' . hoturl("pset", ["u" => $Me->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->maybe_commit_hash()]) . '">' . $title . '</a>';
+        }
 
-        if ($editable)
+        if ($editable) {
             $value = Ht::entry("partner", $partner_email, array("style" => "width:32em"))
                 . " " . Ht::submit("Save");
-        else
+        } else {
             $value = htmlspecialchars($partner_email ? : "(none)");
+        }
 
         // check back-partner links
         $notes = array();
         $backpartners = $info->backpartners();
-        if (count($backpartners) == 0 && $partner)
+        if (count($backpartners) == 0 && $partner) {
             $notes[] = array(true, "ERROR: " . htmlspecialchars($partner_email) . " has not listed you as a partner yet.");
-        else if (count($backpartners) == 1 && $partner && $backpartners[0] == $partner->contactId) {
-            if ($partner->dropped)
+        } else if (count($backpartners) == 1 && $partner && $backpartners[0] == $partner->contactId) {
+            if ($partner->dropped) {
                 $notes[] = array(true, "ERROR: We believe your partner has dropped the course.");
+            }
         } else if (count($backpartners) == 0 && !$partner) {
-            if ($editable)
+            if ($editable) {
                 $notes[] = array(false, "Enter your partner’s email, username, or HUID here.");
+            }
         } else {
             $backpartners[] = -1;
             $result = $Conf->qe("select " . ($user->is_anonymous ? "anon_username" : "email") . " from ContactInfo where contactId ?a", $backpartners);
             $p = array();
-            while (($row = $result->fetch_row()))
-                if ($Me->isPC)
+            while (($row = $result->fetch_row())) {
+                if ($Me->isPC) {
                     $p[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $row[0])) . '">' . htmlspecialchars($row[0]) . '</a>';
-                else
+                } else {
                     $p[] = htmlspecialchars($row[0]);
+                }
+            }
             $notes[] = array(true, "ERROR: These users have listed you as a partner for this pset: " . commajoin($p));
         }
 
-        if ($editable)
+        if ($editable) {
             echo Ht::form($Conf->selfurl(null, ["set_partner" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 "<div class='f-contain'>";
+        }
         self::echo_group($title, $value, $notes);
-        if ($editable)
+        if ($editable) {
             echo "</div></form>";
+        }
         echo "\n";
     }
 
@@ -236,12 +252,15 @@ class ContactView {
         global $Conf, $Me;
         if (!($Me->has_account_here()
               && $qreq->post_ok()
-              && ($pset = $Conf->pset_by_key($qreq->pset))))
+              && ($pset = $Conf->pset_by_key($qreq->pset)))) {
             return;
-        if (!$Me->can_set_repo($pset, $user))
+        }
+        if (!$Me->can_set_repo($pset, $user)) {
             return $Conf->errorMsg("You can’t edit repository information for that problem set now.");
-        if ($user->set_partner($pset, $_REQUEST["partner"]))
+        }
+        if ($user->set_partner($pset, $_REQUEST["partner"])) {
             redirectSelf();
+        }
     }
 
     static function echo_repo_group(PsetView $info, $full = false) {
@@ -254,10 +273,12 @@ class ContactView {
 
         $repo_url = $repo ? $repo->friendly_url() : "";
         $title = "repository";
-        if (!RepositorySite::is_primary($repo))
+        if (!RepositorySite::is_primary($repo)) {
             $title = $repo->reposite->friendly_siteclass() . " " . $title;
-        if ($repo && $repo->url)
+        }
+        if ($repo && $repo->url) {
             $title = $user->link_repo($title, $repo->https_url());
+        }
 
         if ($editable) {
             $xvalue = $repo_url;
@@ -270,16 +291,18 @@ class ContactView {
                 $js["class"] = "error";
             }
             $value = Ht::entry("repo", $xvalue, $js) . " " . Ht::submit("Save");
-        } else if ($user->is_anonymous)
+        } else if ($user->is_anonymous) {
             $value = $repo_url ? "[anonymous]" : "(none)";
-        else
+        } else {
             $value = htmlspecialchars($repo_url ? $repo_url : "(none)");
+        }
         if ($repo_url) {
             $value .= ' <button class="btn ui js-repo-copy need-tooltip" data-pa-repo="' . htmlspecialchars($repo->ssh_url()) . '"';
-            if ($user->is_anonymous)
+            if ($user->is_anonymous) {
                 $value .= ' data-tooltip="[anonymous]"';
-            else
+            } else {
                 $value .= ' data-tooltip="' . htmlspecialchars($repo->ssh_url()) . '"';
+            }
             $value .= ' type="button">Copy URL to clipboard</button>';
         }
 
@@ -294,15 +317,17 @@ class ContactView {
             $prepo = $partner->repo($pset->id);
             if ((!$repo && $prepo) || ($repo && !$prepo)
                 || ($repo && $prepo && $repo->repoid != $prepo->repoid)) {
-                if ($prepo && $repo)
+                if ($prepo && $repo) {
                     $prepo_url = ", " . htmlspecialchars($prepo->friendly_url_like($repo));
-                else if ($prepo)
+                } else if ($prepo) {
                     $prepo_url = ", " . htmlspecialchars($prepo->friendly_url());
-                else
+                } else {
                     $prepo_url = "";
+                }
                 $your_partner = "your partner’s";
-                if ($Me->isPC)
+                if ($Me->isPC) {
                     $your_partner = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $Me->user_linkpart($partner))) . '">' . $your_partner . '</a>';
+                }
                 $ms->error_at("partner", "This repository differs from $your_partner$prepo_url.");
             }
         }
@@ -321,20 +346,24 @@ class ContactView {
         if (!$repo) {
             $repoclasses = RepositorySite::site_classes($Conf);
             $x = commajoin(array_map(function ($k) { return Ht::link($k::global_friendly_siteclass(), $k::global_friendly_siteurl()); }, $repoclasses), "or");
-            if ($editable)
+            if ($editable) {
                 $notes[] = array(false, "Enter your $x repository URL here.");
+            }
         }
 
         // edit
-        if ($editable)
+        if ($editable) {
             echo Ht::form($Conf->selfurl(null, ["set_repo" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 '<div class="f-contain">';
+        }
         self::echo_group($title, $value, $notes);
-        if ($editable)
+        if ($editable) {
             echo "</div></form>\n";
+        }
 
-        if (!$pset->no_branch)
+        if (!$pset->no_branch) {
             self::echo_branch_group($info);
+        }
 
         return $repo;
     }

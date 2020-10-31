@@ -39,7 +39,7 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
         global $Me;
         if (!$first && !$user->seascode_username)
             return;
-        echo Ht::form(hoturl_post("index", array("set_username" => 1, "u" => $Me->user_linkpart($user), "reposite" => "harvardseas"))),
+        echo Ht::form($user->conf->hoturl_post("index", array("set_username" => 1, "u" => $Me->user_linkpart($user), "reposite" => "harvardseas"))),
             '<div class="f-contain">';
         $notes = array();
         if (!$user->seascode_username)

@@ -2658,6 +2658,10 @@ table.hidegrades .pa-gradenote {
 	color: #009900;
 	text-decoration: none;
 }
+.gradesmissing {
+	color: #990000;
+	text-decoration: none;
+}
 .pa-note-links, .pa-note-aa, .pa-note-author {
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
 		"Helvetica Neue", Arial, sans-serif,

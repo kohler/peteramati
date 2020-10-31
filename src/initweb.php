@@ -19,8 +19,9 @@ if ($_SERVER["REQUEST_METHOD"] !== "GET"
 $Qreq = make_qreq();
 
 // Check for redirect to https
-if (get($Opt, "redirectToHttps"))
-    Navigation::redirect_http_to_https(get($Opt, "allowLocalHttp"));
+if ($Opt["redirectToHttps"] ?? false) {
+    Navigation::redirect_http_to_https($Opt["allowLocalHttp"] ?? false);
+}
 
 // Check and fix zlib output compression
 global $zlib_output_compression;
@@ -44,14 +45,15 @@ if ($Me === false)
 // Initialize user
 function initialize_user() {
     global $Conf, $Me, $Qreq;
+    $conf = Conf::$main;
 
     // set up session
-    if (isset($Conf->opt["sessionHandler"])) {
-        $sh = $Conf->opt["sessionHandler"];
-        $Conf->_session_handler = new $sh($Conf);
-        session_set_save_handler($Conf->_session_handler, true);
+    if (($sh = $conf->opt["sessionHandler"] ?? null)) {
+        /** @phan-suppress-next-line PhanTypeExpectedObjectOrClassName, PhanNonClassMethodCall */
+        $conf->_session_handler = new $sh($conf);
+        session_set_save_handler($conf->_session_handler, true);
     }
-    set_session_name($Conf);
+    set_session_name($conf);
     $sn = session_name();
 
     // check CSRF token, using old value of session ID
@@ -80,7 +82,7 @@ function initialize_user() {
     // look up and activate user
     $Me = null;
     if ($trueemail) {
-        $Me = $Conf->user_by_email($trueemail);
+        $Me = $conf->user_by_email($trueemail);
     }
     if (!$Me) {
         $Me = new Contact($trueemail ? (object) ["email" => $trueemail] : null);
@@ -92,7 +94,7 @@ function initialize_user() {
         if ($nav->page === "api") {
             json_exit(["ok" => false, "error" => "Your account is disabled."]);
         } else if ($nav->page !== "index" && $nav->page !== "resetpassword") {
-            Navigation::redirect_site($Conf->hoturl_site_relative_raw("index"));
+            Navigation::redirect_site($conf->hoturl_site_relative_raw("index"));
         }
     }
 
@@ -105,7 +107,7 @@ function initialize_user() {
         && isset($_SESSION["login_bounce"])
         && !isset($_SESSION["testsession"])) {
         $lb = $_SESSION["login_bounce"];
-        if ($lb[0] == $Conf->dsn
+        if ($lb[0] == $conf->dsn
             && $lb[2] !== "index"
             && $lb[2] == Navigation::page()) {
             foreach ($lb[3] as $k => $v)
