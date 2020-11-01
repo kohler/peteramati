@@ -10,8 +10,9 @@ if ($Me->is_empty())
 global $User, $Pset, $Info;
 
 $User = $Me;
-if (isset($Qreq->u))
+if (isset($Qreq->u)) {
     $User = ContactView::prepare_user($Qreq->u);
+}
 
 if (isset($Qreq->imageid)) {
     if ($User
@@ -22,13 +23,15 @@ if (isset($Qreq->imageid)) {
         header("Content-Type: $row[0]");
         header("Cache-Control: public, max-age=31557600");
         header("Expires: " . gmdate("D, d M Y H:i:s", Conf::$now + 31557600) . " GMT");
-        if (!$zlib_output_compression)
+        if (zlib_get_coding_type() === false) {
             header("Content-Length: " . strlen($row[1]));
+        }
         print $row[1];
     } else {
         header("Content-Type: image/gif");
-        if (!$zlib_output_compression)
+        if (zlib_get_coding_type() === false) {
             header("Content-Length: 43");
+        }
         print "GIF89a\001\0\001\0\x80\0\0\0\0\0\0\0\0\x21\xf9\x04\x01\0\0\0\0\x2c\0\0\0\0\x01\0\x01\0\0\x02\x02\x44\x01\0\x3b";
     }
     exit;
@@ -45,13 +48,15 @@ function output($User) {
         '<img class="pa-face" src="' . hoturl("face", ["u" => $u, "imageid" => $User->contactImageId ? : 0]) . '" border="0" />',
         '</a>',
         '<h2><a class="q" href="', hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
-    if ($Me->privChair)
+    if ($Me->privChair) {
         echo "&nbsp;", become_user_link($User);
+    }
     echo '</h2>';
-    if ($User !== $Me)
+    if ($User !== $Me) {
         echo Text::name_html($User),
             ($User->extension ? " (X)" : ""),
             ($User->email ? " &lt;" . htmlspecialchars($User->email) . "&gt;" : "");
+    }
     echo '</div>';
 }
 
@@ -59,8 +64,9 @@ $Conf->header("Thefacebook", "face");
 
 $result = Dbl::qe("select contactId, email, firstName, lastName, github_username, contactImageId, extension from ContactInfo where roles=0");
 echo '<div class="pa-facebook">';
-while (($user = Contact::fetch($result, $Conf)))
+while (($user = Contact::fetch($result, $Conf))) {
     output($user);
+}
 echo '</div>';
 
 $Conf->footer();

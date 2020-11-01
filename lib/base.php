@@ -395,54 +395,6 @@ function opt($idx, $default = null) {
     return get($Conf ? $Conf->opt : $Opt, $idx, $default);
 }
 
-function uploaded_file_error($finfo) {
-    $e = $finfo["error"];
-    $name = get($finfo, "name") ? "<span class=\"lineno\">" . htmlspecialchars($finfo["name"]) . ":</span> " : "";
-    if ($e == UPLOAD_ERR_INI_SIZE || $e == UPLOAD_ERR_FORM_SIZE)
-        return $name . "Uploaded file too big. The maximum upload size is " . ini_get("upload_max_filesize") . "B.";
-    else if ($e == UPLOAD_ERR_PARTIAL)
-        return $name . "Upload process interrupted.";
-    else if ($e != UPLOAD_ERR_NO_FILE)
-        return $name . "Unknown upload error.";
-    else
-        return false;
-}
-
-function make_qreq() {
-    $qreq = new Qrequest($_SERVER["REQUEST_METHOD"]);
-    $qreq->set_path(Navigation::path());
-    foreach ($_GET as $k => $v)
-        $qreq->set_req($k, $v);
-    foreach ($_POST as $k => $v)
-        $qreq->set_req($k, $v);
-    if (empty($_POST))
-        $qreq->set_post_empty();
-
-    // $_FILES requires special processing since we want error messages.
-    $errors = [];
-    foreach ($_FILES as $nx => $fix) {
-        if (is_array($fix["error"])) {
-            $fis = [];
-            foreach (array_keys($fix["error"]) as $i) {
-                $fis[$i ? "$nx.$i" : $nx] = ["name" => $fix["name"][$i], "type" => $fix["type"][$i], "size" => $fix["size"][$i], "tmp_name" => $fix["tmp_name"][$i], "error" => $fix["error"][$i]];
-            }
-        } else {
-            $fis = [$nx => $fix];
-        }
-        foreach ($fis as $n => $fi) {
-            if ($fi["error"] == UPLOAD_ERR_OK) {
-                if (is_uploaded_file($fi["tmp_name"]))
-                    $qreq->set_file($n, $fi);
-            } else if (($err = uploaded_file_error($fi)))
-                $errors[] = $err;
-        }
-    }
-    if (!empty($errors) && Conf::$main)
-        Conf::msg_error("<div class=\"parseerr\"><p>" . join("</p>\n<p>", $errors) . "</p></div>");
-
-    return $qreq;
-}
-
 function object_replace($a, $b) {
     foreach (is_object($b) ? get_object_vars($b) : $b as $k => $v) {
         if ($v === null) {

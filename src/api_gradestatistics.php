@@ -34,7 +34,7 @@ class Series {
             asort($this->series);
             $this->cdf = [];
             $this->median = null;
-            $lastg = false;
+            $lastg = 0.0;
             $subtotal = 0;
             $i = $cdfi = 0;
             $halfn = (int) ($this->n / 2);
@@ -90,7 +90,7 @@ class Series {
         if ($this->n > 1) {
             return sqrt(($this->sumsq - $this->sum * $this->sum / $this->n) / ($this->n - 1));
         } else {
-            return $this->n ? 0.0 : false;
+            return $this->n ? 0.0 : null;
         }
     }
 

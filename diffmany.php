@@ -78,7 +78,8 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
         $lnorder = $info->viewable_line_notes();
         $onlyfiles = $qreq->files;
         $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
-        if (count($onlyfiles) == 1
+        if ($onlyfiles !== null
+            && count($onlyfiles) === 1
             && isset($diff[$onlyfiles[0]])
             && $qreq->lines
             && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m)) {
@@ -117,13 +118,13 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
 }
 
 $title = $Pset->title;
-if ($Qreq->files)
+if ($Qreq->files) {
     $title .= " > " . join(" ", $Qreq->files);
+}
 $Conf->header(htmlspecialchars($title), "home");
 
-if ($Pset->grade_script) {
-    foreach ($Pset->grade_script as $gs)
-        Ht::stash_html($Conf->make_script_file($gs));
+foreach ($Pset->grade_script ?? [] as $gs) {
+    Ht::stash_html($Conf->make_script_file($gs));
 }
 echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
      htmlspecialchars(json_encode(new GradeExport($Pset, $Me->isPC))),
@@ -138,9 +139,10 @@ if (trim((string) $Qreq->users) === "") {
             && $info->grading_hash()
             && !$info->user->dropped) {
             $want[] = $info->user->email;
-            foreach ($info->user->links(LINK_PARTNER, $Pset->id) as $pcid)
+            foreach ($info->user->links(LINK_PARTNER, $Pset->id) as $pcid) {
                 if (($u = $sset->user($pcid)))
                     $u->visited = true;
+            }
         }
     }
     $Qreq->users = join(" ", $want);

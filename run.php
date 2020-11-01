@@ -107,7 +107,7 @@ if ($Me->isPC && $Qreq->runmany && $Qreq->post_ok()) {
     $Conf->header(htmlspecialchars($t), "home");
 
     echo '<h2 id="runmany61_who"></h2>',
-        Ht::form(hoturl_post("run")),
+        Ht::form($Conf->hoturl_post("run")),
         '<div class="f-contain">',
         Ht::hidden("u", ""),
         Ht::hidden("pset", $Pset->urlkey);

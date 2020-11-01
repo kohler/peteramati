@@ -616,7 +616,7 @@ class Conf {
 
     /** @param string $name
      * @param ?int $value
-     * @param ?string $data
+     * @param mixed $data
      * @return bool */
     function save_gsetting($name, $value, $data = null) {
         $change = false;

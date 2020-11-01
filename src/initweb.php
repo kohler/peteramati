@@ -16,7 +16,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "GET"
 }
 
 // Collect $Qreq
-$Qreq = make_qreq();
+$Qreq = Qrequest::make_global();
 
 // Check for redirect to https
 if ($Opt["redirectToHttps"] ?? false) {

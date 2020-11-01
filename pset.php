@@ -56,7 +56,7 @@ if (isset($Qreq->setcommit)
     $Info->mark_grading_commit();
 }
 if (isset($Qreq->setcommit)) {
-    go($Info->hoturl("pset"));
+    Navigation::redirect($Info->hoturl("pset"));
 }
 
 // maybe set partner/repo
@@ -343,7 +343,7 @@ function echo_commit($info) {
     while (($row = $result->fetch_row())) {
         $hex = bin2hex($row[0]);
         $f = "";
-        if ($row[1] & $notesflag) {
+        if (((int) $row[1]) & $notesflag) {
             $f .= "♪";
         }
         if ($row[3]) {

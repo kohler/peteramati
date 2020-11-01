@@ -152,19 +152,6 @@ class MailSender {
                 "<div class='fn2 warning'>Sending mail. <strong>Do not leave this page until it finishes rendering!</strong></div>",
                 "</div>";
         } else {
-            if (isset($Qreq->emailBody) && $Me->privChair
-                && (strpos($Qreq->emailBody, "%REVIEWS%")
-                    || strpos($Qreq->emailBody, "%COMMENTS%"))) {
-                if (!$Conf->timeAuthorViewReviews())
-                    echo "<div class='warning'>Although these mails contain reviews and/or comments, authors can’t see reviews or comments on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change this setting</a>)</div>\n";
-                else if (!$Conf->timeAuthorViewReviews(true))
-                    echo "<div class='warning'>Mails to users who have not completed their own reviews will not include reviews or comments. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change the setting</a>)</div>\n";
-            }
-            if (isset($Qreq->emailBody) && $Me->privChair
-                && substr($recipients, 0, 4) == "dec:") {
-                if (!$Conf->timeAuthorViewDecision())
-                    echo "<div class='warning'>You appear to be sending an acceptance or rejection notification, but authors can’t see paper decisions on the site. (<a href='", hoturl("settings", "group=dec"), "' class='nw'>Change this setting</a>)</div>\n";
-            }
             echo "<div id='foldmail' class='foldc fold2c'>",
                 "<div class='fn fx2 warning'>In the process of preparing mail.  You will be able to send the prepared mail once this message disappears.<br /><span id='mailcount'></span></div>",
                 "<div id='mailwarnings'></div>",
