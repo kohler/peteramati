@@ -250,9 +250,9 @@ function session_list_link($where, PsetView $info, $isprev) {
         . ($isprev ? "« " : "") . $t . ($isprev ? "" : " »") . '</a>';
 }
 
-function echo_session_list_links(PsetView $info) {
-    $sl = $info->conf->session_list();
-    if ($sl) {
+function echo_session_list_links(PsetView $info, Qrequest $qreq) {
+    if (($sl = SessionList::find($info->user, $qreq))) {
+        echo '<div class="pa-list-links">';
         if ($sl->prev ?? null) {
             echo session_list_link($sl->prev, $info, true);
         }
@@ -262,13 +262,12 @@ function echo_session_list_links(PsetView $info) {
         if ($sl->next ?? null) {
             echo session_list_link($sl->next, $info, false);
         }
+        echo '</div>';
     }
 }
 
-if ($Me->isPC && $Conf->session_list()) {
-    echo '<div class="pa-list-links">';
-    echo_session_list_links($Info);
-    echo '</div>';
+if ($Me->isPC) {
+    echo_session_list_links($Info, $Qreq);
 }
 
 ContactView::echo_heading($User);

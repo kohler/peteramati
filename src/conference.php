@@ -1586,46 +1586,6 @@ class Conf {
     }
 
 
-    private function _try_session_list($k) {
-        global $Qreq;
-        $t = $_COOKIE[$k];
-        $sp = strpos($t, " ");
-        if ($sp > 0 && ($x = json_decode(substr($t, $sp + 1)))) {
-            $l = $x;
-        } else {
-            $l = (object) [];
-        }
-        $l->id = $sp > 0 ? substr($t, 0, $sp) : $t;
-        if (!isset($l->cur)
-            || (Navigation::page() === "pset"
-                && $Qreq->u
-                && $Qreq->pset
-                && ($l->cur === "~" . urlencode($Qreq->u) . "/pset/" . $Qreq->pset
-                    || ($Qreq->commit
-                        && $l->cur === "~" . urlencode($Qreq->u) . "/pset/" . $Qreq->pset . "/" . $Qreq->commit)))) {
-            return $this->_session_list = $l;
-        } else {
-            return null;
-        }
-    }
-
-    function session_list() {
-        if ($this->_session_list === false) {
-            $this->_session_list = null;
-            $found = null;
-            foreach ($_COOKIE as $k => $v) {
-                if (str_starts_with($k, "hotlist-info-")
-                    && strpos($k, "_") === false
-                    && ($found === null || strnatcmp($k, $found) > 0)
-                    && $this->_try_session_list($k)) {
-                    $found = $k;
-                }
-            }
-        }
-        return $this->_session_list;
-    }
-
-
     /** @param non-empty-string $url
      * @return string */
     function make_css_link($url, $media = null, $integrity = null) {
