@@ -80,7 +80,13 @@ handle_ui.on("js-pset-flag", function () {
     var $b = $(this), $form = $b.closest("form");
     if (this.name == "flag" && !$form.find("[name=flagreason]").length) {
         $b.before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" /> &nbsp;</span>');
-        $form.find("[name=flagreason]").on("keypress", make_onkey("Enter", function () { $b.click(); })).autogrow()[0].focus();
+        $form.find("[name=flagreason]").on("keypress", function (evt) {
+            if (!event_modkey(evt) && event_key(evt) === "Enter") {
+                evt.preventDefault();
+                evt.stopImmediatePropagation();
+                $b.click();
+            }
+        }).autogrow()[0].focus();
         $b.html("OK");
     } else if (this.name == "flag") {
         $.ajax($form.attr("action"), {

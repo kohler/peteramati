@@ -199,19 +199,6 @@ function now_sec() {
 }
 
 
-// events
-
-function make_onkey(key, f) {
-    return function (evt) {
-        if (!event_modkey(evt) && event_key(evt) === key) {
-            evt.preventDefault();
-            evt.stopImmediatePropagation();
-            f.call(this, evt);
-        }
-    };
-}
-
-
 // render_xmsg
 function render_xmsg(status, msg) {
     if (typeof msg === "string")
