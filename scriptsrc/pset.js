@@ -3,6 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { handle_ui, fold61 } from "./ui.js";
+import { event_key, event_modkey } from "./ui-key.js";
 import { hoturl } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
 import { Bubble } from "./tooltip.js";
