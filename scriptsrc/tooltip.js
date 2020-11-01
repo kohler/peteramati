@@ -3,11 +3,22 @@
 // See LICENSE for open-source distribution terms
 
 import { removeClass } from "./ui.js";
+import { text_to_html, escape_entities } from "./encoders.js";
+
 
 const capdir = ["Top", "Right", "Bottom", "Left"],
     lcdir = ["top", "right", "bottom", "left"],
     szdir = ["height", "width"],
     SPACE = 8;
+
+function geometry_translate(g, offset) {
+    g = $.extend({}, g);
+    g.top += offset.top;
+    g.right += offset.left;
+    g.bottom += offset.top;
+    g.left += offset.left;
+    return g;
+}
 
 function cssborder(dir, suffix) {
     return "border" + capdir[dir] + suffix;
@@ -277,19 +288,21 @@ export function Bubble(content, bubopt) {
 
     var bubble = {
         near: function (epos, reference) {
-            var i, off;
             if (typeof epos === "string" || epos.tagName || epos.jquery) {
                 epos = $(epos);
-                if (dirspec == null && epos[0])
+                if (dirspec == null && epos[0]) {
                     dirspec = epos[0].getAttribute("data-tooltip-dir");
+                }
                 epos = epos.geometry(true);
             }
-            for (i = 0; i < 4; ++i)
+            for (let i = 0; i < 4; ++i) {
                 if (!(lcdir[i] in epos) && (lcdir[i ^ 2] in epos))
                     epos[lcdir[i]] = epos[lcdir[i ^ 2]];
+            }
             if (reference && (reference = $(reference)) && reference.length
-                && reference[0] != window)
+                && reference[0] != window) {
                 epos = geometry_translate(epos, reference.geometry());
+            }
             nearpos = epos;
             show();
             return bubble;

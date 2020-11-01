@@ -149,9 +149,9 @@ const unparsers = {
     D: function (d) { return strftime("%m/%d/%y", d); },
     F: function (d) { return strftime("%Y-%m-%d", d); },
     s: function (d) { return Math.floor(d.getTime() / 1000); },
-    n: function (d) { return "\n"; },
-    t: function (d) { return "\t"; },
-    "%": function (d) { return "%"; }
+    n: function () { return "\n"; },
+    t: function () { return "\t"; },
+    "%": function () { return "%"; }
 };
 
 export function strftime(fmt, d) {
@@ -216,7 +216,7 @@ export class ImmediatePromise {
             return Promise.reject(e);
         }
     }
-    catch(executor) {
+    catch() {
         return this;
     }
     finally(executor) {

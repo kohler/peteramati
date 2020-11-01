@@ -55,7 +55,7 @@ function hoturl_clean(x, page_component) {
 }
 
 export function hoturl(page, options) {
-    var k, v, t, a, m, x, anchor = "", want_forceShow;
+    var k, v, m, x, anchor = "";
     if (siteinfo.site_relative == null || siteinfo.suffix == null) {
         siteinfo.site_relative = siteinfo.suffix = "";
     }
@@ -91,7 +91,6 @@ export function hoturl(page, options) {
         hoturl_clean(x, /^fn=(\w+)$/);
         hoturl_clean(x, /^pset=([^?&#]+)$/);
         hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
-        want_forceShow = true;
     } else if (page === "index") {
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
     } else if (page === "pset" || page === "run") {

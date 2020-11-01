@@ -12,6 +12,27 @@
     },
     "devDependencies": {
         "rollup": "^2.32",
+        "rollup-plugin-eslint": "^7",
         "rollup-plugin-terser": "^7"
+    },
+    "eslintConfig": {
+        "env": {
+            "browser": true,
+            "es6": true,
+            "jquery": true
+        },
+        "parserOptions": {
+            "ecmaVersion": 6,
+            "sourceType": "module"
+        },
+        "extends": ["eslint:recommended"],
+        "globals": {
+            "$pa": "writeable",
+            "Terminal": "readonly",
+            "hljs": "readonly",
+            "markdownit": "readonly",
+            "markdownit_katex": "readonly",
+            "siteinfo": "readonly"
+        }
     }
 }

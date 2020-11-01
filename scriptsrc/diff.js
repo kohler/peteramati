@@ -15,7 +15,7 @@ export function fileref_resolve(e) {
 export function filediff_load(filee) {
     if (hasClass(filee, "need-load")) {
         let p = filee.closest(".pa-psetinfo");
-        return new Promise(function (resolve, reject) {
+        return new Promise(function (resolve) {
             $.ajax(hoturl("api/filediff", hoturl_gradeparts(filee)), {
                 type: "GET", cache: false, dataType: "json",
                 data: {
@@ -77,7 +77,7 @@ function linediff_find_promise(filename, lineid) {
     // create link
     var filee = document.getElementById("pa-file-" + filename);
     if (filee) {
-        return filediff_load(filee).then(_ => {
+        return filediff_load(filee).then(() => {
             // look for present line
             const $tds = $(filee).find(".pa-d" + lineid.charAt(0)),
                 lineno = lineid.substr(1);

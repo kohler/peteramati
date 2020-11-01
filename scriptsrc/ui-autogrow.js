@@ -91,7 +91,7 @@ function make_input_autogrower($self) {
                 width: "auto",
                 display: "table-cell",
                 paddingLeft: p.paddingLeft,
-                paddingLeft: (parseFloat(p.paddingRight) + parseFloat(p.paddingLeft) + parseFloat(p.borderLeftWidth) + parseFloat(p.borderRightWidth)) + "px"
+                paddingRight: (parseFloat(p.paddingRight) + parseFloat(p.paddingLeft) + parseFloat(p.borderLeftWidth) + parseFloat(p.borderRightWidth)) + "px"
             });
             ws = $self.css(["minWidth", "maxWidth"]);
             if (ws.minWidth === "0px") {

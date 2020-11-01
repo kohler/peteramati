@@ -125,7 +125,7 @@ function render_landmark_fence(md) {
     return function (tokens, idx, options, env, self) {
         var token = tokens[idx], xtoken = token,
             info = token.info ? md.utils.unescapeAll(token.info) : "",
-            lang, lango, content, highlighted = false, i, xattrs, m;
+            lang, content, highlighted = false, i, xattrs, m;
         if (info && info.indexOf(" ") >= 0) {
             if ((m = info.match(/^ *([-a-z+]+) *$/))) {
                 info = m[1];
@@ -248,7 +248,7 @@ export function filediff_markdown() {
         e = n;
     }
     // render to markdown
-    var dx = document.createElement("div"), d, dc;
+    var dx = document.createElement("div"), d;
     mdcontext = this;
     dx.innerHTML = make_markdownit().render(l.join(""));
     mdcontext = null;
@@ -316,10 +316,10 @@ export function filediff_markdown() {
         this.insertBefore(lp, e);
     }
     addClass(this, "pa-markdown");
-};
+}
 
 function filediff_unmarkdown() {
-    var e = this.firstChild, l = [], lineno = 1, this_lineno;
+    var e = this.firstChild;
     while (e) {
         var n = e.nextSibling;
         if (hasClass(e, "pa-gr")) {

@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { hoturl_post } from "./hoturl.js";
+import { hoturl_post, url_absolute } from "./hoturl.js";
 
 export function log_jserror(errormsg, error, noconsole) {
     if (!error && errormsg instanceof Error) {

@@ -2,6 +2,9 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
+import { hasClass } from "./ui.js";
+
+
 const key_map = {"Spacebar": " ", "Esc": "Escape"},
     charCode_map = {"9": "Tab", "13": "Enter", "27": "Escape"},
     keyCode_map = {

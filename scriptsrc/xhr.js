@@ -16,9 +16,9 @@ function jqxhr_error_message(jqxhr, status, errormsg) {
 }
 
 
-let tracked_out = 0, tracked_complete = [];
+let tracked_out = 0, tracked_after = [];
 
-$.ajaxPrefilter(function (options, originalOptions, jqxhr) {
+$.ajaxPrefilter(function (options /* originalOptions, jqxhr */) {
     if (options.global === false)
         return;
     var f = options.success;
@@ -63,8 +63,8 @@ $.ajaxPrefilter(function (options, originalOptions, jqxhr) {
 
 $(document).ajaxComplete(function (event, jqxhr, settings) {
     if (settings.trackOutstanding && --tracked_out === 0) {
-        while (tracked_complete.length) {
-            tracked_complete.shift()();
+        while (tracked_after.length) {
+            tracked_after.shift()();
         }
     }
 });
@@ -73,7 +73,7 @@ export function after_outstanding(f) {
     if (f === undefined) {
         return tracked_out > 0;
     } else if (tracked_out > 0) {
-        after.push(f);
+        tracked_after.push(f);
     } else {
         f();
     }
@@ -83,7 +83,7 @@ export function after_outstanding(f) {
 let cond_out = 0, cond_waiting = [];
 
 export function api_conditioner(url, data, method) {
-    return new Promise(function (resolve, reject) {
+    return new Promise(function (resolve) {
         function process() {
             ++cond_out;
             $.ajax(url, {

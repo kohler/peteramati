@@ -8,7 +8,14 @@ import { after_outstanding } from "./xhr.js";
 import { hasClass, handle_ui } from "./ui.js";
 import { event_key } from "./ui-key.js";
 
+
 let cookie_set_at;
+
+function make_link_callback(elt) {
+    return function () {
+        window.location = elt.href;
+    };
+}
 
 function list_digest_update(info) {
     var add = typeof info === "string" ? 1 : 0,
@@ -99,18 +106,6 @@ function is_listable(sitehref) {
     return /(?:^|\/)pset(?:|\.php)(?:$|\/)/.test(sitehref);
 }
 
-function find_hotlist(e) {
-    var hl, $hl;
-    if ((hl = e.closest(".has-hotlist"))) {
-        return hl;
-    } else if (e.tagName === "FORM"
-               && ($hl = $(e).find(".has-hotlist")).length === 1) {
-        return $hl[0];
-    } else {
-        return null;
-    }
-}
-
 function handle_list(e, href) {
     var hl, sitehref;
     if (href
@@ -137,7 +132,7 @@ function unload_list() {
     }
 }
 
-function list_default_click(evt) {
+function list_default_click() {
     var base = location.href;
     if (location.hash) {
         base = base.substring(0, base.length - location.hash.length);

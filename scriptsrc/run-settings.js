@@ -51,7 +51,7 @@ export function run_settings_load(j) {
             $("[data-runsetting-num=" + $($n[i]).attr("name").substr(1) + "]").remove();
 }
 
-handle_ui.on("pa-runconfig", function (event) {
+handle_ui.on("pa-runconfig", function () {
     if (this.name === "define") {
         add();
     } else {

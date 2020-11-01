@@ -49,7 +49,7 @@ function make_svg_path_parser(s) {
     s = s.split(/([a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)/);
     var i = 1, e = s.length, next_cmd;
     return function () {
-        var a = null, m, ch;
+        var a = null, ch;
         while (i < e) {
             ch = s[i];
             if (ch >= "A") {
@@ -258,7 +258,7 @@ function path_x_distance2_buckets(pathNode, point) {
     xmax += width;
     var n = Math.max(Math.ceil((xmax - xmin) / width), 1),
         a = new Array(n + 1),
-        l, t, r, b, d, j;
+        l, t, r, b, d;
     a.fill(Infinity);
     for (i = 0; i !== npsl.length; ++i) {
         item = npsl[i];

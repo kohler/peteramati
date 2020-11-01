@@ -3,21 +3,17 @@
 // See LICENSE for open-source distribution terms
 
 import { wstorage, sprintf, strftime } from "./utils.js";
-import { log_jserror } from "./utils-errors.js";
 import {
-    hasClass, addClass, removeClass, toggleClass, classList, handle_ui,
-    fold61
+    hasClass, addClass, removeClass, toggleClass, classList, handle_ui
     } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
-import {
-    hoturl, hoturl_post, hoturl_absolute_base, url_absolute, hoturl_gradeparts
-    } from "./hoturl.js";
+import { hoturl, hoturl_post, hoturl_gradeparts } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import "./ui-autogrow.js";
 import "./ui-range.js";
 import "./ui-sessionlist.js";
 import { escape_entities } from "./encoders.js";
-import { Bubble, tooltip } from "./tooltip.js";
+import { tooltip } from "./tooltip.js";
 import "./pset.js";
 import { linediff_find, linediff_traverse, linediff_locate } from "./diff.js";
 import { filediff_markdown } from "./diff-markdown.js";
@@ -63,22 +59,22 @@ $.fn.extend({
     },
     scrollIntoView: function (opts) {
         opts = opts || {};
-        for (var i = 0; i !== this.length; ++i) {
-            var p = $(this[i]).geometry(), x = this[i].parentNode;
+        for (let i = 0; i !== this.length; ++i) {
+            let p = $(this[i]).geometry(), x = this[i].parentNode;
             while (x && x.tagName && $(x).css("overflow-y") === "visible") {
                 x = x.parentNode;
             }
             x = x && x.tagName ? x : window;
-            var w = $(x).geometry();
+            let w = $(x).geometry();
             if (p.top < w.top + (opts.marginTop || 0) || opts.atTop) {
-                var pos = Math.max(p.top - (opts.marginTop || 0), 0);
+                let pos = Math.max(p.top - (opts.marginTop || 0), 0);
                 if (x === window) {
                     x.scrollTo(x.scrollX, pos);
                 } else {
                     x.scrollTop = pos;
                 }
             } else if (p.bottom > w.bottom - (opts.marginBottom || 0)) {
-                var pos = Math.max(p.bottom + (opts.marginBottom || 0) - w.height, 0);
+                let pos = Math.max(p.bottom + (opts.marginBottom || 0) - w.height, 0);
                 if (x === window) {
                     x.scrollTo(x.scrollX, pos);
                 } else {
@@ -101,18 +97,6 @@ $.fn.extend({
         return s;
     }
 });
-
-function geometry_translate(g, dx, dy) {
-    if (typeof dx === "object") {
-        dy = dx.top, dx = dx.left;
-    }
-    g = $.extend({}, g);
-    g.top += dy;
-    g.right += dx;
-    g.bottom += dy;
-    g.left += dx;
-    return g;
-}
 
 
 // history
@@ -543,10 +527,6 @@ function hotcrp_load(arg) {
 hotcrp_load.time = function (servzone, hr24) {
     set_local_time.initialize(servzone, hr24);
 };
-hotcrp_load.opencomment = function () {
-    if (location.hash.match(/^\#?commentnew$/))
-        open_new_comment();
-};
 
 
 var foldmap = {}, foldsession_unique = 1;
@@ -689,81 +669,12 @@ function foldup(event, opts) {
 
 handle_ui.on("js-foldup", foldup);
 
-function make_link_callback(elt) {
-    return function () {
-        window.location = elt.href;
-    };
-}
-
-
-// check marks for ajax saves
-function make_outline_flasher(elt, rgba, duration) {
-    var h = elt.hotcrp_outline_flasher, hold_duration;
-    if (!h)
-        h = elt.hotcrp_outline_flasher = {old_outline: elt.style.outline};
-    if (h.interval) {
-        clearInterval(h.interval);
-        h.interval = null;
-    }
-    if (rgba) {
-        duration = duration || 3000;
-        hold_duration = duration * 0.6;
-        h.start = now_msec();
-        h.interval = setInterval(function () {
-            var now = now_msec(), delta = now - h.start, opacity = 0;
-            if (delta < hold_duration)
-                opacity = 0.5;
-            else if (delta <= duration)
-                opacity = 0.5 * Math.cos((delta - hold_duration) / (duration - hold_duration) * Math.PI);
-            if (opacity <= 0.03) {
-                elt.style.outline = h.old_outline;
-                clearInterval(h.interval);
-                h.interval = null;
-            } else
-                elt.style.outline = "4px solid rgba(" + rgba + ", " + opacity + ")";
-        }, 13);
-    }
-}
-
-function setajaxcheck(elt, rv) {
-    if (typeof elt == "string")
-        elt = document.getElementById(elt);
-    if (!elt)
-        return;
-    if (elt.jquery && rv && !rv.ok && rv.errf) {
-        var i, e, f = elt.closest("form")[0];
-        for (i in rv.errf)
-            if (f && (e = f.elements[i])) {
-                elt = e;
-                break;
-            }
-    }
-    if (elt.jquery)
-        elt = elt[0];
-    make_outline_flasher(elt);
-    if (rv && !rv.ok && !rv.error)
-        rv = {error: "Error"};
-    if (!rv || rv.ok)
-        make_outline_flasher(elt, "0, 200, 0");
-    else
-        elt.style.outline = "5px solid red";
-    if (rv && rv.error)
-        Bubble(rv.error, "errorbubble").near(elt).removeOn(elt, "input change click hide");
-}
-
-
-// mail
-function setmailpsel(sel) {
-    fold("psel", !!sel.value.match(/^(?:pc$|pc:|all$)/), 9);
-    fold("psel", !sel.value.match(/^new.*rev$/), 10);
-}
-
 
 handle_ui.on("pa-pset-upload-grades", function () {
     $("#upload").show();
 });
 
-handle_ui.on("pa-signin-radio", function (event) {
+handle_ui.on("pa-signin-radio", function () {
     let v;
     if (this.value === "login") {
         fold("logingroup", false);
@@ -945,7 +856,7 @@ function pa_render_note(note, transition) {
 
 // pa_linenote
 (function ($) {
-var labelctr = 0, curanal, down_event, scrolled_x, scrolled_y, scrolled_at;
+var curanal, down_event, scrolled_x, scrolled_y, scrolled_at;
 
 function render_form($tr, note, transition) {
     $tr.removeClass("hidden").addClass("editing");
@@ -1173,7 +1084,7 @@ var pa_save_note = function (text) {
     });
 }
 
-function cancel(evt) {
+function cancel() {
     unedit(this, true);
     return true;
 }
@@ -1338,7 +1249,7 @@ pa_add_grade_type("formula", {
 
 pa_add_grade_type("text", {
     text: function (v) { return v == null ? "" : v; },
-    entry: function (id, opts) {
+    entry: function (id) {
         return '<div class="pa-pd"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
     },
     justify: "left",
@@ -1347,7 +1258,7 @@ pa_add_grade_type("text", {
 
 pa_add_grade_type("select", {
     text: function (v) { return v == null ? "" : v; },
-    entry: function (id, opts) {
+    entry: function (id) {
         var t = '<div class="pa-pd"><span class="select"><select class="uich pa-gradevalue" name="'.concat(this.key, '" id="', id, '"><option value="">None</option>');
         for (var i = 0; i !== this.options.length; ++i) {
             var n = escape_entities(this.options[i]);
@@ -1463,7 +1374,7 @@ function make_checkboxlike(str) {
 pa_add_grade_type("checkboxes", make_checkboxlike("✓"));
 pa_add_grade_type("stars", make_checkboxlike("⭐"));
 
-handle_ui.on("js-checkboxes-grade", function (evt) {
+handle_ui.on("js-checkboxes-grade", function () {
     var colon = this.name.indexOf(":"),
         name = this.name.substring(0, colon),
         num = this.name.substring(colon + 1),
@@ -1494,16 +1405,16 @@ pa_add_grade_type("letter", {
     },
     justify: "left",
     tics: function () {
-        var a = [];
-        for (var g in lm) {
+        let a = [];
+        for (let g in lm) {
             if (lm[g].length === 1)
                 a.push({x: g, text: lm[g]});
         }
-        for (var g in lm) {
+        for (let g in lm) {
             if (lm[g].length === 2)
                 a.push({x: g, text: lm[g], label_space: 5});
         }
-        for (var g in lm) {
+        for (let g in lm) {
             if (lm[g].length === 2)
                 a.push({x: g, text: lm[g].substring(1), label_space: 2, notic: true});
         }
@@ -1683,7 +1594,7 @@ function pa_set_grade(ge, g, ag, options) {
     }
 }
 
-handle_ui.on("pa-gradevalue", function (evt) {
+handle_ui.on("pa-gradevalue", function () {
     var f = this.closest("form"), gt, typeinfo, self = this;
     if (f && hasClass(f, "pa-grade"))
         $(f).submit();
@@ -1840,28 +1751,28 @@ handle_ui.on("pa-grade-button", function (event) {
 function pa_resolve_gradelist() {
     removeClass(this, "need-pa-gradelist");
     addClass(this, "pa-gradelist");
-    var pi = this.closest(".pa-psetinfo"), gi = pa_gradeinfo.call(pi);
+    let pi = this.closest(".pa-psetinfo"), gi = pa_gradeinfo.call(pi);
     if (!gi) {
         return;
     }
-    var ch = this.firstChild;
+    let ch = this.firstChild;
     while (ch && !hasClass(ch, "pa-grade")) {
         ch = ch.nextSibling;
     }
-    for (var i = 0; i !== gi.order.length; ++i) {
-        var k = gi.order[i];
+    for (let i = 0; i !== gi.order.length; ++i) {
+        let k = gi.order[i];
         if (k) {
             if (ch && ch.getAttribute("data-pa-grade") === k) {
                 ch = ch.nextSibling;
             } else {
-                var e = $(pa_render_grade_entry(gi.entries[k], gi.editable))[0];
+                let e = $(pa_render_grade_entry(gi.entries[k], gi.editable))[0];
                 this.insertBefore(e, ch);
                 pa_show_grade.call(e, gi);
             }
         }
     }
     while (ch) {
-        var e = ch;
+        let e = ch;
         ch = ch.nextSibling;
         this.removeChild(e);
     }
@@ -1974,7 +1885,7 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
         ge = pa_grade_entry.call(gr);
     }
 
-    pa_process_landmark_range.call(this, function (tr, lna, lnb) {
+    pa_process_landmark_range.call(this, function (tr) {
         var note = pa_note(tr), m, gch;
         if (note[1]
             && ((m = /^[\s❮→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:❯]?(?:\s|$)/.exec(note[1]))
@@ -2065,7 +1976,7 @@ handle_ui.on("pa-notes-grade", function (event) {
 });
 
 
-function pa_beforeunload(evt) {
+function pa_beforeunload() {
     var ok = true;
     $(".pa-gw textarea").each(function () {
         var tr = this.closest(".pa-dl"), note = pa_note(tr);
@@ -2201,22 +2112,10 @@ function pa_draw_gradecdf($graph) {
     $graph.addClass(plot_type);
 
     var want_all = plot_type.substring(0, 3) === "all";
-    var want_pdf = plot_type.substring(0, 3) === "pdf";
-    var want_cdf = want_all || plot_type.substring(0, 3) === "cdf";
     var want_extension = plot_type.indexOf("-extension") >= 0
         || (want_all && user_extension && d.extension);
     var want_noextra = plot_type.indexOf("-noextra") >= 0
         || (want_all && d.series.noextra && !want_extension);
-
-    // maxes
-    var datamax = 0;
-    if (want_noextra)
-        datamax = Math.max(datamax, d.series.noextra.max());
-    if (want_extension)
-        datamax = Math.max(datamax, d.series.extension.max());
-    if (want_all || (!want_noextra && !want_extension))
-        datamax = Math.max(datamax, d.series.all.max());
-    var max = d.maxtotal ? Math.max(datamax, d.maxtotal) : datamax;
 
     $graph.removeClass("hidden");
     var $plot = $graph.find(".plot");
@@ -2227,7 +2126,7 @@ function pa_draw_gradecdf($graph) {
     $graph.data("paGradeGraph", gi);
 
     if (gi.total && gi.total < gi.max) {
-        var total = mksvg("line");
+        let total = mksvg("line");
         total.setAttribute("x1", gi.xax(gi.total));
         total.setAttribute("y1", gi.yax(0));
         total.setAttribute("x2", gi.xax(gi.total));
@@ -2272,7 +2171,7 @@ function pa_draw_gradecdf($graph) {
     }
 
     // load user grade
-    var total = null, gri = $pi.data("pa-gradeinfo");
+    let total = null, gri = $pi.data("pa-gradeinfo");
     if (gri)
         total = pa_gradeinfo_total(gri, want_noextra && !want_all)[0];
     if (total != null)
@@ -2420,7 +2319,7 @@ function update_course(str, tries) {
     $(".js-grgraph-highlight-course").each(function () {
         var range = this.getAttribute("data-pa-highlight-range") || "90-100",
             color = this.getAttribute("data-pa-highlight-type") || "h00",
-            min, max, m;
+            m;
         colors[color] = colors[color] || [];
         if ((this.checked = !!ranges[range])) {
             if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-([-+]?(?:\d+\.?\d*|\.\d))(\.?)$/))) {
@@ -2436,16 +2335,17 @@ function update_course(str, tries) {
     });
     var xd;
     if (!any) {
-        for (var color in colors)
+        for (let color in colors) {
             update(document.body, color, "");
+        }
     } else if ((xd = course_xcdf())) {
-        for (var color in colors) {
-            var ranges = colors[color], a = [];
+        for (let color in colors) {
+            let ranges = colors[color], a = [];
             if (ranges.length) {
-                for (var i = 0; i !== xd.cdf.length; i += 2) {
-                    for (var j = 0; j !== ranges.length; j += 2) {
+                for (let i = 0; i !== xd.cdf.length; i += 2) {
+                    for (let j = 0; j !== ranges.length; j += 2) {
                         if (xd.cdf[i] >= ranges[j] && xd.cdf[i] < ranges[j+1]) {
-                            var ui0 = i ? xd.cdf[i-1] : 0;
+                            let ui0 = i ? xd.cdf[i-1] : 0;
                             Array.prototype.push.apply(a, xd.cdfu.slice(ui0, xd.cdf[i+1]));
                             break;
                         }
@@ -2480,7 +2380,6 @@ handle_ui.on("js-grgraph-highlight", function (event) {
     if (event.type !== "change")
         return;
     var rt = this.getAttribute("data-range-type"),
-        $cb = $(this).closest("form").find("input[type=checkbox]"),
         a = [];
     $(this).closest("form").find("input[type=checkbox]").each(function () {
         var tr;
@@ -2499,7 +2398,7 @@ handle_ui.on("js-grgraph-highlight", function (event) {
     }
 });
 
-handle_ui.on("js-grgraph-highlight-course", function (event) {
+handle_ui.on("js-grgraph-highlight-course", function () {
     var a = [];
     $(".js-grgraph-highlight-course").each(function () {
         if (this.checked)
@@ -2516,7 +2415,7 @@ if (hashy) {
     $(window).on("popstate", function (event) {
         var state = (event.originalEvent || event).state;
         state && state.href && update_hash(state.href);
-    }).on("hashchange", function (event) {
+    }).on("hashchange", function () {
         update_hash(location.href);
     });
     $(function () { update_hash(location.href); });
@@ -2748,7 +2647,7 @@ function pa_render_pset_table(pconf, data) {
         },
         gdialog: {
             th: '<th></th>',
-            td: function (s) {
+            td: function () {
                 return '<td><a href="" class="ui x js-gdialog" tabindex="-1" scope="col">Ⓖ</a></td>';
             },
             tw: 1.5,
@@ -2866,8 +2765,8 @@ function pa_render_pset_table(pconf, data) {
         grade_keys = [];
         var grade_abbr = [];
         if (pconf.grades) {
-            var pabbr = {}, grade_titles = [], grade_titles_rest = [];
-            for (var i = 0; i !== pconf.grades.order.length; ++i) {
+            var pabbr = {}, grade_titles = [];
+            for (let i = 0; i !== pconf.grades.order.length; ++i) {
                 var k = pconf.grades.order[i], ge = pconf.grades.entries[k];
                 if (ge.type !== "text") {
                     grade_entries.push(ge);
@@ -2908,7 +2807,7 @@ function pa_render_pset_table(pconf, data) {
         }
 
         var ngrades_expected = -1;
-        for (var i = 0; i < data.length; ++i) {
+        for (let i = 0; i < data.length; ++i) {
             var s = data[i];
             if (s.dropped)
                 s.boringness = 2;
@@ -2956,7 +2855,7 @@ function pa_render_pset_table(pconf, data) {
                 total_colpos = col.length;
                 col.push("total");
             }
-            for (i = 0; i !== grade_keys.length; ++i) {
+            for (let i = 0; i !== grade_keys.length; ++i) {
                 var gt = grade_entries[i].type,
                     typeinfo = pa_grade_types[gt || "numeric"];
                 grade_entries[i].colpos = col.length;
@@ -2978,7 +2877,7 @@ function pa_render_pset_table(pconf, data) {
                 col.push("repo");
             }
         }
-        for (i = 0; i !== col.length; ++i) {
+        for (let i = 0; i !== col.length; ++i) {
             if (typeof col[i] === "string") {
                 col[i] = {type: col[i]};
             }
@@ -3129,7 +3028,7 @@ function pa_render_pset_table(pconf, data) {
             ++trn;
         }
 
-        var trn = 0;
+        trn = 0;
         $b.find(".gt-rownumber").html(function () {
             ++trn;
             return trn + ".";
@@ -3202,7 +3101,7 @@ function pa_render_pset_table(pconf, data) {
         evt.stopPropagation();
     }
     function overlay_create() {
-        var li, ri, i, tw = 0, t, a = [];
+        var li, ri, tw = 0, t, a = [];
         for (li = 0; li !== col.length && !col[li].pin; ++li) {
         }
         for (ri = li; ri !== col.length && col[ri].pin; ++ri) {
@@ -3211,7 +3110,7 @@ function pa_render_pset_table(pconf, data) {
 
         t = '<table class="gtable gtable-fixed gtable-overlay new" style="position:absolute;left:-24px;width:' +
             (tw + 24) + 'px"><thead><tr class="k0 kfade"><th style="width:24px"></th>';
-        for (i = li; i !== ri; ++i) {
+        for (let i = li; i !== ri; ++i) {
             t += '<th style="width:' + col[i].width + 'px"' +
                 col[i].th.call(col[i]).substring(3);
         }
@@ -3219,7 +3118,7 @@ function pa_render_pset_table(pconf, data) {
 
         var tr = $j[0].firstChild.firstChild,
             otr = $overlay[0].firstChild.firstChild;
-        for (i = li; i !== ri; ++i) {
+        for (let i = li; i !== ri; ++i) {
             otr.childNodes[i - li + 1].className = tr.childNodes[i].className;
         }
 
@@ -3232,7 +3131,7 @@ function pa_render_pset_table(pconf, data) {
             if (hasClass(tr, "gt-boring")) {
                 a.push('<tr class="gt-boring"><td colspan="' + (ri - li + 1) + '"><hr></td></tr>');
             } else {
-                var spos = tr.getAttribute("data-pa-spos"),
+                let spos = tr.getAttribute("data-pa-spos"),
                     t = '<tr class="' + tr.className + ' kfade" data-pa-spos="' + spos;
                 if (tr.hasAttribute("data-pa-uid")) {
                     t += '" data-pa-uid="' + tr.getAttribute("data-pa-uid");
@@ -3241,7 +3140,7 @@ function pa_render_pset_table(pconf, data) {
                     t += '" data-pa-partner="1';
                 }
                 t += '"><td></td>';
-                for (i = li; i !== ri; ++i) {
+                for (let i = li; i !== ri; ++i) {
                     t += '<td style="height:' + tr.childNodes[i].clientHeight +
                         'px"' + col[i].td.call(col[i], dmap[spos], "").substring(3);
                 }
@@ -3255,7 +3154,7 @@ function pa_render_pset_table(pconf, data) {
         }, 0);
     }
     function render_user_compare(u) {
-        var t = "";
+        let t = "";
         if ((active_nameflag & 8) && u.anon_username) {
             t = u.anon_username + " ";
         } else if (active_nameflag & 1) {
@@ -3427,7 +3326,7 @@ function pa_render_pset_table(pconf, data) {
         $x.find("th[data-pa-sort='" + f + "']").addClass("plsortactive").
             toggleClass("plsortreverse", sort.rev < 0);
     }
-    function head_click(event) {
+    function head_click() {
         if (!this.hasAttribute("data-pa-sort"))
             return;
         var sf = this.getAttribute("data-pa-sort"), m;
@@ -3461,17 +3360,6 @@ function pa_render_pset_table(pconf, data) {
         resort();
     }
 
-    function grade_index(n) {
-        n = n.closest("td");
-        var i = n.cellIndex, m;
-        var table = n.parentElement.parentElement.parentElement;
-        var th = table.tHead.firstChild.cells[i];
-        var sorter = th ? th.getAttribute("data-pa-sort") : null;
-        if (sorter && /^grade\d+$/.test(sorter))
-            return +sorter.substring(5);
-        else
-            return null;
-    }
     function gdialog_change() {
         toggleClass(this.closest(".pa-pd"), "pa-grade-changed",
                     this.hasAttribute("data-pa-unmixed") || input_differs(this));
@@ -3479,7 +3367,7 @@ function pa_render_pset_table(pconf, data) {
     function grade_update(umap, rv, gorder) {
         var tr = umap[rv.uid],
             su = dmap[tr.getAttribute("data-pa-spos")],
-            total = 0, ngrades_nonempty = 0;
+            ngrades_nonempty = 0;
         for (var i = 0; i !== gorder.length; ++i) {
             var k = gorder[i], ge = pconf.grades.entries[k], c;
             if (ge && (c = col[ge.colpos])) {
@@ -3633,6 +3521,7 @@ function pa_render_pset_table(pconf, data) {
         }
     }
     function gdialog_key(event) {
+        let $b;
         if (event.ctrlKey
             && (event.key === "n" || event.key === "p")
             && ($b = $gdialog.find("button[name=" + (event.key === "n" ? "next" : "prev") + "]"))
@@ -3738,7 +3627,7 @@ function pa_render_pset_table(pconf, data) {
         var thead = $('<thead><tr class="k0"></tr></thead>')[0],
             tfixed = $j.hasClass("want-gtable-fixed"),
             rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
-        for (var i = 0; i !== col.length; ++i) {
+        for (let i = 0; i !== col.length; ++i) {
             var th = col[i].th.call(col[i]), $th = $(th);
             if (tfixed) {
                 col[i].left = table_width;
@@ -3769,7 +3658,7 @@ function pa_render_pset_table(pconf, data) {
             sort_data();
         }
         displaying_last_first = sort.f === "name" && sort.last;
-        for (var i = 0; i !== data.length; ++i) {
+        for (let i = 0; i !== data.length; ++i) {
             var s = data[i];
             s._spos = dmap.length;
             dmap.push(s);

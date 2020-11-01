@@ -187,8 +187,8 @@ export function render_terminal(container, string, options) {
             return line.substring(0, line.length - 2) + "\n";
         var curstyle = styles || "\x1b[m",
             parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/),
-            partno, i, m, r = [];
-        for (partno = 0; partno < parts.length; ++partno) {
+            r = [];
+        for (let partno = 0; partno < parts.length; ++partno) {
             var g = [], glen = 0, clearafter = null;
             var lsplit = parts[partno].split(/(\x1b\[[\d;]*m|\x1b\[0?K)/);
             for (var j = 0; j < lsplit.length; j += 2) {
@@ -245,7 +245,7 @@ export function render_terminal(container, string, options) {
     }
 
     function render_line(line, node) {
-        var m, filematch, a, i, x, isnew = !node, displaylen = 0;
+        var m, isnew = !node, displaylen = 0;
         if (isnew)
             node = document.createElement("span");
 

@@ -18,12 +18,14 @@ export class GradeGraph {
         var dd = plot_type.indexOf("noextra") >= 0 ? d.series.noextra : d.series.all;
         var ddmin = dd.min();
         var xmin = xmin < 0 ? xmin - 1 : 0;
-        if (d.entry && d.entry.type === "letter")
+        if (d.entry && d.entry.type === "letter") {
             xmin = Math.min(65, ddmin < 0 ? ddmin : Math.max(ddmin - 5, 0));
+        }
         this.min = xmin;
         this.max = dd.max();
-        if (d.maxtotal)
+        if (d.maxtotal) {
             this.max = Math.max(this.max, d.maxtotal);
+        }
         this.total = d.maxtotal;
         this.cutoff = d.cutoff;
 
@@ -213,15 +215,16 @@ export class GradeGraph {
     }
     xtics_xaxis() {
         // determine number
-        var label_restrictions = new IntervalSeq,
+        let label_restrictions = new IntervalSeq,
             tic_restrictions = new IntervalSeq,
             d = [];
 
-        for (i = 0; i !== this.xtics.length; ++i) {
-            xt = this.xtics[i];
-            if (xt.x < this.min || xt.x > this.max)
+        for (let i = 0; i !== this.xtics.length; ++i) {
+            let xt = this.xtics[i];
+            if (xt.x < this.min || xt.x > this.max) {
                 continue;
-            var xxv = this.xax(xt.x);
+            }
+            let xxv = this.xax(xt.x);
             if (xt.notic || !tic_restrictions.contains(xxv)) {
                 if (!xt.notic) {
                     d.push("M", xxv, ",0v5");
@@ -393,7 +396,7 @@ export class GradeGraph {
             cdf = this.last_curve_series.cdf,
             cdfu = this.last_curve_series.cdfu,
             data = [], nr, nrgh,
-            i, ui, xv, yv, j, yc;
+            i, ui, xv, yv, yc;
         if (ispdf) {
             nr = 0.9 / (this.maxp * d.n);
         } else {
@@ -433,7 +436,7 @@ export class GradeGraph {
         dot.setAttribute("class", "pa-gg-mark hl-" + (klass || "main"));
         dot.setAttribute("r", !klass || klass === "main" ? 5 : 3.5);
         return dot;
-    };
+    }
     star_annotation(rs, start, n, klass) {
         if (start == null) {
             start = Math.PI / 2;
@@ -487,9 +490,9 @@ export class GradeGraph {
 
         this.last_highlight = this.last_highlight || {};
         var attrs = this.container().attributes, desired = {}, x;
-        for (var i = 0; i !== attrs.length; ++i) {
+        for (let i = 0; i !== attrs.length; ++i) {
             if (attrs[i].name.startsWith("data-pa-highlight")) {
-                var type;
+                let type;
                 if (attrs[i].name === "data-pa-highlight")
                     type = "main";
                 else
@@ -499,13 +502,13 @@ export class GradeGraph {
             }
         }
 
-        for (var type in this.last_highlight) {
+        for (let type in this.last_highlight) {
             var uids = desired[type] || "";
             if (this.last_highlight[type] === uids)
                 continue;
 
-            var uidm = {}, uidx = uids.split(/\s+/), x;
-            for (var i = 0; i !== uidx.length; ++i) {
+            var uidm = {}, uidx = uids.split(/\s+/);
+            for (let i = 0; i !== uidx.length; ++i) {
                 if (uidx[i] !== "")
                     uidm[uidx[i]] = 1;
             }
@@ -527,7 +530,7 @@ export class GradeGraph {
                 el = elnext;
             }
 
-            for (var i = 0; i !== uidx.length; ++i) {
+            for (let i = 0; i !== uidx.length; ++i) {
                 if (uidm[uidx[i]] === 1
                     && (x = this.user_x(uidx[i])) != null) {
                     var e = this.typed_annotation(type);

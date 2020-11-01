@@ -219,12 +219,12 @@ export function run(button, opt) {
             erange = ebutton.nextSibling;
             etime = erange.nextSibling;
             espeed = etime.nextSibling.nextSibling;
-            erange.addEventListener("input", function (event) {
+            erange.addEventListener("input", function () {
                 running = false;
                 addClass(ebutton, "paused");
                 f(+this.value);
             }, false);
-            ebutton.addEventListener("click", function (event) {
+            ebutton.addEventListener("click", function () {
                 if (hasClass(ebutton, "paused")) {
                     removeClass(ebutton, "paused");
                     running = true;
@@ -237,7 +237,7 @@ export function run(button, opt) {
                     running = false;
                 }
             }, false);
-            espeed.addEventListener("input", function (event) {
+            espeed.addEventListener("input", function () {
                 factor = +this.value;
                 wstorage.site(false, "pa-runspeed-" + category, [factor, (new Date).getTime()]);
                 if (running) {

@@ -1,4 +1,5 @@
 import { terser } from "rollup-plugin-terser";
+import { eslint } from "rollup-plugin-eslint";
 const fs = require("fs");
 
 // append mtime to sourcemap
@@ -22,12 +23,16 @@ const sourcemap_mtime = {
 
 export default [{
     input: "scriptsrc/main.js",
+    plugins: [eslint()],
     output: {
         file: "scripts/pa.min.js",
         format: "iife",
         sourcemap: true,
         sourcemapExcludeSources: true,
-        plugins: [terser(), sourcemap_mtime],
+        plugins: [
+            terser(),
+            sourcemap_mtime
+        ],
         name: "$pa"
     }
 }];

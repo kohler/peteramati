@@ -17,15 +17,15 @@ handle_ui.on("js-repo-copy", function () {
     range.selectNode(node);
     window.getSelection().removeAllRanges();
     window.getSelection().addRange(range);
-    var worked;
     try {
-        worked = document.execCommand("copy");
+        document.execCommand("copy");
     } catch (err) {
     }
     window.getSelection().removeAllRanges();
     bub.remove();
-    if (global_tooltip && global_tooltip.elt == this)
+    if (global_tooltip && global_tooltip.elt == this) {
         global_tooltip.text(this.getAttribute("data-pa-repo"));
+    }
 });
 
 handle_ui.on("js-repo-list", function (event) {
