@@ -4,6 +4,7 @@
 
 import { wstorage, sprintf, strftime } from "./utils.js";
 import { hasClass, addClass, removeClass, fold61, handle_ui } from "./ui.js";
+import { event_key, event_modkey } from "./ui-key.js";
 import { render_terminal } from "./render-terminal.js";
 import { grades_fetch } from "./grades.js";
 
