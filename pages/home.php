@@ -375,7 +375,7 @@ function download_psets_report($request) {
         $selection = ["name", "username", "anon_username", "email", "huid", "extension", "npartners"];
     }
 
-    $grouped_psets = $sel_pset ? ["" => [$sel_pset]] : $Conf->pset_categories();
+    $grouped_psets = $sel_pset ? ["" => [$sel_pset]] : $Conf->psets_by_category();
 
     foreach ($grouped_psets as $grp => $psets) {
         foreach ($psets as $pset) {

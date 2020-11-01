@@ -132,7 +132,7 @@ class MailSender {
         global $Conf, $Me, $Qreq;
         if ($this->started)
             return;
-        echo Ht::form_div(hoturl_post("mail"));
+        echo Ht::form(hoturl_post("mail"));
         foreach (array("recipients", "subject", "emailBody", "cc", "replyto", "q", "t", "plimit") as $x)
             if (isset($Qreq[$x]))
                 echo Ht::hidden($x, $Qreq[$x]);
@@ -386,7 +386,7 @@ class MailSender {
             return false;
         else if (!$this->sending)
             $this->echo_actions();
-        echo "</div></form>";
+        echo "</form>";
         echo Ht::unstash_script("\$pa.fold('mail', null);");
         $Conf->footer();
         exit;
