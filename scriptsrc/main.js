@@ -86,14 +86,15 @@ $.fn.extend({
         return this;
     },
     serializeWith: function(data) {
-        var s = this.serialize(), i, sep;
+        var s = this.serialize();
         if (s != null && data) {
-            sep = s.length && s[s.length - 1] != "&" ? "&" : "";
-            for (i in data)
+            let sep = s.length && s[s.length - 1] != "&" ? "&" : "";
+            for (let i in data) {
                 if (data[i] != null) {
                     s += sep + encodeURIComponent(i) + "=" + encodeURIComponent(data[i]);
                     sep = "&";
                 }
+            }
         }
         return s;
     }

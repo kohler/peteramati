@@ -1406,7 +1406,7 @@ function show_pset_table($sset) {
         || (!$pset->gitless && $pset->runners);
 
     $rows = array();
-    $incomplete = array();
+    $incomplete = $incompleteu = [];
     $grades_visible = false;
     $jx = [];
     $gradercounts = [];
@@ -1427,26 +1427,31 @@ function show_pset_table($sset) {
                 $u = $sset->viewer->user_linkpart($s->user);
                 $t = '<a href="' . hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
                     . htmlspecialchars($u);
-                if ($s->user->incomplete !== true)
+                if ($s->user->incomplete !== true) {
                     $t .= " (" . $s->user->incomplete . ")";
+                }
                 $incomplete[] = $t . '</a>';
+                $incompleteu[] = "~" . urlencode($u);
             }
-            if ($s->user_can_view_grades())
+            if ($s->user_can_view_grades()) {
                 $grades_visible = true;
+            }
         }
     }
 
     if (!empty($incomplete)) {
-        echo '<div id="incomplete_pset', $pset->id, '" style="display:none" class="merror">',
-            '<strong>', htmlspecialchars($pset->title), '</strong>: ',
+        echo '<div id="incomplete_pset', $pset->id, '" class="merror hidden has-hotlist" data-hotlist="',
+            htmlspecialchars(json_encode_browser(["pset" => $pset->urlkey, "items" => $incompleteu])),
+            '"><strong>', htmlspecialchars($pset->title), '</strong>: ',
             'Your grading is incomplete. Missing grades: ', join(", ", $incomplete), '</div>',
-            '<script>$("#incomplete_pset', $pset->id, '").remove().show().appendTo("#incomplete_notices")</script>';
+            '<script>$("#incomplete_pset', $pset->id, '").remove().removeClass("hidden").appendTo("#incomplete_notices")</script>';
     }
 
     if ($checkbox) {
         echo Ht::form(hoturl_post("index", ["pset" => $pset->urlkey, "save" => 1]));
-        if ($pset->anonymous)
+        if ($pset->anonymous) {
             echo Ht::hidden("anonymous", $anonymous ? 1 : 0);
+        }
     }
 
     echo '<div class="gtable-container-0"><div class="gtable-container-1"><table class="gtable want-gtable-fixed" id="pa-pset' . $pset->id . '"></table></div></div>';
