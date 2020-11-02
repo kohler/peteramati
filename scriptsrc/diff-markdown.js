@@ -77,14 +77,14 @@ function modify_landmark(base) {
 
 function modify_landmark_image(base) {
     function fix(pi, file) {
-        return siteinfo.site_relative + "~" + encodeURIComponent(peteramati_uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + file;
+        return siteinfo.site_relative + "~" + encodeURIComponent(siteinfo.uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + file;
     }
     return function (tokens, idx, options, env, self) {
         var token = tokens[idx],
             srci = token.attrIndex("src"),
             src = token.attrs[srci][1],
             pi, m, m2;
-        if (peteramati_uservalue
+        if (siteinfo.uservalue
             && mdcontext
             && (pi = mdcontext.closest(".pa-psetinfo"))) {
             if (!/\/\//.test(src)) {
@@ -388,7 +388,7 @@ function filediff_highlight() {
     addClass(this, "pa-highlight");
 }
 
-function filediff_unhighlight() {
+export function filediff_unhighlight() {
     // compute language
     var lang = this.getAttribute("data-language"),
         langclass = lang ? "language-" + lang : "",

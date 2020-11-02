@@ -16,7 +16,7 @@ if (isset($Qreq->u)
     redirectSelf(["u" => null]);
 }
 assert($User === $Me || $Me->isPC);
-Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
+Ht::stash_script("siteinfo.uservalue=" . json_encode_browser($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 if ($Pset->gitless) {

@@ -4,6 +4,7 @@
 
 import { ImmediatePromise } from "./utils.js";
 import { hasClass, removeClass, toggleClass, fold61, handle_ui } from "./ui.js";
+import { push_history_state } from "./ui-history.js";
 import { hoturl, hoturl_gradeparts } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
 

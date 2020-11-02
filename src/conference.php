@@ -128,6 +128,9 @@ class Conf {
     const USERNAME_USERNAME = 16;
     private $_username_classes = 0;
 
+    /** @var false|null|SessionList */
+    private $_active_list = false;
+
     /** @var Conf */
     static public $main;
     /** @var int */
@@ -1398,6 +1401,24 @@ class Conf {
     // Conference header, footer
     //
 
+    /** @return bool */
+    function has_active_list() {
+        return !!$this->_active_list;
+    }
+
+    /** @return ?SessionList */
+    function active_list() {
+        if ($this->_active_list === false) {
+            $this->_active_list = null;
+        }
+        return $this->_active_list;
+    }
+
+    function set_active_list(SessionList $list = null) {
+        assert($this->_active_list === false);
+        $this->_active_list = $list;
+    }
+
     function set_siteurl($base) {
         $old_siteurl = Navigation::siteurl();
         $base = Navigation::set_siteurl($base);
@@ -1726,22 +1747,22 @@ class Conf {
             $title = preg_replace(",(?: |&nbsp;|\302\240)+,", " ", $title);
             $title = str_replace("&#x2215;", "-", $title);
         }
-        if ($title)
+        if ($title) {
             echo $title, " - ";
+        }
         echo htmlspecialchars($this->short_name), "</title>\n";
 
         // <body>
         echo "</head>\n<body", ($id ? " id=\"$id\"" : "");
-        $slist = $this->session_list();
-        if (($options["body_class"] ?? null) || $slist) {
+        if (($options["body_class"] ?? null) || $this->_active_list) {
             echo ' class="', $options["body_class"] ?? "";
-            if ($slist) {
+            if ($this->_active_list) {
                 echo isset($options["body_class"]) ? " " : "", "has-hotlist";
             }
             echo '"';
         }
-        if ($slist) {
-            echo ' data-hotlist="', htmlspecialchars($slist->id), '"';
+        if ($this->_active_list) {
+            echo ' data-hotlist="', htmlspecialchars($this->_active_list->listid), '"';
         }
         echo " onload=\"\$pa.onload()\" data-now=\"", Conf::$now, "\">\n";
 

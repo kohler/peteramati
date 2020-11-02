@@ -15,15 +15,6 @@ function serialize_object(x) {
         return "";
 }
 
-function hoturl_add(url, component) {
-    var hash = url.indexOf("#");
-    if (hash >= 0) {
-        component += url.substring(hash);
-        url = url.substring(0, hash);
-    }
-    return url + (url.indexOf("?") < 0 ? "?" : "&") + component;
-}
-
 function hoturl_clean_before(x, page_component, prefix) {
     if (x.first !== false && x.v.length) {
         for (var i = 0; i < x.v.length; ++i) {
@@ -116,7 +107,7 @@ export function hoturl_gradeparts(e, args) {
     var p = e.closest(".pa-psetinfo"), v;
     args = args || {};
     v = p.getAttribute("data-pa-user");
-    args.u = v || peteramati_uservalue;
+    args.u = v || siteinfo.uservalue;
     if ((v = p.getAttribute("data-pa-pset"))) {
         args.pset = v;
     }

@@ -23,8 +23,8 @@ handle_ui.on("js-repo-copy", function () {
     }
     window.getSelection().removeAllRanges();
     bub.remove();
-    if (global_tooltip && global_tooltip.elt == this) {
-        global_tooltip.text(this.getAttribute("data-pa-repo"));
+    if (window.global_tooltip && window.global_tooltip.elt == this) {
+        window.global_tooltip.text(this.getAttribute("data-pa-repo"));
     }
 });
 

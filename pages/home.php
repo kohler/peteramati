@@ -1042,7 +1042,7 @@ function show_pset($pset, $user) {
 }
 
 if (!$Me->is_empty() && $User->is_student()) {
-    Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
+    Ht::stash_script("siteinfo.uservalue=" . json_encode_browser($Me->user_linkpart($User)));
     foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset) && !$pset->disabled)
             show_pset($pset, $User);
@@ -1590,7 +1590,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             $psetj[$pset->psetid] = $pj;
         }
     }
-    Ht::stash_script('peteramati_psets=' . json_encode_browser($psetj) . ';');
+    Ht::stash_script('siteinfo.psets=' . json_encode_browser($psetj) . ';');
 
     $pctable = [];
     foreach ($Conf->pc_members_and_admins() as $pc) {

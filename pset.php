@@ -16,7 +16,7 @@ if (isset($Qreq->u)
     redirectSelf(array("u" => null));
 }
 assert($User === $Me || $Me->isPC);
-Ht::stash_script("peteramati_uservalue=" . json_encode_browser($Me->user_linkpart($User)));
+Ht::stash_script("siteinfo.uservalue=" . json_encode_browser($Me->user_linkpart($User)));
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
@@ -29,6 +29,7 @@ if (!$Info->set_hash($commit) && $commit && $Info->repo) {
     $Conf->errorMsg("Commit " . htmlspecialchars($commit) . " isn’t connected to this repository.");
     redirectSelf(array("newcommit" => null, "commit" => null));
 }
+$Conf->set_active_list(SessionList::find($Me, $Qreq));
 
 // maybe set commit
 if (isset($Qreq->setgrader)
@@ -250,8 +251,8 @@ function session_list_link($where, PsetView $info, $isprev) {
         . ($isprev ? "« " : "") . $t . ($isprev ? "" : " »") . '</a>';
 }
 
-function echo_session_list_links(PsetView $info, Qrequest $qreq) {
-    if (($sl = SessionList::find($info->user, $qreq))) {
+function echo_session_list_links(PsetView $info) {
+    if (($sl = $info->conf->active_list())) {
         echo '<div class="pa-list-links">';
         if ($sl->prev ?? null) {
             echo session_list_link($sl->prev, $info, true);
@@ -267,7 +268,7 @@ function echo_session_list_links(PsetView $info, Qrequest $qreq) {
 }
 
 if ($Me->isPC) {
-    echo_session_list_links($Info, $Qreq);
+    echo_session_list_links($Info);
 }
 
 ContactView::echo_heading($User);

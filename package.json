@@ -26,6 +26,12 @@
             "sourceType": "module"
         },
         "extends": ["eslint:recommended"],
+        "rules": {
+            "no-empty": ["error", {"allowEmptyCatch": true}],
+            "no-control-regex": "off",
+            "no-useless-escape": "off",
+            "no-constant-condition": ["error", {"checkLoops": false}]
+        },
         "globals": {
             "$pa": "writeable",
             "Terminal": "readonly",

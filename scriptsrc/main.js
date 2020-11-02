@@ -7,6 +7,7 @@ import {
     hasClass, addClass, removeClass, toggleClass, classList, handle_ui
     } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
+import { push_history_state } from "./ui-history.js";
 import { hoturl, hoturl_post, hoturl_gradeparts } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import "./ui-autogrow.js";
@@ -101,27 +102,6 @@ $.fn.extend({
 
 // history
 
-var push_history_state, ever_push_history_state = false;
-if ("pushState" in window.history) {
-    push_history_state = function (href) {
-        var state;
-        if (!history.state) {
-            state = {href: location.href};
-            $(document).trigger("collectState", [state]);
-            history.replaceState(state, document.title, state.href);
-        }
-        if (href) {
-            state = {href: href};
-            $(document).trigger("collectState", [state]);
-            history.pushState(state, document.title, state.href);
-        }
-        ever_push_history_state = true;
-        return true;
-    };
-} else {
-    push_history_state = function () { return false; };
-}
-
 
 // text transformation
 function text_eq(a, b) {
@@ -130,48 +110,6 @@ function text_eq(a, b) {
     a = (a == null ? "" : a).replace(/\r\n?/g, "\n");
     b = (b == null ? "" : b).replace(/\r\n?/g, "\n");
     return a === b;
-}
-
-function plural_noun(n, what) {
-    if ($.isArray(n))
-        n = n.length;
-    if (n == 1)
-        return what;
-    if (what == "this")
-        return "these";
-    if (/^.*?(?:s|sh|ch|[bcdfgjklmnpqrstvxz][oy])$/.test(what)) {
-        if (what.charAt(what.length - 1) === "y")
-            return what.substring(0, what.length - 1) + "ies";
-        else
-            return what + "es";
-    } else
-        return what + "s";
-}
-
-function plural(n, what) {
-    if ($.isArray(n))
-        n = n.length;
-    return n + " " + plural_noun(n, what);
-}
-
-function ordinal(n) {
-    if (n >= 1 && n <= 3)
-        return n + ["st", "nd", "rd"][Math.floor(n - 1)];
-    else
-        return n + "th";
-}
-
-function commajoin(a, joinword) {
-    var l = a.length;
-    joinword = joinword || "and";
-    if (l == 0)
-        return "";
-    else if (l == 1)
-        return a[0];
-    else if (l == 2)
-        return a[0] + " " + joinword + " " + a[1];
-    else
-        return a.slice(0, l - 1).join(", ") + ", " + joinword + " " + a[l - 1];
 }
 
 function now_msec() {
@@ -230,33 +168,6 @@ function input_differs(elt) {
     }
 }
 
-function form_differs(form, want_ediff) {
-    var ediff = null, $is = $(form).find("input, select, textarea");
-    if (!$is.length)
-        $is = $(form).filter("input, select, textarea");
-    $is.each(function () {
-        if (!hasClass(this, "ignore-diff") && input_differs(this)) {
-            ediff = this;
-            return false;
-        }
-    });
-    return want_ediff ? ediff : !!ediff;
-}
-
-function form_highlight(form, elt) {
-    (form instanceof HTMLElement) || (form = $(form)[0]);
-    toggleClass(form, "alert", (elt && form_differs(elt)) || form_differs(form));
-}
-
-function hiliter_children(form) {
-    form = $(form)[0];
-    form_highlight(form);
-    $(form).on("change input", "input, select, textarea", function () {
-        if (!hasClass(this, "ignore-diff") && !hasClass(form, "ignore-diff"))
-            form_highlight(form, this);
-    });
-}
-
 $(function () {
     $("form.need-unload-protection").each(function () {
         var form = this;
@@ -282,27 +193,6 @@ function focus_at(felt) {
             }
         }
         felt.hotcrp_ever_focused = true;
-    }
-}
-
-function focus_within(elt, subfocus_selector) {
-    var $wf = $(elt).find(".want-focus");
-    if (subfocus_selector)
-        $wf = $wf.filter(subfocus_selector);
-    if ($wf.length == 1)
-        focus_at($wf[0]);
-    return $wf.length == 1;
-}
-
-function refocus_within(elt) {
-    var focused = document.activeElement;
-    if (focused && focused.tagName !== "A" && !$(focused).is(":visible")) {
-        while (focused && focused !== elt)
-            focused = focused.parentElement;
-        if (focused) {
-            var focusable = $(elt).find("input, select, textarea, a, button").filter(":visible").first();
-            focusable.length ? focusable.focus() : $(document.activeElement).blur();
-        }
     }
 }
 
@@ -2468,7 +2358,7 @@ function pa_checklatest() {
 
     function checkdata(d) {
         if (d && d.hash && d.hash !== hash && (!d.snaphash || d.snaphash !== hash)) {
-            $(".pa-commitcontainer .pa-pd").first().append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: peteramati_uservalue, pset: pset, commit: d.hash}) + "\">Load them</a></div>");
+            $(".pa-commitcontainer .pa-pd").first().append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: d.hash}) + "\">Load them</a></div>");
             clearTimeout(timeout);
         }
     }
@@ -2483,7 +2373,7 @@ function pa_checklatest() {
             timeout = setTimeout(docheck, (now - start) * 1.25);
         else
             timeout = null;
-        $.ajax(hoturl_post("api/latestcommit", {u: peteramati_uservalue, pset: pset}), {
+        $.ajax(hoturl_post("api/latestcommit", {u: siteinfo.uservalue, pset: pset}), {
                 type: "GET", cache: false, dataType: "json", success: checkdata
             });
     }
@@ -2555,7 +2445,7 @@ function pa_render_pset_table(pconf, data) {
             th: '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>',
             td: function (s) {
                 return '<td class="gt-pset"><a href="' + escaped_href(s) + '" class="track">' +
-                   escape_entities(peteramati_psets[s.psetid].title) +
+                   escape_entities(siteinfo.psets[s.psetid].title) +
                    (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>';
             },
             tw: 12
@@ -2905,7 +2795,7 @@ function pa_render_pset_table(pconf, data) {
     function url_gradeparts(s) {
         var args = {
             u: ukey(s),
-            pset: s.psetid ? peteramati_psets[s.psetid].urlkey : pconf.key
+            pset: s.psetid ? siteinfo.psets[s.psetid].urlkey : pconf.key
         };
         if (s.hash && (!s.is_grade || flagged)) {
             args.commit = s.hash;
@@ -2980,7 +2870,7 @@ function pa_render_pset_table(pconf, data) {
             var s = data[i],
                 t = "~".concat(encodeURIComponent(ukey(s)));
             if (flagged) {
-                t = t.concat("/pset/", peteramati_psets[s.psetid].urlkey);
+                t = t.concat("/pset/", siteinfo.psets[s.psetid].urlkey);
                 if (s.hash)
                     t = t.concat("/", s.hash);
             }
@@ -3101,8 +2991,9 @@ function pa_render_pset_table(pconf, data) {
         evt.stopPropagation();
     }
     function overlay_create() {
-        var li, ri, tw = 0, t, a = [];
-        for (li = 0; li !== col.length && !col[li].pin; ++li) {
+        let li = 0, ri, tw = 0, t, a = [];
+        while (li !== col.length && !col[li].pin) {
+            ++li;
         }
         for (ri = li; ri !== col.length && col[ri].pin; ++ri) {
             tw += col[ri].width;
@@ -3234,7 +3125,7 @@ function pa_render_pset_table(pconf, data) {
                 if (a.boringness !== b.boringness)
                     return a.boringness - b.boringness;
                 else if (a.psetid != b.psetid)
-                    return peteramati_psets[a.psetid].pos < peteramati_psets[b.psetid].pos ? -rev : rev;
+                    return siteinfo.psets[a.psetid].pos < siteinfo.psets[b.psetid].pos ? -rev : rev;
                 else
                     return a.pos < b.pos ? -rev : rev;
             });
@@ -3594,7 +3485,9 @@ function pa_render_pset_table(pconf, data) {
     });
 
     function make_overlay_observer() {
-        for (var i = 0; i !== col.length && !col[i].pin; ++i) {
+        let i = 0;
+        while (i !== col.length && !col[i].pin) {
+            ++i;
         }
         var overlay_div = $('<div style="position:absolute;left:0;top:0;bottom:0;width:' + (col[i].left - 10) + 'px;pointer-events:none"></div>').prependTo($j.parent())[0],
             table_hit = false, left_hit = false;
