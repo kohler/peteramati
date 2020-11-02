@@ -16,7 +16,7 @@ if (isset($Qreq->u)
     redirectSelf(array("u" => null));
 }
 assert($User === $Me || $Me->isPC);
-Ht::stash_script("siteinfo.uservalue=" . json_encode_browser($Me->user_linkpart($User)));
+$Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 

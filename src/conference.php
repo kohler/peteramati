@@ -77,6 +77,7 @@ class Conf {
     public $validate_timeout;
     public $validate_overall_timeout;
 
+    /** @var bool */
     private $_header_printed = false;
     /** @var ?list<array{string,string}> */
     private $_save_msgs;
@@ -130,6 +131,8 @@ class Conf {
 
     /** @var false|null|SessionList */
     private $_active_list = false;
+    /** @var ?array */
+    private $_siteinfo;
 
     /** @var Conf */
     static public $main;
@@ -1684,6 +1687,15 @@ class Conf {
         $this->opt["javascripts"][] = $file;
     }
 
+    /** @param string $key */
+    function set_siteinfo($key, $value) {
+        if ($this->_header_printed) {
+            Ht::stash_script("siteinfo.$key = " . json_encode_browser($value) . ";");
+        } else {
+            $this->_siteinfo[$key] = $value;
+        }
+    }
+
     function set_cookie($name, $value, $expires_at) {
         $opt = [
             "expires" => $expires_at, "path" => Navigation::site_path(),
@@ -1825,6 +1837,10 @@ class Conf {
         if ($Me && $Me->is_pclike()) {
             $siteinfo["user"]["is_pclike"] = true;
         }
+        foreach ($this->_siteinfo ?? [] as $k => $v) {
+            $siteinfo[$k] = $v;
+        }
+        $this->_siteinfo = null;
         Ht::stash_script("window.siteinfo=" . json_encode_browser($siteinfo) . ";");
 
         // pa.js
