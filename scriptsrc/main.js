@@ -560,8 +560,8 @@ function foldup(event, opts) {
 handle_ui.on("js-foldup", foldup);
 
 
-handle_ui.on("pa-pset-upload-grades", function () {
-    $("#upload").show();
+handle_ui.on("js-pset-upload-grades", function () {
+    $("#upload").removeClass("hidden");
 });
 
 handle_ui.on("pa-signin-radio", function () {

@@ -185,10 +185,11 @@ function upload_grades($pset, $text, $fname) {
 
 if ($Me->isPC && check_post() && isset($Qreq->uploadgrades)
     && file_uploaded($_FILES["file"])) {
-    if (($text = file_get_contents($_FILES["file"]["tmp_name"])) === false)
-	$Conf->errorMsg("Internal error: cannot read file.");
-    else if (upload_grades($Pset, $text, $_FILES["file"]["name"]))
+    if (($text = file_get_contents($_FILES["file"]["tmp_name"])) === false) {
+    	$Conf->errorMsg("Internal error: cannot read file.");
+    } else if (upload_grades($Pset, $text, $_FILES["file"]["name"])) {
         redirectSelf();
+    }
 }
 
 // save tab width, wdiff
@@ -590,7 +591,7 @@ function show_pset($info) {
 show_pset($Info);
 
 if ($Info->can_edit_grades_staff()) {
-    echo '<div id="upload" style="display:none"><hr/>',
+    echo '<div id="upload" class="hidden"><hr/>',
         Ht::form($Info->hoturl_post("pset", ["uploadgrades" => 1])),
         '<div class="f-contain">',
         '<input type="file" name="file">',
