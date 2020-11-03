@@ -545,7 +545,7 @@ function echo_all_grades($info) {
         }
         echo '<div class="pa-gradelist want-pa-landmark-links',
             ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
-        Ht::stash_script('$(".pa-psetinfo").first().data("pa-gradeinfo", ' . json_encode_browser($info->grade_json()) . ').each($pa.loadgrades);');
+        Ht::stash_script('$pa.store_gradeinfo($(".pa-psetinfo")[0],' . json_encode_browser($info->grade_json()) . ');');
         if ($info->pset->has_grade_landmark) {
             Ht::stash_script('$(function(){$(".pa-psetinfo").each($pa.loadgrades)})');
         }

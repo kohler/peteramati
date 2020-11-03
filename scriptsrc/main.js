@@ -8,11 +8,11 @@ import {
     } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { push_history_state } from "./ui-history.js";
-import { hoturl, hoturl_post, hoturl_gradeparts } from "./hoturl.js";
-import { api_conditioner } from "./xhr.js";
 import "./ui-autogrow.js";
 import "./ui-range.js";
 import "./ui-sessionlist.js";
+import { hoturl, hoturl_post, hoturl_gradeparts } from "./hoturl.js";
+import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
 import { tooltip } from "./tooltip.js";
 import "./pset.js";
@@ -25,6 +25,7 @@ import { run } from "./run.js";
 import { run_settings_load } from "./run-settings.js";
 import { GradeKde, GradeStats } from "./gradestats.js";
 import { GradeGraph } from "./gradegraph.js";
+import { GradeEntry } from "./gradeentry.js";
 
 function $$(id) {
     return document.getElementById(id);
@@ -1116,6 +1117,7 @@ var pa_grade_types = window.pa_grade_types = {};
 function pa_add_grade_type(name, rest) {
     rest.type = name;
     rest.tcell = rest.tcell || rest.text;
+    rest.simple_text = rest.simple_text || rest.text;
     pa_grade_types[name] = rest;
 }
 
@@ -1162,15 +1164,16 @@ pa_add_grade_type("select", {
 });
 
 pa_add_grade_type("checkbox", {
-    text: function (v, nopretty) {
-        if (nopretty)
-            return v + "";
-        else if (v == null || v === 0)
+    text: function (v) {
+        if (v == null || v === 0)
             return "–";
         else if (v == (this.max || 1))
             return "✓";
         else
             return v + "";
+    },
+    simple_text: function (v) {
+        return v + "";
     },
     tcell: function (v) {
         if (v == null || v === 0)
@@ -1206,15 +1209,16 @@ pa_add_grade_type("checkbox", {
 (function () {
 function make_checkboxlike(str) {
     return {
-        text: function (v, nopretty) {
-            if (nopretty)
-                return v + "";
-            else if (v == null || v === 0)
+        text: function (v) {
+            if (v == null || v === 0)
                 return "–";
             else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05)
                 return str.repeat(Math.round(v));
             else
                 return v + "";
+        },
+        simple_text: function (v) {
+            return v + "";
         },
         tcell: function (v) {
             if (v == null || v === 0)
@@ -1314,53 +1318,8 @@ pa_add_grade_type("letter", {
 });
 })();
 
-function pa_render_grade_entry(ge, editable, live) {
-    var t, name = ge.key, title = ge.title ? escape_entities(ge.title) : name,
-        typeinfo = pa_grade_types[ge.type || "numeric"];
-    if ((editable || ge.student) && typeinfo.entry) {
-        live = live !== false;
-        var opts = {editable: editable},
-            id = "pa-ge" + ++pa_render_grade_entry.id_counter;
-        t = (live ? '<form class="ui-submit ' : '<div class="') + 'pa-grade pa-p';
-        if (ge.type === "section") {
-            t += ' pa-p-section';
-        }
-        if (ge.visible === false) {
-            t += ' pa-p-hidden';
-        }
-        t = t.concat('" data-pa-grade="', name);
-        if (!live) {
-            t = t.concat('" data-pa-grade-type="', typeinfo.type);
-        }
-        t = t.concat('"><label class="pa-pt" for="', id, '">', title, '</label>');
-        if (ge.edit_description) {
-            t += '<div class="pa-pdesc">' + escape_entities(ge.edit_description) + '</div>';
-        }
-        t += typeinfo.entry.call(ge, id, opts) + (live ? '</form>' : '</div>');
-    } else {
-        t = '<div class="pa-grade pa-p';
-        if (ge.type === "section") {
-            t += ' pa-p-section';
-        }
-        t += '" data-pa-grade="' + name + '">' +
-            '<div class="pa-pt">' + title + '</div>';
-        if (ge.type === "text") {
-            t += '<div class="pa-pd pa-gradevalue"></div>';
-        } else {
-            t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
-            if (ge.max && ge.type !== "letter") {
-                t += ' <span class="pa-gradedesc">of ' + ge.max + '</span>';
-            }
-            t += '</div>';
-        }
-        t += '</div>';
-    }
-    return t;
-}
-pa_render_grade_entry.id_counter = 0;
-
 function pa_grade_uncheckbox() {
-    var ge = pa_grade_entry.call(this);
+    var ge = GradeEntry.closest(this);
     if (this.type === "checkbox")
         this.value = this.checked ? ge.max : "";
     this.type = "text";
@@ -1378,7 +1337,7 @@ handle_ui.on("pa-grade-uncheckbox", function () {
 });
 
 function pa_grade_recheckbox() {
-    var v = this.value.trim(), ge = pa_grade_entry.call(this);
+    var v = this.value.trim(), ge = GradeEntry.closest(this);
     this.type = "checkbox";
     this.checked = v !== "" && v !== "0";
     this.value = ge.max;
@@ -1407,7 +1366,7 @@ function pa_set_grade(ge, g, ag, options) {
             $g.find(".pa-gradediffers").remove();
         } else {
             var txt = (ge.key === "late_hours" ? "auto-late hours" : "autograde") +
-                " is " + typeinfo.text.call(ge, ag);
+                " is " + ge.text(ag);
             if (!$g.find(".pa-gradediffers").length) {
                 $g.find(".pa-pd").first().append('<span class="pa-gradediffers"></span>');
             }
@@ -1421,7 +1380,7 @@ function pa_set_grade(ge, g, ag, options) {
     // actual grade value
     var gt;
     if (editable) {
-        gt = g == null ? "" : typeinfo.text.call(ge, g, true);
+        gt = g == null ? "" : ge.simple_text(g);
         if (typeinfo.reflect_value)
             typeinfo.reflect_value.call(ge, $v[0], g, options || {});
         else if ($v.val() !== gt) {
@@ -1443,7 +1402,7 @@ function pa_set_grade(ge, g, ag, options) {
             }
         }
         if (options && options.reset) {
-            $v[0].setAttribute("data-default-value", g == null ? "" : typeinfo.text.call(ge, g, true));
+            $v[0].setAttribute("data-default-value", g == null ? "" : ge.simple_text(g));
             if (options.mixed) {
                 $v[0].setAttribute("placeholder", "Mixed");
                 if (typeinfo.type === "select") {
@@ -1453,7 +1412,7 @@ function pa_set_grade(ge, g, ag, options) {
             }
         }
     } else {
-        gt = typeinfo.text.call(ge, g, false);
+        gt = ge.text(g);
         if ($v.text() !== gt) {
             $v.text(gt);
         }
@@ -1495,30 +1454,6 @@ handle_ui.on("pa-gradevalue", function () {
         setTimeout(function () { typeinfo.reflect_value.call(null, self, +self.value, {}) }, 0);
 });
 
-function pa_gradeinfo() {
-    var e = this.closest(".pa-psetinfo"), gi = null;
-    while (e) {
-        var gix = $(e).data("pa-gradeinfo");
-        if (typeof gix === "string") {
-            gix = JSON.parse(gix);
-            $(e).data("pa-gradeinfo", gix);
-        }
-        gi = gi ? $.extend(gi, gix) : gix;
-        if (gi && gi.entries) {
-            break;
-        }
-        e = e.parentElement.closest(".pa-psetinfo");
-    }
-    return gi;
-}
-
-function pa_grade_entry() {
-    var e = this.closest(".pa-grade"),
-        gi = pa_gradeinfo.call(e);
-    return gi.entries[e.getAttribute("data-pa-grade")];
-}
-
-
 
 (function () {
 function save_grade(self) {
@@ -1532,7 +1467,7 @@ function save_grade(self) {
     }
     $gd.append('<span class="pa-save-message"><span class="spinner"></span></span>');
 
-    var gi = pa_gradeinfo.call(self), g = {}, og = {};
+    var gi = GradeEntry.closest_set(self), g = {}, og = {};
     $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
         var ge = gi.entries[this.name];
         if (gi.grades && ge && gi.grades[ge.pos] != null) {
@@ -1555,7 +1490,7 @@ function save_grade(self) {
             $f.removeData("paOutstandingPromise");
             if (data.ok) {
                 $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
-                $(self).closest(".pa-psetinfo").data("pa-gradeinfo", data).each(pa_loadgrades);
+                $(self).closest(".pa-psetinfo").data("pa-gradeinfo", GradeEntry.realize(data)).each(pa_loadgrades);
                 resolve(self);
             } else {
                 $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
@@ -1576,7 +1511,7 @@ handle_ui.on("pa-grade", function (event) {
 })();
 
 function pa_show_grade(gi) {
-    gi = gi || pa_gradeinfo.call(this);
+    gi = gi || GradeEntry.closest_set(this);
     var k = this.getAttribute("data-pa-grade"), ge = gi.entries[k];
     if (k === "late_hours") {
         pa_set_grade.call(this, {key: "late_hours"}, gi.late_hours, gi.auto_late_hours);
@@ -1588,11 +1523,11 @@ function pa_show_grade(gi) {
 function pa_resolve_grade() {
     removeClass(this, "need-pa-grade");
     var k = this.getAttribute("data-pa-grade"),
-        gi = pa_gradeinfo.call(this), ge;
+        gi = GradeEntry.closest_set(this), ge;
     if (!gi || !k || !(ge = gi.entries[k])) {
         return;
     }
-    $(this).html(pa_render_grade_entry(ge, gi.editable));
+    $(this).html(ge.html_skeleton(gi.editable));
     $(this).find(".need-autogrow").autogrow();
     pa_show_grade.call($(this).find(".pa-grade")[0], gi);
     if (ge.landmark_range && this.closest(".pa-gradebox")) {
@@ -1642,7 +1577,7 @@ handle_ui.on("pa-grade-button", function (event) {
 function pa_resolve_gradelist() {
     removeClass(this, "need-pa-gradelist");
     addClass(this, "pa-gradelist");
-    let pi = this.closest(".pa-psetinfo"), gi = pa_gradeinfo.call(pi);
+    let pi = this.closest(".pa-psetinfo"), gi = GradeEntry.closest_set(pi);
     if (!gi) {
         return;
     }
@@ -1656,7 +1591,7 @@ function pa_resolve_gradelist() {
             if (ch && ch.getAttribute("data-pa-grade") === k) {
                 ch = ch.nextSibling;
             } else {
-                let e = $(pa_render_grade_entry(gi.entries[k], gi.editable))[0];
+                let e = $(gi.entries[k].html_skeleton(gi.editable))[0];
                 this.insertBefore(e, ch);
                 pa_show_grade.call(e, gi);
             }
@@ -1695,7 +1630,7 @@ function pa_loadgrades() {
     if (!hasClass(this, "pa-psetinfo")) {
         throw new Error("bad pa_loadgrades");
     }
-    var gi = pa_gradeinfo.call(this);
+    var gi = GradeEntry.closest_set(this);
     if (!gi || !gi.order) {
         return;
     }
@@ -1743,7 +1678,7 @@ function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
     if (typeof lnfirst === "function") {
         func = lnfirst;
         selector = lnlast;
-        var ge = pa_grade_entry.call(this),
+        var ge = GradeEntry.closest(this),
             m = ge && ge.landmark_range ? /:(\d+):(\d+)$/.exec(ge.landmark_range) : null;
         if (!m || !(tr = tr.closest(".pa-filediff"))) {
             return null;
@@ -1773,7 +1708,7 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
         title = $(gr).find(".pa-pt").html(),
         sum = null;
     if (!ge) {
-        ge = pa_grade_entry.call(gr);
+        ge = GradeEntry.closest(gr);
     }
 
     pa_process_landmark_range.call(this, function (tr) {
@@ -2558,7 +2493,7 @@ function pa_render_pset_table(pconf, data) {
             },
             td: function (s, rownum, text) {
                 var gr = s.grades[this.gidx],
-                    gt = escape_entities(this.typeinfo.tcell.call(this.ge, gr));
+                    gt = escape_entities(this.ge.tcell(gr));
                 if (text) {
                     return gt;
                 } else {
@@ -2654,45 +2589,13 @@ function pa_render_pset_table(pconf, data) {
 
         grade_entries = [];
         grade_keys = [];
-        var grade_abbr = [];
         if (pconf.grades) {
-            var pabbr = {}, grade_titles = [];
+            pconf.grades = GradeEntry.realize(pconf.grades);
             for (let i = 0; i !== pconf.grades.order.length; ++i) {
                 var k = pconf.grades.order[i], ge = pconf.grades.entries[k];
                 if (ge.type !== "text") {
                     grade_entries.push(ge);
                     grade_keys.push(k);
-                    var t = ge.title || k;
-                    grade_titles.push(t);
-                    var m = t.match(/^(p)(?:art\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i);
-                    m = m || t.match(/^(q)(?:uestion\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i);
-                    m = m || t.match(/^[\s:]*()(\S{1,3}[\d.]*)[^\s\d]*[\s:]*/);
-                    if (!m) {
-                        grade_abbr.push(":" + grade_keys.length);
-                    } else {
-                        var abbr = m[1] + m[2],
-                            rest = t.substring(m[0].length),
-                            abbrx;
-                        while ((abbrx = pabbr[abbr])) {
-                            if (abbrx !== true
-                                && (m = abbrx[1].match(/^(\S{1,3}[\d.]*)\S*[\s:]*(.*)$/))) {
-                                grade_abbr[abbrx[0]] += m[1];
-                                pabbr[grade_abbr[abbrx[0]]] = [abbrx[0], m[2]];
-                                pabbr[abbr] = abbrx = true;
-                            }
-                            if ((m = rest.match(/^(\S{1,3}[\d.]*)[^\s\d]*[\s:]*(.*)$/))) {
-                                abbr += m[1];
-                                rest = m[2];
-                            } else {
-                                if (abbrx !== true) {
-                                    abbr += ":" + grade_keys.length;
-                                }
-                                break;
-                            }
-                        }
-                        grade_abbr.push(abbr);
-                        pabbr[abbr] = [grade_keys.length - 1, rest];
-                    }
                 }
             }
         }
@@ -2754,7 +2657,7 @@ function pa_render_pset_table(pconf, data) {
                     type: "grade",
                     gidx: i,
                     gkey: grade_keys[i],
-                    gabbr: grade_abbr[i],
+                    gabbr: grade_entries[i].abbr(),
                     ge: grade_entries[i],
                     typeinfo: typeinfo,
                     justify: typeinfo.justify || "right"
@@ -3448,7 +3351,7 @@ function pa_render_pset_table(pconf, data) {
 
         hc.push('<div class="pa-gradelist in-modal">', '</div>');
         for (var i = 0; i !== grade_entries.length; ++i) {
-            hc.push(pa_render_grade_entry(grade_entries[i], true, false));
+            hc.push(grade_entries[i].html_skeleton(true, false));
         }
         hc.pop();
         hc.push_actions();
@@ -3619,5 +3522,6 @@ window.$pa = {
     pset_actions: pa_pset_actions,
     render_text_page: render_text.on_page,
     render_pset_table: pa_render_pset_table,
-    runmany: runmany61
+    runmany: runmany61,
+    store_gradeinfo: GradeEntry.store
 };
