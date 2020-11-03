@@ -127,7 +127,7 @@ export class GradeGraph {
             return -(ay - gh) / gh;
         };
         if (d.entry && d.entry.type) {
-            var gt = pa_grade_types[d.entry.type];
+            var gt = window.pa_grade_types[d.entry.type];
             if (gt && gt.tics)
                 this.xtics = gt.tics.call(gt);
         }

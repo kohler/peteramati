@@ -25,7 +25,12 @@ import { run } from "./run.js";
 import { run_settings_load } from "./run-settings.js";
 import { GradeKde, GradeStats } from "./gradestats.js";
 import { GradeGraph } from "./gradegraph.js";
-import { GradeEntry } from "./gradeentry.js";
+import { GradeEntry, GradeSheet } from "./gradeentry.js";
+import { GradeClass } from "./gc.js";
+import "./gc-checkbox.js";
+import "./gc-letter.js";
+import "./gc-multicheckbox.js";
+import "./gc-select.js";
 
 function $$(id) {
     return document.getElementById(id);
@@ -1112,346 +1117,15 @@ $(pa_observe_diff);
 */
 
 
-var pa_grade_types = window.pa_grade_types = {};
-
-function pa_add_grade_type(name, rest) {
-    rest.type = name;
-    rest.tcell = rest.tcell || rest.text;
-    rest.simple_text = rest.simple_text || rest.text;
-    pa_grade_types[name] = rest;
-}
-
-function pa_render_editable_entry(id, opts) {
-    var t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="text" class="uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '"></span> <span class="pa-gradedesc">');
-    if (opts.max_text) {
-        t += opts.max_text;
-    } else if (this.max) {
-        t += 'of ' + this.max;
-    }
-    return t + '</span></div>';
-}
-
-pa_add_grade_type("numeric", {
-    text: function (v) { return v == null ? "" : v + ""; },
-    entry: pa_render_editable_entry
-});
-
-pa_add_grade_type("formula", {
-    text: function (v) { return v == null ? "" : v.toFixed(1); }
-});
-
-pa_add_grade_type("text", {
-    text: function (v) { return v == null ? "" : v; },
-    entry: function (id) {
-        return '<div class="pa-pd"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
-    },
-    justify: "left",
-    sort: "forward"
-});
-
-pa_add_grade_type("select", {
-    text: function (v) { return v == null ? "" : v; },
-    entry: function (id) {
-        var t = '<div class="pa-pd"><span class="select"><select class="uich pa-gradevalue" name="'.concat(this.key, '" id="', id, '"><option value="">None</option>');
-        for (var i = 0; i !== this.options.length; ++i) {
-            var n = escape_entities(this.options[i]);
-            t = t.concat('<option value="', n, '">', n, '</option>');
-        }
-        return t + '</select></span></div>';
-    },
-    justify: "left",
-    sort: "forward"
-});
-
-pa_add_grade_type("checkbox", {
-    text: function (v) {
-        if (v == null || v === 0)
-            return "–";
-        else if (v == (this.max || 1))
-            return "✓";
-        else
-            return v + "";
-    },
-    simple_text: function (v) {
-        return v + "";
-    },
-    tcell: function (v) {
-        if (v == null || v === 0)
-            return "";
-        else if (v == (this.max || 1))
-            return "✓";
-        else
-            return v + "";
-    },
-    entry: function (id, opts) {
-        var t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="checkbox" class="ui pa-gradevalue ml-0" name="'.concat(this.key, '" id="', id, '" value="', this.max, '"></span>');
-        if (opts.editable) {
-            t = t.concat(' <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
-        }
-        return t + '</div>';
-    },
-    justify: "center",
-    reflect_value: function (elt, v, opts) {
-        var want_checkbox = v == null || v === "" || v === 0 || (this && v === this.max);
-        if (!want_checkbox && elt.type === "checkbox") {
-            pa_grade_uncheckbox.call(elt);
-        } else if (want_checkbox && elt.type !== "checkbox" && opts.reset) {
-            pa_grade_recheckbox.call(elt);
-        }
-        if (elt.type === "checkbox") {
-            elt.checked = !!v;
-            elt.indeterminate = opts.mixed;
-        } else if (elt.value !== v && (opts.reset || !$(elt).is(":focus")))
-            elt.value = v + "";
-    }
-});
-
-(function () {
-function make_checkboxlike(str) {
-    return {
-        text: function (v) {
-            if (v == null || v === 0)
-                return "–";
-            else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05)
-                return str.repeat(Math.round(v));
-            else
-                return v + "";
-        },
-        simple_text: function (v) {
-            return v + "";
-        },
-        tcell: function (v) {
-            if (v == null || v === 0)
-                return "";
-            else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05)
-                return str.repeat(Math.round(v));
-            else
-                return v + "";
-        },
-        entry: function (id, opts) {
-            var t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="hidden" class="uich pa-gradevalue" name="'.concat(this.key, '">');
-            for (var i = 0; i < this.max; ++i) {
-                t = t.concat('<input type="checkbox" class="ui js-checkboxes-grade ml-0" name="', this.key, ':', i, '" value="1"');
-                if (i === this.max - 1)
-                    t += ' id="' + id + '"';
-                t += '>';
-            }
-            t += '</span>';
-            if (opts.editable) {
-                t += ' <span class="pa-gradedesc">of ' + this.max +
-                    ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>';
-            }
-            return t + '</div>';
-        },
-        justify: "left",
-        reflect_value: function (elt, v, opts) {
-            var want_checkbox = v == null || v === "" || v === 0
-                || (v >= 0 && (!this || v <= this.max) && Math.abs(v - Math.round(v)) < 0.05);
-            if (!want_checkbox && elt.type === "hidden") {
-                pa_grade_uncheckbox.call(elt);
-            } else if (want_checkbox && elt.type !== "hidden" && opts.reset) {
-                pa_grade_recheckbox.call(elt);
-            }
-            if (elt.value !== v && (opts.reset || !$(elt).is(":focus")))
-                elt.value = v;
-            var name = elt.name + ":", value = Math.round(v || 0);
-            $(elt.closest(".pa-pd")).find("input[type=checkbox]").each(function () {
-                if (this.name.startsWith(name)) {
-                    var i = +this.name.substring(name.length);
-                    this.checked = i < value;
-                    this.indeterminate = opts.mixed;
-                }
-            });
-        }
-    };
-}
-
-pa_add_grade_type("checkboxes", make_checkboxlike("✓"));
-pa_add_grade_type("stars", make_checkboxlike("⭐"));
-
-handle_ui.on("js-checkboxes-grade", function () {
-    var colon = this.name.indexOf(":"),
-        name = this.name.substring(0, colon),
-        num = this.name.substring(colon + 1),
-        elt = this.closest("form").elements[name],
-        v = this.checked ? (+num + 1) + "" : num;
-    if (elt.value !== v) {
-        elt.value = v;
-        $(elt).trigger("change");
-    }
-});
-})();
-
-pa_add_grade_type("section", {
-    text: function () { return ""; },
-    entry: function () { return ""; }
-});
-
-(function () {
-var lm = {
-    98: "A+", 95: "A", 92: "A-", 88: "B+", 85: "B", 82: "B-",
-    78: "C+", 75: "C", 72: "C-", 68: "D+", 65: "D", 62: "D-", 50: "F"
-};
-pa_add_grade_type("letter", {
-    text: function (v) { return v == null ? "" : lm[v] || v + ""; },
-    entry: function (id, opts) {
-        opts.max_text = "letter grade";
-        return pa_render_editable_entry.call(this, id, opts);
-    },
-    justify: "left",
-    tics: function () {
-        let a = [];
-        for (let g in lm) {
-            if (lm[g].length === 1)
-                a.push({x: g, text: lm[g]});
-        }
-        for (let g in lm) {
-            if (lm[g].length === 2)
-                a.push({x: g, text: lm[g], label_space: 5});
-        }
-        for (let g in lm) {
-            if (lm[g].length === 2)
-                a.push({x: g, text: lm[g].substring(1), label_space: 2, notic: true});
-        }
-        return a;
-    }
-});
-})();
-
-function pa_grade_uncheckbox() {
-    var ge = GradeEntry.closest(this);
-    if (this.type === "checkbox")
-        this.value = this.checked ? ge.max : "";
-    this.type = "text";
-    this.className = (hasClass(this, "ui") || hasClass(this, "uich") ? "uich " : "") + "pa-gradevalue pa-gradewidth";
-    var container = this.closest(".pa-pd");
-    $(container).find(".pa-grade-uncheckbox").remove();
-    $(container).find("input[name^=\"" + this.name + ":\"]").addClass("hidden");
-}
-handle_ui.on("pa-grade-uncheckbox", function () {
-    $(this.closest(".pa-pd")).find(".pa-gradevalue").each(function () {
-        pa_grade_uncheckbox.call(this);
-        this.focus();
-        this.select();
-    });
-});
-
-function pa_grade_recheckbox() {
-    var v = this.value.trim(), ge = GradeEntry.closest(this);
-    this.type = "checkbox";
-    this.checked = v !== "" && v !== "0";
-    this.value = ge.max;
-    this.className = (hasClass(this, "uich") ? "ui " : "") + "pa-gradevalue";
-    $(this.closest(".pa-pd")).find(".pa-gradedesc").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
-}
-
-function pa_set_grade(ge, g, ag, options) {
-    var $g = $(this),
-        $v = $g.find(".pa-gradevalue"),
-        editable = $v[0] && $v[0].tagName !== "SPAN" && $v[0].tagName !== "DIV",
-        typeinfo = pa_grade_types[ge.type || "numeric"];
-
-    // “grade is above max” message
-    if (ge.max && editable) {
-        if (!g || g <= ge.max) {
-            $g.find(".pa-gradeabovemax").remove();
-        } else if (!$g.find(".pa-gradeabovemax").length) {
-            $g.find(".pa-pd").after('<div class="pa-pd pa-gradeabovemax">Grade is above max</div>');
-        }
-    }
-
-    // “autograde differs” message
-    if (editable) {
-        if (ag == null || g === ag) {
-            $g.find(".pa-gradediffers").remove();
-        } else {
-            var txt = (ge.key === "late_hours" ? "auto-late hours" : "autograde") +
-                " is " + ge.text(ag);
-            if (!$g.find(".pa-gradediffers").length) {
-                $g.find(".pa-pd").first().append('<span class="pa-gradediffers"></span>');
-            }
-            var $ag = $g.find(".pa-gradediffers");
-            if ($ag.text() !== txt) {
-                $ag.text(txt);
-            }
-        }
-    }
-
-    // actual grade value
-    var gt;
-    if (editable) {
-        gt = g == null ? "" : ge.simple_text(g);
-        if (typeinfo.reflect_value)
-            typeinfo.reflect_value.call(ge, $v[0], g, options || {});
-        else if ($v.val() !== gt) {
-            if (!$v.is(":focus") || (options && options.reset))
-                $v.val(gt);
-        }
-        if ($v[0].hasAttribute("placeholder")) {
-            $v[0].removeAttribute("placeholder");
-            if (typeinfo.type === "select"
-                && $v[0].options[0].value === "")
-                $v[0].remove(0);
-        }
-        if ($v[0].type === "checkbox") {
-            $v[0].checked = !!g;
-            $v[0].indeterminate = options && options.mixed;
-        } else if ($v.val() !== gt) {
-            if (!$v.is(":focus") || (options && options.reset)) {
-                $v.val(gt);
-            }
-        }
-        if (options && options.reset) {
-            $v[0].setAttribute("data-default-value", g == null ? "" : ge.simple_text(g));
-            if (options.mixed) {
-                $v[0].setAttribute("placeholder", "Mixed");
-                if (typeinfo.type === "select") {
-                    $v.prepend('<option value="">Mixed</option>');
-                    $v[0].selectedIndex = 0;
-                }
-            }
-        }
-    } else {
-        gt = ge.text(g);
-        if ($v.text() !== gt) {
-            $v.text(gt);
-        }
-        toggleClass(this, "hidden", gt === "" && !ge.max && ge.type !== "section");
-    }
-
-    // maybe add landmark reference
-    if (ge.landmark
-        && this.parentElement
-        && hasClass(this.parentElement, "want-pa-landmark-links")) {
-        var m = /^(.*):(\d+)$/.exec(ge.landmark),
-            $line = $(linediff_find(m[1], "a" + m[2])),
-            want_gbr = "";
-        if ($line.length) {
-            var $pi = $(this).closest(".pa-psetinfo"),
-                directory = $pi[0].getAttribute("data-pa-directory") || "";
-            if (directory && m[1].substr(0, directory.length) === directory) {
-                m[1] = m[1].substr(directory.length);
-            }
-            want_gbr = '@<a href="#' + $line[0].id + '" class="ui pa-goto">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
-        }
-        var $pgbr = $g.find(".pa-gradeboxref");
-        if (!$line.length) {
-            $pgbr.remove();
-        } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
-            $pgbr.remove();
-            $g.find(".pa-pd").first().append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
-        }
-    }
-}
-
 handle_ui.on("pa-gradevalue", function () {
     var f = this.closest("form"), gt, typeinfo, self = this;
-    if (f && hasClass(f, "pa-grade"))
+    if (f && hasClass(f, "pa-grade")) {
         $(f).submit();
-    else if (self.type === "hidden"
-             && (gt = self.closest(".pa-grade").getAttribute("data-pa-grade-type"))
-             && (typeinfo = pa_grade_types[gt]).reflect_value)
+    } else if (self.type === "hidden"
+               && (gt = self.closest(".pa-grade").getAttribute("data-pa-grade-type"))
+               && (typeinfo = GradeClass.find(gt))) {
         setTimeout(function () { typeinfo.reflect_value.call(null, self, +self.value, {}) }, 0);
+    }
 });
 
 
@@ -1467,7 +1141,7 @@ function save_grade(self) {
     }
     $gd.append('<span class="pa-save-message"><span class="spinner"></span></span>');
 
-    var gi = GradeEntry.closest_set(self), g = {}, og = {};
+    var gi = GradeSheet.closest(self), g = {}, og = {};
     $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
         var ge = gi.entries[this.name];
         if (gi.grades && ge && gi.grades[ge.pos] != null) {
@@ -1490,7 +1164,7 @@ function save_grade(self) {
             $f.removeData("paOutstandingPromise");
             if (data.ok) {
                 $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
-                $(self).closest(".pa-psetinfo").data("pa-gradeinfo", GradeEntry.realize(data)).each(pa_loadgrades);
+                $(self).closest(".pa-psetinfo").data("pa-gradeinfo", new GradeSheet(data)).each(pa_loadgrades);
                 resolve(self);
             } else {
                 $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
@@ -1510,26 +1184,16 @@ handle_ui.on("pa-grade", function (event) {
 });
 })();
 
-function pa_show_grade(gi) {
-    gi = gi || GradeEntry.closest_set(this);
-    var k = this.getAttribute("data-pa-grade"), ge = gi.entries[k];
-    if (k === "late_hours") {
-        pa_set_grade.call(this, {key: "late_hours"}, gi.late_hours, gi.auto_late_hours);
-    } else if (ge) {
-        pa_set_grade.call(this, ge, gi.grades ? gi.grades[ge.pos] : null, gi.autogrades ? gi.autogrades[ge.pos] : null);
-    }
-}
-
 function pa_resolve_grade() {
     removeClass(this, "need-pa-grade");
     var k = this.getAttribute("data-pa-grade"),
-        gi = GradeEntry.closest_set(this), ge;
+        gi = GradeSheet.closest(this), ge;
     if (!gi || !k || !(ge = gi.entries[k])) {
         return;
     }
     $(this).html(ge.html_skeleton(gi.editable));
     $(this).find(".need-autogrow").autogrow();
-    pa_show_grade.call($(this).find(".pa-grade")[0], gi);
+    gi.fill_dom_at($(this).find(".pa-grade")[0]);
     if (ge.landmark_range && this.closest(".pa-gradebox")) {
         // XXX maybe calling compute_landmark_range_grade too often
         pa_compute_landmark_range_grade.call(this.firstChild, ge);
@@ -1577,7 +1241,7 @@ handle_ui.on("pa-grade-button", function (event) {
 function pa_resolve_gradelist() {
     removeClass(this, "need-pa-gradelist");
     addClass(this, "pa-gradelist");
-    let pi = this.closest(".pa-psetinfo"), gi = GradeEntry.closest_set(pi);
+    let pi = this.closest(".pa-psetinfo"), gi = GradeSheet.closest(pi);
     if (!gi) {
         return;
     }
@@ -1593,7 +1257,7 @@ function pa_resolve_gradelist() {
             } else {
                 let e = $(gi.entries[k].html_skeleton(gi.editable))[0];
                 this.insertBefore(e, ch);
-                pa_show_grade.call(e, gi);
+                gi.fill_dom_at(e);
             }
         }
     }
@@ -1630,7 +1294,7 @@ function pa_loadgrades() {
     if (!hasClass(this, "pa-psetinfo")) {
         throw new Error("bad pa_loadgrades");
     }
-    var gi = GradeEntry.closest_set(this);
+    var gi = GradeSheet.closest(this);
     if (!gi || !gi.order) {
         return;
     }
@@ -1644,13 +1308,7 @@ function pa_loadgrades() {
     });
 
     $(this).find(".pa-grade").each(function () {
-        var k = this.getAttribute("data-pa-grade"),
-            ge = gi.entries[k];
-        if (k === "late_hours") {
-            pa_set_grade.call(this, {key: "late_hours"}, gi.late_hours, gi.auto_late_hours);
-        } else if (ge) {
-            pa_set_grade.call(this, ge, gi.grades ? gi.grades[ge.pos] : null, gi.autogrades ? gi.autogrades[ge.pos] : null);
-        }
+        gi.fill_dom_at(this);
     });
 
     // print totals
@@ -2510,7 +2168,7 @@ function pa_render_pset_table(pconf, data) {
                 if (this.justify === "right") {
                     this.klass += " r";
                 }
-                if (this.typeinfo.type === "select") {
+                if (this.ge.gc.type === "select") {
                     this.klass += " gt-el";
                     for (var i = 0; i !== this.ge.options.length; ++i)
                         w = Math.max(w, this.ge.options[i].length);
@@ -2590,9 +2248,9 @@ function pa_render_pset_table(pconf, data) {
         grade_entries = [];
         grade_keys = [];
         if (pconf.grades) {
-            pconf.grades = GradeEntry.realize(pconf.grades);
+            pconf.grades = new GradeSheet(pconf.grades);
             for (let i = 0; i !== pconf.grades.order.length; ++i) {
-                var k = pconf.grades.order[i], ge = pconf.grades.entries[k];
+                const k = pconf.grades.order[i], ge = pconf.grades.entries[k];
                 if (ge.type !== "text") {
                     grade_entries.push(ge);
                     grade_keys.push(k);
@@ -2602,14 +2260,15 @@ function pa_render_pset_table(pconf, data) {
 
         var ngrades_expected = -1;
         for (let i = 0; i < data.length; ++i) {
-            var s = data[i];
-            if (s.dropped)
+            const s = data[i];
+            if (s.dropped) {
                 s.boringness = 2;
-            else if (!s.gradehash && !pconf.gitless_grades)
+            } else if (!s.gradehash && !pconf.gitless_grades) {
                 s.boringness = 1;
-            else
+            } else {
                 s.boringness = 0;
-            var ngrades = 0;
+            }
+            let ngrades = 0;
             for (var j = 0; j < grade_keys.length; ++j) {
                 if (grade_keys[j] != pconf.total_key
                     && s.grades[j] != null
@@ -2617,10 +2276,11 @@ function pa_render_pset_table(pconf, data) {
                     ++ngrades;
             }
             s.ngrades_nonempty = ngrades;
-            if (ngrades_expected === -1)
+            if (ngrades_expected === -1) {
                 ngrades_expected = ngrades;
-            else if (ngrades_expected !== ngrades && (!s.boringness || ngrades > 0))
+            } else if (ngrades_expected !== ngrades && (!s.boringness || ngrades > 0)) {
                 ngrades_expected = -2;
+            }
         }
         need_ngrades = ngrades_expected === -2;
 
@@ -2650,17 +2310,15 @@ function pa_render_pset_table(pconf, data) {
                 col.push("total");
             }
             for (let i = 0; i !== grade_keys.length; ++i) {
-                var gt = grade_entries[i].type,
-                    typeinfo = pa_grade_types[gt || "numeric"];
-                grade_entries[i].colpos = col.length;
+                const ge = grade_entries[i];
+                ge.colpos = col.length;
                 col.push({
                     type: "grade",
                     gidx: i,
                     gkey: grade_keys[i],
-                    gabbr: grade_entries[i].abbr(),
-                    ge: grade_entries[i],
-                    typeinfo: typeinfo,
-                    justify: typeinfo.justify || "right"
+                    gabbr: ge.abbr(),
+                    ge: ge,
+                    justify: ge.gc.justify || "right"
                 });
             }
             if (need_ngrades) {
@@ -3053,7 +2711,7 @@ function pa_render_pset_table(pconf, data) {
             });
         } else if ((m = /^grade(\d+)$/.exec(f)) && grade_entries[+m[1]]) {
             var gidx = +m[1],
-                fwd = grade_entries[gidx].type && pa_grade_types[grade_entries[gidx].type].sort === "forward",
+                fwd = grade_entries[gidx].type && grade_entries[gidx].gc.sort === "forward",
                 erev = fwd ? -rev : rev;
             data.sort(function (a, b) {
                 if (a.boringness !== b.boringness)
@@ -3132,7 +2790,7 @@ function pa_render_pset_table(pconf, data) {
                 || sf === "at"
                 || ((m = sf.match(/^grade(\d+)$/))
                     && grade_entries[m[1]].type
-                    && pa_grade_types[grade_entries[m[1]].type].sort === "forward")) {
+                    && grade_entries[m[1]].gc.sort === "forward")) {
                 sort.rev = 1;
             } else {
                 sort.rev = -1;
@@ -3295,9 +2953,9 @@ function pa_render_pset_table(pconf, data) {
                 }
             }
             if (mixed) {
-                pa_set_grade.call(this, ge, null, null, {reset: true, mixed: true});
+                ge.fill_dom(this, null, {reset: true, mixed: true});
             } else {
-                pa_set_grade.call(this, ge, sv, null, {reset: true});
+                ge.fill_dom(this, sv, {reset: true});
             }
         });
         if (su1) {
@@ -3361,6 +3019,7 @@ function pa_render_pset_table(pconf, data) {
         hc.push('<button type="button" name="next" class="btnl">&gt;</button>');
         $gdialog = hc.show(false);
         $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
+        $gdialog.find("form").addClass("pa-psetinfo").data("pa-gradeinfo", pconf.grades);
 
         var checked_spos = $j.find(".papsel:checked").toArray().map(function (x) {
                 return x.parentElement.parentElement.getAttribute("data-pa-spos");
@@ -3523,5 +3182,5 @@ window.$pa = {
     render_text_page: render_text.on_page,
     render_pset_table: pa_render_pset_table,
     runmany: runmany61,
-    store_gradeinfo: GradeEntry.store
+    store_gradeinfo: GradeSheet.store
 };
