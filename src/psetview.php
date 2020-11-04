@@ -444,13 +444,14 @@ class PsetView {
             $notes = json_encode_db($new_notes);
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$record) {
-                $result = $this->conf->qx("insert into ContactGrade set cid=?, pset=?, notes=?, hasactiveflags=?",
-                                          $this->user->contactId, $this->pset->id,
-                                          $notes, $hasactiveflags);
+                $result = Dbl::qx($this->conf->dblink,
+                    "insert into ContactGrade set cid=?, pset=?, notes=?, hasactiveflags=?",
+                    $this->user->contactId, $this->pset->id,
+                    $notes, $hasactiveflags);
             } else {
                 $result = $this->conf->qe("update ContactGrade set notes=?, hasactiveflags=?, notesversion=? where cid=? and pset=? and notesversion=?",
-                                          $notes, $hasactiveflags, $record->notesversion + 1,
-                                          $this->user->contactId, $this->pset->id, $record->notesversion);
+                    $notes, $hasactiveflags, $record->notesversion + 1,
+                    $this->user->contactId, $this->pset->id, $record->notesversion);
             }
             if ($result && $result->affected_rows)
                 break;

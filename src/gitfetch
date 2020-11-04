@@ -174,7 +174,18 @@ find_distinct_heads () {
 
 update=
 if [ $gitfetch_status = 0 ]; then
-    cur_head=`cat .git/refs/remotes/repo$repoid/$mainbranch`
+    if test -f .git/refs/remotes/repo$repoid/$mainbranch; then
+        cur_head=`cat .git/refs/remotes/repo$repoid/$mainbranch`
+    elif test -f .git/refs/remotes/repo$repoid/master; then
+        cur_head=`cat .git/refs/remotes/repo$repoid/master`
+    else
+        potential_branch="`ls .git/refs/remotes/repo$repoid | head -n 1`"
+        if test -n "$potential_branch"; then
+            cur_head=`cat .git/refs/remotes/repo$repoid/$potential_branch`
+        else
+            cur_head=
+        fi
+    fi
     tags="`git tag -l "repo$repoid.snap*" | sort -r`"
     last_tag=`echo $tags | tr ' ' '\n' | head -n 1`
     last_tag_head=`test -n "$last_tag" && cat .git/refs/tags/$last_tag`

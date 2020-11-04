@@ -677,79 +677,92 @@ class Conf {
 
     // database
 
+    /** @return Dbl_Result */
     function q(/* $qstr, ... */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), 0);
     }
+    /** @return Dbl_Result */
     function q_raw(/* $qstr */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_RAW);
     }
+    /** @return Dbl_Result */
     function q_apply(/* $qstr, $args */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_APPLY);
     }
 
+    /** @return Dbl_Result */
     function ql(/* $qstr, ... */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_LOG);
     }
+    /** @return Dbl_Result */
     function ql_raw(/* $qstr */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_RAW | Dbl::F_LOG);
     }
+    /** @return Dbl_Result */
     function ql_apply(/* $qstr, $args */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_APPLY | Dbl::F_LOG);
     }
+    /** @return ?Dbl_Result */
+    function ql_ok(/* $qstr, ... */) {
+        $result = Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_LOG);
+        return Dbl::is_error($result) ? null : $result;
+    }
 
+    /** @return Dbl_Result */
     function qe(/* $qstr, ... */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR);
     }
+    /** @return Dbl_Result */
     function qe_raw(/* $qstr */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_RAW | Dbl::F_ERROR);
     }
+    /** @return Dbl_Result */
     function qe_apply(/* $qstr, $args */) {
         return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_APPLY | Dbl::F_ERROR);
     }
 
-    function qx(/* $qstr, ... */) {
-        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ALLOWERROR);
-    }
-    function qx_raw(/* $qstr */) {
-        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_RAW | Dbl::F_ALLOWERROR);
-    }
-    function qx_apply(/* $qstr, $args */) {
-        return Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_APPLY | Dbl::F_ALLOWERROR);
-    }
-
+    /** @return list<list<?string>> */
     function fetch_rows(/* $qstr, ... */) {
         return Dbl::fetch_rows(Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR));
     }
+    /** @return ?list<?string> */
+    function fetch_first_row(/* $qstr, ... */) {
+        return Dbl::fetch_first_row(Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR));
+    }
+    /** @return ?object */
+    function fetch_first_object(/* $qstr, ... */) {
+        return Dbl::fetch_first_object(Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR));
+    }
+    /** @return ?string */
     function fetch_value(/* $qstr, ... */) {
         return Dbl::fetch_value(Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR));
     }
+    /** @return ?int */
     function fetch_ivalue(/* $qstr, ... */) {
         return Dbl::fetch_ivalue(Dbl::do_query_on($this->dblink, func_get_args(), Dbl::F_ERROR));
     }
 
-    function db_error_html($getdb = true, $while = "") {
+    function db_error_html($getdb = true) {
         $text = "<p>Database error";
-        if ($while)
-            $text .= " $while";
-        if ($getdb)
+        if ($getdb) {
             $text .= ": " . htmlspecialchars($this->dblink->error);
+        }
         return $text . "</p>";
     }
 
-    function db_error_text($getdb = true, $while = "") {
+    function db_error_text($getdb = true) {
         $text = "Database error";
-        if ($while)
-            $text .= " $while";
-        if ($getdb)
+        if ($getdb) {
             $text .= ": " . $this->dblink->error;
+        }
         return $text;
     }
 
     function query_error_handler($dblink, $query) {
         $landmark = caller_landmark(1, "/^(?:Dbl::|Conf::q|call_user_func)/");
-        if (PHP_SAPI == "cli")
+        if (PHP_SAPI == "cli") {
             fwrite(STDERR, "$landmark: database error: $dblink->error in $query\n");
-        else {
+        } else {
             error_log("$landmark: database error: $dblink->error in $query");
             self::msg_error("<p>" . htmlspecialchars($landmark) . ": database error: " . htmlspecialchars($this->dblink->error) . " in " . Ht::pre_text_wrap($query) . "</p>");
         }
