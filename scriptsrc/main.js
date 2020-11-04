@@ -7,7 +7,6 @@ import {
     hasClass, addClass, removeClass, toggleClass, classList, handle_ui
     } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
-import { push_history_state } from "./ui-history.js";
 import "./ui-autogrow.js";
 import "./ui-range.js";
 import "./ui-sessionlist.js";
@@ -24,7 +23,8 @@ import "./render-terminal.js";
 import { run } from "./run.js";
 import { run_settings_load } from "./run-settings.js";
 import { GradeKde, GradeStats } from "./gradestats.js";
-import { GradeGraph } from "./gradegraph.js";
+import { GradeGraph } from "./grgraph.js";
+import "./grgraph-highlight.js";
 import { GradeEntry, GradeSheet } from "./gradeentry.js";
 import { GradeClass } from "./gc.js";
 import "./gc-checkbox.js";
@@ -1726,185 +1726,6 @@ handle_ui.on("js-grgraph-flip", function () {
         pa_draw_gradecdf($graph);
     }
 });
-
-function pa_parse_hash(hash) {
-    hash = hash.replace(/^[^#]*/, "");
-    var regex = /([^#=\/]+)[=\/]?([^\/]*)/g, m, h = {};
-    while ((m = regex.exec(hash))) {
-        h[m[1]] = decodeURIComponent(m[2].replace(/\+/g, " "));
-    }
-    return h;
-}
-
-function pa_unparse_hash(h) {
-    var a = [];
-    for (var k in h) {
-        if (h[k] === null || h[k] === undefined || h[k] === "") {
-            a.push(k);
-        } else {
-            a.push(k + "=" + encodeURIComponent(h[k]).replace(/%20/g, "+"));
-        }
-    }
-    a.sort();
-    return a.length ? "#" + a.join("/") : "";
-}
-
-function pa_update_hash(changes) {
-    var h = pa_parse_hash(location.hash);
-    for (var k in changes) {
-        if (changes[k] === null || changes[k] === undefined) {
-            delete h[k];
-        } else {
-            h[k] = changes[k];
-        }
-    }
-    var newhash = pa_unparse_hash(h);
-    if (newhash !== location.hash) {
-        push_history_state(location.origin + location.pathname + location.search + newhash);
-    }
-}
-
-(function () {
-var hashy = hasClass(document.body, "want-grgraph-hash");
-
-function update(where, color, attr) {
-    var key = "data-pa-highlight" + (color === "main" ? "" : "-" + color);
-    attr = attr || "";
-    $(where).find(".pa-grgraph").each(function () {
-        var old_attr = this.getAttribute(key) || "", that = this;
-        if (old_attr !== attr
-            && (color === "main" || this.getAttribute("data-pa-pset") !== "course")) {
-            attr ? this.setAttribute(key, attr) : this.removeAttribute(key);
-            window.requestAnimationFrame(function () {
-                var gg = $(that).data("paGradeGraph");
-                gg && gg.highlight_users();
-            });
-        }
-    });
-}
-
-function course_xcdf() {
-    var xd = null;
-    $(".pa-grgraph[data-pa-pset=course]").each(function () {
-        var d = $(this).data("paGradeData");
-        if (d && d.series.all && d.series.all.cdfu) {
-            xd = d.series.all;
-            return false;
-        }
-    })
-    return xd;
-}
-
-function update_course(str, tries) {
-    var ranges = {}, colors = {}, any = false;
-    for (var range of str.match(/[-\d.]+/g) || []) {
-        ranges[range] = true;
-    }
-    $(".js-grgraph-highlight-course").each(function () {
-        var range = this.getAttribute("data-pa-highlight-range") || "90-100",
-            color = this.getAttribute("data-pa-highlight-type") || "h00",
-            m;
-        colors[color] = colors[color] || [];
-        if ((this.checked = !!ranges[range])) {
-            if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-([-+]?(?:\d+\.?\d*|\.\d))(\.?)$/))) {
-                colors[color].push(+m[1], +m[2] + (m[3] ? 0.00001 : 0));
-                any = true;
-            } else if ((m = range.match(/^([-+]?(?:\d+\.?\d*|\.\d+))-$/))) {
-                colors[color].push(+m[1], Infinity);
-                any = true;
-            } else {
-                throw new Error("bad range");
-            }
-        }
-    });
-    var xd;
-    if (!any) {
-        for (let color in colors) {
-            update(document.body, color, "");
-        }
-    } else if ((xd = course_xcdf())) {
-        for (let color in colors) {
-            let ranges = colors[color], a = [];
-            if (ranges.length) {
-                for (let i = 0; i !== xd.cdf.length; i += 2) {
-                    for (let j = 0; j !== ranges.length; j += 2) {
-                        if (xd.cdf[i] >= ranges[j] && xd.cdf[i] < ranges[j+1]) {
-                            let ui0 = i ? xd.cdf[i-1] : 0;
-                            Array.prototype.push.apply(a, xd.cdfu.slice(ui0, xd.cdf[i+1]));
-                            break;
-                        }
-                    }
-                }
-                a.sort();
-            }
-            update(document.body, color, a.join(" "));
-        }
-    } else {
-        setTimeout(function () {
-            update_course(pa_parse_hash(location.hash).hr || "", tries + 1);
-        }, 8 << Math.max(tries, 230));
-    }
-}
-
-function update_hash(href) {
-    var h = pa_parse_hash(href);
-    update(document.body, "main", h.hs || "");
-    $("input[type=checkbox].js-grgraph-highlight").prop("checked", false);
-    for (var uid of (h.hs || "").match(/\d+/g) || []) {
-        $("tr[data-pa-uid=" + uid + "] input[type=checkbox].js-grgraph-highlight").prop("checked", true);
-    }
-    update_course(h.hr || "", 0);
-    $(".js-grgraph-highlight-course").prop("checked", false);
-    for (var range of (h.hr || "").match(/[-\d.]+/g) || []) {
-        $(".js-grgraph-highlight-course[data-pa-highlight-range=\"" + range + "\"]").prop("checked", true);
-    }
-}
-
-handle_ui.on("js-grgraph-highlight", function (event) {
-    if (event.type !== "change")
-        return;
-    var rt = this.getAttribute("data-range-type"),
-        a = [];
-    $(this).closest("form").find("input[type=checkbox]").each(function () {
-        var tr;
-        if (this.getAttribute("data-range-type") === rt
-            && this.checked
-            && (tr = this.closest("tr"))
-            && tr.hasAttribute("data-pa-uid"))
-            a.push(+tr.getAttribute("data-pa-uid"));
-    });
-    a.sort(function (x, y) { return x - y; });
-    if (hashy) {
-        pa_update_hash({hs: a.length ? a.join(" ") : null});
-        update(document.body, "main", a.join(" "));
-    } else {
-        update(this.closest("form"), "main", a.join(" "));
-    }
-});
-
-handle_ui.on("js-grgraph-highlight-course", function () {
-    var a = [];
-    $(".js-grgraph-highlight-course").each(function () {
-        if (this.checked)
-            a.push(this.getAttribute("data-pa-highlight-range"));
-    });
-    if (hashy) {
-        pa_update_hash({hr: a.length ? a.join(" ") : null});
-    }
-    update_course(a.join(" "), 0);
-});
-
-
-if (hashy) {
-    $(window).on("popstate", function (event) {
-        var state = (event.originalEvent || event).state;
-        state && state.href && update_hash(state.href);
-    }).on("hashchange", function () {
-        update_hash(location.href);
-    });
-    $(function () { update_hash(location.href); });
-}
-})();
 
 
 $(function () {

@@ -13,11 +13,11 @@ function mksvg(tag) {
 
 export class GradeGraph {
     constructor(parent, d, plot_type) {
-        var $parent = $(parent);
+        const $parent = $(parent);
 
-        var dd = plot_type.indexOf("noextra") >= 0 ? d.series.noextra : d.series.all;
-        var ddmin = dd.min();
-        var xmin = xmin < 0 ? xmin - 1 : 0;
+        const dd = plot_type.indexOf("noextra") >= 0 ? d.series.noextra : d.series.all,
+            ddmin = dd.min();
+        let xmin = ddmin < 0 ? ddmin - 1 : 0;
         if (d.entry && d.entry.type === "letter") {
             xmin = Math.min(65, ddmin < 0 ? ddmin : Math.max(ddmin - 5, 0));
         }
@@ -25,6 +25,10 @@ export class GradeGraph {
         this.max = dd.max();
         if (d.maxtotal) {
             this.max = Math.max(this.max, d.maxtotal);
+        }
+        if (this.min == this.max) {
+            xmin = this.min = this.min - 1;
+            this.max += 1;
         }
         this.total = d.maxtotal;
         this.cutoff = d.cutoff;
@@ -51,7 +55,7 @@ export class GradeGraph {
         this.hoveron = false;
         $parent.html(this.svg);
 
-        var digits = mksvg("text");
+        const digits = mksvg("text");
         digits.appendChild(document.createTextNode("888"));
         this.gx.appendChild(digits);
         var domr = digits.getBBox();
@@ -59,13 +63,13 @@ export class GradeGraph {
         this.xdh = domr.height;
         this.gx.removeChild(digits);
 
-        this.xlw = this.xdw * (Math.floor(Math.log10(this.max)) + 1);
+        this.xlw = this.xdw * (this.max > 0 ? Math.floor(Math.log10(this.max)) + 1 : 1);
 
         this.mt = Math.ceil(Math.max(this.yl ? this.xdh / 2 : 0, 2));
         this.mr = Math.ceil(this.xl ? this.xlw / 2 : 0);
         this.mb = (this.xt ? 5 : 0) + (this.xl ? this.xdh + 3 : 0);
         if (this.yl) {
-            var h = this.th - this.mt - Math.max(this.mb, Math.ceil(this.xdh / 2));
+            const h = this.th - this.mt - Math.max(this.mb, Math.ceil(this.xdh / 2));
             if (h > this.xdh) {
                 var minyaxis = $parent.hasClass("pa-grgraph-min-yaxis");
                 if (minyaxis) {
@@ -73,16 +77,17 @@ export class GradeGraph {
                 } else {
                     this.yfmt = "%.0r";
                 }
-                var labelcap = h / this.xdh;
+                const labelcap = h / this.xdh;
                 this.ymax = 100;
-                if (labelcap > 15)
+                if (labelcap > 15) {
                     this.ylu = 10;
-                else if (labelcap > 5)
+                } else if (labelcap > 5) {
                     this.ylu = 25;
-                else if (labelcap > 3)
+                } else if (labelcap > 3) {
                     this.ylu = 50;
-                else
+                } else {
                     this.ylu = 100;
+                }
                 this.ml = (this.yt ? 5 : 0) + 5 + (minyaxis ? 4.2 : 3) * this.xdw;
 
                 if (!$parent.hasClass("pa-grgraph-min-yaxis")) {
@@ -113,7 +118,7 @@ export class GradeGraph {
 
         this.gw = this.tw - this.ml - this.mr;
         var gh = this.gh = this.th - this.mt - this.mb;
-        var xfactor = this.gw / (this.max - this.min);
+        const xfactor = this.gw / Math.max(this.max - this.min, 0.001);
         this.xax = function (x) {
             return (x - xmin) * xfactor;
         };
@@ -127,7 +132,7 @@ export class GradeGraph {
             return -(ay - gh) / gh;
         };
         if (d.entry && d.entry.type) {
-            var gt = window.pa_grade_types[d.entry.type];
+            const gt = window.pa_grade_types[d.entry.type];
             if (gt && gt.tics)
                 this.xtics = gt.tics.call(gt);
         }
@@ -145,30 +150,31 @@ export class GradeGraph {
     }
     numeric_xaxis() {
         // determine number
-        var ndigit_max = Math.floor(Math.log10(this.max)) + 1,
+        const ndigit_max = Math.floor(Math.log10(this.max)) + 1,
             labelw = this.xdw * (ndigit_max + 0.5),
             labelcap = this.gw / labelw;
 
-        var unitbase = Math.pow(10, Math.max(0, ndigit_max - 2)),
-            nunits = (this.max - this.min) / unitbase,
-            unit;
-        if (labelcap > nunits * 4 && unitbase > 1)
+        const unitbase = Math.pow(10, Math.max(0, ndigit_max - 2)),
+            nunits = (this.max - this.min) / unitbase;
+        let unit;
+        if (labelcap > nunits * 4 && unitbase > 1) {
             unit = unitbase / 2;
-        else if (labelcap > nunits * 2)
+        } else if (labelcap > nunits * 2) {
             unit = unitbase;
-        else if (labelcap > nunits * (unitbase <= 1 ? 0.75 : 1))
+        } else if (labelcap > nunits * (unitbase <= 1 ? 0.75 : 1)) {
             unit = 2 * unitbase;
-        else if (unitbase > 1 && labelcap > nunits * 0.6)
+        } else if (unitbase > 1 && labelcap > nunits * 0.6) {
             unit = 2.5 * unitbase;
-        else if (labelcap > nunits * 0.3)
+        } else if (labelcap > nunits * 0.3) {
             unit = 5 * unitbase;
-        else
+        } else {
             unit = 10 * unitbase;
+        }
 
-        var x = Math.floor(this.min / unit) * unit,
-            d = [], total_done = false, e;
+        const d = [];
+        let x = Math.floor(this.min / unit) * unit, total_done = false;
         while (x < this.max + unit) {
-            var xx = x, draw = this.xl;
+            let xx = x, draw = this.xl;
             if (this.total) {
                 if (xx > this.total
                     && xx - unit < this.total
@@ -176,16 +182,19 @@ export class GradeGraph {
                     xx = this.total;
                     x -= unit;
                 }
-                if (xx == this.total)
+                if (xx == this.total) {
                     total_done = true;
+                }
             }
             x += unit;
-            if (xx < this.min)
+            if (xx < this.min) {
                 continue;
-            if (xx > this.max)
+            }
+            if (xx > this.max) {
                 xx = this.max;
+            }
 
-            var xxv = this.xax(xx);
+            const xxv = this.xax(xx);
             d.push("M", xxv, ",0v5");
 
             if ((this.total
@@ -193,11 +202,12 @@ export class GradeGraph {
                  && Math.abs(xxv - this.xax(this.total)) < labelw)
                 || (xx != this.max
                     && xx != this.total
-                    && Math.abs(xxv - this.xax(this.max)) < labelw))
+                    && Math.abs(xxv - this.xax(this.max)) < labelw)) {
                 draw = false;
+            }
 
             if (draw) {
-                e = mksvg("text");
+                const e = mksvg("text");
                 e.appendChild(document.createTextNode(xx));
                 e.setAttribute("x", xxv);
                 e.setAttribute("y", this.xdh + 3);
@@ -206,7 +216,7 @@ export class GradeGraph {
         }
 
         if (this.xt) {
-            e = mksvg("path");
+            const e = mksvg("path");
             e.setAttribute("d", d.join(""));
             e.setAttribute("fill", "none");
             e.setAttribute("stroke", "black");
@@ -232,9 +242,9 @@ export class GradeGraph {
                 }
 
                 if (this.xl && xt.text) {
-                    var lw = this.xdw * (xt.label_space || xt.text.length + 0.5) * 0.5;
+                    let lw = this.xdw * (xt.label_space || xt.text.length + 0.5) * 0.5;
                     if (!label_restrictions.overlaps(xxv - lw, xxv + lw)) {
-                        var e = mksvg("text");
+                        const e = mksvg("text");
                         e.appendChild(document.createTextNode(xt.text));
                         e.setAttribute("x", xxv);
                         e.setAttribute("y", this.xdh + 3);
@@ -247,7 +257,7 @@ export class GradeGraph {
         }
 
         if (this.xt) {
-            e = mksvg("path");
+            const e = mksvg("path");
             e.setAttribute("d", d.join(""));
             e.setAttribute("fill", "none");
             e.setAttribute("stroke", "black");
@@ -255,15 +265,17 @@ export class GradeGraph {
         }
     }
     xaxis() {
-        if (this.xtics)
+        if (this.xtics) {
             this.xtics_xaxis();
-        else
+        } else {
             this.numeric_xaxis();
+        }
     }
     yaxis() {
-        var y = 0, d = [], e;
+        const d = [];
+        let y = 0;
         while (y <= this.ymax && this.yl) {
-            e = mksvg("text");
+            const e = mksvg("text");
             e.appendChild(document.createTextNode(sprintf(this.yfmt, y)));
             e.setAttribute("x", -8);
             e.setAttribute("y", this.yax(y / this.ymax) + 0.25 * this.xdh);
@@ -275,7 +287,7 @@ export class GradeGraph {
         }
 
         if (this.yt) {
-            e = mksvg("path");
+            const e = mksvg("path");
             e.setAttribute("d", d.join(""));
             e.setAttribute("fill", "none");
             e.setAttribute("stroke", "black");
@@ -291,8 +303,8 @@ export class GradeGraph {
         return this.svg.closest(".pa-grgraph");
     }
     append_cdf(d, klass) {
-        var cdf = d.cdf, data = [], nr = 1 / d.n,
-            cutoff = this.cutoff || 0, i = 0, x;
+        const cdf = d.cdf, data = [], nr = 1 / d.n, cutoff = this.cutoff || 0, xmin = this.min;
+        let i = 0;
         if (cutoff) {
             while (i < cdf.length && cdf[i+1] < cutoff * d.n) {
                 i += 2;
@@ -300,15 +312,17 @@ export class GradeGraph {
         }
         for (; i < cdf.length; i += 2) {
             if (data.length !== 0) {
-                x = Math.max(0, cdf[i] - Math.min(1, cdf[i] - cdf[i - 2]) / 2);
+                const x = Math.max(xmin, cdf[i] - Math.min(1, cdf[i] - cdf[i-2]) / 2);
                 data.push("H", this.xax(x));
-            } else
-                data.push("M", this.xax(Math.max(0, cdf[i] - 0.5)), ",", this.yax(cutoff));
+            } else {
+                data.push("M", this.xax(Math.max(xmin, cdf[i] - 0.5)), ",", this.yax(cutoff));
+            }
             data.push("V", this.yax(cdf[i+1] * nr));
         }
-        if (data.length !== 0)
-            data.push("H", this.xax(cdf[cdf.length-2] + 0.5));
-        var path = mksvg("path");
+        if (data.length !== 0) {
+            data.push("H", this.xax(Math.max(this.max, cdf[cdf.length-2])));
+        }
+        const path = mksvg("path");
         path.setAttribute("d", data.join(""));
         path.setAttribute("fill", "none");
         path.setAttribute("class", klass);
@@ -318,48 +332,50 @@ export class GradeGraph {
         return path;
     }
     append_pdf(kde, klass) {
-        if (kde.maxp === 0)
+        if (kde.maxp === 0) {
             return null;
-        var data = [], bins = kde.kde, nrdy = 0.9 / this.maxp,
+        }
+        const data = [], bins = kde.kde, nrdy = 0.9 / this.maxp,
             xax = this.xax, yax = this.yax;
         // adapted from d3-shape by Mike Bostock
-        var xs = [0, 0, 0, 0], ys = [0, 0, 0, 0],
+        const xs = [0, 0, 0, 0], ys = [0, 0, 0, 0],
             la = [0, 0, 0, 0], la2 = [0, 0, 0, 0],
             epsilon = 1e-6;
         function point(i2) {
-            var i0 = (i2 + 2) % 4, i1 = (i2 + 3) % 4, i3 = (i2 + 1) % 4;
-            var x1 = xs[i1], y1 = ys[i1], x2 = xs[i2], y2 = ys[i2];
+            const i0 = (i2 + 2) % 4, i1 = (i2 + 3) % 4, i3 = (i2 + 1) % 4;
+            let x1 = xs[i1], y1 = ys[i1], x2 = xs[i2], y2 = ys[i2];
             if (la[i1] > epsilon) {
-                var a = 2 * la2[i1] + 3 * la[i1] * la[i2] + la2[i2],
+                let a = 2 * la2[i1] + 3 * la[i1] * la[i2] + la2[i2],
                     n = 3 * la[i1] * (la[i1] + la[i2]);
                 x1 = (x1 * a - xs[i0] * la2[i2] + xs[i2] * la2[i1]) / n;
                 y1 = (y1 * a - ys[i0] * la2[i2] + ys[i2] * la2[i1]) / n;
             }
             if (la[i3] > epsilon) {
-                var b = 2 * la2[i3] + 3 * la[i3] * la[i2] + la2[i2],
+                let b = 2 * la2[i3] + 3 * la[i3] * la[i2] + la2[i2],
                     m = 3 * la[i3] * (la[i3] + la[i2]);
                 x2 = (x2 * b - xs[i3] * la2[i2] + xs[i1] * la2[i3]) / m;
                 y2 = (y2 * b - ys[i3] * la2[i2] + ys[i1] * la2[i3]) / m;
             }
             data.push("C", x1, y1, x2, y2, xs[i2], ys[i2]);
         }
-        for (var i = 0; i !== bins.length; ++i) {
-            var x = xax(this.min + i * kde.binwidth),
+        for (let i = 0; i !== bins.length; ++i) {
+            const x = xax(this.min + i * kde.binwidth),
                 y = yax(bins[i] * nrdy);
             if (i === 0) {
                 data.push("M", x, y);
                 xs[3] = xs[0] = x;
                 ys[3] = ys[0] = y;
             } else {
-                var i1 = (i + 3) % 4, i2 = i % 4;
+                const i1 = (i + 3) % 4, i2 = i % 4;
                 xs[i2] = x;
                 ys[i2] = y;
 
-                var dx = xs[i1] - x, dy = ys[i1] - y;
+                const dx = xs[i1] - x, dy = ys[i1] - y;
                 la2[i2] = Math.sqrt(dx * dx + dy * dy);
                 la[i2] = Math.sqrt(la2[i2]);
-                if (i > 1)
+                if (i > 1) {
                     point(i1);
+                }
 
                 if (i === bins.length - 1) {
                     var i3 = (i + 1) % 4;
@@ -371,7 +387,7 @@ export class GradeGraph {
                 }
             }
         }
-        var path = mksvg("path");
+        const path = mksvg("path");
         path.setAttribute("d", data.join(" "));
         path.setAttribute("fill", "none");
         path.setAttribute("class", klass);
@@ -381,17 +397,19 @@ export class GradeGraph {
         return path;
     }
     remove_if(predicate) {
-        var e = this.gg.firstChild;
+        let e = this.gg.firstChild;
         while (e) {
-            var next = e.nextSibling;
-            if (predicate.call(e))
+            const next = e.nextSibling;
+            if (predicate.call(e)) {
                 this.gg.removeChild(e);
+            }
             e = next;
         }
     }
     highlight_last_curve(d, predicate, klass) {
-        if (!this.last_curve || !this.last_curve_series.cdfu)
+        if (!this.last_curve || !this.last_curve_series.cdfu) {
             return null;
+        }
         var ispdf = hasClass(this.last_curve, "pa-gg-pdf"),
             cdf = this.last_curve_series.cdf,
             cdfu = this.last_curve_series.cdfu,
@@ -415,24 +433,25 @@ export class GradeGraph {
                 } else {
                     yv = this.yax(cdf[i+1] * nr);
                 }
-                if (yv != null)
+                if (yv != null) {
                     data.push("M", xv, ",", yv, "v", yc * nrgh);
+                }
             }
         }
-        if (!data.length)
-            return null;
-        else {
-            var path = mksvg("path");
+        if (data.length) {
+            const path = mksvg("path");
             path.setAttribute("d", data.join(""));
             path.setAttribute("fill", "none");
             path.setAttribute("class", klass);
             this.gg.appendChild(path);
             addClass(this.gg, "pa-gg-has-hl");
             return path;
+        } else {
+            return null;
         }
     }
     typed_annotation(klass) {
-        var dot = mksvg("circle");
+        const dot = mksvg("circle");
         dot.setAttribute("class", "pa-gg-mark hl-" + (klass || "main"));
         dot.setAttribute("r", !klass || klass === "main" ? 5 : 3.5);
         return dot;
@@ -470,33 +489,37 @@ export class GradeGraph {
         return false;
     }
     user_x(uid) {
-        if (!this.last_curve_series.cdfu)
+        if (!this.last_curve_series.cdfu) {
             return undefined;
+        }
         if (!this.last_curve_series.ucdf) {
             var cdf = this.last_curve_series.cdf,
                 cdfu = this.last_curve_series.cdfu,
                 ucdf = this.last_curve_series.ucdf = {}, i, ui;
             for (i = ui = 0; ui !== cdfu.length; ++ui) {
-                while (ui >= cdf[i + 1])
+                while (ui >= cdf[i + 1]) {
                     i += 2;
+                }
                 ucdf[cdfu[ui]] = cdf[i];
             }
         }
         return this.last_curve_series.ucdf[uid];
     }
     highlight_users() {
-        if (!this.last_curve || !this.last_curve_series.cdfu)
+        if (!this.last_curve || !this.last_curve_series.cdfu) {
             return;
+        }
 
         this.last_highlight = this.last_highlight || {};
         var attrs = this.container().attributes, desired = {}, x;
         for (let i = 0; i !== attrs.length; ++i) {
             if (attrs[i].name.startsWith("data-pa-highlight")) {
                 let type;
-                if (attrs[i].name === "data-pa-highlight")
+                if (attrs[i].name === "data-pa-highlight") {
                     type = "main";
-                else
+                } else {
                     type = attrs[i].name.substring(18);
+                }
                 desired[type] = attrs[i].value;
                 this.last_highlight[type] = this.last_highlight[type] || "";
             }
@@ -504,8 +527,9 @@ export class GradeGraph {
 
         for (let type in this.last_highlight) {
             var uids = desired[type] || "";
-            if (this.last_highlight[type] === uids)
+            if (this.last_highlight[type] === uids) {
                 continue;
+            }
 
             var uidm = {}, uidx = uids.split(/\s+/);
             for (let i = 0; i !== uidx.length; ++i) {
@@ -545,11 +569,11 @@ export class GradeGraph {
     hover() {
         var that = this;
         function closer_mark(hlpaths, pt, bestDistance2) {
-            var hlpt = null;
-            for (var hlp of hlpaths) {
-                var m = hlp.getAttribute("transform").match(/^translate\(([-+\d.]+),([-+\d.]+)\)$/);
+            let hlpt = null;
+            for (const hlp of hlpaths) {
+                const m = hlp.getAttribute("transform").match(/^translate\(([-+\d.]+),([-+\d.]+)\)$/);
                 if (m) {
-                    var dx = +m[1] - pt[0], dy = +m[2] - pt[1],
+                    const dx = +m[1] - pt[0], dy = +m[2] - pt[1],
                         distance2 = dx * dx + dy * dy;
                     if (distance2 < bestDistance2) {
                         hlpt = [+m[1], +m[2]];
@@ -563,8 +587,9 @@ export class GradeGraph {
         }
         function handle(event) {
             var pt = {distance: 20}, xfmt = that.xfmt;
-            if (event.type !== "mousemove")
+            if (event.type !== "mousemove") {
                 that.hoveron = event.type !== "mouseleave";
+            }
             if (that.hoveron) {
                 var loc = svgutil.event_to_point(that.svg, event),
                     paths = that.gg.querySelectorAll(".pa-gg-pdf, .pa-gg-cdf");
