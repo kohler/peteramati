@@ -25,12 +25,24 @@
             "ecmaVersion": 6,
             "sourceType": "module"
         },
-        "extends": ["eslint:recommended"],
+        "extends": [
+            "eslint:recommended"
+        ],
         "rules": {
-            "no-empty": ["error", {"allowEmptyCatch": true}],
+            "no-empty": [
+                "error",
+                {
+                    "allowEmptyCatch": true
+                }
+            ],
             "no-control-regex": "off",
             "no-useless-escape": "off",
-            "no-constant-condition": ["error", {"checkLoops": false}]
+            "no-constant-condition": [
+                "error",
+                {
+                    "checkLoops": false
+                }
+            ]
         },
         "globals": {
             "$pa": "writeable",

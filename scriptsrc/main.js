@@ -22,8 +22,7 @@ import { render_text } from "./render.js";
 import "./render-terminal.js";
 import { run } from "./run.js";
 import { run_settings_load } from "./run-settings.js";
-import { GradeKde, GradeStats } from "./gradestats.js";
-import { GradeGraph } from "./grgraph.js";
+import { grgraph } from "./grgraph-ui.js";
 import "./grgraph-highlight.js";
 import { GradeEntry, GradeSheet } from "./gradeentry.js";
 import { GradeClass } from "./gc.js";
@@ -121,10 +120,6 @@ function text_eq(a, b) {
 
 function now_msec() {
     return (new Date).getTime();
-}
-
-function now_sec() {
-    return now_msec() / 1000;
 }
 
 
@@ -1312,7 +1307,7 @@ function pa_loadgrades() {
     });
 
     // print totals
-    var tm = pa_gradeinfo_total(gi), total = "" + tm[0], drawgraph = false;
+    var tm = [gi.get_total(), gi.maxtotal], total = "" + tm[0], drawgraph = false;
     if (tm[0]) {
         $(this).find(".pa-gradelist:not(.pa-gradebox)").each(function () {
             var $t = $(this).find(".pa-total");
@@ -1327,7 +1322,7 @@ function pa_loadgrades() {
         }
     });
     if (drawgraph) {
-        pa_draw_gradecdf($(this).find(".pa-grgraph"));
+        $(this).find(".pa-grgraph").trigger("redrawgraph");
     }
 }
 
@@ -1502,232 +1497,6 @@ function runmany61() {
 }
 
 
-function pa_gradeinfo_total(gi, noextra) {
-    if (typeof gi === "string") {
-        gi = JSON.parse(gi);
-    }
-    var total = 0;
-    for (var i = 0; i < gi.order.length; ++i) {
-        var k = gi.order[i];
-        var ge = k ? gi.entries[k] : null;
-        if (ge && ge.in_total && (!noextra || !ge.is_extra))
-            total += (gi.grades && gi.grades[i]) || 0;
-    }
-    return [Math.round(total * 1000) / 1000,
-            Math.round(gi.maxtotal * 1000) / 1000];
-}
-
-
-/*function pa_gradecdf_kdepath(kde, xax, yax) {
-    var data = [], bins = kde.kde, nrdy = 0.9 / kde.maxp;
-    for (i = 0; i !== bins.length; ++i) {
-        if (i !== 0)
-            data.push(" ", xax(i * kde.binwidth), ",", yax(bins[i] * nrdy));
-        else
-            data.push("M", xax(i * kde.binwidth), ",", yax(bins[i] * nrdy), "L");
-    }
-    return data.join("");
-}*/
-
-function mksvg(tag) {
-    return document.createElementNS("http://www.w3.org/2000/svg", tag);
-}
-
-
-function pa_draw_gradecdf($graph) {
-    var d = $graph.data("paGradeData");
-    if (!d) {
-        $graph.addClass("hidden");
-        $graph.removeData("paGradeGraph");
-        return;
-    }
-
-    var $pi = $graph.closest(".pa-psetinfo");
-    var user_extension = !$pi.length
-        || $pi[0].hasAttribute("data-pa-user-extension");
-
-    // compute plot types
-    var plot_types = [];
-    if (d.series.extension && $pi.length && user_extension) {
-        plot_types.push("cdf-extension", "pdf-extension");
-    }
-    plot_types.push("cdf", "pdf");
-    if (d.series.extension && !$pi.length) {
-        plot_types.push("cdf-extension", "pdf-extension");
-    }
-    if (d.series.noextra) {
-        plot_types.push("cdf-noextra", "pdf-noextra");
-    }
-    plot_types.push("all");
-    $graph[0].setAttribute("data-pa-gg-types", plot_types.join(" "));
-
-    // compute this plot type
-    var plot_type = $graph[0].getAttribute("data-pa-gg-type");
-    if (!plot_type) {
-        plot_type = wstorage(true, "pa-gg-type");
-    }
-    if (!plot_type) {
-        var plotarg = wstorage(false, "pa-gg-type");
-        if (plotarg && plotarg[0] === "{") {
-            try {
-                plotarg = JSON.parse(plotarg);
-                // remember previous plot choice for up to two hours
-                if (typeof plotarg.type === "string"
-                    && typeof plotarg.at === "number"
-                    && plotarg.at >= now_sec() - 7200) {
-                    plot_type = plotarg.type;
-                }
-            } catch (e) {
-            }
-        }
-    }
-    if (!plot_type || plot_type === "default") {
-        plot_type = plot_types[0];
-    }
-    if (plot_types.indexOf(plot_type) < 0) {
-        if (plot_type.substring(0, 3) === "pdf") {
-            plot_type = plot_types[1];
-        } else {
-            plot_type = plot_types[0];
-        }
-    }
-    $graph[0].setAttribute("data-pa-gg-type", plot_type);
-    $graph.removeClass("cdf pdf all cdf-extension pdf-extension all-extension cdf-noextra pdf-noextra all-noextra");
-    $graph.addClass(plot_type);
-
-    var want_all = plot_type.substring(0, 3) === "all";
-    var want_extension = plot_type.indexOf("-extension") >= 0
-        || (want_all && user_extension && d.extension);
-    var want_noextra = plot_type.indexOf("-noextra") >= 0
-        || (want_all && d.series.noextra && !want_extension);
-
-    $graph.removeClass("hidden");
-    var $plot = $graph.find(".plot");
-    if (!$plot.length)
-        $plot = $graph;
-
-    var gi = new GradeGraph($plot[0], d, plot_type);
-    $graph.data("paGradeGraph", gi);
-
-    if (gi.total && gi.total < gi.max) {
-        let total = mksvg("line");
-        total.setAttribute("x1", gi.xax(gi.total));
-        total.setAttribute("y1", gi.yax(0));
-        total.setAttribute("x2", gi.xax(gi.total));
-        total.setAttribute("y2", gi.yax(1));
-        total.setAttribute("class", "pa-gg-anno-total");
-        gi.gg.appendChild(total);
-    }
-
-    // series
-    var kde_nbins = Math.ceil((gi.max - gi.min) / 2), kde_hfactor = 0.08, kdes = {};
-    if (plot_type === "pdf-extension")
-        kdes.extension = new GradeKde(d.series.extension, gi, kde_hfactor, kde_nbins);
-    if (plot_type === "pdf-noextra")
-        kdes.noextra = new GradeKde(d.series.noextra, gi, kde_hfactor, kde_nbins);
-    if (plot_type === "pdf")
-        kdes.main = new GradeKde(d.series.all, gi, kde_hfactor, kde_nbins);
-    for (var i in kdes)
-        gi.maxp = Math.max(gi.maxp, kdes[i].maxp);
-
-    if (plot_type === "pdf-noextra")
-        gi.append_pdf(kdes.noextra, "pa-gg-pdf pa-gg-noextra");
-    if (plot_type === "pdf")
-        gi.append_pdf(kdes.main, "pa-gg-pdf");
-    if (plot_type === "pdf-extension")
-        gi.append_pdf(kdes.extension, "pa-gg-pdf pa-gg-extension");
-    if (plot_type === "cdf-noextra" || (plot_type === "all" && d.series.noextra))
-        gi.append_cdf(d.series.noextra, "pa-gg-cdf pa-gg-noextra");
-    if (plot_type === "cdf" || plot_type === "all")
-        gi.append_cdf(d.series.all, "pa-gg-cdf");
-    if (plot_type === "cdf-extension" || (plot_type === "all" && d.series.extension && user_extension))
-        gi.append_cdf(d.series.extension, "pa-gg-cdf pa-gg-extension");
-
-    // cutoff
-    if (d.cutoff && plot_type.substring(0, 3) !== "pdf") {
-        var cutoff = mksvg("rect");
-        cutoff.setAttribute("x", gi.xax(0));
-        cutoff.setAttribute("y", gi.yax(d.cutoff));
-        cutoff.setAttribute("width", gi.xax(gi.max));
-        cutoff.setAttribute("height", gi.yax(0) - gi.yax(d.cutoff));
-        cutoff.setAttribute("fill", "rgba(255,0,0,0.1)");
-        gi.gg.appendChild(cutoff);
-    }
-
-    // load user grade
-    let total = null, gri = $pi.data("pa-gradeinfo");
-    if (gri)
-        total = pa_gradeinfo_total(gri, want_noextra && !want_all)[0];
-    if (total != null)
-        gi.annotate_last_curve(total);
-
-    // axes
-    gi.xaxis();
-    gi.yaxis();
-
-    if ($graph[0].hasAttribute("data-pa-highlight"))
-        gi.highlight_users();
-
-    gi.hover();
-
-    // summary
-    $graph.find(".statistics").each(function () {
-        var dd = gi.last_curve_series, x = [];
-        if (dd && dd.mean)
-            x.push("mean " + dd.mean.toFixed(1));
-        if (dd && dd.median)
-            x.push("median " + dd.median.toFixed(1));
-        if (dd && dd.stddev)
-            x.push("stddev " + dd.stddev.toFixed(1));
-        x = [x.join(", ")];
-        if (dd && total != null) {
-            var y = dd.count_at(total);
-            if (dd.cutoff && y < dd.cutoff * dd.n)
-                x.push("≤" + Math.round(dd.cutoff * 100) + " %ile");
-            else
-                x.push(Math.round(Math.min(Math.max(1, y * 100 / dd.n), 99)) + " %ile");
-        }
-        if (x.length) {
-            removeClass(this, "hidden");
-            this.innerHTML = x.join(" · ");
-        } else {
-            addClass(this, "hidden");
-            this.innerHTML = "";
-        }
-    });
-
-    $graph.find(".pa-grgraph-type").each(function () {
-        var title = [];
-        if (plot_type.startsWith("cdf"))
-            title.push("CDF");
-        else if (plot_type.startsWith("pdf"))
-            title.push("PDF");
-        if (want_extension && !want_all)
-            title.push("extension");
-        if (want_noextra && !want_all)
-            title.push("no extra credit");
-        var t = title.length ? " (" + title.join(", ") + ")" : "";
-        this.innerHTML = "grade statistics" + t;
-    });
-
-    gi.highlight_users();
-}
-
-handle_ui.on("js-grgraph-flip", function () {
-    var $graph = $(this).closest(".pa-grgraph"),
-        plot_types = ($graph[0].getAttribute("data-pa-gg-types") || "").split(/ /),
-        plot_type = $graph[0].getAttribute("data-pa-gg-type"),
-        i = plot_types.indexOf(plot_type);
-    if (i >= 0) {
-        i = (i + (hasClass(this, "prev") ? plot_types.length - 1 : 1)) % plot_types.length;
-        $graph[0].setAttribute("data-pa-gg-type", plot_types[i]);
-        wstorage(true, "pa-gg-type", plot_types[i]);
-        wstorage(false, "pa-gg-type", {type: plot_types[i], at: now_sec()});
-        pa_draw_gradecdf($graph);
-    }
-});
-
-
 $(function () {
 var delta = document.body.getAttribute("data-now") - ((new Date).getTime() / 1000);
 $(".pa-download-timed").each(function () {
@@ -1754,19 +1523,6 @@ $(".pa-download-timed").each(function () {
 });
 });
 
-
-function pa_gradecdf() {
-    var self = this, p = self.getAttribute("data-pa-pset");
-    $.ajax(hoturl_post("api/gradestatistics", p ? {pset: p} : {}), {
-        type: "GET", cache: true, dataType: "json",
-        success: function (d) {
-            if (d.series && d.series.all) {
-                $(self).data("paGradeData", new GradeStats(d));
-                pa_draw_gradecdf($(self));
-            }
-        }
-    });
-}
 
 function pa_checklatest() {
     var start = (new Date).getTime(), timeout, pset, hash;
@@ -2995,7 +2751,7 @@ window.$pa = {
     checklatest: pa_checklatest,
     filediff_markdown: filediff_markdown,
     fold: fold,
-    gradecdf: pa_gradecdf,
+    grgraph: grgraph,
     onload: hotcrp_load,
     loadgrades: pa_loadgrades,
     load_runsettings: run_settings_load,

@@ -34,7 +34,9 @@ export function log_jserror(errormsg, error, noconsole) {
 
 let old_onerror = window.onerror, nerrors_logged = 0;
 window.onerror = function (errormsg, url, lineno, colno, error) {
-    if ((url || !lineno) && ++nerrors_logged <= 10) {
+    if ((url || !lineno)
+        && errormsg.indexOf("ResizeObserver loop limit exceeded") < 0
+        && ++nerrors_logged <= 10) {
         var x = {error: errormsg, url: url, lineno: lineno};
         if (colno) {
             x.colno = colno;

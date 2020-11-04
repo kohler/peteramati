@@ -296,7 +296,7 @@ function echo_grade_cdf($info) {
         echo '<div class="plot" style="width:350px;height:200px"></div>';
     }
     echo '<div class="statistics"></div></div>';
-    Ht::stash_script("\$(\"#pa-grade-statistics\").each(\$pa.gradecdf)");
+    Ht::stash_script("\$(\"#pa-grade-statistics\").each(\$pa.grgraph)");
 }
 
 /** @param PsetView $info */

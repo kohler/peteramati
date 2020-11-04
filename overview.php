@@ -37,7 +37,7 @@ foreach ($Conf->psets() as $pset) {
     }
 }
 echo '</div></form>';
-Ht::stash_script("\$(\".pa-grgraph\").each(\$pa.gradecdf);\$(window).on(\"resize\",function(){\$(\".pa-grgraph\").each(\$pa.gradecdf)})");
+Ht::stash_script("\$(\".pa-grgraph\").each(\$pa.grgraph);\$(window).on(\"resize\",function(){\$(\".pa-grgraph\").each(\$pa.grgraph)})");
 
 $Sset = new StudentSet($Me);
 $sj = [];

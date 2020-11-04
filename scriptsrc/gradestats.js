@@ -19,13 +19,15 @@ class GradeSeries {
         return this.cdf.length ? this.cdf[this.cdf.length - 2] : 0;
     }
     count_at(x) {
-        let cdf = this.cdf, l = 0, r = cdf.length;
+        const cdf = this.cdf;
+        let l = 0, r = cdf.length;
         while (l < r) {
-            let m = l + ((r - l) >> 2) * 2;
-            if (cdf[m] >= x)
+            const m = l + ((r - l) >> 2) * 2;
+            if (cdf[m] >= x) {
                 r = m;
-            else
+            } else {
                 l = m + 2;
+            }
         }
         return cdf[l+1];
     }
@@ -33,7 +35,7 @@ class GradeSeries {
 
 export class GradeKde {
     constructor(series, gi, hfrac, nbins) {
-        var maxg = gi.max, ming = gi.min,
+        const maxg = gi.max, ming = gi.min,
             H = (maxg - ming) * hfrac, iH = 1 / H;
         function epanechnikov(x) {
             if (x >= -H && x <= H) {
@@ -43,27 +45,27 @@ export class GradeKde {
                 return 0;
             }
         }
-        var bins = [], i;
-        for (i = 0; i !== nbins + 1; ++i) {
+        const bins = [];
+        for (let i = 0; i !== nbins + 1; ++i) {
             bins.push(0);
         }
-        var cdf = series.cdf, dx = (maxg - ming) / nbins, idx = 1 / dx;
-        for (i = 0; i < cdf.length; i += 2) {
-            var y = cdf[i+1] - (i === 0 ? 0 : cdf[i-1]);
-            var x1 = Math.floor((cdf[i] - ming - H) * idx);
-            var x2 = Math.ceil((cdf[i] - ming + H) * idx);
+        const cdf = series.cdf, dx = (maxg - ming) / nbins, idx = 1 / dx;
+        for (let i = 0; i < cdf.length; i += 2) {
+            const y = cdf[i+1] - (i === 0 ? 0 : cdf[i-1]);
+            let x1 = Math.floor((cdf[i] - ming - H) * idx);
+            const x2 = Math.ceil((cdf[i] - ming + H) * idx);
             while (x1 < x2) {
-                var x = Math.max(-1, Math.min(nbins + 1, x1));
+                const x = Math.max(-1, Math.min(nbins + 1, x1));
                 if (x >= 0 && x <= nbins) {
                     bins[x] += epanechnikov(x1 * dx - cdf[i] + ming) * y;
                 }
                 ++x1;
             }
         }
-        var maxp = 0;
+        let maxp = 0;
         if (series.n) {
-            var nr = 1 / series.n;
-            for (i = 0; i !== nbins + 1; ++i) {
+            const nr = 1 / series.n;
+            for (let i = 0; i !== nbins + 1; ++i) {
                 bins[i] *= nr;
                 maxp = Math.max(maxp, bins[i]);
             }

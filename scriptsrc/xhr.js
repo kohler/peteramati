@@ -3,16 +3,17 @@
 // See LICENSE for open-source distribution terms
 
 function jqxhr_error_message(jqxhr, status, errormsg) {
-    if (status === "parsererror")
+    if (status === "parsererror") {
         return "Internal error: bad response from server.";
-    else if (errormsg)
+    } else if (errormsg) {
         return errormsg.toString();
-    else if (status === "timeout")
+    } else if (status === "timeout") {
         return "Connection timed out.";
-    else if (status)
+    } else if (status) {
         return "Failed [" + status + "].";
-    else
+    } else {
         return "Failed.";
+    }
 }
 
 

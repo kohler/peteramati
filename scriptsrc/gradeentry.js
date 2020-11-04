@@ -232,6 +232,17 @@ export class GradeSheet {
         }
     }
 
+    get_total(noextra) {
+        let total = 0;
+        for (let i = 0; i < this.order.length; ++i) {
+            const ge = this.entries[this.order[i]];
+            if (ge && ge.in_total && (!noextra || !this.is_extra)) {
+                total += (this.grades && this.grades[i]) || 0;
+            }
+        }
+        return Math.round(total * 1000) / 1000;
+    }
+
     static parse_json(x) {
         return new GradeSheet(JSON.parse(x));
     }

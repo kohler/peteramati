@@ -34,7 +34,9 @@ export const GradeClass = {
 };
 
 GradeClass.add("numeric", { entry: GradeClass.basic_entry });
-GradeClass.add("formula", { });
+
+GradeClass.add("formula", { text: function (v) { return v == null ? "" : v.toFixed(1); } });
+
 GradeClass.add("text", {
     entry: function (id) {
         return '<div class="pa-pd"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
@@ -42,6 +44,7 @@ GradeClass.add("text", {
     justify: "left",
     sort: "forward"
 });
+
 GradeClass.add("section", {
     text: () => "",
     entry: () => ""

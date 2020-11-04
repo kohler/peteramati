@@ -567,7 +567,7 @@ export class GradeGraph {
         }
     }
     hover() {
-        var that = this;
+        const that = this;
         function closer_mark(hlpaths, pt, bestDistance2) {
             let hlpt = null;
             for (const hlp of hlpaths) {
@@ -586,12 +586,12 @@ export class GradeGraph {
             return hlpt;
         }
         function handle(event) {
-            var pt = {distance: 20}, xfmt = that.xfmt;
+            let pt = {distance: 20}, xfmt = that.xfmt;
             if (event.type !== "mousemove") {
                 that.hoveron = event.type !== "mouseleave";
             }
             if (that.hoveron) {
-                var loc = svgutil.event_to_point(that.svg, event),
+                const loc = svgutil.event_to_point(that.svg, event),
                     paths = that.gg.querySelectorAll(".pa-gg-pdf, .pa-gg-cdf");
                 loc[0] -= that.ml;
                 loc[1] -= that.mt;
@@ -599,7 +599,7 @@ export class GradeGraph {
                     pt = svgutil.closest_point(p, loc, pt);
                 }
                 if (pt.pathNode) {
-                    var hlpt = closer_mark(that.gg.querySelectorAll(".pa-gg-mark.hl-main"), pt, 36)
+                    const hlpt = closer_mark(that.gg.querySelectorAll(".pa-gg-mark.hl-main"), pt, 36)
                         || closer_mark(that.gg.querySelectorAll(".pa-gg-mark:not(.hl-main)"), pt, 25);
                     if (hlpt) {
                         pt = hlpt;
@@ -609,7 +609,7 @@ export class GradeGraph {
                     }
                 }
             }
-            var ha = that.hoveranno;
+            let ha = that.hoveranno;
             if (pt.pathNode) {
                 if (!ha) {
                     ha = that.hoveranno = [that.star_annotation([4, 10], null, null, "pa-gg-hover-mark")];
