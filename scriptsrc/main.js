@@ -18,6 +18,7 @@ import "./pset.js";
 import { linediff_find, linediff_traverse, linediff_locate } from "./diff.js";
 import { filediff_markdown } from "./diff-markdown.js";
 import "./diff-expand.js";
+import { Note } from "./note.js";
 import { render_text } from "./render.js";
 import "./render-terminal.js";
 import { run } from "./run.js";
@@ -585,174 +586,13 @@ handle_ui.on("pa-signin-radio", function () {
 });
 
 
-function pa_note(elt) {
-    var note = elt.getAttribute("data-pa-note");
-    if (typeof note === "string" && note !== "") {
-        note = JSON.parse(note);
-    }
-    if (typeof note === "number") {
-        note = [false, "", 0, note];
-    }
-    return note || [false, ""];
-}
-
-function pa_set_note(elt, note) {
-    if (note === false || note === null) {
-        elt.removeAttribute("data-pa-note");
-    } else if (note !== undefined) {
-        elt.setAttribute("data-pa-note", JSON.stringify(note));
-    }
-}
-
-function pa_fix_note_links() {
-    function note_skippable(tr) {
-        return pa_note(tr)[1] === "";
-    }
-
-    function note_anchor(tr) {
-        var anal = linediff_locate(tr), td;
-        if (anal && (td = linediff_find(anal.ufile, anal.lineid))) {
-            return "#" + td.id;
-        } else {
-            return "";
-        }
-    }
-
-    function set_link(tr, next_tr) {
-        var $a = $(tr).find(".pa-note-links a");
-        if (!$a.length) {
-            $a = $('<a class="ui pa-goto"></a>');
-            $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notecontent"));
-        }
-
-        $a.attr("href", note_anchor(next_tr));
-        var t = next_tr ? "NEXT >" : "TOP";
-        if ($a.text() !== t) {
-            $a.text(t);
-        }
-    }
-
-    var notes = $(".pa-gw"), notepos = 0;
-    while (notepos < notes.length && notes[notepos] !== this) {
-        ++notepos;
-    }
-    if (notepos < notes.length) {
-        var prevpos = notepos - 1;
-        while (prevpos >= 0 && note_skippable(notes[prevpos])) {
-            --prevpos;
-        }
-
-        var nextpos = notepos + 1;
-        while (nextpos < notes.length && note_skippable(notes[nextpos])) {
-            ++nextpos;
-        }
-
-        if (prevpos >= 0) {
-            set_link(notes[prevpos], note_skippable(this) ? notes[nextpos] : this);
-        }
-        set_link(this, notes[nextpos]);
-    }
-}
-
-function pa_render_note(note, transition) {
-    var tr = this, $tr = $(this);
-    if (!hasClass(tr, "pa-gw")) {
-        while (!hasClass(tr, "pa-dl")) {
-            tr = tr.parentElement;
-        }
-        var ntr = tr.nextSibling;
-        while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE
-                       || hasClass(ntr, "pa-gn"))) {
-            tr = ntr;
-            ntr = ntr.nextSibling;
-        }
-        $tr = $('<div class="pa-dl pa-gw"><div class="pa-notebox"></div></div>').insertAfter(tr);
-        tr = $tr[0];
-        var tp = linediff_traverse(tr, false, 1), lineid, e, lm, dash;
-        if (tp) {
-            if (hasClass(tp, "pa-gd")) {
-                lineid = "a" + tp.firstChild.getAttribute("data-landmark");
-            } else if (hasClass(tp, "pa-gr")
-                       && (e = tp.lastChild.firstChild)
-                       && (lm = e.getAttribute("data-landmark"))
-                       && (dash = lm.indexOf("-")) >= 0) {
-                lineid = "b" + lm.substring(dash + 1);
-            } else {
-                lineid = "b" + tp.firstChild.nextSibling.getAttribute("data-landmark");
-            }
-            tr.setAttribute("data-landmark", lineid);
-        }
-    }
-    if (arguments.length == 0) {
-        return tr;
-    }
-
-    pa_set_note(tr, note);
-    var $td = $tr.find(".pa-notebox"), $content = $td.children();
-    if (transition) {
-        $content.slideUp(80).queue(function () { $content.remove(); });
-    } else {
-        $content.remove();
-    }
-
-    if (note[1] === "") {
-        pa_fix_note_links.call(tr);
-        if (transition) {
-            $tr.children().slideUp(80);
-        } else {
-            addClass(tr, "hidden");
-        }
-        return tr;
-    }
-
-    var t = '<div class="pa-notecontent clearfix">';
-    if (note[2]) {
-        var authorids = $.isArray(note[2]) ? note[2] : [note[2]];
-        var authors = [];
-        for (var i in authorids) {
-            var p = siteinfo.pc[authorids[i]];
-            if (p) {
-                if (p.nick)
-                    authors.push(p.nick);
-                else if (p.nicklen || p.lastpos)
-                    authors.push(p.name.substr(0, p.nicklen || p.lastpos - 1));
-                else
-                    authors.push(p.name);
-            }
-        }
-        if (authors.length)
-            t += '<div class="pa-note-author">[' + authors.join(', ') + ']</div>';
-    }
-    t += '<div class="pa-note pa-' + (note[0] ? 'comment' : 'grade') + 'note';
-    if (note[4] && typeof note[4] === "number")
-        t += '" data-format="' + note[4];
-    t += '"></div></div>';
-    $td.append(t);
-
-    if (!note[4]) {
-        $td.find(".pa-note").addClass("format0").text(note[1]);
-    } else {
-        var r = render_text(note[4], note[1]);
-        $td.find(".pa-note").addClass("format" + (r.format || 0)).html(r.content);
-    }
-
-    pa_fix_note_links.call(tr);
-
-    if (transition) {
-        $td.find(".pa-notecontent").hide().slideDown(80);
-    } else {
-        removeClass(tr, "hidden");
-    }
-    return tr;
-}
-
 // pa_linenote
 (function ($) {
 var curanal, down_event, scrolled_x, scrolled_y, scrolled_at;
 
 function render_form($tr, note, transition) {
     $tr.removeClass("hidden").addClass("editing");
-    note && pa_set_note($tr[0], note);
+    note && note.store_at($tr[0]);
     var $td = $tr.find(".pa-notebox");
     if (transition) {
         $tr.css("display", "").children().css("display", "");
@@ -761,11 +601,11 @@ function render_form($tr, note, transition) {
     }
 
     var $pi = $(curanal.tr).closest(".pa-psetinfo");
-    var format = note ? note[4] : null;
+    var format = note ? note.format : null;
     if (format == null)
         format = $tr.closest(".pa-filediff").attr("data-default-format");
     var t = '<form method="post" action="' +
-        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi[0], {file: curanal.file, line: curanal.lineid, oldversion: (note && note[3]) || 0, format: format}))) +
+        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi[0], {file: curanal.file, line: curanal.lineid, oldversion: (note && note.version) || 0, format: format}))) +
         '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">' +
         '<textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
@@ -777,12 +617,12 @@ function render_form($tr, note, transition) {
     var $form = $(t + '</div></form>').appendTo($td);
 
     var $ta = $form.find("textarea");
-    if (note && note[1] !== null) {
-        $ta.text(note[1]);
-        $ta[0].setSelectionRange && $ta[0].setSelectionRange(note[1].length, note[1].length);
+    if (note && note.text !== null) {
+        $ta.text(note.text);
+        $ta[0].setSelectionRange && $ta[0].setSelectionRange(note.text.length, note.text.length);
     }
     $ta.autogrow().keydown(keydown);
-    $form.find("input[name=iscomment]").prop("checked", !!(note && note[0]));
+    $form.find("input[name=iscomment]").prop("checked", !!(note && note.iscomment));
     $form.find("button[name=cancel]").click(cancel);
     $form.on("submit", function () {
         pa_save_note.call(this.closest(".pa-dl"));
@@ -871,17 +711,17 @@ function uncapture() {
 
 function unedit(tr, always) {
     tr = tr.closest(".pa-dl");
-    var note = pa_note(tr),
+    var note = Note.at(tr),
         $text = tr ? $(tr).find("textarea") : null;
     if (!tr
         || (!always
             && $text.length
-            && !text_eq(note[1], $text.val().replace(/\s+$/, "")))) {
+            && !text_eq(note.text, $text.val().replace(/\s+$/, "")))) {
         return false;
     } else {
         removeClass(tr, "editing");
         $(tr).find(":focus").blur();
-        pa_render_note.call(tr, note, true);
+        note.html_near(tr, true);
         var click_tr = anal_tr();
         if (click_tr) {
             capture(click_tr, true);
@@ -912,7 +752,7 @@ var pa_save_note = function (text) {
     addClass(this, "pa-outstanding");
 
     var self = this,
-        note = pa_note(this),
+        note = Note.at(this),
         editing = hasClass(this, "editing"),
         table = this.closest(".pa-filediff"),
         pi = table.closest(".pa-psetinfo"),
@@ -937,11 +777,11 @@ var pa_save_note = function (text) {
         $(f).find(".aab").append('<div class="aabut pa-save-message">Saving…</div>');
     } else {
         if (typeof text === "function") {
-            text = text(note ? note[1] : "", note);
+            text = text(note.text, note);
         }
         data = {note: text};
     }
-    data.format = note ? note[4] : null;
+    data.format = note.format;
     if (data.format == null) {
         data.format = table.getAttribute("data-default-format");
     }
@@ -950,20 +790,20 @@ var pa_save_note = function (text) {
     return new Promise(function (resolve, reject) {
         api_conditioner(
             hoturl_post("api/linenote", hoturl_gradeparts(pi, {
-                file: file, line: lineid, oldversion: (note && note[3]) || 0
+                file: file, line: lineid, oldversion: note.version || 0
             })), data
         ).then(function (data) {
             removeClass(self, "pa-outstanding");
             if (data && data.ok) {
                 removeClass(self, "pa-save-failed");
                 note = data.linenotes[file];
-                note = note && note[lineid];
-                pa_set_note(self, note);
+                note = Note.parse(note && note[lineid]);
+                note.store_at(self);
                 if (editing) {
                     $(self).find(".pa-save-message").html("Saved");
                     unedit(self);
                 } else {
-                    pa_render_note.call(self, note);
+                    note.html_near(self);
                 }
                 resolve(self);
             } else {
@@ -1035,12 +875,7 @@ function pa_linenote(event) {
 }
 
 function make_linenote(event) {
-    var $tr;
-    if (curanal.notetr) {
-        $tr = $(curanal.notetr);
-    } else {
-        $tr = $(pa_render_note.call(curanal.tr));
-    }
+    var $tr = $(curanal.notetr || Note.html_skeleton_near(curanal.tr));
     set_scrolled_at(event);
     if ($tr.hasClass("editing")) {
         if (unedit($tr[0])) {
@@ -1052,7 +887,7 @@ function make_linenote(event) {
             return false;
         }
     } else {
-        render_form($tr, pa_note($tr[0]), true);
+        render_form($tr, Note.at($tr[0]), true);
         capture(curanal.tr, false);
         return false;
     }
@@ -1365,10 +1200,10 @@ function pa_compute_landmark_range_grade(ge, allow_save) {
     }
 
     pa_process_landmark_range.call(this, function (tr) {
-        var note = pa_note(tr), m, gch;
-        if (note[1]
-            && ((m = /^[\s❮→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:❯]?(?:\s|$)/.exec(note[1]))
-                || (m = /^[\s❮→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:❯]?(?:\s|$)/.exec(note[1])))) {
+        var note = Note.at(tr), m, gch;
+        if (note.text
+            && ((m = /^[\s❮→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text))
+                || (m = /^[\s❮→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text)))) {
             if (sum === null) {
                 sum = 0.0;
             }
@@ -1458,8 +1293,8 @@ handle_ui.on("pa-notes-grade", function (event) {
 function pa_beforeunload() {
     var ok = true;
     $(".pa-gw textarea").each(function () {
-        var tr = this.closest(".pa-dl"), note = pa_note(tr);
-        if (note && !text_eq(this.value, note[1]) && !hasClass(tr, "pa-save-failed"))
+        var tr = this.closest(".pa-dl"), note = Note.at(tr);
+        if (!text_eq(this.value, note.text) && !hasClass(tr, "pa-save-failed"))
             ok = false;
     });
     if (!ok)
