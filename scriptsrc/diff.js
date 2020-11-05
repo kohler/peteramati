@@ -108,6 +108,20 @@ export function linediff_find(filename, lineid) {
     return e;
 }
 
+export function linediff_lineid(elt) {
+    let e, lm, dash;
+    if (hasClass(elt, "pa-gd")) {
+        return "a" + elt.firstChild.getAttribute("data-landmark");
+    } else if (hasClass(elt, "pa-dlr")
+               && (e = elt.lastChild.firstChild)
+               && (lm = e.getAttribute("data-landmark"))
+               && (dash = lm.indexOf("-")) >= 0) {
+        return "b" + lm.substring(dash + 1);
+    } else {
+        return "b" + elt.firstChild.nextSibling.getAttribute("data-landmark");
+    }
+}
+
 // linediff_traverse(tr, down, flags)
 //    Find the diff line (pa-d[idc]) near `tr` in the direction of `down`.
 //    If `down === null`, look up *starting* from `tr`.
@@ -188,14 +202,18 @@ export function linediff_locate(tr, down) {
     if (thisline && hasClass(thisline, "pa-gw")) {
         result.notetr = thisline;
     } else {
-        do {
+        while (true) {
             nearline = nearline.nextSibling;
-        } while (nearline
-                 && (nearline.nodeType !== Node.ELEMENT_NODE
-                     || hasClass(nearline, "pa-gn")
-                     || (!nearline.offsetParent && !hasClass(nearline, "pa-gw"))));
-        if (nearline && hasClass(nearline, "pa-gw")) {
-            result.notetr = nearline;
+            if (!nearline) {
+                break;
+            } else if (nearline.nodeType === Node.ELEMENT_NODE) {
+                if (hasClass(nearline, "pa-gw")) {
+                    result.notetr = nearline;
+                    break;
+                } else if (nearline.offsetParent && !hasClass(nearline, "pa-gn")) {
+                    break;
+                }
+            }
         }
     }
     return result;

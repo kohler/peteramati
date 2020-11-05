@@ -4,7 +4,8 @@
 
 import { hasClass, addClass, removeClass } from "./ui.js";
 import { render_text } from "./render.js";
-import { linediff_traverse, linediff_locate, linediff_find } from "./diff.js";
+import { linediff_traverse, linediff_locate, linediff_find,
+    linediff_lineid } from "./diff.js";
 
 
 export class Note {
@@ -59,31 +60,48 @@ export class Note {
             return elt;
         }
 
-        let line = hasClass(elt, "pa-dl") ? elt : elt.closest(".pa-dl");
-        let ntr = line.nextSibling;
-        while (ntr && (ntr.nodeType !== Node.ELEMENT_NODE
-                       || hasClass(ntr, "pa-gn"))) {
-            line = ntr;
-            ntr = ntr.nextSibling;
+        // traverse to previous visible line
+        let line = elt.closest(".pa-dl");
+        while (line && (line.nodeType !== Node.ELEMENT_NODE
+                        || !line.offsetParent
+                        || (!hasClass(line, "pa-gi") && !hasClass(line, "pa-gc") && !hasClass(line, "pa-gd")))) {
+            line = line.previousSibling;
+        }
+        if (!line) {
+            throw new Error("bad html_skeleton_near");
         }
 
-        const tr = $('<div class="pa-dl pa-gw"><div class="pa-notebox"></div></div>')
-            .insertAfter(line)[0],
-            tp = linediff_traverse(tr, false, 1);
-        if (tp) {
-            let lineid, e, lm, dash;
-            if (hasClass(tp, "pa-gd")) {
-                lineid = "a" + tp.firstChild.getAttribute("data-landmark");
-            } else if (hasClass(tp, "pa-gr")
-                       && (e = tp.lastChild.firstChild)
-                       && (lm = e.getAttribute("data-landmark"))
-                       && (dash = lm.indexOf("-")) >= 0) {
-                lineid = "b" + lm.substring(dash + 1);
-            } else {
-                lineid = "b" + tp.firstChild.nextSibling.getAttribute("data-landmark");
+        // determine lineid
+        const lineid = linediff_lineid(line),
+            isa = lineid.charAt(0) === "a",
+            lineno = +lineid.substring(1);
+
+        // traverse forward to insertion point
+        let astart = null;
+        line = line.nextSibling;
+        while (line) {
+            if (line.nodeType === Node.ELEMENT_NODE) {
+                if (hasClass(line, "pa-gx")) {
+                    break;
+                } else if (hasClass(line, "pa-gi") || hasClass(line, "pa-gc")) {
+                    if (isa || lineno < +line.firstChild.nextSibling.getAttribute("data-landmark")) {
+                        break;
+                    }
+                    astart = null;
+                } else if (hasClass(line, "pa-gd")) {
+                    if (isa && lineno < +line.firstChild.getAttribute("data-landmark")) {
+                        astart = line;
+                        break;
+                    }
+                    astart = astart || line;
+                }
             }
-            tr.setAttribute("data-landmark", lineid);
+            line = line.nextSibling;
         }
+
+        // perform insertion
+        const tr = $('<div class="pa-dl pa-gw" data-landmark="'.concat(lineid, '"><div class="pa-notebox"></div></div>'))[0];
+        elt.parentElement.insertBefore(tr, astart || line);
         return tr;
     }
 
@@ -158,12 +176,7 @@ export class Note {
         if (tr.hasAttribute("data-landmark")) {
             this._lineid = tr.getAttribute("data-landmark");
         } else {
-            const lmtr = linediff_traverse(tr, false, 1);
-            if (hasClass(lmtr, "pa-gd")) {
-                this._lineid = "a" + lmtr.firstChild.getAttribute("data-landmark");
-            } else {
-                this._lineid = "b" + lmtr.firstChild.nextSibling.getAttribute("data-landmark");
-            }
+            this._lineid = linediff_lineid(linediff_traverse(tr, false, 1));
         }
     }
 

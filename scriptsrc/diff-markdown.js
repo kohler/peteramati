@@ -230,7 +230,7 @@ export function filediff_markdown() {
     var e = this.firstChild, l = [], lineno = 1, this_lineno;
     while (e) {
         var n = e.nextSibling;
-        if (hasClass(e, "pa-gr")) {
+        if (hasClass(e, "pa-dlr")) {
             this.removeChild(e);
         } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
             this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
@@ -268,7 +268,7 @@ export function filediff_markdown() {
         }
 
         var lp = document.createElement("div");
-        lp.className = "pa-dl pa-gr";
+        lp.className = "pa-dl pa-dlr";
         var la = document.createElement("div");
         la.className = "pa-da";
         var lb = document.createElement("div");
@@ -322,7 +322,7 @@ function filediff_unmarkdown() {
     var e = this.firstChild;
     while (e) {
         var n = e.nextSibling;
-        if (hasClass(e, "pa-gr")) {
+        if (hasClass(e, "pa-dlr")) {
             this.removeChild(e);
         } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
             removeClass(e, "hidden");
