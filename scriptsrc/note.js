@@ -150,6 +150,36 @@ export class Note {
         }
         return tr;
     }
+
+    load_fileid() {
+        const tr = this.element,
+            table = tr.closest(".pa-filediff");
+        this._file = table.getAttribute("data-pa-file");
+        if (tr.hasAttribute("data-landmark")) {
+            this._lineid = tr.getAttribute("data-landmark");
+        } else {
+            const lmtr = linediff_traverse(tr, false, 1);
+            if (hasClass(lmtr, "pa-gd")) {
+                this._lineid = "a" + lmtr.firstChild.getAttribute("data-landmark");
+            } else {
+                this._lineid = "b" + lmtr.firstChild.nextSibling.getAttribute("data-landmark");
+            }
+        }
+    }
+
+    get file() {
+        if (!this._file && this.element) {
+            this.load_fileid();
+        }
+        return this._file;
+    }
+
+    get lineid() {
+        if (!this._lineid && this.element) {
+            this.load_fileid();
+        }
+        return this._lineid;
+    }
 }
 
 

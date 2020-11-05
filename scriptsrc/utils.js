@@ -227,3 +227,14 @@ export class ImmediatePromise {
         return this;
     }
 }
+
+
+export function text_eq(a, b) {
+    if (a === b) {
+        return true;
+    } else {
+        a = (a == null ? "" : a).replace(/\r\n?/g, "\n");
+        b = (b == null ? "" : b).replace(/\r\n?/g, "\n");
+        return a === b;
+    }
+}

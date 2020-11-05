@@ -160,21 +160,20 @@ export function linediff_locate(tr, down) {
         return null;
     }
 
-    var thisline = tr.closest(".pa-dl"),
-        nearline = linediff_traverse(tr, down, 1),
-        filediff;
+    const thisline = tr.closest(".pa-dl");
+    let nearline = linediff_traverse(tr, down, 1), filediff;
     if (!nearline || !(filediff = nearline.closest(".pa-filediff"))) {
         return null;
     }
 
-    var file = filediff.getAttribute("data-pa-file"),
+    const file = filediff.getAttribute("data-pa-file"),
         result = {ufile: file, file: file, tr: nearline},
         user = filediff.getAttribute("data-pa-file-user");
     if (user) {
         result.ufile = user + "-" + file;
     }
 
-    var lm;
+    let lm;
     if (thisline
         && (lm = thisline.getAttribute("data-landmark"))
         && /^[ab]\d+$/.test(lm)) {
@@ -194,7 +193,7 @@ export function linediff_locate(tr, down) {
         } while (nearline
                  && (nearline.nodeType !== Node.ELEMENT_NODE
                      || hasClass(nearline, "pa-gn")
-                     || !nearline.offsetParent));
+                     || (!nearline.offsetParent && !hasClass(nearline, "pa-gw"))));
         if (nearline && hasClass(nearline, "pa-gw")) {
             result.notetr = nearline;
         }
