@@ -4,6 +4,7 @@
 // See LICENSE for open-source distribution terms
 
 class API_Grade {
+    /** @param Pset $pset */
     static private function parse_full_grades($pset, $x, &$errf, $can_edit) {
         if (is_string($x)) {
             $x = json_decode($x, true);
@@ -31,6 +32,7 @@ class API_Grade {
         }
     }
 
+    /** @param PsetView $info */
     static private function apply_grades($info, $g, $ag, $og, &$errf) {
         $v = [];
         foreach ($info->pset->grades() as $ge) {
@@ -236,6 +238,8 @@ class API_Grade {
         return $j;
     }
 
+    /** @param PsetView $info
+     * @param Contact $user */
     static private function apply_linenote($info, $user, $apply, &$lnotes) {
         if (!isset($apply->file)
             || !isset($apply->line)
@@ -259,7 +263,7 @@ class API_Grade {
             $note->users[] = $user->contactId;
         }
         $note->iscomment = isset($apply->iscomment) && $apply->iscomment;
-        $note->note = rtrim(cleannl(isset($apply->note) ? $apply->note : ""));
+        $note->text = rtrim(cleannl($apply->text ?? $apply->note ?? ""));
         $note->version = intval($note->version) + 1;
         if (isset($apply->format) && ctype_digit($apply->format)) {
             $note->format = intval($apply->format);

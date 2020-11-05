@@ -7,10 +7,13 @@ class LineNote implements JsonUpdatable {
     public $lineid;
     /** @var bool */
     public $iscomment = false;
-    public $note;
-    public $users = [];
+    /** @var ?string */
+    public $text;
+    /** @var ?int */
     public $version;
+    /** @var ?int */
     public $format;
+    public $users = [];
 
     /** @param string $file
      * @param string $lineid */
@@ -31,10 +34,10 @@ class LineNote implements JsonUpdatable {
         if (is_int($x) || $x === null) {
             $ln->version = $x;
         } else if (is_string($x)) {
-            $ln->note = $x;
+            $ln->text = $x;
         } else if (is_array($x)) {
             $ln->iscomment = $x[0];
-            $ln->note = $x[1];
+            $ln->text = $x[1];
             if (isset($x[2]) && is_int($x[2])) {
                 $ln->users[] = $x[2];
             } else if (isset($x[2]) && is_array($x[2])) {
@@ -52,7 +55,7 @@ class LineNote implements JsonUpdatable {
 
     /** @return bool */
     function is_empty() {
-        return (string) $this->note === "";
+        return (string) $this->text === "";
     }
 
 
@@ -72,10 +75,10 @@ class LineNote implements JsonUpdatable {
         return true;
     }
     function jsonSerialize() {
-        if ((string) $this->note === "") {
+        if ((string) $this->text === "") {
             return $this->version;
         } else {
-            $j = [$this->iscomment, $this->note,
+            $j = [$this->iscomment, $this->text,
                   count($this->users) === 1 ? $this->users[0] : $this->users];
             if ($this->version || $this->format !== null) {
                 $j[] = $this->version;
@@ -88,7 +91,7 @@ class LineNote implements JsonUpdatable {
     }
     function render_json($can_view_authors) {
         if (!$can_view_authors) {
-            $j = [$this->iscomment, $this->note];
+            $j = [$this->iscomment, $this->text];
             if ($this->format !== null) {
                 array_push($j, null, null, $this->format);
             }
