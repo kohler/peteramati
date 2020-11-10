@@ -1670,7 +1670,7 @@ class PsetView {
         }
 
         if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {
-            echo '<div class="pa-dl pa-gn"><div class="pa-warnbox"><div class="pa-warncontent need-format" data-format="2">', htmlspecialchars($lineanno[$bln]->warnings), '</div></div></div>';
+            echo '<div class="pa-dl pa-gn" data-landmark="', $bln, '"><div class="pa-warnbox"><div class="pa-warncontent need-format" data-format="2">', htmlspecialchars($lineanno[$bln]->warnings), '</div></div></div>';
         }
 
         if ($ala) {
@@ -1679,7 +1679,7 @@ class PsetView {
                 if ($curanno->grade_first && in_array($g, $curanno->grade_first)) {
                     echo ' pa-no-sidebar';
                 }
-                echo '"><div class="pa-graderow">',
+                echo '" data-landmark="', $aln, '"><div class="pa-graderow">',
                     '<div class="pa-gradebox need-pa-grade" data-pa-grade="', $g->key, '"';
                 if ($g->landmark_file === $g->landmark_range_file
                     && $g->landmark_buttons) {
