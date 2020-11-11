@@ -1717,7 +1717,7 @@ class PsetView {
         $nnote = $this->_diff_lnorder->get_next($note->file, $note->lineid);
         if ($nnote) {
             $links[] = '<a href="#L' . $nnote->lineid . '_'
-                . html_id_encode($nnote->file) . '" class="ui pa-goto">Next &gt;</a>';
+                . html_id_encode($nnote->file) . '">Next &gt;</a>';
         } else {
             $links[] = '<a href="#">Top</a>';
         }

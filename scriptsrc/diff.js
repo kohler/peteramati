@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { ImmediatePromise } from "./utils.js";
-import { hasClass, removeClass, toggleClass, fold61, handle_ui } from "./ui.js";
+import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui } from "./ui.js";
 import { push_history_state } from "./ui-history.js";
 import { hoturl, hoturl_gradeparts } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
@@ -17,8 +17,13 @@ export class Filediff {
         this.element = e;
     }
     static find(e) {
-        return new Filediff(e.closest(".pa-filediff")
-            || document.getElementById(e.closest(".pa-fileref").getAttribute("data-pa-fileid")));
+        if (typeof e === "string") {
+            e = document.getElementById("F_" + html_id_encode(e));
+        } else {
+            e = e.closest(".pa-filediff")
+                || document.getElementById(e.closest(".pa-fileref").getAttribute("data-pa-fileid"));
+        }
+        return e ? new Filediff(e) : null;
     }
     load() {
         if (!hasClass(this.element, "need-load")) {
@@ -45,6 +50,21 @@ export class Filediff {
             });
         }
     }
+    toggle(show) {
+        if (show == null) {
+            show = hasClass(this.element, "hidden");
+        }
+        const h3 = this.element.previousSibling,
+            isarrow = h3 && h3.getAttribute("data-pa-fileid") === this.element.id;
+        fold61(this.element, isarrow ? h3 : null, show);
+    }
+    toggle_show_left(show) {
+        if (show == null) {
+            show = hasClass(this.element, "pa-hide-left");
+        }
+        toggleClass(this.element, "pa-hide-left", !show);
+        $(this.element.previousSibling).find(".pa-diff-toggle-hide-left").toggleClass("btn-primary", show);
+    }
     get file() {
         return this.element.getAttribute("data-pa-file");
     }
@@ -58,7 +78,7 @@ export class Filediff {
         const a0 = +m[1], b0 = +m[2], args = {file: this.file, fromline: b0};
         m[3] !== "" && (args.linecount = +m[3]);
         return new Promise(resolve => {
-            $.ajax(hoturl("api/blob", hoturl_gradeparts(this, args)), {
+            $.ajax(hoturl("api/blob", hoturl_gradeparts(this.element, args)), {
                 success: function (data) {
                     if (data.ok && data.data) {
                         const lines = data.data.replace(/\n$/, "").split("\n");
@@ -72,6 +92,47 @@ export class Filediff {
                     }
                 }
             });
+        });
+    }
+    line(lineid) {
+        return this.load().then(() => {
+            const isb = lineid.charAt(0) === "b", line = lineid.substring(1);
+            let dp = this.element, dl = this.element.firstChild, em, m;
+            while (true) {
+                while (!dl && dp !== this) {
+                    dl = dp.nextSibling;
+                    dp = dp.parentElement;
+                }
+                if (!dl) {
+                    throw new Error;
+                } else if (dl.nodeType !== Node.ELEMENT_NODE) {
+                    dl = dl.nextSibling;
+                } else if (/^pa-dl pa-g[idc]/.test(dl.className)
+                           && line === (isb ? dl.firstChild.nextSibling : dl.firstChild).getAttribute("data-landmark")) {
+                    return dl;
+                } else if ((em = dl.getAttribute("data-expandmark"))
+                           && (m = em.match(/^a(\d+)b(\d+)\+(\d*)$/))) {
+                    const delta = line - (isb ? m[2] : m[1]);
+                    if (delta >= 0 && (m[3] === "" || delta < m[3])) {
+                        return this.expand(dl).then(() => this.line(lineid));
+                    }
+                    dl = dl.nextSibling;
+                } else if (hasClass(dl, "pa-dg")) {
+                    dp = dl;
+                    dl = dp.firstChild;
+                } else {
+                    dl = dl.nextSibling;
+                }
+            }
+        }).then(dl => {
+            if (!dl.offsetParent) {
+                for (let e = dl.previousSibling; e; e = e.previousSibling) {
+                    if (hasClass(e, "pa-dlr")) {
+                        return e;
+                    }
+                }
+            }
+            return dl;
         });
     }
 }
@@ -262,7 +323,7 @@ handle_ui.on("pa-diff-unfold", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-unfold") : $(this),
         direction = evt.metaKey ? true : undefined;
     $es.each(function () {
-        Filediff.find(this).load().then(f => fold61(f.element, this, direction));
+        Filediff.find(this).load().then(fd => fd.toggle(direction));
     });
     return false;
 });
@@ -270,22 +331,39 @@ handle_ui.on("pa-diff-unfold", function (evt) {
 handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-hide-left") : $(this),
         show = hasClass(Filediff.find(this).element, "pa-hide-left");
-    $es.each(function () {
-        toggleClass(Filediff.find(this).element, "pa-hide-left", !show);
-        toggleClass(this, "btn-primary", show);
-    });
+    $es.each(function () { Filediff.find(this).toggle_show_left(show); });
 });
 
-handle_ui.on("pa-goto", function () {
-    $(".pa-line-highlight").removeClass("pa-line-highlight");
-    linediff_find_promise(this, null).then(ref => {
-        $(ref).closest(".pa-filediff").removeClass("hidden");
-        let $e = $(ref).closest(".pa-dl");
-        $e.addClass("pa-line-highlight");
-        window.scrollTo(0, Math.max($e.geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
-        push_history_state(this.href);
-    }, null);
-});
+function goto_hash(hash) {
+    let m, line, fd;
+    if ((m = hash.match(/^[^#]*#F_([-A-Za-z0-9_.@\/]+)$/))) {
+        fd = Filediff.find(html_id_decode(m[1]));
+    } else if ((m = hash.match(/^[^#]*#L([ab]\d+)_([-A-Za-z0-9_.@\/]+)$/))) {
+        fd = Filediff.find(html_id_decode(m[2]));
+        line = m[1];
+    }
+    if (fd && line) {
+        fd.line(line).then(dl => {
+            fd.toggle(true);
+            hasClass(dl, "pa-gd") && fd.toggle_show_left(true);
+            addClass(dl, "pa-line-highlight");
+            window.scrollTo(0, Math.max($(dl).geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
+        }).catch(null);
+    } else if (fd) {
+        fd.toggle(true);
+        window.scrollTo(0, Math.max($(fd.element).geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
+    }
+}
+
+if (!hasClass(document.body, "want-grgraph-hash")) {
+    $(window).on("popstate", function (event) {
+        const state = (event.originalEvent || event).state;
+        state && state.href && goto_hash(state.href);
+    }).on("hashchange", function () {
+        goto_hash(location.href);
+    });
+    $(function () { goto_hash(location.href); });
+}
 
 handle_ui.on("pa-gx", function (evt) {
     const ctx = evt.currentTarget;

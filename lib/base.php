@@ -305,9 +305,9 @@ function rfc2822_words_quote($words) {
 /** @param string $text
  * @return string */
 function html_id_encode($text) {
-    $x = preg_split('/([^-a-zA-Z0-9])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+    $x = preg_split('/([^-a-zA-Z0-9_.\/])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
     for ($i = 1; $i < count($x); $i += 2) {
-        $x[$i] = "_" . dechex(ord($x[$i]));
+        $x[$i] = sprintf("@%02X", ord($x[$i]));
     }
     return join("", $x);
 }
@@ -315,7 +315,7 @@ function html_id_encode($text) {
 /** @param string $text
  * @return string */
 function html_id_decode($text) {
-    $x = preg_split('/(_[0-9A-Fa-f][0-9A-Fa-f])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+    $x = preg_split('/(@[0-9A-Fa-f][0-9A-Fa-f])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
     for ($i = 1; $i < count($x); $i += 2) {
         $x[$i] = chr(hexdec(substr($x[$i], 1)));
     }

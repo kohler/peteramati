@@ -211,7 +211,12 @@ export class ImmediatePromise {
     }
     then(executor) {
         try {
-            return new ImmediatePromise(executor(this.value));
+            const v = executor(this.value);
+            if (v instanceof Promise || v instanceof ImmediatePromise) {
+                return v;
+            } else {
+                return new ImmediatePromise(v);
+            }
         } catch (e) {
             return Promise.reject(e);
         }

@@ -135,7 +135,7 @@ export class GradeEntry {
                 if (directory && m[1].substr(0, directory.length) === directory) {
                     m[1] = m[1].substr(directory.length);
                 }
-                want_gbr = '@<a href="#' + $line[0].id + '" class="ui pa-goto">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
+                want_gbr = '@<a href="#' + $line[0].id + '">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
             }
             var $pgbr = $g.find(".pa-gradeboxref");
             if (!$line.length) {

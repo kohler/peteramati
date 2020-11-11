@@ -208,7 +208,7 @@ function note_anchor(tr) {
 function set_link(tr, next_tr) {
     let $a = $(tr).find(".pa-note-links a");
     if (!$a.length) {
-        $a = $('<a class="ui pa-goto"></a>');
+        $a = $('<a></a>');
         $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notecontent"));
     }
 

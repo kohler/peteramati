@@ -236,7 +236,7 @@ export function render_terminal(container, string, options) {
             if (prefix.length)
                 addlinepart(node, prefix);
             var anchor = "Lb" + line + "_" + html_id_encode(file);
-            var a = $("<a href=\"#" + anchor + "\" class=\"uu uic pa-goto\"></a>");
+            var a = $("<a href=\"#" + anchor + "\" class=\"uu pa-goto\"></a>");
             a.text(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;

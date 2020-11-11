@@ -65,7 +65,7 @@ class LineNote implements JsonUpdatable {
         if ($pset && str_starts_with($f, $pset->directory_slash)) {
             $f = substr($f, strlen($pset->directory_slash));
         }
-        return '<a class="ui pa-goto pa-noteref" href="#L' . $this->lineid
+        return '<a class="pa-noteref" href="#L' . $this->lineid
             . '_' . html_id_encode($this->file) . '">' . htmlspecialchars($f)
             . ':' . substr($this->lineid, 1) . '</a>';
     }

@@ -50,11 +50,17 @@ export function regexp_quote(s) {
 }
 
 export function html_id_encode(s) {
-    return encodeURIComponent(s).replace(/[^-A-Za-z0-9%]/g, function (s) {
-        return "_" + s.charCodeAt(0).toString(16);
-    }).replace(/%../g, function (m) { return "_" + m.substr(1).toLowerCase(); });
+    return encodeURIComponent(s).replace(/[^-A-Za-z0-9_.%]|%../g, function (s) {
+        if (s.length === 1) {
+            return "@" + s.charCodeAt(0).toString(16);
+        } else if (s === "%2F") {
+            return "/";
+        } else {
+            return "@" + s.substring(1);
+        }
+    });
 }
 
 export function html_id_decode(s) {
-    return decodeURIComponent(s.replace(/_/g, "%"));
+    return decodeURIComponent(s.replace(/@/g, "%"));
 }
