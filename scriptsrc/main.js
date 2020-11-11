@@ -15,7 +15,7 @@ import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
 import { tooltip } from "./tooltip.js";
 import "./pset.js";
-import { linediff_traverse } from "./diff.js";
+import { Linediff } from "./diff.js";
 import { filediff_markdown } from "./diff-markdown.js";
 import { Note } from "./note.js";
 import "./note-edit.js";
@@ -845,19 +845,30 @@ function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
         lnfirst = +m[1];
         lnlast = +m[2];
     }
-    while ((tr = linediff_traverse(tr, true, 3))) {
-        var td = tr.firstChild;
-        if (td.hasAttribute("data-landmark")) {
-            lna = +td.getAttribute("data-landmark");
-        }
-        td = td.nextSibling;
-        if (td && td.hasAttribute("data-landmark")) {
-            lnb = +td.getAttribute("data-landmark");
-        }
-        if (lna >= lnfirst
-            && lna <= lnlast
-            && (!selector || tr.matches(selector))) {
-            func.call(this, tr, lna, lnb);
+    for (let ln of Linediff.all(tr)) {
+        const e = ln.element;
+        if (!hasClass(e, "pa-dlr")) {
+            const c = e.firstChild;
+            if (hasClass(c, "pa-da")) {
+                if (c.hasAttribute("data-landmark")) {
+                    lna = +c.getAttribute("data-landmark");
+                }
+                if (c.nextSibling.hasAttribute("data-landmark")) {
+                    lnb = +c.getAttribute("data-landmark");
+                }
+            } else if (e.hasAttribute("data-landmark")) {
+                const lm = e.getAttribute("data-landmark");
+                if (lm.charAt(0) === "a") {
+                    lna = +lm.substring(1);
+                } else {
+                    lnb = +lm.substring(1);
+                }
+            }
+            if (lna >= lnfirst
+                && lna <= lnlast
+                && (!selector || e.matches(selector))) {
+                func.call(this, e, lna, lnb);
+            }
         }
     }
 }

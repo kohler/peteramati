@@ -2,9 +2,9 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { escape_entities } from "./encoders.js";
+import { escape_entities, html_id_encode } from "./encoders.js";
 import { hasClass, toggleClass } from "./ui.js";
-import { linediff_find } from "./diff.js";
+import { Filediff } from "./diff.js";
 import { GradeClass } from "./gc.js";
 
 
@@ -126,19 +126,16 @@ export class GradeEntry {
         if (this.landmark
             && element.parentElement
             && hasClass(element.parentElement, "want-pa-landmark-links")) {
-            var m = /^(.*):(\d+)$/.exec(this.landmark),
-                $line = $(linediff_find(m[1], "a" + m[2])),
-                want_gbr = "";
-            if ($line.length) {
-                var $pi = $(this).closest(".pa-psetinfo"),
-                    directory = $pi[0].getAttribute("data-pa-directory") || "";
-                if (directory && m[1].substr(0, directory.length) === directory) {
-                    m[1] = m[1].substr(directory.length);
-                }
-                want_gbr = '@<a href="#' + $line[0].id + '">' + escape_entities(m[1] + ":" + m[2]) + '</a>';
+            let want_gbr = "";
+            const m = /^(.*):(\d+)$/.exec(this.landmark);
+            if (m && Filediff.find(m[1])) {
+                const pi = element.closest(".pa-psetinfo"),
+                    directory = pi.getAttribute("data-pa-directory") || "",
+                    filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
+                want_gbr = '@<a href="#La'.concat(m[2], '_', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
             }
-            var $pgbr = $g.find(".pa-gradeboxref");
-            if (!$line.length) {
+            const $pgbr = $g.find(".pa-gradeboxref");
+            if (want_gbr === "") {
                 $pgbr.remove();
             } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
                 $pgbr.remove();

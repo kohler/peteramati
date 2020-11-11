@@ -4,8 +4,7 @@
 
 import { hasClass, addClass, removeClass } from "./ui.js";
 import { render_text } from "./render.js";
-import { linediff_traverse, linediff_locate, linediff_find,
-    linediff_lineid } from "./diff.js";
+import { Linediff } from "./diff.js";
 
 
 export class Note {
@@ -58,51 +57,14 @@ export class Note {
     static html_skeleton_near(elt) {
         if (hasClass(elt, "pa-gw")) {
             return elt;
+        } else {
+            const source = new Linediff(elt),
+                lineid = source.note_lineid,
+                insertion = source.upper_bound(lineid),
+                tr = $('<div class="pa-dl pa-gw" data-landmark="'.concat(lineid, '"><div class="pa-notebox"></div></div>'))[0];
+            elt.parentElement.insertBefore(tr, insertion ? insertion.element : null);
+            return tr;
         }
-
-        // traverse to previous visible line
-        let line = elt.closest(".pa-dl");
-        while (line && (line.nodeType !== Node.ELEMENT_NODE
-                        || !line.offsetParent
-                        || (!hasClass(line, "pa-gi") && !hasClass(line, "pa-gc") && !hasClass(line, "pa-gd")))) {
-            line = line.previousSibling;
-        }
-        if (!line) {
-            throw new Error("bad html_skeleton_near");
-        }
-
-        // determine lineid
-        const lineid = linediff_lineid(line),
-            isa = lineid.charAt(0) === "a",
-            lineno = +lineid.substring(1);
-
-        // traverse forward to insertion point
-        let astart = null;
-        line = line.nextSibling;
-        while (line) {
-            if (line.nodeType === Node.ELEMENT_NODE) {
-                if (hasClass(line, "pa-gx")) {
-                    break;
-                } else if (hasClass(line, "pa-gi") || hasClass(line, "pa-gc")) {
-                    if (isa || lineno < +line.firstChild.nextSibling.getAttribute("data-landmark")) {
-                        break;
-                    }
-                    astart = null;
-                } else if (hasClass(line, "pa-gd")) {
-                    if (isa && lineno < +line.firstChild.getAttribute("data-landmark")) {
-                        astart = line;
-                        break;
-                    }
-                    astart = astart || line;
-                }
-            }
-            line = line.nextSibling;
-        }
-
-        // perform insertion
-        const tr = $('<div class="pa-dl pa-gw" data-landmark="'.concat(lineid, '"><div class="pa-notebox"></div></div>'))[0];
-        elt.parentElement.insertBefore(tr, astart || line);
-        return tr;
     }
 
     html_near(elt, transition) {
@@ -169,51 +131,28 @@ export class Note {
         return tr;
     }
 
-    load_fileid() {
-        const tr = this.element,
-            table = tr.closest(".pa-filediff");
-        this._file = table.getAttribute("data-pa-file");
-        if (tr.hasAttribute("data-landmark")) {
-            this._lineid = tr.getAttribute("data-landmark");
-        } else {
-            this._lineid = linediff_lineid(linediff_traverse(tr, false, 1));
-        }
-    }
-
     get file() {
-        if (!this._file && this.element) {
-            this.load_fileid();
-        }
-        return this._file;
+        return this.element.closest(".pa-filediff").getAttribute("data-pa-file");
     }
-
     get lineid() {
-        if (!this._lineid && this.element) {
-            this.load_fileid();
-        }
-        return this._lineid;
+        return this.element.getAttribute("data-landmark");
     }
 }
 
-
-function note_anchor(tr) {
-    let anal = linediff_locate(tr), td;
-    if (anal && (td = linediff_find(anal.ufile, anal.lineid))) {
-        return "#" + td.id;
-    } else {
-        return "";
-    }
-}
 
 function set_link(tr, next_tr) {
-    let $a = $(tr).find(".pa-note-links a");
+    let $a = $(tr).find(".pa-note-links a"), t;
     if (!$a.length) {
         $a = $('<a></a>');
         $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notecontent"));
     }
-
-    $a.attr("href", note_anchor(next_tr));
-    const t = next_tr ? "NEXT >" : "TOP";
+    if (next_tr) {
+        $a.attr("href", new Linediff(next_tr).hash);
+        t = "NEXT >";
+    } else {
+        $a.attr("href", "");
+        t = "TOP";
+    }
     if ($a.text() !== t) {
         $a.text(t);
     }
@@ -239,6 +178,6 @@ function fix_links_at(tr) {
         if (prevpos >= 0) {
             set_link(trs[prevpos], Note.at(tr).empty() ? trs[nextpos] : tr);
         }
-        set_link(this, trs[nextpos]);
+        set_link(tr, trs[nextpos]);
     }
 }

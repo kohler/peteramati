@@ -4,10 +4,12 @@
 
 import { ImmediatePromise } from "./utils.js";
 import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui } from "./ui.js";
-import { push_history_state } from "./ui-history.js";
 import { hoturl, hoturl_gradeparts } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
 
+
+const BACKWARD = 1;
+const ANYFILE = 2;
 
 export class Filediff {
     constructor(e) {
@@ -68,254 +70,214 @@ export class Filediff {
     get file() {
         return this.element.getAttribute("data-pa-file");
     }
-    expand(ctx) {
-        const em = ctx.getAttribute("data-expandmark"),
-            m = em ? em.match(/^a(\d+)b(\d+)\+(\d*)$/) : null;
-        if (!m) {
-            return new ImmediatePromise(ctx.nextSibling); // xxx
+    lines() {
+        return Linediff.all(this.element.firstChild);
+    }
+    line(isb, lineno, start) {
+        if (lineno == null) {
+            lineno = +isb.substring(1);
+            isb = isb.charAt(0) === "b";
         }
-        ctx.removeAttribute("data-expandmark");
+        return this.load().then(() => {
+            for (let ln of Linediff.all(start || this.element.firstChild)) {
+                if (ln.base_contains(isb, lineno)) {
+                    return ln;
+                } else if (ln.expansion_contains(isb, lineno)) {
+                    return ln.expand().then(start => this.line(isb, lineno, start));
+                }
+            }
+            throw null;
+        });
+    }
+}
+
+export class Linediff {
+    constructor(e) {
+        if (e.nodeType !== Node.ELEMENT_NODE || !hasClass(e, "pa-dl")) {
+            throw new Error;
+        }
+        this.element = e;
+    }
+    get file() {
+        return this.element.closest(".pa-filediff").getAttribute("data-pa-file");
+    }
+    get user_file() {
+        const fe = this.element.closest(".pa-filediff"),
+            f = fe.getAttribute("data-pa-file");
+        if (fe.hasAttribute("data-pa-file-user")) {
+            return fe.getAttribute("data-pa-file-user").concat("-", f);
+        } else {
+            return f;
+        }
+    }
+    get note_lineid() {
+        const e = this.element;
+        let re, lm, dash;
+        if (e.hasAttribute("data-landmark")) {
+            return e.getAttribute("data-landmark");
+        } else if (hasClass(e, "pa-dlr")
+                   && (re = e.lastChild.firstChild)
+                   && (lm = re.getAttribute("data-landmark"))
+                   && (dash = lm.indexOf("-")) >= 0) {
+            return (hasClass(e, "pa-gd") ? "a" : "b").concat(lm.substring(dash + 1));
+        } else if (hasClass(e, "pa-gd")) {
+            return "a".concat(e.firstChild.getAttribute("data-landmark"));
+        } else {
+            return "b".concat(e.firstChild.nextSibling.getAttribute("data-landmark"));
+        }
+    }
+    get hash() {
+        const uf = this.user_file, e = this.element;
+        if (e.hasAttribute("data-landmark")) {
+            return "#L".concat(e.getAttribute("data-landmark"), "_", uf);
+        } else if (hasClass(e, "pa-gd")) {
+            return "#La".concat(e.firstChild.getAttribute("data-landmark"), "_", uf);
+        } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
+            return "#Lb".concat(e.firstChild.nextSibling.getAttribute("data-landmark"), "_", uf);
+        } else {
+            return null;
+        }
+    }
+    is_visible() {
+        return !!this.element.offsetParent;
+    }
+    visible_predecessor() {
+        if (!this.element.offsetParent) {
+            for (let e = this.element.previousSibling; e; e = e.previousSibling) {
+                if (hasClass(e, "pa-dlr")) {
+                    return new Linediff(e);
+                }
+            }
+        }
+        return this;
+    }
+    visible_source() {
+        for (let ln of Linediff.all(this, BACKWARD)) {
+            if (ln.is_visible() && ln.is_source())
+                return ln;
+        }
+        return null;
+    }
+    is_base() {
+        return /^pa-dl pa-g[idc]/.test(this.element.className);
+    }
+    base_contains(isb, lineno) {
+        const e = this.element;
+        return /^pa-dl pa-g[idc]/.test(e.className)
+            && (isb ? e.firstChild.nextSibling : e.firstChild).getAttribute("data-landmark") == lineno;
+    }
+    is_source() {
+        return / pa-g[idc]/.test(this.element.className);
+    }
+    is_expandable() {
+        return this.element.hasAttribute("data-expandmark");
+    }
+    expansion_contains(isb, lineno) {
+        const em = this.element.getAttribute("data-expandmark"),
+            m = em ? em.match(/^a(\d+)b(\d+)\+(\d*)$/) : null;
+        if (m) {
+            const delta = m[isb ? 2 : 1] - lineno;
+            return delta >= 0 && (!m[3] || delta < m[3]);
+        } else {
+            return false;
+        }
+    }
+    expand() {
+        const e = this.element,
+            em = e.getAttribute("data-expandmark"),
+            m = em ? em.match(/^a(\d+)b(\d+)\+(\d*)$/) : null;
+        if (!m || m[3] === "0") {
+            return new ImmediatePromise(this); // xxx
+        }
+        e.removeAttribute("data-expandmark");
         const a0 = +m[1], b0 = +m[2], args = {file: this.file, fromline: b0};
         m[3] !== "" && (args.linecount = +m[3]);
         return new Promise(resolve => {
-            $.ajax(hoturl("api/blob", hoturl_gradeparts(this.element, args)), {
+            $.ajax(hoturl("api/blob", hoturl_gradeparts(e, args)), {
                 success: function (data) {
                     if (data.ok && data.data) {
                         const lines = data.data.replace(/\n$/, "").split("\n");
                         for (let i = lines.length - 1; i >= 0; --i) {
                             const t = '<div class="pa-dl pa-gc"><div class="pa-da" data-landmark="'.concat(a0 + i, '"></div><div class="pa-db" data-landmark="', b0 + i, '"></div><div class="pa-dd"></div></div>');
-                            $(t).insertAfter(ctx).find(".pa-dd").text(lines[i]);
+                            $(t).insertAfter(e).find(".pa-dd").text(lines[i]);
                         }
-                        const next = ctx.nextSibling;
-                        $(ctx).remove();
-                        resolve(next);
+                        const next = e.nextSibling;
+                        $(e).remove();
+                        resolve(new Linediff(next));
                     }
                 }
             });
         });
     }
-    line(lineid) {
-        return this.load().then(() => {
-            const isb = lineid.charAt(0) === "b", line = lineid.substring(1);
-            let dp = this.element, dl = this.element.firstChild, em, m;
-            while (true) {
-                while (!dl && dp !== this) {
-                    dl = dp.nextSibling;
-                    dp = dp.parentElement;
+    is_annotation() {
+        return hasClass(this.element, "pa-gn");
+    }
+    is_note() {
+        return hasClass(this.element, "pa-gw");
+    }
+    upper_bound(isb, lineno) {
+        if (lineno == null) {
+            lineno = +isb.substring(1);
+            isb = isb.charAt(0) === "b";
+        }
+        let match = false;
+        for (let ln of Linediff.all(this)) {
+            const e = ln.element;
+            if (match && (hasClass(e, "pa-gx") || hasClass(e, "pa-dlr"))) {
+                return ln;
+            } else if (ln.is_source()) {
+                const curlineno = +(isb ? e.firstChild.nextSibling : e.firstChild).getAttribute("data-landmark");
+                if ((!curlineno && match) || lineno < curlineno) {
+                    return ln;
+                } else if (lineno === curlineno && ln.is_base()) {
+                    match = true;
                 }
-                if (!dl) {
-                    throw new Error;
-                } else if (dl.nodeType !== Node.ELEMENT_NODE) {
-                    dl = dl.nextSibling;
-                } else if (/^pa-dl pa-g[idc]/.test(dl.className)
-                           && line === (isb ? dl.firstChild.nextSibling : dl.firstChild).getAttribute("data-landmark")) {
-                    return dl;
-                } else if ((em = dl.getAttribute("data-expandmark"))
-                           && (m = em.match(/^a(\d+)b(\d+)\+(\d*)$/))) {
-                    const delta = line - (isb ? m[2] : m[1]);
-                    if (delta >= 0 && (m[3] === "" || delta < m[3])) {
-                        return this.expand(dl).then(() => this.line(lineid));
-                    }
-                    dl = dl.nextSibling;
-                } else if (hasClass(dl, "pa-dg")) {
-                    dp = dl;
-                    dl = dp.firstChild;
-                } else {
-                    dl = dl.nextSibling;
-                }
-            }
-        }).then(dl => {
-            if (!dl.offsetParent) {
-                for (let e = dl.previousSibling; e; e = e.previousSibling) {
-                    if (hasClass(e, "pa-dlr")) {
-                        return e;
-                    }
+            } else if (e.hasAttribute("data-landmark")) {
+                const curlm = e.getAttribute("data-landmark");
+                if (curlm.charAt(0) === (isb ? "b" : "a")
+                    && lineno < +curlm.substring(1)) {
+                    return ln;
                 }
             }
-            return dl;
-        });
-    }
-}
-
-
-function linediff_find_promise(filename, lineid) {
-    // decode arguments: either (lineref) or (filename, lineid)
-    if (lineid == null) {
-        if (filename instanceof Node) {
-            filename = filename.hash;
         }
-        var m = filename.match(/^#?L([ab]\d+)_(.*)$/);
-        if (!m) {
-            return Promise.reject(null);
-        }
-        filename = m[2];
-        lineid = m[1];
-    } else {
-        if (filename instanceof Node) {
-            var node = filename;
-            while (node && !node.hasAttribute("data-pa-file")) {
-                node = node.parentElement;
-            }
-            if (!node) {
-                return Promise.reject(null);
-            }
-            filename = node.getAttribute("data-pa-file");
-            if (node.hasAttribute("data-pa-file-user")) {
-                filename = node.getAttribute("data-pa-file-user") + "-" + filename;
-            }
-        }
-        filename = html_id_encode(filename);
-    }
-
-    // check lineref
-    var lineref = "L" + lineid + "_" + filename;
-    var e = document.getElementById(lineref);
-    if (e) {
-        return new ImmediatePromise(e);
-    }
-
-    // create link
-    var filee = document.getElementById("pa-file-" + filename);
-    if (filee) {
-        return new Filediff(filee).load().then(() => {
-            // look for present line
-            const $tds = $(filee).find(".pa-d" + lineid.charAt(0)),
-                lineno = lineid.substr(1);
-            for (let i = 0; i < $tds.length; ++i) {
-                if ($tds[i].getAttribute("data-landmark") === lineno) {
-                    $tds[i].id = lineref;
-                    return $tds[i];
-                }
-            }
-            // XXX missing: expand context lines
-            // look for absent line with present linenote
-            const $dls = $(filee).find(".pa-dl[data-landmark='" + lineid + "']");
-            if ($dls.length) {
-                return $dls[0];
-            }
-            // give up
-            throw null;
-        });
-    } else {
-        return Promise.reject(null);
-    }
-}
-
-export function linediff_find(filename, lineid) {
-    var e = null;
-    linediff_find_promise(filename, lineid).then((ee => e = ee), null);
-    return e;
-}
-
-export function linediff_lineid(elt) {
-    let e, lm, dash;
-    if (hasClass(elt, "pa-gd")) {
-        return "a" + elt.firstChild.getAttribute("data-landmark");
-    } else if (hasClass(elt, "pa-dlr")
-               && (e = elt.lastChild.firstChild)
-               && (lm = e.getAttribute("data-landmark"))
-               && (dash = lm.indexOf("-")) >= 0) {
-        return "b" + lm.substring(dash + 1);
-    } else {
-        return "b" + elt.firstChild.nextSibling.getAttribute("data-landmark");
-    }
-}
-
-// linediff_traverse(tr, down, flags)
-//    Find the diff line (pa-d[idc]) near `tr` in the direction of `down`.
-//    If `down === null`, look up *starting* from `tr`.
-//    Flags: 1 means stay within the current file; otherwise traverse
-//    between files. 2 means return all lines.
-export function linediff_traverse(tr, down, flags) {
-    tr = tr.closest(".pa-dl, .pa-dg, .pa-filediff");
-    var tref = tr ? tr.parentElement : null, direction;
-    if (down == null) {
-        down = false;
-        direction = "previousSibling";
-    } else {
-        direction = down ? "nextSibling" : "previousSibling";
-        if (hasClass(tr, "pa-dl")) {
-            tr = tr[direction];
-        }
-    }
-    while (true) {
-        while (!tr && tref) {
-            if ((flags & 1) && hasClass(tref, "pa-filediff")) {
-                return null;
-            }
-            tr = tref[direction];
-            tref = tref.parentElement;
-        }
-        if (!tr) {
-            return null;
-        } else if (tr.nodeType !== Node.ELEMENT_NODE) {
-            tr = tr[direction];
-        } else if (hasClass(tr, "pa-dl")
-                   && ((flags & 2) || / pa-g[idc]/.test(tr.className))
-                   && tr.offsetParent) {
-            return tr;
-        } else if (hasClass(tr, "pa-dg") || hasClass(tr, "pa-filediff")) {
-            tref = tr;
-            tr = tref[down ? "firstChild" : "lastChild"];
-        } else {
-            tr = tr[direction];
-        }
-    }
-}
-
-// linediff_locate(tr, down)
-//    Analyze a click on `tr`. Returns `null` if the target
-//    is a <textarea> or <a>.
-export function linediff_locate(tr, down) {
-    if (!tr
-        || tr.tagName === "TEXTAREA"
-        || tr.tagName === "A") {
         return null;
     }
 
-    const thisline = tr.closest(".pa-dl");
-    let nearline = linediff_traverse(tr, down, 1), filediff;
-    if (!nearline || !(filediff = nearline.closest(".pa-filediff"))) {
-        return null;
+    static get BACKWARD() {
+        return BACKWARD;
     }
-
-    const file = filediff.getAttribute("data-pa-file"),
-        result = {ufile: file, file: file, tr: nearline},
-        user = filediff.getAttribute("data-pa-file-user");
-    if (user) {
-        result.ufile = user + "-" + file;
+    static get ANYFILE() {
+        return ANYFILE;
     }
-
-    let lm;
-    if (thisline
-        && (lm = thisline.getAttribute("data-landmark"))
-        && /^[ab]\d+$/.test(lm)) {
-        result[lm.charAt(0) + "line"] = +lm.substring(1);
-        result.lineid = lm;
-    } else {
-        result.aline = +nearline.firstChild.getAttribute("data-landmark");
-        result.bline = +nearline.firstChild.nextSibling.getAttribute("data-landmark");
-        result.lineid = result.bline ? "b" + result.bline : "a" + result.aline;
-    }
-
-    if (thisline && hasClass(thisline, "pa-gw")) {
-        result.notetr = thisline;
-    } else {
+    static* all(t, flags) {
+        if (t instanceof Linediff) {
+            t = t.element;
+        }
+        let p = t.parentElement;
+        const direction = flags & BACKWARD ? "previousSibling" : "nextSibling";
         while (true) {
-            nearline = nearline.nextSibling;
-            if (!nearline) {
-                break;
-            } else if (nearline.nodeType === Node.ELEMENT_NODE) {
-                if (hasClass(nearline, "pa-gw")) {
-                    result.notetr = nearline;
-                    break;
-                } else if (nearline.offsetParent && !hasClass(nearline, "pa-gn")) {
-                    break;
+            while (!t && p) {
+                if (!(flags & ANYFILE) && hasClass(p, "pa-filediff")) {
+                    return;
                 }
+                t = p[direction];
+                p = p.parentElement;
+            }
+            if (!t) {
+                break;
+            } else if (t.nodeType !== Node.ELEMENT_NODE) {
+                t = t[direction];
+            } else if (hasClass(t, "pa-dg")) {
+                p = t;
+                t = p[flags & BACKWARD ? "lastChild" : "firstChild"];
+            } else {
+                if (hasClass(t, "pa-dl")) {
+                    yield new Linediff(t);
+                }
+                t = t[direction];
             }
         }
     }
-    return result;
 }
 
 
@@ -335,19 +297,20 @@ handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
 });
 
 function goto_hash(hash) {
-    let m, line, fd;
+    let m, lineid, fd;
     if ((m = hash.match(/^[^#]*#F_([-A-Za-z0-9_.@\/]+)$/))) {
         fd = Filediff.find(html_id_decode(m[1]));
     } else if ((m = hash.match(/^[^#]*#L([ab]\d+)_([-A-Za-z0-9_.@\/]+)$/))) {
         fd = Filediff.find(html_id_decode(m[2]));
-        line = m[1];
+        lineid = m[1];
     }
-    if (fd && line) {
-        fd.line(line).then(dl => {
+    if (fd && lineid) {
+        fd.line(lineid).then(ln => {
             fd.toggle(true);
-            hasClass(dl, "pa-gd") && fd.toggle_show_left(true);
-            addClass(dl, "pa-line-highlight");
-            window.scrollTo(0, Math.max($(dl).geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
+            const e = ln.visible_predecessor().element;
+            hasClass(e, "pa-gd") && fd.toggle_show_left(true);
+            addClass(e, "pa-line-highlight");
+            window.scrollTo(0, Math.max($(e).geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
         }).catch(null);
     } else if (fd) {
         fd.toggle(true);
@@ -366,6 +329,5 @@ if (!hasClass(document.body, "want-grgraph-hash")) {
 }
 
 handle_ui.on("pa-gx", function (evt) {
-    const ctx = evt.currentTarget;
-    Filediff.find(ctx).expand(ctx);
+    new Linediff(evt.currentTarget).expand();
 });

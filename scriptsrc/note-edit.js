@@ -7,12 +7,29 @@ import { hoturl_post, hoturl_gradeparts } from "./hoturl.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { text_eq } from "./utils.js";
-import { linediff_find, linediff_traverse, linediff_locate } from "./diff.js";
+import { Linediff } from "./diff.js";
 import { api_conditioner } from "./xhr.js";
 import { Note } from "./note.js";
 
 
-let curanal, down_event, scrolled_x, scrolled_y, scrolled_at;
+let curline, down_event, scrolled_x, scrolled_y, scrolled_at;
+
+function locate(e) {
+    while (e && e.tagName !== "TEXTAREA" && e.tagName !== "A") {
+        if (hasClass(e, "pa-dl")) {
+            for (let ln of Linediff.all(e)) {
+                if (ln.is_note()) {
+                    return ln;
+                } else if (ln.element !== e && ln.is_visible() && !ln.is_annotation()) {
+                    break;
+                }
+            }
+            return new Linediff(e);
+        }
+        e = e.parentElement;
+    }
+    return null;
+}
 
 function render_form($tr, note, transition) {
     $tr.removeClass("hidden").addClass("editing");
@@ -24,18 +41,18 @@ function render_form($tr, note, transition) {
         $content.slideUp(80).queue(function () { $content.remove(); });
     }
 
-    var $pi = $(curanal.tr).closest(".pa-psetinfo");
+    var pi = curline.element.closest(".pa-psetinfo");
     var format = note ? note.format : null;
     if (format == null)
         format = $tr.closest(".pa-filediff").attr("data-default-format");
     var t = '<form method="post" action="' +
-        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts($pi[0], {file: curanal.file, line: curanal.lineid, oldversion: (note && note.version) || 0, format: format}))) +
+        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts(pi, {file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format}))) +
         '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">' +
         '<textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
         '<div class="aabut"><button class="btn-primary" type="submit">Save comment</button></div>' +
         '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
-    if (!$pi[0].hasAttribute("data-pa-user-can-view-grades")) {
+    if (!pi.hasAttribute("data-pa-user-can-view-grades")) {
         t += '<div class="aabut"><label><input type="checkbox" name="iscomment" value="1">Show immediately</label></div>';
     }
     var $form = $(t + '</div></form>').appendTo($td);
@@ -57,18 +74,6 @@ function render_form($tr, note, transition) {
     }
 }
 
-function anal_tr() {
-    var elt;
-    if (curanal && (elt = linediff_find(curanal.ufile, curanal.lineid))) {
-        for (elt = elt.closest(".pa-dl"); elt && !elt.offsetParent; ) {
-            elt = elt.previousSibling;
-        }
-        return elt;
-    } else {
-        return null;
-    }
-}
-
 function set_scrolled_at(evt) {
     if (evt && evt.pageX != null) {
         scrolled_at = evt.timeStamp;
@@ -78,11 +83,11 @@ function set_scrolled_at(evt) {
 }
 
 function arrowcapture(evt) {
-    var key, modkey;
+    let key, modkey;
     if ((evt.type === "mousemove"
          && scrolled_at
          && ((Math.abs(evt.screenX - scrolled_x) <= 1 && Math.abs(evt.screenY - scrolled_y) <= 1)
-             || evt.timeStamp - scrolled_at <= 200))
+             || evt.timeStamp - scrolled_at <= 500))
         || ((evt.type === "keydown" || evt.type === "keyup")
             && event_key.modifier(evt))) {
         return;
@@ -92,32 +97,37 @@ function arrowcapture(evt) {
                    && key !== "Enter")
                || ((modkey = event_modkey(evt))
                    && (modkey !== event_modkey.META || key !== "Enter"))
-               || !curanal) {
+               || !curline) {
         return uncapture();
     }
 
-    var tr = anal_tr();
-    if (!tr) {
-        return uncapture();
-    }
-    if (key === "ArrowDown" || key === "ArrowUp") {
-        removeClass(tr, "live");
-        tr = linediff_traverse(tr, key === "ArrowDown", 0);
-        if (!tr) {
-            return;
+    let ln = curline.visible_source();
+    if (ln && (key === "ArrowDown" || key === "ArrowUp")) {
+        removeClass(ln.element, "live");
+        let start = ln;
+        const flags = Linediff.ANYFILE + (key === "ArrowDown" ? 0 : Linediff.BACKWARD);
+        ln = null;
+        for (let lnx of Linediff.all(start, flags)) {
+            if (lnx.element !== start.element && lnx.is_visible() && lnx.is_source()) {
+                ln = lnx;
+                break;
+            }
         }
     }
-
-    curanal = linediff_locate(tr);
-    evt.preventDefault();
-    set_scrolled_at(evt);
-    if (key === "Enter") {
-        make_linenote();
+    if (ln) {
+        curline = ln;
+        evt.preventDefault();
+        set_scrolled_at(evt);
+        if (key === "Enter") {
+            make_linenote();
+        } else {
+            const wf = ln.element.closest(".pa-with-fixed");
+            $(ln.element).addClass("live").scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
+        }
+        return true;
     } else {
-        var wf = tr.closest(".pa-with-fixed");
-        $(tr).addClass("live").scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
+        return uncapture();
     }
-    return true;
 }
 
 function capture(tr, keydown) {
@@ -146,9 +156,9 @@ function unedit(tr, always) {
         removeClass(tr, "editing");
         $(tr).find(":focus").blur();
         note.html_near(tr, true);
-        var click_tr = anal_tr();
+        let click_tr = curline ? curline.visible_source() : null;
         if (click_tr) {
-            capture(click_tr, true);
+            capture(click_tr.element, true);
         }
         return true;
     }
@@ -258,39 +268,39 @@ function pa_linenote(event) {
         || dl.matches(".pa-gn, .pa-gx")) {
         return;
     }
-    var anal = linediff_locate(event.target),
+    var line = locate(event.target),
         t = new Date().getTime();
-    if (event.type === "mousedown" && anal) {
-        if (curanal
-            && curanal.tr === anal.tr
+    if (event.type === "mousedown" && line) {
+        if (curline
+            && curline.element === line.element
             && down_event
             && nearby(down_event[0] - event.clientX, down_event[1] - event.clientY)
             && t - down_event[2] <= 500) {
             // skip
         } else {
-            curanal = anal;
+            curline = line;
             down_event = [event.clientX, event.clientY, t, false];
         }
-    } else if (event.type === "mouseup" && anal) {
-        if (curanal
-            && curanal.tr === anal.tr
+    } else if (event.type === "mouseup" && line) {
+        if (curline
+            && curline.element === line.element
             && down_event
             && nearby(down_event[0] - event.clientX, down_event[1] - event.clientY)
             && !down_event[3]) {
-            curanal = anal;
+            curline = line;
             down_event[3] = true;
             make_linenote(event);
         }
-    } else if (event.type === "click" && anal) {
-        curanal = anal;
+    } else if (event.type === "click" && line) {
+        curline = line;
         make_linenote(event);
     } else {
-        curanal = down_event = null;
+        curline = down_event = null;
     }
 }
 
 function make_linenote(event) {
-    var $tr = $(curanal.notetr || Note.html_skeleton_near(curanal.tr));
+    let $tr = $(Note.html_skeleton_near(curline.element));
     set_scrolled_at(event);
     if ($tr.hasClass("editing")) {
         if (unedit($tr[0])) {
@@ -303,7 +313,7 @@ function make_linenote(event) {
         }
     } else {
         render_form($tr, Note.at($tr[0]), true);
-        capture(curanal.tr, false);
+        capture(curline.element, false);
         return false;
     }
 }

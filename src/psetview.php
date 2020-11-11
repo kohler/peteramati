@@ -1524,7 +1524,7 @@ class PsetView {
             echo '</h3>';
         }
 
-        echo '<div id="', $tabid, '" class="pa-filediff need-pa-observe-diff';
+        echo '<div id="', $tabid, '" class="pa-filediff pa-dg need-pa-observe-diff';
         if ($hide_left) {
             echo " pa-hide-left";
         }
