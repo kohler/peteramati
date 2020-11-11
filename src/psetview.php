@@ -1429,7 +1429,7 @@ class PsetView {
         if ($id_by_user) {
             $fileid = html_id_encode($this->user->username) . "-" . $fileid;
         }
-        $tabid = "pa-file-" . $fileid;
+        $tabid = "F_" . $fileid;
         $linenotes = $lnorder->file($file);
         if ($this->can_view_note_authors()) {
             $this->conf->stash_hotcrp_pc($this->viewer);
@@ -1537,7 +1537,7 @@ class PsetView {
         if (!$this->user_can_view_grades()) {
             echo " hidegrades";
         }
-        if (!$open && false) {
+        if (!$open) {
             echo " hidden";
         }
         if (!$dinfo->loaded) {

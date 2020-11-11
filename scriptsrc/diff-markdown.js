@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { fileref_resolve } from "./diff.js";
+import { Filediff } from "./diff.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
 
 let md, mdcontext;
@@ -408,21 +408,18 @@ export function filediff_unhighlight() {
 
 
 handle_ui.on("pa-diff-toggle-markdown", function (evt) {
-    var f = fileref_resolve(this), show = !hasClass(f, "pa-markdown");
-    if (evt.metaKey) {
-        $(".pa-diff-toggle-markdown").each(function () {
-            var f2 = fileref_resolve(this), shown = hasClass(f2, "pa-markdown");
-            if (show && !shown) {
-                filediff_markdown.call(f2);
-            } else if (!show && shown) {
-                filediff_unmarkdown.call(f2);
-            }
-            toggleClass(this, "btn-primary", show);
-        });
-    } else {
-        (show ? filediff_markdown : filediff_unmarkdown).call(f);
+    const $es = evt.metaKey ? $(".pa-diff-toggle-markdown") : $(this),
+        show = !hasClass(Filediff.find(this).element, "pa-markdown");
+    $es.each(function () {
+        const f = Filediff.find(this),
+            shown = hasClass(f.element, "pa-markdown");
+        if (show && !shown) {
+            filediff_markdown.call(f.element);
+        } else if (!show && shown) {
+            filediff_unmarkdown.call(f.element);
+        }
         toggleClass(this, "btn-primary", show);
-    }
+    });
 });
 
 $(function () {

@@ -8,36 +8,45 @@ import { push_history_state } from "./ui-history.js";
 import { hoturl, hoturl_gradeparts } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
 
-export function fileref_resolve(e) {
-    var fd = e.closest(".pa-filediff");
-    return fd || document.getElementById(e.closest(".pa-fileref").getAttribute("data-pa-fileid"));
-}
 
-export function filediff_load(filee) {
-    if (hasClass(filee, "need-load")) {
-        let p = filee.closest(".pa-psetinfo");
-        return new Promise(function (resolve) {
-            $.ajax(hoturl("api/filediff", hoturl_gradeparts(filee)), {
-                type: "GET", cache: false, dataType: "json",
-                data: {
-                    "file": html_id_decode(filee.id.substr(8)),
-                    "base_hash": p.getAttribute("data-pa-base-hash"),
-                    "hash": p.getAttribute("data-pa-hash")
-                },
-                success: function (data) {
-                    if (data.ok && data.content_html) {
-                        var $h = $(data.content_html);
-                        $(filee).html($h.html());
+export class Filediff {
+    constructor(e) {
+        if (e.nodeType !== Node.ELEMENT_NODE || !hasClass(e, "pa-filediff")) {
+            throw new Error("bad Filediff");
+        }
+        this.element = e;
+    }
+    static find(e) {
+        return new Filediff(e.closest(".pa-filediff")
+            || document.getElementById(e.closest(".pa-fileref").getAttribute("data-pa-fileid")));
+    }
+    load() {
+        if (!hasClass(this.element, "need-load")) {
+            return new ImmediatePromise(this);
+        } else {
+            const p = this.element.closest(".pa-psetinfo");
+            removeClass(this.element, "need-load");
+            return new Promise(resolve => {
+                $.ajax(hoturl("api/filediff", hoturl_gradeparts(this.element)), {
+                    type: "GET", cache: false, dataType: "json",
+                    data: {
+                        file: html_id_decode(this.element.id.substr(2)),
+                        base_hash: p.getAttribute("data-pa-base-hash"),
+                        hash: p.getAttribute("data-pa-hash")
+                    },
+                    success: data => {
+                        if (data.ok && data.content_html) {
+                            const result = $(data.content_html);
+                            $(this.element).html(result.children());
+                        }
+                        resolve(this);
                     }
-                    removeClass(filee, "need-load");
-                    resolve(filee);
-                }
+                })
             });
-        });
-    } else {
-        return new ImmediatePromise(filee);
+        }
     }
 }
+
 
 function linediff_find_promise(filename, lineid) {
     // decode arguments: either (lineref) or (filename, lineid)
@@ -78,7 +87,7 @@ function linediff_find_promise(filename, lineid) {
     // create link
     var filee = document.getElementById("pa-file-" + filename);
     if (filee) {
-        return filediff_load(filee).then(() => {
+        return new Filediff(filee).load().then(() => {
             // look for present line
             const $tds = $(filee).find(".pa-d" + lineid.charAt(0)),
                 lineno = lineid.substr(1);
@@ -221,27 +230,21 @@ export function linediff_locate(tr, down) {
 
 
 handle_ui.on("pa-diff-unfold", function (evt) {
-    if (evt.metaKey) {
-        $(".pa-diff-unfold").each(function () {
-            fold61(fileref_resolve(this), this, false);
-        });
-    } else {
-        filediff_load(fileref_resolve(this)).then(f => fold61(f, this));
-    }
+    const $es = evt.metaKey ? $(".pa-diff-unfold") : $(this),
+        direction = evt.metaKey ? true : undefined;
+    $es.each(function () {
+        Filediff.find(this).load().then(f => fold61(f.element, this, direction));
+    });
     return false;
 });
 
 handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
-    var f = fileref_resolve(this), show = hasClass(f, "pa-hide-left");
-    if (evt.metaKey) {
-        $(".pa-diff-toggle-hide-left").each(function () {
-            toggleClass(fileref_resolve(this), "pa-hide-left", !show);
-            toggleClass(this, "btn-primary", show);
-        });
-    } else {
-        toggleClass(f, "pa-hide-left", !show);
+    const $es = evt.metaKey ? $(".pa-diff-toggle-hide-left") : $(this),
+        show = hasClass(Filediff.find(this).element, "pa-hide-left");
+    $es.each(function () {
+        toggleClass(Filediff.find(this).element, "pa-hide-left", !show);
         toggleClass(this, "btn-primary", show);
-    }
+    });
 });
 
 handle_ui.on("pa-goto", function () {
