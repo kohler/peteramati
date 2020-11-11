@@ -12,7 +12,7 @@ import { html_id_encode, html_id_decode } from "./encoders.js";
 export class Filediff {
     constructor(e) {
         if (e.nodeType !== Node.ELEMENT_NODE || !hasClass(e, "pa-filediff")) {
-            throw new Error("bad Filediff");
+            throw new Error;
         }
         this.element = e;
     }
@@ -44,6 +44,35 @@ export class Filediff {
                 })
             });
         }
+    }
+    get file() {
+        return this.element.getAttribute("data-pa-file");
+    }
+    expand(ctx) {
+        const em = ctx.getAttribute("data-expandmark"),
+            m = em ? em.match(/^a(\d+)b(\d+)\+(\d*)$/) : null;
+        if (!m) {
+            return new ImmediatePromise(ctx.nextSibling); // xxx
+        }
+        ctx.removeAttribute("data-expandmark");
+        const a0 = +m[1], b0 = +m[2], args = {file: this.file, fromline: b0};
+        m[3] !== "" && (args.linecount = +m[3]);
+        return new Promise(resolve => {
+            $.ajax(hoturl("api/blob", hoturl_gradeparts(this, args)), {
+                success: function (data) {
+                    if (data.ok && data.data) {
+                        const lines = data.data.replace(/\n$/, "").split("\n");
+                        for (let i = lines.length - 1; i >= 0; --i) {
+                            const t = '<div class="pa-dl pa-gc"><div class="pa-da" data-landmark="'.concat(a0 + i, '"></div><div class="pa-db" data-landmark="', b0 + i, '"></div><div class="pa-dd"></div></div>');
+                            $(t).insertAfter(ctx).find(".pa-dd").text(lines[i]);
+                        }
+                        const next = ctx.nextSibling;
+                        $(ctx).remove();
+                        resolve(next);
+                    }
+                }
+            });
+        });
     }
 }
 
@@ -256,4 +285,9 @@ handle_ui.on("pa-goto", function () {
         window.scrollTo(0, Math.max($e.geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
         push_history_state(this.href);
     }, null);
+});
+
+handle_ui.on("pa-gx", function (evt) {
+    const ctx = evt.currentTarget;
+    Filediff.find(ctx).expand(ctx);
 });

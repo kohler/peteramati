@@ -17,7 +17,6 @@ import { tooltip } from "./tooltip.js";
 import "./pset.js";
 import { linediff_traverse } from "./diff.js";
 import { filediff_markdown } from "./diff-markdown.js";
-import "./diff-expand.js";
 import { Note } from "./note.js";
 import "./note-edit.js";
 import { render_text } from "./render.js";

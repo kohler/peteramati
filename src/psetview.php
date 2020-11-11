@@ -1568,7 +1568,7 @@ class PsetView {
         }
         $curanno = new PsetViewAnnoState($file, $fileid);
         foreach ($dinfo as $l) {
-            $this->echo_line_diff($l, $linenotes, $lineanno, $curanno);
+            $this->echo_line_diff($l, $linenotes, $lineanno, $curanno, $dinfo);
         }
         if ($has_grade_range) {
             echo '</div></div>';
@@ -1587,11 +1587,16 @@ class PsetView {
     }
 
     /** @param array{string,?int,?int,string,?int} $l
-    * @param array<string,LineNote> $linenotes */
-    private function echo_line_diff($l, $linenotes, $lineanno, $curanno) {
+     * @param array<string,LineNote> $linenotes
+     * @param DiffInfo $dinfo */
+    private function echo_line_diff($l, $linenotes, $lineanno, $curanno, $dinfo) {
         if ($l[0] === "@") {
+            $cl = " pa-gx ui";
+            if (($r = $dinfo->current_expandmark())) {
+                $cl .= "\" data-expandmark=\"$r";
+            }
             $cx = strlen($l[3]) > 76 ? substr($l[3], 0, 76) . "..." : $l[3];
-            $x = [" pa-gx ui", "pa-dcx", "", "", $cx];
+            $x = [$cl, "pa-dcx", "", "", $cx];
         } else if ($l[0] === " ") {
             $x = [" pa-gc", "pa-dd", $l[1], $l[2], $l[3]];
         } else if ($l[0] === "-") {

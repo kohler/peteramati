@@ -426,14 +426,36 @@ class DiffInfo implements Iterator {
     function key() {
         return $this->_itpos >> 2;
     }
+    /** @return void */
     function next() {
         $this->_itpos += 4;
     }
+    /** @return void */
     function rewind() {
         $this->_itpos = 0;
     }
     /** @return bool */
     function valid() {
         return $this->_itpos < $this->_diffsz;
+    }
+    /** @return string */
+    function current_expandmark() {
+        assert($this->_diff[$this->_itpos] === "@");
+        if ($this->_itpos === 0 && $this->_diff[4] !== " ") {
+            // fully deleted or inserted
+            return "";
+        } else if ($this->_itpos === 0) {
+            $la = $lb = 1;
+        } else {
+            $la = $this->_diff[$this->_itpos - 3] + 1;
+            $lb = $this->_diff[$this->_itpos - 2] + 1;
+        }
+        assert($la !== null && $lb !== null);
+        if ($this->_itpos + 4 === $this->_diffsz) {
+            return "a{$la}b{$lb}+";
+        } else {
+            $n = $this->_diff[$this->_itpos + 6] - $lb;
+            return $n ? "a{$la}b{$lb}+$n" : "";
+        }
     }
 }
