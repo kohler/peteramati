@@ -1409,6 +1409,17 @@ class PsetView {
     }
 
     /** @param string $file
+     * @return string */
+    function rawfile($file) {
+        if ($this->repo->truncated_psetdir($this->pset)
+            && str_starts_with($file, $this->pset->directory_slash)) {
+            return substr($file, strlen($this->pset->directory_slash));
+        } else {
+            return $file;
+        }
+    }
+
+    /** @param string $file
      * @param array $args */
     function echo_file_diff($file, DiffInfo $dinfo, LineNotesOrder $lnorder, $args) {
         if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
@@ -1511,12 +1522,7 @@ class PsetView {
                     . '" aria-label="Toggle Markdown"><span class="icon-markdown"></span></button>';
             }
             if (!$dinfo->fileless && !$dinfo->removed) {
-                $rawfile = $file;
-                if ($this->repo->truncated_psetdir($this->pset)
-                    && str_starts_with($rawfile, $this->pset->directory_slash)) {
-                    $rawfile = substr($rawfile, strlen($this->pset->directory_slash));
-                }
-                $bts[] = '<a href="' . $this->hoturl("raw", ["file" => $rawfile]) . '" class="btn need-tooltip" aria-label="Download"><span class="icon-download"></span></a>';
+                $bts[] = '<a href="' . $this->hoturl("raw", ["file" => $this->rawfile($file)]) . '" class="btn need-tooltip" aria-label="Download"><span class="icon-download"></span></a>';
             }
             if (!empty($bts)) {
                 echo '<div class="hdr-actions btnbox">', join("", $bts), '</div>';
@@ -1561,7 +1567,7 @@ class PsetView {
         if ($dinfo->language) {
             echo ' data-language="', htmlspecialchars($dinfo->language), '"';
         }
-        echo ">";
+        echo ">"; // end div#F_...
         if ($has_grade_range) {
             echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
                 '</div><div class="pa-dg">';
@@ -1571,12 +1577,16 @@ class PsetView {
             $this->echo_line_diff($l, $linenotes, $lineanno, $curanno, $dinfo);
         }
         if ($has_grade_range) {
-            echo '</div></div>';
+            echo '</div></div>'; // end div.pa-dg div.pa-dg.pa-with-sidebar
         }
+        if (preg_match('/\.(?:png|jpg|jpeg|gif)\z/i', $file)) {
+            echo '<img src="', $this->hoturl("raw", ["file" => $this->rawfile($file)]), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="ui-error js-hide-error">';
+        }
+        echo '</div>'; // end div.pa-filediff#F_...
         if (!$no_heading) {
-            echo '</div>';
+            echo '</div>'; // end div.pa-dg.pa-with-fixed
         }
-        echo "</div>\n";
+        echo "\n";
         if (!$only_content && $this->need_format) {
             echo "<script>\$pa.render_text_page()</script>\n";
             $this->need_format = false;

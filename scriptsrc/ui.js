@@ -81,10 +81,12 @@ handle_ui.trigger = function (className, event) {
 
 $(document).on("click", ".ui, .uic", handle_ui);
 $(document).on("change", ".uich", handle_ui);
-$(document).on("keydown", ".uikd", handle_ui);
+$(document).on("error", ".ui-error", handle_ui);
 $(document).on("input", ".uii", handle_ui);
-$(document).on("unfold", ".ui-unfold", handle_ui);
+$(document).on("keydown", ".uikd", handle_ui);
+$(document).on("load", ".ui-load", handle_ui);
 $(document).on("mouseup mousedown", ".uim", handle_ui);
+$(document).on("unfold", ".ui-unfold", handle_ui);
 
 
 export function fold61(sel, arrowholder, direction) {

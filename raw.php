@@ -53,12 +53,17 @@ if ($result === null || $result === "") {
     }
 }
 
+// when commit is named, object doesn't change
+if ($Qreq->commit) {
+    header("Cache-Control: public, max-age=315576000");
+    header("Expires: " . gmdate("D, d M Y H:i:s", time() + 315576000) . " GMT");
+}
+
 // filetype determination
 $slash = strrpos($Qreq->file, "/");
 $filename = substr($Qreq->file, $slash === false ? 0 : $slash + 1);
 $dot = strrpos($filename, ".");
 $ext = ($dot === false ? "" : strtolower(substr($filename, $dot + 1)));
-
 if ($ext === "txt" || strcasecmp($filename, "README") === 0) {
     $mimetype = Mimetype::TXT_TYPE;
 } else if ($ext === "html") {
@@ -66,12 +71,29 @@ if ($ext === "txt" || strcasecmp($filename, "README") === 0) {
 } else {
     $mimetype = Mimetype::content_type($result);
 }
-header("Content-Type: " . Mimetype::type_with_charset($mimetype));
 
-// when commit is named, object doesn't change
-if ($Qreq->commit) {
-    header("Cache-Control: public, max-age=315576000");
-    header("Expires: " . gmdate("D, d M Y H:i:s", time() + 315576000) . " GMT");
+header("Content-Type: " . Mimetype::type_with_charset($mimetype));
+if (zlib_get_coding_type() === false) {
+    header("Content-Length: " . strlen($result));
+}
+
+// Accept header checking
+if (isset($_SERVER["HTTP_ACCEPT"])) {
+    $acceptable = false;
+    foreach (explode(",", $_SERVER["HTTP_ACCEPT"]) as $type_params) {
+        $semi = strpos($type_params, ";");
+        $want = trim($semi === false ? $type_params : substr($type_params, 0, $semi));
+        if ($want === "*/*"
+            || (str_ends_with($want, "/*") && str_starts_with($mimetype, substr($want, 0, -2)))
+            || $want === $mimetype) {
+            $acceptable = true;
+            break;
+        }
+    }
+    if (!$acceptable) {
+        header("HTTP/1.0 406 Not Acceptable");
+        exit;
+    }
 }
 
 echo $result;

@@ -2595,10 +2595,10 @@ table.hidegrades .pa-gradenote {
 .pa-gi, .pa-gisamp {
 	background-color: #ddffdd;
 }
-.pa-hide-left > .pa-gd {
+.pa-hide-left .pa-gd {
 	display: none;
 }
-.pa-hide-left > .pa-gi {
+.pa-hide-left .pa-gi {
 	background-color: #f0fff0;
 }
 .live .pa-gi:hover, .pa-dl.live {
