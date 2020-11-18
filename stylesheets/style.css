@@ -2460,7 +2460,7 @@ tr.gtrow-partner {
 .pa-dr p.image-container {
 	max-width: 95%;
 }
-.pa-dr img {
+.pa-dr img, img.pa-dr {
 	max-width: 100%;
 	max-height: 80vh;
 }

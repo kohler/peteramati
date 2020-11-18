@@ -1580,7 +1580,7 @@ class PsetView {
             echo '</div></div>'; // end div.pa-dg div.pa-dg.pa-with-sidebar
         }
         if (preg_match('/\.(?:png|jpg|jpeg|gif)\z/i', $file)) {
-            echo '<img src="', $this->hoturl("raw", ["file" => $this->rawfile($file)]), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="ui-error js-hide-error">';
+            echo '<img src="', $this->hoturl("raw", ["file" => $this->rawfile($file)]), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="pa-dr ui-error js-hide-error">';
         }
         echo '</div>'; // end div.pa-filediff#F_...
         if (!$no_heading) {
