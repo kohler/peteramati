@@ -25,6 +25,7 @@ class StudentSet implements Iterator, Countable {
     private $_rg = [];
     private $_cn = [];
     private $_cg = [];
+    /** @var array<string,list<int>> */
     private $_rb_uids = [];
     /** @var array<int,true> */
     private $_pset_loaded = [];
@@ -210,12 +211,15 @@ class StudentSet implements Iterator, Countable {
     }
 
 
+    /** @return PsetView */
     function current() {
         return PsetView::make_from_set_at($this, $this->_ua[$this->_upos], $this->pset);
     }
+    /** @return int */
     function key() {
         return $this->_ua[$this->_upos]->contactId;
     }
+    /** @return void */
     function next() {
         ++$this->_upos;
         while ($this->_upos < count($this->_ua)
@@ -232,15 +236,18 @@ class StudentSet implements Iterator, Countable {
             ++$this->_upos;
         }
     }
+    /** @return void */
     function rewind() {
         $this->_upos = -1;
         $this->next();
     }
+    /** @return bool */
     function valid() {
         return $this->_upos < count($this->_ua);
     }
 
 
+    /** @return int */
     function count() {
         return count($this->_ua);
     }

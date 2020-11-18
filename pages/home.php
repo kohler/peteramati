@@ -632,14 +632,15 @@ if ($Me->isPC && $Qreq->post_ok() && $Qreq->doaction) {
 function psets_json_diff_from($original, $update) {
     $res = null;
     foreach (get_object_vars($update) as $k => $vu) {
-        $vo = get($original, $k);
+        $vo = $original->$k ?? null;
         if (is_object($vo) && is_object($vu)) {
-            if (!($vu = psets_json_diff_from($vo, $vu)))
+            if (!($vu = psets_json_diff_from($vo, $vu))) {
                 continue;
+            }
         } else if ($vo === $vu) {
             continue;
         }
-        $res = $res ? : (object) array();
+        $res = $res ?? (object) array();
         $res->$k = $vu;
     }
     return $res;
@@ -1069,7 +1070,7 @@ if (!$Me->is_empty() && $User->is_student()) {
 function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
     global $Conf, $Me, $Profile;
     $j = $s ? StudentSet::json_basics($s, $anonymous) : [];
-    if (($gcid = get($row->notes, "gradercid"))) {
+    if (($gcid = $row->notes->gradercid ?? null)) {
         $j["gradercid"] = $gcid;
     } else if ($row->main_gradercid) {
         $j["gradercid"] = $row->main_gradercid;
@@ -1099,7 +1100,7 @@ function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
             if ($k[0] === "t" && ctype_digit(substr($k, 1))) {
                 $thistime = +substr($k, 1);
             } else {
-                $thistime = get($v, "at", 0);
+                $thistime = $v->at ?? 0;
             }
             $time = max($time, $thistime);
         }
@@ -1117,13 +1118,14 @@ function show_regrades($result, $all) {
     $flagrows = $uids = $psets = [];
     while (($row = $result->fetch_object())) {
         $row->notes = json_decode($row->notes);
-        $flags = (array) get($row->notes, "flags");
+        $flags = (array) ($row->notes->flags ?? []);
         $any = false;
         foreach ($flags as $t => $v) {
-            if ($all || !get($v, "resolved")) {
-                $uids[get($v, "uid", 0)] = $any = true;
-                if (isset($v->conversation))
+            if ($all || !($v->resolved ?? false)) {
+                $uids[$v->uid ?? 0] = $any = true;
+                if (isset($v->conversation)) {
                     $row->conversation = (string) $v->conversation[0][2];
+                }
             }
         }
         if ($any) {
@@ -1160,11 +1162,11 @@ function show_regrades($result, $all) {
     // 4. resolve `repocids`, `main_gradercid`, `gradebhash`
     foreach ($flagrows as $row) {
         $rowuids = [];
-        foreach (get($repouids, "{$row->repoid},{$row->pset}", []) as $uid) {
+        foreach ($repouids["{$row->repoid},{$row->pset}"] ?? [] as $uid) {
             $rowuids[] = $uid;
             $uids[$uid] = true;
 
-            $branch = get($branches, "{$uid},{$row->pset}", 0);
+            $branch = $branches["{$uid},{$row->pset}"] ?? 0;
             $bkey = "{$row->repoid},{$row->pset},{$branch}";
             if (isset($rgs[$bkey])) {
                 $row->main_gradercid = $rgs[$bkey]->gradercid;
@@ -1185,8 +1187,9 @@ function show_regrades($result, $all) {
     echo "<h3>flagged commits</h3>";
     $nintotal = 0;
     $anonymous = null;
-    if ($Qreq->anonymous !== null && $Me->privChair)
+    if ($Qreq->anonymous !== null && $Me->privChair) {
         $anonymous = !!$Qreq->anonymous;
+    }
     $any_anonymous = $any_nonanonymous = false;
     $jx = [];
     foreach ($flagrows as $row) {
@@ -1200,7 +1203,7 @@ function show_regrades($result, $all) {
 
         $partners = [];
         foreach (explode(",", $row->repocids) as $uid) {
-            if (($c = get($contacts, $uid))) {
+            if (($c = $contacts[$uid] ?? null)) {
                 $c->set_anonymous($anon);
                 $partners[] = $c;
             }
@@ -1308,7 +1311,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
 
         if (!$pset->gitless_grades) {
             $gradercid = $info->gradercid();
-            if ($gi && get($gi, "linenotes")) {
+            if ($gi && ($gi->linenotes ?? null)) {
                 $j["has_notes"] = true;
             } else if ($info->viewer->contactId == $gradercid) {
                 $info->user->incomplete = "no line notes";
@@ -1328,6 +1331,9 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         }
         if ($info->user_can_view_grades()) {
             $j["grades_visible"] = true;
+        }
+        if (false &&  ($lh = $info->late_hours())) {
+            $j["late_hours"] = $lh;
         }
     }
 
@@ -1414,7 +1420,7 @@ function show_pset_table($sset) {
         if (!$s->user->visited) {
             $j = render_pset_row($pset, $sset, $s, $anonymous);
             if (!$s->user->dropped && isset($j["gradercid"])) {
-                $gradercounts[$j["gradercid"]] = get($gradercounts, $j["gradercid"], 0) + 1;
+                $gradercounts[$j["gradercid"]] = ($gradercounts[$j["gradercid"]] ?? 0) + 1;
             }
             if (!$pset->partner_repo) {
                 foreach ($s->user->links(LINK_PARTNER, $pset->id) as $pcid) {

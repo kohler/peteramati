@@ -911,7 +911,7 @@ class PsetView {
             return null;
         }
 
-        $timestamp = get($cinfo, "timestamp");
+        $timestamp = $cinfo->timestamp ?? null;
         if (!$timestamp
             && !$this->pset->gitless
             && ($h = $this->hash ? : $this->grading_hash())
@@ -1330,7 +1330,7 @@ class PsetView {
     function diff($commita, $commitb, LineNotesOrder $lnorder = null, $args = []) {
         if (!$this->added_diffinfo) {
             if (($rs = $this->commit_info("runsettings"))
-                && ($id = get($rs, "IGNOREDIFF"))) {
+                && ($id = $rs->IGNOREDIFF ?? null)) {
                 $this->pset->add_diffconfig(new DiffConfig($id, (object) ["ignore" => true]));
             }
             $this->added_diffinfo = true;
@@ -1352,13 +1352,13 @@ class PsetView {
             && $this->pc_view) {
             foreach ($this->pset->grades() as $g) {
                 if ($g->landmark_file
-                    && ($di = get($diff, $g->landmark_file))
+                    && ($di = $diff[$g->landmark_file] ?? null)
                     && !$di->contains_linea($g->landmark_line)
                     && $di->is_handout_commit_a()) {
                     $di->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
                 }
                 if ($g->landmark_range_file
-                    && ($di = get($diff, $g->landmark_range_file))
+                    && ($di = $diff[$g->landmark_range_file] ?? null)
                     && $di->is_handout_commit_a()) {
                     $di->expand_linea($g->landmark_range_first, $g->landmark_range_last);
                 }
@@ -1366,7 +1366,7 @@ class PsetView {
         }
 
         if ($lnorder) {
-            $onlyfiles = Repository::fix_diff_files(get($args, "onlyfiles"));
+            $onlyfiles = Repository::fix_diff_files($args["onlyfiles"] ?? null);
             foreach ($lnorder->fileorder() as $fn => $order) {
                 if (isset($diff[$fn])) {
                     // expand diff to include notes
@@ -1382,7 +1382,7 @@ class PsetView {
                     // expand diff to include fake files
                     if (($diffc = $this->pset->find_diffconfig($fn))
                         && $diffc->fileless
-                        && (!$onlyfiles || get($onlyfiles, $fn))) {
+                        && (!$onlyfiles || ($onlyfiles[$fn] ?? null))) {
                         $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
                         foreach ($lnorder->file($fn) as $note) {
                             $diffi->add("Z", null, (int) substr($note->lineid, 1), "");

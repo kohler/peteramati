@@ -113,7 +113,7 @@ class Conf {
     private $_pc_members_cache = null;
     private $_pc_tags_cache = null;
     private $_pc_members_and_admins_cache = null;
-    /** @var array<int,Repository> */
+    /** @var array<string,Repository> */
     private $_handout_repos = [];
     /** @var array<int,array<string,CommitRecord>> */
     private $_handout_commits = [];
@@ -2002,24 +2002,28 @@ class Conf {
             $hpcj[$pcm->contactId] = $j = (object) ["name" => Text::name_html($pcm), "email" => $pcm->email];
             if ($pcm->lastName) {
                 $r = Text::analyze_name($pcm);
-                if (strlen($r->lastName) !== strlen($r->name))
+                if (strlen($r->lastName) !== strlen($r->name)) {
                     $j->lastpos = strlen(htmlspecialchars($r->firstName)) + 1;
-                if ($r->nameAmbiguous && $r->name && $r->email)
+                }
+                if ($r->nameAmbiguous && $r->name && $r->email) {
                     $j->emailpos = strlen(htmlspecialchars($r->name)) + 1;
+                }
             }
             if (!$pcm->nameAmbiguous && ($pcm->nickname || $pcm->firstName)) {
                 if ($pcm->nicknameAmbiguous) {
                     $j->nicklen = strlen(htmlspecialchars($r->name));
                 } else {
                     $nick = htmlspecialchars($pcm->nickname ? : $pcm->firstName);
-                    if (str_starts_with($j->name, $nick))
+                    if (str_starts_with($j->name, $nick)) {
                         $j->nicklen = strlen($nick);
-                    else
+                    } else {
                         $j->nick = $nick;
+                    }
                 }
             }
-            if (!($pcm->roles & Contact::ROLE_PC))
+            if (!($pcm->roles & Contact::ROLE_PC)) {
                 $j->admin_only = true;
+            }
             $list[] = $pcm->contactId;
         }
         $hpcj["__order__"] = $list;
