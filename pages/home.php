@@ -683,7 +683,7 @@ function reconfig($qreq) {
 
     $o = (object) array();
     $o->disabled = $o->visible = $o->grades_visible = null;
-    $state = get($_POST, "state");
+    $state = $_POST["state"] ?? null;
     if ($state === "disabled") {
         $o->disabled = true;
     } else if ($old_pset->disabled) {
@@ -700,13 +700,13 @@ function reconfig($qreq) {
         $o->grades_visible = false;
     }
 
-    if (get($_POST, "frozen") === "yes") {
+    if (($_POST["frozen"] ?? null) === "yes") {
         $o->frozen = true;
     } else {
         $o->frozen = ($old_pset->frozen ? false : null);
     }
 
-    if (get($_POST, "anonymous") === "yes") {
+    if (($_POST["anonymous"] ?? null) === "yes") {
         $o->anonymous = true;
     } else {
         $o->anonymous = ($old_pset->anonymous ? false : null);
@@ -1314,7 +1314,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
                 $info->user->incomplete = "no line notes";
             }
             if ($gi
-                && $gradercid != get($gi, "gradercid")
+                && $gradercid != ($gi->gradercid ?? null)
                 && $info->viewer->privChair) {
                 $j["has_nongrader_notes"] = true;
             }
@@ -1490,7 +1490,7 @@ function show_pset_table($sset) {
     if ($sset->viewer->privChair && !$pset->gitless_grades) {
         $sel = array("none" => "N/A");
         foreach ($sset->conf->pc_members_and_admins() as $uid => $pcm) {
-            $n = get($gradercounts, $uid) ? " (" . $gradercounts[$uid] . ")" : "";
+            $n = ($gradercounts[$uid] ?? 0) ? " ({$gradercounts[$uid]})" : "";
             $sel[$pcm->email] = Text::name_html($pcm) . $n;
         }
         $sel["__random__"] = "Random";

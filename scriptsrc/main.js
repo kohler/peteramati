@@ -1139,14 +1139,26 @@ function pa_render_pset_table(pconf, data) {
                    escape_entities(siteinfo.psets[s.psetid].title) +
                    (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>';
             },
-            tw: 12
+            tw: 12,
+            compare: function (a, b) {
+                if (a.psetid != b.psetid)
+                    return siteinfo.psets[a.psetid].pos < siteinfo.psets[b.psetid].pos ? -1 : 1;
+                else
+                    return a.pos < b.pos ? -1 : 1;
+            }
         },
         at: {
             th: '<th class="gt-at l plsortable" data-pa-sort="at" scope="col">Flagged</th>',
             td: function (s) {
                 return '<td class="gt-at">' + (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>';
             },
-            tw: 8
+            tw: 8,
+            compare: function (a, b) {
+                if (a.at != b.at)
+                    return a.at < b.at ? -1 : 1;
+                else
+                    return a.pos < b.pos ? -1 : 1;
+            }
         },
         username: {
             th: function () {
@@ -1189,7 +1201,13 @@ function pa_render_pset_table(pconf, data) {
             td: function (s) {
                 return '<td class="gt-extension">' + (s.x ? "X" : "") + '</td>';
             },
-            tw: 2
+            tw: 2,
+            compare: function (a, b) {
+                if (a.x != b.x)
+                    return a.x ? -1 : 1;
+                else
+                    return user_compare(a, b);
+            }
         },
         grader: {
             th: '<th class="gt-grader l plsortable" data-pa-sort="grader" scope="col">Grader</th>',
@@ -1199,30 +1217,50 @@ function pa_render_pset_table(pconf, data) {
                     t = grader_name(siteinfo.pc[s.gradercid]);
                 return '<td class="gt-grader">' + t + '</td>';
             },
-            tw: 6
+            tw: 6,
+            compare: function (a, b) {
+                return grader_compare(a, b) || user_compare(a, b);
+            }
         },
         notes: {
             th: '<th class="gt-notes l plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
             td: function (s) {
                 var t = '';
-                if (s.grades_visible)
+                if (s.grades_visible) {
                     t += '⎚';
-                if (flagged && s.is_grade)
+                }
+                if (flagged && s.is_grade) {
                     t += '✱';
-                if (s.has_notes)
+                }
+                if (s.has_notes) {
                     t += '♪';
-                if (!flagged && s.has_nongrader_notes)
+                }
+                if (!flagged && s.has_nongrader_notes) {
                     t += '<sup>*</sup>';
+                }
                 return '<td class="gt-notes">' + t + '</td>';
             },
             tw: 2
         },
+        late_hours: {
+            th: '<th class="gt-late-hours r plsortable">⏰</th>',
+            td: function (s) {
+                return '<td class="gt-late-hours r">'.concat(s.late_hours || "", '</td>');
+            },
+            tw: 3,
+            compare: function (a, b) {
+                if ((a.late_hours || 0) != (b.late_hours || 0))
+                    return (a.late_hours || 0) < (b.late_hours || 0) ? -1 : 1;
+                else
+                    return user_compare(a, b);
+            }
+        },
         conversation: {
             th: '<th class="gt-conversation l" scope="col">Flag</th>',
             td: function (s) {
-                return '<td class="gt-conversation l">' +
-                    escape_entities(s.conversation || s.conversation_pfx || "") +
-                    (s.conversation_pfx ? "…" : "") + '</td>';
+                return '<td class="gt-conversation l">'.concat(
+                    escape_entities(s.conversation || s.conversation_pfx || ""),
+                    (s.conversation_pfx ? "…" : ""), '</td>');
             },
             tw: 20
         },
@@ -1281,7 +1319,13 @@ function pa_render_pset_table(pconf, data) {
             td: function (s) {
                 return '<td class="gt-ngrades r">' + (s.ngrades_nonempty || "") + '</td>';
             },
-            tw: 2
+            tw: 2,
+            compare: function (a, b) {
+                if (a.ngrades_nonempty !== b.ngrades_nonempty)
+                    return a.ngrades_nonempty < b.ngrades_nonempty ? -1 : 1;
+                else
+                    return -user_compare(a, b);
+            }
         },
         repo: {
             th: '<th class="gt-repo" scope="col"></th>',
@@ -1722,7 +1766,7 @@ function pa_render_pset_table(pconf, data) {
         return t.toLowerCase();
     }
     function user_compare(a, b) {
-        return a._sort_user < b._sort_user ? -sort.rev : (a._sort_user == b._sort_user ? 0 : sort.rev);
+        return a._sort_user < b._sort_user ? -1 : (a._sort_user == b._sort_user ? 0 : 1);
     }
     function grader_compare(a, b) {
         var ap = a.gradercid ? siteinfo.pc[a.gradercid] : null;
@@ -1730,7 +1774,7 @@ function pa_render_pset_table(pconf, data) {
         var ag = (ap && grader_name(ap)) || "~~~";
         var bg = (bp && grader_name(bp)) || "~~~";
         if (ag != bg)
-            return ag < bg ? -sort.rev : sort.rev;
+            return ag < bg ? -1 : 1;
         else
             return 0;
     }
@@ -1743,133 +1787,81 @@ function pa_render_pset_table(pconf, data) {
         }
     }
     function sort_data() {
-        var f = sort.f, rev = sort.rev, m;
+        var f = sort.f, m;
         set_user_sorters();
-        if ((f === "name" || f === "name2") && !anonymous) {
-            data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else
-                    return user_compare(a, b);
-            });
-        } else if (f === "extension") {
-            data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else if (a.x != b.x)
-                    return a.x ? rev : -rev;
-                else
-                    return user_compare(a, b);
-            });
-        } else if (f === "grader") {
-            data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else
-                    return grader_compare(a, b) || user_compare(a, b);
-            });
+        let colr = col.indexOf(f) >= 0 ? col_renderers[f] : null;
+        if (colr && colr.compare) {
+            data.sort(colr.compare);
+        } else if (colr && colr.make_compare) {
+            data.sort(colr.make_compare());
+        } else if ((f === "name" || f === "name2") && !anonymous) {
+            data.sort(user_compare);
         } else if (f === "gradestatus") {
             data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else if (a.grades_visible != b.grades_visible)
+                if (a.grades_visible != b.grades_visible)
                     return a.grades_visible ? -1 : 1;
                 else if (a.has_notes != b.has_notes)
                     return a.has_notes ? -1 : 1;
                 else
                     return grader_compare(a, b) || user_compare(a, b);
             });
-        } else if (f === "pset") {
-            data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else if (a.psetid != b.psetid)
-                    return siteinfo.psets[a.psetid].pos < siteinfo.psets[b.psetid].pos ? -rev : rev;
-                else
-                    return a.pos < b.pos ? -rev : rev;
-            });
-        } else if (f === "at") {
-            data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else if (a.at != b.at)
-                    return a.at < b.at ? -rev : rev;
-                else
-                    return a.pos < b.pos ? -rev : rev;
-            });
         } else if (f === "total") {
             data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else if (a.total != b.total)
-                    return a.total < b.total ? -rev : rev;
+                if (a.total != b.total)
+                    return a.total < b.total ? 1 : -1;
                 else
                     return -user_compare(a, b);
             });
         } else if ((m = /^grade(\d+)$/.exec(f)) && grade_entries[+m[1]]) {
             var gidx = +m[1],
                 fwd = grade_entries[gidx].type && grade_entries[gidx].gc.sort === "forward",
-                erev = fwd ? -rev : rev;
+                erev = fwd ? -1 : 1;
             data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else {
-                    var ag = a.grades && a.grades[gidx],
-                        bg = b.grades && b.grades[gidx];
-                    if (ag === "" || ag == null || bg === "" || bg == null) {
-                        if (ag !== "" && ag != null)
-                            return erev;
-                        else if (bg !== "" && bg != null)
-                            return -erev;
-                        else
-                            return -user_compare(a, b);
-                    } else if (ag < bg) {
-                        return -rev;
-                    } else if (ag > bg) {
-                        return rev;
-                    } else if (fwd) {
-                        return user_compare(a, b);
-                    } else {
+                var ag = a.grades && a.grades[gidx],
+                    bg = b.grades && b.grades[gidx];
+                if (ag === "" || ag == null || bg === "" || bg == null) {
+                    if (ag !== "" && ag != null)
+                        return erev;
+                    else if (bg !== "" && bg != null)
+                        return -erev;
+                    else
                         return -user_compare(a, b);
-                    }
-                }
-            });
-        } else if (f === "ngrades" && need_ngrades) {
-            data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else if (a.ngrades_nonempty !== b.ngrades_nonempty)
-                    return a.ngrades_nonempty < b.ngrades_nonempty ? -rev : rev;
-                else
+                } else if (ag < bg) {
+                    return -1;
+                } else if (ag > bg) {
+                    return 1;
+                } else if (fwd) {
+                    return user_compare(a, b);
+                } else {
                     return -user_compare(a, b);
+                }
             });
         } else if (sort.email && !anonymous) {
             f = "username";
             data.sort(function (a, b) {
-                if (a.boringness !== b.boringness) {
-                    return a.boringness - b.boringness;
+                var ae = (a.email || "").toLowerCase(), be = (b.email || "").toLowerCase();
+                if (ae !== be) {
+                    if (ae === "" || be === "")
+                        return ae === "" ? 1 : -1;
+                    else
+                        return ae < be ? -1 : 1;
                 } else {
-                    var ae = (a.email || "").toLowerCase(), be = (b.email || "").toLowerCase();
-                    if (ae !== be) {
-                        if (ae === "" || be === "")
-                            return ae === "" ? rev : -rev;
-                        else
-                            return ae < be ? -rev : rev;
-                    } else
-                        return user_compare(a, b);
+                    return user_compare(a, b);
                 }
             });
         } else { /* "username" */
             if (f !== "name2") {
                 f = "username";
             }
-            data.sort(function (a, b) {
-                if (a.boringness !== b.boringness)
-                    return a.boringness - b.boringness;
-                else
-                    return user_compare(a, b);
-            });
+            data.sort(user_compare);
         }
+
+        if (sort.rev < 0) {
+            data.reverse();
+        }
+        data.sort(function (a, b) {
+            return a.boringness !== b.boringness ? a.boringness - b.boringness : 0;
+        });
 
         var $x = $overlay ? $([$j[0].firstChild, $overlay[0].firstChild]) : $($j[0].firstChild);
         $x.find(".plsortable").removeClass("plsortactive plsortreverse");

@@ -10,17 +10,23 @@ class StudentSet implements Iterator, Countable {
     public $viewer;
     /** @var ?Pset */
     public $pset;
+    /** @var int */
     private $_psetid;
+    /** @var bool */
     private $_anonymous;
     /** @var array<int,Contact> */
     private $_u = [];
+    /** @var list<Contact> */
     private $_ua;
+    /** @var int */
     private $_upos;
+    /** @var array<int,Repository> */
     private $_repo = [];
     private $_rg = [];
     private $_cn = [];
     private $_cg = [];
     private $_rb_uids = [];
+    /** @var array<int,true> */
     private $_pset_loaded = [];
 
     const COLLEGE = 1;
@@ -106,6 +112,7 @@ class StudentSet implements Iterator, Countable {
         }
     }
 
+    /** @param ?bool $anonymous */
     function set_pset(Pset $pset, $anonymous = null) {
         assert($this->conf === $pset->conf);
         if ($anonymous === null) {
@@ -129,34 +136,42 @@ class StudentSet implements Iterator, Countable {
         }
     }
 
+    /** @return array<int,Contact> */
     function users() {
         return $this->_u;
     }
 
+    /** @param int $cid
+     * @return ?Contact */
     function user($cid) {
-        return get($this->_u, $cid);
+        return $this->_u[$cid] ?? null;
     }
 
+    /** @param int $cid
+     * @return ?PsetView */
     function info($cid) {
         $u = $this->user($cid);
         return $u ? PsetView::make_from_set_at($this, $u, $this->pset) : null;
     }
 
+    /** @param int $cid
+     * @return ?PsetView */
     function info_at($cid, Pset $pset) {
         $u = $this->user($cid);
         return $u ? PsetView::make_from_set_at($this, $u, $pset) : null;
     }
 
+    /** @return ?Repository */
     function repo_at(Contact $user, Pset $pset) {
         $this->load_pset($pset);
         $repoid = $user->link(LINK_REPO, $pset->id);
-        return $repoid ? get($this->_repo, $repoid) : null;
+        return $repoid ? $this->_repo[$repoid] ?? null : null;
     }
 
     function contact_grade_at(Contact $user, Pset $pset) {
         if ($pset->gitless_grades) {
             $this->load_pset($pset);
-            return get($this->_cg, "$pset->id,$user->contactId");
+            return $this->_cg["$pset->id,$user->contactId"] ?? null;
         } else {
             return null;
         }
@@ -167,9 +182,9 @@ class StudentSet implements Iterator, Countable {
             $this->load_pset($pset);
             $repoid = $user->link(LINK_REPO, $pset->id);
             $branchid = $user->branchid($pset);
-            $rg = get($this->_rg, "$pset->id,$repoid,$branchid");
+            $rg = $this->_rg["$pset->id,$repoid,$branchid"] ?? null;
             if ($rg && !property_exists($rg, "bhash")) {
-                $cn = $rg->gradebhash ? get($this->_cn, "$pset->id,$rg->gradebhash") : null;
+                $cn = $rg->gradebhash ? $this->_cn["$pset->id,$rg->gradebhash"] ?? null : null;
                 $rg->bhash = $cn ? $cn->bhash : null;
                 $rg->notes = $cn ? $cn->notes : null;
                 $rg->notesversion = $cn ? $cn->notesversion : null;
@@ -208,7 +223,7 @@ class StudentSet implements Iterator, Countable {
                && $this->pset) {
             $u = $this->_ua[$this->_upos];
             if ($this->pset->gitless_grades) {
-                if (get($this->_cg, "$this->_psetid,$u->contactId"))
+                if ($this->_cg["$this->_psetid,$u->contactId"] ?? null)
                     break;
             } else {
                 if ($u->link(LINK_REPO, $this->_psetid))
