@@ -22,11 +22,11 @@ if (isset($_REQUEST["email"]) && isset($_REQUEST["password"])) {
     $_REQUEST["signin"] = $_REQUEST["signin"] ?? "go";
 }
 // CSRF protection: ignore unvalidated signin/signout for known users
-if (!$Me->is_empty() && !$Qreq->post_ok()) {
+if (!$Me->is_empty() && !$Qreq->valid_token()) {
     unset($_REQUEST["signout"]);
 }
 if ($Me->has_email()
-    && (!$Qreq->post_ok() || strcasecmp($Me->email, trim($Qreq->email)) == 0)) {
+    && (!$Qreq->valid_token() || strcasecmp($Me->email, trim($Qreq->email)) == 0)) {
     unset($_REQUEST["signin"]);
 }
 if (!isset($_REQUEST["email"]) || !isset($_REQUEST["action"])) {
@@ -62,7 +62,7 @@ if (!$Me->isPC || !$User) {
 if (!$Me->is_empty()
     && ($Me === $User || $Me->isPC)
     && $Qreq->set_username
-    && $Qreq->post_ok()
+    && $Qreq->valid_post()
     && ($repoclass = RepositorySite::$sitemap[$Qreq->reposite])
     && in_array($repoclass, RepositorySite::site_classes($Conf), true)) {
     if ($repoclass::save_username($User, $Qreq->username)) {
@@ -83,7 +83,7 @@ if ($Qreq->set_partner !== null) {
 if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
     && $Me->isPC
     && $User->is_student()
-    && $Qreq->post_ok()) {
+    && $Qreq->valid_post()) {
     $Conf->qe("update ContactInfo set dropped=? where contactId=?",
               isset($Qreq->set_drop) ? Conf::$now : 0, $User->contactId);
     $Conf->qe("delete from Settings where name like '__gradets.%'");
@@ -433,7 +433,7 @@ function download_psets_report($request) {
     exit;
 }
 
-if ($Me->isPC && $Qreq->post_ok() && $Qreq->report) {
+if ($Me->isPC && $Qreq->valid_token() && $Qreq->report) {
     download_psets_report($Qreq);
 }
 
@@ -530,7 +530,7 @@ function set_grader(Qrequest $qreq) {
     redirectSelf();
 }
 
-if ($Me->isPC && $Qreq->post_ok() && $Qreq->setgrader) {
+if ($Me->isPC && $Qreq->valid_post() && $Qreq->setgrader) {
     set_grader($Qreq);
 }
 
@@ -556,7 +556,7 @@ function runmany($qreq) {
     redirectSelf();
 }
 
-if ($Me->isPC && $Qreq->post_ok() && $Qreq->runmany) {
+if ($Me->isPC && $Qreq->valid_post() && $Qreq->runmany) {
     runmany($Qreq);
 }
 
@@ -624,7 +624,7 @@ function doaction(Qrequest $qreq) {
     redirectSelf();
 }
 
-if ($Me->isPC && $Qreq->post_ok() && $Qreq->doaction) {
+if ($Me->isPC && $Qreq->valid_post() && $Qreq->doaction) {
     doaction($Qreq);
 }
 
@@ -725,7 +725,7 @@ function reconfig($qreq) {
     save_config_overrides($psetkey, $o, $json);
 }
 
-if ($Me->privChair && $Qreq->post_ok() && $Qreq->reconfig)
+if ($Me->privChair && $Qreq->valid_post() && $Qreq->reconfig)
     reconfig($Qreq);
 
 
@@ -736,7 +736,7 @@ if ($Me->privChair)
 
 // Enable users
 if ($Me->privChair
-    && $Qreq->post_ok()
+    && $Qreq->valid_post()
     && (isset($Qreq->enable_user)
         || isset($Qreq->send_account_info)
         || isset($Qreq->reset_password))) {

@@ -34,7 +34,7 @@ $Conf->set_active_list(SessionList::find($Me, $Qreq));
 // maybe set commit
 if (isset($Qreq->setgrader)
     && isset($Qreq->grader)
-    && $Qreq->post_ok()
+    && $Qreq->valid_post()
     && $Info->can_have_grades()
     && $Me->can_set_grader($Pset, $User)) {
     $grader = 0;

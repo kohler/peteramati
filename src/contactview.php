@@ -251,7 +251,7 @@ class ContactView {
     static function set_partner_action($user, $qreq) {
         global $Conf, $Me;
         if (!($Me->has_account_here()
-              && $qreq->post_ok()
+              && $qreq->valid_post()
               && ($pset = $Conf->pset_by_key($qreq->pset)))) {
             return;
         }
@@ -451,7 +451,7 @@ class ContactView {
     static function set_repo_action($user, $qreq) {
         global $Conf, $Me;
         if (!($Me->has_account_here()
-              && $qreq->post_ok()
+              && $qreq->valid_post()
               && ($pset = $Conf->pset_by_key($qreq->pset)))) {
             return;
         }
@@ -528,7 +528,7 @@ class ContactView {
     static function set_branch_action($user, $qreq) {
         global $Conf, $Me;
         if (!($Me->has_account_here()
-              && $qreq->post_ok()
+              && $qreq->valid_post()
               && ($pset = $Conf->pset_by_key($qreq->pset))
               && !$pset->no_branch)) {
             return;

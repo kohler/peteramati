@@ -39,7 +39,7 @@ assert($User == $Me || $Me->isPC);
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // XXX this should be under `api`
-if ($Qreq->flag && $Qreq->post_ok() && user_pset_info()) {
+if ($Qreq->flag && $Qreq->valid_token() && user_pset_info()) {
     $flags = (array) $Info->current_notes("flags");
     if ($Qreq->flagid && !isset($flags["t" . $Qreq->flagid])) {
         json_exit(["ok" => false, "error" => "No such flag"]);
@@ -66,7 +66,7 @@ if ($Qreq->flag && $Qreq->post_ok() && user_pset_info()) {
 }
 
 // XXX this should be under `api`
-if ($Qreq->resolveflag && $Qreq->post_ok() && user_pset_info()) {
+if ($Qreq->resolveflag && $Qreq->valid_token() && user_pset_info()) {
     $flags = (array) $Info->current_notes("flags");
     if (!$Qreq->flagid || !isset($flags[$Qreq->flagid])) {
         json_exit(["ok" => false, "error" => "No such flag"]);
@@ -84,7 +84,7 @@ foreach ($Pset->runners as $r) {
     if ($r->name == $Qreq->run)
         $Runner = $r;
 }
-$RunMany = $Me->isPC && $Qreq->runmany && $Qreq->post_ok();
+$RunMany = $Me->isPC && $Qreq->runmany && $Qreq->valid_post();
 if (!$Runner) {
     quit("No such command");
 } else if (!$Me->can_view_run($Pset, $Runner, $RunMany ? null : $User)) {
@@ -98,7 +98,7 @@ if (!$Runner) {
 }
 
 // magic multi-runner
-if ($Me->isPC && $Qreq->runmany && $Qreq->post_ok()) {
+if ($Me->isPC && $Qreq->runmany && $Qreq->valid_post()) {
     $t = $Pset->title;
     if ($Qreq->ensure) {
         $t .= " Ensure";
@@ -136,7 +136,7 @@ if ($Me->isPC && $Qreq->runmany && $Qreq->post_ok()) {
 $Info = user_pset_info();
 
 // can we run this?
-if ($Qreq->run === null || !$Qreq->post_ok()) {
+if ($Qreq->run === null || !$Qreq->valid_post()) {
     quit("Permission error");
 } else if ($Runner->command) {
     if (!$Info->repo) {

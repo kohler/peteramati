@@ -260,7 +260,7 @@ function json_exit($json, $arg2 = null) {
     if (JsonResultException::$capturing) {
         throw new JsonResultException($json);
     } else {
-        if ($Qreq && $Qreq->post_ok()) {
+        if ($Qreq && $Qreq->valid_token()) {
             if ($json->status) {
                 http_response_code($json->status);
             }
@@ -274,7 +274,7 @@ function json_exit($json, $arg2 = null) {
             if (!isset($json->content["status"])) {
                 $json->content["status"] = $json->status;
             }
-            if ($Qreq->post && !$Qreq->post_ok()) {
+            if ($Qreq->post && !$Qreq->valid_token()) {
                 $json->content["postvalue"] = post_value(true);
             }
         }

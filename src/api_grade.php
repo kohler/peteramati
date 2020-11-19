@@ -133,7 +133,7 @@ class API_Grade {
         }
         $ugs = (array) $ugs;
         $ispost = $qreq->method() === "POST";
-        if ($ispost && !$qreq->post_ok()) {
+        if ($ispost && !$qreq->valid_post()) {
             return ["ok" => false, "error" => "Missing credentials."];
         }
 

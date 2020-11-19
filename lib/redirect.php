@@ -185,9 +185,10 @@ function kill_session() {
 
 function check_post($qreq = null) {
     $pv = post_value();
-    if ($qreq)
-        return $qreq->post_ok();
-    else
+    if ($qreq) {
+        return $qreq->valid_post();
+    } else {
         return (isset($_GET["post"]) && $_GET["post"] == $pv)
             || (isset($_POST["post"]) && $_POST["post"] == $pv);
+    }
 }
