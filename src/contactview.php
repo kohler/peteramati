@@ -417,7 +417,7 @@ class ContactView {
 
             $timer_start = 0;
             if ($dl->timed) {
-                $all_dltimes = $info->user_info("downloaded_at");
+                $all_dltimes = $info->user_notes("downloaded_at");
                 if ($all_dltimes && isset($all_dltimes->{$dl->key})) {
                     foreach ($all_dltimes->{$dl->key} as $dltime) {
                         if (!isset($dltime[1]) || $dltime[1] == $info->viewer->contactId) {

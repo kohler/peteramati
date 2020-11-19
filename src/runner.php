@@ -375,7 +375,7 @@ class RunnerState {
         register_shutdown_function(array($this, "cleanup"));
 
         // print json to first line
-        $runsettings = $this->info->commit_info("runsettings");
+        $runsettings = $this->info->commit_notes("runsettings");
         $json = (object) [
             "repoid" => $this->repoid, "pset" => $this->pset->urlkey,
             "timestamp" => $this->checkt, "hash" => $this->info->commit_hash(),
@@ -399,7 +399,7 @@ class RunnerState {
         $this->checkout_code();
 
         // save commit settings
-        $this->add_run_settings($this->info->commit_info("runsettings"));
+        $this->add_run_settings($this->info->commit_notes("runsettings"));
 
         // actually run
         $command = "echo; jail/pa-jail run"

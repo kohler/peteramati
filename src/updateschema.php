@@ -37,7 +37,7 @@ function _update_schema_regrade_flags(Conf $conf) {
             $info = PsetView::make($pset, $u, $u);
             $info->force_set_hash($row->hash);
             $update = ["flags" => ["t" . $row->requested_at => ["uid" => $u->contactId]]];
-            $info->update_current_info($update);
+            $info->update_current_notes($update);
         }
     }
     Dbl::free($result);
@@ -552,6 +552,10 @@ function updateSchema($conf) {
     if ($conf->sversion == 131
         && $conf->ql_ok("alter table ContactInfo add `gradeUpdateTime` bigint(11) NOT NULL DEFAULT '0'")) {
         $conf->update_schema_version(132);
+    }
+    if ($conf->sversion === 132
+        && $conf->ql_ok("alter table RepositoryGrade add `commitat` bigint(11) DEFAULT NULL")) {
+        $conf->update_schema_version(135);
     }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");

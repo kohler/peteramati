@@ -1102,7 +1102,7 @@ handle_ui.on("pa-anonymized-link", function (event) {
 
 function pa_render_pset_table(pconf, data) {
     var $j = $(this), table_width = 0, dmap = [],
-        $overlay = null, username_col, name_col, slist_input,
+        $overlay = null, name_col, slist_input,
         $gdialog, gdialog_su,
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
@@ -1112,7 +1112,7 @@ function pa_render_pset_table(pconf, data) {
         },
         active_nameflag = -1, displaying_last_first = null,
         anonymous = pconf.anonymous,
-        col, total_colpos, ngrades_colpos;
+        col, colmap, total_colpos, ngrades_colpos;
 
     var col_renderers = {
         checkbox: {
@@ -1140,6 +1140,7 @@ function pa_render_pset_table(pconf, data) {
                    (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>';
             },
             tw: 12,
+            sort_forward: true,
             compare: function (a, b) {
                 if (a.psetid != b.psetid)
                     return siteinfo.psets[a.psetid].pos < siteinfo.psets[b.psetid].pos ? -1 : 1;
@@ -1153,6 +1154,7 @@ function pa_render_pset_table(pconf, data) {
                 return '<td class="gt-at">' + (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>';
             },
             tw: 8,
+            sort_forward: true,
             compare: function (a, b) {
                 if (a.at != b.at)
                     return a.at < b.at ? -1 : 1;
@@ -1173,7 +1175,8 @@ function pa_render_pset_table(pconf, data) {
                 return '<td class="gt-username">' + render_username_td(s) + '</td>';
             },
             tw: 12,
-            pin: true
+            pin: true,
+            sort_forward: true
         },
         name: {
             th: function () {
@@ -1182,7 +1185,8 @@ function pa_render_pset_table(pconf, data) {
             td: function (s) {
                 return '<td class="gt-name">' + render_display_name(s, false) + '</td>';
             },
-            tw: 14
+            tw: 14,
+            sort_forward: true
         },
         name2: {
             th: function () {
@@ -1194,7 +1198,8 @@ function pa_render_pset_table(pconf, data) {
             td: function (s) {
                 return '<td class="gt-name2">' + render_display_name(s, true) + '</td>';
             },
-            tw: 14
+            tw: 14,
+            sort_forward: true
         },
         extension: {
             th: '<th class="gt-extension l plsortable" data-pa-sort="extension" scope="col">X?</th>',
@@ -1202,6 +1207,7 @@ function pa_render_pset_table(pconf, data) {
                 return '<td class="gt-extension">' + (s.x ? "X" : "") + '</td>';
             },
             tw: 2,
+            sort_forward: true,
             compare: function (a, b) {
                 if (a.x != b.x)
                     return a.x ? -1 : 1;
@@ -1218,12 +1224,27 @@ function pa_render_pset_table(pconf, data) {
                 return '<td class="gt-grader">' + t + '</td>';
             },
             tw: 6,
+            sort_forward: true,
             compare: function (a, b) {
                 return grader_compare(a, b) || user_compare(a, b);
             }
         },
+        latehours: {
+            th: '<th class="gt-latehours r plsortable" data-pa-sort="latehours" scope="col" title="Late">⏰</th>',
+            td: function (s) {
+                return '<td class="gt-latehours r">'.concat(s.late_hours || "", '</td>');
+            },
+            tw: 2.5,
+            compare: function (a, b) {
+                if (a.late_hours != b.late_hours) {
+                    return (a.late_hours || 0) - (b.late_hours || 0);
+                } else {
+                    return user_compare(a, b);
+                }
+            }
+        },
         notes: {
-            th: '<th class="gt-notes l plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
+            th: '<th class="gt-notes c plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
             td: function (s) {
                 var t = '';
                 if (s.grades_visible) {
@@ -1238,22 +1259,9 @@ function pa_render_pset_table(pconf, data) {
                 if (!flagged && s.has_nongrader_notes) {
                     t += '<sup>*</sup>';
                 }
-                return '<td class="gt-notes">' + t + '</td>';
+                return '<td class="gt-notes c">'.concat(t, '</td>');
             },
             tw: 2
-        },
-        late_hours: {
-            th: '<th class="gt-late-hours r plsortable">⏰</th>',
-            td: function (s) {
-                return '<td class="gt-late-hours r">'.concat(s.late_hours || "", '</td>');
-            },
-            tw: 3,
-            compare: function (a, b) {
-                if ((a.late_hours || 0) != (b.late_hours || 0))
-                    return (a.late_hours || 0) < (b.late_hours || 0) ? -1 : 1;
-                else
-                    return user_compare(a, b);
-            }
         },
         conversation: {
             th: '<th class="gt-conversation l" scope="col">Flag</th>',
@@ -1320,6 +1328,7 @@ function pa_render_pset_table(pconf, data) {
                 return '<td class="gt-ngrades r">' + (s.ngrades_nonempty || "") + '</td>';
             },
             tw: 2,
+            sort_forward: true,
             compare: function (a, b) {
                 if (a.ngrades_nonempty !== b.ngrades_nonempty)
                     return a.ngrades_nonempty < b.ngrades_nonempty ? -1 : 1;
@@ -1375,16 +1384,23 @@ function pa_render_pset_table(pconf, data) {
     function initialize() {
         var x = wstorage.site(true, "pa-pset" + pconf.id + "-table");
         x && (sort = JSON.parse(x));
-        if (!sort.f || !/^\w+$/.test(sort.f))
+        if (!sort.f || !/^\w+$/.test(sort.f)) {
             sort.f = "username";
-        if (sort.rev !== 1 && sort.rev !== -1)
+        }
+        if (sort.rev !== 1 && sort.rev !== -1) {
             sort.rev = 1;
-        if (!anonymous || !pconf.can_override_anonymous || !sort.override_anonymous)
+        }
+        if (!anonymous
+            || !pconf.can_override_anonymous
+            || !sort.override_anonymous) {
             delete sort.override_anonymous;
-        if (anonymous && sort.override_anonymous)
+        }
+        if (anonymous && sort.override_anonymous) {
             anonymous = false;
-        if (sort.nameflag == null)
+        }
+        if (sort.nameflag == null) {
             set_sort_nameflag();
+        }
 
         grade_entries = [];
         grade_keys = [];
@@ -1399,7 +1415,7 @@ function pa_render_pset_table(pconf, data) {
             }
         }
 
-        var ngrades_expected = -1;
+        let ngrades_expected = -1, has_late_hours = false;
         for (let i = 0; i < data.length; ++i) {
             const s = data[i];
             if (s.dropped) {
@@ -1422,6 +1438,7 @@ function pa_render_pset_table(pconf, data) {
             } else if (ngrades_expected !== ngrades && (!s.boringness || ngrades > 0)) {
                 ngrades_expected = -2;
             }
+            has_late_hours = has_late_hours || !!s.late_hours;
         }
         need_ngrades = ngrades_expected === -2;
 
@@ -1440,6 +1457,9 @@ function pa_render_pset_table(pconf, data) {
                 col.push("gdialog");
             }
             col.push("username", "name", "extension", "grader");
+            if (has_late_hours) {
+                col.push("latehours");
+            }
             if (flagged) {
                 col.push("conversation");
             }
@@ -1455,11 +1475,13 @@ function pa_render_pset_table(pconf, data) {
                 ge.colpos = col.length;
                 col.push({
                     type: "grade",
+                    name: "grade" + i,
                     gidx: i,
                     gkey: grade_keys[i],
                     gabbr: ge.abbr(),
                     ge: ge,
-                    justify: ge.gc.justify || "right"
+                    justify: ge.gc.justify || "right",
+                    sort_forward: ge.gc.sort === "forward"
                 });
             }
             if (need_ngrades) {
@@ -1470,22 +1492,21 @@ function pa_render_pset_table(pconf, data) {
                 col.push("repo");
             }
         }
+
+        colmap = {};
         for (let i = 0; i !== col.length; ++i) {
             if (typeof col[i] === "string") {
-                col[i] = {type: col[i]};
+                col[i] = {type: col[i], name: col[i]};
             }
             col[i].index = i;
             Object.assign(col[i], col_renderers[col[i].type]);
             if (typeof col[i].th === "string") {
                 col[i].th = string_function(col[i].th);
             }
-            if (col[i].type === "username" && !username_col) {
-                username_col = col[i];
-            }
-            if (col[i].type === "name" && !name_col) {
-                name_col = col[i];
-            }
+            colmap[col[i].name] = colmap[col[i].name] || col[i];
         }
+        name_col = colmap.name;
+
         if ($j[0].closest("form")) {
             slist_input = $('<input name="slist" type="hidden" value="">')[0];
             $j.after(slist_input);
@@ -1787,9 +1808,9 @@ function pa_render_pset_table(pconf, data) {
         }
     }
     function sort_data() {
-        var f = sort.f, m;
+        let f = sort.f, m;
         set_user_sorters();
-        let colr = col.indexOf(f) >= 0 ? col_renderers[f] : null;
+        let colr = colmap[f];
         if (colr && colr.compare) {
             data.sort(colr.compare);
         } else if (colr && colr.make_compare) {
@@ -1871,23 +1892,16 @@ function pa_render_pset_table(pconf, data) {
     function head_click() {
         if (!this.hasAttribute("data-pa-sort"))
             return;
-        var sf = this.getAttribute("data-pa-sort"), m;
+        const sf = this.getAttribute("data-pa-sort");
         if (sf !== sort.f) {
             sort.f = sf;
-            if (sf === "username" || sf === "name" || sf === "name2"
-                || sf === "grader" || sf === "extension" || sf === "pset"
-                || sf === "at"
-                || ((m = sf.match(/^grade(\d+)$/))
-                    && grade_entries[m[1]].type
-                    && grade_entries[m[1]].gc.sort === "forward")) {
-                sort.rev = 1;
-            } else {
-                sort.rev = -1;
-            }
+            const col = colmap[sf];
+            sort.rev = col.sort_forward ? 1 : -1;
         } else if (sf === "name" || (sf === "name2" && !anonymous)) {
             sort.rev = -sort.rev;
-            if (sort.rev === 1)
+            if (sort.rev === 1) {
                 sort.last = !sort.last;
+            }
         } else if (sf === "username") {
             if (sort.rev === -1 && !anonymous) {
                 sort.email = !sort.email;

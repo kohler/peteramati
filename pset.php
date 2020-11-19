@@ -94,10 +94,10 @@ if ($Qreq->download
         exit;
     }
     if ($dl->timed) {
-        $dls = $Info->user_info("downloaded_at") ? : [];
+        $dls = $Info->user_notes("downloaded_at") ? : [];
         $old_dls = $dls ? get($dls, $dl->key, []) : [];
         $old_dls[] = ($Info->viewer === $Info->user ? [Conf::$now] : [Conf::$now, $Info->viewer->contactId]);
-        $Info->update_user_info(["downloaded_at" => [$dl->key => $old_dls]]);
+        $Info->update_user_notes(["downloaded_at" => [$dl->key => $old_dls]]);
     }
     session_write_close();
     header("Content-Type: " . Mimetype::type_with_charset(Mimetype::content_type($content)));
@@ -139,7 +139,7 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
             $updates["timestamp"] = null;
     }
     if (!empty($updates)) {
-        $info->update_grade_info($updates);
+        $info->update_grade_notes($updates);
     }
     return $grades;
 }
@@ -199,12 +199,12 @@ if (isset($Qreq->tab)
     && $Qreq->tab <= 16) {
     $tab = (int) $Qreq->tab;
     $tab = $tab == 4 ? null : $tab;
-    $Info->update_commit_info(["tabwidth" => $tab]);
+    $Info->update_commit_notes(["tabwidth" => $tab]);
 } else if (isset($Qreq->tab)
            && ($Qreq->tab === "" || $Qreq->tab === "none"))
-    $Info->update_commit_info(["tabwidth" => null]);
+    $Info->update_commit_notes(["tabwidth" => null]);
 if (isset($Qreq->wdiff))
-    $Info->update_commit_info(["wdiff" => ((int) $Qreq->wdiff != 0)]);
+    $Info->update_commit_notes(["wdiff" => ((int) $Qreq->wdiff != 0)]);
 
 // save run settings
 if ($Me->isPC && $Me != $User && isset($Qreq->saverunsettings)
@@ -212,7 +212,7 @@ if ($Me->isPC && $Me != $User && isset($Qreq->saverunsettings)
     $x = $Qreq->get_a("runsettings");
     if (empty($x))
         $x = null;
-    $Info->update_commit_info(["runsettings" => $x], true);
+    $Info->update_commit_notes(["runsettings" => $x], true);
     if (isset($Qreq->ajax))
         json_exit(["ok" => true, "runsettings" => $x]);
 }
@@ -304,7 +304,7 @@ function echo_commit($info) {
     global $Qreq, $TABWIDTH, $WDIFF;
     $conf = $info->conf;
     $pset = $info->pset;
-    $Notes = $info->commit_info();
+    $Notes = $info->commit_notes();
     $TABWIDTH = $info->tabwidth();
     $WDIFF = isset($Notes->wdiff) ? $Notes->wdiff : false;
 
@@ -428,7 +428,7 @@ function echo_commit($info) {
     if (($info->is_latest_commit() || $info->viewer->isPC)
         && $pset->handout_repo_url) {
         $last_handout = $pset->latest_handout_commit();
-        $last_myhandout = $last_handout ? $info->derived_handout_hash() : false;
+        $last_myhandout = $last_handout ? $info->derived_handout_hash() : null;
         if ($last_handout
             && $last_myhandout
             && $last_handout->hash == $last_myhandout) {
@@ -658,7 +658,7 @@ if ($Pset->gitless) {
         && !$Info->is_handout_commit()) {
         $runnerbuttons[] = '<div class="g"></div>';
         $all_resolved = true;
-        foreach ($Info->current_info("flags") ? : [] as $k => $v) {
+        foreach ($Info->current_notes("flags") ? : [] as $k => $v) {
             $resolved = get($v, "resolved");
             $all_resolved = $all_resolved && $resolved;
             $conversation = "";
@@ -692,7 +692,7 @@ if ($Pset->gitless) {
             echo Ht::form($Info->hoturl_post("pset", array("saverunsettings" => 1, "ajax" => 1))),
                 '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
             // XXX always using grading commit's settings?
-            if (($runsettings = $Info->commit_info("runsettings"))) {
+            if (($runsettings = $Info->commit_notes("runsettings"))) {
                 echo '<script>$pa.load_runsettings(', json_encode_browser($runsettings), ')</script>';
             }
         }
@@ -724,7 +724,7 @@ if ($Pset->gitless) {
     if ($Info->is_handout_commit()) { // XXX this is a hack
         $crunners = [];
     } else {
-        $crunners = $Info->commit_info("run");
+        $crunners = $Info->commit_notes("run");
     }
     $runcategories = [];
     $any_runners = false;

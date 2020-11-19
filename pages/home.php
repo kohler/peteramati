@@ -1307,7 +1307,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         if ($pset->has_formula) {
             $info->ensure_formula();
         }
-        $gi = $info->current_info();
+        $gi = $info->current_notes();
 
         if (!$pset->gitless_grades) {
             $gradercid = $info->gradercid();
@@ -1332,7 +1332,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         if ($info->user_can_view_grades()) {
             $j["grades_visible"] = true;
         }
-        if (false &&  ($lh = $info->late_hours())) {
+        if (($lh = $info->fast_late_hours())) {
             $j["late_hours"] = $lh;
         }
     }

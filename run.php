@@ -40,7 +40,7 @@ $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // XXX this should be under `api`
 if ($Qreq->flag && $Qreq->post_ok() && user_pset_info()) {
-    $flags = (array) $Info->current_info("flags");
+    $flags = (array) $Info->current_notes("flags");
     if ($Qreq->flagid && !isset($flags["t" . $Qreq->flagid])) {
         json_exit(["ok" => false, "error" => "No such flag"]);
     }
@@ -61,13 +61,13 @@ if ($Qreq->flag && $Qreq->post_ok() && user_pset_info()) {
         $flag["conversation"][] = [Conf::$now, $Me->contactId, $Qreq->flagreason];
     }
     $updates = ["flags" => [$Qreq->flagid => $flag]];
-    $Info->update_current_info($updates);
+    $Info->update_current_notes($updates);
     json_exit(["ok" => true]);
 }
 
 // XXX this should be under `api`
 if ($Qreq->resolveflag && $Qreq->post_ok() && user_pset_info()) {
-    $flags = (array) $Info->current_info("flags");
+    $flags = (array) $Info->current_notes("flags");
     if (!$Qreq->flagid || !isset($flags[$Qreq->flagid])) {
         json_exit(["ok" => false, "error" => "No such flag"]);
     }
@@ -75,7 +75,7 @@ if ($Qreq->resolveflag && $Qreq->post_ok() && user_pset_info()) {
         json_exit(["ok" => true]);
     }
     $updates = ["flags" => [$Qreq->flagid => ["resolved" => [Conf::$now, $Me->contactId]]]];
-    $Info->update_current_info($updates);
+    $Info->update_current_notes($updates);
     json_exit(["ok" => true]);
 }
 
@@ -208,7 +208,7 @@ try {
     $Rstate->start($Queue);
 
     // save information about execution
-    $Info->update_commit_info(["run" => [$Runner->category => $Rstate->checkt]]);
+    $Info->update_commit_notes(["run" => [$Runner->category => $Rstate->checkt]]);
 
     json_exit(["ok" => true,
                "done" => false,

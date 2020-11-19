@@ -2303,8 +2303,8 @@ td.mhcb {
 	white-space: nowrap;
 }
 .gt-rownumber, .gt-username, .gt-name, .gt-grader,
-.gt-notes, .gt-grade, .gt-ngrades, .gt-total,
-.gt-conversation, .gt-repo, .gt-pset, .gt-at {
+.gt-grade, .gt-ngrades, .gt-total,
+.gt-conversation, .gt-repo, .gt-pset, .gt-at, .gt-latehours {
 	padding-right: 0.75rem;
 }
 .gt-grade, .gt-total, .gt-ngrades {

@@ -209,7 +209,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 132) {
+        if ($this->sversion < 135) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -2513,7 +2513,7 @@ class Conf {
         if (is_string($uf)) {
             $uf = $this->api($uf);
         }
-        if ($uf && get($uf, "redirect") && $qreq->redirect
+        if ($uf && ($uf->redirect ?? false) && $qreq->redirect
             && preg_match('@\A(?![a-z]+:|/).+@', $qreq->redirect)) {
             try {
                 JsonResultException::$capturing = true;
@@ -2524,11 +2524,11 @@ class Conf {
             if (is_object($j) && $j instanceof JsonResult) {
                 $j = $j->content;
             }
-            if (!get($j, "ok") && !get($j, "error")) {
+            if (!($j->ok ?? false) && !($j->error ?? false)) {
                 Conf::msg_error("Internal error.");
-            } else if (($x = get($j, "error"))) {
+            } else if (($x = $j->error ?? false)) {
                 Conf::msg_error(htmlspecialchars($x));
-            } else if (($x = get($j, "error_html"))) {
+            } else if (($x = $j->error_html ?? false)) {
                 Conf::msg_error($x);
             }
             Navigation::redirect_site($qreq->redirect);

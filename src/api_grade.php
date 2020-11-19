@@ -48,7 +48,7 @@ class API_Grade {
             if (array_key_exists($k, $g)) {
                 $gv = $g[$k];
                 if ($gv === null
-                    && ($notes = $info->current_info())
+                    && ($notes = $info->current_notes())
                     && isset($notes->autogrades->$k)) {
                     $gv = false;
                 }
@@ -115,7 +115,7 @@ class API_Grade {
                 $j["error"] = "Grade edit conflict, your update was ignored.";
                 return $j;
             } else if (!empty($v)) {
-                $info->update_grade_info($v);
+                $info->update_grade_notes($v);
             }
         } else if (!$info->can_view_grades()) {
             return ["ok" => false, "error" => "Permission error."];
@@ -225,7 +225,7 @@ class API_Grade {
             } else {
                 foreach ($ugs as $uid => $gx) {
                     if (!empty($v[$uid]))
-                        $infos[$uid]->update_grade_info($v[$uid]);
+                        $infos[$uid]->update_grade_notes($v[$uid]);
                 }
             }
         }
@@ -288,7 +288,7 @@ class API_Grade {
             if (($ans = self::apply_linenote($info, $user, $qreq, $lnotes))) {
                 return $ans;
             }
-            $info->update_current_info(["linenotes" => $lnotes]);
+            $info->update_current_notes(["linenotes" => $lnotes]);
         }
 
         if (!$user->can_view_comments($api->pset, $info)) {
@@ -297,7 +297,7 @@ class API_Grade {
         $can_view_grades = $info->can_view_grades();
         $can_view_note_authors = $info->can_view_note_authors();
         $notes = [];
-        foreach ((array) $info->current_info("linenotes") as $file => $linemap) {
+        foreach ((array) $info->current_notes("linenotes") as $file => $linemap) {
             if (($qreq->file && $file !== $qreq->file)
                 || ($lnotes && !isset($lnotes[$file]))) {
                 continue;
