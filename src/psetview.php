@@ -639,9 +639,16 @@ class PsetView {
         $h = $c ? hex2bin($c->hash) : null;
         if ($this->_repo_grade_placeholder_at === 0
             || $this->_repo_grade_placeholder_bhash !== $h) {
-            $this->conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, gradebhash=?, placeholder=1, placeholder_at=? on duplicate key update gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)), placeholder_at=values(placeholder_at)",
-                    $this->repo->repoid, $this->branchid, $this->pset->id,
-                    $c ? hex2bin($c->hash) : null, Conf::$now);
+            $this->conf->qe("insert into RepositoryGrade set
+                repoid=?, branchid=?, pset=?,
+                gradebhash=?, commitat=?, placeholder=1, placeholder_at=?
+                on duplicate key update
+                gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)),
+                commitat=(if(placeholder=1,values(commitat),commitat)),
+                placeholder_at=values(placeholder_at)",
+                $this->repo->repoid, $this->branchid, $this->pset->id,
+                $c ? hex2bin($c->hash) : null, $c ? $c->commitat : null,
+                Conf::$now);
             $this->clear_grade();
             $this->ensure_grade();
         }
