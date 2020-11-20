@@ -976,7 +976,7 @@ function show_pset($pset, $user) {
     if ($pset->gitless_grades
         && $Me === $user
         && !$pset->partner
-        && !$pset->contact_grade_for($user)
+        && !$pset->upi_for($user)
         && !$pset->student_can_edit_grades()) {
         return;
     }
