@@ -123,7 +123,9 @@ function update_schema_branched_repo_grade($conf) {
     $qstager = Dbl::make_multi_ql_stager($conf->dblink);
     $repos = [];
     while ($result && ($row = $result->fetch_row())) {
-        list($pset, $repoid, $branchid) = $row;
+        $pset = (int) $row[0];
+        $repoid = (int) $row[1];
+        $branchid = (int) $row[2];
         $branch = $branchid ? $branches[$branchid] : "master";
         if (!isset($repos["$pset,$repoid"])) {
             $qstager("update RepositoryGrade set branchid=? where repoid=? and pset=?", [$branchid, $repoid, $pset]);
@@ -556,6 +558,10 @@ function updateSchema($conf) {
     if ($conf->sversion === 132
         && $conf->ql_ok("alter table RepositoryGrade add `commitat` bigint(11) DEFAULT NULL")) {
         $conf->update_schema_version(135);
+    }
+    if ($conf->sversion === 135
+        && $conf->ql_ok("alter table Repository add `infosnapat` bigint(11) NOT NULL DEFAULT '0'")) {
+        $conf->update_schema_version(136);
     }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");

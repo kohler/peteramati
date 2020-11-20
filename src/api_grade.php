@@ -48,7 +48,7 @@ class API_Grade {
             if (array_key_exists($k, $g)) {
                 $gv = $g[$k];
                 if ($gv === null
-                    && ($notes = $info->current_notes())
+                    && ($notes = $info->current_jnotes())
                     && isset($notes->autogrades->$k)) {
                     $gv = false;
                 }
@@ -233,7 +233,7 @@ class API_Grade {
         $j["ok"] = true;
         $j["us"] = [];
         foreach ($infos as $uid => $info) {
-            $j["us"][$uid] = $infos[$uid]->grade_json(true);
+            $j["us"][$uid] = $infos[$uid]->grade_json(PsetView::GRADEJSON_NO_ENTRIES);
         }
         return $j;
     }
@@ -297,7 +297,7 @@ class API_Grade {
         $can_view_grades = $info->can_view_grades();
         $can_view_note_authors = $info->can_view_note_authors();
         $notes = [];
-        foreach ((array) $info->current_notes("linenotes") as $file => $linemap) {
+        foreach ((array) $info->current_jnote("linenotes") as $file => $linemap) {
             if (($qreq->file && $file !== $qreq->file)
                 || ($lnotes && !isset($lnotes[$file]))) {
                 continue;

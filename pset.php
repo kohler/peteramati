@@ -94,7 +94,7 @@ if ($Qreq->download
         exit;
     }
     if ($dl->timed) {
-        $dls = $Info->user_notes("downloaded_at") ? : [];
+        $dls = $Info->user_jnote("downloaded_at") ? : [];
         $old_dls = $dls ? get($dls, $dl->key, []) : [];
         $old_dls[] = ($Info->viewer === $Info->user ? [Conf::$now] : [Conf::$now, $Info->viewer->contactId]);
         $Info->update_user_notes(["downloaded_at" => [$dl->key => $old_dls]]);
@@ -210,11 +210,13 @@ if (isset($Qreq->wdiff))
 if ($Me->isPC && $Me != $User && isset($Qreq->saverunsettings)
     && check_post()) {
     $x = $Qreq->get_a("runsettings");
-    if (empty($x))
+    if (empty($x)) {
         $x = null;
-    $Info->update_commit_notes(["runsettings" => $x], true);
-    if (isset($Qreq->ajax))
+    }
+    $Info->update_commit_notes(["runsettings" => $x]);
+    if (isset($Qreq->ajax)) {
         json_exit(["ok" => true, "runsettings" => $x]);
+    }
 }
 
 // check for new commit
@@ -304,7 +306,7 @@ function echo_commit($info) {
     global $Qreq, $TABWIDTH, $WDIFF;
     $conf = $info->conf;
     $pset = $info->pset;
-    $Notes = $info->commit_notes();
+    $Notes = $info->commit_jnotes();
     $TABWIDTH = $info->tabwidth();
     $WDIFF = isset($Notes->wdiff) ? $Notes->wdiff : false;
 
@@ -658,7 +660,7 @@ if ($Pset->gitless) {
         && !$Info->is_handout_commit()) {
         $runnerbuttons[] = '<div class="g"></div>';
         $all_resolved = true;
-        foreach ($Info->current_notes("flags") ? : [] as $k => $v) {
+        foreach ($Info->current_jnote("flags") ?? [] as $k => $v) {
             $resolved = get($v, "resolved");
             $all_resolved = $all_resolved && $resolved;
             $conversation = "";
@@ -692,7 +694,7 @@ if ($Pset->gitless) {
             echo Ht::form($Info->hoturl_post("pset", array("saverunsettings" => 1, "ajax" => 1))),
                 '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
             // XXX always using grading commit's settings?
-            if (($runsettings = $Info->commit_notes("runsettings"))) {
+            if (($runsettings = $Info->commit_jnote("runsettings"))) {
                 echo '<script>$pa.load_runsettings(', json_encode_browser($runsettings), ')</script>';
             }
         }
@@ -724,7 +726,7 @@ if ($Pset->gitless) {
     if ($Info->is_handout_commit()) { // XXX this is a hack
         $crunners = [];
     } else {
-        $crunners = $Info->commit_notes("run");
+        $crunners = $Info->commit_jnote("run");
     }
     $runcategories = [];
     $any_runners = false;

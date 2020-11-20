@@ -618,26 +618,41 @@ class Pset {
         return (object) ["nentries" => $count, "maxgrades" => (object) $max];
     }
 
-    /** @param Contact $student */
-    function contact_grade_for($student) {
-        $cid = $student->contactId;
-        $result = $this->conf->qe("select * from ContactGrade where cid=? and pset=?", $cid, $this->psetid);
-        $cg = $result->fetch_object();
-        if ($cg && $cg->notes) {
-            $cg->notes = json_decode($cg->notes);
-        }
+    /** @param Contact $student
+     * @return ?UserPsetInfo */
+    function upi_for($student) {
+        $result = $this->conf->qe("select * from ContactGrade
+            where cid=? and pset=?",
+            $student->contactId, $this->psetid);
+        $upi = UserPsetInfo::fetch($result);
         Dbl::free($result);
-        return $cg;
+        return $upi;
     }
-    function commit_notes($bhash) {
-        assert(!$this->gitless);
-        $result = $this->conf->qe("select * from CommitNotes where pset=? and bhash=?", $this->psetid, strlen($bhash) === 40 ? hex2bin($bhash) : $bhash);
-        $cn = $result->fetch_object();
-        if ($cn && $cn->notes) {
-            $cn->notes = json_decode($cn->notes);
-        }
+
+    /** @param Repository $repo
+     * @param int $branchid
+     * @return ?RepositoryPsetInfo */
+    function rpi_for($repo, $branchid) {
+        $result = $this->conf->qe("select rg.*, cn.notes, cn.notesversion
+            from RepositoryGrade rg
+            left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)
+            where rg.repoid=? and rg.branchid=? and rg.pset=?",
+            $repo->repoid, $branchid, $this->psetid);
+        $rpi = RepositoryPsetInfo::fetch($result);
         Dbl::free($result);
-        return $cn;
+        return $rpi;
+    }
+
+    /** @param non-empty-string $bhash
+     * @return ?CommitPsetInfo */
+    function cpi_at($bhash) {
+        assert(!$this->gitless);
+        $result = $this->conf->qe("select * from CommitNotes
+            where pset=? and bhash=?",
+            $this->psetid, strlen($bhash) === 40 ? hex2bin($bhash) : $bhash);
+        $cpi = CommitPsetInfo::fetch($result);
+        Dbl::free($result);
+        return $cpi;
     }
 
 

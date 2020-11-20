@@ -48,7 +48,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     }
     if ($info->can_edit_grades_staff()
         || ($info->can_view_grades() && $info->is_grading_commit())) {
-        echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(true)));
+        echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(PsetView::GRADEJSON_NO_ENTRIES)));
     }
     echo '">';
 

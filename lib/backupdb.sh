@@ -1,6 +1,6 @@
 #! /bin/sh
 ## backupdb.sh -- HotCRP database backup to stdout
-## Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
+## Copyright (c) 2006-2020 Eddie Kohler; see LICENSE.
 
 export LC_ALL=C LC_CTYPE=C LC_COLLATE=C CONFNAME=
 if ! expr "$0" : '.*[/]' >/dev/null; then LIBDIR=./
@@ -99,7 +99,7 @@ fi
 
 database_dump () {
     if $pc; then
-        eval "$MYSQLDUMP $FLAGS $mydumpargs $dbname --where='(roles & 7) != 0' ContactInfo"
+        eval "$MYSQLDUMP $mydumpargs $FLAGS $dbname --where='(roles & 7) != 0' ContactInfo"
         pcs=`echo 'select group_concat(contactId) from ContactInfo where (roles & 7) != 0' | eval "$MYSQL $myargs $FLAGS -N $dbname"`
         eval "$MYSQLDUMP $mydumpargs $FLAGS --where='contactId in ($pcs)' $dbname TopicInterest"
         eval "$MYSQLDUMP $mydumpargs $FLAGS $dbname Settings TopicArea"

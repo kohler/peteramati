@@ -3,49 +3,36 @@
 // Peteramati is Copyright (c) 2013-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-class CommitRecord {
-    /** @var int */
-    public $commitat;
-    /** @var non-empty-string */
-    public $hash;
-    /** @var string */
-    public $subject;
-    /** @var ?string */
-    public $fromhead;
-    /** @var ?bool */
-    public $_is_handout;
-    /** @var ?Pset */
-    public $_is_handout_pset;
-    const HANDOUTHEAD = "*handout*";
-    /** @param int $commitat
-     * @param non-empty-string $hash
-     * @param string $subject
-     * @param ?string $fromhead */
-    function __construct($commitat, $hash, $subject, $fromhead = null) {
-        $this->commitat = $commitat;
-        $this->hash = $hash;
-        $this->subject = $subject;
-        $this->fromhead = $fromhead;
-    }
-}
-
 class Repository {
-    /** var Conf */
+    /** @var Conf */
     public $conf;
 
+    /** @var int */
     public $repoid;
+    /** @var string */
     public $url;
     public $reposite;
+    /** @var int */
     public $cacheid;
+    /** @var int */
     public $open;
+    /** @var int */
     public $opencheckat;
+    /** @var ?non-empty-string */
     public $snaphash;
+    /** @var ?int */
     public $snapat;
+    /** @var int */
     public $snapcheckat;
     public $working;
+    /** @var int */
     public $snapcommitat;
+    /** @var ?string */
     public $snapcommitline;
+    /** @var int */
     public $analyzedsnapat;
+    /** @var int */
+    public $infosnapat;
     public $notes;
     public $heads;
 
@@ -81,6 +68,7 @@ class Repository {
         $this->working = (int) $this->working;
         $this->snapcommitat = (int) $this->snapcommitat;
         $this->analyzedsnapat = (int) $this->analyzedsnapat;
+        $this->infosnapat = (int) $this->infosnapat;
         if ($this->notes !== null) {
             $this->notes = json_decode($this->notes, true);
         }
@@ -324,6 +312,7 @@ class Repository {
         preg_match_all('/^(\S+)\s+(\S+)\s+(.*)$/m', $result, $ms, PREG_SET_ORDER);
         foreach ($ms as $m) {
             if (!isset($this->_commits[$m[2]])) {
+                /** @phan-suppress-next-line PhanTypeMismatchArgument */
                 $this->_commits[$m[2]] = new CommitRecord((int) $m[1], $m[2], $m[3], $head);
             }
             if (!isset($list[$m[2]])) {
@@ -385,8 +374,9 @@ class Repository {
 
         $hash = strtolower($hash);
         if (strlen($hash) === 40) {
-            if (array_key_exists($hash, $this->_commits))
+            if (array_key_exists($hash, $this->_commits)) {
                 return $this->_commits[$hash];
+            }
         } else {
             $matches = [];
             foreach ($this->_commits as $h => $cx) {
@@ -450,11 +440,13 @@ class Repository {
 
 
     function analyze_snapshots() {
-        if ($this->snapat <= $this->analyzedsnapat)
+        if ($this->snapat <= $this->analyzedsnapat) {
             return;
+        }
         $timematch = " ";
-        if ($this->analyzedsnapat)
+        if ($this->analyzedsnapat) {
             $timematch = gmstrftime("%Y%m%d.%H%M%S", $this->analyzedsnapat);
+        }
         $qv = [];
         $analyzed_snaptime = 0;
         foreach (glob(SiteLoader::$root . "/repo/repo$this->cacheid/.git/refs/tags/repo{$this->repoid}.snap*") as $snapfile) {
@@ -467,26 +459,31 @@ class Repository {
             $analyzed_snaptime = max($snaptime, $analyzed_snaptime);
             $head = file_get_contents($snapfile);
             $result = $this->gitrun("git log -n20000 --simplify-merges --format=%H " . escapeshellarg($head));
-            foreach (explode("\n", $result) as $line)
+            foreach (explode("\n", $result) as $line) {
                 if (strlen($line) == 40
                     && (!isset($qv[$line]) || $qv[$line][2] > $snaptime))
                     $qv[$line] = [$this->repoid, hex2bin($line), $snaptime];
+            }
         }
-        if (!empty($qv))
+        if (!empty($qv)) {
             $this->conf->qe("insert into RepositoryCommitSnapshot (repoid, bhash, snapshot) values ?v on duplicate key update snapshot=least(snapshot,values(snapshot))", $qv);
-        if ($analyzed_snaptime)
+        }
+        if ($analyzed_snaptime) {
             $this->conf->qe("update Repository set analyzedsnapat=greatest(analyzedsnapat,?) where repoid=?", $analyzed_snaptime, $this->repoid);
+        }
     }
 
     function find_snapshot($hash) {
-        if (array_key_exists($hash, $this->_commits))
+        if (array_key_exists($hash, $this->_commits)) {
             return $this->_commits[$hash];
+        }
         $this->analyze_snapshots();
         $bhash = hex2bin(substr($hash, 0, strlen($hash) & ~1));
-        if (strlen($bhash) == 20)
+        if (strlen($bhash) == 20) {
             $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and bhash=?", $this->repoid, $bhash);
-        else
+        } else {
             $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and left(bhash,?)=?", $this->repoid, strlen($bhash), $bhash);
+        }
         $match = null;
         while ($result && ($row = $result->fetch_object())) {
             $h = bin2hex($row->bhash);
@@ -507,6 +504,26 @@ class Repository {
             $this->_commits[$hash] = null;
         }
         return $this->_commits[$hash];
+    }
+
+    function update_info() {
+        if ($this->infosnapat < $this->snapat) {
+            $qstager = Dbl::make_multi_qe_stager($this->conf->dblink);
+            $result = $this->conf->qe("select * from RepositoryGrade where repoid=? and gradebhash is not null and (commitat is null or commitat=0)", $this->repoid);
+            while (($rpi = RepositoryPsetInfo::fetch($result))) {
+                $c = $this->connected_commit(bin2hex($rpi->gradebhash));
+                $at = $c ? $c->commitat : 0;
+                $qstager("update RepositoryGrade set commitat=? where repoid=? and branchid=? and pset=?",
+                         [$at, $rpi->repoid, $rpi->branchid, $rpi->pset]);
+            }
+            Dbl::free($result);
+            $qstager("update Repository set infosnapat=greatest(infosnapat,?) where repoid=?",
+                     [$this->snapat, $this->repoid]);
+            $qstager(true);
+            return true;
+        } else {
+            return false;
+        }
     }
 
 
@@ -550,16 +567,20 @@ class Repository {
 
     function truncated_hash(Pset $pset, $refname) {
         $hash = $refname;
-        if (!git_refname_is_full_hash($hash))
+        if (!git_refname_is_full_hash($hash)) {
             $hash = $this->rev_parse($hash);
-        if ($hash === false)
+        }
+        if ($hash === false) {
             return false;
-        if (array_key_exists($hash, $this->_truncated_hashes))
-            return $this->_truncated_hashes[$hash];
-        $truncated_hash = $this->rev_parse("truncated_{$hash}");
-        if (!$truncated_hash)
-            $truncated_hash = $this->prepare_truncated_hash($pset, $hash);
-        return ($this->_truncated_hashes[$hash] = $truncated_hash);
+        }
+        if (!array_key_exists($hash, $this->_truncated_hashes)) {
+            $truncated_hash = $this->rev_parse("truncated_{$hash}");
+            if (!$truncated_hash) {
+                $truncated_hash = $this->prepare_truncated_hash($pset, $hash);
+            }
+            $this->_truncated_hashes[$hash] = $truncated_hash;
+        }
+        return $this->_truncated_hashes[$hash];
     }
 
 

@@ -76,9 +76,13 @@ class Contact {
     private $links;
     /** @var ?string */
     private $contactLinks;
+    /** @var array<int,?Repository> */
     private $repos = [];
+    /** @var array<int,?Contact> */
     private $partners = [];
     private $_gcache = [];
+    /** @var array<int,int> */
+    private $_gcache_flags = [];
 
     // Roles
     const ROLE_PC = 1;
@@ -676,9 +680,9 @@ class Contact {
      * @param int $psetid */
     private function adjust_links($type, $psetid) {
         if ($type == LINK_REPO) {
-            $this->repos = array();
+            $this->repos = [];
         } else if ($type == LINK_PARTNER) {
-            $this->partners = array();
+            $this->partners = [];
         }
         if ($type === LINK_REPO || $type === LINK_BRANCH) {
             $this->invalidate_grades($psetid);
@@ -785,8 +789,9 @@ class Contact {
                 $partner = $this->conf->user_by_id($pcid);
             }
             if ($pcid && $partner) {
-                if ($this->is_anonymous)
+                if ($this->is_anonymous) {
                     $partner->set_anonymous(true);
+                }
                 $this->partners[$pset] = $partner;
             }
         }
@@ -801,22 +806,25 @@ class Contact {
         $this->conf->qe("update ContactInfo set gradeUpdateTime=? where contactId=?",
                         Conf::$now, $this->contactId);
         $this->gradeUpdateTime = Conf::$now;
-        $this->_gcache = [];
+        $this->_gcache = $this->_gcache_flags = [];
     }
 
-    private function ensure_gcache(Pset $pset) {
-        if (!array_key_exists($pset->id, $this->_gcache)) {
+    private function ensure_gcache(Pset $pset, $flags) {
+        $f = $flags & PsetView::GRADEJSON_NO_LATE_HOURS ? 1 : 3;
+        if ((($this->_gcache_flags[$pset->id] ?? 0) & $f) !== $f) {
             if ($this->student_set) {
                 $info = $this->student_set->info_at($this->contactId, $pset);
             } else {
                 $info = PsetView::make($pset, $this, $this->conf->site_contact());
             }
-            $this->_gcache[$pset->id] = $info->grade_json(true, true);
+            $this->_gcache[$pset->id] = $info->grade_json($flags | PsetView::GRADEJSON_NO_ENTRIES | PsetView::GRADEJSON_OVERRIDE_VIEW);
+            $this->_gcache_flags[$pset->id] = $f;
         }
     }
 
     function gcache_entry(Pset $pset, GradeEntryConfig $ge) {
-        $this->ensure_gcache($pset);
+        $lh = $ge->key === "late_hours";
+        $this->ensure_gcache($pset, $lh ? 0 : PsetView::GRADEJSON_NO_LATE_HOURS);
         if (isset($this->_gcache[$pset->id])) {
             if ($ge->key === "late_hours") {
                 return $this->_gcache[$pset->id]["late_hours"] ?? null;
@@ -828,10 +836,13 @@ class Contact {
         }
     }
 
+    /** @param bool $noextra
+     * @param bool $raw
+     * @return null|int|float */
     function gcache_total(Pset $pset, $noextra, $raw) {
-        $this->ensure_gcache($pset);
+        $this->ensure_gcache($pset, PsetView::GRADEJSON_NO_LATE_HOURS);
         if (isset($this->_gcache[$pset->id])) {
-            $v = get($this->_gcache[$pset->id], "total", null);
+            $v = $this->_gcache[$pset->id]["total"] ?? null;
             if ($v !== null && $noextra && isset($this->_gcache[$pset->id]["total_noextra"])) {
                 $v = $this->_gcache[$pset->id]["total_noextra"];
             }
@@ -874,22 +885,28 @@ class Contact {
     }
 
 
+    /** @param int $new_roles
+     * @param Contact $actor
+     * @return bool */
     function save_roles($new_roles, $actor) {
         $old_roles = $this->roles;
         // ensure there's at least one system administrator
         if (!($new_roles & self::ROLE_ADMIN) && ($old_roles & self::ROLE_ADMIN)
             && !(($result = $this->conf->qe("select contactId from ContactInfo where (roles&" . self::ROLE_ADMIN . ")!=0 and contactId!=" . $this->contactId . " limit 1"))
-                 && $result->num_rows > 0))
+                 && $result->num_rows > 0)) {
             $new_roles |= self::ROLE_ADMIN;
+        }
         // log role change
         $actor_email = ($actor ? " by $actor->email" : "");
-        foreach (array(self::ROLE_PC => "pc",
-                       self::ROLE_ADMIN => "sysadmin",
-                       self::ROLE_CHAIR => "chair") as $role => $type)
-            if (($new_roles & $role) && !($old_roles & $role))
+        foreach ([self::ROLE_PC => "pc",
+                  self::ROLE_ADMIN => "sysadmin",
+                  self::ROLE_CHAIR => "chair"] as $role => $type) {
+            if (($new_roles & $role) && !($old_roles & $role)) {
                 $this->conf->log("Added as $type$actor_email", $this);
-            else if (!($new_roles & $role) && ($old_roles & $role))
+            } else if (!($new_roles & $role) && ($old_roles & $role)) {
                 $this->conf->log("Removed as $type$actor_email", $this);
+            }
+        }
         // save the roles bits
         if ($old_roles != $new_roles) {
             $this->conf->qe("update ContactInfo set roles=$new_roles where contactId=$this->contactId");
@@ -909,11 +926,12 @@ class Contact {
 
     static function safe_registration($reg) {
         $safereg = (object) array();
-        foreach (array("email", "firstName", "lastName", "name", "preferredEmail",
-                       "affiliation", "collaborators", "seascode_username", "github_username",
-                       "unaccentedName") as $k)
+        foreach (["email", "firstName", "lastName", "name", "preferredEmail",
+                  "affiliation", "collaborators", "seascode_username", "github_username",
+                  "unaccentedName"] as $k) {
             if (isset($reg[$k]))
                 $safereg->$k = $reg[$k];
+        }
         return $safereg;
     }
 
@@ -925,8 +943,9 @@ class Contact {
         } else if (!$this->conf->external_login()) {
             $cu->qv["password"] = $this->password = self::random_password();
             $cu->qv["passwordTime"] = $this->passwordTime = Conf::$now;
-        } else
+        } else {
             $cu->qv["password"] = $this->password = "";
+        }
     }
 
     static function create(Conf $conf, $reg, $send = false) {

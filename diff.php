@@ -68,7 +68,7 @@ if ($commita->hash === $Info->grading_hash()) {
 if ($commitb->hash === $Info->grading_hash()) {
     $commitb->subject .= "  ✱"; // space, nbsp
 }
-$TABWIDTH = $Info->commit_notes("tabwidth") ? : 4;
+$TABWIDTH = $Info->commit_jnote("tabwidth") ? : 4;
 
 
 $Conf->header(htmlspecialchars($Pset->title), "home");

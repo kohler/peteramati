@@ -104,15 +104,18 @@ class ContactView {
         global $Conf;
         $pset = $Conf->pset_by_key($psetkey);
         if ((!$pset || $pset->disabled)
-            && ($psetkey !== null && $psetkey !== "" && $psetkey !== false))
+            && ($psetkey !== null && $psetkey !== "" && $psetkey !== false)) {
             $Conf->errorMsg("No such problem set “" . htmlspecialchars($psetkey) . "”.");
+        }
         if (!$pset || $pset->disabled) {
-            foreach ($Conf->psets() as $p)
+            foreach ($Conf->psets() as $p) {
                 if (!$p->disabled)
                     redirectSelf(array("pset" => $p->urlkey));
-            go("index");
+            }
+            Navigation::redirect("index");
         }
         if ($pset) {
+            /** @phan-suppress-next-line PhanAccessReadOnlyProperty */
             $pset->urlkey = $psetkey;
         }
         return $pset;
@@ -417,7 +420,7 @@ class ContactView {
 
             $timer_start = 0;
             if ($dl->timed) {
-                $all_dltimes = $info->user_notes("downloaded_at");
+                $all_dltimes = $info->user_jnote("downloaded_at");
                 if ($all_dltimes && isset($all_dltimes->{$dl->key})) {
                     foreach ($all_dltimes->{$dl->key} as $dltime) {
                         if (!isset($dltime[1]) || $dltime[1] == $info->viewer->contactId) {
@@ -467,11 +470,10 @@ class ContactView {
         }
 
         // extend it to full url
-        if ($pset->repo_guess_patterns) {
-            for ($i = 0; $i + 1 < count($pset->repo_guess_patterns); $i += 2) {
-                $x = preg_replace('`' . str_replace("`", "\\`", $pset->repo_guess_patterns[$i]) . '`s',
-                                  $pset->repo_guess_patterns[$i + 1],
-                                  $repo_url, -1, $nreplace);
+        if (($rgp = $pset->repo_guess_patterns) !== null) {
+            for ($i = 0; $i + 1 < count($rgp); $i += 2) {
+                $x = preg_replace('`' . str_replace("`", "\\`", $rgp[$i]) . '`s',
+                                  $rgp[$i + 1], $repo_url, -1, $nreplace);
                 if ($x !== null && $nreplace) {
                     $repo_url = $x;
                     break;
@@ -666,37 +668,43 @@ class ContactView {
     }
 
     static function pset_grade($notesj, $pset) {
-        if (!$pset->grades())
+        if (!$pset->grades()) {
             return null;
+        }
 
         $total = $nonextra = 0;
-        $r = array();
-        $g = get($notesj, "grades");
-        $ag = get($notesj, "autogrades");
+        $r = [];
+        $g = $notesj->grades ?? null;
+        $ag = $notesj->autogrades ?? null;
         $rag = array();
         foreach ($pset->grades() as $ge) {
             $key = $ge->key;
             $gv = null;
-            if ($ag && isset($ag->$key))
+            if ($ag && isset($ag->$key)) {
                 $gv = $rag[$key] = $ag->$key;
-            if ($g && isset($g->$key))
+            }
+            if ($g && isset($g->$key)) {
                 $gv = $g->$key;
+            }
             if ($gv !== null) {
                 $r[$key] = $gv;
                 if (!$ge->no_total) {
                     $total += $gv;
-                    if (!$ge->is_extra)
+                    if (!$ge->is_extra) {
                         $nonextra += $gv;
+                    }
                 }
             }
         }
         if (!empty($r)) {
             $r["total"] = $total;
             $r["total_noextra"] = $nonextra;
-            if (!empty($rag))
+            if (!empty($rag)) {
                 $r["autogrades"] = (object) $rag;
+            }
             return (object) $r;
-        } else
+        } else {
             return null;
+        }
     }
 }

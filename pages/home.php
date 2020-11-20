@@ -1154,7 +1154,7 @@ function show_regrades($result, $all) {
     // 3. load RepositoryGrades
     $rgs = [];
     $result = $Conf->qe("select * from RepositoryGrade where " . join(" or ", $rgwanted));
-    while (($row = $result->fetch_object())) {
+    while (($row = RepositoryPsetInfo::fetch($result))) {
         $rgs["{$row->repoid},{$row->pset},{$row->branchid}"] = $row;
     }
     Dbl::free($result);
@@ -1307,7 +1307,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         if ($pset->has_formula) {
             $info->ensure_formula();
         }
-        $gi = $info->current_notes();
+        $gi = $info->current_jnotes();
 
         if (!$pset->gitless_grades) {
             $gradercid = $info->gradercid();

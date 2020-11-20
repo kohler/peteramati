@@ -22,9 +22,12 @@ class StudentSet implements Iterator, Countable {
     private $_upos;
     /** @var array<int,Repository> */
     private $_repo = [];
-    private $_rg = [];
-    private $_cn = [];
-    private $_cg = [];
+    /** @var array<string,RepositoryPsetInfo> */
+    private $_rpi = [];
+    /** @var array<string,CommitPsetInfo> */
+    private $_cpi = [];
+    /** @var array<string,UserPsetInfo> */
+    private $_upi = [];
     /** @var array<string,list<int>> */
     private $_rb_uids = [];
     /** @var array<int,true> */
@@ -71,20 +74,20 @@ class StudentSet implements Iterator, Countable {
         $this->_pset_loaded[$pset->id] = true;
 
         $result = $this->conf->qe("select * from ContactGrade where pset=?", $pset->id);
-        while ($result && ($cg = $result->fetch_object())) {
-            $this->_cg["$pset->id,$cg->cid"] = $cg;
+        while (($upi = UserPsetInfo::fetch($result))) {
+            $this->_upi["$pset->id,$upi->cid"] = $upi;
         }
         Dbl::free($result);
         if (!$pset->gitless_grades) {
             $result = $this->conf->qe("select * from RepositoryGrade where pset=?", $pset->id);
-            while ($result && ($rg = $result->fetch_object())) {
-                $this->_rg["$pset->id,$rg->repoid,$rg->branchid"] = $rg;
+            while (($rpi = RepositoryPsetInfo::fetch($result))) {
+                $this->_rpi["$pset->id,$rpi->repoid,$rpi->branchid"] = $rpi;
             }
             Dbl::free($result);
 
             $result = $this->conf->qe("select * from CommitNotes where pset=?", $pset->id);
-            while ($result && ($cn = $result->fetch_object())) {
-                $this->_cn["$pset->id,$cn->bhash"] = $cn;
+            while (($cpi = CommitPsetInfo::fetch($result))) {
+                $this->_cpi["$pset->id,$cpi->bhash"] = $cpi;
             }
             Dbl::free($result);
         }
@@ -169,28 +172,31 @@ class StudentSet implements Iterator, Countable {
         return $repoid ? $this->_repo[$repoid] ?? null : null;
     }
 
-    function contact_grade_at(Contact $user, Pset $pset) {
+    /** @return ?UserPsetInfo */
+    function upi_for(Contact $user, Pset $pset) {
         if ($pset->gitless_grades) {
             $this->load_pset($pset);
-            return $this->_cg["$pset->id,$user->contactId"] ?? null;
+            return $this->_upi["$pset->id,$user->contactId"] ?? null;
         } else {
             return null;
         }
     }
 
-    function repo_grade_with_notes_at(Contact $user, Pset $pset) {
+    /** @return ?RepositoryPsetInfo */
+    function rpi_for(Contact $user, Pset $pset) {
         if (!$pset->gitless_grades) {
             $this->load_pset($pset);
             $repoid = $user->link(LINK_REPO, $pset->id);
             $branchid = $user->branchid($pset);
-            $rg = $this->_rg["$pset->id,$repoid,$branchid"] ?? null;
-            if ($rg && !property_exists($rg, "bhash")) {
-                $cn = $rg->gradebhash ? $this->_cn["$pset->id,$rg->gradebhash"] ?? null : null;
-                $rg->bhash = $cn ? $cn->bhash : null;
-                $rg->notes = $cn ? $cn->notes : null;
-                $rg->notesversion = $cn ? $cn->notesversion : null;
+            $rpi = $this->_rpi["$pset->id,$repoid,$branchid"] ?? null;
+            if ($rpi && !$rpi->joined_commitnotes) {
+                $rpi->joined_commitnotes = true;
+                if ($rpi->gradebhash
+                    && ($cpi = $this->_cpi["$pset->id,$rpi->gradebhash"] ?? null)) {
+                    $rpi->assign_notes($cpi->notes, $cpi->jnotes(), $cpi->notesversion);
+                }
             }
-            return $rg;
+            return $rpi;
         } else {
             return null;
         }
@@ -227,11 +233,13 @@ class StudentSet implements Iterator, Countable {
                && $this->pset) {
             $u = $this->_ua[$this->_upos];
             if ($this->pset->gitless_grades) {
-                if ($this->_cg["$this->_psetid,$u->contactId"] ?? null)
+                if ($this->_upi["$this->_psetid,$u->contactId"] ?? null) {
                     break;
+                }
             } else {
-                if ($u->link(LINK_REPO, $this->_psetid))
+                if ($u->link(LINK_REPO, $this->_psetid)) {
                     break;
+                }
             }
             ++$this->_upos;
         }

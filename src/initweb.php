@@ -62,10 +62,10 @@ function initialize_user() {
             $sid = $_COOKIE[$sn];
             $l = strlen($Qreq->post);
             if ($l >= 8 && $Qreq->post === substr($sid, strlen($sid) > 16 ? 8 : 0, $l))
-                $Qreq->approve_post();
+                $Qreq->approve_token();
         } else if ($Qreq->post === "<empty-session>"
                    || $Qreq->post === ".empty") {
-            $Qreq->approve_post();
+            $Qreq->approve_token();
         }
     }
     ensure_session(ENSURE_SESSION_ALLOW_EMPTY);
