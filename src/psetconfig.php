@@ -23,7 +23,8 @@ class PsetConfigException extends Exception {
 }
 
 class Pset {
-    /** @var Conf */
+    /** @var Conf
+     * @readonly */
     public $conf;
     /** @var int
      * @readonly */

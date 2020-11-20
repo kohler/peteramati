@@ -29,6 +29,13 @@ class API_Repo {
         }
     }
 
+    static function fileview(Contact $user, Qrequest $qreq, APIData $api) {
+        if (!$user->can_view_repo_contents($api->repo, $api->branch)
+            || ($qreq->is_post() && !$qreq->valid_post())) {
+            return ["ok" => false, "error" => "Permission error."];
+        }
+    }
+
     static function blob(Contact $user, Qrequest $qreq, APIData $api) {
         if (!$user->can_view_repo_contents($api->repo, $api->branch)) {
             return ["ok" => false, "error" => "Permission error."];

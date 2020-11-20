@@ -54,6 +54,7 @@ $config = [
     // your application should be included in this list.
     "directory_list" => [
         Config::projectPath("lib"),
+        Config::projectPath("pages"),
         Config::projectPath("src"),
         Config::projectPath("batch")
     ],

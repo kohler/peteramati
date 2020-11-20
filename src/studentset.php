@@ -4,9 +4,11 @@
 // See LICENSE for open-source distribution terms
 
 class StudentSet implements Iterator, Countable {
-    /** @var Conf */
+    /** @var Conf
+     * @readonly */
     public $conf;
-    /** @var Contact */
+    /** @var Contact
+     * @readonly */
     public $viewer;
     /** @var ?Pset */
     public $pset;

@@ -104,6 +104,7 @@ function report_set($s, $k, $total, $total_noextra, $normfactor) {
     }
 }
 
+/** @param StudentSet $sset */
 function collect_pset_info(&$students, $sset, $entries) {
     global $Conf, $Me, $Qreq;
 
@@ -535,29 +536,34 @@ if ($Me->isPC && $Qreq->valid_post() && $Qreq->setgrader) {
 }
 
 
-function runmany($qreq) {
-    global $Conf, $Me;
-    if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled) {
-        return $Conf->errorMsg("No such pset");
+/** @param Contact $user
+ * @param Qrequest $qreq */
+function runmany($user, $qreq) {
+    if (!($pset = $user->conf->pset_by_key($qreq->pset))
+        || $pset->disabled) {
+        return $user->conf->errorMsg("No such pset");
     }
     $users = [];
-    foreach (qreq_users($qreq) as $user) {
-        $users[] = $Me->user_linkpart($user);
+    foreach (qreq_users($qreq) as $u) {
+        $users[] = $user->user_linkpart($u);
     }
     if (empty($users)) {
-        return $Conf->errorMsg("No users selected.");
+        return $user->conf->errorMsg("No users selected.");
     }
-    $args = ["pset" => $pset->urlkey, "run" => $qreq->runner, "runmany" => 1, "users" => join(" ", $users)];
+    $args = [
+        "pset" => $pset->urlkey, "run" => $qreq->runner, "runmany" => 1,
+        "users" => join(" ", $users)
+    ];
     if (str_ends_with($qreq->runner, ".ensure")) {
         $args["run"] = substr($qreq->runner, 0, -7);
         $args["ensure"] = 1;
     }
-    Navigation::redirect(hoturl_post("run", $args));
+    Navigation::redirect($user->conf->hoturl_post("run", $args));
     redirectSelf();
 }
 
 if ($Me->isPC && $Qreq->valid_post() && $Qreq->runmany) {
-    runmany($Qreq);
+    runmany($Me, $Qreq);
 }
 
 
@@ -576,10 +582,11 @@ function older_enabled_repo_same_handout($pset) {
     return $result;
 }
 
-function doaction(Qrequest $qreq) {
-    global $Conf, $Me;
-    if (!($pset = $Conf->pset_by_key($qreq->pset)) || $pset->disabled) {
-        return $Conf->errorMsg("No such pset");
+function doaction(Contact $viewer, Qrequest $qreq) {
+    $conf = $viewer->conf;
+    if (!($pset = $conf->pset_by_key($qreq->pset))
+        || $pset->disabled) {
+        return $conf->errorMsg("No such pset");
     }
     $hiddengrades = null;
     if ($qreq->action === "showgrades") {
@@ -590,15 +597,15 @@ function doaction(Qrequest $qreq) {
         $hiddengrades = 0;
     } else if ($qreq->action === "clearrepo") {
         foreach (qreq_users($qreq) as $user) {
-            $user->set_repo($pset, null);
+            $user->set_repo($pset->id, null);
             $user->clear_links(LINK_BRANCH, $pset->id);
         }
     } else if ($qreq->action === "copyrepo") {
         if (($old_pset = older_enabled_repo_same_handout($pset))) {
             foreach (qreq_users($qreq) as $user) {
-                if (!$user->repo($pset)
-                    && ($r = $user->repo($old_pset))) {
-                    $user->set_repo($pset, $r);
+                if (!$user->repo($pset->id)
+                    && ($r = $user->repo($old_pset->id))) {
+                    $user->set_repo($pset->id, $r);
                     if (($b = $user->branchid($old_pset)))
                         $user->set_link(LINK_BRANCH, $pset->id, $b);
                 }
@@ -607,15 +614,15 @@ function doaction(Qrequest $qreq) {
     } else if (str_starts_with($qreq->action, "grademany_")) {
         $g = $pset->all_grades[substr($qreq->action, 10)];
         assert($g && !!$g->landmark_range_file);
-        Navigation::redirect(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
+        Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
     } else if (str_starts_with($qreq->action, "diffmany_")) {
-        Navigation::redirect(hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
+        Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
     } else if ($qreq->action === "diffmany") {
-        Navigation::redirect(hoturl_post("diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
+        Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
     }
     if ($hiddengrades !== null) {
         foreach (qreq_users($qreq) as $user) {
-            $info = PsetView::make($pset, $user, $Me);
+            $info = PsetView::make($pset, $user, $viewer);
             if ($info->grading_hash()) {
                 $info->set_hidden_grades($hiddengrades);
             }
@@ -625,7 +632,7 @@ function doaction(Qrequest $qreq) {
 }
 
 if ($Me->isPC && $Qreq->valid_post() && $Qreq->doaction) {
-    doaction($Qreq);
+    doaction($Me, $Qreq);
 }
 
 
@@ -660,6 +667,9 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
     redirectSelf(array("anchor" => $psetkey));
 }
 
+/** @param Conf $conf
+ * @param Pset $pset
+ * @param Pset $from_pset */
 function forward_pset_links($conf, $pset, $from_pset) {
     $links = [LINK_REPO, LINK_REPOVIEW, LINK_BRANCH];
     if ($pset->partner && $from_pset->partner) {
@@ -670,17 +680,18 @@ function forward_pset_links($conf, $pset, $from_pset) {
               $pset->id, $from_pset->id, $links);
 }
 
-function reconfig($qreq) {
-    global $Conf, $Me;
-    if (!($pset = $Conf->pset_by_key($qreq->pset))
+/** @param Contact $user
+ * @param Qrequest $qreq */
+function reconfig($user, $qreq) {
+    if (!($pset = $user->conf->pset_by_key($qreq->pset))
         || $pset->admin_disabled) {
-        return $Conf->errorMsg("No such pset");
+        return $user->conf->errorMsg("No such pset");
     }
     $psetkey = $pset->key;
 
     $json = load_psets_json(true);
     object_merge_recursive($json->$psetkey, $json->_defaults);
-    $old_pset = new Pset($Conf, $psetkey, $json->$psetkey);
+    $old_pset = new Pset($user->conf, $psetkey, $json->$psetkey);
 
     $o = (object) array();
     $o->disabled = $o->visible = $o->grades_visible = null;
@@ -717,26 +728,28 @@ function reconfig($qreq) {
         && (!$pset->disabled || (isset($o->disabled) && !$o->disabled))
         && ($pset->visible || (isset($o->visible) && $o->visible))
         && !$pset->gitless
-        && !$Conf->fetch_ivalue("select exists (select * from ContactLink where pset=?)", $pset->id)
+        && !$user->conf->fetch_ivalue("select exists (select * from ContactLink where pset=?)", $pset->id)
         && ($older_pset = older_enabled_repo_same_handout($pset))) {
-        forward_pset_links($Conf, $pset, $older_pset);
+        forward_pset_links($user->conf, $pset, $older_pset);
     }
 
     save_config_overrides($psetkey, $o, $json);
 }
 
-if ($Me->privChair && $Qreq->valid_post() && $Qreq->reconfig)
-    reconfig($Qreq);
+if ($Me->privChair && $Qreq->valid_post() && $Qreq->reconfig) {
+    reconfig($Me, $Qreq);
+}
 
 
 // check global system settings
-if ($Me->privChair)
+if ($Me->privChair) {
     require_once("adminhome.php");
+}
 
 
 // Enable users
 if ($Me->privChair
-    && $Qreq->valid_post()
+    && $Qreq->valid_token()
     && (isset($Qreq->enable_user)
         || isset($Qreq->send_account_info)
         || isset($Qreq->reset_password))) {
@@ -792,8 +805,9 @@ $title = (!$Me->is_empty() && !isset($_REQUEST["signin"]) ? "Home" : "Sign in");
 $Conf->header($title, "home");
 $xsep = " <span class='barsep'>&nbsp;|&nbsp;</span> ";
 
-if ($Me->privChair)
+if ($Me->privChair) {
     echo "<div id='clock_drift_container'></div>";
+}
 
 
 // Sidebar
@@ -816,30 +830,35 @@ if ($Me->privChair && (!$User || $User === $Me)) {
     $pclike = Contact::ROLE_PCLIKE;
     $result = $Conf->qe("select exists (select * from ContactInfo where password='' and disabled=0 and (roles=0 or (roles&$pclike)=0) and college=1), exists (select * from ContactInfo where password='' and disabled=0 and (roles=0 or (roles&$pclike)=0) and extension=1), exists (select * from ContactInfo where password='' and disabled=0 and roles!=0 and (roles&$pclike)!=0), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and (roles=0 or (roles&$pclike)=0) and lastLogin=0 and college=1), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and (roles=0 or (roles&$pclike)=0) and lastLogin=0 and extension=1), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and roles!=0 and (roles&$pclike)!=0 and lastLogin=0)");
     $row = $result->fetch_row();
+    '@phan-var-force list<?string> $row';
     Dbl::free($result);
 
     $m = [];
-    if ($row[0])
-        $m[] = '<a href="' . hoturl_post("index", "enable_user=college-empty") . '">college users</a>';
-    if ($row[1])
-        $m[] = '<a href="' . hoturl_post("index", "enable_user=extension-empty") . '">extension users</a>';
-    if ($row[2])
-        $m[] = '<a href="' . hoturl_post("index", "enable_user=ta-empty") . '">TAs</a>';
-    if (!empty($m))
+    if ($row[0]) {
+        $m[] = '<a href="' . $Conf->hoturl_post("index", "enable_user=college-empty") . '">college users</a>';
+    }
+    if ($row[1]) {
+        $m[] = '<a href="' . $Conf->hoturl_post("index", "enable_user=extension-empty") . '">extension users</a>';
+    }
+    if ($row[2]) {
+        $m[] = '<a href="' . $Conf->hoturl_post("index", "enable_user=ta-empty") . '">TAs</a>';
+    }
+    if (!empty($m)) {
         echo '    <li>Enable ', join(", ", $m), "</li>\n";
+    }
 
     $m = [];
     if ($row[3])
-        $m[] = '<a href="' . hoturl_post("index", "send_account_info=college-nologin") . '">college users</a>';
+        $m[] = '<a href="' . $Conf->hoturl_post("index", "send_account_info=college-nologin") . '">college users</a>';
     if ($row[4])
-        $m[] = '<a href="' . hoturl_post("index", "send_account_info=extension-nologin") . '">extension users</a>';
+        $m[] = '<a href="' . $Conf->hoturl_post("index", "send_account_info=extension-nologin") . '">extension users</a>';
     if ($row[5])
-        $m[] = '<a href="' . hoturl_post("index", "send_account_info=ta-nologin") . '">TAs</a>';
+        $m[] = '<a href="' . $Conf->hoturl_post("index", "send_account_info=ta-nologin") . '">TAs</a>';
     if (!empty($m))
         echo '    <li>Send account info to ', join(", ", $m), "</li>\n";
 
-    echo "    <li><a href='", hoturl_post("index", "report=nonanonymous"), "'>Overall grade report</a> (<a href='", hoturl_post("index", "report=nonanonymous+college"), "'>college</a>, <a href='", hoturl_post("index", "report=nonanonymous+extension"), "'>extension</a>)</li>
-    <!-- <li><a href='", hoturl("log"), "'>Action log</a></li> -->
+    echo "    <li><a href='", $Conf->hoturl_post("index", "report=nonanonymous"), "'>Overall grade report</a> (<a href='", $Conf->hoturl_post("index", "report=nonanonymous+college"), "'>college</a>, <a href='", $Conf->hoturl_post("index", "report=nonanonymous+extension"), "'>extension</a>)</li>
+    <!-- <li><a href='", $Conf->hoturl("log"), "'>Action log</a></li> -->
   </ul>
 </div>\n";
 }
@@ -873,7 +892,7 @@ Sign in to tell us about your code.';
     echo "</div>
 <hr class='home' />
 <div class='homegrp' id='homeaccount'>\n",
-        Ht::form(hoturl_post("index")),
+        Ht::form($Conf->hoturl_post("index")),
         "<div class='f-contain foldo fold2o' id='logingroup'>
 <input type='hidden' name='cookie' value='1' />
 <div class=\"", Ht::control_class("email", "f-ii"), "\">
@@ -937,6 +956,7 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
 
 
 // Per-pset
+/** @param Pset $pset */
 function render_grades($pset, $gi, $s) {
     global $Me;
     $total = 0;
@@ -971,10 +991,12 @@ function render_grades($pset, $gi, $s) {
     return (object) ["allv" => $gvarr,  "totalv" => round_grade($total), "differentk" => $different];
 }
 
-function show_pset($pset, $user) {
-    global $Me;
+/** @param Pset $pset
+ * @param Contact $user
+ * @param Contact $viewer */
+function show_home_pset($pset, $user, $viewer) {
     if ($pset->gitless_grades
-        && $Me === $user
+        && $viewer === $user
         && !$pset->partner
         && !$pset->upi_for($user)
         && !$pset->student_can_edit_grades()) {
@@ -985,11 +1007,11 @@ function show_pset($pset, $user) {
     if (!$user_can_view) {
         echo '<div class="pa-pset-hidden">';
     }
-    $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $Me->user_linkpart($user)]);
+    $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $viewer->user_linkpart($user)]);
     echo "<h2><a class=\"btn\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
         htmlspecialchars($pset->title), "</a>";
-    $info = PsetView::make($pset, $user, $Me);
-    $grade_check_user = $Me->isPC && $Me != $user ? $user : $Me;
+    $info = PsetView::make($pset, $user, $viewer);
+    $grade_check_user = $viewer->isPC && $viewer !== $user ? $user : $viewer;
     if (($user_see_grade = $info->user_can_view_grades())) {
         $x = [];
         $c = null;
@@ -1046,23 +1068,20 @@ if (!$Me->is_empty() && $User->is_student()) {
     $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
     foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset) && !$pset->disabled)
-            show_pset($pset, $User);
+            show_home_pset($pset, $User, $Me);
     }
     if ($Me->isPC) {
         echo "<div style='margin-top:5em'></div>\n";
         if ($User->dropped) {
-            echo Ht::form(hoturl_post("index", array("set_undrop" => 1,
-                                                     "u" => $Me->user_linkpart($User)))),
+            echo Ht::form($Conf->hoturl_post("index", ["set_undrop" => 1, "u" => $Me->user_linkpart($User)])),
                 "<div>", Ht::submit("Undrop"), "</div></form>";
         } else {
-            echo Ht::form(hoturl_post("index", array("set_drop" => 1,
-                                                     "u" => $Me->user_linkpart($User)))),
+            echo Ht::form($Conf->hoturl_post("index", ["set_drop" => 1, "u" => $Me->user_linkpart($User)])),
                 "<div>", Ht::submit("Drop"), "</div></form>";
         }
     }
     if ($Me->privChair && $User->can_enable()) {
-        echo Ht::form(hoturl_post("index", ["enable_user" => 1,
-                                            "u" => $Me->user_linkpart($User)])),
+        echo Ht::form($Conf->hoturl_post("index", ["enable_user" => 1, "u" => $Me->user_linkpart($User)])),
             Ht::submit("Enable"), "</form>";
     }
 }
@@ -1177,6 +1196,7 @@ function show_regrades($result, $all) {
     }
 
     // 5. load users
+    $contacts = [];
     $result = $Conf->qe("select * from ContactInfo where contactId?a", array_keys($uids));
     while (($c = Contact::fetch($result, $Conf))) {
         $contacts[$c->contactId] = $c;
@@ -1203,7 +1223,7 @@ function show_regrades($result, $all) {
 
         $partners = [];
         foreach (explode(",", $row->repocids) as $uid) {
-            if (($c = $contacts[$uid] ?? null)) {
+            if (($c = $contacts[(int) $uid] ?? null)) {
                 $c->set_anonymous($anon);
                 $partners[] = $c;
             }
@@ -1236,10 +1256,11 @@ function show_regrades($result, $all) {
     echo Ht::unstash(), '<script>$("#pa-pset-flagged").each(function(){$pa.render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 }
 
+/** @param Pset $pset */
 function show_pset_actions($pset) {
     global $Conf;
 
-    echo Ht::form(hoturl_post("index", array("pset" => $pset->urlkey, "reconfig" => 1)), ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
+    echo Ht::form($Conf->hoturl_post("index", ["pset" => $pset->urlkey, "reconfig" => 1]), ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
     $options = array("disabled" => "Disabled",
                      "invisible" => "Hidden",
                      "visible" => "Visible without grades",
@@ -1267,13 +1288,14 @@ function show_pset_actions($pset) {
 
     if (!$pset->disabled) {
         echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
-        echo Ht::link("Grade report", hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]), ["class" => "btn"]);
+        echo Ht::link("Grade report", $Conf->hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]), ["class" => "btn"]);
     }
 
     echo "</form>";
     echo Ht::unstash_script("$('.need-pa-pset-actions').each(\$pa.pset_actions)");
 }
 
+/** @param StudentSet $sset */
 function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     global $Profile, $MicroNow;
     $t0 = microtime(true);
@@ -1371,6 +1393,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     return $j;
 }
 
+/** @param StudentSet $sset */
 function show_pset_table($sset) {
     global $Profile, $Qreq;
 
@@ -1389,8 +1412,8 @@ function show_pset_table($sset) {
 
 /*
     // load links
-    $restrict_repo_view = $Conf->opt("restrictRepoView");
-    $result = $Conf->qe("select * from ContactLink where pset=$pset->id"
+    $restrict_repo_view = $pset->conf->opt("restrictRepoView");
+    $result = $pset->conf->qe("select * from ContactLink where pset=$pset->id"
         . ($restrict_repo_view ? " or type=" . LINK_REPOVIEW : ""));
     $links = [];
     while (($link = $result->fetch_object("ContactLink"))) {
@@ -1454,7 +1477,7 @@ function show_pset_table($sset) {
     }
 
     if ($checkbox) {
-        echo Ht::form(hoturl_post("index", ["pset" => $pset->urlkey, "save" => 1]));
+        echo Ht::form($sset->conf->hoturl_post("index", ["pset" => $pset->urlkey, "save" => 1]));
         if ($pset->anonymous) {
             echo Ht::hidden("anonymous", $anonymous ? 1 : 0);
         }
