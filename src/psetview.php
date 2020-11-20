@@ -1325,7 +1325,7 @@ class PsetView {
 
         $gexp = new GradeExport($this->pset, $pc_view);
         $gexp->uid = $this->user->contactId;
-        $gexp->include_entries = ($flags & self::GRADEJSON_NO_ENTRIES) !== 0;
+        $gexp->include_entries = ($flags & self::GRADEJSON_NO_ENTRIES) === 0;
 
         $notes = $this->current_jnotes();
         $agx = $notes->autogrades ?? null;
@@ -1369,7 +1369,7 @@ class PsetView {
         if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
             $gexp->grading_hash = $this->grading_hash();
         }
-        if (!($flags & self::GRADEJSON_NO_LATE_HOURS)
+        if (($flags & self::GRADEJSON_NO_LATE_HOURS) === 0
             && ($lhd = $this->late_hours_data())) {
             if (isset($lhd->hours)) {
                 $gexp->late_hours = $lhd->hours;
