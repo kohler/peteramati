@@ -4,6 +4,7 @@
 
 import { Filediff } from "./diff.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
+import { hoturl_post, hoturl_gradeparts } from "./hoturl.js";
 
 let md, mdcontext;
 
@@ -409,7 +410,8 @@ export function filediff_unhighlight() {
 
 handle_ui.on("pa-diff-toggle-markdown", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-markdown") : $(this),
-        show = !hasClass(Filediff.find(this).element, "pa-markdown");
+        fd = Filediff.find(this),
+        show = !hasClass(fd.element, "pa-markdown");
     $es.each(function () {
         const f = Filediff.find(this),
             shown = hasClass(f.element, "pa-markdown");
@@ -420,6 +422,10 @@ handle_ui.on("pa-diff-toggle-markdown", function (evt) {
         }
         toggleClass(this, "btn-primary", show);
     });
+    if (!evt.metaKey) {
+        $.post(hoturl_post("api/diffconfig", hoturl_gradeparts(fd.element)),
+            {file: fd.file, markdown: show ? 1 : 0});
+    }
 });
 
 $(function () {

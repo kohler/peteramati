@@ -14,7 +14,9 @@ class APIData {
     public $repo;
     public $branch;
     public $hash;
+    /** @var ?CommitRecord */
     public $commit;
+    /** @var int */
     public $at;
     function __construct(Contact $user, Pset $pset = null, Repository $repo = null) {
         $this->conf = $user->conf;
@@ -23,18 +25,27 @@ class APIData {
         $this->repo = $repo;
         $this->at = Conf::$now;
     }
-    function prepare_grading_commit($info) {
-        if (!$this->pset->gitless_grades) {
-            if (!$this->repo) {
-                return ["ok" => false, "error" => "Missing repository."];
-            }
+    /** @param PsetView $info
+     * @return ?array */
+    function prepare_commit($info) {
+        if ($this->repo) {
             $this->commit = $this->conf->check_api_hash($this->hash, $this);
-            if (!$this->commit) {
-                return ["ok" => false, "error" => ($this->hash ? "Disconnected commit." : "Missing commit.")];
+            if ($this->commit) {
+                $info->force_set_hash($this->commit->hash);
+                return null;
+            } else if ($this->hash) {
+                return ["ok" => false, "error" => "Disconnected commit."];
+            } else {
+                return ["ok" => false, "error" => "Missing commit."];
             }
-            $info->force_set_hash($this->commit->hash);
+        } else {
+            return ["ok" => false, "error" => "Missing repository."];
         }
-        return false;
+    }
+    /** @param PsetView $info
+     * @return ?array */
+    function prepare_grading_commit($info) {
+        return $this->pset->gitless_grades ? null : $this->prepare_commit($info);
     }
 }
 
@@ -209,7 +220,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 136) {
+        if ($this->sversion < 137) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -2443,6 +2454,7 @@ class Conf {
         }
         return call_user_func($uf->callback, $user, $qreq, $api, $uf);
     }
+    /** @return ?CommitRecord */
     function check_api_hash($input_hash, APIData $api) {
         if (!$input_hash) {
             return null;
@@ -2464,6 +2476,7 @@ class Conf {
     private function fill_api_map() {
         $this->_api_map = [
             "blob" => "15 API_Repo::blob",
+            "diffconfig" => "15 API_Repo::diffconfig",
             "filediff" => "15 API_Repo::filediff",
             "grade" => "3 API_Grade::grade",
             "gradestatistics" => "3 API_GradeStatistics::run",

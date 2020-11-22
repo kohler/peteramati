@@ -59,7 +59,6 @@ if (!$commita || !$commitb) {
 $Info->set_hash($commitb->hash);
 
 $diff_options = [
-    "wdiff" => false,
     "no_full" => !$Pset->is_handout($commita) || $Pset->is_handout($commitb)
 ];
 if ($commita->hash === $Info->grading_hash()) {
@@ -68,7 +67,6 @@ if ($commita->hash === $Info->grading_hash()) {
 if ($commitb->hash === $Info->grading_hash()) {
     $commitb->subject .= "  ✱"; // space, nbsp
 }
-$TABWIDTH = $Info->commit_jnote("tabwidth") ? : 4;
 
 
 $Conf->header(htmlspecialchars($Pset->title), "home");

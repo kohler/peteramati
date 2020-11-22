@@ -29,11 +29,48 @@ class API_Repo {
         }
     }
 
-    static function fileview(Contact $user, Qrequest $qreq, APIData $api) {
+    static function diffconfig(Contact $user, Qrequest $qreq, APIData $api) {
         if (!$user->can_view_repo_contents($api->repo, $api->branch)
             || ($qreq->is_post() && !$qreq->valid_post())) {
             return ["ok" => false, "error" => "Permission error."];
         }
+        $info = PsetView::make($api->pset, $api->user, $user);
+        if (($err = $api->prepare_commit($info))) {
+            return $err;
+        }
+        if ($qreq->is_post()) {
+            $file = str_replace("\\*", ".*", $qreq->file ?? "*");
+            $baseline = $api->pset->baseline_diffconfig($file);
+            $diff = [];
+            if (isset($qreq->markdown)) {
+                if ($qreq->markdown === "") {
+                    $diff["markdown"] = null;
+                } else if (($b = friendly_boolean($qreq->markdown)) !== null) {
+                    $diff["markdown"] = $b;
+                } else {
+                    return ["ok" => false, "error" => "Bad `markdown`."];
+                }
+            }
+            if (isset($qreq->tabwidth)) {
+                if ($qreq->tabwidth === "" || $qreq->tabwidth === "0") {
+                    $diff["tabwidth"] = null;
+                } else if (($i = cvtint($qreq->tabwidth)) > 0 && $i < 16) {
+                    $diff["tabwidth"] = $i;
+                } else {
+                    return ["ok" => false, "error" => "Bad `tabwidth`."];
+                }
+            }
+            if (!empty($diff)) {
+                $gr = $info->grading_commit();
+                if (!$gr || $gr->commitat === $api->commit->commitat) {
+                    $info->update_repository_notes(["diffs" => [$file => $diff]]);
+                    $info->update_commit_notes(["diffs" => [$file => array_fill_keys(array_keys($diff), null)]]);
+                } else {
+                    $info->update_commit_notes(["diffs" => [$file => $diff]]);
+                }
+            }
+        }
+        return ["ok" => true];
     }
 
     static function blob(Contact $user, Qrequest $qreq, APIData $api) {

@@ -705,19 +705,22 @@ class Repository {
         $onlyfiles = self::fix_diff_files($options["onlyfiles"] ?? null);
 
         // read "full" files
-        foreach ($pset->all_diffconfig() as $diffconfig) {
-            if (!$ignore_diffconfig
-                && !$no_full
-                && $diffconfig->full
-                && ($fname = $diffconfig->exact_filename()) !== false
-                && (!$onlyfiles || ($onlyfiles[$pset->directory_slash . $fname] ?? false))) {
-                $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg($fname));
-                $di = new DiffInfo("{$pset->directory_slash}{$fname}", $diffconfig);
-                $diffs[$di->filename] = $di;
-                foreach (explode("\n", $result) as $idx => $line) {
-                    $di->add("+", 0, $idx + 1, $line);
+        if (!$ignore_diffconfig && !$no_full) {
+            foreach ($pset->potential_diffconfig_full() as $fname) {
+                if (!str_starts_with($fname, $pset->directory_slash)) {
+                    $fname = $pset->directory_slash . $fname;
                 }
-                $di->finish();
+                if ((!$onlyfiles || ($onlyfiles[$fname] ?? false))
+                    && ($diffconfig = $pset->find_diffconfig($fname))
+                    && $diffconfig->full) {
+                    $result = $this->gitrun("git show {$hashb_arg}:{$repodir}" . escapeshellarg(substr($fname, strlen($pset->directory_slash))));
+                    $di = new DiffInfo($fname, $diffconfig);
+                    $diffs[$di->filename] = $di;
+                    foreach (explode("\n", $result) as $idx => $line) {
+                        $di->add("+", 0, $idx + 1, $line);
+                    }
+                    $di->finish();
+                }
             }
         }
 

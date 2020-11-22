@@ -563,6 +563,11 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table Repository add `infosnapat` bigint(11) NOT NULL DEFAULT '0'")) {
         $conf->update_schema_version(136);
     }
+    if ($conf->sversion === 136
+        && $conf->ql_ok("alter table RepositoryGrade add `rpnotes` varbinary(16384) DEFAULT NULL")
+        && $conf->ql_ok("alter table RepositoryGrade add `rpnotesversion` int(11) NOT NULL DEFAULT '1'")) {
+        $conf->update_schema_version(137);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

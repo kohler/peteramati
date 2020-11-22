@@ -24,6 +24,12 @@ class RepositoryPsetInfo {
     public $placeholder;
     /** @var ?int */
     public $placeholder_at;
+    /** @var ?string */
+    public $rpnotes;
+    /** @var ?object */
+    private $jrpnotes;
+    /** @var ?int */
+    public $rpnotesversion;
 
     // joined from CommitNotes
     /** @var ?string */
@@ -53,6 +59,9 @@ class RepositoryPsetInfo {
         $this->placeholder = (int) $this->placeholder;
         if (isset($this->placeholder_at)) {
             $this->placeholder_at = (int) $this->placeholder_at;
+        }
+        if (isset($this->rpnotesversion)) {
+            $this->rpnotesversion = (int) $this->rpnotesversion;
         }
 
         if (isset($this->notesversion)) {
@@ -84,5 +93,22 @@ class RepositoryPsetInfo {
         $this->notes = $notes;
         $this->jnotes = $jnotes;
         $this->notesversion = $notesversion;
+    }
+
+    /** @return ?object */
+    function jrpnotes() {
+        if ($this->jrpnotes === null && $this->rpnotes !== null) {
+            $this->jrpnotes = json_decode($this->rpnotes);
+        }
+        return $this->jrpnotes;
+    }
+
+    /** @param ?string $rpnotes
+     * @param ?object $jrpnotes
+     * @param int $rpnotesversion */
+    function assign_rpnotes($rpnotes, $jrpnotes, $rpnotesversion) {
+        $this->rpnotes = $rpnotes;
+        $this->jrpnotes = $jrpnotes;
+        $this->rpnotesversion = $rpnotesversion;
     }
 }

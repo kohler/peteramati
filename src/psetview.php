@@ -43,7 +43,6 @@ class PsetView {
     private $hash;
     /** @var bool */
     private $hash_set = false;
-    private $tabwidth = false;
     private $derived_handout_commit;
     /** @var ?int */
     private $n_visible_grades;
@@ -55,7 +54,9 @@ class PsetView {
     private $n_nonempty_grades;
     /** @var ?int */
     private $n_nonempty_assigned_grades;
+    /** @var bool */
     private $need_format = false;
+    /** @var bool */
     private $added_diffinfo = false;
 
     const ERROR_NOTRUN = 1;
@@ -67,6 +68,7 @@ class PsetView {
     private $transferred_warnings_priority;
     public $viewed_gradeentries = [];
 
+    /** @var int */
     private $_diff_tabwidth;
     private $_diff_lnorder;
 
@@ -189,7 +191,7 @@ class PsetView {
         $this->hash_set = true;
         $this->_havepi &= ~4;
         $this->_cpi = null;
-        $this->derived_handout_commit = $this->tabwidth = false;
+        $this->derived_handout_commit = false;
         $this->set_grade_counts(null);
         if ($this->repo) {
             if ($reqhash) {
@@ -214,7 +216,7 @@ class PsetView {
             $this->hash_set = true;
             $this->_havepi &= ~4;
             $this->_cpi = null;
-            $this->derived_handout_commit = $this->tabwidth = false;
+            $this->derived_handout_commit = false;
         }
     }
 
@@ -382,6 +384,19 @@ class PsetView {
     }
 
     /** @return ?object */
+    function repository_jnotes() {
+        assert(!$this->pset->gitless);
+        $rpi = $this->rpi();
+        return $rpi ? $rpi->jrpnotes() : null;
+    }
+
+    /** @param non-empty-string $key */
+    function repository_jnote($key) {
+        $rn = $this->repository_jnotes();
+        return $rn ? $rn->$key ?? null : null;
+    }
+
+    /** @return ?object */
     function current_jnotes() {
         if ($this->pset->gitless_grades
             || $this->hash === null
@@ -429,14 +444,6 @@ class PsetView {
         return $grade;
     }
 
-
-    /** @return int */
-    function tabwidth() {
-        if ($this->tabwidth === false) {
-            $this->tabwidth = $this->commit_jnote("tabwidth") ? : 4;
-        }
-        return $this->tabwidth;
-    }
 
     /** @param ?object $j */
     static private function clean_notes($j) {
@@ -506,6 +513,8 @@ class PsetView {
                     set cid=?, pset=?, notes=?, hasactiveflags=?",
                     $this->user->contactId, $this->pset->id,
                     $notes, $hasactiveflags);
+            } else if ($upi->notes === $notes) {
+                return;
             } else {
                 $result = $this->conf->qe("update ContactGrade
                     set notes=?, hasactiveflags=?, notesversion=?
@@ -526,12 +535,56 @@ class PsetView {
             $this->_havepi |= 1;
             $this->_upi = UserPsetInfo::make_new($this->pset, $this->user);
         }
-        $this->_upi->assign_notes($notes, $new_notes, ($upi ? $upi->notesversion : -1) + 1);
+        $this->_upi->assign_notes($notes, $new_notes, ($upi ? $upi->notesversion : 0) + 1);
         $this->_upi->hasactiveflags = $hasactiveflags;
         $this->can_view_grades = $this->user_can_view_grades = null;
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
             $this->user->invalidate_grades($this->pset->id);
         }
+    }
+
+    /** @param array $updates */
+    function update_repository_notes($updates) {
+        // find original
+        $rpi = $this->rpi();
+
+        // compare-and-swap loop
+        while (true) {
+            // change notes
+            $new_notes = json_update($rpi ? $rpi->jrpnotes() : null, $updates);
+            self::clean_notes($new_notes);
+
+            // update database
+            $notes = json_encode_db($new_notes);
+            if (!$rpi) {
+                $result = Dbl::qe($this->conf->dblink, "insert into RepositoryGrade set
+                    repoid=?, branchid=?, pset=?,
+                    placeholder=1, placeholder_at=?, rpnotes=?",
+                    $this->repo->repoid, $this->branchid, $this->pset->id,
+                    Conf::$now, $notes);
+            } else if ($rpi->rpnotes === $notes) {
+                return;
+            } else {
+                $result = $this->conf->qe("update RepositoryGrade
+                    set rpnotes=?, rpnotesversion=?
+                    where repoid=? and branchid=? and pset=? and rpnotesversion=?",
+                    $notes, $rpi->rpnotesversion + 1,
+                    $this->repo->repoid, $this->branchid, $this->pset->id, $rpi->rpnotesversion);
+            }
+            if ($result && $result->affected_rows) {
+                break;
+            }
+
+            // reload record
+            $this->_havepi &= ~2;
+            $rpi = $this->rpi();
+        }
+
+        if (!$this->_rpi) {
+            $this->_havepi &= ~2;
+            $this->rpi();
+        }
+        $this->_rpi->assign_rpnotes($notes, $new_notes, ($rpi ? $rpi->notesversion : 0) + 1);
     }
 
     /** @param non-empty-string $hash
@@ -574,6 +627,8 @@ class PsetView {
                     notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?",
                     $this->pset->id, hex2bin($hash), $this->repo->repoid,
                     $notes, $haslinenotes, $hasflags, $hasactiveflags);
+            } else if ($old_notes === $notes) {
+                return;
             } else {
                 $result = $this->conf->qe("update CommitNotes set
                     notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?,
@@ -601,13 +656,13 @@ class PsetView {
             $this->_cpi = CommitPsetInfo::make_new($this->pset, $this->repo, $this->hash);
         }
         if ($this_commit) {
-            $this->_cpi->assign_notes($notes, $new_notes, ($old_nversion ?? -1) + 1);
+            $this->_cpi->assign_notes($notes, $new_notes, ($old_nversion ?? 0) + 1);
             $this->_cpi->hasflags = $hasflags;
             $this->_cpi->hasactiveflags = $hasactiveflags;
             $this->_cpi->haslinenotes = $haslinenotes;
         }
         if ($this->_rpi && $this->_rpi->gradehash === $hash) {
-            $this->_rpi->assign_notes($notes, $new_notes, ($old_nversion ?? -1) + 1);
+            $this->_rpi->assign_notes($notes, $new_notes, ($old_nversion ?? 0) + 1);
         }
         if ((isset($updates["grades"]) || isset($updates["autogrades"]))
             && $this->grading_hash() === $hash) {
@@ -1131,10 +1186,7 @@ class PsetView {
             if (!isset($this->transferred_warnings[$file])) {
                 $this->transferred_warnings[$file] = [];
             }
-            if (!isset($this->transferred_warnings_priority[$loc])) {
-                $this->transferred_warnings_priority[$loc] = $priority - 1;
-            }
-            if ($this->transferred_warnings_priority[$loc] < $priority) {
+            if (($this->transferred_warnings_priority[$loc] ?? $priority - 1) < $priority) {
                 $this->transferred_warnings[$file][$line] = [];
                 $this->transferred_warnings_priority[$loc] = $priority;
             }
@@ -1403,6 +1455,19 @@ class PsetView {
         return new LineNotesOrder(null, $this->can_view_grades(), $this->pc_view);
     }
 
+    /** @param float $prio */
+    private function _add_diffconfigs($diffs, $prio) {
+        if (is_object($diffs)) {
+            foreach (get_object_vars($diffs) as $k => $v) {
+                $this->pset->add_diffconfig(new DiffConfig($v, $k, $prio));
+            }
+        } else if (is_array($diffs)) {
+            foreach ($diffs as $v) {
+                $this->pset->add_diffconfig(new DiffConfig($v, null, $prio));
+            }
+        }
+    }
+
     /** @param ?CommitRecord $commita
      * @param ?CommitRecord $commitb
      * @return array<string,DiffInfo> */
@@ -1410,7 +1475,16 @@ class PsetView {
         if (!$this->added_diffinfo) {
             if (($rs = $this->commit_jnote("runsettings"))
                 && ($id = $rs->IGNOREDIFF ?? null)) {
-                $this->pset->add_diffconfig(new DiffConfig($id, (object) ["ignore" => true]));
+                $this->pset->add_diffconfig(new DiffConfig((object) ["ignore" => true], $id, 11.0));
+            }
+            if (($tw = $this->commit_jnote("tabwidth"))) {
+                $this->pset->add_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 11.0));
+            }
+            if (($diffs = $this->repository_jnote("diffs"))) {
+                $this->_add_diffconfigs($diffs, 10.0);
+            }
+            if (($diffs = $this->commit_jnote("diffs"))) {
+                $this->_add_diffconfigs($diffs, 11.0);
             }
             $this->added_diffinfo = true;
         }
@@ -1456,7 +1530,6 @@ class PsetView {
                             $di->expand_line($lineid[0], $l - 2, $l + 3);
                         }
                     }
-
                 } else {
                     // expand diff to include fake files
                     if (($diffc = $this->pset->find_diffconfig($fn))
@@ -1506,7 +1579,7 @@ class PsetView {
             return;
         }
 
-        $this->_diff_tabwidth = $args["tabwidth"] ?? $this->tabwidth();
+        $this->_diff_tabwidth = $dinfo->tabwidth;
         $this->_diff_lnorder = $lnorder;
         $open = !!($args["open"] ?? false);
         $only_content = !!($args["only_content"] ?? false);

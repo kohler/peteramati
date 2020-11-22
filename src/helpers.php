@@ -85,12 +85,15 @@ function json_update($j, $updates) {
     if (is_object($updates)) {
         $is_replacement = $updates instanceof JsonUpdatable
             && $updates->jsonIsReplacement();
-        if ($updates instanceof JsonSerializable)
+        if ($updates instanceof JsonSerializable) {
             $updates = $updates->jsonSerialize();
-        if ($is_replacement)
+        }
+        if ($is_replacement) {
             return $updates;
-        if (is_object($updates))
+        }
+        if (is_object($updates)) {
             $updates = get_object_vars($updates);
+        }
     }
     foreach ($updates as $k => $v) {
         if ($k === "") {
@@ -108,11 +111,13 @@ function json_update($j, $updates) {
         }
     }
     $n = count($j);
-    if ($n == 0)
+    if ($n == 0) {
         return null;
-    for ($i = 0; $i !== $n; ++$i)
+    }
+    for ($i = 0; $i !== $n; ++$i) {
         if (!isset($j[$i]) && !array_key_exists($i, $j))
             return (object) $j;
+    }
     ksort($j, SORT_NUMERIC);
     return array_values($j);
 }

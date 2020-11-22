@@ -26,6 +26,8 @@ class DiffInfo implements Iterator {
     public $highlight;
     /** @var bool */
     public $highlight_allowed;
+    /** @var int */
+    public $tabwidth = 4;
     /** @var ?string */
     public $language;
     /** @var bool */
@@ -62,6 +64,7 @@ class DiffInfo implements Iterator {
     /** @param string $filename */
     function __construct($filename, DiffConfig $diffconfig = null) {
         $this->filename = $filename;
+        $ismd = str_ends_with($filename, ".md");
         if ($diffconfig) {
             $this->title = $diffconfig->title;
             $this->fileless = !!$diffconfig->fileless;
@@ -69,18 +72,14 @@ class DiffInfo implements Iterator {
             $this->_boring_set = $diffconfig->boring !== null;
             $this->hide_if_anonymous = !!$diffconfig->hide_if_anonymous;
             $this->position = (float) $diffconfig->position;
-            if (isset($diffconfig->markdown)) {
-                $this->markdown = $diffconfig->markdown === 2;
-                $this->markdown_allowed = $diffconfig->markdown !== 0;
-            }
-            if (isset($diffconfig->highlight)) {
-                $this->highlight = $diffconfig->highlight === 2;
-                $this->highlight_allowed = $diffconfig->highlight !== 0;
-            }
+            $this->markdown = $diffconfig->markdown ?? $ismd;
+            $this->markdown_allowed = $diffconfig->markdown_allowed ?? $ismd;
+            $this->highlight = !!$diffconfig->highlight;
+            $this->highlight_allowed = !!$diffconfig->highlight_allowed;
             $this->language = $diffconfig->language;
-        }
-        if (!isset($this->markdown)) {
-            $this->markdown = $this->markdown_allowed = str_ends_with($filename, ".md");
+            $this->tabwidth = $diffconfig->tabwidth ?? 4;
+        } else {
+            $this->markdown = $this->markdown_allowed = $ismd;
         }
     }
 

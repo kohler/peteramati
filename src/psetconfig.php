@@ -168,6 +168,8 @@ class Pset {
     private $_extra_diffs;
     /** @var ?list<DiffConfig> */
     private $_all_diffs;
+    /** @var ?DiffConfig */
+    private $_baseline_diff;
     /** @var array<string,DiffConfig> */
     private $_file_diffinfo = [];
 
@@ -417,9 +419,13 @@ class Pset {
 
         // diffs
         $diffs = $p->diffs ?? null;
-        if (is_array($diffs) || is_object($diffs)) {
-            foreach (self::make_config_array($p->diffs) as $k => $v) {
-                $this->diffs[] = new DiffConfig($k, $v);
+        if (is_object($diffs)) {
+            foreach (get_object_vars($p->diffs) as $k => $v) {
+                $this->diffs[] = new DiffConfig($v, $k);
+            }
+        } else if (is_array($diffs)) {
+            foreach ($p->diffs as $i => $v) {
+                $this->diffs[] = new DiffConfig($v);
             }
         } else if ($diffs) {
             throw new PsetConfigException("`diffs` format error", "diffs");
@@ -714,30 +720,60 @@ class Pset {
     }
 
 
+    /** @return list<DiffConfig> */
     function all_diffconfig() {
         if ($this->_all_diffs === null) {
             $this->_all_diffs = $this->diffs;
             if (($regex = $this->file_ignore_regex())) {
-                $this->_all_diffs[] = new DiffConfig($regex, (object) array("ignore" => true, "match_priority" => -10));
+                $this->_all_diffs[] = new DiffConfig((object) ["match" => $regex, "ignore" => true, "match_priority" => -10]);
             }
             foreach ($this->_extra_diffs ?? [] as $d) {
                 $this->_all_diffs[] = $d;
+            }
+            foreach ($this->_all_diffs as $i => $d) {
+                $d->subposition = $i;
             }
         }
         return $this->_all_diffs;
     }
 
-    /** @return ?DiffConfig */
+    /** @param string $filename
+     * @return ?DiffConfig */
     function find_diffconfig($filename) {
         if (!array_key_exists($filename, $this->_file_diffinfo)) {
             $diffinfo = null;
             foreach ($this->all_diffconfig() as $d) {
-                if (preg_match('{(?:\A|/)(?:' . $d->regex . ')(?:/|\z)}', $filename))
-                    $diffinfo = DiffConfig::combine($diffinfo, $d);
+                if ($d->match === ".*"
+                    || preg_match('{(?:\A|/)(?:' . $d->match . ')(?:/|\z)}', $filename)) {
+                    $diffinfo = DiffConfig::combine($filename, $diffinfo, $d);
+                }
             }
             $this->_file_diffinfo[$filename] = $diffinfo;
         }
         return $this->_file_diffinfo[$filename];
+    }
+
+    /** @param string $filename
+     * @return DiffConfig */
+    function baseline_diffconfig($filename) {
+        $diffinfo = null;
+        foreach ($this->diffs as $d) {
+            if ($d->match === ".*"
+                || preg_match('{(?:\A|/)(?:' . $d->match . ')(?:/|\z)}', $filename)) {
+                $diffinfo = DiffConfig::combine($filename, $diffinfo, $d);
+            }
+        }
+        return $diffinfo ?? new DiffConfig((object) [], $filename);
+    }
+
+    /** @return list<string> */
+    function potential_diffconfig_full() {
+        $fnames = [];
+        foreach ($this->all_diffconfig() as $d) {
+            if ($d->full && ($fname = $d->exact_filename()) !== null)
+                $fnames[] = $fname;
+        }
+        return array_unique($fnames);
     }
 
     function maybe_prefix_directory($files) {
@@ -841,23 +877,6 @@ class Pset {
     /** @return null|int|float */
     static function cinterval(...$args) {
         return self::ccheck("check_interval", $args);
-    }
-
-    /** @return null|int */
-    static function cyes_no_allowed(...$args) {
-        return self::ccheck("check_yes_no_allowed", $args);
-    }
-
-    private static function make_config_array($x) {
-        if (is_array($x)) {
-            $y = array();
-            foreach ($x as $i => $v) {
-                $y[$i + 1] = $v;
-            }
-            return $y;
-        } else {
-            return get_object_vars($x);
-        }
     }
 
     private static function reorder_config($what, $a, $order) {
@@ -1408,9 +1427,11 @@ class RunnerConfig {
 
 class DiffConfig {
     /** @var string */
-    public $regex;
+    public $match;
     /** @var float */
     public $match_priority;
+    /** @var int */
+    public $subposition = 0;
     /** @var string */
     public $title;
     /** @var float */
@@ -1429,26 +1450,39 @@ class DiffConfig {
     public $gradable;
     /** @var bool */
     public $hide_if_anonymous;
-    /** @var ?int */
+    /** @var ?bool */
     public $markdown;
-    /** @var ?int */
+    /** @var ?bool */
+    public $markdown_allowed;
+    /** @var ?bool */
     public $highlight;
+    /** @var ?bool */
+    public $highlight_allowed;
     /** @var ?string */
     public $language;
+    /** @var ?int */
+    public $tabwidth;
+    /** @var bool */
+    public $nonshared = false;
 
-    /** @param string $regex
-     * @param object $d */
-    function __construct($regex, $d) {
-        $loc = array("diffs", $regex);
+    /** @param object $d
+     * @param ?string $match
+     * @param ?float $match_priority */
+    function __construct($d, $match = null, $match_priority = 0.0) {
         if (!is_object($d)) {
-            throw new PsetConfigException("diff format error", $loc);
+            throw new PsetConfigException("diff format error", ["diffs", $match]);
         }
-        $this->regex = isset($d->regex) ? $d->regex : $regex;
-        if (!is_string($this->regex) || $this->regex === "") {
-            throw new PsetConfigException("`regex` diff format error", $loc);
+        $this->match = $d->match ?? $d->regex ?? $match;
+        if (!is_string($this->match) || $this->match === "") {
+            throw new PsetConfigException("`match` diff format error", ["diffs", $match]);
         }
+        $loc = ["diffs", $this->match];
         $this->title = Pset::cstr($loc, $d, "title");
-        $this->match_priority = (float) Pset::cint($loc, $d, "match_priority");
+        if (isset($d->match_priority)) {
+            $this->match_priority = (float) Pset::cnum($loc, $d, "match_priority");
+        } else {
+            $this->match_priority = $match_priority;
+        }
         $this->position = Pset::cnum($loc, $d, "position");
         if ($this->position === null && isset($d->priority)) {
             $this->position = -Pset::cnum($loc, $d, "priority");
@@ -1460,53 +1494,72 @@ class DiffConfig {
         $this->boring = Pset::cbool($loc, $d, "boring");
         $this->gradable = Pset::cbool($loc, $d, "gradable", "gradeable");
         $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
-        $this->markdown = Pset::cyes_no_allowed($loc, $d, "markdown");
-        $this->highlight = Pset::cyes_no_allowed($loc, $d, "highlight");
+        $this->markdown = Pset::cbool($loc, $d, "markdown");
+        $this->markdown_allowed = Pset::cbool($loc, $d, "markdown_allowed");
+        if ($this->markdown && $this->markdown_allowed === null) {
+            $this->markdown_allowed = true;
+        }
+        $this->highlight = Pset::cbool($loc, $d, "highlight");
+        $this->highlight_allowed = Pset::cbool($loc, $d, "highlight_allowed");
+        if ($this->highlight && $this->highlight_allowed === null) {
+            $this->highlight_allowed = true;
+        }
         $this->language = Pset::cstr($loc, $d, "language");
+        $this->tabwidth = Pset::cint($loc, $d, "tabwidth");
     }
 
-    /** @return ?DiffConfig */
-    static function combine(DiffConfig $a = null, DiffConfig $b = null) {
+    /** @param string $filename
+     * @return ?DiffConfig */
+    static function combine($filename, DiffConfig $a = null, DiffConfig $b = null) {
         if (!$a && !$b) {
             return null;
         } else if (!$a || !$b) {
             return $a ?? $b;
         } else {
-            if ($a->match_priority > $b->match_priority) {
-                $x = clone $a;
-                $y = $b;
-            } else {
-                $x = clone $b;
-                $y = $a;
+            if ($a->match_priority > $b->match_priority
+                || ($a->match_priority == $b->match_priority
+                    && $a->subposition > $b->subposition)) {
+                $tmp = $b;
+                $b = $a;
+                $a = $tmp;
             }
-            $x->title = $x->title ?? $y->title;
-            $x->position = $x->position ?? $y->position;
-            $x->fileless = $x->fileless ?? $y->fileless;
-            $x->full = $x->full ?? $y->full;
-            $x->collate = $x->collate ?? $y->collate;
-            $x->ignore = $x->ignore ?? $y->ignore;
-            $x->boring = $x->boring ?? $y->boring;
-            $x->gradable = $x->gradable ?? $y->gradable;
-            $x->hide_if_anonymous = $x->hide_if_anonymous ?? $y->hide_if_anonymous;
-            $x->markdown = $x->markdown ?? $y->markdown;
-            $x->highlight = $x->highlight ?? $y->highlight;
-            $x->language = $x->language ?? $y->language;
-            return $x;
+            if (!$a->nonshared) {
+                $a = clone $a;
+                $a->match = preg_quote($filename);
+                $a->nonshared = true;
+            }
+            $a->title = $b->title ?? $a->title;
+            $a->position = $b->position ?? $a->position;
+            $a->fileless = $b->fileless ?? $a->fileless;
+            $a->full = $b->full ?? $a->full;
+            $a->collate = $b->collate ?? $a->collate;
+            $a->ignore = $b->ignore ?? $a->ignore;
+            $a->boring = $b->boring ?? $a->boring;
+            $a->gradable = $b->gradable ?? $a->gradable;
+            $a->hide_if_anonymous = $b->hide_if_anonymous ?? $a->hide_if_anonymous;
+            $a->markdown = $b->markdown ?? $a->markdown;
+            $a->markdown_allowed = $b->markdown_allowed ?? $a->markdown_allowed;
+            $a->highlight = $b->highlight ?? $a->highlight;
+            $a->highlight_allowed = $b->highlight_allowed ?? $a->highlight_allowed;
+            $a->language = $b->language ?? $a->language;
+            $a->tabwidth = $b->tabwidth ?? $a->tabwidth;
+            return $a;
         }
     }
 
-
+    /** @return ?string */
     function exact_filename() {
         $ok = true;
         // XXX should allow \n, \f, \a, \e, \000, etc.
         $unquoted = preg_replace_callback(',(\\\\[^0-9a-zA-Z]?|[$^.\\[\\]|()?*+{}]),',
             function ($m) use (&$ok) {
-                if ($m[1][0] === "\\" && strlen($m[1]) > 1)
+                if ($m[1][0] === "\\" && strlen($m[1]) > 1) {
                     return substr($m[1], 1);
-                else
+                } else {
                     $ok = false;
-            }, $this->regex);
-        return $ok ? $unquoted : false;
+                }
+            }, $this->match);
+        return $ok ? $unquoted : null;
     }
 }
 
@@ -1542,18 +1595,6 @@ function check_interval($x) {
                && preg_match(',\A(\d+(?:\.\d*)?|\.\d+)(?:$|\s*)([smhd]?)\z,', strtolower($x), $m)) {
         $mult = ["" => 1, "s" => 1, "m" => 60, "h" => 3600, "d" => 86400];
         return [true, floatval($m[1]) * $mult[$m[2]]];
-    } else {
-        return false;
-    }
-}
-
-function check_yes_no_allowed($x) {
-    if ($x === "yes" || $x === true) {
-        return [true, 2];
-    } else if ($x === "no" || $x === false) {
-        return [true, 0];
-    } else if ($x === "allowed") {
-        return [true, 1];
     } else {
         return false;
     }

@@ -201,10 +201,13 @@ if (isset($Qreq->tab)
     $tab = $tab == 4 ? null : $tab;
     $Info->update_commit_notes(["tabwidth" => $tab]);
 } else if (isset($Qreq->tab)
-           && ($Qreq->tab === "" || $Qreq->tab === "none"))
+           && ($Qreq->tab === "" || $Qreq->tab === "none")) {
     $Info->update_commit_notes(["tabwidth" => null]);
-if (isset($Qreq->wdiff))
-    $Info->update_commit_notes(["wdiff" => ((int) $Qreq->wdiff != 0)]);
+}
+if (isset($Qreq->wdiff)) {
+    $wdiff = (int) $Qreq->wdiff;
+    $Info->update_commit_notes(["wdiff" => $wdiff > 0 ? true : null]);
+}
 
 // save run settings
 if ($Me->isPC && $Me != $User && isset($Qreq->saverunsettings)
@@ -301,14 +304,14 @@ function echo_grade_cdf($info) {
     Ht::stash_script("\$(\"#pa-grade-statistics\").each(\$pa.grgraph)");
 }
 
-/** @param PsetView $info */
-function echo_commit($info) {
-    global $Qreq, $TABWIDTH, $WDIFF;
+/** @param PsetView $info
+ * @param Qrequest $qreq */
+function echo_commit($info, $qreq) {
     $conf = $info->conf;
     $pset = $info->pset;
     $Notes = $info->commit_jnotes();
-    $TABWIDTH = $info->tabwidth();
-    $WDIFF = isset($Notes->wdiff) ? $Notes->wdiff : false;
+    $TABWIDTH = $Notes->tabwidth ?? $pset->baseline_diffconfig(".*")->tabwidth ?? 4;
+    $WDIFF = $Notes->wdiff ?? false;
 
     // current commit and commit selector
     $sel = $bhashes = [];
@@ -378,7 +381,7 @@ function echo_commit($info) {
     }
 
     // view options
-    $fold_viewoptions = !isset($Qreq->tab) && !isset($Qreq->wdiff);
+    $fold_viewoptions = !isset($qreq->tab) && !isset($qreq->wdiff);
     $value .= '<div class="pa-viewoptions">'
         . '<a class="q ui js-pset-viewoptions" href="">'
         . '<span class="foldarrow">'
@@ -386,13 +389,13 @@ function echo_commit($info) {
         . '</span>&nbsp;options</a><span style="padding-left:1em"'
         . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
     foreach ([2, 4, 8] as $i) {
-        $value .= '&nbsp;<a href="' . $info->conf->selfurl($Qreq, ["tab" => $i]) . '"'
+        $value .= '&nbsp;<a href="' . $info->conf->selfurl($qreq, ["tab" => $i]) . '"'
             . ($TABWIDTH == $i ? " class=\"q\"><strong>$i</strong>" : '>' . $i)
             . '</a>';
     }
     $value .= '<span style="padding-left:1em">wdiff:';
     foreach (["no", "yes"] as $i => $t) {
-        $value .= '&nbsp;<a href="' . $info->conf->selfurl($Qreq, ["wdiff" => $i]) . '"'
+        $value .= '&nbsp;<a href="' . $info->conf->selfurl($qreq, ["wdiff" => $i]) . '"'
             . (!$WDIFF == !$i ? " class=\"q\"><strong>$t</strong>" : '>' . $t)
             . '</a>';
     }
@@ -631,7 +634,7 @@ if ($Pset->gitless) {
 
 } else if ($Info->repo && $Info->recent_commits()) {
     echo_grade_cdf_here($Info);
-    echo_commit($Info);
+    echo_commit($Info, $Qreq);
 
     // print runners
     $runnerbuttons = array();
@@ -709,7 +712,7 @@ if ($Pset->gitless) {
 
     // collect diff and sort line notes
     $lnorder = $Info->viewable_line_notes();
-    $diff = $Info->diff($Info->base_handout_commit(), $Info->commit(), $lnorder, ["wdiff" => $WDIFF]);
+    $diff = $Info->diff($Info->base_handout_commit(), $Info->commit(), $lnorder, ["wdiff" => !!$Info->commit_jnote("wdiff")]);
 
     // print line notes
     $notelinks = array();
