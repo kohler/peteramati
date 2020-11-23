@@ -1445,7 +1445,7 @@ class DiffConfig {
     /** @var bool */
     public $ignore;
     /** @var bool */
-    public $boring;
+    public $collapse;
     /** @var bool */
     public $gradable;
     /** @var bool */
@@ -1491,7 +1491,7 @@ class DiffConfig {
         $this->full = Pset::cbool($loc, $d, "full");
         $this->collate = Pset::cbool($loc, $d, "collate");
         $this->ignore = Pset::cbool($loc, $d, "ignore");
-        $this->boring = Pset::cbool($loc, $d, "boring");
+        $this->collapse = Pset::cbool($loc, $d, "collapse", "boring");
         $this->gradable = Pset::cbool($loc, $d, "gradable", "gradeable");
         $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
         $this->markdown = Pset::cbool($loc, $d, "markdown");
@@ -1534,7 +1534,7 @@ class DiffConfig {
             $a->full = $b->full ?? $a->full;
             $a->collate = $b->collate ?? $a->collate;
             $a->ignore = $b->ignore ?? $a->ignore;
-            $a->boring = $b->boring ?? $a->boring;
+            $a->collapse = $b->collapse ?? $a->collapse;
             $a->gradable = $b->gradable ?? $a->gradable;
             $a->hide_if_anonymous = $b->hide_if_anonymous ?? $a->hide_if_anonymous;
             $a->markdown = $b->markdown ?? $a->markdown;

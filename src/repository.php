@@ -752,7 +752,7 @@ class Repository {
                 $di->set_repoa($this, $pset, $hasha, $line, $pset->is_handout($commita));
                 if ($diffconfig
                     && !$ignore_diffconfig
-                    && ($diffconfig->ignore || $diffconfig->boring)
+                    && ($diffconfig->ignore || $diffconfig->collapse)
                     && (!$needfiles || !($needfiles[$file] ?? false))) {
                     if (!$diffconfig->ignore) {
                         $di->finish_unloaded();

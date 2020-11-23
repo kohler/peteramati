@@ -51,6 +51,15 @@ class API_Repo {
                     return ["ok" => false, "error" => "Bad `markdown`."];
                 }
             }
+            if (isset($qreq->collapse)) {
+                if ($qreq->collapse === "") {
+                    $diff["collapse"] = null;
+                } else if (($b = friendly_boolean($qreq->collapse)) !== null) {
+                    $diff["collapse"] = $b;
+                } else {
+                    return ["ok" => false, "error" => "Bad `collapse`."];
+                }
+            }
             if (isset($qreq->tabwidth)) {
                 if ($qreq->tabwidth === "" || $qreq->tabwidth === "0") {
                     $diff["tabwidth"] = null;

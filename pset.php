@@ -785,7 +785,7 @@ if ($Pset->gitless) {
         }
         foreach ($diff as $file => $dinfo) {
             $open = $lnorder->file_has_notes($file)
-                || (!$dinfo->boring
+                || (!$dinfo->collapse
                     && ($Me != $Info->user
                         || !$Info->can_view_grades()
                         || !$Info->is_grading_commit()

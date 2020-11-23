@@ -111,7 +111,7 @@ if ($diff) {
 
     // diff and line notes
     foreach ($diff as $file => $dinfo) {
-        $open = $lnorder->file_has_notes($file) || !$dinfo->boring || empty($notelinks);
+        $open = $lnorder->file_has_notes($file) || !$dinfo->collapse || empty($notelinks);
         $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open, "only_diff" => true]);
     }
 

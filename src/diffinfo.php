@@ -15,9 +15,9 @@ class DiffInfo implements Iterator {
     /** @var bool */
     public $fileless = false;
     /** @var bool */
-    public $boring = false;
+    public $collapse = false;
     /** @var bool */
-    private $_boring_set = false;
+    private $_collapse_set = false;
     /** @var bool */
     public $markdown;
     /** @var bool */
@@ -68,8 +68,8 @@ class DiffInfo implements Iterator {
         if ($diffconfig) {
             $this->title = $diffconfig->title;
             $this->fileless = !!$diffconfig->fileless;
-            $this->boring = !!$diffconfig->boring;
-            $this->_boring_set = $diffconfig->boring !== null;
+            $this->collapse = !!$diffconfig->collapse;
+            $this->_collapse_set = $diffconfig->collapse !== null;
             $this->hide_if_anonymous = !!$diffconfig->hide_if_anonymous;
             $this->position = (float) $diffconfig->position;
             $this->markdown = $diffconfig->markdown ?? $ismd;
@@ -126,8 +126,8 @@ class DiffInfo implements Iterator {
         if ($n === 4 && str_starts_with($this->_diff[3], "B")) {
             $this->binary = true;
         }
-        if ($this->binary && !$this->_boring_set) {
-            $this->boring = true;
+        if ($this->binary && !$this->_collapse_set) {
+            $this->collapse = true;
         }
         if ($this->binary
             ? preg_match('_ and /dev/null differ$_', $this->_diff[3])

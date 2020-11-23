@@ -4,7 +4,7 @@
 
 import { ImmediatePromise } from "./utils.js";
 import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui } from "./ui.js";
-import { hoturl, hoturl_gradeparts } from "./hoturl.js";
+import { hoturl, hoturl_gradeparts, hoturl_post } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
 
 
@@ -283,11 +283,17 @@ export class Linediff {
 
 handle_ui.on("pa-diff-unfold", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-unfold") : $(this),
-        direction = evt.metaKey ? true : undefined;
+        fd = Filediff.find(this),
+        show = hasClass(fd.element, "hidden"),
+        direction = evt.metaKey ? true : show;
     $es.each(function () {
         Filediff.find(this).load().then(fd => fd.toggle(direction));
     });
-    return false;
+    if (!evt.metaKey) {
+        const fd = Filediff.find(this);
+        $.post(hoturl_post("api/diffconfig", hoturl_gradeparts(fd.element)),
+            {file: fd.file, collapse: show ? 0 : 1});
+    }
 });
 
 handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
