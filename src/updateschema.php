@@ -139,6 +139,60 @@ function update_schema_branched_repo_grade(Conf $conf) {
     return true;
 }
 
+function update_schema_known_branches(Conf $conf) {
+    // branches
+    $result = $conf->ql("select branchid, branch from Branch");
+    $branches = $rbranches = [];
+    $max_branchid = 0;
+    while ($result && ($row = $result->fetch_row())) {
+        $branchid = (int) $row[0];
+        $branches[$branchid] = $row[1];
+        $rbranches[$row[1]] = $branchid;
+        $max_branchid = max($branchid, $max_branchid);
+    }
+    Dbl::free($result);
+
+    // `master` must have branchid 0
+    if (($rbranches["master"] ?? 0) !== 0) {
+        $conf->qe("update ContactLink set link=0 where type=" . LINK_BRANCH . " and link=" . $rbranches["master"]);
+        $conf->qe("update Branch set branchid=0 where branchid=" . $rbranches["master"]);
+    }
+
+    // `main` must have branchid 1
+    if (($branches[1] ?? "main") !== "main") {
+        $branchid = $max_branchid + 1;
+        $conf->qe("update ContactLink set link={$branchid} where type=" . LINK_BRANCH . " and link=1");
+        $conf->qe("update Branch set branchid={$branchid} where branchid=1");
+    }
+    if (($rbranches["main"] ?? 1) !== 1) {
+        $conf->qe("update ContactLink set link=1 where type=" . LINK_BRANCH . " and link=" . $rbranches["main"]);
+        $conf->qe("update Branch set branchid=1 where branchid=" . $rbranches["main"]);
+    }
+
+    $conf->clear_branch_map();
+    return true;
+}
+
+function update_schema_known_branch_links(Conf $conf) {
+    foreach ($conf->psets() as $pset) {
+        if (!$pset->gitless && $pset->main_branch !== "master") {
+            $result = $conf->qe("select rc.cid from ContactLink rc
+                left join ContactLink bc on (bc.cid=rc.cid and bc.type=" . LINK_BRANCH . " and bc.pset=rc.pset)
+                where rc.type=" . LINK_REPO . " and rc.pset={$pset->id} and bc.pset is null");
+            $branchid = $conf->ensure_branch($pset->main_branch);
+            $qv = [];
+            while (($row = $result->fetch_row())) {
+                $qv[] = [+$row[0], LINK_BRANCH, $pset->id, $branchid];
+            }
+            Dbl::free($result);
+            if (!empty($qv)) {
+                $conf->qe("insert into ContactLink (cid,type,pset,link) values ?v", $qv);
+            }
+        }
+    }
+    return true;
+}
+
 function update_schema_drop_keys_if_exist($conf, $table, $key) {
     $indexes = Dbl::fetch_first_columns($conf->dblink, "select distinct index_name from information_schema.statistics where table_schema=database() and `table_name`='$table'");
     $drops = [];
@@ -567,6 +621,15 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table RepositoryGrade add `rpnotes` varbinary(16384) DEFAULT NULL")
         && $conf->ql_ok("alter table RepositoryGrade add `rpnotesversion` int(11) NOT NULL DEFAULT '1'")) {
         $conf->update_schema_version(137);
+    }
+    if ($conf->sversion === 137
+        && update_schema_known_branches($conf)) {
+        $conf->update_schema_version(138);
+    }
+    if ($conf->sversion === 138
+        && $conf->psets()
+        && update_schema_known_branch_links($conf)) {
+        $conf->update_schema_version(139);
     }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");

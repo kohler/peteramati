@@ -281,8 +281,11 @@ function load_pset_info() {
         }
     }
 
-    // update repository regrade requests
-    if ($Conf->sversion == 107) {
+    // update schema as required by psets
+    if ($Conf->sversion === 107) {
+        updateSchema($Conf);
+    }
+    if ($Conf->sversion === 138) {
         updateSchema($Conf);
     }
 }

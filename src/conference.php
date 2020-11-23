@@ -221,7 +221,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 137) {
+        if ($this->sversion < 139) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -2390,7 +2390,7 @@ class Conf {
 
     private function branch_map() {
         if ($this->_branch_map === null) {
-            $this->_branch_map = [];
+            $this->_branch_map = [0 => "master", 1 => "main"];
             $result = $this->qe("select branchid, branch from Branch");
             while (($row = $result->fetch_row())) {
                 $this->_branch_map[+$row[0]] = $row[1];
@@ -2401,26 +2401,35 @@ class Conf {
     }
 
     function branch($branchid) {
-        return ($this->branch_map())[$branchid] ?? null;
+        return ($this->branch_map())[$branchid ?? 0] ?? null;
+    }
+
+    function clear_branch_map() {
+        $this->_branch_map = null;
     }
 
     /** @param ?string $branch
      * @return ?int */
     function ensure_branch($branch) {
-        if ($branch === null || $branch === "") {
+        if ($branch === null || $branch === "" || $branch === "master") {
+            return 0;
+        } else if ($branch === "main") {
+            return 1;
+        } else if (!Repository::validate_branch($branch)) {
             return null;
-        }
-        $key = array_search($branch, $this->branch_map(), true);
-        if ($key === false) {
-            $this->qe("insert into Branch set branch=?", $branch);
-            if (!$this->dblink->insert_id) {
-                $this->_branch_map = null;
-                return $this->ensure_branch($branch);
+        } else {
+            $key = array_search($branch, $this->branch_map(), true);
+            if ($key === false) {
+                $this->qe("insert into Branch set branch=?", $branch);
+                if (!$this->dblink->insert_id) {
+                    $this->_branch_map = null;
+                    return $this->ensure_branch($branch);
+                }
+                $key = $this->dblink->insert_id;
+                $this->_branch_map[$key] = $branch;
             }
-            $key = $this->dblink->insert_id;
-            $this->_branch_map[$key] = $branch;
+            return $key;
         }
-        return $key;
     }
 
 
