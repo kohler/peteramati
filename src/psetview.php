@@ -89,7 +89,7 @@ class PsetView {
         if (!$pset->gitless) {
             $info->repo = $user->repo($pset->id);
             $info->branchid = $user->branchid($pset);
-            $info->branch = $info->branchid ? $info->conf->branch($info->branchid) : null;
+            $info->branch = $info->conf->branch($info->branchid);
         }
         $info->set_hash(null);
         return $info;
@@ -103,7 +103,7 @@ class PsetView {
         if (!$pset->gitless) {
             $info->repo = $user->repo($pset->id, $sset->repo_at($user, $pset));
             $info->branchid = $user->branchid($pset);
-            $info->branch = $info->branchid ? $info->conf->branch($info->branchid) : null;
+            $info->branch = $info->conf->branch($info->branchid);
         }
         $info->_havepi = 1;
         $info->_upi = $sset->upi_for($user, $pset);
@@ -118,7 +118,7 @@ class PsetView {
 
     /** @return string */
     function branch() {
-        return $this->branch ?? $this->pset->main_branch;
+        return $this->branch;
     }
 
     /** @return ?UserPsetInfo */

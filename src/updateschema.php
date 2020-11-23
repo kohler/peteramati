@@ -87,7 +87,7 @@ function _update_schema_linenotes(Conf $conf) {
     return true;
 }
 
-function update_schema_branches($conf) {
+function update_schema_branches(Conf $conf) {
     $result = $conf->ql("select distinct data from ContactLink where type=" . LINK_BRANCH);
     while (($row = $result->fetch_row())) {
         if ($row[0] !== "master")
@@ -109,7 +109,7 @@ function update_schema_branches($conf) {
     return true;
 }
 
-function update_schema_branched_repo_grade($conf) {
+function update_schema_branched_repo_grade(Conf $conf) {
     // branches
     $result = $conf->ql("select branchid, branch from Branch");
     $branches = [];

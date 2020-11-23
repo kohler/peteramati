@@ -52,7 +52,7 @@ if ($api->pset && $api->pset->disabled) {
 // check commit
 if ($api->pset && !$api->pset->gitless && !$Me->is_empty()) {
     $api->repo = $api->user->repo($api->pset);
-    $api->branch = $api->user->branch_name($api->pset);
+    $api->branch = $api->user->branch($api->pset);
 }
 if ($api->repo && $Qreq->commit) {
     $api->hash = $Qreq->commit;

@@ -830,4 +830,11 @@ class Repository {
         self::$_file_contents[$n] = [$hash, $filename, explode("\n", $result), 1];
         return self::$_file_contents[$n][2];
     }
+
+
+    /** @param string $branch
+     * @return bool */
+    static function validate_branch($branch) {
+        return preg_match('/\A(?=[^^:~?*\\[\\\\\\000-\\040\\177]+\z)(?!@\z|.*@\{|[.\/]|.*\/[.\/]|.*[\.\/]\z|.*\.\.|.*\.lock\z|.*\.lock\/)/', $branch);
+    }
 }

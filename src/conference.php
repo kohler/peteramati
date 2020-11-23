@@ -195,10 +195,11 @@ class Conf {
         $this->settings = [];
         $this->settingTexts = [];
         foreach ($this->opt_override ? : [] as $k => $v) {
-            if ($v === null)
+            if ($v === null) {
                 unset($this->opt[$k]);
-            else
+            } else {
                 $this->opt[$k] = $v;
+            }
         }
         $this->opt_override = [];
 
@@ -1885,12 +1886,14 @@ class Conf {
 
     function header($title, $id = "", $options = []) {
         global $Me;
-        if ($this->_header_printed)
+        if ($this->_header_printed) {
             return;
+        }
 
         // <head>
-        if ($title === "Home")
+        if ($title === "Home") {
             $title = "";
+        }
         $this->header_head($title, $id, $options);
 
         echo "<div id='prebody'>\n";
@@ -1939,6 +1942,7 @@ class Conf {
 
         echo "  <hr class=\"c\" />\n";
 
+        $this->_header_printed = true;
         echo "</div>\n<div id=\"initialmsgs\">\n";
         if (($x = $this->opt("maintenance"))) {
             echo Ht::msg(is_string($x) ? $x : "<strong>The site is down for maintenance.</strong> Please check back later.", 2);
@@ -1976,7 +1980,6 @@ class Conf {
         }
         echo "</div>\n";
 
-        $this->_header_printed = true;
         echo "</div>\n<div class='body'>\n";
     }
 

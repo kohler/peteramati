@@ -671,9 +671,8 @@ class Contact {
     }
 
     /** @return string */
-    function branch_name(Pset $pset) {
-        $branchid = $this->branchid($pset);
-        return $branchid ? $this->conf->branch($branchid) : $pset->main_branch;
+    function branch(Pset $pset) {
+        return $this->conf->branch($this->branchid($pset));
     }
 
     /** @param int $type

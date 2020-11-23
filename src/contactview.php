@@ -376,7 +376,7 @@ class ContactView {
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
         $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
-        $branch = $user->branch_name($pset);
+        $branch = $user->branch($pset);
 
         if ($editable) {
             $xvalue = $branch === $pset->main_branch ? null : $branch;
@@ -527,11 +527,13 @@ class ContactView {
         }
     }
 
+    /** @param Contact $user
+     * @param Qrequest $qreq */
     static function set_branch_action($user, $qreq) {
-        global $Conf, $Me;
+        global $Me;
         if (!($Me->has_account_here()
               && $qreq->valid_post()
-              && ($pset = $Conf->pset_by_key($qreq->pset))
+              && ($pset = $user->conf->pset_by_key($qreq->pset))
               && !$pset->no_branch)) {
             return;
         }
@@ -540,14 +542,18 @@ class ContactView {
         }
 
         $branch = trim($qreq->branch);
-        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $branch)) {
+        if ($branch === "") {
+            $branch = $pset->main_branch;
+        }
+        if (!Repository::validate_branch($branch)) {
             return Conf::msg_error("That branch contains funny characters. Remove them.");
         }
 
-        if ($branch === "" || $branch === $pset->main_branch) {
+        $branchid = $user->conf->ensure_branch($branch);
+        if ($branchid === null || $branchid === 0) {
             $user->clear_links(LINK_BRANCH, $pset->id);
         } else {
-            $user->set_link(LINK_BRANCH, $pset->id, $Conf->ensure_branch($branch));
+            $user->set_link(LINK_BRANCH, $pset->id, $branchid);
         }
         redirectSelf();
     }
@@ -558,7 +564,7 @@ class ContactView {
         if ($pset->gitless) {
             return;
         }
-        $branch = $user->branch_name($pset);
+        $branch = $user->branch($pset);
 
         $snaphash = $snapcommitline = $snapcommitat = $value = null;
         if ($repo) {
