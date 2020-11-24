@@ -134,7 +134,9 @@ class PsetView {
     private function rpi() {
         if (($this->_havepi & 2) === 0) {
             $this->_havepi |= 2;
-            $this->_rpi = $this->pset->rpi_for($this->repo, $this->branchid);
+            if ($this->repo) {
+                $this->_rpi = $this->pset->rpi_for($this->repo, $this->branchid);
+            }
         }
         return $this->_rpi;
     }
@@ -155,25 +157,25 @@ class PsetView {
         return $this->pset->gitless_grades ? $this->upi() : $this->rpi();
     }
 
-    /** @return ?CommitRecord */
-    function find_commit($hash) {
-        if ($hash === "handout") {
+    /** @param string $hashpart
+     * @return ?CommitRecord */
+    function find_commit($hashpart) {
+        if ($hashpart === "handout") {
             return $this->base_handout_commit();
-        }
-        if ($hash && ($c = git_commit_in_list($this->pset->handout_commits(), $hash))) {
-            return $c;
-        }
-        if ($this->repo) {
-            if ($hash === "head" || $hash === "latest") {
-                return $this->latest_commit();
-            } else if ($hash === "grade" || $hash === "grading") {
-                $hash = $this->grading_hash();
+        } else if ($hashpart === "head" || $hashpart === "latest") {
+            return $this->latest_commit();
+        } else if ($hashpart === "grade" || $hashpart === "grading") {
+            return $this->grading_commit();
+        } else if ($hashpart) {
+            list($cx, $definitive) = Repository::find_listed_commit($hashpart, $this->pset->handout_commits());
+            if ($cx) {
+                return $cx;
+            } else if ($this->repo) {
+                return $this->repo->connected_commit($hashpart, $this->pset, $this->branch);
+            } else {
+                return null;
             }
-            if ($hash) {
-                return $this->repo->connected_commit($hash, $this->pset, $this->branch);
-            }
         }
-        return null;
     }
 
     /** @param ?int $n */
@@ -1304,6 +1306,8 @@ class PsetView {
         unset($linemap);
     }
 
+    /** @param string $file
+     * @return array<int,list<string>> */
     function transferred_warnings_for($file) {
         if ($this->transferred_warnings === null) {
             $this->transfer_warnings();
@@ -1321,24 +1325,30 @@ class PsetView {
     }
 
 
+    /** @param ?array<string,null|int|string> $args
+     * @return array<string,null|int|string> */
     function hoturl_args($args = null) {
         $xargs = ["pset" => $this->pset->urlkey,
                   "u" => $this->viewer->user_linkpart($this->user)];
         if ($this->hash) {
             $xargs["commit"] = $this->commit_hash();
         }
-        if ($args) {
-            foreach ((array) $args as $k => $v) {
-                $xargs[$k] = $v;
-            }
+        foreach ($args ?? [] as $k => $v) {
+            $xargs[$k] = $v;
         }
         return $xargs;
     }
 
+    /** @param string $base
+     * @param ?array<string,null|int|string> $args
+     * @return string */
     function hoturl($base, $args = null) {
         return $this->conf->hoturl($base, $this->hoturl_args($args));
     }
 
+    /** @param string $base
+     * @param ?array<string,null|int|string> $args
+     * @return string */
     function hoturl_post($base, $args = null) {
         return $this->conf->hoturl_post($base, $this->hoturl_args($args));
     }
@@ -1650,8 +1660,9 @@ class PsetView {
             foreach ($this->transferred_warnings_for($file) as $lineno => $w) {
                 $la = PsetViewLineAnno::ensure($lineanno, "b" . $lineno);
                 $la->warnings = $w;
-                if (!$only_content)
+                if (!$only_content) {
                     $this->need_format = true;
+                }
             }
         }
 
@@ -1837,11 +1848,11 @@ class PsetView {
         }
 
         if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {
-            echo '<div class="pa-dl pa-gn" data-landmark="', $bln, '"><div class="pa-warnbox"><div class="pa-warncontent need-format" data-format="2">', htmlspecialchars($lineanno[$bln]->warnings), '</div></div></div>';
+            echo '<div class="pa-dl pa-gn" data-landmark="', $bln, '"><div class="pa-warnbox"><div class="pa-warncontent need-format" data-format="2">', htmlspecialchars(join("", $lineanno[$bln]->warnings)), '</div></div></div>';
         }
 
         if ($ala) {
-            foreach ($ala->grade_entries ? : [] as $g) {
+            foreach ($ala->grade_entries ?? [] as $g) {
                 echo '<div class="pa-dl pa-gn';
                 if ($curanno->grade_first && in_array($g, $curanno->grade_first)) {
                     echo ' pa-no-sidebar';
@@ -1924,24 +1935,36 @@ class PsetView {
 }
 
 class PsetViewLineAnno {
+    /** @var ?list<GradeEntryConfig> */
     public $grade_entries;
+    /** @var ?list<GradeEntryConfig> */
     public $grade_first;
+    /** @var ?list<GradeEntryConfig> */
     public $grade_last;
+    /** @var ?list<string> */
     public $warnings;
 
-    static function ensure(&$lineanno, $line) {
-        if (!isset($lineanno[$line])) {
-            $lineanno[$line] = new PsetViewLineAnno;
+    /** @param array<string,PsetViewLineAnno> &$lineanno
+     * @param string $lineid
+     * @return PsetViewLineAnno */
+    static function ensure(&$lineanno, $lineid) {
+        if (!isset($lineanno[$lineid])) {
+            $lineanno[$lineid] = new PsetViewLineAnno;
         }
-        return $lineanno[$line];
+        return $lineanno[$lineid];
     }
 }
 
 class PsetViewAnnoState {
+    /** @var string */
     public $file;
+    /** @var string */
     public $fileid;
+    /** @var ?list<GradeEntryConfig> */
     public $grade_first;
 
+    /** @param string $file
+     * @param string $fileid */
     function __construct($file, $fileid) {
         $this->file = $file;
         $this->fileid = $fileid;

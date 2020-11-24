@@ -601,25 +601,6 @@ function git_refname_is_full_hash($refname) {
         && strtolower($refname) === $refname;
 }
 
-function git_commit_in_list($list, $hash) {
-    // XXX strtolower
-    if ((string) $hash === "") {
-        return false;
-    } else if (strlen($hash) === 40 || strlen($hash) === 64) {
-        return get($list, $hash);
-    }
-    $cx = null;
-    foreach ($list as $h => $commit) {
-        if (str_starts_with($h, $hash)) {
-            if ($cx) {
-                return false;
-            }
-            $cx = $commit;
-        }
-    }
-    return $cx;
-}
-
 function round_grade($g) {
     return round($g * 1000) / 1000;
 }

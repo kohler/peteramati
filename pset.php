@@ -403,12 +403,22 @@ function echo_commit($info, $qreq) {
 
     // warnings
     $remarks = array();
-    if (!$info->grading_hash() && $info->pc_view && !$pset->gitless_grades) {
-        $remarks[] = [true, "No commit has been marked for grading."];
-    } else if (!$info->is_grading_commit() && $info->grading_hash()) {
-        $remarks[] = [true, "This is not "
-                      . "<a class=\"uu\" href=\"" . $info->hoturl("pset", ["commit" => $info->grading_hash()]) . "\">the commit currently marked for grading</a>"
-                      . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", ["commit1" => $info->grading_hash()]) . "\">see diff</a>)</span>."];
+    if (!$pset->gitless_grades) {
+        $gc = $info->grading_commit();
+        if ($info->pc_view && !$gc) {
+            $remarks[] = [true, "No commit has been marked for grading."];
+        } else if ($gc && $gc->hash !== $info->commit_hash()) {
+            $tc = $info->commit();
+            $args = $tc->commitat > $gc->commitat
+                ? ["commit" => $gc->hash, "commit1" => $tc->hash]
+                : ["commit" => $tc->hash, "commit1" => $gc->hash];
+            $remarks[] = [true, "This is not "
+                . "<a class=\"uu\" href=\"" . $info->hoturl("pset", ["commit" => $gc->hash])
+                . "\">the commit currently marked for grading</a>"
+                . " <span class=\"n\">(<a href=\"" . $info->hoturl("diff", $args)
+                . "\">see diff</a>)</span>."
+            ];
+        }
     }
     if (!$info->is_latest_commit()) {
         $remarks[] = [true, "This is not "

@@ -770,10 +770,12 @@ class Pset {
     function potential_diffconfig_full() {
         $fnames = [];
         foreach ($this->all_diffconfig() as $d) {
-            if ($d->full && ($fname = $d->exact_filename()) !== null)
+            if ($d->full
+                && ($fname = $d->exact_filename()) !== null
+                && !in_array($fname, $fnames))
                 $fnames[] = $fname;
         }
-        return array_unique($fnames);
+        return $fnames;
     }
 
     function maybe_prefix_directory($files) {

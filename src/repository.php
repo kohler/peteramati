@@ -321,7 +321,8 @@ class Repository {
         }
     }
 
-    /** @return array<string,CommitRecord> */
+    /** @param ?string $branch
+     * @return array<string,CommitRecord> */
     function commits(Pset $pset = null, $branch = null) {
         $dir = "";
         if ($pset
@@ -366,39 +367,49 @@ class Repository {
         return current($c);
     }
 
-    function connected_commit($hash, Pset $pset = null, $branch = null) {
+    /** @param string $hashpart
+     * @param array<string,CommitRecord> $commitlist
+     * @return array{?CommitRecord,bool} */
+    static function find_listed_commit($hashpart, $commitlist) {
+        if (strlen($hashpart) < 5) {
+            // require at least 5 characters
+            return [null, true];
+        } else if (strlen($hashpart) === 40) {
+            return [$commitlist[$hashpart] ?? null, true];
+        } else {
+            $match = null;
+            foreach ($commitlist as $h => $cx) {
+                if (str_starts_with($h, $hashpart)) {
+                    if ($match !== null) {
+                        return [null, true];
+                    } else {
+                        $match = $cx;
+                    }
+                }
+            }
+            return $match ? [$match, true] : [null, false];
+        }
+    }
+
+    /** @param string $hashpart
+     * @param ?string $branch
+     * @return ?CommitRecord */
+    function connected_commit($hashpart, Pset $pset = null, $branch = null) {
         if (empty($this->_commits)) {
             // load some commits first
             $this->commits($pset, $branch);
         }
-
-        $hash = strtolower($hash);
-        if (strlen($hash) === 40) {
-            if (array_key_exists($hash, $this->_commits)) {
-                return $this->_commits[$hash];
-            }
-        } else {
-            $matches = [];
-            foreach ($this->_commits as $h => $cx) {
-                if (str_starts_with($h, $hash))
-                    $matches[] = $cx;
-            }
-            if (count($matches) == 1) {
-                return $matches[0];
-            } else if (!empty($matches)) {
-                return null;
-            }
-        }
-
-        // not found yet
-        // check if all commits are loaded
-        if (!isset($this->_commit_lists["/{$this->conf->default_main_branch}"])) {
+        list($cx, $definitive) = self::find_listed_commit($hashpart, $this->_commits);
+        if ($definitive) {
+            return $cx;
+        } else if (!isset($this->_commit_lists["/{$this->conf->default_main_branch}"])) {
+            // check if all commits are loaded
             $this->commits();
-            return $this->connected_commit($hash);
+            return $this->connected_commit($hashpart);
+        } else {
+            // check snapshots
+            return $this->find_snapshot($hashpart);
         }
-
-        // check snapshots
-        return $this->find_snapshot($hash);
     }
 
     function author_emails($pset = null, $branch = null, $limit = null) {

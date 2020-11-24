@@ -11,10 +11,12 @@ class ContactView {
             return;
         }
         $x = explode("/", $path);
-        if (count($x) && $x[count($x) - 1] === "")
+        if (count($x) && $x[count($x) - 1] === "") {
             array_pop($x);
-        foreach ($x as &$xp)
+        }
+        foreach ($x as &$xp) {
             $xp = urldecode($xp);
+        }
         unset($xp);
         foreach ($paths as $p) {
             $ppos = $xpos = 0;
@@ -27,7 +29,7 @@ class ContactView {
                            && $Conf->pset_by_key(get($x, $xpos))) {
                     $settings["pset"] = $x[$xpos];
                 } else if ($p[$ppos] === "H"
-                           && (strlen($x[$xpos]) == 40 || strlen($x[$xpos]) == 64)
+                           && (strlen($x[$xpos]) === 40 || strlen($x[$xpos]) === 64)
                            && ctype_xdigit($x[$xpos])) {
                     $settings["commit" . $commitsuf] = $x[$xpos];
                     $commitsuf = (int) $commitsuf + 1;
@@ -37,7 +39,7 @@ class ContactView {
                     $settings["commit" . $commitsuf] = $x[$xpos];
                     $commitsuf = (int) $commitsuf + 1;
                 } else if (($p[$ppos] === "H" || $p[$ppos] === "h")
-                           && $x[$xpos] === "handout") {
+                           && in_array($x[$xpos], ["handout", "latest", "grade", "grading", "head"])) {
                     $settings["commit" . $commitsuf] = $x[$xpos];
                     $commitsuf = (int) $commitsuf + 1;
                 } else if ($p[$ppos] === "u"
