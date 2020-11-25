@@ -156,6 +156,7 @@ function update_schema_known_branches(Conf $conf) {
     if (($rbranches["master"] ?? 0) !== 0) {
         $conf->qe("update ContactLink set link=0 where type=" . LINK_BRANCH . " and link=" . $rbranches["master"]);
         $conf->qe("update Branch set branchid=0 where branchid=" . $rbranches["master"]);
+        $conf->qe("update RepositoryGrade set branchid=0 where branchid=" . $rbranches["master"]);
     }
 
     // `main` must have branchid 1
@@ -163,10 +164,12 @@ function update_schema_known_branches(Conf $conf) {
         $branchid = $max_branchid + 1;
         $conf->qe("update ContactLink set link={$branchid} where type=" . LINK_BRANCH . " and link=1");
         $conf->qe("update Branch set branchid={$branchid} where branchid=1");
+        $conf->qe("update RepositoryGrade set branchid={$branchid} where branchid=1");
     }
     if (($rbranches["main"] ?? 1) !== 1) {
         $conf->qe("update ContactLink set link=1 where type=" . LINK_BRANCH . " and link=" . $rbranches["main"]);
         $conf->qe("update Branch set branchid=1 where branchid=" . $rbranches["main"]);
+        $conf->qe("update RepositoryGrade set branchid=1 where branchid=" . $rbranches["main"]);
     }
 
     $conf->clear_branch_map();

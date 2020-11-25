@@ -136,10 +136,11 @@ CREATE TABLE `ContactInfo` (
   `data` varbinary(32767) DEFAULT NULL,
   `studentYear` varbinary(4) DEFAULT NULL,
   `nickname` varchar(60) DEFAULT NULL,
+  `gradeUpdateTime` bigint(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`contactId`),
   UNIQUE KEY `email` (`email`),
-  KEY `roles` (`roles`),
   UNIQUE KEY `anon_username` (`anon_username`),
+  KEY `roles` (`roles`),
   KEY `seascode_username` (`seascode_username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -187,6 +188,21 @@ CREATE TABLE `ExecutionQueue` (
 
 
 --
+-- Table structure for table `GroupSettings`
+--
+
+DROP TABLE IF EXISTS `GroupSettings`;
+CREATE TABLE `GroupSettings` (
+  `name` varbinary(256) NOT NULL,
+  `value` int(11) NOT NULL,
+  `data` varbinary(32767) DEFAULT NULL,
+  `dataOverflow` longblob,
+  PRIMARY KEY (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
+--
 -- Table structure for table `MailLog`
 --
 
@@ -224,6 +240,7 @@ CREATE TABLE `Repository` (
   `notes` varbinary(32767) DEFAULT NULL,
   `heads` varbinary(8192) DEFAULT NULL,
   `analyzedsnapat` bigint(11) NOT NULL DEFAULT '0',
+  `infosnapat` bigint(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`repoid`),
   UNIQUE KEY `url` (`url`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -258,6 +275,9 @@ CREATE TABLE `RepositoryGrade` (
   `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder` tinyint(1) NOT NULL DEFAULT '0',
   `placeholder_at` bigint(11) DEFAULT NULL,
+  `commitat` bigint(11) DEFAULT NULL,
+  `rpnotes` varbinary(16384) DEFAULT NULL,
+  `rpnotesversion` int(11) NOT NULL DEFAULT '1',
   PRIMARY KEY (`repoid`,`branchid`,`pset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -278,7 +298,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 129);
+insert into Settings (name, value) values ('allowPaperOption', 139);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators
