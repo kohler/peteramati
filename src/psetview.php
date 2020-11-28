@@ -62,10 +62,8 @@ class PsetView {
     const ERROR_NOTRUN = 1;
     const ERROR_LOGMISSING = 2;
     public $last_runner_error;
-    /** @var array<string,array<int,list<string>>> */
+    /** @var array<string,array<int,PsetViewLineWarnings>> */
     private $transferred_warnings;
-    /** @var array<string,float> */
-    private $transferred_warnings_priority;
     public $viewed_gradeentries = [];
 
     /** @var int */
@@ -1175,7 +1173,6 @@ class PsetView {
 
     private function reset_transferred_warnings() {
         $this->transferred_warnings = [];
-        $this->transferred_warnings_priority = [];
     }
 
     /** @param ?string $file
@@ -1184,16 +1181,28 @@ class PsetView {
      * @param float $priority */
     private function transfer_one_warning($file, $line, $text, $priority) {
         if ($file !== null && $text !== "") {
-            $loc = "$file:$line";
             if (!isset($this->transferred_warnings[$file])) {
                 $this->transferred_warnings[$file] = [];
             }
-            if (($this->transferred_warnings_priority[$loc] ?? $priority - 1) < $priority) {
-                $this->transferred_warnings[$file][$line] = [];
-                $this->transferred_warnings_priority[$loc] = $priority;
+            if (!($tw = $this->transferred_warnings[$file][$line] ?? null)) {
+                $tw = $this->transferred_warnings[$file][$line] = new PsetViewLineWarnings($priority - 1);
             }
-            if ($this->transferred_warnings_priority[$loc] == $priority) {
-                $this->transferred_warnings[$file][$line][] = $text;
+            if ($tw->priority < $priority) {
+                $tw->priority = $priority;
+                $tw->texts = [];
+                $tw->expected = 0;
+            }
+            if ($tw->priority == $priority) {
+                if ($tw->expected < count($tw->texts)
+                    && $text === $tw->texts[$tw->expected]) {
+                    ++$tw->expected;
+                } else if ($text[0] !== " "
+                           && ($idx = array_search($text, $tw->texts, true)) !== false)  {
+                    $tw->expected = $idx + 1;
+                } else {
+                    $tw->texts[] = $text;
+                    $tw->expected = count($tw->texts);
+                }
             }
         }
     }
@@ -1279,35 +1288,10 @@ class PsetView {
                 $this->transfer_warning_lines(explode("\n", $output), $runner->transfer_warnings_priority ?? 0.0);
             }
         }
-
-        // squeeze out redundant warnings
-        foreach ($this->transferred_warnings as $file => &$linemap) {
-            foreach ($linemap as $line => &$wlist) {
-                $wmap = [];
-                $wtext = "";
-                $nw = count($wlist);
-                for ($i = 0; $i !== $nw; ++$i) {
-                    $w = $wlist[$i];
-                    if ($w[0] !== " " && isset($wmap[$w])) {
-                        $j = $wmap[$w];
-                        while ($i + 1 !== $nw && $wlist[$i + 1] === $wlist[$j + 1]) {
-                            ++$i;
-                            ++$j;
-                        }
-                    } else {
-                        $wmap[$w] = $i;
-                        $wtext .= $w;
-                    }
-                }
-                $wlist = $wtext;
-            }
-            unset($wlist);
-        }
-        unset($linemap);
     }
 
     /** @param string $file
-     * @return array<int,list<string>> */
+     * @return array<int,PsetViewLineWarnings> */
     function transferred_warnings_for($file) {
         if ($this->transferred_warnings === null) {
             $this->transfer_warnings();
@@ -1657,9 +1641,9 @@ class PsetView {
         }
         if ($this->pset->has_transfer_warnings
             && !$this->is_handout_commit()) {
-            foreach ($this->transferred_warnings_for($file) as $lineno => $w) {
+            foreach ($this->transferred_warnings_for($file) as $lineno => $tw) {
                 $la = PsetViewLineAnno::ensure($lineanno, "b" . $lineno);
-                $la->warnings = $w;
+                $la->warnings = $tw->texts;
                 if (!$only_content) {
                     $this->need_format = true;
                 }
@@ -1931,6 +1915,19 @@ class PsetView {
     }
     static function echo_close_pa_sidebar_gradelist() {
         echo '</div></div>';
+    }
+}
+
+class PsetViewLineWarnings {
+    /** @var list<string> */
+    public $texts = [];
+    /** @var float */
+    public $priority;
+    /** @var int */
+    public $expected = 0;
+
+    function __construct($priority) {
+        $this->priority = $priority;
     }
 }
 

@@ -58,24 +58,6 @@ function is_string_list($x) {
 /** @param string $haystack
  * @param string $needle
  * @return bool */
-function str_starts_with($haystack, $needle) {
-    $nl = strlen($needle);
-    $hl = strlen($haystack);
-    return $nl === 0 || ($hl >= $nl && substr_compare($haystack, $needle, 0, $nl) === 0);
-}
-
-/** @param string $haystack
- * @param string $needle
- * @return bool */
-function str_ends_with($haystack, $needle) {
-    $nl = strlen($needle);
-    $hl = strlen($haystack);
-    return $nl === 0 || ($hl >= $nl && substr_compare($haystack, $needle, -$nl) === 0);
-}
-
-/** @param string $haystack
- * @param string $needle
- * @return bool */
 function stri_ends_with($haystack, $needle) {
     $nl = strlen($needle);
     $hl = strlen($haystack);
