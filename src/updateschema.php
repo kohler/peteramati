@@ -152,20 +152,23 @@ function update_schema_known_branches(Conf $conf) {
     }
     Dbl::free($result);
 
-    // `master` must have branchid 0
-    if (($rbranches["master"] ?? 0) !== 0) {
-        $conf->qe("update ContactLink set link=0 where type=" . LINK_BRANCH . " and link=" . $rbranches["master"]);
-        $conf->qe("update Branch set branchid=0 where branchid=" . $rbranches["master"]);
-        $conf->qe("update RepositoryGrade set branchid=0 where branchid=" . $rbranches["master"]);
-    }
-
     // `main` must have branchid 1
     if (($branches[1] ?? "main") !== "main") {
-        $branchid = $max_branchid + 1;
+        $conf->qe("delete from Branch where branchid=1");
+        $result = $conf->qe("insert into Branch set branch=?", $branches[1]);
+        $branchid = $result->insert_id;
         $conf->qe("update ContactLink set link={$branchid} where type=" . LINK_BRANCH . " and link=1");
         $conf->qe("update Branch set branchid={$branchid} where branchid=1");
         $conf->qe("update RepositoryGrade set branchid={$branchid} where branchid=1");
     }
+
+    // `master` must have branchid 0
+    if (($rbranches["master"] ?? 0) !== 0) {
+        $conf->qe("update ContactLink set link=0 where type=" . LINK_BRANCH . " and link=" . $rbranches["master"]);
+        $conf->qe("update Branch set branchid=0 where branchid=" . $rbranches["master"]);
+        $conf->qe("update RepositoryGrade set branchid=-1 where branchid=" . $rbranches["master"]);
+    }
+
     if (($rbranches["main"] ?? 1) !== 1) {
         $conf->qe("update ContactLink set link=1 where type=" . LINK_BRANCH . " and link=" . $rbranches["main"]);
         $conf->qe("update Branch set branchid=1 where branchid=" . $rbranches["main"]);
@@ -190,9 +193,13 @@ function update_schema_known_branch_links(Conf $conf) {
             Dbl::free($result);
             if (!empty($qv)) {
                 $conf->qe("insert into ContactLink (cid,type,pset,link) values ?v", $qv);
+
+                $conf->qe("delete from RepositoryGrade where branchid=? and pset=? and placeholder=1", $branchid, $pset->id);
+                $conf->qe("update RepositoryGrade set branchid=? where branchid=0 and pset=?", $branchid, $pset->id);
             }
         }
     }
+    $conf->qe("update RepositoryGrade set branchid=0 where branchid=-1");
     return true;
 }
 
