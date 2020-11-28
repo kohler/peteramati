@@ -56,7 +56,8 @@ $config = [
         Config::projectPath("lib"),
         Config::projectPath("pages"),
         Config::projectPath("src"),
-        Config::projectPath("batch")
+        Config::projectPath("batch"),
+        Config::projectPath(".phan/stubs")
     ],
 
     "file_list" => [
