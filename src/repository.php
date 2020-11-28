@@ -287,16 +287,19 @@ class Repository {
         }
     }
 
-    function rev_parse($arg) {
+    /** @param string $arg
+     * @return ?string */
+    private function rev_parse($arg) {
         $x = $this->gitrun("git rev-parse --verify " . escapeshellarg($arg), true);
         if ($x->status == 0 && $x->stdout) {
             return trim($x->stdout);
         } else {
-            return false;
+            return null;
         }
     }
 
-    /** @param array<string,CommitRecord> &$list */
+    /** @param ?string $head
+     * @param array<string,CommitRecord> &$list */
     private function load_commits_from_head(&$list, $head, $directory) {
         $dirarg = "";
         if ((string) $directory !== "") {
@@ -361,6 +364,8 @@ class Repository {
         return $list;
     }
 
+    /** @param ?string $branch
+     * @return ?CommitRecord */
     function latest_commit(Pset $pset = null, $branch = null) {
         $c = $this->commits($pset, $branch);
         reset($c);
@@ -554,6 +559,8 @@ class Repository {
         return ($answer === "yes\n" ? $d : null);
     }
 
+    /** @param string $hash
+     * @return ?string */
     private function prepare_truncated_hash(Pset $pset, $hash) {
         $pset_files = $this->ls_files($hash, $pset->directory_noslash);
         foreach ($pset_files as &$f) {
@@ -562,7 +569,7 @@ class Repository {
         unset($f);
 
         if (!($trepo = $this->_temp_repo_clone())) {
-            return false;
+            return null;
         }
         $psetdir_arg = escapeshellarg($pset->directory_slash);
         $trepo_arg = escapeshellarg($trepo);
@@ -576,13 +583,15 @@ class Repository {
         return $this->rev_parse("truncated_{$hash}");
     }
 
+    /** @param string $refname
+     * @return ?string */
     function truncated_hash(Pset $pset, $refname) {
         $hash = $refname;
         if (!git_refname_is_full_hash($hash)) {
             $hash = $this->rev_parse($hash);
         }
-        if ($hash === false) {
-            return false;
+        if ($hash === null) {
+            return null;
         }
         if (!array_key_exists($hash, $this->_truncated_hashes)) {
             $truncated_hash = $this->rev_parse("truncated_{$hash}");

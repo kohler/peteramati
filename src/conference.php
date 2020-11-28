@@ -233,14 +233,17 @@ class Conf {
             && $this->invalidate_caches()) {
             $this->qe_raw("delete from Settings where name='frombackup' and value=" . $this->settings["frombackup"]);
             unset($this->settings["frombackup"]);
-        } else
+        } else {
             $this->invalidate_caches(["rf" => true]);
+        }
 
         // update options
-        if (isset($this->opt["ldapLogin"]) && !$this->opt["ldapLogin"])
+        if (isset($this->opt["ldapLogin"]) && !$this->opt["ldapLogin"]) {
             unset($this->opt["ldapLogin"]);
-        if (isset($this->opt["httpAuthLogin"]) && !$this->opt["httpAuthLogin"])
+        }
+        if (isset($this->opt["httpAuthLogin"]) && !$this->opt["httpAuthLogin"]) {
             unset($this->opt["httpAuthLogin"]);
+        }
 
         // set conferenceKey
         if (!isset($this->opt["conferenceKey"])) {
@@ -256,14 +259,16 @@ class Conf {
             && !($this->opt["disableCapabilities"] ?? null)
             && !(($key = random_bytes(16)) !== false
                  && ($key = base64_encode($key))
-                 && $this->save_setting("cap_key", 1, $key)))
+                 && $this->save_setting("cap_key", 1, $key))) {
             $this->opt["disableCapabilities"] = true;
+        }
 
         // GC old capabilities
         if (($this->settings["__capability_gc"] ?? 0) < Conf::$now - 86400) {
-            foreach (array($this->dblink, Contact::contactdb()) as $db)
+            foreach (array($this->dblink, Contact::contactdb()) as $db) {
                 if ($db)
                     Dbl::ql($db, "delete from Capability where timeExpires>0 and timeExpires<" . Conf::$now);
+            }
             $this->q_raw("insert into Settings (name, value) values ('__capability_gc', " . Conf::$now . ") on duplicate key update value=values(value)");
             $this->settings["__capability_gc"] = Conf::$now;
         }

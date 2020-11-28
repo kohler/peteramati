@@ -1472,10 +1472,6 @@ class PsetView {
      * @return array<string,DiffInfo> */
     function diff($commita, $commitb, LineNotesOrder $lnorder = null, $args = []) {
         if (!$this->added_diffinfo) {
-            if (($rs = $this->commit_jnote("runsettings"))
-                && ($id = $rs->IGNOREDIFF ?? null)) {
-                $this->pset->add_diffconfig(new DiffConfig((object) ["ignore" => true], $id, 11.0));
-            }
             if (($tw = $this->commit_jnote("tabwidth"))) {
                 $this->pset->add_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 11.0));
             }
