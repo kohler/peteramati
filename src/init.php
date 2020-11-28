@@ -25,6 +25,7 @@ $OK = 1;
 
 
 require_once("siteloader.php");
+require_once(SiteLoader::find("lib/polyfills.php"));
 require_once(SiteLoader::find("lib/navigation.php"));
 require_once(SiteLoader::find("lib/base.php"));
 require_once(SiteLoader::find("lib/redirect.php"));
