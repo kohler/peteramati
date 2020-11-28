@@ -440,7 +440,8 @@ class DiffInfo implements Iterator {
     /** @return string */
     function current_expandmark() {
         assert($this->_diff[$this->_itpos] === "@");
-        if ($this->_itpos === 0 && $this->_diff[4] !== " ") {
+        if ($this->_itpos === 0
+            && ($this->_diffsz === 4 || $this->_diff[4] !== " ")) {
             // fully deleted or inserted
             return "";
         } else if ($this->_itpos === 0) {
