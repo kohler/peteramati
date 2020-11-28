@@ -312,6 +312,7 @@ function echo_commit($info, $qreq) {
     $Notes = $info->commit_jnotes();
     $TABWIDTH = $Notes->tabwidth ?? $pset->baseline_diffconfig(".*")->tabwidth ?? 4;
     $WDIFF = $Notes->wdiff ?? false;
+    $info->update_placeholder(null);
 
     // current commit and commit selector
     $sel = $bhashes = [];
@@ -364,9 +365,9 @@ function echo_commit($info, $qreq) {
     Dbl::free($result);
 
     if (!empty($sel)
-        && ($h = $info->update_grading_hash(true))
+        && ($h = $info->grading_hash())
         && isset($sel[$h])) {
-        $sel[$h] = preg_replace('_\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z_', '$1 &nbsp;✱$2', $sel[$h]);
+        $sel[$h] = preg_replace('/\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z/', '$1 &nbsp;✱$2', $sel[$h]);
     }
 
     if ($info->is_grading_commit()) {

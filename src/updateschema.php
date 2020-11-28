@@ -634,6 +634,10 @@ function updateSchema($conf) {
         && update_schema_known_branch_links($conf)) {
         $conf->update_schema_version(139);
     }
+    if ($conf->sversion === 139
+        && $conf->ql_ok("alter table RepositoryGrade add `emptydiff_at` bigint(11) DEFAULT NULL")) {
+        $conf->update_schema_version(140);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

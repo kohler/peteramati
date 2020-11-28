@@ -1307,21 +1307,23 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
     // are any commits committed?
     if (!$pset->gitless_grades && $info->repo) {
         if ($t0 - $MicroNow < 0.2
+            && !$info->user->dropped
             && $pset->student_can_view_grades()) {
-            $gh = $info->update_grading_hash(function ($info, $placeholder_at) use ($t0) {
-                if ($placeholder_at && $placeholder_at < $t0 - 3600) {
-                    return rand(0, 2) == 0;
-                } else if ($placeholder_at < $t0 - 600 && !$info->user->dropped) {
-                    return rand(0, 10) == 0;
-                } else {
+            $info->update_placeholder(function ($info, $rpi) use ($t0) {
+                $placeholder_at = $rpi ? $rpi->placeholder_at : 0;
+                if ($rpi && !$rpi->placeholder) {
                     return false;
+                } else if ($placeholder_at && $placeholder_at < $t0 - 3600) {
+                    return rand(0, 2) == 0;
+                } else {
+                    return $placeholder_at < $t0 - 600 && rand(0, 10) == 0;
                 }
             });
-        } else {
-            $gh = $info->grading_hash();
         }
-        if ($gh !== null) {
+        if (($gh = $info->grading_hash()) !== null) {
             $j["gradehash"] = $gh;
+        } else if (!$info->empty_diff_likely()) {
+            $j["hash"] = $info->commit_hash();
         }
     }
 

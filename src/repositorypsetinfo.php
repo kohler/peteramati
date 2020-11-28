@@ -30,6 +30,8 @@ class RepositoryPsetInfo {
     private $jrpnotes;
     /** @var ?int */
     public $rpnotesversion;
+    /** @var ?int */
+    public $emptydiff_at;
 
     // joined from CommitNotes
     /** @var ?string */
@@ -62,6 +64,9 @@ class RepositoryPsetInfo {
         }
         if (isset($this->rpnotesversion)) {
             $this->rpnotesversion = (int) $this->rpnotesversion;
+        }
+        if (isset($this->emptydiff_at)) {
+            $this->emptydiff_at = (int) $this->emptydiff_at;
         }
 
         if (isset($this->notesversion)) {
