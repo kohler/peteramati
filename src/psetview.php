@@ -1681,7 +1681,7 @@ class PsetView {
                 . ' need-tooltip" aria-label="Toggle diff view">±</a>';
             if (!$dinfo->removed && $dinfo->markdown_allowed) {
                 $bts[] = '<button class="btn ui pa-diff-toggle-markdown need-tooltip'
-                    . ($dinfo->markdown ? " btn-primary" : "")
+                    . ($hide_left && $dinfo->markdown ? " btn-primary" : "")
                     . '" aria-label="Toggle Markdown"><span class="icon-markdown"></span></button>';
             }
             if (!$dinfo->fileless && !$dinfo->removed) {
@@ -1754,7 +1754,7 @@ class PsetView {
             echo "<script>\$pa.render_text_page()</script>\n";
             $this->need_format = false;
         }
-        if (!$only_content && $dinfo->markdown) {
+        if (!$only_content && $hide_left && $dinfo->markdown) {
             echo '<script>$pa.filediff_markdown.call(document.getElementById("', $tabid, '"))</script>';
         }
     }
