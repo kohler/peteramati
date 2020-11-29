@@ -45,16 +45,18 @@ class PsetView {
     private $_hash_set = false;
     /** @var false|null|CommitRecord */
     private $derived_handout_commit = false;
+    /** @var bool */
+    private $_has_grade_counts = false;
     /** @var ?int */
-    private $n_visible_grades;
+    private $_n_visible_grades;
     /** @var ?int */
-    private $n_visible_in_total;
+    private $_n_visible_in_total;
     /** @var ?int */
-    private $n_student_grades;
+    private $_n_student_grades;
     /** @var ?int */
-    private $n_nonempty_grades;
+    private $_n_nonempty_grades;
     /** @var ?int */
-    private $n_nonempty_assigned_grades;
+    private $_n_nonempty_assigned_grades;
     /** @var bool */
     private $need_format = false;
     /** @var bool */
@@ -73,7 +75,7 @@ class PsetView {
 
     static private $forced_commitat = 0;
 
-    function __construct(Pset $pset, Contact $user, Contact $viewer) {
+    private function __construct(Pset $pset, Contact $user, Contact $viewer) {
         $this->conf = $pset->conf;
         $this->pset = $pset;
         $this->user = $user;
@@ -94,6 +96,7 @@ class PsetView {
         return $info;
     }
 
+    /** @return PsetView */
     static function make_from_set_at(StudentSet $sset, Contact $user, Pset $pset) {
         $info = new PsetView($pset, $user, $sset->viewer);
         if (($pcid = $user->link(LINK_PARTNER, $pset->id))) {
@@ -186,6 +189,24 @@ class PsetView {
         $this->n_nonempty_assigned_grades = $n;
     }
 
+    /** @param ?string $reqhash */
+    function force_set_hash($reqhash) {
+        assert($reqhash === null || strlen($reqhash) === 40);
+        if ($this->_hash !== $reqhash
+            || ($reqhash === null && !$this->_hash_set)) {
+            $this->_hash = $reqhash;
+            $this->_hash_set = true;
+            $this->_havepi &= ~4;
+            $this->_cpi = null;
+            $this->derived_handout_commit = false;
+            $this->_has_grade_counts = false;
+        }
+    }
+
+    function set_commit(CommitRecord $commit) {
+        $this->force_set_hash($commit->hash);
+    }
+
     /** @return ?non-empty-string */
     function set_hash($reqhash) {
         $this->_hash = null;
@@ -193,7 +214,7 @@ class PsetView {
         $this->_havepi &= ~4;
         $this->_cpi = null;
         $this->derived_handout_commit = false;
-        $this->set_grade_counts(null);
+        $this->_has_grade_counts = false;
         if ($this->repo) {
             if ($reqhash) {
                 if (($c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch))) {
@@ -208,41 +229,14 @@ class PsetView {
         return $this->_hash;
     }
 
-    /** @param ?string $reqhash */
-    function force_set_hash($reqhash) {
-        assert($reqhash === null || strlen($reqhash) === 40);
-        if ($this->_hash !== $reqhash
-            || ($reqhash === null && !$this->_hash_set)) {
-            $this->_hash = $reqhash;
-            $this->_hash_set = true;
-            $this->_havepi &= ~4;
-            $this->_cpi = null;
-            $this->derived_handout_commit = false;
-        }
-    }
-
-    function set_commit(CommitRecord $commit) {
-        $this->force_set_hash($commit->hash);
-    }
-
-    /** @return bool */
-    function has_commit_set() {
-        return $this->_hash !== null;
+    /** @return ?non-empty-string */
+    function hash() {
+        return $this->_hash;
     }
 
     /** @return non-empty-string */
     function commit_hash() {
         assert($this->_hash !== null);
-        return $this->_hash;
-    }
-
-    /** @return ?non-empty-string */
-    function maybe_commit_hash() {
-        return $this->_hash;
-    }
-
-    /** @return ?non-empty-string */
-    function hash() {
         return $this->_hash;
     }
 
@@ -868,28 +862,29 @@ class PsetView {
         return $this->pc_view;
     }
 
-    private function ensure_n_visible_grades() {
-        if ($this->n_visible_grades === null) {
-            $this->set_grade_counts(0);
-            if ($this->can_view_grades()) {
-                $notes = $this->current_jnotes();
-                $ag = $notes->autogrades ?? null;
-                $g = $notes->grades ?? null;
-                foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
-                    ++$this->n_visible_grades;
-                    if ($ge->student) {
-                        ++$this->n_student_grades;
+    private function load_grade_counts() {
+        $this->_has_grade_counts = true;
+        $this->_n_visible_grades = $this->_n_student_grades =
+            $this->_n_nonempty_grades = $this->_n_nonempty_assigned_grades =
+            $this->_n_visible_in_total = 0;
+        if ($this->can_view_grades()) {
+            $notes = $this->current_jnotes();
+            $ag = $notes->autogrades ?? null;
+            $g = $notes->grades ?? null;
+            foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
+                ++$this->_n_visible_grades;
+                if ($ge->student) {
+                    ++$this->_n_student_grades;
+                }
+                if (($ag && ($ag->{$ge->key} ?? null) !== null)
+                    || ($g && ($g->{$ge->key} ?? null) !== null)) {
+                    ++$this->_n_nonempty_grades;
+                    if (!$ge->student) {
+                        ++$this->_n_nonempty_assigned_grades;
                     }
-                    if (($ag && ($ag->{$ge->key} ?? null) !== null)
-                        || ($g && ($g->{$ge->key} ?? null) !== null)) {
-                        ++$this->n_nonempty_grades;
-                        if (!$ge->student) {
-                            ++$this->n_nonempty_assigned_grades;
-                        }
-                    }
-                    if (!$ge->no_total) {
-                        ++$this->n_visible_in_total;
-                    }
+                }
+                if (!$ge->no_total) {
+                    ++$this->_n_visible_in_total;
                 }
             }
         }
@@ -897,28 +892,28 @@ class PsetView {
 
     /** @return bool */
     function has_nonempty_grades() {
-        $this->ensure_n_visible_grades();
-        return $this->n_nonempty_grades > 0;
+        $this->_has_grade_counts || $this->load_grade_counts();
+        return $this->_n_nonempty_grades > 0;
     }
 
     /** @return bool */
     function has_nonempty_assigned_grades() {
-        $this->ensure_n_visible_grades();
-        return $this->n_nonempty_assigned_grades !== 0;
+        $this->_has_grade_counts || $this->load_grade_counts();
+        return $this->_n_nonempty_assigned_grades !== 0;
     }
 
     /** @return bool */
     function needs_student_grades()  {
-        $this->ensure_n_visible_grades();
-        return $this->n_student_grades !== 0
-            && ($this->n_nonempty_grades === 0
-                || $this->n_nonempty_grades === $this->n_nonempty_assigned_grades);
+        $this->_has_grade_counts || $this->load_grade_counts();
+        return $this->_n_student_grades !== 0
+            && ($this->_n_nonempty_grades === 0
+                || $this->_n_nonempty_grades === $this->_n_nonempty_assigned_grades);
     }
 
     /** @return bool */
     function needs_total() {
-        $this->ensure_n_visible_grades();
-        return $this->n_visible_in_total > 1;
+        $this->_has_grade_counts || $this->load_grade_counts();
+        return $this->_n_visible_in_total > 1;
     }
 
     /** @return array{int|float,int|float,int|float} */

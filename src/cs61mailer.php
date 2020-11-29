@@ -53,7 +53,6 @@ class CS61Mailer extends Mailer {
     private function get_pset_info() {
         if (!$this->_info && $this->pset) {
             $this->_info = PsetView::make($this->pset, $this->recipient, $this->permissionContact);
-            $this->_info->set_hash(null);
         }
         return $this->_info;
     }
@@ -110,15 +109,17 @@ class CS61Mailer extends Mailer {
                 return $isbool ? false : self::EXPANDVAR_CONTINUE;
             $info = $this->get_pset_info();
             $recent = null;
-            if ($info && $info->has_commit_set())
+            if ($info && $info->hash()) {
                 $recent = $info->commit();
+            }
             if (!$recent) {
-                if ($isbool)
+                if ($isbool) {
                     return false;
-                else if ($what == "%COMMITABBREV%" || $what == "%COMMITDATE%")
+                } else if ($what == "%COMMITABBREV%" || $what == "%COMMITDATE%") {
                     return "N/A";
-                else
+                } else {
                     return "(no commit)";
+                }
             }
             if ($what == "%COMMITHASH%")
                 return $recent->hash;

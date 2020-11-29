@@ -205,7 +205,7 @@ class ContactView {
 
         $title = "partner";
         if ($Me->isPC && $partner) {
-            $title = '<a href="' . hoturl("pset", ["u" => $Me->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->maybe_commit_hash()]) . '">' . $title . '</a>';
+            $title = '<a href="' . hoturl("pset", ["u" => $Me->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->hash()]) . '">' . $title . '</a>';
         }
 
         if ($editable) {
@@ -440,7 +440,7 @@ class ContactView {
                 }
                 if ($info->repo
                     && !$info->pset->gitless
-                    && ($h = $info->maybe_commit_hash() ? : $info->grading_hash())
+                    && ($h = $info->hash())
                     && ($ls = $info->connected_commit($h))) {
                     echo '" data-pa-commit-at="', $ls->commitat;
                 }
