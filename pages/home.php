@@ -537,37 +537,6 @@ if ($Me->isPC && $Qreq->valid_post() && $Qreq->setgrader) {
 }
 
 
-/** @param Contact $user
- * @param Qrequest $qreq */
-function runmany($user, $qreq) {
-    if (!($pset = $user->conf->pset_by_key($qreq->pset))
-        || $pset->disabled) {
-        return $user->conf->errorMsg("No such pset");
-    }
-    $users = [];
-    foreach (qreq_users($qreq) as $u) {
-        $users[] = $user->user_linkpart($u);
-    }
-    if (empty($users)) {
-        return $user->conf->errorMsg("No users selected.");
-    }
-    $args = [
-        "pset" => $pset->urlkey, "run" => $qreq->runner, "runmany" => 1,
-        "users" => join(" ", $users)
-    ];
-    if (str_ends_with($qreq->runner, ".ensure")) {
-        $args["run"] = substr($qreq->runner, 0, -7);
-        $args["ensure"] = 1;
-    }
-    Navigation::redirect($user->conf->hoturl_post("run", $args));
-    redirectSelf();
-}
-
-if ($Me->isPC && $Qreq->valid_post() && $Qreq->runmany) {
-    runmany($Me, $Qreq);
-}
-
-
 /** @return ?Pset */
 function older_enabled_repo_same_handout($pset) {
     $result = false;
@@ -1590,8 +1559,8 @@ function show_pset_table($sset) {
     }
     if (count($sel) > 1) {
         echo '<span class="nb" style="padding-right:2em">',
-            Ht::select("runner", $sel + $esel),
-            ' &nbsp;', Ht::submit("runmany", "Run all"),
+            Ht::select("run", $sel + $esel),
+            ' &nbsp;', Ht::submit("Run all", ["formaction" => $pset->conf->hoturl_post("run", ["pset" => $pset->urlkey, "runmany" => 1])]),
             '</span>';
     }
 
