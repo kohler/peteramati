@@ -610,12 +610,11 @@ class PsetView {
         assert(strlen($hash) === 40);
 
         // find original
-        $this_commit = $this->_hash === $hash
-            || (!$this->_hash && $this->_rpi && $this->_rpi->gradehash === $hash);
-        if ($this_commit && $this->_cpi) {
+        if ($this->_hash === $hash && $this->_cpi) {
             $old_notes = $this->_cpi->jnotes();
             $old_nversion = $this->_cpi->notesversion;
-        } else if ($this_commit && $this->_rpi && $this->_rpi->notesversion !== null) {
+        } else if ($this->_rpi && $this->_rpi->gradehash === $hash
+                   && $this->_rpi->notesversion !== null) {
             $old_notes = $this->_rpi->jnotes();
             $old_nversion = $this->_rpi->notesversion;
         } else if (($cpi = $this->pset->cpi_at($hash))) {
@@ -668,11 +667,11 @@ class PsetView {
             }
         }
 
-        if ($this_commit && !$this->_cpi) {
-            $this->_havepi |= 4;
-            $this->_cpi = CommitPsetInfo::make_new($this->pset, $this->repo, $this->_hash);
-        }
-        if ($this_commit) {
+        if ($this->_hash === $hash) {
+            if (!$this->_cpi) {
+                $this->_havepi |= 4;
+                $this->_cpi = CommitPsetInfo::make_new($this->pset, $this->repo, $this->_hash);
+            }
             $this->_cpi->assign_notes($notes, $new_notes, ($old_nversion ?? 0) + 1);
             $this->_cpi->hasflags = $hasflags;
             $this->_cpi->hasactiveflags = $hasactiveflags;
