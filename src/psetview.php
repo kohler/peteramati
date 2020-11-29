@@ -41,8 +41,6 @@ class PsetView {
 
     /** @var ?string */
     private $_hash;
-    /** @var bool */
-    private $_hash_set = false;
     /** @var false|null|CommitRecord */
     private $derived_handout_commit = false;
     /** @var bool */
@@ -84,7 +82,9 @@ class PsetView {
         assert($viewer === $user || $this->pc_view);
     }
 
-    static function make(Pset $pset, Contact $user, Contact $viewer) {
+    /** @param ?string $hash
+     * @return PsetView */
+    static function make(Pset $pset, Contact $user, Contact $viewer, $hash = null) {
         $info = new PsetView($pset, $user, $viewer);
         $info->partner = $user->partner($pset->id);
         if (!$pset->gitless) {
@@ -92,7 +92,9 @@ class PsetView {
             $info->branchid = $user->branchid($pset);
             $info->branch = $info->conf->branch($info->branchid);
         }
-        $info->set_hash(null);
+        if ($hash !== "none") {
+            $info->set_hash($hash);
+        }
         return $info;
     }
 
@@ -180,22 +182,11 @@ class PsetView {
         }
     }
 
-    /** @param ?int $n */
-    private function set_grade_counts($n) {
-        $this->n_visible_grades = $n;
-        $this->n_visible_in_total = $n;
-        $this->n_student_grades = $n;
-        $this->n_nonempty_grades = $n;
-        $this->n_nonempty_assigned_grades = $n;
-    }
-
     /** @param ?string $reqhash */
     function force_set_hash($reqhash) {
         assert($reqhash === null || strlen($reqhash) === 40);
-        if ($this->_hash !== $reqhash
-            || ($reqhash === null && !$this->_hash_set)) {
+        if ($this->_hash !== $reqhash) {
             $this->_hash = $reqhash;
-            $this->_hash_set = true;
             $this->_havepi &= ~4;
             $this->_cpi = null;
             $this->derived_handout_commit = false;
@@ -207,26 +198,20 @@ class PsetView {
         $this->force_set_hash($commit->hash);
     }
 
-    /** @return ?non-empty-string */
+    /** @param ?string $reqhash
+     * @return void */
     function set_hash($reqhash) {
-        $this->_hash = null;
-        $this->_hash_set = true;
-        $this->_havepi &= ~4;
-        $this->_cpi = null;
-        $this->derived_handout_commit = false;
-        $this->_has_grade_counts = false;
-        if ($this->repo) {
-            if ($reqhash) {
+        $hash = null;
+        if ($this->repo && $reqhash !== "none") {
+            if ($reqhash !== null && $reqhash !== "") {
                 if (($c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch))) {
-                    $this->_hash = $c->hash;
+                    $hash = $c->hash;
                 }
-            } else if (($gh = $this->grading_hash())) {
-                $this->_hash = $gh;
-            } else if (($c = $this->latest_commit())) {
-                $this->_hash = $c->hash;
+            } else {
+                $hash = $this->grading_hash() ?? $this->latest_hash();
             }
         }
-        return $this->_hash;
+        $this->force_set_hash($hash);
     }
 
     /** @return ?non-empty-string */

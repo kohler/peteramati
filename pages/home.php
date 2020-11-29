@@ -501,11 +501,12 @@ function set_grader(Qrequest $qreq) {
 
     foreach (qreq_users($qreq) as $user) {
         // XXX check if can_set_grader
-        $info = PsetView::make($pset, $user, $Me);
+        $info = PsetView::make($pset, $user, $Me, "none");
         if ($info->repo) {
             $info->repo->refresh(2700, true);
         }
-        if (!$info->set_hash(null)) {
+        $info->set_hash(null);
+        if (!$info->hash()) {
             error_log("cannot set_hash for $user->email");
             continue;
         }

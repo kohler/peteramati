@@ -21,12 +21,16 @@ $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // load user repo and current commit
-$Info = PsetView::make($Pset, $User, $Me);
-if (!$Info->set_hash($Qreq->newcommit ?? $Qreq->commit)
-    && ($Qreq->newcommit ?? $Qreq->commit)
-    && $Info->repo) {
-    $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository.");
-    redirectSelf(array("newcommit" => null, "commit" => null));
+$Info = PsetView::make($Pset, $User, $Me, $Qreq->newcommit ?? $Qreq->commit);
+if (($Qreq->newcommit ?? $Qreq->commit) && !$Info->hash()) {
+    if ($Info->repo) {
+        $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository.");
+        $Info->set_hash(null); // XXX
+        unset($Qreq->newcommit, $Qreq->commit);
+    } else {
+        $Conf->errorMsg("No repository has been configured for this pset.");
+        ContactView::error_exit("404 Not Found", htmlspecialchars($Pset->title));
+    }
 }
 $Conf->set_active_list(SessionList::find($Me, $Qreq));
 

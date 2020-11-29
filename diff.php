@@ -30,10 +30,7 @@ if (!$Info->repo) {
 }
 if (!$Qreq->commit || !$Qreq->commit1) {
     if (!$Qreq->commit1) {
-        if (!$Info->set_hash(null)) {
-            $Me->escape();
-        }
-        $Qreq->commit1 = $Info->commit_hash();
+        $Qreq->commit1 = $Info->hash();
     }
     if (!$Qreq->commit) {
         $Qreq->commit = $Info->derived_handout_hash();

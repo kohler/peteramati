@@ -12,12 +12,9 @@ global $User, $Pset, $Info, $Commit, $Qreq;
 /** @return PsetView */
 function raw_user_pset_info() {
     global $Conf, $User, $Pset, $Me, $Info, $Commit, $Qreq;
-    $Info = PsetView::make($Pset, $User, $Me);
-    if (($Commit = $Qreq->newcommit) == null) {
-        $Commit = $Qreq->commit;
-    }
-    if (!$Info->set_hash($Commit)) {
-        json_exit(["ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Commit) . " isn’t connected to this repository."]);
+    $Info = PsetView::make($Pset, $User, $Me, $Qreq->newcommit ?? $Qreq->commit);
+    if (!$Info->hash()) {
+        json_exit(["ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository."]);
     }
     return $Info;
 }

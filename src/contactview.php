@@ -715,4 +715,12 @@ class ContactView {
             return null;
         }
     }
+
+    static function error_exit($status, $title) {
+        header("HTTP/1.0 $status");
+        Conf::$main->header($title, "home");
+        echo "<hr class=\"c\">\n";
+        Conf::$main->footer();
+        exit;
+    }
 }

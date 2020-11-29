@@ -16,12 +16,9 @@ function quit($err = null) {
 
 function user_pset_info() {
     global $Conf, $User, $Me, $Pset, $Info, $Qreq;
-    $Info = PsetView::make($Pset, $User, $Me);
-    if (($Commit = $Qreq->newcommit) == null) {
-        $Commit = $Qreq->commit;
-    }
-    if (!$Pset->gitless && !$Info->set_hash($Commit)) {
-        quit(!$Info->repo ? "No repository" : "Commit $Commit isn’t connected to this repository");
+    $Info = PsetView::make($Pset, $User, $Me, $Qreq->newcommit ?? $Qreq->commit);
+    if (!$Pset->gitless && !$Info->hash()) {
+        quit(!$Info->repo ? "No repository" : "Commit " . ($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository");
     }
     return $Info;
 }
