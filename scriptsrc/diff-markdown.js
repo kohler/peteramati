@@ -268,16 +268,16 @@ export function filediff_markdown() {
             addClass(d, "image-container");
         }
 
-        var lp = document.createElement("div");
+        const lp = document.createElement("div");
         lp.className = "pa-dl pa-dlr";
-        var la = document.createElement("div");
+        const la = document.createElement("div");
         la.className = "pa-da";
-        var lb = document.createElement("div");
+        const lb = document.createElement("div");
         lb.className = "pa-db";
 
-        var lm = d.getAttribute("data-landmark");
+        const lm = d.getAttribute("data-landmark");
         if (lm) {
-            var l1 = parseInt(lm),
+            let l1 = parseInt(lm),
                 dash = lm.indexOf("-"),
                 l2 = dash >= 0 ? parseInt(lm.substring(dash + 1)) : l1;
             while (e) {
@@ -288,7 +288,7 @@ export function filediff_markdown() {
                 e = e.nextSibling;
             }
             lb.setAttribute("data-landmark", l1);
-            var klass = 0, ee = e;
+            let klass = 0, ee = e;
             while (ee) {
                 if (hasClass(ee, "pa-gi") || hasClass(ee, "pa-gc")) {
                     if (+ee.firstChild.nextSibling.getAttribute("data-landmark") >= l2) {
@@ -301,7 +301,7 @@ export function filediff_markdown() {
             lp.className += klass === 2 ? " pa-gc" : " pa-gi";
         }
 
-        var lr = document.createElement("div");
+        const lr = document.createElement("div");
         lr.className = "pa-dr";
         if (d === dx.firstChild) {
             dx.removeChild(d);

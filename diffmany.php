@@ -31,7 +31,6 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
     if (!$pset->gitless && !$info->repo) {
         return;
     }
-    $info->set_hash(false);
     $linkpart_html = htmlspecialchars($Me->user_linkpart($user));
     echo '<div id="pa-psetinfo', $psetinfo_idx,
         '" class="pa-psetinfo pa-diffcontext',

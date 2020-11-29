@@ -688,7 +688,9 @@ class PsetView {
 
     /** @param array $updates */
     function update_commit_notes($updates) {
-        assert(!!$this->_hash);
+        if (!$this->_hash) {
+            throw new Exception;
+        }
         $this->update_commit_notes_at($this->_hash, $updates);
     }
 
@@ -1075,39 +1077,41 @@ class PsetView {
         }
     }
 
+    /** @param Contact|int $grader */
     function change_grader($grader) {
         if (is_object($grader)) {
-            $grader = $grader->contactId;
+            $gcid = $grader->contactId ? : null;
+        } else {
+            $gcid = $grader ? : null;
         }
         if ($this->pset->gitless_grades) {
             $q = Dbl::format_query("insert into ContactGrade
                 set cid=?, pset=?, gradercid=?
                 on duplicate key update gradercid=values(gradercid)",
-                $this->user->contactId, $this->pset->id, $grader);
+                $this->user->contactId, $this->pset->id, $gcid);
         } else {
-            assert(!!$this->_hash);
+            if ($this->_hash === null) {
+                throw new Exception;
+            }
             $rpi = $this->rpi();
+            $commit = $this->connected_commit($this->_hash);
             if (!$rpi || $rpi->gradebhash === null) {
-                $commit = $this->_hash ? $this->connected_commit($this->_hash) : null;
                 $q = Dbl::format_query("insert into RepositoryGrade
                     set repoid=?, branchid=?, pset=?,
                     gradebhash=?, commitat=?, gradercid=?, placeholder=0
                     on duplicate key update
-                    gradebhash=values(gradebhash), commitat=values(commitat), gradercid=values(gradercid), placeholder=0",
+                    gradebhash=values(gradebhash), commitat=values(commitat), gradercid=values(gradercid), placeholder=0, emptydiff_at=null",
                     $this->repo->repoid, $this->branchid, $this->pset->id,
-                    $this->_hash ? hex2bin($this->_hash) : null,
-                    $commit ? $commit->commitat : null, $grader);
+                    hex2bin($this->_hash), $commit ? $commit->commitat : null, $gcid);
             } else {
-                $bhash = $this->_hash ? hex2bin($this->_hash) : $this->grading_hash();
-                $commit = $bhash ? $this->connected_commit(bin2hex($bhash)) : null;
                 $q = Dbl::format_query("update RepositoryGrade
-                    set gradebhash=?, commitat=?, gradercid=?, placeholder=0
+                    set gradebhash=?, commitat=?, gradercid=?, placeholder=0, emptydiff_at=null
                     where repoid=? and branchid=? and pset=? and gradebhash=?",
-                    $bhash, $commit ? $commit->commitat : null, $grader,
+                    hex2bin($this->_hash), $commit ? $commit->commitat : null, $gcid,
                     $this->repo->repoid, $this->branchid, $this->pset->id,
                     $rpi->gradebhash);
             }
-            $this->update_commit_notes(["gradercid" => $grader]);
+            $this->update_commit_notes(["gradercid" => $gcid]);
         }
         $this->conf->qe_raw($q);
         $this->clear_grade();
@@ -1120,21 +1124,22 @@ class PsetView {
                 on duplicate key update gradercid=gradercid",
                 $this->user->contactId, $this->pset->psetid, $this->viewer->contactId);
         } else {
-            assert(!!$this->_hash);
-            $cn = $this->commit_jnotes();
-            $grader = $cn ? $cn->gradercid ?? null : null;
-            if (!$grader && ($rpi = $this->rpi())) {
-                $grader = $rpi->gradercid;
+            if (!$this->_hash) {
+                throw new Exception;
             }
-            $commit = $this->_hash ? $this->connected_commit($this->_hash) : null;
+            $cn = $this->commit_jnotes();
+            $gcid = $cn ? $cn->gradercid ?? null : null;
+            if (!$gcid && ($rpi = $this->rpi())) {
+                $gcid = $rpi->gradercid;
+            }
+            $commit = $this->connected_commit($this->_hash);
             $this->conf->qe("insert into RepositoryGrade set
                 repoid=?, branchid=?, pset=?,
                 gradebhash=?, commitat=?, gradercid=?, placeholder=0
                 on duplicate key update
-                gradebhash=values(gradebhash), commitat=values(commitat), gradercid=values(gradercid), placeholder=0",
+                gradebhash=values(gradebhash), commitat=values(commitat), gradercid=values(gradercid), placeholder=0, emptydiff_at=null",
                 $this->repo->repoid, $this->branchid, $this->pset->psetid,
-                $this->_hash ? hex2bin($this->_hash) : null,
-                $commit ? $commit->commitat : null, $grader ? : null);
+                hex2bin($this->_hash), $commit ? $commit->commitat : null, $gcid ? : null);
             $this->user->invalidate_grades($this->pset->id);
         }
         $this->clear_grade();

@@ -22,11 +22,10 @@ $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // load user repo and current commit
 $Info = PsetView::make($Pset, $User, $Me);
-if (($commit = $Qreq->newcommit) == null) {
-    $commit = $Qreq->commit;
-}
-if (!$Info->set_hash($commit) && $commit && $Info->repo) {
-    $Conf->errorMsg("Commit " . htmlspecialchars($commit) . " isn’t connected to this repository.");
+if (!$Info->set_hash($Qreq->newcommit ?? $Qreq->commit)
+    && ($Qreq->newcommit ?? $Qreq->commit)
+    && $Info->repo) {
+    $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository.");
     redirectSelf(array("newcommit" => null, "commit" => null));
 }
 $Conf->set_active_list(SessionList::find($Me, $Qreq));

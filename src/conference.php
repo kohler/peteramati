@@ -1459,8 +1459,9 @@ class Conf {
             $this->opt["assetsUrl"] = $base;
             Ht::$img_base = $this->opt["assetsUrl"] . "images/";
         }
-        if ($this->opt["scriptAssetsUrl"] === $old_siteurl)
+        if ($this->opt["scriptAssetsUrl"] === $old_siteurl) {
             $this->opt["scriptAssetsUrl"] = $base;
+        }
     }
 
     const HOTURL_RAW = 1;
