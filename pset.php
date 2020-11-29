@@ -678,10 +678,10 @@ if ($Pset->gitless) {
         $runnerbuttons[] = '<div class="g"></div>';
         $all_resolved = true;
         foreach ($Info->current_jnote("flags") ?? [] as $k => $v) {
-            $resolved = get($v, "resolved");
+            $resolved = $v->resolved ?? false;
             $all_resolved = $all_resolved && $resolved;
             $conversation = "";
-            if (get($v, "conversation")) {
+            if ($v->conversation ?? false) {
                 $conversation = htmlspecialchars((string) $v->conversation[0][2]);
             }
             if ($resolved && $conversation === "") {

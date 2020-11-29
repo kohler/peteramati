@@ -4,7 +4,7 @@
 
 import { handle_ui, fold61 } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
-import { hoturl } from "./hoturl.js";
+import { hoturl, hoturl_post, hoturl_gradeparts } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
 import { Bubble } from "./tooltip.js";
 
@@ -78,45 +78,36 @@ handle_ui.on("js-pset-setcommit", function () {
 });
 
 handle_ui.on("js-pset-flag", function () {
-    var $b = $(this), $form = $b.closest("form");
-    if (this.name == "flag" && !$form.find("[name=flagreason]").length) {
-        $b.before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" /> &nbsp;</span>');
-        $form.find("[name=flagreason]").on("keypress", function (evt) {
+    let self = this, form = self.closest("form");
+    if (this.name === "flag" && !form.elements.flagreason) {
+        $(self).before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" /> &nbsp;</span>');
+        $(form.elements.flagreason).on("keypress", function (evt) {
             if (!event_modkey(evt) && event_key(evt) === "Enter") {
                 evt.preventDefault();
                 evt.stopImmediatePropagation();
-                $b.click();
+                $(self).click();
             }
         }).autogrow()[0].focus();
-        $b.html("OK");
-    } else if (this.name == "flag") {
-        $.ajax($form.attr("action"), {
-            data: $form.serializeWith({flag: 1}),
-            type: "POST", cache: false,
-            dataType: "json",
-            success: function (data) {
+        $(self).html("OK");
+    } else if (this.name === "flag") {
+        $.post(hoturl_post("api/flag", hoturl_gradeparts(this, {flagid: "new"})),
+            {reason: form.elements.flagreason.value},
+            function (data) {
                 if (data && data.ok) {
-                    $form.find(".flagreason").remove();
-                    $b.replaceWith("<strong>Flagged</strong>");
+                    $(form).find(".flagreason").remove();
+                    $(self).replaceWith("<strong>Flagged</strong>");
+                } else {
+                    $(form).find(".ajaxsave61").html('<span class="error">Failed</span>');
                 }
-            },
-            error: function () {
-                $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
-            }
-        });
+            });
     } else if (this.name == "resolveflag") {
-        $.ajax($form.attr("action"), {
-            data: $form.serializeWith({resolveflag: 1, flagid: $b.attr("data-flagid")}),
-            type: "POST", cache: false,
-            dataType: "json",
-            success: function (data) {
+        $.post(hoturl_post("api/flag", hoturl_gradeparts(this, {flagid: this.getAttribute("data-flagid"), resolve: 1})), {},
+            function (data) {
                 if (data && data.ok) {
-                    $b.replaceWith("<strong>Resolved</strong>");
+                    $(self).replaceWith("<strong>Resolved</strong>");
+                } else {
+                    $(form).find(".ajaxsave61").html('<span class="error">Failed</span>');
                 }
-            },
-            error: function () {
-                $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
-            }
-        })
+            });
     }
 });

@@ -35,47 +35,6 @@ assert($User == $Me || $Me->isPC);
 
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
-// XXX this should be under `api`
-if ($Qreq->flag && $Qreq->valid_token() && user_pset_info()) {
-    $flags = (array) $Info->current_jnote("flags");
-    if ($Qreq->flagid && !isset($flags["t" . $Qreq->flagid])) {
-        json_exit(["ok" => false, "error" => "No such flag"]);
-    }
-    if (!$Qreq->flagid) {
-        $Qreq->flagid = "t" . Conf::$now;
-    }
-    $flag = get($flags, $Qreq->flagid, []);
-    if (!get($flag, "uid")) {
-        $flag["uid"] = $Me->contactId;
-    }
-    if (!get($flag, "started")) {
-        $flag["started"] = Conf::$now;
-    }
-    if (get($flag, "started", $Qreq->flagid) != Conf::$now) {
-        $flag["updated"] = Conf::$now;
-    }
-    if ($Qreq->flagreason) {
-        $flag["conversation"][] = [Conf::$now, $Me->contactId, $Qreq->flagreason];
-    }
-    $updates = ["flags" => [$Qreq->flagid => $flag]];
-    $Info->update_current_notes($updates);
-    json_exit(["ok" => true]);
-}
-
-// XXX this should be under `api`
-if ($Qreq->resolveflag && $Qreq->valid_token() && user_pset_info()) {
-    $flags = (array) $Info->current_jnote("flags");
-    if (!$Qreq->flagid || !isset($flags[$Qreq->flagid])) {
-        json_exit(["ok" => false, "error" => "No such flag"]);
-    }
-    if (get($flags[$Qreq->flagid], "resolved")) {
-        json_exit(["ok" => true]);
-    }
-    $updates = ["flags" => [$Qreq->flagid => ["resolved" => [Conf::$now, $Me->contactId]]]];
-    $Info->update_current_notes($updates);
-    json_exit(["ok" => true]);
-}
-
 $Runner = null;
 foreach ($Pset->runners as $r) {
     if ($r->name == $Qreq->run)

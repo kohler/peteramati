@@ -138,7 +138,8 @@ export function url_absolute(url, loc) {
 }
 
 export function hoturl_absolute_base() {
-    if (!siteinfo.absolute_base)
+    if (!siteinfo.absolute_base) {
         siteinfo.absolute_base = url_absolute(siteinfo.base);
+    }
     return siteinfo.absolute_base;
 }

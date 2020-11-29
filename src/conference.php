@@ -12,7 +12,9 @@ class APIData {
     public $pset;
     /** @var ?Repository*/
     public $repo;
+    /** @var ?string */
     public $branch;
+    /** @var ?string */
     public $hash;
     /** @var ?CommitRecord */
     public $commit;
@@ -2442,24 +2444,22 @@ class Conf {
     // API
 
     private function call_api($uf, Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$uf)
+        if (!$uf) {
             return ["ok" => false, "error" => "API function not found."];
-        if (!($uf->get ?? null) && !check_post($qreq))
+        } else if (!($uf->get ?? null) && !$qreq->valid_post()) {
             return ["ok" => false, "error" => "Missing credentials."];
+        }
         $need_hash = !!($uf->hash ?? false);
         $need_repo = !!($uf->repo ?? false);
         $need_pset = $need_repo || $need_hash || !!($uf->pset ?? false);
         $need_user = !!($uf->user ?? false);
         if ($need_user && !$api->user) {
             return ["ok" => false, "error" => "Missing user."];
-        }
-        if ($need_pset && !$api->pset) {
+        } else if ($need_pset && !$api->pset) {
             return ["ok" => false, "error" => "Missing pset."];
-        }
-        if ($need_repo && !$api->repo) {
+        } else if ($need_repo && !$api->repo) {
             return ["ok" => false, "error" => "Missing repository."];
-        }
-        if ($need_hash) {
+        } else if ($need_hash) {
             $api->commit = $this->check_api_hash($api->hash, $api);
             if (!$api->commit) {
                 return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
@@ -2488,14 +2488,16 @@ class Conf {
             && isset($fj->callback)) {
             $this->_api_map[$fj->fn] = $fj;
             return true;
-        } else
+        } else {
             return false;
+        }
     }
     private function fill_api_map() {
         $this->_api_map = [
             "blob" => "15 API_Repo::blob",
             "diffconfig" => "15 API_Repo::diffconfig",
             "filediff" => "15 API_Repo::filediff",
+            "flag" => "15 API_Flag::flag",
             "grade" => "3 API_Grade::grade",
             "gradestatistics" => "3 API_GradeStatistics::run",
             "jserror" => "1 API_JSError::jserror",
@@ -2504,8 +2506,9 @@ class Conf {
             "multigrade" => "3 API_Grade::multigrade",
             "repositories" => "17 API_Repo::user_repositories"
         ];
-        if (($olist = $this->opt("apiFunctions")))
+        if (($olist = $this->opt("apiFunctions"))) {
             expand_json_includes_callback($olist, [$this, "_add_api_json"]);
+        }
     }
     function has_api($fn) {
         if ($this->_api_map === null) {
