@@ -4,6 +4,7 @@
 
 import { escape_entities } from "./encoders.js";
 import { log_jserror } from "./utils-errors.js";
+import { markdownit_minihtml } from "./markdown-minihtml.js";
 
 
 let default_format = 0;
@@ -127,7 +128,7 @@ render_text.add_format({
     format: 1,
     render: function (text) {
         if (!md) {
-            md = window.markdownit({highlight: try_highlight}).use(markdownit_katex);
+            md = window.markdownit({highlight: try_highlight}).use(markdownit_katex).use(markdownit_minihtml);
         }
         return md.render(text);
     }

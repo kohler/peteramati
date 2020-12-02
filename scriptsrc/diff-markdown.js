@@ -5,6 +5,7 @@
 import { Filediff } from "./diff.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
 import { hoturl_post, hoturl_gradeparts } from "./hoturl.js";
+import { markdownit_minihtml } from "./markdown-minihtml.js";
 
 let md, mdcontext;
 
@@ -186,7 +187,7 @@ function render_landmark_fence(md) {
 
 function make_markdownit() {
     if (!md) {
-        md = markdownit().use(markdownit_katex);
+        md = markdownit().use(markdownit_katex).use(markdownit_minihtml);
         for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
                        "bullet_list_open", "table_open", "blockquote_open",
                        "hr"]) {
