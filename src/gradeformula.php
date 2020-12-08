@@ -3,23 +3,38 @@
 // HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
-class GradeFormula implements JsonSerializable {
-    private $_op;
-    private $_a;
+abstract class GradeFormula implements JsonSerializable {
+    /** @var string */
+    protected $_op;
+    /** @var list<GradeFormula> */
+    protected $_a;
 
+    static public $precedences = [
+        "**" => 13,
+        "*" => 11, "/" => 11, "%" => 11,
+        "+" => 10, "-" => 10, "+?" => 10,
+        "<" => 8, "<=" => 8, ">" => 8, ">=" => 8,
+        "==" => 7, "!=" => 7,
+        "&&" => 3,
+        "||" => 2,
+        "??" => 1
+    ];
+
+    /** @param string $op
+     * @param list<GradeFormula> $a */
     function __construct($op, $a) {
         $this->_op = $op;
         $this->_a = $a;
     }
 
-    static function parse($conf, &$t, $minprec) {
+    static function parse_prefix(Conf $conf, &$t, $minprec) {
         $t = ltrim($t);
 
         if ($t === "") {
             $e = null;
         } else if ($t[0] === "(") {
             $t = substr($t, 1);
-            $e = self::parse($conf, $t, 0);
+            $e = self::parse_ternary_prefix($conf, $t);
             if ($e !== null) {
                 $t = ltrim($t);
                 if ($t === "" || $t[0] !== ")") {
@@ -30,9 +45,9 @@ class GradeFormula implements JsonSerializable {
         } else if ($t[0] === "-" || $t[0] === "+") {
             $op = $t[0];
             $t = substr($t, 1);
-            $e = self::parse($conf, $t, 12);
+            $e = self::parse_prefix($conf, $t, 12);
             if ($e !== null && $op === "-") {
-                $e = new GradeFormula("neg", [$e]);
+                $e = new Unary_GradeFormula("neg", $e);
             }
         } else if (preg_match('/\A(\d+\.?\d*|\.\d+)(.*)\z/s', $t, $m)) {
             $t = $m[2];
@@ -42,15 +57,21 @@ class GradeFormula implements JsonSerializable {
             $e = new Number_GradeFormula((float) M_PI);
         } else if (preg_match('/\A(log10|log|ln|lg|exp)\b(.*)\z/s', $t, $m)) {
             $t = $m[2];
-            $e = self::parse($conf, $t, 12);
+            $e = self::parse_prefix($conf, $t, 12);
             if ($e !== null) {
-                $e = new GradeFormula($m[1], [$e]);
+                $e = new Unary_GradeFormula($m[1], $e);
             }
         } else if (preg_match('/\A(\w+)\s*\.\s*(\w+)(.*)\z/s', $t, $m)) {
-            if (($pset = $conf->pset_by_key_or_title($m[1]))
-                && ($ge = $pset->gradelike_by_key($m[2]))) {
-                $t = $m[3];
-                $e = new GradeEntry_GradeFormula($pset, $ge);
+            if (($pset = $conf->pset_by_key_or_title($m[1]))) {
+                if ($m[2] === "total") {
+                    $t = $m[3];
+                    $e = new PsetTotal_GradeFormula($pset, false, false);
+                } else if (($ge = $pset->gradelike_by_key($m[2]))) {
+                    $t = $m[3];
+                    $e = new GradeEntry_GradeFormula($pset, $ge);
+                } else {
+                    return null;
+                }
             } else {
                 return null;
             }
@@ -95,65 +116,58 @@ class GradeFormula implements JsonSerializable {
 
         while (true) {
             $t = ltrim($t);
-            if (preg_match('/\A(\+|-|\*\*?|\/|%)(.*)\z/s', $t, $m)) {
+            if (preg_match('/\A(\+\??|-|\*\*?|\/|%|\?\?|\|\||\&\&|==|<=?|>=?|!=)(.*)\z/s', $t, $m)) {
                 $op = $m[1];
-                if ($op === "**") {
-                    $prec = 13;
-                } else if ($op === "*" || $op === "/" || $op === "%") {
-                    $prec = 11;
-                } else {
-                    $prec = 10;
-                }
+                $prec = self::$precedences[$op];
                 if ($prec < $minprec) {
                     return $e;
                 }
                 $t = $m[2];
-                $e2 = self::parse($conf, $t, $op === "**" ? $prec : $prec + 1);
-                if ($e === null) {
+                $e2 = self::parse_prefix($conf, $t, $op === "**" ? $prec : $prec + 1);
+                if ($e2 === null) {
                     return null;
                 }
-                $e = new GradeFormula($op, [$e, $e2]);
+                if (in_array($op, ["+?", "??", "||", "&&"])) {
+                    $e = new NullableBin_GradeFormula($op, $e, $e2);
+                } else if (in_array($op, ["<", "==", ">", "<=", ">=", "!="])) {
+                    $e = new Relation_GradeFormula($op, $e, $e2);
+                } else {
+                    $e = new Bin_GradeFormula($op, $e, $e2);
+                }
             } else {
                 return $e;
             }
         }
     }
 
-    function evaluate(Contact $student) {
-        $vs = [];
-        foreach ($this->_a as $e) {
-            $v = $e->evaluate($student);
-            if ($v === null) {
-                return null;
-            }
-            $vs[] = $v;
-        }
-        switch ($this->_op) {
-        case "+":
-            return $vs[0] + $vs[1];
-        case "-":
-            return $vs[0] - $vs[1];
-        case "*":
-            return $vs[0] * $vs[1];
-        case "/":
-            return $vs[0] / $vs[1];
-        case "%":
-            return $vs[0] % $vs[1];
-        case "**":
-            return $vs[0] ** $vs[1];
-        case "neg":
-            return -$vs[0];
-        case "log":
-        case "log10":
-            return log10($vs[0]);
-        case "ln":
-            return log($vs[0]);
-        case "lg":
-            return log($vs[0]) / log(2);
-        case "exp":
-            return exp($vs[0]);
+    static function parse_ternary_prefix(Conf $conf, &$t) {
+        $t = ltrim($t);
+        $e = self::parse_prefix($conf, $t, 0);
+        if ($e !== null
+            && $t !== ""
+            && preg_match('/\A\s*\?(?!\?)(.*)\z/s', $t, $m)
+            && ($e2 = self::parse_prefix($conf, $m[1], 0))
+            && preg_match('/\A\s*:(.*)\z/s', $m[1], $mm)
+            && ($e3 = self::parse_ternary_prefix($conf, $mm[1]))) {
+            $t = $mm[1];
+            return new Ternary_GradeFormula($e, $e2, $e3);
+        } else {
+            return $e;
         }
     }
+
+    /** @param ?string $s
+     * @return ?GradeFormula */
+    static function parse(Conf $conf, $s) {
+        if ($s !== null
+            && ($f = self::parse_ternary_prefix($conf, $s)) !== null) {
+            return trim($s) === "" ? $f : null;
+        } else {
+            return null;
+        }
+    }
+
+    abstract function evaluate(Contact $student);
 
     function jsonSerialize() {
         $x = [$this->_op];
@@ -164,6 +178,113 @@ class GradeFormula implements JsonSerializable {
     }
 }
 
+class Unary_GradeFormula extends GradeFormula {
+    function __construct($op, $e) {
+        parent::__construct($op, [$e]);
+    }
+    function evaluate(Contact $student) {
+        if (($v0 = $this->_a[0]->evaluate($student)) === null) {
+            return null;
+        }
+        switch ($this->_op) {
+        case "neg":
+            return -$v0;
+        case "log":
+        case "log10":
+            return log10($v0);
+        case "ln":
+            return log($v0);
+        case "lg":
+            return log($v0) / log(2);
+        case "exp":
+            return exp($v0);
+        }
+    }
+}
+
+class Bin_GradeFormula extends GradeFormula {
+    function __construct($op, $e1, $e2) {
+        parent::__construct($op, [$e1, $e2]);
+    }
+    function evaluate(Contact $student) {
+        if (($v0 = $this->_a[0]->evaluate($student)) === null
+            || ($v1 = $this->_a[1]->evaluate($student)) === null) {
+            return null;
+        }
+        switch ($this->_op) {
+        case "+":
+            return $v0 + $v1;
+        case "-":
+            return $v0 - $v1;
+        case "*":
+            return $v0 * $v1;
+        case "/":
+            return $v0 / $v1;
+        case "%":
+            return $v0 % $v1;
+        case "**":
+            return $v0 ** $v1;
+        }
+    }
+}
+
+class Relation_GradeFormula extends GradeFormula {
+    function __construct($op, $e1, $e2) {
+        parent::__construct($op, [$e1, $e2]);
+    }
+    function evaluate(Contact $student) {
+        $v0 = $this->_a[0]->evaluate($student);
+        $v1 = $this->_a[1]->evaluate($student);
+        switch ($this->_op) {
+        case "==":
+            return $v0 == $v1;
+        case "!=":
+            return $v0 != $v1;
+        case "<":
+            return $v0 < $v1;
+        case "<=":
+            return $v0 <= $v1;
+        case ">":
+            return $v0 > $v1;
+        case ">=":
+            return $v0 >= $v1;
+        }
+    }
+}
+
+class NullableBin_GradeFormula extends GradeFormula {
+    function __construct($op, $e1, $e2) {
+        parent::__construct($op, [$e1, $e2]);
+    }
+    function evaluate(Contact $student) {
+        $v0 = $this->_a[0]->evaluate($student);
+        $v1 = $this->_a[1]->evaluate($student);
+        switch ($this->_op) {
+        case "+?":
+            if ($v0 === null && $v1 === null) {
+                return null;
+            } else {
+                return (float) $v0 + (float) $v1;
+            }
+        case "??":
+            return $v0 ?? $v1;
+        case "&&":
+            return $v0 ? $v1 : $v0;
+        case "||":
+            return $v0 ? : $v1;
+        }
+    }
+}
+
+class Ternary_GradeFormula extends GradeFormula {
+    function __construct($ec, $et, $ef) {
+        parent::__construct("?:", [$ec, $et, $ef]);
+    }
+    function evaluate(Contact $student) {
+        $v0 = $this->_a[0]->evaluate($student);
+        return $this->_a[$v0 ? 1 : 2]->evaluate($student);
+    }
+}
 
 class Number_GradeFormula extends GradeFormula {
     /** @var float */

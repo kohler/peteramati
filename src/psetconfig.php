@@ -1278,9 +1278,8 @@ class GradeEntryConfig {
     function formula(Conf $conf) {
         if ($this->_formula === false) {
             $this->_formula = null;
-            if (($t = $this->formula)
-                && ($f = GradeFormula::parse($conf, $t, 0))
-                && trim($t) === "") {
+            if ($this->formula
+                && ($f = GradeFormula::parse($conf, $this->formula))) {
                 $this->_formula = $f;
             }
         }
