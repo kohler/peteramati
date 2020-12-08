@@ -209,14 +209,17 @@ export class GradeEntry {
 
 export class GradeSheet {
     constructor(x) {
+        x && this.extend(x);
+    }
+
+    extend(x) {
         Object.assign(this, x);
-        if (this.entries) {
+        if (x.entries) {
             for (let i in this.entries) {
                 this.entries[i] = new GradeEntry(this.entries[i]);
                 this.entries[i]._all = this;
             }
         }
-        this.elements = this.entries;
     }
 
     fill_dom_at(element) {
@@ -252,12 +255,18 @@ export class GradeSheet {
     static closest(element) {
         let e = element.closest(".pa-psetinfo"), gi = null;
         while (e) {
-            var gix = $(e).data("pa-gradeinfo");
-            if (typeof gix === "string") {
-                gix = GradeSheet.parse_json(gix);
-                $(e).data("pa-gradeinfo", gix);
+            const edata = $(e).data("pa-gradeinfo");
+            if (edata) {
+                const jx = typeof edata === "string" ? JSON.parse(edata) : edata;
+                if (gi) {
+                    gi.extend(jx);
+                } else if (jx instanceof GradeSheet) {
+                    gi = jx;
+                } else {
+                    gi = new GradeSheet(jx);
+                    $(e).data("pa-gradeinfo", gi);
+                }
             }
-            gi = gi ? $.extend(gi, gix) : gix;
             if (gi && gi.entries) {
                 break;
             }

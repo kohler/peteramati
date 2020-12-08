@@ -111,7 +111,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
 
     echo "</div>\n";
     if ($want_grades) {
-        echo Ht::unstash_script('pa_loadgrades.call(document.getElementById("pa-psetinfo' . $psetinfo_idx . '"))');
+        echo Ht::unstash_script('$pa.loadgrades.call(document.getElementById("pa-psetinfo' . $psetinfo_idx . '"))');
     }
     echo "<hr />\n";
 }

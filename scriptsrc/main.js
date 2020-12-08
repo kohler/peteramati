@@ -798,7 +798,7 @@ function pa_loadgrades() {
     if (!hasClass(this, "pa-psetinfo")) {
         throw new Error("bad pa_loadgrades");
     }
-    var gi = GradeSheet.closest(this);
+    const gi = GradeSheet.closest(this);
     if (!gi || !gi.order) {
         return;
     }
@@ -816,15 +816,16 @@ function pa_loadgrades() {
     });
 
     // print totals
-    var tm = [gi.get_total(), gi.maxtotal], total = "" + tm[0], drawgraph = false;
+    const tm = [gi.get_total(), gi.maxtotal], total = "" + tm[0];
+    let drawgraph = false;
     if (tm[0]) {
         $(this).find(".pa-gradelist:not(.pa-gradebox)").each(function () {
-            var $t = $(this).find(".pa-total");
+            const $t = $(this).find(".pa-total");
             $t.length || $(this).prepend(pa_render_total(gi, tm));
         });
     }
     $(this).find(".pa-total").each(function () {
-        var $v = $(this).find(".pa-gradevalue");
+        const $v = $(this).find(".pa-gradevalue");
         if ($v.text() !== total) {
             $v.text(total);
             drawgraph = true;
