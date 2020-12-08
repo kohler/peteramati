@@ -560,6 +560,20 @@ class ContactView {
         redirectSelf();
     }
 
+    static function late_hour_note(PsetView $info) {
+        if (($lh = $info->late_hours())
+            && $lh > 0
+            && (!$info->pset->obscure_late_hours || $info->can_view_grades())) {
+            $t = plural($lh, "late hour") . " used";
+            if (!$info->pset->obscure_late_hours) {
+                $t = '<strong class="overdue">' . $t . '</strong>';
+            }
+            return $t;
+        } else {
+            return null;
+        }
+    }
+
     static function echo_repo_last_commit_group(PsetView $info, $commitgroup) {
         global $Me;
         list($user, $repo, $pset) = [$info->user, $info->repo, $info->pset];
@@ -568,22 +582,20 @@ class ContactView {
         }
         $branch = $user->branch($pset);
 
-        $snaphash = $snapcommitline = $snapcommitat = $value = null;
+        $snapc = $value = null;
         if ($repo) {
+            $snapc = $info->commit();
+        } else if ($repo) {
             if ($repo->snaphash && $branch === $info->conf->default_main_branch) {
-                $snaphash = $repo->snaphash;
-                $snapcommitline = $repo->snapcommitline;
-                $snapcommitat = $repo->snapcommitat;
-            } else if ($repo->snapat && ($c = $repo->latest_commit($pset, $branch))) {
-                $snaphash = $c->hash;
-                $snapcommitline = $c->subject;
-                $snapcommitat = $c->commitat;
+                $snapc = new CommitRecord($repo->snapcommitat, $repo->snaphash, $repo->snapcommitline);
+            } else if ($repo->snapat) {
+                $snapc = $repo->latest_commit($pset, $branch);
             }
         }
         if ($repo && !$info->user_can_view_repo_contents()) {
             $value = "(unconfirmed repository)";
-        } else if ($snaphash) {
-            $value = substr($snaphash, 0, 7) . " " . htmlspecialchars($snapcommitline);
+        } else if ($snapc) {
+            $value = substr($snapc->hash, 0, 7) . " " . htmlspecialchars($snapc->subject);
         } else {
             if (!$repo) {
                 $value = "(no repo yet)";
@@ -597,8 +609,11 @@ class ContactView {
         $notes = array();
         if ($repo && $info->can_view_repo_contents() && $repo->snapat) {
             $n = "";
-            if ($snapcommitat) {
-                $n = "committed " . ago($snapcommitat) . ", ";
+            if ($snapc) {
+                $n = "committed " . ago($snapc->commitat) . ", ";
+                if ($commitgroup && ($lh = self::late_hour_note($info))) {
+                    $n .= "{$lh}, ";
+                }
             }
             $n .= "fetched " . ago($repo->snapat) . ", last checked " . ago($repo->snapcheckat);
             if ($Me->privChair) {
@@ -631,8 +646,8 @@ class ContactView {
 
         if ($commitgroup) {
             echo "<div class=\"pa-commitcontainer\" data-pa-pset=\"", htmlspecialchars($info->pset->urlkey);
-            if ($snaphash) {
-                echo "\" data-pa-commit=\"", $snaphash;
+            if ($snapc) {
+                echo "\" data-pa-commit=\"", $snapc->hash;
             }
             echo "\">";
             Ht::stash_script("\$pa.checklatest()", "pa_checklatest");
@@ -662,13 +677,7 @@ class ContactView {
         if ($ginfo && $ginfo->commitat) {
             $notes[] = "committed " . ago($ginfo->commitat);
         }
-        if (($lh = $info->late_hours())
-            && $lh > 0
-            && (!$info->pset->obscure_late_hours || $info->can_view_grades())) {
-            $t = plural($lh, "late hour") . " used";
-            if (!$info->pset->obscure_late_hours) {
-                $t = '<strong class="overdue">' . $t . '</strong>';
-            }
+        if (($t = self::late_hour_note($info))) {
             $notes[] = $t;
         }
 
