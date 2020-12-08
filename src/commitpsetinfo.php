@@ -76,6 +76,13 @@ class CommitPsetInfo {
         return $this->jnotes;
     }
 
+    /** @param string $key
+     * @return mixed */
+    function jnote($key) {
+        $jn = $this->jnotes();
+        return $jn ? $jn->$key ?? null : null;
+    }
+
     /** @param ?string $notes
      * @param ?object $jnotes
      * @param int $notesversion */

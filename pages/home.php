@@ -1056,74 +1056,59 @@ if (!$Me->is_empty() && $User->is_student()) {
     }
 }
 
-function render_regrade_row(Pset $pset, Contact $s = null, $row, $anonymous) {
+function render_flag_row(Pset $pset, Contact $s = null, FlagTableRow $row, $anonymous) {
     global $Conf, $Me, $Profile;
     $j = $s ? StudentSet::json_basics($s, $anonymous) : [];
-    if (($gcid = $row->notes->gradercid ?? null)) {
+    if (($gcid = $row->jnote("gradercid") ?? null)) {
         $j["gradercid"] = $gcid;
-    } else if ($row->main_gradercid) {
-        $j["gradercid"] = $row->main_gradercid;
+    } else if ($row->rpi && $row->rpi->gradercid) {
+        $j["gradercid"] = $row->rpi->gradercid;
     }
     $j["psetid"] = $pset->id;
-    $j["hash"] = bin2hex($row->bhash);
-    if ($row->gradebhash === $row->bhash && $row->bhash !== null) {
+    $bhash = $row->bhash();
+    $j["hash"] = bin2hex($bhash);
+    $j["flagid"] = $row->flagid;
+    if ($bhash !== null && $row->rpi && $row->rpi->gradebhash === $bhash) {
         $j["is_grade"] = true;
     }
-    if ($row->haslinenotes) {
+    if ($row->cpi->haslinenotes) {
         $j["has_notes"] = true;
     }
-    if ($row->conversation) {
-        if (strlen($row->conversation) < 40) {
-            $j["conversation"] = $row->conversation;
+    if (isset($row->flag->conversation)
+        && ($conv = $row->flag->conversation[0][2] ?? "") !== "") {
+        if (strlen($conv) < 40) {
+            $j["conversation"] = $conv;
         } else {
-            $j["conversation_pfx"] = UnicodeHelper::utf8_word_prefix($row->conversation, 40);
+            $j["conversation_pfx"] = UnicodeHelper::utf8_word_prefix($conv, 40);
         }
     }
-    if ($row->notes) {
-        $garr = render_grades($pset, $row->notes, null);
+    if ($row->cpi->notes) {
+        $garr = render_grades($pset, $row->cpi->notes, null);
         $j["total"] = $garr->totalv;
     }
-    $time = 0;
-    if ($row->notes && isset($row->notes->flags)) {
-        foreach ((array) $row->notes->flags as $k => $v) {
-            if ($k[0] === "t" && ctype_digit(substr($k, 1))) {
-                $thistime = +substr($k, 1);
-            } else {
-                $thistime = $v->at ?? 0;
-            }
-            $time = max($time, $thistime);
-        }
-    }
-    if ($time) {
-        $j["at"] = $time;
+    if ($row->flagid[0] === "t" && ctype_digit(substr($row->flagid, 1))) {
+        $j["at"] = (int) substr($row->flagid, 1);
+    } else if ($row->flag->at ?? 0) {
+        $j["at"] = $row->flag->at;
     }
     return $j;
 }
 
-function show_regrades($result, $all) {
+function show_flags($result, $all) {
     global $Conf, $Me, $Qreq;
 
     // 1. load commit notes
     $flagrows = $uids = $psets = [];
-    while (($row = $result->fetch_object())) {
-        $row->notes = json_decode($row->notes);
-        $flags = (array) ($row->notes->flags ?? []);
-        $any = false;
-        foreach ($flags as $t => $v) {
+    while (($row = CommitPsetInfo::fetch($result))) {
+        foreach ((array) $row->jnote("flags") as $flagid => $v) {
             if ($all || !($v->resolved ?? false)) {
-                $uids[$v->uid ?? 0] = $any = true;
-                if (isset($v->conversation)) {
-                    $row->conversation = (string) $v->conversation[0][2];
-                }
+                $uids[$v->uid ?? 0] = $psets[$row->pset] = true;
+                $flagrows[] = new FlagTableRow($row, $flagid, $v);
             }
-        }
-        if ($any) {
-            $flagrows[] = $row;
-            $psets[$row->pset] = true;
         }
     }
     Dbl::free($result);
-    if (empty($flags)) {
+    if (empty($flagrows)) {
         return;
     }
 
@@ -1132,10 +1117,10 @@ function show_regrades($result, $all) {
     $result = $Conf->qe("select cid, type, pset, link from ContactLink where (type=" . LINK_REPO . " or type=" . LINK_BRANCH . ") and pset?a", array_keys($psets));
     while (($row = $result->fetch_row())) {
         if ($row[1] == LINK_REPO) {
-            $repouids[$row[3] . "," . $row[2]][] = (int) $row[0];
+            $repouids["{$row[3]},{$row[2]}"][] = (int) $row[0];
             $rgwanted[] = "(repoid={$row[3]} and pset={$row[2]})";
         } else {
-            $branches[$row[0] . "," . $row[2]] = (int) $row[3];
+            $branches["{$row[0]},{$row[2]}"] = (int) $row[3];
         }
     }
     Dbl::free($result);
@@ -1150,19 +1135,15 @@ function show_regrades($result, $all) {
 
     // 4. resolve `repocids`, `main_gradercid`, `gradebhash`
     foreach ($flagrows as $row) {
-        $rowuids = [];
-        foreach ($repouids["{$row->repoid},{$row->pset}"] ?? [] as $uid) {
-            $rowuids[] = $uid;
+        foreach ($repouids["{$row->repoid()},{$row->pset()}"] ?? [] as $uid) {
+            $row->repouids[] = $uid;
             $uids[$uid] = true;
-
-            $branch = $branches["{$uid},{$row->pset}"] ?? 0;
-            $bkey = "{$row->repoid},{$row->pset},{$branch}";
-            if (isset($rgs[$bkey])) {
-                $row->main_gradercid = $rgs[$bkey]->gradercid;
-                $row->gradebhash = $rgs[$bkey]->gradebhash;
+            if (!isset($row->rpi)) {
+                $branch = $branches["{$uid},{$row->pset()}"] ?? 0;
+                $bkey = "{$row->repoid()},{$row->pset()},{$branch}";
+                $row->rpi = $rgs["{$row->repoid()},{$row->pset()},{$branch}"] ?? null;
             }
         }
-        $row->repocids = join(",", $rowuids);
     }
 
     // 5. load users
@@ -1183,16 +1164,16 @@ function show_regrades($result, $all) {
     $any_anonymous = $any_nonanonymous = false;
     $jx = [];
     foreach ($flagrows as $row) {
-        if (!$row->repocids) {
+        if (!$row->repouids) {
             continue;
         }
-        $pset = $Conf->pset_by_id($row->pset);
+        $pset = $Conf->pset_by_id($row->pset());
         $anon = $anonymous === null ? $pset->anonymous : $anonymous;
         $any_anonymous = $any_anonymous || $anon;
         $any_nonanonymous = $any_nonanonymous || !$anon;
 
         $partners = [];
-        foreach (explode(",", $row->repocids) as $uid) {
+        foreach ($row->repouids as $uid) {
             if (($c = $contacts[(int) $uid] ?? null)) {
                 $c->set_anonymous($anon);
                 $partners[] = $c;
@@ -1200,9 +1181,9 @@ function show_regrades($result, $all) {
         }
         usort($partners, "Contact::compare");
 
-        $j = render_regrade_row($pset, $partners[0], $row, $anon);
+        $j = render_flag_row($pset, $partners[0], $row, $anon);
         for ($i = 1; $i < count($partners); ++$i) {
-            $j["partners"][] = render_regrade_row($pset, $partners[$i], $row, $anon);
+            $j["partners"][] = render_flag_row($pset, $partners[$i], $row, $anon);
         }
         $j["pos"] = count($jx);
         $jx[] = $j;
@@ -1611,10 +1592,10 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
 
     $allflags = !!$Qreq->allflags;
     $field = $allflags ? "hasflags" : "hasactiveflags";
-    $result = Dbl::qe("select *, null as main_gradercid, null as gradebhash, null as repocids, null as conversation from CommitNotes where $field=1");
+    $result = Dbl::qe("select * from CommitNotes where $field=1");
     if ($result->num_rows) {
         echo $sep;
-        show_regrades($result, $allflags);
+        show_flags($result, $allflags);
         if ($Profile) {
             echo "<div>Δt ", sprintf("%.06f", microtime(true) - $t0), "</div>";
         }

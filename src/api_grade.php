@@ -81,7 +81,7 @@ class API_Grade {
             return $err;
         }
         // XXX match commit with grading commit
-        if ($qreq->method() === "POST") {
+        if ($qreq->is_post()) {
             if (!check_post($qreq)) {
                 return ["ok" => false, "error" => "Missing credentials."];
             } else if ($info->is_handout_commit()) {
@@ -132,8 +132,7 @@ class API_Grade {
             return ["ok" => false, "error" => "Missing parameter."];
         }
         $ugs = (array) $ugs;
-        $ispost = $qreq->method() === "POST";
-        if ($ispost && !$qreq->valid_post()) {
+        if ($qreq->is_post() && !$qreq->valid_post()) {
             return ["ok" => false, "error" => "Missing credentials."];
         }
 
@@ -164,7 +163,7 @@ class API_Grade {
                         ?? $info->repo->connected_commit($hash, $info->pset, $info->branch);
                 }
                 if (!$commit) {
-                    $errno = max($errno, $hash ? 3 : 4);
+                    $errno = max($errno, $hash ? 4 : 3);
                     continue;
                 }
                 $info->force_set_hash($commit->hash);
@@ -174,9 +173,9 @@ class API_Grade {
                 }
             }
             if (!$info->can_view_grades()
-                || ($ispost && !$info->can_edit_grades_staff())) {
+                || ($qreq->is_post() && !$info->can_edit_grades_staff())) {
                 return ["ok" => false, "error" => "Permission error."];
-            } else if ($ispost && $info->is_handout_commit()) {
+            } else if ($qreq->is_post() && $info->is_handout_commit()) {
                 $errno = max($errno, 1);
             }
             $infos[$u->contactId] = $info;
@@ -195,7 +194,7 @@ class API_Grade {
         }
 
         // XXX match commit with grading commit
-        if ($ispost) {
+        if ($qreq->is_post()) {
             // parse grade elements
             $g = $ag = $og = $errf = [];
             foreach ($ugs as $uid => $gx) {
