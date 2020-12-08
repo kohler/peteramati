@@ -1154,8 +1154,10 @@ function show_flags($result, $all) {
     }
     Dbl::free($result);
 
-    echo '<div>';
-    echo "<h3>flagged commits</h3>";
+    echo '<div>',
+        "<h3>flagged commits</h3>",
+        Ht::form(""),
+        '<div class="gtable-container-0"><div class="gtable-container-1">';
     $nintotal = 0;
     $anonymous = null;
     if ($Qreq->anonymous !== null && $Me->privChair) {
@@ -1191,12 +1193,15 @@ function show_flags($result, $all) {
             ++$nintotal;
         }
     }
-    echo '<table class="gtable" id="pa-pset-flagged"></table></div>', "\n";
+    echo '<table class="gtable" id="pa-pset-flagged"></table></div></div>',
+        Ht::button("Resolve flags", ["class" => "btn ui js-multiresolveflag"]),
+        '</form></div>', "\n";
     $jd = [
         "id" => "flagged",
         "flagged_commits" => true,
         "anonymous" => true,
-        "has_nonanonymous" => $any_nonanonymous
+        "has_nonanonymous" => $any_nonanonymous,
+        "checkbox" => true
     ];
     if ($Me->privChair) {
         $jd["can_override_anonymous"] = true;

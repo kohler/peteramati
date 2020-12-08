@@ -1120,9 +1120,21 @@ function pa_render_pset_table(pconf, data) {
             th: '<th class="gt-checkbox" scope="col"></th>',
             td: function (s, rownum) {
                 return rownum == "" ? '<td></td>' :
-                    '<td class="gt-checkbox"><input type="checkbox" name="' +
-                    render_checkbox_name(s) + '" value="1" class="' +
-                    (this.className || "uic js-range-click papsel") + '" data-range-type="s61"></td>';
+                    '<td class="gt-checkbox"><input type="checkbox" name="'.concat(
+                        render_checkbox_name(s), '" value="1" class="',
+                        this.className || "uic js-range-click papsel",
+                        '" data-range-type="s61"></td>');
+            },
+            tw: 1.5
+        },
+        flagcheckbox: {
+            th: '<th class="gt-checkbox" scope="col"></th>',
+            td: function (s, rownum) {
+                return rownum == "" ? '<td></td>' :
+                    '<td class="gt-checkbox"><input type="checkbox" name="s:'.concat(
+                        s._spos, '" value="1" class="',
+                        this.className || "uic js-range-click papsel",
+                        '" data-range-type="s61"></td>');
             },
             tw: 1.5
         },
@@ -1448,7 +1460,7 @@ function pa_render_pset_table(pconf, data) {
         } else {
             col = [];
             if (pconf.checkbox) {
-                col.push("checkbox");
+                col.push(pconf.flagged_commits ? "flagcheckbox" : "checkbox");
             }
             col.push("rownumber");
             if (flagged) {
@@ -2267,10 +2279,30 @@ function pa_render_pset_table(pconf, data) {
         name_text: function (uid) {
             var spos = $j.find("tr[data-pa-uid=" + uid + "]").attr("data-pa-spos");
             return spos ? render_name_text(dmap[spos]) : null;
+        },
+        s: function (spos) {
+            return data[spos];
         }
     });
     $j.children("tbody").on("pa-hotlist", make_hotlist);
 }
+
+handle_ui.on("js-multiresolveflag", function () {
+    const $gt = $(this.closest("form")).find(".gtable").first(),
+        pat = $gt.data("paTable"),
+        flags = [];
+    $gt.find(".papsel:checked").each(function () {
+        const s = pat.s(this.closest("tr").getAttribute("data-pa-spos"));
+        flags.push({psetid: s.psetid, uid: s.uid, hash: s.hash, flagid: s.flagid});
+    });
+    if (flags.length !== 0) {
+        $.ajax(hoturl_post("api/multiresolveflag"), {
+                type: "POST", cache: false, data: {flags: JSON.stringify(flags)}
+            });
+    } else {
+        window.alert("No flags selected.");
+    }
+});
 
 
 window.$pa = {

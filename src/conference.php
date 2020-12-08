@@ -2504,6 +2504,7 @@ class Conf {
             "latestcommit" => "3 API_Repo::latestcommit",
             "linenote" => "15 API_Grade::linenote",
             "multigrade" => "3 API_Grade::multigrade",
+            "multiresolveflag" => "0 API_Flag::multiresolve",
             "repositories" => "17 API_Repo::user_repositories"
         ];
         if (($olist = $this->opt("apiFunctions"))) {

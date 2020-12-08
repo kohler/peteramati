@@ -4,6 +4,34 @@
 // See LICENSE for open-source distribution terms
 
 class API_Flag {
+    /** @param string $flagid
+     * @param bool $create
+     * @param int $uid
+     * @param ?string $reason
+     * @param bool $resolve
+     * @param int $when
+     * @return bool */
+    static function update_flag(PsetView $info, $flagid, $create, $uid, $reason, $resolve, $when) {
+        $flags = (array) $info->current_jnote("flags");
+        if (!$create && !isset($flags[$flagid])) {
+            return false;
+        }
+        $flag = (array) ($flags[$flagid] ?? []);
+        $flag["uid"] = $flag["uid"] ?? $uid;
+        $flag["started"] = $flag["started"] ?? $when;
+        if ($flag["started"] !== $when) {
+            $flag["updated"] = max($flag["updated"] ?? $when, $when);
+        }
+        if (($reason ?? "") !== "") {
+            $flag["conversation"][] = [$when, $uid, $reason];
+        }
+        if ($resolve && !($flag["resolved"] ?? false)) {
+            $flag["resolved"] = [$when, $uid];
+        }
+        $info->update_current_notes(["flags" => [$flagid => $flag]]);
+        return true;
+    }
+
     static function flag(Contact $user, Qrequest $qreq, APIData $api) {
         $info = PsetView::make($api->pset, $api->user, $user);
         if (($err = $api->prepare_commit($info))) {
@@ -11,29 +39,86 @@ class API_Flag {
         } else if (!$user->isPC && $user !== $api->user) {
             return ["ok" => false, "error" => "Permission error."];
         }
-        $flags = (array) $info->current_jnote("flags");
         if ($qreq->is_post()) {
             $flagid = $qreq->flagid;
-            if (!$flagid || $flagid === "new") {
-                $flagid = "t" . Conf::$now;
-            } else if (!isset($flags[$flagid])) {
-                return ["ok" => false, "error" => "Not found."];
-            }
-            $flag = (array) ($flags[$flagid] ?? []);
-            $flag["uid"] = $flag["uid"] ?? $user->contactId;
-            $flag["started"] = $flag["started"] ?? Conf::$now;
-            if ($flag["started"] !== Conf::$now) {
-                $flag["updated"] = Conf::$now;
-            }
-            $reason = trim($qreq->reason ?? "");
-            if ($reason !== "") {
-                $flag["conversation"][] = [Conf::$now, $user->contactId, $reason];
-            }
-            if ($qreq->resolve && !($flag["resolved"] ?? false)) {
-                $flag["resolved"] = [Conf::$now, $user->contactId];
-            }
-            $info->update_current_notes(["flags" => [$flagid => $flag]]);
+            $create = !$flagid || $flagid === "new";
+            $when = Conf::$now;
+            self::update_flag($info, $create ? "t$when" : $flagid, $create,
+                              $user->contactId, trim($qreq->reason ?? ""), !!$qreq->resolve, $when);
         }
         return ["ok" => true, "flags" => $info->current_jnote("flags")];
+    }
+
+    static function multiresolve(Contact $viewer, Qrequest $qreq, APIData $api) {
+        if (!isset($qreq->flags)
+            || !($flags = json_decode($qreq->flags))
+            || !is_array($flags)) {
+            return ["ok" => false, "error" => "Missing parameter."];
+        }
+        if ($qreq->is_post() && !$qreq->valid_post()) {
+            return ["ok" => false, "error" => "Missing credentials."];
+        }
+
+        $info = null;
+        $users = [];
+        $work = [];
+        $errors = [];
+        // XXX This does what it can as long as there are no serious errors
+        foreach ($flags as $flag) {
+            if (!is_object($flag)
+                || !is_int($flag->uid ?? null)
+                || !is_int($flag->psetid ?? null)
+                || !is_string($flag->hash ?? null)
+                || !ctype_xdigit($flag->hash)
+                || !is_string($flag->flagid ?? null)) {
+                return ["ok" => false, "error" => "Format error."];
+            }
+            if (!($u = $users[$flag->uid] ?? $viewer->conf->user_by_id($flag->uid))
+                || ($u->contactId !== $viewer->contactId && !$viewer->isPC)) {
+                return ["ok" => false, "error" => "Permission error."];
+            }
+            if (!($pset = $viewer->conf->pset_by_id($flag->psetid))
+                || $pset->gitless) {
+                return ["ok" => false, "error" => "Bad psetid."];
+            }
+            if (!isset($users[$flag->uid])) {
+                $u->set_anonymous($pset->anonymous);
+                $users[$flag->uid] = $u;
+            } else if ($u->is_anonymous !== $pset->anonymous) {
+                $u = $viewer->conf->user_by_id($flag->uid);
+                $u->set_anonymous($pset->anonymous);
+            }
+
+            $info = PsetView::make($pset, $u, $viewer);
+            if (!$info->repo) {
+                $flag->error = "No repository.";
+                $errors[] = $flag;
+                continue;
+            }
+            $commit = $info->repo->connected_commit($flag->hash, $info->pset, $info->branch);
+            if (!$commit) {
+                $flag->error = "Disconnected commit.";
+                $errors[] = $flag;
+                continue;
+            }
+            $info->force_set_hash($commit->hash);
+            $flags = (array) $info->current_jnote("flags");
+            if (isset($flags[$flag->flagid])) {
+                $work[] = [$info, $flag];
+            } else {
+                $flag->error = "Flag not found.";
+                $errors[] = $flag;
+            }
+        }
+
+        $done = [];
+        foreach ($work as $info_flag) {
+            list($info, $flag) = $info_flag;
+            self::update_flag($info, $flag->flagid, false,
+                              $viewer->contactId, null, true, Conf::$now);
+            $done[] = $flag;
+        }
+
+        return ["ok" => !empty($done), "doneflags" => $done, "errorflags" => $errors];
     }
 }
