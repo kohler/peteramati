@@ -1612,14 +1612,14 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset)) {
             if (!$sset) {
-                $flags = 0;
+                $ssflags = 0;
                 if ($Qreq->extension) {
-                    $flags |= StudentSet::EXTENSION;
+                    $ssflags |= StudentSet::EXTENSION;
                 }
                 if ($Qreq->college) {
-                    $flags |= StudentSet::COLLEGE;
+                    $ssflags |= StudentSet::COLLEGE;
                 }
-                $sset = new StudentSet($Me, $flags);
+                $sset = new StudentSet($Me, $ssflags ? : StudentSet::ALL);
             }
             $sset->set_pset($pset);
             echo $sep;

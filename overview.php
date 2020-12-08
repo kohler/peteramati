@@ -39,7 +39,7 @@ foreach ($Conf->psets() as $pset) {
 echo '</div></form>';
 Ht::stash_script("\$(\".pa-grgraph\").each(\$pa.grgraph);\$(window).on(\"resize\",function(){\$(\".pa-grgraph\").each(\$pa.grgraph)})");
 
-$Sset = new StudentSet($Me);
+$Sset = new StudentSet($Me, StudentSet::ALL);
 $sj = [];
 $college = $Qreq->college || $Qreq->all || !$Qreq->extension;
 $extension = $Qreq->extension || $Qreq->all;

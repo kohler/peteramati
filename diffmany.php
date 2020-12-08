@@ -131,7 +131,7 @@ echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
 
 if (trim((string) $Qreq->users) === "") {
     $want = [];
-    $sset = new StudentSet($Me);
+    $sset = new StudentSet($Me, StudentSet::ALL);
     $sset->set_pset($Pset);
     foreach ($sset as $info) {
         if (!$info->user->visited

@@ -34,43 +34,52 @@ class StudentSet implements Iterator, Countable {
     private $_rb_uids = [];
     /** @var array<int,true> */
     private $_pset_loaded = [];
+    /** @var ?array<string,PsetView> */
+    private $_infos;
 
     const COLLEGE = 1;
     const EXTENSION = 2;
     const ENROLLED = 4;
     const DROPPED = 8;
+    const ALL = 15;
 
     function __construct(Contact $viewer, $flags = 0) {
         $this->conf = $viewer->conf;
         $this->viewer = $viewer;
-        $ce = [];
-        if ($flags & self::COLLEGE) {
-            $ce[] = "college";
+        $cflags = $flags & (self::COLLEGE | self::EXTENSION);
+        $eflags = $flags & (self::ENROLLED | self::DROPPED);
+        if ($cflags !== 0 && $eflags !== 0) {
+            $cwhere = $cflags === self::COLLEGE ? "college" : ($cflags === self::EXTENSION ? "extension" : "true");
+            $ewhere = $eflags === self::ENROLLED ? "not dropped" : ($cflags === self::DROPPED ? "dropped" : "true");
+            $result = $this->conf->qe("select *, coalesce((select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId),'') contactLinks from ContactInfo where ($cwhere) and ($ewhere)");
+            while (($u = Contact::fetch($result, $this->conf))) {
+                $this->_u[$u->contactId] = $u;
+                $u->student_set = $this;
+            }
+            Dbl::free($result);
+            $this->_ua = array_values($this->_u);
+        } else {
+            $this->_ua = [];
         }
-        if ($flags & self::EXTENSION) {
-            $ce[] = "extension";
-        }
-        $ce = $ce ? join(" or ", $ce) : "college or extension";
-        $ed = [];
-        if ($flags & self::ENROLLED) {
-            $ed[] = "not dropped";
-        }
-        if ($flags & self::DROPPED) {
-            $ed[] = "dropped";
-        }
-        $ed = $ed ? join(" or ", $ed) : "true";
-        $result = $this->conf->qe("select *, coalesce((select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId),'') contactLinks from ContactInfo where ($ce) and ($ed)");
-        while (($u = Contact::fetch($result, $this->conf))) {
-            $this->_u[$u->contactId] = $u;
-            $u->student_set = $this;
-        }
-        $this->_ua = array_values($this->_u);
-        Dbl::free($result);
     }
 
-    function load_pset(Pset $pset) {
+    static function make_singleton(Contact $viewer, Contact $user) {
+        $ss = new StudentSet($viewer);
+        $ss->_u[$user->contactId] = $user;
+        $ss->_ua[] = $user;
+        $user->student_set = $ss;
+        $ss->_infos = [];
+        return $ss;
+    }
+
+    function add_info(PsetView $info) {
+        assert(isset($this->_infos) && isset($this->_u[$info->user->contactId]));
+        $this->_infos["{$info->user->contactId},{$info->pset->id}"] = $info;
+    }
+
+    private function load_pset(Pset $pset) {
         assert($this->conf === $pset->conf);
-        if (isset($this->_pset_loaded[$pset->id])) {
+        if (isset($this->_pset_loaded[$pset->id]) || isset($this->_infos)) {
             return;
         }
         $this->_pset_loaded[$pset->id] = true;
@@ -156,15 +165,31 @@ class StudentSet implements Iterator, Countable {
     /** @param int $cid
      * @return ?PsetView */
     function info($cid) {
-        $u = $this->user($cid);
-        return $u ? PsetView::make_from_set_at($this, $u, $this->pset) : null;
+        return $this->info_at($cid);
     }
 
     /** @param int $cid
      * @return ?PsetView */
     function info_at($cid, Pset $pset) {
         $u = $this->user($cid);
-        return $u ? PsetView::make_from_set_at($this, $u, $pset) : null;
+        if ($u === null) {
+            return null;
+        } else if ($this->_infos !== null) {
+            return $this->_infos["{$cid},{$pset->id}"] ?? null;
+        } else {
+            return PsetView::make_from_set_at($this, $u, $pset);
+        }
+    }
+
+    /** @return list<PsetView> */
+    function infos($cid) {
+        assert($this->_infos !== null && isset($this->_u[$cid]));
+        $infos = [];
+        foreach ($this->_infos as $info) {
+            if ($info->user->contactId === $cid)
+                $infos[] = $info;
+        }
+        return $infos;
     }
 
     /** @return ?Repository */
@@ -248,6 +273,7 @@ class StudentSet implements Iterator, Countable {
     }
     /** @return void */
     function rewind() {
+        assert($this->_infos === null);
         $this->_upos = -1;
         $this->next();
     }
