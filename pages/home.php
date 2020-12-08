@@ -961,27 +961,30 @@ function render_grades($pset, $gi, $s) {
     return (object) ["allv" => $gvarr,  "totalv" => round_grade($total), "differentk" => $different];
 }
 
-/** @param Pset $pset
- * @param Contact $user
- * @param Contact $viewer */
-function show_home_pset($pset, $user, $viewer) {
-    if ($pset->gitless_grades
-        && $viewer === $user
-        && !$pset->partner
-        && !$pset->upi_for($user)
-        && !$pset->student_can_edit_grades()) {
-        return;
+/** @return ?PsetView */
+function home_psetview(Pset $pset, Contact $user, Contact $viewer) {
+    if ($pset->disabled
+        || !$viewer->can_view_pset($pset)
+        || ($pset->gitless_grades
+            && $viewer === $user
+            && !$pset->partner
+            && !$pset->upi_for($user)
+            && !$pset->student_can_edit_grades())) {
+        return null;
+    } else {
+        return PsetView::make($pset, $user, $viewer);
     }
+}
+
+function show_home_pset(PsetView $info) {
     echo "<hr>\n";
-    $user_can_view = $user->can_view_pset($pset);
+    $user_can_view = $info->user->can_view_pset($info->pset);
     if (!$user_can_view) {
         echo '<div class="pa-pset-hidden">';
     }
-    $pseturl = hoturl("pset", ["pset" => $pset->urlkey, "u" => $viewer->user_linkpart($user)]);
+    $pseturl = $info->hoturl("pset", ["commit" => null]);
     echo "<h2><a class=\"btn\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
-        htmlspecialchars($pset->title), "</a>";
-    $info = PsetView::make($pset, $user, $viewer);
-    $grade_check_user = $viewer->isPC && $viewer !== $user ? $user : $viewer;
+        htmlspecialchars($info->pset->title), "</a>";
     if (($user_see_grade = $info->user_can_view_grades())) {
         $x = [];
         $c = null;
@@ -1036,9 +1039,24 @@ function show_home_pset($pset, $user, $viewer) {
 
 if (!$Me->is_empty() && $User->is_student()) {
     $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
+    $ss = StudentSet::make_singleton($Me, $User);
     foreach ($Conf->psets_newest_first() as $pset) {
-        if ($Me->can_view_pset($pset) && !$pset->disabled)
-            show_home_pset($pset, $User, $Me);
+        if (($info = home_psetview($pset, $User, $Me)))
+            $ss->add_info($info);
+    }
+    if ($Conf->config->_student_visible_formulas ?? null) {
+        foreach ($Conf->config->_student_visible_formulas as $x) {
+            if (($x->visible ?? null) !== false
+                && ($User !== $Me || ($x->student_visible ?? null) !== false)
+                && ($gf = GradeFormula::parse($Conf, $x->formula ?? null))
+                && ($v = $gf->evaluate($User)) !== null
+                && (!($x->nonzero ?? false) || (float) $v !== 0.0)) {
+                ContactView::echo_group(htmlspecialchars($x->title), $v);
+            }
+        }
+    }
+    foreach ($ss->infos($User->contactId) as $info) {
+        show_home_pset($info);
     }
     if ($Me->isPC) {
         echo "<div style='margin-top:5em'></div>\n";
