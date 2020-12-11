@@ -39,7 +39,7 @@ export function run(button, opt) {
         $(therun.lastChild).find("span.pa-runcursor").remove();
 
     function terminal_char_width(min, max) {
-        var x = $('<span style="position:absolute">0</span>').appendTo(thepre),
+        const x = $('<span style="position:absolute">0</span>').appendTo(thepre),
             w = Math.trunc(thepre.width() / x.width() / 1.33);
         x.remove();
         return Math.max(min, Math.min(w, max));
@@ -54,7 +54,7 @@ export function run(button, opt) {
         thexterm.open(thepre[0]);
         thexterm.attachCustomKeyEventHandler(function (e) {
             if (e.type === "keydown") {
-                var key = event_key(e), mod = event_modkey(e);
+                let key = event_key(e), mod = event_modkey(e);
                 if (key === "Enter" && !mod) {
                     key = "\r";
                 } else if (key === "Escape" && !mod) {
@@ -81,13 +81,16 @@ export function run(button, opt) {
     function scroll_therun() {
         if (!thexterm
             && (hasClass(therun, "pa-run-short")
-                || therun.hasAttribute("data-pa-runbottom")))
+                || therun.hasAttribute("data-pa-runbottom"))) {
             requestAnimationFrame(function () {
-                if (therun.scrollHeight > therun.clientHeight)
+                if (therun.scrollHeight > therun.clientHeight) {
                     removeClass(therun, "pa-run-short");
-                if (therun.hasAttribute("data-pa-runbottom"))
+                }
+                if (therun.hasAttribute("data-pa-runbottom")) {
                     therun.scrollTop = Math.max(therun.scrollHeight - therun.clientHeight, 0);
+                }
             });
+        }
     }
 
     if (!therun.hasAttribute("data-pa-opened")) {
@@ -106,14 +109,15 @@ export function run(button, opt) {
         }
     }
 
-    var ibuffer = "", // initial buffer; holds data before any results arrive
+    let ibuffer = "", // initial buffer; holds data before any results arrive
         offset = -1, backoff = 50, queueid = null, times = null;
 
     function hide_cursor() {
-        if (thexterm)
+        if (thexterm) {
             thexterm.write("\x1b[?25l"); // “hide cursor” escape
-        else if (therun.lastChild)
+        } else if (therun.lastChild) {
             $(therun.lastChild).find(".pa-runcursor").remove();
+        }
     }
 
     function done() {
@@ -185,13 +189,13 @@ export function run(button, opt) {
     }
 
     function parse_times(times) {
-        var a = [0, 0], p = 0;
+        let a = [0, 0], p = 0;
         while (p < times.length) {
-            var c = times.indexOf(",", p);
+            const c = times.indexOf(",", p);
             if (c < 0) {
                 break;
             }
-            var n = times.indexOf("\n", c + 1);
+            let n = times.indexOf("\n", c + 1);
             if (n < 0) {
                 n = times.length;
             }
@@ -334,6 +338,8 @@ export function run(button, opt) {
         }
     }
 
+    let send_out = 0, send_args = {};
+
     function succeed(data) {
         var x, t;
 
@@ -404,8 +410,9 @@ export function run(button, opt) {
             }
             append_data(data.result, data);
         }
-        if (!data.data && !data.result)
+        if (!data.data && !data.result) {
             backoff = Math.min(backoff * 2, 500);
+        }
 
         scroll_therun();
         if (data.status == "old") {
@@ -421,24 +428,42 @@ export function run(button, opt) {
     }
 
     function succeed_add_times(data) {
+        --send_out;
         if (data.data && data.done && data.time_data != null) {
             append_timed(data, true);
         }
     }
 
     function send(args, success) {
-        var a = {};
+        if (args && args.stop) {
+            send_args.stop = 1;
+        }
+        if (args && args.write) {
+            send_args.write = (send_args.write || "").concat(args.write);
+        }
+        if (send_args.write && send_out > 0) {
+            return;
+        }
+
+        let a = {};
         if (!$f[0].run) {
             a.run = category;
         }
         a.offset = offset;
         checkt && (a.check = checkt);
         queueid && (a.queueid = queueid);
-        args && $.extend(a, args);
+        Object.assign(a, send_args);
+        delete send_args.write;
+        ++send_out;
+
         jQuery.ajax($f.attr("action"), {
             data: $f.serializeWith(a),
-            type: "POST", cache: false, dataType: "json",
-            success: success || succeed, timeout: 30000,
+            type: "POST", cache: false, dataType: "json", timeout: 30000,
+            success: function (data) {
+                --send_out;
+                (success || succeed)(data);
+                send_args.write && send({});
+            },
             error: function () {
                 $f.find(".ajaxsave61").html("Failed");
                 $f.prop("outstanding", false);
