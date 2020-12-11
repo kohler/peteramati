@@ -730,6 +730,7 @@ class RunnerState {
             }
             $now = microtime(true);
             do {
+                usleep(10);
                 $answer = $this->full_json($offset);
             } while ($qreq->stop
                      && ($rct = $this->running_checkt()) == $this->checkt

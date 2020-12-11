@@ -60,7 +60,7 @@ export function run(button, opt) {
                 } else if (key === "Escape" && !mod) {
                     key = "\x1B";
                 } else if (key === "Backspace" && !mod) {
-                    key = "\x08";
+                    key = "\x7F";
                 } else if (key >= "a"
                            && key <= "z"
                            && (mod & 0xE) === event_modkey.CTRL) {
