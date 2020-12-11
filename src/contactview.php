@@ -601,6 +601,8 @@ class ContactView {
                 $value = "(no repo yet)";
             } else if (!$repo->snapat) {
                 $value = "(checking)";
+            } else if ($pset->directory_noslash !== "" && $repo->latest_commit(null, $branch)) {
+                $value = "(missing pset subdirectory)";
             } else {
                 $value = "(no such branch)";
             }
