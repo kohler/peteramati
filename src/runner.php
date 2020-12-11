@@ -138,7 +138,8 @@ class RunnerState {
         return $answer;
     }
 
-    private function running_checkt($fn = null) {
+    /** @return false|int */
+    function running_checkt($fn = null) {
         $fn = $fn ?? $this->info->runner_pidfile();
         if (($f = @fopen($fn, "r"))) {
             $s = stream_get_contents($f);
@@ -164,11 +165,6 @@ class RunnerState {
         } else {
             return false;
         }
-    }
-
-    /** @return bool */
-    function is_recent_job_running() {
-        return $this->running_checkt() !== false;
     }
 
     /** @return ?string */
@@ -367,8 +363,8 @@ class RunnerState {
             throw new RunnerException("Can’t cd to main directory");
         } else if (!is_executable("jail/pa-jail")) {
             throw new RunnerException("The pa-jail program has not been compiled");
-        } else if ($this->is_recent_job_running()) {
-            throw new RunnerException("Another command is running now");
+        } else if ($this->running_checkt()) {
+            throw new RunnerException("Recent job still running");
         }
 
         // create logfile and pidfile
@@ -497,7 +493,7 @@ class RunnerState {
         $checkoutdir = $clonedir = $this->jailhomedir . "/repo";
         if ($this->repo->truncated_psetdir($this->pset)
             && $this->pset->directory_noslash !== "") {
-            $clonedir .= "/" . $this->pset->directory_noslash;
+            $clonedir .= "/{$this->pset->directory_noslash}";
         }
 
         fwrite($this->logstream, "++ mkdir $checkoutdir\n");
@@ -505,7 +501,8 @@ class RunnerState {
             throw new RunnerException("Can’t initialize user repo in jail");
         }
 
-        $repodir = SiteLoader::$root . "/repo/repo" . $this->repo->cacheid;
+        $root = SiteLoader::$root;
+        $repodir = "{$root}/repo/repo{$this->repo->cacheid}";
 
         // need a branch to check out a specific commit
         $branch = "jailcheckout_" . Conf::$now;

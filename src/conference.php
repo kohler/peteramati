@@ -20,6 +20,9 @@ class APIData {
     public $commit;
     /** @var int */
     public $at;
+
+    const ERRORCODE_RUNCONFLICT = 1001;
+
     function __construct(Contact $user, Pset $pset = null, Repository $repo = null) {
         $this->conf = $user->conf;
         $this->user = $user;

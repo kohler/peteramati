@@ -8,8 +8,8 @@ if ($Me->is_empty()) {
     $Me->escape();
 }
 
-function quit($err = null) {
-    json_exit(["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err]);
+function quit($err = null, $js = null) {
+    json_exit(["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err] + ($js ?? []));
 }
 
 class RunRequest {
@@ -159,8 +159,8 @@ class RunRequest {
 
         // otherwise run
         try {
-            if ($Rstate->is_recent_job_running()) {
-                quit("Recent job still running");
+            if (($checkt = $Rstate->running_checkt())) {
+                quit("Recent job still running.", ["errorcode" => APIData::ERRORCODE_RUNCONFLICT, "checkt" => $checkt, "status" => "workingconflict"]);
             } else if ($info->pset->gitless) {
                 quit("Nothing to do");
             }

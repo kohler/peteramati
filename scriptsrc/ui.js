@@ -90,8 +90,9 @@ $(document).on("unfold", ".ui-unfold", handle_ui);
 
 
 export function fold61(sel, arrowholder, direction) {
-    if (direction != null)
+    if (direction != null) {
         direction = !direction;
+    }
     toggleClass(sel, "hidden", direction);
     arrowholder && $(arrowholder).find("span.foldarrow").html(
         hasClass(sel, "hidden") ? "&#x25B6;" : "&#x25BC;"

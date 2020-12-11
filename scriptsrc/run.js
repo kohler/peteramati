@@ -9,34 +9,52 @@ import { render_terminal } from "./render-terminal.js";
 import { grades_fetch } from "./grades.js";
 
 export function run(button, opt) {
-    var $f = $(button).closest("form"),
+    const $f = $(button).closest("form"),
         category = button.getAttribute("data-pa-run-category") || button.value,
         directory = $(button).closest(".pa-psetinfo").attr("data-pa-directory"),
         therun = document.getElementById("pa-run-" + category),
-        thepre = $(therun).find("pre"),
-        thexterm,
-        checkt;
+        therunout = therun.closest(".pa-runout"),
+        thepre = $(therun).find("pre");
+    let thexterm,
+        checkt,
+        kill_checkt;
 
-    if (typeof opt !== "object")
+    if (typeof opt !== "object") {
         opt = {};
-    if (opt.unfold && therun.dataset.paTimestamp)
+    }
+    if (opt.unfold && therun.dataset.paTimestamp) {
         checkt = +therun.dataset.paTimestamp;
-    else {
-        if ($f.prop("outstanding"))
+    } else {
+        if ($f.prop("outstanding")) {
             return true;
+        }
         $f.find("button").prop("disabled", true);
         $f.prop("outstanding", true);
     }
     delete therun.dataset.paTimestamp;
 
-    fold61(therun, jQuery("#pa-runout-" + category).removeClass("hidden"), true);
+    therunout && removeClass(therunout, "hidden");
+    fold61(therun, therunout, true);
     if (!checkt && !opt.noclear) {
         thepre.html("");
         addClass(thepre[0].parentElement, "pa-run-short");
         thepre[0].removeAttribute("data-pa-terminal-style");
         $(therun).children(".pa-runrange").remove();
-    } else if (therun.lastChild)
+    } else if (therun.lastChild) {
         $(therun.lastChild).find("span.pa-runcursor").remove();
+    }
+
+    function stop_button(on) {
+        const h3 = therunout ? therunout.firstChild : null;
+        if (h3 && h3.tagName === "H3") {
+            const btn = $(h3).find(".pa-runstop");
+            if (on && !btn.length) {
+                $("<button class=\"btn btn-danger pa-runstop\" type=\"button\">Stop</button>").click(stop).appendTo(h3);
+            } else if (!on && btn.length) {
+                btn.remove();
+            }
+        }
+    }
 
     function terminal_char_width(min, max) {
         const x = $('<span style="position:absolute">0</span>').appendTo(thepre),
@@ -362,14 +380,7 @@ export function run(button, opt) {
             return;
         }
 
-        if (data && data.status == "working") {
-            if (!$("#pa-runstop-" + category).length) {
-                $("<button id=\"pa-runstop-" + category + "\" class=\"btn btn-danger pa-runstop\" type=\"button\">Stop</button>")
-                    .click(stop).appendTo("#pa-runout-" + category + " > h3");
-            }
-        } else {
-            $("#pa-runstop-" + category).remove();
-        }
+        stop_button(data && (data.status === "working" || data.status === "workingconflict"));
 
         if (!data || !data.ok) {
             x = "Unknown error";
@@ -382,6 +393,10 @@ export function run(button, opt) {
                     x = data.error;
                 } else if (data.message) {
                     x = data.message;
+                }
+                if (data.errorcode === 1001 // ERRORCODE_RUNCONFLICT
+                    && data.checkt) {
+                    kill_checkt = data.checkt;
                 }
             }
             append("\x1b[1;3;31m" + x + "\x1b[m\r\n");
@@ -450,7 +465,11 @@ export function run(button, opt) {
             a.run = category;
         }
         a.offset = offset;
-        checkt && (a.check = checkt);
+        if (checkt) {
+            a.check = checkt;
+        } else if (args && args.stop && kill_checkt) {
+            a.check = kill_checkt;
+        }
         queueid && (a.queueid = queueid);
         Object.assign(a, send_args);
         delete send_args.write;
