@@ -9,12 +9,12 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <errno.h>
-#include <signal.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstdarg>
+#include <cstring>
+#include <cerrno>
+#include <csignal>
 #include <poll.h>
 #include <dirent.h>
 #include <termios.h>
@@ -22,7 +22,7 @@
 #include <grp.h>
 #include <fcntl.h>
 #include <utime.h>
-#include <assert.h>
+#include <cassert>
 #include <getopt.h>
 #include <fnmatch.h>
 #include <string>
@@ -30,6 +30,7 @@
 #include <vector>
 #include <iostream>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #if __linux__
 #include <mntent.h>
 #include <sched.h>
@@ -76,6 +77,7 @@ static int timingfd = -1;
 static std::string linkdir;
 static std::string dstroot;
 static std::string pidfilename;
+static std::string pidcontents;
 static std::string timingfilename;
 static int pidfd = -1;
 static volatile sig_atomic_t got_sigterm = 0;
@@ -1695,13 +1697,15 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
 
     struct dirent* de;
     while ((de = readdir(dir))) {
-        if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+        if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
             continue;
+        }
 
         // don't follow symbolic links
         if (de->d_type == DT_LNK) {
-            if (x_lchownat(dirfd, de->d_name, owner, group, dirbuf))
+            if (x_lchownat(dirfd, de->d_name, owner, group, dirbuf)) {
                 exit(exit_value);
+            }
             continue;
         }
 
@@ -1710,8 +1714,9 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
         gid_t g = group;
         if (home_map) {
             auto it = home_map->find(de->d_name);
-            if (it != home_map->end())
+            if (it != home_map->end()) {
                 u = it->second.first, g = it->second.second;
+            }
         }
 
         // recurse
@@ -1721,17 +1726,20 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
             if (it == mount_table.end()) { // not a mount point
                 int subdirfd = openat(dirfd, de->d_name, O_CLOEXEC | O_NOFOLLOW);
                 struct stat subdirst;
-                if (subdirfd == -1 || fstat(subdirfd, &subdirst) != 0)
+                if (subdirfd == -1 || fstat(subdirfd, &subdirst) != 0) {
                     perror_die(dirbuf);
+                }
                 if (subdirst.st_dev == dev) {
-                    if (x_fchown(subdirfd, u, g, dirbuf))
+                    if (x_fchown(subdirfd, u, g, dirbuf)) {
                         exit(exit_value);
+                    }
                     chown_recursive(subdirfd, dirbuf, u, g, false, dev);
                 }
             }
             dirbuf.resize(dirbuflen);
-        } else if (x_lchownat(dirfd, de->d_name, u, g, dirbuf))
+        } else if (x_lchownat(dirfd, de->d_name, u, g, dirbuf)) {
             exit(exit_value);
+        }
     }
 
     closedir(dir);
@@ -1745,41 +1753,50 @@ void jaildirinfo::remove() {
 void jaildirinfo::remove_recursive(int parentdirfd, std::string component,
                                    std::string dirname) {
     auto it = dst_table.find(dirname);
-    if (it != dst_table.end() && it->second == 3) // unmounted file system
+    if (it != dst_table.end() && it->second == 3) { // unmounted file system
         return;
+    }
 
     int dirfd = openat(parentdirfd, component.c_str(), O_RDONLY);
     struct stat dirst;
-    if (dirfd == -1 || fstat(dirfd, &dirst) != 0)
+    if (dirfd == -1 || fstat(dirfd, &dirst) != 0) {
         perror_die(dirname);
+    }
     if (dirst.st_dev != dev) { // --one-file-system
         close(dirfd);
         return;
     }
 
     DIR* dir = fdopendir(dirfd);
-    if (!dir)
+    if (!dir) {
         perror_die(dirname);
-    while (struct dirent* de = readdir(dir))
+    }
+    while (struct dirent* de = readdir(dir)) {
         if (de->d_type == DT_DIR) {
-            if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+            if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
                 continue;
+            }
             std::string next_component = de->d_name;
             std::string next_dirname = dirname + next_component;
             remove_recursive(dirfd, next_component, dirname + next_component);
         } else {
-            if (verbose)
+            if (verbose) {
                 fprintf(verbosefile, "rm %s%s\n", dirname.c_str(), de->d_name);
-            if (!dryrun && unlinkat(dirfd, de->d_name, de->d_type == DT_DIR ? AT_REMOVEDIR : 0) != 0)
+            }
+            if (!dryrun && unlinkat(dirfd, de->d_name, de->d_type == DT_DIR ? AT_REMOVEDIR : 0) != 0) {
                 perror_die("rm " + dirname + de->d_name);
+            }
         }
+    }
     closedir(dir);
     close(dirfd);
 
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "rmdir %s\n", dirname.c_str());
-    if (!dryrun && unlinkat(parentdirfd, component.c_str(), AT_REMOVEDIR) != 0)
+    }
+    if (!dryrun && unlinkat(parentdirfd, component.c_str(), AT_REMOVEDIR) != 0) {
         perror_die("rmdir " + dirname);
+    }
 }
 
 
@@ -1852,8 +1869,9 @@ jailownerinfo::jailownerinfo()
     if (stdin_tty_ || stdout_tty_ || stderr_tty_) {
         ttyfd_ = stdin_tty_ ? STDIN_FILENO : (stdout_tty_ ? STDOUT_FILENO : STDERR_FILENO);
         tcgetattr(ttyfd_, &ttyfd_termios_);
-    } else
+    } else {
         ttyfd_ = -1;
+    }
 }
 
 jailownerinfo::~jailownerinfo() {
@@ -1863,38 +1881,44 @@ jailownerinfo::~jailownerinfo() {
 static bool check_shell(const char* shell) {
     bool found = false;
     char* sh;
-    while (!found && (sh = getusershell()))
+    while (!found && (sh = getusershell())) {
         found = strcmp(sh, shell) == 0;
+    }
     endusershell();
     return found;
 }
 
 void jailownerinfo::init(const char* owner_name) {
-    if (strlen(owner_name) >= 1024)
+    if (strlen(owner_name) >= 1024) {
         die("%s: Username too long\n", owner_name);
+    }
 
     struct passwd* pwnam = getpwnam(owner_name);
-    if (!pwnam)
+    if (!pwnam) {
         die("%s: No such user\n", owner_name);
+    }
 
     owner_ = pwnam->pw_uid;
     group_ = pwnam->pw_gid;
-    if (strcmp(pwnam->pw_dir, "/") == 0)
+    if (strcmp(pwnam->pw_dir, "/") == 0) {
         owner_home_ = "/home/nobody";
-    else if (strncmp(pwnam->pw_dir, "/home/", 6) == 0)
+    } else if (strncmp(pwnam->pw_dir, "/home/", 6) == 0) {
         owner_home_ = pwnam->pw_dir;
-    else
+    } else {
         die("%s: Home directory %s not under /home\n", owner_name, pwnam->pw_dir);
+    }
 
     if (strcmp(pwnam->pw_shell, "/bin/bash") == 0
         || strcmp(pwnam->pw_shell, "/bin/sh") == 0
-        || check_shell(pwnam->pw_shell))
+        || check_shell(pwnam->pw_shell)) {
         owner_sh_ = pwnam->pw_shell;
-    else
+    } else {
         die("%s: Shell %s not allowed by /etc/shells\n", owner_name, pwnam->pw_shell);
+    }
 
-    if (owner_ == ROOT)
+    if (owner_ == ROOT) {
         die("%s: Jail user cannot be root\n", owner_name);
+    }
 }
 
 #if __linux__
@@ -1909,11 +1933,21 @@ static int exec_clone_function(void* arg) {
 static void write_pid(int p) {
     if (pidfd >= 0) {
         lseek(pidfd, 0, SEEK_SET);
-        char buf[1024];
-        int l = sprintf(buf, "%d\n", p);
-        ssize_t w = write(pidfd, buf, l);
-        if (w != l || ftruncate(pidfd, l) != 0)
+        char buf[1024], *sx = buf;
+        const char* s0 = pidcontents.data(), *s1 = s0 + pidcontents.length();
+        while (s0 != s1 && sx != buf + 1024) {
+            if (*s0 == '$' && s0 + 1 != s1 && s0[1] == '$') {
+                int l = snprintf(sx, buf + 1024 - sx, "%d", p);
+                sx += std::min(ssize_t(l), buf + 1024 - sx);
+                s0 += 2;
+            } else {
+                *sx++ = *s0++;
+            }
+        }
+        ssize_t w = write(pidfd, buf, sx - buf);
+        if (w != ssize_t(sx - buf) || ftruncate(pidfd, w) != 0) {
             perror_die(pidfilename);
+        }
     }
 }
 
@@ -1928,15 +1962,17 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     const char* ld_library_path = nullptr;
     {
         extern char** environ;
-        for (char** eptr = environ; *eptr; ++eptr)
-            if (strncmp(*eptr, "PATH=", 5) == 0)
+        for (char** eptr = environ; *eptr; ++eptr) {
+            if (strncmp(*eptr, "PATH=", 5) == 0) {
                 path = *eptr;
-            else if (strncmp(*eptr, "LANG=", 5) == 0)
+            } else if (strncmp(*eptr, "LANG=", 5) == 0) {
                 lang = *eptr;
-            else if (strncmp(*eptr, "TERM=", 5) == 0)
+            } else if (strncmp(*eptr, "TERM=", 5) == 0) {
                 term = *eptr;
-            else if (strncmp(*eptr, "LD_LIBRARY_PATH=", 16) == 0)
+            } else if (strncmp(*eptr, "LD_LIBRARY_PATH=", 16) == 0) {
                 ld_library_path = *eptr;
+            }
+        }
     }
     newenv_.push_back(path);
     newenv_.push_back(lang);
@@ -1948,39 +1984,46 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     while (argc > 0) {
         const char* arg = argv[0];
         const char* argpos = arg;
-        while (*argpos && (isalnum((unsigned char) *argpos) || *argpos == '_'))
+        while (*argpos && (isalnum((unsigned char) *argpos) || *argpos == '_')) {
             ++argpos;
-        if (arg == argpos || *argpos != '=')
+        }
+        if (arg == argpos || *argpos != '=') {
             break;
+        }
         std::vector<const char*>::size_type i = 0;
-        while (i < newenv_.size() && strncmp(newenv_[i], arg, argpos - arg) != 0)
+        while (i < newenv_.size() && strncmp(newenv_[i], arg, argpos - arg) != 0) {
             ++i;
-        if (i < newenv_.size())
+        }
+        if (i < newenv_.size()) {
             newenv_[i] = arg;
-        else
+        } else {
             newenv_.push_back(arg);
+        }
         --argc, ++argv;
     }
     newenv_.push_back(NULL);
 
     // create command
-    if (!argc)
+    if (!argc) {
         die("Nothing to run\n");
+    }
     delete[] argv_;
     argv_ = new char*[5 + argc];
-    if (!argv_)
+    if (!argv_) {
         die("Out of memory\n");
+    }
     int newargvpos = 0;
     std::string command;
     argv_[newargvpos++] = (char*) owner_sh_.c_str();
     argv_[newargvpos++] = (char*) "-l";
     argv_[newargvpos++] = (char*) "-c";
-    if (argc == 1)
+    if (argc == 1) {
         command = argv[0];
-    else {
+    } else {
         command = shell_quote(argv[0]);
-        for (int i = 0; i < argc; ++i)
+        for (int i = 0; i < argc; ++i) {
             command += std::string(" ") + shell_quote(argv[i]);
+        }
     }
     argv_[newargvpos++] = const_cast<char*>(command.c_str());
     argv_[newargvpos++] = nullptr;
@@ -1994,33 +2037,39 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         delta.tv_sec = (long) timeout;
         delta.tv_usec = (long) ((timeout - delta.tv_sec) * 1000000);
         timeradd(&this->start_time_, &delta, &this->expiry_);
-    } else
+    } else {
         timerclear(&this->expiry_);
+    }
 
     // enter the jail
 #if __linux__
     char* new_stack = (char*) malloc(256 * 1024);
-    if (!new_stack)
+    if (!new_stack) {
         die("Out of memory\n");
-    if (verbose)
+    }
+    if (verbose) {
         fprintf(verbosefile, "-clone-\n");
+    }
     int child;
-    if (!dryrun)
+    if (!dryrun) {
         child = clone(exec_clone_function, new_stack + 256 * 1024,
                       CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | SIGCHLD, this);
-    else {
+    } else {
         exec_clone_function(this);
         exit(0);
     }
-    if (child == -1)
+    if (child == -1) {
         perror_die("clone");
+    }
 #else
     int child = fork();
-    if (child == 0)
+    if (child == 0) {
         exit(exec_go());
+    }
 #endif
-    if (child == -1)
+    if (child == -1) {
         perror_die("fork");
+    }
     write_pid(child);
 
     // we don't need file descriptors any more
@@ -2035,8 +2084,9 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         r = setresuid(caller_owner, caller_owner, caller_owner);
         (void) r;
         exit_status = x_waitpid(child, 0).second;
-    } else
+    } else {
         pidfd = -1;
+    }
     exit(exit_status);
 }
 
@@ -2048,10 +2098,12 @@ int jailownerinfo::exec_go() {
     // (some Linux distros, such as Ubuntu 15.10, have / a shared mount
     // by default, which means mount changes propagate despite CLONE_NEWNS.
     // This undoes the shared mount)
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "mount --make-rslave /\n");
-    if (mount("none", "/", NULL, MS_REC | MS_SLAVE, NULL) != 0)
+    }
+    if (mount("none", "/", NULL, MS_REC | MS_SLAVE, NULL) != 0) {
         perror_die("mount --make-rslave /");
+    }
 
     populate_mount_table();     // ensure we know how to mount /proc
     for (size_t i = 0; i != delayed_mounts.size(); i += 2) {
@@ -2064,61 +2116,77 @@ int jailownerinfo::exec_go() {
 #endif
 
     // chroot, remount /proc
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "cd %s\n", jaildir_->dir.c_str());
-    if (!dryrun && chdir(jaildir_->dir.c_str()) != 0)
+    }
+    if (!dryrun && chdir(jaildir_->dir.c_str()) != 0) {
         perror_die(jaildir_->dir);
-    if (verbose)
+    }
+    if (verbose) {
         fprintf(verbosefile, "chroot .\n");
-    if (!dryrun && chroot(".") != 0)
+    }
+    if (!dryrun && chroot(".") != 0) {
         perror_die("chroot");
+    }
 
     // create a pty
     int ptymaster = -1;
     char* ptyslavename = NULL;
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "su %s\nmake-pty\n", uid_to_name(owner_));
+    }
     if (!dryrun) {
         // change effective uid/gid, but save root for later
-        if (setresgid(group_, group_, ROOT) != 0)
+        if (setresgid(group_, group_, ROOT) != 0) {
             perror_die("setresgid");
-        if (setresuid(owner_, owner_, ROOT) != 0)
+        }
+        if (setresuid(owner_, owner_, ROOT) != 0) {
             perror_die("setresuid");
+        }
         // create pty
-        if ((ptymaster = posix_openpt(O_RDWR)) == -1)
+        if ((ptymaster = posix_openpt(O_RDWR)) == -1) {
             perror_die("posix_openpt");
-        if (grantpt(ptymaster) == -1)
+        }
+        if (grantpt(ptymaster) == -1) {
             perror_die("grantpt");
-        if (unlockpt(ptymaster) == -1)
+        }
+        if (unlockpt(ptymaster) == -1) {
             perror_die("unlockpt");
-        if ((ptyslavename = ptsname(ptymaster)) == NULL)
+        }
+        if ((ptyslavename = ptsname(ptymaster)) == NULL) {
             perror_die("ptsname");
+        }
     }
 
     // change into their home directory
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "cd %s\n", owner_home_.c_str());
-    if (!dryrun && chdir(owner_home_.c_str()) != 0)
+    }
+    if (!dryrun && chdir(owner_home_.c_str()) != 0) {
         perror_die(owner_home_);
+    }
 
     // check that shell exists
-    if (!dryrun && access(owner_sh_.c_str(), R_OK | X_OK) != 0)
+    if (!dryrun && access(owner_sh_.c_str(), R_OK | X_OK) != 0) {
         perror_die(owner_sh_);
+    }
 
     if (verbose) {
-        for (int i = 0; newenv_[i]; ++i)
+        for (int i = 0; newenv_[i]; ++i) {
             fprintf(verbosefile, "%s ", newenv_[i]);
-        for (int i = 0; argv_[i]; ++i)
+        }
+        for (int i = 0; argv_[i]; ++i) {
             fprintf(verbosefile, i ? " %s" : "%s", shell_quote(argv_[i]).c_str());
+        }
         fprintf(verbosefile, "\n");
     }
 
     if (!dryrun) {
         start_sigpipe();
         pid_t child = fork();
-        if (child < 0)
+        if (child < 0) {
             perror_die("fork");
-        else if (child == 0) {
+        } else if (child == 0) {
             child = getpid();
 #if __linux__
             // sigfd is close-on-exec
@@ -2128,17 +2196,20 @@ int jailownerinfo::exec_go() {
 #endif
 
             // reduce privileges permanently
-            if (setresgid(group_, group_, group_) != 0)
+            if (setresgid(group_, group_, group_) != 0) {
                 perror_die("setresgid");
-            if (setresuid(owner_, owner_, owner_) != 0)
+            }
+            if (setresuid(owner_, owner_, owner_) != 0) {
                 perror_die("setresuid");
-
-            if (setsid() == -1)
+            }
+            if (setsid() == -1) {
                 perror_die("setsid");
+            }
 
             int ptyslave = open(ptyslavename, O_RDWR);
-            if (ptyslave == -1)
+            if (ptyslave == -1) {
                 perror_die(ptyslavename);
+            }
             close(ptymaster);
 #ifdef TIOCSCTTY
             ioctl(ptyslave, TIOCSCTTY, 0);
@@ -2161,27 +2232,32 @@ int jailownerinfo::exec_go() {
                 }
             }
 
-            if (inputfd_ > 0 || stdin_tty_)
+            if (inputfd_ > 0 || stdin_tty_) {
                 dup2(ptyslave, STDIN_FILENO);
-            if (inputfd_ > 0 || stdout_tty_)
+            }
+            if (inputfd_ > 0 || stdout_tty_) {
                 dup2(ptyslave, STDOUT_FILENO);
-            if (inputfd_ > 0 || stderr_tty_)
+            }
+            if (inputfd_ > 0 || stderr_tty_) {
                 dup2(ptyslave, STDERR_FILENO);
+            }
             close(ptyslave);
 
             // restore all signals to their default actions
             // (e.g., PHP may have ignored SIGPIPE; don't want that
             // to propagate to student code!)
-            for (int sig = 1; sig < NSIG; ++sig)
+            for (int sig = 1; sig < NSIG; ++sig) {
                 signal(sig, SIG_DFL);
+            }
 
             if (execve(argv_[0], (char* const*) argv_,
                        (char* const*) newenv_.data()) != 0) {
                 fprintf(stderr, "exec %s: %s\n", owner_sh_.c_str(), strerror(errno));
                 exit(126);
             }
-        } else
+        } else {
             wait_background(child, ptymaster);
+        }
     }
 
     return 0;
@@ -2190,18 +2266,14 @@ int jailownerinfo::exec_go() {
 extern "C" {
 #if !__linux__
 void sighandler(int signo) {
-    if (signo == SIGTERM)
+    if (signo == SIGTERM) {
         got_sigterm = 1;
+    }
     char c = (char) signo;
     ssize_t w = write(sigpipe[1], &c, 1);
     (void) w;
 }
 #endif
-
-void cleanup_pidfd(void) {
-    if (pidfd >= 0)
-        write_pid(0);
-}
 }
 
 static void make_nonblocking(int fd) {
@@ -2214,15 +2286,18 @@ void jailownerinfo::start_sigpipe() {
     sigemptyset(&mask);
     sigaddset(&mask, SIGCHLD);
     sigaddset(&mask, SIGTERM);
-    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
         perror_die("sigprocmask");
+    }
     sigfd = signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
-    if (sigfd == -1)
+    if (sigfd == -1) {
         perror_die("signalfd");
+    }
 #else
     int r = pipe(sigpipe);
-    if (r != 0)
+    if (r != 0) {
         perror_die("pipe");
+    }
     make_nonblocking(sigpipe[0]);
     make_nonblocking(sigpipe[1]);
 
@@ -2234,10 +2309,12 @@ void jailownerinfo::start_sigpipe() {
     sigaction(SIGTERM, &sa, NULL);
 #endif
 
-    if (inputfd_ > 0 || stdin_tty_)
+    if (inputfd_ > 0 || stdin_tty_) {
         make_nonblocking(inputfd_);
-    if (inputfd_ > 0 || stdout_tty_)
+    }
+    if (inputfd_ > 0 || stdout_tty_) {
         make_nonblocking(STDOUT_FILENO);
+    }
 }
 
 void jailownerinfo::buffer::transfer_in(int from) {
@@ -2250,11 +2327,11 @@ void jailownerinfo::buffer::transfer_in(int from) {
 
     if (from >= 0 && !input_closed_ && end_ != cap_) {
         ssize_t nr = read(from, &buf_[end_], cap_ - end_);
-        if (nr != 0 && nr != -1)
+        if (nr != 0 && nr != -1) {
             end_ += nr;
-        else if (nr == 0)
+        } else if (nr == 0) {
             input_closed_ = true;
-        else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
+        } else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
             input_closed_ = true;
             rerrno_ = errno;
         }
@@ -2267,10 +2344,11 @@ void jailownerinfo::buffer::transfer_in(int from) {
 void jailownerinfo::buffer::transfer_out(int to) {
     if (to >= 0 && !output_closed_ && head_ != tail_) {
         ssize_t nw = write(to, &buf_[head_], tail_ - head_);
-        if (nw != 0 && nw != -1)
+        if (nw != 0 && nw != -1) {
             head_ += nw;
-        else if (errno != EINTR && errno != EAGAIN)
+        } else if (errno != EINTR && errno != EAGAIN) {
             output_closed_ = true;
+        }
     }
 }
 
@@ -2296,10 +2374,12 @@ void jailownerinfo::block(int ptymaster) {
     }
 
     int ptymaster_events = 0;
-    if (!from_slave_.input_closed_ && !from_slave_.output_closed_)
+    if (!from_slave_.input_closed_ && !from_slave_.output_closed_) {
         ptymaster_events |= POLLIN;
-    if (!to_slave_.output_closed_ && to_slave_.head_ != to_slave_.tail_)
+    }
+    if (!to_slave_.output_closed_ && to_slave_.head_ != to_slave_.tail_) {
         ptymaster_events |= POLLOUT;
+    }
     if (ptymaster_events) {
         p[nfd].fd = ptymaster;
         p[nfd].events = ptymaster_events;
@@ -2319,8 +2399,9 @@ void jailownerinfo::block(int ptymaster) {
         if (timercmp(&now, &expiry_, <)) {
             timersub(&expiry_, &now, &now);
             timeout_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
-        } else
+        } else {
             timeout_ms = 0;
+        }
     }
 
     if (poll(p, nfd, 0) == 0) {
@@ -2333,14 +2414,16 @@ void jailownerinfo::block(int ptymaster) {
         struct signalfd_siginfo ssi;
         ssize_t r;
         while ((r = read(sigfd, &ssi, sizeof(ssi))) == sizeof(ssi)) {
-            if (ssi.ssi_signo == SIGTERM)
+            if (ssi.ssi_signo == SIGTERM) {
                 got_sigterm = 1;
+            }
         }
         assert(r == 0 || (r == -1 && errno == EAGAIN));
 #else
         char buf[128];
-        while (read(sigpipe[0], buf, sizeof(buf)) > 0)
-            /* skip */;
+        while (read(sigpipe[0], buf, sizeof(buf)) > 0) {
+            /* skip */
+        }
 #endif
     }
 }
@@ -2349,26 +2432,28 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
     std::pair<pid_t, int> xr;
     do {
         xr = x_waitpid(-1, WNOHANG);
-        if (xr.first == child)
+        if (xr.first == child) {
             child_status_ = xr.second;
+        }
     } while (xr.first != -1);
-    if (errno != EAGAIN && errno != ECHILD)
+
+    if (errno != EAGAIN && errno != ECHILD) {
         return 125;
-
-    if (child_status_ >= 0 && waitpid)
+    } else if (child_status_ >= 0 && waitpid) {
         return child_status_;
-
-    if (got_sigterm)
+    } else if (got_sigterm) {
         return 128 + SIGTERM;
-
-    struct timeval now;
-    if (timerisset(&expiry_)
-        && gettimeofday(&now, NULL) == 0
-        && timercmp(&now, &expiry_, >))
-        return 124;
-
-    errno = EAGAIN;
-    return -1;
+    } else {
+        struct timeval now;
+        if (timerisset(&expiry_)
+            && gettimeofday(&now, NULL) == 0
+            && timercmp(&now, &expiry_, >)) {
+            return 124;
+        } else {
+            errno = EAGAIN;
+            return -1;
+        }
+    }
 }
 
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
@@ -2408,8 +2493,9 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         // check child and timeout
         // (only wait for child if read done/failed)
         int exit_status = check_child_timeout(child, from_slave_.done());
-        if (exit_status != -1)
+        if (exit_status != -1) {
             exec_done(child, exit_status);
+        }
 
         // if child has not died, and read produced error, report it
         if (from_slave_.input_closed_ && from_slave_.rerrno_ != EIO) {
@@ -2423,8 +2509,9 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         // transfer data
         to_slave_.transfer_in(inputfd_);
         if (to_slave_.head_ != to_slave_.tail_
-            && memmem(&to_slave_.buf_[to_slave_.head_], to_slave_.tail_ - to_slave_.head_, "\x1b\x03", 2) != NULL)
+            && memmem(&to_slave_.buf_[to_slave_.head_], to_slave_.tail_ - to_slave_.head_, "\x1b\x03", 2) != NULL) {
             exec_done(child, 128 + SIGTERM);
+        }
         to_slave_.transfer_out(ptymaster);
         from_slave_.transfer_in(ptymaster);
         if (has_blocked_ && timingfd != -1) {
@@ -2440,8 +2527,9 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
             assert(len < 256);
             while (written < len) {
                 int r = write(timingfd, timingstr, len);
-                if (r < 0)
+                if (r < 0) {
                     perror_die("Timing file");
+                }
                 written += r;
             }
             has_blocked_ = false;
@@ -2452,10 +2540,11 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 
 void jailownerinfo::exec_done(pid_t child, int exit_status) {
     const char* xmsg = nullptr;
-    if (exit_status == 124 && !quiet)
+    if (exit_status == 124 && !quiet) {
         xmsg = "...timed out";
-    if (exit_status == 128 + SIGTERM && !quiet)
+    } else if (exit_status == 128 + SIGTERM && !quiet) {
         xmsg = "...terminated";
+    }
     if (xmsg) {
         const char* nl = no_onlcr ? "\n" : "\r\n";
         fprintf(stderr, inputfd_ > 0 || stderr_tty_ ? "%s\x1b[3;7;31m%s\x1b[K\x1b[0m%s\x1b[K%s" : "%s%s%s%s", nl, xmsg, nl, nl);
@@ -2463,12 +2552,14 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
 #if __linux__
     (void) child;
 #else
-    if (exit_status >= 124)
+    if (exit_status >= 124) {
         kill(child, SIGKILL);
+    }
 #endif
     fflush(stderr);
-    if (ttyfd_ >= 0)
+    if (ttyfd_ >= 0) {
         (void) tcsetattr(ttyfd_, TCSAFLUSH, &ttyfd_termios_);
+    }
     exit(exit_status);
 }
 
@@ -2476,7 +2567,7 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
 static __attribute__((noreturn)) void usage(jailaction action = do_start) {
     if (action == do_start) {
         fprintf(stderr, "Usage: pa-jail add [-nh] [-f FILE | -F DATA] [-S SKELETON] JAILDIR [USER]\n\
-       pa-jail run [--fg] [-nqh] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n\
+       pa-jail run [--fg] [-nqhL] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n\
                    [-f FILE | -F DATA] [-S SKELETON] JAILDIR USER COMMAND\n\
        pa-jail mv SOURCE DEST\n\
        pa-jail rm [-nf] JAILDIR\n");
@@ -2495,26 +2586,28 @@ JAILDIR must be allowed by /etc/pa-jail.conf.\n\
   -n, --dry-run     print the actions that would be taken, don't run them\n\
   -V, --verbose     print actions as well as running them\n");
     } else {
-        if (action == do_add)
+        if (action == do_add) {
             fprintf(stderr, "Usage: pa-jail add [OPTIONS...] JAILDIR [USER]\n\
 Create or augment a jail. JAILDIR must be allowed by /etc/pa-jail.conf.\n\n");
-        else
+        } else {
             fprintf(stderr, "Usage: pa-jail run [OPTIONS...] JAILDIR USER [NAME=VALUE...] COMMAND...\n\
 Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
 /etc/pa-jail.conf.\n\n");
+        }
         fprintf(stderr, "  -f, --manifest-file FILE  populate jail with manifest from FILE\n");
         fprintf(stderr, "  -F, --manifest MANIFEST   populate jail with MANIFEST\n");
         fprintf(stderr, "  -h, --chown-home          change ownership of USER homedir\n");
         fprintf(stderr, "  -S, --skeleton SKELDIR    populate jail from SKELDIR\n");
         if (action == do_run) {
             fprintf(stderr, "  -p, --pid-file PIDFILE    write jail process PID to PIDFILE\n\
+  -P, --pid-contents STR    write STR to PIDFILE\n\
   -i, --input INPUTSOCKET   use TTY, read input from INPUTSOCKET\n\
       --no-onlcr            don't translate \\n -> \\r\\n in output\n\
   -T, --timeout TIMEOUT     kill the jail after TIMEOUT\n\
-      --fg          run in the foreground\n");
+      --fg                  run in the foreground\n");
         }
-        fprintf(stderr, "  -n, --dry-run     print the actions that would be taken, don't run them\n\
-  -V, --verbose     print actions as well as running them\n");
+        fprintf(stderr, "  -n, --dry-run             print actions, don't run them\n\
+  -V, --verbose             print actions and run them\n");
     }
     exit(1);
 }
@@ -2534,6 +2627,7 @@ static struct option longoptions_run[] = {
     { "help", no_argument, NULL, 'H' },
     { "skeleton", required_argument, NULL, 'S' },
     { "pid-file", required_argument, NULL, 'p' },
+    { "pid-contents", required_argument, NULL, 'P' },
     { "contents-file", required_argument, NULL, 'f' },
     { "contents", required_argument, NULL, 'F' },
     { "manifest-file", required_argument, NULL, 'f' },
@@ -2561,7 +2655,7 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:f:F:p:T:qi:hu:t:", "VnS:f:F:p:T:qi:hu:t:", "Vnf", "Vn"
+    "+Vn", "VnS:f:F:p:P:T:qi:hu:t:", "VnS:f:F:p:P:T:qi:hu:t:", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
@@ -2571,6 +2665,7 @@ int main(int argc, char** argv) {
     double timeout = -1;
     std::string inputarg, linkarg, manifest;
     std::vector<std::string> chown_user_args;
+    pidcontents = "$$\n";
 
     int ch;
     while (1) {
@@ -2586,14 +2681,18 @@ int main(int argc, char** argv) {
                 doforce = true;
             } else if (ch == 'f') {
                 manifest += file_get_contents(optarg, 2);
-                if (!manifest.empty() && manifest.back() != '\n')
+                if (!manifest.empty() && manifest.back() != '\n') {
                     manifest.push_back('\n');
+                }
             } else if (ch == 'F') {
                 manifest += optarg;
-                if (!manifest.empty() && manifest.back() != '\n')
+                if (!manifest.empty() && manifest.back() != '\n') {
                     manifest.push_back('\n');
-            } else if (ch == 'p') {
+                }
+            } else if (ch == 'p' && action == do_run) {
                 pidfilename = optarg;
+            } else if (ch == 'P' && action == do_run) {
+                pidcontents = optarg;
             } else if (ch == 'i') {
                 inputarg = optarg;
             } else if (ch == ARG_ONLCR) {
@@ -2611,9 +2710,10 @@ int main(int argc, char** argv) {
             } else if (ch == 'T') {
                 char* end;
                 timeout = strtod(optarg, &end);
-                if (end == optarg || *end != 0)
+                if (end == optarg || *end != 0) {
                     usage();
-            } else if(ch == 't' && action == do_run) {
+                }
+            } else if (ch == 't' && action == do_run) {
                 timingfilename = optarg;
             } else { /* if (ch == 'H') */
                 usage(action);
@@ -2682,13 +2782,21 @@ int main(int argc, char** argv) {
 
     // open pidfile as current user
     if (!pidfilename.empty() && verbose) {
-        fprintf(verbosefile, "touch %s\n", pidfilename.c_str());
+        fprintf(verbosefile, "touch %s\nflock %s\n", pidfilename.c_str(), pidfilename.c_str());
     }
     if (!pidfilename.empty() && !dryrun) {
         pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
-        if (pidfd == -1)
+        if (pidfd == -1) {
             perror_die(pidfilename);
-        atexit(cleanup_pidfd);
+        }
+        while (true) {
+            int r = flock(pidfd, LOCK_EX);
+            if (r == 0) {
+                break;
+            } else if (r == -1 && errno != EINTR) {
+                perror_die(pidfilename);
+            }
+        }
     }
 
     // create timing file as current user
@@ -2697,8 +2805,9 @@ int main(int argc, char** argv) {
     }
     if (!timingfilename.empty() && !dryrun) {
         timingfd = open(timingfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
-        if (timingfd == -1)
+        if (timingfd == -1) {
             perror_die(timingfilename);
+        }
     }
 
     // escalate so that the real (not just effective) UID/GID is root. this is
@@ -2836,7 +2945,7 @@ int main(int argc, char** argv) {
         jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, inputfd, timeout, foreground);
     }
 
-    // close timing file if appropriate
+    // close timing and lock file if appropriate
     if (timingfd != -1) {
         close(timingfd);
     }

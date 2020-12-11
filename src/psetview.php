@@ -1135,12 +1135,27 @@ class PsetView {
     }
 
 
-    function runner_logfile($checkt) {
-        return SiteLoader::$root . "/log/run" . $this->repo->cacheid
-            . ".pset" . $this->pset->id . "/repo" . $this->repo->repoid
-            . ".pset" . $this->pset->id . "." . $checkt . ".log";
+    /** @return string */
+    function runner_pidfile() {
+        $root = SiteLoader::$root;
+        return "{$root}/log/run{$this->repo->cacheid}.pset{$this->pset->id}/repo{$this->repo->repoid}.pset{$this->pset->id}.pid";
     }
 
+    /** @param int $checkt
+     * @return string */
+    function runner_logbase($checkt) {
+        $root = SiteLoader::$root;
+        return "{$root}/log/run{$this->repo->cacheid}.pset{$this->pset->id}/repo{$this->repo->repoid}.pset{$this->pset->id}.{$checkt}";
+    }
+
+    /** @param int $checkt
+     * @return string */
+    function runner_logfile($checkt) {
+        return $this->runner_logbase($checkt) . ".log";
+    }
+
+    /** @param int $checkt
+     * @return string|false */
     function runner_output($checkt) {
         return @file_get_contents($this->runner_logfile($checkt));
     }
