@@ -248,17 +248,19 @@ class StudentSet implements Iterator, Countable {
     function current() {
         return PsetView::make_from_set_at($this, $this->_ua[$this->_upos], $this->pset);
     }
+
     /** @return int */
     function key() {
         return $this->_ua[$this->_upos]->contactId;
     }
+
     /** @return void */
     function next() {
         ++$this->_upos;
         while ($this->_upos < count($this->_ua)
-               && $this->_ua[$this->_upos]->dropped
-               && $this->pset) {
-            $u = $this->_ua[$this->_upos];
+               && ($u = $this->_ua[$this->_upos])
+               && $this->pset
+               && ($u->dropped || $u->isPC)) {
             if ($this->pset->gitless_grades) {
                 if ($this->_upi["$this->_psetid,$u->contactId"] ?? null) {
                     break;
@@ -271,12 +273,14 @@ class StudentSet implements Iterator, Countable {
             ++$this->_upos;
         }
     }
+
     /** @return void */
     function rewind() {
         assert($this->_infos === null);
         $this->_upos = -1;
         $this->next();
     }
+
     /** @return bool */
     function valid() {
         return $this->_upos < count($this->_ua);
