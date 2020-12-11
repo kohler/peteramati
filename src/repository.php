@@ -298,8 +298,8 @@ class Repository {
         }
     }
 
-    /** @param ?string $head
-     * @param array<string,CommitRecord> &$list */
+    /** @param array<string,CommitRecord> &$list
+     * @param ?string $head */
     private function load_commits_from_head(&$list, $head, $directory) {
         $dirarg = "";
         if ((string) $directory !== "") {

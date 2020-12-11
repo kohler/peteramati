@@ -13,12 +13,13 @@ class RunnerState {
     public $info;
     /** @var Repository */
     public $repo;
+    /** @var ?int */
     public $repoid;
     /** @var Pset */
     public $pset;
     /** @var RunnerConfig */
     public $runner;
-
+    /** @var ?string */
     public $logdir;
 
     /** @var ?int */

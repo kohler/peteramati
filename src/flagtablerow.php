@@ -18,7 +18,6 @@ class FlagTableRow {
     /** @param string $flagid
      * @param object $flag */
     function __construct(CommitPsetInfo $cpi, $flagid, $flag) {
-        $this->pset = $cpi->pset;
         $this->cpi = $cpi;
         $this->flagid = $flagid;
         $this->flag = $flag;

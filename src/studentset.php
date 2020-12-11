@@ -165,7 +165,7 @@ class StudentSet implements Iterator, Countable {
     /** @param int $cid
      * @return ?PsetView */
     function info($cid) {
-        return $this->info_at($cid);
+        return $this->pset ? $this->info_at($cid, $this->pset) : null;
     }
 
     /** @param int $cid

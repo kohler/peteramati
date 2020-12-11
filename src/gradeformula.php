@@ -140,6 +140,8 @@ abstract class GradeFormula implements JsonSerializable {
         }
     }
 
+    /** @param string &$t
+     * @suppress PhanInfiniteRecursion */
     static function parse_ternary_prefix(Conf $conf, &$t) {
         $t = ltrim($t);
         $e = self::parse_prefix($conf, $t, 0);
