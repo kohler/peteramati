@@ -180,7 +180,9 @@ class API_GradeStatistics {
             if (!$ge->no_total) {
                 ++$nge;
                 $lastge = $ge;
-                if ($ge->max && ($pcview || $ge->max_visible) && !$ge->is_extra) {
+                if ($ge->max
+                    && ($pcview || $ge->max_visible)
+                    && !$ge->is_extra) {
                     $maxtotal += $ge->max;
                 }
             }
@@ -192,7 +194,7 @@ class API_GradeStatistics {
             }
         }
         if ($nge === 1) {
-            $r->entry = $ge->json($pcview);
+            $r->entry = $lastge->json($pcview);
         }
 
         return $r;

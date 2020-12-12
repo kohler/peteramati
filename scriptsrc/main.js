@@ -31,6 +31,7 @@ import "./gc-checkbox.js";
 import "./gc-letter.js";
 import "./gc-multicheckbox.js";
 import "./gc-select.js";
+import "./gc-markdown.js";
 
 function $$(id) {
     return document.getElementById(id);
@@ -640,7 +641,7 @@ function save_grade(self) {
     var $pd = $f.find(".pa-pd").first(),
         $gd = $pd.find(".pa-gradedesc");
     if (!$gd.length) {
-        $($pd[0].firstChild).after(' <span class="pa-gradedesc"></span>');
+        $pd.find(".pa-gradevalue").after(' <span class="pa-gradedesc"></span>');
         $gd = $pd.find(".pa-gradedesc");
     }
     $gd.append('<span class="pa-save-message"><span class="spinner"></span></span>');

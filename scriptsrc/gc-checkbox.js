@@ -28,11 +28,11 @@ GradeClass.add("checkbox", {
         }
     },
     entry: function (id, opts) {
-        var t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="checkbox" class="ui pa-gradevalue ml-0" name="'.concat(this.key, '" id="', id, '" value="', this.max, '"></span>');
+        let t = '<span class="pa-gradewidth"><input type="checkbox" class="ui pa-gradevalue ml-0" name="'.concat(this.key, '" id="', id, '" value="', this.max, '"></span>');
         if (opts.editable) {
             t = t.concat(' <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
         }
-        return t + '</div>';
+        return t;
     },
     justify: "center",
     reflect_value: function (elt, v, opts) {

@@ -988,7 +988,7 @@ function show_home_pset(PsetView $info) {
     if (($user_see_grade = $info->user_can_view_grades())) {
         $x = [];
         $c = null;
-        if ($info->needs_student_grades()) {
+        if ($info->needs_answers()) {
             $x[] = "data missing";
             $c = "gradesmissing";
         }

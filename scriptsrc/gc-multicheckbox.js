@@ -29,7 +29,7 @@ function make_multicheckbox(mark) {
             }
         },
         entry: function (id, opts) {
-            let t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="hidden" class="uich pa-gradevalue" name="'.concat(this.key, '">');
+            let t = '<span class="pa-gradewidth"><input type="hidden" class="uich pa-gradevalue" name="'.concat(this.key, '">');
             for (let i = 0; i < this.max; ++i) {
                 t = t.concat('<input type="checkbox" class="ui js-multicheckbox-grade ml-0" name="', this.key, ':', i, '" value="1"');
                 if (i === this.max - 1) {
@@ -41,7 +41,7 @@ function make_multicheckbox(mark) {
             if (opts.editable) {
                 t = t.concat(' <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
             }
-            return t + '</div>';
+            return t;
         },
         justify: "left",
         reflect_value: function (elt, v, opts) {

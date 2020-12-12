@@ -7,13 +7,15 @@ let map = {};
 export const GradeClass = {
     basic_text: v => (v == null ? "" : "" + v),
     basic_entry: function (id, opts) {
-        var t = '<div class="pa-pd"><span class="pa-gradewidth"><input type="text" class="uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '"></span> <span class="pa-gradedesc">');
+        let x;
         if (opts.max_text) {
-            t += opts.max_text;
+            x = opts.max_text;
         } else if (this.max) {
-            t += 'of ' + this.max;
+            x = 'of ' + this.max;
+        } else {
+            x = '';
         }
-        return t + '</span></div>';
+        return '<span class="pa-gradewidth"><input type="text" class="uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '"></span> <span class="pa-gradedesc">', x, '</span>');
     },
     basic_reflect_value: function (elt, g, opts) {
         const gt = this.simple_text(g);
@@ -39,7 +41,7 @@ GradeClass.add("formula", { text: function (v) { return v == null ? "" : v.toFix
 
 GradeClass.add("text", {
     entry: function (id) {
-        return '<div class="pa-pd"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
+        return '<textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     justify: "left",
     sort: "forward"

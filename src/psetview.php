@@ -1,6 +1,6 @@
 <?php
 // psetview.php -- CS61-monster helper class for pset view
-// Peteramati is Copyright (c) 2006-2019 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class PsetView {
@@ -50,7 +50,7 @@ class PsetView {
     /** @var ?int */
     private $_n_visible_in_total;
     /** @var ?int */
-    private $_n_student_grades;
+    private $_n_answers;
     /** @var ?int */
     private $_n_nonempty_grades;
     /** @var ?int */
@@ -506,16 +506,20 @@ class PsetView {
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$upi) {
                 $result = Dbl::qx($this->conf->dblink, "insert into ContactGrade
-                    set cid=?, pset=?, notes=?, hasactiveflags=?",
+                    set cid=?, pset=?, updateat=?, updateby=?,
+                    notes=?, hasactiveflags=?",
                     $this->user->contactId, $this->pset->id,
+                    Conf::$now, $this->viewer->contactId,
                     $notes, $hasactiveflags);
             } else if ($upi->notes === $notes) {
                 return;
             } else {
                 $result = $this->conf->qe("update ContactGrade
-                    set notes=?, hasactiveflags=?, notesversion=?
+                    set notesversion=?, updateat=?, updateby=?,
+                    notes=?, hasactiveflags=?
                     where cid=? and pset=? and notesversion=?",
-                    $notes, $hasactiveflags, $upi->notesversion + 1,
+                    $upi->notesversion + 1, Conf::$now, $this->viewer->contactId,
+                    $notes, $hasactiveflags,
                     $this->user->contactId, $this->pset->id, $upi->notesversion);
             }
             if ($result && $result->affected_rows) {
@@ -525,6 +529,14 @@ class PsetView {
             // reload record
             $this->_havepi &= ~1;
             $upi = $this->upi();
+        }
+
+        if ($upi && $this->pset->grades_history) {
+            $antiupdates = json_antiupdate($upi->jnotes(), $updates);
+            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, notes=?",
+                $this->user->contactId, $this->pset->id,
+                $upi->notesversion, $upi->updateat, $upi->updateby,
+                json_encode_db($antiupdates));
         }
 
         if (!$this->_upi) {
@@ -849,7 +861,7 @@ class PsetView {
 
     private function load_grade_counts() {
         $this->_has_grade_counts = true;
-        $this->_n_visible_grades = $this->_n_student_grades =
+        $this->_n_visible_grades = $this->_n_answers =
             $this->_n_nonempty_grades = $this->_n_nonempty_assigned_grades =
             $this->_n_visible_in_total = 0;
         if ($this->can_view_grades()) {
@@ -858,13 +870,13 @@ class PsetView {
             $g = $notes->grades ?? null;
             foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
                 ++$this->_n_visible_grades;
-                if ($ge->student) {
-                    ++$this->_n_student_grades;
+                if ($ge->answer) {
+                    ++$this->_n_answers;
                 }
                 if (($ag && ($ag->{$ge->key} ?? null) !== null)
                     || ($g && ($g->{$ge->key} ?? null) !== null)) {
                     ++$this->_n_nonempty_grades;
-                    if (!$ge->student) {
+                    if (!$ge->answer) {
                         ++$this->_n_nonempty_assigned_grades;
                     }
                 }
@@ -888,9 +900,9 @@ class PsetView {
     }
 
     /** @return bool */
-    function needs_student_grades()  {
+    function needs_answers()  {
         $this->_has_grade_counts || $this->load_grade_counts();
-        return $this->_n_student_grades !== 0
+        return $this->_n_answers !== 0
             && ($this->_n_nonempty_grades === 0
                 || $this->_n_nonempty_grades === $this->_n_nonempty_assigned_grades);
     }
@@ -991,6 +1003,7 @@ class PsetView {
         }
     }
 
+    /** @return ?LateHoursData */
     function late_hours_data() {
         if (!($deadline = $this->deadline())) {
             return null;
@@ -1001,22 +1014,22 @@ class PsetView {
         $ts = $ts ?? $this->current_timestamp(true);
         $autohours = self::auto_late_hours($deadline, $ts);
 
-        $ld = [];
+        $ld = new LateHoursData;
         if (isset($cn->late_hours)) {
-            $ld["hours"] = $cn->late_hours;
+            $ld->hours = $cn->late_hours;
             if ($autohours !== null && $cn->late_hours !== $autohours) {
-                $ld["autohours"] = $autohours;
+                $ld->autohours = $autohours;
             }
-        } else if (isset($autohours)) {
-            $ld["hours"] = $autohours;
+        } else {
+            $ld->hours = $autohours;
         }
         if ($ts) {
-            $ld["timestamp"] = $ts;
+            $ld->timestamp = $ts;
         }
         if ($deadline) {
-            $ld["deadline"] = $deadline;
+            $ld->deadline = $deadline;
         }
-        return !empty($ld) ? (object) $ld : null;
+        return $ld->is_empty() ? null : $ld;
     }
 
     /** @return ?int */

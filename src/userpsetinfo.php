@@ -10,6 +10,10 @@ class UserPsetInfo {
     public $pset;
     /** @var ?int */
     public $gradercid;
+    /** @var ?int */
+    public $updateat;
+    /** @var ?int */
+    public $updateby;
     /** @var int */
     public $hidegrade;
     /** @var ?string */
@@ -24,11 +28,14 @@ class UserPsetInfo {
     private function merge() {
         $this->cid = (int) $this->cid;
         $this->pset = (int) $this->pset;
+        $this->notesversion = (int) $this->notesversion;
+        if (isset($this->updateat)) {
+            $this->updateat = (int) $this->updateat;
+        }
         if (isset($this->gradercid)) {
             $this->gradercid = (int) $this->gradercid;
         }
         $this->hidegrade = (int) $this->hidegrade;
-        $this->notesversion = (int) $this->notesversion;
         $this->hasactiveflags = (int) $this->hasactiveflags;
     }
 
@@ -46,8 +53,8 @@ class UserPsetInfo {
         $upi = new UserPsetInfo;
         $upi->cid = $user->contactId;
         $upi->pset = $pset->id;
-        $upi->hidegrade = 0;
         $upi->notesversion = 0;
+        $upi->hidegrade = 0;
         $upi->hasactiveflags = 0;
         return $upi;
     }

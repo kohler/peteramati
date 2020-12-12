@@ -2153,16 +2153,25 @@ td.mhcb {
 .pa-pt {
 	min-width: 168px;
 	padding-right: 6px;
-	padding-bottom: 2px;
 	flex-grow: 1;
 	font-weight: bold;
 }
+.pa-pt > p:first-child:last-child {
+	margin-bottom: 0;
+}
 .pa-pdesc {
 	width: 100%;
+	margin-bottom: 0.25rem;
+}
+.pa-pdesc > p:last-child {
+	margin-bottom: 0;
 }
 .pa-pd {
 	min-width: 168px;
 	width: calc(100% - 168px);
+}
+.pa-pdesc + .pa-pd {
+	width: 100%;
 }
 .pa-pd.pa-grade-changed:after {
 	content: " ✶";
@@ -2183,7 +2192,23 @@ td.mhcb {
 	width: auto;
 }
 .pa-p-section {
-	margin-top: 2rem;
+	margin-top: 2.5rem;
+}
+.pa-p-section > label.pa-pt {
+	font-size: larger;
+}
+.pa-preview-border {
+	border-top: 1px dashed black;
+	max-width: 800px;
+	margin-top: 0.25rem;
+	margin-bottom: 0.25rem;
+}
+.pa-preview-notice {
+	max-width: 800px;
+	font-size: smaller;
+	font-style: italic;
+	text-align: right;
+	margin-bottom: 0.5rem;
 }
 
 .pa-gradelist {
@@ -2840,6 +2865,9 @@ input.pa-gradewidth {
 textarea.pa-gradevalue {
 	vertical-align: top;
 	width: 40rem;
+}
+textarea.pa-gradevalue.pa-wide {
+	width: 800px;
 }
 .pa-total span.pa-gradevalue {
 	font-weight: bold;

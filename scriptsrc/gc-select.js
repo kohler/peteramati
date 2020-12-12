@@ -8,12 +8,12 @@ import { escape_entities } from "./encoders.js";
 
 GradeClass.add("select", {
     entry: function (id) {
-        let t = '<div class="pa-pd"><span class="select"><select class="uich pa-gradevalue" name="'.concat(this.key, '" id="', id, '"><option value="">None</option>');
+        let t = '<span class="select"><select class="uich pa-gradevalue" name="'.concat(this.key, '" id="', id, '"><option value="">None</option>');
         for (let i = 0; i !== this.options.length; ++i) {
             const n = escape_entities(this.options[i]);
             t = t.concat('<option value="', n, '">', n, '</option>');
         }
-        return t + '</select></span></div>';
+        return t + '</select></span>';
     },
     justify: "left",
     sort: "forward",

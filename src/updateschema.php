@@ -645,6 +645,24 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table RepositoryGrade add `emptydiff_at` bigint(11) DEFAULT NULL")) {
         $conf->update_schema_version(140);
     }
+    if ($conf->sversion === 140
+        && $conf->ql_ok("drop table if exists `ContactGradeHistory`")
+        && $conf->ql_ok("create table `ContactGradeHistory` (
+            `cid` int NOT NULL,
+            `pset` int NOT NULL,
+            `notesversion` int NOT NULL,
+            `updateat` bigint NOT NULL,
+            `notes` varbinary(32767) DEFAULT NULL,
+            PRIMARY KEY (`cid`,`pset`,`notesversion`)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8")
+        && $conf->ql_ok("alter table `ContactGrade` add `updateat` bigint DEFAULT NULL")) {
+        $conf->update_schema_version(141);
+    }
+    if ($conf->sversion === 141
+        && $conf->ql_ok("alter table `ContactGrade` add `updateby` int DEFAULT NULL")
+        && $conf->ql_ok("alter table `ContactGradeHistory` add `updateby` int NOT NULL DEFAULT '0'")) {
+        $conf->update_schema_version(142);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

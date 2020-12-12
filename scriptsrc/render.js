@@ -134,4 +134,27 @@ render_text.add_format({
     }
 });
 
+render_text.add_format({
+    format: 5,
+    render: function (text) {
+        return text;
+    }
+});
+
+
+export function render_ftext(ftext) {
+    let ch, pos, dig;
+    if (ftext.charAt(0) === "<"
+        && (ch = ftext.charAt(1)) >= "0"
+        && ch <= "9"
+        && (pos = ftext.indexOf(">")) >= 2
+        && /^\d+$/.test((dig = ftext.substring(1, pos)))) {
+        const r = renderers[+dig];
+        if (r) {
+            return r.render.call(this, ftext.substring(pos + 1));
+        }
+    }
+    return escape_entities(ftext);
+}
+
 $(render_text.on_page);

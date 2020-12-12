@@ -109,6 +109,8 @@ class Pset {
     public $grades_visible_at;
     /** @var ?int */
     public $grades_total;
+    /** @var bool */
+    public $grades_history = false;
     /** @var int */
     public $grade_statistics_visible;
     /** @var ?float */
@@ -124,7 +126,7 @@ class Pset {
     /** @var bool */
     public $has_formula = false;
     /** @var bool */
-    private $has_student_editable_grades = false;
+    private $has_answers = false;
     private $_max_grade = [null, null, null, null];
     public $grade_script;
     /** @var GradeEntryConfig */
@@ -322,8 +324,8 @@ class Pset {
                 if ($g->is_extra) {
                     $this->has_extra = true;
                 }
-                if ($g->visible && $g->student) {
-                    $this->has_student_editable_grades = true;
+                if ($g->visible && $g->answer) {
+                    $this->has_answers = true;
                 }
             }
         } else if ($grades) {
@@ -338,6 +340,7 @@ class Pset {
             $ge->pcview_index = $i;
         }
         $this->grades_total = self::cnum($p, "grades_total");
+        $this->grades_history = self::cbool($p, "grades_history") ?? false;
         $gv = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->grades_visible_at = is_int($gv) ? $gv : 0;
@@ -481,13 +484,13 @@ class Pset {
     /** @return bool */
     function student_can_view_grades() {
         return $this->student_can_view()
-            && ($this->has_student_editable_grades || $this->grades_visible);
+            && ($this->has_answers || $this->grades_visible);
     }
 
     /** @return bool */
     function student_can_edit_grades() {
         return $this->student_can_view()
-            && $this->has_student_editable_grades;
+            && $this->has_answers;
     }
 
 
@@ -546,7 +549,7 @@ class Pset {
     /** @return array<string,GradeEntryConfig> */
     function numeric_grades() {
         return array_filter($this->grades, function ($ge) {
-            return $ge->type !== "text";
+            return $ge->type !== "text" && $ge->type !== "markdown";
         });
     }
 
@@ -558,7 +561,7 @@ class Pset {
         } else if (!$this->disabled && $this->visible) {
             $g = [];
             foreach ($this->grades as $k => $ge) {
-                if ($ge->visible && ($this->grades_visible || $ge->student)) {
+                if ($ge->visible && ($this->grades_visible || $ge->answer)) {
                     $g[$k] = $ge;
                 }
             }
@@ -953,7 +956,7 @@ class GradeEntryConfig {
     /** @var string */
     public $title;
     /** @var string */
-    public $edit_description;
+    public $description;
     /** @var string */
     public $type;
     /** @var ?string */
@@ -966,7 +969,7 @@ class GradeEntryConfig {
     /** @var null|int|float */
     public $max;
     /** @var bool */
-    public $student;
+    public $answer;
     /** @var bool */
     public $visible;
     /** @var bool */
@@ -1021,14 +1024,14 @@ class GradeEntryConfig {
         if ((string) $this->title === "") {
             $this->title = $this->key;
         }
-        $this->edit_description = Pset::cstr($loc, $g, "edit_description");
+        $this->description = Pset::cstr($loc, $g, "description", "edit_description");
 
         $type = null;
         if (isset($g->type)) {
             $type = Pset::cstr($loc, $g, "type");
             if ($type === "number") {
                 $type = null;
-            } else if (in_array($type, ["text", "checkbox", "checkboxes", "stars", "letter", "section"], true)) {
+            } else if (in_array($type, ["text", "markdown", "checkbox", "checkboxes", "stars", "letter", "section"], true)) {
                 // nada
             } else if ($type === "select"
                        && isset($g->options)
@@ -1057,7 +1060,7 @@ class GradeEntryConfig {
             $this->round = $round;
         }
 
-        if (in_array($this->type, ["text", "select", "formula", "section"], true)) {
+        if (in_array($this->type, ["text", "markdown", "select", "formula", "section"], true)) {
             if (isset($g->no_total) && !$g->no_total) {
                 throw new PsetConfigException("grade entry type {$this->type} cannot be in total", $loc);
             }
@@ -1099,7 +1102,7 @@ class GradeEntryConfig {
             $this->max_visible = $this->_max_visible_defaulted = true;
         }
         $this->is_extra = Pset::cbool($loc, $g, "is_extra");
-        $this->student = Pset::cbool($loc, $g, "student", "student_editable");
+        $this->answer = Pset::cbool($loc, $g, "answer", "student");
 
         $this->position = Pset::cnum($loc, $g, "position");
         if ($this->position === null && isset($g->priority)) {
@@ -1188,7 +1191,7 @@ class GradeEntryConfig {
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
         } else if (is_string($v)) {
-            if ($this->type === "text") {
+            if ($this->type === "text" || $this->type === "markdown") {
                 return rtrim($v);
             } else if ($this->type === "select") {
                 if ($v === null || $v === "" || strcasecmp($v, "none") === 0)
@@ -1234,6 +1237,7 @@ class GradeEntryConfig {
         } else if ($v1 === null
                    || $v2 === null
                    || $this->type === "text"
+                   || $this->type === "markdown"
                    || $this->type === "select") {
             return $v1 !== $v2;
         } else {
@@ -1255,7 +1259,7 @@ class GradeEntryConfig {
 
     /** @return bool */
     function student_can_edit() {
-        return $this->visible && $this->student;
+        return $this->visible && $this->answer;
     }
 
     function json($pcview, $pos = null) {
@@ -1290,11 +1294,11 @@ class GradeEntryConfig {
         if (!$this->visible) {
             $gej["visible"] = false;
         }
-        if ($this->student)  {
-            $gej["student"] = true;
+        if ($this->answer)  {
+            $gej["answer"] = true;
         }
-        if (($pcview || $this->student) && $this->edit_description) {
-            $gej["edit_description"] = $this->edit_description;
+        if (($pcview || $this->answer) && $this->description) {
+            $gej["description"] = $this->description;
         }
         return $gej;
     }

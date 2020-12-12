@@ -122,6 +122,56 @@ function json_update($j, $updates) {
     return array_values($j);
 }
 
+function json_antiupdate($j, $updates) {
+    if (is_object($j)) {
+        $j = get_object_vars($j);
+    } else if (!is_array($j)) {
+        $j = [];
+    }
+    if (is_object($updates)) {
+        $is_replacement = $updates instanceof JsonUpdatable
+            && $updates->jsonIsReplacement();
+        if ($updates instanceof JsonSerializable) {
+            $updates = $updates->jsonSerialize();
+        }
+        if ($is_replacement) {
+            return $j;
+        }
+        if (is_object($updates)) {
+            $updates = get_object_vars($updates);
+        }
+    }
+    $aj = [];
+    foreach ($updates as $k => $v) {
+        if (isset($j[$k])) {
+            if (is_object($v) || is_associative_array($v)) {
+                $av = json_antiupdate($j[$k], $v);
+            } else if ($j[$k] !== $v) {
+                $av = $j[$k];
+            } else {
+                continue;
+            }
+        } else {
+            if ($v !== null) {
+                $av = null;
+            } else {
+                continue;
+            }
+        }
+        $aj[$k] = $av;
+    }
+    $n = count($aj);
+    if ($n == 0) {
+        return null;
+    }
+    for ($i = 0; $i !== $n; ++$i) {
+        if (!isset($aj[$i]) && !array_key_exists($i, $aj))
+            return (object) $aj;
+    }
+    ksort($aj, SORT_NUMERIC);
+    return array_values($aj);
+}
+
 
 // web helpers
 

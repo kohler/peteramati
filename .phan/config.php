@@ -68,19 +68,21 @@ $config = [
         Config::projectPath("diffmany.php"),
         Config::projectPath("face.php"),
         Config::projectPath("index.php"),
-        Config::projectPath("mail.php"),
         Config::projectPath("overview.php"),
         Config::projectPath("profile.php"),
         Config::projectPath("pset.php"),
         Config::projectPath("raw.php"),
-        Config::projectPath("resetpassword.php"),
         Config::projectPath("run.php")
     ],
 
     "exclude_file_list" => [
         Config::projectPath(".phan/config.php"),
         Config::projectPath("lib/collatorshim.php"),
-        Config::projectPath("lib/polyfills.php")
+        Config::projectPath("lib/polyfills.php"),
+        Config::projectPath("lib/mailer.php"),
+        Config::projectPath("mail.php"),
+        Config::projectPath("resetpassword.php"),
+        Config::projectPath("src/cs61mailer.php")
     ],
 
     "globals_type_map" => [

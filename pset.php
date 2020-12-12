@@ -577,7 +577,7 @@ function echo_all_grades($info) {
             || (isset($lhd->hours)
                 && $lhd->hours > 0
                 && !$info->pset->obscure_late_hours)) {
-            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours) . '</span>');
+            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours ?? 0) . '</span>');
         }
     } else if ($info->can_edit_grades_staff() && $info->pset->late_hours_entry()) {
         echo '<form class="ui-submit pa-grade pa-p" data-pa-grade="late_hours">',

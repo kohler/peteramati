@@ -6,6 +6,7 @@ import { escape_entities, html_id_encode } from "./encoders.js";
 import { hasClass, toggleClass } from "./ui.js";
 import { Filediff } from "./diff.js";
 import { GradeClass } from "./gc.js";
+import { render_ftext } from "./render.js";
 
 
 let id_counter = 0, late_hours_entry;
@@ -66,9 +67,9 @@ export class GradeEntry {
 
     html_skeleton(editable, live) {
         const name = this.key,
-            title = this.title ? escape_entities(this.title) : name;
+            title = this.title ? render_ftext(this.title) : name;
         let t;
-        if ((editable || this.student) && this.gc.entry) {
+        if ((editable || this.answer) && this.gc.entry) {
             live = live !== false;
             let opts = {editable: editable},
                 id = "pa-ge" + ++id_counter;
@@ -84,22 +85,22 @@ export class GradeEntry {
                 t = t.concat('" data-pa-grade-type="', this.gc.type);
             }
             t = t.concat('"><label class="pa-pt" for="', id, '">', title, '</label>');
-            if (this.edit_description) {
-                t += '<div class="pa-pdesc">' + escape_entities(this.edit_description) + '</div>';
+            if (this.description) {
+                t = t.concat('<div class="pa-pdesc pa-dr">', render_ftext(this.description), '</div>');
             }
-            t += this.gc.entry.call(this, id, opts) + (live ? '</form>' : '</div>');
+            t = t.concat('<div class="pa-pd">', this.gc.entry.call(this, id, opts), '</div>', live ? '</form>' : '</div>');
         } else {
             t = '<div class="pa-grade pa-p';
             if (this.type === "section") {
                 t += ' pa-p-section';
             }
-            t += '" data-pa-grade="'.concat(name, '"><div class="pa-pt">', title, '</div>');
+            t = t.concat('" data-pa-grade="', name, '"><div class="pa-pt">', title, '</div>');
             if (this.type === "text") {
                 t += '<div class="pa-pd pa-gradevalue"></div>';
             } else {
                 t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
                 if (this.max && this.type !== "letter") {
-                    t += ' <span class="pa-gradedesc">of ' + this.max + '</span>';
+                    t = t.concat(' <span class="pa-gradedesc">of ', this.max, '</span>');
                 }
                 t += '</div>';
             }
@@ -114,6 +115,9 @@ export class GradeEntry {
 
         if (v && v.tagName !== "SPAN" && v.tagName !== "DIV") {
             this.fill_dom_editable(element, v, g, options || {});
+        } else if (this.gc.fill_dom) {
+            this.gc.fill_dom.call(this, g, v);
+            toggleClass(element, "hidden", v.firstChild !== null && this.type !== "section");
         } else {
             const gt = this.text(g);
             if ($(v).text() !== gt) {
