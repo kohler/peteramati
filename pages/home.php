@@ -989,7 +989,7 @@ function show_home_pset(PsetView $info) {
         $x = [];
         $c = null;
         if ($info->needs_answers()) {
-            $x[] = "data missing";
+            $x[] = "empty";
             $c = "gradesmissing";
         }
         if ($info->has_nonempty_assigned_grades()) {
