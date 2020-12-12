@@ -173,18 +173,26 @@ class API_GradeStatistics {
             $r->series["extension_noextra"] = $xnoextra_series->summary($pcview);
         }
 
-        $pgj = $pset->gradeinfo_json($pcview);
-        if ($pgj && isset($pgj->maxgrades->total)) {
-            $r->maxtotal = $pgj->maxgrades->total;
-            foreach ($r->series as $s) {
-                $s->maxtotal = $pgj->maxgrades->total;
+        $nge = 0;
+        $lastge = null;
+        $maxtotal = 0;
+        foreach ($pset->visible_grades($pcview) as $ge) {
+            if (!$ge->no_total) {
+                ++$nge;
+                $lastge = $ge;
+                if ($ge->max && ($pcview || $ge->max_visible) && !$ge->is_extra) {
+                    $maxtotal += $ge->max;
+                }
             }
         }
-
-        $ge = $pset->visible_grades_in_total($pcview);
-        if (count($ge) === 1) {
-            reset($ge);
-            $r->entry = current($ge)->json($pcview);
+        if ($maxtotal !== 0) {
+            $r->maxtotal = $maxtotal;
+            foreach ($r->series as $s) {
+                $s->maxtotal = $maxtotal;
+            }
+        }
+        if ($nge === 1) {
+            $r->entry = $ge->json($pcview);
         }
 
         return $r;

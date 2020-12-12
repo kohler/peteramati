@@ -907,19 +907,19 @@ class PsetView {
         $notes = $this->current_jnotes();
         $ag = $notes->autogrades ?? null;
         $g = $notes->grades ?? null;
-        foreach ($this->pset->visible_grades_in_total($this->pc_view) as $ge) {
-            $gv = $g ? $g->{$ge->key} ?? null : null;
-            if ($gv === null && $ag) {
-                $gv = $ag->{$ge->key} ?? null;
-            }
-            if ($gv) {
-                $total += $gv;
-            }
-            if ($gv && !$ge->is_extra) {
-                $total_noextra += $gv;
-            }
-            if (!$ge->is_extra && $ge->max && $ge->max_visible) {
-                $maxtotal += $ge->max;
+        foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
+            if (!$ge->no_total) {
+                $gv = $g ? $g->{$ge->key} ?? null : null;
+                if ($gv === null && $ag) {
+                    $gv = $ag->{$ge->key} ?? null;
+                }
+                if ($gv) {
+                    $total += $gv;
+                    $total_noextra += $ge->is_extra ? 0 : $gv;
+                }
+                if (!$ge->is_extra && $ge->max && $ge->max_visible) {
+                    $maxtotal += $ge->max;
+                }
             }
         }
         return [$total, $this->pset->grades_total ?? $maxtotal, $total_noextra];
@@ -1393,8 +1393,7 @@ class PsetView {
                 }
                 if ($gx && property_exists($gx, $key)) {
                     $gv = $gx->$key;
-                    if ($gx->$key === false)
-                        $gv = null;
+                    $gv = $gv === false ? null : $gv;
                 }
                 if ($ge->formula && property_exists($fgx, $key)) {
                     $gv = $fgx->$key;

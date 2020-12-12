@@ -568,18 +568,6 @@ class Pset {
         }
     }
 
-    /** @param bool $pcview
-     * @return array<string,GradeEntryConfig> */
-    function visible_grades_in_total($pcview) {
-        $g = [];
-        foreach ($this->visible_grades($pcview) as $k => $ge) {
-            if (!$ge->no_total) {
-                $g[$k] = $ge;
-            }
-        }
-        return $g;
-    }
-
     /** @return GradeEntryConfig */
     function late_hours_entry() {
         return $this->_late_hours;
@@ -602,27 +590,6 @@ class Pset {
             $this->_max_grade[$i] = $max;
         }
         return $this->_max_grade[$i];
-    }
-
-    /** @param bool $pcview */
-    function gradeinfo_json($pcview) {
-        $max = [];
-        $count = $maxtotal = 0;
-        foreach ($this->visible_grades($pcview) as $ge) {
-            ++$count;
-            if ($ge->max && ($pcview || $ge->max_visible)) {
-                $max[$ge->key] = $ge->max;
-                if (!$ge->is_extra && !$ge->no_total) {
-                    $maxtotal += $ge->max;
-                }
-            }
-        }
-        if ($this->grades_total !== null) {
-            $max["total"] = $this->grades_total;
-        } else if ($maxtotal > 0) {
-            $max["total"] = $maxtotal;
-        }
-        return (object) ["nentries" => $count, "maxgrades" => (object) $max];
     }
 
     /** @param Contact $student
