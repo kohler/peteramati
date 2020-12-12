@@ -21,7 +21,7 @@ $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
 $Pset = ContactView::find_pset_redirect($Qreq->pset);
 
 // load user repo and current commit
-$Info = PsetView::make($Pset, $User, $Me, $Qreq->newcommit ?? $Qreq->commit);
+$Info = PsetView::make($Pset, $User, $Me, $Qreq->newcommit ?? $Qreq->commit, "pset");
 if (($Qreq->newcommit ?? $Qreq->commit) && !$Info->hash()) {
     if ($Info->repo) {
         $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository.");

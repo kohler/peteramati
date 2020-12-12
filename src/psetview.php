@@ -12,6 +12,8 @@ class PsetView {
     public $user;
     /** @var Contact */
     public $viewer;
+    /** @var ?string */
+    public $mode;
     /** @var bool */
     public $pc_view;
     /** @var ?Repository */
@@ -35,11 +37,11 @@ class PsetView {
     private $_cpi;
 
     /** @var ?bool */
-    private $can_view_grades;
+    private $_can_view_grades;
     /** @var ?bool */
-    private $user_can_view_grades;
+    private $_user_can_view_grades;
     /** @var ?bool */
-    private $user_can_view_assigned_grades;
+    private $_user_can_view_assigned_grades;
     /** @var ?list<int> */
     private $_grades_vf;
     /** @var ?bool */
@@ -51,6 +53,8 @@ class PsetView {
     private $derived_handout_commit = false;
     /** @var bool */
     private $_has_grade_counts = false;
+    /** @var ?int */
+    private $_n_visible_grades;
     /** @var ?int */
     private $_n_visible_in_total;
     /** @var ?int */
@@ -87,10 +91,13 @@ class PsetView {
     }
 
     /** @param ?string $hash
+     * @param ?string $mode
      * @return PsetView */
-    static function make(Pset $pset, Contact $user, Contact $viewer, $hash = null) {
+    static function make(Pset $pset, Contact $user, Contact $viewer,
+                         $hash = null, $mode = null) {
         $info = new PsetView($pset, $user, $viewer);
         $info->partner = $user->partner($pset->id);
+        $info->mode = $mode;
         if (!$pset->gitless) {
             $info->repo = $user->repo($pset->id);
             $info->branchid = $user->branchid($pset);
@@ -494,10 +501,10 @@ class PsetView {
         return 0;
     }
 
-    private function reset_can_view_grades() {
-        $this->can_view_grades = null;
-        $this->user_can_view_grades = null;
-        $this->user_can_view_assigned_grades = null;
+    private function clear_can_view_grades() {
+        $this->_can_view_grades = null;
+        $this->_user_can_view_grades = null;
+        $this->_user_can_view_assigned_grades = null;
         $this->_grades_vf = null;
         $this->_grades_suppressed = null;
     }
@@ -557,7 +564,7 @@ class PsetView {
         }
         $this->_upi->assign_notes($notes, $new_notes, ($upi ? $upi->notesversion : 0) + 1);
         $this->_upi->hasactiveflags = $hasactiveflags;
-        $this->reset_can_view_grades();
+        $this->clear_can_view_grades();
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
             $this->user->invalidate_grades($this->pset->id);
         }
@@ -684,7 +691,7 @@ class PsetView {
             $this->_rpi->assign_notes($notes, $new_notes, ($old_nversion ?? 0) + 1);
         }
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
-            $this->reset_can_view_grades();
+            $this->clear_can_view_grades();
             if ($this->grading_hash() === $hash) {
                 $this->user->invalidate_grades($this->pset->id);
             }
@@ -811,14 +818,14 @@ class PsetView {
 
     /** @return list<GradeEntryConfig> */
     function visible_grades($pc_view = null) {
-        $this->grades_vf();
+        $gvf = $this->grades_vf();
         if (!$this->_grades_suppressed && ($pc_view ?? $this->pc_view)) {
             return $this->pset->visible_grades(true);
         } else {
             $f = $pc_view ?? $this->pc_view ? 2 : 1;
             $g = [];
             foreach ($this->pset->visible_grades(true) as $i => $ge) {
-                if ($this->_grades_vf[$i] & $f) {
+                if ($gvf[$i] & $f) {
                     $g[] = $ge;
                 }
             }
@@ -840,18 +847,18 @@ class PsetView {
 
     /** @return bool */
     function can_view_grades() {
-        if ($this->can_view_grades === null) {
+        if ($this->_can_view_grades === null) {
             if ($this->user === $this->viewer) {
-                $this->can_view_grades = $this->user_can_view_grades();
+                $this->_can_view_grades = $this->user_can_view_grades();
             } else {
-                $this->can_view_grades = $this->viewer->isPC && $this->viewer->can_view_pset($this->pset);
+                $this->_can_view_grades = $this->viewer->isPC && $this->viewer->can_view_pset($this->pset);
             }
         }
-        return $this->can_view_grades;
+        return $this->_can_view_grades;
     }
 
     private function set_user_can_view_grades() {
-        $this->user_can_view_grades = $this->user_can_view_assigned_grades = false;
+        $this->_user_can_view_grades = $this->_user_can_view_assigned_grades = false;
         if ($this->pset->student_can_view()
             && ($this->pset->gitless_grades
                 || ($this->repo && $this->user_can_view_repo_contents()))) {
@@ -863,12 +870,12 @@ class PsetView {
             if ($maybe || $this->pset->student_can_edit_grades()) {
                 foreach ($this->visible_grades(false) as $ge) {
                     if ($ge->answer) {
-                        $this->user_can_view_grades = true;
+                        $this->_user_can_view_grades = true;
                         if (!$maybe) {
                             return;
                         }
                     } else if ($maybe) {
-                        $this->user_can_view_grades = $this->user_can_view_assigned_grades = true;
+                        $this->_user_can_view_grades = $this->_user_can_view_assigned_grades = true;
                         return;
                     }
                 }
@@ -878,10 +885,10 @@ class PsetView {
 
     /** @return bool */
     function user_can_view_grades() {
-        if ($this->user_can_view_grades === null) {
+        if ($this->_user_can_view_grades === null) {
             $this->set_user_can_view_grades();
         }
-        return $this->user_can_view_grades;
+        return $this->_user_can_view_grades;
     }
 
     /** @return bool */
@@ -895,7 +902,7 @@ class PsetView {
         // also see API_GradeStatistics
         $gsv = $this->pset->grade_statistics_visible;
         return $gsv === 1
-            || ($gsv === 2 && $this->user_can_view_grades() && $this->user_can_view_assigned_grades)
+            || ($gsv === 2 && $this->user_can_view_grades() && $this->_user_can_view_assigned_grades)
             || ($gsv > 2 && $gsv <= Conf::$now);
     }
 
@@ -1134,7 +1141,7 @@ class PsetView {
 
 
     private function clear_grade() {
-        $this->can_view_grades = $this->user_can_view_grades = null;
+        $this->clear_can_view_grades();
         if ($this->pset->gitless_grades) {
             $this->_havepi &= ~1;
             $this->_upi = null;
@@ -1450,7 +1457,7 @@ class PsetView {
     const GRADEJSON_OVERRIDE_VIEW = 2;
     const GRADEJSON_NO_LATE_HOURS = 4;
 
-    /** @param GradeExprt $gexp */
+    /** @param GradeExport $gexp */
     private function compute_grade_json_entries($gx, $agx, $fgx, $gexp) {
         $g = $ag = [];
         $total = $total_noextra = 0;

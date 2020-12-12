@@ -1268,7 +1268,7 @@ class GradeEntryConfig {
 
     /** @return string */
     function parse_value_error() {
-        $this->_last_error;
+        return $this->_last_error;
     }
 
     /** @return bool */
