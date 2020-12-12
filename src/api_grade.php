@@ -4,8 +4,10 @@
 // See LICENSE for open-source distribution terms
 
 class API_Grade {
-    /** @param Pset $pset */
-    static private function parse_full_grades($pset, $x, &$errf, $can_edit) {
+    /** @param array<string,string> &$errf
+     * @param bool $can_edit
+     * @return array */
+    static private function parse_full_grades(PsetView $info, $x, &$errf, $can_edit) {
         if (is_string($x)) {
             $x = json_decode($x, true);
             if (!is_array($x)) {
@@ -17,7 +19,7 @@ class API_Grade {
         }
         if (is_array($x)) {
             foreach ($x as $k => &$v) {
-                if (($ge = $pset->gradelike_by_key($k))) {
+                if (($ge = $info->gradelike_by_key($k))) {
                     $v = $ge->parse_value($v);
                     if ($v === false && !isset($errf[$k])) {
                         $errf[$k] = $ge->parse_value_error();
@@ -95,9 +97,9 @@ class API_Grade {
             // parse grade elements
             $qreq->allow_a("grades", "autogrades", "oldgrades");
             $errf = [];
-            $g = self::parse_full_grades($info->pset, $qreq->grades, $errf, $info->can_edit_grades_any());
-            $ag = self::parse_full_grades($info->pset, $qreq->autogrades, $errf, $info->can_edit_grades_any());
-            $og = self::parse_full_grades($info->pset, $qreq->oldgrades, $errf, true);
+            $g = self::parse_full_grades($info, $qreq->grades, $errf, $info->can_edit_grades_any());
+            $ag = self::parse_full_grades($info, $qreq->autogrades, $errf, $info->can_edit_grades_any());
+            $og = self::parse_full_grades($info, $qreq->oldgrades, $errf, true);
             if (!empty($errf)) {
                 if (isset($errf["!invalid"])) {
                     return ["ok" => false, "error" => "Invalid request."];
@@ -197,10 +199,10 @@ class API_Grade {
         if ($qreq->is_post()) {
             // parse grade elements
             $g = $ag = $og = $errf = [];
-            foreach ($ugs as $uid => $gx) {
-                $g[$uid] = self::parse_full_grades($api->pset, $gx->grades ?? null, $errf, true);
-                $ag[$uid] = self::parse_full_grades($api->pset, $gx->autogrades ?? null, $errf, true);
-                $og[$uid] = self::parse_full_grades($api->pset, $gx->oldgrades ?? null, $errf, true);
+            foreach ($infos as $uid => $info) {
+                $g[$uid] = self::parse_full_grades($info, $gx->grades ?? null, $errf, true);
+                $ag[$uid] = self::parse_full_grades($info, $gx->autogrades ?? null, $errf, true);
+                $og[$uid] = self::parse_full_grades($info, $gx->oldgrades ?? null, $errf, true);
             }
             if (!empty($errf)) {
                 reset($errf);
@@ -232,7 +234,7 @@ class API_Grade {
         $j["ok"] = true;
         $j["us"] = [];
         foreach ($infos as $uid => $info) {
-            $j["us"][$uid] = $infos[$uid]->grade_json(PsetView::GRADEJSON_NO_ENTRIES);
+            $j["us"][$uid] = $infos[$uid]->grade_json(PsetView::GRADEJSON_SLICE);
         }
         return $j;
     }

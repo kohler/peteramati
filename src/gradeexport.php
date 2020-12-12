@@ -28,8 +28,8 @@ class GradeExport implements JsonSerializable {
     public $auto_late_hours;
     /** @var ?bool */
     public $editable;
-    /** @var ?list<bool> */
-    private $stripped;
+    /** @var ?list<GradeEntryConfig> */
+    private $visible_grades;
 
     /** @param bool $pc_view */
     function __construct(Pset $pset, $pc_view) {
@@ -37,21 +37,37 @@ class GradeExport implements JsonSerializable {
         $this->pc_view = $pc_view;
     }
 
-    function strip_absent_extra() {
-        $gi = 0;
-        $si = [];
-        foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
-            if ($ge->is_extra
-                && ($this->grades[$gi] ?? 0) == 0) {
-                $si[] = $gi;
-            }
-            ++$gi;
+    /** @return list<GradeEntryConfig> */
+    function visible_grades() {
+        if ($this->visible_grades !== null) {
+            return $this->visible_grades;
+        } else {
+            return $this->pset->visible_grades($this->pc_view);
         }
-        if (!empty($si)) {
-            $this->stripped = array_fill(0, $gi, false);
-            foreach ($si as $gi) {
-                $this->stripped[$gi] = true;
+    }
+
+    /** @param list<GradeEntryConfig> $vg */
+    function set_visible_grades($vges) {
+        $this->visible_grades = $vges;
+    }
+
+    function suppress_absent_extra() {
+        $ges = $this->visible_grades();
+        $nges = count($ges);
+        for ($i = 0; $i !== count($ges); ) {
+            if ($ges[$i]->is_extra
+                && ($this->grades[$i] ?? 0) == 0) {
+                array_splice($ges, $i, 1);
+                array_splice($this->grades, $i, 1);
+                if ($this->autogrades !== null) {
+                    array_splice($this->autogrades, $i, 1);
+                }
+            } else {
+                ++$i;
             }
+        }
+        if ($i !== $nges) {
+            $this->visible_grades = $ges;
         }
     }
 
@@ -61,19 +77,9 @@ class GradeExport implements JsonSerializable {
         if (isset($this->uid)) {
             $r["uid"] = $this->uid;
             if ($this->grades !== null) {
-                $g = $this->grades;
-                if ($this->stripped !== null) {
-                    foreach ($this->stripped as $si => $s) {
-                        if ($s)
-                            $g[$si] = null;
-                    }
-                    for ($gi = count($g) - 1; $gi >= 0 && $g[$gi] === null; --$gi) {
-                        array_pop($g);
-                    }
-                }
                 $r["grades"] = $this->grades;
             }
-            if ($this->autogrades !== null) {
+            if ($this->pc_view && !empty($this->autogrades)) {
                 $r["autogrades"] = $this->autogrades;
             }
             if ($this->total !== null) {
@@ -98,13 +104,9 @@ class GradeExport implements JsonSerializable {
         if ($this->include_entries) {
             $entries = $order = [];
             $gi = $maxtotal = 0;
-            foreach ($this->pset->visible_grades($this->pc_view) as $ge) {
-                if ($this->stripped === null || !$this->stripped[$gi]) {
-                    $entries[$ge->key] = $ge->json($this->pc_view, $gi);
-                    $order[] = $ge->key;
-                } else {
-                    $order[] = null;
-                }
+            foreach ($this->visible_grades() as $ge) {
+                $order[] = $ge->key;
+                $entries[$ge->key] = $ge->json($this->pc_view, $gi);
                 if ($ge->max
                     && !$ge->is_extra
                     && !$ge->no_total
@@ -112,11 +114,6 @@ class GradeExport implements JsonSerializable {
                     $maxtotal += $ge->max;
                 }
                 ++$gi;
-            }
-            if ($this->stripped !== null) {
-                for ($gi = count($order) - 1; $gi >= 0 && $order[$gi] === null; --$gi) {
-                    array_pop($order);
-                }
             }
             $r["entries"] = $entries;
             $r["order"] = $order;

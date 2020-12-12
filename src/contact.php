@@ -817,7 +817,7 @@ class Contact {
                 $info = PsetView::make($pset, $this, $this->conf->site_contact());
             }
             if ($info) {
-                $this->_gcache[$pset->id] = $info->grade_json($flags | PsetView::GRADEJSON_NO_ENTRIES | PsetView::GRADEJSON_OVERRIDE_VIEW);
+                $this->_gcache[$pset->id] = $info->grade_json($flags | PsetView::GRADEJSON_SLICE | PsetView::GRADEJSON_OVERRIDE_VIEW);
             } else {
                 $this->_gcache[$pset->id] = null;
             }

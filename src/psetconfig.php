@@ -103,6 +103,8 @@ class Pset {
     public $all_grades = [];
     /** @var array<string,GradeEntryConfig> */
     public $grades;
+    /** @var list<int> */
+    public $grades_vf;
     /** @var bool */
     public $grades_visible;
     /** @var int */
@@ -111,6 +113,8 @@ class Pset {
     public $grades_total;
     /** @var bool */
     public $grades_history = false;
+    /** @var ?string */
+    public $grades_selection_function;
     /** @var int */
     public $grade_statistics_visible;
     /** @var ?float */
@@ -336,14 +340,24 @@ class Pset {
         } else {
             $this->grades = self::position_sort("grades", $this->all_grades);
         }
-        foreach (array_values($this->grades) as $i => $ge) {
-            $ge->pcview_index = $i;
-        }
         $this->grades_total = self::cnum($p, "grades_total");
         $this->grades_history = self::cbool($p, "grades_history") ?? false;
+        $this->grades_selection_function = self::cstr($p, "grades_selection_function");
         $gv = self::cdate($p, "grades_visible", "show_grades_to_students");
         $this->grades_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->grades_visible_at = is_int($gv) ? $gv : 0;
+        $this->grades_vf = [];
+        $vis1 = !$this->disabled && $this->visible;
+        $vis2 = $vis1 && $this->grades_visible;
+        foreach (array_values($this->grades) as $i => $ge) {
+            $ge->pcview_index = $i;
+            if ($ge->visible && $vis1 && ($vis2 || $ge->answer)) {
+                $this->grades_vf[] = 3;
+            } else {
+                $this->grades_vf[] = 2;
+            }
+        }
+
         $gsv = self::cdate_or_grades($p, "grade_statistics_visible", "grade_cdf_visible");
         if ($gsv === true) {
             $this->grade_statistics_visible = 1;
@@ -554,21 +568,26 @@ class Pset {
     }
 
     /** @param bool $pcview
-     * @return array<string,GradeEntryConfig> */
+     * @return list<GradeEntryConfig> */
     function visible_grades($pcview) {
         if ($pcview) {
-            return $this->grades;
+            return array_values($this->grades);
         } else if (!$this->disabled && $this->visible) {
             $g = [];
             foreach ($this->grades as $k => $ge) {
-                if ($ge->visible && ($this->grades_visible || $ge->answer)) {
-                    $g[$k] = $ge;
+                if ($this->grades_vf[$k] & 2) {
+                    $g[] = $ge;
                 }
             }
             return $g;
         } else {
             return [];
         }
+    }
+
+    /** @return list<int> */
+    function grades_vf() {
+        return $this->grades_vf;
     }
 
     /** @return GradeEntryConfig */
@@ -968,9 +987,11 @@ class GradeEntryConfig {
     private $_formula = false;
     /** @var null|int|float */
     public $max;
-    /** @var bool */
+    /** @var bool
+     * @readonly */
     public $answer;
-    /** @var bool */
+    /** @var bool
+     * @readonly */
     public $visible;
     /** @var bool */
     private $_visible_defaulted = false;

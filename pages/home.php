@@ -594,7 +594,7 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         foreach (qreq_users($qreq) as $user) {
             $info = PsetView::make($pset, $user, $viewer);
             if ($info->grading_hash()) {
-                $info->set_hidden_grades($hiddengrades);
+                $info->set_grades_hidden($hiddengrades);
             }
         }
     }
