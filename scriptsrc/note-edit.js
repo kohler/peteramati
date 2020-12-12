@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { escape_entities } from "./encoders.js";
-import { hoturl_post, hoturl_gradeparts } from "./hoturl.js";
+import { hoturl_gradeapi } from "./hoturl.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { text_eq } from "./utils.js";
@@ -46,7 +46,7 @@ function render_form($tr, note, transition) {
     if (format == null)
         format = $tr.closest(".pa-filediff").attr("data-default-format");
     var t = '<form method="post" action="' +
-        escape_entities(hoturl_post("api/linenote", hoturl_gradeparts(pi, {file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format}))) +
+        escape_entities(hoturl_gradeapi(pi, "=api/linenote", {file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})) +
         '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">' +
         '<textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
@@ -214,9 +214,9 @@ function pa_save_note(text) {
     grb && grb.setAttribute("data-pa-notes-outstanding", +grb.getAttribute("data-pa-notes-outstanding") + 1);
     return new Promise(function (resolve, reject) {
         api_conditioner(
-            hoturl_post("api/linenote", hoturl_gradeparts(pi, {
+            hoturl_gradeapi(pi, "=api/linenote", {
                 file: note.file, line: note.lineid, oldversion: note.version || 0
-            })), data
+            }), data
         ).then(function (data) {
             removeClass(self, "pa-outstanding");
             if (data && data.ok) {

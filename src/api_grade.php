@@ -5,9 +5,9 @@
 
 class API_Grade {
     /** @param array<string,string> &$errf
-     * @param bool $can_edit
+     * @param bool $isnew
      * @return array */
-    static private function parse_full_grades(PsetView $info, $x, &$errf, $can_edit) {
+    static private function parse_full_grades(PsetView $info, $x, &$errf, $isnew) {
         if (is_string($x)) {
             $x = json_decode($x, true);
             if (!is_array($x)) {
@@ -16,51 +16,58 @@ class API_Grade {
             }
         } else if (is_object($x)) {
             $x = (array) $x;
-        }
-        if (is_array($x)) {
-            foreach ($x as $k => &$v) {
-                if (($ge = $info->gradelike_by_key($k))) {
-                    $v = $ge->parse_value($v);
-                    if ($v === false && !isset($errf[$k])) {
-                        $errf[$k] = $ge->parse_value_error();
-                    } else if (!$can_edit && !$ge->student_can_edit()) {
-                        $errf[$k] = "Permission error.";
-                    }
-                }
-            }
-            return $x;
-        } else {
+        } else if (!is_array($x)) {
             return [];
         }
+        foreach ($x as $k => &$v) {
+            if (($ge = $info->gradelike_by_key($k))) {
+                $v = $ge->parse_value($v, $isnew);
+                if ($v === false && !isset($errf[$k])) {
+                    $errf[$k] = $ge->parse_value_error();
+                }
+            }
+        }
+        return $x;
     }
 
-    /** @param PsetView $info */
+    /** @param PsetView $info
+     * @param array<string,string> &$errf */
     static private function apply_grades($info, $g, $ag, $og, &$errf) {
         $v = [];
         foreach ($info->pset->grades() as $ge) {
             $k = $ge->key;
+            $oldgv = $info->current_grade_value($k);
             if (array_key_exists($k, $og)) {
-                $curgv = $info->current_grade_entry($k);
-                if ($ge->value_differs($curgv, $og[$k])
+                if ($ge->value_differs($oldgv, $og[$k])
                     && (!array_key_exists($k, $g)
-                        || $ge->value_differs($curgv, $g[$k]))) {
-                    $errf[$k] = true;
+                        || $ge->value_differs($oldgv, $g[$k]))) {
+                    $errf[$k] = "Edit conflict.";
                 }
+            }
+            $has_agv = false;
+            if (array_key_exists($k, $ag)
+                && $info->pc_view) {
+                $v["autogrades"][$k] = $agv = $ag[$k];
+                $has_agv = true;
             }
             if (array_key_exists($k, $g)) {
                 $gv = $g[$k];
-                if ($gv === null
-                    && ($notes = $info->current_jnotes())
-                    && isset($notes->autogrades->$k)) {
-                    $gv = false;
+                if (!$has_agv) {
+                    $agv = null;
+                    if (($notes = $info->current_jnotes())
+                        && isset($notes->autogrades)) {
+                        $agv = $notes->autogrades->$k ?? null;
+                    }
                 }
-                $v["grades"][$k] = $gv;
-            }
-            if (array_key_exists($k, $ag)) {
-                $v["autogrades"][$k] = $ag[$k];
+                if ($ge->allow_edit($gv, $oldgv, $agv, $info)) {
+                    $v["grades"][$k] = $gv ?? (isset($agv) ? false : null);
+                } else {
+                    $errf[$k] = $ge->parse_value_error();
+                }
             }
         }
-        if (array_key_exists("late_hours", $g)) { // XXX separate permission check?
+        if (array_key_exists("late_hours", $g)
+            && $info->pc_view) { // XXX separate permission check?
             $curlhd = $info->late_hours_data() ? : (object) [];
             $lh = $curlhd->hours ?? 0;
             $alh = $curlhd->autohours ?? $lh;
@@ -82,6 +89,7 @@ class API_Grade {
         if (($err = $api->prepare_grading_commit($info))) {
             return $err;
         }
+        $known_entries = $qreq->knowngrades ? explode(" ", $qreq->knowngrades) : null;
         // XXX match commit with grading commit
         if ($qreq->is_post()) {
             if (!check_post($qreq)) {
@@ -97,9 +105,9 @@ class API_Grade {
             // parse grade elements
             $qreq->allow_a("grades", "autogrades", "oldgrades");
             $errf = [];
-            $g = self::parse_full_grades($info, $qreq->grades, $errf, $info->can_edit_grades_any());
-            $ag = self::parse_full_grades($info, $qreq->autogrades, $errf, $info->can_edit_grades_any());
-            $og = self::parse_full_grades($info, $qreq->oldgrades, $errf, true);
+            $g = self::parse_full_grades($info, $qreq->grades, $errf, true);
+            $ag = self::parse_full_grades($info, $qreq->autogrades, $errf, false);
+            $og = self::parse_full_grades($info, $qreq->oldgrades, $errf, false);
             if (!empty($errf)) {
                 if (isset($errf["!invalid"])) {
                     return ["ok" => false, "error" => "Invalid request."];
@@ -112,7 +120,7 @@ class API_Grade {
             // assign grades
             $v = self::apply_grades($info, $g, $ag, $og, $errf);
             if (!empty($errf)) {
-                $j = (array) $info->grade_json();
+                $j = (array) $info->grade_json(0, $known_entries);
                 $j["ok"] = false;
                 $j["error"] = "Grade edit conflict, your update was ignored.";
                 return $j;
@@ -122,7 +130,7 @@ class API_Grade {
         } else if (!$info->can_view_grades()) {
             return ["ok" => false, "error" => "Permission error."];
         }
-        $j = (array) $info->grade_json();
+        $j = (array) $info->grade_json(0, $known_entries);
         $j["ok"] = true;
         return $j;
     }
@@ -201,8 +209,8 @@ class API_Grade {
             $g = $ag = $og = $errf = [];
             foreach ($infos as $uid => $info) {
                 $g[$uid] = self::parse_full_grades($info, $gx->grades ?? null, $errf, true);
-                $ag[$uid] = self::parse_full_grades($info, $gx->autogrades ?? null, $errf, true);
-                $og[$uid] = self::parse_full_grades($info, $gx->oldgrades ?? null, $errf, true);
+                $ag[$uid] = self::parse_full_grades($info, $gx->autogrades ?? null, $errf, false);
+                $og[$uid] = self::parse_full_grades($info, $gx->oldgrades ?? null, $errf, false);
             }
             if (!empty($errf)) {
                 reset($errf);

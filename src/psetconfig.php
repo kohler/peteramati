@@ -103,7 +103,8 @@ class Pset {
     public $all_grades = [];
     /** @var array<string,GradeEntryConfig> */
     public $grades;
-    /** @var list<int> */
+    /** @var list<int>
+     * @readonly */
     public $grades_vf;
     /** @var bool */
     public $grades_visible;
@@ -287,14 +288,14 @@ class Pset {
         } else if (isset($p->directory) && $p->directory !== false) {
             throw new PsetConfigException("`directory` format error", "directory");
         }
-        $this->directory_slash = preg_replace(',([^/])/*\z,', '$1/', $this->directory);
+        $this->directory_slash = preg_replace('/([^\/])\/*\z/', '$1/', $this->directory);
         while (str_starts_with($this->directory_slash, "./")) {
             $this->directory_slash = substr($this->directory_slash, 2);
         }
         if (str_starts_with($this->directory_slash, "/")) {
             $this->directory_slash = substr($this->directory_slash, 1);
         }
-        $this->directory_noslash = preg_replace(',/+\z,', '', $this->directory_slash);
+        $this->directory_noslash = preg_replace('/\/+\z/', '', $this->directory_slash);
         $this->test_file = self::cstr($p, "test_file");
 
         // deadlines
@@ -574,8 +575,8 @@ class Pset {
             return array_values($this->grades);
         } else if (!$this->disabled && $this->visible) {
             $g = [];
-            foreach ($this->grades as $k => $ge) {
-                if ($this->grades_vf[$k] & 2) {
+            foreach (array_values($this->grades) as $i => $ge) {
+                if ($this->grades_vf[$i] & 2) {
                     $g[] = $ge;
                 }
             }
@@ -583,11 +584,6 @@ class Pset {
         } else {
             return [];
         }
-    }
-
-    /** @return list<int> */
-    function grades_vf() {
-        return $this->grades_vf;
     }
 
     /** @return GradeEntryConfig */
@@ -1013,6 +1009,12 @@ class GradeEntryConfig {
     public $landmark_range_first;
     public $landmark_range_last;
     public $landmark_buttons;
+    /** @var ?int */
+    public $timeout;
+    /** @var ?string */
+    private $_last_error;
+    /** @var object */
+    public $config;
 
     static public $letter_map = [
         "A+" => 98, "A" => 95, "A-" => 92, "A–" => 92, "A−" => 92,
@@ -1024,8 +1026,9 @@ class GradeEntryConfig {
 
     function __construct($name, $g) {
         $loc = array("grades", $name);
-        if (!is_object($g))
+        if (!is_object($g)) {
             throw new PsetConfigException("grade entry format error", $loc);
+        }
         $this->key = $name;
         if (isset($g->key)) {
             $this->key = $g->key;
@@ -1033,6 +1036,7 @@ class GradeEntryConfig {
             $this->key = $g->name;
         }
         if (!is_string($this->key)
+            // no spaces, no commas, no plusses
             || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->key)
             || $this->key[0] === "_"
             || $this->key === "total"
@@ -1052,7 +1056,7 @@ class GradeEntryConfig {
             $type = Pset::cstr($loc, $g, "type");
             if ($type === "number") {
                 $type = null;
-            } else if (in_array($type, ["text", "shorttext", "markdown", "checkbox", "checkboxes", "stars", "letter", "section"], true)) {
+            } else if (in_array($type, ["text", "shorttext", "markdown", "checkbox", "checkboxes", "stars", "letter", "section", "timermark"], true)) {
                 // nada
             } else if ($type === "select"
                        && isset($g->options)
@@ -1081,7 +1085,7 @@ class GradeEntryConfig {
             $this->round = $round;
         }
 
-        if (in_array($this->type, ["text", "shorttext", "markdown", "select", "formula", "section"], true)) {
+        if (in_array($this->type, ["text", "shorttext", "markdown", "select", "formula", "timermark", "section"], true)) {
             if (isset($g->no_total) && !$g->no_total) {
                 throw new PsetConfigException("grade entry type {$this->type} cannot be in total", $loc);
             }
@@ -1177,6 +1181,10 @@ class GradeEntryConfig {
                     $this->landmark_buttons[] = $lb;
             }
         }
+
+        $this->timeout = Pset::cinterval($loc, $g, "timeout");
+
+        $this->config = $g;
     }
 
     static function make_late_hours() {
@@ -1205,8 +1213,10 @@ class GradeEntryConfig {
     }
 
 
-    function parse_value($v) {
+    /** @param bool $isnew */
+    function parse_value($v, $isnew) {
         if ($this->type === "formula") {
+            $this->_last_error = "Formula grades cannot be edited.";
             return false;
         }
         if ($v === null || is_int($v) || is_float($v)) {
@@ -1214,44 +1224,56 @@ class GradeEntryConfig {
         } else if (is_string($v)) {
             if (in_array($this->type, ["text", "shorttext", "markdown"])) {
                 return rtrim($v);
-            } else if ($this->type === "select") {
-                if ($v === null || $v === "" || strcasecmp($v, "none") === 0)
+            } else if ($this->type === "timermark") {
+                $v = trim($v);
+                if ($v === "" || $v === "0") {
                     return null;
-                else if (in_array((string) $v, $this->options))
-                    return $v;
-                else
+                } else if ($isnew || $v === "now") {
+                    return Conf::$now;
+                } else if (ctype_digit($v)) {
+                    return (int) $v;
+                } else {
+                    $this->_last_error = "Invalid timermark.";
                     return false;
+                }
+            } else if ($this->type === "select") {
+                if ($v === "" || strcasecmp($v, "none") === 0) {
+                    return null;
+                } else if (in_array((string) $v, $this->options)) {
+                    return $v;
+                } else {
+                    $this->_last_error = "Invalid grade.";
+                    return false;
+                }
             }
             $v = trim($v);
             if ($v === "") {
                 return null;
-            } else if (preg_match('{\A[-+]?\d+\z}', $v)) {
+            } else if (preg_match('/\A[-+]?\d+\z/', $v)) {
                 return intval($v);
-            } else if (preg_match('{\A[-+]?(?:\d+\.|\.\d)\d*\z}', $v)) {
+            } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
                 return floatval($v);
             }
             if ($this->type === "letter"
                 && isset(self::$letter_map[strtoupper($v)])) {
                 return self::$letter_map[strtoupper($v)];
+            } else if ($this->type === "letter") {
+                $this->_last_error = "Letter grade expected.";
+                return false;
             }
         }
+        $this->_last_error = $this->type === null ? "Number expected." : "Invalid grade.";
         return false;
     }
 
     /** @return string */
     function parse_value_error() {
-        if ($this->type === null) {
-            return "Number expected.";
-        } else if ($this->type === "letter") {
-            return "Letter grade expected.";
-        } else {
-            return "Invalid grade.";
-        }
+        $this->_last_error;
     }
 
     /** @return bool */
     function value_differs($v1, $v2) {
-        if (($this->type === "checkbox" || $this->type === "checkboxes" || $this->type === "stars")
+        if (in_array($this->type, ["checkbox", "checkboxes", "stars", "timermark"])
             && (int) $v1 === 0
             && (int) $v2 === 0) {
             return false;
@@ -1266,6 +1288,26 @@ class GradeEntryConfig {
         }
     }
 
+    /** @return bool */
+    function allow_edit($newv, $oldv, $autov, PsetView $info) {
+        if (!$this->value_differs($newv, $oldv)) {
+            return true;
+        } else if (!$info->pc_view && (!$this->visible || !$this->answer)) {
+            $this->_last_error = "Cannot modify grade.";
+            return false;
+        } else if ($this->type === "timermark" && $oldv && !$info->pc_view) {
+            $this->_last_error = "Time already started.";
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /** @return bool */
+    function student_can_edit() {
+        return $this->visible && $this->answer;
+    }
+
     /** @return ?GradeFormula */
     function formula(Conf $conf) {
         if ($this->_formula === false) {
@@ -1276,11 +1318,6 @@ class GradeEntryConfig {
             }
         }
         return $this->_formula;
-    }
-
-    /** @return bool */
-    function student_can_edit() {
-        return $this->visible && $this->answer;
     }
 
     function json($pcview, $pos = null) {
@@ -1305,6 +1342,9 @@ class GradeEntryConfig {
         }
         if ($this->is_extra) {
             $gej["is_extra"] = true;
+        }
+        if ($this->type === "timermark" && isset($this->timeout)) {
+            $gej["timeout"] = $this->timeout;
         }
         if ($this->landmark_file) {
             $gej["landmark"] = $this->landmark_file . ":" . $this->landmark_line;
@@ -1575,7 +1615,7 @@ function check_date($x) {
 
 function check_date_or_grades($x) {
     if ($x === "grades") {
-        return [true, $x];
+        return true;
     } else {
         return check_date($x);
     }
@@ -1585,7 +1625,7 @@ function check_interval($x) {
     if (is_int($x) || is_float($x)) {
         return true;
     } else if (is_string($x)
-               && preg_match(',\A(\d+(?:\.\d*)?|\.\d+)(?:$|\s*)([smhd]?)\z,', strtolower($x), $m)) {
+               && preg_match('/\A(\d+(?:\.\d*)?|\.\d+)(?:$|\s*)([smhd]?)\z/', strtolower($x), $m)) {
         $mult = ["" => 1, "s" => 1, "m" => 60, "h" => 3600, "d" => 86400];
         return [true, floatval($m[1]) * $mult[$m[2]]];
     } else {

@@ -4,7 +4,7 @@
 
 import { handle_ui, fold61 } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
-import { hoturl, hoturl_post, hoturl_gradeparts } from "./hoturl.js";
+import { hoturl, hoturl_gradeapi } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
 import { Bubble } from "./tooltip.js";
 
@@ -90,7 +90,7 @@ handle_ui.on("js-pset-flag", function () {
         }).autogrow()[0].focus();
         $(self).html("OK");
     } else if (this.name === "flag") {
-        $.post(hoturl_post("api/flag", hoturl_gradeparts(this, {flagid: "new"})),
+        $.post(hoturl_gradeapi(this, "=api/flag", {flagid: "new"}),
             {reason: form.elements.flagreason.value},
             function (data) {
                 if (data && data.ok) {
@@ -101,7 +101,7 @@ handle_ui.on("js-pset-flag", function () {
                 }
             });
     } else if (this.name == "resolveflag") {
-        $.post(hoturl_post("api/flag", hoturl_gradeparts(this, {flagid: this.getAttribute("data-flagid"), resolve: 1})), {},
+        $.post(hoturl_gradeapi(this, "=api/flag", {flagid: this.getAttribute("data-flagid"), resolve: 1}), {},
             function (data) {
                 if (data && data.ok) {
                     $(self).replaceWith("<strong>Resolved</strong>");

@@ -10,7 +10,7 @@ import { event_key } from "./ui-key.js";
 import "./ui-autogrow.js";
 import "./ui-range.js";
 import "./ui-sessionlist.js";
-import { hoturl, hoturl_post, hoturl_gradeparts } from "./hoturl.js";
+import { hoturl, hoturl_post, hoturl_gradeapi } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
 import { tooltip } from "./tooltip.js";
@@ -32,6 +32,7 @@ import "./gc-letter.js";
 import "./gc-multicheckbox.js";
 import "./gc-select.js";
 import "./gc-markdown.js";
+import "./gc-timermark.js";
 
 function $$(id) {
     return document.getElementById(id);
@@ -663,13 +664,13 @@ function save_grade(self) {
     });
 
     $f.data("paOutstandingPromise", new Promise(function (resolve, reject) {
-        api_conditioner(hoturl_post("api/grade", hoturl_gradeparts($f[0])),
+        api_conditioner(hoturl_gradeapi($f[0], "=api/grade"),
             {grades: g, oldgrades: og})
         .then(function (data) {
             $f.removeData("paOutstandingPromise");
             if (data.ok) {
                 $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
-                $(self).closest(".pa-psetinfo").data("pa-gradeinfo", new GradeSheet(data)).each(pa_loadgrades);
+                GradeSheet.store(self.closest(".pa-psetinfo"), data);
                 resolve(self);
             } else {
                 $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
@@ -1018,16 +1019,18 @@ function runmany61() {
     setTimeout(runmany61, 10);
 }
 
-
 $(function () {
-var delta = document.body.getAttribute("data-now") - ((new Date).getTime() / 1000);
+document.body.setAttribute("data-time-skew", Math.floor(new Date().getTime() / 1000) - +document.body.getAttribute("data-now"));
+});
+
 $(".pa-download-timed").each(function () {
     var that = this, timer = setInterval(show, 15000);
     function show() {
-        var downloadat = +that.getAttribute("data-pa-download-at"),
+        const downloadat = +that.getAttribute("data-pa-download-at"),
             commitat = +that.getAttribute("data-pa-commit-at"),
             expiry = +that.getAttribute("data-pa-download-expiry"),
-            now = ((new Date).getTime() / 1000 + delta), t;
+            now = new Date().getTime() / 1000 + +document.body.getAttribute("data-time-skew");
+        let t;
         if (now > expiry) {
             t = strftime("%Y/%m/%d %H:%M", downloadat);
         } else {
@@ -1042,7 +1045,6 @@ $(".pa-download-timed").each(function () {
         }
     }
     show();
-});
 });
 
 

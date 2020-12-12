@@ -140,10 +140,8 @@ function draw_grgraph() {
     }
 
     // load user grade
-    let total = null, gi = $(pi).data("pa-gradeinfo");
-    if (gi) {
-        total = gi.get_total(want_noextra && !want_all);
-    }
+    const sheet = $(pi).data("pa-gradeinfo"),
+        total = sheet ? sheet.get_total(want_noextra && !want_all) : null;
     if (total != null) {
         grgr.annotate_last_curve(total);
     }

@@ -4,7 +4,7 @@
 
 import { Filediff } from "./diff.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
-import { hoturl_post, hoturl_gradeparts } from "./hoturl.js";
+import { hoturl_gradeapi } from "./hoturl.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
 
 let md, mdcontext;
@@ -424,7 +424,7 @@ handle_ui.on("pa-diff-toggle-markdown", function (evt) {
         toggleClass(this, "btn-primary", show);
     });
     if (!evt.metaKey) {
-        $.post(hoturl_post("api/diffconfig", hoturl_gradeparts(fd.element)),
+        $.post(hoturl_gradeapi(fd.element, "=api/diffconfig"),
             {file: fd.file, markdown: show ? 1 : 0});
     }
 });

@@ -4,7 +4,7 @@
 
 import { ImmediatePromise } from "./utils.js";
 import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui } from "./ui.js";
-import { hoturl, hoturl_gradeparts, hoturl_post } from "./hoturl.js";
+import { hoturl_gradeapi } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
 
 
@@ -34,7 +34,7 @@ export class Filediff {
             const p = this.element.closest(".pa-psetinfo");
             removeClass(this.element, "need-load");
             return new Promise(resolve => {
-                $.ajax(hoturl("api/filediff", hoturl_gradeparts(this.element)), {
+                $.ajax(hoturl_gradeapi(this.element, "api/filediff"), {
                     type: "GET", cache: false, dataType: "json",
                     data: {
                         file: html_id_decode(this.element.id.substr(2)),
@@ -193,7 +193,7 @@ export class Linediff {
         const a0 = +m[1], b0 = +m[2], args = {file: this.file, fromline: b0};
         m[3] !== "" && (args.linecount = +m[3]);
         return new Promise(resolve => {
-            $.ajax(hoturl("api/blob", hoturl_gradeparts(e, args)), {
+            $.ajax(hoturl_gradeapi(e, "api/blob", args), {
                 success: function (data) {
                     if (data.ok && data.data) {
                         const lines = data.data.replace(/\n$/, "").split("\n");
@@ -291,8 +291,7 @@ handle_ui.on("pa-diff-unfold", function (evt) {
     });
     if (!evt.metaKey) {
         const fd = Filediff.find(this);
-        $.post(hoturl_post("api/diffconfig", hoturl_gradeparts(fd.element)),
-            {file: fd.file, collapse: show ? 0 : 1});
+        $.post(hoturl_gradeapi(fd.element, "=api/diffconfig", {file: fd.file, collapse: show ? 0 : 1}));
     }
 });
 

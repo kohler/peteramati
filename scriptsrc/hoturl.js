@@ -3,16 +3,19 @@
 // See LICENSE for open-source distribution terms
 
 function serialize_object(x) {
-    if (typeof x === "string")
+    if (typeof x === "string") {
         return x;
-    else if (x) {
-        var k, v, a = [];
-        for (k in x)
+    } else if (x) {
+        var k, v, a = [""];
+        for (k in x) {
             if ((v = x[k]) != null)
-                a.push(encodeURIComponent(k) + "=" + encodeURIComponent(v));
-        return a.join("&");
-    } else
+                a.push(encodeURIComponent(k), "=", encodeURIComponent(v).replace(/%20/g, "+"), "&");
+        }
+        a[a.length - 1] = "";
+        return a.join("");
+    } else {
         return "";
+    }
 }
 
 function hoturl_clean_before(x, page_component, prefix) {
@@ -67,7 +70,7 @@ export function hoturl(page, options) {
             else if (k === "anchor")
                 anchor = "#" + v;
             else
-                x.v.push(encodeURIComponent(k) + "=" + encodeURIComponent(v));
+                x.v.push(encodeURIComponent(k).concat("=", encodeURIComponent(v).replace(/%20/g, "+")));
         }
     }
 
@@ -90,10 +93,12 @@ export function hoturl(page, options) {
         hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
     }
 
-    if (siteinfo.defaults)
+    if (siteinfo.defaults) {
         x.v.push(serialize_object(siteinfo.defaults));
-    if (x.v.length)
+    }
+    if (x.v.length) {
         x.t += "?" + x.v.join("&");
+    }
     return siteinfo.site_relative + x.pt + x.t + anchor;
 }
 
@@ -103,10 +108,10 @@ export function hoturl_post(page, options) {
     return hoturl(page, options);
 }
 
-export function hoturl_gradeparts(e, args) {
-    var p = e.closest(".pa-psetinfo"), v;
+export function hoturl_gradeapi(e, fn, args) {
+    const p = e.closest(".pa-psetinfo");
     args = args || {};
-    v = p.getAttribute("data-pa-user");
+    let v = p.getAttribute("data-pa-user");
     args.u = v || siteinfo.uservalue;
     if ((v = p.getAttribute("data-pa-pset"))) {
         args.pset = v;
@@ -114,7 +119,17 @@ export function hoturl_gradeparts(e, args) {
     if ((v = p.getAttribute("data-pa-hash"))) {
         args.commit = v;
     }
-    return args;
+    const post = fn.charAt(0) === "=";
+    post && (fn = fn.substring(1));
+    let sheet;
+    if (fn === "api/grade" && (sheet = $(p).data("pa-gradeinfo"))) {
+        const enames = [];
+        for (let i in sheet.entries) {
+            enames.push(i);
+        }
+        args.knowngrades = enames.join(" ");
+    }
+    return post ? hoturl_post(fn, args) : hoturl(fn, args);
 }
 
 export function url_absolute(url, loc) {

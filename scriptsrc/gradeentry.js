@@ -213,15 +213,19 @@ export class GradeEntry {
 
 export class GradeSheet {
     constructor(x) {
+        this.entries = {};
         x && this.extend(x);
     }
 
     extend(x) {
-        Object.assign(this, x);
-        if (x.entries) {
-            for (let i in this.entries) {
-                this.entries[i] = new GradeEntry(this.entries[i]);
-                this.entries[i]._all = this;
+        for (let k in x) {
+            if (k === "entries") {
+                for (let i in x.entries) {
+                    this.entries[i] = new GradeEntry(x.entries[i]);
+                    this.entries[i]._all = this;
+                }
+            } else {
+                this[k] = x[k];
             }
         }
     }
@@ -252,7 +256,11 @@ export class GradeSheet {
     }
 
     static store(element, x) {
-        $(element).data("pa-gradeinfo", new GradeSheet(x));
+        let gs = $(element).data("pa-gradeinfo");
+        if (!gs) {
+            $(element).data("pa-gradeinfo", (gs = new GradeSheet));
+        }
+        gs.extend(x);
         window.$pa.loadgrades.call(element);
     }
 

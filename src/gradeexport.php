@@ -30,6 +30,8 @@ class GradeExport implements JsonSerializable {
     public $editable;
     /** @var ?list<GradeEntryConfig> */
     private $visible_grades;
+    /** @var ?list<bool> */
+    private $known_entries;
 
     /** @param bool $pc_view */
     function __construct(Pset $pset, $pc_view) {
@@ -71,6 +73,15 @@ class GradeExport implements JsonSerializable {
         }
     }
 
+    /** @param list<string> $known_entries */
+    function suppress_known_entries($known_entries) {
+        $this->known_entries = $this->known_entries ?? array_fill(0, count($this->pset->grades), false);
+        foreach ($known_entries as $key) {
+            if (($ge = $this->pset->grades[$key]))
+                $this->known_entries[$ge->pcview_index] = true;
+        }
+    }
+
     /** @return array */
     function jsonSerialize() {
         $r = [];
@@ -106,7 +117,10 @@ class GradeExport implements JsonSerializable {
             $gi = $maxtotal = 0;
             foreach ($this->visible_grades() as $ge) {
                 $order[] = $ge->key;
-                $entries[$ge->key] = $ge->json($this->pc_view, $gi);
+                if (!isset($this->known_entries)
+                    || !$this->known_entries[$ge->pcview_index]) {
+                    $entries[$ge->key] = $ge->json($this->pc_view, $gi);
+                }
                 if ($ge->max
                     && !$ge->is_extra
                     && !$ge->no_total
@@ -115,7 +129,11 @@ class GradeExport implements JsonSerializable {
                 }
                 ++$gi;
             }
-            $r["entries"] = $entries;
+            if (!empty($entries)) {
+                $r["entries"] = $entries;
+            } else if (empty($order)) {
+                $r["entries"] = (object) $entries;
+            }
             $r["order"] = $order;
             if ($this->pset->grades_total !== null) {
                 $r["maxtotal"] = $this->pset->grades_total;
