@@ -563,7 +563,7 @@ class Pset {
     /** @return array<string,GradeEntryConfig> */
     function numeric_grades() {
         return array_filter($this->grades, function ($ge) {
-            return $ge->type !== "text" && $ge->type !== "markdown";
+            return $ge->type !== "text" && $ge->type !== "shorttext" && $ge->type !== "markdown";
         });
     }
 
@@ -1052,7 +1052,7 @@ class GradeEntryConfig {
             $type = Pset::cstr($loc, $g, "type");
             if ($type === "number") {
                 $type = null;
-            } else if (in_array($type, ["text", "markdown", "checkbox", "checkboxes", "stars", "letter", "section"], true)) {
+            } else if (in_array($type, ["text", "shorttext", "markdown", "checkbox", "checkboxes", "stars", "letter", "section"], true)) {
                 // nada
             } else if ($type === "select"
                        && isset($g->options)
@@ -1081,7 +1081,7 @@ class GradeEntryConfig {
             $this->round = $round;
         }
 
-        if (in_array($this->type, ["text", "markdown", "select", "formula", "section"], true)) {
+        if (in_array($this->type, ["text", "shorttext", "markdown", "select", "formula", "section"], true)) {
             if (isset($g->no_total) && !$g->no_total) {
                 throw new PsetConfigException("grade entry type {$this->type} cannot be in total", $loc);
             }
@@ -1212,7 +1212,7 @@ class GradeEntryConfig {
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
         } else if (is_string($v)) {
-            if ($this->type === "text" || $this->type === "markdown") {
+            if (in_array($this->type, ["text", "shorttext", "markdown"])) {
                 return rtrim($v);
             } else if ($this->type === "select") {
                 if ($v === null || $v === "" || strcasecmp($v, "none") === 0)

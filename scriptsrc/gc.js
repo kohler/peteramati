@@ -47,6 +47,14 @@ GradeClass.add("text", {
     sort: "forward"
 });
 
+GradeClass.add("shorttext", {
+    entry: function (id) {
+        return '<textarea class="uich pa-pd pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea>');
+    },
+    justify: "left",
+    sort: "forward"
+});
+
 GradeClass.add("section", {
     text: () => "",
     entry: () => ""
