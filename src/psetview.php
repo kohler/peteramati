@@ -86,7 +86,7 @@ class PsetView {
         $this->pset = $pset;
         $this->user = $user;
         $this->viewer = $viewer;
-        $this->pc_view = $viewer->isPC && $viewer !== $user;
+        $this->pc_view = $viewer->isPC;
         assert($viewer === $user || $this->pc_view);
     }
 
@@ -848,10 +848,12 @@ class PsetView {
     /** @return bool */
     function can_view_grades() {
         if ($this->_can_view_grades === null) {
-            if ($this->user === $this->viewer) {
+            if ($this->viewer->isPC && $this->viewer->can_view_pset($this->pset)) {
+                $this->_can_view_grades = true;
+            } else if ($this->user === $this->viewer) {
                 $this->_can_view_grades = $this->user_can_view_grades();
             } else {
-                $this->_can_view_grades = $this->viewer->isPC && $this->viewer->can_view_pset($this->pset);
+                $this->_can_view_grades = false;
             }
         }
         return $this->_can_view_grades;
@@ -893,8 +895,7 @@ class PsetView {
 
     /** @return bool */
     function can_view_grade_statistics() {
-        return ($this->viewer->isPC && $this->viewer !== $this->user)
-            || $this->user_can_view_grade_statistics();
+        return $this->pc_view || $this->user_can_view_grade_statistics();
     }
 
     /** @return bool */
@@ -908,20 +909,20 @@ class PsetView {
 
     /** @return bool */
     function can_view_grade_statistics_graph() {
-        return ($this->viewer->isPC && $this->viewer !== $this->user)
+        return $this->pc_view
             || ($this->pset->grade_cdf_cutoff < 1
                 && $this->user_can_view_grade_statistics());
     }
 
     /** @return bool */
     function can_edit_grades_staff() {
-        return $this->can_view_grades() && $this->viewer !== $this->user;
+        return $this->can_view_grades() && $this->pc_view;
     }
 
     /** @return bool */
     function can_edit_grades_any() {
         return $this->can_view_grades()
-            && ($this->viewer !== $this->user || $this->pset->student_can_edit_grades());
+            && ($this->pc_view || $this->pset->student_can_edit_grades());
     }
 
 
