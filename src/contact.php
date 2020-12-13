@@ -1451,13 +1451,11 @@ class Contact {
     }
 
     function can_view_grader(Pset $pset, Contact $user = null) {
-        return ($this->isPC && (!$user || $user != $this))
-            || $this->privChair;
+        return $this->isPC;
     }
 
     function can_set_grader(Pset $pset, Contact $user = null) {
-        return ($this->isPC && (!$user || $user != $this))
-            || $this->privChair;
+        return $this->isPC;
     }
 
     function can_view_comments(Pset $pset, PsetView $info = null) {
@@ -1473,7 +1471,7 @@ class Contact {
     function can_run(Pset $pset, RunnerConfig $runner = null, $user = null) {
         if (!$runner || $runner->disabled) {
             return false;
-        } else if ($this->isPC && (!$user || $user !== $this)) {
+        } else if ($this->isPC) {
             return true;
         } else {
             return $runner->visible && $this->show_setting_on($runner->visible, $pset);
@@ -1483,7 +1481,7 @@ class Contact {
     function can_view_run(Pset $pset, RunnerConfig $runner, $user = null) {
         if ($runner->disabled) {
             return false;
-        } else if ($this->isPC && (!$user || $user !== $this)) {
+        } else if ($this->isPC) {
             return true;
         } else {
             return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
@@ -1494,7 +1492,7 @@ class Contact {
     function can_view_transferred_warnings(Pset $pset, RunnerConfig $runner, $user = null) {
         if ($runner->disabled) {
             return false;
-        } else if ($this->isPC && (!$user || $user !== $this)) {
+        } else if ($this->isPC) {
             return true;
         } else {
             return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
