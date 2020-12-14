@@ -79,6 +79,8 @@ export function run(button, opt) {
                     key = "\x1B";
                 } else if (key === "Backspace" && !mod) {
                     key = "\x7F";
+                } else if (key === "Tab" && !mod) {
+                    key = "\x09";
                 } else if (key >= "a"
                            && key <= "z"
                            && (mod & 0xE) === event_modkey.CTRL) {

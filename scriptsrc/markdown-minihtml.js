@@ -17,7 +17,7 @@ function minihtml_inline(state, silent) {
     // Quick fail on second char
     ch = state.src.charCodeAt(pos + 1) | 0x20;
     if (ch !== 0x62 && ch !== 0x2f && ch !== 0x73) {
-      return false;
+        return false;
     }
 
     match = state.src.slice(pos).match(/<br\s*\/?>(?:\s*<\/br\s*>)?|<\/br\s*>|<su[bp]\s*>\s*([^<]+?)\s*<\/\s*su/i);
