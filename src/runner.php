@@ -718,8 +718,9 @@ class RunnerState {
 
         $offset = cvtint($qreq->offset, 0);
         $rct = $this->running_checkt();
-        if ($rct == $this->checkt && ($qreq->stop || $qreq->write)) {
-            if ($qreq->write) {
+        if (($rct == $this->checkt && ($qreq->stop ?? "") !== "" && $qreq->stop !== "0")
+            || ($rct == $this->checkt && ($qreq->write ?? "") !== "")) {
+            if (($qreq->write ?? "") !== "") {
                 $this->write($qreq->write);
             }
             if ($qreq->stop) {
