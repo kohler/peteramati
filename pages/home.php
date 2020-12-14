@@ -1299,7 +1299,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         } else if (($h = $info->commit_hash()) !== null) {
             $j["hash"] = $h;
         }
-        if (!$h || $info->empty_diff_likely()) {
+        if ($h && $info->empty_diff_likely()) {
             $j["emptydiff"] = true;
         }
     }
