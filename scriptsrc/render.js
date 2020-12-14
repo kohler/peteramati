@@ -128,7 +128,7 @@ render_text.add_format({
     format: 1,
     render: function (text) {
         if (!md) {
-            md = window.markdownit({highlight: try_highlight}).use(markdownit_katex).use(markdownit_minihtml);
+            md = window.markdownit({highlight: try_highlight, linkify: true}).use(markdownit_katex).use(markdownit_minihtml);
         }
         return md.render(text);
     }

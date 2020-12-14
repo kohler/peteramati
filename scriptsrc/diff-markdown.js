@@ -187,7 +187,7 @@ function render_landmark_fence(md) {
 
 function make_markdownit() {
     if (!md) {
-        md = markdownit().use(markdownit_katex).use(markdownit_minihtml);
+        md = markdownit({linkify: true}).use(markdownit_katex).use(markdownit_minihtml);
         for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
                        "bullet_list_open", "table_open", "blockquote_open",
                        "hr"]) {

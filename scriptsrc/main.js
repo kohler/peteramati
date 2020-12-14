@@ -33,6 +33,9 @@ import "./gc-multicheckbox.js";
 import "./gc-select.js";
 import "./gc-markdown.js";
 import "./gc-timermark.js";
+import LinkifyIt from "linkify-it";
+window.markdownit.linkify = LinkifyIt();
+window.markdownit.linkify.set({fuzzyEmail: false, "---": true});
 
 function $$(id) {
     return document.getElementById(id);
