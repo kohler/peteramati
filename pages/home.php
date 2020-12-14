@@ -1101,7 +1101,7 @@ function render_flag_row(Pset $pset, Contact $s = null, FlagTableRow $row, $anon
         }
     }
     if ($row->cpi->notes) {
-        $garr = render_grades($pset, $row->cpi->notes, null);
+        $garr = render_grades($pset, $row->cpi->jnotes(), null);
         $j["total"] = $garr->totalv;
     }
     if ($row->flagid[0] === "t" && ctype_digit(substr($row->flagid, 1))) {
