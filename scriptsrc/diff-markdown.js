@@ -10,23 +10,17 @@ import { markdownit_minihtml } from "./markdown-minihtml.js";
 let md, mdcontext;
 
 
-function hljs_line(s, tags) {
-    var t = tags.length ? tags.join("").concat(s) : s,
-        m = s.match(/<[^>]*>/g), i;
-    if (m) {
-        for (i = 0; i !== m.length; ++i) {
-            if (m[i].charAt(1) === "/") {
-                tags.pop();
-            } else {
-                tags.push(m[i]);
-            }
+function hljs_line(lang, s, hlstate) {
+    try {
+        const result = hljs.highlight(lang, s, true, hlstate),
+            ns = result.value;
+        if (s.endsWith("\r\n") && ns.endsWith("\n\n")) {
+            result.value = ns.substring(0, ns.length - 1);
         }
+        return result;
+    } catch (exc) {
+        return null;
     }
-    for (i = tags.length - 1; i >= 0; --i) {
-        var sp = tags[i].indexOf(" ");
-        t = t.concat('</', tags[i].substr(1, sp < 0 ? -1 : sp - 1), '>');
-    }
-    return t;
 }
 
 function render_map(map) {
@@ -125,9 +119,8 @@ function modify_landmark_image(base) {
 
 function render_landmark_fence(md) {
     return function (tokens, idx, options, env, self) {
-        var token = tokens[idx], xtoken = token,
-            info = token.info ? md.utils.unescapeAll(token.info) : "",
-            lang, content, highlighted = false, i, xattrs, m;
+        const token = tokens[idx];
+        let info = token.info ? md.utils.unescapeAll(token.info) : "", m;
         if (info && info.indexOf(" ") >= 0) {
             if ((m = info.match(/^ *([-a-z+]+) *$/))) {
                 info = m[1];
@@ -137,19 +130,14 @@ function render_landmark_fence(md) {
                 info = "";
             }
         }
-        lang = info ? info.trim().split(/\s+/g)[0] : "";
-
-        if (lang && hljs.getLanguage(lang)) {
-            try {
-                content = hljs.highlight(lang, token.content, true).value;
-                highlighted = true;
-            } catch (ex) {
-            }
+        let lang = info ? info.trim().split(/\s+/g)[0] : "";
+        if (!lang || !hljs.getLanguage(lang)) {
+            lang = null;
         }
-        highlighted || (content = md.utils.escapeHtml(token.content));
 
-        if (info) {
-            i = token.attrIndex("class");
+        let xtoken = token;
+        if (lang) {
+            let i = token.attrIndex("class");
             xtoken = {attrs: token.attrs ? token.attrs.slice() : []};
             if (i < 0) {
                 xtoken.attrs.push(["class", options.langPrefix + lang]);
@@ -157,30 +145,35 @@ function render_landmark_fence(md) {
                 xtoken.attrs[i][1] += " " + options.langPrefix + lang;
             }
         }
-        xattrs = '><code'.concat(self.renderAttrs(xtoken), '>');
+        let xattrs = '><code'.concat(self.renderAttrs(xtoken), '>');
 
         if (token.map && token.level === 0) {
             // split into lines, assign landmarks
-            var x = content.split(/\n/), y = [], ln0 = token.map[0] + 2;
+            const x = token.content.split(/\n/), y = [];
             x[x.length - 1] === "" && x.pop();
-            var xl = x.length;
-            if (highlighted) {
-                var tags = [];
-                for (i = 0; i !== xl; ++i) {
+            const xl = x.length;
+            let i = 0, ln0 = token.map[0] + 2, hlstate = null;
+            while (lang && i !== xl) {
+                let result = hljs_line(lang, x + "\n", hlstate);
+                if (result) {
                     y.push('<pre data-landmark="', ln0 + i,
                            i + 1 !== xl ? '" class="partial"' : '"',
-                           xattrs, hljs_line(x[i], tags), "\n</code></pre>");
+                           xattrs, result.value, "</code></pre>");
+                    hlstate = result.top;
+                    ++i;
+                } else {
+                    break;
                 }
-            } else {
-                for (i = 0; i !== xl; ++i) {
-                    y.push('<pre data-landmark="', ln0 + i,
-                           i + 1 !== xl ? '" class="partial"' : '"',
-                           xattrs, x[i], "\n</code></pre>");
-                }
+            }
+            while (i !== xl) {
+                y.push('<pre data-landmark="', ln0 + i,
+                       i + 1 !== xl ? '" class="partial"' : '"',
+                       xattrs, x[i], "\n</code></pre>");
+                ++i;
             }
             return y.join("");
         } else {
-            return '<pre'.concat(xattrs, content, '</code></pre>');
+            return '<pre'.concat(xattrs, md.utils.escapeHtml(token.content), '</code></pre>');
         }
     };
 }
@@ -356,20 +349,15 @@ function filediff_highlight() {
     while (e) {
         if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
             const ce = e.lastChild,
-                s = ce.textContent;
-            try {
-                let result = hljs.highlight(lang, s, true, hlstate);
-                hlstate = result.top;
-                ce.setAttribute("data-pa-text", s);
-                let ns = result.value;
-                if (s.endsWith("\r\n") && ns.endsWith("\n\n")) {
-                    ns = ns.substring(0, ns.length - 1);
-                }
-                ce.innerHTML = ns;
-                addClass(ce, langclass);
-            } catch (exc) {
+                s = ce.textContent,
+                result = hljs_line(lang, s, hlstate);
+            if (!result) {
                 break;
             }
+            hlstate = result.top;
+            ce.setAttribute("data-pa-text", s);
+            ce.innerHTML = result.value;
+            addClass(ce, langclass);
         }
         e = e.nextSibling;
     }
