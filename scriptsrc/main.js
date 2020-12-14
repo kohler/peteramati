@@ -1436,7 +1436,7 @@ function pa_render_pset_table(pconf, data) {
             const s = data[i];
             if (s.dropped) {
                 s.boringness = 2;
-            } else if (!s.gradehash && !s.hash && !pconf.gitless_grades) {
+            } else if (s.emptydiff) {
                 s.boringness = 1;
             } else {
                 s.boringness = 0;

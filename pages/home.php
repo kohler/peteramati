@@ -1294,10 +1294,13 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
                 }
             });
         }
-        if (($gh = $info->grading_hash()) !== null) {
-            $j["gradehash"] = $gh;
-        } else if (!$info->empty_diff_likely()) {
-            $j["hash"] = $info->commit_hash();
+        if (($h = $info->grading_hash()) !== null) {
+            $j["gradehash"] = $h;
+        } else if (($h = $info->commit_hash()) !== null) {
+            $j["hash"] = $h;
+        }
+        if (!$h || $info->empty_diff_likely()) {
+            $j["emptydiff"] = true;
         }
     }
 
