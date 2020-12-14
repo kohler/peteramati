@@ -70,24 +70,26 @@ export function run(button, opt) {
         addClass(thepre[0].parentElement, "pa-run-xterm-js");
         thexterm = new Terminal({cols: terminal_char_width(80, 132), rows: 25});
         thexterm.open(thepre[0]);
-        thexterm.attachCustomKeyEventHandler(function (e) {
-            if (e.type === "keydown") {
-                let key = event_key(e), mod = event_modkey(e);
+        thexterm.attachCustomKeyEventHandler(function (event) {
+            if (event.type === "keydown") {
+                let key = event_key(event), mod = event_modkey(event);
                 if (key === "Enter" && !mod) {
                     key = "\r";
                 } else if (key === "Escape" && !mod) {
                     key = "\x1B";
                 } else if (key === "Backspace" && !mod) {
                     key = "\x7F";
+                    event.preventDefault();
                 } else if (key === "Tab" && !mod) {
                     key = "\x09";
+                    event.preventDefault();
                 } else if (key >= "a"
                            && key <= "z"
                            && (mod & 0xE) === event_modkey.CTRL) {
                     key = String.fromCharCode(key.charCodeAt(0) - 96);
                 } else if (key.length !== 1
                            || (mod & 0xE) !== 0
-                           || !event_key.printable(e)) {
+                           || !event_key.printable(event)) {
                     key = "";
                 }
                 if (key !== "") {
