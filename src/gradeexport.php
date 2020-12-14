@@ -92,6 +92,8 @@ class GradeExport implements JsonSerializable {
             }
             if ($this->pc_view && !empty($this->autogrades)) {
                 $r["autogrades"] = $this->autogrades;
+            } else if ($this->pc_view && $this->grades === null) {
+                $r["grades"] = [];
             }
             if ($this->total !== null) {
                 $r["total"] = $this->total;
