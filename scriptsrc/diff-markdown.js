@@ -351,39 +351,25 @@ function filediff_highlight() {
         || hasClass(this, "pa-markdown"))
         return;
     // collect content
-    var e = this.firstChild, l = [], lineno = 1, this_lineno;
+    const langclass = "language-" + lang;
+    let e = this.firstChild, hlstate = null;
     while (e) {
         if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
-            while (lineno < this_lineno) {
-                l.push("\n");
-                ++lineno;
+            const ce = e.lastChild,
+                s = ce.textContent;
+            try {
+                let result = hljs.highlight(lang, s, true, hlstate);
+                hlstate = result.top;
+                ce.setAttribute("data-pa-text", s);
+                let ns = result.value;
+                if (s.endsWith("\r\n") && ns.endsWith("\n\n")) {
+                    ns = ns.substring(0, ns.length - 1);
+                }
+                ce.innerHTML = ns;
+                addClass(ce, langclass);
+            } catch (exc) {
+                break;
             }
-            l.push(e.lastChild.textContent);
-            if (!hasClass(e.lastChild, "pa-dnonl")) {
-                l.push("\n");
-            }
-            ++lineno;
-        }
-        e = e.nextSibling;
-    }
-    // highlight
-    var hl;
-    try {
-        hl = hljs.highlight(lang, l.join(""), true).value.split("\n");
-    } catch (exc) {
-        return;
-    }
-    // replace content with highlight
-    e = this.firstChild;
-    var tags = [], langclass = "language-" + lang;
-    while (e) {
-        if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
-            var et = e.lastChild;
-            et.setAttribute("data-pa-text", et.textContent);
-            et.innerHTML = hljs_line(hl[this_lineno - 1], tags);
-            addClass(et, langclass);
         }
         e = e.nextSibling;
     }

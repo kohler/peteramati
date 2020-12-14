@@ -1938,14 +1938,14 @@ class PsetView {
         }
 
         if ($x[0]) {
+            $f = $l[4] ?? 0;
             echo '<div class="pa-dl', $x[0], '">',
                 '<div class="pa-da"', $ak, '></div>',
                 '<div class="pa-db"', $bk, '></div>',
-                '<div class="', $x[1];
-            if (isset($l[4]) && ($l[4] & DiffInfo::LINE_NONL)) {
-                echo ' pa-dnonl';
-            }
-            echo '">', $this->diff_line_code($x[4]), "</div></div>\n";
+                '<div class="', $x[1],
+                ($f & DiffInfo::LINE_NONL ? ' pa-dnonl">' : '">'),
+                $this->diff_line_code($x[4]),
+                ($f & DiffInfo::LINE_NONL ? "</div></div>\n" : "\n</div></div>\n");
         }
 
         if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {
