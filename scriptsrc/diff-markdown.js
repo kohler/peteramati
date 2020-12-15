@@ -219,16 +219,17 @@ function fix_list_item(d) {
 }
 
 export function filediff_markdown() {
-    if (hasClass(this, "pa-markdown") || hasClass(this, "pa-highlight"))
+    if (hasClass(this, "pa-markdown") || hasClass(this, "pa-highlight")) {
         return;
+    }
     // collect content
-    var e = this.firstChild, l = [], lineno = 1, this_lineno;
+    let e = this.firstChild, l = [], lineno = 1;
     while (e) {
-        var n = e.nextSibling;
+        let n = e.nextSibling;
         if (hasClass(e, "pa-dlr")) {
             this.removeChild(e);
         } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
+            const this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
             while (lineno < this_lineno) {
                 l.push("\n");
                 ++lineno;
@@ -240,7 +241,7 @@ export function filediff_markdown() {
         e = n;
     }
     // render to markdown
-    var dx = document.createElement("div"), d;
+    let dx = document.createElement("div"), d;
     mdcontext = this;
     dx.innerHTML = make_markdownit().render(l.join(""));
     mdcontext = null;
