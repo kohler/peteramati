@@ -1283,11 +1283,20 @@ function pa_render_pset_table(pconf, data) {
             tw: 2
         },
         conversation: {
-            th: '<th class="gt-conversation l" scope="col">Flag</th>',
+            th: '<th class="gt-conversation l plsortable" data-pa-sort="conversation" scope="col">Flag</th>',
             td: function (s) {
                 return '<td class="gt-conversation l">'.concat(
                     escape_entities(s.conversation || s.conversation_pfx || ""),
                     (s.conversation_pfx ? "…" : ""), '</td>');
+            },
+            compare: function (a, b) {
+                const sa = a.conversation || a.conversation_pfx || "",
+                      sb = b.conversation || b.conversation_pfx || "";
+                if (sa === "" || sb === "") {
+                    return sa === sb ? 0 : (sa === "" ? 1 : -1);
+                } else {
+                    return sa.localeCompare(sb);
+                }
             },
             tw: 20
         },
