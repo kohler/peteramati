@@ -554,7 +554,7 @@ class PsetView {
             $antiupdates = json_antiupdate($upi->jnotes(), $updates);
             $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, notes=?",
                 $this->user->contactId, $this->pset->id,
-                $upi->notesversion, $upi->updateat, $upi->updateby,
+                $upi->notesversion, $upi->updateat ?? 0, $upi->updateby ?? 0,
                 json_encode_db($antiupdates));
         }
 
