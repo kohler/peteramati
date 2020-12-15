@@ -47,6 +47,8 @@ class RunnerState {
     private $jailhomedir;
 
     private $_logged_checkts;
+    /** @var ?list<RunOverlayConfig> */
+    private $_overlay;
 
     function __construct(PsetView $info, RunnerConfig $runner, $checkt = null) {
         $this->conf = $info->conf;
@@ -193,30 +195,20 @@ class RunnerState {
         return $f;
     }
 
-    /** @return list<string> */
-    private function overlayfiles() {
-        $f = $this->runner->overlay;
-        if (!isset($f)) {
-            $f = $this->pset->run_overlay;
-        }
-        if ($f === null || $f === "" || $f === []) {
-            return [];
-        }
-        if (is_string($f)) {
-            $f = [$f];
-        }
-        for ($i = 0; $i !== count($f); ) {
-            if ($f[$i] === "") {
-                array_splice($f, $i, 1);
-            } else {
-                if ($f[$i][0] !== "/") {
-                    $f[$i] = SiteLoader::$root . "/" . $f[$i];
+    /** @return list<RunOverlayConfig> */
+    private function overlay() {
+        if ($this->_overlay === null) {
+            $this->_overlay = [];
+            foreach ($this->runner->overlay ?? $this->pset->run_overlay ?? [] as $r) {
+                $r = clone $r;
+                if ($r->file[0] !== "/") {
+                    $r->file = SiteLoader::$root . "/" . $r->file;
                 }
-                $f[$i] = $this->expand($f[$i]);
-                ++$i;
+                $r->file = $this->expand($r->file);
+                $this->_overlay[] = $r;
             }
         }
-        return $f;
+        return $this->_overlay;
     }
 
     /** @return int */
@@ -225,8 +217,8 @@ class RunnerState {
         if (($f = $this->jailfiles())) {
             $t = max($t, (int) @filemtime($f));
         }
-        foreach ($this->overlayfiles() as $f) {
-            $t = max($t, (int) @filemtime($f));
+        foreach ($this->overlay() as $r) {
+            $t = max($t, (int) @filemtime($r->file));
         }
         return $t;
     }
@@ -528,19 +520,24 @@ class RunnerState {
         }
 
         // create overlay
-        if (($overlay = $this->overlayfiles())) {
+        if (($overlay = $this->overlay())) {
             $this->checkout_overlay($checkoutdir, $overlay);
         }
     }
 
+    /** @param list<RunOverlayConfig> $overlayfiles */
     function checkout_overlay($checkoutdir, $overlayfiles) {
-        foreach ($overlayfiles as $overlayfile) {
-            if (preg_match('/(?:\.tar|\.tar\.[gx]z|\.t[bgx]z|\.tar\.bz2)\z/i', $overlayfile)) {
-                $x = $this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($overlayfile));
+        foreach ($overlayfiles as $ro) {
+            if (preg_match('/(?:\.tar|\.tar\.[gx]z|\.t[bgx]z|\.tar\.bz2)\z/i', $ro->file)) {
+                $c = "cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($ro->file);
+                foreach ($ro->exclude ?? [] as $xf) {
+                    $c .= " --exclude " . escapeshellarg($xf);
+                }
+                $x = $this->run_and_log($c);
             } else {
-                fwrite($this->logstream, "++ cp " . escapeshellarg($overlayfile) . " " . escapeshellarg($checkoutdir) . "\n");
-                $rslash = strrpos($overlayfile, "/");
-                $x = !copy($overlayfile, $checkoutdir . substr($overlayfile, $rslash));
+                fwrite($this->logstream, "++ cp " . escapeshellarg($ro->file) . " " . escapeshellarg($checkoutdir) . "\n");
+                $rslash = strrpos($ro->file, "/");
+                $x = !copy($ro->file, $checkoutdir . substr($ro->file, $rslash));
             }
             if ($x) {
                 throw new RunnerException("Can’t unpack overlay");

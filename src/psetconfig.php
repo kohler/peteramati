@@ -148,7 +148,7 @@ class Pset {
     public $run_username;
     /** @var ?string */
     public $run_dirpattern;
-    /** @var null|string|list<string> */
+    /** @var ?list<RunOverlayConfig> */
     public $run_overlay;
     /** @var ?string */
     public $run_skeletondir;
@@ -424,7 +424,12 @@ class Pset {
         }
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
         $this->run_username = self::cstr($p, "run_username");
-        $this->run_overlay = self::cstr_or_str_list($p, "run_overlay");
+        if (($ro = $p->run_overlay ?? null) !== null) {
+            $this->run_overlay = [];
+            foreach (is_array($ro) ? $ro : [$ro] as $k => $r) {
+                $this->run_overlay[] = new RunOverlayConfig($k, $r);
+            }
+        }
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
         $this->run_jailmanifest = self::cstr_or_str_list($p, "run_jailmanifest");
         $this->run_xterm_js = self::cbool($p, "run_xterm_js");
@@ -928,7 +933,7 @@ class DownloadEntryConfig {
     public $visible;
 
     function __construct($name, $g) {
-        $loc = array("downloads", $name);
+        $loc = ["downloads", $name];
         if (!is_object($g)) {
             throw new PsetConfigException("download entry format error", $loc);
         }
@@ -1025,7 +1030,7 @@ class GradeEntryConfig {
     ];
 
     function __construct($name, $g) {
-        $loc = array("grades", $name);
+        $loc = ["grades", $name];
         if (!is_object($g)) {
             throw new PsetConfigException("grade entry format error", $loc);
         }
@@ -1380,29 +1385,49 @@ class GradeEntryConfig {
 }
 
 class RunnerConfig {
+    /** @var string */
     public $name;
+    /** @var string */
     public $category;
+    /** @var string */
     public $title;
+    /** @var string */
     public $output_title;
+    /** @var ?bool */
     public $disabled;
+    /** @var ?bool */
     public $visible;
+    /** @var ?bool */
     public $output_visible;
+    /** @var ?float */
     public $position;
+    /** @var ?string */
     public $command;
+    /** @var ?string */
     public $username;
+    /** @var ?list<RunOverlayConfig> */
     public $overlay;
+    /** @var ?float */
     public $timeout;
+    /** @var ?string */
     public $queue;
+    /** @var ?int */
     public $nconcurrent;
+    /** @var ?bool */
     public $xterm_js;
+    /** @var ?bool */
     public $transfer_warnings;
+    /** @var ?float */
     public $transfer_warnings_priority;
+    /** @var ?string */
     public $require;
+    /** @var ?string */
     public $eval;
+    /** @var null|bool|float */
     public $timed_replay;
 
     function __construct($name, $r, $defr) {
-        $loc = array("runners", $name);
+        $loc = ["runners", $name];
         if (!is_object($r)) {
             throw new PsetConfigException("runner format error", $loc);
         }
@@ -1424,16 +1449,8 @@ class RunnerConfig {
             throw new PsetConfigException("runner category format error", $loc);
         }
 
-        $this->title = Pset::cstr($loc, $r, "title", "text");
-        if ($this->title === null) {
-            $this->title = $this->name;
-        }
-
-        $this->output_title = Pset::cstr($loc, $r, "output_title", "output_text");
-        if ($this->output_title === null) {
-            $this->output_title = $this->title . " output";
-        }
-
+        $this->title = Pset::cstr($loc, $r, "title") ?? $this->name;
+        $this->output_title = Pset::cstr($loc, $r, "output_title") ?? "{$this->title} output";
         $this->disabled = Pset::cbool($loc, $rs, "disabled");
         $this->visible = Pset::cdate_or_grades($loc, $rs, "visible", "show_to_students");
         $this->output_visible = Pset::cdate_or_grades($loc, $rs, "output_visible", "show_output_to_students", "show_results_to_students");
@@ -1457,7 +1474,12 @@ class RunnerConfig {
         if ($this->position === null && isset($r->priority)) {
             $this->position = -Pset::cnum($loc, $r, "priority");
         }
-        $this->overlay = Pset::cstr_or_str_list($loc, $rs, "overlay");
+        if (($ro = $r->overlay ?? null) !== null) {
+            $this->overlay = [];
+            foreach (is_array($ro) ? $ro : [$ro] as $k => $r) {
+                $this->overlay[] = new RunOverlayConfig($loc, $r);
+            }
+        }
         if (isset($r->timed_replay)
             ? is_number($r->timed_replay)
             : $defr && isset($defr->timed_replay) && is_number($defr->timed_replay)) {
@@ -1467,8 +1489,31 @@ class RunnerConfig {
             $this->timed_replay = !!Pset::cbool($loc, $rs, "timed_replay");
         }
     }
+    /** @return ?string */
     function category_argument() {
         return $this->category === $this->name ? null : $this->category;
+    }
+}
+
+class RunOverlayConfig {
+    /** @var string */
+    public $file;
+    /** @var ?list<string> */
+    public $exclude;
+
+    function __construct($name, $r) {
+        $loc = ["runner overlay", $name];
+        if (is_string($r)) {
+            $this->file = $r;
+        } else if (is_object($r)) {
+            $this->file = Pset::cstr($loc, $r, "file") ?? null;
+            if ($this->file === null || $this->file === "") {
+                throw new PsetConfigException("runner overlay file format error", $loc);
+            }
+            if (($x = Pset::cstr_or_str_list($loc, $r, "exclude"))) {
+                $this->exclude = is_string($x) ? [$x] : $x;
+            }
+        }
     }
 }
 
