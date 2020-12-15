@@ -234,9 +234,6 @@ export function filediff_markdown() {
                 ++lineno;
             }
             l.push(e.lastChild.textContent);
-            if (!hasClass(e.lastChild, "pa-dnonl")) {
-                l.push("\n");
-            }
             ++lineno;
             addClass(e, "hidden");
         }
