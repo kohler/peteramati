@@ -567,9 +567,9 @@ class Pset {
     }
 
     /** @return array<string,GradeEntryConfig> */
-    function numeric_grades() {
+    function tabular_grades() {
         return array_filter($this->grades, function ($ge) {
-            return $ge->type !== "text" && $ge->type !== "shorttext" && $ge->type !== "markdown";
+            return $ge->type_tabular;
         });
     }
 
@@ -979,6 +979,8 @@ class GradeEntryConfig {
     public $description;
     /** @var string */
     public $type;
+    /** @var bool */
+    public $type_tabular;
     /** @var ?string */
     public $round;
     public $options;
@@ -1061,17 +1063,22 @@ class GradeEntryConfig {
             $type = Pset::cstr($loc, $g, "type");
             if ($type === "number") {
                 $type = null;
-            } else if (in_array($type, ["text", "shorttext", "markdown", "checkbox", "checkboxes", "stars", "letter", "section", "timermark"], true)) {
-                // nada
+                $this->type_tabular = true;
+            } else if (in_array($type, ["checkbox", "checkboxes", "stars", "letter", "section", "timermark"], true)) {
+                $this->type_tabular = true;
+            } else if (in_array($type, ["text", "shorttext", "markdown", "section"], true)) {
+                $this->type_tabular = false;
             } else if ($type === "select"
                        && isset($g->options)
                        && is_array($g->options)) {
                 // XXX check components are strings all different
                 $this->options = $g->options;
+                $this->type_tabular = true;
             } else if ($type === "formula"
                        && isset($g->formula)
                        && is_string($g->formula)) {
                 $this->formula = $g->formula;
+                $this->type_tabular = true;
             } else {
                 throw new PsetConfigException("unknown grade entry type", $loc);
             }

@@ -786,9 +786,7 @@ $(function () {
 function pa_render_total(gi, tm) {
     var t = '<div class="pa-total pa-p', ne = 0;
     for (var k in gi.entries) {
-        if (gi.entries[k].type !== "text"
-            && gi.entries[k].type !== "select"
-            && gi.entries[k].type !== "section")
+        if (gi.entries[k].type_tabular)
             ++ne;
     }
     if (ne <= 1) {
@@ -1437,7 +1435,7 @@ function pa_render_pset_table(pconf, data) {
             pconf.grades = new GradeSheet(pconf.grades);
             for (let i = 0; i !== pconf.grades.order.length; ++i) {
                 const k = pconf.grades.order[i], ge = pconf.grades.entries[k];
-                if (ge.type !== "text") {
+                if (ge.type_tabular) {
                     grade_entries.push(ge);
                     grade_keys.push(k);
                 }

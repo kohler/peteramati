@@ -20,6 +20,10 @@ export class GradeEntry {
         this._all = null;
     }
 
+    get type_tabular() {
+        return this.gc.type_tabular;
+    }
+
     abbr() {
         this._abbr || this.compute_abbr();
         return this._abbr;
@@ -31,7 +35,11 @@ export class GradeEntry {
         let pabbr = {}, grade_titles = [];
 
         for (let i = 0; i !== order.length; ++i) {
-            const k = order[i], ge = entries[k], t = ge.title || k;
+            const k = order[i], ge = entries[k];
+            let t = ge.title || k;
+            if (t.startsWith("<1>")) {
+                t = t.substring(3);
+            }
             grade_titles.push(t);
             let m = t.match(/^(p)(?:art\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i)
                 || t.match(/^(q)(?:uestion\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i)

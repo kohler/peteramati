@@ -26,6 +26,7 @@ export const GradeClass = {
 
     add: (name, x) => {
         x.type = name;
+        x.type_tabular = x.type_tabular == null ? true : x.type_tabular;
         x.text = x.text || GradeClass.basic_text;
         x.simple_text = x.simple_text || x.text;
         x.tcell = x.tcell || x.text;
@@ -44,7 +45,8 @@ GradeClass.add("text", {
         return '<textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     justify: "left",
-    sort: "forward"
+    sort: "forward",
+    type_tabular: false
 });
 
 GradeClass.add("shorttext", {
@@ -52,10 +54,12 @@ GradeClass.add("shorttext", {
         return '<textarea class="uich pa-pd pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     justify: "left",
-    sort: "forward"
+    sort: "forward",
+    type_tabular: false
 });
 
 GradeClass.add("section", {
     text: () => "",
-    entry: () => ""
+    entry: () => "",
+    type_tabular: false
 });

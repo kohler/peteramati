@@ -22,7 +22,8 @@ GradeClass.add("markdown", {
         return '<p class="pa-preview-notice"><span>Markdown styling and LaTeX math supported · </span><a href="" class="ui js-toggle-gc-markdown-preview" tabindex="-1">Preview</a></p><textarea class="uich pa-pd pa-gradevalue pa-wide need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     justify: "left",
-    sort: "forward"
+    sort: "forward",
+    type_tabular: false
 });
 
 handle_ui.on("js-toggle-gc-markdown-preview", function () {

@@ -148,7 +148,7 @@ function collect_pset_info(&$students, $sset, $entries) {
             }
 
             if ($entries) {
-                foreach ($pset->numeric_grades() as $ge) {
+                foreach ($pset->tabular_grades() as $ge) {
                     if (($g = $info->current_grade_value($ge->key)) !== null)
                         $ss->{$ge->key} = $g;
                 }
@@ -931,7 +931,7 @@ function render_grades($pset, $gi, $s) {
     global $Me;
     $total = 0;
     $garr = $gvarr = $different = [];
-    foreach ($pset->numeric_grades() as $ge) {
+    foreach ($pset->tabular_grades() as $ge) {
         $k = $ge->key;
         $gv = $ggv = $agv = null;
         if ($gi && isset($gi->grades)) {
@@ -1464,7 +1464,7 @@ function show_pset_table($sset) {
     }
 
     echo '<div class="gtable-container-0"><div class="gtable-container-1"><table class="gtable want-gtable-fixed" id="pa-pset' . $pset->id . '"></table></div></div>';
-    $grades = $pset->numeric_grades();
+    $grades = $pset->tabular_grades();
     $jd = [
         "id" => $pset->id,
         "checkbox" => $checkbox,
