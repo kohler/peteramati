@@ -1451,7 +1451,7 @@ function show_pset_table($sset) {
     if (!empty($incomplete)) {
         echo '<div id="incomplete_pset', $pset->id, '" class="merror hidden has-hotlist" data-hotlist="',
             htmlspecialchars(json_encode_browser(["pset" => $pset->urlkey, "items" => $incompleteu])),
-            '"><strong>', htmlspecialchars($pset->title), '</strong>: ',
+            '"><strong><a href="#', $pset->urlkey, '">', htmlspecialchars($pset->title), '</a></strong>: ',
             'Your grading is incomplete. Missing grades: ', join(", ", $incomplete), '</div>',
             '<script>$("#incomplete_pset', $pset->id, '").remove().removeClass("hidden").appendTo("#incomplete_notices")</script>';
     }
