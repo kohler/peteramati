@@ -1223,7 +1223,21 @@ class GradeEntryConfig {
             return $v;
         } else if (is_string($v)) {
             if (in_array($this->type, ["text", "shorttext", "markdown"])) {
-                return rtrim($v);
+                if (!$isnew) {
+                    // do not frobulate old values -- preserve database version
+                    return $v;
+                } else if ($this->type === "shorttext") {
+                    return rtrim($v);
+                } else {
+                    $l = $d = strlen($v);
+                    if ($l > 0 && $v[$l - 1] === "\n") {
+                        --$l;
+                    }
+                    if ($l > 0 && $v[$l - 1] === "\r") {
+                        --$l;
+                    }
+                    return $l === $d ? $v : substr($v, 0, $l);
+                }
             } else if ($this->type === "timermark") {
                 $v = trim($v);
                 if ($v === "" || $v === "0") {
