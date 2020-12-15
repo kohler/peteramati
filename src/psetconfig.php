@@ -424,10 +424,10 @@ class Pset {
         }
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
         $this->run_username = self::cstr($p, "run_username");
-        if (($ro = $p->run_overlay ?? null) !== null) {
+        if (($overs = $p->run_overlay ?? null) !== null) {
             $this->run_overlay = [];
-            foreach (is_array($ro) ? $ro : [$ro] as $k => $r) {
-                $this->run_overlay[] = new RunOverlayConfig($k, $r);
+            foreach (is_array($overs) ? $overs : [$overs] as $k => $over) {
+                $this->run_overlay[] = new RunOverlayConfig($k, $over);
             }
         }
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
@@ -1474,10 +1474,10 @@ class RunnerConfig {
         if ($this->position === null && isset($r->priority)) {
             $this->position = -Pset::cnum($loc, $r, "priority");
         }
-        if (($ro = $r->overlay ?? null) !== null) {
+        if (($overs = $r->overlay ?? null) !== null) {
             $this->overlay = [];
-            foreach (is_array($ro) ? $ro : [$ro] as $k => $r) {
-                $this->overlay[] = new RunOverlayConfig($loc, $r);
+            foreach (is_array($overs) ? $overs : [$overs] as $k => $over) {
+                $this->overlay[] = new RunOverlayConfig($loc, $over);
             }
         }
         if (isset($r->timed_replay)
