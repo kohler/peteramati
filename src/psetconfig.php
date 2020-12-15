@@ -461,6 +461,7 @@ class Pset {
         $this->config_mtime = self::cint($p, "config_mtime");
     }
 
+    /** @return int */
     static function compare(Pset $a, Pset $b) {
         if ($a->position != $b->position) {
             return $a->position < $b->position ? -1 : 1;
@@ -478,6 +479,7 @@ class Pset {
         }
     }
 
+    /** @return int */
     static function compare_newest_first(Pset $a, Pset $b) {
         if ($a->position != $b->position) {
             return $a->position < $b->position ? -1 : 1;
@@ -1058,30 +1060,39 @@ class GradeEntryConfig {
         }
         $this->description = Pset::cstr($loc, $g, "description", "edit_description");
 
+        $allow_total = false;
         $type = null;
         if (isset($g->type)) {
             $type = Pset::cstr($loc, $g, "type");
             if ($type === "number") {
                 $type = null;
+                $this->type_tabular = $allow_total = true;
+            } else if (in_array($type, ["checkbox", "checkboxes", "stars"], true)) {
+                $this->type_tabular = $allow_total = true;
+            } else if (in_array($type, ["letter", "timermark"], true)) {
                 $this->type_tabular = true;
-            } else if (in_array($type, ["checkbox", "checkboxes", "stars", "letter", "section", "timermark"], true)) {
-                $this->type_tabular = true;
+                $allow_total = false;
             } else if (in_array($type, ["text", "shorttext", "markdown", "section"], true)) {
-                $this->type_tabular = false;
+                $this->type_tabular = $allow_total = false;
             } else if ($type === "select"
                        && isset($g->options)
                        && is_array($g->options)) {
                 // XXX check components are strings all different
                 $this->options = $g->options;
                 $this->type_tabular = true;
+                $allow_total = false;
             } else if ($type === "formula"
                        && isset($g->formula)
                        && is_string($g->formula)) {
                 $this->formula = $g->formula;
                 $this->type_tabular = true;
+                $allow_total = false;
             } else {
                 throw new PsetConfigException("unknown grade entry type", $loc);
             }
+        } else {
+            $this->type_tabular = true;
+            $allow_total = true;
         }
         $this->type = $type;
 
@@ -1097,7 +1108,7 @@ class GradeEntryConfig {
             $this->round = $round;
         }
 
-        if (in_array($this->type, ["text", "shorttext", "markdown", "select", "formula", "timermark", "section"], true)) {
+        if (!$allow_total) {
             if (isset($g->no_total) && !$g->no_total) {
                 throw new PsetConfigException("grade entry type {$this->type} cannot be in total", $loc);
             }

@@ -4,7 +4,8 @@
 // See LICENSE for open-source distribution terms
 
 class GradeExport implements JsonSerializable {
-    /** @var Pset */
+    /** @var Pset
+     * @readonly */
     public $pset;
     /** @var bool */
     public $pc_view;
@@ -39,18 +40,14 @@ class GradeExport implements JsonSerializable {
         $this->pc_view = $pc_view;
     }
 
-    /** @return list<GradeEntryConfig> */
-    function visible_grades() {
-        if ($this->visible_grades !== null) {
-            return $this->visible_grades;
-        } else {
-            return $this->pset->visible_grades($this->pc_view);
-        }
-    }
-
     /** @param list<GradeEntryConfig> $vg */
     function set_visible_grades($vges) {
         $this->visible_grades = $vges;
+    }
+
+    /** @return list<GradeEntryConfig> */
+    function visible_grades() {
+        return $this->visible_grades ?? $this->pset->visible_grades($this->pc_view);
     }
 
     function suppress_absent_extra() {

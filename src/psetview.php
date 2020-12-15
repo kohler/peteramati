@@ -1024,12 +1024,22 @@ class PsetView {
         if ($this->pset->gitless_grades) {
             $upi = $this->upi();
             return $upi ? $upi->gradercid : 0;
-        } else if (($rpi = $this->rpi()) && $this->_hash === $rpi->gradehash) {
-            return $rpi->gradercid;
         } else {
-            $cn = $this->commit_jnotes();
-            return $cn ? $cn->gradercid ?? 0 : 0;
+            $rpi = $this->rpi();
+            if ((!$rpi || $this->_hash !== $rpi->gradehash)
+                && ($cn = $this->commit_jnotes())
+                && ($cn->gradercid ?? 0) > 0) {
+                return $cn->gradercid;
+            } else {
+                return $rpi ? $rpi->gradercid ?? 0 : 0;
+            }
         }
+    }
+
+    /** @return bool */
+    function viewer_is_grader() {
+        return $this->viewer->contactId > 0
+            && $this->viewer->contactId === $this->gradercid();
     }
 
     /** @return bool */

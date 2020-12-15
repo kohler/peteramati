@@ -926,22 +926,24 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
 
 
 // Per-pset
-/** @param Pset $pset */
-function render_grades($pset, $gi, $s) {
-    global $Me;
+/** @param list<GradeEntryConfig> $gelist
+ * @param ?object $gi
+ * @param array<string,mixed> &$j */
+function add_visible_grades($gelist, $gi, &$j, PsetView $info = null, $all = false) {
     $total = 0;
-    $garr = $gvarr = $different = [];
-    foreach ($pset->tabular_grades() as $ge) {
+    $gvarr = $different = [];
+    foreach ($gelist as $ge) {
         $k = $ge->key;
-        $gv = $ggv = $agv = null;
-        if ($gi && isset($gi->grades)) {
-            $ggv = $gi->grades->$k ?? null;
-        }
-        if ($gi && isset($gi->autogrades)) {
-            $agv = $gi->autogrades->$k ?? null;
-        }
-        if ($ge->formula && $gi && isset($gi->formula)) {
-            $ggv = $gi->formula->$k ?? null;
+        if ($gi) {
+            if ($ge->formula) {
+                $ggv = isset($gi->formula) ? $gi->formula->$k ?? null : null;
+                $agv = null;
+            } else {
+                $ggv = isset($gi->grades) ? $gi->grades->$k ?? null : null;
+                $agv = isset($gi->autogrades) ? $gi->autogrades->$k ?? null : null;
+            }
+        } else {
+            $ggv = $agv = null;
         }
         $gv = $ggv ?? $agv;
         if ($gv !== null && !$ge->no_total) {
@@ -949,16 +951,22 @@ function render_grades($pset, $gi, $s) {
         }
         if ($gv === null
             && !$ge->is_extra
-            && $s
-            && $Me->contactId == $s->gradercid) {
-            $s->incomplete = "grade missing";
+            && $info
+            && $info->viewer_is_grader()) {
+            $info->user->incomplete = "grade missing";
         }
         $gvarr[] = $gv;
         if ($ggv && $agv && $ggv != $agv) {
             $different[$k] = true;
         }
     }
-    return (object) ["allv" => $gvarr,  "totalv" => round_grade($total), "differentk" => $different];
+    $j["total"] = $total;
+    if ($all) {
+        $j["grades"] = $gvarr;
+        if ($different) {
+            $j["highlight_grades"] = $different;
+        }
+    }
 }
 
 /** @return ?PsetView */
@@ -1101,8 +1109,7 @@ function render_flag_row(Pset $pset, Contact $s = null, FlagTableRow $row, $anon
         }
     }
     if ($row->cpi->notes) {
-        $garr = render_grades($pset, $row->cpi->jnotes(), null);
-        $j["total"] = $garr->totalv;
+        add_visible_grades($pset->tabular_grades(), $row->cpi->jnotes(), $j, null, false);
     }
     if ($row->flagid[0] === "t" && ctype_digit(substr($row->flagid, 1))) {
         $j["at"] = (int) substr($row->flagid, 1);
@@ -1269,8 +1276,8 @@ function show_pset_actions($pset) {
     echo Ht::unstash_script("$('.need-pa-pset-actions').each(\$pa.pset_actions)");
 }
 
-/** @param StudentSet $sset */
-function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
+function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
+                         GradeExport $gex, $anonymous) {
     global $Profile, $MicroNow;
     $t0 = microtime(true);
     $j = StudentSet::json_basics($info->user, $anonymous);
@@ -1304,7 +1311,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
         }
     }
 
-    if ($pset->grades()) {
+    if ($gex->visible_grades()) {
         if ($pset->has_formula) {
             $info->ensure_formula();
         }
@@ -1325,12 +1332,7 @@ function render_pset_row(Pset $pset, $sset, PsetView $info, $anonymous) {
             }
         }
 
-        $garr = render_grades($pset, $gi, $info->user);
-        $j["grades"] = $garr->allv;
-        $j["total"] = $garr->totalv;
-        if ($garr->differentk) {
-            $j["highlight_grades"] = $garr->differentk;
-        }
+        add_visible_grades($gex->visible_grades(), $gi, $j, $info, true);
         if ($info->user_can_view_grades()) {
             $j["grades_visible"] = true;
         }
@@ -1419,16 +1421,18 @@ function show_pset_table($sset) {
     $grades_visible = false;
     $jx = [];
     $gradercounts = [];
+    $gex = new GradeExport($pset, true);
+    $gex->set_visible_grades($pset->tabular_grades());
     foreach ($sset as $s) {
         if (!$s->user->visited) {
-            $j = render_pset_row($pset, $sset, $s, $anonymous);
+            $j = render_pset_row($pset, $sset, $s, $gex, $anonymous);
             if (!$s->user->dropped && isset($j["gradercid"])) {
                 $gradercounts[$j["gradercid"]] = ($gradercounts[$j["gradercid"]] ?? 0) + 1;
             }
             if (!$pset->partner_repo) {
                 foreach ($s->user->links(LINK_PARTNER, $pset->id) as $pcid) {
                     if (($ss = $sset->info($pcid)))
-                        $j["partners"][] = render_pset_row($pset, $sset, $ss, $anonymous);
+                        $j["partners"][] = render_pset_row($pset, $sset, $ss, $gex, $anonymous);
                 }
             }
             $jx[] = $j;
@@ -1464,12 +1468,11 @@ function show_pset_table($sset) {
     }
 
     echo '<div class="gtable-container-0"><div class="gtable-container-1"><table class="gtable want-gtable-fixed" id="pa-pset' . $pset->id . '"></table></div></div>';
-    $grades = $pset->tabular_grades();
     $jd = [
         "id" => $pset->id,
         "checkbox" => $checkbox,
         "anonymous" => $anonymous,
-        "grades" => new GradeExport($pset, true),
+        "grades" => $gex,
         "gitless" => $pset->gitless,
         "gitless_grades" => $pset->gitless_grades,
         "key" => $pset->urlkey,
@@ -1479,7 +1482,7 @@ function show_pset_table($sset) {
         $jd["can_override_anonymous"] = true;
     }
     $i = $nintotal = $last_in_total = 0;
-    foreach ($grades as $ge) {
+    foreach ($gex->visible_grades() as $ge) {
         if (!$ge->no_total) {
             ++$nintotal;
             $last_in_total = $ge->key;
