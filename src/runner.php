@@ -604,8 +604,8 @@ class RunnerState {
             // - no pidfile & last update < 30sec ago
             // - running for more than 5min (configurable)
             if (($row->runat > 0
-                 && $row->pidfile
-                 && $this->running_checkt($row->pidfile) != $row->runat)
+                 && $row->lockfile
+                 && $this->running_checkt($row->lockfile) != $row->runat)
                 || ($row->runat <= 0
                     && $row->updateat < Conf::$now - 30)
                 || ($runtimeout
