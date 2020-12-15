@@ -1298,6 +1298,7 @@ function pa_render_pset_table(pconf, data) {
                     return sa.localeCompare(sb);
                 }
             },
+            sort_forward: true,
             tw: 20
         },
         gdialog: {
