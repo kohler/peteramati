@@ -522,23 +522,25 @@ class PsetView {
 
             // update database
             $notes = json_encode_db($new_notes);
+            $notesa = strlen($notes) > 32000 ? null : $notes;
+            $notesb = strlen($notes) > 32000 ? $notes : null;
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if (!$upi) {
                 $result = Dbl::qx($this->conf->dblink, "insert into ContactGrade
                     set cid=?, pset=?, updateat=?, updateby=?,
-                    notes=?, hasactiveflags=?",
+                    notes=?, notesOverflow=?, hasactiveflags=?",
                     $this->user->contactId, $this->pset->id,
                     Conf::$now, $this->viewer->contactId,
-                    $notes, $hasactiveflags);
+                    $notesa, $notesb, $hasactiveflags);
             } else if ($upi->notes === $notes) {
                 return;
             } else {
                 $result = $this->conf->qe("update ContactGrade
                     set notesversion=?, updateat=?, updateby=?,
-                    notes=?, hasactiveflags=?
+                    notes=?, notesOverflow=?, hasactiveflags=?
                     where cid=? and pset=? and notesversion=?",
                     $upi->notesversion + 1, Conf::$now, $this->viewer->contactId,
-                    $notes, $hasactiveflags,
+                    $notesa, $notesb, $hasactiveflags,
                     $this->user->contactId, $this->pset->id, $upi->notesversion);
             }
             if ($result && $result->affected_rows) {
@@ -551,11 +553,13 @@ class PsetView {
         }
 
         if ($upi && $this->pset->grades_history) {
-            $antiupdates = json_antiupdate($upi->jnotes(), $updates);
-            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, notes=?",
+            $unotes = json_encode_db(json_antiupdate($upi->jnotes(), $updates));
+            $unotesa = strlen($unotes) > 32000 ? null : $unotes;
+            $unotesb = strlen($unotes) > 32000 ? $unotes : null;
+            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, notes=?, notesOverflow=?",
                 $this->user->contactId, $this->pset->id,
                 $upi->notesversion, $upi->updateat ?? 0, $upi->updateby ?? 0,
-                json_encode_db($antiupdates));
+                $unotesa, $unotesb);
         }
 
         if (!$this->_upi) {

@@ -18,6 +18,8 @@ class UserPsetInfo {
     public $hidegrade;
     /** @var ?string */
     public $notes;
+    /** @var ?string */
+    private $notesOverflow;
     /** @var ?object */
     private $jnotes;
     /** @var int */
@@ -37,6 +39,8 @@ class UserPsetInfo {
         }
         $this->hidegrade = (int) $this->hidegrade;
         $this->hasactiveflags = (int) $this->hasactiveflags;
+        $this->notes = $this->notesOverflow ?? $this->notes;
+        $this->notesOverflow = null;
     }
 
     /** @return ?UserPsetInfo */

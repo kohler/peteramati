@@ -14,6 +14,8 @@ class CommitPsetInfo {
     public $repoid;
     /** @var ?string */
     public $notes;
+    /** @var ?string */
+    private $notesOverflow;
     /** @var ?object */
     private $jnotes;
     /** @var int */
@@ -34,6 +36,8 @@ class CommitPsetInfo {
         $this->hasflags = (int) $this->hasflags;
         $this->hasactiveflags = (int) $this->hasactiveflags;
         $this->haslinenotes = (int) $this->haslinenotes;
+        $this->notes = $this->notesOverflow ?? $this->notes;
+        $this->notesOverflow = null;
     }
 
     /** @return ?CommitPsetInfo */
