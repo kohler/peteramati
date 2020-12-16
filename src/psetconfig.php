@@ -983,6 +983,8 @@ class GradeEntryConfig {
     public $type;
     /** @var bool */
     public $type_tabular;
+    /** @var bool */
+    public $type_numeric;
     /** @var ?string */
     public $round;
     public $options;
@@ -1066,33 +1068,32 @@ class GradeEntryConfig {
             $type = Pset::cstr($loc, $g, "type");
             if ($type === "number") {
                 $type = null;
-                $this->type_tabular = $allow_total = true;
+                $this->type_tabular = $this->type_numeric = $allow_total = true;
             } else if (in_array($type, ["checkbox", "checkboxes", "stars"], true)) {
-                $this->type_tabular = $allow_total = true;
+                $this->type_tabular = $this->type_numeric = $allow_total = true;
             } else if (in_array($type, ["letter", "timermark"], true)) {
-                $this->type_tabular = true;
+                $this->type_tabular = $this->type_numeric = true;
                 $allow_total = false;
             } else if (in_array($type, ["text", "shorttext", "markdown", "section"], true)) {
-                $this->type_tabular = $allow_total = false;
+                $this->type_tabular = $this->type_numeric = $allow_total = false;
             } else if ($type === "select"
                        && isset($g->options)
                        && is_array($g->options)) {
                 // XXX check components are strings all different
                 $this->options = $g->options;
                 $this->type_tabular = true;
-                $allow_total = false;
+                $this->type_numeric = $allow_total = false;
             } else if ($type === "formula"
                        && isset($g->formula)
                        && is_string($g->formula)) {
                 $this->formula = $g->formula;
-                $this->type_tabular = true;
+                $this->type_tabular = $this->type_numeric = true;
                 $allow_total = false;
             } else {
                 throw new PsetConfigException("unknown grade entry type", $loc);
             }
         } else {
-            $this->type_tabular = true;
-            $allow_total = true;
+            $this->type_tabular = $this->type_numeric = $allow_total = true;
         }
         $this->type = $type;
 
@@ -1316,9 +1317,7 @@ class GradeEntryConfig {
             return false;
         } else if ($v1 === null
                    || $v2 === null
-                   || $this->type === "text"
-                   || $this->type === "markdown"
-                   || $this->type === "select") {
+                   || !$this->type_numeric) {
             return $v1 !== $v2;
         } else {
             return abs($v1 - $v2) >= 0.0001;
