@@ -26,6 +26,10 @@ class UserPsetInfo {
     public $notesversion;
     /** @var int */
     public $hasactiveflags;
+    /** @var ?list<UserPsetHistory> */
+    private $_history;
+    /** @var ?int */
+    private $_history_v0;
 
     private function merge() {
         $this->cid = (int) $this->cid;
@@ -81,5 +85,49 @@ class UserPsetInfo {
         $this->notes = $notes;
         $this->jnotes = $jnotes;
         $this->notesversion = $notesversion;
+    }
+
+    /** @param int $version */
+    function jnotes_on($version, Conf $conf) {
+        if ($version > $this->notesversion) {
+            return null;
+        }
+        if ($this->_history_v0 === null || $this->_history_v0 < $version) {
+            $v0 = $version - ($version & 7);
+            $v1 = $this->_history_v0 ?? PHP_INT_MAX;
+            $result = $conf->qe("select * from ContactGradeHistory where cid=? and pset=? and notesversion>=? and notesversion<? order by notesversion asc", $this->cid, $this->pset, $v0, $v1);
+            $hs = array_fill(0, $this->notesversion - $v0 + 1, null);
+            foreach ($this->_history ?? [] as $h) {
+                if ($h)
+                    $hs[$h->notesversion - $v0] = $h;
+            }
+            while (($h = ContactGradeHistory::fetch($result))) {
+                $hs[$h->notesversion - $v0] = $h;
+            }
+            $this->_history = $hs;
+            $this->_history_v0 = $v0;
+        }
+        $h = $this->_history[$version - $this->_history_v0] ?? null;
+        if ($h && !isset($h->computed_jnotes)) {
+            $v1 = $version + 1;
+            while ($v1 < $this->notesversion) {
+                $hx = $this->_history[$v1 - $this->_history_v0] ?? null;
+                if (!$hx) {
+                    return null;
+                } else if (isset($hx->computed_jnotes)) {
+                    break;
+                }
+            }
+            if ($v1 === $this->notesversion) {
+                $jnotes = $this->jnotes();
+            } else {
+                $jnotes = $this->_history[$v1 - $this->_history_v0]->jnotes();
+            }
+            for (--$v1; $v1 >= $version; --$v1) {
+                $jnotes = $this->_history[$v1 - $this->_history_v0]->apply_reverse($jnotes);
+            }
+            $h->computed_jnotes = $jnotes;
+        }
+        return $h ? $h->computed_jnotes : null;
     }
 }

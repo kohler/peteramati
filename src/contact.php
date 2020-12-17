@@ -848,10 +848,7 @@ class Contact {
      * @return null|int|float */
     function gcache_total(Pset $pset, $noextra, $raw) {
         if (($gexp = $this->ensure_gcache($pset, PsetView::GRADEJSON_NO_LATE_HOURS))) {
-            $v = $gexp->total ?? null;
-            if ($v !== null && $noextra && isset($gexp->total_noextra)) {
-                $v = $gexp->total_noextra;
-            }
+            $v = $noextra ? $gexp->total_noextra() : $gexp->total();
             if ($v !== null && !$raw) {
                 $v = round(($v * 1000.0) / $pset->max_grade(true)) / 10;
             }

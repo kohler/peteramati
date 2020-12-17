@@ -49,7 +49,12 @@ GradeClass.add("timermark", {
             timermark_interval(this, tm, g);
             $(elt).data("pa-timermark-interval", setInterval(timermark_interval, 15000, this, tm, g));
         } else if (g) {
-            tm.innerHTML = strftime("%Y/%m/%d %H:%M", g);
+            if (this._all && (this._all.updateat || 0) > g) {
+                const delta = this._all.updateat - g;
+                tm.innerHTML = strftime("%Y/%m/%d %H:%M (updates from %dh%dm)", g, delta / 3600, (delta / 60) % 60);
+            } else {
+                tm.innerHTML = strftime("%Y/%m/%d %H:%M", g);
+            }
         }
     },
     justify: "left",

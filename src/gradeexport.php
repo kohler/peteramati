@@ -21,6 +21,8 @@ class GradeExport implements JsonSerializable {
     public $total;
     /** @var null|int|float */
     public $total_noextra;
+    /** @var bool */
+    private $has_total = false;
     /** @var ?string */
     public $grading_hash;
     /** @var ?int */
@@ -48,7 +50,9 @@ class GradeExport implements JsonSerializable {
 
     /** @param list<GradeEntryConfig> $vg */
     function set_visible_grades($vges) {
+        assert(!isset($this->grades));
         $this->visible_grades = $vges;
+        $this->has_total = false;
     }
 
     /** @return list<GradeEntryConfig> */
@@ -85,6 +89,39 @@ class GradeExport implements JsonSerializable {
         }
     }
 
+    /** @return null|int|float */
+    function total() {
+        if (!$this->has_total) {
+            $t = $tnx = 0;
+            $any = false;
+            foreach ($this->visible_grades() as $i => $ge) {
+                if (!$ge->no_total && ($gv = $this->grades[$i]) !== null) {
+                    $t += $gv;
+                    if (!$ge->is_extra) {
+                        $tnx += $gv;
+                    }
+                    $any = true;
+                }
+            }
+            if ($any) {
+                $this->total = round_grade($t);
+                $this->total_nonextra = round_grade($tnx);
+            } else {
+                $this->total = $this->total_nonextra = null;
+            }
+            $this->has_total = true;
+        }
+        return $this->total;
+    }
+
+    /** @return null|int|float */
+    function total_nonextra() {
+        if (!$this->has_total) {
+            $this->total();
+        }
+        return $this->total_nonextra;
+    }
+
     /** @return array */
     function jsonSerialize() {
         $r = [];
@@ -97,6 +134,9 @@ class GradeExport implements JsonSerializable {
             }
             if ($this->pc_view && !empty($this->autogrades)) {
                 $r["autogrades"] = $this->autogrades;
+            }
+            if (!$this->has_total) {
+                $this->total();
             }
             if ($this->total !== null) {
                 $r["total"] = $this->total;

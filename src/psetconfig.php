@@ -1368,6 +1368,23 @@ class GradeEntryConfig {
         return $this->_formula;
     }
 
+    /** @param ?object $gx
+     * @param ?object $agx
+     * @param ?object $fgx
+     * @return null|int|float */
+    function extract_value($gx, $agx, $fgx, &$av) {
+        $key = $this->key;
+        $av = $agx ? $agx->$key ?? null : null;
+        if ($this->formula && property_exists($fgx, $key)) {
+            return $fgx->$key;
+        } else if ($gx && property_exists($gx, $key)) {
+            $gv = $gx->$key;
+            return $gv !== false ? $gv : null;
+        } else {
+            return $av;
+        }
+    }
+
     function json($pcview, $pos = null) {
         $gej = ["key" => $this->key, "title" => $this->title];
         if ($pos !== null) {

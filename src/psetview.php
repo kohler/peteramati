@@ -1477,36 +1477,16 @@ class PsetView {
 
     /** @param GradeExport $gexp */
     private function compute_grade_json_entries($gx, $agx, $fgx, $gexp) {
-        $g = $ag = [];
-        $total = $total_noextra = 0;
+        $g = [];
+        $ag = $agx ? [] : null;
         foreach ($gexp->visible_grades() as $ge) {
-            $key = $ge->key;
-            $gv = null;
+            $g[] = $ge->extract_value($gx, $agx, $fgx, $av);
             if ($agx) {
-                $gv = property_exists($agx, $key) ? $agx->$key : null;
-                $ag[] = $gv;
-            }
-            if ($gx && property_exists($gx, $key)) {
-                $gv = $gx->$key;
-                $gv = $gv === false ? null : $gv;
-            }
-            if ($ge->formula && property_exists($fgx, $key)) {
-                $gv = $fgx->$key;
-            }
-            $g[] = $gv;
-            if (!$ge->no_total && $gv) {
-                $total += $gv;
-                if (!$ge->is_extra) {
-                    $total_noextra += $gv;
-                }
+                $ag[] = $av;
             }
         }
         $gexp->grades = $g;
         $gexp->autogrades = $ag;
-        $gexp->total = round_grade($total);
-        if ($total != $total_noextra) {
-            $gexp->total_noextra = round_grade($total_noextra);
-        }
     }
 
     /** @param int $flags
@@ -1561,6 +1541,31 @@ class PsetView {
             $gexp->suppress_absent_extra();
         }
         return $gexp;
+    }
+
+    /** @param int $answer_version
+     * @return bool */
+    function export_answers_on(GradeExport $gexp, $answer_version) {
+        if ($this->gitless_grades && ($upi = $this->upi())) {
+            if ($upi->notesversion === $answer_version
+                && ($gexp->answer_version ?? $gexp->version) === $answer_version) {
+                return true;
+            } else if (($j = $upi->jnotes_on($answer_version, $this->conf))) {
+                $gx = $j->grades ?? null;
+                $agx = $j->autogrades ?? null;
+                $fgx = $j->formulas ?? null;
+                foreach ($gexp->visible_grades() as $i => $ge) {
+                    if ($ge->answer) {
+                        $gexp->grades[$i] = $ge->extract_value($gx, $agx, $fgx, $av);
+                        if ($agx) {
+                            $gexp->autogrades[$i] = $av;
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     /** @param int $flags

@@ -136,10 +136,11 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
     }
     if (isset($values["timestamp"]) && is_numeric($values["timestamp"])) {
         $timestamp = intval($values["timestamp"]);
-        if ($timestamp >= 1400000000)
+        if ($timestamp >= 1400000000) {
             $updates["timestamp"] = $timestamp;
-        else if ($timestamp <= 0)
+        } else if ($timestamp <= 0) {
             $updates["timestamp"] = null;
+        }
     }
     if (!empty($updates)) {
         $info->update_grade_notes($updates);
