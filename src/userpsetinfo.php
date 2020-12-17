@@ -34,6 +34,9 @@ class UserPsetInfo {
         if (isset($this->updateat)) {
             $this->updateat = (int) $this->updateat;
         }
+        if (isset($this->updateby)) {
+            $this->updateby = (int) $this->updateby;
+        }
         if (isset($this->gradercid)) {
             $this->gradercid = (int) $this->gradercid;
         }

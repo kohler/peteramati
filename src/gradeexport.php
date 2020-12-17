@@ -23,6 +23,12 @@ class GradeExport implements JsonSerializable {
     public $total_noextra;
     /** @var ?string */
     public $grading_hash;
+    /** @var ?int */
+    public $version;
+    /** @var ?int */
+    public $answer_version;
+    /** @var ?int */
+    public $updateat;
     /** @var null|int */
     public $late_hours;
     /** @var null|int */
@@ -107,6 +113,15 @@ class GradeExport implements JsonSerializable {
             if ($this->auto_late_hours !== null) {
                 $r["auto_late_hours"] = $this->auto_late_hours;
             }
+            if ($this->updateat) {
+                $r["updateat"] = $this->updateat;
+            }
+            if ($this->version !== null) {
+                $r["version"] = $this->version;
+            }
+            if ($this->answer_version !== null) {
+                $r["answer_version"] = $this->answer_version;
+            }
             if ($this->editable !== null) {
                 $r["editable"] = $this->editable;
             }
@@ -138,6 +153,9 @@ class GradeExport implements JsonSerializable {
                 $r["maxtotal"] = $this->pset->grades_total;
             } else if ($maxtotal > 0) {
                 $r["maxtotal"] = $maxtotal;
+            }
+            if ($this->pset->grades_history) {
+                $r["history"] = true;
             }
         }
         return $r;

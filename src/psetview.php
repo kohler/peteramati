@@ -1069,7 +1069,8 @@ class PsetView {
      * @return ?int */
     private function current_timestamp($force) {
         if ($this->pset->gitless) {
-            return null;
+            $upi = $this->upi();
+            return $upi ? $upi->updateat : null;
         } else if ($this->_hash
                    && ($rpi = $this->rpi())
                    && $rpi->gradehash === $this->_hash) {
@@ -1545,6 +1546,12 @@ class PsetView {
             if (isset($lhd->autohours) && $lhd->autohours !== $lhd->hours) {
                 $gexp->auto_late_hours = $lhd->autohours;
             }
+        }
+        if ($this->pset->gitless_grades && ($gpi = $this->gpi())) {
+            $gexp->version = $gpi->notesversion;
+        }
+        if (($ts = $this->current_timestamp(false))) {
+            $gexp->updateat = $ts;
         }
         if ($this->can_edit_grades_staff()) {
             $gexp->editable = true;

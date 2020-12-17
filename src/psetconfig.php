@@ -68,11 +68,17 @@ class Pset {
     public $visible_at;
     /** @var bool */
     public $frozen;
+    /** @var bool */
     public $partner;
+    /** @var bool */
     public $no_branch;
+    /** @var bool */
     public $anonymous;
+    /** @var bool */
     public $gitless;
+    /** @var bool */
     public $gitless_grades;
+    /** @var ?string */
     public $partner_repo;
     public $hide_comments = false;
 
@@ -987,6 +993,7 @@ class GradeEntryConfig {
     public $type_numeric;
     /** @var ?string */
     public $round;
+    /** @var ?list<string> */
     public $options;
     /** @var ?string */
     public $formula;
@@ -1014,10 +1021,15 @@ class GradeEntryConfig {
     public $position;
     /** @var ?int */
     public $pcview_index;
+    /** @var ?string */
     public $landmark_file;
+    /** @var ?int */
     public $landmark_line;
+    /** @var ?string */
     public $landmark_range_file;
+    /** @var ?int */
     public $landmark_range_first;
+    /** @var ?int */
     public $landmark_range_last;
     public $landmark_buttons;
     /** @var ?int */
