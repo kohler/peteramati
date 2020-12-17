@@ -80,9 +80,12 @@ class Contact {
     private $repos = [];
     /** @var array<int,?Contact> */
     private $partners = [];
+    /** @var array<int,?GradeExport> */
     private $_gcache = [];
     /** @var array<int,int> */
     private $_gcache_flags = [];
+    /** @var array<int,list<null|false|float>> */
+    private $_gcache_group = [];
 
     // Roles
     const ROLE_PC = 1;
@@ -805,9 +808,10 @@ class Contact {
         $this->conf->qe("update ContactInfo set gradeUpdateTime=? where contactId=?",
                         Conf::$now, $this->contactId);
         $this->gradeUpdateTime = Conf::$now;
-        $this->_gcache = $this->_gcache_flags = [];
+        $this->_gcache = $this->_gcache_flags = $this->_gcache_group = [];
     }
 
+    /** @return ?GradeExport */
     private function ensure_gcache(Pset $pset, $flags) {
         $f = $flags & PsetView::GRADEJSON_NO_LATE_HOURS ? 1 : 3;
         if ((($this->_gcache_flags[$pset->id] ?? 0) & $f) !== $f) {
@@ -817,22 +821,22 @@ class Contact {
                 $info = PsetView::make($pset, $this, $this->conf->site_contact());
             }
             if ($info) {
-                $this->_gcache[$pset->id] = $info->grade_json($flags | PsetView::GRADEJSON_SLICE | PsetView::GRADEJSON_OVERRIDE_VIEW);
+                $this->_gcache[$pset->id] = $info->grade_export($flags | PsetView::GRADEJSON_SLICE | PsetView::GRADEJSON_OVERRIDE_VIEW);
             } else {
                 $this->_gcache[$pset->id] = null;
             }
             $this->_gcache_flags[$pset->id] = $f;
         }
+        return $this->_gcache[$pset->id];
     }
 
     function gcache_entry(Pset $pset, GradeEntryConfig $ge) {
         $lh = $ge->key === "late_hours";
-        $this->ensure_gcache($pset, $lh ? 0 : PsetView::GRADEJSON_NO_LATE_HOURS);
-        if (isset($this->_gcache[$pset->id])) {
+        if (($gexp = $this->ensure_gcache($pset, $lh ? 0 : PsetView::GRADEJSON_NO_LATE_HOURS))) {
             if ($ge->key === "late_hours") {
-                return $this->_gcache[$pset->id]["late_hours"] ?? null;
+                return $gexp->late_hours;
             } else {
-                return $this->_gcache[$pset->id]["grades"][$ge->pcview_index] ?? null;
+                return $gexp->grades[$ge->pcview_index];
             }
         } else {
             return null;
@@ -843,11 +847,10 @@ class Contact {
      * @param bool $raw
      * @return null|int|float */
     function gcache_total(Pset $pset, $noextra, $raw) {
-        $this->ensure_gcache($pset, PsetView::GRADEJSON_NO_LATE_HOURS);
-        if (isset($this->_gcache[$pset->id])) {
-            $v = $this->_gcache[$pset->id]["total"] ?? null;
-            if ($v !== null && $noextra && isset($this->_gcache[$pset->id]["total_noextra"])) {
-                $v = $this->_gcache[$pset->id]["total_noextra"];
+        if (($gexp = $this->ensure_gcache($pset, PsetView::GRADEJSON_NO_LATE_HOURS))) {
+            $v = $gexp->total ?? null;
+            if ($v !== null && $noextra && isset($gexp->total_noextra)) {
+                $v = $gexp->total_noextra;
             }
             if ($v !== null && !$raw) {
                 $v = round(($v * 1000.0) / $pset->max_grade(true)) / 10;
@@ -864,11 +867,11 @@ class Contact {
      * @return ?float */
     function gcache_category_total($group, $noextra, $raw) {
         $k = "\$g\$group";
-        if (!array_key_exists($k, $this->_gcache)) {
-            $this->_gcache[$k] = [false, false, false, false];
+        if (!array_key_exists($k, $this->_gcache_group)) {
+            $this->_gcache_group[$k] = [false, false, false, false];
         }
         $i = ($noextra ? 1 : 0) | ($raw ? 2 : 0);
-        if ($this->_gcache[$k][$i] === false) {
+        if ($this->_gcache_group[$k][$i] === false) {
             $gw = $this->conf->category_weight($group);
             $x = null;
             foreach ($this->conf->psets() as $p) {
@@ -882,9 +885,9 @@ class Contact {
                     }
                 }
             }
-            $this->_gcache[$k][$i] = $x === null ? null : round($x * 10.0) / 10;
+            $this->_gcache_group[$k][$i] = $x === null ? null : round($x * 10.0) / 10;
         }
-        return $this->_gcache[$k][$i];
+        return $this->_gcache_group[$k][$i];
     }
 
 

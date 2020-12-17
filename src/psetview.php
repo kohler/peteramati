@@ -624,10 +624,12 @@ class PsetView {
         assert(strlen($hash) === 40);
 
         // find original
-        if ($this->_hash === $hash && $this->_cpi) {
+        if ($this->_cpi
+            && $this->_hash === $hash) {
             $old_notes = $this->_cpi->jnotes();
             $old_nversion = $this->_cpi->notesversion;
-        } else if ($this->_rpi && $this->_rpi->gradehash === $hash
+        } else if ($this->_rpi
+                   && $this->_rpi->gradehash === $hash
                    && $this->_rpi->notesversion !== null) {
             $old_notes = $this->_rpi->jnotes();
             $old_nversion = $this->_rpi->notesversion;
@@ -1507,9 +1509,8 @@ class PsetView {
     }
 
     /** @param int $flags
-     * @param ?list<string> $known_entries
-     * @return ?array */
-    function grade_json($flags = 0, $known_entries = null) {
+     * @return ?GradeExport */
+    function grade_export($flags = 0) {
         $override_view = ($flags & self::GRADEJSON_OVERRIDE_VIEW) !== 0;
         if (!$override_view && !$this->can_view_grades()) {
             return null;
@@ -1552,6 +1553,14 @@ class PsetView {
         if (!$gexp->pc_view) {
             $gexp->suppress_absent_extra();
         }
+        return $gexp;
+    }
+
+    /** @param int $flags
+     * @param ?list<string> $known_entries
+     * @return ?array */
+    function grade_json($flags = 0, $known_entries = null) {
+        $gexp = $this->grade_export($flags);
         if ($known_entries) {
             $gexp->suppress_known_entries($known_entries);
         }
