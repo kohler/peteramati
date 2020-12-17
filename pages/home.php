@@ -1303,7 +1303,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
         }
         if (($h = $info->grading_hash()) !== null) {
             $j["gradehash"] = $h;
-        } else if (($h = $info->commit_hash()) !== null) {
+        } else if (($h = $info->hash()) !== null) {
             $j["hash"] = $h;
         }
         if ($h && $info->empty_diff_likely()) {
