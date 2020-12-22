@@ -960,7 +960,7 @@ function add_visible_grades($gelist, $gi, &$j, PsetView $info = null, $all = fal
             $different[$k] = true;
         }
     }
-    $j["total"] = $total;
+    $j["total"] = round_grade($total);
     if ($all) {
         $j["grades"] = $gvarr;
         if ($different) {

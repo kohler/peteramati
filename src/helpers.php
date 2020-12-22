@@ -651,6 +651,8 @@ function git_refname_is_full_hash($refname) {
         && strtolower($refname) === $refname;
 }
 
+/** @param null|int|float $g
+ * @return ?float */
 function round_grade($g) {
-    return round($g * 1000) / 1000;
+    return $g !== null ? round($g * 1000) / 1000 : null;
 }

@@ -192,7 +192,7 @@ class GradeExport implements JsonSerializable {
             if ($this->pset->grades_total !== null) {
                 $r["maxtotal"] = $this->pset->grades_total;
             } else if ($maxtotal > 0) {
-                $r["maxtotal"] = $maxtotal;
+                $r["maxtotal"] = round_grade($maxtotal);
             }
             if ($this->pset->grades_history) {
                 $r["history"] = true;
