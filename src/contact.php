@@ -84,7 +84,7 @@ class Contact {
     private $_gcache = [];
     /** @var array<int,int> */
     private $_gcache_flags = [];
-    /** @var array<int,list<null|false|float>> */
+    /** @var array<string,list<null|false|float>> */
     private $_gcache_group = [];
 
     // Roles
@@ -535,7 +535,7 @@ class Contact {
     }
 
     private function trim() {
-        $this->contactId = (int) trim($this->contactId);
+        $this->contactId = (int) $this->contactId;
         $this->cid = $this->contactId;
         $this->visits = trim($this->visits);
         $this->firstName = simplify_whitespace($this->firstName);
@@ -836,7 +836,7 @@ class Contact {
             if ($ge->key === "late_hours") {
                 return $gexp->late_hours;
             } else {
-                return $gexp->grades[$ge->pcview_index];
+                return $gexp->grades[$ge->pcview_index] ?? null;
             }
         } else {
             return null;
@@ -863,12 +863,11 @@ class Contact {
      * @param bool $raw
      * @return ?float */
     function gcache_category_total($group, $noextra, $raw) {
-        $k = "\$g\$group";
-        if (!array_key_exists($k, $this->_gcache_group)) {
-            $this->_gcache_group[$k] = [false, false, false, false];
+        if (!isset($this->_gcache_group[$group])) {
+            $this->_gcache_group[$group] = [false, false, false, false];
         }
         $i = ($noextra ? 1 : 0) | ($raw ? 2 : 0);
-        if ($this->_gcache_group[$k][$i] === false) {
+        if ($this->_gcache_group[$group][$i] === false) {
             $gw = $this->conf->category_weight($group);
             $x = null;
             foreach ($this->conf->psets() as $p) {
@@ -882,9 +881,9 @@ class Contact {
                     }
                 }
             }
-            $this->_gcache_group[$k][$i] = $x === null ? null : round($x * 10.0) / 10;
+            $this->_gcache_group[$group][$i] = $x !== null ? round($x * 10.0) / 10 : null;
         }
-        return $this->_gcache_group[$k][$i];
+        return $this->_gcache_group[$group][$i];
     }
 
 

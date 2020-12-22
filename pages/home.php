@@ -926,7 +926,7 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
 
 
 // Per-pset
-/** @param list<GradeEntryConfig> $gelist
+/** @param iterable<GradeEntryConfig> $gelist
  * @param ?object $gi
  * @param array<string,mixed> &$j */
 function add_visible_grades($gelist, $gi, &$j, PsetView $info = null, $all = false) {
@@ -1422,7 +1422,7 @@ function show_pset_table($sset) {
     $jx = [];
     $gradercounts = [];
     $gex = new GradeExport($pset, true);
-    $gex->set_visible_grades($pset->tabular_grades());
+    $gex->set_visible_grades(array_values($pset->tabular_grades()));
     foreach ($sset as $s) {
         if (!$s->user->visited) {
             $j = render_pset_row($pset, $sset, $s, $gex, $anonymous);

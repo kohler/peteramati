@@ -167,18 +167,16 @@ class API_Repo {
                 . "{ repositories(first:100, affiliations:[ORGANIZATION_MEMBER]"
                 . ($cursor ? ", after:" . json_encode($cursor) : "")
                 . ") { nodes { name, owner { login }}, pageInfo { hasNextPage, endCursor }} }}");
-            if ($gql->status !== 200
-                || !$gql->j
-                || !isset($gql->j->data)) {
+            if (!$gql->rdata) {
                 error_log(json_encode($gql));
                 return ["ok" => false, "error" => "GitHub API error."];
             }
-            foreach ($gql->j->data->user->repositories->nodes as $n) {
+            foreach ($gql->rdata->user->repositories->nodes as $n) {
                 if ($n->owner->login === $organization)
                     $repos[] = ["name" => "$organization/{$n->name}", "url" => "https://github.com/" . urlencode($organization) . "/" . urlencode($n->name)];
             }
             usort($repos, function ($a, $b) { return strnatcmp($a["name"], $b["name"]); });
-            $pageinfo = $gql->j->data->user->repositories->pageInfo;
+            $pageinfo = $gql->rdata->user->repositories->pageInfo;
             if (!$pageinfo->hasNextPage)
                 break;
             $cursor = $pageinfo->endCursor;

@@ -1546,7 +1546,7 @@ class PsetView {
     /** @param int $answer_version
      * @return bool */
     function export_answers_on(GradeExport $gexp, $answer_version) {
-        if ($this->gitless_grades && ($upi = $this->upi())) {
+        if ($this->pset->gitless_grades && ($upi = $this->upi())) {
             if ($upi->notesversion === $answer_version
                 && ($gexp->answer_version ?? $gexp->version) === $answer_version) {
                 return true;

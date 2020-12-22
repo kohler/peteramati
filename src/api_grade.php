@@ -45,6 +45,7 @@ class API_Grade {
                 }
             }
             $has_agv = false;
+            $agv = null;
             if (array_key_exists($k, $ag)
                 && $info->pc_view) {
                 $v["autogrades"][$k] = $agv = $ag[$k];
@@ -52,12 +53,10 @@ class API_Grade {
             }
             if (array_key_exists($k, $g)) {
                 $gv = $g[$k];
-                if (!$has_agv) {
-                    $agv = null;
-                    if (($notes = $info->current_jnotes())
-                        && isset($notes->autogrades)) {
-                        $agv = $notes->autogrades->$k ?? null;
-                    }
+                if (!$has_agv
+                    && ($notes = $info->current_jnotes())
+                    && isset($notes->autogrades)) {
+                    $agv = $notes->autogrades->$k ?? null;
                 }
                 if ($ge->allow_edit($gv, $oldgv, $agv, $info)) {
                     $v["grades"][$k] = $gv ?? (isset($agv) ? false : null);
@@ -208,6 +207,7 @@ class API_Grade {
             // parse grade elements
             $g = $ag = $og = $errf = [];
             foreach ($infos as $uid => $info) {
+                $gx = $ugs[$uid];
                 $g[$uid] = self::parse_full_grades($info, $gx->grades ?? null, $errf, true);
                 $ag[$uid] = self::parse_full_grades($info, $gx->autogrades ?? null, $errf, false);
                 $og[$uid] = self::parse_full_grades($info, $gx->oldgrades ?? null, $errf, false);

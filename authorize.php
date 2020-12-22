@@ -37,9 +37,9 @@ if ($Qreq->code) {
             "code" => $Qreq->code, "state" => $state
         ], "Accept: application/json\r\n");
     if ($response->status === 200
-        && $response->j
-        && isset($response->j->access_token)) {
-        $Conf->save_setting("opt.githubOAuthToken", 1, $response->j->access_token);
+        && $response->response
+        && isset($response->response->access_token)) {
+        $Conf->save_setting("opt.githubOAuthToken", 1, $response->response->access_token);
         $Conf->save_setting("__github_oauth", null);
         Navigation::redirect_site("");
     } else {

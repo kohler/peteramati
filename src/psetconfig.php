@@ -1461,7 +1461,7 @@ class RunnerConfig {
     public $nconcurrent;
     /** @var ?bool */
     public $xterm_js;
-    /** @var ?bool */
+    /** @var null|bool|'grades' */
     public $transfer_warnings;
     /** @var ?float */
     public $transfer_warnings_priority;

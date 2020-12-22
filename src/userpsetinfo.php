@@ -92,7 +92,7 @@ class UserPsetInfo {
         if ($version > $this->notesversion) {
             return null;
         }
-        if ($this->_history_v0 === null || $this->_history_v0 < $version) {
+        if ($this->_history === null || $this->_history_v0 < $version) {
             $v0 = $version - ($version & 7);
             $v1 = $this->_history_v0 ?? PHP_INT_MAX;
             $result = $conf->qe("select * from ContactGradeHistory where cid=? and pset=? and notesversion>=? and notesversion<? order by notesversion asc", $this->cid, $this->pset, $v0, $v1);
@@ -101,7 +101,7 @@ class UserPsetInfo {
                 if ($h)
                     $hs[$h->notesversion - $v0] = $h;
             }
-            while (($h = ContactGradeHistory::fetch($result))) {
+            while (($h = UserPsetHistory::fetch($result))) {
                 $hs[$h->notesversion - $v0] = $h;
             }
             $this->_history = $hs;

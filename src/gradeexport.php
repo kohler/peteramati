@@ -48,7 +48,7 @@ class GradeExport implements JsonSerializable {
         $this->pc_view = $pc_view;
     }
 
-    /** @param list<GradeEntryConfig> $vg */
+    /** @param list<GradeEntryConfig> $vges */
     function set_visible_grades($vges) {
         assert(!isset($this->grades));
         $this->visible_grades = $vges;
@@ -95,7 +95,8 @@ class GradeExport implements JsonSerializable {
             $t = $tnx = 0;
             $any = false;
             foreach ($this->visible_grades() as $i => $ge) {
-                if (!$ge->no_total && ($gv = $this->grades[$i]) !== null) {
+                if (!$ge->no_total
+                    && ($gv = $this->grades[$i] ?? null) !== null) {
                     $t += $gv;
                     if (!$ge->is_extra) {
                         $tnx += $gv;
@@ -105,9 +106,9 @@ class GradeExport implements JsonSerializable {
             }
             if ($any) {
                 $this->total = round_grade($t);
-                $this->total_nonextra = round_grade($tnx);
+                $this->total_noextra = round_grade($tnx);
             } else {
-                $this->total = $this->total_nonextra = null;
+                $this->total = $this->total_noextra = null;
             }
             $this->has_total = true;
         }
@@ -115,11 +116,11 @@ class GradeExport implements JsonSerializable {
     }
 
     /** @return null|int|float */
-    function total_nonextra() {
+    function total_noextra() {
         if (!$this->has_total) {
             $this->total();
         }
-        return $this->total_nonextra;
+        return $this->total_noextra;
     }
 
     /** @return array */

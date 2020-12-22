@@ -38,15 +38,19 @@ class RepositorySite {
         return $this->siteclass;
     }
 
+    /** @return string */
     function https_url() {
         return $this->url;
     }
+    /** @return string */
     function ssh_url() {
         return $this->url;
     }
+    /** @return string */
     function git_url() {
         return $this->url;
     }
+    /** @return string */
     function friendly_url() {
         return $this->url;
     }
@@ -55,20 +59,25 @@ class RepositorySite {
         return ["REPOGITURL" => null, "REPOBASE" => null];
     }
 
+    /** @return int */
     function validate_open(MessageSet $ms = null) {
         return -1;
     }
+    /** @return int */
     function validate_working(MessageSet $ms = null) {
         return -1;
     }
+    /** @return bool */
     function validate_ownership_always() {
         return true;
     }
+    /** @return int */
     function validate_ownership(Repository $repo, Contact $user, Contact $partner = null,
                                 MessageSet $ms = null) {
         return -1;
     }
 
+    /** @return -1 */
     static private function chair_error($error) {
         global $Me;
         if ($Me && $Me->privChair) {
@@ -76,16 +85,24 @@ class RepositorySite {
         }
         return -1;
     }
+    /** @return 0|-1 */
+    static function disabled_remote_error(Conf $conf) {
+        if (($dr = $conf->opt("disableRemote"))) {
+            if (is_string($dr)) {
+                self::chair_error(htmlspecialchars($dr));
+            }
+            return -1;
+        } else {
+            return 0;
+        }
+    }
+    /** @return int */
     static function run_remote_oauth(Conf $conf, $clientid, $token,
                                      $gitcommand, &$output) {
         global $Me;
-        if ($conf->opt("disableRemote")) {
-            if (is_string($conf->opt("disableRemote"))) {
-                self::chair_error(htmlspecialchars($conf->opt("disableRemote")));
-            }
+        if (self::disabled_remote_error($conf) < 0) {
             return -1;
-        }
-        if (!$clientid || !$token) {
+        } else if (!$clientid || !$token) {
             return self::chair_error("Missing OAuth client ID and/or token.");
         } else if (!ctype_alnum($token)) {
             return self::chair_error("Bad OAuth token.");

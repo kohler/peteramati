@@ -578,7 +578,7 @@ function echo_all_grades($info) {
             || (isset($lhd->hours)
                 && $lhd->hours > 0
                 && !$info->pset->obscure_late_hours)) {
-            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . htmlspecialchars($lhd->hours ?? 0) . '</span>');
+            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . ($lhd->hours ?? 0) . '</span>');
         }
     } else if ($info->can_edit_grades_staff() && $info->pset->late_hours_entry()) {
         echo '<form class="ui-submit pa-grade pa-p" data-pa-grade="late_hours">',
@@ -588,7 +588,7 @@ function echo_all_grades($info) {
                       ["class" => "uich pa-gradevalue pa-gradewidth"]),
             '</span> <span class="pa-gradedesc"></span>';
         if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours) {
-            echo '<span class="pa-gradediffers">auto-late hours is ', htmlspecialchars($lhd->autohours), '</span>';
+            echo '<span class="pa-gradediffers">auto-late hours is ', $lhd->autohours, '</span>';
         }
         echo '</div></form>';
     }

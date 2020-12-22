@@ -151,6 +151,8 @@ class Repository {
                 set_time_limit(30);
             }
             $this->reposite->gitfetch($this->repoid, $this->cacheid, $foreground);
+        } else {
+            RepositorySite::disabled_remote_error($this->conf);
         }
     }
 

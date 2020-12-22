@@ -14,13 +14,15 @@ class GitHubResponse implements JsonSerializable {
     public $headers = [];
     /** @var ?string */
     public $content;
-    /** @var mixed */
-    public $j;
+    /** @var ?object */
+    public $response;
+    /** @var ?object */
+    public $rdata;
     function __construct($url) {
         $this->url = $url;
     }
     function jsonSerialize() {
-        return $this->j ?? ["status" => $this->status, "content" => $this->content];
+        return $this->response ?? ["status" => $this->status, "content" => $this->content];
     }
     function run_post(Conf $conf, $content_type, $content, $header = "") {
         if (is_array($content) || is_object($content)) {
@@ -59,8 +61,14 @@ class GitHubResponse implements JsonSerializable {
             }
             $this->content = stream_get_contents($stream);
             if ($this->content !== false
-                && (empty($this->headers) || str_starts_with($this->headers["content-type"], "application/json"))) {
-                $this->j = json_decode($this->content);
+                && (empty($this->headers) || str_starts_with($this->headers["content-type"], "application/json"))
+                && ($j = json_decode($this->content))
+                && is_object($j)) {
+                $this->response = $j;
+                $rd = $j->data ?? null;
+                if ($this->status === 200 && is_object($rd)) {
+                    $this->rdata = $rd;
+                }
             }
             fclose($stream);
         }
@@ -173,25 +181,23 @@ class GitHub_RepositorySite extends RepositorySite {
         }
         $gq .= " } }";
         $gql = self::graphql($user->conf, $gq);
-        if ($gql->status !== 200
-            || !$gql->j
-            || !isset($gql->j->data)) {
+        if (!$gql->rdata) {
             error_log(json_encode($gql));
             Conf::msg_error("Error contacting the GitHub API. Maybe try again?");
             return false;
-        } else if (!isset($gql->j->data->user)) {
+        } else if (!isset($gql->rdata->user)) {
             Conf::msg_error("That user doesn’t exist. Check your spelling and try again.");
             return false;
-        } else if (!isset($gql->j->data->user->organization)) {
+        } else if (!isset($gql->rdata->user->organization)) {
             if ($user->conf->opt("githubRequireOrganizationMembership")) {
                 Conf::msg_error("That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . ", which manages the class. Follow the link to register with the class, or contact course staff.");
                 return false;
             }
         } else if ($staff_team
                    && $user->is_student()
-                   && isset($gql->j->data->user->organization->team)
-                   && isset($gql->j->data->user->organization->team->members)
-                   && array_filter($gql->j->data->user->organization->team->members->nodes,
+                   && isset($gql->rdata->user->organization->team)
+                   && isset($gql->rdata->user->organization->team->members)
+                   && array_filter($gql->rdata->user->organization->team->members->nodes,
                                 function ($node) use ($username) {
                                     return strcasecmp($username, $node->login) === 0;
                                 })) {
@@ -246,15 +252,13 @@ class GitHub_RepositorySite extends RepositorySite {
         $gql = self::graphql($this->conf,
             "{ repository(owner:" . json_encode($owner_name[0])
             . ", name:" . json_encode($owner_name[1]) . ") { isPrivate } }");
-        if ($gql->status !== 200
-            || !$gql->j
-            || !isset($gql->j->data)) {
+        if (!$gql->rdata) {
             error_log(json_encode($gql));
             return -1;
-        } else if ($gql->j->data->repository == null) {
+        } else if ($gql->rdata->repository == null) {
             $ms && $ms->error_at("open", $this->expand_message("repo_nonexistent", $ms->user));
             return 1;
-        } else if (!$gql->j->data->repository->isPrivate) {
+        } else if (!$gql->rdata->repository->isPrivate) {
             $ms && $ms->error_at("open", $this->expand_message("repo_toopublic", $ms->user));
             return 1;
         } else {
@@ -310,14 +314,12 @@ class GitHub_RepositorySite extends RepositorySite {
             . " collaborators(query:" . json_encode($user->github_username)
             . ") { nodes { login } } } }";
         $gql = self::graphql($this->conf, $gq);
-        if ($gql->status !== 200
-            || !$gql->j
-            || !isset($gql->j->data)) {
+        if (!$gql->rdata) {
             error_log(json_encode($gql));
             return -1;
-        } else if ($gql->j->data->repository == null) { // no such repository
+        } else if ($gql->rdata->repository == null) { // no such repository
             return -1;
-        } else if (array_filter($gql->j->data->repository->collaborators->nodes,
+        } else if (array_filter($gql->rdata->repository->collaborators->nodes,
                         function ($node) use ($user) {
                             return strcasecmp($node->login, $user->github_username) === 0;
                         })) {

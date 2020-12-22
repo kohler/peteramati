@@ -82,7 +82,8 @@ $config = [
         Config::projectPath("lib/mailer.php"),
         Config::projectPath("mail.php"),
         Config::projectPath("resetpassword.php"),
-        Config::projectPath("src/cs61mailer.php")
+        Config::projectPath("src/cs61mailer.php"),
+        Config::projectPath("src/harvardseas_repositorysite.php")
     ],
 
     "globals_type_map" => [
