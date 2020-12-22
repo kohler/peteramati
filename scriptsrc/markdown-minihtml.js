@@ -131,9 +131,15 @@ function minihtml_inline(state, silent) {
         }
     } else if (tag.tag === "img" && tag.attr.src) {
         let token = state.push("image", "img", 0);
-        let attrs = token.attrs = [["src", tag.attr.src], ["alt", ""]];
+        token.attrs = [["src", tag.attr.src], ["alt", ""]];
+        if (tag.attr.title) {
+            token.attrs.push(["title", tag.attr.title]);
+        }
         token.children = [];
         token.content = tag.attr.alt || "";
+        if (token.content !== "") {
+            state.md.inline.parse(token.content, state.md, state.env, token.children);
+        }
     } else {
         return false;
     }
