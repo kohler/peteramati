@@ -452,10 +452,11 @@ class RunnerState {
             $command .= " -F" . escapeshellarg(join("\n", $jmanifest));
         }
 
-        if ($this->runner->timeout > 0) {
-            $command .= " -T" . $this->runner->timeout;
-        } else if ($this->runner->timeout == null && $this->pset->run_timeout > 0) {
-            $command .= " -T" . $this->pset->run_timeout;
+        if (($to = $this->runner->timeout ?? $this->pset->run_timeout) > 0) {
+            $command .= " -T" . $to;
+        }
+        if (($to = $this->runner->idle_timeout ?? $this->pset->run_idle_timeout) > 0) {
+            $command .= " -I" . $to;
         }
         if ($this->inputfifo) {
             $command .= " -i" . escapeshellarg($this->inputfifo);

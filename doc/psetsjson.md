@@ -409,6 +409,11 @@ This depends on the suid-root `pa-jail` program in the `jail` subdirectory.
     Timeout after which the container will shut down. Defaults to 10 minutes.
     If set to ≤0, there is no timeout.
 
+* `idle_timeout`: interval (number or string like `10m` or `20s`)
+
+    Timeout after which the container will shut down if idle (no input or
+    output). Defaults to 3 minutes. If set to ≤0, there is no timeout.
+
 * `queue`: string
 
     Optional run queue. If set, …

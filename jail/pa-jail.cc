@@ -1812,7 +1812,7 @@ class jailownerinfo {
     ~jailownerinfo();
     void init(const char* owner_name);
     void exec(int argc, char** argv, jaildirinfo& jaildir,
-              int inputfd, double timeout, bool foreground);
+              int inputfd, double timeout, double idle_timeout, bool foreground);
     int exec_go();
 
   private:
@@ -1822,6 +1822,9 @@ class jailownerinfo {
     int inputfd_;
     struct timeval start_time_;
     struct timeval expiry_;
+    double idle_timeout_;
+    struct timeval active_time_;
+    struct timeval idle_expiry_;
     struct buffer {
         unsigned char* buf_;
         size_t head_;
@@ -1838,8 +1841,8 @@ class jailownerinfo {
         ~buffer() {
             delete[] buf_;
         }
-        void transfer_in(int from);
-        void transfer_out(int to);
+        bool transfer_in(int from);
+        bool transfer_out(int to);
         bool done();
     };
     buffer to_slave_;
@@ -1951,8 +1954,22 @@ static void write_pid(int p) {
     }
 }
 
+static struct timeval timer_add_delay(struct timeval tv, double delay) {
+    struct timeval delta;
+    delta.tv_sec = (long) delay;
+    delta.tv_usec = (long) ((delay - delta.tv_sec) * 1000000);
+    timeradd(&tv, &delta, &tv);
+    return tv;
+}
+
+static int timer_difference_ms(const struct timeval& lhs, struct timeval rhs) {
+    timersub(&lhs, &rhs, &rhs);
+    return rhs.tv_sec * 1000 + rhs.tv_usec / 1000;
+}
+
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         int inputfd, double timeout, bool foreground) {
+                         int inputfd, double timeout, double idle_timeout,
+                         bool foreground) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     sprintf(homebuf, "HOME=%s", owner_home_.c_str());
@@ -1976,10 +1993,12 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     }
     newenv_.push_back(path);
     newenv_.push_back(lang);
-    if (term)
+    if (term) {
         newenv_.push_back(term);
-    if (ld_library_path)
+    }
+    if (ld_library_path) {
         newenv_.push_back(ld_library_path);
+    }
     newenv_.push_back(homebuf);
     while (argc > 0) {
         const char* arg = argv[0];
@@ -2031,14 +2050,16 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     // store other arguments
     this->jaildir_ = &jaildir;
     this->inputfd_ = inputfd;
+    gettimeofday(&this->start_time_, nullptr);
     if (timeout > 0) {
-        gettimeofday(&this->start_time_, 0);
-        struct timeval delta;
-        delta.tv_sec = (long) timeout;
-        delta.tv_usec = (long) ((timeout - delta.tv_sec) * 1000000);
-        timeradd(&this->start_time_, &delta, &this->expiry_);
+        this->expiry_ = timer_add_delay(this->start_time_, timeout);
     } else {
         timerclear(&this->expiry_);
+    }
+    this->idle_timeout_ = idle_timeout;
+    if (idle_timeout > 0) {
+        this->active_time_ = this->start_time_;
+        this->idle_expiry_ = timer_add_delay(this->active_time_, idle_timeout);
     }
 
     // enter the jail
@@ -2317,7 +2338,8 @@ void jailownerinfo::start_sigpipe() {
     }
 }
 
-void jailownerinfo::buffer::transfer_in(int from) {
+bool jailownerinfo::buffer::transfer_in(int from) {
+    bool any = false;
     if (end_ == cap_ && head_ != 0) {
         memmove(buf_, &buf_[head_], end_ - head_);
         tail_ -= head_;
@@ -2329,6 +2351,7 @@ void jailownerinfo::buffer::transfer_in(int from) {
         ssize_t nr = read(from, &buf_[end_], cap_ - end_);
         if (nr != 0 && nr != -1) {
             end_ += nr;
+            any = true;
         } else if (nr == 0) {
             input_closed_ = true;
         } else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
@@ -2339,17 +2362,21 @@ void jailownerinfo::buffer::transfer_in(int from) {
         // functionality is currently unused
         tail_ = end_;
     }
+    return any;
 }
 
-void jailownerinfo::buffer::transfer_out(int to) {
+bool jailownerinfo::buffer::transfer_out(int to) {
+    bool any = false;
     if (to >= 0 && !output_closed_ && head_ != tail_) {
         ssize_t nw = write(to, &buf_[head_], tail_ - head_);
         if (nw != 0 && nw != -1) {
             head_ += nw;
+            any = true;
         } else if (errno != EINTR && errno != EAGAIN) {
             output_closed_ = true;
         }
     }
+    return any;
 }
 
 bool jailownerinfo::buffer::done() {
@@ -2393,12 +2420,20 @@ void jailownerinfo::block(int ptymaster) {
     }
 
     int timeout_ms = 3600000;
+    struct timeval now;
+    if (timerisset(&expiry_) || idle_timeout_ > 0) {
+        gettimeofday(&now, nullptr);
+    }
     if (timerisset(&expiry_)) {
-        struct timeval now;
-        gettimeofday(&now, 0);
         if (timercmp(&now, &expiry_, <)) {
-            timersub(&expiry_, &now, &now);
-            timeout_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
+            timeout_ms = std::min(timeout_ms, timer_difference_ms(expiry_, now));
+        } else {
+            timeout_ms = 0;
+        }
+    }
+    if (timerisset(&idle_expiry_)) {
+        if (timercmp(&now, &idle_expiry_, <)) {
+            timeout_ms = std::min(timeout_ms, timer_difference_ms(idle_expiry_, now));
         } else {
             timeout_ms = 0;
         }
@@ -2445,14 +2480,15 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
         return 128 + SIGTERM;
     } else {
         struct timeval now;
-        if (timerisset(&expiry_)
-            && gettimeofday(&now, NULL) == 0
-            && timercmp(&now, &expiry_, >)) {
-            return 124;
-        } else {
-            errno = EAGAIN;
-            return -1;
+        if ((timerisset(&expiry_) || timerisset(&idle_expiry_))
+            && gettimeofday(&now, nullptr) == 0) {
+            if ((timerisset(&expiry_) && timercmp(&now, &expiry_, >))
+                || (timerisset(&idle_expiry_) && timercmp(&now, &idle_expiry_, >))) {
+                return 124;
+            }
         }
+        errno = EAGAIN;
+        return -1;
     }
 }
 
@@ -2505,19 +2541,20 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 
         // wait for something to occur
         block(ptymaster);
+        bool any = false;
 
         // transfer data
-        to_slave_.transfer_in(inputfd_);
+        any = to_slave_.transfer_in(inputfd_) || any;
         if (to_slave_.head_ != to_slave_.tail_
             && memmem(&to_slave_.buf_[to_slave_.head_], to_slave_.tail_ - to_slave_.head_, "\x1b\x03", 2) != NULL) {
             exec_done(child, 128 + SIGTERM);
         }
-        to_slave_.transfer_out(ptymaster);
-        from_slave_.transfer_in(ptymaster);
+        any = to_slave_.transfer_out(ptymaster) || any;
+        any = from_slave_.transfer_in(ptymaster) || any;
         if (has_blocked_ && timingfd != -1) {
             off_t out_offset = lseek(STDOUT_FILENO, 0, SEEK_CUR);
             struct timeval now, delta;
-            gettimeofday(&now, 0);
+            gettimeofday(&now, nullptr);
             timersub(&now, &this->start_time_, &delta);
             unsigned long long deltamsecs = (delta.tv_sec * 1000000 + delta.tv_usec) / 1000;
 
@@ -2534,7 +2571,13 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
             }
             has_blocked_ = false;
         }
-        from_slave_.transfer_out(STDOUT_FILENO);
+        any = from_slave_.transfer_out(STDOUT_FILENO) || any;
+
+        // maybe reset idle timeout
+        if (any && idle_timeout_ > 0) {
+            gettimeofday(&active_time_, nullptr);
+            idle_expiry_ = timer_add_delay(active_time_, idle_timeout_);
+        }
     }
 }
 
@@ -2567,8 +2610,9 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
 static __attribute__((noreturn)) void usage(jailaction action = do_start) {
     if (action == do_start) {
         fprintf(stderr, "Usage: pa-jail add [-nh] [-f FILE | -F DATA] [-S SKELETON] JAILDIR [USER]\n\
-       pa-jail run [--fg] [-nqhL] [-T TIMEOUT] [-p PIDFILE] [-i INPUT] \\\n\
-                   [-f FILE | -F DATA] [-S SKELETON] JAILDIR USER COMMAND\n\
+       pa-jail run [--fg] [-nqhL] [-T TIMEOUT] [-I TIMEOUT] [-p PIDFILE] \\\n\
+                   [-i INPUT] [-f FILE | -F DATA] [-S SKELETON] \\\n\
+                   JAILDIR USER COMMAND\n\
        pa-jail mv SOURCE DEST\n\
        pa-jail rm [-nf] JAILDIR\n");
     } else if (action == do_mv) {
@@ -2603,7 +2647,8 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
   -P, --pid-contents STR    write STR to PIDFILE\n\
   -i, --input INPUTSOCKET   use TTY, read input from INPUTSOCKET\n\
       --no-onlcr            don't translate \\n -> \\r\\n in output\n\
-  -T, --timeout TIMEOUT     kill the jail after TIMEOUT\n\
+  -T, --timeout TIMEOUT     kill the jail after TIMEOUT seconds\n\
+  -I, --idle-timeout TIMEOUT  kill the jail after TIMEOUT idle seconds\n\
       --fg                  run in the foreground\n");
         }
         fprintf(stderr, "  -n, --dry-run             print actions, don't run them\n\
@@ -2634,6 +2679,7 @@ static struct option longoptions_run[] = {
     { "manifest", required_argument, NULL, 'F' },
     { "fg", no_argument, NULL, 'g' },
     { "timeout", required_argument, NULL, 'T' },
+    { "idle-timeout", required_argument, NULL, 'I' },
     { "input", required_argument, NULL, 'i' },
     { "chown-home", no_argument, NULL, 'h' },
     { "chown-user", required_argument, NULL, 'u' },
@@ -2655,14 +2701,14 @@ static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:f:F:p:P:T:qi:hu:t:", "VnS:f:F:p:P:T:qi:hu:t:", "Vnf", "Vn"
+    "+Vn", "VnS:f:F:p:P:T:I:qi:hu:t:", "VnS:f:F:p:P:T:I:qi:hu:t:", "Vnf", "Vn"
 };
 
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
     bool chown_home = false, foreground = false;
-    double timeout = -1;
+    double timeout = -1, idle_timeout = -1;
     std::string inputarg, linkarg, manifest;
     std::vector<std::string> chown_user_args;
     pidcontents = "$$\n";
@@ -2710,6 +2756,12 @@ int main(int argc, char** argv) {
             } else if (ch == 'T') {
                 char* end;
                 timeout = strtod(optarg, &end);
+                if (end == optarg || *end != 0) {
+                    usage();
+                }
+            } else if (ch == 'I') {
+                char* end;
+                idle_timeout = strtod(optarg, &end);
                 if (end == optarg || *end != 0) {
                     usage();
                 }
@@ -2942,7 +2994,7 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc) {
-        jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, inputfd, timeout, foreground);
+        jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, inputfd, timeout, idle_timeout, foreground);
     }
 
     // close timing and lock file if appropriate

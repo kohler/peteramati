@@ -166,6 +166,8 @@ class Pset {
     public $run_binddir;
     /** @var ?float */
     public $run_timeout;
+    /** @var ?float */
+    public $run_idle_timeout;
     /** @var ?bool */
     public $run_xterm_js;
     /** @var bool */
@@ -439,10 +441,8 @@ class Pset {
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
         $this->run_jailmanifest = self::cstr_or_str_list($p, "run_jailmanifest");
         $this->run_xterm_js = self::cbool($p, "run_xterm_js");
-        $this->run_timeout = self::cinterval($p, "run_timeout");
-        if ($this->run_timeout === null) { // default run_timeout is 10m
-            $this->run_timeout = 600;
-        }
+        $this->run_timeout = self::cinterval($p, "run_timeout") ?? 600 /* 10m default */;
+        $this->run_idle_timeout = self::cinterval($p, "run_idle_timeout") ?? 180 /* 3m default */;
         $this->run_skeletondir = self::cstr($p, "run_skeletondir");
         $this->run_binddir = self::cstr($p, "run_binddir");
 
@@ -934,6 +934,7 @@ class DownloadEntryConfig {
     public $filename;
     /** @var bool */
     public $timed;
+    /** @var ?float */
     public $timeout;
     /** @var ?float */
     public $position;
@@ -1455,6 +1456,8 @@ class RunnerConfig {
     public $overlay;
     /** @var ?float */
     public $timeout;
+    /** @var ?float */
+    public $idle_timeout;
     /** @var ?string */
     public $queue;
     /** @var ?int */
@@ -1501,6 +1504,7 @@ class RunnerConfig {
         $this->visible = Pset::cdate_or_grades($loc, $rs, "visible", "show_to_students");
         $this->output_visible = Pset::cdate_or_grades($loc, $rs, "output_visible", "show_output_to_students", "show_results_to_students");
         $this->timeout = Pset::cinterval($loc, $rs, "timeout", "run_timeout");
+        $this->idle_timeout = Pset::cinterval($loc, $rs, "idle_timeout");
         $this->xterm_js = Pset::cbool($loc, $rs, "xterm_js");
         if (isset($r->transfer_warnings)
             ? $r->transfer_warnings === "grades"
