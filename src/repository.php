@@ -723,6 +723,7 @@ class Repository {
 
         $ignore_diffconfig = $pset->is_handout($commita) && $pset->is_handout($commitb);
         $no_full = $options["no_full"] ?? false;
+        $no_collapse = $options["no_collapse"] ?? false;
         $needfiles = self::fix_diff_files($options["needfiles"] ?? null);
         $onlyfiles = self::fix_diff_files($options["onlyfiles"] ?? null);
 
@@ -774,7 +775,7 @@ class Repository {
                 $di->set_repoa($this, $pset, $hasha, $line, $pset->is_handout($commita));
                 if ($diffconfig
                     && !$ignore_diffconfig
-                    && ($diffconfig->ignore || $diffconfig->collapse)
+                    && ($diffconfig->ignore || ($diffconfig->collapse && !$no_collapse))
                     && (!$needfiles || !($needfiles[$file] ?? false))) {
                     if (!$diffconfig->ignore) {
                         $di->finish_unloaded();

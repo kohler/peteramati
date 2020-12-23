@@ -90,7 +90,6 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
 
 // collect diff and sort line notes
 $lnorder = $Pset->is_handout($commitb) ? $Info->empty_line_notes() : $Info->viewable_line_notes();
-$diff = $Info->diff($commita, $commitb, $lnorder, $diff_options);
 
 // print line notes
 $notelinks = array();
@@ -101,8 +100,11 @@ foreach ($lnorder->seq() as $note) {
 }
 if (!empty($notelinks)) {
     ContactView::echo_group("notes", join(", ", $notelinks));
+} else {
+    $diff_options["no_collapse"] = true;
 }
 
+$diff = $Info->diff($commita, $commitb, $lnorder, $diff_options);
 if ($diff) {
     echo '<div class="pa-diffset">';
 
