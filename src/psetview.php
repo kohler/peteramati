@@ -2049,7 +2049,7 @@ class PsetView {
                 echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
             }
         }
-        echo '<div class="pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
+        echo '<div class="pa-dr pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
         if ($note->format) {
             echo ' need-format" data-format="', $note->format;
             $this->need_format = true;

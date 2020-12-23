@@ -2462,6 +2462,9 @@ tr.gtrow-partner {
 	}
 }
 
+.pa-dr {
+	overflow-wrap: break-word;
+}
 .pa-dr h1, .pa-dr h2, .pa-dr h3, .pa-dr h4, .pa-dr h5, .pa-dr h6 {
 	display: block;
 	margin-top: 0;
@@ -2498,6 +2501,9 @@ tr.gtrow-partner {
 	padding: 0.5em;
 	border: 1px solid silver;
 }
+.pa-dr.pa-note > *:last-child {
+	margin-bottom: 0;
+}
 
 .pa-with-sidebar {
 	display: flex;
@@ -2532,9 +2538,6 @@ tr.gtrow-partner {
 .pa-no-sidebar {
 	display: none;
 }
-}
-.pa-note {
-	overflow-wrap: break-word;
 }
 .pa-notebox {
 	flex: 1 1 auto;
@@ -2581,7 +2584,6 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	font-size: 87.5%;
 }
 .pa-note {
-	overflow-wrap: break-word;
 	font-family: Georgia, serif;
 	line-height: 1.35;
 }
@@ -2592,12 +2594,6 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 1.5;
 	white-space: pre-wrap;
-}
-.pa-note > *:first-child {
-	margin-top: 0;
-}
-.pa-note > *:last-child {
-	margin-bottom: 0;
 }
 table.hidegrades .pa-gradenote {
 	color: #880000;

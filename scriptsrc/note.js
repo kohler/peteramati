@@ -115,7 +115,7 @@ export class Note {
                 t += '<div class="pa-note-author">[' + authors.join(', ') + ']</div>';
             }
         }
-        t += '<div class="pa-note pa-' + (this.iscomment ? 'comment' : 'grade') + 'note';
+        t += '<div class="pa-dr pa-note pa-' + (this.iscomment ? 'comment' : 'grade') + 'note';
         if (this.format) {
             t += '" data-format="' + this.format;
         }
