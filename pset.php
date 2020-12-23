@@ -767,7 +767,7 @@ if ($Pset->gitless) {
         }
 
         $runcategories[$r->category] = true;
-        echo '<div id="pa-runout-' . $r->category . '" class="pa-runout';
+        echo '<div id="run-' . $r->category . '" class="pa-runout';
         if (!$rj || !isset($rj->timestamp)) {
             echo ' hidden';
         }

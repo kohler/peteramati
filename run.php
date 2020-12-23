@@ -210,7 +210,7 @@ class RunRequest {
         echo Ht::hidden("run", $this->runner->name, ["id" => "runmany61", "data-pa-run-category" => $this->runner->category_argument()]),
             '</div></form>';
 
-        echo '<div id="pa-runout-' . $this->runner->category . '">',
+        echo '<div id="run-' . $this->runner->category . '">',
             '<div class="pa-run pa-run-short" id="pa-run-' . $this->runner->category . '">',
             '<pre class="pa-runpre"></pre></div>',
             '</div>';

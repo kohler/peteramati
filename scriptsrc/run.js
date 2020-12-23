@@ -8,7 +8,7 @@ import { event_key, event_modkey } from "./ui-key.js";
 import { render_terminal } from "./render-terminal.js";
 import { grades_fetch } from "./grades.js";
 
-export function run(button, opt) {
+export function run(button, opts) {
     const $f = $(button).closest("form"),
         category = button.getAttribute("data-pa-run-category") || button.value,
         directory = $(button).closest(".pa-psetinfo").attr("data-pa-directory"),
@@ -19,10 +19,7 @@ export function run(button, opt) {
         checkt,
         kill_checkt;
 
-    if (typeof opt !== "object") {
-        opt = {};
-    }
-    if (opt.unfold && therun.dataset.paTimestamp) {
+    if (opts.unfold && therun.dataset.paTimestamp) {
         checkt = +therun.dataset.paTimestamp;
     } else {
         if ($f.prop("outstanding")) {
@@ -35,7 +32,7 @@ export function run(button, opt) {
 
     therunout && removeClass(therunout, "hidden");
     fold61(therun, therunout, true);
-    if (!checkt && !opt.noclear) {
+    if (!checkt && !opts.noclear) {
         thepre.html("");
         addClass(thepre[0].parentElement, "pa-run-short");
         thepre[0].removeAttribute("data-pa-terminal-style");
@@ -111,6 +108,9 @@ export function run(button, opt) {
             }
             return false;
         });
+        if (opts.focus) {
+            thexterm.focus();
+        }
     }
 
     function scroll_therun() {
@@ -205,12 +205,12 @@ export function run(button, opt) {
                 if (tsmsg !== "") {
                     tsmsg = "\x1b[3;1;38;5;86m" + tsmsg + "\x1b[m\r\n";
                 }
-                if (!opt.noclear) {
+                if (!opts.noclear) {
                     tsmsg = "\x1bc" + tsmsg;
                 }
                 str = tsmsg + str;
             } else {
-                if (!opt.noclear) {
+                if (!opts.noclear) {
                     thepre.html("");
                 }
                 if (tsmsg !== "") {
@@ -515,16 +515,19 @@ export function run(button, opt) {
         send({write: value});
     }
 
-    if (opt.headline && opt.noclear && !thexterm && thepre[0].firstChild) {
+    if (opts.headline && opts.noclear && !thexterm && thepre[0].firstChild) {
         append("\n\n");
     }
-    if (opt.headline && opt.headline instanceof Node) {
-        append_html(opt.headline);
-    } else if (opt.headline) {
-        append("\x1b[1;37m" + opt.headline + "\x1b[m\n");
+    if (opts.headline && opts.headline instanceof Node) {
+        append_html(opts.headline);
+    } else if (opts.headline) {
+        append("\x1b[1;37m" + opts.headline + "\x1b[m\n");
     }
-    if (opt.unfold && therun.getAttribute("data-pa-content")) {
+    if (opts.unfold && therun.getAttribute("data-pa-content")) {
         append(therun.getAttribute("data-pa-content"));
+    }
+    if (opts.focus) {
+        $(therunout).scrollIntoView();
     }
     therun.removeAttribute("data-pa-content");
     scroll_therun();
@@ -535,18 +538,17 @@ export function run(button, opt) {
 
 
 handle_ui.on("pa-runner", function () {
-    run(this);
+    run(this, {focus: true});
 });
 
 handle_ui.on("pa-run-show", function () {
-    var parent = this.closest(".pa-runout"),
-        name = parent.id.substring(10),
-        therun = document.getElementById("pa-run-" + name),
-        thebutton;
+    const parent = this.closest(".pa-runout"),
+        name = parent.id.substring(4),
+        therun = document.getElementById("pa-run-" + name);
     if (therun.dataset.paTimestamp && !$(therun).is(":visible")) {
-        thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
+        const thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
         run(thebutton, {unfold: true});
     } else {
-        fold61(therun, jQuery("#pa-runout-" + name));
+        fold61(therun, jQuery("#run-" + name));
     }
 });
