@@ -6,6 +6,7 @@ import { html_id_encode } from "./encoders.js";
 import { sprintf } from "./utils.js";
 import { hasClass } from "./ui.js";
 import { render_text } from "./render.js";
+import { Filediff } from "./diff.js";
 
 
 const styleset = {
@@ -29,45 +30,49 @@ const styleset = {
 };
 
 function parse_styles(dst, style) {
-    var a;
     if (arguments.length === 1) {
         style = dst;
         dst = null;
     }
-    if (!style || style === "\x1b[m" || style === "\x1b[0m")
+    if (!style || style === "\x1b[m" || style === "\x1b[0m") {
         return null;
-    if (style.charAt(0) === "\x1b")
+    }
+    let a;
+    if (style.charAt(0) === "\x1b") {
         a = style.substring(2, style.length - 1).split(";");
-    else
+    } else {
         a = style.split(";");
-    for (var i = 0; i < a.length; ++i) {
-        var cmp = styleset[parseInt(a[i])];
-        if (cmp === false)
+    }
+    for (let i = 0; i < a.length; ++i) {
+        const cmp = styleset[parseInt(a[i])];
+        if (cmp === false) {
             dst = null;
-        else if (!cmp)
-            /* do nothing */;
-        else if (typeof cmp === "object") {
-            for (var j in cmp) {
+        } else if (!cmp) {
+            /* do nothing */
+        } else if (typeof cmp === "object") {
+            for (let j in cmp) {
                 if (cmp[j] !== false) {
                     dst = dst || {};
                     dst[j] = cmp[j];
-                } else if (dst)
+                } else if (dst) {
                     delete dst[j];
+                }
             }
         } else if (cmp === "fg" || cmp === "bg") {
-            var r, g, b;
+            let r, g, b;
             dst = dst || {};
             if (i + 4 < a.length && parseInt(a[i+1]) === 2) {
                 r = parseInt(a[i+2]);
                 g = parseInt(a[i+3]);
                 b = parseInt(a[i+4]);
-                if (r <= 255 && g <= 255 && b <= 255)
+                if (r <= 255 && g <= 255 && b <= 255) {
                     dst[cmp] = [r, g, b];
+                }
             } else if (i + 2 < a.length && parseInt(a[i+1]) === 5) {
-                var c = parseInt(a[i+1]);
-                if (c <= 15)
+                const c = parseInt(a[i+1]);
+                if (c <= 15) {
                     dst[cmp] = c;
-                else if (c <= 0xe7) {
+                } else if (c <= 0xe7) {
                     b = (c - 16) % 6;
                     g = ((c - 16 - b) / 6) % 6;
                     r = (c - 16 - b - 6 * g) / 36;
@@ -83,62 +88,73 @@ function parse_styles(dst, style) {
 }
 
 function unparse_styles(dst) {
-    if (!dst)
+    if (!dst) {
         return "\x1b[m";
-    var a = [];
-    for (var key in styleback)
+    }
+    const a = [];
+    for (let key in styleback) {
         if (dst[key])
             a.push(styleback[key]);
+    }
     if (dst.fg) {
-        if (typeof dst.fg === "number")
+        if (typeof dst.fg === "number") {
             a.push(dst.fg < 8 ? 30 + dst.fg : 90 + dst.fg - 8);
-        else
+        } else {
             a.push(38, 2, dst.fg[0], dst.fg[1], dst.fg[2]);
+        }
     }
     if (dst.bg) {
-        if (typeof dst.bg === "number")
+        if (typeof dst.bg === "number") {
             a.push(dst.bg < 8 ? 40 + dst.bg : 100 + dst.bg - 8);
-        else
+        } else {
             a.push(48, 2, dst.bg[0], dst.bg[1], dst.bg[2]);
+        }
     }
     return "\x1b[" + a.join(";") + "m";
 }
 
 function style_text(text, style) {
-    if (typeof text === "string")
+    if (typeof text === "string") {
         text = document.createTextNode(text);
-    else if (text instanceof jQuery)
+    } else if (text instanceof jQuery) {
         text = text[0];
+    }
     if (!style || style === "\x1b[m"
-        || (typeof style === "string" && !(style = parse_styles(style))))
+        || (typeof style === "string" && !(style = parse_styles(style)))) {
         return text;
-    var node = document.createElement("span");
-    var cl = [];
-    for (var key in styleback)
+    }
+    const node = document.createElement("span"), cl = [];
+    for (let key in styleback) {
         if (style[key])
             cl.push("ansi" + key);
+    }
     if (style.fg) {
-        if (typeof style.fg === "number")
+        if (typeof style.fg === "number") {
             cl.push("ansifg" + style.fg);
-        else
+        } else {
             node.styles.foregroundColor = sprintf("#%02x%02x%02x", style.fg[0], style.fg[1], style.fg[2]);
+        }
     }
     if (style.bg) {
-        if (typeof style.bg === "number")
+        if (typeof style.bg === "number") {
             cl.push("ansibg" + style.bg);
-        else
+        } else {
             node.styles.backgroundColor = sprintf("#%02x%02x%02x", style.bg[0], style.bg[1], style.bg[2]);
+        }
     }
-    if (cl.length)
+    if (cl.length) {
         node.className = cl.join(" ");
+    }
     node.appendChild(text);
     return node;
 }
 
-function filediff_find(file) {
-    return $(".pa-filediff").filter(function () {
-        return this.getAttribute("data-pa-file") === file;
-    });
+function ansi_combine(a1, a2) {
+    if (/^\x1b\[[\d;]*m$/.test(a2)) {
+        return unparse_styles(parse_styles(parse_styles(null, a1), a2));
+    } else {
+        return a1;
+    }
 }
 
 export function render_terminal(container, string, options) {
@@ -153,8 +169,9 @@ export function render_terminal(container, string, options) {
     if (options && options.clear) {
         container.removeAttribute("data-pa-terminal-style");
         container.removeAttribute("data-pa-outputpart");
-        while (container.firstChild)
+        while (container.firstChild) {
             container.removeChild(container.firstChild);
+        }
     }
 
     var styles = container.getAttribute("data-pa-terminal-style"),
@@ -165,20 +182,10 @@ export function render_terminal(container, string, options) {
     }
 
     function addfragment(node) {
-        if (!fragment)
+        if (!fragment) {
             fragment = document.createDocumentFragment();
+        }
         fragment.appendChild(node);
-    }
-
-    function ansi_combine(a1, a2) {
-        if (/^\x1b\[[\d;]*m$/.test(a2))
-            return unparse_styles(parse_styles(parse_styles(null, a1), a2));
-        else
-            return a1;
-    }
-
-    function ends_with(str, chr) {
-        return str !== "" && str.charAt(str.length - 1) === chr;
     }
 
     function clean_cr(line) {
@@ -197,10 +204,11 @@ export function render_terminal(container, string, options) {
                     glen += lsplit[j].length;
                 }
                 if (j + 1 < lsplit.length) {
-                    if (ends_with(lsplit[j + 1], "K"))
+                    if (lsplit[j + 1].endsWith("K")) {
                         clearafter = glen;
-                    else
+                    } else {
                         curstyle = ansi_combine(curstyle, lsplit[j + 1]);
+                    }
                 }
             }
             // glen: number of characters to overwrite
@@ -222,19 +230,20 @@ export function render_terminal(container, string, options) {
     }
 
     function add_file_link(node, prefix, file, line, link) {
-        var m;
+        let m;
         while ((m = file.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
             styles = ansi_combine(styles, m[1]);
             file = m[2];
         }
-        var filematch = filediff_find(file);
-        if (!filematch.length && options && options.directory) {
+        let filematch = Filediff.find(file);
+        if (!filematch && options && options.directory) {
             file = options.directory + file;
-            filematch = filediff_find(file);
+            filematch = Filediff.find(file);
         }
-        if (filematch.length) {
-            if (prefix.length)
+        if (filematch) {
+            if (prefix.length) {
                 addlinepart(node, prefix);
+            }
             var anchor = "Lb" + line + "_" + html_id_encode(file);
             var a = $("<a href=\"#" + anchor + "\" class=\"uu pa-goto\"></a>");
             a.text(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
@@ -300,7 +309,7 @@ export function render_terminal(container, string, options) {
         if (lines.length && lines[lines.length - 1] === "") {
             lines.pop();
         }
-        lastfull = lines.length && ends_with(lines[lines.length - 1], "\n");
+        lastfull = lines.length && lines[lines.length - 1].endsWith("\n");
     } else {
         lines = [];
         lastfull = true;
@@ -336,7 +345,7 @@ export function render_terminal(container, string, options) {
     for (i = 0; i < lines.length; i = j) {
         laststyles = styles;
         last = lines[i];
-        for (j = i + 1; !ends_with(last, "\n") && j < lines.length; ++j) {
+        for (j = i + 1; !last.endsWith("\n") && j < lines.length; ++j) {
             last += lines[j];
         }
         if (j == lines.length && lastfull) {

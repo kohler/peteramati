@@ -73,27 +73,40 @@ export function run(button, opt) {
         thexterm.attachCustomKeyEventHandler(function (event) {
             if (event.type === "keydown") {
                 let key = event_key(event), mod = event_modkey(event);
-                if (key === "Enter" && !mod) {
-                    key = "\r";
-                } else if (key === "Escape" && !mod) {
-                    key = "\x1B";
-                } else if (key === "Backspace" && !mod) {
-                    key = "\x7F";
-                    event.preventDefault();
-                } else if (key === "Tab" && !mod) {
-                    key = "\x09";
-                    event.preventDefault();
-                } else if (key >= "a"
-                           && key <= "z"
-                           && (mod & 0xE) === event_modkey.CTRL) {
-                    key = String.fromCharCode(key.charCodeAt(0) - 96);
-                } else if (key.length !== 1
-                           || (mod & 0xE) !== 0
-                           || !event_key.printable(event)) {
-                    key = "";
+                if (key.length === 1) {
+                    if ((mod & 0xE) === 0 && event_key.printable(event)) {
+                        // keep `key`
+                    } else if ((mod & 0xE) === event_modkey.CTRL
+                               && key >= "a"
+                               && key <= "z") {
+                        key = String.fromCharCode(key.charCodeAt(0) - 96);
+                    } else {
+                        key = "";
+                    }
+                } else {
+                    if (key === "Enter" && !mod) {
+                        key = "\r";
+                    } else if (key === "Escape" && !mod) {
+                        key = "\x1B";
+                    } else if (key === "Backspace" && !mod) {
+                        key = "\x7F";
+                    } else if (key === "Tab" && !mod) {
+                        key = "\x09";
+                    } else if (key === "ArrowUp" && !mod) {
+                        key = "\x1B[A";
+                    } else if (key === "ArrowDown" && !mod) {
+                        key = "\x1B[B";
+                    } else if (key === "ArrowRight" && !mod) {
+                        key = "\x1B[C";
+                    } else if (key === "ArrowLeft" && !mod) {
+                        key = "\x1B[D";
+                    } else {
+                        key = "";
+                    }
                 }
                 if (key !== "") {
                     write(key);
+                    event.preventDefault();
                 }
             }
             return false;
