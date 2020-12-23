@@ -93,7 +93,7 @@ export class Filediff {
         });
     }
     static define_method(name, f) {
-        if (!Filediff.prototype.hasOwnProperty(name)) {
+        if (!Object.prototype.hasOwnProperty.call(Filediff.prototype, name)) {
             Object.defineProperty(Filediff.prototype, name, {
                 value: f, enumerable: false, configurable: true, writable: true
             });

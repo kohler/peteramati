@@ -267,7 +267,7 @@ function pa_linenote(event) {
     var dl = event.target.closest(".pa-dl");
     if (event.button !== 0
         || !dl
-        || dl.matches(".pa-gn, .pa-gx")
+        || hasClass(dl, "pa-gx")
         || event.target.matches("button, a, textarea")) {
         return;
     }
