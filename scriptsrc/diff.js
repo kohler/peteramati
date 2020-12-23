@@ -45,6 +45,9 @@ export class Filediff {
                         if (data.ok && data.content_html) {
                             const result = $(data.content_html);
                             $(this.element).html(result.children());
+                            if (hasClass(this.element, "need-highlight") && this.highlight) {
+                                this.highlight();
+                            }
                         }
                         resolve(this);
                     }
@@ -88,6 +91,13 @@ export class Filediff {
             }
             throw null;
         });
+    }
+    static define_method(name, f) {
+        if (!Filediff.prototype.hasOwnProperty(name)) {
+            Object.defineProperty(Filediff.prototype, name, {
+                value: f, enumerable: false, configurable: true, writable: true
+            });
+        }
     }
 }
 

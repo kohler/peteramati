@@ -218,16 +218,17 @@ function fix_list_item(d) {
     return d;
 }
 
-export function filediff_markdown() {
-    if (hasClass(this, "pa-markdown") || hasClass(this, "pa-highlight")) {
+Filediff.define_method("markdown", function () {
+    const elt = this.element;
+    if (hasClass(elt, "pa-markdown") || hasClass(elt, "pa-highlight")) {
         return;
     }
     // collect content
-    let e = this.firstChild, l = [], lineno = 1;
+    let e = elt.firstChild, l = [], lineno = 1;
     while (e) {
         let n = e.nextSibling;
         if (hasClass(e, "pa-dlr")) {
-            this.removeChild(e);
+            elt.removeChild(e);
         } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
             const this_lineno = +e.firstChild.nextSibling.getAttribute("data-landmark");
             while (lineno < this_lineno) {
@@ -242,11 +243,11 @@ export function filediff_markdown() {
     }
     // render to markdown
     let dx = document.createElement("div"), d;
-    mdcontext = this;
+    mdcontext = elt;
     dx.innerHTML = make_markdownit().render(l.join(""));
     mdcontext = null;
     // split up and insert into order
-    e = this.firstChild;
+    e = elt.firstChild;
     while ((d = dx.firstChild)) {
         if (d.nodeType !== 1) {
             dx.removeChild(d);
@@ -306,44 +307,45 @@ export function filediff_markdown() {
         lp.appendChild(la);
         lp.appendChild(lb);
         lp.appendChild(lr);
-        this.insertBefore(lp, e);
+        elt.insertBefore(lp, e);
     }
-    addClass(this, "pa-markdown");
-}
+    addClass(elt, "pa-markdown");
+});
 
-function filediff_unmarkdown() {
-    var e = this.firstChild;
+Filediff.define_method("unmarkdown", function () {
+    const elt = this.element;
+    let e = elt.firstChild;
     while (e) {
         var n = e.nextSibling;
         if (hasClass(e, "pa-dlr")) {
-            this.removeChild(e);
+            elt.removeChild(e);
         } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
             removeClass(e, "hidden");
         }
         e = n;
     }
-    removeClass(this, "pa-markdown");
-}
+    removeClass(elt, "pa-markdown");
+});
 
-
-function filediff_highlight() {
+Filediff.define_method("highlight", function () {
+    const elt = this.element;
     // compute language
-    var file = this.getAttribute("data-pa-file"), lang;
-    if (!(lang = this.getAttribute("data-language"))) {
+    var file = elt.getAttribute("data-pa-file"), lang;
+    if (!(lang = elt.getAttribute("data-language"))) {
         if (/\.(?:cc|cpp|hh|hpp|c\+\+|h\+\+|C|H)$/.test(file)) {
             lang = "c++";
         } else if (/\.(?:c|h)$/.test(file)) {
             lang = "c";
         }
-        lang && this.setAttribute("data-language", lang);
+        lang && elt.setAttribute("data-language", lang);
     }
     if (!lang || !hljs.getLanguage(lang)
-        || hasClass(this, "pa-highlight")
-        || hasClass(this, "pa-markdown"))
+        || hasClass(elt, "pa-highlight")
+        || hasClass(elt, "pa-markdown"))
         return;
     // collect content
     const langclass = "language-" + lang;
-    let e = this.firstChild, hlstate = null;
+    let e = elt.firstChild, hlstate = null;
     while (e) {
         if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
             const ce = e.lastChild,
@@ -359,14 +361,15 @@ function filediff_highlight() {
         }
         e = e.nextSibling;
     }
-    addClass(this, "pa-highlight");
-}
+    addClass(elt, "pa-highlight");
+});
 
-export function filediff_unhighlight() {
+Filediff.define_method("unhighlight", function () {
     // compute language
-    var lang = this.getAttribute("data-language"),
-        langclass = lang ? "language-" + lang : "",
-        e = this.firstChild, et;
+    const elt = this.element,
+        lang = elt.getAttribute("data-language"),
+        langclass = lang ? "language-" + lang : "";
+    let e = elt.firstChild, et;
     while (e) {
         if ((et = e.lastChild)
             && et.hasAttribute("data-pa-text")
@@ -377,8 +380,8 @@ export function filediff_unhighlight() {
         }
         e = e.nextSibling;
     }
-    removeClass(this, "pa-highlight");
-}
+    removeClass(elt, "pa-highlight");
+});
 
 
 handle_ui.on("pa-diff-toggle-markdown", function (evt) {
@@ -389,9 +392,9 @@ handle_ui.on("pa-diff-toggle-markdown", function (evt) {
         const f = Filediff.find(this),
             shown = hasClass(f.element, "pa-markdown");
         if (show && !shown) {
-            filediff_markdown.call(f.element);
+            f.markdown();
         } else if (!show && shown) {
-            filediff_unmarkdown.call(f.element);
+            f.unmarkdown();
         }
         toggleClass(this, "btn-primary", show);
     });
@@ -402,5 +405,7 @@ handle_ui.on("pa-diff-toggle-markdown", function (evt) {
 });
 
 $(function () {
-    $(".pa-filediff.need-highlight:not(.need-load)").each(filediff_highlight);
+    $(".pa-filediff.need-highlight:not(.need-load)").each(function () {
+        new Filediff(this).highlight();
+    });
 });

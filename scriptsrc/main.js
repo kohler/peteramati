@@ -15,8 +15,8 @@ import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
 import { tooltip } from "./tooltip.js";
 import "./pset.js";
-import { Linediff } from "./diff.js";
-import { filediff_markdown } from "./diff-markdown.js";
+import { Filediff, Linediff } from "./diff.js";
+import "./diff-markdown.js";
 import { Note } from "./note.js";
 import "./note-edit.js";
 import { render_text } from "./render.js";
@@ -2323,7 +2323,12 @@ handle_ui.on("js-multiresolveflag", function () {
 window.$pa = {
     beforeunload: pa_beforeunload,
     checklatest: pa_checklatest,
-    filediff_markdown: filediff_markdown,
+    filediff_at: function (elt) {
+        if (typeof elt === "string") {
+            elt = document.getElementById(elt);
+        }
+        return elt && hasClass(elt, "pa-filediff") ? new Filediff(elt) : null;
+    },
     fold: fold,
     grgraph: grgraph,
     onload: hotcrp_load,
