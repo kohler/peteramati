@@ -1859,6 +1859,7 @@ class jailownerinfo {
     void block(int ptymaster);
     int check_child_timeout(pid_t child, bool waitpid);
     void wait_background(pid_t child, int ptymaster);
+    void write_timing();
     void exec_done(pid_t child, int exit_status) __attribute__((noreturn));
 };
 
@@ -2492,6 +2493,25 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
     }
 }
 
+void jailownerinfo::write_timing() {
+    off_t out_offset = lseek(STDOUT_FILENO, 0, SEEK_CUR);
+    struct timeval now, delta;
+    gettimeofday(&now, nullptr);
+    timersub(&now, &this->start_time_, &delta);
+    unsigned long long deltamsecs = (delta.tv_sec * 1000000 + delta.tv_usec) / 1000;
+    char timingstr[256];
+    int written = 0;
+    int len = snprintf(timingstr, sizeof(timingstr), "%llu,%llu\n", deltamsecs, (unsigned long long) out_offset);
+    assert(len < 256);
+    while (written < len) {
+        int r = write(timingfd, timingstr, len);
+        if (r < 0) {
+            perror_die("Timing file");
+        }
+        written += r;
+    }
+}
+
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     // This process is the `init` (pid 1) of the new process namespace.
     // On Linux, if it dies, everything in the jail dies too.
@@ -2552,23 +2572,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         any = to_slave_.transfer_out(ptymaster) || any;
         any = from_slave_.transfer_in(ptymaster) || any;
         if (has_blocked_ && timingfd != -1) {
-            off_t out_offset = lseek(STDOUT_FILENO, 0, SEEK_CUR);
-            struct timeval now, delta;
-            gettimeofday(&now, nullptr);
-            timersub(&now, &this->start_time_, &delta);
-            unsigned long long deltamsecs = (delta.tv_sec * 1000000 + delta.tv_usec) / 1000;
-
-            char timingstr[256];
-            int written = 0;
-            int len = snprintf(timingstr, sizeof(timingstr), "%llu,%llu\n", deltamsecs, (unsigned long long) out_offset);
-            assert(len < 256);
-            while (written < len) {
-                int r = write(timingfd, timingstr, len);
-                if (r < 0) {
-                    perror_die("Timing file");
-                }
-                written += r;
-            }
+            write_timing();
             has_blocked_ = false;
         }
         any = from_slave_.transfer_out(STDOUT_FILENO) || any;
@@ -2582,6 +2586,9 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
 }
 
 void jailownerinfo::exec_done(pid_t child, int exit_status) {
+    if (timingfd != -1) {
+        write_timing();
+    }
     const char* xmsg = nullptr;
     if (exit_status == 124 && !quiet) {
         xmsg = "...timed out";
