@@ -75,7 +75,7 @@ function render_form($tr, note, transition) {
 }
 
 function set_scrolled_at(evt) {
-    if (evt && evt.pageX != null) {
+    if (evt && evt.screenX != null) {
         scrolled_at = evt.timeStamp;
         scrolled_x = evt.screenX;
         scrolled_y = evt.screenY;
@@ -131,13 +131,16 @@ function arrowcapture(evt) {
 }
 
 function capture(tr, keydown) {
-    addClass(tr, "live");
+    if (!hasClass(tr, "pa-gw")) {
+        addClass(tr, "live");
+    }
     $(".pa-filediff").removeClass("live");
     $(document).off(".pa-linenote");
     $(document).on((keydown ? "keydown.pa-linenote " : "") + "mousemove.pa-linenote mousedown.pa-linenote", arrowcapture);
 }
 
 function uncapture() {
+    console.log("uncapture");
     $(".pa-dl.live").removeClass("live");
     $(".pa-filediff").addClass("live");
     $(document).off(".pa-linenote");

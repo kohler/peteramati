@@ -55,16 +55,24 @@ export class Note {
     }
 
     static html_skeleton_near(elt) {
-        if (hasClass(elt, "pa-gw")) {
-            return elt;
-        } else {
-            const source = new Linediff(elt),
-                lineid = source.note_lineid,
-                insertion = source.upper_bound(lineid),
-                tr = $('<div class="pa-dl pa-gw" data-landmark="'.concat(lineid, '"><div class="pa-notebox"></div></div>'))[0];
-            elt.parentElement.insertBefore(tr, insertion ? insertion.element : null);
-            return tr;
+        let ewalk = elt;
+        while (ewalk) {
+            if (ewalk.nodeType !== 1) {
+                ewalk = ewalk.nextSibling;
+            } else if (hasClass(ewalk, "pa-gw")) {
+                return ewalk;
+            } else if (ewalk === elt || hasClass(ewalk, "pa-gn") || hasClass(ewalk, "pa-gx")) {
+                ewalk = ewalk.nextSibling;
+            } else {
+                break;
+            }
         }
+        const source = new Linediff(elt),
+            lineid = source.note_lineid,
+            insertion = source.upper_bound(lineid),
+            tr = $('<div class="pa-dl pa-gw" data-landmark="'.concat(lineid, '"><div class="pa-notebox"></div></div>'))[0];
+        elt.parentElement.insertBefore(tr, insertion ? insertion.element : null);
+        return tr;
     }
 
     html_near(elt, transition) {
