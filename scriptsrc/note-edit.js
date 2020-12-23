@@ -140,7 +140,6 @@ function capture(tr, keydown) {
 }
 
 function uncapture() {
-    console.log("uncapture");
     $(".pa-dl.live").removeClass("live");
     $(".pa-filediff").addClass("live");
     $(document).off(".pa-linenote");
@@ -181,7 +180,7 @@ function resolve_grade_range(grb) {
 
 function pa_save_note(text) {
     if (!hasClass(this, "pa-gw")) {
-        throw new Error("!");
+        throw new Error("bad `this` in pa_save_note");
     }
     if (hasClass(this, "pa-outstanding")) {
         return false;
@@ -195,7 +194,7 @@ function pa_save_note(text) {
         pi = table.closest(".pa-psetinfo"),
         grb = this.closest(".pa-grade-range-block"),
         data;
-    if (editing) {
+    if (text == null) {
         let f = $(this).find("form")[0];
         data = {note: f.note.value};
         if (f.iscomment && f.iscomment.checked) {
@@ -268,7 +267,8 @@ function pa_linenote(event) {
     var dl = event.target.closest(".pa-dl");
     if (event.button !== 0
         || !dl
-        || dl.matches(".pa-gn, .pa-gx")) {
+        || dl.matches(".pa-gn, .pa-gx")
+        || event.target.matches("button, a, textarea")) {
         return;
     }
     var line = locate(event.target),
