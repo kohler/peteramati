@@ -950,8 +950,8 @@ function add_visible_grades($gelist, $gi, &$j, PsetView $info = null, $all = fal
             $total += $gv;
         }
         if ($gv === null
-            && !$ge->is_extra
             && $info
+            && $ge->grader_entry_required()
             && $info->viewer_is_grader()) {
             $info->user->incomplete = "grade missing";
         }

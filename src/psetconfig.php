@@ -1357,6 +1357,17 @@ class GradeEntryConfig {
         return $this->visible && $this->answer;
     }
 
+    /** @return bool */
+    function grader_entry_required() {
+        return !$this->answer
+            && !$this->is_extra
+            && !$this->no_total
+            && $this->type_numeric
+            && $this->type !== "checkbox"
+            && $this->type !== "checkboxes"
+            && $this->type !== "stars";
+    }
+
     /** @return ?GradeFormula */
     function formula(Conf $conf) {
         if ($this->_formula === false) {
