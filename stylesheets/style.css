@@ -2224,14 +2224,17 @@ td.mhcb {
 .pa-grp-hidden > .pa-p {
 	margin-bottom: 0;
 }
-.pa-grp-hidden, .pa-pset-hidden, .pa-p-hidden {
+.pa-grp-hidden, .pa-pset-hidden, .is-main > .pa-p-hidden, .is-modal > .pa-p-hidden {
 	background-color: #f3f3f3;
 	color: #888888;
 	margin-left: -24px;
 	margin-right: -24px;
 	padding: 0.5rem 24px;
 }
-.in-modal > .pa-p-hidden {
+.pa-p-hidden {
+	color: #888888;
+}
+.is-modal > .pa-p-hidden {
 	margin-left: -1rem;
 	margin-right: -1rem;
 	padding-left: 1rem;
@@ -2242,13 +2245,14 @@ td.mhcb {
 	margin-right: 0;
 	padding: 0;
 }
-.pa-p-hidden + .pa-p-hidden {
+.is-main > .pa-p-hidden + .pa-p-hidden,
+.is-modal > .pa-p-hidden + .pa-p-hidden {
 	margin-top: -1rem;
 }
 .pa-pset-hidden > .pa-p-hidden + .pa-p-hidden {
 	margin-top: 0;
 }
-.pa-pset-hidden.in-modal {
+.pa-pset-hidden.is-modal {
 	background-color: #e8e8e8;
 	color: #777777;
 	margin-left: -1rem;

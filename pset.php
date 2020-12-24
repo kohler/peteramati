@@ -563,7 +563,7 @@ function echo_all_grades($info) {
                 Ht::stash_html($info->conf->make_script_file($gs));
             }
         }
-        echo '<div class="pa-gradelist want-pa-landmark-links',
+        echo '<div class="pa-gradelist is-main want-pa-landmark-links',
             ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
         Ht::stash_script('$pa.store_gradeinfo($(".pa-psetinfo")[0],' . json_encode_browser($info->grade_json()) . ');');
         if ($info->pset->has_grade_landmark) {

@@ -2138,7 +2138,7 @@ function pa_render_pset_table(pconf, data) {
             hc.push('<strong class="gt-name-email"></strong>');
         hc.push('<div class="pa-messages"></div>');
 
-        hc.push('<div class="pa-gradelist in-modal">', '</div>');
+        hc.push('<div class="pa-gradelist is-modal">', '</div>');
         for (var i = 0; i !== grade_entries.length; ++i) {
             hc.push(grade_entries[i].html_skeleton(true, false));
         }

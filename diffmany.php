@@ -105,7 +105,7 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
 
         $all_viewed_gradeentries += $info->viewed_gradeentries; // XXX off if want all grades
     } else {
-        echo '<div class="pa-gradelist',
+        echo '<div class="pa-gradelist is-main',
             ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
         $want_grades = true;
     }
