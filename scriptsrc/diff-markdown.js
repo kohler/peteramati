@@ -345,16 +345,22 @@ Filediff.define_method("highlight", function () {
         return;
     // collect content
     const langclass = "language-" + lang;
-    let e = elt.firstChild, hlstate = null;
+    let e = elt.firstChild, hlstatei = null, hlstated = null;
     while (e) {
-        if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
+        const type = hasClass(e, "pa-gi") ? 2 : (hasClass(e, "pa-gc") ? 3 : (hasClass(e, "pa-gd") ? 1 : 0));
+        if (type !== 0) {
             const ce = e.lastChild,
                 s = ce.textContent,
-                result = hljs_line(lang, s, hlstate);
+                result = hljs_line(lang, s, type & 2 ? hlstatei : hlstated);
             if (!result) {
                 break;
             }
-            hlstate = result.top;
+            if (type & 1) {
+                hlstated = result.top;
+            }
+            if (type & 2) {
+                hlstatei = result.top;
+            }
             ce.setAttribute("data-pa-text", s);
             ce.innerHTML = result.value;
             addClass(ce, langclass);
