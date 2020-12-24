@@ -154,7 +154,7 @@ function render_landmark_fence(md) {
             const xl = x.length;
             let i = 0, ln0 = token.map[0] + 2, hlstate = null;
             while (lang && i !== xl) {
-                let result = hljs_line(lang, x + "\n", hlstate);
+                const result = hljs_line(lang, x[i] + "\n", hlstate);
                 if (result) {
                     y.push('<pre data-landmark="', ln0 + i,
                            i + 1 !== xl ? '" class="partial"' : '"',
