@@ -309,7 +309,7 @@ object keyed by regular expression. For example:
 ```json
 "diffs": {
     "README\\.txt": {"full": true, "position": -1},
-    "\\.gitignore|check\\.pl": {"boring": true},
+    "\\.gitignore|check\\.pl": {"collapse": true},
     "out": {"ignore": true}
 }
 ```
@@ -319,8 +319,8 @@ This setting says:
 * Files named `README.txt` will be displayed in full (not as a diff), before
   other files (files by default have position 0).
 
-* Files named `.gitignore` and `check.pl` are “boring.” This means that any
-  diffs in these files will not be displayed by default.
+* Files named `.gitignore` and `check.pl` are collapsed. This means that diffs
+  in these files will not be displayed by default.
 
 * Files and directories named `out` are entirely ignored; they will not appear
   in diffs at all.

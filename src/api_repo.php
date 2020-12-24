@@ -142,7 +142,7 @@ class API_Repo {
         }
         ob_start();
         foreach ($diff as $file => $dinfo) {
-            $info->echo_file_diff($file, $dinfo, $lnorder, ["open" => true, "only_content" => true]);
+            $info->echo_file_diff($file, $dinfo, $lnorder, ["expand" => true, "only_content" => true]);
         }
         $content = ob_get_contents();
         ob_end_clean();

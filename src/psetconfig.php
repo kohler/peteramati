@@ -723,7 +723,7 @@ class Pset {
         if ($this->_all_diffs === null) {
             $this->_all_diffs = $this->diffs;
             if (($regex = $this->file_ignore_regex())) {
-                $this->_all_diffs[] = new DiffConfig((object) ["match" => $regex, "ignore" => true, "match_priority" => -10]);
+                $this->_all_diffs[] = new DiffConfig((object) ["match" => $regex, "ignore" => true, "priority" => -10]);
             }
             foreach ($this->_extra_diffs ?? [] as $d) {
                 $this->_all_diffs[] = $d;
@@ -1571,7 +1571,9 @@ class DiffConfig {
     /** @var string */
     public $match;
     /** @var float */
-    public $match_priority;
+    public $priority;
+    /** @var float */
+    public $priority_default;
     /** @var int */
     public $subposition = 0;
     /** @var string */
@@ -1586,8 +1588,10 @@ class DiffConfig {
     public $collate;
     /** @var bool */
     public $ignore;
-    /** @var bool */
+    /** @var ?bool */
     public $collapse;
+    /** @var ?bool */
+    public $collapse_default;
     /** @var bool */
     public $gradable;
     /** @var bool */
@@ -1609,8 +1613,8 @@ class DiffConfig {
 
     /** @param object $d
      * @param ?string $match
-     * @param ?float $match_priority */
-    function __construct($d, $match = null, $match_priority = 0.0) {
+     * @param ?float $priority */
+    function __construct($d, $match = null, $priority = 0.0) {
         if (!is_object($d)) {
             throw new PsetConfigException("diff format error", ["diffs", $match]);
         }
@@ -1620,20 +1624,16 @@ class DiffConfig {
         }
         $loc = ["diffs", $this->match];
         $this->title = Pset::cstr($loc, $d, "title");
-        if (isset($d->match_priority)) {
-            $this->match_priority = (float) Pset::cnum($loc, $d, "match_priority");
-        } else {
-            $this->match_priority = $match_priority;
-        }
+        $p = (float) (Pset::cnum($loc, $d, "priority", "match_priority") ?? $priority ?? 0.0);
+        $this->priority = $p;
+        $this->priority_default = $p >= 100.0 ? -INF : $p;
         $this->position = Pset::cnum($loc, $d, "position");
-        if ($this->position === null && isset($d->priority)) {
-            $this->position = -Pset::cnum($loc, $d, "priority");
-        }
         $this->fileless = Pset::cbool($loc, $d, "fileless");
         $this->full = Pset::cbool($loc, $d, "full");
         $this->collate = Pset::cbool($loc, $d, "collate");
         $this->ignore = Pset::cbool($loc, $d, "ignore");
         $this->collapse = Pset::cbool($loc, $d, "collapse", "boring");
+        $this->collapse_default = $p >= 100.0 ? null : $this->collapse;
         $this->gradable = Pset::cbool($loc, $d, "gradable", "gradeable");
         $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
         $this->markdown = Pset::cbool($loc, $d, "markdown");
@@ -1658,8 +1658,8 @@ class DiffConfig {
         } else if (!$a || !$b) {
             return $a ?? $b;
         } else {
-            if ($a->match_priority > $b->match_priority
-                || ($a->match_priority == $b->match_priority
+            if ($a->priority > $b->priority
+                || ($a->priority == $b->priority
                     && $a->subposition > $b->subposition)) {
                 $tmp = $b;
                 $b = $a;
@@ -1685,6 +1685,13 @@ class DiffConfig {
             $a->highlight_allowed = $b->highlight_allowed ?? $a->highlight_allowed;
             $a->language = $b->language ?? $a->language;
             $a->tabwidth = $b->tabwidth ?? $a->tabwidth;
+            if ($b->priority_default > -INF
+                && ($b->priority_default > $a->priority_default
+                    || ($b->priority_default == $a->priority_default
+                        && $b->subposition > $a->subposition))) {
+                $a->priority_default = $b->priority_default;
+                $a->collapse_default = $b->collapse_default ?? $a->collapse_default;
+            }
             return $a;
         }
     }

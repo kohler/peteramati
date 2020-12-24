@@ -1613,13 +1613,13 @@ class PsetView {
     function diff($commita, $commitb, LineNotesOrder $lnorder = null, $args = []) {
         if (!$this->added_diffinfo) {
             if (($tw = $this->commit_jnote("tabwidth"))) {
-                $this->pset->add_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 11.0));
+                $this->pset->add_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 101.0));
             }
             if (($diffs = $this->repository_jnote("diffs"))) {
-                $this->_add_diffconfigs($diffs, 10.0);
+                $this->_add_diffconfigs($diffs, 100.0);
             }
             if (($diffs = $this->commit_jnote("diffs"))) {
-                $this->_add_diffconfigs($diffs, 11.0);
+                $this->_add_diffconfigs($diffs, 101.0);
             }
             $this->added_diffinfo = true;
         }
@@ -1727,7 +1727,8 @@ class PsetView {
 
         $this->_diff_tabwidth = $dinfo->tabwidth;
         $this->_diff_lnorder = $lnorder;
-        $open = !!($args["open"] ?? false);
+        $expand = $args["expand"] ?? !$dinfo->collapse;
+        assert(!$expand || $dinfo->loaded);
         $only_content = !!($args["only_content"] ?? false);
         $no_heading = ($args["no_heading"] ?? false) || $only_content;
         $id_by_user = !!($args["id_by_user"] ?? false);
@@ -1805,7 +1806,7 @@ class PsetView {
         if (!$no_heading) {
             echo '<div class="pa-dg pa-with-fixed">',
                 '<h3 class="pa-fileref" data-pa-fileid="', $tabid, '"><a class="qq ui pa-diff-unfold" href=""><span class="foldarrow">',
-                ($open ? "&#x25BC;" : "&#x25B6;"),
+                ($expand && $dinfo->loaded ? "&#x25BC;" : "&#x25B6;"),
                 "</span>";
             if ($args["diffcontext"] ?? false) {
                 echo '<span class="pa-fileref-context">', $args["diffcontext"], '</span>';
@@ -1842,7 +1843,7 @@ class PsetView {
         if (!$this->user_can_view_grades()) {
             echo " hidegrades";
         }
-        if (!$open) {
+        if (!$expand || !$dinfo->loaded) {
             echo " hidden";
         }
         if (!$dinfo->loaded) {

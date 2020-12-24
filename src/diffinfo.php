@@ -69,7 +69,7 @@ class DiffInfo implements Iterator {
             $this->title = $diffconfig->title;
             $this->fileless = !!$diffconfig->fileless;
             $this->collapse = !!$diffconfig->collapse;
-            $this->_collapse_set = $diffconfig->collapse !== null;
+            $this->_collapse_set = isset($diffconfig->collapse);
             $this->hide_if_anonymous = !!$diffconfig->hide_if_anonymous;
             $this->position = (float) $diffconfig->position;
             $this->markdown = $diffconfig->markdown ?? $ismd;
@@ -90,6 +90,12 @@ class DiffInfo implements Iterator {
         $this->_hasha = $hasha;
         $this->_filenamea = $filenamea;
         $this->_hasha_hrepo = $hasha_hrepo;
+    }
+
+    /** @param ?bool $collapse */
+    function set_collapse($collapse) {
+        $this->collapse = !!$collapse;
+        $this->_collapse_set = isset($collapse);
     }
 
     /** @param string $ch
@@ -147,6 +153,7 @@ class DiffInfo implements Iterator {
     function finish_unloaded() {
         $this->finish();
         $this->loaded = false;
+        $this->collapse = true;
     }
 
 

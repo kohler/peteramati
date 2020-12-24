@@ -727,7 +727,9 @@ if ($Pset->gitless) {
 
     // collect diff and sort line notes
     $lnorder = $Info->viewable_line_notes();
-    $diff = $Info->diff($Info->base_handout_commit(), $Info->commit(), $lnorder, ["wdiff" => !!$Info->commit_jnote("wdiff")]);
+    $diff = $Info->diff($Info->base_handout_commit(), $Info->commit(), $lnorder, [
+        "wdiff" => !!$Info->commit_jnote("wdiff")
+    ]);
 
     // print line notes
     $notelinks = array();
@@ -799,15 +801,7 @@ if ($Pset->gitless) {
             PsetView::echo_pa_sidebar_gradelist();
         }
         foreach ($diff as $file => $dinfo) {
-            $open = $lnorder->file_has_notes($file)
-                || (!$dinfo->collapse
-                    && ($Me != $Info->user
-                        || !$Info->can_view_grades()
-                        || !$Info->is_grading_commit()
-                        || !$lnorder->has_linenotes_in_diff));
-            $Info->echo_file_diff($file, $dinfo, $lnorder, [
-                "open" => $open, "hide_left" => $can_edit_grades
-            ]);
+            $Info->echo_file_diff($file, $dinfo, $lnorder, ["hide_left" => $can_edit_grades]);
         }
         if ($Info->can_edit_grades_any() && !$Pset->has_grade_landmark_range) {
             PsetView::echo_close_pa_sidebar_gradelist();

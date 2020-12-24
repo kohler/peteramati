@@ -723,7 +723,7 @@ class Repository {
 
         $ignore_diffconfig = $pset->is_handout($commita) && $pset->is_handout($commitb);
         $no_full = $options["no_full"] ?? false;
-        $no_collapse = $options["no_collapse"] ?? false;
+        $no_user_collapse = $options["no_user_collapse"] ?? false;
         $needfiles = self::fix_diff_files($options["needfiles"] ?? null);
         $onlyfiles = self::fix_diff_files($options["onlyfiles"] ?? null);
 
@@ -770,12 +770,19 @@ class Repository {
                 if ($onlyfiles && !($onlyfiles[$truncpfx . $line] ?? false)) {
                     continue;
                 }
-                // skip ignored files, unless user requested them
+                // create diff record
                 $di = new DiffInfo($file, $diffconfig);
                 $di->set_repoa($this, $pset, $hasha, $line, $pset->is_handout($commita));
+                // decide whether file is collapsed
+                if ($no_user_collapse && !$diffconfig->collapse_default) {
+                    $di->set_collapse($diffconfig->collapse_default);
+                } else if ($di->collapse && $needfiles && ($needfiles[$file] ?? false)) {
+                    $di->set_collapse(null);
+                }
+                // store diff if collapsed, skip if ignored
                 if ($diffconfig
                     && !$ignore_diffconfig
-                    && ($diffconfig->ignore || ($diffconfig->collapse && !$no_collapse))
+                    && ($diffconfig->ignore || $di->collapse)
                     && (!$needfiles || !($needfiles[$file] ?? false))) {
                     if (!$diffconfig->ignore) {
                         $di->finish_unloaded();

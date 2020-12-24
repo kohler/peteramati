@@ -92,10 +92,11 @@ function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
                 $want_grades = true;
             }
             foreach ($diff as $file => $dinfo) {
-                $info->echo_file_diff($file, $dinfo, $lnorder,
-                    ["open" => true, "id_by_user" => true, "hide_left" => true,
-                     "no_heading" => count($qreq->files) == 1,
-                     "diffcontext" => $linkpart_html . "/"]);
+                $info->echo_file_diff($file, $dinfo, $lnorder, [
+                    "expand" => true, "id_by_user" => true, "hide_left" => true,
+                    "no_heading" => count($qreq->files) == 1,
+                    "diffcontext" => $linkpart_html . "/"
+                ]);
             }
             if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
                 PsetView::echo_close_pa_sidebar_gradelist();

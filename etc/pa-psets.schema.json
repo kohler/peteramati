@@ -152,7 +152,7 @@
             "properties": {
                 "regex": {},
                 "title": {},
-                "match_priority": {},
+                "priority": {},
                 "position": {},
                 "fileless": {},
                 "full": {},

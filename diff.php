@@ -55,9 +55,6 @@ if (!$commita || !$commitb) {
 }
 $Info->set_hash($commitb->hash);
 
-$diff_options = [
-    "no_full" => !$Pset->is_handout($commita) || $Pset->is_handout($commitb)
-];
 if ($commita->hash === $Info->grading_hash()) {
     $commita->subject .= "  ✱"; // space, nbsp
 }
@@ -100,20 +97,18 @@ foreach ($lnorder->seq() as $note) {
 }
 if (!empty($notelinks)) {
     ContactView::echo_group("notes", join(", ", $notelinks));
-} else {
-    $diff_options["no_collapse"] = true;
 }
 
-$diff = $Info->diff($commita, $commitb, $lnorder, $diff_options);
+$diff = $Info->diff($commita, $commitb, $lnorder, [
+    "no_full" => !$Pset->is_handout($commita) || $Pset->is_handout($commitb),
+    "no_user_collapse" => true
+]);
 if ($diff) {
     echo '<div class="pa-diffset">';
-
     // diff and line notes
     foreach ($diff as $file => $dinfo) {
-        $open = $lnorder->file_has_notes($file) || !$dinfo->collapse || empty($notelinks);
-        $Info->echo_file_diff($file, $dinfo, $lnorder, ["open" => $open, "only_diff" => true]);
+        $Info->echo_file_diff($file, $dinfo, $lnorder, ["only_diff" => true]);
     }
-
     echo '</div>';
 }
 
