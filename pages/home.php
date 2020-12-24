@@ -1322,6 +1322,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
             if ($gi && ($gi->linenotes ?? null)) {
                 $j["has_notes"] = true;
             } else if ($info->viewer->contactId == $gradercid
+                       && !$info->user->dropped
                        && !$info->empty_diff_likely()) {
                 $info->user->incomplete = "no line notes";
             }
