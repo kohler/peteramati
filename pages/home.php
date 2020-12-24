@@ -14,6 +14,7 @@ global $Qreq, $MicroNow;
 ContactView::set_path_request(array("/u"));
 
 $Profile = $Me && $Me->privChair && $Qreq->profile;
+$ProfileElapsed = 0.0;
 
 // signin links
 // auto-signin when email & password set
@@ -1084,7 +1085,7 @@ if (!$Me->is_empty() && $User->is_student()) {
 }
 
 function render_flag_row(Pset $pset, Contact $s = null, FlagTableRow $row, $anonymous) {
-    global $Conf, $Me, $Profile;
+    global $Conf, $Me;
     $j = $s ? StudentSet::json_basics($s, $anonymous) : [];
     if (($gcid = $row->jnote("gradercid") ?? null)) {
         $j["gradercid"] = $gcid;
@@ -1290,6 +1291,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
     if (!$pset->gitless_grades && $info->repo) {
         if ($t0 - $MicroNow < 0.2
             && !$info->user->dropped
+            && !$Profile
             && $pset->student_can_view_grades()) {
             $info->update_placeholder(function ($info, $rpi) use ($t0) {
                 $placeholder_at = $rpi ? $rpi->placeholder_at : 0;
@@ -1379,7 +1381,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
 
 /** @param StudentSet $sset */
 function show_pset_table($sset) {
-    global $Profile, $Qreq;
+    global $Qreq;
 
     $pset = $sset->pset;
     echo '<div id="', $pset->urlkey, '">';
@@ -1391,8 +1393,6 @@ function show_pset_table($sset) {
         echo "</div>\n";
         return;
     }
-
-    $t0 = $Profile ? microtime(true) : 0;
 
 /*
     // load links
@@ -1580,11 +1580,6 @@ function show_pset_table($sset) {
         echo "</form>\n";
     }
 
-    if ($Profile) {
-        $t2 = microtime(true);
-        echo sprintf("<div>Δt %.06f total</div>", $t2 - $t0);
-    }
-
     echo "</div>\n";
 }
 
@@ -1628,7 +1623,9 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
         echo $sep;
         show_flags($result, $allflags);
         if ($Profile) {
-            echo "<div>Δt ", sprintf("%.06f", microtime(true) - $t0), "</div>";
+            $deltat = microtime(true) - $t0;
+            $ProfileElapsed += $deltat;
+            echo sprintf("<div>Δt %.06fs, %.06fs total</div>", $deltat, $ProfileElapsed);
         }
         $sep = "<hr />\n";
     }
@@ -1637,6 +1634,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
     $MicroNow = microtime(true);
     foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset)) {
+            $t0 = $Profile ? microtime(true) : 0.0;
             if (!$sset) {
                 $ssflags = 0;
                 if ($Qreq->extension) {
@@ -1651,6 +1649,11 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             echo $sep;
             show_pset_table($sset);
             $sep = "<hr />\n";
+            if ($Profile) {
+                $deltat = microtime(true) - $t0;
+                $ProfileElapsed += $deltat;
+                echo sprintf("<div>Δt %.06fs, %.06fs total</div>", $deltat, $ProfileElapsed);
+            }
         }
     }
 }
