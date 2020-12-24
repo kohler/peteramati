@@ -2474,7 +2474,7 @@ tr.gtrow-partner {
 	margin-top: 0;
 	margin-bottom: 1rem;
 }
-.pa-dr pre {
+.pa-dr pre, .pa-dr code {
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
 }
