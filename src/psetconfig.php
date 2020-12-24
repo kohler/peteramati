@@ -589,7 +589,7 @@ class Pset {
         } else if (!$this->disabled && $this->visible) {
             $g = [];
             foreach (array_values($this->grades) as $i => $ge) {
-                if ($this->grades_vf[$i] & 2) {
+                if ($this->grades_vf[$i] & 1) {
                     $g[] = $ge;
                 }
             }
