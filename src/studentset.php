@@ -24,11 +24,11 @@ class StudentSet implements Iterator, Countable {
     private $_upos;
     /** @var array<int,Repository> */
     private $_repo = [];
-    /** @var array<string,RepositoryPsetInfo> */
+    /** @var array<int,RepositoryPsetInfo> */
     private $_rpi = [];
     /** @var array<string,CommitPsetInfo> */
     private $_cpi = [];
-    /** @var array<string,UserPsetInfo> */
+    /** @var array<int,UserPsetInfo> */
     private $_upi = [];
     /** @var array<string,list<int>> */
     private $_rb_uids = [];
@@ -43,7 +43,8 @@ class StudentSet implements Iterator, Countable {
     const DROPPED = 8;
     const ALL = 15;
 
-    function __construct(Contact $viewer, $flags = 0) {
+    /** @param int $flags */
+    function __construct(Contact $viewer, $flags) {
         $this->conf = $viewer->conf;
         $this->viewer = $viewer;
         $cflags = $flags & (self::COLLEGE | self::EXTENSION);
@@ -64,7 +65,7 @@ class StudentSet implements Iterator, Countable {
     }
 
     static function make_singleton(Contact $viewer, Contact $user) {
-        $ss = new StudentSet($viewer);
+        $ss = new StudentSet($viewer, 0);
         $ss->_u[$user->contactId] = $user;
         $ss->_ua[] = $user;
         $user->student_set = $ss;
@@ -86,19 +87,23 @@ class StudentSet implements Iterator, Countable {
 
         $result = $this->conf->qe("select * from ContactGrade where pset=?", $pset->id);
         while (($upi = UserPsetInfo::fetch($result))) {
-            $this->_upi["$pset->id,$upi->cid"] = $upi;
+            $upi->sset_next = $this->_upi[$upi->cid] ?? null;
+            $this->_upi[$upi->cid] = $upi;
         }
         Dbl::free($result);
+
         if (!$pset->gitless_grades) {
             $result = $this->conf->qe("select * from RepositoryGrade where pset=?", $pset->id);
             while (($rpi = RepositoryPsetInfo::fetch($result))) {
-                $this->_rpi["$pset->id,$rpi->repoid,$rpi->branchid"] = $rpi;
+                $rpi->sset_next = $this->_rpi[$rpi->repoid] ?? null;
+                $this->_rpi[$rpi->repoid] = $rpi;
             }
             Dbl::free($result);
 
             $result = $this->conf->qe("select * from CommitNotes where pset=?", $pset->id);
             while (($cpi = CommitPsetInfo::fetch($result))) {
-                $this->_cpi["$pset->id,$cpi->bhash"] = $cpi;
+                $cpi->sset_next = $this->_cpi[$cpi->bhash] ?? null;
+                $this->_cpi[$cpi->bhash] = $cpi;
             }
             Dbl::free($result);
         }
@@ -203,7 +208,11 @@ class StudentSet implements Iterator, Countable {
     function upi_for(Contact $user, Pset $pset) {
         if ($pset->gitless_grades) {
             $this->load_pset($pset);
-            return $this->_upi["$pset->id,$user->contactId"] ?? null;
+            $upi = $this->_upi[$user->contactId] ?? null;
+            while ($upi && $upi->pset !== $pset->id) {
+                $upi = $upi->sset_next;
+            }
+            return $upi;
         } else {
             return null;
         }
@@ -215,11 +224,14 @@ class StudentSet implements Iterator, Countable {
             $this->load_pset($pset);
             $repoid = $user->link(LINK_REPO, $pset->id);
             $branchid = $user->branchid($pset);
-            $rpi = $this->_rpi["$pset->id,$repoid,$branchid"] ?? null;
+            $rpi = $this->_rpi[$repoid] ?? null;
+            while ($rpi && ($rpi->pset !== $pset->id || $rpi->branchid !== $branchid)) {
+                $rpi = $rpi->sset_next;
+            }
             if ($rpi && !$rpi->joined_commitnotes) {
                 $rpi->joined_commitnotes = true;
                 if ($rpi->gradebhash
-                    && ($cpi = $this->_cpi["$pset->id,$rpi->gradebhash"] ?? null)) {
+                    && ($cpi = $this->cpi_for($rpi->gradebhash, $pset))) {
                     $rpi->assign_notes($cpi->notes, $cpi->jnotes(), $cpi->notesversion);
                 }
             }
@@ -229,6 +241,16 @@ class StudentSet implements Iterator, Countable {
         }
     }
 
+    /** @return ?CommitPsetInfo */
+    function cpi_for($bhash, Pset $pset) {
+        $cpi = $this->_cpi[$bhash] ?? null;
+        while ($cpi && $cpi->pset !== $pset->id) {
+            $cpi = $cpi->sset_next;
+        }
+        return $cpi;
+    }
+
+    /** @return bool */
     function repo_sharing(Contact $user) {
         assert(!$this->pset->gitless);
         if (($repoid = $user->link(LINK_REPO, $this->_psetid))) {
@@ -239,8 +261,9 @@ class StudentSet implements Iterator, Countable {
                 $sharers = array_diff($sharers, $user->links(LINK_PARTNER, $this->_psetid));
             }
             return !empty($sharers);
-        } else
+        } else {
             return false;
+        }
     }
 
 
@@ -262,7 +285,7 @@ class StudentSet implements Iterator, Countable {
                && $this->pset
                && ($u->dropped || $u->isPC)) {
             if ($this->pset->gitless_grades) {
-                if ($this->_upi["$this->_psetid,$u->contactId"] ?? null) {
+                if ($this->upi_for($u, $this->pset)) {
                     break;
                 }
             } else {

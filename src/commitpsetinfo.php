@@ -26,6 +26,8 @@ class CommitPsetInfo {
     public $hasactiveflags;
     /** @var int */
     public $haslinenotes;
+    /** @var ?CommitPsetInfo */
+    public $sset_next;
 
     private function merge() {
         $this->pset = (int) $this->pset;

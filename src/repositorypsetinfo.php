@@ -43,6 +43,9 @@ class RepositoryPsetInfo {
     /** @var ?bool */
     public $joined_commitnotes;
 
+    /** @var ?RepositoryPsetInfo */
+    public $sset_next;
+
     private function merge() {
         $this->repoid = (int) $this->repoid;
         $this->branchid = (int) $this->branchid;

@@ -30,6 +30,8 @@ class UserPsetInfo {
     private $_history;
     /** @var ?int */
     private $_history_v0;
+    /** @var ?UserPsetInfo */
+    public $sset_next;
 
     private function merge() {
         $this->cid = (int) $this->cid;
