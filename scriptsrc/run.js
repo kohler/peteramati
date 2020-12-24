@@ -77,6 +77,11 @@ export function run(button, opts) {
                                && key >= "a"
                                && key <= "z") {
                         key = String.fromCharCode(key.charCodeAt(0) - 96);
+                    } else if ((mod & 0xE) === event_modkey.META
+                               && key == "v") {
+                        navigator.clipboard.readText().then(tx => write(tx));
+                        event.preventDefault();
+                        return;
                     } else {
                         key = "";
                     }
