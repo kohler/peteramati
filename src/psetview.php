@@ -133,7 +133,8 @@ class PsetView {
         }
         if ($bhash !== null) {
             $info->_havepi |= 4;
-            if (($info->_cpi = $sset->cpi_for($bhash, $pset))) {
+            $info->_cpi = $sset->cpi_for($bhash, $pset);
+            if ($info->_cpi) {
                 $info->_hash = $info->_cpi->hash;
             }
         }
@@ -252,6 +253,23 @@ class PsetView {
         }
         assert($this->_hash !== null);
         return $this->_hash ? $this->connected_commit($this->_hash) : null;
+    }
+
+    /** @return ?int */
+    function commitat() {
+        if ($this->_hash === null) {
+            return null;
+        } else if ($this->_cpi !== null
+                   && $this->_cpi->commitat !== null) {
+            return $this->_cpi->commitat;
+        } else if ($this->_rpi !== null
+                   && $this->_rpi->commitat !== null
+                   && $this->_rpi->gradehash === $this->_hash) {
+            return $this->_rpi->commitat;
+        } else {
+            $c = $this->commit();
+            return $c ? $c->commitat : null;
+        }
     }
 
     /** @return bool */

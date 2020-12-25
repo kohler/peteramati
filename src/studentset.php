@@ -45,6 +45,7 @@ class StudentSet implements Iterator, Countable {
     const EXTENSION = 2;
     const ENROLLED = 4;
     const DROPPED = 8;
+    const TF = 16;
     const ALL = 15;
     const ALL_ENROLLED = 7;
 
@@ -52,12 +53,26 @@ class StudentSet implements Iterator, Countable {
     function __construct(Contact $viewer, $flags) {
         $this->conf = $viewer->conf;
         $this->viewer = $viewer;
-        $cflags = $flags & (self::COLLEGE | self::EXTENSION);
-        $eflags = $flags & (self::ENROLLED | self::DROPPED);
-        if ($cflags !== 0 && $eflags !== 0) {
-            $cwhere = $cflags === self::COLLEGE ? "college" : ($cflags === self::EXTENSION ? "extension" : "true");
-            $ewhere = $eflags === self::ENROLLED ? "not dropped" : ($cflags === self::DROPPED ? "dropped" : "true");
-            $result = $this->conf->qe("select *, coalesce((select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId),'') contactLinks from ContactInfo where ($cwhere) and ($ewhere)");
+        if ($flags !== 0) {
+            $w = [];
+            $cf = $flags & (self::COLLEGE | self::EXTENSION);
+            if ($cf === self::COLLEGE) {
+                $w[] = "college";
+            } else if ($cf === self::EXTENSION) {
+                $w[] = "extension";
+            }
+            $ef = $flags & (self::ENROLLED | self::DROPPED);
+            if ($ef === self::ENROLLED) {
+                $w[] = "not dropped";
+            } else if ($ef === self::DROPPED) {
+                $w[] = "dropped";
+            }
+            if (!($flags & self::TF)) {
+                $w[] = "roles=0";
+            } else if ($flags === self::TF) {
+                $w[] = "roles!=0 and (roles&1)!=0";
+            }
+            $result = $this->conf->qe("select *, coalesce((select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId),'') contactLinks from ContactInfo where " . join(" and ", $w));
             while (($u = Contact::fetch($result, $this->conf))) {
                 $this->_u[$u->contactId] = $u;
                 $u->student_set = $this;
@@ -211,6 +226,16 @@ class StudentSet implements Iterator, Countable {
         return $infos;
     }
 
+    /** @return ?PsetView */
+    function info_for(Contact $user, Pset $pset) {
+        if ($this->_infos !== null) {
+            return $this->_infos["{$user->contactId},{$pset->id}"] ?? null;
+        } else {
+            return PsetView::make_from_set_at($this, $user, $pset);
+        }
+    }
+
+
     /** @return ?Repository */
     function repo_at(Contact $user, Pset $pset) {
         $this->load_pset($pset);
@@ -319,6 +344,12 @@ class StudentSet implements Iterator, Countable {
                 }
             }
             $mqe(true);
+        }
+    }
+
+    function all_info_for(Contact $user, Pset $pset) {
+        foreach ($this->all_cpi_for($user, $pset) as $cpi) {
+            yield PsetView::make_from_set_at($this, $user, $pset, $cpi->bhash);
         }
     }
 

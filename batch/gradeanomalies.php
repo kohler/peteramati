@@ -22,15 +22,33 @@ class GradeAnomalies {
 
     function run_pset(Pset $pset) {
         foreach ($this->sset->users() as $u) {
-            foreach ($this->sset->all_cpi_for($u, $pset) as $cpi) {
-                echo sprintf("%d %s %s\n", $cpi->commitat, $cpi->hash, $u->email);
+            $ginfo = $this->sset->info_for($u, $pset);
+            list($tot0, $max0, $tne0) = $ginfo->grade_total();
+            $ex0 = $tot0 - $tne0;
+            $any_base = false;
+            foreach ($this->sset->all_info_for($u, $pset) as $info) {
+                list($tot1, $max1, $tne1) = $info->grade_total();
+                $ex1 = $tot1 - $tne1;
+                if ($tot0 < $tot1 || $ex0 < $ex1) {
+                    if (!$any_base) {
+                        echo sprintf("\n%s %s\n%s %s %g+%g Grading commit\n",
+                                     $pset->key, $u->email,
+                                     strftime("%Y-%m-%dT%H:%M", $ginfo->commitat()),
+                                     substr($ginfo->hash() ?? "--------", 0, 8), $tot0, $ex0);
+                        $any_base = true;
+                    }
+                    echo sprintf("%s %s %g+%g %s commit\n",
+                                 strftime("%Y-%m-%dT%H:%M", $info->commitat()),
+                                 substr($info->hash() ?? "--------", 0, 8), $tot1, $ex1,
+                                 $info->commitat() > $ginfo->commitat() ? "Later" : "Earlier");
+                }
             }
         }
     }
 
     function run_all() {
         foreach ($this->conf->psets() as $pset) {
-            if (!$pset->gitless_grades) {
+            if (!$pset->disabled && !$pset->gitless_grades) {
                 $this->run_pset($pset);
             }
         }
