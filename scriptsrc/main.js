@@ -1310,43 +1310,34 @@ function pa_render_pset_table(pconf, data) {
         total: {
             th: '<th class="gt-total r plsortable" data-pa-sort="total" scope="col">Tot</th>',
             td: function (s) {
-                return '<td class="gt-total r">' + s.total + '</td>';
+                return '<td class="gt-total r">'.concat(s.total, '</td>');
+            },
+            compare: function (a, b) {
+                if (a.total != b.total) {
+                    return a.total < b.total ? -1 : 1;
+                } else {
+                    return -user_compare(a, b);
+                }
             },
             tw: 3
         },
         grade: {
             th: function () {
-                var klass = this.justify === "right" ? "gt-grade r" : "gt-grade l";
-                return '<th class="' + klass + ' plsortable" data-pa-sort="grade' + this.gidx + '" scope="col">' + this.gabbr + '</th>';
+                return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="grade', this.gidx, '" scope="col">', this.ge.abbr(), '</th>');
             },
             td: function (s, rownum, text) {
-                var gr = s.grades[this.gidx],
+                let gr = s.grades[this.gidx],
                     gt = escape_entities(this.ge.tcell(gr));
                 if (text) {
                     return gt;
                 } else {
-                    var t = '<td class="' + this.klass;
-                    if (s.highlight_grades && s.highlight_grades[this.gkey]) {
-                        t += " gt-highlight";
-                    }
-                    return t + '">' + gt + '</td>';
+                    const hl = s.highlight_grades && s.highlight_grades[this.gkey];
+                    return (hl ? '<td class="gt-highlight ' : '<td class="').concat(this.className, '">', gt, '</td>');
                 }
             },
             tw: function () {
-                var w = 0;
-                this.klass = this.gkey === pconf.total_key ? "gt-total" : "gt-grade";
-                if (this.justify === "right") {
-                    this.klass += " r";
-                }
-                if (this.ge.gc.type === "select") {
-                    this.klass += " gt-el";
-                    for (var i = 0; i !== this.ge.options.length; ++i)
-                        w = Math.max(w, this.ge.options[i].length);
-                    w = Math.floor(Math.min(w, 10) * 1.25) / 2;
-                } else {
-                    w = 3;
-                }
-                return Math.max(w, this.gabbr.length * 0.5 + 1.5);
+                const w = this.ge.abbr().length * 0.5 + 1.5;
+                return Math.max(w, this.ge.tcell_width());
             }
         },
         ngrades: {
@@ -1367,25 +1358,32 @@ function pa_render_pset_table(pconf, data) {
             th: '<th class="gt-repo" scope="col"></th>',
             td: function (s) {
                 var txt;
-                if (!s.repo)
+                if (!s.repo) {
                     txt = '';
-                else if (anonymous)
-                    txt = '<a href="" data-pa-link="' + escape_entities(s.repo) + '" class="ui pa-anonymized-link">repo</a>';
-                else
-                    txt = '<a class="track" href="' + escape_entities(s.repo) + '">repo</a>';
-                if (s.repo_broken)
+                } else if (anonymous) {
+                    txt = '<a href="" data-pa-link="'.concat(escape_entities(s.repo), '" class="ui pa-anonymized-link">repo</a>');
+                } else {
+                    txt = '<a class="track" href="'.concat(escape_entities(s.repo), '">repo</a>');
+                }
+                if (s.repo_broken) {
                     txt += ' <strong class="err">broken</strong>';
-                if (s.repo_unconfirmed)
+                }
+                if (s.repo_unconfirmed) {
                     txt += ' <strong class="err">unconfirmed</strong>';
-                if (s.repo_too_open)
+                }
+                if (s.repo_too_open) {
                     txt += ' <strong class="err">open</strong>';
-                if (s.repo_handout_old)
+                }
+                if (s.repo_handout_old) {
                     txt += ' <strong class="err">handout</strong>';
-                if (s.repo_partner_error)
+                }
+                if (s.repo_partner_error) {
                     txt += ' <strong class="err">partner</strong>';
-                if (s.repo_sharing)
+                }
+                if (s.repo_sharing) {
                     txt += ' <strong class="err">sharing</strong>';
-                return '<td class="gt-repo">' + txt + '</td>';
+                }
+                return '<td class="gt-repo">'.concat(txt, '</td>');
             },
             tw: 10
         }
@@ -1398,14 +1396,18 @@ function pa_render_pset_table(pconf, data) {
         if (sort.f === "name" || sort.f === "name2" || sort.f === "username"
             || sort.f === "email" || sort.nameflag == null) {
             sort.nameflag = 0;
-            if (sort.f === "name" || sort.f === "name2")
+            if (sort.f === "name" || sort.f === "name2") {
                 sort.nameflag |= 1;
-            if (sort.last)
+            }
+            if (sort.last) {
                 sort.nameflag |= 2;
-            if (sort.email)
+            }
+            if (sort.email) {
                 sort.nameflag |= 4;
-            if (anonymous)
+            }
+            if (anonymous) {
                 sort.nameflag |= 8;
+            }
         }
     }
     function initialize() {
@@ -1501,16 +1503,12 @@ function pa_render_pset_table(pconf, data) {
             for (let i = 0; i !== grade_keys.length; ++i) {
                 const ge = grade_entries[i];
                 ge.colpos = col.length;
-                col.push({
+                col.push(ge.configure_column({
                     type: "grade",
                     name: "grade" + i,
                     gidx: i,
-                    gkey: grade_keys[i],
-                    gabbr: ge.abbr(),
-                    ge: ge,
-                    justify: ge.gc.justify || "right",
-                    sort_forward: ge.gc.sort === "forward"
-                });
+                    gkey: grade_keys[i]
+                }, pconf));
             }
             if (need_ngrades) {
                 ngrades_colpos = col.length;
@@ -1808,24 +1806,27 @@ function pa_render_pset_table(pconf, data) {
         } else {
             t += u.username || "";
         }
-        if (u.psetid != null)
+        if (u.psetid != null) {
             t += sprintf(" %5d", u.psetid);
-        if (u.at != null)
+        }
+        if (u.at != null) {
             t += sprintf(" %11g", u.at);
+        }
         return t.toLowerCase();
     }
     function user_compare(a, b) {
-        return a._sort_user < b._sort_user ? -1 : (a._sort_user == b._sort_user ? 0 : 1);
+        return a._sort_user.localeCompare(b._sort_user);
     }
     function grader_compare(a, b) {
         var ap = a.gradercid ? siteinfo.pc[a.gradercid] : null;
         var bp = b.gradercid ? siteinfo.pc[b.gradercid] : null;
         var ag = (ap && grader_name(ap)) || "~~~";
         var bg = (bp && grader_name(bp)) || "~~~";
-        if (ag != bg)
+        if (ag != bg) {
             return ag < bg ? -1 : 1;
-        else
+        } else {
             return 0;
+        }
     }
     function set_user_sorters() {
         if (sort.nameflag !== active_nameflag) {
@@ -1836,53 +1837,23 @@ function pa_render_pset_table(pconf, data) {
         }
     }
     function sort_data() {
-        let f = sort.f, m;
+        let f = sort.f;
         set_user_sorters();
         let colr = colmap[f];
         if (colr && colr.compare) {
             data.sort(colr.compare);
         } else if (colr && colr.make_compare) {
-            data.sort(colr.make_compare());
+            data.sort(colr.make_compare(sort));
         } else if ((f === "name" || f === "name2") && !anonymous) {
             data.sort(user_compare);
         } else if (f === "gradestatus") {
             data.sort(function (a, b) {
-                if (a.grades_visible != b.grades_visible)
+                if (a.grades_visible != b.grades_visible) {
                     return a.grades_visible ? -1 : 1;
-                else if (a.has_notes != b.has_notes)
+                } else if (a.has_notes != b.has_notes) {
                     return a.has_notes ? -1 : 1;
-                else
-                    return grader_compare(a, b) || user_compare(a, b);
-            });
-        } else if (f === "total") {
-            data.sort(function (a, b) {
-                if (a.total != b.total)
-                    return a.total < b.total ? 1 : -1;
-                else
-                    return -user_compare(a, b);
-            });
-        } else if ((m = /^grade(\d+)$/.exec(f)) && grade_entries[+m[1]]) {
-            var gidx = +m[1],
-                fwd = grade_entries[gidx].type && grade_entries[gidx].gc.sort === "forward",
-                erev = fwd ? -1 : 1;
-            data.sort(function (a, b) {
-                var ag = a.grades && a.grades[gidx],
-                    bg = b.grades && b.grades[gidx];
-                if (ag === "" || ag == null || bg === "" || bg == null) {
-                    if (ag !== "" && ag != null)
-                        return erev;
-                    else if (bg !== "" && bg != null)
-                        return -erev;
-                    else
-                        return -user_compare(a, b);
-                } else if (ag < bg) {
-                    return -1;
-                } else if (ag > bg) {
-                    return 1;
-                } else if (fwd) {
-                    return user_compare(a, b);
                 } else {
-                    return -user_compare(a, b);
+                    return grader_compare(a, b) || user_compare(a, b);
                 }
             });
         } else if (sort.email && !anonymous) {

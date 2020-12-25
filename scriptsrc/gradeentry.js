@@ -203,6 +203,15 @@ export class GradeEntry {
         return this.gc.simple_text.call(this, g);
     }
 
+    configure_column(col, pconf) {
+        return this.gc.configure_column.call(this, col, pconf);
+    }
+
+    tcell_width() {
+        const w = this.gc.tcell_width || 3;
+        return typeof w === "function" ? w.call(this) : w;
+    }
+
     tcell(g) {
         return this.gc.tcell.call(this, g);
     }

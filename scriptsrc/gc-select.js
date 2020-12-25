@@ -15,6 +15,18 @@ GradeClass.add("select", {
         }
         return t + '</select></span>';
     },
+    configure_column: function (col, pconf) {
+        col = GradeClass.basic_configure_column(col, pconf);
+        col.className += " gt-el";
+        return col;
+    },
+    tcell_width: function (col) {
+        let w = 0;
+        for (let opt of this.options) {
+            w = Math.max(w, opt.length);
+        }
+        return Math.max(GradeClass.basic_tcell_width(col), Math.floor(Math.min(w, 10) * 1.25) / 2);
+    },
     justify: "left",
     sort: "forward",
     reflect_value: function (elt, g, opts) {
