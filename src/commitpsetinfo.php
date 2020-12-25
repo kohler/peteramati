@@ -10,6 +10,8 @@ class CommitPsetInfo {
     public $bhash;
     /** @var non-empty-string */
     public $hash;
+    /** @var ?int */
+    public $commitat;
     /** @var int */
     public $repoid;
     /** @var ?string */
@@ -28,11 +30,14 @@ class CommitPsetInfo {
     public $haslinenotes;
     /** @var ?CommitPsetInfo */
     public $sset_next;
+    /** @var ?CommitPsetInfo */
+    public $sset_repo_next;
 
     private function merge() {
         $this->pset = (int) $this->pset;
         /** @phan-suppress-next-line PhanTypeMismatchProperty */
         $this->hash = bin2hex($this->bhash);
+        $this->commitat = isset($this->commitat) ? (int) $this->commitat : null;
         $this->repoid = (int) $this->repoid;
         $this->notesversion = (int) $this->notesversion;
         $this->hasflags = (int) $this->hasflags;

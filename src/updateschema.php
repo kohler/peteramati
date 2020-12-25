@@ -669,6 +669,10 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table `ContactGradeHistory` add `notesOverflow` longblob DEFAULT NULL")) {
         $conf->update_schema_version(143);
     }
+    if ($conf->sversion === 143
+        && $conf->ql_ok("alter table `CommitNotes` add `commitat` bigint DEFAULT NULL")) {
+        $conf->update_schema_version(144);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

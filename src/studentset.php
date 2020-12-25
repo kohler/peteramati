@@ -30,18 +30,23 @@ class StudentSet implements Iterator, Countable {
     private $_cpi = [];
     /** @var array<int,UserPsetInfo> */
     private $_upi = [];
+    /** @var array<int,int> */
+    private $_flags = [];
     /** @var array<string,list<int>> */
     private $_rb_uids = [];
-    /** @var array<int,true> */
-    private $_pset_loaded = [];
+    /** @var ?array<int,CommitPsetInfo> */
+    private $_cpi_by_repo;
     /** @var ?array<string,PsetView> */
     private $_infos;
+
+    const NO_UPI = 1;
 
     const COLLEGE = 1;
     const EXTENSION = 2;
     const ENROLLED = 4;
     const DROPPED = 8;
     const ALL = 15;
+    const ALL_ENROLLED = 7;
 
     /** @param int $flags */
     function __construct(Contact $viewer, $flags) {
@@ -76,19 +81,21 @@ class StudentSet implements Iterator, Countable {
     function add_info(PsetView $info) {
         assert(isset($this->_infos) && isset($this->_u[$info->user->contactId]));
         $this->_infos["{$info->user->contactId},{$info->pset->id}"] = $info;
+        $this->_flags[$info->pset->id] = $this->_flags[$info->pset->id] ?? 0;
     }
 
     private function load_pset(Pset $pset) {
         assert($this->conf === $pset->conf);
-        if (isset($this->_pset_loaded[$pset->id]) || isset($this->_infos)) {
+        if (isset($this->_flags[$pset->id]) || isset($this->_infos)) {
             return;
         }
-        $this->_pset_loaded[$pset->id] = true;
 
         $result = $this->conf->qe("select * from ContactGrade where pset=?", $pset->id);
+        $any_upi = false;
         while (($upi = UserPsetInfo::fetch($result))) {
             $upi->sset_next = $this->_upi[$upi->cid] ?? null;
             $this->_upi[$upi->cid] = $upi;
+            $any_upi = true;
         }
         Dbl::free($result);
 
@@ -100,10 +107,15 @@ class StudentSet implements Iterator, Countable {
             }
             Dbl::free($result);
 
+            $want_cbr = isset($this->_cpi_by_repo);
             $result = $this->conf->qe("select * from CommitNotes where pset=?", $pset->id);
             while (($cpi = CommitPsetInfo::fetch($result))) {
                 $cpi->sset_next = $this->_cpi[$cpi->bhash] ?? null;
                 $this->_cpi[$cpi->bhash] = $cpi;
+                if ($want_cbr) {
+                    $cpi->sset_repo_next = $this->_cpi_by_repo[$cpi->repoid] ?? null;
+                    $this->_cpi_by_repo[$cpi->repoid] = $cpi;
+                }
             }
             Dbl::free($result);
         }
@@ -130,6 +142,8 @@ class StudentSet implements Iterator, Countable {
                 Dbl::free($result);
             }
         }
+
+        $this->_flags[$pset->id] = $any_upi ? 0 : self::NO_UPI;
     }
 
     /** @param ?bool $anonymous */
@@ -206,15 +220,15 @@ class StudentSet implements Iterator, Countable {
 
     /** @return ?UserPsetInfo */
     function upi_for(Contact $user, Pset $pset) {
-        if ($pset->gitless_grades) {
-            $this->load_pset($pset);
+        $this->load_pset($pset);
+        if (($this->_flags[$pset->id] ?? 0) & self::NO_UPI) {
+            return null;
+        } else {
             $upi = $this->_upi[$user->contactId] ?? null;
             while ($upi && $upi->pset !== $pset->id) {
                 $upi = $upi->sset_next;
             }
             return $upi;
-        } else {
-            return null;
         }
     }
 
@@ -248,6 +262,64 @@ class StudentSet implements Iterator, Countable {
             $cpi = $cpi->sset_next;
         }
         return $cpi;
+    }
+
+    /** @return list<CommitPsetInfo> */
+    function all_cpi_for(Contact $user, Pset $pset) {
+        $cpis = [];
+        if (!$pset->gitless_grades) {
+            if (!isset($this->_cpi_by_repo)) {
+                $this->_cpi_by_repo = [];
+                foreach ($this->_cpi as $cpi) {
+                    while ($cpi !== null) {
+                        $cpi->sset_repo_next = $this->_cpi_by_repo[$cpi->repoid] ?? null;
+                        $this->_cpi_by_repo[$cpi->repoid] = $cpi;
+                        $cpi = $cpi->sset_next;
+                    }
+                }
+            }
+
+            $this->load_pset($pset);
+            $repoid = $user->link(LINK_REPO, $pset->id);
+            $cpi = $this->_cpi_by_repo[$repoid] ?? null;
+            $any_nullts = false;
+            while ($cpi) {
+                if ($cpi->pset === $pset->id) {
+                    $cpis[] = $cpi;
+                    $any_nullts = $any_nullts || $cpi->commitat === null;
+                }
+                $cpi = $cpi->sset_repo_next;
+            }
+
+            if ($any_nullts) {
+                $this->_update_cpi_commitat($cpis, $repoid);
+            }
+            usort($cpis, function ($a, $b) {
+                if ($a->commitat < $b->commitat) {
+                    return -1;
+                } else if ($a->commitat > $b->commitat) {
+                    return 0;
+                } else {
+                    return strcmp($a->hash, $b->hash);
+                }
+            });
+        }
+        return $cpis;
+    }
+
+    private function _update_cpi_commitat($cpis, $repoid) {
+        if (($repo = $this->_repo[$repoid] ?? null)) {
+            $mqe = Dbl::make_multi_qe_stager($this->conf->dblink);
+            foreach ($cpis as $cpi) {
+                if ($cpi->commitat === null
+                    && ($c = $repo->connected_commit($cpi->hash))) {
+                    $cpi->commitat = $c->commitat;
+                    $mqe("update CommitNotes set commitat=? where pset=? and bhash=?",
+                         [$cpi->commitat, $cpi->pset, $cpi->bhash]);
+                }
+            }
+            $mqe(true);
+        }
     }
 
     /** @return bool */

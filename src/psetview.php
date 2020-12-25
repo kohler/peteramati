@@ -109,23 +109,32 @@ class PsetView {
         return $info;
     }
 
-    /** @return PsetView */
-    static function make_from_set_at(StudentSet $sset, Contact $user, Pset $pset) {
+    /** @param ?string $bhash
+     * @return PsetView */
+    static function make_from_set_at(StudentSet $sset, Contact $user, Pset $pset,
+                                     $bhash = null) {
         $info = new PsetView($pset, $user, $sset->viewer);
         if (($pcid = $user->link(LINK_PARTNER, $pset->id))) {
             $info->partner = $user->partner($pset->id, $sset->user($pcid));
         }
         if (!$pset->gitless) {
             $info->repo = $user->repo($pset->id, $sset->repo_at($user, $pset));
+        }
+        $info->_havepi = 3;
+        $info->_upi = $sset->upi_for($user, $pset);
+        $info->_rpi = $sset->rpi_for($user, $pset);
+        if ($info->_rpi) {
+            $info->branchid = $info->_rpi->branchid;
+            $info->branch = $info->conf->branch($info->branchid);
+            $info->_hash = $info->_rpi->gradehash;
+        } else {
             $info->branchid = $user->branchid($pset);
             $info->branch = $info->conf->branch($info->branchid);
         }
-        $info->_havepi = 1;
-        $info->_upi = $sset->upi_for($user, $pset);
-        if (!$pset->gitless_grades) {
-            $info->_havepi |= 2;
-            if (($info->_rpi = $sset->rpi_for($user, $pset))) {
-                $info->_hash = $info->_rpi->gradehash;
+        if ($bhash !== null) {
+            $info->_havepi |= 4;
+            if (($info->_cpi = $sset->cpi_for($bhash, $pset))) {
+                $info->_hash = $info->_cpi->hash;
             }
         }
         return $info;
@@ -656,8 +665,10 @@ class PsetView {
                 $commit = $commit ?? $this->connected_commit($hash);
                 $result = $this->conf->qe("insert into CommitNotes set
                     pset=?, bhash=?, repoid=?,
+                    commitat=?,
                     notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?",
                     $this->pset->id, hex2bin($hash), $this->repo->repoid,
+                    $commit ? $commit->commitat : null,
                     $notes, $haslinenotes, $hasflags, $hasactiveflags);
             } else if ($old_notes === $notes) {
                 return;
