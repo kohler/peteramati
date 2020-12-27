@@ -747,6 +747,43 @@ handle_ui.on("pa-grade-button", function (event) {
     }
 });
 
+function gradelist_resolve_section(gi, ge, e, insp) {
+    addClass(insp, "pa-with-sticky");
+    addClass(e, "pa-sticky");
+    const desc = e.firstChild.nextSibling;
+    if (desc && hasClass(desc, "pa-pdesc")) {
+        addClass(desc, "pa-pdesc-external");
+        insp.insertBefore(desc, e.nextSibling);
+    }
+    let t = "";
+    if (gi.section_has_description(ge)) {
+        t += '<button class="btn ui pa-grade-toggle-description" aria-label="Toggle description">…</button>';
+    }
+    if (t !== "") {
+        const btnbox = document.createElement("div");
+        btnbox.className = "hdr-actions btnbox";
+        btnbox.innerHTML = t;
+        let label = e.firstChild;
+        const lc = label.firstChild;
+        if (lc.nodeType === 1
+            && lc === label.lastChild
+            && lc.tagName === "P") {
+            label = lc;
+        }
+        label.appendChild(btnbox);
+    }
+}
+
+handle_ui.on("pa-grade-toggle-description", function (event) {
+    const me = this.closest(".pa-gsection"),
+        $es = event.metaKey ? $(".pa-gsection") : $(me),
+        show = hasClass(me, "pa-hide-description");
+    $es.each(function () {
+        toggleClass(this, "pa-hide-description", !show);
+        $(this).find(".pa-grade-toggle-description").toggleClass("btn-primary", !show);
+    });
+});
+
 function pa_resolve_gradelist() {
     removeClass(this, "need-pa-gradelist");
     addClass(this, "pa-gradelist");
@@ -800,7 +837,7 @@ function pa_resolve_gradelist() {
             sidebar = sidebare = null;
             // add new section if needed
             if (!ch || !hasClass(ch, "pa-gsection")) {
-                if (gi.section_wants_sidebar(i)) {
+                if (gi.section_wants_sidebar(ge)) {
                     const div = document.createElement("div");
                     div.className = "pa-dg pa-with-sidebar pa-gsection";
                     insp.insertBefore(div, ch);
@@ -848,13 +885,7 @@ function pa_resolve_gradelist() {
             gi.fill_dom_at(e);
             // separate section heading from description
             if (ge.type === "section" && ge.title) {
-                addClass(insp, "pa-with-sticky");
-                addClass(e, "pa-sticky");
-                const desc = e.firstChild.nextSibling;
-                if (desc && hasClass(desc, "pa-pdesc")) {
-                    addClass(desc, "pa-pdesc-external");
-                    insp.insertBefore(desc, ch);
-                }
+                gradelist_resolve_section(gi, ge, e, insp);
             }
         }
 

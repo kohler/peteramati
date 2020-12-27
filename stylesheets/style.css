@@ -2516,6 +2516,9 @@ tr.gtrow-partner {
 	margin-bottom: 0;
 }
 
+.pa-hide-description .pa-pdesc {
+	display: none;
+}
 .pa-with-sidebar {
 	display: flex;
 	flex-direction: row-reverse;

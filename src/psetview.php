@@ -924,14 +924,6 @@ class PsetView {
         return $h ? $this->connected_commit($h) : null;
     }
 
-    /** @param string $key */
-    function suppress_grade($key) {
-        $ge = $this->pset->grades[$key];
-        $this->_grades_vf = $this->_grades_vf ?? $this->pset->grades_vf;
-        $this->_grades_vf[$ge->pcview_index] = 0;
-        $this->_grades_suppressed = true;
-    }
-
     /** @return list<int> */
     private function grades_vf() {
         if ($this->_grades_suppressed === null) {
@@ -941,6 +933,17 @@ class PsetView {
             }
         }
         return $this->_grades_vf ?? $this->pset->grades_vf;
+    }
+
+    /** @param string $key */
+    function suppress_grade($key) {
+        if ($this->_grades_suppressed === null) {
+            $this->grades_vf(); // call the selection function
+        }
+        $ge = $this->pset->grades[$key];
+        $this->_grades_vf = $this->_grades_vf ?? $this->pset->grades_vf;
+        $this->_grades_vf[$ge->pcview_index] = 0;
+        $this->_grades_suppressed = true;
     }
 
     /** @return list<GradeEntryConfig> */

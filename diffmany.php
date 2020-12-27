@@ -19,9 +19,12 @@ class DiffMany {
     /** @var Contact */
     public $viewer;
     /** @var list<string> */
-    public $files;
+    private $files;
+    /** @var list<string> */
+    private $suppress_grades = [];
     /** @var int */
     public $psetinfo_idx = 0;
+    /** @var array<string,GradeEntryConfig> */
     public $all_viewed = [];
 
     function __construct(Pset $pset, Qrequest $qreq, Contact $viewer) {
@@ -31,25 +34,44 @@ class DiffMany {
         $this->viewer = $viewer;
 
         if ($qreq->files) {
-            $f = simplify_whitespace($Qreq->files);
-            $this->files = $f === "" ? [] : explode(" ", $f);
+            $f = simplify_whitespace($qreq->files);
+            $fs = $f === "" ? [] : explode(" ", $f);
         } else if ($qreq->file) {
-            $this->files = [$qreq->file];
+            $fs = [$qreq->file];
+        } else {
+            $fs = null;
         }
-        $this->files = $pset->maybe_prefix_directory($this->files);
+        if ($fs !== null) {
+            $this->files = $pset->maybe_prefix_directory($fs);
+        }
+
+        if ($qreq->grade) {
+            $f = simplify_whitespace($qreq->grade);
+            $grades = [];
+            foreach (explode(" ", $f) as $key) {
+                foreach ($pset->expand_grades($pset->gradelike_by_key($key)) as $ge) {
+                    $grades[$ge->key] = true;
+                }
+            }
+            foreach ($pset->grades as $ge) {
+                if (!isset($grades[$ge->key])) {
+                    $this->suppress_grades[] = $ge->key;
+                }
+            }
+        }
     }
 
     function echo_one(Contact $user) {
         ++$this->psetinfo_idx;
         $pset = $this->pset;
         $info = PsetView::make($pset, $user, $this->viewer);
+        foreach ($this->suppress_grades as $key) {
+            $info->suppress_grade($key);
+        }
 
         // should we skip?
-        if ($pset->gitless) {
-        } else {
-            if (!$info->repo) {
-                return;
-            }
+        if ($pset->gitless ? !$info->visible_grades() : !$info->repo) {
+            return;
         }
 
         $linkpart_html = htmlspecialchars($this->viewer->user_linkpart($user));
@@ -101,8 +123,8 @@ class DiffMany {
             if ($onlyfiles !== null
                 && count($onlyfiles) === 1
                 && isset($diff[$onlyfiles[0]])
-                && $qreq->lines
-                && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m)) {
+                && $this->qreq->lines
+                && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $this->qreq->lines, $m)) {
                 $diff[$onlyfiles[0]] = $diff[$onlyfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
             }
             $want_grades = $pset->has_grade_landmark;
@@ -115,7 +137,7 @@ class DiffMany {
                 foreach ($diff as $file => $dinfo) {
                     $info->echo_file_diff($file, $dinfo, $lnorder, [
                         "expand" => true, "id_by_user" => true, "hide_left" => true,
-                        "no_heading" => count($qreq->files) == 1,
+                        "no_heading" => count($this->files) == 1,
                         "diffcontext" => $linkpart_html . "/"
                     ]);
                 }

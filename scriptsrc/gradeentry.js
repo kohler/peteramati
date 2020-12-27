@@ -75,7 +75,7 @@ export class GradeEntry {
 
     html_skeleton(editable, live) {
         const name = this.key,
-            title = this.title ? render_ftext(this.title) : name;
+            title = (this.title ? render_ftext(this.title) : name).trim();
         let t;
         if ((editable || this.answer) && this.gc.entry) {
             live = live !== false;
@@ -297,19 +297,34 @@ export class GradeSheet {
         }
     }
 
-    section_wants_sidebar(start) {
-        let answer = 0;
-        for (let i = start + 1; i < this.order.length; ++i) {
-            const ge = this.entries[this.order[i]];
-            if (ge.type === "section") {
+    section_wants_sidebar(ge) {
+        let start = this.gpos[ge.key], answer = 0;
+        while (start != null && start < this.order.length) {
+            const xge = this.entries[this.order[start]];
+            if (xge !== ge && xge.type === "section") {
                 break;
-            } else if (ge.answer) {
+            } else if (xge.answer) {
                 answer |= 1;
             } else {
                 answer |= 2;
             }
+            ++start;
         }
         return answer === 3;
+    }
+
+    section_has_description(ge) {
+        let start = this.gpos[ge.key];
+        while (start != null && start < this.order.length) {
+            const xge = this.entries[this.order[start]];
+            if ((xge === ge) !== (xge.type === "section")) {
+                break;
+            } else if (xge.description) {
+                return true;
+            }
+            ++start;
+        }
+        return false;
     }
 
     static parse_json(x) {

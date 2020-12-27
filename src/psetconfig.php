@@ -80,6 +80,7 @@ class Pset {
     public $gitless_grades;
     /** @var ?string */
     public $partner_repo;
+    /** @var bool */
     public $hide_comments = false;
 
     /** @var string */
@@ -579,6 +580,23 @@ class Pset {
         }
     }
 
+    /** @return list<GradeEntryConfig> */
+    function expand_grades(GradeEntryConfig $ge = null) {
+        $ges = [];
+        if ($ge) {
+            $ges[] = $ge;
+            if ($ge->type === "section") {
+                $gvs = array_values($this->grades);
+                for ($i = $ge->pcview_index + 1;
+                     $i < count($gvs) && $gvs[$i]->type !== "section";
+                     ++$i) {
+                    $ges[] = $gvs[$i];
+                }
+            }
+        }
+        return $ges;
+    }
+
     /** @return array<string,GradeEntryConfig> */
     function tabular_grades() {
         return array_filter($this->grades, function ($ge) {
@@ -779,11 +797,10 @@ class Pset {
         return $fnames;
     }
 
+    /** @param list<string> $files
+     * @return list<string> */
     function maybe_prefix_directory($files) {
-        if (is_string($files)) {
-            $files = $this->maybe_prefix_directory([$files]);
-            return $files[0];
-        } else if (!$this->directory_slash) {
+        if (!$this->directory_slash) {
             return $files;
         } else {
             $pfiles = [];
