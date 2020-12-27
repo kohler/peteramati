@@ -121,6 +121,10 @@ class Conf {
     private $_psets_by_category;
     /** @var array<string,bool> */
     private $_category_has_extra;
+    /** @var ?list<FormulaConfig> */
+    private $_formulas;
+    /** @var array<string,FormulaConfig> */
+    private $_formulas_by_name;
 
     /** @var bool */
     private $_date_format_initialized = false;
@@ -2278,6 +2282,47 @@ class Conf {
     function pset_category_has_extra($category) {
         $this->psets_by_category();
         return $this->_category_has_extra[$category] ?? false;
+    }
+
+
+    /** @return list<FormulaConfig> */
+    function formulas() {
+        if (!isset($this->_formulas)) {
+            $this->_formulas = [];
+            $n = 0;
+            foreach ($this->config->_formulas ?? [] as $name => $fc) {
+                $this->_formulas[] = $f = new FormulaConfig($this, $name, $fc, $n++);
+                if ($f->name) {
+                    $this->_formulas_by_name[$f->name] = $f;
+                }
+            }
+        }
+        return $this->_formulas;
+    }
+
+    /** @return ?FormulaConfig */
+    function formula_by_name($name) {
+        if (!isset($this->_formulas)) {
+            $this->formulas();
+        }
+        return $this->_formulas[$name] ?? null;
+    }
+
+    /** @return list<FormulaConfig> */
+    function formulas_by_home_position() {
+        $fs = [];
+        foreach ($this->formulas() as $f) {
+            if ($f->home_position !== null)
+                $fs[] = $f;
+        }
+        usort($fs, function ($a, $b) {
+            if ($a->home_position != $b->home_position) {
+                return $a->home_position < $b->home_position ? -1 : 1;
+            } else {
+                return $a->subposition - $b->subposition;
+            }
+        });
+        return $fs;
     }
 
 

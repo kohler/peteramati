@@ -1054,15 +1054,12 @@ if (!$Me->is_empty() && $User->is_student()) {
         if (($info = home_psetview($pset, $User, $Me)))
             $ss->add_info($info);
     }
-    if ($Conf->config->_student_visible_formulas ?? null) {
-        foreach ($Conf->config->_student_visible_formulas as $x) {
-            if (($x->visible ?? null) !== false
-                && ($User !== $Me || ($x->student_visible ?? null) !== false)
-                && ($gf = GradeFormula::parse($Conf, $x->formula ?? null))
-                && ($v = $gf->evaluate($User)) !== null
-                && (!($x->nonzero ?? false) || (float) $v !== 0.0)) {
-                ContactView::echo_group(htmlspecialchars($x->title), $v);
-            }
+    foreach ($Conf->formulas_by_home_position() as $fc) {
+        if (($User !== $Me || $fc->visible)
+            && ($gf = $fc->formula())
+            && ($v = $gf->evaluate($User)) !== null
+            && (!($fc->nonzero ?? false) || (float) $v !== 0.0)) {
+            ContactView::echo_group(htmlspecialchars($fc->title), $v);
         }
     }
     foreach ($ss->infos($User->contactId) as $info) {

@@ -1723,6 +1723,76 @@ class DiffConfig {
     }
 }
 
+class FormulaConfig {
+    /** @var Conf
+     * @readonly */
+    public $conf;
+    /** @var ?string */
+    public $name;
+    /** @var int */
+    public $subposition;
+    /** @var ?string */
+    public $title;
+    /** @var ?string */
+    public $description;
+    /** @var ?float */
+    public $home_position;
+    /** @var ?bool */
+    public $visible;
+    /** @var ?bool */
+    public $nonzero;
+    /** @var string */
+    public $formula;
+    /** @var null|false|GradeFormula */
+    private $_formula = false;
+
+    function __construct(Conf $conf, $name, $g, $subposition = 0) {
+        $this->conf = $conf;
+        $loc = ["formulas", $name];
+        if (!is_object($g)) {
+            throw new PsetConfigException("formula format error", $loc);
+        }
+        if (is_string($name) && !ctype_digit($name)) {
+            $this->name = $name;
+        }
+        if (isset($g->name)) {
+            $this->name = $g->name;
+        }
+        if (isset($this->name)
+            && (!is_string($this->name)
+                // no spaces, no commas, no plusses
+                || !preg_match('/\A[@A-Za-z_][@A-Za-z0-9_]+\z/', $this->name)
+                || $this->name[0] === "_"
+                || $this->name === "total")) {
+            throw new PsetConfigException("formula name format error", $loc);
+        }
+        $this->title = Pset::cstr($loc, $g, "title");
+        $this->description = Pset::cstr($loc, $g, "description");
+        if (isset($g->visible)) {
+            $this->visible = Pset::cbool($loc, $g, "visible");
+        } else if (isset($g->hidden)) {
+            $this->visible = !Pset::cbool($loc, $g, "hidden");
+        }
+        $this->nonzero = Pset::cbool($loc, $g, "nonzero");
+        $this->home_position = Pset::cnum($loc, $g, "home_position");
+        $this->subposition = $subposition;
+        $this->formula = Pset::cstr($loc, $g, "formula");
+        $this->config = $g;
+    }
+
+    /** @return ?GradeFormula */
+    function formula() {
+        if ($this->_formula === false) {
+            $this->_formula = null;
+            if ($this->formula
+                && ($f = GradeFormula::parse($this->conf, $this->formula))) {
+                $this->_formula = $f;
+            }
+        }
+        return $this->_formula;
+    }
+}
+
 
 function is_string_or_string_list($x) {
     return is_string($x) || is_string_list($x);
