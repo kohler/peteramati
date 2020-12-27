@@ -8,165 +8,191 @@ ContactView::set_path_request(["/p"]);
 if ($Me->is_empty() || !$Me->isPC) {
     $Me->escape();
 }
-global $Pset, $Qreq, $psetinfo_idx, $all_viewed_gradeentries;
-$Pset = ContactView::find_pset_redirect($Qreq->pset);
 
-if ($Qreq->files) {
-    $f = simplify_whitespace($Qreq->files);
-    $Qreq->files = $f === "" ? [] : explode(" ", $f);
-} else if ($Qreq->file) {
-    $Qreq->files = [$Qreq->file];
-} else {
-    $Qreq->files = [];
-}
-$Qreq->files = $Pset->maybe_prefix_directory($Qreq->files);
+class DiffMany {
+    /** @var Conf */
+    public $conf;
+    /** @var Pset */
+    public $pset;
+    /** @var Qrequest */
+    public $qreq;
+    /** @var Contact */
+    public $viewer;
+    /** @var list<string> */
+    public $files;
+    /** @var int */
+    public $psetinfo_idx = 0;
+    public $all_viewed = [];
 
-$psetinfo_idx = 0;
-$all_viewed_gradeentries = [];
+    function __construct(Pset $pset, Qrequest $qreq, Contact $viewer) {
+        $this->conf = $viewer->conf;
+        $this->pset = $pset;
+        $this->qreq = $qreq;
+        $this->viewer = $viewer;
 
-function echo_one(Contact $user, Pset $pset, Qrequest $qreq) {
-    global $Me, $psetinfo_idx, $all_viewed_gradeentries;
-    ++$psetinfo_idx;
-    $info = PsetView::make($pset, $user, $Me);
-    if (!$pset->gitless && !$info->repo) {
-        return;
-    }
-    $linkpart_html = htmlspecialchars($Me->user_linkpart($user));
-    echo '<div id="pa-psetinfo', $psetinfo_idx,
-        '" class="pa-psetinfo pa-diffcontext',
-        '" data-pa-pset="', htmlspecialchars($pset->urlkey),
-        '" data-pa-user="', $linkpart_html;
-    if (!$pset->gitless && $info->commit_hash()) {
-        echo '" data-pa-hash="', htmlspecialchars($info->commit_hash());
-    }
-    if (!$pset->gitless && $pset->directory) {
-        echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);
-    }
-    if ($info->user_can_view_grades()) {
-        echo '" data-pa-user-can-view-grades="yes';
-    }
-    if ($info->can_edit_grades_staff()
-        || ($info->can_view_grades() && $info->is_grading_commit())) {
-        echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(PsetView::GRADEJSON_SLICE)));
-    }
-    echo '">';
-
-    $u = $Me->user_linkpart($user);
-    if ($user !== $Me && !$user->is_anonymous && $user->contactImageId) {
-        echo '<img class="pa-smallface" src="' . hoturl("face", array("u" => $u, "imageid" => $user->contactImageId)) . '" />';
-    }
-
-    echo '<h2 class="homeemail"><a href="',
-        hoturl("pset", array("u" => $u, "pset" => $pset->urlkey)), '">', htmlspecialchars($u), '</a>';
-    if ($user->extension) {
-        echo " (X)";
-    }
-    /*if ($Me->privChair && $user->is_anonymous)
-        echo " ",*/
-    if ($Me->privChair) {
-        echo "&nbsp;", become_user_link($user);
-    }
-    echo '</h2>';
-
-    if ($user !== $Me && !$user->is_anonymous) {
-        echo '<h3>', Text::user_html($user), '</h3>';
-    }
-    echo '<hr class="c" />';
-
-    if (!$pset->gitless && $info->commit()) {
-        $lnorder = $info->viewable_line_notes();
-        $onlyfiles = $qreq->files;
-        $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
-        if ($onlyfiles !== null
-            && count($onlyfiles) === 1
-            && isset($diff[$onlyfiles[0]])
-            && $qreq->lines
-            && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m)) {
-            $diff[$onlyfiles[0]] = $diff[$onlyfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
+        if ($qreq->files) {
+            $f = simplify_whitespace($Qreq->files);
+            $this->files = $f === "" ? [] : explode(" ", $f);
+        } else if ($qreq->file) {
+            $this->files = [$qreq->file];
         }
-        $want_grades = $pset->has_grade_landmark;
+        $this->files = $pset->maybe_prefix_directory($this->files);
+    }
 
-        if (!empty($diff)) {
-            if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
-                PsetView::echo_pa_sidebar_gradelist();
-                $want_grades = true;
-            }
-            foreach ($diff as $file => $dinfo) {
-                $info->echo_file_diff($file, $dinfo, $lnorder, [
-                    "expand" => true, "id_by_user" => true, "hide_left" => true,
-                    "no_heading" => count($qreq->files) == 1,
-                    "diffcontext" => $linkpart_html . "/"
-                ]);
-            }
-            if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
-                PsetView::echo_close_pa_sidebar_gradelist();
+    function echo_one(Contact $user) {
+        ++$this->psetinfo_idx;
+        $pset = $this->pset;
+        $info = PsetView::make($pset, $user, $this->viewer);
+
+        // should we skip?
+        if ($pset->gitless) {
+        } else {
+            if (!$info->repo) {
+                return;
             }
         }
 
-        $all_viewed_gradeentries += $info->viewed_gradeentries; // XXX off if want all grades
-    } else {
-        echo '<div class="pa-gradelist is-main',
-            ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
-        $want_grades = true;
+        $linkpart_html = htmlspecialchars($this->viewer->user_linkpart($user));
+        echo '<div id="pa-psetinfo', $this->psetinfo_idx,
+            '" class="pa-psetinfo pa-psetinfo-partial pa-diffcontext',
+            '" data-pa-pset="', htmlspecialchars($pset->urlkey),
+            '" data-pa-user="', $linkpart_html;
+        if (!$pset->gitless && $info->commit_hash()) {
+            echo '" data-pa-hash="', htmlspecialchars($info->commit_hash());
+        }
+        if (!$pset->gitless && $pset->directory) {
+            echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);
+        }
+        if ($info->user_can_view_grades()) {
+            echo '" data-pa-user-can-view-grades="yes';
+        }
+        if ($info->can_edit_grades_staff()
+            || ($info->can_view_grades() && $info->is_grading_commit())) {
+            echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(PsetView::GRADEJSON_SLICE)));
+        }
+        echo '">';
+
+        $u = $this->viewer->user_linkpart($user);
+        if ($user !== $this->viewer && !$user->is_anonymous && $user->contactImageId) {
+            echo '<img class="pa-smallface" src="' . hoturl("face", ["u" => $u, "imageid" => $user->contactImageId]) . '" />';
+        }
+
+        echo '<h2 class="homeemail"><a href="',
+            hoturl("pset", array("u" => $u, "pset" => $pset->urlkey)), '">', htmlspecialchars($u), '</a>';
+        if ($user->extension) {
+            echo " (X)";
+        }
+        /*if ($Me->privChair && $user->is_anonymous)
+            echo " ",*/
+        if ($this->viewer->privChair) {
+            echo "&nbsp;", become_user_link($user);
+        }
+        echo '</h2>';
+
+        if ($user !== $this->viewer && !$user->is_anonymous) {
+            echo '<h3>', Text::user_html($user), '</h3>';
+        }
+        echo '<hr class="c" />';
+
+        if (!$pset->gitless && $info->commit()) {
+            $lnorder = $info->viewable_line_notes();
+            $onlyfiles = $this->files;
+            $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
+            if ($onlyfiles !== null
+                && count($onlyfiles) === 1
+                && isset($diff[$onlyfiles[0]])
+                && $qreq->lines
+                && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $qreq->lines, $m)) {
+                $diff[$onlyfiles[0]] = $diff[$onlyfiles[0]]->restrict_linea(intval($m[1]), intval($m[2]) + 1);
+            }
+            $want_grades = $pset->has_grade_landmark;
+
+            if (!empty($diff)) {
+                if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
+                    PsetView::echo_pa_sidebar_gradelist();
+                    $want_grades = true;
+                }
+                foreach ($diff as $file => $dinfo) {
+                    $info->echo_file_diff($file, $dinfo, $lnorder, [
+                        "expand" => true, "id_by_user" => true, "hide_left" => true,
+                        "no_heading" => count($qreq->files) == 1,
+                        "diffcontext" => $linkpart_html . "/"
+                    ]);
+                }
+                if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
+                    PsetView::echo_close_pa_sidebar_gradelist();
+                }
+            }
+
+            $this->all_viewed += $info->viewed_gradeentries; // XXX off if want all grades
+        } else {
+            echo '<div class="pa-gradelist is-main',
+                ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
+            $want_grades = true;
+        }
+
+        echo "</div>\n";
+        if ($want_grades) {
+            echo Ht::unstash_script('$pa.loadgrades.call(document.getElementById("pa-psetinfo' . $this->psetinfo_idx . '"))');
+        }
+        echo "<hr />\n";
     }
 
-    echo "</div>\n";
-    if ($want_grades) {
-        echo Ht::unstash_script('$pa.loadgrades.call(document.getElementById("pa-psetinfo' . $psetinfo_idx . '"))');
-    }
-    echo "<hr />\n";
-}
+    function run() {
+        $title = $this->pset->title;
+        if ($this->files) {
+            $title .= " > " . join(" ", $this->files);
+        }
+        $this->conf->header(htmlspecialchars($title), "home");
 
-$title = $Pset->title;
-if ($Qreq->files) {
-    $title .= " > " . join(" ", $Qreq->files);
-}
-$Conf->header(htmlspecialchars($title), "home");
+        foreach ($this->pset->grade_script ?? [] as $gs) {
+            Ht::stash_html($this->conf->make_script_file($gs));
+        }
+        echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
+             htmlspecialchars(json_encode(new GradeExport($this->pset, $this->viewer->isPC))),
+             "\">";
 
-foreach ($Pset->grade_script ?? [] as $gs) {
-    Ht::stash_html($Conf->make_script_file($gs));
-}
-echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
-     htmlspecialchars(json_encode(new GradeExport($Pset, $Me->isPC))),
-     "\">";
+        if (trim((string) $this->qreq->users) === "") {
+            $want = [];
+            $sset = new StudentSet($this->viewer, StudentSet::ALL);
+            $sset->set_pset($this->pset);
+            foreach ($sset as $info) {
+                if (!$info->user->visited
+                    && $info->grading_hash()
+                    && !$info->user->dropped) {
+                    $want[] = $info->user->email;
+                    foreach ($info->user->links(LINK_PARTNER, $this->pset->id) as $pcid) {
+                        if (($u = $sset->user($pcid)))
+                            $u->visited = true;
+                    }
+                }
+            }
+            $this->qreq->users = join(" ", $want);
+        }
 
-if (trim((string) $Qreq->users) === "") {
-    $want = [];
-    $sset = new StudentSet($Me, StudentSet::ALL);
-    $sset->set_pset($Pset);
-    foreach ($sset as $info) {
-        if (!$info->user->visited
-            && $info->grading_hash()
-            && !$info->user->dropped) {
-            $want[] = $info->user->email;
-            foreach ($info->user->links(LINK_PARTNER, $Pset->id) as $pcid) {
-                if (($u = $sset->user($pcid)))
-                    $u->visited = true;
+        foreach (explode(" ", $this->qreq->users) as $user) {
+            if ($user !== "" && ($u = $this->conf->user_by_whatever($user))) {
+                $this->echo_one($u);
+            } else if ($user !== "") {
+                echo "<p>no such user ", htmlspecialchars($user), "</p>\n";
             }
         }
-    }
-    $Qreq->users = join(" ", $want);
-}
 
-foreach (explode(" ", $Qreq->users) as $user) {
-    if ($user !== "" && ($user = $Conf->user_by_whatever($user))) {
-        echo_one($user, $Pset, $Qreq);
-    } else if ($user !== "") {
-        echo "<p>no such user ", htmlspecialchars($user), "</p>\n";
-    }
-}
-
-foreach ($all_viewed_gradeentries as $gkey => $x) {
-    $gradeentry = $Pset->all_grades[$gkey];
-    if ($gradeentry->landmark_buttons) {
-        foreach ($gradeentry->landmark_buttons as $lb) {
-            if (is_object($lb) && isset($lb->summary_className)) {
-                echo '<button type="button" class="ui btn ', $lb->summary_className, '" data-pa-class="', $lb->className, '">Summarize ', $lb->title, '</button>';
+        foreach ($this->all_viewed as $gkey => $x) {
+            $gradeentry = $this->pset->all_grades[$gkey];
+            if ($gradeentry->landmark_buttons) {
+                foreach ($gradeentry->landmark_buttons as $lb) {
+                    if (is_object($lb) && isset($lb->summary_className)) {
+                        echo '<button type="button" class="ui btn ', $lb->summary_className, '" data-pa-class="', $lb->className, '">Summarize ', $lb->title, '</button>';
+                    }
+                }
             }
         }
+
+        Ht::stash_script('$(window).on("beforeunload",$pa.beforeunload)');
+        echo "</div><div class='clear'></div>\n";
+        $this->conf->footer();
     }
 }
 
-Ht::stash_script('$(window).on("beforeunload",$pa.beforeunload)');
-echo "</div><div class='clear'></div>\n";
-$Conf->footer();
+(new DiffMany(ContactView::find_pset_redirect($Qreq->pset), $Qreq, $Me))->run();

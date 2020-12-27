@@ -652,9 +652,9 @@ function save_grade(self) {
 
     var gi = GradeSheet.closest(self), g = {}, og = {};
     $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
-        var ge = gi.entries[this.name];
-        if (gi.grades && ge && gi.grades[ge.pos] != null) {
-            og[this.name] = gi.grades[ge.pos];
+        let ge = gi.entries[this.name], gv;
+        if (ge && (gv = gi.grade_value(ge)) != null) {
+            og[this.name] = gv;
         } else if (this.name === "late_hours" && gi.late_hours != null) {
             og[this.name] = gi.late_hours;
         }
@@ -860,11 +860,14 @@ function pa_resolve_gradelist() {
 
         // add grade to sidebar
         if (!ge.answer && sidebar) {
-            if (sidebar.className === "pa-sidebar" && sidebare === null) {
-                const div = document.createElement("div");
-                div.className = "pa-gradebox pa-ps";
-                sidebar.appendChild(div);
-                sidebar = div;
+            if (sidebar.className === "pa-sidebar") {
+                if (sidebar.firstChild === null) {
+                    const div = document.createElement("div");
+                    div.className = "pa-gradebox pa-ps";
+                    sidebar.appendChild(div);
+                }
+                sidebar = sidebar.firstChild;
+                sidebare = sidebar.firstChild;
             }
             if (sidebare && sidebare.getAttribute("data-pa-grade") === k) {
                 sidebare = sidebare.nextSibling;
@@ -1605,6 +1608,7 @@ function pa_render_pset_table(pconf, data) {
             }
             for (let i = 0; i !== grade_keys.length; ++i) {
                 const ge = grade_entries[i];
+                ge.gpos = i;
                 ge.colpos = col.length;
                 col.push(ge.configure_column({
                     type: "grade",
@@ -2029,8 +2033,8 @@ function pa_render_pset_table(pconf, data) {
         for (var i = 0; i !== gorder.length; ++i) {
             var k = gorder[i], ge = pconf.grades.entries[k], c;
             if (ge && (c = col[ge.colpos])) {
-                if (su.grades[ge.pos] !== rv.grades[i]) {
-                    su.grades[ge.pos] = rv.grades[i];
+                if (su.grades[ge.gpos] !== rv.grades[i]) {
+                    su.grades[ge.gpos] = rv.grades[i];
                     tr.childNodes[ge.colpos].innerText = c.td.call(c, su, null, true);
                 }
                 if (rv.grades[i] != null && rv.grades[i] !== "") {
@@ -2078,7 +2082,7 @@ function pa_render_pset_table(pconf, data) {
                     var su = gdialog_su[i];
                     byuid[su.uid] = byuid[su.uid] || {grades: {}, oldgrades: {}};
                     byuid[su.uid].grades[k] = v;
-                    byuid[su.uid].oldgrades[k] = su.grades[ge.pos];
+                    byuid[su.uid].oldgrades[k] = su.grades[ge.gpos];
                 }
                 any = true;
             }
@@ -2147,10 +2151,10 @@ function pa_render_pset_table(pconf, data) {
         $gdialog.find(".pa-grade").each(function () {
             var k = this.getAttribute("data-pa-grade"),
                 ge = pconf.grades.entries[k],
-                sv = gdialog_su[0].grades[ge.pos],
+                sv = gdialog_su[0].grades[ge.gpos],
                 mixed = false;
             for (var i = 1; i !== gdialog_su.length; ++i) {
-                var suv = gdialog_su[i].grades[ge.pos];
+                var suv = gdialog_su[i].grades[ge.gpos];
                 if (suv !== sv
                     && !(suv == null && sv === "")
                     && !(suv === "" && sv == null)) {

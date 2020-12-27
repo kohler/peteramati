@@ -584,8 +584,12 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         }
     } else if (str_starts_with($qreq->action, "grademany_")) {
         $g = $pset->all_grades[substr($qreq->action, 10)];
-        assert($g && !!$g->landmark_range_file);
-        Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
+        assert($g && $g->collate);
+        if (!!$g->landmark_range_file) {
+            Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
+        } else {
+            Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "grade" => $g->key, "users" => join(" ", qreq_usernames($qreq))]));
+        }
     } else if (str_starts_with($qreq->action, "diffmany_")) {
         Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
     } else if ($qreq->action === "diffmany") {
@@ -1532,18 +1536,21 @@ function show_pset_table($sset) {
                     $actions["diffmany_$f"] = "$f diffs";
                 }
             }
-            if ($pset->has_grade_landmark) {
-                foreach ($pset->grades() as $ge)
-                    if ($ge->landmark_range_file) {
-                        if ($stage !== -1 && $stage !== 1)
-                            $actions[] = null;
-                        $stage = 1;
-                        $actions["grademany_{$ge->key}"] = "Grade {$ge->title}";
+        }
+        if ($pset->has_grade_collate) {
+            foreach ($pset->grades() as $ge) {
+                if ($ge->collate) {
+                    if ($stage !== -1 && $stage !== 1) {
+                        $actions[] = null;
                     }
+                    $stage = 1;
+                    $actions["grademany_{$ge->key}"] = "Grade " . $ge->text_title();
+                }
             }
         }
-        if ($stage !== -1 && $stage !== 2)
+        if ($stage !== -1 && $stage !== 2) {
             $actions[] = null;
+        }
         $stage = 2;
         $actions["showgrades"] = "Show grades";
         $actions["hidegrades"] = "Hide grades";

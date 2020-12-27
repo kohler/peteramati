@@ -1623,9 +1623,9 @@ class PsetView {
             $gexp->include_entries = false;
         } else {
             $gexp = new GradeExport($this->pset, $override_view || $this->pc_view);
-            if ($this->pset->grades_selection_function) {
-                $gexp->set_visible_grades($this->visible_grades());
-            }
+        }
+        if ($this->pset->grades_selection_function) {
+            $gexp->set_visible_grades($this->visible_grades());
         }
         $gexp->uid = $this->user->contactId;
 

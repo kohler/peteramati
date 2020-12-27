@@ -131,6 +131,8 @@ class Pset {
     /** @var bool */
     public $has_extra = false;
     /** @var bool */
+    public $has_grade_collate = false;
+    /** @var bool */
     public $has_grade_landmark = false;
     /** @var bool */
     public $has_grade_landmark_range = false;
@@ -325,6 +327,9 @@ class Pset {
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
                 }
                 $this->all_grades[$g->key] = $g;
+                if ($g->collate) {
+                    $this->has_grade_collate = true;
+                }
                 if ($g->landmark_file || $g->landmark_range_file) {
                     $this->has_grade_landmark = true;
                 }
@@ -1020,6 +1025,8 @@ class GradeEntryConfig {
     public $position;
     /** @var ?int */
     public $pcview_index;
+    /** @var ?bool */
+    public $collate;
     /** @var ?string */
     public $landmark_file;
     /** @var ?int */
@@ -1169,6 +1176,7 @@ class GradeEntryConfig {
             $this->position = -Pset::cnum($loc, $g, "priority");
         }
 
+        $this->collate = Pset::cbool($loc, $g, "collate");
         $lm = self::clean_landmark($g, "landmark");
         $lmr = self::clean_landmark($g, "landmark_range");
         if ($lm === null && $lmr !== null) {
@@ -1201,6 +1209,7 @@ class GradeEntryConfig {
                 $this->landmark_range_file = $lmr[0];
                 $this->landmark_range_first = $lmr[1];
                 $this->landmark_range_last = $lmr[count($lmr) - 1];
+                $this->collate = $this->collate ?? true;
             }
             if ($this->landmark_range_file === null
                 || $this->landmark_range_first > $this->landmark_range_last) {
@@ -1247,6 +1256,18 @@ class GradeEntryConfig {
         return $x;
     }
 
+
+    /** @return ?string */
+    function text_title() {
+        $t = $this->title;
+        if (str_starts_with($t, "<1>")) {
+            $t = substr($t, 3);
+        }
+        if (str_ends_with($t, ")") && preg_match('/\A(.*?)\s*\(\d+ points?\)\z/', $t, $m)) {
+            $t = $m[1];
+        }
+        return $t;
+    }
 
     /** @param bool $isnew */
     function parse_value($v, $isnew) {
@@ -1397,9 +1418,6 @@ class GradeEntryConfig {
 
     function json($pcview, $pos = null) {
         $gej = ["key" => $this->key, "title" => $this->title];
-        if ($pos !== null) {
-            $gej["pos"] = $pos;
-        }
         if ($this->type !== null) {
             $gej["type"] = $this->type;
             if ($this->type === "select") {

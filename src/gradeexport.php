@@ -167,7 +167,7 @@ class GradeExport implements JsonSerializable {
                 $r["editable"] = $this->editable;
             }
         }
-        if ($this->include_entries) {
+        if ($this->include_entries || $this->visible_grades !== null) {
             $entries = $order = [];
             $gi = $maxtotal = 0;
             foreach ($this->visible_grades() as $ge) {
@@ -184,10 +184,12 @@ class GradeExport implements JsonSerializable {
                 }
                 ++$gi;
             }
-            if (!empty($entries)) {
-                $r["entries"] = $entries;
-            } else if (empty($order)) {
-                $r["entries"] = (object) $entries;
+            if ($this->include_entries) {
+                if (!empty($entries)) {
+                    $r["entries"] = $entries;
+                } else if (empty($order)) {
+                    $r["entries"] = (object) $entries;
+                }
             }
             $r["order"] = $order;
             if ($this->pset->grades_total !== null) {

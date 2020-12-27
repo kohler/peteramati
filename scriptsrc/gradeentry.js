@@ -232,18 +232,24 @@ export class GradeEntry {
 export class GradeSheet {
     constructor(x) {
         this.entries = {};
-        x && this.extend(x);
+        x && this.extend(x, false);
     }
 
-    extend(x) {
+    extend(x, replace) {
         for (let k in x) {
             if (k === "entries") {
                 for (let i in x.entries) {
                     this.entries[i] = new GradeEntry(x.entries[i]);
                     this.entries[i]._all = this;
                 }
-            } else {
+            } else if (replace || !(k in this)) {
                 this[k] = x[k];
+            }
+        }
+        if ("order" in x) {
+            this.gpos = {};
+            for (let i = 0; i < this.order.length; ++i) {
+                this.gpos[this.order[i]] = i;
             }
         }
     }
@@ -254,7 +260,10 @@ export class GradeSheet {
         if (k === "late_hours") {
             GradeEntry.late_hours().fill_dom(element, this.late_hours, {autograde: this.auto_late_hours});
         } else if (ge) {
-            ge.fill_dom(element, this.grades ? this.grades[ge.pos] : null, {autograde: this.autogrades ? this.autogrades[ge.pos] : null});
+            const gpos = this.gpos[k];
+            if (gpos != null) {
+                ge.fill_dom(element, this.grades ? this.grades[gpos] : null, {autograde: this.autogrades ? this.autogrades[gpos] : null});
+            }
         }
     }
 
@@ -277,6 +286,15 @@ export class GradeSheet {
             }
         }
         return false;
+    }
+
+    grade_value(ge) {
+        if (this.grades) {
+            const i = this.gpos[ge.key];
+            return this.grades[i];
+        } else {
+            return null;
+        }
     }
 
     section_wants_sidebar(start) {
@@ -303,7 +321,7 @@ export class GradeSheet {
         if (!gs) {
             $(element).data("pa-gradeinfo", (gs = new GradeSheet));
         }
-        gs.extend(x);
+        gs.extend(x, true);
         window.$pa.loadgrades.call(element);
     }
 
@@ -314,7 +332,7 @@ export class GradeSheet {
             if (edata) {
                 const jx = typeof edata === "string" ? JSON.parse(edata) : edata;
                 if (gi) {
-                    gi.extend(jx);
+                    gi.extend(jx, false);
                 } else if (jx instanceof GradeSheet) {
                     gi = jx;
                 } else {
@@ -322,10 +340,10 @@ export class GradeSheet {
                     $(e).data("pa-gradeinfo", gi);
                 }
             }
-            if (gi && gi.entries) {
+            if (gi && !hasClass(e, "pa-psetinfo-partial")) {
                 break;
             }
-            e = e.closest(".pa-psetinfo");
+            e = e.parentElement.closest(".pa-psetinfo");
         }
         return gi;
     }
