@@ -72,12 +72,20 @@ class UserPsetInfo {
         return $upi;
     }
 
+
     /** @return ?object */
     function jnotes() {
         if ($this->jnotes === null && $this->notes !== null) {
             $this->jnotes = json_decode($this->notes);
         }
         return $this->jnotes;
+    }
+
+    /** @param string $key
+     * @return mixed */
+    function jnote($key) {
+        $jn = $this->jnotes();
+        return $jn ? $jn->$key ?? null : null;
     }
 
     /** @param ?string $notes

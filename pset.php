@@ -122,7 +122,7 @@ function save_grades(Pset $pset, PsetView $info, $values, $isauto) {
         if (isset($values[$ge->key])
             && ($g = $ge->parse_value($values[$ge->key], !$isauto)) !== false) {
             if (isset($values["old;" . $ge->key])) {
-                $old_grade = $info->current_grade_value($ge->key);
+                $old_grade = $info->grade_value($ge->key);
                 if ($ge->value_differs($g, $old_grade)) {
                     json_exit(["ok" => false, "error" => "This grade has been updated—please reload."]);
                 }

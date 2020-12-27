@@ -150,7 +150,7 @@ function collect_pset_info(&$students, $sset, $entries) {
 
             if ($entries) {
                 foreach ($pset->tabular_grades() as $ge) {
-                    if (($g = $info->current_grade_value($ge->key)) !== null)
+                    if (($g = $info->grade_value($ge->key)) !== null)
                         $ss->{$ge->key} = $g;
                 }
             }

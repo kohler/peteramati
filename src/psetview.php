@@ -146,6 +146,7 @@ class PsetView {
         return $this->branch;
     }
 
+
     /** @return ?UserPsetInfo */
     private function upi() {
         if (($this->_havepi & 1) === 0) {
@@ -177,10 +178,6 @@ class PsetView {
         return $this->_cpi;
     }
 
-    /** @return null|RepositoryPsetInfo|UserPsetInfo */
-    private function gpi() {
-        return $this->pset->gitless_grades ? $this->upi() : $this->rpi();
-    }
 
     /** @param string $hashpart
      * @return ?CommitRecord */
@@ -393,18 +390,6 @@ class PsetView {
     }
 
     /** @return ?object */
-    function grade_jnotes() {
-        $gpi = $this->gpi();
-        return $gpi ? $gpi->jnotes() : null;
-    }
-
-    /** @param non-empty-string $key */
-    function grade_jnote($key) {
-        $gn = $this->grade_jnotes();
-        return $gn ? $gn->$key ?? null : null;
-    }
-
-    /** @return ?object */
     function commit_jnotes() {
         assert(!$this->pset->gitless);
         $cpi = $this->cpi();
@@ -430,12 +415,11 @@ class PsetView {
         return $rn ? $rn->$key ?? null : null;
     }
 
+
     /** @return ?object */
     function current_jnotes() {
-        if ($this->pset->gitless_grades
-            || $this->_hash === null
-            || ($this->_rpi && $this->_rpi->gradehash === $this->_hash)) {
-            return $this->grade_jnotes();
+        if ($this->pset->gitless) {
+            return $this->user_jnotes();
         } else {
             return $this->commit_jnotes();
         }
@@ -462,18 +446,39 @@ class PsetView {
         }
     }
 
-    function current_grade_value($k, $type = null) {
-        $gn = $this->current_jnotes();
+
+    /** @return ?object */
+    function grade_jnotes() {
+        if ($this->pset->gitless) {
+            return $this->user_jnotes();
+        } else if ($this->pset->gitless_grades) {
+            return $this->repository_jnotes();
+        } else {
+            return $this->commit_jnotes();
+        }
+    }
+
+    /** @param non-empty-string $key
+     * @return mixed */
+    function grade_jnote($key) {
+        $jn = $this->grade_jnotes();
+        return $jn ? $jn->$key ?? null : null;
+    }
+
+    /** @param string $key
+     * @return null|int|float|string */
+    function grade_value($key, $type = null) {
+        $gn = $this->grade_jnotes();
         $grade = null;
         if ((!$type || $type == "autograde")
             && isset($gn->autogrades)
-            && property_exists($gn->autogrades, $k)) {
-            $grade = $gn->autogrades->$k;
+            && property_exists($gn->autogrades, $key)) {
+            $grade = $gn->autogrades->$key;
         }
         if ((!$type || $type == "grade")
             && isset($gn->grades)
-            && property_exists($gn->grades, $k)) {
-            $grade = $gn->grades->$k;
+            && property_exists($gn->grades, $key)) {
+            $grade = $gn->grades->$key;
         }
         return $grade;
     }
@@ -642,8 +647,9 @@ class PsetView {
             $this->_havepi &= ~2;
             $this->rpi();
         }
-        $this->_rpi->assign_rpnotes($notes, $new_notes, ($rpi ? $rpi->notesversion : 0) + 1);
+        $this->_rpi->assign_rpnotes($notes, $new_notes, ($rpi ? $rpi->rpnotesversion : 0) + 1);
     }
+
 
     /** @param non-empty-string $hash
      * @param array $updates */
@@ -655,11 +661,6 @@ class PsetView {
             && $this->_hash === $hash) {
             $old_notes = $this->_cpi->jnotes();
             $old_nversion = $this->_cpi->notesversion;
-        } else if ($this->_rpi
-                   && $this->_rpi->gradehash === $hash
-                   && $this->_rpi->notesversion !== null) {
-            $old_notes = $this->_rpi->jnotes();
-            $old_nversion = $this->_rpi->notesversion;
         } else if (($cpi = $this->pset->cpi_at($hash))) {
             $old_notes = $cpi->jnotes();
             $old_nversion = $cpi->notesversion;
@@ -722,9 +723,6 @@ class PsetView {
             $this->_cpi->hasactiveflags = $hasactiveflags;
             $this->_cpi->haslinenotes = $haslinenotes;
         }
-        if ($this->_rpi && $this->_rpi->gradehash === $hash) {
-            $this->_rpi->assign_notes($notes, $new_notes, ($old_nversion ?? 0) + 1);
-        }
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
             $this->clear_can_view_grades();
             if ($this->grading_hash() === $hash) {
@@ -752,8 +750,10 @@ class PsetView {
 
     /** @param array $updates */
     function update_grade_notes($updates) {
-        if ($this->pset->gitless || $this->pset->gitless_grades) {
+        if ($this->pset->gitless) {
             $this->update_user_notes($updates);
+        } else if ($this->pset->gitless_grades) {
+            $this->update_repository_notes($updates);
         } else {
             $this->update_commit_notes($updates);
         }
@@ -899,10 +899,10 @@ class PsetView {
         if ($this->pset->student_can_view()
             && ($this->pset->gitless_grades
                 || ($this->repo && $this->user_can_view_repo_contents()))) {
-            $gpi = $this->gpi();
-            $maybe = $gpi
-                && ($gpi->hidegrade < 0
-                    || ($gpi->hidegrade == 0
+            $xpi = $this->pset->gitless ? $this->upi() : $this->rpi();
+            $maybe = $xpi
+                && ($xpi->hidegrade < 0
+                    || ($xpi->hidegrade == 0
                         && $this->pset->student_can_view_grades()));
             if ($maybe || $this->pset->student_can_edit_grades()) {
                 foreach ($this->visible_grades(false) as $ge) {
@@ -982,7 +982,7 @@ class PsetView {
             $this->_n_nonempty_grades = $this->_n_nonempty_assigned_grades =
             $this->_n_visible_in_total = 0;
         if ($this->can_view_grades()) {
-            $notes = $this->current_jnotes();
+            $notes = $this->grade_jnotes();
             $ag = $notes->autogrades ?? null;
             $g = $notes->grades ?? null;
             foreach ($this->visible_grades() as $ge) {
@@ -1033,7 +1033,7 @@ class PsetView {
     /** @return array{int|float,int|float,int|float} */
     function grade_total() {
         $total = $total_noextra = $maxtotal = 0;
-        $notes = $this->current_jnotes();
+        $notes = $this->grade_jnotes();
         $ag = $notes->autogrades ?? null;
         $g = $notes->grades ?? null;
         foreach ($this->visible_grades() as $ge) {
@@ -1137,7 +1137,7 @@ class PsetView {
             return null;
         }
 
-        $cn = $this->current_jnotes();
+        $cn = $this->grade_jnotes();
         $ts = $cn ? $cn->timestamp ?? null : null;
         $ts = $ts ?? $this->current_timestamp(true);
         $autohours = self::auto_late_hours($deadline, $ts);
@@ -1537,7 +1537,7 @@ class PsetView {
         }
         $gexp->uid = $this->user->contactId;
 
-        $notes = $this->current_jnotes();
+        $notes = $this->grade_jnotes();
         $agx = $notes->autogrades ?? null;
         $gx = $notes->grades ?? null;
         $fgx = $this->pset->has_formula ? $notes->formula ?? null : null;
@@ -1556,8 +1556,9 @@ class PsetView {
                 $gexp->auto_late_hours = $lhd->autohours;
             }
         }
-        if ($this->pset->gitless_grades && ($gpi = $this->gpi())) {
-            $gexp->version = $gpi->notesversion;
+        if ($this->pset->gitless_grades
+            && ($xpi = $this->pset->gitless ? $this->upi() : $this->rpi())) {
+            $gexp->version = $xpi->notesversion;
         }
         if (($ts = $this->current_timestamp(false))) {
             $gexp->updateat = $ts;

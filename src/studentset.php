@@ -267,13 +267,6 @@ class StudentSet implements Iterator, Countable {
             while ($rpi && ($rpi->pset !== $pset->id || $rpi->branchid !== $branchid)) {
                 $rpi = $rpi->sset_next;
             }
-            if ($rpi && !$rpi->joined_commitnotes) {
-                $rpi->joined_commitnotes = true;
-                if ($rpi->gradebhash
-                    && ($cpi = $this->cpi_for($rpi->gradebhash, $pset))) {
-                    $rpi->assign_notes($cpi->notes, $cpi->jnotes(), $cpi->notesversion);
-                }
-            }
             return $rpi;
         } else {
             return null;

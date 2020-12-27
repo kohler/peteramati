@@ -79,6 +79,7 @@ class CommitPsetInfo {
         return $cpi;
     }
 
+
     /** @return ?object */
     function jnotes() {
         if ($this->jnotes === null && $this->notes !== null) {

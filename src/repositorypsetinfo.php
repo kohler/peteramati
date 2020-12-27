@@ -33,16 +33,6 @@ class RepositoryPsetInfo {
     /** @var ?int */
     public $emptydiff_at;
 
-    // joined from CommitNotes
-    /** @var ?string */
-    public $notes;
-    /** @var ?object */
-    private $jnotes;
-    /** @var ?int */
-    public $notesversion;
-    /** @var ?bool */
-    public $joined_commitnotes;
-
     /** @var ?RepositoryPsetInfo */
     public $sset_next;
 
@@ -71,10 +61,6 @@ class RepositoryPsetInfo {
         if (isset($this->emptydiff_at)) {
             $this->emptydiff_at = (int) $this->emptydiff_at;
         }
-
-        if (isset($this->notesversion)) {
-            $this->notesversion = (int) $this->notesversion;
-        }
     }
 
     /** @return ?RepositoryPsetInfo */
@@ -86,22 +72,6 @@ class RepositoryPsetInfo {
         return $rp;
     }
 
-    /** @return ?object */
-    function jnotes() {
-        if ($this->jnotes === null && $this->notes !== null) {
-            $this->jnotes = json_decode($this->notes);
-        }
-        return $this->jnotes;
-    }
-
-    /** @param ?string $notes
-     * @param ?object $jnotes
-     * @param int $notesversion */
-    function assign_notes($notes, $jnotes, $notesversion) {
-        $this->notes = $notes;
-        $this->jnotes = $jnotes;
-        $this->notesversion = $notesversion;
-    }
 
     /** @return ?object */
     function jrpnotes() {

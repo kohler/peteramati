@@ -36,7 +36,7 @@ class API_Grade {
         $v = [];
         foreach ($info->pset->grades() as $ge) {
             $k = $ge->key;
-            $oldgv = $info->current_grade_value($k);
+            $oldgv = $info->grade_value($k);
             if (array_key_exists($k, $og)) {
                 if ($ge->value_differs($oldgv, $og[$k])
                     && (!array_key_exists($k, $g)

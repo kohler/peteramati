@@ -638,10 +638,8 @@ class Pset {
      * @param int $branchid
      * @return ?RepositoryPsetInfo */
     function rpi_for($repo, $branchid) {
-        $result = $this->conf->qe("select rg.*, cn.notes, cn.notesversion
-            from RepositoryGrade rg
-            left join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)
-            where rg.repoid=? and rg.branchid=? and rg.pset=?",
+        $result = $this->conf->qe("select * from RepositoryGrade
+            where repoid=? and branchid=? and pset=?",
             $repo->repoid, $branchid, $this->psetid);
         $rpi = RepositoryPsetInfo::fetch($result);
         Dbl::free($result);
