@@ -874,7 +874,7 @@ function pa_resolve_gradelist() {
         const gre = grl[k];
         if (gre && gre === ch) {
             ch = ch.nextSibling;
-            while (ch && hasClass(ge, "pa-pdesc")) {
+            while (ch && hasClass(ch, "pa-pdesc")) {
                 ch = ch.nextSibling;
             }
         } else if (gre) {

@@ -10,6 +10,11 @@ import { render_ftext } from "./render.js";
 
 
 let id_counter = 0, late_hours_entry;
+const want_props = {
+    "uid": true, "last_hours": true, "auto_late_hours": true, "updateat": true,
+    "version": true, "editable": true, "maxtotal": true, "history": true, "total": true,
+    "total_noextra": true, "grading_hash": true, "answer_version": true
+};
 
 export class GradeEntry {
     constructor(x) {
@@ -232,25 +237,50 @@ export class GradeEntry {
 export class GradeSheet {
     constructor(x) {
         this.entries = {};
-        x && this.extend(x, false);
+        x && this.extend(x);
     }
 
-    extend(x, replace) {
-        for (let k in x) {
-            if (k === "entries") {
-                for (let i in x.entries) {
-                    this.entries[i] = new GradeEntry(x.entries[i]);
-                    this.entries[i]._all = this;
-                }
-            } else if (replace || !(k in this)) {
-                this[k] = x[k];
+    extend(x) {
+        if (x.entries) {
+            for (let i in x.entries) {
+                this.entries[i] = new GradeEntry(x.entries[i]);
+                this.entries[i]._all = this;
             }
         }
-        if ("order" in x) {
+        if (x.order && !this.order) {
+            this.order = x.order;
             this.gpos = {};
             for (let i = 0; i < this.order.length; ++i) {
                 this.gpos[this.order[i]] = i;
             }
+        }
+        if (x.grades) {
+            this.grades = this.merge_grades(this.grades, x.grades, x.order || this.order);
+        }
+        if (x.autogrades) {
+            this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x.order || this.order);
+        }
+        for (let k in x) {
+            if (want_props[k])
+                this[k] = x[k];
+        }
+    }
+
+    merge_grades(myg, ing, inorder) {
+        if (!myg && (!this.order || inorder === this.order)) {
+            return ing;
+        } else {
+            myg = myg || [];
+            for (let i in inorder) {
+                const j = this.gpos[inorder[i]];
+                if (j != null) {
+                    while (myg.length <= j) {
+                        myg.push(null);
+                    }
+                    myg[j] = ing[i];
+                }
+            }
+            return myg;
         }
     }
 
@@ -336,7 +366,7 @@ export class GradeSheet {
         if (!gs) {
             $(element).data("pa-gradeinfo", (gs = new GradeSheet));
         }
-        gs.extend(x, true);
+        gs.extend(x);
         window.$pa.loadgrades.call(element);
     }
 
@@ -347,7 +377,7 @@ export class GradeSheet {
             if (edata) {
                 const jx = typeof edata === "string" ? JSON.parse(edata) : edata;
                 if (gi) {
-                    gi.extend(jx, false);
+                    gi.extend(jx);
                 } else if (jx instanceof GradeSheet) {
                     gi = jx;
                 } else {
