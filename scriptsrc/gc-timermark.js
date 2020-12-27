@@ -72,7 +72,7 @@ GradeClass.add("timermark", {
                 const delta = this._all.updateat - g;
                 t += sprintf(" (updated %dh%dm later)", delta / 3600, (delta / 60) % 60);
             }
-            return t;
+            tm.innerHTML = t;
         }
     },
     justify: "left",
