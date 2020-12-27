@@ -1743,6 +1743,8 @@ class FormulaConfig {
     public $formula;
     /** @var null|false|GradeFormula */
     private $_formula = false;
+    /** @var object */
+    public $config;
 
     function __construct(Conf $conf, $name, $g, $subposition = 0) {
         $this->conf = $conf;
