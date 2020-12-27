@@ -2305,7 +2305,7 @@ class Conf {
         if (!isset($this->_formulas)) {
             $this->formulas();
         }
-        return $this->_formulas[$name] ?? null;
+        return $this->_formulas_by_name[$name] ?? null;
     }
 
     /** @return list<FormulaConfig> */
