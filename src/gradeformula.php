@@ -99,6 +99,8 @@ abstract class GradeFormula implements JsonSerializable {
                 $noextra = $noextra && $pset->has_extra;
                 $raw = $raw === null || $raw;
                 $e = new PsetTotal_GradeFormula($pset, $noextra, $raw);
+            } else if (($gf = $conf->formula_by_name($k))) {
+                $e = $gf->formula();
             } else if ($conf->pset_category($kbase)) {
                 $noextra = $noextra && $conf->pset_category_has_extra($kbase);
                 $raw = $raw !== null && $raw;
