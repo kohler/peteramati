@@ -2163,6 +2163,10 @@ td.mhcb {
 	width: 100%;
 	margin-bottom: 0.25rem;
 }
+.pa-pdesc.pa-pdesc-external {
+	margin-top: -0.5rem;
+	margin-bottom: 0.5rem;
+}
 .pa-pdesc > p:last-child {
 	margin-bottom: 0;
 }
@@ -2191,8 +2195,11 @@ td.mhcb {
 	min-width: initial;
 	width: auto;
 }
-.pa-p-section {
-	margin-top: 2.5rem;
+.pa-gsection {
+	margin-bottom: 2.5rem;
+}
+.pa-gsection:last-child {
+	margin-bottom: 0;
 }
 .pa-p-section > label.pa-pt {
 	font-size: larger;
@@ -2358,7 +2365,7 @@ tr.gtrow-partner {
 .pa-fileref-context {
 	font-weight: 500;
 }
-.pa-fileref {
+.pa-fileref, .pa-sticky {
 	position: sticky;
 	z-index: 1;
 	top: 0;

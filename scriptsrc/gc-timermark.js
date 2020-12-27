@@ -70,7 +70,7 @@ GradeClass.add("timermark", {
             let t = strftime(timefmt, g);
             if (this._all && (this._all.updateat || 0) > g) {
                 const delta = this._all.updateat - g;
-                t += sprintf(" (updated %dh%dm later)", delta / 3600, (delta / 60) % 60);
+                t += sprintf(" (updated %dh%dm later at %s)", delta / 3600, (delta / 60) % 60, strftime(timefmt, this._all.updateat));
             }
             tm.innerHTML = t;
         }

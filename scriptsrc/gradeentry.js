@@ -135,23 +135,24 @@ export class GradeEntry {
         }
 
         // maybe add landmark reference
-        if (this.landmark
-            && element.parentElement
-            && hasClass(element.parentElement, "want-pa-landmark-links")) {
-            let want_gbr = "";
-            const m = /^(.*):(\d+)$/.exec(this.landmark);
-            if (m && Filediff.find(m[1])) {
-                const pi = element.closest(".pa-psetinfo"),
-                    directory = pi.getAttribute("data-pa-directory") || "",
-                    filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
-                want_gbr = '@<a href="#La'.concat(m[2], '_', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
-            }
-            const $pgbr = $g.find(".pa-gradeboxref");
-            if (want_gbr === "") {
-                $pgbr.remove();
-            } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
-                $pgbr.remove();
-                $g.find(".pa-pd").first().append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
+        if (this.landmark) {
+            const gl = element.closest(".pa-gradelist");
+            if (gl && hasClass(gl, "want-landmark-links")) {
+                let want_gbr = "";
+                const m = /^(.*):(\d+)$/.exec(this.landmark);
+                if (m && Filediff.find(m[1])) {
+                    const pi = element.closest(".pa-psetinfo"),
+                        directory = pi.getAttribute("data-pa-directory") || "",
+                        filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
+                    want_gbr = '@<a href="#La'.concat(m[2], '_', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
+                }
+                const $pgbr = $g.find(".pa-gradeboxref");
+                if (want_gbr === "") {
+                    $pgbr.remove();
+                } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
+                    $pgbr.remove();
+                    $g.find(".pa-pd").first().append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
+                }
             }
         }
     }
@@ -268,6 +269,31 @@ export class GradeSheet {
         return Math.round(total * 1000) / 1000;
     }
 
+    get has_sections() {
+        for (let i = 0; i < this.order.length; ++i) {
+            const ge = this.entries[this.order[i]];
+            if (ge.type === "section") {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    section_wants_sidebar(start) {
+        let answer = 0;
+        for (let i = start + 1; i < this.order.length; ++i) {
+            const ge = this.entries[this.order[i]];
+            if (ge.type === "section") {
+                break;
+            } else if (ge.answer) {
+                answer |= 1;
+            } else {
+                answer |= 2;
+            }
+        }
+        return answer === 3;
+    }
+
     static parse_json(x) {
         return new GradeSheet(JSON.parse(x));
     }
@@ -299,7 +325,7 @@ export class GradeSheet {
             if (gi && gi.entries) {
                 break;
             }
-            e = e.parentElement.closest(".pa-psetinfo");
+            e = e.closest(".pa-psetinfo");
         }
         return gi;
     }

@@ -927,7 +927,6 @@ class PsetView {
     /** @param string $key */
     function suppress_grade($key) {
         $ge = $this->pset->grades[$key];
-        assert(!!$ge->no_total);
         $this->_grades_vf = $this->_grades_vf ?? $this->pset->grades_vf;
         $this->_grades_vf[$ge->pcview_index] = 0;
         $this->_grades_suppressed = true;
