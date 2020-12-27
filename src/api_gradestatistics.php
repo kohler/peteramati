@@ -126,7 +126,7 @@ class API_GradeStatistics {
         } else {
             $notdropped = "not c.dropped";
         }
-        $q = "select c.contactId, cn.notes, c.extension from ContactInfo c\n";
+        $q = "select c.contactId, cn.notes, c.extension, cn.notesOverflow from ContactInfo c\n";
         if ($pset->gitless_grades) {
             $q .= "\t\tjoin ContactGrade cn on (cn.cid=c.contactId and cn.pset={$pset->id})";
         } else {
@@ -136,7 +136,7 @@ class API_GradeStatistics {
         }
         $result = $pset->conf->qe_raw($q . " where $notdropped");
         while (($row = $result->fetch_row())) {
-            if (($g = ContactView::pset_grade(json_decode($row[1]), $pset))) {
+            if (($g = ContactView::pset_grade(json_decode($row[3] ?? $row[1]), $pset))) {
                 $cid = +$row[0];
                 $series->add($cid, $g->total);
                 if ($xseries && $row[2]) {
