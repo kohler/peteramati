@@ -383,6 +383,12 @@ class PsetView {
         return $upi ? $upi->jnotes() : null;
     }
 
+    /** @return ?object */
+    function user_jxnotes() {
+        $upi = $this->upi();
+        return $upi ? $upi->jxnotes() : null;
+    }
+
     /** @param non-empty-string $key */
     function user_jnote($key) {
         $un = $this->user_jnotes();
@@ -396,6 +402,13 @@ class PsetView {
         return $cpi ? $cpi->jnotes() : null;
     }
 
+    /** @return ?object */
+    function commit_jxnotes() {
+        assert(!$this->pset->gitless);
+        $cpi = $this->cpi();
+        return $cpi ? $cpi->jxnotes() : null;
+    }
+
     /** @param non-empty-string $key */
     function commit_jnote($key) {
         $cn = $this->commit_jnotes();
@@ -407,6 +420,13 @@ class PsetView {
         assert(!$this->pset->gitless);
         $rpi = $this->rpi();
         return $rpi ? $rpi->jrpnotes() : null;
+    }
+
+    /** @return ?object */
+    function repository_jxnotes() {
+        assert(!$this->pset->gitless);
+        $rpi = $this->rpi();
+        return $rpi ? $rpi->jrpxnotes() : null;
     }
 
     /** @param non-empty-string $key */
@@ -458,10 +478,28 @@ class PsetView {
         }
     }
 
+    /** @return ?object */
+    function grade_jxnotes() {
+        if ($this->pset->gitless) {
+            return $this->user_jxnotes();
+        } else if ($this->pset->gitless_grades) {
+            return $this->repository_jxnotes();
+        } else {
+            return $this->commit_jxnotes();
+        }
+    }
+
     /** @param non-empty-string $key
      * @return mixed */
     function grade_jnote($key) {
         $jn = $this->grade_jnotes();
+        return $jn ? $jn->$key ?? null : null;
+    }
+
+    /** @param non-empty-string $key
+     * @return mixed */
+    function grade_jxnote($key) {
+        $jn = $this->grade_jxnotes();
         return $jn ? $jn->$key ?? null : null;
     }
 
@@ -498,6 +536,10 @@ class PsetView {
             if (!count(get_object_vars($j->grades))) {
                 unset($j->grades);
             }
+        }
+        if (is_object($j)) {
+            unset($j->formula);
+            unset($j->formula_at);
         }
     }
 
@@ -545,6 +587,7 @@ class PsetView {
     function update_user_notes($updates) {
         // find original
         $upi = $this->upi();
+        $is_student = !$this->viewer->isPC;
 
         // compare-and-swap loop
         while (true) {
@@ -560,18 +603,22 @@ class PsetView {
             if (!$upi) {
                 $result = Dbl::qx($this->conf->dblink, "insert into ContactGrade
                     set cid=?, pset=?, updateat=?, updateby=?,
+                    studentupdateat=?,
                     notes=?, notesOverflow=?, hasactiveflags=?",
                     $this->user->contactId, $this->pset->id,
                     Conf::$now, $this->viewer->contactId,
+                    $is_student ? Conf::$now : null,
                     $notesa, $notesb, $hasactiveflags);
             } else if ($upi->notes === $notes) {
                 return;
             } else {
                 $result = $this->conf->qe("update ContactGrade
                     set notesversion=?, updateat=?, updateby=?,
+                    studentupdateat=?,
                     notes=?, notesOverflow=?, hasactiveflags=?
                     where cid=? and pset=? and notesversion=?",
                     $upi->notesversion + 1, Conf::$now, $this->viewer->contactId,
+                    $is_student ? Conf::$now : $upi->studentupdateat,
                     $notesa, $notesb, $hasactiveflags,
                     $this->user->contactId, $this->pset->id, $upi->notesversion);
             }
@@ -588,10 +635,10 @@ class PsetView {
             $unotes = json_encode_db(json_antiupdate($upi->jnotes(), $updates));
             $unotesa = strlen($unotes) > 32000 ? null : $unotes;
             $unotesb = strlen($unotes) > 32000 ? $unotes : null;
-            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, notes=?, notesOverflow=?",
+            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, studentupdateat=?, notes=?, notesOverflow=?",
                 $this->user->contactId, $this->pset->id,
                 $upi->notesversion, $upi->updateat ?? 0, $upi->updateby ?? 0,
-                $unotesa, $unotesb);
+                $upi->studentupdateat, $unotesa, $unotesb);
         }
 
         if (!$this->_upi) {
@@ -607,6 +654,21 @@ class PsetView {
     }
 
     /** @param array $updates */
+    function update_user_xnotes($updates) {
+        if (($upi = $this->upi())) {
+            $new_xnotes = json_update($upi->jxnotes(), $updates);
+            $xnotes = json_encode_db($new_xnotes);
+            $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
+            $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
+            $result = $this->conf->qe("update ContactGrade set xnotes=?, xnotesOverflow=? where cid=? and pset=? and notesversion=?",
+                $xnotesa, $xnotesb, $upi->cid, $upi->pset, $upi->notesversion);
+            Dbl::free($result);
+            $upi->assign_xnotes($xnotes, $new_xnotes);
+        }
+    }
+
+
+    /** @param array $updates */
     function update_repository_notes($updates) {
         // find original
         $rpi = $this->rpi();
@@ -619,19 +681,21 @@ class PsetView {
 
             // update database
             $notes = json_encode_db($new_notes);
+            $notesa = strlen($notes) > 16000 ? null : $notes;
+            $notesb = strlen($notes) > 16000 ? $notes : null;
             if (!$rpi) {
                 $result = Dbl::qe($this->conf->dblink, "insert into RepositoryGrade set
                     repoid=?, branchid=?, pset=?,
-                    placeholder=1, placeholder_at=?, rpnotes=?",
+                    placeholder=1, placeholder_at=?, rpnotes=?, rpnotesOverflow=?",
                     $this->repo->repoid, $this->branchid, $this->pset->id,
-                    Conf::$now, $notes);
+                    Conf::$now, $notesa, $notesb);
             } else if ($rpi->rpnotes === $notes) {
                 return;
             } else {
                 $result = $this->conf->qe("update RepositoryGrade
-                    set rpnotes=?, rpnotesversion=?
+                    set rpnotes=?, rpnotesOverflow=?, rpnotesversion=?
                     where repoid=? and branchid=? and pset=? and rpnotesversion=?",
-                    $notes, $rpi->rpnotesversion + 1,
+                    $notesa, $notesb, $rpi->rpnotesversion + 1,
                     $this->repo->repoid, $this->branchid, $this->pset->id, $rpi->rpnotesversion);
             }
             if ($result && $result->affected_rows) {
@@ -648,6 +712,21 @@ class PsetView {
             $this->rpi();
         }
         $this->_rpi->assign_rpnotes($notes, $new_notes, ($rpi ? $rpi->rpnotesversion : 0) + 1);
+    }
+
+    /** @param array $updates */
+    function update_repository_xnotes($updates) {
+        if (($rpi = $this->rpi())) {
+            $new_xnotes = json_update($rpi->jrpxnotes(), $updates);
+            $xnotes = json_encode_db($new_xnotes);
+            $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
+            $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
+            $result = $this->conf->qe("update RepositoryGrade set xnotes=?, xnotesOverflow=? where repoid=? and branchid=? and pset=? and rpnotesversion=?",
+                $xnotesa, $xnotesb,
+                $rpi->repoid, $rpi->branchid, $rpi->pset, $rpi->rpnotesversion);
+            Dbl::free($result);
+            $rpi->assign_rpxnotes($xnotes, $new_xnotes);
+        }
     }
 
 
@@ -740,6 +819,21 @@ class PsetView {
     }
 
     /** @param array $updates */
+    function update_commit_xnotes($updates) {
+        if (($cpi = $this->cpi())) {
+            $new_xnotes = json_update($cpi->jxnotes(), $updates);
+            $xnotes = json_encode_db($new_xnotes);
+            $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
+            $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
+            $result = $this->conf->qe("update CommitNotes set xnotes=?, xnotesOverflow=? where pset=? and bhash=? and notesversion=?",
+                $xnotesa, $xnotesb, $cpi->pset, $cpi->bhash, $cpi->notesversion);
+            Dbl::free($result);
+            $cpi->assign_xnotes($xnotes, $new_xnotes);
+        }
+    }
+
+
+    /** @param array $updates */
     function update_current_notes($updates) {
         if ($this->pset->gitless) {
             $this->update_user_notes($updates);
@@ -759,16 +853,15 @@ class PsetView {
         }
     }
 
-    /** @param array $updates
-     * @deprecated */
-    function update_commit_info($updates) {
-        return $this->update_commit_notes($updates);
-    }
-
-    /** @param array $updates
-     * @deprecated */
-    function update_grade_info($updates) {
-        return $this->update_grade_notes($updates);
+    /** @param array $updates */
+    function update_grade_xnotes($updates) {
+        if ($this->pset->gitless) {
+            $this->update_user_xnotes($updates);
+        } else if ($this->pset->gitless_grades) {
+            $this->update_repository_xnotes($updates);
+        } else {
+            $this->update_commit_xnotes($updates);
+        }
     }
 
 
@@ -1096,10 +1189,10 @@ class PsetView {
 
     /** @param bool $force
      * @return ?int */
-    private function current_timestamp($force) {
+    private function student_timestamp($force) {
         if ($this->pset->gitless) {
             $upi = $this->upi();
-            return $upi ? $upi->updateat : null;
+            return $upi ? $upi->studentupdateat : null;
         } else if ($this->_hash
                    && ($rpi = $this->rpi())
                    && $rpi->gradehash === $this->_hash) {
@@ -1139,7 +1232,7 @@ class PsetView {
 
         $cn = $this->grade_jnotes();
         $ts = $cn ? $cn->timestamp ?? null : null;
-        $ts = $ts ?? $this->current_timestamp(true);
+        $ts = $ts ?? $this->student_timestamp(true);
         $autohours = self::auto_late_hours($deadline, $ts);
 
         $ld = new LateHoursData;
@@ -1179,7 +1272,7 @@ class PsetView {
             return $cn->late_hours;
         } else if (($deadline = $this->deadline())) {
             $ts = $cn ? $cn->timestamp ?? null : null;
-            $ts = $ts ?? $this->current_timestamp(false);
+            $ts = $ts ?? $this->student_timestamp(false);
             return self::auto_late_hours($deadline, $ts);
         } else {
             return null;
@@ -1485,17 +1578,18 @@ class PsetView {
 
     function ensure_formula() {
         if ($this->pset->has_formula) {
-            $notes = $this->current_jnotes();
+            $notes = $this->grade_jxnotes();
             $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
+            //error_log("{$t} {$this->user->gradeUpdateTime} {$this->pset->config_mtime} {$notes->formula_at}");
             if (!isset($notes->formula_at)
                 || $notes->formula_at !== $t) {
-                $u = ["formula_at" => $t, "formula" => []];
+                $fs = [];
                 foreach ($this->pset->grades() as $ge) {
                     if (($f = $ge->formula($this->conf))) {
-                        $u["formula"][$ge->key] = $f->evaluate($this->user);
+                        $fs[$ge->key] = $f->evaluate($this->user);
                     }
                 }
-                $this->update_current_notes($u);
+                $this->update_grade_xnotes(["formula_at" => $t, "formula" => empty($fs) ? null : $fs]);
             }
         }
     }
@@ -1540,7 +1634,7 @@ class PsetView {
         $notes = $this->grade_jnotes();
         $agx = $notes->autogrades ?? null;
         $gx = $notes->grades ?? null;
-        $fgx = $this->pset->has_formula ? $notes->formula ?? null : null;
+        $fgx = $this->pset->has_formula ? $this->grade_jxnote("formula") : null;
         if ($agx || $gx || $this->is_grading_commit()) {
             $this->compute_grade_json_entries($gx, $agx, $fgx, $gexp);
         }
@@ -1560,7 +1654,7 @@ class PsetView {
             && ($xpi = $this->pset->gitless ? $this->upi() : $this->rpi())) {
             $gexp->version = $xpi->notesversion;
         }
-        if (($ts = $this->current_timestamp(false))) {
+        if (($ts = $this->student_timestamp(false))) {
             $gexp->updateat = $ts;
         }
         if ($this->can_edit_grades_staff()) {
@@ -1575,15 +1669,15 @@ class PsetView {
 
     /** @param int $answer_version
      * @return bool */
-    function export_answers_on(GradeExport $gexp, $answer_version) {
+    function export_answers_as_of(GradeExport $gexp, $answer_version) {
         if ($this->pset->gitless_grades && ($upi = $this->upi())) {
             if ($upi->notesversion === $answer_version
                 && ($gexp->answer_version ?? $gexp->version) === $answer_version) {
                 return true;
-            } else if (($j = $upi->jnotes_on($answer_version, $this->conf))) {
+            } else if (($j = $upi->jnotes_as_of($answer_version, $this->conf))) {
                 $gx = $j->grades ?? null;
                 $agx = $j->autogrades ?? null;
-                $fgx = $j->formulas ?? null;
+                $fgx = null;
                 foreach ($gexp->visible_grades() as $i => $ge) {
                     if ($ge->answer) {
                         $gexp->grades[$i] = $ge->extract_value($gx, $agx, $fgx, $av);

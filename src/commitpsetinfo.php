@@ -22,6 +22,12 @@ class CommitPsetInfo {
     private $jnotes;
     /** @var int */
     public $notesversion;
+    /** @var ?string */
+    public $xnotes;
+    /** @var ?string */
+    private $xnotesOverflow;
+    /** @var ?object */
+    private $jxnotes;
     /** @var int */
     public $hasflags;
     /** @var int */
@@ -45,6 +51,8 @@ class CommitPsetInfo {
         $this->haslinenotes = (int) $this->haslinenotes;
         $this->notes = $this->notesOverflow ?? $this->notes;
         $this->notesOverflow = null;
+        $this->xnotes = $this->xnotesOverflow ?? $this->xnotes;
+        $this->xnotesOverflow = null;
     }
 
     /** @return ?CommitPsetInfo */
@@ -102,5 +110,28 @@ class CommitPsetInfo {
         $this->notes = $notes;
         $this->jnotes = $jnotes;
         $this->notesversion = $notesversion;
+    }
+
+
+    /** @return ?object */
+    function jxnotes() {
+        if ($this->jxnotes === null && $this->xnotes !== null) {
+            $this->jxnotes = json_decode($this->xnotes);
+        }
+        return $this->jxnotes;
+    }
+
+    /** @param string $key
+     * @return mixed */
+    function jxnote($key) {
+        $jn = $this->jxnotes();
+        return $jn ? $jn->$key ?? null : null;
+    }
+
+    /** @param ?string $xnotes
+     * @param ?object $jxnotes */
+    function assign_xnotes($xnotes, $jxnotes) {
+        $this->xnotes = $xnotes;
+        $this->jxnotes = $jxnotes;
     }
 }

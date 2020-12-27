@@ -12,6 +12,8 @@ class UserPsetHistory {
     public $updateat;
     /** @var ?int */
     public $updateby;
+    /** @var ?int */
+    public $studentupdateat;
     /** @var ?string */
     public $notes;
     /** @var ?string */
@@ -29,6 +31,7 @@ class UserPsetHistory {
         $this->notesversion = (int) $this->notesversion;
         $this->updateat = (int) $this->updateat;
         $this->updateby = (int) $this->updateby;
+        $this->studentupdateat = (int) $this->studentupdateat;
         $this->notes = $this->notesOverflow ?? $this->notes;
         $this->notesOverflow = null;
     }

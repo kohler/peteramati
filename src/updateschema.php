@@ -217,6 +217,44 @@ function update_schema_drop_keys_if_exist($conf, $table, $key) {
     }
 }
 
+function update_schema_studentupdateat($conf) {
+    $all = [];
+    $result = $conf->qe("select * from ContactGrade");
+    while (($row = UserPsetInfo::fetch($result))) {
+        $all[$row->pset][$row->cid][] = $row;
+    }
+    Dbl::free($result);
+
+    $result = $conf->qe("select * from ContactGradeHistory");
+    while (($row = UserPsetHistory::fetch($result))) {
+        $all[$row->pset][$row->cid][] = $row;
+    }
+    Dbl::free($result);
+
+    $mqe = Dbl::make_multi_query_stager($conf->dblink, Dbl::F_LOG);
+    foreach ($all as $pset => &$bycid) {
+        foreach ($bycid as $cid => &$items) {
+            $n = count($items);
+            usort($items, function ($a, $b) {
+                return $a->notesversion - $b->notesversion;
+            });
+            $studentupdateat = null;
+            for ($i = 0; $i !== $n; ++$i) {
+                if ($items[$i]->updateby == $cid) {
+                    $studentupdateat = $items[$i]->updateat;
+                }
+                if ($items[$i]->studentupdateat !== $studentupdateat) {
+                    $table = $items[$i] instanceof UserPsetInfo ? "ContactGrade" : "ContactGradeHistory";
+                    $mqe("update $table set studentupdateat=? where cid=? and pset=? and notesversion=?", [$studentupdateat, $cid, $pset, $items[$i]->notesversion]);
+                }
+            }
+        }
+        unset($items);
+    }
+    $mqe(true);
+    return true;
+}
+
 function updateSchema($conf) {
     global $OK;
     // avoid error message about timezone, set to $Opt
@@ -672,6 +710,22 @@ function updateSchema($conf) {
     if ($conf->sversion === 143
         && $conf->ql_ok("alter table `CommitNotes` add `commitat` bigint DEFAULT NULL")) {
         $conf->update_schema_version(144);
+    }
+    if ($conf->sversion === 144
+        && $conf->ql_ok("alter table `ContactGrade` add `studentupdateat` bigint DEFAULT NULL")
+        && $conf->ql_ok("alter table `ContactGradeHistory` add `studentupdateat` bigint DEFAULT NULL")
+        && update_schema_studentupdateat($conf)) {
+        $conf->update_schema_version(145);
+    }
+    if ($conf->sversion === 145
+        && $conf->ql_ok("alter table `ContactGrade` add `xnotes` varbinary(1024) DEFAULT NULL")
+        && $conf->ql_ok("alter table `RepositoryGrade` add `rpxnotes` varbinary(1024) DEFAULT NULL")
+        && $conf->ql_ok("alter table `CommitNotes` add `xnotes` varbinary(1024) DEFAULT NULL")
+        && $conf->ql_ok("alter table `ContactGrade` add `xnotesOverflow` longblob DEFAULT NULL")
+        && $conf->ql_ok("alter table `RepositoryGrade` add `rpnotesOverflow` longblob DEFAULT NULL")
+        && $conf->ql_ok("alter table `RepositoryGrade` add `rpxnotesOverflow` longblob DEFAULT NULL")
+        && $conf->ql_ok("alter table `CommitNotes` add `xnotesOverflow` longblob DEFAULT NULL")) {
+        $conf->update_schema_version(146);
     }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");

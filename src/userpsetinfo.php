@@ -14,6 +14,8 @@ class UserPsetInfo {
     public $updateat;
     /** @var ?int */
     public $updateby;
+    /** @var ?int */
+    public $studentupdateat;
     /** @var int */
     public $hidegrade;
     /** @var ?string */
@@ -22,6 +24,12 @@ class UserPsetInfo {
     private $notesOverflow;
     /** @var ?object */
     private $jnotes;
+    /** @var ?string */
+    public $xnotes;
+    /** @var ?string */
+    private $xnotesOverflow;
+    /** @var ?object */
+    private $jxnotes;
     /** @var int */
     public $notesversion;
     /** @var int */
@@ -43,6 +51,9 @@ class UserPsetInfo {
         if (isset($this->updateby)) {
             $this->updateby = (int) $this->updateby;
         }
+        if (isset($this->studentupdateat)) {
+            $this->studentupdateat = (int) $this->studentupdateat;
+        }
         if (isset($this->gradercid)) {
             $this->gradercid = (int) $this->gradercid;
         }
@@ -50,6 +61,8 @@ class UserPsetInfo {
         $this->hasactiveflags = (int) $this->hasactiveflags;
         $this->notes = $this->notesOverflow ?? $this->notes;
         $this->notesOverflow = null;
+        $this->xnotes = $this->xnotesOverflow ?? $this->xnotes;
+        $this->xnotesOverflow = null;
     }
 
     /** @return ?UserPsetInfo */
@@ -97,8 +110,9 @@ class UserPsetInfo {
         $this->notesversion = $notesversion;
     }
 
+
     /** @param int $version */
-    function jnotes_on($version, Conf $conf) {
+    function jnotes_as_of($version, Conf $conf) {
         if ($version > $this->notesversion) {
             return null;
         }
@@ -139,5 +153,28 @@ class UserPsetInfo {
             $h->computed_jnotes = $jnotes;
         }
         return $h ? $h->computed_jnotes : null;
+    }
+
+
+    /** @return ?object */
+    function jxnotes() {
+        if ($this->jxnotes === null && $this->xnotes !== null) {
+            $this->jxnotes = json_decode($this->xnotes);
+        }
+        return $this->jxnotes;
+    }
+
+    /** @param string $key
+     * @return mixed */
+    function jxnote($key) {
+        $jn = $this->jxnotes();
+        return $jn ? $jn->$key ?? null : null;
+    }
+
+    /** @param ?string $xnotes
+     * @param ?object $jxnotes */
+    function assign_xnotes($xnotes, $jxnotes) {
+        $this->xnotes = $xnotes;
+        $this->jxnotes = $jxnotes;
     }
 }

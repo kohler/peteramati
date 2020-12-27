@@ -26,8 +26,16 @@ class RepositoryPsetInfo {
     public $placeholder_at;
     /** @var ?string */
     public $rpnotes;
+    /** @var ?string */
+    private $rpnotesOverflow;
     /** @var ?object */
     private $jrpnotes;
+    /** @var ?string */
+    public $rpxnotes;
+    /** @var ?string */
+    private $rpxnotesOverflow;
+    /** @var ?object */
+    private $jrpxnotes;
     /** @var ?int */
     public $rpnotesversion;
     /** @var ?int */
@@ -55,9 +63,13 @@ class RepositoryPsetInfo {
         if (isset($this->placeholder_at)) {
             $this->placeholder_at = (int) $this->placeholder_at;
         }
+        $this->rpnotes = $this->rpnotesOverflow ?? $this->rpnotes;
+        $this->rpnotesOverflow = null;
         if (isset($this->rpnotesversion)) {
             $this->rpnotesversion = (int) $this->rpnotesversion;
         }
+        $this->rpxnotes = $this->rpxnotesOverflow ?? $this->rpxnotes;
+        $this->rpxnotesOverflow = null;
         if (isset($this->emptydiff_at)) {
             $this->emptydiff_at = (int) $this->emptydiff_at;
         }
@@ -88,5 +100,21 @@ class RepositoryPsetInfo {
         $this->rpnotes = $rpnotes;
         $this->jrpnotes = $jrpnotes;
         $this->rpnotesversion = $rpnotesversion;
+    }
+
+
+    /** @return ?object */
+    function jrpxnotes() {
+        if ($this->jrpxnotes === null && $this->rpxnotes !== null) {
+            $this->jrpxnotes = json_decode($this->rpxnotes);
+        }
+        return $this->jrpxnotes;
+    }
+
+    /** @param ?string $rpxnotes
+     * @param ?object $jrpxnotes */
+    function assign_rpxnotes($rpxnotes, $jrpxnotes) {
+        $this->rpxnotes = $rpxnotes;
+        $this->jrpxnotes = $jrpxnotes;
     }
 }
