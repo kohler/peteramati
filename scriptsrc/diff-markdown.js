@@ -339,8 +339,8 @@ Filediff.define_method("highlight", function () {
         }
         lang && elt.setAttribute("data-language", lang);
     }
-    if (!lang || !hljs.getLanguage(lang)
-        || hasClass(elt, "pa-highlight")
+    if (!lang
+        || !hljs.getLanguage(lang)
         || hasClass(elt, "pa-markdown"))
         return;
     // collect content
@@ -350,7 +350,8 @@ Filediff.define_method("highlight", function () {
         const type = hasClass(e, "pa-gi") ? 2 : (hasClass(e, "pa-gc") ? 3 : (hasClass(e, "pa-gd") ? 1 : 0));
         if (type !== 0) {
             const ce = e.lastChild,
-                s = ce.textContent,
+                ishl = hasClass(ce, langclass),
+                s = ishl ? ce.getAttribute("data-pa-text") : ce.textContent,
                 result = hljs_line(lang, s, type & 2 ? hlstatei : hlstated);
             if (!result) {
                 break;
@@ -361,13 +362,16 @@ Filediff.define_method("highlight", function () {
             if (type & 2) {
                 hlstatei = result.top;
             }
-            ce.setAttribute("data-pa-text", s);
-            ce.innerHTML = result.value;
-            addClass(ce, langclass);
+            if (!ishl) {
+                ce.setAttribute("data-pa-text", s);
+                ce.innerHTML = result.value;
+                addClass(ce, langclass);
+            }
         }
         e = e.nextSibling;
     }
     addClass(elt, "pa-highlight");
+    removeClass(elt, "need-highlight");
 });
 
 Filediff.define_method("unhighlight", function () {

@@ -213,6 +213,10 @@ export class Linediff {
                         }
                         const next = e.nextSibling;
                         $(e).remove();
+                        const fd = Filediff.find(next);
+                        if (hasClass(fd.element, "pa-highlight")) {
+                            fd.highlight();
+                        }
                         resolve(new Linediff(next));
                     }
                 }
