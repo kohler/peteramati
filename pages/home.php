@@ -929,15 +929,16 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
 // Per-pset
 /** @param iterable<GradeEntryConfig> $gelist
  * @param ?object $gi
+ * @param ?object $fgi
  * @param array<string,mixed> &$j */
-function add_visible_grades($gelist, $gi, &$j, PsetView $info = null, $all = false) {
+function add_visible_grades($gelist, $gi, $fgi, &$j, PsetView $info = null, $all = false) {
     $total = 0;
     $gvarr = $different = [];
     foreach ($gelist as $ge) {
         $k = $ge->key;
         if ($gi) {
             if ($ge->formula) {
-                $ggv = isset($gi->formula) ? $gi->formula->$k ?? null : null;
+                $ggv = isset($fgi->formula) ? $fgi->formula->$k ?? null : null;
                 $agv = null;
             } else {
                 $ggv = isset($gi->grades) ? $gi->grades->$k ?? null : null;
@@ -1108,7 +1109,7 @@ function render_flag_row(Pset $pset, Contact $s = null, FlagTableRow $row, $anon
         }
     }
     if ($row->cpi->notes) {
-        add_visible_grades($pset->tabular_grades(), $row->cpi->jnotes(), $j, null, false);
+        add_visible_grades($pset->tabular_grades(), $row->cpi->jnotes(), null, $j, null, false);
     }
     if ($row->flagid[0] === "t" && ctype_digit(substr($row->flagid, 1))) {
         $j["at"] = (int) substr($row->flagid, 1);
@@ -1312,10 +1313,13 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
     }
 
     if ($gex->visible_grades()) {
+        $gi = $info->grade_jnotes();
         if ($pset->has_formula) {
             $info->ensure_formula();
+            $fgi = $info->grade_jxnotes();
+        } else {
+            $fgi = null;
         }
-        $gi = $info->current_jnotes();
 
         if (!$pset->gitless_grades) {
             $gradercid = $info->gradercid();
@@ -1333,7 +1337,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
             }
         }
 
-        add_visible_grades($gex->visible_grades(), $gi, $j, $info, true);
+        add_visible_grades($gex->visible_grades(), $gi, $fgi, $j, $info, true);
         if ($info->user_can_view_grades()) {
             $j["grades_visible"] = true;
         }

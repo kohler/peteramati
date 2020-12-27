@@ -79,7 +79,6 @@ GradeClass.add("numeric", {
 });
 
 GradeClass.add("formula", {
-    text: function (v) { return v == null ? "" : v.toFixed(1); }
 });
 
 GradeClass.add("text", {

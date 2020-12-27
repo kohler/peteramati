@@ -1385,8 +1385,8 @@ class GradeEntryConfig {
     function extract_value($gx, $agx, $fgx, &$av) {
         $key = $this->key;
         $av = $agx ? $agx->$key ?? null : null;
-        if ($this->formula && property_exists($fgx, $key)) {
-            return $fgx->$key;
+        if ($this->formula) {
+            return $fgx ? $fgx->$key ?? null : null;
         } else if ($gx && property_exists($gx, $key)) {
             $gv = $gx->$key;
             return $gv !== false ? $gv : null;
