@@ -46,12 +46,9 @@ class DiffMany {
         }
 
         if ($qreq->grade) {
-            $f = simplify_whitespace($qreq->grade);
             $grades = [];
-            foreach (explode(" ", $f) as $key) {
-                foreach ($pset->expand_grades($pset->gradelike_by_key($key)) as $ge) {
-                    $grades[$ge->key] = true;
-                }
+            foreach ($pset->grades_by_key_list($qreq->grade, true) as $ge) {
+                $grades[$ge->key] = true;
             }
             foreach ($pset->grades as $ge) {
                 if (!isset($grades[$ge->key])) {

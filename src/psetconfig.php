@@ -569,7 +569,8 @@ class Pset {
         return $this->grades;
     }
 
-    /** @return ?GradeEntryConfig */
+    /** @param string $key
+     * @return ?GradeEntryConfig */
     function gradelike_by_key($key) {
         if (isset($this->all_grades[$key])) {
             return $this->all_grades[$key];
@@ -580,17 +581,59 @@ class Pset {
         }
     }
 
-    /** @return list<GradeEntryConfig> */
-    function expand_grades(GradeEntryConfig $ge = null) {
+    private function grades_by_key_list_one($gvs, $i, &$ges, $expand_section) {
+        $ge = $gvs[$i];
+        ++$i;
+        $ges[] = $ge;
+        if ($expand_section && $ge->type === "section") {
+            while ($i < count($gvs) && $gvs[$i]->type !== "section") {
+                $ges[] = $gvs[$i];
+                ++$i;
+            }
+        }
+        return $i;
+    }
+
+    /** @param string $keys
+     * @param bool $expand_section
+     * @return list<GradeEntryConfig> */
+    function grades_by_key_list($keys, $expand_section) {
         $ges = [];
-        if ($ge) {
-            $ges[] = $ge;
-            if ($ge->type === "section") {
-                $gvs = array_values($this->grades);
-                for ($i = $ge->pcview_index + 1;
-                     $i < count($gvs) && $gvs[$i]->type !== "section";
-                     ++$i) {
-                    $ges[] = $gvs[$i];
+        $keys = simplify_whitespace(str_replace(",", " ", $keys));
+        if ($keys !== "") {
+            $gvs = array_values($this->grades);
+            foreach (explode(" ", $keys) as $kstr) {
+                $ge1 = $ge2 = $this->grades[$kstr] ?? null;
+                if (!$ge1 && ($pos = strpos($kstr, "-")) !== false) {
+                    if ($pos === 0) {
+                        $ge1 = $gvs[0];
+                        $ge2 = $this->grades[substr($kstr, 1)];
+                    } else if ($pos === strlen($kstr) - 1) {
+                        $ge1 = $this->grades[substr($kstr, 0, $pos)];
+                        $ge2 = $gvs[count($gvs) - 1];
+                    } else {
+                        $ge1 = $this->grades[substr($kstr, 0, $pos)];
+                        $ge2 = $this->grades[substr($kstr, $pos + 1)];
+                    }
+                } else if (!$ge1 && strcspn($kstr, "[?*") !== strlen($kstr)) {
+                    for ($i = 0; $i !== count($gvs); ) {
+                        if (fnmatch($kstr, $gvs[$i]->key, FNM_NOESCAPE)) {
+                            $i = $this->grades_by_key_list_one($gvs, $i, $ges, $expand_section);
+                        } else {
+                            ++$i;
+                        }
+                    }
+                    continue;
+                }
+                if (!$ge1 || !$ge2) {
+                    continue;
+                }
+                $n1 = $ge1->pcview_index;
+                $n2 = $ge2->pcview_index;
+                $delta = $n1 <= $n2 ? 1 : -1;
+                while ($delta < 0 ? $n1 >= $n2 : $n1 <= $n2) {
+                    $i = $this->grades_by_key_list_one($gvs, $n1, $ges, $expand_section);
+                    $n1 = $delta > 0 ? $i : $n1 - 1;
                 }
             }
         }
