@@ -46,8 +46,8 @@ export class GradeEntry {
                 t = t.substring(3);
             }
             grade_titles.push(t);
-            let m = t.match(/^(p)(?:art\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i)
-                || t.match(/^(q)(?:uestion\s*|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i)
+            let m = t.match(/^(p)(?:art[\s\d]|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i)
+                || t.match(/^(q)(?:uestion[\s\d]|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i)
                 || t.match(/^[\s:]*()(\S{1,3}[\d.]*)[^\s\d]*[\s:]*/);
             if (!m) {
                 ge._abbr = ":" + i;
