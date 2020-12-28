@@ -79,6 +79,14 @@ GradeClass.add("numeric", {
 });
 
 GradeClass.add("formula", {
+    text: function (v) {
+        if (v == null) {
+            return "";
+        } else {
+            const t = v.toFixed(1);
+            return t.endsWith(".0") ? t.substring(0, t.length - 2) : t;
+        }
+    }
 });
 
 GradeClass.add("text", {
