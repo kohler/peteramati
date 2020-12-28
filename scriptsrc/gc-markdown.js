@@ -19,7 +19,7 @@ GradeClass.add("markdown", {
         }
     },
     entry: function (id) {
-        return '<p class="pa-preview-notice"><span>Markdown styling and LaTeX math supported · </span><a href="" class="ui js-toggle-gc-markdown-preview" tabindex="-1">Preview</a></p><textarea class="uich pa-pd pa-gradevalue pa-wide need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        return '<p class="pa-preview-notice"><span>Markdown styling and LaTeX math supported · </span><a href="" class="ui js-toggle-gc-markdown-preview" tabindex="-1">Preview</a></p><div class="pa-textgrade-width pa-wide"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
     },
     justify: "left",
     sort: "forward",

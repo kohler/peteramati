@@ -83,7 +83,7 @@ GradeClass.add("formula", {
 
 GradeClass.add("text", {
     entry: function (id) {
-        return '<textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        return '<div class="pa-textgrade-width"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
     },
     justify: "left",
     sort: "forward",
@@ -92,7 +92,7 @@ GradeClass.add("text", {
 
 GradeClass.add("shorttext", {
     entry: function (id) {
-        return '<textarea class="uich pa-pd pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        return '<div class="pa-textgrade-width"><textarea class="uich pa-pd pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
     },
     justify: "left",
     sort: "forward",

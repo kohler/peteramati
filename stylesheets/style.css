@@ -2540,7 +2540,7 @@ tr.gtrow-partner {
 	padding-right: 0.8rem;
 	font-size: 90%;
 }
-@media screen and (max-width: 800px), print {
+@media screen and (max-width: 1024px), print {
 .pa-sidebar {
 	display: none;
 }
@@ -2548,7 +2548,7 @@ tr.gtrow-partner {
 	max-width: 100%;
 }
 }
-@media screen and (min-width: 800px) {
+@media screen and (min-width: 1024px) {
 .pa-no-sidebar {
 	display: none;
 }
@@ -2872,12 +2872,15 @@ input.pa-gradewidth {
 .pa-gradevalue {
 	margin-left: 0;
 }
+.pa-textgrade-width {
+	max-width: 40rem;
+}
+.pa-textgrade-width.pa-wide {
+	max-width: 800px;
+}
 textarea.pa-gradevalue {
 	vertical-align: top;
-	width: 40rem;
-}
-textarea.pa-gradevalue.pa-wide {
-	width: 800px;
+	width: 100%;
 }
 .pa-total span.pa-gradevalue {
 	font-weight: bold;
