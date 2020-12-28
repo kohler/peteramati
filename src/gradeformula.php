@@ -17,8 +17,12 @@ abstract class GradeFormula implements JsonSerializable {
         "==" => 7, "!=" => 7,
         "&&" => 3,
         "||" => 2,
-        "??" => 1
+        "??" => 1,
+        "?" => 0, ":" => 0,
+        "," => -1
     ];
+    const UNARY_PRECEDENCE = 12;
+    const MIN_PRECEDENCE = -2;
 
     /** @param string $op
      * @param list<GradeFormula> $a */
@@ -34,7 +38,7 @@ abstract class GradeFormula implements JsonSerializable {
             $e = null;
         } else if ($t[0] === "(") {
             $t = substr($t, 1);
-            $e = self::parse_ternary_prefix($conf, $t);
+            $e = self::parse_prefix($conf, $t, self::MIN_PRECEDENCE);
             if ($e !== null) {
                 $t = ltrim($t);
                 if ($t === "" || $t[0] !== ")") {
@@ -45,7 +49,7 @@ abstract class GradeFormula implements JsonSerializable {
         } else if ($t[0] === "-" || $t[0] === "+") {
             $op = $t[0];
             $t = substr($t, 1);
-            $e = self::parse_prefix($conf, $t, 12);
+            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE);
             if ($e !== null && $op === "-") {
                 $e = new Unary_GradeFormula("neg", $e);
             }
@@ -57,9 +61,15 @@ abstract class GradeFormula implements JsonSerializable {
             $e = new Number_GradeFormula((float) M_PI);
         } else if (preg_match('/\A(log10|log|ln|lg|exp)\b(.*)\z/s', $t, $m)) {
             $t = $m[2];
-            $e = self::parse_prefix($conf, $t, 12);
+            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE);
             if ($e !== null) {
                 $e = new Unary_GradeFormula($m[1], $e);
+            }
+        } else if (preg_match('/\A(min|max)\b(.*)\z/s', $t, $m)) {
+            $t = $m[2];
+            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE);
+            if ($e !== null) {
+                $e = new MinMax_GradeFormula($m[1], $e);
             }
         } else if (preg_match('/\A(\w+)\s*\.\s*(\w+)(.*)\z/s', $t, $m)) {
             if (($pset = $conf->pset_by_key_or_title($m[1]))) {
@@ -118,7 +128,7 @@ abstract class GradeFormula implements JsonSerializable {
 
         while (true) {
             $t = ltrim($t);
-            if (preg_match('/\A(\+\??|-|\*\*?|\/|%|\?\?|\|\||\&\&|==|<=?|>=?|!=)(.*)\z/s', $t, $m)) {
+            if (preg_match('/\A(\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|==|<=?|>=?|!=|,|:)(.*)\z/s', $t, $m)) {
                 $op = $m[1];
                 $prec = self::$precedences[$op];
                 if ($prec < $minprec) {
@@ -133,6 +143,22 @@ abstract class GradeFormula implements JsonSerializable {
                     $e = new NullableBin_GradeFormula($op, $e, $e2);
                 } else if (in_array($op, ["<", "==", ">", "<=", ">=", "!="])) {
                     $e = new Relation_GradeFormula($op, $e, $e2);
+                } else if ($op === ",") {
+                    if ($e instanceof Comma_GradeFormula) {
+                        $e->add_arg($e2);
+                    } else {
+                        $e = new Comma_GradeFormula($e, $e2);
+                    }
+                } else if ($op === "?") {
+                    if (preg_match('/\A\s*:(.*)\z/s', $t, $m)
+                        && ($e3 = self::parse_prefix($conf, $m[1], $prec))) {
+                        $t = $m[1];
+                        $e = new Ternary_GradeFormula($e, $e2, $e3);
+                    } else {
+                        return null;
+                    }
+                } else if ($op === ":") {
+                    return null;
                 } else {
                     $e = new Bin_GradeFormula($op, $e, $e2);
                 }
@@ -142,30 +168,15 @@ abstract class GradeFormula implements JsonSerializable {
         }
     }
 
-    /** @param string &$t
-     * @suppress PhanInfiniteRecursion */
-    static function parse_ternary_prefix(Conf $conf, &$t) {
-        $t = ltrim($t);
-        $e = self::parse_prefix($conf, $t, 0);
-        if ($e !== null
-            && $t !== ""
-            && preg_match('/\A\s*\?(?!\?)(.*)\z/s', $t, $m)
-            && ($e2 = self::parse_prefix($conf, $m[1], 0))
-            && preg_match('/\A\s*:(.*)\z/s', $m[1], $mm)
-            && ($e3 = self::parse_ternary_prefix($conf, $mm[1]))) {
-            $t = $mm[1];
-            return new Ternary_GradeFormula($e, $e2, $e3);
-        } else {
-            return $e;
-        }
-    }
-
     /** @param ?string $s
      * @return ?GradeFormula */
     static function parse(Conf $conf, $s) {
+        $sin = $s;
         if ($s !== null
-            && ($f = self::parse_ternary_prefix($conf, $s)) !== null) {
-            return trim($s) === "" ? $f : null;
+            && ($f = self::parse_prefix($conf, $s, self::MIN_PRECEDENCE)) !== null
+            && !($f instanceof Comma_GradeFormula)
+            && trim($s) === "") {
+            return $f;
         } else {
             return null;
         }
@@ -287,6 +298,46 @@ class Ternary_GradeFormula extends GradeFormula {
     function evaluate(Contact $student) {
         $v0 = $this->_a[0]->evaluate($student);
         return $this->_a[$v0 ? 1 : 2]->evaluate($student);
+    }
+}
+
+class Comma_GradeFormula extends GradeFormula {
+    function __construct($el, $er) {
+        parent::__construct(",", [$el, $er]);
+    }
+    function add_arg($e) {
+        $this->_a[] = $e;
+    }
+    function args() {
+        return $this->_a;
+    }
+    function evaluate(Contact $student) {
+        return null;
+    }
+}
+
+abstract class Function_GradeFormula extends GradeFormula {
+    function __construct($op, $arge) {
+        parent::__construct($op, $arge instanceof Comma_GradeFormula ? $arge->args() : [$arge]);
+    }
+}
+
+class MinMax_GradeFormula extends Function_GradeFormula {
+    function __construct($op, $arge) {
+        parent::__construct($op, $arge);
+    }
+    function evaluate(Contact $student) {
+        $cur = null;
+        $ismax = $this->_op === "max";
+        foreach ($this->_a as $e) {
+            $v = $e->evaluate($student);
+            if ($v !== null
+                && ($cur === null
+                    || ($ismax ? $cur < $v : $cur > $v))) {
+                $cur = $v;
+            }
+        }
+        return $cur;
     }
 }
 

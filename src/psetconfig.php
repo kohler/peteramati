@@ -141,7 +141,7 @@ class Pset {
     public $has_formula = false;
     /** @var bool */
     private $has_answers = false;
-    private $_max_grade = [null, null, null, null];
+    private $_max_grade = [null, null];
     public $grade_script;
     /** @var GradeEntryConfig */
     private $_late_hours;
@@ -671,22 +671,25 @@ class Pset {
     }
 
     /** @param bool $pcview
-     * @param bool $include_extra
      * @return int|float */
-    function max_grade($pcview, $include_extra = false) {
-        $i = ($pcview ? 1 : 0) | ($include_extra ? 2 : 0);
-        if (!isset($this->_max_grade[$i])) {
-            $max = 0;
-            foreach ($this->visible_grades($pcview) as $ge) {
-                if ($ge->max
-                    && !$ge->no_total
-                    && ($pcview || $ge->max_visible)
-                    && (!$ge->is_extra || $include_extra))
-                    $max += $ge->max;
+    function max_grade($pcview) {
+        if (isset($this->grades_total)) {
+            return $this->grades_total;
+        } else {
+            $i = $pcview ? 1 : 0;
+            if (!isset($this->_max_grade[$i])) {
+                $max = 0;
+                foreach ($this->visible_grades($pcview) as $ge) {
+                    if ($ge->max
+                        && !$ge->no_total
+                        && ($pcview || $ge->max_visible)
+                        && !$ge->is_extra)
+                        $max += $ge->max;
+                }
+                $this->_max_grade[$i] = $max;
             }
-            $this->_max_grade[$i] = $max;
+            return $this->_max_grade[$i];
         }
-        return $this->_max_grade[$i];
     }
 
     /** @param Contact $student
