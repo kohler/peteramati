@@ -67,7 +67,9 @@ abstract class GradeFormula implements JsonSerializable {
 
     /** @return ?GradeFormula */
     static private function parse_grade_word($gkey, Conf $conf, Pset $context = null) {
-        if (($pset = $conf->pset_by_key_or_title($gkey))) {
+        if (($gf = $conf->formula_by_name($gkey))) {
+            return $gf->formula();
+        } else if (($pset = $conf->pset_by_key_or_title($gkey))) {
             return new PsetTotal_GradeFormula($pset, false, false);
         } else if ($conf->pset_category($gkey)) {
             return new PsetCategoryTotal_GradeFormula($gkey, false, true);
@@ -124,7 +126,7 @@ abstract class GradeFormula implements JsonSerializable {
             }
         } else if (preg_match('/\A(\w+)\s*\.\s*(\w+)(.*)\z/s', $t, $m)) {
             $t = $m[3];
-            $e = self::parse_grade_pair($m[1], $m[2], $conf);
+            $e = self::parse_grade_pair($m[1], $m[2], $conf, $context);
         } else if (preg_match('/\A(\w+)(.*)\z/s', $t, $m)) {
             $t = $m[2];
             $e = self::parse_grade_word($m[1], $conf, $context);
@@ -188,6 +190,7 @@ abstract class GradeFormula implements JsonSerializable {
             && trim($s) === "") {
             return $f;
         } else {
+            error_log("failure parsing formula $sin at $s");
             return null;
         }
     }
