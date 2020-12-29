@@ -74,7 +74,11 @@ abstract class GradeFormula implements JsonSerializable {
         } else if ($conf->pset_category($gkey)) {
             return new PsetCategoryTotal_GradeFormula($gkey, false, true);
         } else if ($context && ($ge = $context->gradelike_by_key($gkey))) {
-            return new GradeEntry_GradeFormula($context, $ge);
+            if ($ge->formula) {
+                return $ge->formula();
+            } else {
+                return new GradeEntry_GradeFormula($context, $ge);
+            }
         } else {
             return null;
         }
