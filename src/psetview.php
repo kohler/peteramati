@@ -1583,7 +1583,7 @@ class PsetView {
             $notes = $this->grade_jxnotes();
             $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
             //error_log("{$t} {$this->user->gradeUpdateTime} {$this->pset->config_mtime} {$notes->formula_at}");
-            if ($notes && $notes->formula_at !== $t) {
+            if (!$notes || $notes->formula_at !== $t) {
                 $fs = [];
                 foreach ($this->pset->grades() as $ge) {
                     if (($f = $ge->formula())) {
