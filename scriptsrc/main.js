@@ -1447,14 +1447,20 @@ function pa_render_pset_table(pconf, data) {
         total: {
             th: '<th class="gt-total r plsortable" data-pa-sort="total" scope="col">Tot</th>',
             td: function (s) {
-                return '<td class="gt-total r">'.concat(s.total, '</td>');
+                const t = s.total == null ? "" : s.total;
+                return '<td class="gt-total r">'.concat(t, '</td>');
             },
             compare: function (a, b) {
-                if (a.total != b.total) {
+                if (a.total == null || b.total == null) {
+                    if (a.total != null) {
+                        return -1;
+                    } else if (b.total == null) {
+                        return 1;
+                    }
+                } else if (a.total != b.total) {
                     return a.total < b.total ? -1 : 1;
-                } else {
-                    return -user_compare(a, b);
                 }
+                return -user_compare(a, b);
             },
             tw: 3
         },

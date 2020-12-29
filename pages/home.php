@@ -936,7 +936,7 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
  * @param ?object $fgi
  * @param array<string,mixed> &$j */
 function add_visible_grades($gelist, $gi, $fgi, &$j, PsetView $info = null, $all = false) {
-    $total = 0;
+    $total = null;
     $gvarr = $different = [];
     foreach ($gelist as $ge) {
         $k = $ge->key;
@@ -953,7 +953,7 @@ function add_visible_grades($gelist, $gi, $fgi, &$j, PsetView $info = null, $all
         }
         $gv = $ggv ?? $agv;
         if ($gv !== null && !$ge->no_total) {
-            $total += $gv;
+            $total = ($total ?? 0) + $gv;
         }
         if ($gv === null
             && $info
@@ -967,7 +967,9 @@ function add_visible_grades($gelist, $gi, $fgi, &$j, PsetView $info = null, $all
             $different[$k] = true;
         }
     }
-    $j["total"] = round_grade($total);
+    if ($total !== null) {
+        $j["total"] = round_grade($total);
+    }
     if ($all) {
         $j["grades"] = $gvarr;
         if ($different) {
