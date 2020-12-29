@@ -1098,6 +1098,8 @@ class GradeEntryConfig {
     /** @var ?bool */
     public $collate;
     /** @var ?string */
+    public $table_color;
+    /** @var ?string */
     public $landmark_file;
     /** @var ?int */
     public $landmark_line;
@@ -1248,6 +1250,7 @@ class GradeEntryConfig {
         }
 
         $this->collate = Pset::cbool($loc, $g, "collate");
+        $this->table_color = Pset::cstr($loc, $g, "table_color");
         $lm = self::clean_landmark($g, "landmark");
         $lmr = self::clean_landmark($g, "landmark_range");
         if ($lm === null && $lmr !== null) {
@@ -1499,6 +1502,9 @@ class GradeEntryConfig {
         }
         if ($this->max && ($pcview || $this->max_visible)) {
             $gej["max"] = $this->max;
+        }
+        if ($this->table_color) {
+            $gej["table_color"] = $this->table_color;
         }
         if (!$this->no_total) {
             $gej["in_total"] = true;

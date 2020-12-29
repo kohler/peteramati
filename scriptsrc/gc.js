@@ -4,6 +4,11 @@
 
 let map = {};
 
+const color_map = {
+    "red": "cR", "orange": "cO", "yellow": "cY", "green": "cG",
+    "blue": "cB", "purple": "cP", "gray": "cA", "grey": "cA"
+};
+
 export const GradeClass = {
     basic_text: v => (v == null ? "" : "" + v),
 
@@ -34,6 +39,9 @@ export const GradeClass = {
         const justify = this.gc.justify || "right";
         col.className = (col.gkey === pconf.total_key ? "gt-total" : "gt-grade") +
             (justify === "left" ? " l" : " r");
+        if (this.table_color && color_map[this.table_color]) {
+            col.className += " " + color_map[this.table_color];
+        }
         col.make_compare = sort => this.gc.make_compare.call(this, col, sort);
         return col;
     },

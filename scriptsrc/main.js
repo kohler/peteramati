@@ -1460,7 +1460,7 @@ function pa_render_pset_table(pconf, data) {
         },
         grade: {
             th: function () {
-                return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="grade', this.gidx, '" scope="col">', this.ge.abbr(), '</th>');
+                return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="grade', this.gidx, '" scope="col" title="', escape_entities(this.ge.title), '">', this.ge.abbr(), '</th>');
             },
             td: function (s, rownum, text) {
                 let gr = s.grades[this.gidx],

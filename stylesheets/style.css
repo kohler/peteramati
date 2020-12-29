@@ -246,6 +246,27 @@ label.checki {
 	font-weight: normal;
 }
 
+.cR {
+	background-color: #ffd8d8;
+}
+.cO {
+	background-color: #fdebcc;
+}
+.cY {
+	background-color: #fdffcb;
+}
+.cG {
+	background-color: #d8ffd8;
+}
+.cB {
+	background-color: #d8d8ff;
+}
+.cP {
+	background-color: #f2d8f8;
+}
+.cA {
+	background-color: #e2e2e2;
+}
 
 /* generic vertical styles */
 .lg { /* large gap */
