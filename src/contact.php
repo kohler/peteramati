@@ -812,38 +812,52 @@ class Contact {
     }
 
     /** @return ?GradeExport */
-    const GCF_GRADES = 1;
-    const GCF_ALL = 3;
-    const GCF_RECURSE = 4;
-    private function ensure_gcache(Pset $pset, $flags) {
-        $want = $flags & PsetView::GRADEJSON_NO_LATE_HOURS ? self::GCF_GRADES : self::GCF_ALL;
+    private function ensure_gcache(Pset $pset, $flags, GradeEntryConfig $ge = null) {
+        $flagbase = PsetView::GRADEJSON_NO_LATE_HOURS | PsetView::GRADEJSON_NO_FORMULAS;
+        assert(($flags & $flagbase) === $flags);
+
         $cflags = $this->_gcache_flags[$pset->id] ?? 0;
-        if (($cflags & $want) !== $want) {
+        if ($cflags === 0) {
             $this->_gcache[$pset->id] = null;
-            $this->_gcache_flags[$pset->id] = $want | self::GCF_RECURSE;
+            $this->_gcache_flags[$pset->id] = 0;
+        }
+        $gexp = $this->_gcache[$pset->id];
+
+        if ($cflags === 0
+            || ($cflags & (~$flags & $flagbase)) !== 0) {
+            //error_log("computing for {$this->email}/{$pset->nonnumeric_key}." . ($ge ? $ge->key : "total"));
             if ($this->student_set) {
                 $info = $this->student_set->info_at($this->contactId, $pset);
             } else {
                 $info = PsetView::make($pset, $this, $this->conf->site_contact());
             }
-            if ($info) {
-                $this->_gcache[$pset->id] = $info->grade_export($flags | PsetView::GRADEJSON_SLICE | PsetView::GRADEJSON_OVERRIDE_VIEW);
+            if ($info && !$gexp) {
+                $this->_gcache_flags[$pset->id] = $cflags = PsetView::GRADEJSON_NO_LATE_HOURS | PsetView::GRADEJSON_NO_FORMULAS;
+                $this->_gcache[$pset->id] = $gexp = $info->grade_export(PsetView::GRADEJSON_SLICE | PsetView::GRADEJSON_OVERRIDE_VIEW | $cflags);
             }
-            $this->_gcache_flags[$pset->id] = $want;
-        } else if ($cflags & self::GCF_RECURSE) {
-            error_log("recursing for {$pset->key} formulas " . json_encode(GradeFormula::$evaluation_stack) . "\n" . debug_string_backtrace());
+            if ($info
+                && !($flags & PsetView::GRADEJSON_NO_LATE_HOURS)
+                && ($cflags & PsetView::GRADEJSON_NO_LATE_HOURS)) {
+                $this->_gcache_flags[$pset->id] = $cflags = $cflags & ~PsetView::GRADEJSON_NO_LATE_HOURS;
+                $info->grade_export_late_hours($gexp);
+            }
+            if ($info
+                && !($flags & PsetView::GRADEJSON_NO_FORMULAS)
+                && ($cflags & PsetView::GRADEJSON_NO_FORMULAS)) {
+                $this->_gcache_flags[$pset->id] = $cflags = $cflags & ~PsetView::GRADEJSON_NO_FORMULAS;
+                $info->grade_export_formulas($gexp);
+            }
         }
+
         return $this->_gcache[$pset->id];
     }
 
     function gcache_entry(Pset $pset, GradeEntryConfig $ge) {
         $lh = $ge->key === "late_hours";
-        if (($gexp = $this->ensure_gcache($pset, $lh ? 0 : PsetView::GRADEJSON_NO_LATE_HOURS))) {
-            if ($ge->key === "late_hours") {
-                return $gexp->late_hours;
-            } else {
-                return $gexp->grades[$ge->pcview_index] ?? null;
-            }
+        $flags = ($lh ? 0 : PsetView::GRADEJSON_NO_LATE_HOURS)
+            | ($ge->formula ? 0 : PsetView::GRADEJSON_NO_FORMULAS);
+        if (($gexp = $this->ensure_gcache($pset, $flags, $ge))) {
+            return $lh ? $gexp->late_hours : $gexp->grades[$ge->pcview_index] ?? null;
         } else {
             return null;
         }
@@ -853,7 +867,7 @@ class Contact {
      * @param bool $norm
      * @return null|int|float */
     function gcache_total(Pset $pset, $noextra, $norm) {
-        if (($gexp = $this->ensure_gcache($pset, PsetView::GRADEJSON_NO_LATE_HOURS))) {
+        if (($gexp = $this->ensure_gcache($pset, PsetView::GRADEJSON_NO_LATE_HOURS, null))) {
             $v = $noextra ? $gexp->total_noextra() : $gexp->total();
             if ($v !== null && $norm) {
                 $v = round(($v * 1000.0) / $pset->max_grade(true)) / 10;

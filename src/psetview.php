@@ -1598,20 +1598,8 @@ class PsetView {
     const GRADEJSON_SLICE = 1;
     const GRADEJSON_OVERRIDE_VIEW = 2;
     const GRADEJSON_NO_LATE_HOURS = 4;
-
-    /** @param GradeExport $gexp */
-    private function compute_grade_json_entries($gx, $agx, $fgx, $gexp) {
-        $g = [];
-        $ag = $agx ? [] : null;
-        foreach ($gexp->visible_grades() as $ge) {
-            $g[] = $ge->extract_value($gx, $agx, $fgx, $av);
-            if ($agx) {
-                $ag[] = $av;
-            }
-        }
-        $gexp->grades = $g;
-        $gexp->autogrades = $ag;
-    }
+    const GRADEJSON_NO_FORMULAS = 8;
+    const GRADEJSON_RECURSE = 16;
 
     /** @param int $flags
      * @return ?GradeExport */
@@ -1620,7 +1608,7 @@ class PsetView {
         if (!$override_view && !$this->can_view_grades()) {
             return null;
         }
-        $this->ensure_formula();
+
         if ($flags & self::GRADEJSON_SLICE) {
             $gexp = new GradeExport($this->pset, true);
             $gexp->include_entries = false;
@@ -1635,21 +1623,27 @@ class PsetView {
         $notes = $this->grade_jnotes();
         $agx = $notes->autogrades ?? null;
         $gx = $notes->grades ?? null;
-        $fgx = $this->pset->has_formula ? $this->grade_jxnote("formula") : null;
         if ($agx || $gx || $this->is_grading_commit()) {
-            $this->compute_grade_json_entries($gx, $agx, $fgx, $gexp);
+            $gexp->grades = [];
+            $gexp->autogrades = $agx ? [] : null;
+            foreach ($gexp->visible_grades() as $ge) {
+                $gexp->grades[] = $ge->extract_value($gx, $agx, $av);
+                if ($agx) {
+                    $gexp->autogrades[] = $av;
+                }
+            }
         }
+
+        if (!($flags & self::GRADEJSON_NO_FORMULAS)
+            && $this->pset->has_formula) {
+            $this->grade_export_formulas($gexp);
+        }
+
         if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
             $gexp->grading_hash = $this->grading_hash();
         }
-        if (($flags & self::GRADEJSON_NO_LATE_HOURS) === 0
-            && ($lhd = $this->late_hours_data())) {
-            if (isset($lhd->hours)) {
-                $gexp->late_hours = $lhd->hours;
-            }
-            if (isset($lhd->autohours) && $lhd->autohours !== $lhd->hours) {
-                $gexp->auto_late_hours = $lhd->autohours;
-            }
+        if (!($flags & self::GRADEJSON_NO_LATE_HOURS)) {
+            $this->grade_export_late_hours($gexp);
         }
         if ($this->pset->gitless_grades
             && ($xpi = $this->pset->gitless ? $this->upi() : $this->rpi())) {
@@ -1666,6 +1660,32 @@ class PsetView {
             $gexp->suppress_absent_extra();
         }
         return $gexp;
+    }
+
+    function grade_export_formulas(GradeExport $gexp) {
+        $this->ensure_formula();
+        if (($fgx = $this->grade_jxnote("formula"))) {
+            foreach ($gexp->visible_grades() as $i => $ge) {
+                if ($ge->type === "formula"
+                    && ($v = $fgx->{$ge->key} ?? null) !== null) {
+                    if ($gexp->grades === null) {
+                        $gexp->grades = array_fill(0, count($gexp->visible_grades()), null);
+                    }
+                    $gexp->grades[$i] = $v;
+                }
+            }
+        }
+    }
+
+    function grade_export_late_hours(GradeExport $gexp) {
+        if (($lhd = $this->late_hours_data())) {
+            if (isset($lhd->hours)) {
+                $gexp->late_hours = $lhd->hours;
+            }
+            if (isset($lhd->autohours) && $lhd->autohours !== $lhd->hours) {
+                $gexp->auto_late_hours = $lhd->autohours;
+            }
+        }
     }
 
     /** @param int $answer_version
