@@ -503,20 +503,34 @@ class PsetView {
         return $jn ? $jn->$key ?? null : null;
     }
 
-    /** @param string $key
+    /** @param string|GradeEntryConfig $ge
      * @return null|int|float|string */
-    function grade_value($key, $type = null) {
-        $gn = $this->grade_jnotes();
-        $grade = null;
-        if ((!$type || $type == "autograde")
-            && isset($gn->autogrades)
-            && property_exists($gn->autogrades, $key)) {
-            $grade = $gn->autogrades->$key;
+    function grade_value($ge, $type = null) {
+        if (is_string($ge)
+            && !($ge = $this->pset->gradelike_by_key($ge))) {
+            return null;
         }
-        if ((!$type || $type == "grade")
-            && isset($gn->grades)
-            && property_exists($gn->grades, $key)) {
-            $grade = $gn->grades->$key;
+        $key = $ge->key;
+        $grade = null;
+        if ($ge->formula) {
+            $this->ensure_formula();
+            if (($fx = $this->grade_jxnotes())
+                && isset($fx->formula)) {
+                $grade = $fx->formula->$key ?? null;
+            }
+        } else {
+            if (($gn = $this->grade_jnotes())) {
+                if ((!$type || $type == "autograde")
+                    && isset($gn->autogrades)
+                    && property_exists($gn->autogrades, $key)) {
+                    $grade = $gn->autogrades->$key;
+                }
+                if ((!$type || $type == "grade")
+                    && isset($gn->grades)
+                    && property_exists($gn->grades, $key)) {
+                    $grade = $gn->grades->$key;
+                }
+            }
         }
         return $grade;
     }

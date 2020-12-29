@@ -150,7 +150,7 @@ function collect_pset_info(&$students, $sset, $entries) {
 
             if ($entries) {
                 foreach ($pset->tabular_grades() as $ge) {
-                    if (($g = $info->grade_value($ge->key)) !== null)
+                    if (($g = $info->grade_value($ge)) !== null)
                         $ss->{$ge->key} = $g;
                 }
             }
@@ -553,6 +553,48 @@ function older_enabled_repo_same_handout($pset) {
     return $result;
 }
 
+function download_pset_report(Pset $pset, Qrequest $qreq, $report) {
+    $sset = StudentSet::make_for($pset->conf->site_contact(), qreq_users($qreq));
+    $sset->set_pset($pset, false);
+    $csv = new CsvGenerator;
+    $csv->select($report->fields);
+
+    $fobj = [];
+    foreach ($report->fields as $ft) {
+        if (in_array($ft, ["first", "last", "huid"])) {
+            $fobj[] = $ft;
+        } else if (($f = $pset->conf->formula_by_name($ft))) {
+            $fobj[] = $ft;
+        } else if (($ge = $pset->gradelike_by_key($ft))) {
+            $fobj[] = $ge;
+        }
+    }
+
+    foreach ($sset as $info) {
+        $x = [];
+        foreach ($fobj as $f) {
+            if ($f instanceof GradeEntryConfig) {
+                if (($v = $info->grade_value($f)) !== null) {
+                    $x[$f->key] = $f->unparse_value($v);
+                }
+            } else if ($f instanceof FormulaConfig) {
+                $x[$f->name] = $f->formula()->evaluate($info->user);
+            } else if ($f === "first") {
+                $x[$f] = $info->user->firstName;
+            } else if ($f === "last") {
+                $x[$f] = $info->user->lastName;
+            } else if ($f === "huid") {
+                $x[$f] = $info->user->huid;
+            }
+        }
+        $csv->add_row($x);
+    }
+
+    $csv->download_headers($report->key);
+    $csv->download();
+    exit;
+}
+
 function doaction(Contact $viewer, Qrequest $qreq) {
     $conf = $viewer->conf;
     if (!($pset = $conf->pset_by_key($qreq->pset))
@@ -592,6 +634,12 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         }
     } else if (str_starts_with($qreq->action, "diffmany_")) {
         Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
+    } else if (str_starts_with($qreq->action, "report_")) {
+        foreach ($pset->reports as $r) {
+            if (substr($qreq->action, 7) === $r->key) {
+                download_pset_report($pset, $qreq, $r);
+            }
+        }
     } else if ($qreq->action === "diffmany") {
         Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
     }
@@ -1056,7 +1104,7 @@ function show_home_pset(PsetView $info) {
 
 if (!$Me->is_empty() && $User->is_student()) {
     $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
-    $ss = StudentSet::make_singleton($Me, $User);
+    $ss = StudentSet::make_empty_for($Me, $User);
     foreach ($Conf->psets_newest_first() as $pset) {
         if (($info = home_psetview($pset, $User, $Me)))
             $ss->add_info($info);
@@ -1470,7 +1518,7 @@ function show_pset_table($sset) {
     }
 
     if ($checkbox) {
-        echo Ht::form($sset->conf->hoturl_post("index", ["pset" => $pset->urlkey, "save" => 1]));
+        echo Ht::form($sset->conf->hoturl_post("index", ["pset" => $pset->urlkey, "save" => 1, "college" => $Qreq->college, "extension" => $Qreq->extension]));
         if ($pset->anonymous) {
             echo Ht::hidden("anonymous", $anonymous ? 1 : 0);
         }
@@ -1561,6 +1609,12 @@ function show_pset_table($sset) {
             $actions["clearrepo"] = "Clear repo";
             if (older_enabled_repo_same_handout($pset)) {
                 $actions["copyrepo"] = "Adopt previous repo";
+            }
+        }
+        if ($pset->reports) {
+            $actions[] = null;
+            foreach ($pset->reports as $r) {
+                $actions["report_{$r->key}"] = $r->title;
             }
         }
     }

@@ -84,12 +84,22 @@ class StudentSet implements Iterator, Countable {
         }
     }
 
-    static function make_singleton(Contact $viewer, Contact $user) {
+    static function make_empty_for(Contact $viewer, Contact $user) {
         $ss = new StudentSet($viewer, 0);
         $ss->_u[$user->contactId] = $user;
         $ss->_ua[] = $user;
         $user->student_set = $ss;
         $ss->_infos = [];
+        return $ss;
+    }
+
+    static function make_for(Contact $viewer, $users) {
+        $ss = new StudentSet($viewer, 0);
+        foreach ($users as $u) {
+            $ss->_u[$u->contactId] = $u;
+            $ss->_ua[] = $u;
+            $u->student_set = $ss;
+        }
         return $ss;
     }
 

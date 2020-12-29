@@ -149,6 +149,8 @@ class Pset {
     /** @var array<string,DownloadEntryConfig> */
     public $downloads = [];
 
+    public $reports = [];
+
     /** @var array<string,RunnerConfig> */
     public $all_runners = [];
     /** @var array<string,RunnerConfig> */
@@ -409,6 +411,9 @@ class Pset {
             throw new PsetConfigException("`downloads` format error`", "downloads");
         }
         $this->downloads = self::position_sort("downloads", $this->downloads);
+
+        // reports
+        $this->reports = $p->reports ?? [];
 
         // runners
         $runners = $p->runners ?? null;
@@ -1408,6 +1413,16 @@ class GradeEntryConfig {
         }
         $this->_last_error = $this->type === null ? "Number expected." : "Invalid grade.";
         return false;
+    }
+
+    function unparse_value($v) {
+        if ($this->type === "letter"
+            && $v !== null
+            && ($k = array_search($v, self::$letter_map))) {
+            return $k;
+        } else {
+            return $v;
+        }
     }
 
     /** @return string */
