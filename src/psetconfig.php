@@ -322,7 +322,7 @@ class Pset {
         $grades = $p->grades ?? null;
         if (is_array($grades) || is_object($grades)) {
             foreach ((array) $p->grades as $k => $v) {
-                $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v);
+                $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v, $this);
                 if (isset($this->all_grades[$g->key])
                     || $g->key === "late_hours") {
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
@@ -392,7 +392,7 @@ class Pset {
 
         if (($this->deadline || $this->deadline_college || $this->deadline_extension)
             && !self::cbool($p, "no_late_hours")) {
-            $this->_late_hours = GradeEntryConfig::make_late_hours();
+            $this->_late_hours = GradeEntryConfig::make_late_hours($this);
         }
 
         // downloads
@@ -1044,13 +1044,20 @@ class DownloadEntryConfig {
 }
 
 class GradeEntryConfig {
-    /** @var string */
+    /** @var Pset
+     * @readonly */
+    public $pset;
+    /** @var string
+     * @readonly */
     public $key;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $name;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $title;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $description;
     /** @var string */
     public $type;
@@ -1116,7 +1123,8 @@ class GradeEntryConfig {
         "E" => 50, "F" => 50
     ];
 
-    function __construct($name, $g) {
+    function __construct($name, $g, Pset $pset) {
+        $this->pset = $pset;
         $loc = ["grades", $name];
         if (!is_object($g)) {
             throw new PsetConfigException("grade entry format error", $loc);
@@ -1294,8 +1302,8 @@ class GradeEntryConfig {
         $this->config = $g;
     }
 
-    static function make_late_hours() {
-        $ge = new GradeEntryConfig("x_late_hours", (object) ["no_total" => true, "position" => PHP_INT_MAX, "title" => "late hours"]);
+    static function make_late_hours(Pset $pset) {
+        $ge = new GradeEntryConfig("x_late_hours", (object) ["no_total" => true, "position" => PHP_INT_MAX, "title" => "late hours"], $pset);
         $ge->key = "late_hours";
         return $ge;
     }
@@ -1451,11 +1459,11 @@ class GradeEntryConfig {
     }
 
     /** @return ?GradeFormula */
-    function formula(Conf $conf) {
+    function formula() {
         if ($this->_formula === false) {
             $this->_formula = null;
             if ($this->formula
-                && ($f = GradeFormula::parse($conf, $this->formula))) {
+                && ($f = GradeFormula::parse($this->pset->conf, $this->formula, $this->pset))) {
                 $this->_formula = $f;
             }
         }
@@ -1866,7 +1874,7 @@ class FormulaConfig {
         if ($this->_formula === false) {
             $this->_formula = null;
             if ($this->formula
-                && ($f = GradeFormula::parse($this->conf, $this->formula))) {
+                && ($f = GradeFormula::parse($this->conf, $this->formula, null))) {
                 $this->_formula = $f;
             }
         }

@@ -24,6 +24,14 @@ abstract class GradeFormula implements JsonSerializable {
     const UNARY_PRECEDENCE = 12;
     const MIN_PRECEDENCE = -2;
 
+    static public $total_gkeys = [
+        "total" => 0, "total_noextra" => 1,
+        "total_norm" => 2, "total_noextra_norm" => 3, "total_norm_noextra" => 3,
+        "total_raw" => 4, "total_noextra_raw" => 5, "total_raw_noextra" => 5
+    ];
+
+    static public $evaluation_stack = [];
+
     /** @param string $op
      * @param list<GradeFormula> $a */
     function __construct($op, $a) {
@@ -31,14 +39,57 @@ abstract class GradeFormula implements JsonSerializable {
         $this->_a = $a;
     }
 
-    static function parse_prefix(Conf $conf, &$t, $minprec) {
+    /** @return ?GradeFormula */
+    static private function parse_grade_pair($pkey, $gkey, Conf $conf, Pset $context = null) {
+        if ($pkey === "self" && $context) {
+            $pset = $context;
+        } else {
+            $pset = $conf->pset_by_key_or_title($pkey);
+        }
+        if ($pset) {
+            if (($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
+                return new PsetTotal_GradeFormula($pset, ($f & 1) !== 0, ($f & 2) !== 0);
+            } else if (($ge = $pset->gradelike_by_key($gkey))) {
+                return new GradeEntry_GradeFormula($pset, $ge);
+            } else {
+                return null;
+            }
+        } else if ($conf->pset_category($pkey)
+                   && ($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
+            if (!$conf->pset_category_has_extra($pkey)) {
+                $f &= ~1;
+            }
+            return new PsetCategoryTotal_GradeFormula($pkey, ($f & 1) !== 0, ($f & 4) !== 4);
+        } else {
+            return null;
+        }
+    }
+
+    /** @return ?GradeFormula */
+    static private function parse_grade_word($gkey, Conf $conf, Pset $context = null) {
+        if (($pset = $conf->pset_by_key_or_title($gkey))) {
+            return new PsetTotal_GradeFormula($pset, false, false);
+        } else if ($conf->pset_category($gkey)) {
+            return new PsetCategoryTotal_GradeFormula($gkey, false, true);
+        } else if ($context && ($ge = $context->gradelike_by_key($gkey))) {
+            return new GradeEntry_GradeFormula($context, $ge);
+        } else {
+            return null;
+        }
+    }
+
+    /** @param int $minprec
+     * @param string &$t
+     * @param ?Pset $context
+     * @return ?GradeFormula */
+    static function parse_prefix(Conf $conf, &$t, $minprec, $context) {
         $t = ltrim($t);
 
         if ($t === "") {
             $e = null;
         } else if ($t[0] === "(") {
             $t = substr($t, 1);
-            $e = self::parse_prefix($conf, $t, self::MIN_PRECEDENCE);
+            $e = self::parse_prefix($conf, $t, self::MIN_PRECEDENCE, $context);
             if ($e !== null) {
                 $t = ltrim($t);
                 if ($t === "" || $t[0] !== ")") {
@@ -49,7 +100,7 @@ abstract class GradeFormula implements JsonSerializable {
         } else if ($t[0] === "-" || $t[0] === "+") {
             $op = $t[0];
             $t = substr($t, 1);
-            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE);
+            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE, $context);
             if ($e !== null && $op === "-") {
                 $e = new Unary_GradeFormula("neg", $e);
             }
@@ -61,63 +112,22 @@ abstract class GradeFormula implements JsonSerializable {
             $e = new Number_GradeFormula((float) M_PI);
         } else if (preg_match('/\A(log10|log|ln|lg|exp)\b(.*)\z/s', $t, $m)) {
             $t = $m[2];
-            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE);
+            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE, $context);
             if ($e !== null) {
                 $e = new Unary_GradeFormula($m[1], $e);
             }
         } else if (preg_match('/\A(min|max)\b(.*)\z/s', $t, $m)) {
             $t = $m[2];
-            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE);
+            $e = self::parse_prefix($conf, $t, self::UNARY_PRECEDENCE, $context);
             if ($e !== null) {
                 $e = new MinMax_GradeFormula($m[1], $e);
             }
         } else if (preg_match('/\A(\w+)\s*\.\s*(\w+)(.*)\z/s', $t, $m)) {
-            if (($pset = $conf->pset_by_key_or_title($m[1]))) {
-                if ($m[2] === "total") {
-                    $t = $m[3];
-                    $e = new PsetTotal_GradeFormula($pset, false, false);
-                } else if (($ge = $pset->gradelike_by_key($m[2]))) {
-                    $t = $m[3];
-                    $e = new GradeEntry_GradeFormula($pset, $ge);
-                } else {
-                    return null;
-                }
-            } else {
-                return null;
-            }
+            $t = $m[3];
+            $e = self::parse_grade_pair($m[1], $m[2], $conf);
         } else if (preg_match('/\A(\w+)(.*)\z/s', $t, $m)) {
             $t = $m[2];
-            $k = $m[1];
-            $kbase = $k;
-            $noextra = false;
-            $raw = null;
-            while (true) {
-                if (str_ends_with($kbase, "_noextra")) {
-                    $kbase = substr($kbase, 0, -8);
-                    $noextra = true;
-                } else if (str_ends_with($kbase, "_raw") && $raw === null) {
-                    $kbase = substr($kbase, 0, -4);
-                    $raw = true;
-                } else if (str_ends_with($kbase, "_norm") && $raw === null) {
-                    $kbase = substr($kbase, 0, -5);
-                    $raw = false;
-                } else {
-                    break;
-                }
-            }
-            if (($pset = $conf->pset_by_key_or_title($kbase))) {
-                $noextra = $noextra && $pset->has_extra;
-                $raw = $raw === null || $raw;
-                $e = new PsetTotal_GradeFormula($pset, $noextra, $raw);
-            } else if (($gf = $conf->formula_by_name($k))) {
-                $e = $gf->formula();
-            } else if ($conf->pset_category($kbase)) {
-                $noextra = $noextra && $conf->pset_category_has_extra($kbase);
-                $raw = $raw !== null && $raw;
-                $e = new PsetCategoryTotal_GradeFormula($kbase, $noextra, $raw);
-            } else {
-                return null;
-            }
+            $e = self::parse_grade_word($m[1], $conf, $context);
         } else {
             $e = null;
         }
@@ -135,7 +145,7 @@ abstract class GradeFormula implements JsonSerializable {
                     return $e;
                 }
                 $t = $m[2];
-                $e2 = self::parse_prefix($conf, $t, $op === "**" ? $prec : $prec + 1);
+                $e2 = self::parse_prefix($conf, $t, $op === "**" ? $prec : $prec + 1, $context);
                 if ($e2 === null) {
                     return null;
                 }
@@ -151,7 +161,7 @@ abstract class GradeFormula implements JsonSerializable {
                     }
                 } else if ($op === "?") {
                     if (preg_match('/\A\s*:(.*)\z/s', $t, $m)
-                        && ($e3 = self::parse_prefix($conf, $m[1], $prec))) {
+                        && ($e3 = self::parse_prefix($conf, $m[1], $prec, $context))) {
                         $t = $m[1];
                         $e = new Ternary_GradeFormula($e, $e2, $e3);
                     } else {
@@ -170,10 +180,10 @@ abstract class GradeFormula implements JsonSerializable {
 
     /** @param ?string $s
      * @return ?GradeFormula */
-    static function parse(Conf $conf, $s) {
+    static function parse(Conf $conf, $s, Pset $context = null) {
         $sin = $s;
         if ($s !== null
-            && ($f = self::parse_prefix($conf, $s, self::MIN_PRECEDENCE)) !== null
+            && ($f = self::parse_prefix($conf, $s, self::MIN_PRECEDENCE, $context)) !== null
             && !($f instanceof Comma_GradeFormula)
             && trim($s) === "") {
             return $f;
@@ -183,6 +193,20 @@ abstract class GradeFormula implements JsonSerializable {
     }
 
     abstract function evaluate(Contact $student);
+
+    function evaluate_global(Contact $student, $config = null) {
+        if ($config && $config instanceof GradeEntryConfig) {
+            $name = "{$config->pset->nonnumeric_key}.{$config->key}";
+        } else if ($config && $config instanceof FormulaConfig) {
+            $name = "{$config->key}";
+        } else {
+            $name = "[{$this->_op}]";
+        }
+        array_push(self::$evaluation_stack, $name);
+        $v = $this->evaluate($student);
+        array_pop(self::$evaluation_stack);
+        return $v;
+    }
 
     function jsonSerialize() {
         $x = [$this->_op];
@@ -394,7 +418,7 @@ class PsetTotal_GradeFormula extends GradeFormula {
         return $student->gcache_total($this->pset, $this->noextra, $this->norm);
     }
     function jsonSerialize() {
-        return $this->pset->nonnumeric_key . ($this->noextra ? "_noextra" : "") . ($this->norm ? "" : "_norm");
+        return $this->pset->nonnumeric_key . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "_norm" : "");
     }
 }
 
@@ -416,6 +440,6 @@ class PsetCategoryTotal_GradeFormula extends GradeFormula {
         return $student->gcache_category_total($this->category, $this->noextra, $this->norm);
     }
     function jsonSerialize() {
-        return $this->category . ($this->noextra ? "_noextra" : "") . ($this->norm ? "_raw" : "");
+        return $this->category . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "" : "_raw");
     }
 }

@@ -812,9 +812,15 @@ class Contact {
     }
 
     /** @return ?GradeExport */
+    const GCF_GRADES = 1;
+    const GCF_ALL = 3;
+    const GCF_RECURSE = 4;
     private function ensure_gcache(Pset $pset, $flags) {
-        $f = $flags & PsetView::GRADEJSON_NO_LATE_HOURS ? 1 : 3;
-        if ((($this->_gcache_flags[$pset->id] ?? 0) & $f) !== $f) {
+        $want = $flags & PsetView::GRADEJSON_NO_LATE_HOURS ? self::GCF_GRADES : self::GCF_ALL;
+        $cflags = $this->_gcache_flags[$pset->id] ?? 0;
+        if (($cflags & $want) !== $want) {
+            $this->_gcache[$pset->id] = null;
+            $this->_gcache_flags[$pset->id] = $want | self::GCF_RECURSE;
             if ($this->student_set) {
                 $info = $this->student_set->info_at($this->contactId, $pset);
             } else {
@@ -822,10 +828,10 @@ class Contact {
             }
             if ($info) {
                 $this->_gcache[$pset->id] = $info->grade_export($flags | PsetView::GRADEJSON_SLICE | PsetView::GRADEJSON_OVERRIDE_VIEW);
-            } else {
-                $this->_gcache[$pset->id] = null;
             }
-            $this->_gcache_flags[$pset->id] = $f;
+            $this->_gcache_flags[$pset->id] = $want;
+        } else if ($cflags & self::GCF_RECURSE) {
+            error_log("recursing for {$pset->key} formulas " . json_encode(GradeFormula::$evaluation_stack) . "\n" . debug_string_backtrace());
         }
         return $this->_gcache[$pset->id];
     }
@@ -844,12 +850,12 @@ class Contact {
     }
 
     /** @param bool $noextra
-     * @param bool $raw
+     * @param bool $norm
      * @return null|int|float */
-    function gcache_total(Pset $pset, $noextra, $raw) {
+    function gcache_total(Pset $pset, $noextra, $norm) {
         if (($gexp = $this->ensure_gcache($pset, PsetView::GRADEJSON_NO_LATE_HOURS))) {
             $v = $noextra ? $gexp->total_noextra() : $gexp->total();
-            if ($v !== null && !$raw) {
+            if ($v !== null && $norm) {
                 $v = round(($v * 1000.0) / $pset->max_grade(true)) / 10;
             }
             return $v;
@@ -860,21 +866,21 @@ class Contact {
 
     /** @param string $group
      * @param bool $noextra
-     * @param bool $raw
+     * @param bool $norm
      * @return ?float */
-    function gcache_category_total($group, $noextra, $raw) {
+    function gcache_category_total($group, $noextra, $norm) {
         if (!isset($this->_gcache_group[$group])) {
             $this->_gcache_group[$group] = [false, false, false, false];
         }
-        $i = ($noextra ? 1 : 0) | ($raw ? 2 : 0);
+        $i = ($noextra ? 1 : 0) | ($norm ? 2 : 0);
         if ($this->_gcache_group[$group][$i] === false) {
             $gw = $this->conf->category_weight($group);
             $x = null;
             foreach ($this->conf->psets() as $p) {
                 if (!$p->disabled && $p->category === $group) {
-                    $v = $this->gcache_total($p, $noextra, $raw);
+                    $v = $this->gcache_total($p, $noextra, $norm);
                     if ($v !== null) {
-                        if (!$raw) {
+                        if ($norm) {
                             $v *= $p->weight / $gw;
                         }
                         $x = ($x === null ? 0.0 : $x) + $v;

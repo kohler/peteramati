@@ -1586,8 +1586,8 @@ class PsetView {
             if ($notes && $notes->formula_at !== $t) {
                 $fs = [];
                 foreach ($this->pset->grades() as $ge) {
-                    if (($f = $ge->formula($this->conf))) {
-                        $fs[$ge->key] = $f->evaluate($this->user);
+                    if (($f = $ge->formula())) {
+                        $fs[$ge->key] = $f->evaluate_global($this->user, $ge);
                     }
                 }
                 $this->update_grade_xnotes(["formula_at" => $t, "formula" => empty($fs) ? null : $fs]);
