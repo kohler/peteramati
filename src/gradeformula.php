@@ -50,7 +50,11 @@ abstract class GradeFormula implements JsonSerializable {
             if (($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
                 return new PsetTotal_GradeFormula($pset, ($f & 1) !== 0, ($f & 2) !== 0);
             } else if (($ge = $pset->gradelike_by_key($gkey))) {
-                return new GradeEntry_GradeFormula($pset, $ge);
+                if ($ge->formula) {
+                    return $ge->formula();
+                } else {
+                    return new GradeEntry_GradeFormula($pset, $ge);
+                }
             } else {
                 return null;
             }
@@ -205,7 +209,7 @@ abstract class GradeFormula implements JsonSerializable {
         if ($config && $config instanceof GradeEntryConfig) {
             $name = "{$config->pset->nonnumeric_key}.{$config->key}";
         } else if ($config && $config instanceof FormulaConfig) {
-            $name = "{$config->key}";
+            $name = "{$config->name}";
         } else {
             $name = "[{$this->_op}]";
         }
@@ -394,10 +398,13 @@ class GradeEntry_GradeFormula extends GradeFormula {
     /** @var GradeEntryConfig */
     private $ge;
 
+    /** @param Pset $pset
+     * @param GradeEntryConfig $ge */
     function __construct($pset, $ge) {
         parent::__construct("g", []);
         $this->pset = $pset;
         $this->ge = $ge;
+        assert(!$ge->formula);
     }
     function evaluate(Contact $student) {
         return (float) $student->gcache_entry($this->pset, $this->ge);
@@ -415,6 +422,9 @@ class PsetTotal_GradeFormula extends GradeFormula {
     /** @var bool */
     private $norm;
 
+    /** @param Pset $pset
+     * @param bool $noextra
+     * @param bool $norm */
     function __construct($pset, $noextra, $norm) {
         parent::__construct("gpt", []);
         $this->pset = $pset;
