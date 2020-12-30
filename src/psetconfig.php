@@ -330,6 +330,9 @@ class Pset {
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
                 }
                 $this->all_grades[$g->key] = $g;
+                if (!$g->disabled) {
+                    $this->grades[$g->key] = $g;
+                }
                 if ($g->collate) {
                     $this->has_grade_collate = true;
                 }
@@ -355,7 +358,7 @@ class Pset {
         if ($p->grade_order ?? null) {
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         } else {
-            $this->grades = self::position_sort("grades", $this->all_grades);
+            $this->grades = self::position_sort("grades", $this->grades);
         }
         $this->grades_total = self::cnum($p, "grades_total");
         $this->grades_history = self::cbool($p, "grades_history") ?? false;
@@ -956,12 +959,13 @@ class Pset {
         $b = array();
         foreach ($order as $name) {
             if (is_string($name)) {
-                if (isset($a[$name]) && !isset($b[$name]))
+                if (isset($a[$name]) && !isset($b[$name])) {
                     $b[$name] = $a[$name];
-                else if (isset($a[$name]))
+                } else if (isset($a[$name])) {
                     throw new PsetConfigException("`$what` entry `$name` reused", $what);
-                else
+                } else {
                     throw new PsetConfigException("`$what` entry `$name` unknown", $what);
+                }
             } else {
                 throw new PsetConfigException("`$what` format error", $what);
             }
@@ -995,21 +999,29 @@ class Pset {
 
 
 class DownloadEntryConfig {
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $key;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $title;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $file;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $filename;
-    /** @var bool */
+    /** @var bool
+     * @readonly */
     public $timed;
-    /** @var ?float */
+    /** @var ?float
+     * @readonly */
     public $timeout;
-    /** @var ?float */
+    /** @var ?float
+     * @readonly */
     public $position;
-    /** @var null|bool|int|'grades' */
+    /** @var null|bool|int|'grades'
+     * @readonly */
     public $visible;
 
     function __construct($name, $g) {
@@ -1064,12 +1076,29 @@ class GradeEntryConfig {
     /** @var string
      * @readonly */
     public $description;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $type;
-    /** @var bool */
+    /** @var bool
+     * @readonlg */
     public $type_tabular;
-    /** @var bool */
+    /** @var bool
+     * @readonly */
     public $type_numeric;
+    /** @var bool
+     * @readonly */
+    public $disabled;
+    /** @var bool
+     * @readonly */
+    public $answer;
+    /** @var float|false
+     * @readonly */
+    public $position;
+    /** @var bool
+     * @readonly */
+    public $visible;
+    /** @var bool */
+    private $_visible_defaulted = false;
     /** @var ?string */
     public $round;
     /** @var ?list<string> */
@@ -1080,14 +1109,6 @@ class GradeEntryConfig {
     private $_formula = false;
     /** @var null|int|float */
     public $max;
-    /** @var bool
-     * @readonly */
-    public $answer;
-    /** @var bool
-     * @readonly */
-    public $visible;
-    /** @var bool */
-    private $_visible_defaulted = false;
     /** @var bool */
     public $max_visible;
     /** @var bool */
@@ -1096,8 +1117,6 @@ class GradeEntryConfig {
     public $no_total;
     /** @var bool */
     public $is_extra;
-    /** @var float */
-    public $position;
     /** @var ?int */
     public $pcview_index;
     /** @var ?bool */
@@ -1130,6 +1149,7 @@ class GradeEntryConfig {
         "E" => 50, "F" => 50
     ];
 
+    /** @param string $name */
     function __construct($name, $g, Pset $pset) {
         $this->pset = $pset;
         $loc = ["grades", $name];
@@ -1157,6 +1177,11 @@ class GradeEntryConfig {
             $this->title = $this->key;
         }
         $this->description = Pset::cstr($loc, $g, "description", "edit_description");
+        $this->disabled = Pset::cbool($loc, $g, "disabled");
+        $this->position = Pset::cnum($loc, $g, "position");
+        if ($this->position === null && isset($g->priority)) {
+            $this->position = -Pset::cnum($loc, $g, "priority");
+        }
 
         $allow_total = false;
         $type = null;
@@ -1249,11 +1274,6 @@ class GradeEntryConfig {
         $this->is_extra = Pset::cbool($loc, $g, "is_extra");
         $this->answer = Pset::cbool($loc, $g, "answer", "student");
 
-        $this->position = Pset::cnum($loc, $g, "position");
-        if ($this->position === null && isset($g->priority)) {
-            $this->position = -Pset::cnum($loc, $g, "priority");
-        }
-
         $this->collate = Pset::cbool($loc, $g, "collate");
         $this->table_color = Pset::cstr($loc, $g, "table_color");
         $lm = self::clean_landmark($g, "landmark");
@@ -1311,7 +1331,10 @@ class GradeEntryConfig {
     }
 
     static function make_late_hours(Pset $pset) {
-        $ge = new GradeEntryConfig("x_late_hours", (object) ["no_total" => true, "position" => PHP_INT_MAX, "title" => "late hours"], $pset);
+        $ge = new GradeEntryConfig("x_late_hours", (object) [
+            "no_total" => true, "position" => PHP_INT_MAX, "title" => "late hours"
+        ], $pset);
+        /** @phan-suppress-next-line PhanAccessReadOnlyProperty */
         $ge->key = "late_hours";
         return $ge;
     }
@@ -1488,22 +1511,7 @@ class GradeEntryConfig {
         return $this->_formula;
     }
 
-    /** @param ?object $gx
-     * @param ?object $agx
-     * @return null|int|float */
-    function extract_value($gx, $agx, &$av) {
-        $key = $this->key;
-        $av = $agx ? $agx->$key ?? null : null;
-        if ($this->formula) {
-            return null;
-        } else if ($gx && property_exists($gx, $key)) {
-            $gv = $gx->$key;
-            return $gv !== false ? $gv : null;
-        } else {
-            return $av;
-        }
-    }
-
+    /** @return array<string,mixed> */
     function json($pcview, $pos = null) {
         $gej = ["key" => $this->key, "title" => $this->title];
         if ($this->type !== null) {
@@ -1686,18 +1694,23 @@ class RunOverlayConfig {
 }
 
 class DiffConfig {
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $match;
-    /** @var float */
+    /** @var float
+     * @readonly */
     public $priority;
-    /** @var float */
+    /** @var float
+     * @readonly */
     public $priority_default;
+    /** @var string
+     * @readonly */
+    public $title;
+    /** @var float
+     * @readonly */
+    public $position;
     /** @var int */
     public $subposition = 0;
-    /** @var string */
-    public $title;
-    /** @var float */
-    public $position;
     /** @var bool */
     public $fileless;
     /** @var bool */
@@ -1769,7 +1782,8 @@ class DiffConfig {
     }
 
     /** @param string $filename
-     * @return ?DiffConfig */
+     * @return ?DiffConfig
+     * @suppress PhanAccessReadOnlyProperty */
     static function combine($filename, DiffConfig $a = null, DiffConfig $b = null) {
         if (!$a && !$b) {
             return null;

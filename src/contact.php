@@ -805,9 +805,8 @@ class Contact {
     function invalidate_grades($psetid) {
         $this->conf->qe("delete from Settings where name=? or name=?",
                         "__gradets.p$psetid", "__gradets.pp$psetid");
-        $this->conf->qe("update ContactInfo set gradeUpdateTime=? where contactId=?",
-                        Conf::$now, $this->contactId);
-        $this->gradeUpdateTime = Conf::$now;
+        $this->conf->qe("update ContactInfo set gradeUpdateTime=greatest(?,gradeUpdateTime+1) where contactId=?", Conf::$now, $this->contactId);
+        $this->gradeUpdateTime = max(Conf::$now, $this->gradeUpdateTime + 1);
         $this->_gcache = $this->_gcache_flags = $this->_gcache_group = [];
     }
 

@@ -134,4 +134,30 @@ class CommitPsetInfo {
         $this->xnotes = $xnotes;
         $this->jxnotes = $jxnotes;
     }
+
+
+    /** @return null|int|float */
+    function grade_total(Pset $pset) {
+        assert($pset->id === $this->pset);
+        $t = null;
+        if ($this->notes && ($jn = $this->jnotes())) {
+            $g = $jn->grades ?? null;
+            $ag = $jn->autogrades ?? null;
+            if ($g || $ag) {
+                foreach ($pset->grades as $ge) {
+                    if (!$ge->no_total) {
+                        if ($g && property_exists($g, $ge->key)) {
+                            $v = $g->{$ge->key};
+                        } else {
+                            $v = $ag ? $ag->{$ge->key} ?? null : null;
+                        }
+                        if ($v !== null) {
+                            $t = ($t ?? 0) + $v;
+                        }
+                    }
+                }
+            }
+        }
+        return $t;
+    }
 }

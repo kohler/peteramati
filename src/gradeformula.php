@@ -84,8 +84,8 @@ abstract class GradeFormula implements JsonSerializable {
         }
     }
 
-    /** @param int $minprec
-     * @param string &$t
+    /** @param string &$t
+     * @param int $minprec
      * @param ?Pset $context
      * @return ?GradeFormula */
     static function parse_prefix(Conf $conf, &$t, $minprec, $context) {

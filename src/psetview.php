@@ -35,6 +35,10 @@ class PsetView {
     private $_rpi;
     /** @var ?CommitPsetInfo */
     private $_cpi;
+    /** @var ?string */
+    private $_hash;
+    /** @var false|null|CommitRecord */
+    private $_derived_handout_commit = false;
 
     /** @var ?bool */
     private $_can_view_grades;
@@ -47,10 +51,19 @@ class PsetView {
     /** @var ?bool */
     private $_grades_suppressed;
 
-    /** @var ?string */
-    private $_hash;
-    /** @var false|null|CommitRecord */
-    private $derived_handout_commit = false;
+    /** @var int */
+    private $_gtime = null;
+    /** @var ?list<mixed> */
+    private $_g;
+    /** @var ?list<mixed> */
+    private $_ag;
+    /** @var null|int|float */
+    private $_gmaxtot;
+    /** @var null|int|float */
+    private $_gtot;
+    /** @var null|int|float */
+    private $_gtotne;
+
     /** @var bool */
     private $_has_grade_counts = false;
     /** @var ?int */
@@ -207,8 +220,9 @@ class PsetView {
             $this->_hash = $reqhash;
             $this->_havepi &= ~4;
             $this->_cpi = null;
-            $this->derived_handout_commit = false;
+            $this->_derived_handout_commit = false;
             $this->_has_grade_counts = false;
+            $this->_gtime = null;
         }
     }
 
@@ -312,8 +326,8 @@ class PsetView {
 
     /** @return ?CommitRecord */
     function derived_handout_commit() {
-        if ($this->derived_handout_commit === false) {
-            $this->derived_handout_commit = null;
+        if ($this->_derived_handout_commit === false) {
+            $this->_derived_handout_commit = null;
             $hbases = $this->pset->handout_commits();
             $seen_hash = !$this->_hash;
             foreach ($this->recent_commits() as $c) {
@@ -321,14 +335,14 @@ class PsetView {
                     $seen_hash = true;
                 }
                 if (isset($hbases[$c->hash])) {
-                    $this->derived_handout_commit = $c;
+                    $this->_derived_handout_commit = $c;
                     if ($seen_hash) {
                         break;
                     }
                 }
             }
         }
-        return $this->derived_handout_commit;
+        return $this->_derived_handout_commit;
     }
 
     /** @return ?non-empty-string */
@@ -469,10 +483,8 @@ class PsetView {
 
     /** @return ?object */
     function grade_jnotes() {
-        if ($this->pset->gitless) {
+        if ($this->pset->gitless_grades) {
             return $this->user_jnotes();
-        } else if ($this->pset->gitless_grades) {
-            return $this->repository_jnotes();
         } else {
             return $this->commit_jnotes();
         }
@@ -480,10 +492,8 @@ class PsetView {
 
     /** @return ?object */
     function grade_jxnotes() {
-        if ($this->pset->gitless) {
+        if ($this->pset->gitless_grades) {
             return $this->user_jxnotes();
-        } else if ($this->pset->gitless_grades) {
-            return $this->repository_jxnotes();
         } else {
             return $this->commit_jxnotes();
         }
@@ -503,36 +513,130 @@ class PsetView {
         return $jn ? $jn->$key ?? null : null;
     }
 
+
+    private function ensure_grades() {
+        if ($this->_gtime !== $this->user->gradeUpdateTime) {
+            $this->_ag = $this->_gmaxtot = null;
+            $this->_gtime = $this->user->gradeUpdateTime;
+            $jn = $this->grade_jnotes();
+            if ($jn && ($ag = $jn->autogrades ?? null)) {
+                $this->_ag = [];
+                foreach ($this->pset->grades as $ge) {
+                    $this->_ag[] = $ag->{$ge->key} ?? null;
+                }
+            }
+            $this->_g = $this->_ag;
+            if ($jn && ($g = $jn->grades ?? null)) {
+                $this->_g = $this->_g ?? array_fill(0, count($this->pset->grades), null);
+                foreach ($this->pset->grades as $ge) {
+                    if (property_exists($g, $ge->key)) {
+                        $this->_g[$ge->pcview_index] = $g->{$ge->key};
+                    }
+                }
+            }
+        }
+    }
+
+    private function ensure_grade_total() {
+        if ($this->_gmaxtot === null
+            || $this->_gtime !== $this->user->gradeUpdateTime) {
+            $this->ensure_grades();
+            $this->_gmaxtot = 0;
+            $this->_gtot = $this->_gtotne = null;
+            foreach ($this->visible_grades() as $ge) {
+                if (!$ge->no_total) {
+                    if (!$ge->is_extra && $ge->max_visible) {
+                        $this->_gmaxtot += $ge->max;
+                    }
+                    if (($v = $this->_g[$ge->pcview_index]) !== null) {
+                        $this->_gtot += $v;
+                        if (!$ge->is_extra) {
+                            $this->_gtotne += $v;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** @return int|float */
+    function grade_max_total() {
+        if ($this->pset->grades_total !== null) {
+            return $this->pset->grades_total;
+        } else {
+            $this->ensure_grade_total();
+            return $this->_gmaxtot;
+        }
+    }
+
+    /** @return null|int|float */
+    function grade_total() {
+        $this->ensure_grades();
+        return $this->_gtot;
+    }
+
+    /** @return null|int|float */
+    function grade_total_noextra() {
+        $this->ensure_grades();
+        return $this->_gtotne;
+    }
+
+    function ensure_formulas() {
+        if ($this->pset->has_formula) {
+            $this->ensure_grades();
+            $this->_g = $this->_g ?? array_fill(0, count($this->pset->grades), null);
+            $jn = $this->grade_jxnotes();
+            $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
+            //error_log("{$t} {$this->user->gradeUpdateTime} {$this->pset->config_mtime} {$jn->formula_at}");
+            if (!$jn || $jn->formula_at !== $t) {
+                $fs = [];
+                foreach ($this->pset->grades as $ge) {
+                    if (($f = $ge->formula())) {
+                        $v = $f->evaluate_global($this->user, $ge);
+                        $fs[$ge->key] = $v;
+                        $this->_g[$ge->pcview_index] = $v;
+                    }
+                }
+                $this->update_grade_xnotes(["formula_at" => $t, "formula" => empty($fs) ? null : $fs]);
+            } else if (($g = $jn->formula ?? null)) {
+                foreach ($this->pset->grades as $ge) {
+                    if (property_exists($g, $ge->key) && $ge->formula) {
+                        $this->_g[$ge->pcview_index] = $g->{$ge->key};
+                    }
+                }
+            }
+        }
+    }
+
+
     /** @param string|GradeEntryConfig $ge
      * @return null|int|float|string */
-    function grade_value($ge, $type = null) {
-        if (is_string($ge)
-            && !($ge = $this->pset->gradelike_by_key($ge))) {
-            return null;
+    function grade_value($ge) {
+        if (is_string($ge)) {
+            $ge = $this->pset->gradelike_by_key($ge);
         }
-        $key = $ge->key;
-        $grade = null;
-        if ($ge->formula) {
-            $this->ensure_formula();
-            if (($fx = $this->grade_jxnotes())
-                && isset($fx->formula)) {
-                $grade = $fx->formula->$key ?? null;
-            }
-        } else {
-            if (($gn = $this->grade_jnotes())) {
-                if ((!$type || $type == "autograde")
-                    && isset($gn->autogrades)
-                    && property_exists($gn->autogrades, $key)) {
-                    $grade = $gn->autogrades->$key;
-                }
-                if ((!$type || $type == "grade")
-                    && isset($gn->grades)
-                    && property_exists($gn->grades, $key)) {
-                    $grade = $gn->grades->$key;
-                }
+        $gv = null;
+        if ($ge && $ge->pcview_index !== null) {
+            $ge->formula ? $this->ensure_formulas() : $this->ensure_grades();
+            if ($this->_g) {
+                $gv = $this->_g[$ge->pcview_index];
             }
         }
-        return $grade;
+        return $gv;
+    }
+
+    /** @param string|GradeEntryConfig $ge
+     * @return null|int|float|string */
+    function autograde_value($ge) {
+        if (is_string($ge)) {
+            $ge = $this->pset->gradelike_by_key($ge);
+        }
+        $gv = null;
+        if ($ge && $ge->pcview_index !== null && !$ge->formula) {
+            $this->ensure_grades();
+            $gv = $this->_ag ? $this->_ag[$ge->pcview_index] : null;
+        }
+        return $gv;
     }
 
 
@@ -955,9 +1059,11 @@ class PsetView {
             $this->grades_vf(); // call the selection function
         }
         $ge = $this->pset->grades[$key];
-        $this->_grades_vf = $this->_grades_vf ?? $this->pset->grades_vf;
-        $this->_grades_vf[$ge->pcview_index] = 0;
-        $this->_grades_suppressed = true;
+        if ($ge->pcview_index !== null) {
+            $this->_grades_vf = $this->_grades_vf ?? $this->pset->grades_vf;
+            $this->_grades_vf[$ge->pcview_index] = 0;
+            $this->_grades_suppressed = true;
+        }
     }
 
     /** @return list<GradeEntryConfig> */
@@ -981,7 +1087,7 @@ class PsetView {
      * return ?GradeEntryConfig */
     function gradelike_by_key($key) {
         $ge = $this->pset->gradelike_by_key($key);
-        if ($ge) {
+        if ($ge && $ge->pcview_index !== null) {
             $f = $this->pc_view ? 2 : 1;
             return ($this->grades_vf())[$ge->pcview_index] & $f ? $ge : null;
         } else {
@@ -1091,16 +1197,13 @@ class PsetView {
             $this->_n_nonempty_grades = $this->_n_nonempty_assigned_grades =
             $this->_n_visible_in_total = 0;
         if ($this->can_view_grades()) {
-            $notes = $this->grade_jnotes();
-            $ag = $notes->autogrades ?? null;
-            $g = $notes->grades ?? null;
+            $this->ensure_grades();
             foreach ($this->visible_grades() as $ge) {
                 ++$this->_n_visible_grades;
                 if ($ge->answer) {
                     ++$this->_n_answers;
                 }
-                if (($ag && ($ag->{$ge->key} ?? null) !== null)
-                    || ($g && ($g->{$ge->key} ?? null) !== null)) {
+                if ($this->_g[$ge->pcview_index] !== null) {
                     ++$this->_n_nonempty_grades;
                     if (!$ge->answer) {
                         ++$this->_n_nonempty_assigned_grades;
@@ -1137,30 +1240,6 @@ class PsetView {
     function needs_total() {
         $this->_has_grade_counts || $this->load_grade_counts();
         return $this->_n_visible_in_total > 1;
-    }
-
-    /** @return array{int|float,int|float,int|float} */
-    function grade_total() {
-        $total = $total_noextra = $maxtotal = 0;
-        $notes = $this->grade_jnotes();
-        $ag = $notes->autogrades ?? null;
-        $g = $notes->grades ?? null;
-        foreach ($this->visible_grades() as $ge) {
-            if (!$ge->no_total) {
-                $gv = $g ? $g->{$ge->key} ?? null : null;
-                if ($gv === null && $ag) {
-                    $gv = $ag->{$ge->key} ?? null;
-                }
-                if ($gv) {
-                    $total += $gv;
-                    $total_noextra += $ge->is_extra ? 0 : $gv;
-                }
-                if (!$ge->is_extra && $ge->max && $ge->max_visible) {
-                    $maxtotal += $ge->max;
-                }
-            }
-        }
-        return [$total, $this->pset->grades_total ?? $maxtotal, $total_noextra];
     }
 
     /** @return int */
@@ -1592,23 +1671,6 @@ class PsetView {
     }
 
 
-    function ensure_formula() {
-        if ($this->pset->has_formula) {
-            $notes = $this->grade_jxnotes();
-            $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
-            //error_log("{$t} {$this->user->gradeUpdateTime} {$this->pset->config_mtime} {$notes->formula_at}");
-            if (!$notes || $notes->formula_at !== $t) {
-                $fs = [];
-                foreach ($this->pset->grades() as $ge) {
-                    if (($f = $ge->formula())) {
-                        $fs[$ge->key] = $f->evaluate_global($this->user, $ge);
-                    }
-                }
-                $this->update_grade_xnotes(["formula_at" => $t, "formula" => empty($fs) ? null : $fs]);
-            }
-        }
-    }
-
     const GRADEJSON_SLICE = 1;
     const GRADEJSON_OVERRIDE_VIEW = 2;
     const GRADEJSON_NO_LATE_HOURS = 4;
@@ -1634,16 +1696,16 @@ class PsetView {
         }
         $gexp->uid = $this->user->contactId;
 
-        $notes = $this->grade_jnotes();
-        $agx = $notes->autogrades ?? null;
-        $gx = $notes->grades ?? null;
-        if ($agx || $gx || $this->is_grading_commit()) {
+        $this->ensure_grades();
+        if ($this->_g !== null || $this->is_grading_commit()) {
             $gexp->grades = [];
-            $gexp->autogrades = $agx ? [] : null;
+            $gexp->autogrades = $this->_ag !== null ? [] : null;
             foreach ($gexp->visible_grades() as $ge) {
-                $gexp->grades[] = $ge->extract_value($gx, $agx, $av);
-                if ($agx) {
-                    $gexp->autogrades[] = $av;
+                if (!$ge->formula) {
+                    $gexp->grades[] = $this->_g ? $this->_g[$ge->pcview_index] : null;
+                    if ($this->_ag !== null) {
+                        $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
+                    }
                 }
             }
         }
@@ -1677,7 +1739,7 @@ class PsetView {
     }
 
     function grade_export_formulas(GradeExport $gexp) {
-        $this->ensure_formula();
+        $this->ensure_formulas();
         if (($fgx = $this->grade_jxnote("formula"))) {
             foreach ($gexp->visible_grades() as $i => $ge) {
                 if ($ge->type === "formula"
@@ -1700,31 +1762,6 @@ class PsetView {
                 $gexp->auto_late_hours = $lhd->autohours;
             }
         }
-    }
-
-    /** @param int $answer_version
-     * @return bool */
-    function export_answers_as_of(GradeExport $gexp, $answer_version) {
-        if ($this->pset->gitless_grades && ($upi = $this->upi())) {
-            if ($upi->notesversion === $answer_version
-                && ($gexp->answer_version ?? $gexp->version) === $answer_version) {
-                return true;
-            } else if (($j = $upi->jnotes_as_of($answer_version, $this->conf))) {
-                $gx = $j->grades ?? null;
-                $agx = $j->autogrades ?? null;
-                $fgx = null;
-                foreach ($gexp->visible_grades() as $i => $ge) {
-                    if ($ge->answer) {
-                        $gexp->grades[$i] = $ge->extract_value($gx, $agx, $fgx, $av);
-                        if ($agx) {
-                            $gexp->autogrades[$i] = $av;
-                        }
-                    }
-                }
-                return true;
-            }
-        }
-        return false;
     }
 
     /** @param int $flags

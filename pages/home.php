@@ -632,53 +632,6 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
 
 
 // Per-pset
-/** @param iterable<GradeEntryConfig> $gelist
- * @param ?object $gi
- * @param ?object $fgi
- * @param array<string,mixed> &$j */
-function add_visible_grades($gelist, $gi, $fgi, &$j, PsetView $info = null, $all = false) {
-    $total = null;
-    $gvarr = $different = [];
-    foreach ($gelist as $ge) {
-        $k = $ge->key;
-        if ($gi) {
-            if ($ge->formula) {
-                $ggv = isset($fgi->formula) ? $fgi->formula->$k ?? null : null;
-                $agv = null;
-            } else {
-                $ggv = isset($gi->grades) ? $gi->grades->$k ?? null : null;
-                $agv = isset($gi->autogrades) ? $gi->autogrades->$k ?? null : null;
-            }
-        } else {
-            $ggv = $agv = null;
-        }
-        $gv = $ggv ?? $agv;
-        if ($gv !== null && !$ge->no_total) {
-            $total = ($total ?? 0) + $gv;
-        }
-        if ($gv === null
-            && $info
-            && !$info->user->dropped
-            && $ge->grader_entry_required()
-            && $info->viewer_is_grader()) {
-            $info->user->incomplete = "grade missing";
-        }
-        $gvarr[] = $gv;
-        if ($ggv && $agv && $ggv != $agv) {
-            $different[$k] = true;
-        }
-    }
-    if ($total !== null) {
-        $j["total"] = round_grade($total);
-    }
-    if ($all) {
-        $j["grades"] = $gvarr;
-        if ($different) {
-            $j["highlight_grades"] = $different;
-        }
-    }
-}
-
 /** @return ?PsetView */
 function home_psetview(Pset $pset, Contact $user, Contact $viewer) {
     if ($pset->disabled
@@ -733,10 +686,9 @@ function show_home_pset(PsetView $info) {
     if ($info->can_view_grades()
         && $info->has_nonempty_assigned_grades()
         && $info->needs_total()) {
-        $tm = $info->grade_total();
-        $t = "<strong>" . $tm[0] . "</strong>";
-        if ($tm[1]) {
-            $t .= " / " . $tm[1];
+        $t = "<strong>" . $info->grade_total() . "</strong>";
+        if (($max = $info->grade_max_total())) {
+            $t .= " / " . $max;
         }
         if (!$user_see_grade) {
             echo '<div class="pa-grp-hidden">';
@@ -815,8 +767,8 @@ function render_flag_row(Pset $pset, Contact $s = null, FlagTableRow $row, $anon
             $j["conversation_pfx"] = UnicodeHelper::utf8_word_prefix($conv, 40);
         }
     }
-    if ($row->cpi->notes) {
-        add_visible_grades($pset->tabular_grades(), $row->cpi->jnotes(), null, $j, null, false);
+    if (($t = $row->cpi->grade_total($pset)) !== null) {
+        $j["total"] = $t;
     }
     if ($row->flagid[0] === "t" && ctype_digit(substr($row->flagid, 1))) {
         $j["at"] = (int) substr($row->flagid, 1);
@@ -1020,16 +972,9 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
     }
 
     if ($gex->visible_grades()) {
-        $gi = $info->grade_jnotes();
-        if ($pset->has_formula) {
-            $info->ensure_formula();
-            $fgi = $info->grade_jxnotes();
-        } else {
-            $fgi = null;
-        }
-
         if (!$pset->gitless_grades) {
             $gradercid = $info->gradercid();
+            $gi = $info->grade_jnotes();
             if ($gi && ($gi->linenotes ?? null)) {
                 $j["has_notes"] = true;
             } else if ($info->viewer->contactId == $gradercid
@@ -1043,8 +988,23 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
                 $j["has_nongrader_notes"] = true;
             }
         }
-
-        add_visible_grades($gex->visible_grades(), $gi, $fgi, $j, $info, true);
+        if (($total = $info->grade_total()) !== null) {
+            $j["total"] = $total;
+        }
+        foreach ($gex->visible_grades() as $ge) {
+            $gv = $info->grade_value($ge);
+            $agv = $info->autograde_value($ge);
+            if ($gv === null
+                && !$info->user->dropped
+                && $ge->grader_entry_required()
+                && $info->viewer_is_grader()) {
+                $info->user->incomplete = "grade missing";
+            }
+            $j["grades"][] = $gv;
+            if ($agv !== null && $gv !== $agv) {
+                $j["highlight_grades"][$ge->key] = true;
+            }
+        }
         if ($info->user_can_view_grades()) {
             $j["grades_visible"] = true;
         }
