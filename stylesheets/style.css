@@ -2313,6 +2313,10 @@ td.mhcb {
 	background: red;
 }
 
+.gtable {
+	font-size: 75%;
+	line-height: 1.5;
+}
 .gtable-container-0 {
 	margin-left: -24px;
 	margin-right: -24px;
