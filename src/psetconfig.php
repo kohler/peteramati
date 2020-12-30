@@ -1504,7 +1504,7 @@ class GradeEntryConfig {
         if ($this->_formula === false) {
             $this->_formula = null;
             if ($this->formula
-                && ($f = GradeFormula::parse($this->pset->conf, $this->formula, $this->pset))) {
+                && ($f = GradeFormula::parse($this->pset->conf, $this->formula, $this))) {
                 $this->_formula = $f;
             }
         }

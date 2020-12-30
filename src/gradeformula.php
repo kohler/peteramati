@@ -39,10 +39,13 @@ abstract class GradeFormula implements JsonSerializable {
         $this->_a = $a;
     }
 
-    /** @return ?GradeFormula */
-    static private function parse_grade_pair($pkey, $gkey, Conf $conf, Pset $context = null) {
+    /** @param string $pkey
+     * @param string $gkey
+     * @param ?GradeEntryConfig $context
+     * @return ?GradeFormula */
+    static private function parse_grade_pair($pkey, $gkey, Conf $conf, $context) {
         if ($pkey === "self" && $context) {
-            $pset = $context;
+            $pset = $context->pset;
         } else if ($pkey === "global") {
             return self::parse_grade_word($gkey, $conf, null);
         } else {
@@ -71,13 +74,17 @@ abstract class GradeFormula implements JsonSerializable {
         }
     }
 
-    /** @return ?GradeFormula */
-    static private function parse_grade_word($gkey, Conf $conf, Pset $context = null) {
-        if ($context && ($ge = $context->gradelike_by_key($gkey))) {
+    /** @param string $gkey
+     * @param ?GradeEntryConfig $context
+     * @return ?GradeFormula */
+    static private function parse_grade_word($gkey, Conf $conf, $context) {
+        if ($context
+            && ($ge = $context->pset->gradelike_by_key($gkey))
+            && $ge !== $context) {
             if ($ge->formula) {
                 return $ge->formula();
             } else {
-                return new GradeEntry_GradeFormula($context, $ge);
+                return new GradeEntry_GradeFormula($context->pset, $ge);
             }
         } else if (($gf = $conf->formula_by_name($gkey))) {
             return $gf->formula();
@@ -92,7 +99,7 @@ abstract class GradeFormula implements JsonSerializable {
 
     /** @param string &$t
      * @param int $minprec
-     * @param ?Pset $context
+     * @param ?GradeEntryConfig $context
      * @return ?GradeFormula */
     static function parse_prefix(Conf $conf, &$t, $minprec, $context) {
         $t = ltrim($t);
@@ -192,7 +199,7 @@ abstract class GradeFormula implements JsonSerializable {
 
     /** @param ?string $s
      * @return ?GradeFormula */
-    static function parse(Conf $conf, $s, Pset $context = null) {
+    static function parse(Conf $conf, $s, GradeEntryConfig $context = null) {
         $sin = $s;
         if ($s !== null
             && ($f = self::parse_prefix($conf, $s, self::MIN_PRECEDENCE, $context)) !== null
