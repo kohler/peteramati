@@ -43,6 +43,8 @@ abstract class GradeFormula implements JsonSerializable {
     static private function parse_grade_pair($pkey, $gkey, Conf $conf, Pset $context = null) {
         if ($pkey === "self" && $context) {
             $pset = $context;
+        } else if ($pkey === "global") {
+            return self::parse_grade_word($gkey, $conf, null);
         } else {
             $pset = $conf->pset_by_key_or_title($pkey);
         }
@@ -71,18 +73,18 @@ abstract class GradeFormula implements JsonSerializable {
 
     /** @return ?GradeFormula */
     static private function parse_grade_word($gkey, Conf $conf, Pset $context = null) {
-        if (($gf = $conf->formula_by_name($gkey))) {
-            return $gf->formula();
-        } else if (($pset = $conf->pset_by_key_or_title($gkey))) {
-            return new PsetTotal_GradeFormula($pset, false, false);
-        } else if ($conf->pset_category($gkey)) {
-            return new PsetCategoryTotal_GradeFormula($gkey, false, true);
-        } else if ($context && ($ge = $context->gradelike_by_key($gkey))) {
+        if ($context && ($ge = $context->gradelike_by_key($gkey))) {
             if ($ge->formula) {
                 return $ge->formula();
             } else {
                 return new GradeEntry_GradeFormula($context, $ge);
             }
+        } else if (($gf = $conf->formula_by_name($gkey))) {
+            return $gf->formula();
+        } else if (($pset = $conf->pset_by_key_or_title($gkey))) {
+            return new PsetTotal_GradeFormula($pset, false, false);
+        } else if ($conf->pset_category($gkey)) {
+            return new PsetCategoryTotal_GradeFormula($gkey, false, true);
         } else {
             return null;
         }
