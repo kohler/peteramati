@@ -581,7 +581,7 @@ class PsetView {
         return $this->_gtotne;
     }
 
-    function ensure_formulas() {
+    private function ensure_formulas() {
         if ($this->pset->has_formula) {
             $this->ensure_grades();
             $this->_g = $this->_g ?? array_fill(0, count($this->pset->grades), null);
@@ -1701,11 +1701,9 @@ class PsetView {
             $gexp->grades = [];
             $gexp->autogrades = $this->_ag !== null ? [] : null;
             foreach ($gexp->visible_grades() as $ge) {
-                if (!$ge->formula) {
-                    $gexp->grades[] = $this->_g ? $this->_g[$ge->pcview_index] : null;
-                    if ($this->_ag !== null) {
-                        $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
-                    }
+                $gexp->grades[] = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
+                if ($this->_ag !== null) {
+                    $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
                 }
             }
         }
