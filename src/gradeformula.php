@@ -221,7 +221,8 @@ class GradeEntry_GradeFormula extends GradeFormula {
         assert(!$ge->formula);
     }
     function evaluate(Contact $student) {
-        return (float) $student->gcache_entry($this->ge->pset, $this->ge);
+        $v = $student->gcache_entry($this->ge->pset, $this->ge);
+        return $v !== null ? (float) $v : null;
     }
     function jsonSerialize() {
         return $this->ge->pset->nonnumeric_key . "." . $this->ge->key;
