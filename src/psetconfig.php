@@ -1503,9 +1503,9 @@ class GradeEntryConfig {
     function formula() {
         if ($this->_formula === false) {
             $this->_formula = null;
-            if ($this->formula
-                && ($f = GradeFormula::parse($this->pset->conf, $this->formula, $this))) {
-                $this->_formula = $f;
+            if ($this->formula) {
+                $fc = new GradeFormulaCompiler($this->pset->conf, $this);
+                $this->_formula = $fc->parse($this->formula);
             }
         }
         return $this->_formula;
@@ -1907,10 +1907,8 @@ class FormulaConfig {
     function formula() {
         if ($this->_formula === false) {
             $this->_formula = null;
-            if ($this->formula
-                && ($f = GradeFormula::parse($this->conf, $this->formula, null))) {
-                $this->_formula = $f;
-            }
+            $fc = new GradeFormulaCompiler($this->conf, null);
+            $this->_formula = $fc->parse($this->formula);
         }
         return $this->_formula;
     }
