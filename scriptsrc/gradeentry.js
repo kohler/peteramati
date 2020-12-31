@@ -82,7 +82,7 @@ export class GradeEntry {
         const name = this.key,
             title = (this.title ? render_ftext(this.title) : name).trim();
         let t;
-        if ((editable || this.answer) && this.gc.entry) {
+        if ((editable || this.answer) && !this.readonly) {
             live = live !== false;
             let opts = {editable: editable},
                 id = "pa-ge" + ++id_counter;

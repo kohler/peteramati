@@ -9,9 +9,9 @@ import { hasClass, handle_ui } from "./ui.js";
 
 GradeClass.add("checkbox", {
     text: function (v) {
-        if (v == null || v === 0) {
+        if (v == null || v === 0 || v === false) {
             return "–";
-        } else if (v == (this.max || 1)) {
+        } else if (v === (this.max || 1) || v === true) {
             return "✓";
         } else {
             return "" + v;
@@ -19,9 +19,9 @@ GradeClass.add("checkbox", {
     },
     simple_text: GradeClass.basic_text,
     tcell: function (v) {
-        if (v == null || v === 0) {
+        if (v == null || v === 0 || v === false) {
             return "";
-        } else if (v == (this.max || 1)) {
+        } else if (v === (this.max || 1) || v === true) {
             return "✓";
         } else {
             return "" + v;

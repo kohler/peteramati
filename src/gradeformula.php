@@ -8,6 +8,12 @@ abstract class GradeFormula implements JsonSerializable {
     protected $_op;
     /** @var list<GradeFormula> */
     protected $_a;
+    /** @var int */
+    public $vtype = 0;
+
+    const VTNUMBER = 0;
+    const VTBOOL = 1;
+    const VTLETTER = 2;
 
     static public $evaluation_stack = [];
 
@@ -56,11 +62,11 @@ class Unary_GradeFormula extends GradeFormula {
             return -$v0;
         case "log":
         case "log10":
-            return log10($v0);
+            return $v0 > 0 ? log10($v0) : null;
         case "ln":
-            return log($v0);
+            return $v0 > 0 ? log($v0) : null;
         case "lg":
-            return log($v0) / log(2);
+            return $v0 > 0 ? log($v0) / log(2) : null;
         case "exp":
             return exp($v0);
         }
@@ -84,9 +90,9 @@ class Bin_GradeFormula extends GradeFormula {
         case "*":
             return $v0 * $v1;
         case "/":
-            return $v0 / $v1;
+            return $v1 != 0 ? $v0 / $v1 : null;
         case "%":
-            return $v0 % $v1;
+            return $v1 != 0 ? $v0 % $v1 : null;
         case "**":
             return $v0 ** $v1;
         }
@@ -96,6 +102,7 @@ class Bin_GradeFormula extends GradeFormula {
 class Relation_GradeFormula extends GradeFormula {
     function __construct($op, $e1, $e2) {
         parent::__construct($op, [$e1, $e2]);
+        $this->vtype = self::VTBOOL;
     }
     function evaluate(Contact $student) {
         $v0 = $this->_a[0]->evaluate($student);
@@ -120,6 +127,11 @@ class Relation_GradeFormula extends GradeFormula {
 class NullableBin_GradeFormula extends GradeFormula {
     function __construct($op, $e1, $e2) {
         parent::__construct($op, [$e1, $e2]);
+        if ($op !== "+?" && $e1->vtype === $e2->vtype) {
+            $this->vtype = $e1->vtype;
+        } else if ($op === "&&") {
+            $this->vtype = $e2->vtype;
+        }
     }
     function evaluate(Contact $student) {
         $v0 = $this->_a[0]->evaluate($student);
@@ -144,6 +156,9 @@ class NullableBin_GradeFormula extends GradeFormula {
 class Ternary_GradeFormula extends GradeFormula {
     function __construct($ec, $et, $ef) {
         parent::__construct("?:", [$ec, $et, $ef]);
+        if ($et->vtype === $ef->vtype) {
+            $this->vtype = $et->vtype;
+        }
     }
     function evaluate(Contact $student) {
         $v0 = $this->_a[0]->evaluate($student);
@@ -218,6 +233,11 @@ class GradeEntry_GradeFormula extends GradeFormula {
     function __construct($ge) {
         parent::__construct("g", []);
         $this->ge = $ge;
+        if ($ge->type === "letter") {
+            $this->vtype = GradeFormula::VTLETTER;
+        } else if ($ge->type === "checkbox") {
+            $this->vtype = GradeFormula::VTBOOL;
+        }
         assert(!$ge->formula);
     }
     function evaluate(Contact $student) {

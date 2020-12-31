@@ -1515,9 +1515,21 @@ class GradeEntryConfig {
     function json($pcview, $pos = null) {
         $gej = ["key" => $this->key, "title" => $this->title];
         if ($this->type !== null) {
-            $gej["type"] = $this->type;
             if ($this->type === "select") {
+                $gej["type"] = "select";
                 $gej["options"] = $this->options;
+            } else if ($this->type === "formula"
+                       && ($f = $this->formula())) {
+                if ($f->vtype === GradeFormula::VTBOOL) {
+                    $gej["type"] = "checkbox";
+                } else if ($f->vtype === GradeFormula::VTLETTER) {
+                    $gej["type"] = "letter";
+                } else {
+                    $gej["type"] = "formula";
+                }
+                $gej["readonly"] = true;
+            } else {
+                $gej["type"] = $this->type;
             }
         }
         if ($this->round) {
