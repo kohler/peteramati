@@ -69,8 +69,6 @@ class PsetView {
     /** @var ?int */
     private $_n_visible_grades;
     /** @var ?int */
-    private $_n_visible_in_total;
-    /** @var ?int */
     private $_n_answers;
     /** @var ?int */
     private $_n_nonempty_grades;
@@ -548,10 +546,11 @@ class PsetView {
                     if (!$ge->is_extra && $ge->max_visible) {
                         $this->_gmaxtot += $ge->max;
                     }
-                    if (($v = $this->_g[$ge->pcview_index]) !== null) {
-                        $this->_gtot += $v;
+                    if ($this->_g !== null
+                        && ($v = $this->_g[$ge->pcview_index]) !== null) {
+                        $this->_gtot = ($this->_gtot ?? 0) + $v;
                         if (!$ge->is_extra) {
-                            $this->_gtotne += $v;
+                            $this->_gtotne = ($this->_gtotne ?? 0) + $v;
                         }
                     }
                 }
@@ -571,13 +570,13 @@ class PsetView {
 
     /** @return null|int|float */
     function grade_total() {
-        $this->ensure_grades();
+        $this->ensure_grade_total();
         return $this->_gtot;
     }
 
     /** @return null|int|float */
     function grade_total_noextra() {
-        $this->ensure_grades();
+        $this->ensure_grade_total();
         return $this->_gtotne;
     }
 
@@ -1194,8 +1193,7 @@ class PsetView {
     private function load_grade_counts() {
         $this->_has_grade_counts = true;
         $this->_n_visible_grades = $this->_n_answers =
-            $this->_n_nonempty_grades = $this->_n_nonempty_assigned_grades =
-            $this->_n_visible_in_total = 0;
+            $this->_n_nonempty_grades = $this->_n_nonempty_assigned_grades = 0;
         if ($this->can_view_grades()) {
             $this->ensure_grades();
             foreach ($this->visible_grades() as $ge) {
@@ -1203,14 +1201,12 @@ class PsetView {
                 if ($ge->answer) {
                     ++$this->_n_answers;
                 }
-                if ($this->_g[$ge->pcview_index] !== null) {
+                if ($this->_g !== null
+                    && $this->_g[$ge->pcview_index] !== null) {
                     ++$this->_n_nonempty_grades;
                     if (!$ge->answer) {
                         ++$this->_n_nonempty_assigned_grades;
                     }
-                }
-                if (!$ge->no_total) {
-                    ++$this->_n_visible_in_total;
                 }
             }
         }
@@ -1234,12 +1230,6 @@ class PsetView {
         return $this->_n_answers !== 0
             && ($this->_n_nonempty_grades === 0
                 || $this->_n_nonempty_grades === $this->_n_nonempty_assigned_grades);
-    }
-
-    /** @return bool */
-    function needs_total() {
-        $this->_has_grade_counts || $this->load_grade_counts();
-        return $this->_n_visible_in_total > 1;
     }
 
     /** @return int */

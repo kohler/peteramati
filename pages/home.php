@@ -53,7 +53,7 @@ if ($Conf->opt("httpAuthLogin")) {
 $User = null;
 if (isset($Qreq->u)
     && !($User = ContactView::prepare_user($Qreq->u))) {
-    redirectSelf(array("u" => null));
+    redirectSelf(["u" => null]);
 }
 if (!$Me->isPC || !$User) {
     $User = $Me;
@@ -684,11 +684,10 @@ function show_home_pset(PsetView $info) {
         ContactView::echo_repo_last_commit_group($info, true);
     }
     if ($info->can_view_grades()
-        && $info->has_nonempty_assigned_grades()
-        && $info->needs_total()) {
-        $t = "<strong>" . $info->grade_total() . "</strong>";
+        && ($t = $info->grade_total()) !== null) {
+        $t = "<strong>{$t}</strong>";
         if (($max = $info->grade_max_total())) {
-            $t .= " / " . $max;
+            $t .= " / {$max}";
         }
         if (!$user_see_grade) {
             echo '<div class="pa-grp-hidden">';
