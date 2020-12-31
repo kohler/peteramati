@@ -152,8 +152,11 @@ class Ternary_GradeFormula extends GradeFormula {
 }
 
 class Comma_GradeFormula extends GradeFormula {
-    function __construct($el, $er) {
+    /** @var int */
+    public $oppos;
+    function __construct($el, $er, $oppos) {
         parent::__construct(",", [$el, $er]);
+        $this->oppos = $oppos;
     }
     function add_arg($e) {
         $this->_a[] = $e;

@@ -16,23 +16,27 @@ class Ht {
     const ATTR_BOOL = 2;
     const ATTR_BOOLTEXT = 3;
     const ATTR_NOEMPTY = 4;
-    private static $_attr_type = array("accept-charset" => self::ATTR_SKIP,
-                                       "action" => self::ATTR_SKIP,
-                                       "autofocus" => self::ATTR_BOOL,
-                                       "checked" => self::ATTR_BOOL,
-                                       "class" => self::ATTR_NOEMPTY,
-                                       "data-default-checked" => self::ATTR_BOOLTEXT,
-                                       "disabled" => self::ATTR_BOOL,
-                                       "enctype" => self::ATTR_SKIP,
-                                       "formnovalidate" => self::ATTR_BOOL,
-                                       "method" => self::ATTR_SKIP,
-                                       "multiple" => self::ATTR_BOOL,
-                                       "novalidate" => self::ATTR_BOOL,
-                                       "optionstyles" => self::ATTR_SKIP,
-                                       "readonly" => self::ATTR_BOOL,
-                                       "required" => self::ATTR_BOOL,
-                                       "spellcheck" => self::ATTR_BOOLTEXT,
-                                       "type" => self::ATTR_SKIP);
+    private static $_attr_type = [
+        "accept-charset" => self::ATTR_SKIP,
+        "action" => self::ATTR_SKIP,
+        "async" => self::ATTR_BOOL,
+        "autofocus" => self::ATTR_BOOL,
+        "checked" => self::ATTR_BOOL,
+        "class" => self::ATTR_NOEMPTY,
+        "data-default-checked" => self::ATTR_BOOLTEXT,
+        "defer" => self::ATTR_BOOL,
+        "disabled" => self::ATTR_BOOL,
+        "enctype" => self::ATTR_SKIP,
+        "formnovalidate" => self::ATTR_BOOL,
+        "method" => self::ATTR_SKIP,
+        "multiple" => self::ATTR_BOOL,
+        "novalidate" => self::ATTR_BOOL,
+        "optionstyles" => self::ATTR_SKIP,
+        "readonly" => self::ATTR_BOOL,
+        "required" => self::ATTR_BOOL,
+        "spellcheck" => self::ATTR_BOOLTEXT,
+        "type" => self::ATTR_SKIP
+    ];
 
     /** @param ?array<string,mixed> $js
      * @return string */
@@ -327,7 +331,7 @@ class Ht {
         } else if ($js === null) {
             $js = array();
         }
-        $js["class"] = trim(get_s($js, "class") . " hidden");
+        $js["class"] = trim(($js["class"] ?? "") . " hidden");
         return self::submit($name, $value, $js);
     }
 
@@ -342,7 +346,7 @@ class Ht {
     }
 
     /** @param string $name
-     * @param string $value
+     * @param string|int $value
      * @param ?array<string,mixed> $js
      * @return string */
     static function entry($name, $value, $js = null) {
@@ -403,7 +407,8 @@ class Ht {
         return $t . $extra_text . "</div>\n";
     }
 
-    /** @param string|list<string> $html */
+    /** @param string|list<string> $html
+     * @return string */
     static function pre($html) {
         if (is_array($html)) {
             $html = join("\n", $html);
@@ -411,7 +416,8 @@ class Ht {
         return "<pre>" . $html . "</pre>";
     }
 
-    /** @param string|list<string> $text */
+    /** @param string|list<string> $text
+     * @return string */
     static function pre_text($text) {
         if (is_array($text)
             && array_keys($text) === range(0, count($text) - 1)) {
@@ -436,6 +442,8 @@ class Ht {
         return "<pre style=\"white-space:pre-wrap\">" . htmlspecialchars(var_export($x, true)) . "</pre>";
     }
 
+    /** @param string $src
+     * @return string */
     static function img($src, $alt, $js = null) {
         if (is_string($js)) {
             $js = array("class" => $js);
@@ -477,25 +485,35 @@ class Ht {
                             '<a href="$1" rel="noreferrer">$1</a>$2', $html);
     }
 
+    /** @param string $text
+     * @return string */
     static function format0($text) {
         return self::format0_html(htmlspecialchars($text));
     }
 
+    /** @param string $html
+     * @return string */
     static function format0_html($html) {
         $html = self::link_urls(Text::single_line_paragraphs($html));
         return preg_replace('/(?:\r\n?){2,}|\n{2,}/', "</p><p>", "<p>$html</p>");
     }
 
+    /** @param string $uniqueid
+     * @return bool */
     static function check_stash($uniqueid) {
         return self::$_stash_map[$uniqueid] ?? false;
     }
 
+    /** @param string $uniqueid
+     * @return bool */
     static function mark_stash($uniqueid) {
         $marked = self::$_stash_map[$uniqueid] ?? false;
         self::$_stash_map[$uniqueid] = true;
         return !$marked;
     }
 
+    /** @param string $html
+     * @param ?string $uniqueid */
     static function stash_html($html, $uniqueid = null) {
         if ($html !== null && $html !== false && $html !== ""
             && (!$uniqueid || self::mark_stash($uniqueid))) {
@@ -507,6 +525,8 @@ class Ht {
         }
     }
 
+    /** @param string $js
+     * @param ?string $uniqueid */
     static function stash_script($js, $uniqueid = null) {
         if ($js !== null && $js !== false && $js !== ""
             && (!$uniqueid || self::mark_stash($uniqueid))) {
@@ -522,6 +542,7 @@ class Ht {
         }
     }
 
+    /** @return string */
     static function unstash() {
         $stash = self::$_stash;
         if (self::$_stash_inscript) {
@@ -532,17 +553,27 @@ class Ht {
         return $stash;
     }
 
+    /** @param string $js
+     * @return string */
     static function unstash_script($js) {
         self::stash_script($js);
         return self::unstash();
     }
 
+    /** @return string
+     * @deprecated */
     static function take_stash() {
         return self::unstash();
     }
 
 
-    static function contextual_diagnostic($s, $pos1, $pos2, $message, $status = null) {
+    /** @param string $s
+     * @param int $pos1
+     * @param int $pos2
+     * @param string $msg
+     * @param ?int $status
+     * @return string */
+    static function contextual_diagnostic($s, $pos1, $pos2, $msg, $status = null) {
         $klass = $status && $status === 1 ? "is-warning" : "is-error";
         if (is_usascii($s)) {
             $s = preg_replace('/\s/', " ", $s);
@@ -563,9 +594,8 @@ class Ht {
             $t = htmlspecialchars($s);
         }
         $indent = str_repeat(" ", $spaces);
-        return $t . "\n"
-            . $indent . '<span class="' . $klass . '">' . str_repeat("↑", $arrows) . "</span>\n"
-            . $indent . '<span class="text-default ' . $klass . '">' . $message . "</span>\n";
+        return "{$t}\n{$indent}<span class=\"{$klass}\">"
+            . str_repeat("↑", $arrows) . "</span>\n{$indent}<span class=\"text-default {$klass}\">{$msg}</span>\n";
     }
 
 

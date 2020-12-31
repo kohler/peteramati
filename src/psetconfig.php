@@ -1500,12 +1500,12 @@ class GradeEntryConfig {
     }
 
     /** @return ?GradeFormula */
-    function formula() {
+    function formula($compiler = null) {
         if ($this->_formula === false) {
             $this->_formula = null;
             if ($this->formula) {
-                $fc = new GradeFormulaCompiler($this->pset->conf, $this);
-                $this->_formula = $fc->parse($this->formula);
+                $fc = new GradeFormulaCompiler($this->pset->conf);
+                $this->_formula = $fc->parse($this->formula, $this);
             }
         }
         return $this->_formula;
@@ -1904,11 +1904,11 @@ class FormulaConfig {
     }
 
     /** @return ?GradeFormula */
-    function formula() {
+    function formula($compiler = null) {
         if ($this->_formula === false) {
             $this->_formula = null;
-            $fc = new GradeFormulaCompiler($this->conf, null);
-            $this->_formula = $fc->parse($this->formula);
+            $fc = new GradeFormulaCompiler($this->conf);
+            $this->_formula = $fc->parse($this->formula, null);
         }
         return $this->_formula;
     }

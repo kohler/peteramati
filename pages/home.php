@@ -554,6 +554,17 @@ if ($Me->isPC && $User === $Me) {
 if (($v = $Conf->setting_data("homemsg"))) {
     $Conf->infoMsg($v);
 }
+if ($Me->isPC) {
+    $gc = new GradeFormulaCompiler($Conf);
+    $gc->check_all();
+    $t = "";
+    for ($i = 0; $i !== count($gc->errors); ++$i) {
+        $t .= "<div>" . htmlspecialchars($gc->error_ident[$i]) . ": Formula error:<pre>" . $gc->error_decor[$i] . "</pre></div>";
+    }
+    if ($t !== "") {
+        $Conf->warnMsg($t);
+    }
+}
 
 
 // Sign in
