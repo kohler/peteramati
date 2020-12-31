@@ -73,7 +73,21 @@ function rcvtint(&$value, $default = -1) {
 
 
 interface JsonUpdatable extends JsonSerializable {
+    /** @return bool */
     public function jsonIsReplacement();
+}
+
+class JsonReplacement implements JsonUpdatable {
+    private $x;
+    function __construct($x) {
+        $this->x = $x;
+    }
+    function jsonIsReplacement() {
+        return true;
+    }
+    function jsonSerialize() {
+        return $this->x;
+    }
 }
 
 function json_update($j, $updates) {
@@ -89,7 +103,11 @@ function json_update($j, $updates) {
             $updates = $updates->jsonSerialize();
         }
         if ($is_replacement) {
-            return $updates;
+            if (is_associative_array($updates)) {
+                return (object) $updates;
+            } else {
+                return $updates;
+            }
         }
         if (is_object($updates)) {
             $updates = get_object_vars($updates);

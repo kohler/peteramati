@@ -74,6 +74,7 @@ class LineNote implements JsonUpdatable {
     function jsonIsReplacement() {
         return true;
     }
+
     function jsonSerialize() {
         if ((string) $this->text === "") {
             return $this->version;
@@ -89,6 +90,7 @@ class LineNote implements JsonUpdatable {
             return $j;
         }
     }
+
     function render_json($can_view_authors) {
         if (!$can_view_authors) {
             $j = [$this->iscomment, $this->text];

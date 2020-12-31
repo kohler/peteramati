@@ -596,7 +596,7 @@ class PsetView {
                         $this->_g[$ge->pcview_index] = $v;
                     }
                 }
-                $this->update_grade_xnotes(["formula_at" => $t, "formula" => empty($fs) ? null : $fs]);
+                $this->update_grade_xnotes(["formula_at" => $t, "formula" => new JsonReplacement(empty($fs) ? null : $fs)]);
             } else if (($g = $jn->formula ?? null)) {
                 foreach ($this->pset->grades as $ge) {
                     if (property_exists($g, $ge->key) && $ge->formula) {
