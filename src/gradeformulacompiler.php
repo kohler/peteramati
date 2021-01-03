@@ -188,6 +188,11 @@ class GradeFormulaCompiler {
             if ($e !== null && $op === "-") {
                 $e = new Unary_GradeFormula("neg", $e);
             }
+        } else if ($t[0] === "!") {
+            $op = $t[0];
+            $t = substr($t, 1);
+            $e = $this->parse_prefix($t, self::UNARY_PRECEDENCE);
+            $e = $e ? new Not_GradeFormula($e) : null;
         } else if (preg_match('/\A(\d+\.?\d*|\.\d+)(.*)\z/s', $t, $m)) {
             $t = $m[2];
             $e = new Number_GradeFormula((float) $m[1]);

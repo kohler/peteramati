@@ -50,6 +50,8 @@ abstract class GradeFormula implements JsonSerializable {
 }
 
 class Unary_GradeFormula extends GradeFormula {
+    /** @param string $op
+     * @param GradeFormula $e */
     function __construct($op, $e) {
         parent::__construct($op, [$e]);
     }
@@ -73,7 +75,22 @@ class Unary_GradeFormula extends GradeFormula {
     }
 }
 
+class Not_GradeFormula extends GradeFormula {
+    /** @param GradeFormula $e */
+    function __construct($e) {
+        parent::__construct("!", [$e]);
+        $this->vtype = self::VTBOOL;
+    }
+    function evaluate(Contact $student) {
+        $v0 = $this->_a[0]->evaluate($student);
+        return !$v0;
+    }
+}
+
 class Bin_GradeFormula extends GradeFormula {
+    /** @param string $op
+     * @param GradeFormula $e1
+     * @param GradeFormula $e2 */
     function __construct($op, $e1, $e2) {
         parent::__construct($op, [$e1, $e2]);
     }
@@ -100,6 +117,9 @@ class Bin_GradeFormula extends GradeFormula {
 }
 
 class Relation_GradeFormula extends GradeFormula {
+    /** @param string $op
+     * @param GradeFormula $e1
+     * @param GradeFormula $e2 */
     function __construct($op, $e1, $e2) {
         parent::__construct($op, [$e1, $e2]);
         $this->vtype = self::VTBOOL;
@@ -125,6 +145,9 @@ class Relation_GradeFormula extends GradeFormula {
 }
 
 class NullableBin_GradeFormula extends GradeFormula {
+    /** @param string $op
+     * @param GradeFormula $e1
+     * @param GradeFormula $e2 */
     function __construct($op, $e1, $e2) {
         parent::__construct($op, [$e1, $e2]);
         if ($op !== "+?" && $e1->vtype === $e2->vtype) {
@@ -154,6 +177,9 @@ class NullableBin_GradeFormula extends GradeFormula {
 }
 
 class Ternary_GradeFormula extends GradeFormula {
+    /** @param GradeFormla $ec
+     * @param GradeFormula $et
+     * @param GradeFormula $ef */
     function __construct($ec, $et, $ef) {
         parent::__construct("?:", [$ec, $et, $ef]);
         if ($et->vtype === $ef->vtype) {
@@ -169,13 +195,18 @@ class Ternary_GradeFormula extends GradeFormula {
 class Comma_GradeFormula extends GradeFormula {
     /** @var int */
     public $oppos;
+    /** @param GradeFormula $el
+     * @param GradeFormula $er
+     * @param int $oppos */
     function __construct($el, $er, $oppos) {
         parent::__construct(",", [$el, $er]);
         $this->oppos = $oppos;
     }
+    /** @param GradeFormula $e */
     function add_arg($e) {
         $this->_a[] = $e;
     }
+    /** @return list<GradeFormula> */
     function args() {
         return $this->_a;
     }
