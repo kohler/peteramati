@@ -15,24 +15,24 @@ class SiteLoader {
         "ZipDocument" => "lib/documenthelper.php"
     ];
 
+    static $suffix_map = [
+        "_api.php" => ["api_", "api"]
+    ];
+
     /** @var string */
     static public $root;
 
     static function set_root() {
         global $ConfSitePATH;
-        if (isset($ConfSitePATH)) {
-            self::$root = $ConfSitePATH;
-        } else {
-            self::$root = substr(__FILE__, 0, strrpos(__FILE__, "/"));
-            while (self::$root !== ""
-                   && !file_exists(self::$root . "/src/init.php")) {
-                self::$root = substr(self::$root, 0, strrpos(self::$root, "/"));
-            }
-            if (self::$root === "") {
-                self::$root = "/var/www/html";
-            }
-            $ConfSitePATH = self::$root;
+        self::$root = substr(__FILE__, 0, strrpos(__FILE__, "/"));
+        while (self::$root !== ""
+               && !file_exists(self::$root . "/src/init.php")) {
+            self::$root = substr(self::$root, 0, strrpos(self::$root, "/"));
         }
+        if (self::$root === "") {
+            self::$root = "/var/www/html";
+        }
+        $ConfSitePATH = self::$root;
     }
 
     /** @param non-empty-string $suffix
@@ -43,6 +43,18 @@ class SiteLoader {
         } else {
             return self::$root . "/" . $suffix;
         }
+    }
+
+    static private function expand_includes_once($file, $includepath, $globby) {
+        foreach ($file[0] === "/" ? [""] : $includepath as $idir) {
+            $try = $idir . $file;
+            if (!$globby && is_readable($try)) {
+                return [$try];
+            } else if ($globby && ($m = glob($try, GLOB_BRACE))) {
+                return $m;
+            }
+        }
+        return [];
     }
 
     /** @param string|list<string> $files */
@@ -72,8 +84,8 @@ class SiteLoader {
             if (strpos((string) $f, '$') !== false) {
                 foreach ($expansions as $k => $v) {
                     if ($v !== false && $v !== null) {
-                        $f = preg_replace(',\$\{' . $k . '\}|\$' . $k . '\b,', $v, $f);
-                    } else if (preg_match(',\$\{' . $k . '\}|\$' . $k . '\b,', $f)) {
+                        $f = preg_replace("/\\\$\\{{$k}\\}|\\\${$k}\\b/", $v, $f);
+                    } else if (preg_match("/\\\$\\{{$k}\\}|\\\${$k}\\b/", $f)) {
                         $f = "";
                         break;
                     }
@@ -84,23 +96,20 @@ class SiteLoader {
             }
             $matches = [];
             $ignore_not_found = $globby = false;
-            if (str_starts_with($f, "?")) {
+            if ($f[0] === "?") {
                 $ignore_not_found = true;
                 $f = substr($f, 1);
             }
             if (preg_match('/[\[\]\*\?\{\}]/', $f)) {
                 $ignore_not_found = $globby = true;
             }
-            foreach ($f[0] === "/" ? array("") : $includepath as $idir) {
-                $e = $idir . $f;
-                if ($globby) {
-                    $matches = glob($f, GLOB_BRACE);
-                } else if (is_readable($e)) {
-                    $matches = [$e];
-                }
-                if (!empty($matches)) {
-                    break;
-                }
+            $matches = self::expand_includes_once($f, $includepath, $globby);
+            if (empty($matches)
+                && isset($expansions["autoload"])
+                && ($underscore = strpos($f, "_"))
+                && ($f2 = SiteLoader::$suffix_map[substr($f, $underscore)] ?? null)) {
+                $xincludepath = array_merge($f2[1] ? [self::$root."/src/{$f2[1]}/"] : [], $includepath);
+                $matches = self::expand_includes_once($f2[0] . substr($f, 0, $underscore) . ".php", $xincludepath, $globby);
             }
             $results = array_merge($results, $matches);
             if (empty($matches) && !$ignore_not_found) {

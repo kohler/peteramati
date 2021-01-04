@@ -29,7 +29,7 @@ class Series {
         $this->calculated = false;
     }
 
-    function calculate() {
+    private function calculate() {
         if (!$this->calculated) {
             asort($this->series);
             $this->cdf = [];
@@ -106,7 +106,7 @@ class Series {
     }
 }
 
-class API_GradeStatistics {
+class GradeStatistics_API {
     static function compute(Pset $pset, $pcview) {
         $series = new Series;
         $xseries = $noextra_series = $xnoextra_series = null;

@@ -1149,7 +1149,7 @@ class PsetView {
 
     /** @return bool */
     function user_can_view_grade_statistics() {
-        // also see API_GradeStatistics
+        // also see GradeStatistics_API
         $gsv = $this->pset->grade_statistics_visible;
         return $gsv === 1
             || ($gsv === 2 && $this->user_can_view_grades() && $this->_user_can_view_assigned_grades)

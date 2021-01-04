@@ -2542,18 +2542,18 @@ class Conf {
     }
     private function fill_api_map() {
         $this->_api_map = [
-            "blob" => "15 API_Repo::blob",
-            "diffconfig" => "15 API_Repo::diffconfig",
-            "filediff" => "15 API_Repo::filediff",
-            "flag" => "15 API_Flag::flag",
-            "grade" => "3 API_Grade::grade",
-            "gradestatistics" => "3 API_GradeStatistics::run",
-            "jserror" => "1 API_JSError::jserror",
-            "latestcommit" => "3 API_Repo::latestcommit",
-            "linenote" => "15 API_Grade::linenote",
-            "multigrade" => "3 API_Grade::multigrade",
-            "multiresolveflag" => "0 API_Flag::multiresolve",
-            "repositories" => "17 API_Repo::user_repositories"
+            "blob" => "15 Repo_API::blob",
+            "diffconfig" => "15 Repo_API::diffconfig",
+            "filediff" => "15 Repo_API::filediff",
+            "flag" => "15 Flag_API::flag",
+            "grade" => "3 Grade_API::grade",
+            "gradestatistics" => "3 GradeStatistics_API::run",
+            "jserror" => "1 JSError_API::jserror",
+            "latestcommit" => "3 Repo_API::latestcommit",
+            "linenote" => "15 Grade_API::linenote",
+            "multigrade" => "3 Grade_API::multigrade",
+            "multiresolveflag" => "0 Flag_API::multiresolve",
+            "repositories" => "17 Repo_API::user_repositories"
         ];
         if (($olist = $this->opt("apiFunctions"))) {
             expand_json_includes_callback($olist, [$this, "_add_api_json"]);

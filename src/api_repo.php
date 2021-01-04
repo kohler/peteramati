@@ -3,7 +3,7 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-class API_Repo {
+class Repo_API {
     static function latestcommit(Contact $user, Qrequest $qreq, APIData $api) {
         if (!$api->repo) {
             return ["hash" => false];

@@ -3,7 +3,7 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-class API_JSError {
+class JSError_API {
     static function resolve_sourcemap(&$sourcemaps, $s, $noname) {
         $sx = "";
         while (preg_match('/\S+\/scripts\/([^:?\s]*)\??((?:mtime=\d+)?)[^\s:]*:(\d+):(\d+)/', $s, $m, PREG_OFFSET_CAPTURE)) {

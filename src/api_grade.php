@@ -3,7 +3,7 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-class API_Grade {
+class Grade_API {
     /** @param array<string,string> &$errf
      * @param bool $isnew
      * @return array */
