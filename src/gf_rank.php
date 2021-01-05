@@ -6,12 +6,11 @@
 class Rank_GradeFormula extends Function_GradeFormula {
     function __construct() {
         parent::__construct("rank");
+        $this->cacheable = false;
     }
     function evaluate(Contact $user) {
-        if ($this->_allv === null) {
-            $this->compute_all($user->conf);
-        }
-        return $this->_allv[$user->contactId];
+        $allv = $this->_allv ?? $this->compute_all($user->conf);
+        return $allv[$user->contactId];
     }
     function compute_all(Conf $conf) {
         if ($this->_allv === null) {

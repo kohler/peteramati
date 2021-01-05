@@ -48,10 +48,10 @@ class GradeExport implements JsonSerializable {
         $this->pc_view = $pc_view;
     }
 
-    /** @param list<GradeEntryConfig> $vges */
+    /** @param iterable<GradeEntryConfig> $vges */
     function set_visible_grades($vges) {
         assert(!isset($this->grades));
-        $this->visible_grades = $vges;
+        $this->visible_grades = is_list($vges) ? $vges : iterator_to_array($vges, false);
         $this->has_total = false;
     }
 

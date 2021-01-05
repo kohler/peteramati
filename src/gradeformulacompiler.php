@@ -81,9 +81,9 @@ class GradeFormulaCompiler {
 
     /** @return ?GradeFormula */
     private function parse_grade_entry(GradeEntryConfig $ge) {
-        if ($ge->formula) {
+        if ($ge->is_formula()) {
             $e = $ge->formula();
-            if (!$e) {
+            if (!$e || $e instanceof Error_GradeFormula) {
                 $this->error_at($this->state->pos1, $this->state->pos2, "References invalid formula.");
             }
             return $e;
@@ -135,7 +135,7 @@ class GradeFormulaCompiler {
             return $this->parse_grade_entry($ge);
         } else if (($gf = $this->conf->formula_by_name($gkey))) {
             $e = $gf->formula();
-            if (!$e) {
+            if (!$e || $e instanceof Error_GradeFormula) {
                 $this->error_at($this->state->pos1, $this->state->pos2, "References invalid formula.");
             }
             return $e;
@@ -336,15 +336,15 @@ class GradeFormulaCompiler {
         foreach ($this->conf->psets() as $pset) {
             if ($pset->has_formula) {
                 foreach ($pset->grades() as $ge) {
-                    if ($ge->formula) {
-                        $this->parse($ge->formula, $ge, "{$pset->nonnumeric_key}.{$ge->key}");
+                    if ($ge->is_formula()) {
+                        $this->parse($ge->formula_expression(), $ge, "{$pset->nonnumeric_key}.{$ge->key}");
                     }
                 }
             }
         }
         foreach ($this->conf->global_formulas() as $i => $f) {
             $name = $f->name ?? "\$g$i";
-            $this->parse($f->formula, null, "global.{$name}");
+            $this->parse($f->formula_expression(), null, "global.{$name}");
         }
     }
 }

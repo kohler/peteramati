@@ -141,6 +141,9 @@ class Pset {
     public $has_formula = false;
     /** @var bool */
     public $has_answers = false;
+    /** @var ?bool */
+    private $_has_uncacheable_formula;
+    /** @var array{null|int|float,null|int|float} */
     private $_max_grade = [null, null];
     public $grade_script;
     /** @var GradeEntryConfig */
@@ -342,7 +345,7 @@ class Pset {
                 if ($g->landmark_range_file) {
                     $this->has_grade_landmark_range = true;
                 }
-                if ($g->formula) {
+                if ($g->formula !== null) {
                     $this->has_formula = true;
                 }
                 if ($g->is_extra) {
@@ -572,7 +575,7 @@ class Pset {
     }
 
 
-    /** @return array<string,GradeEntryConfig> */
+    /** @return iterable<GradeEntryConfig> */
     function grades() {
         return $this->grades;
     }
@@ -648,11 +651,36 @@ class Pset {
         return $ges;
     }
 
-    /** @return array<string,GradeEntryConfig> */
+    /** @return iterable<GradeEntryConfig> */
     function tabular_grades() {
-        return array_filter($this->grades, function ($ge) {
-            return $ge->type_tabular;
-        });
+        foreach ($this->grades as $ge) {
+            if ($ge->type_tabular)
+                yield $ge;
+        }
+    }
+
+    /** @return iterable<GradeEntryConfig> */
+    function formula_grades() {
+        if ($this->has_formula) {
+            foreach ($this->grades as $ge) {
+                if ($ge->formula !== null)
+                    yield $ge;
+            }
+        }
+    }
+
+    /** @return bool */
+    function has_uncacheable_formula() {
+        if ($this->_has_uncacheable_formula === null) {
+            $this->_has_uncacheable_formula = false;
+            foreach ($this->formula_grades() as $ge) {
+                if (!$ge->formula()->cacheable) {
+                    $this->_has_uncacheable_formula = true;
+                    break;
+                }
+            }
+        }
+        return $this->_has_uncacheable_formula;
     }
 
     /** @param bool $pcview
@@ -1105,8 +1133,8 @@ class GradeEntryConfig {
     public $options;
     /** @var ?string */
     public $formula;
-    /** @var null|false|GradeFormula */
-    private $_formula = false;
+    /** @var ?GradeFormula */
+    private $_formula;
     /** @var null|int|float */
     public $max;
     /** @var bool */
@@ -1499,13 +1527,24 @@ class GradeEntryConfig {
             && $this->type !== "stars";
     }
 
-    /** @return ?GradeFormula */
-    function formula($compiler = null) {
-        if ($this->_formula === false) {
-            $this->_formula = null;
-            if ($this->formula) {
+    /** @return bool */
+    function is_formula() {
+        return $this->formula !== null;
+    }
+
+    /** @return ?string */
+    function formula_expression() {
+        return $this->formula;
+    }
+
+    /** @return GradeFormula */
+    function formula() {
+        if ($this->_formula === null) {
+            if ($this->formula !== null) {
                 $fc = new GradeFormulaCompiler($this->pset->conf);
-                $this->_formula = $fc->parse($this->formula, $this);
+                $this->_formula = $fc->parse($this->formula, $this) ?? new Error_GradeFormula;
+            } else {
+                $this->_formula = new GradeEntry_GradeFormula($this);
             }
         }
         return $this->_formula;
@@ -1518,8 +1557,8 @@ class GradeEntryConfig {
             if ($this->type === "select") {
                 $gej["type"] = "select";
                 $gej["options"] = $this->options;
-            } else if ($this->type === "formula"
-                       && ($f = $this->formula())) {
+            } else if ($this->formula !== null) {
+                $f = $this->formula();
                 if ($f->vtype === GradeFormula::VTBOOL) {
                     $gej["type"] = "checkbox";
                 } else if ($f->vtype === GradeFormula::VTLETTER) {
@@ -1876,8 +1915,8 @@ class FormulaConfig {
     public $nonzero;
     /** @var string */
     public $formula;
-    /** @var null|false|GradeFormula */
-    private $_formula = false;
+    /** @var ?GradeFormula */
+    private $_formula;
     /** @var object */
     public $config;
 
@@ -1915,12 +1954,16 @@ class FormulaConfig {
         $this->config = $g;
     }
 
-    /** @return ?GradeFormula */
-    function formula($compiler = null) {
-        if ($this->_formula === false) {
-            $this->_formula = null;
+    /** @return ?string */
+    function formula_expression() {
+        return $this->formula;
+    }
+
+    /** @return GradeFormula */
+    function formula() {
+        if ($this->_formula === null) {
             $fc = new GradeFormulaCompiler($this->conf);
-            $this->_formula = $fc->parse($this->formula, null);
+            $this->_formula = $fc->parse($this->formula, null) ?? new Error_GradeFormula;
         }
         return $this->_formula;
     }

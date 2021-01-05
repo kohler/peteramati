@@ -53,6 +53,8 @@ class PsetView {
 
     /** @var int */
     private $_gtime = null;
+    /** @var bool */
+    private $_has_formula = false;
     /** @var ?list<mixed> */
     private $_g;
     /** @var ?list<mixed> */
@@ -210,6 +212,7 @@ class PsetView {
             $this->_cpi = null;
             $this->_derived_handout_commit = false;
             $this->_gtime = null;
+            $this->_has_formula = false;
         }
     }
 
@@ -505,6 +508,7 @@ class PsetView {
         if ($this->_gtime !== $this->user->gradeUpdateTime) {
             $this->_ag = $this->_gmaxtot = null;
             $this->_gtime = $this->user->gradeUpdateTime;
+            $this->_has_formula = false;
             $jn = $this->grade_jnotes();
             if ($jn && ($ag = $jn->autogrades ?? null)) {
                 $this->_ag = [];
@@ -516,7 +520,7 @@ class PsetView {
             if ($jn && ($g = $jn->grades ?? null)) {
                 $this->_g = $this->_g ?? array_fill(0, count($this->pset->grades), null);
                 foreach ($this->pset->grades as $ge) {
-                    if (property_exists($g, $ge->key)) {
+                    if (property_exists($g, $ge->key) && !$ge->is_formula()) {
                         $this->_g[$ge->pcview_index] = $g->{$ge->key};
                     }
                 }
@@ -570,26 +574,38 @@ class PsetView {
     }
 
     private function ensure_formulas() {
-        if ($this->pset->has_formula) {
+        if ($this->pset->has_formula && !$this->_has_formula) {
             $this->ensure_grades();
+            $this->_has_formula = true;
             $this->_g = $this->_g ?? array_fill(0, count($this->pset->grades), null);
             $jn = $this->grade_jxnotes();
             $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
             //error_log("{$t} {$this->user->gradeUpdateTime} {$this->pset->config_mtime} {$jn->formula_at}");
             if (!$jn || $jn->formula_at !== $t) {
                 $fs = [];
-                foreach ($this->pset->grades as $ge) {
-                    if (($f = $ge->formula())) {
-                        $v = $f->evaluate($this->user);
+                foreach ($this->pset->formula_grades() as $ge) {
+                    $f = $ge->formula();
+                    $v = $f->evaluate($this->user);
+                    $this->_g[$ge->pcview_index] = $v;
+                    if ($f->cacheable) {
                         $fs[$ge->key] = $v;
-                        $this->_g[$ge->pcview_index] = $v;
                     }
                 }
                 $this->update_grade_xnotes(["formula_at" => $t, "formula" => new JsonReplacement(empty($fs) ? null : $fs)]);
-            } else if (($g = $jn->formula ?? null)) {
-                foreach ($this->pset->grades as $ge) {
-                    if (property_exists($g, $ge->key) && $ge->formula) {
-                        $this->_g[$ge->pcview_index] = $g->{$ge->key};
+            } else {
+                if (($g = $jn->formula ?? null)) {
+                    foreach ($this->pset->formula_grades() as $ge) {
+                        if (property_exists($g, $ge->key)) {
+                            $this->_g[$ge->pcview_index] = $g->{$ge->key};
+                        }
+                    }
+                }
+                if ($this->pset->has_uncacheable_formula()) {
+                    foreach ($this->pset->formula_grades() as $ge) {
+                        $f = $ge->formula();
+                        if (!$f->cacheable) {
+                            $this->_g[$ge->pcview_index] = $f->evaluate($this->user);
+                        }
                     }
                 }
             }
@@ -605,7 +621,7 @@ class PsetView {
         }
         $gv = null;
         if ($ge && $ge->pcview_index !== null) {
-            $ge->formula ? $this->ensure_formulas() : $this->ensure_grades();
+            $ge->is_formula() ? $this->ensure_formulas() : $this->ensure_grades();
             if ($this->_g) {
                 $gv = $this->_g[$ge->pcview_index];
             }
@@ -620,7 +636,7 @@ class PsetView {
             $ge = $this->pset->gradelike_by_key($ge);
         }
         $gv = null;
-        if ($ge && $ge->pcview_index !== null && !$ge->formula) {
+        if ($ge && $ge->pcview_index !== null && !$ge->is_formula()) {
             $this->ensure_grades();
             $gv = $this->_ag ? $this->_ag[$ge->pcview_index] : null;
         }
@@ -1724,10 +1740,10 @@ class PsetView {
 
     function grade_export_formulas(GradeExport $gexp) {
         $this->ensure_formulas();
-        if (($fgx = $this->grade_jxnote("formula"))) {
+        if ($this->pset->has_formula) {
             foreach ($gexp->visible_grades() as $i => $ge) {
-                if ($ge->type === "formula"
-                    && ($v = $fgx->{$ge->key} ?? null) !== null) {
+                if ($ge->is_formula()
+                    && ($v = $this->_g[$ge->pcview_index]) !== null) {
                     if ($gexp->grades === null) {
                         $gexp->grades = array_fill(0, count($gexp->visible_grades()), null);
                     }

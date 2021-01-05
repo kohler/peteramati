@@ -10,6 +10,8 @@ abstract class GradeFormula implements JsonSerializable {
     protected $_a;
     /** @var int */
     public $vtype = 0;
+    /** @var bool */
+    public $cacheable = true;
     /** @var ?string */
     private $_canonid;
     /** @var ?array<int,mixed> */
@@ -198,7 +200,7 @@ class NullableBin_GradeFormula extends GradeFormula {
 }
 
 class Ternary_GradeFormula extends GradeFormula {
-    /** @param GradeFormla $ec
+    /** @param GradeFormula $ec
      * @param GradeFormula $et
      * @param GradeFormula $ef */
     function __construct($ec, $et, $ef) {
@@ -262,33 +264,6 @@ class Number_GradeFormula extends GradeFormula {
     }
 }
 
-class GradeEntry_GradeFormula extends GradeFormula {
-    /** @var GradeEntryConfig */
-    private $ge;
-
-    /** @param GradeEntryConfig $ge */
-    function __construct($ge) {
-        parent::__construct("g", []);
-        $this->ge = $ge;
-        if ($ge->type === "letter") {
-            $this->vtype = GradeFormula::VTLETTER;
-        } else if ($ge->type === "checkbox") {
-            $this->vtype = GradeFormula::VTBOOL;
-        }
-        assert(!$ge->formula);
-    }
-    function evaluate(Contact $student) {
-        $v = $student->gcache_entry($this->ge->pset, $this->ge);
-        return $v !== null ? (float) $v : null;
-    }
-    function export_grade_names(&$v) {
-        $v[] = "{$this->ge->pset->id}.{$this->ge->key}";
-    }
-    function jsonSerialize() {
-        return "{$this->ge->pset->nonnumeric_key}.{$this->ge->key}";
-    }
-}
-
 class PsetTotal_GradeFormula extends GradeFormula {
     /** @var Pset */
     private $pset;
@@ -339,7 +314,7 @@ class CategoryTotal_GradeFormula extends GradeFormula {
     }
     function export_grade_names(&$v) {
         foreach ($this->conf->pset_category($this->category) as $pset) {
-            $v[] = "{$this->pset->id}.total" . ($this->noextra ? "_noextra" : "");
+            $v[] = "{$pset->id}.total" . ($this->noextra ? "_noextra" : "");
         }
     }
     function jsonSerialize() {

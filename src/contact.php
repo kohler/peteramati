@@ -854,7 +854,7 @@ class Contact {
     function gcache_entry(Pset $pset, GradeEntryConfig $ge) {
         $lh = $ge->key === "late_hours";
         $flags = ($lh ? 0 : PsetView::GRADEJSON_NO_LATE_HOURS)
-            | ($ge->formula ? 0 : PsetView::GRADEJSON_NO_FORMULAS);
+            | ($ge->is_formula() ? 0 : PsetView::GRADEJSON_NO_FORMULAS);
         if (($gexp = $this->ensure_gcache($pset, $flags, $ge))) {
             return $lh ? $gexp->late_hours : $gexp->grades[$ge->pcview_index] ?? null;
         } else {
