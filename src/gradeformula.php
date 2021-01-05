@@ -10,6 +10,10 @@ abstract class GradeFormula implements JsonSerializable {
     protected $_a;
     /** @var int */
     public $vtype = 0;
+    /** @var ?string */
+    private $_canonid;
+    /** @var ?array<int,mixed> */
+    protected $_allv;
 
     const VTNUMBER = 0;
     const VTBOOL = 1;
@@ -26,10 +30,22 @@ abstract class GradeFormula implements JsonSerializable {
 
     abstract function evaluate(Contact $student);
 
+    /** @param list<string> &$v */
     function export_grade_names(&$v) {
         foreach ($this->_a as $a) {
             $a->export_grade_names($v);
         }
+    }
+
+    /** @return array<int,mixed> */
+    function compute_all(Conf $conf) {
+        if ($this->_allv === null) {
+            $this->_allv = [];
+            foreach (StudentSet::make_all($conf)->users() as $u) {
+                $this->_allv[$u->contactId] = $this->evaluate($u);
+            }
+        }
+        return $this->_allv;
     }
 
     function jsonSerialize() {
@@ -38,6 +54,19 @@ abstract class GradeFormula implements JsonSerializable {
             $x[] = is_number($a) ? $a : $a->jsonSerialize();
         }
         return $x;
+    }
+
+    /** @return string */
+    function canonical_id() {
+        if ($this->_canonid === null) {
+            $this->_canonid = json_encode($this->jsonSerialize());
+        }
+        return $this->_canonid;
+    }
+
+    /** @return GradeFormula */
+    function canonicalize(Conf $conf) {
+        return $conf->canonical_formula($this);
     }
 }
 
@@ -191,6 +220,10 @@ abstract class Function_GradeFormula extends GradeFormula {
     /** @param GradeFormula $e */
     function add_arg($e) {
         $this->_a[] = $e;
+    }
+    /** @return int */
+    function nargs() {
+        return count($this->_a);
     }
 }
 

@@ -161,10 +161,12 @@ class GradeFormulaCompiler {
     }
 
     /** @param int $p
+     * @param ?int $min
+     * @param ?int $max
      * @return array{?GradeFormula,int} */
-    private function parse_arguments(Function_GradeFormula $fe, $p) {
+    private function parse_arguments(Function_GradeFormula $fe, $p, $min = null, $max = null) {
         $s = $this->state->str;
-        $p = $this->skip_space($p);
+        $p0 = $p = $this->skip_space($p);
 
         if ($p === strlen($s)) {
             $this->error_near($p, "Expression missing.");
@@ -189,15 +191,23 @@ class GradeFormulaCompiler {
                 $this->error_near($p, "Missing “)”.");
                 return [null, $p];
             }
-            return [$fe, $p + 1];
+            ++$p;
         } else {
             list($e, $p) = $this->parse_prefix($p, self::UNARY_PRECEDENCE);
-            if ($e) {
-                $fe->add_arg($e);
-                return [$fe, $p];
-            } else {
+            if (!$e) {
                 return [null, $p];
             }
+            $fe->add_arg($e);
+        }
+
+        if ($min !== null && $fe->nargs() < $min) {
+            $this->error_at($p0, $p, "Too few arguments.");
+            return [null, $p];
+        } else if ($max !== null && $fe->nargs() > $max) {
+            $this->error_at($p0, $p, "Too many arguments.");
+            return [null, $p];
+        } else {
+            return [$fe, $p];
         }
     }
 
@@ -243,6 +253,9 @@ class GradeFormulaCompiler {
             }
         } else if (preg_match('/\G(?:min|max)\b/s', $s, $m, 0, $p)) {
             list($e, $p) = $this->parse_arguments(new MinMax_GradeFormula($m[0]), $p + strlen($m[0]));
+        } else if (preg_match('/\G(?:rank)\b/s', $s, $m, 0, $p)) {
+            list($e, $p) = $this->parse_arguments(new Rank_GradeFormula, $p + strlen($m[0]), 1, 1);
+            $e = $e ? $e->canonicalize($this->conf) : null;
         } else if (preg_match('/\G(\w+)\s*\.\s*(\w+)/s', $s, $m, 0, $p)) {
             $this->state->pos1 = $p;
             $p = $this->state->pos2 = $p + strlen($m[0]);

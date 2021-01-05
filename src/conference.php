@@ -126,6 +126,8 @@ class Conf {
     private $_global_formulas;
     /** @var array<string,FormulaConfig> */
     private $_formulas_by_name;
+    /** @var list<GradeFormula> */
+    private $_canon_formulas = [];
 
     /** @var bool */
     private $_date_format_initialized = false;
@@ -2324,6 +2326,18 @@ class Conf {
             }
         });
         return $fs;
+    }
+
+    /** @return GradeFormula */
+    function canonical_formula(GradeFormula $gf) {
+        $n = $gf->canonical_id();
+        foreach ($this->_canon_formulas as $ff) {
+            if ($ff->canonical_id() === $n) {
+                return $ff;
+            }
+        }
+        $this->_canon_formulas[] = $gf;
+        return $gf;
     }
 
 

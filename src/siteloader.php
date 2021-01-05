@@ -7,6 +7,7 @@ class SiteLoader {
         "CapabilityManager" => "src/capability.php",
         "CsvGenerator" => "lib/csv.php",
         "CsvParser" => "lib/csv.php",
+        "Function_GradeFormula" => "src/gradeformula.php",
         "GitHubResponse" => "src/github_repositorysite.php",
         "LoginHelper" => "lib/login.php",
         "MimeText" => "lib/mailer.php",

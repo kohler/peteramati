@@ -49,6 +49,8 @@ class StudentSet implements Iterator, Countable {
     const ALL = 15;
     const ALL_ENROLLED = 7;
 
+    static private $all_set = null;
+
     /** @param int $flags */
     function __construct(Contact $viewer, $flags) {
         $this->conf = $viewer->conf;
@@ -82,8 +84,12 @@ class StudentSet implements Iterator, Countable {
         } else {
             $this->_ua = [];
         }
+        if ($flags === self::ALL && $viewer->isPC && !self::$all_set) {
+            self::$all_set = $this;
+        }
     }
 
+    /** @return StudentSet */
     static function make_empty_for(Contact $viewer, Contact $user) {
         $ss = new StudentSet($viewer, 0);
         $ss->_u[$user->contactId] = $user;
@@ -93,6 +99,7 @@ class StudentSet implements Iterator, Countable {
         return $ss;
     }
 
+    /** @return StudentSet */
     static function make_for(Contact $viewer, $users) {
         $ss = new StudentSet($viewer, 0);
         foreach ($users as $u) {
@@ -101,6 +108,11 @@ class StudentSet implements Iterator, Countable {
             $u->student_set = $ss;
         }
         return $ss;
+    }
+
+    /** @return StudentSet */
+    static function make_all(Conf $conf) {
+        return self::$all_set ?? new StudentSet($conf->site_contact(), self::ALL);
     }
 
     function add_info(PsetView $info) {
