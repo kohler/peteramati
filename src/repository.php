@@ -36,6 +36,7 @@ class Repository {
     public $notes;
     public $heads;
 
+    /** @var bool */
     public $is_handout = false;
     public $viewable_by = [];
     public $_truncated_hashes = [];
@@ -300,28 +301,73 @@ class Repository {
         }
     }
 
+    static private function set_directory(CommitRecord $cr, $s, $x, $end) {
+        $x0 = $x;
+        $mode = 0;
+        $dir = null;
+        while ($x !== $end) {
+            $ch = $s[$x];
+            if ($mode === 1 && ($ch === "\n" || $ch === "/") && $x > $x0) {
+                $d = substr($s, $x0, $x - $x0);
+                if ($dir === null) {
+                    $dir = $d;
+                } else if (is_string($dir)) {
+                    if ($dir !== $d) {
+                        $dir = [$dir, $d];
+                    }
+                } else if (!in_array($d, $dir)) {
+                    $dir[] = $d;
+                }
+            }
+            if ($ch === "/") {
+                $mode = 2;
+            } else if ($ch === "\n") {
+                $mode = 0;
+            } else if ($mode === 0) {
+                $x0 = $x;
+                $mode = 1;
+            }
+            ++$x;
+        }
+        $cr->directory = $dir;
+    }
+
     /** @param array<string,CommitRecord> &$list
      * @param ?string $head */
-    private function load_commits_from_head(&$list, $head, $directory) {
-        $dirarg = "";
-        if ((string) $directory !== "") {
-            $dirarg = " -- " . escapeshellarg($directory);
-        }
-        //$limitarg = $limit ? " -n$limit" : "";
-        $limitarg = "";
-        $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
-        if ($result === "") {
+    private function load_commits_from_head(&$list, $head) {
+        $s = $this->gitrun("git log --simplify-merges --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
+        if ($s === "") {
             $this->refresh(30, true);
-            $result = $this->gitrun("git log$limitarg --simplify-merges --format='%ct %H %s' " . escapeshellarg($head) . $dirarg);
+            $s = $this->gitrun("git log --simplify-merges --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
         }
-        preg_match_all('/^(\S+)\s+(\S+)\s+(.*)$/m', $result, $ms, PREG_SET_ORDER);
-        foreach ($ms as $m) {
-            if (!isset($this->_commits[$m[2]])) {
-                /** @phan-suppress-next-line PhanTypeMismatchArgument */
-                $this->_commits[$m[2]] = new CommitRecord((int) $m[1], $m[2], $m[3], $head);
+        $p = 0;
+        $l = strlen($s);
+        while ($p < $l && $s[$p] === "\0") {
+            $p0 = $p + 1;
+            if (($p = strpos($s, "\0", $p0)) === false) {
+                $p = $l;
             }
-            if (!isset($list[$m[2]])) {
-                $list[$m[2]] = $this->_commits[$m[2]];
+            if (($sp1 = strpos($s, " ", $p0)) !== false
+                && ($sp2 = strpos($s, " ", $sp1 + 1)) !== false
+                && ($nl = strpos($s, "\n", $sp2 + 1)) !== false
+                && $nl < $p) {
+                $time = substr($s, $p0, $sp1 - $p0);
+                $hash = substr($s, $sp1 + 1, $sp2 - ($sp1 + 1));
+                if (strlen($time) > 8
+                    && strlen($hash) >= 40
+                    && ctype_digit($time)
+                    && ctype_xdigit($hash)) {
+                    if (($cr = $this->_commits[$hash] ?? null) === null) {
+                        $subject = substr($s, $sp2 + 1, $nl - ($sp2 + 1));
+                        /** @phan-suppress-next-line PhanTypeMismatchArgument */
+                        $cr = new CommitRecord((int) $time, $hash, $subject, $head);
+                        self::set_directory($cr, $s, $nl, $p);
+                        $this->_commits[$hash] = $cr;
+                    }
+                    if (!isset($list[$hash])) {
+                        $list[$hash] = $cr;
+                    }
+                }
             }
         }
     }
@@ -329,40 +375,52 @@ class Repository {
     /** @param ?string $branch
      * @return array<string,CommitRecord> */
     function commits(Pset $pset = null, $branch = null) {
-        $dir = "";
+        $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
+
+        if (isset($this->_commit_lists[$branch])) {
+            $list = $this->_commit_lists[$branch];
+        } else {
+            // XXX should gitrun once, not multiple times
+            $list = [];
+            $heads = explode(" ", $this->heads);
+            $heads[0] = "%REPO%/$branch";
+            foreach ($heads as $h) {
+                $this->load_commits_from_head($list, $h);
+            }
+            $this->_commit_lists[$branch] = $list;
+        }
+
         if ($pset
             && $pset->directory_noslash !== ""
             && !($this->_truncated_psetdir[$pset->psetid] ?? false)) {
             $dir = $pset->directory_noslash;
-        }
-        $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
-
-        $key = "$dir/$branch";
-        if (isset($this->_commit_lists[$key])) {
-            return $this->_commit_lists[$key];
+            assert(strpos($dir, "/") === false);
+        } else {
+            $dir = "";
         }
 
-        // XXX should gitrun once, not multiple times
-        $list = [];
-        $heads = explode(" ", $this->heads);
-        $heads[0] = "%REPO%/$branch";
-        foreach ($heads as $h) {
-            $this->load_commits_from_head($list, $h, $dir);
-        }
-
-        if (!$list
-            && $dir !== ""
-            && $pset
-            && isset($pset->test_file)
-            && !isset($this->_truncated_psetdir[$pset->psetid])) {
-            $this->_truncated_psetdir[$pset->psetid] =
-                !!$this->ls_files("%REPO%/$branch", $pset->test_file);
-            if ($this->_truncated_psetdir[$pset->psetid]) {
-                return $this->commits(null, $branch);
+        if ($dir !== "" && !empty($list)) {
+            $key = "$dir//$branch";
+            if (isset($this->_commit_lists[$key])) {
+                $list = $this->_commit_lists[$key];
+            } else {
+                $xlist = [];
+                foreach ($list as $cr) {
+                    if ($cr->directory === $dir
+                        || (is_array($cr->directory) && in_array($dir, $cr->directory))) {
+                        $xlist[$cr->hash] = $cr;
+                    }
+                }
+                if (empty($xlist)
+                    && isset($pset->test_file)
+                    && ($this->_truncated_psetdir[$pset->psetid] =
+                        !!$this->ls_files("%REPO%/$branch", $pset->test_file))) {
+                    $xlist = $list;
+                }
+                $list = $this->_commit_lists[$key] = $xlist;
             }
         }
 
-        $this->_commit_lists[$key] = $list;
         return $list;
     }
 
@@ -516,7 +574,7 @@ class Repository {
         Dbl::free($result);
         if ($match) {
             $list = [];
-            $this->load_commits_from_head($list, "repo{$this->repoid}.snap" . gmstrftime("%Y%m%d.%H%M%S", $match->snapshot), "");
+            $this->load_commits_from_head($list, "repo{$this->repoid}.snap" . gmstrftime("%Y%m%d.%H%M%S", $match->snapshot));
         }
         if (!array_key_exists($hash, $this->_commits)) {
             $this->_commits[$hash] = null;

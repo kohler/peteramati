@@ -12,6 +12,8 @@ class CommitRecord {
     public $subject;
     /** @var ?string */
     public $fromhead;
+    /** @var null|string|list<string> */
+    public $directory;
     /** @var ?bool */
     public $_is_handout;
     /** @var ?Pset */

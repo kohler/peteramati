@@ -362,6 +362,7 @@ class StudentSet implements Iterator, Countable {
         }
     }
 
+    /** @return \Generator<PsetView> */
     function all_info_for(Contact $user, Pset $pset) {
         foreach ($this->all_cpi_for($user, $pset) as $cpi) {
             yield PsetView::make_from_set_at($this, $user, $pset, $cpi->bhash);
