@@ -140,7 +140,7 @@ class Pset {
     /** @var bool */
     public $has_formula = false;
     /** @var bool */
-    private $has_answers = false;
+    public $has_answers = false;
     private $_max_grade = [null, null];
     public $grade_script;
     /** @var GradeEntryConfig */

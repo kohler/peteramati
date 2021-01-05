@@ -65,16 +65,6 @@ class PsetView {
     private $_gtotne;
 
     /** @var bool */
-    private $_has_grade_counts = false;
-    /** @var ?int */
-    private $_n_visible_grades;
-    /** @var ?int */
-    private $_n_answers;
-    /** @var ?int */
-    private $_n_nonempty_grades;
-    /** @var ?int */
-    private $_n_nonempty_assigned_grades;
-    /** @var bool */
     private $need_format = false;
     /** @var bool */
     private $added_diffinfo = false;
@@ -219,7 +209,6 @@ class PsetView {
             $this->_havepi &= ~4;
             $this->_cpi = null;
             $this->_derived_handout_commit = false;
-            $this->_has_grade_counts = false;
             $this->_gtime = null;
         }
     }
@@ -1190,46 +1179,53 @@ class PsetView {
         return $this->pc_view;
     }
 
-    private function load_grade_counts() {
-        $this->_has_grade_counts = true;
-        $this->_n_visible_grades = $this->_n_answers =
-            $this->_n_nonempty_grades = $this->_n_nonempty_assigned_grades = 0;
+    /** @return bool */
+    function has_nonempty_grades() {
         if ($this->can_view_grades()) {
             $this->ensure_grades();
-            foreach ($this->visible_grades() as $ge) {
-                ++$this->_n_visible_grades;
-                if ($ge->answer) {
-                    ++$this->_n_answers;
-                }
-                if ($this->_g !== null
-                    && $this->_g[$ge->pcview_index] !== null) {
-                    ++$this->_n_nonempty_grades;
-                    if (!$ge->answer) {
-                        ++$this->_n_nonempty_assigned_grades;
+            if ($this->_g !== null) {
+                foreach ($this->visible_grades() as $ge) {
+                    if ($this->_g[$ge->pcview_index] !== null) {
+                        return true;
                     }
                 }
             }
         }
-    }
-
-    /** @return bool */
-    function has_nonempty_grades() {
-        $this->_has_grade_counts || $this->load_grade_counts();
-        return $this->_n_nonempty_grades > 0;
+        return false;
     }
 
     /** @return bool */
     function has_nonempty_assigned_grades() {
-        $this->_has_grade_counts || $this->load_grade_counts();
-        return $this->_n_nonempty_assigned_grades !== 0;
+        if ($this->can_view_grades()) {
+            $this->ensure_grades();
+            if ($this->_g !== null) {
+                foreach ($this->visible_grades() as $ge) {
+                    if (!$ge->answer
+                        && $this->_g[$ge->pcview_index] !== null) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** @return bool */
     function needs_answers()  {
-        $this->_has_grade_counts || $this->load_grade_counts();
-        return $this->_n_answers !== 0
-            && ($this->_n_nonempty_grades === 0
-                || $this->_n_nonempty_grades === $this->_n_nonempty_assigned_grades);
+        if ($this->pset->has_answers && $this->can_view_grades()) {
+            $this->ensure_grades();
+            if ($this->_g !== null) {
+                foreach ($this->visible_grades() as $ge) {
+                    if ($ge->answer
+                        && $this->_g[$ge->pcview_index] !== null) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /** @return int */
