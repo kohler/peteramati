@@ -121,8 +121,9 @@ class Conf {
     private $_psets_by_category;
     /** @var array<string,bool> */
     private $_category_has_extra;
+
     /** @var ?list<FormulaConfig> */
-    private $_formulas;
+    private $_global_formulas;
     /** @var array<string,FormulaConfig> */
     private $_formulas_by_name;
 
@@ -2286,24 +2287,24 @@ class Conf {
 
 
     /** @return list<FormulaConfig> */
-    function formulas() {
-        if (!isset($this->_formulas)) {
-            $this->_formulas = [];
+    function global_formulas() {
+        if (!isset($this->_global_formulas)) {
+            $this->_global_formulas = [];
             $n = 0;
             foreach ($this->config->_formulas ?? [] as $name => $fc) {
-                $this->_formulas[] = $f = new FormulaConfig($this, $name, $fc, $n++);
+                $this->_global_formulas[] = $f = new FormulaConfig($this, $name, $fc, $n++);
                 if ($f->name) {
                     $this->_formulas_by_name[$f->name] = $f;
                 }
             }
         }
-        return $this->_formulas;
+        return $this->_global_formulas;
     }
 
     /** @return ?FormulaConfig */
     function formula_by_name($name) {
-        if (!isset($this->_formulas)) {
-            $this->formulas();
+        if (!isset($this->_global_formulas)) {
+            $this->global_formulas();
         }
         return $this->_formulas_by_name[$name] ?? null;
     }
@@ -2311,7 +2312,7 @@ class Conf {
     /** @return list<FormulaConfig> */
     function formulas_by_home_position() {
         $fs = [];
-        foreach ($this->formulas() as $f) {
+        foreach ($this->global_formulas() as $f) {
             if ($f->home_position !== null)
                 $fs[] = $f;
         }

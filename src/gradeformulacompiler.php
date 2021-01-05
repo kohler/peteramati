@@ -1,6 +1,6 @@
 <?php
 // gradeformulacompiler.php -- Peteramati grade formulas
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2021 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 require_once(SiteLoader::$root . "/src/gradeformula.php");
@@ -48,11 +48,10 @@ class GradeFormulaCompiler {
         "&&" => 3,
         "||" => 2,
         "??" => 1,
-        "?" => 0, ":" => 0,
-        "," => -1
+        "?" => 0, ":" => 0
     ];
     const UNARY_PRECEDENCE = 12;
-    const MIN_PRECEDENCE = -2;
+    const MIN_PRECEDENCE = -1;
 
     static public $total_gkeys = [
         "total" => 0, "total_noextra" => 1,
@@ -130,7 +129,7 @@ class GradeFormulaCompiler {
             if (!$this->conf->pset_category_has_extra($pkey)) {
                 $f &= ~1;
             }
-            return new PsetCategoryTotal_GradeFormula($pkey, ($f & 1) !== 0, ($f & 4) !== 4);
+            return new CategoryTotal_GradeFormula($this->conf, $pkey, ($f & 1) !== 0, ($f & 4) !== 4);
         } else {
             $this->error_at($this->state->pos1, $this->state->pos1 + strlen($pkey), "Undefined problem set.");
             return null;
@@ -155,9 +154,49 @@ class GradeFormulaCompiler {
         } else if (($pset = $this->conf->pset_by_key_or_title($gkey))) {
             return new PsetTotal_GradeFormula($pset, false, false);
         } else if ($this->conf->pset_category($gkey)) {
-            return new PsetCategoryTotal_GradeFormula($gkey, false, true);
+            return new CategoryTotal_GradeFormula($this->conf, $gkey, false, true);
         } else {
             $this->error_at($this->state->pos1, $this->state->pos2, "Undefined problem set or category.");
+            return null;
+        }
+    }
+
+    /** @param string &$t
+     * @return ?GradeFormula */
+    private function parse_arguments(Function_GradeFormula $fe, &$t) {
+        $t = ltrim($t);
+
+        if ($t === "") {
+            $this->error_near($t, "Expression missing.");
+            return null;
+        } else if ($t[0] === "(") {
+            $t = ltrim(substr($t, 1));
+            if ($t !== "" && $t[0] === ")") {
+                // no arguments
+            } else {
+                while (true) {
+                    $e = $this->parse_prefix($t, self::MIN_PRECEDENCE);
+                    if ($e === null) {
+                        return null;
+                    }
+                    $fe->add_arg($e);
+                    $t = ltrim($t);
+                    if ($t === "" || $t[0] !== ",") {
+                        break;
+                    }
+                    $t = substr($t, 1);
+                }
+            }
+            if ($t === "" || $t[0] !== ")") {
+                $this->error_near($t, "Missing “)”.");
+                return null;
+            }
+            $t = substr($t, 1);
+            return $fe;
+        } else if (($e = $this->parse_prefix($t, self::UNARY_PRECEDENCE))) {
+            $fe->add_arg($e);
+            return $fe;
+        } else {
             return null;
         }
     }
@@ -207,10 +246,7 @@ class GradeFormulaCompiler {
             }
         } else if (preg_match('/\A(min|max)\b(.*)\z/s', $t, $m)) {
             $t = $m[2];
-            $e = $this->parse_prefix($t, self::UNARY_PRECEDENCE);
-            if ($e !== null) {
-                $e = new MinMax_GradeFormula($m[1], $e);
-            }
+            $e = $this->parse_arguments(new MinMax_GradeFormula($m[1]), $t);
         } else if (preg_match('/\A(\w+)\s*\.\s*(\w+)(.*)\z/s', $t, $m)) {
             $this->set_landmark_near($t, $m[3]);
             $t = $m[3];
@@ -230,7 +266,7 @@ class GradeFormulaCompiler {
 
         while (true) {
             $t = ltrim($t);
-            if (preg_match('/\A(\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|==|<=?|>=?|!=|,|:)(.*)\z/s', $t, $m)) {
+            if (preg_match('/\A(\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|==|<=?|>=?|!=|:)(.*)\z/s', $t, $m)) {
                 $op = $m[1];
                 $oppos = strlen($this->state->str) - strlen($t);
                 $prec = self::$precedences[$op];
@@ -249,12 +285,6 @@ class GradeFormulaCompiler {
                     $e = new NullableBin_GradeFormula($op, $e, $e2);
                 } else if (in_array($op, ["<", "==", ">", "<=", ">=", "!="])) {
                     $e = new Relation_GradeFormula($op, $e, $e2);
-                } else if ($op === ",") {
-                    if ($e instanceof Comma_GradeFormula) {
-                        $e->add_arg($e2);
-                    } else {
-                        $e = new Comma_GradeFormula($e, $e2, $oppos);
-                    }
                 } else if ($op === "?") {
                     if (!preg_match('/\A\s*:(.*)\z/s', $t, $m)) {
                         $this->error_near($t, "Missing “:”.");
@@ -291,9 +321,6 @@ class GradeFormulaCompiler {
         } else if (trim($s) !== "") {
             $this->error_near($s, "Syntax error.");
             $e = null;
-        } else if ($e instanceof Comma_GradeFormula) {
-            $this->error_at($e->oppos, $e->oppos, "Syntax error.");
-            $e = null;
         }
         $this->state = $oldstate;
         return $e;
@@ -309,8 +336,9 @@ class GradeFormulaCompiler {
                 }
             }
         }
-        foreach ($this->conf->formulas() as $f) {
-            $this->parse($f->formula, null, "global.{$f->name}");
+        foreach ($this->conf->global_formulas() as $i => $f) {
+            $name = $f->name ?? "\$g$i";
+            $this->parse($f->formula, null, "global.{$name}");
         }
     }
 }

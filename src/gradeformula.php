@@ -1,6 +1,6 @@
 <?php
 // gradeformula.php -- Peteramati grade formulas
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2021 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 abstract class GradeFormula implements JsonSerializable {
@@ -26,18 +26,10 @@ abstract class GradeFormula implements JsonSerializable {
 
     abstract function evaluate(Contact $student);
 
-    function evaluate_global(Contact $student, $config = null) {
-        if ($config && $config instanceof GradeEntryConfig) {
-            $name = "{$config->pset->nonnumeric_key}.{$config->key}";
-        } else if ($config && $config instanceof FormulaConfig) {
-            $name = "{$config->name}";
-        } else {
-            $name = "[{$this->_op}]";
+    function export_grade_names(&$v) {
+        foreach ($this->_a as $a) {
+            $a->export_grade_names($v);
         }
-        array_push(self::$evaluation_stack, $name);
-        $v = $this->evaluate($student);
-        array_pop(self::$evaluation_stack);
-        return $v;
     }
 
     function jsonSerialize() {
@@ -192,38 +184,19 @@ class Ternary_GradeFormula extends GradeFormula {
     }
 }
 
-class Comma_GradeFormula extends GradeFormula {
-    /** @var int */
-    public $oppos;
-    /** @param GradeFormula $el
-     * @param GradeFormula $er
-     * @param int $oppos */
-    function __construct($el, $er, $oppos) {
-        parent::__construct(",", [$el, $er]);
-        $this->oppos = $oppos;
+abstract class Function_GradeFormula extends GradeFormula {
+    function __construct($op) {
+        parent::__construct($op, []);
     }
     /** @param GradeFormula $e */
     function add_arg($e) {
         $this->_a[] = $e;
     }
-    /** @return list<GradeFormula> */
-    function args() {
-        return $this->_a;
-    }
-    function evaluate(Contact $student) {
-        return null;
-    }
-}
-
-abstract class Function_GradeFormula extends GradeFormula {
-    function __construct($op, $arge) {
-        parent::__construct($op, $arge instanceof Comma_GradeFormula ? $arge->args() : [$arge]);
-    }
 }
 
 class MinMax_GradeFormula extends Function_GradeFormula {
-    function __construct($op, $arge) {
-        parent::__construct($op, $arge);
+    function __construct($op) {
+        parent::__construct($op);
     }
     function evaluate(Contact $student) {
         $cur = null;
@@ -275,8 +248,11 @@ class GradeEntry_GradeFormula extends GradeFormula {
         $v = $student->gcache_entry($this->ge->pset, $this->ge);
         return $v !== null ? (float) $v : null;
     }
+    function export_grade_names(&$v) {
+        $v[] = "{$this->ge->pset->id}.{$this->ge->key}";
+    }
     function jsonSerialize() {
-        return $this->ge->pset->nonnumeric_key . "." . $this->ge->key;
+        return "{$this->ge->pset->nonnumeric_key}.{$this->ge->key}";
     }
 }
 
@@ -300,12 +276,17 @@ class PsetTotal_GradeFormula extends GradeFormula {
     function evaluate(Contact $student) {
         return $student->gcache_total($this->pset, $this->noextra, $this->norm);
     }
+    function export_grade_names(&$v) {
+        $v[] = "{$this->pset->id}.total" . ($this->noextra ? "_noextra" : "");
+    }
     function jsonSerialize() {
         return $this->pset->nonnumeric_key . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "_norm" : "");
     }
 }
 
-class PsetCategoryTotal_GradeFormula extends GradeFormula {
+class CategoryTotal_GradeFormula extends GradeFormula {
+    /** @var Conf */
+    private $conf;
     /** @var string */
     private $category;
     /** @var bool */
@@ -313,14 +294,20 @@ class PsetCategoryTotal_GradeFormula extends GradeFormula {
     /** @var bool */
     private $norm;
 
-    function __construct($category, $noextra, $norm) {
+    function __construct(Conf $conf, $category, $noextra, $norm) {
         parent::__construct("ggt", []);
+        $this->conf = $conf;
         $this->category = $category;
         $this->noextra = $noextra;
         $this->norm = $norm;
     }
     function evaluate(Contact $student) {
         return $student->gcache_category_total($this->category, $this->noextra, $this->norm);
+    }
+    function export_grade_names(&$v) {
+        foreach ($this->conf->pset_category($this->category) as $pset) {
+            $v[] = "{$this->pset->id}.total" . ($this->noextra ? "_noextra" : "");
+        }
     }
     function jsonSerialize() {
         return $this->category . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "" : "_raw");

@@ -16,7 +16,8 @@ class SiteLoader {
     ];
 
     static $suffix_map = [
-        "_api.php" => ["api_", "api"]
+        "_api.php" => ["api_", "api"],
+        "_gradeformula.php" => ["gf_", "gradeformulas"]
     ];
 
     /** @var string */

@@ -591,7 +591,7 @@ class PsetView {
                 $fs = [];
                 foreach ($this->pset->grades as $ge) {
                     if (($f = $ge->formula())) {
-                        $v = $f->evaluate_global($this->user, $ge);
+                        $v = $f->evaluate($this->user);
                         $fs[$ge->key] = $v;
                         $this->_g[$ge->pcview_index] = $v;
                     }
