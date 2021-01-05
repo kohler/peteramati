@@ -1717,16 +1717,8 @@ class PsetView {
 
         $this->ensure_grades();
         if ($this->_g !== null || $this->is_grading_commit()) {
-            $gexp->grades = [];
-            $gexp->autogrades = $this->_ag !== null ? [] : null;
-            foreach ($gexp->visible_grades() as $ge) {
-                $gexp->grades[] = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
-                if ($this->_ag !== null) {
-                    $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
-                }
-            }
+            $this->grade_export_grades($gexp);
         }
-
         if (!($flags & self::GRADEJSON_NO_FORMULAS)
             && $this->pset->has_formula) {
             $this->grade_export_formulas($gexp);
@@ -1755,16 +1747,28 @@ class PsetView {
         return $gexp;
     }
 
+    function grade_export_grades(GradeExport $gexp) {
+        $this->ensure_grades();
+        $gexp->grades = [];
+        $gexp->autogrades = $this->_ag !== null ? [] : null;
+        foreach ($gexp->visible_grades() as $ge) {
+            $gexp->grades[] = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
+            if ($this->_ag !== null) {
+                $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
+            }
+        }
+    }
+
     function grade_export_formulas(GradeExport $gexp) {
-        $this->ensure_formulas();
         if ($this->pset->has_formula) {
             foreach ($gexp->visible_grades() as $i => $ge) {
-                if ($ge->is_formula()
-                    && ($v = $this->_g[$ge->pcview_index]) !== null) {
-                    if ($gexp->grades === null) {
-                        $gexp->grades = array_fill(0, count($gexp->visible_grades()), null);
+                if ($ge->is_formula()) {
+                    $v = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
+                    $v = $v ?? $this->grade_value($ge);
+                    if ($v !== null) {
+                        $gexp->grades = $gexp->grades ?? $gexp->blank_gradelist();
+                        $gexp->grades[$i] = $v;
                     }
-                    $gexp->grades[$i] = $v;
                 }
             }
         }

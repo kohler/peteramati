@@ -1001,18 +1001,21 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
         if (($total = $info->grade_total()) !== null) {
             $j["total"] = $total;
         }
-        foreach ($gex->visible_grades() as $ge) {
-            $gv = $info->grade_value($ge);
-            $agv = $info->autograde_value($ge);
-            if ($gv === null
-                && !$info->user->dropped
-                && $ge->grader_entry_required()
-                && $info->viewer_is_grader()) {
-                $info->user->incomplete = "grade missing";
+        $info->grade_export_grades($gex);
+        $info->grade_export_formulas($gex);
+        $j["grades"] = $gex->grades;
+        if (!$info->user->dropped && $info->viewer_is_grader()) {
+            foreach ($gex->visible_grades() as $i => $ge) {
+                if ($gex->grades[$i] === null && $ge->grader_entry_required())
+                    $info->user->incomplete = "grade missing";
             }
-            $j["grades"][] = $gv;
-            if ($agv !== null && $gv !== $agv) {
-                $j["highlight_grades"][$ge->key] = true;
+        }
+        if ($gex->autogrades !== null) {
+            foreach ($gex->visible_grades() as $i => $ge) {
+                if ($gex->autogrades[$i] !== null
+                    && $gex->autogrades[$i] !== $gex->grades[$i]) {
+                    $j["highlight_grades"][$ge->key] = true;
+                }
             }
         }
         if ($info->user_can_view_grades()) {
