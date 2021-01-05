@@ -797,10 +797,11 @@ class Pset {
         if ($this->conf->setting("__gitignore_pset{$this->id}_at", 0) < Conf::$now - 900) {
             $hrepo = $this->handout_repo();
             $result = "";
+            $branch = $this->handout_branch;
             if ($this->directory_slash !== "") {
-                $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/master:" . escapeshellarg($this->directory_slash) . ".gitignore 2>/dev/null");
+                $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/{$branch}:" . escapeshellarg($this->directory_slash) . ".gitignore 2>/dev/null");
             }
-            $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/master:.gitignore 2>/dev/null");
+            $result .= $hrepo->gitrun("git show repo{$hrepo->repoid}/{$branch}:.gitignore 2>/dev/null");
             $this->conf->save_setting("__gitignore_pset{$this->id}_at", Conf::$now);
             $this->conf->save_setting("gitignore_pset{$this->id}", 1, $result);
         }
