@@ -13,9 +13,9 @@ class GradeExport implements JsonSerializable {
     public $include_entries = true;
     /** @var ?int */
     public $uid;
-    /** @var ?list<float> */
+    /** @var ?list<mixed> */
     public $grades;
-    /** @var ?list<float> */
+    /** @var ?list<mixed> */
     public $autogrades;
     /** @var null|int|float */
     public $total;
@@ -58,6 +58,11 @@ class GradeExport implements JsonSerializable {
     /** @return list<GradeEntryConfig> */
     function visible_grades() {
         return $this->visible_grades ?? $this->pset->visible_grades($this->pc_view);
+    }
+
+    /** @return list<mixed> */
+    function blank_gradelist() {
+        return array_fill(0, count($this->visible_grades()), null);
     }
 
     function suppress_absent_extra() {

@@ -108,7 +108,8 @@ class Pset {
 
     /** @var array<string,GradeEntryConfig> */
     public $all_grades = [];
-    /** @var array<string,GradeEntryConfig> */
+    /** @var array<string,GradeEntryConfig>
+     * @readonly */
     public $grades;
     /** @var list<int>
      * @readonly */
