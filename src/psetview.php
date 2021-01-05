@@ -130,6 +130,7 @@ class PsetView {
             $info->branchid = $info->_rpi->branchid;
             $info->branch = $info->conf->branch($info->branchid);
             $info->_hash = $info->_rpi->gradehash;
+            $bhash = $bhash ?? $info->_rpi->gradebhash;
         } else {
             $info->branchid = $user->branchid($pset);
             $info->branch = $info->conf->branch($info->branchid);
