@@ -73,22 +73,10 @@ class GradeFormulaCompiler {
         $this->error_ident[] = $this->state->ident;
     }
 
-    /** @param string $suffix
+    /** @param int $pos
      * @param string $msg */
-    private function error_near($suffix, $msg) {
-        $pos = strlen($this->state->str) - strlen($suffix);
+    private function error_near($pos, $msg) {
         $this->error_at($pos, $pos, $msg);
-    }
-
-    /** @param string $suffix1
-     * @param ?string $suffix2 */
-    private function set_landmark_near($suffix1, $suffix2 = null) {
-        $this->state->pos1 = strlen($this->state->str) - strlen($suffix1);
-        if ($suffix2 !== null) {
-            $this->state->pos2 = strlen($this->state->str) - strlen($suffix2);
-        } else {
-            $this->state->pos2 = $this->state->pos1;
-        }
     }
 
     /** @return ?GradeFormula */
@@ -161,146 +149,151 @@ class GradeFormulaCompiler {
         }
     }
 
-    /** @param string &$t
-     * @return ?GradeFormula */
-    private function parse_arguments(Function_GradeFormula $fe, &$t) {
-        $t = ltrim($t);
+    /** @param int $p
+     * @return int */
+    private function skip_space($p) {
+        $s = $this->state->str;
+        $l = strlen($s);
+        while ($p < $l && ctype_space($s[$p])) {
+            ++$p;
+        }
+        return $p;
+    }
 
-        if ($t === "") {
-            $this->error_near($t, "Expression missing.");
-            return null;
-        } else if ($t[0] === "(") {
-            $t = ltrim(substr($t, 1));
-            if ($t !== "" && $t[0] === ")") {
-                // no arguments
-            } else {
+    /** @param int $p
+     * @return array{?GradeFormula,int} */
+    private function parse_arguments(Function_GradeFormula $fe, $p) {
+        $s = $this->state->str;
+        $p = $this->skip_space($p);
+
+        if ($p === strlen($s)) {
+            $this->error_near($p, "Expression missing.");
+            return [null, $p];
+        } else if ($s[$p] === "(") {
+            $p = $this->skip_space($p + 1);
+            if ($p === strlen($s) || $s[$p] !== ")") {
                 while (true) {
-                    $e = $this->parse_prefix($t, self::MIN_PRECEDENCE);
+                    list($e, $p) = $this->parse_prefix($p, self::MIN_PRECEDENCE);
                     if ($e === null) {
-                        return null;
+                        return [null, $p];
                     }
                     $fe->add_arg($e);
-                    $t = ltrim($t);
-                    if ($t === "" || $t[0] !== ",") {
+                    $p = $this->skip_space($p);
+                    if ($p === strlen($s) || $s[$p] !== ",") {
                         break;
                     }
-                    $t = substr($t, 1);
+                    ++$p;
                 }
             }
-            if ($t === "" || $t[0] !== ")") {
-                $this->error_near($t, "Missing “)”.");
-                return null;
+            if ($p === strlen($s) || $s[$p] !== ")") {
+                $this->error_near($p, "Missing “)”.");
+                return [null, $p];
             }
-            $t = substr($t, 1);
-            return $fe;
-        } else if (($e = $this->parse_prefix($t, self::UNARY_PRECEDENCE))) {
-            $fe->add_arg($e);
-            return $fe;
+            return [$fe, $p + 1];
         } else {
-            return null;
+            list($e, $p) = $this->parse_prefix($p, self::UNARY_PRECEDENCE);
+            if ($e) {
+                $fe->add_arg($e);
+                return [$fe, $p];
+            } else {
+                return [null, $p];
+            }
         }
     }
 
-    /** @param string &$t
+    /** @param int $p
      * @param int $minprec
-     * @return ?GradeFormula */
-    private function parse_prefix(&$t, $minprec) {
-        $t = ltrim($t);
+     * @return array{?GradeFormula,int} */
+    private function parse_prefix($p, $minprec) {
+        $s = $this->state->str;
+        $p = $this->skip_space($p);
 
-        if ($t === "") {
-            $this->error_near($t, "Expression missing.");
+        if ($p === strlen($s)) {
+            $this->error_near($p, "Expression missing.");
             $e = null;
-        } else if ($t[0] === "(") {
-            $t = substr($t, 1);
-            $e = $this->parse_prefix($t, self::MIN_PRECEDENCE);
+        } else if ($s[$p] === "(") {
+            list($e, $p) = $this->parse_prefix($p + 1, self::MIN_PRECEDENCE);
             if ($e !== null) {
-                $t = ltrim($t);
-                if ($t === "" || $t[0] !== ")") {
-                    return $e;
+                $p = $this->skip_space($p);
+                if ($p !== strlen($s) && $s[$p] === ")") {
+                    ++$p;
+                } else {
+                    $this->error_near($p, "Missing “)”.");
+                    $e = null;
                 }
-                $t = substr($t, 1);
             }
-        } else if ($t[0] === "-" || $t[0] === "+") {
-            $op = $t[0];
-            $t = substr($t, 1);
-            $e = $this->parse_prefix($t, self::UNARY_PRECEDENCE);
-            if ($e !== null && $op === "-") {
-                $e = new Unary_GradeFormula("neg", $e);
-            }
-        } else if ($t[0] === "!") {
-            $op = $t[0];
-            $t = substr($t, 1);
-            $e = $this->parse_prefix($t, self::UNARY_PRECEDENCE);
+        } else if ($s[$p] === "+") {
+            list($e, $p) = $this->parse_prefix($p + 1, self::UNARY_PRECEDENCE);
+        } else if ($s[$p] === "-") {
+            list($e, $p) = $this->parse_prefix($p + 1, self::UNARY_PRECEDENCE);
+            $e = $e ? new Unary_GradeFormula("neg", $e) : null;
+        } else if ($s[$p] === "!") {
+            list($e, $p) = $this->parse_prefix($p + 1, self::UNARY_PRECEDENCE);
             $e = $e ? new Not_GradeFormula($e) : null;
-        } else if (preg_match('/\A(\d+\.?\d*|\.\d+)(.*)\z/s', $t, $m)) {
-            $t = $m[2];
-            $e = new Number_GradeFormula((float) $m[1]);
-        } else if (preg_match('/\A(?:pi|π|m_pi)\b(.*)\z/si', $t, $m)) {
-            $t = $m[1];
+        } else if (preg_match('/\G(?:\d+\.?\d*|\.\d+)/s', $s, $m, 0, $p)) {
+            $p += strlen($m[0]);
+            $e = new Number_GradeFormula((float) $m[0]);
+        } else if (preg_match('/\G(?:pi|π|m_pi)\b/si', $s, $m, 0, $p)) {
+            $p += strlen($m[0]);
             $e = new Number_GradeFormula((float) M_PI);
-        } else if (preg_match('/\A(log10|log|ln|lg|exp)\b(.*)\z/s', $t, $m)) {
-            $t = $m[2];
-            $e = $this->parse_prefix($t, self::UNARY_PRECEDENCE);
+        } else if (preg_match('/\G(?:log10|log|ln|lg|exp)\b/s', $s, $m, 0, $p)) {
+            list($e, $p) = $this->parse_prefix($p + strlen($m[0]), self::UNARY_PRECEDENCE);
             if ($e !== null) {
-                $e = new Unary_GradeFormula($m[1], $e);
+                $e = new Unary_GradeFormula($m[0], $e);
             }
-        } else if (preg_match('/\A(min|max)\b(.*)\z/s', $t, $m)) {
-            $t = $m[2];
-            $e = $this->parse_arguments(new MinMax_GradeFormula($m[1]), $t);
-        } else if (preg_match('/\A(\w+)\s*\.\s*(\w+)(.*)\z/s', $t, $m)) {
-            $this->set_landmark_near($t, $m[3]);
-            $t = $m[3];
+        } else if (preg_match('/\G(?:min|max)\b/s', $s, $m, 0, $p)) {
+            list($e, $p) = $this->parse_arguments(new MinMax_GradeFormula($m[0]), $p + strlen($m[0]));
+        } else if (preg_match('/\G(\w+)\s*\.\s*(\w+)/s', $s, $m, 0, $p)) {
+            $this->state->pos1 = $p;
+            $p = $this->state->pos2 = $p + strlen($m[0]);
             $e = $this->parse_grade_pair($m[1], $m[2]);
-        } else if (preg_match('/\A(\w+)(.*)\z/s', $t, $m)) {
-            $this->set_landmark_near($t, $m[2]);
-            $t = $m[2];
-            $e = $this->parse_grade_word($m[1], false);
+        } else if (preg_match('/\G\w+/s', $s, $m, 0, $p)) {
+            $this->state->pos1 = $p;
+            $p = $this->state->pos2 = $p + strlen($m[0]);
+            $e = $this->parse_grade_word($m[0], false);
         } else {
-            $this->error_near($t, "Syntax error.");
+            $this->error_near($p, "Syntax error.");
             $e = null;
         }
 
         if ($e === null) {
-            return null;
+            return [null, $p];
         }
 
         while (true) {
-            $t = ltrim($t);
-            if (preg_match('/\A(\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|==|<=?|>=?|!=|:)(.*)\z/s', $t, $m)) {
-                $op = $m[1];
-                $oppos = strlen($this->state->str) - strlen($t);
+            $p = $this->skip_space($p);
+            if (preg_match('/\G(?:\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|==|<=?|>=?|!=|:)/s', $s, $m, 0, $p)) {
+                $op = $m[0];
                 $prec = self::$precedences[$op];
                 if ($prec < $minprec) {
-                    return $e;
+                    return [$e, $p];
                 } else if ($op === ":") {
-                    $this->error_near($t, "Syntax error.");
-                    return null;
+                    $this->error_near($p, "Syntax error.");
+                    return [null, $p];
                 }
-                $t = $m[2];
-                $e2 = $this->parse_prefix($t, $op === "**" ? $prec : $prec + 1);
+                list($e2, $p) = $this->parse_prefix($p + strlen($op), $op === "**" ? $prec : $prec + 1);
                 if ($e2 === null) {
-                    return null;
+                    return [null, $p];
                 }
                 if (in_array($op, ["+?", "??", "||", "&&"])) {
                     $e = new NullableBin_GradeFormula($op, $e, $e2);
                 } else if (in_array($op, ["<", "==", ">", "<=", ">=", "!="])) {
                     $e = new Relation_GradeFormula($op, $e, $e2);
                 } else if ($op === "?") {
-                    if (!preg_match('/\A\s*:(.*)\z/s', $t, $m)) {
-                        $this->error_near($t, "Missing “:”.");
-                        return null;
+                    if (!preg_match('/\G\s*:/s', $s, $m, 0, $p)) {
+                        $this->error_near($p, "Missing “:”.");
+                        return [null, $p];
                     }
-                    $e3 = $this->parse_prefix($m[1], $prec);
+                    list($e3, $p) = $this->parse_prefix($p + strlen($m[0]), $prec);
                     if (!$e3) {
-                        return null;
+                        return [null, $p];
                     }
-                    $t = $m[1];
                     $e = new Ternary_GradeFormula($e, $e2, $e3);
                 } else {
                     $e = new Bin_GradeFormula($op, $e, $e2);
                 }
             } else {
-                return $e;
+                return [$e, $p];
             }
         }
     }
@@ -315,11 +308,11 @@ class GradeFormulaCompiler {
         }
         $oldstate = $this->state;
         $this->state = new GradeFormulaCompilerState($s, $context, $ident);
-        $e = $this->parse_prefix($s, self::MIN_PRECEDENCE);
+        list($e, $p) = $this->parse_prefix(0, self::MIN_PRECEDENCE);
         if ($e === null) {
             // skip
-        } else if (trim($s) !== "") {
-            $this->error_near($s, "Syntax error.");
+        } else if ($this->skip_space($p) !== strlen($s)) {
+            $this->error_near($p, "Syntax error.");
             $e = null;
         }
         $this->state = $oldstate;
