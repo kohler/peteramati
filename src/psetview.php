@@ -967,10 +967,8 @@ class PsetView {
 
     /** @param array $updates */
     function update_grade_notes($updates) {
-        if ($this->pset->gitless) {
+        if ($this->pset->gitless_grades) {
             $this->update_user_notes($updates);
-        } else if ($this->pset->gitless_grades) {
-            $this->update_repository_notes($updates);
         } else {
             $this->update_commit_notes($updates);
         }
@@ -978,10 +976,8 @@ class PsetView {
 
     /** @param array $updates */
     function update_grade_xnotes($updates) {
-        if ($this->pset->gitless) {
+        if ($this->pset->gitless_grades) {
             $this->update_user_xnotes($updates);
-        } else if ($this->pset->gitless_grades) {
-            $this->update_repository_xnotes($updates);
         } else {
             $this->update_commit_xnotes($updates);
         }
