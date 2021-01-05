@@ -731,11 +731,12 @@ class PsetView {
         $this->_grades_suppressed = null;
     }
 
-    /** @param array $updates */
-    function update_user_notes($updates) {
+    /** @param array $updates
+     * @param ?bool $is_student */
+    function update_user_notes($updates, $is_student = null) {
         // find original
         $upi = $this->upi();
-        $is_student = !$this->viewer->isPC;
+        $is_student = $is_student ?? !$this->viewer->isPC;
 
         // compare-and-swap loop
         while (true) {
@@ -803,16 +804,18 @@ class PsetView {
 
     /** @param array $updates */
     function update_user_xnotes($updates) {
-        if (($upi = $this->upi())) {
-            $new_xnotes = json_update($upi->jxnotes(), $updates);
-            $xnotes = json_encode_db($new_xnotes);
-            $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
-            $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
-            $result = $this->conf->qe("update ContactGrade set xnotes=?, xnotesOverflow=? where cid=? and pset=? and notesversion=?",
-                $xnotesa, $xnotesb, $upi->cid, $upi->pset, $upi->notesversion);
-            Dbl::free($result);
-            $upi->assign_xnotes($xnotes, $new_xnotes);
+        if (!$this->_upi) {
+            $this->update_user_notes([], false);
         }
+        $upi = $this->upi();
+        $new_xnotes = json_update($upi->jxnotes(), $updates);
+        $xnotes = json_encode_db($new_xnotes);
+        $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
+        $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
+        $result = $this->conf->qe("update ContactGrade set xnotes=?, xnotesOverflow=? where cid=? and pset=? and notesversion=?",
+            $xnotesa, $xnotesb, $upi->cid, $upi->pset, $upi->notesversion);
+        Dbl::free($result);
+        $upi->assign_xnotes($xnotes, $new_xnotes);
     }
 
 
@@ -862,25 +865,11 @@ class PsetView {
         $this->_rpi->assign_rpnotes($notes, $new_notes, ($rpi ? $rpi->rpnotesversion : 0) + 1);
     }
 
-    /** @param array $updates */
-    function update_repository_xnotes($updates) {
-        if (($rpi = $this->rpi())) {
-            $new_xnotes = json_update($rpi->jrpxnotes(), $updates);
-            $xnotes = json_encode_db($new_xnotes);
-            $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
-            $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
-            $result = $this->conf->qe("update RepositoryGrade set xnotes=?, xnotesOverflow=? where repoid=? and branchid=? and pset=? and rpnotesversion=?",
-                $xnotesa, $xnotesb,
-                $rpi->repoid, $rpi->branchid, $rpi->pset, $rpi->rpnotesversion);
-            Dbl::free($result);
-            $rpi->assign_rpxnotes($xnotes, $new_xnotes);
-        }
-    }
-
 
     /** @param non-empty-string $hash
-     * @param array $updates */
-    function update_commit_notes_at($hash, $updates) {
+     * @param array $updates
+     * @param ?bool $is_student */
+    function update_commit_notes_at($hash, $updates, $is_student = null) {
         assert(strlen($hash) === 40);
 
         // find original
@@ -968,16 +957,21 @@ class PsetView {
 
     /** @param array $updates */
     function update_commit_xnotes($updates) {
-        if (($cpi = $this->cpi())) {
-            $new_xnotes = json_update($cpi->jxnotes(), $updates);
-            $xnotes = json_encode_db($new_xnotes);
-            $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
-            $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
-            $result = $this->conf->qe("update CommitNotes set xnotes=?, xnotesOverflow=? where pset=? and bhash=? and notesversion=?",
-                $xnotesa, $xnotesb, $cpi->pset, $cpi->bhash, $cpi->notesversion);
-            Dbl::free($result);
-            $cpi->assign_xnotes($xnotes, $new_xnotes);
+        if (!$this->_hash) {
+            throw new Exception;
         }
+        if (!$this->_cpi) {
+            $this->update_commit_notes_at($this->_hash, [], false);
+        }
+        $cpi = $this->_cpi;
+        $new_xnotes = json_update($cpi->jxnotes(), $updates);
+        $xnotes = json_encode_db($new_xnotes);
+        $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
+        $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
+        $result = $this->conf->qe("update CommitNotes set xnotes=?, xnotesOverflow=? where pset=? and bhash=? and notesversion=?",
+            $xnotesa, $xnotesb, $cpi->pset, $cpi->bhash, $cpi->notesversion);
+        Dbl::free($result);
+        $cpi->assign_xnotes($xnotes, $new_xnotes);
     }
 
 
