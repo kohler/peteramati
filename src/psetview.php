@@ -1192,32 +1192,37 @@ class PsetView {
         return $this->pc_view;
     }
 
-    /** @return bool */
-    function has_nonempty_grades() {
+    /** @return \Generator<GradeEntryConfig> */
+    private function nonempty_visible_grades() {
         if ($this->can_view_grades()) {
             $this->ensure_grades();
-            if ($this->_g !== null) {
+            if ($this->_g !== null || $this->pset->has_formula) {
                 foreach ($this->visible_grades() as $ge) {
-                    if ($this->_g[$ge->pcview_index] !== null) {
-                        return true;
+                    $gv = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
+                    if ($gv === null && $ge->is_formula()) {
+                        $gv = $this->grade_value($ge);
+                    }
+                    if ($gv !== null) {
+                        yield $ge;
                     }
                 }
             }
+        }
+    }
+
+    /** @return bool */
+    function has_nonempty_grades() {
+        foreach ($this->nonempty_visible_grades() as $ge) {
+            return true;
         }
         return false;
     }
 
     /** @return bool */
     function has_nonempty_assigned_grades() {
-        if ($this->can_view_grades()) {
-            $this->ensure_grades();
-            if ($this->_g !== null) {
-                foreach ($this->visible_grades() as $ge) {
-                    if (!$ge->answer
-                        && $this->_g[$ge->pcview_index] !== null) {
-                        return true;
-                    }
-                }
+        foreach ($this->nonempty_visible_grades() as $ge) {
+            if (!$ge->answer) {
+                return true;
             }
         }
         return false;
@@ -1226,13 +1231,9 @@ class PsetView {
     /** @return bool */
     function needs_answers()  {
         if ($this->pset->has_answers && $this->can_view_grades()) {
-            $this->ensure_grades();
-            if ($this->_g !== null) {
-                foreach ($this->visible_grades() as $ge) {
-                    if ($ge->answer
-                        && $this->_g[$ge->pcview_index] !== null) {
-                        return false;
-                    }
+            foreach ($this->nonempty_visible_grades() as $ge) {
+                if ($ge->answer) {
+                    return false;
                 }
             }
             return true;
