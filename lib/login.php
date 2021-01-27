@@ -182,7 +182,6 @@ class LoginHelper {
 
         // give chair privilege to first user (external login or contactdb)
         if ($conf->setting("setupPhase", false)) {
-            $user->activate_database_account();
             self::first_user($user, "", false);
         }
 
