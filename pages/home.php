@@ -860,10 +860,10 @@ function show_flags($result, $all) {
     $any_anonymous = $any_nonanonymous = false;
     $jx = [];
     foreach ($flagrows as $row) {
-        if (!$row->repouids) {
+        if (!$row->repouids
+            || !($pset = $Conf->pset_by_id($row->pset()))) {
             continue;
         }
-        $pset = $Conf->pset_by_id($row->pset());
         $anon = $anonymous === null ? $pset->anonymous : $anonymous;
         $any_anonymous = $any_anonymous || $anon;
         $any_nonanonymous = $any_nonanonymous || !$anon;
