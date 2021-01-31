@@ -15,29 +15,21 @@ if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {
     exit(0);
 }
 
-$facefetch_urlpattern = get($Opt, "facefetch_urlpattern");
-if ($Conf->config->_facefetch_urlpattern ?? null) {
-    $facefetch_urlpattern = $Conf->config->_facefetch_urlpattern;
-}
-if (!$facefetch_urlpattern) {
-    fwrite(STDERR, 'Need `_facefetch_urlpattern` configuration option.' . "\n");
-    exit(1);
-}
-if (is_string($facefetch_urlpattern)) {
-    $facefetch_urlpattern = [$facefetch_urlpattern];
-}
-
-$fetchscript = $Conf->config->_facefetch_script ?? null;
+$fetchcommand = $Conf->config->_facefetch_command ?? null;
 if (count($arg["_"])) {
-    $fetchscript = $arg["_"][0];
+    $fetchcommand = $arg["_"];
 }
-if (!$fetchscript) {
-    fwrite(STDERR, "Need `_facefetch_script` configuration option or argument.\n");
+if (!$fetchcommand) {
+    fwrite(STDERR, "Need `_facefetch_command` configuration option or argument.\n");
     exit(1);
 }
+if (is_string($fetchcommand)) {
+    $fetchcommand = [$fetchcommand];
+}
 
-if (!isset($arg["limit"]))
-    $arg["limit"] = get($arg, "l");
+if (!isset($arg["limit"])) {
+    $arg["limit"] = $arg["l"] ?? null;
+}
 $limit = (int) $arg["limit"];
 
 $where = [];
@@ -67,34 +59,39 @@ if ($limit) {
 Dbl::free($result);
 
 
-function one_facefetch($row, $url) {
-    global $fetchscript, $verbose;
+function one_facefetch($row, $cmd) {
+    global $verbose;
 
-    if (strpos($url, '${EMAIL}') !== false) {
-        if ($row->email === null) {
-            return false;
+    $args = [];
+    foreach (preg_split('/\s+/', $cmd) as $word) {
+        if (strpos($word, '${EMAIL}') !== false) {
+            if ($row->email === null) {
+                return false;
+            }
+            $word = str_replace('${EMAIL}', urlencode($row->email), $word);
         }
-        $url = str_replace('${EMAIL}', urlencode($row->email), $url);
-    }
-    if (strpos($url, '${ID}') !== false) {
-        if ($row->huid === null) {
-            return false;
+        if (strpos($word, '${ID}') !== false) {
+            if ($row->huid === null) {
+                return false;
+            }
+            $word = str_replace('${ID}', urlencode($row->huid), $word);
         }
-        $url = str_replace('${ID}', urlencode($row->huid), $url);
-    }
-    if (strpos($url, '${NAMESEARCH}') !== false) {
-        if ((string) $row->lastName === "")
-            return false;
-        $name = strtolower($row->lastName);
-        if ((string) $row->firstName !== "") {
-            $name .= " " . strtolower(preg_replace('/(^\S+)\s+.*/', '$1', $row->firstName));
+        if (strpos($word, '${NAMESEARCH}') !== false) {
+            if ((string) $row->lastName === "")
+                return false;
+            $name = strtolower($row->lastName);
+            if ((string) $row->firstName !== "") {
+                $name .= " " . strtolower(preg_replace('/(^\S+)\s+.*/', '$1', $row->firstName));
+            }
+            $word = str_replace('${NAMESEARCH}', urlencode($name), $word);
         }
-        $url = str_replace('${NAMESEARCH}', urlencode($name), $url);
+        $args[] = escapeshellarg($word);
     }
-    if ($verbose)
-        error_log("    $url\n");
+    if ($verbose) {
+        error_log("    " . join(" ", $args) . "\n");
+    }
 
-    $handle = popen($fetchscript . " " . escapeshellarg($url), "r");
+    $handle = popen(join(" ", $args), "r");
     $data = stream_get_contents($handle);
     $status = pclose($handle);
 
@@ -128,8 +125,8 @@ foreach ($rows as $row) {
     $ok = false;
     fwrite(STDOUT, "$row->email ");
 
-    foreach ($facefetch_urlpattern as $url) {
-        if (($ok = one_facefetch($row, $url)))
+    foreach ($fetchcommand as $cmd) {
+        if (($ok = one_facefetch($row, $cmd)))
             break;
     }
 
