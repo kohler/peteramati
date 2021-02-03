@@ -29,4 +29,20 @@ class CommitRecord {
         $this->subject = $subject;
         $this->fromhead = $fromhead;
     }
+    /** @param string $dir
+     * @return bool */
+    function touches_directory($dir) {
+        if (str_ends_with($dir, "/")) {
+            $dir = substr($dir, 0, -1);
+        }
+        if ($dir === "") {
+            return true;
+        } else if ($this->directory === null) {
+            return false;
+        } else if (is_string($this->directory)) {
+            return $this->directory === $dir;
+        } else {
+            return in_array($dir, $this->directory);
+        }
+    }
 }

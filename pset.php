@@ -407,7 +407,7 @@ function echo_commit($info, $qreq) {
     $value .= '</span></span></div>';
 
     // warnings
-    $remarks = array();
+    $remarks = [];
     if (!$pset->gitless_grades) {
         $gc = $info->grading_commit();
         if ($info->pc_view && !$gc) {
@@ -481,9 +481,17 @@ function echo_commit($info, $qreq) {
         }
     }
 
+    $xnotes = [];
+    if (($c = $info->commit())) {
+        $xnotes[] = "committed " . ago($c->commitat);
+    }
+    //$xnotes[] = "fetched " . ago($info->repo->snapat);
+    $xnotes[] = "last checked " . ago($info->repo->snapcheckat);
+    $remarks[] = join(", ", $xnotes);
+
     // actually print
     echo Ht::form($info->hoturl_post("pset", ["commit" => null, "setcommit" => 1]),
-            ["class" => "pa-commitcontainer", "data-pa-pset" => $info->pset->urlkey, "data-pa-commit" => $info->latest_hash()]),
+            ["class" => "pa-commitcontainer", "data-pa-pset" => $info->pset->urlkey, "data-pa-checkhash" => $info->latest_hash()]),
         "<div class=\"f-contain\">";
     ContactView::echo_group($key, $value, $remarks);
     echo "</div></form>\n";
@@ -604,7 +612,6 @@ function show_pset($info) {
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);
     ContactView::echo_repo_group($info, $info->can_edit_grades_any());
-    ContactView::echo_repo_last_commit_group($info, false);
     ContactView::echo_downloads_group($info);
 }
 
@@ -644,6 +651,7 @@ if ($Pset->gitless) {
 
 } else if ($Info->repo && !$Info->can_view_repo_contents()) {
     echo_grade_cdf_here($Info);
+    ContactView::echo_commits_group($Info);
     echo_grader($Info);
     echo_all_grades($Info);
 
@@ -814,11 +822,7 @@ if ($Pset->gitless) {
     if ($Pset->gitless_grades) {
         echo_grade_cdf_here($Info);
     }
-
-    echo "<div class=\"pa-commitcontainer\" data-pa-pset=\"", htmlspecialchars($Info->pset->urlkey), "\">";
-    ContactView::echo_group("this commit", "No commits yet for this problem set", array());
-    echo "</div>\n";
-
+    ContactView::echo_commits_group($Info);
     if ($Pset->gitless_grades) {
         echo_grader($Info);
         echo_all_grades($Info);
@@ -829,7 +833,7 @@ echo "</div>\n";
 
 
 if (!$Pset->gitless) {
-    Ht::stash_script("\$pa.checklatest()", "pa_checklatest");
+    Ht::stash_script("\$pa.checklatest(\"{$Pset->urlkey}\")", "pa_checklatest");
 }
 
 echo "<div class='clear'></div>\n";

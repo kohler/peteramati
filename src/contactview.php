@@ -187,7 +187,6 @@ class ContactView {
     }
 
     static function echo_partner_group(PsetView $info) {
-        global $Conf, $Me;
         list($user, $pset, $partner) =
             array($info->user, $info->pset, $info->partner);
         if (!$pset->partner) {
@@ -201,11 +200,11 @@ class ContactView {
         } else if ($partner) {
             $partner_email = $partner->email;
         }
-        $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
+        $editable = $info->viewer->can_set_repo($pset, $user) && !$user->is_anonymous;
 
         $title = "partner";
-        if ($Me->isPC && $partner) {
-            $title = '<a href="' . hoturl("pset", ["u" => $Me->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->hash()]) . '">' . $title . '</a>';
+        if ($info->viewer->isPC && $partner) {
+            $title = '<a href="' . hoturl("pset", ["u" => $info->viewer->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->hash()]) . '">' . $title . '</a>';
         }
 
         if ($editable) {
@@ -230,10 +229,10 @@ class ContactView {
             }
         } else {
             $backpartners[] = -1;
-            $result = $Conf->qe("select " . ($user->is_anonymous ? "anon_username" : "email") . " from ContactInfo where contactId ?a", $backpartners);
+            $result = $info->conf->qe("select " . ($user->is_anonymous ? "anon_username" : "email") . " from ContactInfo where contactId ?a", $backpartners);
             $p = array();
             while (($row = $result->fetch_row())) {
-                if ($Me->isPC) {
+                if ($info->viewer->isPC) {
                     $p[] = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $row[0])) . '">' . htmlspecialchars($row[0]) . '</a>';
                 } else {
                     $p[] = htmlspecialchars($row[0]);
@@ -243,7 +242,7 @@ class ContactView {
         }
 
         if ($editable) {
-            echo Ht::form($Conf->selfurl(null, ["set_partner" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
+            echo Ht::form($info->conf->selfurl(null, ["set_partner" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 "<div class='f-contain'>";
         }
         self::echo_group($title, $value, $notes);
@@ -269,12 +268,12 @@ class ContactView {
     }
 
     static function echo_repo_group(PsetView $info, $full = false) {
-        global $Conf, $Me, $Qreq;
+        global $Qreq;
         if ($info->pset->gitless)
             return;
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
-        $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
+        $editable = $info->viewer->can_set_repo($pset, $user) && !$user->is_anonymous;
 
         $repo_url = $repo ? $repo->friendly_url() : "";
         $title = "repository";
@@ -310,6 +309,9 @@ class ContactView {
             }
             $value .= ' type="button">Copy URL to clipboard</button>';
         }
+        if ($repo && $info->viewer->privChair) {
+            $value .= " <small style=\"padding-left:1em;font-size:60%\">group " . $repo->cacheid . ", repo" . $repo->repoid . "</small>";
+        }
 
         // check repo
         $ms = new MessageSet;
@@ -330,8 +332,8 @@ class ContactView {
                     $prepo_url = "";
                 }
                 $your_partner = "your partner’s";
-                if ($Me->isPC) {
-                    $your_partner = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $Me->user_linkpart($partner))) . '">' . $your_partner . '</a>';
+                if ($info->viewer->isPC) {
+                    $your_partner = '<a href="' . hoturl("pset", array("pset" => $pset->urlkey, "u" => $info->viewer->user_linkpart($partner))) . '">' . $your_partner . '</a>';
                 }
                 $ms->error_at("partner", "This repository differs from $your_partner$prepo_url.");
             }
@@ -349,7 +351,7 @@ class ContactView {
             $notes[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for us to grade and harder for you to get pset updates."];
         }
         if (!$repo) {
-            $repoclasses = RepositorySite::site_classes($Conf);
+            $repoclasses = RepositorySite::site_classes($info->conf);
             $x = commajoin(array_map(function ($k) { return Ht::link($k::global_friendly_siteclass(), $k::global_friendly_siteurl()); }, $repoclasses), "or");
             if ($editable) {
                 $notes[] = array(false, "Enter your $x repository URL here.");
@@ -358,7 +360,7 @@ class ContactView {
 
         // edit
         if ($editable) {
-            echo Ht::form($Conf->selfurl(null, ["set_repo" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
+            echo Ht::form($info->conf->selfurl(null, ["set_repo" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 '<div class="f-contain">';
         }
         self::echo_group($title, $value, $notes);
@@ -374,10 +376,10 @@ class ContactView {
     }
 
     static function echo_branch_group(PsetView $info) {
-        global $Conf, $Me, $Qreq;
+        global $Qreq;
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
-        $editable = $Me->can_set_repo($pset, $user) && !$user->is_anonymous;
+        $editable = $info->viewer->can_set_repo($pset, $user) && !$user->is_anonymous;
         $branch = $user->branch($pset);
 
         if ($editable) {
@@ -398,7 +400,7 @@ class ContactView {
 
         // edit
         if ($editable) {
-            echo Ht::form($Conf->selfurl(null, ["set_branch" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
+            echo Ht::form($info->conf->selfurl(null, ["set_branch" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
                 '<div class="f-contain">';
         }
         self::echo_group("branch", $value, []);
@@ -408,7 +410,7 @@ class ContactView {
     }
 
     static function echo_downloads_group(PsetView $info) {
-        global $Conf, $Me, $Qreq;
+        global $Qreq;
         $n = 0;
         foreach ($info->pset->downloads as $dl) {
             if ($info->user == $info->viewer
@@ -574,116 +576,95 @@ class ContactView {
         }
     }
 
-    static function echo_repo_last_commit_group(PsetView $info, $commitgroup) {
-        global $Me;
-        list($user, $repo, $pset) = [$info->user, $info->repo, $info->pset];
-        if ($pset->gitless) {
-            return;
-        }
-        $branch = $user->branch($pset);
-
-        $snapc = $value = null;
-        if ($repo) {
-            $snapc = $info->commit();
-        } else if ($repo) {
-            if ($repo->snaphash && $branch === $info->conf->default_main_branch) {
-                $snapc = new CommitRecord($repo->snapcommitat, $repo->snaphash, $repo->snapcommitline);
-            } else if ($repo->snapat) {
-                $snapc = $repo->latest_commit($pset, $branch);
-            }
-        }
-        if ($repo && !$info->user_can_view_repo_contents()) {
-            $value = "(unconfirmed repository)";
-        } else if ($snapc) {
-            $value = substr($snapc->hash, 0, 7) . " " . htmlspecialchars($snapc->subject);
+    static private function unconfirmed_repository_note(PsetView $info) {
+        if ($info->user->is_anonymous) {
+            return [true, "ERROR: The user hasn’t confirmed that they can view this repository."];
         } else {
-            if (!$repo) {
-                $value = "(no repo yet)";
-            } else if (!$repo->snapat) {
-                $value = "(checking)";
-            } else if ($pset->directory_noslash !== "" && $repo->latest_commit(null, $branch)) {
-                $value = "(missing pset subdirectory)";
+            $uname = Text::analyze_name($info->user);
+            if ($uname->name && $uname->email) {
+                $uname = "$uname->name <$uname->email>";
+            } else if ($uname->email) {
+                $uname = "Your Name <$uname->email>";
+            } else if ($uname->name) {
+                $uname = "$uname->name <youremail@example.com>";
             } else {
-                $value = "(no such branch)";
+                $uname = "Your Name <youremail@example.com>";
             }
-        }
-
-        $notes = array();
-        if ($repo && $info->can_view_repo_contents() && $repo->snapat) {
-            $n = "";
-            if ($snapc) {
-                $n = "committed " . ago($snapc->commitat) . ", ";
-                if ($commitgroup && ($lh = self::late_hour_note($info))) {
-                    $n .= "{$lh}, ";
-                }
-            }
-            $n .= "fetched " . ago($repo->snapat) . ", last checked " . ago($repo->snapcheckat);
-            if ($Me->privChair) {
-                $n .= " <small style=\"padding-left:1em;font-size:70%\">group " . $repo->cacheid . ", repo" . $repo->repoid . "</small>";
-            }
-            $notes[] = $n;
-        }
-        if ($repo && !$info->user_can_view_repo_contents()) {
-            if ($user->is_anonymous) {
-                $notes[] = array(true, "ERROR: The user hasn’t confirmed that they can view this repository.");
-            } else {
-                $uname = Text::analyze_name($user);
-                if ($uname->name && $uname->email) {
-                    $uname = "$uname->name <$uname->email>";
-                } else if ($uname->email) {
-                    $uname = "Your Name <$uname->email>";
-                } else if ($uname->name) {
-                    $uname = "$uname->name <youremail@example.com>";
-                } else {
-                    $uname = "Your Name <youremail@example.com>";
-                }
-                $uname = addcslashes($uname, "\\\"\`\$!");
-                $notes[] = array(true, "ERROR: We haven’t confirmed that you can view this repository.<br>
-    We only let you view repositories that you’ve committed to.<br>
-    Fix this error by making a commit from your course-related email address, " . htmlspecialchars($user->email) . ", and pushing that commit to the repository.<br>
-    For example, try these commands: <pre>git commit --allow-empty --author=\"" . htmlspecialchars($uname) . "\" -m \"Confirm repository\"\ngit push</pre>");
-            }
-            $commitgroup = true;
-        }
-
-        if ($commitgroup) {
-            echo "<div class=\"pa-commitcontainer\" data-pa-pset=\"", htmlspecialchars($info->pset->urlkey);
-            if ($snapc) {
-                echo "\" data-pa-commit=\"", $snapc->hash;
-            }
-            echo "\">";
-            Ht::stash_script("\$pa.checklatest()", "pa_checklatest");
-        }
-        self::echo_group("last commit", $value, $notes);
-        if ($commitgroup) {
-            echo "</div>";
+            $uname = addcslashes($uname, "\\\"\`\$!");
+            return [true, "ERROR: We haven’t confirmed that you can view this repository.<br>
+We only let you view repositories that you’ve committed to.<br>
+Fix this error by making a commit from your course-related email address, " . htmlspecialchars($info->user->email) . ", and pushing that commit to the repository.<br>
+For example, try these commands: <pre>git commit --allow-empty --author=\"" . htmlspecialchars($uname) . "\" -m \"Confirm repository\"\ngit push</pre>"];
         }
     }
 
-    static function echo_repo_grade_commit_group(PsetView $info) {
-        list($user, $repo) = array($info->user, $info->repo);
-        if ($info->pset->gitless_grades) {
+    static function echo_commit_groups(PsetView $info) {
+        $user = $info->user;
+        $repo = $info->repo;
+        $pset = $info->pset;
+        if ($pset->gitless) {
             return;
-        } else if (!$info->user_can_view_repo_contents()
-                   || !$info->grading_hash()) {
-            return self::echo_repo_last_commit_group($info, false);
-        }
-        // XXX should check can_view_grades here
-
-        $value = "";
-        if (($ginfo = $info->grading_commit())) {
-            $value = substr($ginfo->hash, 0, 7) . " " . htmlspecialchars($ginfo->subject);
         }
 
-        $notes = array();
-        if ($ginfo && $ginfo->commitat) {
-            $notes[] = "committed " . ago($ginfo->commitat);
+        echo '<div class="pa-commitcontainer" data-pa-pset="', $info->pset->urlkey;
+        if ($repo && $repo->snaphash && $info->can_view_repo_contents()) {
+            echo '" data-pa-checkhash="', $repo->snaphash;
         }
-        if (($t = self::late_hour_note($info))) {
-            $notes[] = $t;
+        echo '">';
+        $want_latest = false;
+
+        if (!$repo) {
+            $title = "latest commit";
+            $value = "(no configured repository)";
+        } else if (!$info->can_view_repo_contents()) {
+            $title = $info->grading_hash() ? "grading commit" : "latest commit";
+            $value = "(unconfirmed repository)";
+            $notes[] = self::unconfirmed_repository_note($info);
+        } else {
+            $xnotes = [];
+            if ($info->grading_hash()) {
+                $title = "grading commit";
+                if (($c = $info->grading_commit())) {
+                    $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);
+                    $xnotes[] = "committed " . ago($c->commitat);
+                } else {
+                    $value = "(disconnected commit)";
+                }
+                $want_latest = !$info->is_latest_commit();
+            } else if (($c = $info->latest_commit())) {
+                $title = "latest commit";
+                $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);
+                $xnotes[] = "committed " . ago($c->commitat);
+            } else {
+                $title = "latest commit";
+                if (!$repo->snapat) {
+                    $value = "(checking)";
+                } else if ($pset->directory_noslash !== ""
+                           && $repo->latest_commit(null, $branch)) {
+                    $value = "(no commits yet for this pset)";
+                } else {
+                    $value = "(no such branch)";
+                }
+            }
+            if (($lh = self::late_hour_note($info))) {
+                $xnotes[] = $lh;
+            }
+            //$xnotes[] = "fetched " . ago($repo->snapat);
+            $xnotes[] = "last checked " . ago($repo->snapcheckat);
+            $notes[] = join(", ", $xnotes);
+            if ($info->user !== $info->viewer && !$info->user_can_view_repo_contents()) {
+                $notes[] = self::unconfirmed_repository_note($info);
+            }
         }
 
-        self::echo_group("grading commit", $value, array(join(", ", $notes)));
+        self::echo_group($title, $value, $notes);
+
+        if ($want_latest && ($c = $info->latest_commit())) {
+            $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);
+            self::echo_group("latest commit", $value, ["committed " . ago($c->commitat)]);
+        }
+
+        echo '</div>';
     }
 
     static function pset_grade($notesj, $pset) {

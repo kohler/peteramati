@@ -688,12 +688,9 @@ function show_home_pset(PsetView $info) {
     ContactView::echo_repo_group($info);
     if ($info->repo) {
         $info->repo->refresh(30);
+        Ht::stash_script("\$pa.checklatest(null)", "pa_checklatest");
     }
-    if ($info->grading_hash()) {
-        ContactView::echo_repo_grade_commit_group($info);
-    } else {
-        ContactView::echo_repo_last_commit_group($info, true);
-    }
+    ContactView::echo_commit_groups($info);
     if ($info->can_view_grades()
         && ($t = $info->grade_total()) !== null) {
         $t = "<strong>{$t}</strong>";

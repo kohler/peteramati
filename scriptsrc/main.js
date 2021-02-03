@@ -1186,22 +1186,35 @@ $(".pa-download-timed").each(function () {
 });
 
 
-function pa_checklatest() {
-    var start = (new Date).getTime(), timeout, pset, hash;
+function pa_checklatest(pset) {
+    var start = (new Date).getTime(), timeout;
 
     function checkdata(d) {
-        if (d && d.hash && d.hash !== hash && (!d.snaphash || d.snaphash !== hash)) {
-            $(".pa-commitcontainer .pa-pd").first().append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: d.hash}) + "\">Load them</a></div>");
-            clearTimeout(timeout);
+        if (d && d.commits) {
+            $(".pa-commitcontainer").each(function () {
+                var pset = this.getAttribute("data-pa-pset"),
+                    latesthash = this.getAttribute("data-pa-checkhash");
+                for (var c of d.commits) {
+                    if (c.pset == pset
+                        && c.hash
+                        && c.hash !== latesthash
+                        && c.snaphash !== latesthash) {
+                        $(this).find(".pa-pd").append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: c.hash}) + "\">Load them</a></div>");
+                        clearTimeout(timeout);
+                        break;
+                    }
+                }
+            });
         }
     }
 
     function docheck() {
-        var now = (new Date).getTime();
+        var now = (new Date).getTime(),
+            anyhash = $(".pa-commitcontainer[data-pa-checkhash]").length > 0;
         if (now - start <= 60000)
-            timeout = setTimeout(docheck, hash ? 10000 : 2000);
+            timeout = setTimeout(docheck, anyhash ? 10000 : 2000);
         else if (now - start <= 600000)
-            timeout = setTimeout(docheck, hash ? 20000 : 10000);
+            timeout = setTimeout(docheck, anyhash ? 20000 : 10000);
         else if (now - start <= 3600000)
             timeout = setTimeout(docheck, (now - start) * 1.25);
         else
@@ -1211,11 +1224,7 @@ function pa_checklatest() {
             });
     }
 
-    pset = $(".pa-commitcontainer").first().attr("data-pa-pset");
-    if (pset) {
-        hash = $(".pa-commitcontainer").first().attr("data-pa-commit");
-        setTimeout(docheck, 2000);
-    }
+    setTimeout(docheck, 2000);
 }
 
 function pa_pset_actions() {

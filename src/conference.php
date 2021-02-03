@@ -2564,7 +2564,7 @@ class Conf {
             "grade" => "3 Grade_API::grade",
             "gradestatistics" => "3 GradeStatistics_API::run",
             "jserror" => "1 JSError_API::jserror",
-            "latestcommit" => "3 Repo_API::latestcommit",
+            "latestcommit" => "1 Repo_API::latestcommit",
             "linenote" => "15 Grade_API::linenote",
             "multigrade" => "3 Grade_API::multigrade",
             "multiresolveflag" => "0 Flag_API::multiresolve",

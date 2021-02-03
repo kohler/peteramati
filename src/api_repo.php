@@ -5,27 +5,62 @@
 
 class Repo_API {
     static function latestcommit(Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$api->repo) {
-            return ["hash" => false];
+        if ($user->is_empty()) {
+            return ["ok" => false, "error" => "Permission denied"];
         }
+
+        if (!$api->pset) {
+            $apis = [];
+            foreach ($user->conf->psets() as $pset) {
+                if (!$pset->gitless && !$pset->disabled && $user->can_view_pset($pset)) {
+                    $apix = new APIData($api->user, $pset);
+                    $apix->repo = $api->user->repo($pset);
+                    $apix->branch = $api->user->branch($pset);
+                    $apis[] = $apix;
+                }
+            }
+        } else {
+            $apis = [$api];
+        }
+
         $fresh = 30;
         if ($qreq->fresh !== null && ctype_digit($qreq->fresh)) {
             $fresh = max((int) $qreq->fresh, 10);
         }
-        $api->repo->refresh($fresh, !!$qreq->sync);
-        $c = $api->repo->latest_commit($api->pset, $api->branch);
-        if (!$c) {
-            return ["hash" => false];
-        } else if (!$user->can_view_repo_contents($api->repo, $api->branch)) {
-            return ["hash" => false, "error" => "Unconfirmed repository."];
+
+        $repofreshes = [];
+        $commits = [];
+        foreach ($apis as $apix) {
+            $commits[] = self::latestcommit1($user, $apix, $fresh, !!$qreq->sync, $repofreshes);
+        }
+        return ["ok" => true, "commits" => $commits];
+    }
+
+    static private function latestcommit1(Contact $user, APIData $api, $fresh, $sync, &$repofreshes) {
+        $pset = $api->pset;
+        $repo = $api->repo;
+        if (!$repo) {
+            return ["pset" => $pset->urlkey, "hash" => false, "error" => "No repository configured."];
         } else {
-            return [
-                "hash" => $c->hash,
-                "subject" => $c->subject,
-                "commitat" => $c->commitat,
-                "snaphash" => $api->repo->snaphash,
-                "snapcheckat" => $api->repo->snapcheckat
-            ];
+            if (!isset($repofreshes[$repo->url])) {
+                $repo->refresh($fresh, $sync);
+                $repofreshes[$repo->url] = true;
+            }
+            $c = $repo->latest_commit($pset, $api->branch);
+            if (!$c) {
+                return ["pset" => $pset->urlkey, "hash" => false, "error" => "No commits."];
+            } else if (!$user->can_view_repo_contents($repo, $api->branch)) {
+                return ["pset" => $pset->urlkey, "hash" => false, "error" => "Unconfirmed repository."];
+            } else {
+                return [
+                    "pset" => $pset->urlkey,
+                    "hash" => $c->hash,
+                    "subject" => $c->subject,
+                    "commitat" => $c->commitat,
+                    "snaphash" => $repo->snaphash,
+                    "snapcheckat" => $repo->snapcheckat
+                ];
+            }
         }
     }
 
