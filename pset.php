@@ -651,7 +651,7 @@ if ($Pset->gitless) {
 
 } else if ($Info->repo && !$Info->can_view_repo_contents()) {
     echo_grade_cdf_here($Info);
-    ContactView::echo_commits_group($Info);
+    ContactView::echo_commit_groups($Info);
     echo_grader($Info);
     echo_all_grades($Info);
 
@@ -822,7 +822,7 @@ if ($Pset->gitless) {
     if ($Pset->gitless_grades) {
         echo_grade_cdf_here($Info);
     }
-    ContactView::echo_commits_group($Info);
+    ContactView::echo_commit_groups($Info);
     if ($Pset->gitless_grades) {
         echo_grader($Info);
         echo_all_grades($Info);
