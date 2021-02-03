@@ -25,7 +25,8 @@ GradeClass.add("select", {
         for (let opt of this.options) {
             w = Math.max(w, opt.length);
         }
-        return Math.max(GradeClass.basic_tcell_width(col), Math.floor(Math.min(w, 10) * 1.25) / 2);
+        return Math.max(GradeClass.basic_tcell_width.call(this, col),
+                        Math.floor(Math.min(w, 10) * 1.25) / 2);
     },
     justify: "left",
     sort: "forward",

@@ -66,6 +66,10 @@ export const GradeClass = {
         };
     },
 
+    basic_tcell_width: function () {
+        return 3;
+    },
+
     add: (name, x) => {
         x.type = name;
         x.type_tabular = x.type_tabular == null ? true : x.type_tabular;
