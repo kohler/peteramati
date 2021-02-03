@@ -52,7 +52,7 @@ class PsetView {
     private $_grades_suppressed;
 
     /** @var int */
-    private $_gtime = null;
+    private $_gtime;
     /** @var bool */
     private $_has_formula = false;
     /** @var ?list<mixed> */
@@ -798,6 +798,7 @@ class PsetView {
         $this->_upi->hasactiveflags = $hasactiveflags;
         $this->clear_can_view_grades();
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
+            $this->_gtime = null;
             $this->user->invalidate_grades($this->pset->id);
         }
     }
@@ -941,6 +942,7 @@ class PsetView {
         }
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
             $this->clear_can_view_grades();
+            $this->_gtime = null;
             if ($this->grading_hash() === $hash) {
                 $this->user->invalidate_grades($this->pset->id);
             }
