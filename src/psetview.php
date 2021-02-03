@@ -2150,7 +2150,7 @@ class PsetView {
             }
             if ($start_grade_range) {
                 $curanno->grade_first = $ala->grade_first;
-                echo '<div class="pa-dg pa-with-sidebar pa-grade-range-block"><div class="pa-sidebar"><div class="pa-gradebox pa-ps">';
+                echo '<div class="pa-dg pa-with-sidebar pa-grade-range-block" data-pa-landmark="a', $x[2], '"><div class="pa-sidebar"><div class="pa-gradebox pa-ps">';
                 foreach ($curanno->grade_first as $g) {
                     echo '<div class="need-pa-grade" data-pa-grade="', $g->key, '"';
                     if ($g->landmark_buttons) {

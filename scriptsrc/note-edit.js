@@ -10,6 +10,7 @@ import { text_eq } from "./utils.js";
 import { Linediff } from "./diff.js";
 import { api_conditioner } from "./xhr.js";
 import { Note } from "./note.js";
+import { GradeEntry } from "./gradeentry.js";
 
 
 let curline, down_event, scrolled_x, scrolled_y, scrolled_at;
@@ -173,7 +174,7 @@ function resolve_grade_range(grb) {
     } else {
         grb.removeAttribute("data-pa-notes-outstanding");
         $(grb).find(".pa-grade").each(function () {
-            pa_compute_landmark_range_grade.call(this, null, true);
+            GradeEntry.closest(this).save_landmark_grade(grb);
         });
     }
 }

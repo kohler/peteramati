@@ -263,10 +263,12 @@ export class Linediff {
     static get ANYFILE() {
         return ANYFILE;
     }
+
     static* all(t, flags) {
         if (t instanceof Linediff) {
             t = t.element;
         }
+        flags = flags || 0;
         let p = t.parentElement;
         const direction = flags & BACKWARD ? "previousSibling" : "nextSibling";
         while (true) {
@@ -289,6 +291,38 @@ export class Linediff {
                     yield new Linediff(t);
                 }
                 t = t[direction];
+            }
+        }
+    }
+
+    static* range(t, lo, hi, selector) {
+        let linea = -1, lineb = -1;
+        for (let ln of Linediff.all(t)) {
+            const e = ln.element;
+            if (!hasClass(e, "pa-dlr")) {
+                const c = e.firstChild;
+                if (hasClass(c, "pa-da")) {
+                    if (c.hasAttribute("data-landmark")) {
+                        linea = +c.getAttribute("data-landmark");
+                    }
+                    if (c.nextSibling.hasAttribute("data-landmark")) {
+                        lineb = +c.getAttribute("data-landmark");
+                    }
+                } else if (e.hasAttribute("data-landmark")) {
+                    const lm = e.getAttribute("data-landmark");
+                    if (lm.charAt(0) === "a") {
+                        linea = +lm.substring(1);
+                    } else {
+                        lineb = +lm.substring(1);
+                    }
+                }
+                if (linea > hi) {
+                    break;
+                } else if (linea >= lo && (!selector || e.matches(selector))) {
+                    ln.linea = linea;
+                    ln.lineb = lineb;
+                    yield ln;
+                }
             }
         }
     }

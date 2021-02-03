@@ -4,7 +4,8 @@
 
 import { escape_entities, html_id_encode } from "./encoders.js";
 import { hasClass, toggleClass } from "./ui.js";
-import { Filediff } from "./diff.js";
+import { Filediff, Linediff } from "./diff.js";
+import { Note } from "./note.js";
 import { GradeClass } from "./gc.js";
 import { render_ftext } from "./render.js";
 
@@ -220,6 +221,89 @@ export class GradeEntry {
 
     tcell(g) {
         return this.gc.tcell.call(this, g);
+    }
+
+    landmark_lines(t, selector) {
+        const m = (this.landmark_range ? /:(\d+):(\d+)$/.exec(this.landmark_range) : null);
+        if (!m) {
+            throw new Error("bad landmark_lines");
+        }
+        const lo = +m[1];
+        let fd = t instanceof Linediff ? t.element : t, lm;
+        while (!hasClass(fd, "pa-filediff")
+               && (!(lm = fd.getAttribute("data-pa-landmark"))
+                   || lm.charAt(0) !== "a"
+                   || parseInt(lm.substring(1)) > lo)) {
+            fd = fd.parentElement;
+        }
+        return Linediff.range(fd, +m[1], +m[2], selector);
+    }
+
+    landmark_grade(t) {
+        let sum = null;
+
+        for (let ln of this.landmark_lines(t, ".pa-gw")) {
+            const note = Note.at(ln.element);
+            let m, gch;
+            if (note.text
+                && ((m = /^[\s❮→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text))
+                    || (m = /^[\s❮→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text)))) {
+                if (sum === null) {
+                    sum = 0.0;
+                }
+                sum += parseFloat(m[2]);
+                gch = escape_entities(this.title).concat(": ", escape_entities(m[1]), "<b>", escape_entities(m[2]), "</b>", escape_entities(m[3]));
+            }
+            let $nd = $(ln.element).find(".pa-note-gradecontrib");
+            if (!$nd.length && gch) {
+                $nd = $('<div class="pa-note-gradecontrib"></div>').insertBefore($(ln.element).find(".pa-note"));
+            }
+            gch ? $nd.html(gch) : $nd.remove();
+        }
+
+        if (this.round && sum != null) {
+            if (this.round === "up") {
+                sum = Math.ceil(sum);
+            } else if (this.round === "down") {
+                sum = Math.floor(sum);
+            } else {
+                sum = Math.round(sum);
+            }
+        }
+
+        let $gnv = $(t).find(".pa-notes-grade");
+        if (sum === null) {
+            $gnv.remove();
+        } else {
+            if (!$gnv.length) {
+                $gnv = $('<a class="uic uikd pa-notes-grade" href=""></a>');
+                let e = t.lastChild.firstChild;
+                while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
+                    e = e.nextSibling;
+                }
+                t.firstChild.nextSibling.insertBefore($gnv[0], e);
+            }
+            $gnv.text("Notes grade " + sum);
+        }
+
+        return sum;
+    }
+
+    save_landmark_grade(t) {
+        const sum = this.landmark_grade(t);
+
+        const gv = $(t).find(".pa-gradevalue")[0];
+        if (gv) {
+            const sumstr = sum === null ? "" : "" + sum,
+                gval = $(gv).val();
+            if (gval == gv.getAttribute("data-pa-notes-grade")
+                && sumstr != gval) {
+                $(gv).val(sumstr).change();
+            }
+            gv.setAttribute("data-pa-notes-grade", sumstr);
+        }
+
+        return sum;
     }
 
     static closest(elt) {

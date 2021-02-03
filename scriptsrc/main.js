@@ -705,7 +705,7 @@ function pa_resolve_grade() {
     gi.fill_dom_at($(this).find(".pa-grade")[0]);
     if (ge.landmark_range && this.closest(".pa-gradebox")) {
         // XXX maybe calling compute_landmark_range_grade too often
-        pa_compute_landmark_range_grade.call(this.firstChild, ge);
+        ge.landmark_grade(this.firstChild);
     }
     if (this.hasAttribute("data-pa-landmark-buttons")) {
         var lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
@@ -974,112 +974,6 @@ function pa_loadgrades() {
     if (drawgraph) {
         $(this).find(".pa-grgraph").trigger("redrawgraph");
     }
-}
-
-function pa_process_landmark_range(lnfirst, lnlast, func, selector) {
-    var lna = -1, lnb = -1, tr = this;
-    if (typeof lnfirst === "function") {
-        func = lnfirst;
-        selector = lnlast;
-        var ge = GradeEntry.closest(this),
-            m = ge && ge.landmark_range ? /:(\d+):(\d+)$/.exec(ge.landmark_range) : null;
-        if (!m || !(tr = tr.closest(".pa-filediff"))) {
-            return null;
-        }
-        lnfirst = +m[1];
-        lnlast = +m[2];
-    }
-    for (let ln of Linediff.all(tr)) {
-        const e = ln.element;
-        if (!hasClass(e, "pa-dlr")) {
-            const c = e.firstChild;
-            if (hasClass(c, "pa-da")) {
-                if (c.hasAttribute("data-landmark")) {
-                    lna = +c.getAttribute("data-landmark");
-                }
-                if (c.nextSibling.hasAttribute("data-landmark")) {
-                    lnb = +c.getAttribute("data-landmark");
-                }
-            } else if (e.hasAttribute("data-landmark")) {
-                const lm = e.getAttribute("data-landmark");
-                if (lm.charAt(0) === "a") {
-                    lna = +lm.substring(1);
-                } else {
-                    lnb = +lm.substring(1);
-                }
-            }
-            if (lna >= lnfirst
-                && lna <= lnlast
-                && (!selector || e.matches(selector))) {
-                func.call(this, e, lna, lnb);
-            }
-        }
-    }
-}
-
-function pa_compute_landmark_range_grade(ge, allow_save) {
-    var gr = this.closest(".pa-grade"),
-        title = $(gr).find(".pa-pt").html(),
-        sum = null;
-    if (!ge) {
-        ge = GradeEntry.closest(gr);
-    }
-
-    pa_process_landmark_range.call(this, function (tr) {
-        var note = Note.at(tr), m, gch;
-        if (note.text
-            && ((m = /^[\s❮→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text))
-                || (m = /^[\s❮→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text)))) {
-            if (sum === null) {
-                sum = 0.0;
-            }
-            sum += parseFloat(m[2]);
-            gch = title + ": " + escape_entities(m[1]) + "<b>" + escape_entities(m[2]) + "</b>" + escape_entities(m[3]);
-        }
-        var $nd = $(tr).find(".pa-note-gradecontrib");
-        if (!$nd.length && gch) {
-            $nd = $('<div class="pa-note-gradecontrib"></div>').insertBefore($(tr).find(".pa-note"));
-        }
-        gch ? $nd.html(gch) : $nd.remove();
-    }, ".pa-gw");
-
-    if (ge.round && sum != null) {
-        if (ge.round === "up") {
-            sum = Math.ceil(sum);
-        } else if (ge.round === "down") {
-            sum = Math.floor(sum);
-        } else {
-            sum = Math.round(sum);
-        }
-    }
-
-    var $gnv = $(this).find(".pa-notes-grade");
-    if (sum === null) {
-        $gnv.remove();
-    } else {
-        if (!$gnv.length) {
-            $gnv = $('<a class="uic uikd pa-notes-grade" href=""></a>');
-            var e = this.lastChild.firstChild;
-            while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
-                e = e.nextSibling;
-            }
-            this.firstChild.nextSibling.insertBefore($gnv[0], e);
-        }
-        $gnv.text("Notes grade " + sum);
-    }
-
-    var gv = $(this).find(".pa-gradevalue")[0];
-    if (gv) {
-        var sums = sum === null ? "" : "" + sum, gval;
-        if (allow_save
-            && (gval = $(gv).val()) == gv.getAttribute("data-pa-notes-grade")
-            && sums != gval) {
-            $(gv).val(sums).change();
-        }
-        gv.setAttribute("data-pa-notes-grade", sums);
-    }
-
-    return sum;
 }
 
 handle_ui.on("pa-notes-grade", function (event) {
