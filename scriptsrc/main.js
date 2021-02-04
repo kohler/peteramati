@@ -2341,14 +2341,12 @@ handle_ui.on("js-multiresolveflag", function () {
 window.$pa = {
     beforeunload: pa_beforeunload,
     checklatest: pa_checklatest,
-    filediff_at: function (elt) {
-        if (typeof elt === "string") {
-            elt = document.getElementById(elt);
-        }
-        return elt && hasClass(elt, "pa-filediff") ? new Filediff(elt) : null;
-    },
+    filediff: Filediff.find,
+    gradeentry_closest: GradeEntry.closest,
     fold: fold,
     grgraph: grgraph,
+    note_near: Note.near,
+    on: handle_ui.on,
     onload: hotcrp_load,
     loadgrades: pa_loadgrades,
     load_runsettings: run_settings_load,
@@ -2356,5 +2354,6 @@ window.$pa = {
     render_text_page: render_text.on_page,
     render_pset_table: pa_render_pset_table,
     runmany: runmany61,
-    store_gradeinfo: GradeSheet.store
+    store_gradeinfo: GradeSheet.store,
+    text_eq: text_eq
 };

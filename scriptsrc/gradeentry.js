@@ -271,17 +271,21 @@ export class GradeEntry {
             }
         }
 
-        let $gnv = $(t).find(".pa-notes-grade");
+        const gh = t.closest(".pa-grade") || t.closest(".pa-grade-range-block");
+        let $gnv = $(gh).find(".pa-notes-grade");
         if (sum === null) {
             $gnv.remove();
         } else {
             if (!$gnv.length) {
-                $gnv = $('<a class="uic uikd pa-notes-grade" href=""></a>');
-                let e = t.lastChild.firstChild;
-                while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
-                    e = e.nextSibling;
-                }
-                t.firstChild.nextSibling.insertBefore($gnv[0], e);
+                const $gs = hasClass(gh, "pa-grade") ? $(gh) : $(gh).find(".pa-grade");
+                $gs.each(function () {
+                    let e = this.lastChild.firstChild;
+                    while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
+                        e = e.nextSibling;
+                    }
+                    this.lastChild.insertBefore($('<a class="uic uikd pa-notes-grade" href=""></a>')[0], e);
+                });
+                $gnv = $(gh).find(".pa-notes-grade");
             }
             $gnv.text("Notes grade " + sum);
         }

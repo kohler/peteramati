@@ -2111,7 +2111,7 @@ class PsetView {
             $this->need_format = false;
         }
         if (!$only_content && $hide_left && $dinfo->markdown) {
-            echo '<script>$pa.filediff_at("', $tabid, '").markdown()</script>';
+            echo '<script>$pa.filediff(document.getElementById("', $tabid, '")).markdown()</script>';
         }
     }
 

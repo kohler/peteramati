@@ -3,7 +3,11 @@
 // See LICENSE for open-source distribution terms
 
 import { hasClass, addClass, removeClass } from "./ui.js";
+import { escape_entities } from "./encoders.js";
+import { hoturl_gradeapi } from "./hoturl.js";
+import { api_conditioner } from "./xhr.js";
 import { render_text } from "./render.js";
+import { text_eq } from "./utils.js";
 import { Linediff } from "./diff.js";
 
 
@@ -17,17 +21,16 @@ export class Note {
         return this.text === "";
     }
 
-    store_at(elt) {
-        if (this.text === "" && this.version == null) {
-            elt.removeAttribute("data-pa-note");
-        } else if (this.text === "" && this.users == null) {
-            elt.setAttribute("data-pa-note", "" + this.version);
+    get file() {
+        const e = this.element || this.source;
+        return e.closest(".pa-filediff").getAttribute("data-pa-file");
+    }
+
+    get lineid() {
+        if (this.element) {
+            return this.element.getAttribute("data-landmark");
         } else {
-            const a = [this.iscomment, this.text];
-            if (this.users != null || this.version != null || this.format != null) {
-                a.push(this.users, this.version, this.format);
-            }
-            elt.setAttribute("data-pa-note", JSON.stringify(a));
+            return new Linediff(this.source).note_lineid;
         }
     }
 
@@ -36,16 +39,39 @@ export class Note {
         if (typeof x === "string" && x !== "") {
             x = JSON.parse(x);
         }
-        if (typeof x === "number") {
-            n.version = x;
-        } else if (Array.isArray(x)) {
-            n.iscomment = x[0];
-            n.text = x[1];
-            n.users = x[2] || null;
-            n.version = (x[3] && typeof x[3] === "number" ? x[3] : null);
-            n.format = (x[4] && typeof x[4] === "number" ? x[4] : null);
-        }
+        n.assign(x);
         return n;
+    }
+
+    assign(x) {
+        if (typeof x === "number") {
+            this.iscomment = false;
+            this.text = "";
+            this.users = null;
+            this.version = x;
+            this.format = null;
+        } else if (Array.isArray(x)) {
+            this.iscomment = x[0];
+            this.text = x[1];
+            this.users = x[2] || null;
+            this.version = (x[3] && typeof x[3] === "number" ? x[3] : null);
+            this.format = (x[4] && typeof x[4] === "number" ? x[4] : null);
+        }
+
+        const elt = this.element;
+        if (elt) {
+            if (this.text === "" && this.version == null) {
+                elt.removeAttribute("data-pa-note");
+            } else if (this.text === "" && this.users == null) {
+                elt.setAttribute("data-pa-note", "" + this.version);
+            } else {
+                const a = [this.iscomment, this.text];
+                if (this.users != null || this.version != null || this.format != null) {
+                    a.push(this.users, this.version, this.format);
+                }
+                elt.setAttribute("data-pa-note", JSON.stringify(a));
+            }
+        }
     }
 
     static at(elt) {
@@ -54,31 +80,64 @@ export class Note {
         return n;
     }
 
-    static html_skeleton_near(elt) {
-        let ewalk = elt;
-        while (ewalk) {
-            if (ewalk.nodeType !== 1) {
-                ewalk = ewalk.nextSibling;
-            } else if (hasClass(ewalk, "pa-gw")) {
-                return ewalk;
-            } else if (ewalk === elt || hasClass(ewalk, "pa-gn") || hasClass(ewalk, "pa-gx")) {
-                ewalk = ewalk.nextSibling;
+    static closest(elt) {
+        const e = elt.closest(".pa-dl");
+        return e ? Note.at(e) : null;
+    }
+
+    static near(t) {
+        if (t instanceof Linediff) {
+            t = t.element;
+        }
+        let e = t;
+        while (e) {
+            if (e.nodeType !== 1) {
+                e = e.nextSibling;
+            } else if (hasClass(e, "pa-gw")) {
+                return Note.at(e);
+            } else if (e === t || hasClass(e, "pa-gn") || hasClass(e, "pa-gx")) {
+                e = e.nextSibling;
             } else {
                 break;
             }
         }
-        const source = new Linediff(elt),
-            lineid = source.note_lineid,
-            insertion = source.upper_bound(lineid),
-            tr = $('<div class="pa-dl pa-gw" data-landmark="'.concat(lineid, '"><div class="pa-notebox"></div></div>'))[0];
-        elt.parentElement.insertBefore(tr, insertion ? insertion.element : null);
-        return tr;
+        const n = new Note();
+        n.source = t;
+        return n;
     }
 
-    html_near(elt, transition) {
-        var tr = Note.html_skeleton_near(elt), $tr = $(tr);
-        this.store_at(tr);
-        var $td = $tr.find(".pa-notebox"), $content = $td.children();
+    force_element() {
+        if (!this.element) {
+            const source = new Linediff(this.source),
+                lineid = source.note_lineid,
+                insertion = source.upper_bound(lineid);
+            this.element = $('<div class="pa-dl pa-gw" data-landmark="'.concat(lineid, '"><div class="pa-notebox"></div></div>'))[0];
+            this.source.parentElement.insertBefore(this.element, insertion ? insertion.element : null);
+        }
+        return this.element;
+    }
+
+    cancel_edit() {
+        if (this.element && hasClass(this.element, "editing")) {
+            $(this.element).find("textarea").val(this.text);
+        }
+        return this;
+    }
+
+    render(transition) {
+        this.force_element();
+
+        if (hasClass(this.element, "editing")) {
+            const $text = $(this.element).find("textarea");
+            if ($text.length && !text_eq(this.text, $text.val().replace(/\s+$/, ""))) {
+                return false;
+            }
+            removeClass(this.element, "editing");
+            $(this.element).find(":focus").blur();
+        }
+
+        var $td = $(this.element).find(".pa-notebox"),
+            $content = $td.children();
         if (transition) {
             $content.slideUp(80).queue(function () { $content.remove(); });
         } else {
@@ -86,13 +145,13 @@ export class Note {
         }
 
         if (this.text === "") {
-            fix_links_at(tr);
+            fix_links_at(this.element);
             if (transition) {
-                $tr.children().slideUp(80);
+                $(this.element).children().slideUp(80);
             } else {
-                addClass(tr, "hidden");
+                addClass(this.element, "hidden");
             }
-            return tr;
+            return true;
         }
 
         let t = '<div class="pa-notecontent clearfix">';
@@ -115,9 +174,9 @@ export class Note {
                 t += '<div class="pa-note-author">[' + authors.join(', ') + ']</div>';
             }
         }
-        t += '<div class="pa-dr pa-note pa-' + (this.iscomment ? 'comment' : 'grade') + 'note';
+        t = t.concat('<div class="pa-dr pa-note pa-', this.iscomment ? 'comment' : 'grade', 'note');
         if (this.format) {
-            t += '" data-format="' + this.format;
+            t = t.concat('" data-format="', this.format);
         }
         t += '"></div></div>';
         $td.append(t);
@@ -129,21 +188,72 @@ export class Note {
             $td.find(".pa-note").addClass("format" + (r.format || 0)).html(r.content);
         }
 
-        fix_links_at(tr);
-
+        fix_links_at(this.element);
         if (transition) {
             $td.find(".pa-notecontent").hide().slideDown(80);
         } else {
-            removeClass(tr, "hidden");
+            $td.show();
+            removeClass(this.element, "hidden");
         }
-        return tr;
+        return true;
     }
 
-    get file() {
-        return this.element.closest(".pa-filediff").getAttribute("data-pa-file");
-    }
-    get lineid() {
-        return this.element.getAttribute("data-landmark");
+    save(text, iscomment) {
+        if (this.element) {
+            if (hasClass(this.element, "pa-outstanding")) {
+                return Promise.reject(new Error("Outstanding request"));
+            }
+            addClass(this.element, "pa-outstanding");
+        }
+
+        const editing = this.element && hasClass(this.element, "editing"),
+            self = this,
+            tr = this.element || this.source,
+            fd = tr.closest(".pa-filediff"),
+            pi = fd.closest(".pa-psetinfo"),
+            grb = tr.closest(".pa-grade-range-block");
+
+        const data = {note: text};
+        if (iscomment) {
+            data.iscomment = 1;
+        }
+        data.format = this.format;
+        if (data.format == null) {
+            data.format = fd.getAttribute("data-default-format");
+        }
+
+        if (grb) {
+            grb.setAttribute("data-pa-notes-outstanding", +grb.getAttribute("data-pa-notes-outstanding") + 1);
+        }
+
+        return new Promise(function (resolve, reject) {
+            api_conditioner(
+                hoturl_gradeapi(pi, "=api/linenote", {
+                    file: self.file, line: self.lineid, oldversion: self.version || 0
+                }), data
+            ).then(function (data) {
+                self.element && removeClass(self.element, "pa-outstanding");
+                if (data && data.ok) {
+                    self.force_element();
+                    removeClass(self.element, "pa-save-failed");
+                    const nd = data.linenotes[self.file];
+                    self.assign(nd && nd[self.lineid]);
+                    self.render(editing);
+                    resolve(self);
+                } else {
+                    if (self.element) {
+                        addClass(self.element, "pa-save-failed");
+                    }
+                    if (editing) {
+                        $(self.element).find(".pa-save-message").html('<strong class="err">' + escape_entities(data.error || "Failed") + '</strong>');
+                    }
+                    reject(new Error(data.error || "Save failed"));
+                }
+                if (grb) {
+                    resolve_grade_range(grb);
+                }
+            });
+        });
     }
 }
 
@@ -187,5 +297,17 @@ function fix_links_at(tr) {
             set_link(trs[prevpos], Note.at(tr).empty() ? trs[nextpos] : tr);
         }
         set_link(tr, trs[nextpos]);
+    }
+}
+
+function resolve_grade_range(grb) {
+    var count = +grb.getAttribute("data-pa-notes-outstanding") - 1;
+    if (count) {
+        grb.setAttribute("data-pa-notes-outstanding", count);
+    } else {
+        grb.removeAttribute("data-pa-notes-outstanding");
+        $(grb).find(".pa-grade").each(function () {
+            $pa.gradeentry_closest(this).save_landmark_grade(grb);
+        });
     }
 }

@@ -8,9 +8,7 @@ import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { text_eq } from "./utils.js";
 import { Linediff } from "./diff.js";
-import { api_conditioner } from "./xhr.js";
 import { Note } from "./note.js";
-import { GradeEntry } from "./gradeentry.js";
 
 
 let curline, down_event, scrolled_x, scrolled_y, scrolled_at;
@@ -34,7 +32,6 @@ function locate(e) {
 
 function render_form($tr, note, transition) {
     $tr.removeClass("hidden").addClass("editing");
-    note && note.store_at($tr[0]);
     var $td = $tr.find(".pa-notebox");
     if (transition) {
         $tr.css("display", "").children().css("display", "");
@@ -63,11 +60,11 @@ function render_form($tr, note, transition) {
         $ta.text(note.text);
         $ta[0].setSelectionRange && $ta[0].setSelectionRange(note.text.length, note.text.length);
     }
-    $ta.autogrow().keydown(keydown);
+    $ta.autogrow().keydown(textarea_keydown);
     $form.find("input[name=iscomment]").prop("checked", !!(note && note.iscomment));
     $form.find("button[name=cancel]").click(cancel);
     $form.on("submit", function () {
-        pa_save_note.call(this.closest(".pa-dl"));
+        pa_save_my_note(this.closest(".pa-dl"));
     });
     if (transition) {
         $ta.focus();
@@ -146,111 +143,38 @@ function uncapture() {
     $(document).off(".pa-linenote");
 }
 
-function unedit(tr, always) {
-    tr = tr.closest(".pa-dl");
-    var note = Note.at(tr),
-        $text = tr ? $(tr).find("textarea") : null;
-    if (!tr
-        || (!always
-            && $text.length
-            && !text_eq(note.text, $text.val().replace(/\s+$/, "")))) {
-        return false;
-    } else {
-        removeClass(tr, "editing");
-        $(tr).find(":focus").blur();
-        note.html_near(tr, true);
-        let click_tr = curline ? curline.visible_source() : null;
-        if (click_tr) {
-            capture(click_tr.element, true);
-        }
-        return true;
-    }
+function unedit(note) {
+    const done = note.render(true),
+        ctr = curline && curline.visible_source();
+    ctr && capture(ctr.element, true);
+    return done;
 }
 
-function resolve_grade_range(grb) {
-    var count = +grb.getAttribute("data-pa-notes-outstanding") - 1;
-    if (count) {
-        grb.setAttribute("data-pa-notes-outstanding", count);
-    } else {
-        grb.removeAttribute("data-pa-notes-outstanding");
-        $(grb).find(".pa-grade").each(function () {
-            GradeEntry.closest(this).save_landmark_grade(grb);
-        });
-    }
-}
-
-function pa_save_note(text) {
-    if (!hasClass(this, "pa-gw")) {
-        throw new Error("bad `this` in pa_save_note");
-    }
-    if (hasClass(this, "pa-outstanding")) {
-        return false;
-    }
-    addClass(this, "pa-outstanding");
-
-    var self = this,
-        note = Note.at(this),
-        editing = hasClass(this, "editing"),
-        table = this.closest(".pa-filediff"),
-        pi = table.closest(".pa-psetinfo"),
-        grb = this.closest(".pa-grade-range-block"),
-        data;
-    if (text == null) {
-        let f = $(this).find("form")[0];
-        data = {note: f.note.value};
-        if (f.iscomment && f.iscomment.checked) {
-            data.iscomment = 1;
-        }
+function pa_save_my_note(elt) {
+    if (!hasClass(elt, "pa-gw")) {
+        throw new Error("bad `elt` in pa_save_my_note");
+    } else if (!hasClass(elt, "pa-outstanding")) {
+        const f = $(elt).find("form")[0],
+            text = f.elements.note.value,
+            iscomment = f.elements.iscomment && f.elements.iscomment.checked;
         $(f).find(".pa-save-message").remove();
         $(f).find(".aab").append('<div class="aabut pa-save-message">Saving…</div>');
-    } else {
-        if (typeof text === "function") {
-            text = text(note.text, note);
-        }
-        data = {note: text};
-    }
-    data.format = note.format;
-    if (data.format == null) {
-        data.format = table.getAttribute("data-default-format");
-    }
-
-    grb && grb.setAttribute("data-pa-notes-outstanding", +grb.getAttribute("data-pa-notes-outstanding") + 1);
-    return new Promise(function (resolve, reject) {
-        api_conditioner(
-            hoturl_gradeapi(pi, "=api/linenote", {
-                file: note.file, line: note.lineid, oldversion: note.version || 0
-            }), data
-        ).then(function (data) {
-            removeClass(self, "pa-outstanding");
-            if (data && data.ok) {
-                removeClass(self, "pa-save-failed");
-                const nd = data.linenotes[note.file],
-                    newnote = Note.parse(nd && nd[note.lineid]);
-                newnote.store_at(self);
-                if (editing) {
-                    $(self).find(".pa-save-message").html("Saved");
-                    unedit(self);
-                } else {
-                    newnote.html_near(self);
-                }
-                resolve(self);
-            } else {
-                addClass(self, "pa-save-failed");
-                editing && $(self).find(".pa-save-message").html('<strong class="err">' + escape_entities(data.error || "Failed") + '</strong>');
-                reject(self);
+        Note.at(elt).save(text, iscomment).then(() => {
+            const click_tr = curline ? curline.visible_source() : null;
+            if (click_tr) {
+                capture(click_tr.element, true);
             }
-            grb && resolve_grade_range(grb);
         });
-    });
+    }
 }
 
 function cancel() {
-    unedit(this, true);
+    unedit(Note.closest(this).cancel_edit());
     return true;
 }
 
-function keydown(evt) {
-    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(this)) {
+function textarea_keydown(evt) {
+    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(Note.closest(this))) {
         return false;
     } else if (event_key(evt) === "Enter" && event_modkey(evt) === event_modkey.META) {
         $(this).closest("form").submit();
@@ -304,19 +228,19 @@ function pa_linenote(event) {
 }
 
 function make_linenote(event) {
-    let $tr = $(Note.html_skeleton_near(curline.element));
+    const note = Note.near(curline), tr = note.force_element();
     set_scrolled_at(event);
-    if ($tr.hasClass("editing")) {
-        if (unedit($tr[0])) {
+    if (hasClass(tr, "editing")) {
+        if (unedit(note)) {
             event && event.stopPropagation();
             return true;
         } else {
-            var $ta = $tr.find("textarea").focus();
+            var $ta = $(tr).find("textarea").focus();
             $ta[0].setSelectionRange && $ta[0].setSelectionRange(0, $ta.val().length);
             return false;
         }
     } else {
-        render_form($tr, Note.at($tr[0]), true);
+        render_form($(tr), note, true);
         capture(curline.element, false);
         return false;
     }
