@@ -430,7 +430,14 @@ export function run(button, opts) {
         if (data.data && data.offset < offset) {
             data.data = data.data.substring(offset - data.offset);
         }
+        // Stay on alternate screen at end of display
+        if (data.data
+            && data.done
+            && (x = data.data.match(/\x1b\[\?1049l(?:[\r\n]|\x1b\[\?1l|\x1b>)*/))) {
+            data.data = data.data.substring(0, data.data.length - x[0].length);
+        }
         if (data.data) {
+            // Stay on alternate screen at end of display
             offset = data.lastoffset;
             if (data.done && data.time_data != null && ibuffer === "") {
                 // Parse timing data

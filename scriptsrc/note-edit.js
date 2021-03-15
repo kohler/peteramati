@@ -6,7 +6,6 @@ import { escape_entities } from "./encoders.js";
 import { hoturl_gradeapi } from "./hoturl.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
-import { text_eq } from "./utils.js";
 import { Linediff } from "./diff.js";
 import { Note } from "./note.js";
 

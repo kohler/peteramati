@@ -15,7 +15,7 @@ import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
 import { tooltip } from "./tooltip.js";
 import "./pset.js";
-import { Filediff, Linediff } from "./diff.js";
+import { Filediff } from "./diff.js";
 import "./diff-markdown.js";
 import { Note } from "./note.js";
 import "./note-edit.js";
