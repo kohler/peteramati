@@ -304,7 +304,6 @@ class RunnerState {
             }
             $json->data = $data;
             $json->offset = max($offset, 0);
-            $json->lastoffset = $json->offset + strlen($data);
         }
         return $json;
     }

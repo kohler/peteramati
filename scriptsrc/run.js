@@ -429,6 +429,7 @@ export function run(button, opts) {
         checkt = checkt || data.timestamp;
         if (data.data && data.offset < offset) {
             data.data = data.data.substring(offset - data.offset);
+            data.offset = offset;
         }
         // Stay on alternate screen when done (rather than clearing it)
         if (data.data
@@ -437,7 +438,7 @@ export function run(button, opts) {
             data.data = data.data.substring(0, data.data.length - x[0].length);
         }
         if (data.data != null) {
-            offset = data.lastoffset;
+            offset = data.offset + data.length;
             if (data.done && data.time_data != null && ibuffer === "") {
                 // Parse timing data
                 append_timed(data);
