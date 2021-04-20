@@ -438,7 +438,7 @@ export function run(button, opts) {
             data.data = data.data.substring(0, data.data.length - x[0].length);
         }
         if (data.data != null) {
-            offset = data.offset + data.length;
+            offset = data.offset + data.data.length;
             if (data.done && data.time_data != null && ibuffer === "") {
                 // Parse timing data
                 append_timed(data);
