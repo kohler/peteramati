@@ -1826,10 +1826,9 @@ class PsetView {
         }
     }
 
-    /** @param CommitRecord $commita
-     * @param CommitRecord $commitb
-     * @return array<string,DiffInfo> */
-    function diff($commita, $commitb, LineNotesOrder $lnorder = null, $args = []) {
+    /** @return array<string,DiffInfo> */
+    function diff(CommitRecord $commita, CommitRecord $commitb,
+                  LineNotesOrder $lnorder = null, $args = []) {
         if (!$this->added_diffinfo) {
             if (($tw = $this->commit_jnote("tabwidth"))) {
                 $this->pset->add_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 101.0));

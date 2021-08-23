@@ -735,12 +735,15 @@ if ($Pset->gitless) {
 
     // collect diff and sort line notes
     $lnorder = $Info->viewable_line_notes();
-    $diff = $Info->diff($Info->base_handout_commit(), $Info->commit(), $lnorder, [
-        "wdiff" => !!$Info->commit_jnote("wdiff")
-    ]);
+    if ($Info->commit()) {
+        $diff = $Info->diff($Info->base_handout_commit(), $Info->commit(),
+            $lnorder, ["wdiff" => !!$Info->commit_jnote("wdiff")]);
+    } else {
+        $diff = [];
+    }
 
     // print line notes
-    $notelinks = array();
+    $notelinks = [];
     foreach ($lnorder->seq() as $note) {
         if (!$note->is_empty()) {
             $notelinks[] = $note->render_line_link_html($Pset);
