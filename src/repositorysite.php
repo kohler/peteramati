@@ -106,10 +106,8 @@ class RepositorySite {
         $output = [];
         if (self::disabled_remote_error($conf) < 0) {
             return -1;
-        } else if (!$clientid || !$token) {
+        } else if (!$clientid || !$token || $token === Conf::INVALID_TOKEN) {
             return self::chair_error("Missing OAuth client ID and/or token.");
-        } else if (!preg_match('/\A[A-Za-z0-9_.]+\z/', $token)) {
-            return self::chair_error("Bad OAuth token.");
         }
         putenv("GIT_USERNAME=$clientid");
         putenv("GIT_PASSWORD=$token");

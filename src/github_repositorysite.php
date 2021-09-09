@@ -267,7 +267,8 @@ class GitHub_RepositorySite extends RepositorySite {
     }
     function validate_working(MessageSet $ms = null) {
         $status = RepositorySite::run_remote_oauth($this->conf,
-            $this->conf->opt("githubOAuthClientId"), $this->conf->opt("githubOAuthToken"),
+            $this->conf->opt("githubOAuthClientId"),
+            $this->conf->opt("githubOAuthToken"),
             "ls-remote " . escapeshellarg($this->https_url()) . " 2>&1",
             $output);
         $answer = join("\n", $output);
@@ -287,7 +288,7 @@ class GitHub_RepositorySite extends RepositorySite {
     function gitfetch($repoid, $cacheid, $foreground) {
         if (!($id = $this->conf->opt("githubOAuthClientId"))
             || !($token = $this->conf->opt("githubOAuthToken"))
-            || !ctype_alnum($token)) {
+            || $token === Conf::INVALID_TOKEN) {
             return false;
         }
         putenv("GIT_USERNAME=$id");

@@ -164,6 +164,8 @@ class Conf {
 
     static public $hoturl_defaults = null;
 
+    const INVALID_TOKEN = "INVALID";
+
     function __construct($options, $make_dsn) {
         // unpack dsn, connect to database, load current settings
         if ($make_dsn && ($this->dsn = Dbl::make_dsn($options))) {
@@ -409,6 +411,12 @@ class Conf {
         }
         if (in_array("harvardseas", $this->_repository_site_classes)) {
             $this->_username_classes |= self::USERNAME_HARVARDSEAS;
+        }
+
+        // check tokens
+        if (isset($this->opt["githubOAuthToken"])
+            && !preg_match('/\A[-a-zA-Z0-9_.]+\z/', $this->opt["githubOAuthToken"])) {
+            $this->opt["githubOAuthToken"] = self::INVALID_TOKEN;
         }
 
         $sort_by_last = !!($this->opt["sortByLastName"] ?? false);
