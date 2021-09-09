@@ -38,6 +38,7 @@ class Repository {
 
     /** @var bool */
     public $is_handout = false;
+    /** @var array<int,bool> */
     public $viewable_by = [];
     public $_truncated_hashes = [];
     public $_truncated_psetdir = [];

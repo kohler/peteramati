@@ -70,7 +70,6 @@ class Contact {
 
     public $visited = false;
     public $incomplete = false;
-    public $viewable_by;
 
     /** @var ?array<int,array<int,list<int>>> */
     private $links;
@@ -1431,13 +1430,12 @@ class Contact {
             || $repo->is_handout) {
             return true;
         }
-        $allowed = get($repo->viewable_by, $this->contactId);
+        $allowed = $repo->viewable_by[$this->contactId] ?? null;
         if ($allowed === null) {
             $allowed = in_array($repo->repoid, $this->links(LINK_REPOVIEW));
             if (!$allowed && $cached) {
                 return false;
-            }
-            if (!$allowed) {
+            } else if (!$allowed) {
                 $users = $repo->author_emails();
                 $allowed = isset($users[strtolower($this->email)]);
                 if (!$allowed && $branch && $branch !== $this->conf->default_main_branch) {
