@@ -99,12 +99,11 @@ class RepositorySite {
     /** @return int */
     static function run_remote_oauth(Conf $conf, $clientid, $token,
                                      $gitcommand, &$output) {
-        global $Me;
         if (self::disabled_remote_error($conf) < 0) {
             return -1;
         } else if (!$clientid || !$token) {
             return self::chair_error("Missing OAuth client ID and/or token.");
-        } else if (!ctype_alnum($token)) {
+        } else if (!preg_match('/\A[A-Za-z0-9_.]+\z/', $token)) {
             return self::chair_error("Bad OAuth token.");
         }
         putenv("GIT_USERNAME=$clientid");
