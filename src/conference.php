@@ -2464,7 +2464,7 @@ class Conf {
             $this->_branch_map = [0 => "master", 1 => "main"];
             $result = $this->qe("select branchid, branch from Branch");
             while (($row = $result->fetch_row())) {
-                $this->_branch_map[+$row[0]] = $row[1];
+                $this->_branch_map[(int) $row[0]] = $row[1];
             }
             Dbl::free($result);
         }
@@ -2472,7 +2472,13 @@ class Conf {
     }
 
     function branch($branchid) {
-        return ($this->branch_map())[$branchid ?? 0] ?? null;
+        if (($branchid ?? 0) === 0) {
+            return "master";
+        } else if ($branchid === 1) {
+            return "main";
+        } else {
+            return ($this->branch_map())[$branchid] ?? null;
+        }
     }
 
     function clear_branch_map() {

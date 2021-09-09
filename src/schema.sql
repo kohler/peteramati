@@ -27,7 +27,7 @@ CREATE TABLE `Branch` (
   `branch` varbinary(255) NOT NULL,
   PRIMARY KEY (`branchid`),
   UNIQUE KEY `branch` (`branch`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8;
 
 
 
