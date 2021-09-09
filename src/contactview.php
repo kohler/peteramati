@@ -384,7 +384,12 @@ class ContactView {
         $branch = $user->branch($pset);
 
         if ($editable) {
-            $xvalue = $branch === $pset->main_branch ? null : $branch;
+            if ((!$repo && !$user->has_branch($pset))
+                || $branch === $pset->main_branch) {
+                $xvalue = null;
+            } else {
+                $xvalue = $branch;
+            }
             $js = ["style" => "width:32em", "placeholder" => $pset->main_branch];
             if (isset($Qreq->set_branch)
                 && $Qreq->pset === $pset->urlkey

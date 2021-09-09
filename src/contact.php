@@ -664,13 +664,29 @@ class Contact {
         return $this->links[$type][$pset] ?? [];
     }
 
+    /** @return bool */
+    function has_branch(Pset $pset) {
+        if ($pset->no_branch) {
+            return false;
+        } else {
+            if ($this->links === null) {
+                $this->load_links();
+            }
+            return isset($this->links[LINK_BRANCH][$pset->id]);
+        }
+    }
+
     /** @return int */
     function branchid(Pset $pset) {
-        if ($this->links === null) {
-            $this->load_links();
+        if ($pset->no_branch) {
+            return 0;
+        } else {
+            if ($this->links === null) {
+                $this->load_links();
+            }
+            $l = $this->links[LINK_BRANCH][$pset->id] ?? null;
+            return $l !== null && count($l) === 1 ? $l[0] : 0;
         }
-        $l = $this->links[LINK_BRANCH][$pset->id] ?? null;
-        return $l !== null && count($l) === 1 && !$pset->no_branch ? $l[0] : 0;
     }
 
     /** @return string */
