@@ -782,17 +782,21 @@ class Contact {
         return $this->repos[$pset];
     }
 
-    /** @param int $pset
-     * @param ?Repository $repo
+    /** @param ?Repository $repo
      * @return bool */
-    function set_repo($pset, $repo) {
-        $pset = is_object($pset) ? $pset->psetid : $pset;
+    function set_repo(Pset $pset, $repo) {
         if ($repo) {
-            $this->set_link(LINK_REPO, $pset, $repo->repoid);
+            $this->set_link(LINK_REPO, $pset->id, $repo->repoid);
         } else {
-            $this->clear_links(LINK_REPO, $pset);
+            $this->clear_links(LINK_REPO, $pset->id);
         }
-        $this->repos[$pset] = $repo;
+        $this->repos[$pset->id] = $repo;
+        if ($repo
+            && !$pset->no_branch
+            && $pset->main_branch !== "master"
+            && !$this->has_branch($pset)) {
+            $this->set_link(LINK_BRANCH, $pset->id, $this->conf->ensure_branch($pset->main_branch));
+        }
         return true;
     }
 

@@ -475,7 +475,7 @@ class ContactView {
         // clean up repo url
         $repo_url = trim($qreq->repo);
         if ($repo_url === "") {
-            $user->set_repo($pset->id, null);
+            $user->set_repo($pset, null);
             redirectSelf();
         }
 
@@ -521,7 +521,7 @@ class ContactView {
                 if ($repo) {
                     $repo->check_open();
                 }
-                if ($user->set_repo($pset->id, $repo)) {
+                if ($user->set_repo($pset, $repo)) {
                     redirectSelf();
                 }
                 return;
@@ -618,6 +618,7 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
         }
         echo '">';
         $want_latest = false;
+        $notes = [];
 
         if (!$repo) {
             $title = "latest commit";

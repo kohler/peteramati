@@ -263,7 +263,7 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         $hiddengrades = 0;
     } else if ($qreq->action === "clearrepo") {
         foreach (qreq_users($qreq) as $user) {
-            $user->set_repo($pset->id, null);
+            $user->set_repo($pset, null);
             $user->clear_links(LINK_BRANCH, $pset->id);
         }
     } else if ($qreq->action === "copyrepo") {
@@ -271,7 +271,7 @@ function doaction(Contact $viewer, Qrequest $qreq) {
             foreach (qreq_users($qreq) as $user) {
                 if (!$user->repo($pset->id)
                     && ($r = $user->repo($old_pset->id))) {
-                    $user->set_repo($pset->id, $r);
+                    $user->set_repo($pset, $r);
                     if (($b = $user->branchid($old_pset)))
                         $user->set_link(LINK_BRANCH, $pset->id, $b);
                 }
