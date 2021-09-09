@@ -560,7 +560,10 @@ class ContactView {
         }
 
         $branchid = $user->conf->ensure_branch($branch);
-        if ($branchid === null || $branchid === 0) {
+        if ($branchid === null
+            || ($branchid === 0
+                && ($pset->main_branch === "master"
+                    || $user->repo($pset)))) {
             $user->clear_links(LINK_BRANCH, $pset->id);
         } else {
             $user->set_link(LINK_BRANCH, $pset->id, $branchid);
