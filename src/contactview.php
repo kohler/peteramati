@@ -269,8 +269,9 @@ class ContactView {
 
     static function echo_repo_group(PsetView $info, $full = false) {
         global $Qreq;
-        if ($info->pset->gitless)
+        if ($info->pset->gitless) {
             return;
+        }
         list($user, $pset, $partner, $repo) =
             array($info->user, $info->pset, $info->partner, $info->repo);
         $editable = $info->viewer->can_set_repo($pset, $user) && !$user->is_anonymous;

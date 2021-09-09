@@ -96,9 +96,14 @@ class RepositorySite {
             return 0;
         }
     }
-    /** @return int */
+    /** @param string $clientid
+     * @param string $token
+     * @param string $gitcommand
+     * @param list<string> &$output
+     * @return int */
     static function run_remote_oauth(Conf $conf, $clientid, $token,
                                      $gitcommand, &$output) {
+        $output = [];
         if (self::disabled_remote_error($conf) < 0) {
             return -1;
         } else if (!$clientid || !$token) {
