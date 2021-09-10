@@ -3,7 +3,7 @@
 // Peteramati is Copyright (c) 2013-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-class CommitRecord {
+class CommitRecord implements JsonSerializable {
     /** @var int */
     public $commitat;
     /** @var non-empty-string */
@@ -44,5 +44,8 @@ class CommitRecord {
         } else {
             return in_array($dir, $this->directory);
         }
+    }
+    function jsonSerialize() {
+        return $this->hash;
     }
 }
