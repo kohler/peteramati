@@ -343,10 +343,10 @@ class Repository {
     /** @param array<string,CommitRecord> &$list
      * @param ?string $head */
     private function load_commits_from_head(&$list, $head) {
-        $s = $this->gitrun("git log --simplify-merges --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
+        $s = $this->gitrun("git log --simplify-merges -c --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
         if ($s === "") {
             $this->refresh(30, true);
-            $s = $this->gitrun("git log --simplify-merges --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
+            $s = $this->gitrun("git log --simplify-merges -c --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
         }
         $p = 0;
         $l = strlen($s);
