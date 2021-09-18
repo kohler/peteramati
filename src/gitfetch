@@ -144,7 +144,7 @@ if test -f .git/FETCH_HEAD -a ! -w .git/FETCH_HEAD; then
     rm -f .git/FETCH_HEAD
 fi
 
-git -c credential.helper= -c credential.helper='!f () { echo username=$GIT_USERNAME; echo password=$GIT_PASSWORD; }; f' fetch repo$repoid
+git -c credential.helper= -c credential.helper='!f () { echo username=$GIT_USERNAME; echo password=$GIT_PASSWORD; }; f' fetch --prune repo$repoid
 gitfetch_status=$?
 
 now=`date -u '+%Y%m%d.%H%M%S<%s'`
