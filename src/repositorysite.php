@@ -4,6 +4,7 @@
 // See LICENSE for open-source distribution terms
 
 class RepositorySite {
+    /** @var string */
     public $url;
     public $siteclass;
     static public $sitemap = ["github" => "GitHub_RepositorySite", "harvardseas" => "HarvardSEAS_RepositorySite"];
@@ -17,6 +18,8 @@ class RepositorySite {
             return RepositorySite::$sitemap[$abbr];
         }, $conf->repository_site_classes());
     }
+    /** @param string $url
+     * @return RepositorySite */
     static function make($url, Conf $conf) {
         foreach (self::site_classes($conf) as $k) {
             if (($s = $k::make_url($url, $conf)))
@@ -24,6 +27,8 @@ class RepositorySite {
         }
         return new Bad_RepositorySite($url);
     }
+    /** @param string $url
+     * @return string */
     static function make_https_url($url, Conf $conf) {
         if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)([^/:]+(?::\d+)?)(?::/*|/+)(.*?)(?:\.git|)\z_i', $url, $m))
             return "https://" . $m[1] . "/" . $m[2];

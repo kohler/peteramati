@@ -11,6 +11,7 @@ class Repository {
     public $repoid;
     /** @var string */
     public $url;
+    /** @var RepositorySite */
     public $reposite;
     /** @var int */
     public $cacheid;
@@ -121,19 +122,25 @@ class Repository {
         return $repo;
     }
 
+    /** @return string */
     function https_url() {
         return $this->reposite->https_url();
     }
+    /** @return string */
     function ssh_url() {
         return $this->reposite->ssh_url();
     }
+    /** @return string */
     function friendly_url() {
         return $this->reposite->friendly_url();
     }
+    /** @return string */
     function friendly_url_like(Repository $other) {
-        if ($this->reposite->siteclass === $other->reposite->siteclass)
+        if ($this->reposite->siteclass === $other->reposite->siteclass) {
             return $this->reposite->friendly_url();
-        return $this->url;
+        } else {
+            return $this->url;
+        }
     }
 
     function expand_message($name, Contact $user) {

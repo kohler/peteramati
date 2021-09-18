@@ -18,6 +18,7 @@ class GitHubResponse implements JsonSerializable {
     public $response;
     /** @var ?object */
     public $rdata;
+
     function __construct($url) {
         $this->url = $url;
     }
@@ -78,7 +79,11 @@ class GitHubResponse implements JsonSerializable {
 class GitHub_RepositorySite extends RepositorySite {
     /** @var Conf */
     public $conf;
+    /** @var ?string */
     public $base;
+
+    /** @param string $url
+     * @param ?string $base */
     function __construct($url, $base, Conf $conf) {
         $this->url = $url;
         $this->base = $base;
@@ -218,15 +223,19 @@ class GitHub_RepositorySite extends RepositorySite {
         return "https://github.com/";
     }
 
+    /** @return string */
     function https_url() {
-        return "https://github.com/" . $this->base;
+        return "https://github.com/{$this->base}";
     }
+    /** @return string */
     function ssh_url() {
-        return "git@github.com:" . $this->base;
+        return "git@github.com:{$this->base}";
     }
+    /** @return string */
     function git_url() {
-        return "git://github.com/" . $this->base;
+        return "git://github.com/{$this->base}";
     }
+    /** @return string */
     function friendly_url() {
         return $this->base ? : $this->url;
     }
