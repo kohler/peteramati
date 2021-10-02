@@ -343,13 +343,14 @@ class Repository {
     /** @param array<string,CommitRecord> &$list
      * @param ?string $head */
     private function load_commits_from_head(&$list, $head) {
-        $s = $this->gitrun("git log --simplify-merges -c --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
+        $s = $this->gitrun("git log --simplify-merges -m --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
         if ($s === "") {
             $this->refresh(30, true);
-            $s = $this->gitrun("git log --simplify-merges -c --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
+            $s = $this->gitrun("git log --simplify-merges -m --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
         }
         $p = 0;
         $l = strlen($s);
+        $cr = $newcr = null;
         while ($p < $l && $s[$p] === "\0") {
             $p0 = $p + 1;
             if (($p = strpos($s, "\0", $p0)) === false) {
@@ -365,15 +366,20 @@ class Repository {
                     && strlen($hash) >= 40
                     && ctype_digit($time)
                     && ctype_xdigit($hash)) {
-                    if (($cr = $this->_commits[$hash] ?? null) === null) {
+                    if ($cr && $cr->hash === $hash) {
+                        // another branch of the merge commit
+                    } else if (($cr = $this->_commits[$hash] ?? null)) {
+                        // assume already completely populated
+                        $newcr = null;
+                        $list[$hash] = $cr;
+                    } else {
                         $subject = substr($s, $sp2 + 1, $nl - ($sp2 + 1));
                         /** @phan-suppress-next-line PhanTypeMismatchArgument */
-                        $cr = new CommitRecord((int) $time, $hash, $subject, $head);
-                        self::set_directory($cr, $s, $nl, $p);
-                        $this->_commits[$hash] = $cr;
+                        $newcr = new CommitRecord((int) $time, $hash, $subject, $head);
+                        $this->_commits[$hash] = $cr = $list[$hash] = $newcr;
                     }
-                    if (!isset($list[$hash])) {
-                        $list[$hash] = $cr;
+                    if ($newcr) {
+                        self::set_directory($cr, $s, $nl, $p);
                     }
                 }
             }
