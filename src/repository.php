@@ -529,7 +529,7 @@ class Repository {
         }
         $timematch = " ";
         if ($this->analyzedsnapat) {
-            $timematch = gmstrftime("%Y%m%d.%H%M%S", $this->analyzedsnapat);
+            $timematch = gmdate("Ymd.His", $this->analyzedsnapat);
         }
         $qv = [];
         $analyzed_snaptime = 0;
@@ -582,7 +582,7 @@ class Repository {
         Dbl::free($result);
         if ($match) {
             $list = [];
-            $this->load_commits_from_head($list, "repo{$this->repoid}.snap" . gmstrftime("%Y%m%d.%H%M%S", $match->snapshot));
+            $this->load_commits_from_head($list, "repo{$this->repoid}.snap" . gmdate("Ymd.His", $match->snapshot));
         }
         if (!array_key_exists($hash, $this->_commits)) {
             $this->_commits[$hash] = null;

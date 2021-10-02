@@ -33,12 +33,12 @@ class GradeAnomalies {
                     if (!$any_base) {
                         echo sprintf("\n%s %s\n%s %s %g+%g Grading commit\n",
                                      $pset->key, $u->email,
-                                     strftime("%Y-%m-%dT%H:%M", $ginfo->commitat()),
+                                     date("Y-m-d\\TH:i", $ginfo->commitat()),
                                      substr($ginfo->hash() ?? "--------", 0, 8), $tot0, $ex0);
                         $any_base = true;
                     }
                     echo sprintf("%s %s %g+%g %s commit\n",
-                                 strftime("%Y-%m-%dT%H:%M", $info->commitat()),
+                                 date("Y-m-d\\TH:i", $info->commitat()),
                                  substr($info->hash() ?? "--------", 0, 8), $tot1, $ex1,
                                  $info->commitat() > $ginfo->commitat() ? "Later" : "Earlier");
                 }

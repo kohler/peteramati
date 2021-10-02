@@ -46,6 +46,7 @@ class RunnerState {
     /** @var string */
     private $jailhomedir;
 
+    /** @var ?list<int> */
     private $_logged_checkts;
     /** @var ?list<RunOverlayConfig> */
     private $_overlay;
@@ -76,6 +77,8 @@ class RunnerState {
         }
     }
 
+    /** @param string $x
+     * @return string */
     function expand($x) {
         if (strpos($x, '${') !== false) {
             $x = str_replace('${REPOID}', $this->repoid, $x);
@@ -90,6 +93,7 @@ class RunnerState {
     }
 
 
+    /** @return list<int> */
     function logged_checkts() {
         if ($this->_logged_checkts === null) {
             $logfs = glob("{$this->logdir}/repo{$this->repoid}.pset{$this->pset->id}.*.log");
@@ -472,7 +476,7 @@ class RunnerState {
         while (is_dir($this->jaildir)) {
             Conf::set_current_time(time());
 
-            $newdir = $this->jaildir . "~." . gmstrftime("%Y%m%dT%H%M%S", Conf::$now);
+            $newdir = $this->jaildir . "~." . gmdate("Ymd\\THis", Conf::$now);
             if ($this->run_and_log("jail/pa-jail mv " . escapeshellarg($this->jaildir) . " " . escapeshellarg($newdir))) {
                 throw new RunnerException("Can’t remove old jail");
             }
