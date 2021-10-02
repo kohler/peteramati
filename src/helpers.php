@@ -218,7 +218,7 @@ function file_uploaded(&$var) {
     switch ($var['error']) {
     case UPLOAD_ERR_OK:
         return is_uploaded_file($var['tmp_name'])
-            || (PHP_SAPI === "cli" && get($var, "tmp_name_safe"));
+            || (PHP_SAPI === "cli" && ($var["tmp_name_safe"] ?? false));
     case UPLOAD_ERR_NO_FILE:
         return false;
     case UPLOAD_ERR_INI_SIZE:
@@ -300,7 +300,7 @@ class JsonResult {
                 }
             }
             if ($t !== "") {
-                $this->content["response"] = $t . get_s($this->content, "response");
+                $this->content["response"] = $t . ($this->content["response"] ?? "");
             }
             $this->has_messages = true;
         }

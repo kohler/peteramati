@@ -71,12 +71,12 @@ class Mailer {
 
     function expand_user($contact, $out) {
         $r = Text::analyze_name($contact);
-        if (is_object($contact) && get_s($contact, "preferredEmail") != "")
+        if (is_object($contact) && ($contact->preferredEmail ?? "") != "")
             $r->email = $contact->preferredEmail;
 
         // maybe infer username
         if ($r->firstName == "" && $r->lastName == "" && is_object($contact)
-            && (get_s($contact, "email") !== "" || get_s($contact, "preferredEmail") !== ""))
+            && (($contact->email ?? "") !== "" || ($contact->preferredEmail ?? "") !== ""))
             $this->infer_user_name($r, $contact);
 
         if ($out == "NAME" || $out == "CONTACT")
@@ -464,7 +464,8 @@ class Mailer {
         $eol = self::eol();
         $prep->headers = array("from" => $Conf->opt("emailFromHeader") . $eol, "subject" => $subject . $eol, "to" => "");
         foreach (self::$email_fields as $lcfield => $field)
-            if (($text = get_s($m, $lcfield)) !== "" && $text !== "<none>") {
+            if (($text = ($m[$lcfield] ?? "")) !== ""
+                && $text !== "<none>") {
                 if (($hdr = MimeText::encode_email_header($field . ": ", $text)))
                     $prep->headers[$lcfield] = $hdr . $eol;
                 else {

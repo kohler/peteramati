@@ -79,34 +79,40 @@ class Text {
             if (is_string($v) || is_bool($v)) {
                 if ($i + $delta < 4) {
                     $k = self::$argkeys[$i + $delta];
-                    if (get($ret, $k) === null)
+                    if (!isset($ret->$k)) {
                         $ret->$k = $v;
+                    }
                 }
             } else if (is_array($v) && isset($v[0])) {
                 for ($j = 0; $j < 3 && $j < count($v); ++$j) {
                     $k = self::$argkeys[$j];
-                    if (get($ret, $k) === null)
+                    if (!isset($ret->$k)) {
                         $ret->$k = $v[$j];
+                    }
                 }
             } else if (is_array($v)) {
-                foreach ($v as $k => $x)
-                    if (($mk = get(self::$mapkeys, $k))
-                        && get($ret, $mk) === null)
+                foreach ($v as $k => $x) {
+                    if (($mk = self::$mapkeys[$k] ?? null)
+                        && !isset($ret->$mk)) {
                         $ret->$mk = $x;
+                    }
+                }
                 $delta = 3;
             } else if (is_object($v)) {
-                foreach (self::$mapkeys as $k => $mk)
-                    if (get($ret, $mk) === null
-                        && get($v, $k) !== null
-                        && (get(self::$boolkeys, $mk)
+                foreach (self::$mapkeys as $k => $mk) {
+                    if (!isset($ret->$mk)
+                        && isset($v->$k)
+                        && (isset(self::$boolkeys[$mk])
                             ? is_bool($v->$k)
                             : is_string($v->$k)))
                         $ret->$mk = $v->$k;
+                }
             }
         }
-        foreach (self::$defaults as $k => $v)
-            if (get($ret, $k) === null)
+        foreach (self::$defaults as $k => $v) {
+            if (!isset($ret->$k))
                 $ret->$k = $v;
+        }
         if ($ret->name && $ret->firstName === "" && $ret->lastName === "")
             list($ret->firstName, $ret->lastName) = self::split_name($ret->name);
         if ($ret->withMiddle && $ret->middleName) {
@@ -119,18 +125,21 @@ class Text {
             $ret->firstName = trim($ret->firstName . " " . $m[0]);
             $ret->lastName = $m[1];
         }
-        if ($ret->lastName === "" || $ret->firstName === "")
+        if ($ret->lastName === "" || $ret->firstName === "") {
             $ret->name = $ret->firstName . $ret->lastName;
-        else if (get($ret, "lastFirst"))
+        } else if ($ret->lastFirst ?? false) {
             $ret->name = $ret->lastName . ", " . $ret->firstName;
-        else
+        } else {
             $ret->name = $ret->firstName . " " . $ret->lastName;
-        if ($ret->lastName === "" || $ret->firstName === "")
+        }
+        if ($ret->lastName === "" || $ret->firstName === "") {
             $x = $ret->firstName . $ret->lastName;
-        else
+        } else {
             $x = $ret->firstName . " " . $ret->lastName;
-        if (preg_match('/[\x80-\xFF]/', $x))
+        }
+        if (preg_match('/[\x80-\xFF]/', $x)) {
             $x = UnicodeHelper::deaccent($x);
+        }
         $ret->unaccentedName = $x;
         return $ret;
     }
@@ -142,10 +151,11 @@ class Text {
     static function user_text(/* ... */) {
         // was contactText
         $r = self::analyze_name_args(func_get_args());
-        if ($r->name && $r->email)
+        if ($r->name && $r->email) {
             return "$r->name <$r->email>";
-        else
+        } else {
             return $r->name ? : $r->email;
+        }
     }
 
     static function user_html(/* ... */) {

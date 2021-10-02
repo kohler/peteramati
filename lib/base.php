@@ -339,7 +339,8 @@ function json_encode_db($x, $flags = 0) {
 
 /** @param object|array|null $var
  * @param string|int $idx
- * @return mixed */
+ * @return mixed
+ * @deprecated */
 function get($var, $idx, $default = null) {
     if (is_array($var)) {
         return array_key_exists($idx, $var) ? $var[$idx] : $default;
@@ -351,30 +352,12 @@ function get($var, $idx, $default = null) {
     }
 }
 
-/** @param object|array|null $var
- * @param string|int $idx
- * @return string */
-function get_s($var, $idx, $default = null) {
-    return (string) get($var, $idx, $default);
-}
-
-/** @param object|array|null $var
- * @param string|int $idx
- * @return int */
-function get_i($var, $idx, $default = null) {
-    return (int) get($var, $idx, $default);
-}
-
-/** @param object|array|null $var
- * @param string|int $idx
- * @return float */
-function get_f($var, $idx, $default = null) {
-    return (float) get($var, $idx, $default);
-}
-
+/** @param string $idx
+ * @deprecated */
 function opt($idx, $default = null) {
     global $Conf, $Opt;
-    return get($Conf ? $Conf->opt : $Opt, $idx, $default);
+    $opt = $Conf ? $Conf->opt : $Opt;
+    return $opt[$idx] ?? $default;
 }
 
 function object_replace($a, $b) {

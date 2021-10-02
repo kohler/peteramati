@@ -77,7 +77,7 @@ if ($Qreq->set_branch) {
 // maybe download file
 if ($Qreq->download
     && check_post()) {
-    $dl = get($Info->pset->downloads, $Qreq->download);
+    $dl = $Info->pset->downloads[$Qreq->download] ?? null;
     if (!$dl
         || ($Info->viewer === $Info->user
             && (!$dl->visible
@@ -97,8 +97,8 @@ if ($Qreq->download
         exit;
     }
     if ($dl->timed) {
-        $dls = $Info->user_jnote("downloaded_at") ? : [];
-        $old_dls = $dls ? get($dls, $dl->key, []) : [];
+        $dls = $Info->user_jnote("downloaded_at") ?? null;
+        $old_dls = $dls ? $dls->{$dl->key} ?? [] : [];
         $old_dls[] = ($Info->viewer === $Info->user ? [Conf::$now] : [Conf::$now, $Info->viewer->contactId]);
         $Info->update_user_notes(["downloaded_at" => [$dl->key => $old_dls]]);
     }
@@ -503,7 +503,7 @@ function echo_grader($info) {
     if ($info->is_grading_commit()
         && $info->viewer->can_view_grader($info->pset, $info->user)) {
         $pcm = $info->conf->pc_members_and_admins();
-        $gpc = get($pcm, $gradercid);
+        $gpc = $pcm[$gradercid] ?? null;
         $value_post = "";
         if ($info->viewer->can_set_grader($info->pset, $info->user)) {
             $sel = array();
@@ -525,7 +525,7 @@ function echo_grader($info) {
                     } else if ($seen_pset && $xpset->category === $info->pset->category) {
                         $xinfo = PsetView::make($xpset, $info->user, $info->viewer);
                         if (($xcid = $xinfo->gradercid())
-                            && ($pcm = get($info->conf->pc_members_and_admins(), $xcid))) {
+                            && ($pcm = ($info->conf->pc_members_and_admins())[$xcid] ?? null)) {
                             $sel[$pcm->email] .= " [✱" . htmlspecialchars($xpset->title) . "]";
                         }
                         break;
@@ -755,7 +755,7 @@ if ($Pset->gitless) {
 
     // print runners
     if ($Info->is_handout_commit()) { // XXX this is a hack
-        $crunners = [];
+        $crunners = null;
     } else {
         $crunners = $Info->commit_jnote("run");
     }
@@ -768,7 +768,7 @@ if ($Pset->gitless) {
         }
 
         $rj = null;
-        if (($checkt = get($crunners, $r->category))) {
+        if ($crunners !== null && ($checkt = $crunners->{$r->category} ?? null)) {
             $rj = (new RunnerState($Info, $r, $checkt))->full_json();
         }
         if (!$rj && !$Me->can_run($Pset, $r, $User)) {

@@ -73,7 +73,7 @@ class HarvardSEAS_RepositorySite extends RepositorySite {
         $response_code = 509;
         if (($stream = fopen($userurl, "r", false, $context))) {
             if (($metadata = stream_get_meta_data($stream))
-                && ($w = get($metadata, "wrapper_data"))
+                && ($w = $metadata["wrapper_data"] ?? null)
                 && is_array($w)
                 && preg_match(',\AHTTP/[\d.]+\s+(\d+)\s+(.+)\z,', $w[0], $m))
                 $response_code = (int) $m[1];

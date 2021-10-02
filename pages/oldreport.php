@@ -18,11 +18,12 @@ function collect_pset_info(&$students, $sset, $entries) {
     global $Conf, $Me, $Qreq;
 
     $pset = $sset->pset;
-    $grp = null;
     if ($pset->category && $pset->weight) {
         $grp = $pset->category;
-        $max = $pset->max_grade(true);
-        $factor = (100.0 * $pset->weight) / ($max * $Conf->category_weight($grp));
+        $factor = (100.0 * $pset->weight) / ($pset->max_grade(true) * $Conf->category_weight($grp));
+    } else {
+        $grp = null;
+        $factor = 1.0;
     }
 
     foreach ($sset as $info) {
@@ -51,9 +52,9 @@ function collect_pset_info(&$students, $sset, $entries) {
             report_set($ss, $pset->key, $total, $total_noextra, 100.0 / $max);
 
             if ($grp) {
-                $ss->{$grp} = get_f($ss, $grp) + $total * $factor;
+                $ss->{$grp} = (float) ($ss->{$grp} ?? 0.0) + $total * $factor;
                 $k = "{$grp}_noextra";
-                $ss->{$k} = get_f($ss, $k) + $total_noextra * $factor;
+                $ss->{$k} = (float) ($ss->{$k} ?? 0.0) + $total_noextra * $factor;
             }
 
             if ($entries) {
@@ -134,7 +135,7 @@ function parse_formula($conf, &$t, $example, $minprec) {
         $t = $m[2];
         $e = (float) $m[1];
     } else if (preg_match('{\A(?:pi|π|m_pi)(.*)\z}si', $t, $m)) {
-        $t = $m[2];
+        $t = $m[1];
         $e = (float) M_PI;
     } else if (preg_match('{\A(log10|log|ln|lg|exp)\b(.*)\z}s', $t, $m)) {
         $t = $m[2];

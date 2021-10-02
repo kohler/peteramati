@@ -144,9 +144,9 @@ class Contact {
         } else {
             $name = Text::analyze_name($user);
         }
-        $this->firstName = get_s($name, "firstName");
-        $this->lastName = get_s($name, "lastName");
-        $this->nickname = get_s($name, "nickname");
+        $this->firstName = $name->firstName ?? "";
+        $this->lastName = $name->lastName ?? "";
+        $this->nickname = $name->nickname ?? "";
         if (isset($user->unaccentedName)) {
             $this->unaccentedName = $user->unaccentedName;
         } else if (isset($name->unaccentedName)) {
@@ -204,7 +204,7 @@ class Contact {
         }
         if (isset($user->roles) || isset($user->isPC) || isset($user->isAssistant)
             || isset($user->isChair)) {
-            $roles = (int) get($user, "roles");
+            $roles = (int) ($user->roles ?? 0);
             if ($user->isPC ?? false) {
                 $roles |= self::ROLE_PC;
             }
@@ -321,7 +321,7 @@ class Contact {
     /** @return Contact */
     static function site_contact() {
         global $Opt;
-        if (!get($Opt, "contactEmail") || $Opt["contactEmail"] == "you@example.com") {
+        if (!($Opt["contactEmail"] ?? false) || $Opt["contactEmail"] == "you@example.com") {
             $result = Dbl::ql("select firstName, lastName, nickname, email from ContactInfo where (roles&" . (self::ROLE_CHAIR | self::ROLE_ADMIN) . ")!=0 order by (roles&" . self::ROLE_CHAIR . ") desc limit 1");
             if ($result && ($row = $result->fetch_object())) {
                 $Opt["defaultSiteContact"] = true;
@@ -1001,21 +1001,26 @@ class Contact {
             return $acct;
 
         // validate email, check contactdb
-        if (!get($reg, "no_validate_email") && !validate_email($email))
+        if (!($reg->no_validate_email ?? false) && !validate_email($email)) {
             return null;
+        }
         $cdbu = Contact::contactdb_find_by_email($email);
-        if (get($reg, "only_if_contactdb") && !$cdbu)
+        if (($reg->only_if_contactdb ?? false) && !$cdbu) {
             return null;
+        }
 
         $cj = (object) array();
         foreach (array("firstName", "lastName", "email", "affiliation",
-                       "collaborators", "preferredEmail") as $k)
-            if (($v = $cdbu && $cdbu->$k ? $cdbu->$k : get($reg, $k)))
+                       "collaborators", "preferredEmail") as $k) {
+            if (($v = $cdbu && $cdbu->$k ? $cdbu->$k : ($reg->$k ?? null)))
                 $cj->$k = $v;
-        if (($v = $cdbu && $cdbu->voicePhoneNumber ? $cdbu->voicePhoneNumber : get($reg, "voicePhoneNumber")))
+        }
+        if (($v = $cdbu && $cdbu->voicePhoneNumber ? $cdbu->voicePhoneNumber : ($reg->voicePhoneNumber ?? null))) {
             $cj->phone = $v;
-        if (($cdbu && $cdbu->disabled) || get($reg, "disabled"))
+        }
+        if (($cdbu && $cdbu->disabled) || ($reg->disabled ?? false)) {
             $cj->disabled = true;
+        }
 
         $acct = new Contact;
         if ($acct->save_json($cj, null, $send)) {
@@ -1092,7 +1097,8 @@ class Contact {
     }
 
     static function password_storage_cleartext() {
-        return opt("safePasswords") < 1;
+        global $Conf;
+        return $Conf->opt("safePasswords") < 1;
     }
 
     function allow_contactdb_password() {
@@ -1541,7 +1547,7 @@ class Contact {
         $user = $user ?? $this;
         if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous))) {
             return $user->anon_username;
-        } else if ($this->isPC || get($_SESSION, "last_actas")) {
+        } else if ($this->isPC || ($_SESSION["last_actas"] ?? null)) {
             return $user->username ? : $user->email;
         } else {
             return null;
@@ -1550,7 +1556,7 @@ class Contact {
 
     function user_idpart(Contact $user = null) {
         $user = $user ?? $this;
-        if (!$this->isPC && !get($_SESSION, "last_actas")) {
+        if (!$this->isPC && !($_SESSION["last_actas"] ?? null)) {
             return null;
         } else {
             return $user->github_username ? : ($user->seascode_username ? : $user->huid);

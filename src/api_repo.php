@@ -14,7 +14,7 @@ class Repo_API {
             foreach ($user->conf->psets() as $pset) {
                 if (!$pset->gitless && !$pset->disabled && $user->can_view_pset($pset)) {
                     $apix = new APIData($api->user, $pset);
-                    $apix->repo = $api->user->repo($pset);
+                    $apix->repo = $api->user->repo($pset->id);
                     $apix->branch = $api->user->branch($pset);
                     $apis[] = $apix;
                 }

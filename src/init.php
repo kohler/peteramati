@@ -119,10 +119,10 @@ function read_main_options() {
         } else {
             $Opt["missing"][] = $options;
         }
-        if (get($Opt, "multiconference")) {
+        if ($Opt["multiconference"] ?? false) {
             Multiconference::init();
         }
-        if (get($Opt, "include")) {
+        if ($Opt["include"] ?? false) {
             read_included_options($Opt["include"]);
         }
     }

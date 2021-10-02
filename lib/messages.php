@@ -12,7 +12,7 @@ class Messages {
     public function add($j, $type = null) {
         if (!$type)
             $type = $j->type;
-        if (!get($j, "type")) {
+        if (!($j->type ?? null)) {
             $j = clone $j;
             $j->type = $type;
         }
@@ -27,12 +27,12 @@ class Messages {
 
     private function check($j, $defs) {
         $nrequire = 1;
-        if (get($j, "require")) {
+        if ($j->require ?? null) {
             $reqs = is_array($j->require) ? $j->require : array($j->require);
             foreach ($reqs as $req)
                 if (preg_match('/\A(!?)(\w+)\z/', $req, $m)) {
                     $exists = (array_key_exists($m[2], $defs) ? $defs[$m[2]] !== null :
-                               get($this->defs, $m[2]) !== null);
+                               isset($this->defs[$m[2]]));
                     if ($exists ? $m[1] === "!" : $m[1] === "")
                         return 0;
                     ++$nrequire;
@@ -45,12 +45,14 @@ class Messages {
         $reqj = null;
         $reqprio = -10000;
         $reqnrequire = 0;
-        foreach (get($this->mtype, $type) ? : array() as $j) {
-            if (get($j, $kind) === null)
+        foreach ($this->mtype[$type] ?? [] as $j) {
+            if (!isset($j->$kind)) {
                 continue;
-            if (($nrequire = $this->check($j, $defs)) <= 0)
+            }
+            if (($nrequire = $this->check($j, $defs)) <= 0) {
                 continue;
-            $prio = (float) get($reqj, "priority");
+            }
+            $prio = (float) ($reqj->priority ?? 0.0);
             if ($prio < $reqprio || ($prio == $reqprio && $nrequire < $reqnrequire))
                 continue;
             $reqj = $j;
@@ -67,10 +69,11 @@ class Messages {
             $u = $reqj->$kind;
             while (preg_match('/\A(.*?)%(\w+)%(.*)\z/s', $u, $m)) {
                 $t .= $m[1];
-                if (array_key_exists($m[2], $defs))
+                if (array_key_exists($m[2], $defs)) {
                     $t .= (string) $defs[$m[2]];
-                else if (get($this->defs, $m[2]))
+                } else if ($this->defs[$m[2]] ?? null) {
                     $t .= $this->defs[$m[2]];
+                }
                 $u = $m[3];
             }
             return $t . $u;

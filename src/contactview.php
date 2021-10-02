@@ -26,7 +26,8 @@ class ContactView {
                 if ($p[$ppos] === "/") {
                     ++$xpos;
                 } else if ($p[$ppos] === "p"
-                           && $Conf->pset_by_key(get($x, $xpos))) {
+                           && isset($x[$xpos])
+                           && $Conf->pset_by_key($x[$xpos])) {
                     $settings["pset"] = $x[$xpos];
                 } else if ($p[$ppos] === "H"
                            && (strlen($x[$xpos]) === 40 || strlen($x[$xpos]) === 64)

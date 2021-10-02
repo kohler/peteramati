@@ -61,7 +61,7 @@ if ($User->dropped)
     ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
 
 
-echo Ht::form(hoturl_post("profile", array("u" => $User->email))), "<div>";
+echo Ht::form($Conf->hoturl_post("profile", array("u" => $User->email))), "<div>";
 if ($User->disabled || $User->password == "")
     echo Ht::submit("enable", "Enable user", array("value" => 1));
 else

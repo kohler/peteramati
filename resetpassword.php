@@ -32,8 +32,8 @@ $Me = new Contact;
 
 $password_class = "";
 if (isset($_POST["go"]) && check_post()) {
-    $_POST["password"] = trim(get_s($_POST, "password"));
-    $_POST["password2"] = trim(get_s($_POST, "password2"));
+    $_POST["password"] = trim($_POST["password"] ?? "");
+    $_POST["password2"] = trim($_POST["password2"] ?? "");
     if ($_POST["password"] == "")
         Conf::msg_error("You must enter a password.");
     else if ($_POST["password"] !== $_POST["password2"])

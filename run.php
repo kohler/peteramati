@@ -8,10 +8,6 @@ if ($Me->is_empty()) {
     $Me->escape();
 }
 
-function quit($err = null, $js = null) {
-    json_exit(["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err] + ($js ?? []));
-}
-
 class RunRequest {
     /** @var Conf */
     public $conf;
@@ -27,6 +23,10 @@ class RunRequest {
     public $runner;
     /** @var bool */
     public $is_ensure;
+
+    static function quit($err = null, $js = null) {
+        json_exit(["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err] + ($js ?? []));
+    }
 
     function __construct(Contact $viewer, Qrequest $qreq) {
         $this->conf = $viewer->conf;
@@ -51,7 +51,7 @@ class RunRequest {
         }
         if (!$this->runner
             || (!$this->viewer->isPC && !$this->runner->visible)) {
-            quit("No such command.");
+            self::quit("No such command.");
         }
     }
 
@@ -83,34 +83,34 @@ class RunRequest {
     function run() {
         $qreq = $this->qreq;
         if ($qreq->run === null || !$qreq->valid_post()) {
-            quit("Permission error.");
+            self::quit("Permission error.");
         } else if (($err = $this->check_view(false))) {
-            quit($err);
+            self::quit($err);
         }
 
         $info = PsetView::make($this->pset, $this->user, $this->viewer, $qreq->newcommit ?? $qreq->commit);
         if (!$this->pset->gitless && !$info->hash()) {
             if (!$info->repo) {
-                quit("No repository.");
+                self::quit("No repository.");
             } else if ($qreq->newcommit ?? $qreq->commit) {
-                quit("Commit " . ($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
+                self::quit("Commit " . ($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
             } else {
-                quit("No commits in repository.");
+                self::quit("No commits in repository.");
             }
         }
 
         // can we run this?
         if ($this->runner->command) {
             if (!$info->repo) {
-                quit("No repository.");
+                self::quit("No repository.");
             } else if (!$info->commit()) {
-                quit("No commit to run.");
+                self::quit("No commit to run.");
             } else if (!$info->can_view_repo_contents()) {
-                quit("Unconfirmed repository.");
+                self::quit("Unconfirmed repository.");
             }
         }
         if (!$this->viewer->can_run($this->pset, $this->runner, $this->user)) {
-            quit("You can’t run that command.");
+            self::quit("You can’t run that command.");
         }
 
         // extract request info
@@ -133,9 +133,9 @@ class RunRequest {
         // check runnability
         if ($this->runner->command) {
             if (!$this->pset->run_dirpattern) {
-                quit("Configuration error (run_dirpattern).");
+                self::quit("Configuration error (run_dirpattern).");
             } else if (!$this->pset->run_jailfiles) {
-                quit("Configuration error (run_jailfiles).");
+                self::quit("Configuration error (run_jailfiles).");
             }
         }
 
@@ -160,9 +160,9 @@ class RunRequest {
         // otherwise run
         try {
             if (($checkt = $Rstate->running_checkt())) {
-                quit("Recent job still running.", ["errorcode" => APIData::ERRORCODE_RUNCONFLICT, "checkt" => $checkt, "status" => "workingconflict"]);
+                self::quit("Recent job still running.", ["errorcode" => APIData::ERRORCODE_RUNCONFLICT, "checkt" => $checkt, "status" => "workingconflict"]);
             } else if ($info->pset->gitless) {
-                quit("Nothing to do");
+                self::quit("Nothing to do");
             }
             session_write_close();
 
@@ -179,17 +179,17 @@ class RunRequest {
                        "pset" => $info->pset->id,
                        "timestamp" => $Rstate->checkt]);
         } catch (Exception $e) {
-            quit($e->getMessage());
+            self::quit($e->getMessage());
         }
     }
 
     function runmany() {
         if (!$this->viewer->isPC) {
-            quit("Command reserved for TFs.");
+            self::quit("Command reserved for TFs.");
         } else if (!$this->qreq->valid_post()) {
-            quit("Session out of date.");
+            self::quit("Session out of date.");
         } else if (($err = $this->check_view(true))) {
-            quit($err);
+            self::quit($err);
         }
 
         $t = $this->pset->title;

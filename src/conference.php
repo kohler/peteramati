@@ -217,8 +217,6 @@ class Conf {
         }
         $this->opt_override = [];
 
-        $this->_pc_seeall_cache = null;
-
         $result = $this->q_raw("select name, value, data from Settings");
         while ($result && ($row = $result->fetch_row())) {
             $this->settings[$row[0]] = (int) $row[1];
@@ -2094,14 +2092,17 @@ class Conf {
                     $t .= "<span class=\"$msg[0]\">$msg[1]</span>";
             }
         }
-        if ($t !== "")
-            $values["response"] = $t . get_s($values, "response");
-        if (isset($_REQUEST["jsontext"]) && $_REQUEST["jsontext"])
+        if ($t !== "") {
+            $values["response"] = $t . ($values["response"] ?? "");
+        }
+        if (isset($_REQUEST["jsontext"]) && $_REQUEST["jsontext"]) {
             header("Content-Type: text/plain");
-        else
+        } else {
             header("Content-Type: application/json");
-        if (check_post())
+        }
+        if (check_post()) {
             header("Access-Control-Allow-Origin: *");
+        }
         echo json_encode_browser($values);
     }
 

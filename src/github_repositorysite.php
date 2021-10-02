@@ -49,7 +49,7 @@ class GitHubResponse implements JsonSerializable {
         $context = stream_context_create(array("http" => $htopt));
         if (($stream = fopen($this->url, "r", false, $context))) {
             if (($metadata = stream_get_meta_data($stream))
-                && ($w = get($metadata, "wrapper_data"))
+                && ($w = $metadata["wrapper_data"] ?? null)
                 && is_array($w)) {
                 if (preg_match(',\AHTTP/[\d.]+\s+(\d+)\s+(.+)\z,', $w[0], $m)) {
                     $this->status = (int) $m[1];

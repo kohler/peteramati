@@ -13,12 +13,13 @@ class CapabilityManager {
     }
 
     public function create($capabilityType, $options = array()) {
-        $contactId = get($options, "contactId", 0);
-        if (!$contactId && ($user = get($options, "user")))
+        $contactId = $options["contactId"] ?? 0;
+        if (!$contactId && ($user = $options["user"] ?? null)) {
             $contactId = $this->prefix === "U" ? $user->contactDbId : $user->contactId;
-        $paperId = get($options, "paperId", 0);
-        $timeExpires = get($options, "timeExpires", time() + 259200);
-        $data = get($options, "data");
+        }
+        $paperId = $options["paperId"] ?? 0;
+        $timeExpires = $options["timeExpires"] ?? time() + 259200;
+        $data = $options["data"] ?? null;
         $ok = false;
 
         for ($tries = 0; !$ok && $tries < 4; ++$tries)

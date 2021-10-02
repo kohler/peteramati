@@ -37,7 +37,7 @@ class CurlHelper {
         $this->temp_cookiefile = !$cookiefile;
         $this->cookiefile = $cookiefile ? : tempnam("/tmp", "hotcrp_cookiejar");
         if ($this->temp_cookiefile || !file_exists($this->cookiefile)) {
-            @file_put_contents($cookiefile, "");
+            @file_put_contents($this->cookiefile, "");
             @chmod($this->cookiefile, 0770 & ~umask());
         }
         if (!file_exists($this->cookiefile) || !is_writable($this->cookiefile)) {
@@ -163,10 +163,12 @@ class CurlHelper {
     function go() {
         assert(!!$this->next_url);
         $headers = $this->next_headers;
-        if ($this->next_origin && !isset($headers["origin"]))
+        if ($this->next_origin && !isset($headers["origin"])) {
             $headers["origin"] = "Origin: $this->next_origin";
-        if ($this->next_referer && !isset($headers["referer"]))
+        }
+        if ($this->next_referer && !isset($headers["referer"])) {
             $headers["referer"] = "Referer: $this->next_referer";
+        }
         ksort($headers);
         curl_setopt($this->curlh, CURLOPT_HTTPHEADER, array_values($headers));
         $this->init_files();
@@ -286,6 +288,8 @@ class CurlHelper {
         }
     }
 
+    /** @param string $url
+     * @return string */
     function resolve($url) {
         $urlp = parse_url($url);
         if (isset($urlp["scheme"])) {
@@ -306,13 +310,7 @@ class CurlHelper {
         if (isset($locp["port"])) {
             $lochost .= ":" . $locp["port"];
         }
-        if ($url === "") {
-            $lochost .= $locp["path"] ?? "";
-            if (isset($locp["query"])) {
-                $lochost .= "?" . $locp["query"];
-            }
-            return $lochost;
-        } else if ($url[0] === "/") {
+        if ($url[0] === "/") {
             return $lochost . $url;
         }
         $lochost .= preg_replace(',/+[^/]+\z,', "/", $locp["path"] ?? "");
@@ -339,9 +337,9 @@ class CurlHelper {
     }
 
     function restore_state($state) {
-        $this->location = get($state, "location");
-        $this->next_referer = get($state, "referer");
-        $this->next_origin = get($state, "origin");
+        $this->location = $state->location ?? null;
+        $this->next_referer = $state->referer ?? null;
+        $this->next_origin = $state->next_origin ?? null;
     }
 
     function next_cookie($name = null) {
