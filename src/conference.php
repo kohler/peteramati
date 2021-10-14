@@ -10,7 +10,7 @@ class APIData {
     public $user;
     /** @var ?Pset */
     public $pset;
-    /** @var ?Repository*/
+    /** @var ?Repository */
     public $repo;
     /** @var ?string */
     public $branch;

@@ -13,7 +13,7 @@ global $User, $Pset, $Info, $Qreq;
 $User = $Me;
 if (isset($Qreq->u)
     && !($User = ContactView::prepare_user($Qreq->u))) {
-    redirectSelf(array("u" => null));
+    redirectSelf(["u" => null]);
 }
 assert($User === $Me || $Me->isPC);
 $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));

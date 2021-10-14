@@ -62,10 +62,11 @@ if ($User->dropped)
 
 
 echo Ht::form($Conf->hoturl_post("profile", array("u" => $User->email))), "<div>";
-if ($User->disabled || $User->password == "")
+if ($User->is_disabled() || $User->password == "") {
     echo Ht::submit("enable", "Enable user", array("value" => 1));
-else
+} else {
     echo Ht::submit("disable", "Disable user", array("value" => 1));
+}
 echo '<hr>';
 
 echo '<table class="pltable" style="margin-top:1em"><tbody class="pltable pltable_alternate">';

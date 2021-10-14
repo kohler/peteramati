@@ -50,7 +50,7 @@ class Contact {
     private $lastLogin;
     public $gradeUpdateTime;
 
-    public $disabled = false;
+    private $disabled = false;
     private $_disabled;
     public $activity_at = false;
     public $note;
@@ -111,8 +111,6 @@ class Contact {
             $this->merge($trueuser);
         } else if ($this->contactId || $this->contactDbId) {
             $this->db_load();
-        } else if ($this->conf->opt("disableNonPC")) {
-            $this->disabled = true;
         }
     }
 
@@ -216,9 +214,6 @@ class Contact {
             }
             $this->assign_roles($roles);
         }
-        if (!$this->isPC && $this->conf->opt("disableNonPC")) {
-            $this->disabled = true;
-        }
         if (isset($user->is_site_contact)) {
             $this->is_site_contact = $user->is_site_contact;
         }
@@ -252,9 +247,6 @@ class Contact {
         }
         if (isset($this->roles)) {
             $this->assign_roles((int) $this->roles);
-        }
-        if (!$this->isPC && $this->conf->opt("disableNonPC")) {
-            $this->disabled = true;
         }
         $this->username = $this->github_username ? : $this->seascode_username;
     }
@@ -443,7 +435,11 @@ class Contact {
     function is_disabled() {
         if ($this->_disabled === null) {
             $this->_disabled = $this->disabled
-                || (!$this->isPC && $this->conf->opt("disableNonPC"));
+                || (!$this->isPC
+                    && $this->conf->opt("disableNonPC")
+                    && (!$this->activated_
+                        || !self::$true_user
+                        || !self::$true_user->isPC));
         }
         return $this->_disabled;
     }
