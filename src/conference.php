@@ -1931,7 +1931,7 @@ class Conf {
         if ($Me && !$Me->is_empty()) {
             // profile link
             $profile_parts = [];
-            if ($Me->has_email() && !$Me->disabled) {
+            if ($Me->has_email() && !$Me->is_disabled()) {
 	        $profile_parts[] = '<strong>' . htmlspecialchars($Me->email) . '</strong>';
                 /*echo '<a class="q" href="', hoturl("profile"), '"><strong>',
                     htmlspecialchars($Me->email),
