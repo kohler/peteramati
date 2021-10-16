@@ -147,9 +147,61 @@ class PsetView {
         return $info;
     }
 
+
+    /** @return list<int> */
+    function backpartners() {
+        return array_values(array_unique($this->user->links(LINK_BACKPARTNER, $this->pset->id)));
+    }
+
+    /** @return bool */
+    function partner_same() {
+        if ($this->partner_same === null) {
+            $bp = $this->backpartners();
+            if ($this->partner) {
+                $this->partner_same = count($bp) === 1 && $this->partner->contactId === $bp[0];
+            } else {
+                $this->partner_same = empty($bp);
+            }
+        }
+        return $this->partner_same;
+    }
+
+
     /** @return string */
     function branch() {
         return $this->branch;
+    }
+
+
+    /** @return array<string,CommitRecord> */
+    function recent_commits() {
+        if ($this->repo) {
+            return $this->repo->commits($this->pset, $this->branch);
+        } else {
+            return [];
+        }
+    }
+
+    /** @return ?CommitRecord */
+    function connected_commit($hash) {
+        if ($this->repo) {
+            return $this->repo->connected_commit($hash, $this->pset, $this->branch);
+        } else {
+            return null;
+        }
+    }
+
+    /** @return ?CommitRecord */
+    function latest_commit() {
+        $cs = $this->repo ? $this->repo->commits($this->pset, $this->branch) : [];
+        reset($cs);
+        return current($cs);
+    }
+
+    /** @return ?non-empty-string */
+    function latest_hash() {
+        $lc = $this->latest_commit();
+        return $lc ? $lc->hash : null;
     }
 
 
@@ -206,6 +258,26 @@ class PsetView {
         }
     }
 
+    /** @return ?non-empty-string */
+    function hash() {
+        return $this->_hash;
+    }
+
+    /** @return non-empty-string */
+    function commit_hash() {
+        assert($this->_hash !== null);
+        return $this->_hash;
+    }
+
+    /** @return ?CommitRecord */
+    function commit() {
+        if ($this->_hash === null) {
+            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $this->viewer->email);
+        }
+        assert($this->_hash !== null);
+        return $this->_hash ? $this->connected_commit($this->_hash) : null;
+    }
+
     /** @param ?string $reqhash */
     function force_set_hash($reqhash) {
         assert($reqhash === null || strlen($reqhash) === 40);
@@ -239,24 +311,23 @@ class PsetView {
         $this->force_set_hash($hash);
     }
 
-    /** @return ?non-empty-string */
-    function hash() {
-        return $this->_hash;
+    /** @return bool */
+    function is_latest_commit() {
+        return $this->_hash && $this->_hash === $this->latest_hash();
     }
 
-    /** @return non-empty-string */
-    function commit_hash() {
-        assert($this->_hash !== null);
-        return $this->_hash;
+    /** @return bool */
+    function is_handout_commit() {
+        return $this->_hash && $this->_hash === $this->derived_handout_hash();
     }
 
-    /** @return ?CommitRecord */
-    function commit() {
-        if ($this->_hash === null) {
-            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $this->viewer->email);
-        }
-        assert($this->_hash !== null);
-        return $this->_hash ? $this->connected_commit($this->_hash) : null;
+    /** @return bool */
+    function is_grading_commit() {
+        return $this->pset->gitless_grades
+            || ($this->_hash !== null
+                && ($rpi = $this->rpi())
+                && !$rpi->placeholder
+                && $rpi->gradehash === $this->_hash);
     }
 
     /** @return ?int */
@@ -279,42 +350,6 @@ class PsetView {
     /** @return bool */
     function can_have_grades() {
         return $this->pset->gitless_grades || $this->commit();
-    }
-
-    /** @return array<string,CommitRecord> */
-    function recent_commits() {
-        if ($this->repo) {
-            return $this->repo->commits($this->pset, $this->branch);
-        } else {
-            return [];
-        }
-    }
-
-    /** @return ?CommitRecord */
-    function connected_commit($hash) {
-        if ($this->repo) {
-            return $this->repo->connected_commit($hash, $this->pset, $this->branch);
-        } else {
-            return null;
-        }
-    }
-
-    /** @return ?CommitRecord */
-    function latest_commit() {
-        $cs = $this->repo ? $this->repo->commits($this->pset, $this->branch) : [];
-        reset($cs);
-        return current($cs);
-    }
-
-    /** @return ?non-empty-string */
-    function latest_hash() {
-        $lc = $this->latest_commit();
-        return $lc ? $lc->hash : null;
-    }
-
-    /** @return bool */
-    function is_latest_commit() {
-        return $this->_hash && $this->_hash === $this->latest_hash();
     }
 
     /** @return ?CommitRecord */
@@ -358,19 +393,49 @@ class PsetView {
         }
     }
 
-    /** @return bool */
-    function is_handout_commit() {
-        return $this->_hash && $this->_hash === $this->derived_handout_hash();
+    /** @return ?CommitRecord */
+    function grading_commit() {
+        $h = $this->grading_hash();
+        return $h ? $this->connected_commit($h) : null;
     }
 
-    /** @return bool */
-    function is_grading_commit() {
-        return $this->pset->gitless_grades
-            || ($this->_hash !== null
-                && ($rpi = $this->rpi())
-                && !$rpi->placeholder
-                && $rpi->gradehash === $this->_hash);
+    /** @return ?non-empty-string */
+    function grading_hash() {
+        $rpi = $this->pset->gitless_grades ? null : $this->rpi();
+        return $rpi && !$rpi->placeholder ? $rpi->gradehash : null;
     }
+
+
+    /** @param ?callable(PsetView,?RepositoryPsetInfo):bool $updater
+     * @return void */
+    function update_placeholder($updater) {
+        if (!$this->pset->gitless_grades
+            && (!($rpi = $this->rpi())
+                || $rpi->placeholder
+                || $rpi->gradebhash === null)
+            && ($updater === null
+                || call_user_func($updater, $this, $rpi))) {
+            $c = $this->latest_commit();
+            $bh = $c ? hex2bin($c->hash) : null;
+            if (!$rpi
+                || ($rpi->placeholder_at ?? 0) === 0
+                || $rpi->gradebhash !== $bh) {
+                $this->conf->qe("insert into RepositoryGrade set
+                    repoid=?, branchid=?, pset=?,
+                    gradebhash=?, commitat=?, placeholder=1, placeholder_at=?
+                    on duplicate key update
+                    gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)),
+                    commitat=(if(placeholder=1,values(commitat),commitat)),
+                    placeholder_at=values(placeholder_at),
+                    emptydiff_at=null",
+                    $this->repo->repoid, $this->branchid, $this->pset->id,
+                    $bh, $c ? $c->commitat : null, Conf::$now);
+                $this->_havepi &= ~2;
+                $this->_rpi = null;
+            }
+        }
+    }
+
 
     /** @return bool */
     function empty_diff_likely() {
@@ -1004,65 +1069,6 @@ class PsetView {
         }
     }
 
-
-    function backpartners() {
-        return array_unique($this->user->links(LINK_BACKPARTNER, $this->pset->id));
-    }
-
-    /** @return bool */
-    function partner_same() {
-        if ($this->partner_same === null) {
-            $bp = $this->backpartners();
-            if ($this->partner) {
-                $this->partner_same = count($bp) === 1 && $this->partner->contactId === $bp[0];
-            } else {
-                $this->partner_same = empty($bp);
-            }
-        }
-        return $this->partner_same;
-    }
-
-    /** @return ?non-empty-string */
-    function grading_hash() {
-        $rpi = $this->pset->gitless_grades ? null : $this->rpi();
-        return $rpi && !$rpi->placeholder ? $rpi->gradehash : null;
-    }
-
-    /** @param ?callable(PsetView,?RepositoryPsetInfo):bool $updater
-     * @return void */
-    function update_placeholder($updater) {
-        if (!$this->pset->gitless_grades
-            && (!($rpi = $this->rpi())
-                || $rpi->placeholder
-                || $rpi->gradebhash === null)
-            && ($updater === null
-                || call_user_func($updater, $this, $rpi))) {
-            $c = $this->latest_commit();
-            $bh = $c ? hex2bin($c->hash) : null;
-            if (!$rpi
-                || ($rpi->placeholder_at ?? 0) === 0
-                || $rpi->gradebhash !== $bh) {
-                $this->conf->qe("insert into RepositoryGrade set
-                    repoid=?, branchid=?, pset=?,
-                    gradebhash=?, commitat=?, placeholder=1, placeholder_at=?
-                    on duplicate key update
-                    gradebhash=(if(placeholder=1,values(gradebhash),gradebhash)),
-                    commitat=(if(placeholder=1,values(commitat),commitat)),
-                    placeholder_at=values(placeholder_at),
-                    emptydiff_at=null",
-                    $this->repo->repoid, $this->branchid, $this->pset->id,
-                    $bh, $c ? $c->commitat : null, Conf::$now);
-                $this->_havepi &= ~2;
-                $this->_rpi = null;
-            }
-        }
-    }
-
-    /** @return ?CommitRecord */
-    function grading_commit() {
-        $h = $this->grading_hash();
-        return $h ? $this->connected_commit($h) : null;
-    }
 
     /** @return list<int> */
     private function grades_vf() {
