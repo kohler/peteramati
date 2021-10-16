@@ -159,7 +159,7 @@ class RunRequest {
 
         // otherwise run
         try {
-            if (($checkt = $Rstate->running_checkt())) {
+            if (($checkt = $this->runner->active_job($info))) {
                 self::quit("Recent job still running.", ["errorcode" => APIData::ERRORCODE_RUNCONFLICT, "checkt" => $checkt, "status" => "workingconflict"]);
             } else if ($info->pset->gitless) {
                 self::quit("Nothing to do");

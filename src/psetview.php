@@ -1491,45 +1491,21 @@ class PsetView {
     }
 
 
-    /** @return string */
-    function runner_pidfile() {
-        $root = SiteLoader::$root;
-        return "{$root}/log/run{$this->repo->cacheid}.pset{$this->pset->id}/repo{$this->repo->repoid}.pset{$this->pset->id}.pid";
-    }
-
-    /** @param int $checkt
-     * @return string */
-    function runner_logbase($checkt) {
-        $root = SiteLoader::$root;
-        return "{$root}/log/run{$this->repo->cacheid}.pset{$this->pset->id}/repo{$this->repo->repoid}.pset{$this->pset->id}.{$checkt}";
-    }
-
-    /** @param int $checkt
-     * @return string */
-    function runner_logfile($checkt) {
-        return $this->runner_logbase($checkt) . ".log";
-    }
-
-    /** @param int $checkt
+    /** @param RunnerConfig $runner
      * @return string|false */
-    function runner_output($checkt) {
-        return @file_get_contents($this->runner_logfile($checkt));
-    }
-
     function runner_output_for($runner) {
-        if (is_string($runner)) {
-            $runner = $this->pset->all_runners[$runner];
-        }
         $cnotes = $this->commit_jnotes();
         if ($cnotes && isset($cnotes->run) && isset($cnotes->run->{$runner->name})) {
-            $f = $this->runner_output($cnotes->run->{$runner->name});
-            $this->last_runner_error = $f === false ? self::ERROR_LOGMISSING : 0;
-            return $f;
+            $fn = $runner->output_file($this, $cnotes->run->{$runner->name});
+            $s = @file_get_contents($fn);
+            $this->last_runner_error = $s === false ? self::ERROR_LOGMISSING : 0;
+            return $s;
         } else {
             $this->last_runner_error = self::ERROR_NOTRUN;
             return false;
         }
     }
+
 
     private function reset_transferred_warnings() {
         $this->transferred_warnings = [];
