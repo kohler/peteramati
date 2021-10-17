@@ -18,21 +18,10 @@ class RunnerState {
     public $runner;
     /** @var ?RunLogger */
     public $runlog;
-
     /** @var ?int */
     public $checkt;
     /** @var ?int */
     public $queueid;
-    /** @var string */
-    private $logfile;
-    private $logstream;
-    /** @var string */
-    private $jaildir;
-    /** @var string */
-    private $jailhomedir;
-
-    /** @var ?list<RunOverlayConfig> */
-    private $_overlay;
 
     /** @param ?int $checkt */
     function __construct(PsetView $info, RunnerConfig $runner, $checkt = null) {
@@ -59,81 +48,6 @@ class RunnerState {
         if ($checkt) {
             $this->set_checkt($checkt);
         }
-    }
-
-    /** @param string $x
-     * @return string */
-    function expand($x) {
-        if (strpos($x, '${') !== false) {
-            $x = str_replace('${REPOID}', $this->repoid, $x);
-            $x = str_replace('${PSET}', (string) $this->pset->id, $x);
-            $x = str_replace('${CONFDIR}', "conf/", $x);
-            $x = str_replace('${SRCDIR}', "src/", $x);
-            $x = str_replace('${HOSTTYPE}', $this->conf->opt("hostType") ?? "", $x);
-            $x = str_replace('${COMMIT}', $this->info->commit_hash(), $x);
-            $x = str_replace('${HASH}', $this->info->commit_hash(), $x);
-        }
-        return $x;
-    }
-
-    /** @return ?string */
-    private function jailfiles() {
-        $f = $this->pset->run_jailfiles ? : $this->conf->opt("run_jailfiles");
-        return $f ? $this->expand($f) : null;
-    }
-
-    /** @return list<string> */
-    private function jailmanifest() {
-        $f = $this->pset->run_jailmanifest;
-        if ($f === null || $f === "" || $f === []) {
-            return [];
-        }
-        if (is_string($f)) {
-            $f = preg_split('/\r\n|\r|\n/', $f);
-        }
-        for ($i = 0; $i !== count($f); ) {
-            if ($f[$i] === "") {
-                array_splice($f, $i, 1);
-            } else {
-                ++$i;
-            }
-        }
-        return $f;
-    }
-
-    /** @return list<RunOverlayConfig> */
-    private function overlay() {
-        if ($this->_overlay === null) {
-            $this->_overlay = [];
-            foreach ($this->runner->overlay ?? $this->pset->run_overlay ?? [] as $r) {
-                $r = clone $r;
-                if ($r->file[0] !== "/") {
-                    $r->file = SiteLoader::$root . "/" . $r->file;
-                }
-                $r->file = $this->expand($r->file);
-                $this->_overlay[] = $r;
-            }
-        }
-        return $this->_overlay;
-    }
-
-    /** @return int */
-    function environment_timestamp() {
-        $t = 0;
-        if (($f = $this->jailfiles())) {
-            $t = max($t, (int) @filemtime($f));
-        }
-        foreach ($this->overlay() as $r) {
-            $t = max($t, (int) @filemtime($r->file));
-        }
-        return $t;
-    }
-
-
-    private function run_and_log($command, $bg = false) {
-        fwrite($this->logstream, "++ $command\n");
-        system("($command) </dev/null >>" . escapeshellarg($this->logfile) . " 2>&1" . ($bg ? " &" : ""), $status);
-        return $status;
     }
 
 
@@ -165,24 +79,38 @@ class RunnerState {
         return $this->queueid !== null;
     }
 
+    /** @return RunResponse */
     function generic_json() {
-        return (object) [
-            "ok" => true, "repoid" => $this->repoid,
-            "pset" => $this->pset->urlkey, "timestamp" => $this->checkt
-        ];
+        $rr = new RunResponse;
+        $rr->ok = true;
+        $rr->repoid = $this->repoid;
+        $rr->pset = $this->pset->urlkey;
+        $rr->timestamp = $this->checkt;
+        return $rr;
     }
 
+    /** @return ?RunResponse */
     function full_json($offset = null) {
         if (!$this->checkt) {
-            return false;
+            return null;
         }
         $json = $this->generic_json();
-        $this->runlog->job_status($this->checkt, $json);
+        $json->done = $this->runlog->active_job() !== $this->checkt;
+        if ($json->done) {
+            $json->status = "done";
+        } else if (Conf::$now - $this->checkt <= 600) {
+            $json->status = "working";
+        } else {
+            $json->status = "old";
+        }
         if ($offset !== null) {
             $logbase = $this->runlog->job_prefix($this->checkt);
             $data = @file_get_contents("{$logbase}.log", false, null, max($offset, 0));
             if ($data === false) {
-                return (object) ["error" => true, "message" => "No such log"];
+                $json->ok = false;
+                $json->error = true;
+                $json->message = "No such log";
+                return $json;
             }
             // Fix up $data if it is not valid UTF-8.
             if (!is_valid_utf8($data)) {
@@ -228,250 +156,6 @@ class RunnerState {
     }
 
 
-    /** @param QueueItem $queue */
-    function start($queue) {
-        assert($this->checkt === null && $this->logfile === null);
-
-        // collect user information
-        if ($this->runner->username) {
-            $username = $this->runner->username;
-        } else if ($this->pset->run_username) {
-            $username = $this->pset->run_username;
-        } else {
-            $username = "jail61user";
-        }
-        if (!preg_match('/\A\w+\z/', $username)) {
-            throw new RunnerException("Bad run_username");
-        }
-
-        $info = posix_getpwnam($username);
-        $userhome = $info ? $info["dir"] : "/home/jail61";
-        $userhome = preg_replace('/\/+\z/', '', $userhome);
-
-        $this->jaildir = preg_replace('/\/+\z/', '', $this->expand($this->pset->run_dirpattern));
-        if (!$this->jaildir) {
-            throw new RunnerException("Bad run_dirpattern");
-        }
-        $this->jailhomedir = $this->jaildir . "/" . preg_replace('/\A\/+/', '', $userhome);
-
-        if (!chdir(SiteLoader::$root)) {
-            throw new RunnerException("Can’t cd to main directory");
-        } else if (!is_executable("jail/pa-jail")) {
-            throw new RunnerException("The pa-jail program has not been compiled");
-        } else if ($this->runlog->active_job()) {
-            throw new RunnerException("Recent job still running");
-        }
-
-        // create logfile and pidfile
-        $this->checkt = time();
-        $logbase = $this->runlog->job_prefix($this->checkt);
-        $this->logfile = "{$logbase}.log";
-        $timingfile = "{$logbase}.log.time";
-        $pidfile = $this->runlog->pid_file();
-        file_put_contents($pidfile, "");
-        $inputfifo = "{$logbase}.in";
-        if (!posix_mkfifo($inputfifo, 0660)) {
-            $inputfifo = null;
-        }
-        if ($this->runner->timed_replay) {
-            touch($timingfile);
-        }
-        $this->logstream = fopen($this->logfile, "a");
-        if ($queue) {
-            Dbl::qe("update ExecutionQueue set runat=?, status=1, lockfile=?, inputfifo=? where queueid=?",
-                    $this->checkt, $pidfile, $inputfifo, $queue->queueid);
-        }
-        register_shutdown_function(array($this, "cleanup"));
-
-        // print json to first line
-        $runsettings = $this->info->commit_jnote("runsettings");
-        $json = (object) [
-            "repoid" => $this->repoid, "pset" => $this->pset->urlkey,
-            "timestamp" => $this->checkt, "hash" => $this->info->commit_hash(),
-            "runner" => $this->runner->name
-        ];
-        if ($runsettings) {
-            $json->settings = [];
-            foreach ($runsettings as $k => $v) {
-                $json->settings[$k] = $v;
-            }
-        }
-        fwrite($this->logstream, "++ " . json_encode($json) . "\n");
-
-        // create jail
-        $this->remove_old_jails();
-        if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->jaildir) . " " . escapeshellarg($username))) {
-            throw new RunnerException("Can’t initialize jail");
-        }
-
-        // check out code
-        $this->checkout_code();
-
-        // save commit settings
-        $this->add_run_settings($this->info->commit_jnote("runsettings"));
-
-        // actually run
-        $command = "echo; jail/pa-jail run"
-            . " -p" . escapeshellarg($pidfile)
-            . " -P'{$this->checkt} $$"
-            . ($inputfifo ? " -i" : "") . "'";
-        if ($this->runner->timed_replay) {
-            $command .= " -t" . escapeshellarg($timingfile);
-        }
-
-        $skeletondir = $this->pset->run_skeletondir ? : $this->conf->opt("run_skeletondir");
-        $binddir = $this->pset->run_binddir ? : $this->conf->opt("run_binddir");
-        if ($skeletondir && $binddir && !is_dir("$skeletondir/proc")) {
-            $binddir = false;
-        }
-        $jfiles = $this->jailfiles();
-
-        if ($skeletondir && $binddir) {
-            $binddir = preg_replace('/\/+\z/', '', $binddir);
-            $contents = "/ <- " . $skeletondir . " [bind-ro";
-            if ($jfiles
-                && !preg_match('/[\s\];]/', $jfiles)
-                && ($jhash = hash_file("sha256", $jfiles)) !== false) {
-                $contents .= " $jhash $jfiles";
-            }
-            $contents .= "]\n"
-                . $userhome . " <- " . $this->jailhomedir . " [bind]";
-            $command .= " -u" . escapeshellarg($this->jailhomedir)
-                . " -F" . escapeshellarg($contents);
-            $homedir = $binddir;
-        } else if ($jfiles) {
-            $command .= " -h -f" . escapeshellarg($jfiles);
-            if ($skeletondir) {
-                $command .= " -S" . escapeshellarg($skeletondir);
-            }
-            $homedir = $this->jaildir;
-        } else {
-            throw new RunnerException("Missing jail population configuration");
-        }
-
-        $jmanifest = $this->jailmanifest();
-        if ($jmanifest) {
-            $command .= " -F" . escapeshellarg(join("\n", $jmanifest));
-        }
-
-        if (($to = $this->runner->timeout ?? $this->pset->run_timeout) > 0) {
-            $command .= " -T" . $to;
-        }
-        if (($to = $this->runner->idle_timeout ?? $this->pset->run_idle_timeout) > 0) {
-            $command .= " -I" . $to;
-        }
-        if ($inputfifo) {
-            $command .= " -i" . escapeshellarg($inputfifo);
-        }
-        $command .= " " . escapeshellarg($homedir)
-            . " " . escapeshellarg($username)
-            . " TERM=xterm-256color"
-            . " " . escapeshellarg($this->expand($this->runner->command));
-        return $this->run_and_log($command);
-    }
-
-    private function remove_old_jails() {
-        while (is_dir($this->jaildir)) {
-            Conf::set_current_time(time());
-
-            $newdir = $this->jaildir . "~." . gmdate("Ymd\\THis", Conf::$now);
-            if ($this->run_and_log("jail/pa-jail mv " . escapeshellarg($this->jaildir) . " " . escapeshellarg($newdir))) {
-                throw new RunnerException("Can’t remove old jail");
-            }
-
-            $this->run_and_log("jail/pa-jail rm " . escapeshellarg($newdir), true);
-            clearstatcache(false, $this->jaildir);
-        }
-    }
-
-    private function checkout_code() {
-        $checkoutdir = $clonedir = $this->jailhomedir . "/repo";
-        if ($this->repo->truncated_psetdir($this->pset)
-            && $this->pset->directory_noslash !== "") {
-            $clonedir .= "/{$this->pset->directory_noslash}";
-        }
-
-        fwrite($this->logstream, "++ mkdir $checkoutdir\n");
-        if (!mkdir($clonedir, 0777, true)) {
-            throw new RunnerException("Can’t initialize user repo in jail");
-        }
-
-        $root = SiteLoader::$root;
-        $repodir = "{$root}/repo/repo{$this->repo->cacheid}";
-
-        // need a branch to check out a specific commit
-        $branch = "jailcheckout_" . Conf::$now;
-        if ($this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch $branch " . $this->info->commit_hash())) {
-            throw new RunnerException("Can’t create branch for checkout");
-        }
-
-        // make the checkout
-        $status = $this->run_and_log("cd " . escapeshellarg($clonedir) . " && "
-                                     . "if test ! -d .git; then git init --shared=group; fi && "
-                                     . "git fetch --depth=1 -p " . escapeshellarg($repodir) . " $branch && "
-                                     . "git reset --hard " . $this->info->commit_hash());
-
-        $this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch -D $branch");
-
-        if ($status) {
-            throw new RunnerException("Can’t check out code into jail");
-        }
-
-        if ($this->run_and_log("cd " . escapeshellarg($clonedir) . " && rm -rf .git .gitcheckout")) {
-            throw new RunnerException("Can’t clean up checkout in jail");
-        }
-
-        // create overlay
-        if (($overlay = $this->overlay())) {
-            $this->checkout_overlay($checkoutdir, $overlay);
-        }
-    }
-
-    /** @param list<RunOverlayConfig> $overlayfiles */
-    function checkout_overlay($checkoutdir, $overlayfiles) {
-        foreach ($overlayfiles as $ro) {
-            if (preg_match('/(?:\.tar|\.tar\.[gx]z|\.t[bgx]z|\.tar\.bz2)\z/i', $ro->file)) {
-                $c = "cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($ro->file);
-                foreach ($ro->exclude ?? [] as $xf) {
-                    $c .= " --exclude " . escapeshellarg($xf);
-                }
-                $x = $this->run_and_log($c);
-            } else {
-                fwrite($this->logstream, "++ cp " . escapeshellarg($ro->file) . " " . escapeshellarg($checkoutdir) . "\n");
-                $rslash = strrpos($ro->file, "/");
-                $x = !copy($ro->file, $checkoutdir . substr($ro->file, $rslash));
-            }
-            if ($x) {
-                throw new RunnerException("Can’t unpack overlay");
-            }
-        }
-
-        $checkout_instructions = @file_get_contents($checkoutdir . "/.gitcheckout");
-        if ($checkout_instructions) {
-            foreach (explode("\n", $checkout_instructions) as $text) {
-                if (substr($text, 0, 3) === "rm:") {
-                    $this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && rm -rf " . escapeshellarg(substr($text, 3)));
-                }
-            }
-        }
-    }
-
-    private function add_run_settings($s) {
-        $mk = $sh = [];
-        foreach ((array) $s as $k => $v) {
-            if (preg_match('/\A[A-Za-z_][A-Za-z_0-9]*\z/', $k)
-                && !preg_match('/\A(?:PATH|MAKE|HOME|SHELL|POSIXLY_CORRECT|TMPDIR|LANG|USER|LOGNAME|SSH.*|PS\d|HISTFILE|LD_LIBRARY_PATH|HOST|HOSTNAME|TERM|TERMCAP|EDITOR|PAGER|MANPATH)\z/', $k)) {
-                if (preg_match('/\A[-A-Za-z0-9_:\/ .,]*\z/', $v)) {
-                    $mk[] = "$k = $v\n";
-                }
-                $sh[] = "$k=" . escapeshellarg($v) . "\n";
-            }
-        }
-        file_put_contents($this->jailhomedir . "/config.mk", join("", $mk));
-        file_put_contents($this->jailhomedir . "/config.sh", join("", $sh));
-    }
-
-
     /** @return ?QueueItem */
     private function load_queue() {
         if ($this->queueid === null) {
@@ -496,7 +180,7 @@ class RunnerState {
     private function clean_queue($qconf) {
         assert($this->queueid !== null);
         $runtimeout = isset($qconf->runtimeout) ? $qconf->runtimeout : 300;
-        $result = $this->conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $this->runner->queue, $this->queueid);
+        $result = $this->conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $this->runner->queue ?? "", $this->queueid);
         while (($row = QueueItem::fetch($this->conf, $result))) {
             // remove dead items from queue
             // - pidfile contains "0\n": child has exited, remove it
@@ -519,9 +203,7 @@ class RunnerState {
 
     /** @return ?QueueItem */
     function make_queue() {
-        if (!isset($this->runner->queue)) {
-            return null;
-        }
+        $qname = $this->runner->queue ?? "";
 
         if ($this->queueid === null) {
             $nconcurrent = null;
@@ -529,15 +211,20 @@ class RunnerState {
                 && $this->runner->nconcurrent > 0) {
                 $nconcurrent = $this->runner->nconcurrent;
             }
+            $runsettings = $this->info->commit_jnote("runsettings");
+            $runsettingsj = $runsettings ? json_encode_db($runsettings) : null;
+            assert($runsettingsj === null || strlen($runsettingsj) < 8000);
             $this->conf->qe("insert into ExecutionQueue set reqcid=?,
                     runnername=?, cid=?, psetid=?, repoid=?, bhash=?,
                     queueclass=?, nconcurrent=?,
-                    insertat=?, updateat=?, runat=0, status=0",
+                    insertat=?, updateat=?, runat=0, status=0,
+                    runsettings=?",
                     $this->info->viewer->contactId,
                     $this->runner->name, $this->info->user->contactId, $this->pset->id,
                     $this->repoid, hex2bin($this->info->commit_hash()),
-                    $this->runner->queue, $nconcurrent,
-                    Conf::$now, Conf::$now);
+                    $qname, $nconcurrent,
+                    Conf::$now, Conf::$now,
+                    $runsettingsj);
             $this->queueid = $this->conf->dblink->insert_id;
         } else {
             $this->conf->qe("update ExecutionQueue set updateat=? where queueid=?",
@@ -545,7 +232,10 @@ class RunnerState {
         }
         $queue = $this->load_queue();
 
-        $qconf = $this->conf->config->_queues->{$this->runner->queue} ?? null;
+        $qconf = null;
+        if ($qname !== "" && isset($this->conf->config->_queues->{$qname})) {
+            $qconf = $this->conf->config->_queues->{$qname};
+        }
         if (!$qconf) {
             $qconf = (object) ["nconcurrent" => 1];
         }
@@ -598,13 +288,13 @@ class RunnerState {
         if ($qreq->check === "recent") {
             $checkt = 0;
             $n = 0;
-            $envts = $this->environment_timestamp();
+            $envts = $this->runner->environment_timestamp();
             foreach ($this->runlog->past_jobs() as $t) {
                 if ($t > $envts
                     && ($s = $this->runlog->job_info($t))
-                    && $s->done
                     && $s->runner === $this->runner->name
-                    && $s->hash === $this->info->commit_hash()) {
+                    && $s->hash === $this->info->commit_hash()
+                    && $this->runlog->active_job() !== $t) {
                     $checkt = $t;
                     break;
                 } else if ($n >= 200) {

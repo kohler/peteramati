@@ -772,6 +772,10 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table `ExecutionQueue` change `cid` `cid` int NOT NULL")) {
         $conf->update_schema_version(152);
     }
+    if ($conf->sversion === 152
+        && $conf->ql_ok("alter table `ExecutionQueue` add `runsettings` varbinary(8192) DEFAULT NULL")) {
+        $conf->update_schema_version(153);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

@@ -101,41 +101,16 @@ class RunLogger {
     }
 
     /** @param int $jobid
-     * @param ?object $answer
      * @return ?object */
-    function job_status($jobid, $answer = null) {
-        if (!$jobid) {
-            return null;
-        }
-        $answer = $answer ?? (object) [];
-        if ($this->active_job() !== $jobid) {
-            $answer->done = true;
-            $answer->status = "done";
-        } else {
-            $answer->done = false;
-            $answer->status = "working";
-            if (Conf::$now - $jobid > 600) {
-                $answer->status = "old";
-            }
-        }
-        return $answer;
-    }
-
-    /** @param int $jobid
-     * @param ?object $answer
-     * @return ?object */
-    function job_info($jobid, $answer = null) {
-        $answer = $this->job_status($jobid, $answer);
-        if ($answer
-            && ($t = @file_get_contents($this->output_file($jobid), false, null, 0, 4096))
+    function job_info($jobid) {
+        if (($t = @file_get_contents($this->output_file($jobid), false, null, 0, 4096))
             && str_starts_with($t, "++ {")
             && ($pos = strpos($t, "\n"))
-            && ($j = json_decode(substr($t, 3, $pos - 3)))) {
-            foreach ((array) $j as $k => $v) {
-                if (!isset($answer->$k))
-                    $answer->$k = $v;
-            }
+            && ($j = json_decode(substr($t, 3, $pos - 3)))
+            && is_object($j)) {
+            return $j;
+        } else {
+            return null;
         }
-        return $answer;
     }
 }

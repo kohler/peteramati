@@ -432,7 +432,7 @@ class Pset {
         $this->has_transfer_warnings = $this->has_xterm_js = false;
         if (is_array($runners) || is_object($runners)) {
             foreach ((array) $p->runners as $k => $v) {
-                $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v, $default_runner);
+                $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v, $default_runner, $this);
                 if (isset($this->all_runners[$r->name])) {
                     throw new PsetConfigException("runner `$r->name` reused", "runners", $k);
                 }
@@ -457,7 +457,7 @@ class Pset {
         if (($overs = $p->run_overlay ?? null) !== null) {
             $this->run_overlay = [];
             foreach (is_array($overs) ? $overs : [$overs] as $k => $over) {
-                $this->run_overlay[] = new RunOverlayConfig($k, $over);
+                $this->run_overlay[] = new RunOverlayConfig($k, $over, $this);
             }
         }
         $this->run_jailfiles = self::cstr($p, "run_jailfiles");
@@ -1695,13 +1695,20 @@ class RunnerException extends Exception {
 }
 
 class RunnerConfig {
-    /** @var string */
+    /** @var Pset
+     * @readonly */
+    public $pset;
+    /** @var string
+     * @readonly */
     public $name;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $category;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $title;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $output_title;
     /** @var ?bool */
     public $disabled;
@@ -1738,13 +1745,14 @@ class RunnerConfig {
     /** @var null|bool|float */
     public $timed_replay;
 
-    function __construct($name, $r, $defr) {
+    function __construct($name, $r, $defr, Pset $pset) {
         $loc = ["runners", $name];
         if (!is_object($r)) {
             throw new PsetConfigException("runner format error", $loc);
         }
         $rs = $defr ? [$r, $defr] : $r;
 
+        $this->pset = $pset;
         $this->name = isset($r->name) ? $r->name : $name;
         if (!is_string($this->name) || !preg_match(',\A[A-Za-z][0-9A-Za-z_]*\z,', $this->name)) {
             throw new PsetConfigException("runner name format error", $loc);
@@ -1790,7 +1798,7 @@ class RunnerConfig {
         if (($overs = $r->overlay ?? null) !== null) {
             $this->overlay = [];
             foreach (is_array($overs) ? $overs : [$overs] as $k => $over) {
-                $this->overlay[] = new RunOverlayConfig($loc, $over);
+                $this->overlay[] = new RunOverlayConfig($loc, $over, $pset);
             }
         }
         if (isset($r->timed_replay)
@@ -1807,27 +1815,101 @@ class RunnerConfig {
     function category_argument() {
         return $this->category === $this->name ? null : $this->category;
     }
+
+    /** @param string $x
+     * @param Pset $pset
+     * @return string */
+    static function expand($x, $pset) {
+        if (strpos($x, '${') !== false) {
+            $x = str_replace('${PSET}', (string) $pset->id, $x);
+            $x = str_replace('${CONFDIR}', "conf/", $x);
+            $x = str_replace('${SRCDIR}', "src/", $x);
+            $x = str_replace('${HOSTTYPE}', $pset->conf->opt("hostType") ?? "", $x);
+        }
+        return $x;
+    }
+
+    /** @return ?string */
+    function jailfiles() {
+        $f = $this->pset->run_jailfiles ?? $this->pset->conf->opt("run_jailfiles");
+        return $f ? self::expand($f, $this->pset) : null;
+    }
+
+    /** @return list<string> */
+    function jailmanifest() {
+        $f = $this->pset->run_jailmanifest;
+        if ($f === null || $f === "" || $f === []) {
+            return [];
+        }
+        if (is_string($f)) {
+            $f = preg_split('/\r\n|\r|\n/', $f);
+        }
+        for ($i = 0; $i !== count($f); ) {
+            if ($f[$i] === "") {
+                array_splice($f, $i, 1);
+            } else {
+                ++$i;
+            }
+        }
+        return $f;
+    }
+
+    /** @return list<RunOverlayConfig> */
+    function overlay() {
+        return $this->overlay ?? $this->pset->run_overlay ?? [];
+    }
+
+    /** @return int */
+    function environment_timestamp() {
+        $t = 0;
+        if (($f = $this->jailfiles())) {
+            $t = max($t, (int) @filemtime($f));
+        }
+        foreach ($this->overlay() as $r) {
+            $t = max($t, (int) @filemtime($r->file));
+        }
+        return $t;
+    }
 }
 
 class RunOverlayConfig {
-    /** @var string */
+    /** @var Pset
+     * @readonly */
+    public $pset;
+    /** @var string
+     * @readonly */
     public $file;
-    /** @var ?list<string> */
+    /** @var ?list<string>
+     * @readonly */
     public $exclude;
 
-    function __construct($name, $r) {
+    /** @param Pset $pset */
+    function __construct($name, $r, $pset) {
         $loc = ["runner overlay", $name];
+        $this->pset = $pset;
         if (is_string($r)) {
             $this->file = $r;
         } else if (is_object($r)) {
             $this->file = Pset::cstr($loc, $r, "file") ?? null;
-            if ($this->file === null || $this->file === "") {
-                throw new PsetConfigException("runner overlay file format error", $loc);
-            }
             if (($x = Pset::cstr_or_str_list($loc, $r, "exclude"))) {
                 $this->exclude = is_string($x) ? [$x] : $x;
             }
         }
+        if ($this->file === null || $this->file === "") {
+            throw new PsetConfigException("runner overlay file format error", $loc);
+        }
+    }
+
+    /** @return string */
+    function absolute_path() {
+        $f = $this->file;
+        if (strpos($f, '${') !== null) {
+            $f = RunnerConfig::expand($f, $this->pset);
+        }
+        if ($f[0] !== '/') {
+            $f = SiteLoader::$root . "/" . $f;
+        }
+        return $f;
     }
 }
 

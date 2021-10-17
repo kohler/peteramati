@@ -212,6 +212,7 @@ CREATE TABLE `ExecutionQueue` (
   `lockfile` varchar(1024) DEFAULT NULL,
   `inputfifo` varchar(1024) DEFAULT NULL,
   `autorun` tinyint(1) NOT NULL DEFAULT '0',
+  `runsettings` varbinary(8192) DEFAULT NULL,
   PRIMARY KEY (`queueid`),
   KEY `queueclass` (`queueclass`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -333,7 +334,7 @@ CREATE TABLE `Settings` (
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 152);
+insert into Settings (name, value) values ('allowPaperOption', 153);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators

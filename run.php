@@ -167,17 +167,17 @@ class RunRequest {
             session_write_close();
 
             // run
-            $rstate->start($queue);
+            $queue->start();
 
             // save information about execution
-            $info->update_commit_notes(["run" => [$this->runner->category => $rstate->checkt]]);
+            $info->update_commit_notes(["run" => [$this->runner->category => $queue->runat]]);
 
             json_exit(["ok" => true,
                        "done" => false,
                        "status" => "working",
                        "repoid" => $info->repo->repoid,
                        "pset" => $info->pset->id,
-                       "timestamp" => $rstate->checkt]);
+                       "timestamp" => $queue->runat]);
         } catch (Exception $e) {
             self::quit($e->getMessage());
         }
