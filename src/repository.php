@@ -92,6 +92,7 @@ class Repository {
     /** @param string $url
      * @return ?Repository */
     static function find_or_create_url($url, Conf $conf) {
+        $url = normalize_uri($url);
         $result = $conf->qe("select * from Repository where url=?", $url);
         $repo = Repository::fetch($result, $conf);
         Dbl::free($result);

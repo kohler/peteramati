@@ -316,6 +316,61 @@ function base64url_decode($text) {
     return base64_decode(strtr($text, '-_', '+/'));
 }
 
+/** @param string $uri
+ * @return string */
+function normalize_uri($uri) {
+    if (strpos($uri, "%") !== false) {
+        $uri = preg_replace_callback('/%[0-9A-Fa-f][0-9A-Fa-f]/', function ($m) {
+            $ch = intval(substr($m[0], 1), 16);
+            if ($ch === 0x2D
+                || $ch === 0x2E
+                || ($ch >= 0x30 && $ch <= 0x39)
+                || ($ch >= 0x41 && $ch <= 0x5A)
+                || $ch >= 0x5F
+                || ($ch >= 0x61 && $ch <= 0x7A)
+                || $ch === 0x7E) {
+                return chr($ch);
+            } else {
+                return strtoupper($m[0]);
+            }
+        }, $uri);
+    }
+    $x = parse_url($uri);
+    if ($x === false) {
+        return "";
+    }
+    $t = "";
+    if (isset($x["scheme"])) {
+        $t = strtolower($x["scheme"]) . ":";
+    }
+    if (isset($x["host"])) {
+        $t .= "//";
+        if (isset($x["user"])) {
+            $t .= $x["user"];
+            if (isset($x["password"])) {
+                $t .= ":" . $x["password"];
+            }
+            $t .= "@";
+        }
+        $t .= strtolower($x["host"]);
+        if (isset($x["port"])
+            && ($x["port"] !== "80" || strcasecmp($x["scheme"] ?? "", "http") !== 0)
+            && ($x["port"] !== "443" || strcasecmp($x["scheme"] ?? "", "https") !== 0)) {
+            $t .= ":" . $x["port"];
+        }
+    }
+    if (isset($x["path"])) {
+        $t .= $x["path"];
+    }
+    if (isset($x["query"])) {
+        $t .= "?" . $x["query"];
+    }
+    if (isset($x["fragment"])) {
+        $t .= "#" . $x["fragment"];
+    }
+    return $t;
+}
+
 
 // JSON encoding helpers
 
