@@ -310,25 +310,6 @@ class Contact {
         return strnatcasecmp($a->sorter, $b->sorter);
     }
 
-    /** @return Contact */
-    static function site_contact() {
-        global $Opt;
-        if (!($Opt["contactEmail"] ?? false) || $Opt["contactEmail"] == "you@example.com") {
-            $result = Dbl::ql("select firstName, lastName, nickname, email from ContactInfo where (roles&" . (self::ROLE_CHAIR | self::ROLE_ADMIN) . ")!=0 order by (roles&" . self::ROLE_CHAIR . ") desc limit 1");
-            if ($result && ($row = $result->fetch_object())) {
-                $Opt["defaultSiteContact"] = true;
-                $Opt["contactName"] = Text::name_text($row);
-                $Opt["contactEmail"] = $row->email;
-            }
-        }
-        return new Contact((object) array("fullName" => $Opt["contactName"],
-                                          "email" => $Opt["contactEmail"],
-                                          "isChair" => true,
-                                          "isPC" => true,
-                                          "is_site_contact" => true,
-                                          "contactTags" => null));
-    }
-
     private function assign_roles($roles) {
         $this->roles = $roles;
         $this->isPC = ($roles & self::ROLE_PCLIKE) != 0;

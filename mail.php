@@ -429,7 +429,7 @@ if (isset($Qreq->cc) && $Me->privChair)
 else if (isset($Opt["emailCc"]))
     $Qreq->cc = $Opt["emailCc"] ? $Opt["emailCc"] : "";
 else
-    $Qreq->cc = Text::user_email_to(Contact::site_contact());
+    $Qreq->cc = Text::user_email_to($Conf->site_contact());
 if (isset($Qreq->replyto) && $Me->privChair)
     $Qreq->replyto = simplify_whitespace($Qreq->replyto);
 else

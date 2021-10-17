@@ -133,17 +133,20 @@ class Conf {
     private $_date_format_initialized = false;
     /** @var ?DateTimeZone */
     private $_dtz;
-    private $_pc_members_cache = null;
-    private $_pc_tags_cache = null;
-    private $_pc_members_and_admins_cache = null;
+    /** @var ?array<int,Contact> */
+    private $_pc_members_cache;
+    private $_pc_tags_cache;
+    private $_pc_members_and_admins_cache;
+    /** @var ?Contact */
+    private $_site_contact;
     /** @var array<string,Repository> */
     private $_handout_repos = [];
     /** @var array<int,array<string,CommitRecord>> */
     private $_handout_commits = [];
     /** @var array<int,?CommitRecord> */
     private $_handout_latest_commit = [];
-    private $_api_map = null;
-    private $_repository_site_classes = null;
+    private $_api_map;
+    private $_repository_site_classes;
     private $_branch_map;
     const USERNAME_GITHUB = 1;
     const USERNAME_HARVARDSEAS = 2;
@@ -423,6 +426,7 @@ class Conf {
         }
         $this->sort_by_last = $sort_by_last;
         $this->default_format = (int) ($this->opt["defaultFormat"] ?? 0);
+        $this->_site_contact = null;
         $this->_api_map = null;
         $this->_date_format_initialized = false;
         $this->_dtz = null;
@@ -806,6 +810,7 @@ class Conf {
 
     // name
 
+    /** @return string */
     function full_name() {
         if ($this->short_name && $this->short_name != $this->long_name) {
             return $this->long_name . " (" . $this->short_name . ")";
@@ -817,29 +822,42 @@ class Conf {
 
     // users
 
+    /** @return bool */
     function external_login() {
         return isset($this->opt["ldapLogin"]) || isset($this->opt["httpAuthLogin"]);
     }
 
-    function site_contact() {
-        $contactEmail = $this->opt("contactEmail");
-        if (!$contactEmail || $contactEmail == "you@example.com") {
-            $result = $this->ql("select firstName, lastName, email from ContactInfo where (roles&" . (Contact::ROLE_CHAIR | Contact::ROLE_ADMIN) . ")!=0 order by (roles&" . Contact::ROLE_CHAIR . ") desc limit 1");
-            if ($result && ($row = $result->fetch_object())) {
-                $this->set_opt("defaultSiteContact", true);
-                $this->set_opt("contactName", Text::name_text($row));
-                $this->set_opt("contactEmail", $row->email);
-            }
-            Dbl::free($result);
-        }
-        return new Contact((object) array("fullName" => $this->opt["contactName"],
-                                          "email" => $this->opt["contactEmail"],
-                                          "isChair" => true,
-                                          "isPC" => true,
-                                          "is_site_contact" => true,
-                                          "contactTags" => null), $this);
+    /** @return object */
+    function default_site_contact() {
+        $result = $this->ql("select firstName, lastName, affiliation, email from ContactInfo where roles!=0 and (roles&" . (Contact::ROLE_CHAIR | Contact::ROLE_ADMIN) . ")!=0 order by (roles&" . Contact::ROLE_CHAIR . ") desc, contactId asc limit 1");
+        $chair = $result->fetch_object();
+        Dbl::free($result);
+        return $chair;
     }
 
+    /** @return Contact */
+    function site_contact() {
+        if (!$this->_site_contact) {
+            $args = [
+                "fullName" => $this->opt("contactName"),
+                "email" => $this->opt("contactEmail"),
+                "isChair" => 1, "isPC" => 1, "is_site_contact" => 1,
+                "contactTags" => null
+            ];
+            if ((!$args["email"] || $args["email"] === "you@example.com")
+                && ($row = $this->default_site_contact())) {
+                unset($args["fullName"]);
+                $args["email"] = $row->email;
+                $args["firstName"] = $row->firstName;
+                $args["lastName"] = $row->lastName;
+            }
+            $this->_site_contact = new Contact($args, $this);
+        }
+        return $this->_site_contact;
+    }
+
+    /** @param int $id
+     * @return ?Contact */
     function user_by_id($id) {
         $result = $this->qe("select ContactInfo.* from ContactInfo where contactId=?", $id);
         $acct = Contact::fetch($result, $this);
@@ -847,6 +865,8 @@ class Conf {
         return $acct;
     }
 
+    /** @param string $email
+     * @return ?Contact */
     function user_by_email($email) {
         $acct = null;
         if (($email = trim((string) $email)) !== "") {
@@ -857,6 +877,7 @@ class Conf {
         return $acct;
     }
 
+    /** @return ?Contact */
     function user_by_query($qpart, $args) {
         $result = $this->qe_apply("select ContactInfo.* from ContactInfo where $qpart", $args);
         $acct = Contact::fetch($result, $this);
@@ -864,6 +885,7 @@ class Conf {
         return $acct && $acct->contactId ? $acct : null;
     }
 
+    /** @return ?Contact */
     function user_by_whatever($whatever, $types = 0) {
         if ($types === 0) {
             $types = $this->_username_classes | self::USERNAME_HUID | self::USERNAME_EMAIL;
@@ -927,6 +949,8 @@ class Conf {
         }
     }
 
+    /** @param string $email
+     * @return int|false */
     function user_id_by_email($email) {
         $result = $this->qe("select contactId from ContactInfo where email=?", trim($email));
         $row = $result->fetch_row();
@@ -934,6 +958,7 @@ class Conf {
         return $row ? (int) $row[0] : false;
     }
 
+    /** @return associative-array<int,Contact> */
     function pc_members() {
         if ($this->_pc_members_cache === null) {
             $pc = $pca = array();
@@ -980,28 +1005,35 @@ class Conf {
         return $this->_pc_members_cache;
     }
 
+    /** @return associative-array<int,Contact> */
     function pc_members_and_admins() {
-        if ($this->_pc_members_and_admins_cache === null)
+        if ($this->_pc_members_and_admins_cache === null) {
             $this->pc_members();
+        }
         return $this->_pc_members_and_admins_cache;
     }
 
+    /** @param string $email
+     * @return ?Contact */
     function pc_member_by_email($email) {
-        foreach ($this->pc_members() as $p)
+        foreach ($this->pc_members() as $p) {
             if (strcasecmp($p->email, $email) == 0)
                 return $p;
+        }
         return null;
     }
 
     function pc_tags() {
-        if ($this->_pc_tags_cache === null)
+        if ($this->_pc_tags_cache === null) {
             $this->pc_members();
+        }
         return $this->_pc_tags_cache;
     }
 
     function pc_tag_exists($tag) {
-        if ($this->_pc_tags_cache === null)
+        if ($this->_pc_tags_cache === null) {
             $this->pc_members();
+        }
         return isset($this->_pc_tags_cache[strtolower($tag)]);
     }
 

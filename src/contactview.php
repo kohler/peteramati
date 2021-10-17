@@ -564,7 +564,7 @@ class ContactView {
         if ($branchid === null
             || ($branchid === 0
                 && ($pset->main_branch === "master"
-                    || $user->repo($pset)))) {
+                    || $user->repo($pset->id)))) {
             $user->clear_links(LINK_BRANCH, $pset->id);
         } else {
             $user->set_link(LINK_BRANCH, $pset->id, $branchid);
