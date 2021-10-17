@@ -27,16 +27,10 @@ class RunnerState {
     /** @var string */
     private $logfile;
     /** @var ?string */
-    private $timingfile;
-    /** @var ?string */
     private $pidfile;
     /** @var ?string */
     private $inputfifo;
     private $logstream;
-    /** @var string */
-    private $username;
-    /** @var string */
-    private $userhome;
     /** @var string */
     private $jaildir;
     /** @var string */
@@ -243,25 +237,25 @@ class RunnerState {
 
         // collect user information
         if ($this->runner->username) {
-            $this->username = $this->runner->username;
+            $username = $this->runner->username;
         } else if ($this->pset->run_username) {
-            $this->username = $this->pset->run_username;
+            $username = $this->pset->run_username;
         } else {
-            $this->username = "jail61user";
+            $username = "jail61user";
         }
-        if (!preg_match('/\A\w+\z/', $this->username)) {
+        if (!preg_match('/\A\w+\z/', $username)) {
             throw new RunnerException("Bad run_username");
         }
 
-        $info = posix_getpwnam($this->username);
-        $this->userhome = $info ? $info["dir"] : "/home/jail61";
-        $this->userhome = preg_replace('/\/+\z/', '', $this->userhome);
+        $info = posix_getpwnam($username);
+        $userhome = $info ? $info["dir"] : "/home/jail61";
+        $userhome = preg_replace('/\/+\z/', '', $userhome);
 
         $this->jaildir = preg_replace('/\/+\z/', '', $this->expand($this->pset->run_dirpattern));
         if (!$this->jaildir) {
             throw new RunnerException("Bad run_dirpattern");
         }
-        $this->jailhomedir = $this->jaildir . "/" . preg_replace('/\A\/+/', '', $this->userhome);
+        $this->jailhomedir = $this->jaildir . "/" . preg_replace('/\A\/+/', '', $userhome);
 
         if (!chdir(SiteLoader::$root)) {
             throw new RunnerException("Can’t cd to main directory");
@@ -275,7 +269,7 @@ class RunnerState {
         $this->checkt = time();
         $logbase = $this->runner->job_prefix($this->info, $this->checkt);
         $this->logfile = "{$logbase}.log";
-        $this->timingfile = "{$logbase}.log.time";
+        $timingfile = "{$logbase}.log.time";
         $this->pidfile = $this->runner->pid_file($this->info);
         file_put_contents($this->pidfile, "");
         $this->inputfifo = "{$logbase}.in";
@@ -283,7 +277,7 @@ class RunnerState {
             $this->inputfifo = null;
         }
         if ($this->runner->timed_replay) {
-            touch($this->timingfile);
+            touch($timingfile);
         }
         $this->logstream = fopen($this->logfile, "a");
         if ($queue) {
@@ -309,7 +303,7 @@ class RunnerState {
 
         // create jail
         $this->remove_old_jails();
-        if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->jaildir) . " " . escapeshellarg($this->username))) {
+        if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->jaildir) . " " . escapeshellarg($username))) {
             throw new RunnerException("Can’t initialize jail");
         }
 
@@ -325,7 +319,7 @@ class RunnerState {
             . " -P'{$this->checkt} $$"
             . ($this->inputfifo ? " -i" : "") . "'";
         if ($this->runner->timed_replay) {
-            $command .= " -t" . escapeshellarg($this->timingfile);
+            $command .= " -t" . escapeshellarg($timingfile);
         }
 
         $skeletondir = $this->pset->run_skeletondir ? : $this->conf->opt("run_skeletondir");
@@ -344,7 +338,7 @@ class RunnerState {
                 $contents .= " $jhash $jfiles";
             }
             $contents .= "]\n"
-                . $this->userhome . " <- " . $this->jailhomedir . " [bind]";
+                . $userhome . " <- " . $this->jailhomedir . " [bind]";
             $command .= " -u" . escapeshellarg($this->jailhomedir)
                 . " -F" . escapeshellarg($contents);
             $homedir = $binddir;
@@ -373,7 +367,7 @@ class RunnerState {
             $command .= " -i" . escapeshellarg($this->inputfifo);
         }
         $command .= " " . escapeshellarg($homedir)
-            . " " . escapeshellarg($this->username)
+            . " " . escapeshellarg($username)
             . " TERM=xterm-256color"
             . " " . escapeshellarg($this->expand($this->runner->command));
         $this->pidfile = null; /* now owned by command */
@@ -469,9 +463,9 @@ class RunnerState {
     private function add_run_settings($s) {
         $mk = $sh = [];
         foreach ((array) $s as $k => $v) {
-            if (preg_match('{\A[A-Za-z_][A-Za-z_0-9]*\z}', $k)
-                && !preg_match('{\A(?:PATH|MAKE|HOME|SHELL|POSIXLY_CORRECT|TMPDIR|LANG|USER|LOGNAME|SSH.*|PS\d|HISTFILE|LD_LIBRARY_PATH|HOST|HOSTNAME|TERM|TERMCAP|EDITOR|PAGER|MANPATH)\z}', $k)) {
-                if (preg_match('{\A[-A-Za-z0-9_:/ .,]*\z}', $v)) {
+            if (preg_match('/\A[A-Za-z_][A-Za-z_0-9]*\z/', $k)
+                && !preg_match('/\A(?:PATH|MAKE|HOME|SHELL|POSIXLY_CORRECT|TMPDIR|LANG|USER|LOGNAME|SSH.*|PS\d|HISTFILE|LD_LIBRARY_PATH|HOST|HOSTNAME|TERM|TERMCAP|EDITOR|PAGER|MANPATH)\z/', $k)) {
+                if (preg_match('/\A[-A-Za-z0-9_:\/ .,]*\z/', $v)) {
                     $mk[] = "$k = $v\n";
                 }
                 $sh[] = "$k=" . escapeshellarg($v) . "\n";
@@ -482,6 +476,7 @@ class RunnerState {
     }
 
 
+    /** @return ?QueueItem */
     private function load_queue() {
         if ($this->queueid === null) {
             return null;
@@ -493,9 +488,9 @@ class RunnerState {
             from ExecutionQueue q
             left join ExecutionQueue fq on (fq.queueclass=q.queueclass and fq.queueid<q.queueid)
             where q.queueid={$this->queueid} group by q.queueid");
-        $queue = $result->fetch_object();
+        $queue = QueueItem::fetch($this->conf, $result);
         Dbl::free($result);
-        if ($queue && $queue->repoid == $this->repoid) {
+        if ($queue && $queue->repoid === $this->repoid) {
             return $queue;
         } else {
             return null;
@@ -506,7 +501,7 @@ class RunnerState {
         assert($this->queueid !== null);
         $runtimeout = isset($qconf->runtimeout) ? $qconf->runtimeout : 300;
         $result = $this->conf->qe("select * from ExecutionQueue where queueclass=? and queueid<?", $this->runner->queue, $this->queueid);
-        while (($row = $result->fetch_object())) {
+        while (($row = QueueItem::fetch($this->conf, $result))) {
             // remove dead items from queue
             // - pidfile contains "0\n": child has exited, remove it
             // - pidfile specified but not there
@@ -514,7 +509,7 @@ class RunnerState {
             // - running for more than 5min (configurable)
             if (($row->runat > 0
                  && $row->lockfile
-                 && $this->runner->active_job($this->info, $row->lockfile) != $row->runat)
+                 && $this->runner->active_job_at($row->lockfile) != $row->runat)
                 || ($row->runat <= 0
                     && $row->updateat < Conf::$now - 30)
                 || ($runtimeout
@@ -526,6 +521,7 @@ class RunnerState {
         Dbl::free($result);
     }
 
+    /** @return ?QueueItem */
     function make_queue() {
         if (!isset($this->runner->queue)) {
             return null;
@@ -537,11 +533,15 @@ class RunnerState {
                 && $this->runner->nconcurrent > 0) {
                 $nconcurrent = $this->runner->nconcurrent;
             }
-            $this->conf->qe("insert into ExecutionQueue set queueclass=?, repoid=?, insertat=?, updateat=?, runat=0, status=0, nconcurrent=?, psetid=?, runnername=?, bhash=?",
-                    $this->runner->queue, $this->repoid,
-                    Conf::$now, Conf::$now, $nconcurrent,
-                    $this->pset->id, $this->runner->name,
-                    hex2bin($this->info->commit_hash()));
+            $this->conf->qe("insert into ExecutionQueue set reqcid=?,
+                    runnername=?, cid=?, psetid=?, repoid=?, bhash=?,
+                    queueclass=?, nconcurrent=?,
+                    insertat=?, updateat=?, runat=0, status=0",
+                    $this->info->viewer->contactId,
+                    $this->runner->name, $this->info->user->contactId, $this->pset->id,
+                    $this->repoid, hex2bin($this->info->commit_hash()),
+                    $this->runner->queue, $nconcurrent,
+                    Conf::$now, Conf::$now);
             $this->queueid = $this->conf->dblink->insert_id;
         } else {
             $this->conf->qe("update ExecutionQueue set updateat=? where queueid=?",

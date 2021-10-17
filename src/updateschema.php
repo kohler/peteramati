@@ -727,6 +727,50 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table `CommitNotes` add `xnotesOverflow` longblob DEFAULT NULL")) {
         $conf->update_schema_version(146);
     }
+    if ($conf->sversion === 146
+        && $conf->ql_ok("alter table `ExecutionQueue` change `bhash` `bhash` varbinary(32) DEFAULT NULL")
+        && $conf->ql_ok("alter table `ExecutionQueue` add `reqcid` int NOT NULL DEFAULT '0'")
+        && $conf->ql_ok("alter table `ExecutionQueue` add `cid` int NOT NULL DEFAULT '0'")
+        && $conf->ql_ok("alter table `ExecutionQueue` change `reqcid` `reqcid` int NOT NULL")
+        && $conf->ql_ok("alter table `ExecutionQueue` change `cid` `cid` int")) {
+        $conf->update_schema_version(147);
+    }
+    if ($conf->sversion === 147
+        && $conf->ql_ok("alter table `ExecutionQueue` change `runnername` `runnername` varbinary(128) NOT NULL")) {
+        $conf->update_schema_version(148);
+    }
+    if ($conf->sversion === 148
+        && $conf->ql_ok("alter table `ExecutionQueue` change `repoid` `repoid` int DEFAULT NULL")) {
+        $conf->update_schema_version(149);
+    }
+    if ($conf->sversion === 149
+        && $conf->ql_ok("alter table `ExecutionQueue` change `psetid` `psetid` int NOT NULL")) {
+        $conf->update_schema_version(150);
+    }
+    if ($conf->sversion === 150
+        && $conf->ql_ok("alter table `ActionLog` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `Branch` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `Capability` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `CommitNotes` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `ContactGrade` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `ContactGradeHistory` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `ContactImage` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `ContactInfo` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `ContactLink` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `ExecutionQueue` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `GroupSettings` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `MailLog` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `Repository` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `RepositoryCommitSnapshot` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `RepositoryGrade` convert to character set utf8mb4")
+        && $conf->ql_ok("alter table `Settings` convert to character set utf8mb4")) {
+        $conf->update_schema_version(151);
+    }
+    if ($conf->sversion === 151
+        && $conf->ql_ok("update ExecutionQueue set cid=0 where cid is null")
+        && $conf->ql_ok("alter table `ExecutionQueue` change `cid` `cid` int NOT NULL")) {
+        $conf->update_schema_version(152);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

@@ -1764,11 +1764,9 @@ class RunnerConfig {
         return $this->log_file($info, ".{$jobid}.log");
     }
 
-    /** @param PsetView $info
-     * @param ?string $fn
+    /** @param string $fn
      * @return int|false */
-    function active_job($info, $fn = null) {
-        $fn = $fn ?? $this->pid_file($info);
+    function active_job_at($fn) {
         if (($f = @fopen($fn, "r"))) {
             $s = stream_get_contents($f);
             $runat = false;
@@ -1795,6 +1793,12 @@ class RunnerConfig {
         } else {
             return false;
         }
+    }
+
+    /** @param PsetView $info
+     * @return int|false */
+    function active_job($info) {
+        return $this->active_job_at($this->pid_file($info));
     }
 
     /** @param PsetView $info
