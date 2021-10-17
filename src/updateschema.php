@@ -748,6 +748,7 @@ function updateSchema($conf) {
         $conf->update_schema_version(150);
     }
     if ($conf->sversion === 150
+        && $conf->ql_ok("alter table `Repository` change `url` `url` varbinary(512) NOT NULL")
         && $conf->ql_ok("alter table `ActionLog` convert to character set utf8mb4")
         && $conf->ql_ok("alter table `Branch` convert to character set utf8mb4")
         && $conf->ql_ok("alter table `Capability` convert to character set utf8mb4")

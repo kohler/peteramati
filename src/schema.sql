@@ -258,7 +258,7 @@ CREATE TABLE `MailLog` (
 DROP TABLE IF EXISTS `Repository`;
 CREATE TABLE `Repository` (
   `repoid` int(11) NOT NULL AUTO_INCREMENT,
-  `url` varchar(255) NOT NULL,
+  `url` varbinary(512) NOT NULL,
   `cacheid` varchar(20) NOT NULL,
   `open` int(11) NOT NULL,
   `opencheckat` bigint(11) NOT NULL DEFAULT '0',
