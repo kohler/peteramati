@@ -362,7 +362,7 @@ class Pset {
         if ($p->grade_order ?? null) {
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         } else {
-            $this->grades = self::position_sort("grades", $this->grades);
+            $this->grades = self::position_sort("grades", $this->grades ?? []);
         }
         $this->grades_total = self::cnum($p, "grades_total");
         $this->grades_history = self::cbool($p, "grades_history") ?? false;

@@ -30,7 +30,7 @@ handle_ui.on("js-toggle-gc-markdown-preview", function () {
     const pd = this.closest(".pa-pd"),
         ta = pd.querySelector("textarea");
     if (hasClass(ta, "hidden")) {
-        pd.removeChild(ta.previousSibling);
+        ta.parentElement.removeChild(ta.previousSibling);
         removeClass(ta, "hidden");
         ta.focus();
         this.innerHTML = "Preview";
