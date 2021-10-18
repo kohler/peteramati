@@ -39,7 +39,7 @@ class GradeExport implements JsonSerializable {
     public $editable;
     /** @var ?list<GradeEntryConfig> */
     private $visible_grades;
-    /** @var ?list<bool> */
+    /** @var ?list<int> */
     private $known_entries;
 
     /** @param bool $pc_view */
@@ -88,9 +88,9 @@ class GradeExport implements JsonSerializable {
     /** @param list<string> $known_entries */
     function suppress_known_entries($known_entries) {
         $this->known_entries = $this->known_entries ?? array_fill(0, count($this->pset->grades), false);
-        foreach ($known_entries as $key) {
+        foreach ($known_entries as $i => $key) {
             if (($ge = $this->pset->grades[$key]))
-                $this->known_entries[$ge->pcview_index] = true;
+                $this->known_entries[$ge->pcview_index] = $i;
         }
     }
 
@@ -174,13 +174,17 @@ class GradeExport implements JsonSerializable {
         }
         if ($this->include_entries || $this->visible_grades !== null) {
             $entries = $order = [];
+            $need_order = $this->known_entries === null;
             $gi = $maxtotal = 0;
             foreach ($this->visible_grades() as $ge) {
-                $order[] = $ge->key;
-                if (!isset($this->known_entries)
-                    || !$this->known_entries[$ge->pcview_index]) {
+                if ($this->known_entries === null
+                    || $this->known_entries[$ge->pcview_index] === false) {
                     $entries[$ge->key] = $ge->json($this->pc_view, $gi);
+                    $need_order = true;
+                } else if ($this->known_entries[$ge->pcview_index] !== count($order)) {
+                    $need_order = true;
                 }
+                $order[] = $ge->key;
                 if ($ge->max
                     && !$ge->is_extra
                     && !$ge->no_total
@@ -196,7 +200,9 @@ class GradeExport implements JsonSerializable {
                     $r["entries"] = (object) $entries;
                 }
             }
-            $r["order"] = $order;
+            if ($need_order) {
+                $r["order"] = $order;
+            }
             if ($this->pset->grades_total !== null) {
                 $r["maxtotal"] = $this->pset->grades_total;
             } else if ($maxtotal > 0) {
