@@ -46,11 +46,12 @@ GradeClass.add("timermark", {
         };
     },
     entry: function () {
-        let t = '<button class="ui js-timermark hidden" type="button" name="'.concat(this.key, ':b" value="1">Press to start</button>');
+        let t = '<button class="ui js-timermark hidden mr-2" type="button" name="'.concat(this.key, ':b" value="1">Press to start</button>');
         if (siteinfo.user.is_pclike) {
-            t = t.concat('<button class="ui js-timermark hidden" type="button" name="', this.key, ':r" value="0">Reset</button>');
+            t = t.concat('<button class="ui js-timermark hidden mr-2" type="button" name="', this.key, ':r" value="0">Reset</button>');
         }
-        return t.concat('<span class="pa-timermark-result hidden"></span><input type="hidden" class="uich pa-gradevalue" name="', this.key, '">');
+        t = t.concat('<span class="pa-timermark-result hidden"></span><input type="hidden" class="uich pa-gradevalue" name="', this.key, '">');
+        return t;
     },
     reflect_value: function (elt, g) {
         const pd = elt.closest(".pa-pd");
@@ -58,7 +59,7 @@ GradeClass.add("timermark", {
             e.classList.toggle("hidden", !g !== (e.value === "1"));
         });
         const tm = pd.querySelector(".pa-timermark-result");
-        tm.classList.toggle("hidden", !g);
+        tm.classList.toggle("hidden", !g && !this.timeout);
         const to = $(elt).data("pa-timermark-interval");
         to && clearInterval(to);
         if (g
@@ -73,6 +74,8 @@ GradeClass.add("timermark", {
                 t += sprintf(" (updated %dh%dm later at %s)", delta / 3600, (delta / 60) % 60, strftime(timefmt, this._all.updateat));
             }
             tm.innerHTML = t;
+        } else if (this.timeout) {
+            tm.innerHTML = "Time once started: " + sec2text(this.timeout);
         }
     },
     justify: "left",
@@ -87,16 +90,26 @@ handle_ui.on("js-timermark", function () {
     $(elt).trigger("change");
 });
 
+function sec2text(s) {
+    if (s >= 3600 && s % 900 == 0) {
+        return (s / 3600) + "h";
+    } else if (s >= 3600) {
+        return sprintf("%dh%dm", s / 3600, (s / 60) % 60);
+    } else if (s > 360) {
+        return sprintf("%dm", s / 60);
+    } else {
+        return sprintf("%dm%ds", s / 60, s % 60);
+    }
+}
+
 function timermark_interval(ge, tm, gv) {
     const delta = +document.body.getAttribute("data-time-skew"),
         left = gv + ge.timeout - new Date().getTime() / 1000 + delta;
     let t = strftime(timefmt, gv);
-    if (left >= 3600) {
-        t += sprintf(" (%dh%dm left)", left / 3600, (left / 60) % 60);
-    } else if (left > 360) {
-        t += sprintf(" (%dm left)", left / 60);
+    if (left > 360) {
+        t = t.concat(" (", sec2text(left), " left)");
     } else if (left > 0) {
-        t += sprintf(" <strong class=\"overdue\">(%dm%ds left)</strong>", left / 60, left % 60);
+        t = t.concat(" <strong class=\"overdue\">(", sec2text(left), " left)</strong>");
     }
     tm.innerHTML = t;
 }
