@@ -1258,7 +1258,7 @@ class PsetView {
     /** @return bool */
     function has_nonempty_assigned_grades() {
         foreach ($this->nonempty_visible_grades() as $ge) {
-            if (!$ge->answer) {
+            if (!$ge->answer && !$ge->concealed) {
                 return true;
             }
         }
