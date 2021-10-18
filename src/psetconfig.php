@@ -375,7 +375,7 @@ class Pset {
         $vis2 = $vis1 && $this->grades_visible;
         foreach (array_values($this->grades) as $i => $ge) {
             $ge->pcview_index = $i;
-            if ($ge->visible && $vis1 && ($vis2 || $ge->answer)) {
+            if ($ge->visible && $vis1 && ($vis2 || $ge->answer || $ge->concealed)) {
                 $this->grades_vf[] = 3;
             } else {
                 $this->grades_vf[] = 2;
@@ -1129,6 +1129,9 @@ class GradeEntryConfig {
     public $visible;
     /** @var bool */
     private $_visible_defaulted = false;
+    /** @var bool
+     * @readonly */
+    public $concealed;
     /** @var ?string */
     public $round;
     /** @var ?list<string> */
@@ -1166,6 +1169,8 @@ class GradeEntryConfig {
     public $landmark_buttons;
     /** @var ?int */
     public $timeout;
+    /** @var ?string */
+    public $timeout_entry;
     /** @var ?string */
     private $_last_error;
     /** @var object */
@@ -1217,7 +1222,7 @@ class GradeEntryConfig {
         $type = null;
         if (isset($g->type)) {
             $type = Pset::cstr($loc, $g, "type");
-            if ($type === "number") {
+            if ($type === "number" || $type === "numeric") {
                 $type = null;
                 $this->type_tabular = $this->type_numeric = $allow_total = true;
             } else if (in_array($type, ["checkbox", "checkboxes", "stars"], true)) {
@@ -1294,6 +1299,9 @@ class GradeEntryConfig {
         } else {
             $this->visible = $this->_visible_defaulted = true;
         }
+        if (isset($g->concealed)) {
+            $this->concealed = Pset::cbool($loc, $g, "concealed");
+        }
         if (isset($g->max_visible)) {
             $this->max_visible = Pset::cbool($loc, $g, "max_visible");
         } else if (isset($g->hide_max)) {
@@ -1356,6 +1364,7 @@ class GradeEntryConfig {
         }
 
         $this->timeout = Pset::cinterval($loc, $g, "timeout");
+        $this->timeout_entry = Pset::cstr($loc, $g, "timeout_entry");
 
         $this->config = $g;
     }
@@ -1591,6 +1600,9 @@ class GradeEntryConfig {
         if ($this->type === "timermark" && isset($this->timeout)) {
             $gej["timeout"] = $this->timeout;
         }
+        if ($this->type === "timermark" && isset($this->timeout_entry)) {
+            $gej["timeout_entry"] = $this->timeout_entry;
+        }
         if ($this->landmark_file) {
             $gej["landmark"] = $this->landmark_file . ":" . $this->landmark_line;
         }
@@ -1599,6 +1611,9 @@ class GradeEntryConfig {
         }
         if (!$this->visible) {
             $gej["visible"] = false;
+        }
+        if ($this->concealed) {
+            $gej["concealed"] = true;
         }
         if ($this->answer)  {
             $gej["answer"] = true;

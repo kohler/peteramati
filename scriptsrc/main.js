@@ -826,6 +826,10 @@ function pa_resolve_gradelist() {
         sectioned = gi.has_sections;
     for (let i = 0; i !== gi.order.length; ++i) {
         const k = gi.order[i], ge = gi.entries[k];
+        if (!gi.editable && ge.concealed) {
+            continue;
+        }
+
         if (sectioned && (ge.type === "section" || insp === this)) {
             // end current section
             while (insp !== this) {

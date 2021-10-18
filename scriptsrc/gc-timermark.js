@@ -3,6 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { GradeClass } from "./gc.js";
+import { GradeSheet } from "./gradeentry.js";
 import { handle_ui } from "./ui.js";
 import { sprintf, strftime } from "./utils.js";
 
@@ -54,17 +55,26 @@ GradeClass.add("timermark", {
         return t;
     },
     reflect_value: function (elt, g) {
+        this._timeout = this.timeout;
+        if (this.timeout_entry) {
+            let gs = GradeSheet.closest(elt), ge, gv;
+            if (gs
+                && (ge = gs.entries[this.timeout_entry])
+                && (gv = gs.grade_value(ge)) != null) {
+                this._timeout = gv;
+            }
+        }
         const pd = elt.closest(".pa-pd");
         pd.querySelectorAll(".js-timermark").forEach(function (e) {
             e.classList.toggle("hidden", !g !== (e.value === "1"));
         });
         const tm = pd.querySelector(".pa-timermark-result");
-        tm.classList.toggle("hidden", !g && !this.timeout);
+        tm.classList.toggle("hidden", !g && !this._timeout);
         const to = $(elt).data("pa-timermark-interval");
         to && clearInterval(to);
         if (g
-            && this.timeout
-            && g + this.timeout > +document.body.getAttribute("data-now")) {
+            && this._timeout
+            && g + this._timeout > +document.body.getAttribute("data-now")) {
             timermark_interval(this, tm, g);
             $(elt).data("pa-timermark-interval", setInterval(timermark_interval, 15000, this, tm, g));
         } else if (g) {
@@ -74,8 +84,8 @@ GradeClass.add("timermark", {
                 t += sprintf(" (updated %dh%dm later at %s)", delta / 3600, (delta / 60) % 60, strftime(timefmt, this._all.updateat));
             }
             tm.innerHTML = t;
-        } else if (this.timeout) {
-            tm.innerHTML = "Time once started: " + sec2text(this.timeout);
+        } else if (this._timeout) {
+            tm.innerHTML = "Time once started: " + sec2text(this._timeout);
         }
     },
     justify: "left",
@@ -104,7 +114,7 @@ function sec2text(s) {
 
 function timermark_interval(ge, tm, gv) {
     const delta = +document.body.getAttribute("data-time-skew"),
-        left = gv + ge.timeout - new Date().getTime() / 1000 + delta;
+        left = gv + ge._timeout - new Date().getTime() / 1000 + delta;
     let t = strftime(timefmt, gv);
     if (left > 360) {
         t = t.concat(" (", sec2text(left), " left)");

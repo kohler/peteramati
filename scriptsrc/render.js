@@ -98,7 +98,10 @@ function on() {
 
 $.extend(render_text, {
     add_format: function (x) {
-        x.format && (renderers[x.format] = x);
+        if (!x.format || renderers[x.format]) {
+            throw new Error("bad or reused format");
+        }
+        renderers[x.format] = x;
     },
     format: function (format) {
         return lookup(format);
@@ -122,7 +125,7 @@ function try_highlight(str, lang) {
     return "";
 }
 
-let md;
+let md, md2;
 
 render_text.add_format({
     format: 1,
@@ -131,6 +134,16 @@ render_text.add_format({
             md = window.markdownit({highlight: try_highlight, linkify: true}).use(markdownit_katex).use(markdownit_minihtml);
         }
         return md.render(text);
+    }
+});
+
+render_text.add_format({
+    format: 3,
+    render: function (text) {
+        if (!md2) {
+            md2 = window.markdownit({highlight: try_highlight, linkify: true, html: true}).use(markdownit_katex);
+        }
+        return md2.render(text);
     }
 });
 

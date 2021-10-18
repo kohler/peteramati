@@ -1159,7 +1159,7 @@ class PsetView {
                         && $this->pset->student_can_view_grades()));
             if ($maybe || $this->pset->student_can_edit_grades()) {
                 foreach ($this->visible_grades(false) as $ge) {
-                    if ($ge->answer) {
+                    if ($ge->answer || $ge->concealed) {
                         $this->_user_can_view_grades = true;
                         if (!$maybe) {
                             return;
