@@ -48,8 +48,8 @@ class PsetView {
     private $_user_can_view_assigned_grades;
     /** @var ?list<int> */
     private $_grades_vf;
-    /** @var ?bool */
-    private $_grades_suppressed;
+    /** @var int */
+    private $_grades_suppressed = 0; // 1: set, 2: selecting, 4: some suppressed
 
     /** @var int */
     private $_gtime;
@@ -792,8 +792,10 @@ class PsetView {
         $this->_can_view_grades = null;
         $this->_user_can_view_grades = null;
         $this->_user_can_view_assigned_grades = null;
-        $this->_grades_vf = null;
-        $this->_grades_suppressed = null;
+        if (($this->_grades_suppressed & 2) === 0) {
+            $this->_grades_vf = null;
+            $this->_grades_suppressed = 0;
+        }
     }
 
     /** @param array $updates
@@ -1058,6 +1060,12 @@ class PsetView {
         } else {
             $this->update_commit_notes($updates);
         }
+        // NB automatically unsuppresses all grades
+        if ($this->pset->grades_selection_function
+            && ($this->_grades_suppressed & 2) === 0) {
+            $this->_grades_vf = null;
+            $this->_grades_suppressed = 0;
+        }
     }
 
     /** @param array $updates */
@@ -1072,32 +1080,34 @@ class PsetView {
 
     /** @return list<int> */
     private function grades_vf() {
-        if ($this->_grades_suppressed === null) {
-            $this->_grades_suppressed = false;
+        if ($this->_grades_suppressed === 0) {
+            $this->_grades_suppressed = 3;
             if ($this->pset->grades_selection_function) {
                 call_user_func($this->pset->grades_selection_function, $this);
             }
+            $this->_grades_suppressed &= ~2;
         }
         return $this->_grades_vf ?? $this->pset->grades_vf;
     }
 
     /** @param string $key */
     function suppress_grade($key) {
-        if ($this->_grades_suppressed === null) {
+        if ($this->_grades_suppressed === 0) {
             $this->grades_vf(); // call the selection function
         }
         $ge = $this->pset->grades[$key];
         if ($ge->pcview_index !== null) {
             $this->_grades_vf = $this->_grades_vf ?? $this->pset->grades_vf;
             $this->_grades_vf[$ge->pcview_index] = 0;
-            $this->_grades_suppressed = true;
+            $this->_grades_suppressed |= 4;
         }
     }
 
     /** @return list<GradeEntryConfig> */
     function visible_grades($pc_view = null) {
         $gvf = $this->grades_vf();
-        if (!$this->_grades_suppressed && ($pc_view ?? $this->pc_view)) {
+        if (($this->_grades_suppressed & 4) === 0
+            && ($pc_view ?? $this->pc_view)) {
             return $this->pset->visible_grades(true);
         } else {
             $f = $pc_view ?? $this->pc_view ? 2 : 1;
