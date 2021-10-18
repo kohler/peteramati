@@ -335,7 +335,7 @@ export class GradeSheet {
                 this.entries[i]._all = this;
             }
         }
-        if (x.order && !this.order) {
+        if (x.order) {
             this.order = x.order;
             this.gpos = {};
             for (let i = 0; i < this.order.length; ++i) {
@@ -343,10 +343,10 @@ export class GradeSheet {
             }
         }
         if (x.grades) {
-            this.grades = this.merge_grades(this.grades, x.grades, x.order || this.order);
+            this.grades = this.merge_grades(this.grades, x.grades, this.order);
         }
         if (x.autogrades) {
-            this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x.order || this.order);
+            this.autogrades = this.merge_grades(this.autogrades, x.autogrades, this.order);
         }
         for (let k in x) {
             if (want_props[k])
