@@ -582,7 +582,8 @@ function echo_all_grades($info) {
 
     $lhd = $info->late_hours_data();
     if ($lhd && $info->can_view_grades() && !$info->can_edit_grades_staff()) {
-        if ($has_grades
+        if (($has_grades
+             && $info->has_nonempty_assigned_grades())
             || (isset($lhd->hours)
                 && $lhd->hours > 0
                 && !$info->pset->obscure_late_hours)) {
