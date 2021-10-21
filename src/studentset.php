@@ -459,6 +459,9 @@ class StudentSet implements Iterator, Countable {
             if ((string) $s->lastName !== "")
                 $j["last"] = $s->lastName;
         }
+        if ($s->studentYear) {
+            $j["year"] = ctype_digit($s->studentYear) ? (int) $s->studentYear : $s->studentYear;
+        }
         if ($s->extension) {
             $j["x"] = true;
         }

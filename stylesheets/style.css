@@ -2387,7 +2387,7 @@ tr.gtrow-partner {
 .gt-highlight {
 	color: red;
 }
-.gt-anonymous .gt-name {
+.gt-anonymous .gt-name, .gt-anonymous .gt-year {
 	display: none;
 }
 

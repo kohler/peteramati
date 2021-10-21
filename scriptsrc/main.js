@@ -1265,7 +1265,7 @@ function pa_render_pset_table(pconf, data) {
         extension: {
             th: '<th class="gt-extension l plsortable" data-pa-sort="extension" scope="col">X?</th>',
             td: function (s) {
-                return '<td class="gt-extension">' + (s.x ? "X" : "") + '</td>';
+                return s.x ? '<td class="gt-extension">X</td>' : '<td class="gt-extension"></td>';
             },
             tw: 2,
             sort_forward: true,
@@ -1273,6 +1273,39 @@ function pa_render_pset_table(pconf, data) {
                 if (a.x != b.x)
                     return a.x ? -1 : 1;
                 else
+                    return user_compare(a, b);
+            }
+        },
+        year: {
+            th: '<th class="gt-year c plsortable" data-pa-sort="year" scole="col">Yr</th>',
+            td: function (s) {
+                var t = '';
+                if (s.year) {
+                    if (typeof s.year === "number") {
+                        if (s.year >= 1 && s.year <= 20) {
+                            t = String.fromCharCode(9311 + s.year);
+                        } else {
+                            t = s.year;
+                        }
+                    } else if (s.year.length === 1 && s.year >= "A" && s.year <= "Z") {
+                        t = String.fromCharCode(9333 + s.year.charCodeAt(0));
+                    } else {
+                        t = escape_entities(s.year);
+                    }
+                }
+                return '<td class="gt-year c">'.concat(t, '</td>');
+            },
+            tw: 2,
+            sort_forward: true,
+            compare: function (a, b) {
+                if (a.year != b.year) {
+                    if (!a.year || !b.year)
+                        return a.year ? -1 : 1;
+                    else if (typeof a.year !== typeof b.year)
+                        return typeof a.year === "number" ? -1 : 1;
+                    else
+                        return a.year < b.year ? -1 : 1;
+                } else
                     return user_compare(a, b);
             }
         },
@@ -1536,7 +1569,7 @@ function pa_render_pset_table(pconf, data) {
             } else {
                 col.push("gdialog");
             }
-            col.push("username", "name", "extension", "grader");
+            col.push("username", "name", "extension", "year", "grader");
             if (has_late_hours) {
                 col.push("latehours");
             }
