@@ -146,6 +146,8 @@ check_mysqlish () {
     eval ${1}="$m"
 }
 
+default_charset=
+
 set_myargs () {
     myargs=""
     if test -n "$1"; then myargs=" -u$1"; fi
@@ -177,6 +179,12 @@ set_myargs () {
         else
             myargs="$myargs -h'$dbhost'"
         fi
+    fi
+    if test -z "$default_charset"; then
+        myargs="$myargs --default-character-set=utf8mb4"
+    else
+        myargs_redacted="$myargs_redacted --default-character-set='$default_charset'"
+        myargs="$myargs --default-character-set='$default_charset'"
     fi
 }
 
@@ -226,6 +234,11 @@ parse_common_argument () {
         CONFNAME="`echo "$1" | sed 's/^-n//'`"; shift=1;;
     --no-password-f|--no-password-fi|--no-password-fil|--no-password-file)
         no_password_file=true; shift=1;;
+    --default-character-set=*)
+        default_charset="`echo "$1" | sed 's/^[^=]*=//'`"; shift=1;;
+    --default-character-set)
+        test "$#" -gt 1 || usage
+        default_charset="$2"; shift=2;;
     *)
         shift=0;;
     esac

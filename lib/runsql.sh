@@ -52,6 +52,8 @@ while [ $# -gt 0 ]; do
     --json-dbopt)
         test -z "$mode" || usage
         mode=json_dbopt;;
+    --default-character-set=*|--default-character-set)
+        parse_common_argument "$@";;
     -c|--co|--con|--conf|--confi|--config|-c*|--co=*|--con=*|--conf=*|--confi=*|--config=*)
         parse_common_argument "$@";;
     -n|--n|--na|--nam|--name|-n*|--n=*|--na=*|--nam=*|--name=*)
