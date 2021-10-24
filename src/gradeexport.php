@@ -202,6 +202,9 @@ class GradeExport implements JsonSerializable {
             }
             if ($need_order) {
                 $r["order"] = $order;
+                if (!$this->include_entries) {
+                    $r["order_fixed"] = true;
+                }
             }
             if ($this->pset->grades_total !== null) {
                 $r["maxtotal"] = $this->pset->grades_total;

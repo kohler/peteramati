@@ -14,7 +14,7 @@ let id_counter = 0, late_hours_entry;
 const want_props = {
     "uid": true, "last_hours": true, "auto_late_hours": true, "updateat": true,
     "version": true, "editable": true, "maxtotal": true, "history": true, "total": true,
-    "total_noextra": true, "grading_hash": true, "answer_version": true
+    "total_noextra": true, "grading_hash": true, "answer_version": true, "order_fixed": true
 };
 
 export class GradeEntry {
@@ -335,7 +335,7 @@ export class GradeSheet {
                 this.entries[i]._all = this;
             }
         }
-        if (x.order) {
+        if (x.order && (!this.order || !this.order_fixed)) {
             this.order = x.order;
             this.gpos = {};
             for (let i = 0; i < this.order.length; ++i) {
@@ -343,10 +343,10 @@ export class GradeSheet {
             }
         }
         if (x.grades) {
-            this.grades = this.merge_grades(this.grades, x.grades, this.order);
+            this.grades = this.merge_grades(this.grades, x.grades, x.order || this.order);
         }
         if (x.autogrades) {
-            this.autogrades = this.merge_grades(this.autogrades, x.autogrades, this.order);
+            this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x.order || this.order);
         }
         for (let k in x) {
             if (want_props[k])
