@@ -1974,12 +1974,12 @@ class Conf {
             // "act as" link
             if (($actas = $_SESSION["last_actas"] ?? null)
                 && (($Me->privChair && strcasecmp($actas, $Me->email) !== 0)
-                    || Contact::$true_user)) {
+                    || Contact::$base_auth_user)) {
                 // Link becomes true user if not currently chair.
-                $actas = Contact::$true_user ? Contact::$true_user->email : $actas;
+                $actas = Contact::$base_auth_user ? Contact::$base_auth_user->email : $actas;
                 $profile_parts[] = "<a href=\""
-                    . $this->selfurl(null, ["actas" => Contact::$true_user ? null : $actas]) . "\">"
-                    . (Contact::$true_user ? "Admin" : htmlspecialchars($actas))
+                    . $this->selfurl(null, ["actas" => Contact::$base_auth_user ? null : $actas]) . "\">"
+                    . (Contact::$base_auth_user ? "Admin" : htmlspecialchars($actas))
                     . "&nbsp;" . Ht::img("viewas.png", "Act as " . htmlspecialchars($actas))
                     . "</a>";
             }

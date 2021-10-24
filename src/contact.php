@@ -15,8 +15,16 @@ class Contact_Update {
 }
 
 class Contact {
+    /** @var int */
     static public $rights_version = 1;
-    static public $true_user;
+    /** @var ?Contact */
+    static public $main_user;
+    /** @var bool */
+    static public $no_main_user = false;
+    /** The base authenticated user when "acting as"; otherwise null.
+     * @var ?Contact */
+    static public $base_auth_user;
+    /** @var bool */
     static public $allow_nonexistent_properties = false;
 
     public $contactId = 0;
@@ -251,6 +259,12 @@ class Contact {
         $this->username = $this->github_username ? : $this->seascode_username;
     }
 
+    static function set_main_user(Contact $user = null) {
+        global $Me;
+        Contact::$main_user = $Me = $user;
+    }
+
+
     // begin changing contactId to cid
     function __get($name) {
         if ($name === "cid")
@@ -321,7 +335,7 @@ class Contact {
 
     /** @return Contact */
     private function actas_user($x) {
-        assert(!self::$true_user || self::$true_user === $this);
+        assert(!self::$base_auth_user || self::$base_auth_user === $this);
 
         // translate to email
         if (is_numeric($x)) {
@@ -358,7 +372,7 @@ class Contact {
                 $this->conf->save_session("l", null);
                 Conf::$hoturl_defaults["actas"] = urlencode($actascontact->email);
                 $_SESSION["last_actas"] = $actascontact->email;
-                self::$true_user = $this;
+                self::$base_auth_user = $this;
                 return $actascontact->activate($qreq);
             }
         }
@@ -419,8 +433,8 @@ class Contact {
                 || (!$this->isPC
                     && $this->conf->opt("disableNonPC")
                     && (!$this->activated_
-                        || !self::$true_user
-                        || !self::$true_user->isPC));
+                        || !self::$base_auth_user
+                        || !self::$base_auth_user->isPC));
         }
         return $this->_disabled;
     }

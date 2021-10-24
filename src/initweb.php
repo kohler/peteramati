@@ -45,7 +45,7 @@ if ($Me === false) {
 
 // Initialize user
 function initialize_user() {
-    global $Conf, $Me, $Qreq;
+    global $Qreq;
     $conf = Conf::$main;
 
     // set up session
@@ -81,17 +81,18 @@ function initialize_user() {
     $trueemail = isset($_SESSION["u"]) ? $_SESSION["u"] : null;
 
     // look up and activate user
-    $Me = null;
+    $guser = null;
     if ($trueemail) {
-        $Me = $conf->user_by_email($trueemail);
+        $guser = $conf->user_by_email($trueemail);
     }
-    if (!$Me) {
-        $Me = new Contact($trueemail ? (object) ["email" => $trueemail] : null);
+    if (!$guser) {
+        $guser = new Contact($trueemail ? (object) ["email" => $trueemail] : null);
     }
-    $Me = $Me->activate($Qreq, true);
+    $guser = $guser->activate($Qreq, true);
+    Contact::set_main_user($guser);
 
     // redirect if disabled
-    if ($Me->is_disabled()) {
+    if ($guser->is_disabled()) {
         if ($nav->page === "api") {
             json_exit(["ok" => false, "error" => "Your account is disabled."]);
         } else if ($nav->page !== "index" && $nav->page !== "resetpassword") {
@@ -105,7 +106,7 @@ function initialize_user() {
         unset($_SESSION["login_bounce"]);
     }
 
-    if (!$Me->is_empty()
+    if (!$guser->is_empty()
         && isset($_SESSION["login_bounce"])
         && !isset($_SESSION["testsession"])) {
         $lb = $_SESSION["login_bounce"];
@@ -122,7 +123,7 @@ function initialize_user() {
 
     // set $_SESSION["addrs"]
     if ($_SERVER["REMOTE_ADDR"]
-        && (!$Me->is_empty()
+        && (!$guser->is_empty()
             || isset($_SESSION["addrs"]))
         && (!isset($_SESSION["addrs"])
             || !is_array($_SESSION["addrs"])
