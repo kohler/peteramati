@@ -80,107 +80,50 @@ export class GradeEntry {
         }
     }
 
-    editable_html_skeleton(live) {
-        const name = this.key,
-            title = (this.title ? render_ftext(this.title) : name).trim();
-        live = live !== false;
-        let opts = {editable: true},
-            id = "pa-ge" + ++id_counter,
-            t = (live ? '<form class="ui-submit ' : '<div class="') + 'pa-grade pa-p';
-        if (this.type === "section") {
-            t += ' pa-p-section';
+    render(gi, mode) {
+        if (mode == null) {
+            if (this.readonly
+                || (this.answer ? gi.editable_answers === false : !gi.editable)) {
+                mode = 0;
+            } else {
+                mode = 2;
+            }
         }
-        if (this.visible === false) {
-            t += ' pa-p-hidden';
-        }
-        t = t.concat('" data-pa-grade="', name);
-        if (!live) {
-            t = t.concat('" data-pa-grade-type="', this.gc.type);
-        }
-        t = t.concat('"><label class="pa-pt" for="', id, '">', title, '</label>');
+        const id = "pe-ge" + ++id_counter;
+        let t = (mode === 2 ? '<form class="ui-submit ' : '<div class="').concat(
+            'pa-grade pa-p',
+            this.visible === false ? ' pa-p-hidden' : '',
+            '" data-pa-grade="', this.key,
+            '"><label class="pa-pt" for="', id, '">',
+            (this.title ? render_ftext(this.title) : this.key).trim(),
+            '</label>');
         if (this.description) {
             t = t.concat('<div class="pa-pdesc pa-dr">', render_ftext(this.description), '</div>');
         }
-        return t.concat('<div class="pa-pd">', this.gc.entry.call(this, id, opts), '</div>', live ? '</form>' : '</div>');
+        const e = $(t.concat('<div class="pa-pd', mode ? ' e' : '', '"></div>',
+                             mode === 2 ? '</form>' : '</div>'))[0];
+        this.mount_at(e.lastChild, id, mode);
+        return e;
     }
 
-    noneditable_html_skeleton() {
-        const name = this.key,
-            title = (this.title ? render_ftext(this.title) : name).trim(),
-            id = "pa-ge" + ++id_counter;
-        let t = '<div class="pa-grade pa-p';
-        if (this.type === "section") {
-            t += ' pa-p-section';
-        }
-        t = t.concat('" data-pa-grade="', name, '"><label class="pa-pt" for="', id, '">', title, '</label><div id="', id, '" class="pa-pd');
-        if (this.type === "text") {
-            t += ' pa-gradevalue">';
-        } else if (this.type === "markdown") {
-            t += ' pa-gradevalue pa-markdown">';
+    mount_at(pde, id, mode) {
+        let t;
+        if (mode) {
+            t = this.gc.mount_edit.call(this, pde, id);
         } else {
-            t += '"><span class="pa-gradevalue pa-gradewidth"></span>';
-            if (this.max && this.type !== "letter") {
-                t = t.concat(' <span class="pa-gradedesc">of ', this.max, '</span>');
-            }
+            t = this.gc.mount_show.call(this, pde, id);
         }
-        return t + '</div></div>';
-    }
-
-    html_skeleton(gi) {
-        if (!this.readonly
-            && (this.answer ? gi.editable_answers !== false : gi.editable)) {
-            return this.editable_html_skeleton(true);
-        } else {
-            return this.noneditable_html_skeleton();
+        if (typeof t === "string") {
+            pde.innerHTML = t;
         }
     }
 
-    fill_dom(element, g, options) {
-        const $g = $(element),
-            v = $g.find(".pa-gradevalue")[0];
-
-        if (v && v.tagName !== "SPAN" && v.tagName !== "DIV") {
-            this.fill_dom_editable(element, v, g, options || {});
-        } else if (this.gc.fill_dom) {
-            this.gc.fill_dom.call(this, g, v);
-            toggleClass(element, "hidden", v.firstChild === null && this.type !== "section");
-        } else {
-            const gt = this.text(g);
-            if ($(v).text() !== gt) {
-                $(v).text(gt);
-            }
-            toggleClass(element, "hidden", gt === "" && !this.max && this.type !== "section");
-        }
-
-        // maybe add landmark reference
-        if (this.landmark) {
-            const gl = element.closest(".pa-gradelist");
-            if (gl && hasClass(gl, "want-landmark-links")) {
-                let want_gbr = "";
-                const m = /^(.*):(\d+)$/.exec(this.landmark);
-                if (m && Filediff.find(m[1])) {
-                    const pi = element.closest(".pa-psetinfo"),
-                        directory = pi.getAttribute("data-pa-directory") || "",
-                        filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
-                    want_gbr = '@<a href="#La'.concat(m[2], '_', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
-                }
-                const $pgbr = $g.find(".pa-gradeboxref");
-                if (want_gbr === "") {
-                    $pgbr.remove();
-                } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
-                    $pgbr.remove();
-                    $g.find(".pa-pd").first().append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
-                }
-            }
-        }
-    }
-
-    fill_dom_editable(element, v, g, options) {
-        const $g = $(element);
+    update_edit(elt, v, opts) {
+        const $g = $(elt);
 
         // “grade is above max” message
         if (this.max) {
-            if (!g || g <= this.max) {
+            if (!v || v <= this.max) {
                 $g.find(".pa-gradeabovemax").remove();
             } else if (!$g.find(".pa-gradeabovemax").length) {
                 $g.find(".pa-pd").after('<div class="pa-pd pa-gradeabovemax">Grade is above max</div>');
@@ -188,11 +131,11 @@ export class GradeEntry {
         }
 
         // “autograde differs” message
-        if (options.autograde == null || g === options.autograde) {
+        if (opts.autograde == null || v === opts.autograde) {
             $g.find(".pa-gradediffers").remove();
         } else {
             const txt = (this.key === "late_hours" ? "auto-late hours" : "autograde") +
-                " is " + this.text(options.autograde);
+                " is " + this.text(opts.autograde);
             if (!$g.find(".pa-gradediffers").length) {
                 $g.find(".pa-pd").first().append('<span class="pa-gradediffers"></span>');
             }
@@ -203,23 +146,58 @@ export class GradeEntry {
         }
 
         // grade value
-        this.gc.reflect_value.call(this, v, g, options);
-        if (options.reset && options.mixed) {
-            v.setAttribute("placeholder", "Mixed");
-        } else if (v.hasAttribute("placeholder")) {
-            v.removeAttribute("placeholder");
+        this.gc.update_edit.call(this, elt, v, opts);
+
+        let ve;
+        if (opts.reset && (ve = elt.querySelector(".pa-gradevalue"))) {
+            ve.setAttribute("data-default-value", this.simple_text(v));
         }
-        if (options.reset) {
-            v.setAttribute("data-default-value", this.simple_text(g));
+        this.landmark && this.update_landmark(elt);
+    }
+
+    update_show(elt, v) {
+        const ve = elt.querySelector(".pa-gradevalue");
+        let hidden;
+        if (this.gc.update_show) {
+            hidden = this.gc.update_show.call(this, ve, v);
+        } else {
+            const gt = this.text(v);
+            if (ve.innerText !== gt) {
+                ve.innerText = gt;
+            }
+            hidden = gt === "" && !this.max;
+        }
+        hidden != null && toggleClass(elt, "hidden", hidden);
+        this.landmark && this.update_landmark(elt);
+    }
+
+    update_landmark(elt) {
+        let gl = elt.closest(".pa-gradelist");
+        if (gl && hasClass(gl, "want-landmark-links")) {
+            let want_gbr = "";
+            const m = /^(.*):(\d+)$/.exec(this.landmark);
+            if (m && Filediff.find(m[1])) {
+                const pi = elt.closest(".pa-psetinfo"),
+                    directory = pi.getAttribute("data-pa-directory") || "",
+                    filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
+                want_gbr = '@<a href="#La'.concat(m[2], '_', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
+            }
+            const $g = $(elt), $pgbr = $g.find(".pa-gradeboxref");
+            if (want_gbr === "") {
+                $pgbr.remove();
+            } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
+                $pgbr.remove();
+                $g.find(".pa-pd").first().append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
+            }
         }
     }
 
-    text(g) {
-        return this.gc.text.call(this, g);
+    text(v) {
+        return this.gc.text.call(this, v);
     }
 
-    simple_text(g) {
-        return this.gc.simple_text.call(this, g);
+    simple_text(v) {
+        return this.gc.simple_text.call(this, v);
     }
 
     configure_column(col, pconf) {
@@ -231,8 +209,8 @@ export class GradeEntry {
         return typeof w === "function" ? w.call(this) : w;
     }
 
-    tcell(g) {
-        return this.gc.tcell.call(this, g);
+    tcell(v) {
+        return this.gc.tcell.call(this, v);
     }
 
     landmark_lines(t, selector) {
@@ -384,16 +362,52 @@ export class GradeSheet {
         }
     }
 
-    fill_dom_at(element) {
-        const k = element.getAttribute("data-pa-grade"),
-            ge = this.entries[k];
+    remount_at(elt, mode) {
+        const k = elt.getAttribute("data-pa-grade");
+        let ge;
         if (k === "late_hours") {
-            GradeEntry.late_hours().fill_dom(element, this.late_hours, {autograde: this.auto_late_hours});
-        } else if (ge) {
-            const gpos = this.gpos[k];
-            if (gpos != null) {
-                ge.fill_dom(element, this.grades ? this.grades[gpos] : null, {autograde: this.autogrades ? this.autogrades[gpos] : null});
+            ge = GradeEntry.late_hours();
+        } else {
+            ge = this.entries[k];
+        }
+        if (ge) {
+            let pde = elt.firstChild, id;
+            while (!hasClass(pde, "pa-pd")) {
+                pde.tagName === "LABEL" && (id = pde.id);
+                pde = pde.nextSibling;
             }
+            while (pde.nextSibling) {
+                elt.removeChild(pde.nextSibling);
+            }
+            while (pde.firstChild) {
+                pde.removeChild(pde.firstChild);
+            }
+            pde.className = mode ? 'pa-pd e' : 'pa-pd';
+            ge.mount_at(pde, id, mode);
+        }
+    }
+
+    update_at(elt) {
+        const k = elt.getAttribute("data-pa-grade");
+        let ge, v, opts, gpos;
+        if (k === "late_hours") {
+            ge = GradeEntry.late_hours();
+            v = this.late_hours;
+            opts = {autograde: this.auto_late_hours};
+        } else if ((ge = this.entries[k]) && (gpos = this.gpos[k]) != null) {
+            v = this.grades ? this.grades[gpos] : null;
+            opts = {autograde: this.autogrades ? this.autogrades[gpos] : null};
+        } else {
+            return;
+        }
+        let pde = elt.firstChild;
+        while (!hasClass(pde, "pa-pd")) {
+            pde = pde.nextSibling;
+        }
+        if (hasClass(pde, "e")) {
+            ge.update_edit(elt, v, opts);
+        } else {
+            ge.update_show(elt, v, opts);
         }
     }
 

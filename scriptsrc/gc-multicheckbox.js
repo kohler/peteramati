@@ -28,7 +28,7 @@ function make_multicheckbox(mark) {
                 return "" + v;
             }
         },
-        entry: function (id, opts) {
+        mount_edit: function (elt, id) {
             let t = '<span class="pa-gradewidth"><input type="hidden" class="uich pa-gradevalue" name="'.concat(this.key, '">');
             for (let i = 0; i < this.max; ++i) {
                 t = t.concat('<input type="checkbox" class="ui js-multicheckbox-grade ml-0" name="', this.key, ':', i, '" value="1"');
@@ -37,33 +37,30 @@ function make_multicheckbox(mark) {
                 }
                 t += '>';
             }
-            t += '</span>';
-            if (opts.editable) {
-                t = t.concat(' <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
-            }
-            return t;
+            return t.concat('</span>  <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
         },
-        justify: "left",
-        reflect_value: function (elt, v, opts) {
+        update_edit: function (elt, v, opts) {
             const want_checkbox = v == null || v === "" || v === 0
-                || (v >= 0 && (!this || v <= this.max) && Math.abs(v - Math.round(v)) < 0.05);
-            if (!want_checkbox && elt.type === "hidden") {
-                Checkbox_GradeClass.uncheckbox(elt);
-            } else if (want_checkbox && elt.type !== "hidden" && opts.reset) {
-                Checkbox_GradeClass.recheckbox(elt);
+                    || (v >= 0 && (!this || v <= this.max) && Math.abs(v - Math.round(v)) < 0.05),
+                ve = elt.firstChild.firstChild;
+            if (!want_checkbox && ve.type === "hidden") {
+                Checkbox_GradeClass.uncheckbox(ve);
+            } else if (want_checkbox && ve.type !== "hidden" && opts.reset) {
+                Checkbox_GradeClass.recheckbox(ve);
             }
-            if (elt.value !== v && (opts.reset || !$(elt).is(":focus"))) {
-                elt.value = v;
+            if (ve.value !== v && (opts.reset || !$(ve).is(":focus"))) {
+                ve.value = v;
             }
-            const name = elt.name + ":", value = Math.round(v || 0);
-            $(elt.closest(".pa-pd")).find("input[type=checkbox]").each(function () {
+            const name = ve.name + ":", value = Math.round(v || 0);
+            $(elt).find("input[type=checkbox]").each(function () {
                 if (this.name.startsWith(name)) {
                     const i = +this.name.substring(name.length);
                     this.checked = i < value;
                     this.indeterminate = opts.mixed;
                 }
             });
-        }
+        },
+        justify: "left"
     };
 }
 

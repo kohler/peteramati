@@ -46,15 +46,14 @@ GradeClass.add("timermark", {
             return a._sort_user.localeCompare(b._sort_user);
         };
     },
-    entry: function () {
+    mount_edit: function () {
         let t = '<button class="ui js-timermark hidden mr-2" type="button" name="'.concat(this.key, ':b" value="1">Press to start</button>');
         if (siteinfo.user.is_pclike) {
             t = t.concat('<button class="ui js-timermark hidden mr-2" type="button" name="', this.key, ':r" value="0">Reset</button>');
         }
-        t = t.concat('<span class="pa-timermark-result hidden"></span><input type="hidden" class="uich pa-gradevalue" name="', this.key, '">');
-        return t;
+        return t.concat('<span class="pa-timermark-result hidden"></span><input type="hidden" class="uich pa-gradevalue" name="', this.key, '">');
     },
-    reflect_value: function (elt, g) {
+    update_edit: function (elt, v) {
         this._timeout = this.timeout;
         if (this.timeout_entry) {
             let gs = GradeSheet.closest(elt), ge, gv;
@@ -64,23 +63,23 @@ GradeClass.add("timermark", {
                 this._timeout = gv;
             }
         }
-        const pd = elt.closest(".pa-pd");
-        pd.querySelectorAll(".js-timermark").forEach(function (e) {
-            e.classList.toggle("hidden", !g !== (e.value === "1"));
+        elt.querySelectorAll(".js-timermark").forEach(function (e) {
+            e.classList.toggle("hidden", !v !== (e.value === "1"));
         });
-        const tm = pd.querySelector(".pa-timermark-result");
-        tm.classList.toggle("hidden", !g && !this._timeout);
-        const to = $(elt).data("pa-timermark-interval");
+        const tm = elt.querySelector(".pa-timermark-result");
+        tm.classList.toggle("hidden", !v && !this._timeout);
+        const ve = elt.querySelector(".pa-gradevalue"),
+            to = $(ve).data("pa-timermark-interval");
         to && clearInterval(to);
-        if (g
+        if (v
             && this._timeout
-            && g + this._timeout > +document.body.getAttribute("data-now")) {
-            timermark_interval(this, tm, g);
-            $(elt).data("pa-timermark-interval", setInterval(timermark_interval, 15000, this, tm, g));
-        } else if (g) {
-            let t = strftime(timefmt, g);
-            if (this._all && (this._all.updateat || 0) > g) {
-                const delta = this._all.updateat - g;
+            && v + this._timeout > +document.body.getAttribute("data-now")) {
+            timermark_interval(this, tm, v);
+            $(ve).data("pa-timermark-interval", setInterval(timermark_interval, 15000, this, tm, v));
+        } else if (v) {
+            let t = strftime(timefmt, v);
+            if (this._all && (this._all.updateat || 0) > v) {
+                const delta = this._all.updateat - v;
                 t += sprintf(" (updated %dh%dm later at %s)", delta / 3600, (delta / 60) % 60, strftime(timefmt, this._all.updateat));
             }
             tm.innerHTML = t;

@@ -2,6 +2,8 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
+import { addClass } from "./ui.js";
+
 let map = {};
 
 const color_map = {
@@ -12,9 +14,9 @@ const color_map = {
 export const GradeClass = {
     basic_text: v => (v == null ? "" : "" + v),
 
-    basic_entry: function (id, opts) {
+    basic_mount_edit: function (elt, id, opts) {
         let x;
-        if (opts.max_text) {
+        if (opts && opts.max_text) {
             x = opts.max_text;
         } else if (this.max) {
             x = 'of ' + this.max;
@@ -24,10 +26,23 @@ export const GradeClass = {
         return '<span class="pa-gradewidth"><input type="text" class="uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '"></span> <span class="pa-gradedesc">', x, '</span>');
     },
 
-    basic_reflect_value: function (elt, g, opts) {
-        const gt = this.simple_text(g);
-        if ($(elt).val() !== gt && (opts.reset || !$(elt).is(":focus"))) {
-            $(elt).val(gt);
+    basic_mount_show: function (elt, id) {
+        elt.id = id;
+        let t = '<span class="pa-gradevalue pa-gradewidth"></span>';
+        if (this.max && this.type !== "letter") {
+            t = t.concat(' <span class="pa-gradedesc">of ', this.max, '</span>');
+        }
+        return t;
+    },
+
+    basic_update_edit: function (elt, v, opts) {
+        const ve = elt.querySelector(".pa-gradevalue"),
+            gt = this.simple_text(v);
+        if ($(ve).val() !== gt && (opts.reset || !$(ve).is(":focus"))) {
+            $(ve).val(gt);
+        }
+        if (opts.mixed != null) {
+            opts.mixed ? ve.setAttribute("placeholder", "Mixed") : ve.removeAttribute("placeholder");
         }
     },
 
@@ -79,15 +94,18 @@ export const GradeClass = {
         x.tcell_width = x.tcell_width || GradeClass.basic_tcell_width;
         x.tcell = x.tcell || x.text;
         x.make_compare = x.make_compare || GradeClass.basic_make_compare;
-        x.reflect_value = x.reflect_value || GradeClass.basic_reflect_value;
+        x.mount_show = x.mount_show || GradeClass.basic_mount_show;
+        x.mount_edit = x.mount_edit || GradeClass.basic_mount_edit;
+        x.update_edit = x.update_edit || GradeClass.basic_update_edit;
         map[name] = x;
     },
 
     find: name => map[name] || map.numeric
 };
 
+
 GradeClass.add("numeric", {
-    entry: GradeClass.basic_entry
+    mount_edit: GradeClass.basic_mount_edit
 });
 
 GradeClass.add("formula", {
@@ -104,7 +122,11 @@ GradeClass.add("formula", {
 });
 
 GradeClass.add("text", {
-    entry: function (id) {
+    mount_show: function (elt, id) {
+        elt.id = id;
+        addClass(elt, "pa-gradevalue");
+    },
+    mount_edit: function (elt, id) {
         return '<div class="pa-textgrade-width"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
     },
     justify: "left",
@@ -113,7 +135,11 @@ GradeClass.add("text", {
 });
 
 GradeClass.add("shorttext", {
-    entry: function (id) {
+    mount_show: function (elt, id) {
+        elt.id = id;
+        addClass(elt, "pa-gradevalue");
+    },
+    mount_edit: function (elt, id) {
         return '<div class="pa-textgrade-width"><textarea class="uich pa-pd pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
     },
     justify: "left",
@@ -123,6 +149,15 @@ GradeClass.add("shorttext", {
 
 GradeClass.add("section", {
     text: () => "",
-    entry: () => "",
+    mount_show: function (elt, id) {
+        elt.id = id;
+        addClass(elt.closest(".pa-p"), "pa-p-section");
+    },
+    mount_edit: function (elt) {
+        addClass(elt.closest(".pa-p"), "pa-p-section");
+    },
+    update_show: function () {
+        return false;
+    },
     type_tabular: false
 });

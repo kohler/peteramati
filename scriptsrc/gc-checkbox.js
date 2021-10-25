@@ -27,28 +27,27 @@ GradeClass.add("checkbox", {
             return "" + v;
         }
     },
-    entry: function (id, opts) {
-        let t = '<span class="pa-gradewidth"><input type="checkbox" class="ui pa-gradevalue ml-0" name="'.concat(this.key, '" id="', id, '" value="', this.max, '"></span>');
-        if (opts.editable) {
-            t = t.concat(' <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
-        }
-        return t;
+    mount_edit: function (elt, id) {
+        return '<span class="pa-gradewidth"><input type="checkbox" class="ui pa-gradevalue ml-0" name="'.concat(
+            this.key, '" id="', id, '" value="', this.max, '"></span>',
+            ' <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
     },
-    justify: "center",
-    reflect_value: function (elt, v, opts) {
-        const want_checkbox = v == null || v === "" || v === 0 || (this && v === this.max);
-        if (!want_checkbox && elt.type === "checkbox") {
-            Checkbox_GradeClass.uncheckbox(elt);
-        } else if (want_checkbox && elt.type !== "checkbox" && opts.reset) {
-            Checkbox_GradeClass.recheckbox(elt);
+    update_edit: function (elt, v, opts) {
+        const want_checkbox = v == null || v === "" || v === 0 || (this && v === this.max),
+            ve = elt.firstChild.firstChild;
+        if (!want_checkbox && ve.type === "checkbox") {
+            Checkbox_GradeClass.uncheckbox(ve);
+        } else if (want_checkbox && ve.type !== "checkbox" && opts.reset) {
+            Checkbox_GradeClass.recheckbox(ve);
         }
-        if (elt.type === "checkbox") {
-            elt.checked = !!v;
-            elt.indeterminate = opts.mixed;
-        } else if (elt.value !== v && (opts.reset || !$(elt).is(":focus"))) {
-            elt.value = "" + v;
+        if (ve.type === "checkbox") {
+            ve.checked = !!v;
+            ve.indeterminate = opts.mixed;
+        } else if (ve.value !== v && (opts.reset || !$(ve).is(":focus"))) {
+            ve.value = "" + v;
         }
-    }
+    },
+    justify: "center"
 });
 
 export class Checkbox_GradeClass {

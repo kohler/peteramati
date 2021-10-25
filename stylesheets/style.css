@@ -2199,7 +2199,7 @@ td.mhcb {
 	min-width: 168px;
 	width: calc(100% - 168px);
 }
-.pa-pdesc + .pa-pd {
+.pa-pdesc + .pa-pd.e {
 	width: 100%;
 }
 .pa-pd.pa-grade-changed:after {

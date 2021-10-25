@@ -7,13 +7,28 @@ import { escape_entities } from "./encoders.js";
 
 
 GradeClass.add("select", {
-    entry: function (id) {
+    mount_edit: function (elt, id) {
         let t = '<span class="select"><select class="uich pa-gradevalue" name="'.concat(this.key, '" id="', id, '"><option value="">None</option>');
         for (let i = 0; i !== this.options.length; ++i) {
             const n = escape_entities(this.options[i]);
             t = t.concat('<option value="', n, '">', n, '</option>');
         }
         return t + '</select></span>';
+    },
+    update_edit: function (elt, v, opts) {
+        const gt = this.simple_text(v),
+            ve = elt.firstChild.firstChild;
+        if ($(ve).val() !== gt && (opts.reset || !$(ve).is(":focus"))) {
+            $(ve).val(gt);
+        }
+        if (opts.reset && opts.mixed) {
+            if (ve.options[0].value !== "") {
+                $(ve).prepend('<option value="">Mixed</option>');
+            }
+            ve.selectedIndex = 0;
+        } else if (gt !== "") {
+            ve.remove(0);
+        }
     },
     configure_column: function (col, pconf) {
         col = GradeClass.basic_configure_column.call(this, col, pconf);
@@ -29,19 +44,5 @@ GradeClass.add("select", {
                         Math.floor(Math.min(w, 10) * 1.25) / 2);
     },
     justify: "left",
-    sort: "forward",
-    reflect_value: function (elt, g, opts) {
-        const gt = this.simple_text(g);
-        if ($(elt).val() !== gt && (opts.reset || !$(elt).is(":focus"))) {
-            $(elt).val(gt);
-        }
-        if (opts.reset && opts.mixed) {
-            if (elt.options[0].value !== "") {
-                $(elt).prepend('<option value="">Mixed</option>');
-            }
-            elt.selectedIndex = 0;
-        } else if (gt !== "") {
-            elt.remove(0);
-        }
-    }
+    sort: "forward"
 });

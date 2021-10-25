@@ -11,17 +11,22 @@ GradeClass.add("markdown", {
     text: function (v) {
         return v == null ? "" : "" + v;
     },
-    fill_dom: function (v, e) {
-        if (v == null || v === "") {
-            e.innerHTML = "";
-        } else if (hasClass(e, "pa-markdown")) {
-            render_text(1, v, e);
-        } else {
-            render_text(0, v, e);
-        }
+    mount_show: function (elt, id) {
+        elt.id = id;
+        addClass(elt, "pa-gradevalue");
     },
-    entry: function (id) {
+    mount_edit: function (elt, id) {
         return '<p class="pa-preview-notice"><span>Markdown styling and LaTeX math supported · </span><a href="" class="ui js-toggle-gc-markdown-preview" tabindex="-1">Preview</a></p><div class="pa-textgrade-width pa-wide"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
+    },
+    update_show: function (ve, v) {
+        if (v == null || v === "") {
+            ve.innerHTML = "";
+        } else if (hasClass(ve, "pa-markdown")) {
+            render_text(1, v, ve);
+        } else {
+            render_text(0, v, ve);
+        }
+        return ve.firstChild === null;
     },
     justify: "left",
     sort: "forward",

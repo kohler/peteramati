@@ -12,9 +12,8 @@ const lm = {
 
 GradeClass.add("letter", {
     text: v => (v == null ? "" : lm[v] || "" + v),
-    entry: function (id, opts) {
-        opts.max_text = "letter grade";
-        return GradeClass.basic_entry.call(this, id, opts);
+    mount_edit: function (elt, id) {
+        return GradeClass.basic_mount_edit.call(this, elt, id, {max_text: "letter grade"});
     },
     justify: "left",
     tics: () => {
