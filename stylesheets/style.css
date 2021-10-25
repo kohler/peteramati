@@ -2192,7 +2192,7 @@ td.mhcb {
 	margin-top: -0.5rem;
 	margin-bottom: 0.5rem;
 }
-.pa-pdesc > p:last-child {
+.pa-pdesc > p:last-child, .pa-pd > p:last-child {
 	margin-bottom: 0;
 }
 .pa-pd {
@@ -2630,10 +2630,10 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	font-family: Georgia, serif;
 	line-height: 1.35;
 }
-.pa-note.format0 {
+.format0, .format4 {
 	white-space: pre-wrap;
 }
-.pa-note.format2 {
+.format2 {
 	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
 	line-height: 1.5;
 	white-space: pre-wrap;

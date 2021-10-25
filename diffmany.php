@@ -87,7 +87,11 @@ class DiffMany {
         }
         if ($info->can_edit_grades_staff()
             || ($info->can_view_grades() && $info->is_grading_commit())) {
-            echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(PsetView::GRADEJSON_SLICE)));
+            $flags = PsetView::GRADEJSON_SLICE;
+            if ($pset->has_assigned && $pset->has_answers) {
+                $flags |= PsetView::GRADEJSON_NO_EDITABLE_ANSWERS;
+            }
+            echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json($flags)));
         }
         echo '">';
 

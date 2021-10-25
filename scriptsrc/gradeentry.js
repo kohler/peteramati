@@ -14,7 +14,8 @@ let id_counter = 0, late_hours_entry;
 const want_props = {
     "uid": true, "last_hours": true, "auto_late_hours": true, "updateat": true,
     "version": true, "editable": true, "maxtotal": true, "history": true, "total": true,
-    "total_noextra": true, "grading_hash": true, "answer_version": true, "order_fixed": true
+    "total_noextra": true, "grading_hash": true, "answer_version": true,
+    "order_fixed": true, "editable_answers": true
 };
 
 export class GradeEntry {
@@ -79,48 +80,59 @@ export class GradeEntry {
         }
     }
 
-    html_skeleton(editable, live) {
+    editable_html_skeleton(live) {
         const name = this.key,
             title = (this.title ? render_ftext(this.title) : name).trim();
-        let t;
-        if ((editable || this.answer) && !this.readonly) {
-            live = live !== false;
-            let opts = {editable: editable},
-                id = "pa-ge" + ++id_counter;
+        live = live !== false;
+        let opts = {editable: true},
+            id = "pa-ge" + ++id_counter,
             t = (live ? '<form class="ui-submit ' : '<div class="') + 'pa-grade pa-p';
-            if (this.type === "section") {
-                t += ' pa-p-section';
-            }
-            if (this.visible === false) {
-                t += ' pa-p-hidden';
-            }
-            t = t.concat('" data-pa-grade="', name);
-            if (!live) {
-                t = t.concat('" data-pa-grade-type="', this.gc.type);
-            }
-            t = t.concat('"><label class="pa-pt" for="', id, '">', title, '</label>');
-            if (this.description) {
-                t = t.concat('<div class="pa-pdesc pa-dr">', render_ftext(this.description), '</div>');
-            }
-            t = t.concat('<div class="pa-pd">', this.gc.entry.call(this, id, opts), '</div>', live ? '</form>' : '</div>');
-        } else {
-            t = '<div class="pa-grade pa-p';
-            if (this.type === "section") {
-                t += ' pa-p-section';
-            }
-            t = t.concat('" data-pa-grade="', name, '"><div class="pa-pt">', title, '</div>');
-            if (this.type === "text") {
-                t += '<div class="pa-pd pa-gradevalue"></div>';
-            } else {
-                t += '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span>';
-                if (this.max && this.type !== "letter") {
-                    t = t.concat(' <span class="pa-gradedesc">of ', this.max, '</span>');
-                }
-                t += '</div>';
-            }
-            t += '</div>';
+        if (this.type === "section") {
+            t += ' pa-p-section';
         }
-        return t;
+        if (this.visible === false) {
+            t += ' pa-p-hidden';
+        }
+        t = t.concat('" data-pa-grade="', name);
+        if (!live) {
+            t = t.concat('" data-pa-grade-type="', this.gc.type);
+        }
+        t = t.concat('"><label class="pa-pt" for="', id, '">', title, '</label>');
+        if (this.description) {
+            t = t.concat('<div class="pa-pdesc pa-dr">', render_ftext(this.description), '</div>');
+        }
+        return t.concat('<div class="pa-pd">', this.gc.entry.call(this, id, opts), '</div>', live ? '</form>' : '</div>');
+    }
+
+    noneditable_html_skeleton() {
+        const name = this.key,
+            title = (this.title ? render_ftext(this.title) : name).trim(),
+            id = "pa-ge" + ++id_counter;
+        let t = '<div class="pa-grade pa-p';
+        if (this.type === "section") {
+            t += ' pa-p-section';
+        }
+        t = t.concat('" data-pa-grade="', name, '"><label class="pa-pt" for="', id, '">', title, '</label><div id="', id, '" class="pa-pd');
+        if (this.type === "text") {
+            t += ' pa-gradevalue">';
+        } else if (this.type === "markdown") {
+            t += ' pa-gradevalue pa-markdown">';
+        } else {
+            t += '"><span class="pa-gradevalue pa-gradewidth"></span>';
+            if (this.max && this.type !== "letter") {
+                t = t.concat(' <span class="pa-gradedesc">of ', this.max, '</span>');
+            }
+        }
+        return t + '</div></div>';
+    }
+
+    html_skeleton(gi) {
+        if (!this.readonly
+            && (this.answer ? gi.editable_answers !== false : gi.editable)) {
+            return this.editable_html_skeleton(true);
+        } else {
+            return this.noneditable_html_skeleton();
+        }
     }
 
     fill_dom(element, g, options) {
@@ -131,7 +143,7 @@ export class GradeEntry {
             this.fill_dom_editable(element, v, g, options || {});
         } else if (this.gc.fill_dom) {
             this.gc.fill_dom.call(this, g, v);
-            toggleClass(element, "hidden", v.firstChild !== null && this.type !== "section");
+            toggleClass(element, "hidden", v.firstChild === null && this.type !== "section");
         } else {
             const gt = this.text(g);
             if ($(v).text() !== gt) {
@@ -431,13 +443,13 @@ export class GradeSheet {
         return answer === 3;
     }
 
-    section_has_description(ge) {
+    section_has(ge, f) {
         let start = this.gpos[ge.key];
         while (start != null && start < this.order.length) {
             const xge = this.entries[this.order[start]];
             if ((xge === ge) !== (xge.type === "section")) {
                 break;
-            } else if (xge.description) {
+            } else if (f(xge, this)) {
                 return true;
             }
             ++start;
@@ -452,7 +464,8 @@ export class GradeSheet {
     static store(element, x) {
         let gs = $(element).data("pa-gradeinfo");
         if (!gs) {
-            $(element).data("pa-gradeinfo", (gs = new GradeSheet));
+            gs = new GradeSheet;
+            $(element).data("pa-gradeinfo", gs);
         }
         gs.extend(x);
         window.$pa.loadgrades.call(element);
@@ -467,7 +480,7 @@ export class GradeSheet {
                 if (gi) {
                     gi.extend(jx);
                 } else if (jx instanceof GradeSheet) {
-                    gi = jx;
+                    return jx;
                 } else {
                     gi = new GradeSheet(jx);
                     $(e).data("pa-gradeinfo", gi);

@@ -14,8 +14,10 @@ GradeClass.add("markdown", {
     fill_dom: function (v, e) {
         if (v == null || v === "") {
             e.innerHTML = "";
-        } else {
+        } else if (hasClass(e, "pa-markdown")) {
             e.innerHTML = render_ftext('<1>'.concat(v));
+        } else {
+            e.innerHTML = render_ftext('<4>'.concat(v));
         }
     },
     entry: function (id) {

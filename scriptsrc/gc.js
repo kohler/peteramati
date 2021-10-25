@@ -2,6 +2,8 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
+import { render_ftext } from "./render.js";
+
 let map = {};
 
 const color_map = {

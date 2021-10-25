@@ -141,6 +141,8 @@ class Pset {
     /** @var bool */
     public $has_formula = false;
     /** @var bool */
+    public $has_assigned = false;
+    /** @var bool */
     public $has_answers = false;
     /** @var ?bool */
     private $_has_uncacheable_formula;
@@ -354,6 +356,8 @@ class Pset {
                 }
                 if ($g->visible && $g->answer) {
                     $this->has_answers = true;
+                } else if ($g->visible && $g->formula === null) {
+                    $this->has_assigned = true;
                 }
             }
         } else if ($grades) {
@@ -728,6 +732,7 @@ class Pset {
             return $this->_max_grade[$i];
         }
     }
+
 
     /** @param Contact $student
      * @return ?UserPsetInfo */

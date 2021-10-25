@@ -695,12 +695,13 @@ handle_ui.on("pa-grade", function (event) {
 
 function pa_resolve_grade() {
     removeClass(this, "need-pa-grade");
-    var k = this.getAttribute("data-pa-grade"),
-        gi = GradeSheet.closest(this), ge;
+    const k = this.getAttribute("data-pa-grade"),
+        gi = GradeSheet.closest(this);
+    let ge;
     if (!gi || !k || !(ge = gi.entries[k])) {
         return;
     }
-    $(this).html(ge.html_skeleton(gi.editable));
+    $(this).html(ge.html_skeleton(gi));
     $(this).find(".need-autogrow").autogrow();
     gi.fill_dom_at($(this).find(".pa-grade")[0]);
     if (ge.landmark_range && this.closest(".pa-gradebox")) {
@@ -756,8 +757,14 @@ function gradelist_resolve_section(gi, ge, e, insp) {
         insp.insertBefore(desc, e.nextSibling);
     }
     let t = "";
-    if (gi.section_has_description(ge)) {
+    if (gi.section_has(ge, xge => xge.description)) {
         t += '<button class="btn ui pa-grade-toggle-description" aria-label="Toggle description">…</button>';
+    }
+    if (gi.section_has(ge, xge => xge.type === "markdown")) {
+        t += '<button class="btn ui pa-grade-toggle-markdown btn-primary" aria-label="Toggle Markdown">M</button>';
+    }
+    if (gi.editable && gi.section_has(ge, xge => xge.answer)) {
+        t += '<button class="btn ui pa-grade-toggle-answer'.concat(gi.editable_answers ? "btn-primary" : "", '" aria-label="Toggle answer editing" disabled>E</button>');
     }
     if (t !== "") {
         const btnbox = document.createElement("div");
@@ -776,11 +783,29 @@ function gradelist_resolve_section(gi, ge, e, insp) {
 
 handle_ui.on("pa-grade-toggle-description", function (event) {
     const me = this.closest(".pa-gsection"),
-        $es = event.metaKey ? $(".pa-gsection") : $(me),
+        $es = event.shiftKey ? $(".pa-gsection") : $(me),
         show = hasClass(me, "pa-hide-description");
     $es.each(function () {
         toggleClass(this, "pa-hide-description", !show);
         $(this).find(".pa-grade-toggle-description").toggleClass("btn-primary", !show);
+    });
+});
+
+handle_ui.on("pa-grade-toggle-markdown", function (event) {
+    const me = this.closest(".pa-gsection"),
+        $es = event.shiftKey ? $(".pa-gsection") : $(me),
+        show = !hasClass(this, "btn-primary");
+    $es.each(function () {
+        const gi = GradeSheet.closest(this);
+        $(this).find(".pa-grade > .pa-gradevalue").each(function () {
+            const ge = gi.entries[this.parentElement.getAttribute("data-pa-grade")];
+            if (ge.type === "markdown"
+                && hasClass(this, "pa-markdown") !== show) {
+                toggleClass(this, "pa-markdown", show);
+                gi.fill_dom_at(this.parentElement);
+            }
+        });
+        $(this).find(".pa-grade-toggle-markdown").toggleClass("btn-primary", show);
     });
 });
 
@@ -884,7 +909,7 @@ function pa_resolve_gradelist() {
         } else if (gre) {
             insp.insertBefore(gre, ch);
         } else {
-            const e = $(ge.html_skeleton(gi.editable))[0];
+            const e = $(ge.html_skeleton(gi))[0];
             insp.insertBefore(e, ch);
             gi.fill_dom_at(e);
             // separate section heading from description
@@ -907,7 +932,7 @@ function pa_resolve_gradelist() {
             if (sidebare && sidebare.getAttribute("data-pa-grade") === k) {
                 sidebare = sidebare.nextSibling;
             } else {
-                const e = $(ge.html_skeleton(gi.editable))[0];
+                const e = $(ge.html_skeleton(gi))[0];
                 sidebar.insertBefore(e, sidebare);
                 gi.fill_dom_at(e);
             }
@@ -2195,7 +2220,7 @@ function pa_render_pset_table(pconf, data) {
 
         hc.push('<div class="pa-gradelist is-modal">', '</div>');
         for (var i = 0; i !== grade_entries.length; ++i) {
-            hc.push(grade_entries[i].html_skeleton(true, false));
+            hc.push(grade_entries[i].editable_html_skeleton(false));
         }
         hc.pop();
         hc.push_actions();

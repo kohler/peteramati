@@ -37,6 +37,8 @@ class GradeExport implements JsonSerializable {
     public $auto_late_hours;
     /** @var ?bool */
     public $editable;
+    /** @var ?bool */
+    public $editable_answers;
     /** @var ?list<GradeEntryConfig> */
     private $visible_grades;
     /** @var ?list<int> */
@@ -170,6 +172,9 @@ class GradeExport implements JsonSerializable {
             }
             if ($this->editable !== null) {
                 $r["editable"] = $this->editable;
+            }
+            if ($this->editable_answers !== null) {
+                $r["editable_answers"] = $this->editable_answers;
             }
         }
         if ($this->include_entries || $this->visible_grades !== null) {

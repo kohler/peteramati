@@ -148,6 +148,13 @@ render_text.add_format({
 });
 
 render_text.add_format({
+    format: 4,
+    render: function (text) {
+        return '<div class="format4">'.concat(escape_entities(text), '</div>');
+    }
+});
+
+render_text.add_format({
     format: 5,
     render: function (text) {
         return text;

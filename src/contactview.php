@@ -633,13 +633,13 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
             $notes[] = self::unconfirmed_repository_note($info);
         } else {
             $xnotes = [];
-            if ($info->grading_hash()) {
+            if (($ghash = $info->grading_hash())) {
                 $title = "grading commit";
                 if (($c = $info->grading_commit())) {
-                    $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);
+                    $value = substr($ghash, 0, 7) . " " . htmlspecialchars($c->subject);
                     $xnotes[] = "committed " . ago($c->commitat);
                 } else {
-                    $value = "(disconnected commit)";
+                    $value = substr($ghash, 0, 7) . " (disconnected commit)";
                 }
                 $want_latest = !$info->is_latest_commit();
             } else if (($c = $info->latest_commit())) {

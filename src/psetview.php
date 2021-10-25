@@ -1689,6 +1689,7 @@ class PsetView {
     const GRADEJSON_NO_LATE_HOURS = 4;
     const GRADEJSON_NO_FORMULAS = 8;
     const GRADEJSON_RECURSE = 16;
+    const GRADEJSON_NO_EDITABLE_ANSWERS = 32;
 
     /** @param int $flags
      * @return ?GradeExport */
@@ -1733,6 +1734,9 @@ class PsetView {
         }
         if ($this->can_edit_grades_staff()) {
             $gexp->editable = true;
+        }
+        if ($flags & self::GRADEJSON_NO_EDITABLE_ANSWERS) {
+            $gexp->editable_answers = false;
         }
         // maybe hide extra-credits that are missing
         if (!$gexp->pc_view) {
