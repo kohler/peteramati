@@ -184,8 +184,7 @@ export class Note {
         if (!this.format) {
             $td.find(".pa-note").addClass("format0").text(this.text);
         } else {
-            const r = render_text(this.format, this.text);
-            $td.find(".pa-note").addClass("format" + (r.format || 0)).html(r.content);
+            render_text(this.format, this.text, $td.find(".pa-note")[0]);
         }
 
         fix_links_at(this.element);

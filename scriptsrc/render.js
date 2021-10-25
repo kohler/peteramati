@@ -3,12 +3,51 @@
 // See LICENSE for open-source distribution terms
 
 import { escape_entities } from "./encoders.js";
-import { log_jserror } from "./utils-errors.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
+
+function render_class(c, format) {
+    if (c) {
+        return c.replace(/(?:^|\s)(?:need-format|format\d+)(?=$|\s)/g, "").concat(" format", format).trimStart();
+    } else {
+        return "format" + format;
+    }
+}
+
+function render_with(r, text, context) {
+    const t = r.render(text);
+    if (context == null) {
+        return t;
+    } else if (context instanceof Element) {
+        context.className = render_class(context.className, r.format);
+        context.innerHTML = t;
+    } else {
+        return '<div class="'.concat(render_class(context, r.format), '">', t, '</div>');
+    }
+}
 
 
 let default_format = 0;
-const renderers = {"0": {format: 0, render: render0}};
+const renderers = {};
+
+export function render_text(format, text, context) {
+    return render_with(renderers[format] || renderers[0], text, context);
+}
+
+render_text.add_format = function (r) {
+    if (r.format == null || r.format === "" || renderers[r.format]) {
+        throw new Error("bad or reused format");
+    }
+    renderers[r.format] = r;
+};
+
+render_text.on_page = function () {
+    $(".need-format").each(function () {
+        const format = this.getAttribute("data-format") || default_format,
+            content = this.getAttribute("data-content") || this.innerText;
+        render_text(format, content, this);
+    });
+};
+
 
 function link_urls(t) {
     var re = /((?:https?|ftp):\/\/(?:[^\s<>\"&]|&amp;)*[^\s<>\"().,:;&])([\"().,:;]*)(?=[\s<>&]|$)/g;
@@ -17,104 +56,14 @@ function link_urls(t) {
     });
 }
 
-function render0(text) {
-    return link_urls(escape_entities(text));
-}
-
-function lookup(format) {
-    var r, p;
-    if (format
-        && ((r = renderers[format])
-            || (typeof format === "string"
-                && (p = format.indexOf(".")) > 0
-                && (r = renderers[format.substring(0, p)])))) {
-        return r;
+render_text.add_format({
+    format: 0,
+    render: function (text) {
+        return link_urls(escape_entities(text));
     }
-    if (format == null) {
-        format = default_format;
-    }
-    return renderers[format] || renderers[0];
-}
-
-function do_render(format, is_inline, a) {
-    var r = lookup(format);
-    if (r.format) {
-        try {
-            var f = (is_inline && r.render_inline) || r.render;
-            return {
-                format: r.formatClass || r.format,
-                content: f.apply(this, a)
-            };
-        } catch (e) {
-            log_jserror("do_render format " + r.format + ": " + e.toString(), e);
-        }
-    }
-    return {format: 0, content: render0(a[0])};
-}
-
-export function render_text(format, text /* arguments... */) {
-    var a = [text], i;
-    for (i = 2; i < arguments.length; ++i) {
-        a.push(arguments[i]);
-    }
-    return do_render.call(this, format, false, a);
-}
-
-function render_inline(format, text /* arguments... */) {
-    var a = [text], i;
-    for (i = 2; i < arguments.length; ++i) {
-        a.push(arguments[i]);
-    }
-    return do_render.call(this, format, true, a);
-}
-
-function on() {
-    var $j = $(this),
-        format = this.getAttribute("data-format"),
-        content = this.getAttribute("data-content") || $j.text(),
-        args = null, f, i;
-    if ((i = format.indexOf(".")) > 0) {
-        var a = format.split(/\./);
-        format = a[0];
-        args = {};
-        for (i = 1; i < a.length; ++i) {
-            args[a[i]] = true;
-        }
-    }
-    if (this.tagName == "DIV") {
-        f = render_text.call(this, format, content, args);
-    } else {
-        f = render_inline.call(this, format, content, args);
-    }
-    if (f.format) {
-        $j.html(f.content);
-    }
-    var s = $.trim(this.className.replace(/(?:^| )(?:need-format|format\d+)(?= |$)/g, " "));
-    this.className = s + (s ? " format" : "format") + (f.format || 0);
-    if (f.format) {
-        $j.trigger("renderText", f);
-    }
-}
-
-$.extend(render_text, {
-    add_format: function (x) {
-        if (!x.format || renderers[x.format]) {
-            throw new Error("bad or reused format");
-        }
-        renderers[x.format] = x;
-    },
-    format: function (format) {
-        return lookup(format);
-    },
-    set_default_format: function (format) {
-        default_format = format;
-    },
-    inline: render_inline,
-    on: on,
-    on_page: function () { $(".need-format").each(on); }
 });
 
-
+let md, md2;
 function try_highlight(str, lang) {
     if (lang && hljs.getLanguage(lang)) {
         try {
@@ -124,8 +73,6 @@ function try_highlight(str, lang) {
     }
     return "";
 }
-
-let md, md2;
 
 render_text.add_format({
     format: 1,
@@ -148,13 +95,6 @@ render_text.add_format({
 });
 
 render_text.add_format({
-    format: 4,
-    render: function (text) {
-        return '<div class="format4">'.concat(escape_entities(text), '</div>');
-    }
-});
-
-render_text.add_format({
     format: 5,
     render: function (text) {
         return text;
@@ -162,19 +102,18 @@ render_text.add_format({
 });
 
 
-export function render_ftext(ftext) {
-    let ch, pos, dig;
+export function render_ftext(ftext, context) {
+    let ch, pos, dig, r;
     if (ftext.charAt(0) === "<"
         && (ch = ftext.charAt(1)) >= "0"
         && ch <= "9"
         && (pos = ftext.indexOf(">")) >= 2
-        && /^\d+$/.test((dig = ftext.substring(1, pos)))) {
-        const r = renderers[+dig];
-        if (r) {
-            return r.render.call(this, ftext.substring(pos + 1));
-        }
+        && /^\d+$/.test((dig = ftext.substring(1, pos)))
+        && (r = renderers[+dig])) {
+        return render_with(r, ftext.substring(pos + 1), context);
+    } else {
+        return render_with(renderers[0], ftext, context);
     }
-    return escape_entities(ftext);
 }
 
 $(render_text.on_page);

@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { GradeClass } from "./gc.js";
-import { render_ftext } from "./render.js";
+import { render_text } from "./render.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 
 
@@ -15,9 +15,9 @@ GradeClass.add("markdown", {
         if (v == null || v === "") {
             e.innerHTML = "";
         } else if (hasClass(e, "pa-markdown")) {
-            e.innerHTML = render_ftext('<1>'.concat(v));
+            render_text(1, v, e);
         } else {
-            e.innerHTML = render_ftext('<4>'.concat(v));
+            render_text(0, v, e);
         }
     },
     entry: function (id) {
@@ -40,7 +40,7 @@ handle_ui.on("js-toggle-gc-markdown-preview", function () {
     } else {
         $(ta).before('<div class="pa-preview"><hr class="pa-preview-border"><div class="pa-dr"></div><hr class="pa-preview-border"></div>');
         addClass(ta, "hidden");
-        ta.previousSibling.firstChild.nextSibling.innerHTML = render_ftext('<1>'.concat(ta.value));
+        render_text(1, ta.value, ta.previousSibling.firstChild.nextSibing);
         this.innerHTML = "Edit";
         addClass(this.previousSibling, "hidden");
     }
