@@ -171,6 +171,7 @@ class DiffMany {
         foreach ($this->pset->grade_script ?? [] as $gs) {
             Ht::stash_html($this->conf->make_script_file($gs));
         }
+        Ht::stash_script("\$pa.long_page = true");
         echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
              htmlspecialchars(json_encode(new GradeExport($this->pset, $this->viewer->isPC))),
              "\">";

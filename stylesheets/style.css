@@ -26,6 +26,16 @@ table, tr, td, th {
 tr, textarea, select {
 	vertical-align: baseline;
 }
+textarea.ta1 {
+	appearance: textfield;
+	-webkit-appearance: textfield;
+	-moz-appearance: textfield;
+	display: inline-block;
+	resize: none;
+	vertical-align: -10px;
+	margin-bottom: 2px;
+	white-space: nowrap;
+}
 input, textarea, select, button {
 	font-family: inherit;
 	font-size: 100%;
@@ -2894,7 +2904,7 @@ span.pa-gradewidth {
 	margin-right: 0.5rem;
 	display: inline-block;
 }
-input.pa-gradewidth {
+input.pa-gradewidth, textarea.pa-gradewidth {
 	min-width: 3rem;
 	width: 6rem;
 }
@@ -2907,7 +2917,7 @@ input.pa-gradewidth {
 .pa-textgrade-width.pa-wide {
 	max-width: 800px;
 }
-textarea.pa-gradevalue {
+.pa-textgrade-width > textarea {
 	vertical-align: top;
 	width: 100%;
 }

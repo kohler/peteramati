@@ -89,6 +89,19 @@ $(document).on("mouseup mousedown", ".uim", handle_ui);
 $(document).on("unfold", ".ui-unfold", handle_ui);
 
 
+let in_tab = false;
+$(document).on("keydown keyup", function (event) {
+    if (event.key === "Tab" && !event.metaKey) {
+        in_tab = event.type === "keydown";
+    }
+});
+$(document).on("focus", "textarea.ta1", function () {
+    if (in_tab) {
+        let self = this;
+        setTimeout(function () { self.setSelectionRange(0, self.value.length); }, 0);
+    }
+});
+
 export function fold61(sel, arrowholder, direction) {
     if (direction != null) {
         direction = !direction;
