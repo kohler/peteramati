@@ -2178,7 +2178,7 @@ function pa_render_pset_table(pconf, data) {
                     break;
                 }
             }
-            ge.update_edit(this, sv, opts);
+            ge.update_at(this, sv, opts);
         });
         if (su1) {
             var tr = $j.find("tbody")[0].firstChild, tr1;

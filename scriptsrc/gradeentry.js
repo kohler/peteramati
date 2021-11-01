@@ -171,6 +171,18 @@ export class GradeEntry {
         this.landmark && this.update_landmark(elt);
     }
 
+    update_at(elt, v, opts) {
+        let pde = elt.firstChild;
+        while (!hasClass(pde, "pa-pd")) {
+            pde = pde.nextSibling;
+        }
+        if (hasClass(pde, "e")) {
+            this.update_edit(pde, v, opts);
+        } else {
+            this.update_show(pde, v, opts);
+        }
+    }
+
     update_landmark(elt) {
         let gl = elt.closest(".pa-gradelist");
         if (gl && hasClass(gl, "want-landmark-links")) {
@@ -400,15 +412,7 @@ export class GradeSheet {
         } else {
             return;
         }
-        let pde = elt.firstChild;
-        while (!hasClass(pde, "pa-pd")) {
-            pde = pde.nextSibling;
-        }
-        if (hasClass(pde, "e")) {
-            ge.update_edit(elt, v, opts);
-        } else {
-            ge.update_show(elt, v, opts);
-        }
+        ge.update_at(elt, v, opts);
     }
 
     get_total(noextra) {
