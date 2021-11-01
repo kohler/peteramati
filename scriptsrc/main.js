@@ -744,23 +744,36 @@ handle_ui.on("pa-grade-button", function (event) {
     }
 });
 
-function gradelist_resolve_section(gi, ge, e, insp) {
-    addClass(insp, "pa-with-sticky");
-    addClass(e, "pa-sticky");
-    const desc = e.firstChild.nextSibling;
-    if (desc && hasClass(desc, "pa-pdesc")) {
-        addClass(desc, "pa-pdesc-external");
-        insp.insertBefore(desc, e.nextSibling);
-    }
+function gradelist_resolve_section(gi, ge, insp) {
     let t = "";
     if (gi.section_has(ge, xge => xge.description)) {
-        t += '<button class="btn ui pa-grade-toggle-description need-tooltip" aria-label="Toggle description">…</button>';
+        t += '<button class="btn ui pa-grade-toggle-description need-tooltip'.concat(insp.closest(".pa-gsection").classList.contains("pa-hide-description") ? ' btn-primary' : '', '" aria-label="Toggle description">…</button>');
     }
     if (gi.section_has(ge, xge => xge.type === "markdown") && gi.editable_answers === false) {
         t += '<button class="btn ui pa-grade-toggle-markdown need-tooltip" aria-label="Toggle Markdown">M</button>';
     }
     if (gi.editable && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
         t += '<button class="btn ui pa-grade-toggle-answer'.concat(gi.editable_answers !== false ? " btn-primary" : "", ' need-tooltip" aria-label="Toggle answer editing">E</button>');
+    }
+    let e = insp.firstChild;
+    if (!e.classList.contains("pa-p-section")) {
+        if (t === "") {
+            return;
+        }
+        e = document.createElement("div");
+        e.className = "pa-p pa-p-section";
+        e.appendChild(document.createElement("label"));
+        e.firstChild.className = "pa-pt";
+        e.firstChild.textContent = "—";
+        insp.insertBefore(e, insp.firstChild);
+    }
+
+    addClass(insp, "pa-with-sticky");
+    addClass(e, "pa-sticky");
+    const desc = e.firstChild.nextSibling;
+    if (desc && hasClass(desc, "pa-pdesc")) {
+        addClass(desc, "pa-pdesc-external");
+        insp.insertBefore(desc, e.nextSibling);
     }
     if (t !== "") {
         const btnbox = document.createElement("div");
@@ -854,13 +867,17 @@ function pa_resolve_gradelist() {
     let insp = this,
         sidebar = null,
         sidebare = null,
-        sectioned = gi.has_sections;
+        sectioned = gi.has(xge => xge.description || xge.answer ||
+                xge.type === "section" ||
+                (xge.type === "markdown" && gi.editable_answers === false)),
+        section_class = "pa-dg pa-gsection".concat(gi.editable ? " pa-hide-description" : "");
     for (let i = 0; i !== gi.order.length; ++i) {
         const k = gi.order[i], ge = gi.entries[k];
         if (!gi.editable && ge.concealed) {
             continue;
         }
 
+        let new_section = null;
         if (sectioned && (ge.type === "section" || insp === this)) {
             // end current section
             while (insp !== this) {
@@ -872,22 +889,18 @@ function pa_resolve_gradelist() {
             sidebar = sidebare = null;
             // add new section if needed
             if (!ch || !hasClass(ch, "pa-gsection")) {
+                new_section = document.createElement("div");
+                new_section.className = section_class;
+                insp.insertBefore(new_section, ch);
+                ch = new_section;
                 if (gi.section_wants_sidebar(ge)) {
-                    const div = document.createElement("div");
-                    div.className = "pa-dg pa-with-sidebar pa-gsection";
-                    insp.insertBefore(div, ch);
-                    ch = div;
+                    new_section.className += " pa-with-sidebar";
                     const sb = document.createElement("div");
                     sb.className = "pa-sidebar";
-                    div.appendChild(sb);
+                    new_section.appendChild(sb);
                     const sdiv = document.createElement("div");
                     sdiv.className = "pa-dg";
-                    div.appendChild(sdiv);
-                } else {
-                    const div = document.createElement("div");
-                    div.className = "pa-dg pa-gsection";
-                    insp.insertBefore(div, ch);
-                    ch = div;
+                    new_section.appendChild(sdiv);
                 }
             }
             // navigate into section
@@ -918,10 +931,11 @@ function pa_resolve_gradelist() {
             const e = ge.render(gi);
             insp.insertBefore(e, ch);
             gi.update_at(e);
-            // separate section heading from description
-            if (ge.type === "section" && ge.title) {
-                gradelist_resolve_section(gi, ge, e, insp);
-            }
+        }
+
+        // separate section heading from description
+        if (new_section) {
+            gradelist_resolve_section(gi, ge, insp);
         }
 
         // add grade to sidebar

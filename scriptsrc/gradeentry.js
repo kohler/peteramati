@@ -488,27 +488,20 @@ export class GradeSheet {
         return i != null ? this.grades[i] : null;
     }
 
-    section_wants_sidebar(ge) {
-        let start = this.gpos[ge.key], answer = 0;
-        while (start != null && start < this.order.length) {
-            const xge = this.entries[this.order[start]];
-            if (xge !== ge && xge.type === "section") {
-                break;
-            } else if (xge.answer) {
-                answer |= 1;
-            } else {
-                answer |= 2;
-            }
-            ++start;
+    has(f) {
+        for (let i = 0; i !== this.value_order.length; ++i) {
+            const xge = this.entries[this.value_order[i]];
+            if (f(xge, this))
+                return true;
         }
-        return answer === 3;
+        return false;
     }
 
     section_has(ge, f) {
         let start = this.gpos[ge.key];
-        while (start != null && start < this.order.length) {
-            const xge = this.entries[this.order[start]];
-            if ((xge === ge) !== (xge.type === "section")) {
+        while (start != null && start < this.value_order.length) {
+            const xge = this.entries[this.value_order[start]];
+            if (xge !== ge && xge.type === "section") {
                 break;
             } else if (f(xge, this)) {
                 return true;
@@ -516,6 +509,14 @@ export class GradeSheet {
             ++start;
         }
         return false;
+    }
+
+    section_wants_sidebar(ge) {
+        let answer = 0;
+        return this.section_has(ge, xge => {
+            answer |= xge.answer ? 1 : 2;
+            return answer === 3;
+        });
     }
 
     static parse_json(x) {
