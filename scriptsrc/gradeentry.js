@@ -190,7 +190,7 @@ export class GradeEntry {
     }
 
     update_show(elt, v) {
-        const ve = elt.querySelector(".pa-gradevalue");
+        const ve = elt.classList.contains("pa-gradevalue") ? elt : elt.querySelector(".pa-gradevalue");
         let hidden;
         if (this.gc.update_show) {
             hidden = this.gc.update_show.call(this, ve, v);
