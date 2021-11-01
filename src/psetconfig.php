@@ -1566,8 +1566,9 @@ class GradeEntryConfig {
         return $this->_formula;
     }
 
-    /** @return array<string,mixed> */
-    function json($pcview, $pos = null) {
+    /** @param bool $psview
+     * @return array<string,mixed> */
+    function json($pcview) {
         $gej = ["key" => $this->key, "title" => $this->title];
         if ($this->type !== null) {
             if ($this->type === "select") {

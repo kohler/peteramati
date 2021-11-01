@@ -179,11 +179,11 @@ class GradeExport implements JsonSerializable {
         }
         if ($this->include_entries || $this->visible_grades !== null) {
             $entries = $order = [];
-            $gi = $maxtotal = 0;
+            $maxtotal = 0;
             foreach ($this->visible_grades() as $ge) {
                 if ($this->known_entries === null
                     || $this->known_entries[$ge->pcview_index] === false) {
-                    $entries[$ge->key] = $ge->json($this->pc_view, $gi);
+                    $entries[$ge->key] = $ge->json($this->pc_view);
                 }
                 $order[] = $ge->key;
                 if ($ge->max
@@ -192,7 +192,6 @@ class GradeExport implements JsonSerializable {
                     && ($this->pc_view || $ge->max_visible)) {
                     $maxtotal += $ge->max;
                 }
-                ++$gi;
             }
             if ($this->include_entries) {
                 if (!empty($entries)) {
