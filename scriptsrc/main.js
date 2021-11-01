@@ -766,14 +766,7 @@ function gradelist_resolve_section(gi, ge, e, insp) {
         const btnbox = document.createElement("div");
         btnbox.className = "hdr-actions btnbox";
         btnbox.innerHTML = t;
-        let label = e.firstChild;
-        const lc = label.firstChild;
-        if (lc.nodeType === 1
-            && lc === label.lastChild
-            && lc.tagName === "P") {
-            label = lc;
-        }
-        label.appendChild(btnbox);
+        e.firstChild.appendChild(btnbox);
     }
 }
 
