@@ -152,45 +152,49 @@ export class GradeEntry {
         }
     }
 
-    update_edit(elt, v, opts) {
-        const $g = $(elt);
+    update_edit(pde, v, opts) {
+        const $pde = $(pde);
 
         // “grade is above max” message
         if (this.max) {
+            const has_max = pde.nextSibling && pde.nextSibling.classList.contains("pa-gradeabovemax");
             if (!v || v <= this.max) {
-                $g.find(".pa-gradeabovemax").remove();
-            } else if (!$g.find(".pa-gradeabovemax").length) {
-                $g.find(".pa-pd").after('<div class="pa-pd pa-gradeabovemax">Grade is above max</div>');
+                has_max && pde.parentElement.removeChild(pde.nextSibling);
+            } else if (!has_max) {
+                const e = document.createElement("div");
+                e.classList = "pa-pd pa-gradeabovemax";
+                e.textContent = "Grade is above max";
+                pde.parentElement.insertBefore(e, pde.nextSibling);
             }
         }
 
         // “autograde differs” message
         if (opts.autograde == null || v === opts.autograde) {
-            $g.find(".pa-gradediffers").remove();
+            $pde.find(".pa-gradediffers").remove();
         } else {
             const txt = (this.key === "late_hours" ? "auto-late hours" : "autograde") +
                 " is " + this.text(opts.autograde);
-            if (!$g.find(".pa-gradediffers").length) {
-                $g.find(".pa-pd").first().append('<span class="pa-gradediffers"></span>');
+            if (!$pde.find(".pa-gradediffers").length) {
+                $pde.append('<span class="pa-gradediffers"></span>');
             }
-            const $ag = $g.find(".pa-gradediffers");
+            const $ag = $pde.find(".pa-gradediffers");
             if ($ag.text() !== txt) {
                 $ag.text(txt);
             }
         }
 
         // grade value
-        this.gc.update_edit.call(this, elt, v, opts);
+        this.gc.update_edit.call(this, pde, v, opts);
 
         let ve;
-        if (opts.reset && (ve = elt.querySelector(".pa-gradevalue"))) {
+        if (opts.reset && (ve = pde.querySelector(".pa-gradevalue"))) {
             ve.setAttribute("data-default-value", this.simple_text(v));
         }
-        this.landmark && this.update_landmark(elt);
+        this.landmark && this.update_landmark(pde);
     }
 
-    update_show(elt, v) {
-        const ve = elt.classList.contains("pa-gradevalue") ? elt : elt.querySelector(".pa-gradevalue");
+    update_show(pde, v) {
+        const ve = pde.classList.contains("pa-gradevalue") ? pde : pde.querySelector(".pa-gradevalue");
         let hidden;
         if (this.gc.update_show) {
             hidden = this.gc.update_show.call(this, ve, v);
@@ -201,8 +205,8 @@ export class GradeEntry {
             }
             hidden = gt === "" && !this.max;
         }
-        hidden != null && toggleClass(elt, "hidden", hidden);
-        this.landmark && this.update_landmark(elt);
+        hidden != null && toggleClass(pde, "hidden", hidden);
+        this.landmark && this.update_landmark(pde);
     }
 
     update_at(elt, v, opts) {
@@ -217,23 +221,23 @@ export class GradeEntry {
         }
     }
 
-    update_landmark(elt) {
-        let gl = elt.closest(".pa-gradelist");
+    update_landmark(pde) {
+        let gl = pde.closest(".pa-gradelist");
         if (gl && hasClass(gl, "want-landmark-links")) {
             let want_gbr = "";
             const m = /^(.*):(\d+)$/.exec(this.landmark);
             if (m && Filediff.find(m[1])) {
-                const pi = elt.closest(".pa-psetinfo"),
+                const pi = pde.closest(".pa-psetinfo"),
                     directory = pi.getAttribute("data-pa-directory") || "",
                     filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
                 want_gbr = '@<a href="#La'.concat(m[2], '_', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
             }
-            const $g = $(elt), $pgbr = $g.find(".pa-gradeboxref");
+            const $pgbr = $(pde).find(".pa-gradeboxref");
             if (want_gbr === "") {
                 $pgbr.remove();
             } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
                 $pgbr.remove();
-                $g.find(".pa-pd").first().append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
+                $(pde).append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
             }
         }
     }
