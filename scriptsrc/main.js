@@ -1193,7 +1193,7 @@ function pa_render_pset_table(pconf, data) {
         $gdialog, gdialog_su,
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
-        grade_entries, grade_keys, need_ngrades,
+        table_entries, need_ngrades,
         sort = {
             f: flagged ? "at" : "username", last: true, rev: 1
         },
@@ -1444,7 +1444,7 @@ function pa_render_pset_table(pconf, data) {
         },
         grade: {
             th: function () {
-                return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="grade', this.gidx, '" scope="col" title="', escape_entities(this.ge.title), '">', this.ge.abbr(), '</th>');
+                return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="grade', this.gidx, '" scope="col" title="', escape_entities(this.ge.title_text), '">', this.ge.abbr(), '</th>');
             },
             td: function (s, rownum, text) {
                 let gr = s.grades[this.gidx],
@@ -1552,15 +1552,13 @@ function pa_render_pset_table(pconf, data) {
             set_sort_nameflag();
         }
 
-        grade_entries = [];
-        grade_keys = [];
+        table_entries = [];
         if (pconf.grades) {
             pconf.grades = new GradeSheet(pconf.grades);
-            for (let i = 0; i !== pconf.grades.order.length; ++i) {
-                const k = pconf.grades.order[i], ge = pconf.grades.entries[k];
+            for (let i = 0; i !== pconf.grades.value_order.length; ++i) {
+                const k = pconf.grades.value_order[i], ge = pconf.grades.entries[k];
                 if (ge.type_tabular) {
-                    grade_entries.push(ge);
-                    grade_keys.push(k);
+                    table_entries.push(ge);
                 }
             }
         }
@@ -1577,8 +1575,8 @@ function pa_render_pset_table(pconf, data) {
                 s.boringness = 0;
             }
             let ngrades = 0;
-            for (var j = 0; j < grade_keys.length; ++j) {
-                if (grade_keys[j] != pconf.total_key
+            for (var j = 0; j !== table_entries.length; ++j) {
+                if (table_entries[j].key != pconf.total_key
                     && s.grades[j] != null
                     && s.grades[j] !== "")
                     ++ngrades;
@@ -1621,15 +1619,15 @@ function pa_render_pset_table(pconf, data) {
                 total_colpos = col.length;
                 col.push("total");
             }
-            for (let i = 0; i !== grade_keys.length; ++i) {
-                const ge = grade_entries[i];
+            for (let i = 0; i !== table_entries.length; ++i) {
+                const ge = table_entries[i];
                 ge.gpos = i;
                 ge.colpos = col.length;
                 col.push(ge.configure_column({
                     type: "grade",
                     name: "grade" + i,
                     gidx: i,
-                    gkey: grade_keys[i]
+                    gkey: ge.key
                 }, pconf));
             }
             if (need_ngrades) {
@@ -2047,7 +2045,7 @@ function pa_render_pset_table(pconf, data) {
             ngrades_nonempty = 0;
         for (var i = 0; i !== gorder.length; ++i) {
             var k = gorder[i], ge = pconf.grades.entries[k], c;
-            if (ge && (c = col[ge.colpos])) {
+            if (ge && ge.gpos != null && (c = col[ge.colpos])) {
                 if (su.grades[ge.gpos] !== rv.grades[i]) {
                     su.grades[ge.gpos] = rv.grades[i];
                     tr.childNodes[ge.colpos].innerText = c.td.call(c, su, null, true);
@@ -2110,7 +2108,7 @@ function pa_render_pset_table(pconf, data) {
             .then(function (rv) {
                 gdialog_store_start(rv);
                 if (rv.ok) {
-                    grade_update(make_umap(), rv, rv.order);
+                    grade_update(make_umap(), rv, rv.value_order || rv.order);
                     next();
                 }
             });
@@ -2128,7 +2126,7 @@ function pa_render_pset_table(pconf, data) {
                 if (rv.ok) {
                     var umap = make_umap();
                     for (var i in rv.us) {
-                        grade_update(umap, rv.us[i], rv.order);
+                        grade_update(umap, rv.us[i], rv.value_order || rv.order);
                     }
                     next();
                 }
@@ -2239,8 +2237,8 @@ function pa_render_pset_table(pconf, data) {
         $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
         $gdialog.find("form").addClass("pa-psetinfo").data("pa-gradeinfo", pconf.grades);
         let gl = $gdialog.find(".pa-gradelist")[0], gi = GradeSheet.closest(gl);
-        for (var i = 0; i !== grade_entries.length; ++i) {
-            gl.appendChild(grade_entries[i].render(gi, 1));
+        for (let i = 0; i !== table_entries.length; ++i) {
+            gl.appendChild(table_entries[i].render(gi, 1));
         }
         hc.pop();
 

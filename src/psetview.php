@@ -573,7 +573,7 @@ class PsetView {
 
 
     /** @return list<mixed> */
-    private function blank_gradelist() {
+    private function blank_values() {
         return array_fill(0, count($this->pset->grades), null);
     }
 
@@ -584,7 +584,7 @@ class PsetView {
             $this->_has_formula = false;
             $jn = $this->grade_jnotes();
             if ($jn && ($ag = $jn->autogrades ?? null)) {
-                $this->_ag = $this->blank_gradelist();
+                $this->_ag = $this->blank_values();
                 foreach ($this->pset->grades as $ge) {
                     if (!$ge->is_formula() && isset($ag->{$ge->key})) {
                         $this->_ag[$ge->pcview_index] = $ag->{$ge->key};
@@ -593,7 +593,7 @@ class PsetView {
             }
             $this->_g = $this->_ag;
             if ($jn && ($g = $jn->grades ?? null)) {
-                $this->_g = $this->_g ?? $this->blank_gradelist();
+                $this->_g = $this->_g ?? $this->blank_values();
                 foreach ($this->pset->grades as $ge) {
                     if (!$ge->is_formula() && property_exists($g, $ge->key)) {
                         $this->_g[$ge->pcview_index] = $g->{$ge->key};
@@ -617,7 +617,7 @@ class PsetView {
                     $f = $ge->formula();
                     $v = $f->evaluate($this->user);
                     if ($v !== null) {
-                        $this->_g = $this->_g ?? $this->blank_gradelist();
+                        $this->_g = $this->_g ?? $this->blank_values();
                         $this->_g[$ge->pcview_index] = $v;
                     } else {
                         $this->_has_fg[$ge->pcview_index] = true;
@@ -632,7 +632,7 @@ class PsetView {
                     if (property_exists($g, $ge->key)) {
                         $v = $g->{$ge->key};
                         if ($v !== null) {
-                            $this->_g = $this->_g ?? $this->blank_gradelist();
+                            $this->_g = $this->_g ?? $this->blank_values();
                             $this->_g[$ge->pcview_index] = $v;
                         } else {
                             $this->_has_fg[$ge->pcview_index] = true;
@@ -709,7 +709,7 @@ class PsetView {
                 if ($gv === null && !isset($this->_has_fg[$ge->pcview_index])) {
                     $gv = $ge->formula()->evaluate($this->user);
                     if ($gv !== null) {
-                        $this->_g = $this->_g ?? $this->blank_gradelist();
+                        $this->_g = $this->_g ?? $this->blank_values();
                         $this->_g[$ge->pcview_index] = $gv;
                     } else {
                         $this->_has_fg[$ge->pcview_index] = true;
@@ -1701,7 +1701,7 @@ class PsetView {
 
         if ($flags & self::GRADEJSON_SLICE) {
             $gexp = new GradeExport($this->pset, true);
-            $gexp->include_entries = false;
+            $gexp->slice = true;
         } else {
             $gexp = new GradeExport($this->pset, $override_view || $this->pc_view);
         }
@@ -1749,7 +1749,7 @@ class PsetView {
         $this->ensure_grades();
         $gexp->grades = [];
         $gexp->autogrades = $this->_ag !== null ? [] : null;
-        foreach ($gexp->visible_grades() as $ge) {
+        foreach ($gexp->value_entries() as $ge) {
             $gexp->grades[] = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
             if ($this->_ag !== null) {
                 $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
@@ -1759,12 +1759,12 @@ class PsetView {
 
     function grade_export_formulas(GradeExport $gexp) {
         if ($this->pset->has_formula) {
-            foreach ($gexp->visible_grades() as $i => $ge) {
+            foreach ($gexp->value_entries() as $i => $ge) {
                 if ($ge->is_formula()) {
                     $v = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
                     $v = $v ?? $this->grade_value($ge);
                     if ($v !== null) {
-                        $gexp->grades = $gexp->grades ?? $gexp->blank_gradelist();
+                        $gexp->grades = $gexp->grades ?? $gexp->blank_values();
                         $gexp->grades[$i] = $v;
                     }
                 }

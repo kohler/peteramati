@@ -978,7 +978,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
         }
     }
 
-    if ($gex->visible_grades()) {
+    if ($gex->value_entries()) {
         if (!$pset->gitless_grades) {
             $gradercid = $info->gradercid();
             $gi = $info->grade_jnotes();
@@ -1002,13 +1002,13 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
         $info->grade_export_formulas($gex);
         $j["grades"] = $gex->grades;
         if (!$info->user->dropped && $info->viewer_is_grader()) {
-            foreach ($gex->visible_grades() as $i => $ge) {
+            foreach ($gex->value_entries() as $i => $ge) {
                 if ($gex->grades[$i] === null && $ge->grader_entry_required())
                     $info->user->incomplete = "grade missing";
             }
         }
         if ($gex->autogrades !== null) {
-            foreach ($gex->visible_grades() as $i => $ge) {
+            foreach ($gex->value_entries() as $i => $ge) {
                 if ($gex->autogrades[$i] !== null
                     && $gex->autogrades[$i] !== $gex->grades[$i]) {
                     $j["highlight_grades"][$ge->key] = true;
@@ -1102,7 +1102,7 @@ function show_pset_table($sset) {
     $jx = [];
     $gradercounts = [];
     $gex = new GradeExport($pset, true);
-    $gex->set_visible_grades($pset->tabular_grades());
+    $gex->set_exported_values($pset->tabular_grades());
     foreach ($sset as $s) {
         if (!$s->user->visited) {
             $j = render_pset_row($pset, $sset, $s, $gex, $anonymous);
@@ -1162,7 +1162,7 @@ function show_pset_table($sset) {
         $jd["can_override_anonymous"] = true;
     }
     $i = $nintotal = $last_in_total = 0;
-    foreach ($gex->visible_grades() as $ge) {
+    foreach ($gex->value_entries() as $ge) {
         if (!$ge->no_total) {
             ++$nintotal;
             $last_in_total = $ge->key;

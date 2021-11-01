@@ -10,7 +10,9 @@ class GradeExport implements JsonSerializable {
     /** @var bool */
     public $pc_view;
     /** @var bool */
-    public $include_entries = true;
+    public $slice = false;
+    /** @var bool */
+    public $value_slice = false;
     /** @var ?int */
     public $uid;
     /** @var ?list<mixed> */
@@ -40,7 +42,7 @@ class GradeExport implements JsonSerializable {
     /** @var ?bool */
     public $editable_answers;
     /** @var ?list<GradeEntryConfig> */
-    private $visible_grades;
+    private $visible_values;
     /** @var ?list<int> */
     private $known_entries;
 
@@ -52,23 +54,39 @@ class GradeExport implements JsonSerializable {
 
     /** @param iterable<GradeEntryConfig> $vges */
     function set_visible_grades($vges) {
-        assert(!isset($this->grades));
-        $this->visible_grades = is_list($vges) ? $vges : iterator_to_array($vges, false);
+        assert(!isset($this->grades) && !$this->value_slice);
+        $this->visible_values = is_list($vges) ? $vges : iterator_to_array($vges, false);
         $this->has_total = false;
     }
 
+    /** @param iterable<GradeEntryConfig> $vges */
+    function set_exported_values($vges) {
+        assert($this->pc_view && $this->visible_values === null);
+        $this->set_visible_grades($vges);
+        $this->value_slice = true;
+    }
+
     /** @return list<GradeEntryConfig> */
-    function visible_grades() {
-        return $this->visible_grades ?? $this->pset->visible_grades($this->pc_view);
+    function visible_entries() {
+        if ($this->value_slice || $this->visible_values === null) {
+            return $this->pset->visible_grades($this->pc_view);
+        } else {
+            return $this->visible_values;
+        }
+    }
+
+    /** @return list<GradeEntryConfig> */
+    function value_entries() {
+        return $this->visible_values ?? $this->pset->visible_grades($this->pc_view);
     }
 
     /** @return list<mixed> */
-    function blank_gradelist() {
-        return array_fill(0, count($this->visible_grades()), null);
+    function blank_values() {
+        return array_fill(0, count($this->value_entries()), null);
     }
 
     function suppress_absent_extra() {
-        $ges = $this->visible_grades();
+        $ges = $this->value_entries();
         $nges = count($ges);
         for ($i = 0; $i !== count($ges); ) {
             if ($ges[$i]->is_extra
@@ -83,7 +101,7 @@ class GradeExport implements JsonSerializable {
             }
         }
         if ($i !== $nges) {
-            $this->visible_grades = $ges;
+            $this->visible_values = $ges;
         }
     }
 
@@ -101,7 +119,7 @@ class GradeExport implements JsonSerializable {
         if (!$this->has_total) {
             $t = $tnx = 0;
             $any = false;
-            foreach ($this->visible_grades() as $i => $ge) {
+            foreach ($this->value_entries() as $i => $ge) {
                 if (!$ge->no_total
                     && ($gv = $this->grades[$i] ?? null) !== null) {
                     $t += $gv;
@@ -177,10 +195,10 @@ class GradeExport implements JsonSerializable {
                 $r["editable_answers"] = $this->editable_answers;
             }
         }
-        if ($this->include_entries || $this->visible_grades !== null) {
+        if (!$this->slice || $this->visible_values !== null) {
             $entries = $order = [];
             $maxtotal = 0;
-            foreach ($this->visible_grades() as $ge) {
+            foreach ($this->visible_entries() as $ge) {
                 if ($this->known_entries === null
                     || $this->known_entries[$ge->pcview_index] === false) {
                     $entries[$ge->key] = $ge->json($this->pc_view);
@@ -193,7 +211,7 @@ class GradeExport implements JsonSerializable {
                     $maxtotal += $ge->max;
                 }
             }
-            if ($this->include_entries) {
+            if (!$this->slice) {
                 if (!empty($entries)) {
                     $r["entries"] = $entries;
                 } else if (empty($order)) {
@@ -201,8 +219,11 @@ class GradeExport implements JsonSerializable {
                 }
             }
             $r["order"] = $order;
-            if (!$this->include_entries) {
-                $r["order_fixed"] = true;
+            if ($this->value_slice) {
+                $r["value_order"] = [];
+                foreach ($this->value_entries() as $ge) {
+                    $r["value_order"][] = $ge->key;
+                }
             }
             if ($this->pset->grades_total !== null) {
                 $r["maxtotal"] = $this->pset->grades_total;

@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { escape_entities, html_id_encode } from "./encoders.js";
+import { escape_entities, unescape_entities, html_id_encode } from "./encoders.js";
 import { hasClass, toggleClass } from "./ui.js";
 import { Filediff, Linediff } from "./diff.js";
 import { Note } from "./note.js";
@@ -15,7 +15,7 @@ const want_props = {
     "uid": true, "last_hours": true, "auto_late_hours": true, "updateat": true,
     "version": true, "editable": true, "maxtotal": true, "history": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,
-    "order_fixed": true, "editable_answers": true
+    "editable_answers": true
 };
 
 export class GradeEntry {
@@ -31,6 +31,44 @@ export class GradeEntry {
         return this.gc.type_tabular;
     }
 
+    get title_html() {
+        let t = this.title, ch, int;
+        if (!t) {
+            return this.key;
+        } else if (t.charAt(0) === "<"
+                   && (ch = t.charAt(1)) >= "0"
+                   && ch <= "9") {
+            t = render_ftext(t).trim();
+            if (t.startsWith("<p>")
+                && t.endsWith("</p>")
+                && (int = t.substring(3, t.length - 4)).indexOf("</p>") < 0) {
+                t = int;
+            }
+            return t;
+        } else {
+            return escape_entities(t);
+        }
+    }
+
+    get title_text() {
+        let t = this.title, ch, int;
+        if (!t) {
+            return this.key;
+        } else if (t.charAt(0) === "<"
+                   && (ch = t.charAt(1)) >= "0"
+                   && ch <= "9") {
+            t = render_ftext(t).trim();
+            if (t.startsWith("<p>")
+                && t.endsWith("</p>")
+                && (int = t.substring(3, t.length - 4)).indexOf("</p>") < 0) {
+                t = int;
+            }
+            return unescape_entities(t);
+        } else {
+            return t;
+        }
+    }
+
     abbr() {
         this._abbr || this.compute_abbr();
         return this._abbr;
@@ -38,22 +76,20 @@ export class GradeEntry {
 
     compute_abbr() {
         const order = this._all ? this._all.order : [this.key],
+            value_order = this._all ? this._all.value_order : [this.key],
             entries = this._all ? this._all.entries : {[this.key]: this};
         let pabbr = {}, grade_titles = [];
 
         for (let i = 0; i !== order.length; ++i) {
-            const k = order[i], ge = entries[k];
-            let t = ge.title || k;
-            if (t.startsWith("<1>")) {
-                t = t.substring(3);
-            }
+            entries[order[i]]._abbr = ":" + i;
+        }
+        for (let i = 0; i !== value_order.length; ++i) {
+            const k = value_order[i], ge = entries[k], t = ge.title_text;
             grade_titles.push(t);
             let m = t.match(/^(p)(?:art[\s\d]|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i)
                 || t.match(/^(q)(?:uestion[\s\d]|(?=\d))([-.a-z\d]+)(?:[\s:]+|$)/i)
                 || t.match(/^[\s:]*()(\S{1,3}[\d.]*)[^\s\d]*[\s:]*/);
-            if (!m) {
-                ge._abbr = ":" + i;
-            } else {
+            if (m) {
                 let abbr = m[1] + m[2],
                     rest = t.substring(m[0].length),
                     abbrx;
@@ -94,9 +130,7 @@ export class GradeEntry {
             'pa-grade pa-p',
             this.visible === false ? ' pa-p-hidden' : '',
             '" data-pa-grade="', this.key,
-            '"><label class="pa-pt" for="', id, '">',
-            (this.title ? render_ftext(this.title) : this.key).trim(),
-            '</label>');
+            '"><label class="pa-pt" for="', id, '">', this.title_html, '</label>');
         if (this.description) {
             t = t.concat('<div class="pa-pdesc pa-dr">', render_ftext(this.description), '</div>');
         }
@@ -254,7 +288,7 @@ export class GradeEntry {
                     sum = 0.0;
                 }
                 sum += parseFloat(m[2]);
-                gch = escape_entities(this.title).concat(": ", escape_entities(m[1]), "<b>", escape_entities(m[2]), "</b>", escape_entities(m[3]));
+                gch = escape_entities(this.title_text).concat(": ", escape_entities(m[1]), "<b>", escape_entities(m[2]), "</b>", escape_entities(m[3]));
             }
             let $nd = $(ln.element).find(".pa-note-gradecontrib");
             if (!$nd.length && gch) {
@@ -331,24 +365,36 @@ export class GradeSheet {
     }
 
     extend(x) {
+        let need_gpos = false;
         if (x.entries) {
             for (let i in x.entries) {
                 this.entries[i] = new GradeEntry(x.entries[i]);
                 this.entries[i]._all = this;
             }
         }
-        if (x.order && (!this.order || !this.order_fixed)) {
+        if (x.value_order && !this.explicit_value_order) {
+            this.value_order = x.value_order;
+            this.explicit_value_order = true;
+            need_gpos = true;
+        }
+        if (x.order) {
             this.order = x.order;
+            if (!this.explicit_value_order) {
+                this.value_order = x.order;
+                need_gpos = true;
+            }
+        }
+        if (need_gpos) {
             this.gpos = {};
-            for (let i = 0; i < this.order.length; ++i) {
-                this.gpos[this.order[i]] = i;
+            for (let i = 0; i < this.value_order.length; ++i) {
+                this.gpos[this.value_order[i]] = i;
             }
         }
         if (x.grades) {
-            this.grades = this.merge_grades(this.grades, x.grades, x.order || this.order);
+            this.grades = this.merge_grades(this.grades, x.grades, x);
         }
         if (x.autogrades) {
-            this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x.order || this.order);
+            this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x);
         }
         for (let k in x) {
             if (want_props[k])
@@ -356,8 +402,9 @@ export class GradeSheet {
         }
     }
 
-    merge_grades(myg, ing, inorder) {
-        if (!myg && (!this.order || inorder === this.order)) {
+    merge_grades(myg, ing, x) {
+        let inorder = x.value_order || x.order || this.value_order;
+        if (!myg && inorder === this.value_order) {
             return ing;
         } else {
             myg = myg || [];
@@ -417,7 +464,7 @@ export class GradeSheet {
 
     get_total(noextra) {
         let total = 0;
-        for (let i = 0; i < this.order.length; ++i) {
+        for (let i = 0; i !== this.order.length; ++i) {
             const ge = this.entries[this.order[i]];
             if (ge && ge.in_total && (!noextra || !this.is_extra)) {
                 total += (this.grades && this.grades[i]) || 0;
@@ -427,7 +474,7 @@ export class GradeSheet {
     }
 
     get has_sections() {
-        for (let i = 0; i < this.order.length; ++i) {
+        for (let i = 0; i !== this.order.length; ++i) {
             const ge = this.entries[this.order[i]];
             if (ge.type === "section") {
                 return true;
@@ -437,12 +484,8 @@ export class GradeSheet {
     }
 
     grade_value(ge) {
-        if (this.grades) {
-            const i = this.gpos[ge.key];
-            return this.grades[i];
-        } else {
-            return null;
-        }
+        const i = this.grades ? this.gpos[ge.key] : null;
+        return i != null ? this.grades[i] : null;
     }
 
     section_wants_sidebar(ge) {
