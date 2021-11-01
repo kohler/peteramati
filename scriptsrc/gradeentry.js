@@ -364,7 +364,7 @@ export class GradeSheet {
         x && this.extend(x);
     }
 
-    extend(x) {
+    extend(x, replace_order) {
         let need_gpos = false;
         if (x.entries) {
             for (let i in x.entries) {
@@ -372,12 +372,12 @@ export class GradeSheet {
                 this.entries[i]._all = this;
             }
         }
-        if (x.value_order && !this.explicit_value_order) {
+        if (x.value_order && (!this.explicit_value_order || replace_order)) {
             this.value_order = x.value_order;
             this.explicit_value_order = true;
             need_gpos = true;
         }
-        if (x.order) {
+        if (x.order && (!this.order || replace_order)) {
             this.order = x.order;
             if (!this.explicit_value_order) {
                 this.value_order = x.order;
@@ -528,7 +528,7 @@ export class GradeSheet {
             gs = new GradeSheet;
             $(element).data("pa-gradeinfo", gs);
         }
-        gs.extend(x);
+        gs.extend(x, !element.classList.contains("pa-psetinfo-partial"));
         window.$pa.loadgrades.call(element);
     }
 

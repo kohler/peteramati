@@ -194,10 +194,24 @@ class DiffMany {
             $this->qreq->users = join(" ", $want);
         }
 
+        if (isset($this->qreq->anonymous)) {
+            $anonymous = (bool) $this->qreq->anonymous;
+        } else {
+            $anonymous = $this->pset->anonymous;
+        }
         foreach (explode(" ", $this->qreq->users) as $user) {
-            if ($user !== "" && ($u = $this->conf->user_by_whatever($user))) {
+            if ($user === "") {
+                continue;
+            } else if (ctype_digit($user) && strlen($user) < 8) {
+                if (($u = $this->conf->user_by_id($user))) {
+                    $u->set_anonymous($anonymous);
+                }
+            } else {
+                $u = $this->conf->user_by_whatever($user);
+            }
+            if ($u) {
                 $this->echo_one($u);
-            } else if ($user !== "") {
+            } else {
                 echo "<p>no such user ", htmlspecialchars($user), "</p>\n";
             }
         }

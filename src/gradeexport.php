@@ -54,7 +54,7 @@ class GradeExport implements JsonSerializable {
 
     /** @param iterable<GradeEntryConfig> $vges */
     function set_visible_grades($vges) {
-        assert(!isset($this->grades) && !$this->value_slice);
+        assert(!isset($this->grades));
         $this->visible_values = is_list($vges) ? $vges : iterator_to_array($vges, false);
         $this->has_total = false;
     }

@@ -10,7 +10,7 @@ import { event_key } from "./ui-key.js";
 import "./ui-autogrow.js";
 import "./ui-range.js";
 import "./ui-sessionlist.js";
-import { hoturl, hoturl_post, hoturl_gradeapi } from "./hoturl.js";
+import { hoturl, hoturl_post, hoturl_gradeapi, hoturl_post_go } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
 import { tooltip } from "./tooltip.js";
@@ -1190,7 +1190,7 @@ handle_ui.on("pa-anonymized-link", function (event) {
 function pa_render_pset_table(pconf, data) {
     var $j = $(this), table_width = 0, dmap = [],
         $overlay = null, name_col, slist_input,
-        $gdialog, gdialog_su,
+        $gdialog, gdialog_self, gdialog_su,
         flagged = pconf.flagged_commits,
         visible = pconf.grades_visible,
         table_entries, need_ngrades,
@@ -2057,8 +2057,10 @@ function pa_render_pset_table(pconf, data) {
         }
         if (rv.total !== su.total) {
             su.total = rv.total;
-            if (total_colpos)
-                tr.childNodes[total_colpos].innerText = su.total;
+            if (total_colpos) {
+                const t = su.total == null ? "" : su.total;
+                tr.childNodes[total_colpos].innerText = t;
+            }
         }
         if (ngrades_nonempty !== su.ngrades_nonempty) {
             su.ngrades_nonempty = ngrades_nonempty;
@@ -2080,26 +2082,60 @@ function pa_render_pset_table(pconf, data) {
             }
         }
     }
-    function gdialog_store(next) {
-        var any = false, byuid = {};
-        $gdialog.find(".pa-gradevalue").each(function () {
-            if ((this.hasAttribute("data-pa-unmixed") || input_differs(this))
-                && !this.indeterminate) {
-                var k = this.name, ge = pconf.grades.entries[k], v;
-                if (this.type === "checkbox") {
-                    v = this.checked ? this.value : "";
-                } else {
-                    v = $(this).val();
-                }
-                for (var i = 0; i !== gdialog_su.length; ++i) {
-                    var su = gdialog_su[i];
-                    byuid[su.uid] = byuid[su.uid] || {grades: {}, oldgrades: {}};
-                    byuid[su.uid].grades[k] = v;
-                    byuid[su.uid].oldgrades[k] = su.grades[ge.gpos];
-                }
-                any = true;
+    function gdialog_grademany() {
+        const $gsi = $gdialog.find(".pa-gdialog-gradesheet input"),
+            ge = [], us = [];
+        for (let i = 0; i !== $gsi.length; ++i) {
+            if ($gsi[i].checked)
+                ge.push(pconf.grades.entries[$gsi[i].name]);
+        }
+        for (let i = 0; i !== gdialog_su.length; ++i) {
+            us.push(gdialog_su[i].uid);
+        }
+        if (ge.length === 0) {
+            alert("No grades selected.");
+        } else {
+            const opt = {pset: pconf.key, anonymous: anonymous ? 1 : "", users: us.join(" ")};
+            if (ge.length === 1 && ge[0].landmark_range_file) {
+                opt.file = ge[0].landmark_range_file;
+                opt.lines = ge[0].landmark_range_first + "-" + ge[0].landmark_range_last;
             }
-        });
+            opt.grade = ge[0].key;
+            for (let i = 1; i !== ge.length; ++i) {
+                opt.grade += " " + ge[i].key;
+            }
+            hoturl_post_go("diffmany", opt);
+        }
+    }
+    function gdialog_store(next) {
+        const gradesheet_mode = $gdialog.find("button[name=mode-gradesheet]").hasClass("btn-primary");
+        let any = false, byuid = {};
+        if (gradesheet_mode) {
+            if (!next) {
+                gdialog_grademany();
+                return;
+            }
+        } else {
+            $gdialog.find(".pa-gradevalue").each(function () {
+                if ((this.hasAttribute("data-pa-unmixed") || input_differs(this))
+                    && !this.indeterminate) {
+                    let k = this.name, ge = pconf.grades.entries[k], v;
+                    if (this.type === "checkbox") {
+                        v = this.checked ? this.value : "";
+                    } else {
+                        v = $(this).val();
+                    }
+                    for (let i = 0; i !== gdialog_su.length; ++i) {
+                        let su = gdialog_su[i];
+                        byuid[su.uid] = byuid[su.uid] || {grades: {}, oldgrades: {}};
+                        byuid[su.uid].grades[k] = v;
+                        byuid[su.uid].oldgrades[k] = su.grades[ge.gpos];
+                    }
+                    any = true;
+                }
+            });
+        }
+        next = next || function () { $gdialog.close(); };
         if (!any) {
             next();
         } else if (gdialog_su.length === 1) {
@@ -2113,7 +2149,7 @@ function pa_render_pset_table(pconf, data) {
                 }
             });
         } else {
-            for (var i = 0; i !== gdialog_su.length; ++i) {
+            for (let i = 0; i !== gdialog_su.length; ++i) {
                 if (gdialog_su[i].gradehash) {
                     byuid[gdialog_su[i].uid].commit = gdialog_su[i].gradehash;
                     byuid[gdialog_su[i].uid].commit_is_grade = 1;
@@ -2124,8 +2160,8 @@ function pa_render_pset_table(pconf, data) {
             .then(function (rv) {
                 gdialog_store_start(rv);
                 if (rv.ok) {
-                    var umap = make_umap();
-                    for (var i in rv.us) {
+                    const umap = make_umap();
+                    for (let i in rv.us) {
                         grade_update(umap, rv.us[i], rv.value_order || rv.order);
                     }
                     next();
@@ -2134,27 +2170,44 @@ function pa_render_pset_table(pconf, data) {
         }
     }
     function gdialog_traverse() {
-        var next_spos = this.getAttribute("data-pa-spos");
-        gdialog_store(function () {
-            gdialog_fill([next_spos]);
-        });
+        const next_spos = this.getAttribute("data-pa-spos");
+        gdialog_store(function () { gdialog_fill([next_spos]); });
     }
     function gdialog_clear_error() {
         removeClass(this, "has-error");
     }
+    function gdialog_fill_user(su1) {
+        let t;
+        if (su1.first || su1.last) {
+            t = su1.first.concat(" ", su1.last, " <", su1.email, ">");
+        } else {
+            t = "<".concat(su1.email, ">");
+        }
+        $gdialog.find(".gt-name-email").html(escape_entities(t)).removeClass("hidden");
+        let tr = $j.find("tbody")[0].firstChild, tr1;
+        while (tr && tr.getAttribute("data-pa-spos") != su1._spos) {
+            tr = tr.nextSibling;
+        }
+        for (tr1 = tr; tr1 && (tr1 === tr || !tr1.hasAttribute("data-pa-spos")); ) {
+            tr1 = tr1.previousSibling;
+        }
+        $gdialog.find("button[name=prev]").attr("data-pa-spos", tr1 ? tr1.getAttribute("data-pa-spos") : "").prop("disabled", !tr1);
+        for (tr1 = tr; tr1 && (tr1 === tr || !tr1.hasAttribute("data-pa-spos")); ) {
+            tr1 = tr1.nextSibling;
+        }
+        $gdialog.find("button[name=next]").attr("data-pa-spos", tr1 ? tr1.getAttribute("data-pa-spos") : "").prop("disabled", !tr1);
+    }
     function gdialog_fill(spos) {
         gdialog_su = [];
-        for (var i = 0; i !== spos.length; ++i) {
+        for (let i = 0; i !== spos.length; ++i) {
             gdialog_su.push(dmap[spos[i]]);
         }
         $gdialog.find("h2").html(escape_entities(pconf.title) + " : " +
             gdialog_su.map(function (su) {
                 return escape_entities(anonymous ? su.anon_username : su.username || su.email);
             }).join(", "));
-        var su1 = gdialog_su.length === 1 ? gdialog_su[0] : null;
-        if (su1) {
-            var t = (su1.first || su1.last ? su1.first + " " + su1.last + " " : "") + "<" + su1.email + ">";
-            $gdialog.find(".gt-name-email").html(escape_entities(t)).removeClass("hidden");
+        if (gdialog_su.length === 1) {
+            gdialog_fill_user(gdialog_su[0]);
         } else {
             $gdialog.find(".gt-name-email").addClass("hidden");
         }
@@ -2178,20 +2231,6 @@ function pa_render_pset_table(pconf, data) {
             }
             ge.update_at(this, sv, opts);
         });
-        if (su1) {
-            var tr = $j.find("tbody")[0].firstChild, tr1;
-            while (tr && tr.getAttribute("data-pa-spos") != su1._spos) {
-                tr = tr.nextSibling;
-            }
-            for (tr1 = tr; tr1 && (tr1 === tr || !tr1.hasAttribute("data-pa-spos")); ) {
-                tr1 = tr1.previousSibling;
-            }
-            $gdialog.find("button[name=prev]").attr("data-pa-spos", tr1 ? tr1.getAttribute("data-pa-spos") : "").prop("disabled", !tr1);
-            for (tr1 = tr; tr1 && (tr1 === tr || !tr1.hasAttribute("data-pa-spos")); ) {
-                tr1 = tr1.nextSibling;
-            }
-            $gdialog.find("button[name=next]").attr("data-pa-spos", tr1 ? tr1.getAttribute("data-pa-spos") : "").prop("disabled", !tr1);
-        }
     }
     function gdialog_key(event) {
         let $b;
@@ -2203,7 +2242,7 @@ function pa_render_pset_table(pconf, data) {
             event.stopImmediatePropagation();
             event.preventDefault();
         } else if (event.key === "Return" || event.key === "Enter") {
-            gdialog_store(function () { $gdialog.close(); });
+            gdialog_store(null);
             event.stopImmediatePropagation();
             event.preventDefault();
         } else if (event.key === "Esc" || event.key === "Escape") {
@@ -2220,47 +2259,100 @@ function pa_render_pset_table(pconf, data) {
             gdialog_change.call(this);
         }
     }
+    function gdialog_section_click(event) {
+        if (event.type === "click" && !event.shiftKey) {
+            const checked = this.checked;
+            let l = this.closest("label");
+            while ((l = l.nextSibling)) {
+                const ch = l.firstChild.firstChild;
+                if (ch.classList.contains("pa-gdialog-section"))
+                    break;
+                ch.checked = checked;
+            }
+        }
+    }
+    function gdialog_mode_values() {
+        const gl = $gdialog.find(".pa-gradelist")[0];
+        if (gl.firstChild === null) {
+            const gi = GradeSheet.closest(gl);
+            for (let i = 0; i !== table_entries.length; ++i) {
+                gl.appendChild(table_entries[i].render(gi, 1));
+            }
+        }
+        gl.classList.remove("hidden");
+        if (gl.nextSibling.classList.contains("pa-gdialog-gradesheet")) {
+            gl.nextSibling.classList.add("hidden");
+        }
+        $gdialog.find("button[name=bsubmit]").text("Save");
+    }
+    function gdialog_mode_gradesheet() {
+        const gl = $gdialog.find(".pa-gradelist")[0];
+        let gs = gl.nextSibling;
+        if (!gs || !gs.classList.contains("pa-gdialog-gradesheet")) {
+            gs = document.createElement("div");
+            gs.className = "pa-gdialog-gradesheet";
+            gl.parentElement.insertBefore(gs, gl.nextSibling);
+            const yc = new HtmlCollector;
+            let in_section = false;
+            for (let i = 0; i !== pconf.grades.order.length; ++i) {
+                const ge = pconf.grades.entries[pconf.grades.order[i]],
+                    gcl = in_section && ge.type !== "section" ? "checki ml-4" : "checki",
+                    ccl = ge.type === "section" ? " pa-gdialog-section" : "";
+                yc.push('<label class="'.concat(gcl, '"><span class="checkc"><input type="checkbox" name="', ge.key, '" class="uic js-range-click', ccl, '" data-range-type="mge"></span>', ge.title_html, '</label>'));
+                in_section = in_section || ge.type === "section";
+            }
+            gs.innerHTML = yc.render();
+        }
+        gl.classList.add("hidden");
+        gs.classList.remove("hidden");
+        $gdialog.find("button[name=bsubmit]").text("Edit gradesheet");
+    }
+    function gdialog_mode() {
+        $gdialog.find(".nav-pills button").removeClass("btn-primary");
+        if (this.name === "mode-gradesheet") {
+            gdialog_mode_gradesheet();
+        } else {
+            gdialog_mode_values();
+        }
+        this.classList.add("btn-primary");
+    }
     function gdialog() {
-        var hc = popup_skeleton();
+        gdialog_self = this;
+        const hc = popup_skeleton();
         hc.push('<h2></h2>');
         if (!anonymous)
             hc.push('<strong class="gt-name-email"></strong>');
         hc.push('<div class="pa-messages"></div>');
 
+        hc.push('<div class="nav-pills"><button type="button" class="btn btn-primary no-focus" name="mode-values">Values</button><button type="button" class="btn no-focus" name="mode-gradesheet">Gradesheet</button></div>');
         hc.push('<div class="pa-gradelist is-modal"></div>');
         hc.push_actions();
         hc.push('<button type="button" name="bsubmit" class="btn-primary">Save</button>');
         hc.push('<button type="button" name="cancel">Cancel</button>');
-        hc.push('<button type="button" name="prev" class="btnl">&lt;</button>');
-        hc.push('<button type="button" name="next" class="btnl">&gt;</button>');
+        hc.push('<span class="btnbox"><button type="button" name="prev" class="btnl">&lt;</button><button type="button" name="next" class="btnl">&gt;</button></span>');
         $gdialog = hc.show(false);
         $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
         $gdialog.find("form").addClass("pa-psetinfo").data("pa-gradeinfo", pconf.grades);
-        let gl = $gdialog.find(".pa-gradelist")[0], gi = GradeSheet.closest(gl);
-        for (let i = 0; i !== table_entries.length; ++i) {
-            gl.appendChild(table_entries[i].render(gi, 1));
-        }
-        hc.pop();
-
-        var checked_spos = $j.find(".papsel:checked").toArray().map(function (x) {
+        gdialog_mode_values();
+        $gdialog.on("click", ".pa-gdialog-section", gdialog_section_click);
+        $gdialog.on("change blur", ".pa-gradevalue", gdialog_change);
+        $gdialog.on("input change", ".pa-gradevalue", gdialog_clear_error);
+        $gdialog.on("keydown", gdialog_key);
+        $gdialog.on("keydown", "input, textarea, select", gdialog_key);
+        $gdialog.on("input", "input, textarea, select", gdialog_input);
+        $gdialog.find("button[name=bsubmit]").on("click", function () { gdialog_store(null); });
+        $gdialog.find("button[name=prev], button[name=next]").on("click", gdialog_traverse);
+        $gdialog.find("button[name=mode-values], button[name=mode-gradesheet]").on("click", gdialog_mode);
+        const checked_spos = $j.find(".papsel:checked").toArray().map(function (x) {
                 return x.parentElement.parentElement.getAttribute("data-pa-spos");
             }),
-            my_spos = this.closest("tr").getAttribute("data-pa-spos");
+            my_spos = gdialog_self.closest("tr").getAttribute("data-pa-spos");
         if (checked_spos.indexOf(my_spos) < 0) {
             gdialog_fill([my_spos]);
         } else {
             $gdialog.find("button[name=prev], button[name=next]").prop("disabled", true).addClass("hidden");
             gdialog_fill(checked_spos);
         }
-        $gdialog.on("change blur", ".pa-gradevalue", gdialog_change);
-        $gdialog.on("input change", ".pa-gradevalue", gdialog_clear_error);
-        $gdialog.on("keydown", gdialog_key);
-        $gdialog.on("keydown", "input, textarea, select", gdialog_key);
-        $gdialog.on("input", "input, textarea, select", gdialog_input);
-        $gdialog.find("button[name=bsubmit]").on("click", function () {
-            gdialog_store(function () { $gdialog.close(); });
-        });
-        $gdialog.find("button[name=prev], button[name=next]").on("click", gdialog_traverse);
         hc.show();
     }
     $j.parent().on("click", "a.js-gdialog", function (event) {

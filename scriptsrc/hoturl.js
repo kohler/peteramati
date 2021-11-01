@@ -158,3 +158,18 @@ export function hoturl_absolute_base() {
     }
     return siteinfo.absolute_base;
 }
+
+export function hoturl_post_go(page, options) {
+    const form = document.createElement("form");
+    form.setAttribute("method", "post");
+    form.setAttribute("enctype", "multipart/form-data");
+    form.setAttribute("accept-charset", "UTF-8");
+    form.action = hoturl_post(page, options);
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "____empty____";
+    input.value = "1";
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+}

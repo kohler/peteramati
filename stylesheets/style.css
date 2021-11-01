@@ -313,6 +313,18 @@ form {
 .ml-0 {
 	margin-left: 0 !important;
 }
+.ml-2 {
+	margin-left: 0.5em !important;
+	margin-left: 0.5rem !important;
+}
+.ml-3 {
+	margin-left: 1em !important;
+	margin-left: 1rem !important;
+}
+.ml-4 {
+	margin-left: 1.5em !important;
+	margin-left: 1.5rem !important;
+}
 .mr-2 {
 	margin-right: 0.5em !important;
 	margin-right: 0.5rem !important;
@@ -877,6 +889,14 @@ button:disabled, button:disabled:hover,
 	border-top-right-radius: 4px;
 	border-bottom-right-radius: 4px;
 }
+.nav-pills {
+	display: flex;
+	margin-bottom: 1.5rem;
+}
+.nav-pills > * {
+	flex-basis: 0;
+	flex-grow: 1;
+}
 .licon {
 	fill: currentColor;
 	vertical-align: -0.0625em;
@@ -1260,6 +1280,10 @@ td.rpad {
 }
 div.pcconfaff {
 	font-size: 69%;
+}
+
+.pa-gdialog-gradesheet {
+	columns: 15rem 3;
 }
 
 tr.pt_topics td.entry, tr.pt_actions td,
