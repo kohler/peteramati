@@ -15,7 +15,13 @@ export class GradeGraph {
     constructor(parent, d, plot_type) {
         const $parent = $(parent);
 
-        const dd = plot_type.indexOf("noextra") >= 0 ? d.series.noextra : d.series.all,
+        let mainplot = "all";
+        if (plot_type.indexOf("extension") >= 0) {
+            mainplot = "extension";
+        } else if (plot_type.indexOf("noextra") >= 0) {
+            mainplot = "noextra";
+        }
+        const dd = d.series[mainplot] || d.series.all,
             ddmin = dd.min();
         let xmin = ddmin < 0 ? ddmin - 1 : 0;
         if (d.entry && d.entry.type === "letter") {
@@ -31,7 +37,7 @@ export class GradeGraph {
             this.max += 1;
         }
         this.total = d.maxtotal;
-        this.cutoff = d.cutoff;
+        this.cutoff = dd.cutoff;
 
         this.svg = mksvg("svg");
         this.gg = mksvg("g");
@@ -303,7 +309,8 @@ export class GradeGraph {
         return this.svg.closest(".pa-grgraph");
     }
     append_cdf(d, klass) {
-        const cdf = d.cdf, data = [], nr = 1 / d.n, cutoff = this.cutoff || 0, xmin = this.min;
+        const cdf = d.cdf, data = [], nr = 1 / d.n,
+              cutoff = this.cutoff || 0, xmin = this.min;
         let i = 0;
         if (cutoff) {
             while (i < cdf.length && cdf[i+1] < cutoff * d.n) {

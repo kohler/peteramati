@@ -129,12 +129,12 @@ function draw_grgraph() {
     }
 
     // cutoff
-    if (d.cutoff && plot_type.substring(0, 3) !== "pdf") {
+    if (grgr.cutoff && plot_type.substring(0, 3) !== "pdf") {
         const cutoff = mksvg("rect");
         cutoff.setAttribute("x", grgr.xax(0));
-        cutoff.setAttribute("y", grgr.yax(d.cutoff));
+        cutoff.setAttribute("y", grgr.yax(grgr.cutoff));
         cutoff.setAttribute("width", grgr.xax(grgr.max));
-        cutoff.setAttribute("height", grgr.yax(0) - grgr.yax(d.cutoff));
+        cutoff.setAttribute("height", grgr.yax(0) - grgr.yax(grgr.cutoff));
         cutoff.setAttribute("fill", "rgba(255,0,0,0.1)");
         grgr.gg.appendChild(cutoff);
     }
