@@ -1438,9 +1438,9 @@ function pa_render_pset_table(pconf, data) {
             compare: function (a, b) {
                 if (a.total == null || b.total == null) {
                     if (a.total != null) {
-                        return -1;
-                    } else if (b.total == null) {
                         return 1;
+                    } else if (b.total != null) {
+                        return -1;
                     }
                 } else if (a.total != b.total) {
                     return a.total < b.total ? -1 : 1;
