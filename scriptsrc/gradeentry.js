@@ -117,32 +117,52 @@ export class GradeEntry {
     }
 
     render(gi, mode) {
+        let wantform = false;
         if (mode == null) {
-            if (this.readonly
-                || (this.answer ? gi.editable_answers === false : !gi.editable)) {
+            if (this.readonly || (!this.answer && !gi.editable)) {
                 mode = 0;
+            } else if (this.answer && gi.editable_answers === false) {
+                mode = 0;
+                wantform = true;
             } else {
                 mode = 2;
+                wantform = true;
             }
+        } else {
+            wantform = mode === 2;
         }
         const id = "pe-ge" + ++id_counter;
-        let t = (mode === 2 ? '<form class="ui-submit ' : '<div class="').concat(
-            'pa-grade pa-p',
-            this.visible === false ? ' pa-p-hidden' : '',
-            '" data-pa-grade="', this.key,
-            '"><label class="pa-pt" for="', id, '">', this.title_html, '</label>');
-        if (this.description) {
-            t = t.concat('<div class="pa-pdesc pa-dr">', render_ftext(this.description), '</div>');
+        let hsv;
+        if (this.visible == null) {
+            hsv = gi.hide_grades !== false && !this.answer;
+        } else {
+            hsv = this.visible === false || this.visible === "none";
         }
-        const e = $(t.concat('<div class="pa-pd', mode ? ' e' : '', '"></div>',
-                             mode === 2 ? '</form>' : '</div>'))[0];
-        this.mount_at(e.lastChild, id, mode);
+        const e = document.createElement(wantform ? 'form' : 'div'),
+            className = 'pa-grade pa-p'.concat(hsv ? ' pa-p-hidden' : ''),
+            le = document.createElement('label'),
+            pde = document.createElement('div');
+        e.className = wantform ? 'ui-submit ' + className : className;
+        e.setAttribute('data-pa-grade', this.key);
+        le.className = 'pa-pt';
+        le.htmlFor = id;
+        le.innerHTML = this.title_html;
+        e.appendChild(le);
+        if (this.description) {
+            const de = document.createElement('div');
+            de.className = 'pa-pdesc pa-dr';
+            de.innerHTML = render_ftext(this.description);
+            e.appendChild(de);
+        }
+        pde.className = mode ? 'pa-pd e' : 'pa-pd';
+        e.appendChild(pde);
+        this.mount_at(pde, id, mode);
         return e;
     }
 
-    mount_at(pde, id, mode) {
+    mount_at(pde, id, edit) {
         let t;
-        if (mode) {
+        if (edit) {
             t = this.gc.mount_edit.call(this, pde, id);
         } else {
             t = this.gc.mount_show.call(this, pde, id);
@@ -425,7 +445,7 @@ export class GradeSheet {
         }
     }
 
-    remount_at(elt, mode) {
+    remount_at(elt, edit) {
         const k = elt.getAttribute("data-pa-grade");
         let ge;
         if (k === "late_hours") {
@@ -436,7 +456,7 @@ export class GradeSheet {
         if (ge) {
             let pde = elt.firstChild, id;
             while (!hasClass(pde, "pa-pd")) {
-                pde.tagName === "LABEL" && (id = pde.id);
+                pde.tagName === "LABEL" && (id = pde.htmlFor);
                 pde = pde.nextSibling;
             }
             while (pde.nextSibling) {
@@ -445,8 +465,8 @@ export class GradeSheet {
             while (pde.firstChild) {
                 pde.removeChild(pde.firstChild);
             }
-            pde.className = mode ? 'pa-pd e' : 'pa-pd';
-            ge.mount_at(pde, id, mode);
+            pde.className = edit ? 'pa-pd e' : 'pa-pd';
+            ge.mount_at(pde, id, edit);
         }
     }
 
