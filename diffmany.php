@@ -203,7 +203,7 @@ class DiffMany {
             if ($user === "") {
                 continue;
             } else if (ctype_digit($user) && strlen($user) < 8) {
-                if (($u = $this->conf->user_by_id($user))) {
+                if (($u = $this->conf->user_by_id(intval($user)))) {
                     $u->set_anonymous($anonymous);
                 }
             } else {

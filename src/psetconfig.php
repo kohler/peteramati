@@ -1415,6 +1415,93 @@ class GradeEntryConfig {
         return $t;
     }
 
+    /** @param string $v
+     * @return ?string */
+    static function parse_text_value($v) {
+        $l = $d = strlen($v);
+        if ($l > 0 && $v[$l - 1] === "\n") {
+            --$l;
+        }
+        if ($l > 0 && $v[$l - 1] === "\r") {
+            --$l;
+        }
+        if ($l === 0) {
+            return null;
+        } else if ($l === $d) {
+            return $v;
+        } else {
+            return substr($v, 0, $l);
+        }
+    }
+
+    /** @param string $v
+     * @return ?string */
+    static function parse_shorttext_value($v) {
+        return rtrim($v);
+    }
+
+    /** @param string $v
+     * @param bool $isnew
+     * @return null|int|false */
+    static function parse_timermark_value($v, $isnew) {
+        $v = trim($v);
+        if ($v === "" || $v === "0") {
+            return null;
+        } else if ($isnew || $v === "now") {
+            return Conf::$now;
+        } else if (ctype_digit($v)) {
+            return (int) $v;
+        } else {
+            return false;
+        }
+    }
+
+    /** @param string $v
+     * @return null|string|false */
+    function parse_select_value($v) {
+        if ($v === "" || strcasecmp($v, "none") === 0) {
+            return null;
+        } else if (in_array((string) $v, $this->options)) {
+            return $v;
+        } else {
+            $this->_last_error = "Invalid grade.";
+            return false;
+        }
+    }
+
+    /** @param string $v
+     * @return null|int|float|false */
+    static function parse_letter_value($v) {
+        $v = trim($v);
+        if ($v === "") {
+            return null;
+        } else if (isset(self::$letter_map[strtoupper($v)])) {
+            return self::$letter_map[strtoupper($v)];
+        } else if (preg_match('/\A[-+]?\d+\z/', $v)) {
+            return intval($v);
+        } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
+            return floatval($v);
+        } else {
+            return false;
+        }
+    }
+
+    /** @param null|int|float|string $v
+     * @return null|int|float|false */
+    static function parse_numeric_value($v) {
+        if ($v === null || is_int($v) || is_float($v)) {
+            return $v;
+        } else if (($v = trim($v)) === "") {
+            return null;
+        } else if (preg_match('/\A[-+]?\d+\z/', $v)) {
+            return intval($v);
+        } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
+            return floatval($v);
+        } else {
+            return false;
+        }
+    }
+
     /** @param bool $isnew */
     function parse_value($v, $isnew) {
         if ($this->type === "formula") {
@@ -1424,58 +1511,31 @@ class GradeEntryConfig {
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
         } else if (is_string($v)) {
-            if (in_array($this->type, ["text", "shorttext", "markdown"])) {
-                if (!$isnew) {
-                    // do not frobulate old values -- preserve database version
-                    return $v;
-                } else if ($this->type === "shorttext") {
-                    return rtrim($v);
-                } else {
-                    $l = $d = strlen($v);
-                    if ($l > 0 && $v[$l - 1] === "\n") {
-                        --$l;
-                    }
-                    if ($l > 0 && $v[$l - 1] === "\r") {
-                        --$l;
-                    }
-                    return $l === $d ? $v : substr($v, 0, $l);
-                }
+            if ($this->type === "text"
+                || $this->type === "markdown") {
+                // do not frobulate old values -- preserve database version
+                return $isnew ? self::parse_text_value($v) : $v;
+            } else if ($this->type === "shorttext") {
+                return $isnew ? self::parse_shorttext_value($v) : $v;
             } else if ($this->type === "timermark") {
-                $v = trim($v);
-                if ($v === "" || $v === "0") {
-                    return null;
-                } else if ($isnew || $v === "now") {
-                    return Conf::$now;
-                } else if (ctype_digit($v)) {
-                    return (int) $v;
-                } else {
+                $v = self::parse_timermark_value($v, $isnew);
+                if ($v === false) {
                     $this->_last_error = "Invalid timermark.";
-                    return false;
                 }
+                return $v;
             } else if ($this->type === "select") {
-                if ($v === "" || strcasecmp($v, "none") === 0) {
-                    return null;
-                } else if (in_array((string) $v, $this->options)) {
-                    return $v;
-                } else {
-                    $this->_last_error = "Invalid grade.";
-                    return false;
-                }
-            }
-            $v = trim($v);
-            if ($v === "") {
-                return null;
-            } else if (preg_match('/\A[-+]?\d+\z/', $v)) {
-                return intval($v);
-            } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
-                return floatval($v);
-            }
-            if ($this->type === "letter"
-                && isset(self::$letter_map[strtoupper($v)])) {
-                return self::$letter_map[strtoupper($v)];
+                return $this->parse_select_value($v);
             } else if ($this->type === "letter") {
-                $this->_last_error = "Letter grade expected.";
-                return false;
+                $v = self::parse_letter_value($v);
+                if ($v === false) {
+                    $this->_last_error = "Letter grade expected.";
+                }
+                return $v;
+            } else {
+                $v = self::parse_numeric_value($v);
+                if ($v !== false) {
+                    return $v;
+                }
             }
         }
         $this->_last_error = $this->type === null ? "Number expected." : "Invalid grade.";

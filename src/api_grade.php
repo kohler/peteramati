@@ -66,18 +66,21 @@ class Grade_API {
             }
         }
         if (array_key_exists("late_hours", $g)
-            && $info->pc_view) { // XXX separate permission check?
+            && $info->pc_view // XXX separate permission check?
+            && ($gv = GradeEntryConfig::parse_numeric_value($g["late_hours"])) !== false) {
             $curlhd = $info->late_hours_data() ? : (object) [];
             $lh = $curlhd->hours ?? 0;
             $alh = $curlhd->autohours ?? $lh;
-            if ($og["late_hours"] !== null
-                && abs($og["late_hours"] - $lh) >= 0.0001) {
+            if (isset($og["late_hours"])
+                && ($ogv = GradeEntryConfig::parse_numeric_value($og["late_hours"])) !== null
+                && $ogv !== false
+                && abs($ogv - $lh) >= 0.0001) {
                 $errf["late_hours"] = true;
-            } else if ($g["late_hours"] === null
-                       || abs($g["late_hours"] - $alh) < 0.0001) {
+            } else if ($gv === null
+                       || abs($gv - $alh) < 0.0001) {
                 $v["late_hours"] = null;
             } else {
-                $v["late_hours"] = $g["late_hours"];
+                $v["late_hours"] = $gv;
             }
         }
         return $v;

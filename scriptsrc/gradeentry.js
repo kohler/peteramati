@@ -12,7 +12,7 @@ import { render_ftext } from "./render.js";
 
 let id_counter = 0, late_hours_entry;
 const want_props = {
-    "uid": true, "last_hours": true, "auto_late_hours": true, "updateat": true,
+    "uid": true, "late_hours": true, "auto_late_hours": true, "updateat": true,
     "version": true, "editable": true, "maxtotal": true, "history": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,
     "editable_answers": true
