@@ -1,6 +1,6 @@
 <?php
 // psetconfig.php -- Peteramati configuration classes
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class PsetConfigException extends Exception {
@@ -1626,7 +1626,7 @@ class GradeEntryConfig {
         return $this->_formula;
     }
 
-    /** @param bool $psview
+    /** @param bool $pcview
      * @return array<string,mixed> */
     function json($pcview) {
         $gej = ["key" => $this->key, "title" => $this->title];
@@ -1689,6 +1689,9 @@ class GradeEntryConfig {
         }
         return $gej;
     }
+}
+
+class RunnerException extends Exception {
 }
 
 class RunnerConfig {
@@ -1803,140 +1806,6 @@ class RunnerConfig {
     /** @return ?string */
     function category_argument() {
         return $this->category === $this->name ? null : $this->category;
-    }
-
-    /** @param PsetView $info
-     * @return string */
-    function log_dir($info) {
-        $root = SiteLoader::$root;
-        return "{$root}/log/run{$info->repo->cacheid}.pset{$info->pset->id}";
-    }
-
-    /** @param PsetView $info
-     * @param string $suffix
-     * @return string */
-    function log_file($info, $suffix) {
-        $root = SiteLoader::$root;
-        return "{$root}/log/run{$info->repo->cacheid}.pset{$info->pset->id}/repo{$info->repo->repoid}.pset{$info->pset->id}{$suffix}";
-    }
-
-    // log_file($info, ".pid")           PID of active runner
-    // log_file($info, ".{$T}.log")      output of runner @$T
-    // log_file($info, ".{$T}.log.time") timing information for output
-    // log_file($info, ".{$T}.in")       FIFO for communication
-
-    /** @param PsetView $info
-     * @return string */
-    function pid_file($info) {
-        return $this->log_file($info, ".pid");
-    }
-
-    /** @param PsetView $info
-     * @param int $jobid
-     * @return string */
-    function job_prefix($info, $jobid) {
-        return $this->log_file($info, ".{$jobid}");
-    }
-
-    /** @param PsetView $info
-     * @param int $jobid
-     * @return string */
-    function output_file($info, $jobid) {
-        return $this->log_file($info, ".{$jobid}.log");
-    }
-
-    /** @param string $fn
-     * @return int|false */
-    function active_job_at($fn) {
-        if (($f = @fopen($fn, "r"))) {
-            $s = stream_get_contents($f);
-            $runat = false;
-            if (($sp = strpos($s, " ")) > 0) {
-                $w = substr($s, 0, $sp);
-                if (ctype_digit($w)) {
-                    $runat = (int) $w;
-                }
-            }
-            if (flock($f, LOCK_SH | LOCK_NB)) {
-                if ($runat
-                    && strpos($s, "-i") !== false
-                    && str_ends_with($fn, ".pid")) {
-                    @unlink(substr($fn, 0, -4) . ".{$runat}.in");
-                }
-                unlink($fn);
-                flock($f, LOCK_UN);
-                $result = false;
-            } else {
-                $result = $runat ? : 1;
-            }
-            fclose($f);
-            return $result;
-        } else {
-            return false;
-        }
-    }
-
-    /** @param PsetView $info
-     * @return int|false */
-    function active_job($info) {
-        return $this->active_job_at($this->pid_file($info));
-    }
-
-    /** @param PsetView $info
-     * @return list<int> */
-    function past_jobs($info) {
-        $a = [];
-        foreach (glob($this->log_file($info, ".*.log")) as $f) {
-            $rp = strlen($f);
-            $lp = strrpos($f, ".", -5);
-            $t = substr($f, $lp + 1, $rp - $lp - 1);
-            if (ctype_digit($t)) {
-                $a[] = intval($t);
-            }
-        }
-        rsort($a);
-        return $a;
-    }
-
-    /** @param PsetView $info
-     * @param int $jobid
-     * @param ?object $answer
-     * @return ?object */
-    function job_status($info, $jobid, $answer = null) {
-        if (!$jobid) {
-            return null;
-        }
-        $answer = $answer ?? (object) [];
-        if ($this->active_job($info) !== $jobid) {
-            $answer->done = true;
-            $answer->status = "done";
-        } else {
-            $answer->done = false;
-            $answer->status = "working";
-            if (Conf::$now - $jobid > 600) {
-                $answer->status = "old";
-            }
-        }
-        return $answer;
-    }
-
-    /** @param PsetView $info
-     * @param int $jobid
-     * @param ?object $answer
-     * @return ?object */
-    function job_info($info, $jobid, $answer = null) {
-        $answer = $this->job_status($info, $jobid, $answer);
-        if ($answer
-            && ($t = @file_get_contents($this->output_file($info, $jobid), false, null, 0, 4096))
-            && str_starts_with($t, "++ {")
-            && ($pos = strpos($t, "\n"))
-            && ($j = json_decode(substr($t, 3, $pos - 3)))) {
-            foreach ((array) $j as $k => $v) {
-                if (!isset($answer->$k))
-                    $answer->$k = $v;
-            }
-        }
-        return $answer;
     }
 }
 

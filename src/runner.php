@@ -3,9 +3,6 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-class RunnerException extends Exception {
-}
-
 class RunnerState {
     /** @var Conf */
     public $conf;
@@ -19,6 +16,8 @@ class RunnerState {
     public $pset;
     /** @var RunnerConfig */
     public $runner;
+    /** @var ?RunLogger */
+    public $runlog;
 
     /** @var ?int */
     public $checkt;
@@ -26,10 +25,6 @@ class RunnerState {
     public $queueid;
     /** @var string */
     private $logfile;
-    /** @var ?string */
-    private $pidfile;
-    /** @var ?string */
-    private $inputfifo;
     private $logstream;
     /** @var string */
     private $jaildir;
@@ -49,8 +44,9 @@ class RunnerState {
         $this->runner = $runner;
         assert(!$runner->command || $this->repoid);
 
-        if (!$this->pset->gitless) {
-            $logdir = $this->runner->log_dir($this->info);
+        if ($this->repo && !$this->pset->gitless) {
+            $this->runlog = new RunLogger($this->repo, $this->pset);
+            $logdir = $this->runlog->log_dir();
             if (!is_dir($logdir)) {
                 $old_umask = umask(0);
                 if (!mkdir($logdir, 02770, true)) {
@@ -181,9 +177,9 @@ class RunnerState {
             return false;
         }
         $json = $this->generic_json();
-        $this->runner->job_status($this->info, $this->checkt, $json);
+        $this->runlog->job_status($this->checkt, $json);
         if ($offset !== null) {
-            $logbase = $this->runner->job_prefix($this->info, $this->checkt);
+            $logbase = $this->runlog->job_prefix($this->checkt);
             $data = @file_get_contents("{$logbase}.log", false, null, max($offset, 0));
             if ($data === false) {
                 return (object) ["error" => true, "message" => "No such log"];
@@ -218,7 +214,7 @@ class RunnerState {
         if (!$this->checkt) {
             return false;
         }
-        $logbase = $this->runner->job_prefix($this->info, $this->checkt);
+        $logbase = $this->runlog->job_prefix($this->checkt);
         $proc = proc_open(SiteLoader::$root . "/jail/pa-writefifo " . escapeshellarg("{$logbase}.in"),
                           [["pipe", "r"]], $pipes);
         if ($pipes[0]) {
@@ -232,6 +228,7 @@ class RunnerState {
     }
 
 
+    /** @param QueueItem $queue */
     function start($queue) {
         assert($this->checkt === null && $this->logfile === null);
 
@@ -261,20 +258,20 @@ class RunnerState {
             throw new RunnerException("Can’t cd to main directory");
         } else if (!is_executable("jail/pa-jail")) {
             throw new RunnerException("The pa-jail program has not been compiled");
-        } else if ($this->runner->active_job($this->info)) {
+        } else if ($this->runlog->active_job()) {
             throw new RunnerException("Recent job still running");
         }
 
         // create logfile and pidfile
         $this->checkt = time();
-        $logbase = $this->runner->job_prefix($this->info, $this->checkt);
+        $logbase = $this->runlog->job_prefix($this->checkt);
         $this->logfile = "{$logbase}.log";
         $timingfile = "{$logbase}.log.time";
-        $this->pidfile = $this->runner->pid_file($this->info);
-        file_put_contents($this->pidfile, "");
-        $this->inputfifo = "{$logbase}.in";
-        if (!posix_mkfifo($this->inputfifo, 0660)) {
-            $this->inputfifo = null;
+        $pidfile = $this->runlog->pid_file();
+        file_put_contents($pidfile, "");
+        $inputfifo = "{$logbase}.in";
+        if (!posix_mkfifo($inputfifo, 0660)) {
+            $inputfifo = null;
         }
         if ($this->runner->timed_replay) {
             touch($timingfile);
@@ -282,7 +279,7 @@ class RunnerState {
         $this->logstream = fopen($this->logfile, "a");
         if ($queue) {
             Dbl::qe("update ExecutionQueue set runat=?, status=1, lockfile=?, inputfifo=? where queueid=?",
-                    $this->checkt, $this->pidfile, $this->inputfifo, $queue->queueid);
+                    $this->checkt, $pidfile, $inputfifo, $queue->queueid);
         }
         register_shutdown_function(array($this, "cleanup"));
 
@@ -315,9 +312,9 @@ class RunnerState {
 
         // actually run
         $command = "echo; jail/pa-jail run"
-            . " -p" . escapeshellarg($this->pidfile)
+            . " -p" . escapeshellarg($pidfile)
             . " -P'{$this->checkt} $$"
-            . ($this->inputfifo ? " -i" : "") . "'";
+            . ($inputfifo ? " -i" : "") . "'";
         if ($this->runner->timed_replay) {
             $command .= " -t" . escapeshellarg($timingfile);
         }
@@ -363,14 +360,13 @@ class RunnerState {
         if (($to = $this->runner->idle_timeout ?? $this->pset->run_idle_timeout) > 0) {
             $command .= " -I" . $to;
         }
-        if ($this->inputfifo) {
-            $command .= " -i" . escapeshellarg($this->inputfifo);
+        if ($inputfifo) {
+            $command .= " -i" . escapeshellarg($inputfifo);
         }
         $command .= " " . escapeshellarg($homedir)
             . " " . escapeshellarg($username)
             . " TERM=xterm-256color"
             . " " . escapeshellarg($this->expand($this->runner->command));
-        $this->pidfile = null; /* now owned by command */
         return $this->run_and_log($command);
     }
 
@@ -509,7 +505,7 @@ class RunnerState {
             // - running for more than 5min (configurable)
             if (($row->runat > 0
                  && $row->lockfile
-                 && $this->runner->active_job_at($row->lockfile) != $row->runat)
+                 && $this->runlog->active_job_at($row->lockfile) != $row->runat)
                 || ($row->runat <= 0
                     && $row->updateat < Conf::$now - 30)
                 || ($runtimeout
@@ -603,9 +599,9 @@ class RunnerState {
             $checkt = 0;
             $n = 0;
             $envts = $this->environment_timestamp();
-            foreach ($this->runner->past_jobs($this->info) as $t) {
+            foreach ($this->runlog->past_jobs() as $t) {
                 if ($t > $envts
-                    && ($s = $this->runner->job_info($this->info, $t))
+                    && ($s = $this->runlog->job_info($t))
                     && $s->done
                     && $s->runner === $this->runner->name
                     && $s->hash === $this->info->commit_hash()) {
@@ -628,7 +624,7 @@ class RunnerState {
         $this->set_checkt($checkt);
 
         $offset = cvtint($qreq->offset, 0);
-        $rct = $this->runner->active_job($this->info);
+        $rct = $this->runlog->active_job();
         if (($rct == $this->checkt && ($qreq->stop ?? "") !== "" && $qreq->stop !== "0")
             || ($rct == $this->checkt && ($qreq->write ?? "") !== "")) {
             if (($qreq->write ?? "") !== "") {
@@ -643,7 +639,7 @@ class RunnerState {
                 usleep(10);
                 $answer = $this->full_json($offset);
             } while ($qreq->stop
-                     && ($rct = $this->runner->active_job($this->info)) == $this->checkt
+                     && ($rct = $this->runlog->active_job()) == $this->checkt
                      && microtime(true) - $now < 0.1);
         } else {
             $answer = $this->full_json($offset);
@@ -664,11 +660,8 @@ class RunnerState {
     }
 
     function cleanup() {
-        if ($this->pidfile) {
-            unlink($this->pidfile);
-        }
-        if ($this->pidfile && $this->inputfifo) {
-            unlink($this->inputfifo);
-        }
+        $runlog = new RunLogger($this->repo(), $this->pset());
+        unlink($runlog->pid_file());
+        @unlink($runlog->job_prefix($this->checkt) . ".in");
     }
 }

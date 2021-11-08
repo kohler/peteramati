@@ -763,7 +763,7 @@ class Contact {
             $this->repos[$pset] = null;
             $repoid = $this->link(LINK_REPO, $pset);
             if ($repoid && (!$repo || $repo->repoid != $repoid)) {
-                $repo = Repository::find_id($repoid, $this->conf);
+                $repo = Repository::by_id($repoid, $this->conf);
             }
             if ($repoid && $repo) {
                 $this->repos[$pset] = $repo;

@@ -1506,7 +1506,8 @@ class PsetView {
     function runner_output_for($runner) {
         $cnotes = $this->commit_jnotes();
         if ($cnotes && isset($cnotes->run) && isset($cnotes->run->{$runner->name})) {
-            $fn = $runner->output_file($this, $cnotes->run->{$runner->name});
+            $runlog = new RunLogger($this->repo, $this->pset);
+            $fn = $runlog->output_file($cnotes->run->{$runner->name});
             $s = @file_get_contents($fn);
             $this->last_runner_error = $s === false ? self::ERROR_LOGMISSING : 0;
             return $s;

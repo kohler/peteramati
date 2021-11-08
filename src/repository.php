@@ -102,7 +102,7 @@ class Repository {
         $repo_hash = substr(sha1($url), 10, 1);
         $now = time();
         $result = $conf->qe("insert into Repository set url=?, cacheid=?, working=?, open=?, opencheckat=?", $url, $repo_hash, $now, -1, 0);
-        return $result ? self::find_id($conf->dblink->insert_id, $conf) : null;
+        return $result ? self::by_id($conf->dblink->insert_id, $conf) : null;
     }
 
     /** param string $url
@@ -116,7 +116,7 @@ class Repository {
 
     /** @param int $repoid
      * @return ?Repository */
-    static function find_id($repoid, Conf $conf) {
+    static function by_id($repoid, Conf $conf) {
         $result = $conf->qe("select * from Repository where repoid=?", $repoid);
         $repo = Repository::fetch($result, $conf);
         Dbl::free($result);

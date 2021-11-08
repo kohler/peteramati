@@ -43,6 +43,7 @@ class QueueItem {
     /** @var ?string */
     public $inputfifo;
 
+    // loaded from joins
     /** @var ?int */
     public $nahead;
     /** @var ?int */
