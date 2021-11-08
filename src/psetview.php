@@ -606,7 +606,7 @@ class PsetView {
     private function ensure_formulas() {
         if ($this->pset->has_formula && !$this->_has_formula) {
             $this->_has_formula = true;
-            $this->_g = $this->_g ?? array_fill(0, count($this->pset->grades), null);
+            $this->_g = $this->_g ?? $this->blank_values();
             $this->_has_fg = [];
             $jn = $this->grade_jxnotes();
             $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
@@ -617,7 +617,6 @@ class PsetView {
                     $f = $ge->formula();
                     $v = $f->evaluate($this->user);
                     if ($v !== null) {
-                        $this->_g = $this->_g ?? $this->blank_values();
                         $this->_g[$ge->pcview_index] = $v;
                     } else {
                         $this->_has_fg[$ge->pcview_index] = true;
@@ -632,7 +631,6 @@ class PsetView {
                     if (property_exists($g, $ge->key)) {
                         $v = $g->{$ge->key};
                         if ($v !== null) {
-                            $this->_g = $this->_g ?? $this->blank_values();
                             $this->_g[$ge->pcview_index] = $v;
                         } else {
                             $this->_has_fg[$ge->pcview_index] = true;
@@ -704,12 +702,11 @@ class PsetView {
             if ($gv === null && $ge->is_formula()) {
                 if (!$this->_has_formula) {
                     $this->ensure_formulas();
-                    $gv = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
+                    $gv = $this->_g[$ge->pcview_index];
                 }
                 if ($gv === null && !isset($this->_has_fg[$ge->pcview_index])) {
                     $gv = $ge->formula()->evaluate($this->user);
                     if ($gv !== null) {
-                        $this->_g = $this->_g ?? $this->blank_values();
                         $this->_g[$ge->pcview_index] = $gv;
                     } else {
                         $this->_has_fg[$ge->pcview_index] = true;
