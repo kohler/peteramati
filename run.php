@@ -114,17 +114,17 @@ class RunRequest {
         }
 
         // extract request info
-        $Rstate = new RunnerState($info, $this->runner);
-        $Rstate->set_queueid($qreq->get("queueid"));
+        $rstate = new RunnerState($info, $this->runner);
+        $rstate->set_queueid($qreq->get("queueid"));
 
         // recent or checkup
         if ($qreq->check) {
-            json_exit($Rstate->check($qreq));
+            json_exit($rstate->check($qreq));
         }
 
         // ensure
         if ($qreq->ensure) {
-            $answer = $Rstate->check(new Qrequest("GET", ["check" => "recent"]));
+            $answer = $rstate->check(new Qrequest("GET", ["check" => "recent"]));
             if ($answer->ok || !($answer->run_empty ?? false)) {
                 json_exit($answer);
             }
@@ -140,19 +140,19 @@ class RunRequest {
         }
 
         // queue
-        $Queue = $Rstate->make_queue();
-        if ($Queue && !$Queue->runnable) {
-            json_exit(["onqueue" => true, "queueid" => $Queue->queueid, "nahead" => $Queue->nahead, "headage" => ($Queue->head_runat ? Conf::$now - $Queue->head_runat : null)]);
+        $queue = $rstate->make_queue();
+        if ($queue && !$queue->runnable) {
+            json_exit(["onqueue" => true, "queueid" => $queue->queueid, "nahead" => $queue->nahead, "headage" => ($queue->head_runat ? Conf::$now - $queue->head_runat : null)]);
         }
 
 
         // maybe eval
         if (!$this->runner->command && $this->runner->eval) {
-            $Rstate->set_checkt(time());
-            $json = $Rstate->generic_json();
+            $rstate->set_checkt(time());
+            $json = $rstate->generic_json();
             $json->done = true;
             $json->status = "done";
-            $Rstate->evaluate($json);
+            $rstate->evaluate($json);
             json_exit($json);
         }
 
@@ -167,17 +167,17 @@ class RunRequest {
             session_write_close();
 
             // run
-            $Rstate->start($Queue);
+            $rstate->start($queue);
 
             // save information about execution
-            $info->update_commit_notes(["run" => [$this->runner->category => $Rstate->checkt]]);
+            $info->update_commit_notes(["run" => [$this->runner->category => $rstate->checkt]]);
 
             json_exit(["ok" => true,
                        "done" => false,
                        "status" => "working",
                        "repoid" => $info->repo->repoid,
                        "pset" => $info->pset->id,
-                       "timestamp" => $Rstate->checkt]);
+                       "timestamp" => $rstate->checkt]);
         } catch (Exception $e) {
             self::quit($e->getMessage());
         }
