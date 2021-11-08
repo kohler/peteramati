@@ -625,7 +625,12 @@ class PsetView {
                         $fs[$ge->key] = $v;
                     }
                 }
-                $this->update_grade_xnotes(["formula_at" => $t, "formula" => new JsonReplacement(empty($fs) ? null : $fs)]);
+                if ($this->pset->gitless_grades || $this->_hash) {
+                    $this->update_grade_xnotes([
+                        "formula_at" => $t,
+                        "formula" => new JsonReplacement(empty($fs) ? null : $fs)
+                    ]);
+                }
             } else if (($g = $jn->formula ?? null)) {
                 foreach ($this->pset->formula_grades() as $ge) {
                     if (property_exists($g, $ge->key)) {
