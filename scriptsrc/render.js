@@ -43,7 +43,7 @@ render_text.add_format = function (r) {
 render_text.on_page = function () {
     $(".need-format").each(function () {
         const format = this.getAttribute("data-format") || default_format,
-            content = this.getAttribute("data-content") || this.innerText;
+            content = this.getAttribute("data-content") || this.textContent;
         render_text(format, content, this);
     });
 };
