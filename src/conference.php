@@ -1807,7 +1807,7 @@ class Conf {
             echo '<meta name="viewport" content="width=device-width, initial-scale=1">', "\n";
             echo $this->make_css_link("stylesheets/mobile.css", "screen and (max-width: 768px)"), "\n";
         }
-        echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css", null, "sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X");
+        echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/katex.min.css", null, "sha384-R4558gYOUz8mP9YWpZJjofhk+zx0AS11p36HnD2ZKj/6JR5z27gSSULCNHIRReVs");
         foreach (mkarray($this->opt("stylesheets") ?? []) as $css) {
             echo $this->make_css_link($css), "\n";
         }
@@ -1879,7 +1879,7 @@ class Conf {
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/highlight.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it-katexx.min.js", true) . "\n");
-        Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.js" integrity="sha384-g7c+Jr9ZivxKLnZTDUhnkOnsh30B4H0rpLUpJ4jAIKs4fnJI+sEnkvrMWph2EDg4" crossorigin="anonymous"></script>');
+        Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/katex.min.js" integrity="sha384-z1fJDqw8ZApjGO3/unPWUPsIymfsJmyrDVWC8Tv/a1HeOtGmkwNd/7xUS0Xcnvsx" crossorigin="anonymous"></script>');
         foreach (mkarray($this->opt("javascripts") ?? []) as $scriptfile) {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
         }
