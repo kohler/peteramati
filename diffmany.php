@@ -82,16 +82,11 @@ class DiffMany {
         if (!$pset->gitless && $pset->directory) {
             echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);
         }
-        if ($info->user_can_view_grades()) {
-            echo '" data-pa-user-can-view-grades="yes';
-        }
-        if ($info->can_edit_grades_staff()
-            || ($info->can_view_grades() && $info->is_grading_commit())) {
-            $flags = PsetView::GRADEJSON_SLICE;
-            if ($pset->has_assigned && $pset->has_answers) {
-                $flags |= PsetView::GRADEJSON_NO_EDITABLE_ANSWERS;
-            }
-            echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json($flags)));
+        if ($info->can_edit_scores()
+            || ($info->can_view_grade() && $info->is_grading_commit())) {
+            echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(PsetView::GRADEJSON_SLICE)));
+        } else {
+            echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->info_json()));
         }
         echo '">';
 
@@ -118,7 +113,7 @@ class DiffMany {
         echo '<hr class="c" />';
 
         if (!$pset->gitless && $info->commit()) {
-            $lnorder = $info->viewable_line_notes();
+            $lnorder = $info->visible_line_notes();
             $onlyfiles = $this->files;
             $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
             if ($onlyfiles !== null
@@ -131,7 +126,7 @@ class DiffMany {
             $want_grades = $pset->has_grade_landmark;
 
             if (!empty($diff)) {
-                if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
+                if ($info->can_edit_scores() && !$pset->has_grade_landmark_range) {
                     PsetView::echo_pa_sidebar_gradelist();
                     $want_grades = true;
                 }
@@ -142,7 +137,7 @@ class DiffMany {
                         "diffcontext" => $linkpart_html . "/"
                     ]);
                 }
-                if ($info->can_edit_grades_staff() && !$pset->has_grade_landmark_range) {
+                if ($info->can_edit_scores() && !$pset->has_grade_landmark_range) {
                     PsetView::echo_close_pa_sidebar_gradelist();
                 }
             }
@@ -150,7 +145,7 @@ class DiffMany {
             $this->all_viewed += $info->viewed_gradeentries; // XXX off if want all grades
         } else {
             echo '<div class="pa-gradelist is-main',
-                ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
+                ($info->user_can_view_score() ? "" : " pa-pset-hidden"), '"></div>';
             $want_grades = true;
         }
 

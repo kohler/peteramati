@@ -127,12 +127,13 @@ class Grade_API {
             if (!empty($errf)) {
                 $j = (array) $info->grade_json(0, $known_entries);
                 $j["ok"] = false;
-                $j["error"] = "Grade edit conflict, your update was ignored.";
+                reset($errf);
+                $j["error"] = current($errf);
                 return $j;
             } else if (!empty($v)) {
                 $info->update_grade_notes($v);
             }
-        } else if (!$info->can_view_grades()) {
+        } else if (!$info->can_view_grade()) {
             return ["ok" => false, "error" => "Permission error."];
         }
         $j = (array) $info->grade_json(0, $known_entries);
@@ -187,8 +188,8 @@ class Grade_API {
                     $errno = max($errno, 2);
                 }
             }
-            if (!$info->can_view_grades()
-                || ($qreq->is_post() && !$info->can_edit_grades_staff())) {
+            if (!$info->can_view_grade()
+                || ($qreq->is_post() && !$info->can_edit_scores())) {
                 return ["ok" => false, "error" => "Permission error."];
             } else if ($qreq->is_post() && $info->is_handout_commit()) {
                 $errno = max($errno, 1);
@@ -347,7 +348,7 @@ class Grade_API {
         }
 
         $notes = [];
-        $lnorder = $info->viewable_line_notes();
+        $lnorder = $info->visible_line_notes();
         foreach ($lnorder->fileorder() as $file => $order) {
             if (!$qreq->file || $file === $qreq->file) {
                 foreach ($lnorder->file($file) as $lineid => $note) {

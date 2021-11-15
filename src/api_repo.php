@@ -170,7 +170,7 @@ class Repo_API {
             return ["ok" => false, "error" => "Disconnected commit."];
         }
         $info->set_commit($api->commit);
-        $lnorder = $info->viewable_line_notes();
+        $lnorder = $info->visible_line_notes();
         $diff = $info->repo->diff($api->pset, $base_commit, $info->commit(), array("needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file]));
         if (empty($diff)) {
             return ["ok" => false, "error" => "No diff."];

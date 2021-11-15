@@ -8,6 +8,7 @@ import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { Linediff } from "./diff.js";
 import { Note } from "./note.js";
+import { GradeSheet } from "./gradeentry.js";
 
 
 let curline, down_event, scrolled_x, scrolled_y, scrolled_at;
@@ -38,18 +39,18 @@ function render_form($tr, note, transition) {
         $content.slideUp(80).queue(function () { $content.remove(); });
     }
 
-    var pi = curline.element.closest(".pa-psetinfo");
+    let gi = GradeSheet.closest(curline.element);
     var format = note ? note.format : null;
     if (format == null)
         format = $tr.closest(".pa-filediff").attr("data-default-format");
     var t = '<form method="post" action="' +
-        escape_entities(hoturl_gradeapi(pi, "=api/linenote", {file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})) +
+        escape_entities(hoturl_gradeapi(gi.element, "=api/linenote", {file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})) +
         '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">' +
         '<textarea class="pa-note-entry" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
         '<div class="aabut"><button class="btn-primary" type="submit">Save comment</button></div>' +
         '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
-    if (!pi.hasAttribute("data-pa-user-can-view-grades")) {
+    if (!gi.user_visible_scores) {
         t += '<div class="aabut"><label><input type="checkbox" name="iscomment" value="1">Show immediately</label></div>';
     }
     var $form = $(t + '</div></form>').appendTo($td);

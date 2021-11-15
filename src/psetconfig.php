@@ -538,9 +538,10 @@ class Pset {
     }
 
     /** @return bool */
-    function student_can_edit_grades() {
+    function student_can_edit_answers() {
         return $this->student_can_view()
-            && $this->has_answers;
+            && $this->has_answers
+            && !$this->frozen;
     }
 
 
@@ -1574,12 +1575,16 @@ class GradeEntryConfig {
 
     /** @return bool */
     function allow_edit($newv, $oldv, $autov, PsetView $info) {
-        if (!$this->value_differs($newv, $oldv)) {
+        if (!$this->value_differs($newv, $oldv)
+            || $info->pc_view) {
             return true;
-        } else if (!$info->pc_view && (!$this->visible || !$this->answer)) {
+        } else if (!$this->visible || !$this->answer) {
             $this->_last_error = "Cannot modify grade.";
             return false;
-        } else if ($this->type === "timermark" && $oldv && !$info->pc_view) {
+        } else if ($this->pset->frozen) {
+            $this->_last_error = "You can’t edit your answers further.";
+            return false;
+        } else if ($this->type === "timermark" && $oldv) {
             $this->_last_error = "Time already started.";
             return false;
         } else {

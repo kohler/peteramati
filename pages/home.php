@@ -651,7 +651,7 @@ function home_psetview(Pset $pset, Contact $user, Contact $viewer) {
             && $viewer === $user
             && !$pset->partner
             && !$pset->upi_for($user)
-            && !$pset->student_can_edit_grades())) {
+            && !$pset->student_can_edit_answers())) {
         return null;
     } else {
         return PsetView::make($pset, $user, $viewer);
@@ -667,20 +667,18 @@ function show_home_pset(PsetView $info) {
     $pseturl = $info->hoturl("pset", ["commit" => null]);
     echo "<h2><a class=\"btn\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
         htmlspecialchars($info->pset->title), "</a>";
-    if (($user_see_grade = $info->user_can_view_grades())) {
-        $x = [];
-        $c = null;
-        if ($info->needs_answers()) {
-            $x[] = "empty";
-            $c = "gradesmissing";
-        }
-        if ($info->has_nonempty_assigned_grades()) {
-            $x[] = "grade ready";
-            $c = "gradesready";
-        }
-        if ($x) {
-            echo ' <a class="', $c, '" href="', $pseturl, '">(', join(", ", $x), ')</a>';
-        }
+    $x = [];
+    $c = null;
+    if ($info->user_can_view_grade() && $info->needs_answers()) {
+        $x[] = "empty";
+        $c = "gradesmissing";
+    }
+    if ($info->user_can_view_score() && $info->can_view_nonempty_score()) {
+        $x[] = "grade ready";
+        $c = "gradesready";
+    }
+    if ($x) {
+        echo ' <a class="', $c, '" href="', $pseturl, '">(', join(", ", $x), ')</a>';
     }
     echo "</h2>";
     ContactView::echo_deadline_group($info);
@@ -691,17 +689,17 @@ function show_home_pset(PsetView $info) {
         Ht::stash_script("\$pa.checklatest(null)", "pa_checklatest");
     }
     ContactView::echo_commit_groups($info);
-    if ($info->can_view_grades()
-        && ($t = $info->grade_total()) !== null) {
+    if ($info->can_view_grade()
+        && ($t = $info->visible_total()) !== null) {
         $t = "<strong>{$t}</strong>";
         if (($max = $info->grade_max_total())) {
             $t .= " / {$max}";
         }
-        if (!$user_see_grade) {
+        if ($info->user_can_view_score()) {
+            ContactView::echo_group("grade", $t);
+        } else {
             echo '<div class="pa-grp-hidden">';
-        }
-        ContactView::echo_group("grade", $t);
-        if (!$user_see_grade) {
+            ContactView::echo_group("grade", $t);
             echo '</div>';
         }
     }
@@ -995,7 +993,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
                 $j["has_nongrader_notes"] = true;
             }
         }
-        if (($total = $info->grade_total()) !== null) {
+        if (($total = $info->visible_total()) !== null) {
             $j["total"] = $total;
         }
         $info->grade_export_grades($gex);
@@ -1015,7 +1013,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
                 }
             }
         }
-        if ($info->user_can_view_grades()) {
+        if ($info->user_can_view_grade()) {
             $j["grades_visible"] = true;
         }
         if (($lh = $info->fast_late_hours())) {
@@ -1126,7 +1124,7 @@ function show_pset_table($sset) {
                 $incomplete[] = $t . '</a>';
                 $incompleteu[] = "~" . urlencode($u);
             }
-            if ($s->user_can_view_grades()) {
+            if ($s->user_can_view_grade()) {
                 $grades_visible = true;
             }
         }

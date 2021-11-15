@@ -4,7 +4,7 @@
 
 import { GradeClass } from "./gc.js";
 import { GradeSheet } from "./gradeentry.js";
-import { handle_ui } from "./ui.js";
+import { handle_ui, addClass, removeClass } from "./ui.js";
 import { sprintf, strftime } from "./utils.js";
 
 
@@ -46,7 +46,12 @@ GradeClass.add("timermark", {
             return a._sort_user.localeCompare(b._sort_user);
         };
     },
-    mount_edit: function () {
+    mount_show: function (elt, id) {
+        elt.id = id;
+        addClass(elt, "pa-gradevalue");
+    },
+    mount_edit: function (elt) {
+        removeClass(elt, "pa-gradevalue");
         let t = '<button class="ui js-timermark hidden mr-2" type="button" name="'.concat(this.key, ':b" value="1">Press to start</button>');
         if (siteinfo.user.is_pclike) {
             t = t.concat('<button class="ui js-timermark hidden mr-2" type="button" name="', this.key, ':r" value="0">Reset</button>');

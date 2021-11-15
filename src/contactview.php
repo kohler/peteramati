@@ -169,7 +169,7 @@ class ContactView {
     }
 
     static function echo_group($key, $value, $notes = null) {
-        echo "<div class=\"pa-p\"><div class=\"pa-pt\">", $key, "</div><div class=\"pa-pd\">";
+        echo "<div class=\"pa-p\"><div class=\"pa-pt\">", $key, "</div><div class=\"pa-pv\">";
         if ($notes && $value && !str_starts_with($value, '<div'))
             $value = "<div>" . $value . "</div>";
         echo $value;
@@ -454,7 +454,7 @@ class ContactView {
                     echo '" data-pa-commit-at="', $ls->commitat;
                 }
             }
-            echo '"><div class="pa-pt">', htmlspecialchars($dl->title), '</div><div class="pa-pd">';
+            echo '"><div class="pa-pt">', htmlspecialchars($dl->title), '</div><div class="pa-pv">';
             echo '<a href="', hoturl("pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "post" => post_value(), "download" => $dl->key]), '">', htmlspecialchars($dl->filename), '</a>';
             if ($timer_start)
                 echo '<span class="pa-download-timer" style="padding-left:1em"></span>';
@@ -575,7 +575,7 @@ class ContactView {
     static function late_hour_note(PsetView $info) {
         if (($lh = $info->late_hours())
             && $lh > 0
-            && (!$info->pset->obscure_late_hours || $info->can_view_grades())) {
+            && (!$info->pset->obscure_late_hours || $info->can_view_grade())) {
             $t = plural($lh, "late hour") . " used";
             if (!$info->pset->obscure_late_hours) {
                 $t = '<strong class="overdue">' . $t . '</strong>';

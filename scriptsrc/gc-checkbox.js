@@ -58,7 +58,7 @@ export class Checkbox_GradeClass {
         }
         element.type = "text";
         element.className = (hasClass(element, "ui") || hasClass(element, "uich") ? "uich " : "") + "pa-gradevalue pa-gradewidth";
-        const container = element.closest(".pa-pd");
+        const container = element.closest(".pa-pv");
         $(container).find(".pa-grade-uncheckbox").remove();
         $(container).find("input[name^=\"" + element.name + ":\"]").addClass("hidden");
     }
@@ -68,12 +68,12 @@ export class Checkbox_GradeClass {
         element.checked = v !== "" && v !== "0";
         element.value = ge.max;
         element.className = (hasClass(element, "uich") ? "ui " : "") + "pa-gradevalue";
-        $(element.closest(".pa-pd")).find(".pa-gradedesc").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
+        $(element.closest(".pa-pv")).find(".pa-gradedesc").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
     }
 }
 
 handle_ui.on("pa-grade-uncheckbox", function () {
-    $(this.closest(".pa-pd")).find(".pa-gradevalue").each(function () {
+    $(this.closest(".pa-pv")).find(".pa-gradevalue").each(function () {
         Checkbox_GradeClass.uncheckbox(this);
         this.focus();
         this.select();

@@ -32,11 +32,14 @@ export const GradeClass = {
 
     basic_mount_show: function (elt, id) {
         elt.id = id;
-        let t = '<span class="pa-gradevalue pa-gradewidth"></span>';
+        const es = [document.createElement("span")];
+        es[0].className = "pa-gradevalue pa-gradewidth";
         if (this.max && this.type !== "letter") {
-            t = t.concat(' <span class="pa-gradedesc">of ', this.max, '</span>');
+            es.push(" ", document.createElement("span"));
+            es[2].className = "pa-gradedesc";
+            es[2].append("of " + this.max);
         }
-        return t;
+        elt.replaceChildren(...es);
     },
 
     basic_update_edit: function (elt, v, opts) {
@@ -128,10 +131,12 @@ GradeClass.add("formula", {
 GradeClass.add("text", {
     mount_show: function (elt, id) {
         elt.id = id;
+        addClass(elt, "pa-textv");
         addClass(elt, "pa-gradevalue");
     },
     mount_edit: function (elt, id) {
-        return '<div class="pa-textgrade-width"><textarea class="uich pa-pd pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
+        addClass(elt, "pa-textv");
+        return '<textarea class="uich pa-pv pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     justify: "left",
     sort: "forward",
@@ -144,7 +149,7 @@ GradeClass.add("shorttext", {
         addClass(elt, "pa-gradevalue");
     },
     mount_edit: function (elt, id) {
-        return '<div class="pa-textgrade-width"><textarea class="uich pa-pd pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea></div>');
+        return '<textarea class="uich pa-pv pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     justify: "left",
     sort: "forward",

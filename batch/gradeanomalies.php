@@ -23,12 +23,12 @@ class GradeAnomalies {
     function run_pset(Pset $pset) {
         foreach ($this->sset->users() as $u) {
             $ginfo = $this->sset->info_for($u, $pset);
-            $tot0 = $ginfo->grade_total();
-            $ex0 = $tot0 - $ginfo->grade_total_noextra();
+            $tot0 = $ginfo->visible_total();
+            $ex0 = $tot0 - $ginfo->visible_total_noextra();
             $any_base = false;
             foreach ($this->sset->all_info_for($u, $pset) as $info) {
-                $tot1 = $info->grade_total();
-                $ex1 = $tot1 - $info->grade_total_noextra();
+                $tot1 = $info->visible_total();
+                $ex1 = $tot1 - $info->visible_total_noextra();
                 if ($tot0 < $tot1 || $ex0 < $ex1) {
                     if (!$any_base) {
                         echo sprintf("\n%s %s\n%s %s %g+%g Grading commit\n",

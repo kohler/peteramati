@@ -578,7 +578,7 @@ handle_ui.on("pa-signin-radio", function () {
 
 handle_ui.on("pa-gradevalue", function () {
     var f = this.closest("form"), ge, self = this;
-    if (f && hasClass(f, "pa-grade")) {
+    if (f && hasClass(f, "pa-pv")) {
         $(f).submit();
     } else if (self.type === "hidden" && (ge = GradeEntry.closest(self))) {
         setTimeout(function () { ge.gc.update_edit.call(ge, self, +self.value, {}) }, 0);
@@ -590,11 +590,10 @@ handle_ui.on("pa-gradevalue", function () {
 function save_grade(self) {
     var $f = $(self);
     $f.find(".pa-gradediffers, .pa-save-message").remove();
-    var $pd = $f.find(".pa-pd").first(),
-        $gd = $pd.find(".pa-gradedesc");
+    var $gd = $f.find(".pa-gradedesc");
     if (!$gd.length) {
-        $pd.find(".pa-gradevalue").after(' <span class="pa-gradedesc"></span>');
-        $gd = $pd.find(".pa-gradedesc");
+        $f.find(".pa-gradevalue").after(' <span class="pa-gradedesc"></span>');
+        $gd = $f.find(".pa-gradedesc");
     }
     $gd.append('<span class="pa-save-message"><span class="spinner"></span></span>');
 
@@ -630,7 +629,7 @@ function save_grade(self) {
         });
     }));
 }
-handle_ui.on("pa-grade", function (event) {
+handle_ui.on("pa-pv", function (event) {
     event.preventDefault();
     var p = $(this).data("paOutstandingPromise");
     if (p) {
@@ -658,9 +657,9 @@ function pa_resolve_grade() {
             const lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
             for (let i = 0; i !== lb.length; ++i) {
                 if (typeof lb[i] === "string") {
-                    $(e).find(".pa-pd").first().append(lb[i]);
+                    $(e).find(".pa-pv").first().append(lb[i]);
                 } else if (lb[i].className) {
-                    $(e).find(".pa-pd").first().append('<button type="button" class="btn uic uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
+                    $(e).find(".pa-pv").first().append('<button type="button" class="btn uic uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
                 }
             }
         }
@@ -700,11 +699,11 @@ function gradelist_resolve_section(gi, ge, insp) {
     if (gi.section_has(ge, xge => xge.description)) {
         t += '<button class="btn ui pa-grade-toggle-description need-tooltip'.concat(insp.closest(".pa-gsection").classList.contains("pa-hide-description") ? ' btn-primary' : '', '" aria-label="Toggle description">…</button>');
     }
-    if (gi.section_has(ge, xge => xge.type === "markdown") && gi.editable_answers === false) {
+    if (gi.section_has(ge, xge => xge.type === "markdown")) {
         t += '<button class="btn ui pa-grade-toggle-markdown need-tooltip" aria-label="Toggle Markdown">M</button>';
     }
-    if (gi.editable && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
-        t += '<button class="btn ui pa-grade-toggle-answer'.concat(gi.editable_answers !== false ? " btn-primary" : "", ' need-tooltip" aria-label="Toggle answer editing">E</button>');
+    if (gi.editable_scores && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
+        t += '<button class="btn ui pa-grade-toggle-answer need-tootlip" aria-label="Toggle answer editing">E</button>';
     }
     let e = insp.firstChild;
     if (!e.classList.contains("pa-p-section")) {
@@ -736,7 +735,7 @@ function gradelist_resolve_section(gi, ge, insp) {
 
 handle_ui.on("pa-grade-toggle-description", function (event) {
     const me = this.closest(".pa-gsection"),
-        $es = event.shiftKey ? $(".pa-gsection") : $(me),
+        $es = event.metaKey ? $(".pa-gsection") : $(me),
         show = hasClass(me, "pa-hide-description");
     $es.each(function () {
         toggleClass(this, "pa-hide-description", !show);
@@ -746,16 +745,19 @@ handle_ui.on("pa-grade-toggle-description", function (event) {
 
 handle_ui.on("pa-grade-toggle-markdown", function (event) {
     const me = this.closest(".pa-gsection"),
-        $es = event.shiftKey ? $(".pa-gsection") : $(me),
+        $es = event.metaKey ? $(".pa-gsection") : $(me),
         show = !hasClass(this, "btn-primary");
     $es.each(function () {
         const gi = GradeSheet.closest(this);
-        $(this).find(".pa-grade > .pa-gradevalue").each(function () {
-            const ge = gi.entries[this.parentElement.getAttribute("data-pa-grade")];
+        $(this).find(".pa-grade").each(function () {
+            const ge = gi.entries[this.getAttribute("data-pa-grade")];
             if (ge.type === "markdown"
                 && hasClass(this, "pa-markdown") !== show) {
                 toggleClass(this, "pa-markdown", show);
-                gi.update_at(this.parentElement);
+                if (!hasClass(this, "e")) {
+                    gi.remount_at(this, false);
+                    gi.update_at(this);
+                }
             }
         });
         $(this).find(".pa-grade-toggle-markdown").toggleClass("btn-primary", show);
@@ -764,7 +766,7 @@ handle_ui.on("pa-grade-toggle-markdown", function (event) {
 
 handle_ui.on("pa-grade-toggle-answer", function (event) {
     const me = this.closest(".pa-gsection"),
-        $es = event.shiftKey ? $(".pa-gsection") : $(me),
+        $es = event.metaKey ? $(".pa-gsection") : $(me),
         edit = !hasClass(this, "btn-primary");
     $es.each(function () {
         const gi = GradeSheet.closest(this);
@@ -821,10 +823,10 @@ function pa_resolve_gradelist() {
         sectioned = gi.has(xge => xge.description || xge.answer ||
                 xge.type === "section" ||
                 (xge.type === "markdown" && gi.editable_answers === false)),
-        section_class = "pa-dg pa-gsection".concat(gi.editable ? " pa-hide-description" : "");
+        section_class = "pa-dg pa-gsection".concat(gi.editable_scores ? " pa-hide-description" : "");
     for (let i = 0; i !== gi.order.length; ++i) {
         const k = gi.order[i], ge = gi.entries[k];
-        if (!gi.editable && ge.concealed) {
+        if (!gi.editable_scores && ge.concealed) {
             continue;
         }
 
@@ -930,7 +932,7 @@ function pa_render_total(gi, tm) {
         t += ' hidden';
     }
     return t + '"><div class="pa-pt">total</div>' +
-        '<div class="pa-pd"><span class="pa-gradevalue pa-gradewidth"></span> ' +
+        '<div class="pa-pv"><span class="pa-gradevalue pa-gradewidth"></span> ' +
         '<span class="pa-gradedesc">of ' + tm[1] + '</span></div></div>';
 }
 
@@ -1093,7 +1095,7 @@ function pa_checklatest(pset) {
                         && c.hash
                         && c.hash !== latesthash
                         && c.snaphash !== latesthash) {
-                        $(this).find(".pa-pd").append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: c.hash}) + "\">Load them</a></div>");
+                        $(this).find(".pa-pv").append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: c.hash}) + "\">Load them</a></div>");
                         clearTimeout(timeout);
                         break;
                     }
@@ -1994,7 +1996,7 @@ function pa_render_pset_table(pconf, data) {
     }
 
     function gdialog_change() {
-        toggleClass(this.closest(".pa-pd"), "pa-grade-changed",
+        toggleClass(this.closest(".pa-pv"), "pa-grade-changed",
                     this.hasAttribute("data-pa-unmixed") || input_differs(this));
     }
     function grade_update(umap, rv, gorder) {

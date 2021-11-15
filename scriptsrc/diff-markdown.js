@@ -223,6 +223,10 @@ Filediff.define_method("markdown", function () {
     if (hasClass(elt, "pa-markdown") || hasClass(elt, "pa-highlight")) {
         return;
     }
+    const hidelm = hasClass(elt, "pa-hide-landmarks"),
+        daclass = hidelm ? "pa-da hidden" : "pa-da",
+        dbclass = hidelm ? "pa-db hidden" : "pa-db",
+        drclass = hidelm ? "pa-dr pa-dhlm" : "pa-dr";
     // collect content
     let e = elt.firstChild, l = [], lineno = 1;
     while (e) {
@@ -264,9 +268,9 @@ Filediff.define_method("markdown", function () {
         const lp = document.createElement("div");
         lp.className = "pa-dl pa-dlr";
         const la = document.createElement("div");
-        la.className = "pa-da";
+        la.className = daclass;
         const lb = document.createElement("div");
-        lb.className = "pa-db";
+        lb.className = dbclass;
 
         const lm = d.getAttribute("data-landmark");
         if (lm) {
@@ -295,7 +299,7 @@ Filediff.define_method("markdown", function () {
         }
 
         const lr = document.createElement("div");
-        lr.className = "pa-dr";
+        lr.className = drclass;
         if (d === dx.firstChild) {
             dx.removeChild(d);
         }

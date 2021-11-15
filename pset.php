@@ -345,7 +345,7 @@ function echo_commit($info, $qreq) {
         $bhashes[] = hex2bin($k->hash);
     }
     $notesflag = HASNOTES_ANY;
-    if (!$info->pc_view && !$info->can_view_grades()) {
+    if (!$info->pc_view && !$info->can_view_score()) {
         $notesflag = HASNOTES_COMMENT;
     }
     $result = $info->conf->qe("select bhash, haslinenotes, hasflags, hasactiveflags
@@ -563,16 +563,15 @@ function echo_all_grades($info) {
         return;
     }
 
-    $has_grades = $info->has_nonempty_grades();
-    if ($info->can_view_grades()
-        && ($has_grades || $info->can_edit_grades_any())) {
-        if ($info->pset->grade_script && $info->can_edit_grades_any()) {
+    $has_grades = $info->can_view_nonempty_grade();
+    if ($has_grades || $info->can_edit_grade()) {
+        if ($info->pset->grade_script && $info->can_edit_grade()) {
             foreach ($info->pset->grade_script as $gs) {
                 Ht::stash_html($info->conf->make_script_file($gs));
             }
         }
         echo '<div class="pa-gradelist is-main want-pa-landmark-links',
-            ($info->user_can_view_grades() ? "" : " pa-pset-hidden"), '"></div>';
+            ($info->user_can_view_score() ? "" : " pa-pset-hidden"), '"></div>';
         Ht::stash_script('$pa.store_gradeinfo($(".pa-psetinfo")[0],' . json_encode_browser($info->grade_json()) . ');');
         if ($info->pset->has_grade_landmark) {
             Ht::stash_script('$(function(){$(".pa-psetinfo").each($pa.loadgrades)})');
@@ -581,25 +580,28 @@ function echo_all_grades($info) {
     }
 
     $lhd = $info->late_hours_data();
-    if ($lhd && $info->can_view_grades() && !$info->can_edit_grades_staff()) {
+    if ($lhd && $info->can_view_grade() && !$info->can_edit_scores()) {
         if (($has_grades
-             && $info->has_nonempty_assigned_grades())
+             && $info->can_view_nonempty_score())
             || (isset($lhd->hours)
                 && $lhd->hours > 0
                 && !$info->pset->obscure_late_hours)) {
-            ContactView::echo_group("late hours", '<span class="pa-grade" data-pa-grade="late_hours">' . ($lhd->hours ?? 0) . '</span>');
+            echo '<div class="pa-grade pa-p" data-pa-grade="late_hours">',
+                '<label class="pa-pt" for="late_hours">late hours</label>',
+                '<div class="pa-pv pa-gradevalue" id="late_hours">', $lhd->hours ?? 0, '</div>',
+                '</div>';
         }
-    } else if ($info->can_edit_grades_staff() && $info->pset->late_hours_entry()) {
-        echo '<form class="ui-submit pa-grade pa-p" data-pa-grade="late_hours">',
-            '<label class="pa-pt" for="pa-lh">late hours</label>',
-            '<div class="pa-pd"><span class="pa-gradewidth">',
+    } else if ($info->can_edit_scores() && $info->pset->late_hours_entry()) {
+        echo '<div class="pa-grade pa-p e" data-pa-grade="late_hours">',
+            '<label class="pa-pt" for="late_hours">late hours</label>',
+            '<form class="ui-submitpa-pv"><span class="pa-gradewidth">',
             Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
-                      ["class" => "uich pa-gradevalue pa-gradewidth"]),
+                      ["class" => "uich pa-gradevalue pa-gradewidth", "id" => "late_hours"]),
             '</span> <span class="pa-gradedesc"></span>';
         if ($lhd && isset($lhd->autohours) && $lhd->hours !== $lhd->autohours) {
             echo '<span class="pa-gradediffers">auto-late hours is ', $lhd->autohours, '</span>';
         }
-        echo '</div></form>';
+        echo '</form></div>';
     }
 }
 
@@ -607,18 +609,18 @@ function echo_all_grades($info) {
 /** @param PsetView $info */
 function show_pset($info) {
     echo "<hr>\n";
-    if ($info->pset->gitless_grades && $info->can_edit_grades_staff()) {
+    if ($info->pset->gitless_grades && $info->can_edit_scores()) {
         echo '<div style="float:right"><button type="button" class="ui js-pset-upload-grades">upload</button></div>';
     }
     echo "<h2>", htmlspecialchars($info->pset->title), "</h2>";
     ContactView::echo_partner_group($info);
-    ContactView::echo_repo_group($info, $info->can_edit_grades_any());
+    ContactView::echo_repo_group($info, $info->can_edit_grade());
     ContactView::echo_downloads_group($info);
 }
 
 show_pset($Info);
 
-if ($Info->can_edit_grades_staff()) {
+if ($Info->can_edit_scores()) {
     echo '<div id="upload" class="hidden"><hr/>',
         Ht::form($Info->hoturl_post("pset", ["uploadgrades" => 1])),
         '<div class="f-contain">',
@@ -636,9 +638,6 @@ if (!$Pset->gitless && $Info->hash()) {
 }
 if (!$Pset->gitless && $Pset->directory) {
     echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
-}
-if ($Info->user_can_view_grades()) {
-    echo '" data-pa-user-can-view-grades="yes';
 }
 if ($Info->user->extension) {
     echo '" data-pa-user-extension="yes';
@@ -735,7 +734,7 @@ if ($Pset->gitless) {
     echo_all_grades($Info);
 
     // collect diff and sort line notes
-    $lnorder = $Info->viewable_line_notes();
+    $lnorder = $Info->visible_line_notes();
     if ($Info->commit()) {
         $diff = $Info->diff($Info->base_handout_commit(), $Info->commit(),
             $lnorder, ["wdiff" => !!$Info->commit_jnote("wdiff")]);
@@ -808,14 +807,13 @@ if ($Pset->gitless) {
     if (!empty($diff)) {
         echo "<hr>\n";
         echo '<div class="pa-diffset">';
-        $can_edit_grades = $Info->can_edit_grades_any();
-        if ($can_edit_grades && !$Pset->has_grade_landmark_range) {
+        if ($Info->can_edit_scores() && !$Pset->has_grade_landmark_range) {
             PsetView::echo_pa_sidebar_gradelist();
         }
         foreach ($diff as $file => $dinfo) {
-            $Info->echo_file_diff($file, $dinfo, $lnorder, ["hide_left" => $can_edit_grades]);
+            $Info->echo_file_diff($file, $dinfo, $lnorder, ["hide_left" => $Info->can_edit_scores()]);
         }
-        if ($Info->can_edit_grades_any() && !$Pset->has_grade_landmark_range) {
+        if ($Info->can_edit_scores() && !$Pset->has_grade_landmark_range) {
             PsetView::echo_close_pa_sidebar_gradelist();
         }
         echo '</div>';

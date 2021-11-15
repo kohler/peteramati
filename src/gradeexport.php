@@ -15,6 +15,8 @@ class GradeExport implements JsonSerializable {
     public $value_slice = false;
     /** @var ?int */
     public $uid;
+    /** @var ?string */
+    public $user;
     /** @var ?list<mixed> */
     public $grades;
     /** @var ?list<mixed> */
@@ -38,7 +40,9 @@ class GradeExport implements JsonSerializable {
     /** @var null|int */
     public $auto_late_hours;
     /** @var ?bool */
-    public $editable;
+    public $user_visible_scores;
+    /** @var ?bool */
+    public $editable_scores;
     /** @var ?bool */
     public $editable_answers;
     /** @var ?LineNotesOrder */
@@ -155,6 +159,7 @@ class GradeExport implements JsonSerializable {
         $r = [];
         if (isset($this->uid)) {
             $r["uid"] = $this->uid;
+            $r["user"] = $this->user;
             if ($this->grades !== null) {
                 $r["grades"] = $this->grades;
             } else if ($this->pc_view && empty($this->autogrades)) {
@@ -190,8 +195,11 @@ class GradeExport implements JsonSerializable {
             if ($this->answer_version !== null) {
                 $r["answer_version"] = $this->answer_version;
             }
-            if ($this->editable !== null) {
-                $r["editable"] = $this->editable;
+            if ($this->user_visible_scores !== null) {
+                $r["user_visible_scores"] = $this->user_visible_scores;
+            }
+            if ($this->editable_scores !== null) {
+                $r["editable_scores"] = $this->editable_scores;
             }
             if ($this->editable_answers !== null) {
                 $r["editable_answers"] = $this->editable_answers;

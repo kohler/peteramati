@@ -68,12 +68,10 @@ ContactView::echo_heading($User);
 
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey),
     '" data-pa-base-hash="', htmlspecialchars($commita->hash),
-    '" data-pa-hash="', htmlspecialchars($commitb->hash);
+    '" data-pa-hash="', htmlspecialchars($commitb->hash),
+    '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($Info->info_export()));
 if (!$Pset->gitless && $Pset->directory) {
     echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
-}
-if ($Info->user_can_view_grades()) {
-    echo '" data-pa-user-can-view-grades="yes';
 }
 if ($Info->user->extension) {
     echo '" data-pa-user-extension="yes';
@@ -86,10 +84,10 @@ echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height
     "</td></tr></table>";
 
 // collect diff and sort line notes
-$lnorder = $Pset->is_handout($commitb) ? $Info->empty_line_notes() : $Info->viewable_line_notes();
+$lnorder = $Pset->is_handout($commitb) ? $Info->empty_line_notes() : $Info->visible_line_notes();
 
 // print line notes
-$notelinks = array();
+$notelinks = [];
 foreach ($lnorder->seq() as $note) {
     if (!$note->is_empty()) {
         $notelinks[] = $note->render_line_link_html($Pset);

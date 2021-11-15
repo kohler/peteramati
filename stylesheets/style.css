@@ -304,11 +304,20 @@ form {
 	margin-bottom: 0;
 	display: inline;
 }
+.bg-none {
+	background-color: transparent !important;
+}
 .inline {
 	display: inline;
 }
 .float-left {
-	float: left;
+	float: left !important;
+}
+.align-top {
+	vertical-align: top !important;
+}
+.align-self-start {
+	align-self: flex-start !important;
 }
 .ml-0 {
 	margin-left: 0 !important;
@@ -2205,13 +2214,13 @@ td.mhcb {
 	display: flex;
 	align-items: baseline;
 	align-content: space-between;
+	justify-content: flex-end;
 	flex-wrap: wrap;
 	margin-bottom: 0.5rem;
-	justify-content: flex-end;
 }
 .pa-pt {
 	min-width: 168px;
-	padding-right: 6px;
+	padding-right: 12px;
 	flex-grow: 1;
 	font-weight: bold;
 }
@@ -2221,26 +2230,42 @@ td.mhcb {
 .pa-pdesc {
 	width: 100%;
 	margin-bottom: 0.25rem;
+	color: #555;
+	font-size: 93.75%;
 }
 .pa-pdesc.pa-pdesc-external {
 	margin-top: -0.5rem;
 	margin-bottom: 0.5rem;
 }
-.pa-pdesc > p:last-child, .pa-pd > p:last-child {
+.pa-pdesc > p:last-child,
+.pa-pv > p:last-child {
 	margin-bottom: 0;
 }
-.pa-pd {
+.pa-pv {
 	min-width: 168px;
 	width: calc(100% - 168px);
 }
-.pa-pdesc + .pa-pd.e {
-	width: 100%;
+.pa-ans.e > .pa-textv {
+	min-width: 32px;
+	width: calc(100% - 32px);
 }
-.pa-pd.pa-grade-changed:after {
+.pa-ans > .pa-pv {
+	padding-left: 4px;
+	background-color: #f0fff0;
+}
+.pa-ans.e > .pa-pv,
+.pa-ans > .pa-pv.bg-none {
+	padding-left: 0;
+	background-color: inherit;
+}
+.pa-ans > .pa-pv > textarea {
+	background-color: #f0fff0;
+}
+.pa-pv.pa-grade-changed:after {
 	content: " ✶";
 	color: blue;
 }
-.pa-pd.pa-grade-error:after {
+.pa-pv.pa-grade-error:after {
 	content: " \274C\FE0E"
 }
 .pa-ps .pa-p {
@@ -2250,7 +2275,7 @@ td.mhcb {
 	min-width: initial;
 	width: 100%;
 }
-.pa-ps .pa-pd {
+.pa-ps .pa-pv {
 	min-width: initial;
 	width: auto;
 }
@@ -2264,17 +2289,33 @@ td.mhcb {
 	font-size: larger;
 }
 .pa-preview-border {
-	border-top: 1px dashed black;
 	max-width: 800px;
+	border-top: 1px dashed black;
 	margin-top: 0.25rem;
 	margin-bottom: 0.25rem;
 }
 .pa-preview-notice {
 	max-width: 800px;
-	font-size: smaller;
+	font-size: 65%;
 	font-style: italic;
 	text-align: right;
-	margin-bottom: 0.5rem;
+	margin-bottom: 0.25rem;
+}
+.pa-pv > textarea {
+	vertical-align: top;
+}
+.pa-p + .pa-ans {
+	margin-top: 1rem;
+}
+.pa-p > .pa-pv > .pa-preview-notice,
+.pa-p > .pa-pv > textarea,
+.pa-p > .pa-pv > .pa-preview > .pa-preview-border {
+	max-width: 664px;
+}
+.pa-p.pa-ans > .pa-pv > .pa-preview-notice,
+.pa-p.pa-ans > .pa-pv > textarea,
+.pa-p.pa-ans > .pa-pv > .pa-preview > .pa-preview-border {
+	max-width: 800px;
 }
 
 .pa-gradelist {
@@ -2442,12 +2483,16 @@ tr.gtrow-partner {
 .pa-filediff {
 	margin-bottom: 1.5rem;
 }
+.pa-pv > .pa-filediff,
 .pa-filediff.need-load {
 	margin-bottom: 0;
 }
 @media screen and (min-width: 800px) {
 .pa-filediff {
-	 margin-left: 2rem;
+	 margin-left: 32px;
+}
+.pa-pv > .pa-filediff {
+	margin-left: 0;
 }
 .pa-gradebox {
 	position: relative;
@@ -2465,6 +2510,9 @@ tr.gtrow-partner {
 	padding-left: 0.5em;
 	user-select: none;
 	flex: 0 0 content;
+}
+.pa-dhlm {
+	padding-left: 0.5em;
 }
 .pa-da {
 	min-width: 3em;
@@ -2623,7 +2671,6 @@ tr.gtrow-partner {
 	background: #f3d1fc;
 	background:
 	    left top / 100% 5px no-repeat linear-gradient(180deg, rgba(180,120,180,0.2), rgba(0,0,0,0)),
-	    left bottom / 100% 5px no-repeat linear-gradient(0deg, rgba(180,120,180,0.2), rgba(0,0,0,0)),
 	    linear-gradient(90deg, rgba(238,192,242,0) 5.4em, rgba(238,192,242,1) 5.5em, rgba(243,209,252,1) 95%, rgba(238,192,242,1) 100%) right top,
             4.7em center / 0.8em 0.8em repeat-y linear-gradient(125deg, rgba(227,163,227,0) 0.7em, rgba(227,163,227,1) 0.8em, rgba(238,192,242,1) 1em),
             4.7em center / 0.8em 0.8em repeat-y linear-gradient(55deg, rgba(227,163,227,0) 0.7em, rgba(227,163,227,1) 0.8em, rgba(238,192,242,1) 1em);
@@ -2799,7 +2846,7 @@ table.hidegrades .pa-gradenote {
 .pa-gradebox > .pa-p {
 	margin-left: 0;
 }
-.pa-gradebox .pa-pd {
+.pa-gradebox .pa-pv {
 	width: auto;
 }
 .pa-warnbox {
@@ -2849,7 +2896,7 @@ table.hidegrades .pa-gradenote {
 	font-style: italic;
 }
 .pa-runpre {
-	padding: 1.5rem 0 1.5rem 2rem;
+	padding: 1.5rem 0 1.5rem 32px;
 	margin: 0;
 }
 .pa-runcursor:after {
@@ -2935,16 +2982,6 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 .pa-gradevalue {
 	margin-left: 0;
 }
-.pa-textgrade-width {
-	max-width: 40rem;
-}
-.pa-textgrade-width.pa-wide {
-	max-width: 800px;
-}
-.pa-textgrade-width > textarea {
-	vertical-align: top;
-	width: 100%;
-}
 .pa-total span.pa-gradevalue {
 	font-weight: bold;
 }
@@ -2957,7 +2994,7 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 	font-size: smaller;
 	color: #999999;
 }
-.pa-pd > .pa-gradedesc {
+.pa-pv > .pa-gradedesc {
 	display: inline-block;
 	min-width: 3.5em;
 }

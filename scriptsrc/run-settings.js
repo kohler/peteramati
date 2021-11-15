@@ -8,7 +8,7 @@ function add(name, value) {
     var $j = $("#pa-runsettings"), num = $j.find(".n").length;
     while ($j.find("[data-runsetting-num=" + num + "]").length)
         ++num;
-    var $x = $("<div class=\"pa-p\" data-runsetting-num=\"" + num + "\"><div class=\"pa-pt\"></div><div class=\"pa-pd\"><input name=\"n" + num + "\" class=\"uich pa-runconfig ignore-diff n\" size=\"30\" placeholder=\"Name\"> &nbsp; <input name=\"v" + num + "\" class=\"uich pa-runconfig ignore-diff v\" size=\"40\" placeholder=\"Value\"></div></div>");
+    var $x = $("<div class=\"pa-p\" data-runsetting-num=\"" + num + "\"><div class=\"pa-pt\"></div><div class=\"pa-pv\"><input name=\"n" + num + "\" class=\"uich pa-runconfig ignore-diff n\" size=\"30\" placeholder=\"Name\"> &nbsp; <input name=\"v" + num + "\" class=\"uich pa-runconfig ignore-diff v\" size=\"40\" placeholder=\"Value\"></div></div>");
     if (name) {
         $x.find(".n").val(name);
         $x.find(".v").val(value);

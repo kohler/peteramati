@@ -47,8 +47,8 @@ function collect_pset_info(&$students, $sset, $entries) {
                       "npartners" => 0);
         }
 
-        if ($info->has_nonempty_assigned_grades()) {
-            list($total, $max, $total_noextra) = $info->grade_total();
+        if ($info->can_view_nonempty_score()) {
+            list($total, $max, $total_noextra) = $info->visible_total();
             report_set($ss, $pset->key, $total, $total_noextra, 100.0 / $max);
 
             if ($grp) {

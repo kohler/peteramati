@@ -14,9 +14,10 @@ let id_counter = 0, late_hours_entry;
 const gradesheet_props = {
     "uid": true, "user": true,
     "late_hours": true, "auto_late_hours": true, "updateat": true,
-    "version": true, "editable": true, "maxtotal": true, "history": true, "total": true,
+    "version": true, "maxtotal": true, "history": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,
-    "editable_answers": true, "linenotes": true
+    "user_visible_scores": true, "editable_scores": true, "editable_answers": true,
+    "linenotes": true
 };
 
 export class GradeEntry {
@@ -118,47 +119,36 @@ export class GradeEntry {
     }
 
     render(gi, mode) {
-        let wantform = false;
         if (mode == null) {
-            if (this.readonly || (!this.answer && !gi.editable)) {
-                mode = 0;
-            } else if (this.answer && gi.editable_answers === false) {
-                mode = 0;
-                wantform = true;
-            } else {
-                mode = 2;
-                wantform = true;
-            }
-        } else {
-            wantform = mode === 2;
+            mode = !this.readonly
+                && (this.answer ? gi.editable_answers : gi.editable_scores) ? 2 : 0;
         }
         const id = "pe-ge" + ++id_counter;
         let hsv;
         if (this.visible == null) {
-            hsv = gi.hide_grades !== false && !this.answer;
+            hsv = !this.answer && gi.user_visible_scores === false;
         } else {
             hsv = this.visible === false || this.visible === "none";
         }
-        const e = document.createElement(wantform ? 'form' : 'div'),
-            className = 'pa-grade pa-p'.concat(hsv ? ' pa-p-hidden' : ''),
-            le = document.createElement('label'),
-            pde = document.createElement('div');
-        e.className = wantform ? 'ui-submit ' + className : className;
-        e.setAttribute('data-pa-grade', this.key);
-        le.className = 'pa-pt';
+        const pge = document.createElement("div"),
+            le = document.createElement("label"),
+            pde = document.createElement(mode === 2 ? "form" : "div");
+        pge.className = "pa-grade pa-p".concat(hsv ? "pa-p-hidden" : "", this.answer ? " pa-ans" : "", mode ? " e" : "");
+        pge.setAttribute("data-pa-grade", this.key);
+        le.className = "pa-pt";
         le.htmlFor = id;
         le.innerHTML = this.title_html;
-        e.appendChild(le);
+        pge.appendChild(le);
         if (this.description) {
-            const de = document.createElement('div');
-            de.className = 'pa-pdesc pa-dr';
+            const de = document.createElement("div");
+            de.className = "pa-pdesc pa-dr";
             de.innerHTML = render_ftext(this.description);
-            e.appendChild(de);
+            pge.appendChild(de);
         }
-        pde.className = mode ? 'pa-pd e' : 'pa-pd';
-        e.appendChild(pde);
+        pde.className = mode === 2 ? "ui-submit pa-pv" : "pa-pv";
+        pge.appendChild(pde);
         this.mount_at(pde, id, mode);
-        return e;
+        return pge;
     }
 
     mount_at(pde, id, edit) {
@@ -183,7 +173,7 @@ export class GradeEntry {
                 has_max && pde.parentElement.removeChild(pde.nextSibling);
             } else if (!has_max) {
                 const e = document.createElement("div");
-                e.classList = "pa-pd pa-gradeabovemax";
+                e.classList = "pa-pv pa-gradeabovemax";
                 e.textContent = "Grade is above max";
                 pde.parentElement.insertBefore(e, pde.nextSibling);
             }
@@ -232,10 +222,10 @@ export class GradeEntry {
 
     update_at(elt, v, opts) {
         let pde = elt.firstChild;
-        while (!hasClass(pde, "pa-pd")) {
+        while (!hasClass(pde, "pa-pv")) {
             pde = pde.nextSibling;
         }
-        if (hasClass(pde, "e")) {
+        if (hasClass(elt, "e")) {
             this.update_edit(pde, v, opts);
         } else {
             this.update_show(pde, v, opts);
@@ -386,6 +376,7 @@ export class GradeEntry {
 export class GradeSheet {
     constructor(x) {
         this.entries = {};
+        this.gversion = [];
         x && this.extend(x);
     }
 
@@ -410,16 +401,24 @@ export class GradeSheet {
             }
         }
         if (need_gpos) {
+            while (this.gversion.length < this.value_order.length) {
+                this.gversion.push(0);
+            }
             this.gpos = {};
             for (let i = 0; i < this.value_order.length; ++i) {
                 this.gpos[this.value_order[i]] = i;
+                ++this.gversion[i];
             }
+            this.grades = this.autogrades = null;
         }
         if (x.grades) {
             this.grades = this.merge_grades(this.grades, x.grades, x);
         }
         if (x.autogrades) {
             this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x);
+        }
+        while (this.grades && this.gversion.length !== this.grades.length) {
+            this.gversion.push(0);
         }
         for (let k in x) {
             if (gradesheet_props[k])
@@ -439,52 +438,52 @@ export class GradeSheet {
                     while (myg.length <= j) {
                         myg.push(null);
                     }
-                    myg[j] = ing[i];
+                    if (myg[j] != ing[i]) {
+                        myg[j] = ing[i];
+                        ++this.gversion[j];
+                    }
                 }
             }
             return myg;
         }
     }
 
-    remount_at(elt, edit) {
-        const k = elt.getAttribute("data-pa-grade");
-        let ge;
-        if (k === "late_hours") {
-            ge = GradeEntry.late_hours();
-        } else {
-            ge = this.entries[k];
-        }
+    remount_at(elt, mode) {
+        const k = elt.getAttribute("data-pa-grade"), islh = k === "late_hours",
+            ge = islh ? GradeEntry.late_hours() : this.entries[k];
         if (ge) {
             let pde = elt.firstChild, id;
-            while (!hasClass(pde, "pa-pd")) {
+            while (!hasClass(pde, "pa-pv")) {
                 pde.tagName === "LABEL" && (id = pde.htmlFor);
                 pde = pde.nextSibling;
             }
             while (pde.nextSibling) {
                 elt.removeChild(pde.nextSibling);
             }
-            while (pde.firstChild) {
-                pde.removeChild(pde.firstChild);
+            if (typeof mode === "boolean") {
+                mode = mode ? 2 : 0;
             }
-            pde.className = edit ? 'pa-pd e' : 'pa-pd';
-            ge.mount_at(pde, id, edit);
+            const pdx = document.createElement(mode === 2 ? "form" : "div");
+            pdx.className = mode === 2 ? "ui-submit pa-pv" : "pa-pv";
+            toggleClass(elt, "e", mode !== 0);
+            elt.replaceChild(pdx, pde);
+            ge.mount_at(pdx, id, mode !== 0);
         }
     }
 
     update_at(elt) {
-        const k = elt.getAttribute("data-pa-grade");
-        let ge, v, opts, gpos;
-        if (k === "late_hours") {
-            ge = GradeEntry.late_hours();
-            v = this.late_hours;
-            opts = {autograde: this.auto_late_hours};
-        } else if ((ge = this.entries[k]) && (gpos = this.gpos[k]) != null) {
-            v = this.grades ? this.grades[gpos] : null;
-            opts = {autograde: this.autogrades ? this.autogrades[gpos] : null};
-        } else {
-            return;
+        const k = elt.getAttribute("data-pa-grade"), islh = k === "late_hours";
+        let ge, gpos;
+        if (islh) {
+            GradeEntry.late_hours().update_at(elt, this.late_hours, {autograde: this.auto_late_hours});
+        } else if ((ge = this.entries[k])
+                   && (gpos = this.gpos[k]) != null
+                   && elt.getAttribute("data-pa-gv") != this.gversion[gpos]) {
+            const v = this.grades ? this.grades[gpos] : null,
+                av = this.autogrades ? this.autogrades[gpos] : null;
+            ge.update_at(elt, v, {autograde: av});
+            elt.setAttribute("data-pa-gv", this.gversion[gpos]);
         }
-        ge.update_at(elt, v, opts);
     }
 
     get_total(noextra) {
@@ -538,7 +537,7 @@ export class GradeSheet {
 
     section_wants_sidebar(ge) {
         let answer = 0;
-        return this.section_has(ge, xge => {
+        return this.editable_scores && this.section_has(ge, xge => {
             answer |= xge.answer ? 1 : 2;
             return answer === 3;
         });
@@ -552,6 +551,7 @@ export class GradeSheet {
         let gs = $(element).data("pa-gradeinfo");
         if (!gs) {
             gs = new GradeSheet;
+            gs.element = element;
             $(element).data("pa-gradeinfo", gs);
         }
         gs.extend(x, !element.classList.contains("pa-psetinfo-partial"));
@@ -570,11 +570,9 @@ export class GradeSheet {
                     break;
                 } else {
                     gi = new GradeSheet(jx);
+                    gi.element = e;
                     $(e).data("pa-gradeinfo", gi);
                 }
-            }
-            if (e.hasAttribute("data-pa-user")) {
-                gi.user = e.getAttribute("data-pa-user");
             }
             if (gi && !hasClass(e, "pa-psetinfo-partial")) {
                 break;
