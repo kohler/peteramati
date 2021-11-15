@@ -1,5 +1,5 @@
 // note-edit.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2020 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 import { escape_entities } from "./encoders.js";
