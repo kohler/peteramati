@@ -11,8 +11,9 @@ import { render_ftext } from "./render.js";
 
 
 let id_counter = 0, late_hours_entry;
-const want_props = {
-    "uid": true, "late_hours": true, "auto_late_hours": true, "updateat": true,
+const gradesheet_props = {
+    "uid": true, "user": true,
+    "late_hours": true, "auto_late_hours": true, "updateat": true,
     "version": true, "editable": true, "maxtotal": true, "history": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,
     "editable_answers": true, "linenotes": true
@@ -421,7 +422,7 @@ export class GradeSheet {
             this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x);
         }
         for (let k in x) {
-            if (want_props[k])
+            if (gradesheet_props[k])
                 this[k] = x[k];
         }
     }
@@ -560,17 +561,20 @@ export class GradeSheet {
     static closest(element) {
         let e = element.closest(".pa-psetinfo"), gi = null;
         while (e) {
-            const edata = $(e).data("pa-gradeinfo");
-            if (edata) {
-                const jx = typeof edata === "string" ? JSON.parse(edata) : edata;
+            let jx = $(e).data("pa-gradeinfo");
+            if (jx) {
                 if (gi) {
                     gi.extend(jx);
                 } else if (jx instanceof GradeSheet) {
-                    return jx;
+                    gi = jx;
+                    break;
                 } else {
                     gi = new GradeSheet(jx);
                     $(e).data("pa-gradeinfo", gi);
                 }
+            }
+            if (e.hasAttribute("data-pa-user")) {
+                gi.user = e.getAttribute("data-pa-user");
             }
             if (gi && !hasClass(e, "pa-psetinfo-partial")) {
                 break;

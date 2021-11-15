@@ -36,7 +36,7 @@ GradeClass.add("markdown", {
             div.className = "pa-filediff pa-dg pa-hide-left uim pa-editablenotes live";
             let fileid = "/g/" + html_id_encode(this.key);
             if (hasClass(document.body, "pa-multiuser")) {
-                div.id = "U".concat(html_id_encode(ve.closest(".pa-psetinfo").getAttribute("data-pa-user")), "/F", fileid);
+                div.id = "U".concat(html_id_encode(this._all.user), "/F", fileid);
             } else {
                 div.id = "F" + fileid;
             }
@@ -63,7 +63,7 @@ GradeClass.add("markdown", {
             }
             ve.replaceChildren(div);
             const fd = new Filediff(div);
-            if (!hasClass(ve, "pa-markdown")) {
+            if (hasClass(ve, "pa-markdown")) {
                 fd.markdown();
             }
             let ln;
