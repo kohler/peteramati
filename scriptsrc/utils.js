@@ -182,6 +182,17 @@ if (!Element.prototype.closest) {
     };
 }
 
+if (!Element.prototype.replaceChildren) {
+    Element.prototype.replaceChildren = function () {
+        while (this.lastChild) {
+            this.removeChild(this.lastChild);
+        }
+        for (let i = 0; i !== arguments.length; ++i) {
+            this.append(arguments[i]);
+        }
+    };
+}
+
 if (!String.prototype.startsWith) {
     String.prototype.startsWith = function (search, pos) {
         pos = !pos || pos < 0 ? 0 : +pos;
