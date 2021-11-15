@@ -18,12 +18,26 @@ export class Filediff {
         }
         this.element = e;
     }
-    static find(e) {
-        if (typeof e === "string") {
-            e = document.getElementById("F_" + html_id_encode(e));
-        } else {
-            e = e.closest(".pa-filediff")
-                || document.getElementById(e.closest(".pa-fileref").getAttribute("data-pa-fileid"));
+    static closest(e) {
+        const ed = e.closest(".pa-filediff");
+        return ed ? new Filediff(ed) : null;
+    }
+    static referenced(e) {
+        const er = e.closest(".pa-fileref");
+        let fd;
+        if (er.firstChild.tagName === "A") {
+            fd = Filediff.by_hash(er.firstChild.hash);
+        }
+        return fd || Filediff.closest(e);
+    }
+    static by_file(fn) {
+        const e = document.getElementById("F" + html_id_encode(fn));
+        return e ? new Filediff(e) : null;
+    }
+    static by_hash(hash) {
+        let e;
+        if (hash.startsWith("#F") || hash.startsWith("#U")) {
+            e = document.getElementById(hash.substring(1));
         }
         return e ? new Filediff(e) : null;
     }
@@ -60,7 +74,8 @@ export class Filediff {
             show = hasClass(this.element, "hidden");
         }
         const h3 = this.element.previousSibling,
-            isarrow = h3 && h3.getAttribute("data-pa-fileid") === this.element.id;
+            h3fd = h3 && hasClass(h3, "pa-fileref") ? Filediff.referenced(h3) : null,
+            isarrow = h3fd && h3fd.element === this.element;
         fold61(this.element, isarrow ? h3 : null, show);
     }
     toggle_show_left(show) {
@@ -71,7 +86,13 @@ export class Filediff {
         $(this.element.previousSibling).find(".pa-diff-toggle-hide-left").toggleClass("btn-primary", show);
     }
     get file() {
-        return this.element.getAttribute("data-pa-file");
+        const id = this.element.id;
+        if (id.charAt(0) === "U") {
+            const sl = id.indexOf("/F");
+            return html_id_decode(id.substring(sl + 2));
+        } else {
+            return html_id_decode(id.substring(1));
+        }
     }
     lines() {
         return Linediff.all(this.element.firstChild);
@@ -109,16 +130,7 @@ export class Linediff {
         this.element = e;
     }
     get file() {
-        return this.element.closest(".pa-filediff").getAttribute("data-pa-file");
-    }
-    get user_file() {
-        const fe = this.element.closest(".pa-filediff"),
-            f = fe.getAttribute("data-pa-file");
-        if (fe.hasAttribute("data-pa-file-user")) {
-            return fe.getAttribute("data-pa-file-user").concat("-", f);
-        } else {
-            return f;
-        }
+        return Filediff.closest(this.element).file;
     }
     get note_lineid() {
         const e = this.element;
@@ -137,13 +149,13 @@ export class Linediff {
         }
     }
     get hash() {
-        const uf = this.user_file, e = this.element;
+        const e = this.element, fd = Filediff.closest(e), uf = fd.element.id;
         if (e.hasAttribute("data-landmark")) {
-            return "#L".concat(e.getAttribute("data-landmark"), "_", uf);
+            return "#L".concat(e.getAttribute("data-landmark"), uf);
         } else if (hasClass(e, "pa-gd")) {
-            return "#La".concat(e.firstChild.getAttribute("data-landmark"), "_", uf);
+            return "#La".concat(e.firstChild.getAttribute("data-landmark"), uf);
         } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            return "#Lb".concat(e.firstChild.nextSibling.getAttribute("data-landmark"), "_", uf);
+            return "#Lb".concat(e.firstChild.nextSibling.getAttribute("data-landmark"), uf);
         } else {
             return null;
         }
@@ -213,7 +225,7 @@ export class Linediff {
                         }
                         const next = e.nextSibling;
                         $(e).remove();
-                        const fd = Filediff.find(next);
+                        const fd = Filediff.closest(next);
                         if (hasClass(fd.element, "pa-highlight")) {
                             fd.highlight();
                         }
@@ -331,30 +343,29 @@ export class Linediff {
 
 handle_ui.on("pa-diff-unfold", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-unfold") : $(this),
-        fd = Filediff.find(this),
+        fd = Filediff.by_hash(this.hash),
         show = hasClass(fd.element, "hidden"),
         direction = evt.metaKey ? true : show;
     $es.each(function () {
-        Filediff.find(this).load().then(fd => fd.toggle(direction));
+        Filediff.by_hash(this.hash).load().then(fd => fd.toggle(direction));
     });
     if (!evt.metaKey) {
-        const fd = Filediff.find(this);
         $.post(hoturl_gradeapi(fd.element, "=api/diffconfig", {file: fd.file, collapse: show ? 0 : 1}));
     }
 });
 
 handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-hide-left") : $(this),
-        show = hasClass(Filediff.find(this).element, "pa-hide-left");
-    $es.each(function () { Filediff.find(this).toggle_show_left(show); });
+        show = hasClass(Filediff.referenced(this).element, "pa-hide-left");
+    $es.each(function () { Filediff.referenced(this).toggle_show_left(show); });
 });
 
 function goto_hash(hash) {
     let m, lineid, fd;
-    if ((m = hash.match(/^[^#]*#F_([-A-Za-z0-9_.@\/]+)$/))) {
-        fd = Filediff.find(html_id_decode(m[1]));
-    } else if ((m = hash.match(/^[^#]*#L([ab]\d+)_([-A-Za-z0-9_.@\/]+)$/))) {
-        fd = Filediff.find(html_id_decode(m[2]));
+    if ((m = hash.match(/^[^#]*(#(?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@\/]+)$/))) {
+        fd = Filediff.by_hash(m[1]);
+    } else if ((m = hash.match(/^[^#]*#L([ab]\d+)((?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@\/]+)$/))) {
+        fd = Filediff.by_hash("#" + m[2]);
         lineid = m[1];
     }
     if (fd && lineid) {

@@ -137,7 +137,7 @@ class DiffMany {
                 }
                 foreach ($diff as $file => $dinfo) {
                     $info->echo_file_diff($file, $dinfo, $lnorder, [
-                        "expand" => true, "id_by_user" => true, "hide_left" => true,
+                        "expand" => true, "hide_left" => true,
                         "no_heading" => count($this->files) == 1,
                         "diffcontext" => $linkpart_html . "/"
                     ]);
@@ -166,6 +166,7 @@ class DiffMany {
         if ($this->files) {
             $title .= " > " . join(" ", $this->files);
         }
+        $this->conf->set_multiuser_page();
         $this->conf->header(htmlspecialchars($title), "home");
 
         foreach ($this->pset->grade_script ?? [] as $gs) {

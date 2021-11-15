@@ -84,8 +84,8 @@ function modify_landmark_image(base) {
             && mdcontext
             && (pi = mdcontext.closest(".pa-psetinfo"))) {
             if (!/\/\//.test(src)) {
-                var fileref = mdcontext.closest(".pa-filediff"),
-                    dir = fileref && fileref.hasAttribute("data-pa-file") ? fileref.getAttribute("data-pa-file").replace(/^(.*)\/[^\/]*$/, '$1') : "";
+                var fd = Filediff.closest(mdcontext),
+                    dir = fd ? fd.file.replace(/^(.*)\/[^\/]*$/, '$1') : "";
                 while (true) {
                     if (src.startsWith("./")) {
                         src = src.substring(2).replace(/^\/+/, "");
@@ -330,8 +330,9 @@ Filediff.define_method("unmarkdown", function () {
 Filediff.define_method("highlight", function () {
     const elt = this.element;
     // compute language
-    var file = elt.getAttribute("data-pa-file"), lang;
+    let lang;
     if (!(lang = elt.getAttribute("data-language"))) {
+        let file = this.file;
         if (/\.(?:cc|cpp|hh|hpp|c\+\+|h\+\+|C|H)$/.test(file)) {
             lang = "c++";
         } else if (/\.(?:c|h)$/.test(file)) {
@@ -396,15 +397,15 @@ Filediff.define_method("unhighlight", function () {
 
 handle_ui.on("pa-diff-toggle-markdown", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-markdown") : $(this),
-        fd = Filediff.find(this),
+        fd = Filediff.referenced(this),
         show = !hasClass(fd.element, "pa-markdown");
     $es.each(function () {
-        const f = Filediff.find(this),
-            shown = hasClass(f.element, "pa-markdown");
+        const fd = Filediff.referenced(this),
+            shown = hasClass(fd.element, "pa-markdown");
         if (show && !shown) {
-            f.markdown();
+            fd.markdown();
         } else if (!show && shown) {
-            f.unmarkdown();
+            fd.unmarkdown();
         }
         toggleClass(this, "btn-primary", show);
     });

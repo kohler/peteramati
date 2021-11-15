@@ -1,6 +1,6 @@
 <?php
 // psetview.php -- CS61-monster helper class for pset view
-// Peteramati is Copyright (c) 2006-2020 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class PsetView {
@@ -82,6 +82,7 @@ class PsetView {
 
     /** @var int */
     private $_diff_tabwidth;
+    /** @var ?LineNotesOrder */
     private $_diff_lnorder;
 
     static private $forced_commitat = 0;
@@ -1608,7 +1609,7 @@ class PsetView {
                 } else if ($expect_context
                            && $i + 1 < $nlines
                            && strpos($lines[$i + 1], "^") !== false) {
-                    $text .= $s . "\n" . $lines[$i + 1] . "\n";
+                    $text .= "{$s}\n{$lines[$i+1]}\n";
                     ++$i;
                     $in_instantiation = 0;
                 } else {
@@ -1948,15 +1949,13 @@ class PsetView {
         assert(!$expand || $dinfo->loaded);
         $only_content = !!($args["only_content"] ?? false);
         $no_heading = ($args["no_heading"] ?? false) || $only_content;
-        $id_by_user = !!($args["id_by_user"] ?? false);
         $no_grades = ($args["only_diff"] ?? false) || $only_content;
         $hide_left = ($args["hide_left"] ?? false) && !$only_content && !$dinfo->removed;
 
-        $fileid = html_id_encode($file);
-        if ($id_by_user) {
-            $fileid = html_id_encode($this->user->username) . "-" . $fileid;
+        $tabid = "F" . html_id_encode($file);
+        if ($this->conf->multiuser_page) {
+            $tabid = "U" . html_id_encode($this->user->username) . "/{$tabid}";
         }
-        $tabid = "F_" . $fileid;
         $linenotes = $lnorder->file($file);
         if ($this->can_view_note_authors()) {
             $this->conf->stash_hotcrp_pc($this->viewer);
@@ -2022,7 +2021,8 @@ class PsetView {
 
         if (!$no_heading) {
             echo '<div class="pa-dg pa-with-fixed">',
-                '<h3 class="pa-fileref" data-pa-fileid="', $tabid, '"><a class="qq ui pa-diff-unfold" href=""><span class="foldarrow">',
+                // NB Javascript depend on `h3 > a:first-child[href=#FILEID]`
+                '<h3 class="pa-fileref"><a class="qq ui pa-diff-unfold" href="#', $tabid, '"><span class="foldarrow">',
                 ($expand && $dinfo->loaded ? "&#x25BC;" : "&#x25B6;"),
                 "</span>";
             if ($args["diffcontext"] ?? false) {
@@ -2047,7 +2047,7 @@ class PsetView {
             echo '</h3>';
         }
 
-        echo '<div id="', $tabid, '" class="pa-filediff pa-dg need-pa-observe-diff';
+        echo '<div id="', $tabid, '" class="pa-filediff pa-dg';
         if ($hide_left) {
             echo " pa-hide-left";
         }
@@ -2074,10 +2074,6 @@ class PsetView {
         }
         echo '"';
 
-        if ($id_by_user) {
-            echo ' data-pa-file-user="', htmlspecialchars($this->user->username), '"';
-        }
-        echo ' data-pa-file="', htmlspecialchars($file), '"';
         if ($this->conf->default_format) {
             echo ' data-default-format="', $this->conf->default_format, '"';
         }
@@ -2089,7 +2085,7 @@ class PsetView {
             echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
                 '</div><div class="pa-dg">';
         }
-        $curanno = new PsetViewAnnoState($file, $fileid);
+        $curanno = new PsetViewAnnoState($file, $tabid);
         foreach ($dinfo as $l) {
             $this->echo_line_diff($l, $linenotes, $lineanno, $curanno, $dinfo);
         }
@@ -2109,7 +2105,7 @@ class PsetView {
             $this->need_format = false;
         }
         if (!$only_content && $hide_left && $dinfo->markdown) {
-            echo '<script>$pa.filediff(document.getElementById("', $tabid, '")).markdown()</script>';
+            echo '<script>$pa.filediff_closest(document.getElementById("', $tabid, '")).markdown()</script>';
         }
     }
 
@@ -2165,20 +2161,20 @@ class PsetView {
 
         $ak = $bk = "";
         if ($linenotes && $aln && isset($linenotes[$aln])) {
-            $ak = ' id="L' . $aln . '_' . $curanno->fileid . '"';
+            $ak = " id=\"L{$aln}{$curanno->diffid}\"";
         }
         if ($linenotes && $bln && isset($linenotes[$bln])) {
-            $bk = ' id="L' . $bln . '_' . $curanno->fileid . '"';
+            $bk = " id=\"L{$bln}{$curanno->diffid}\"";
         }
 
         if (!$x[2] && !$x[3]) {
             $x[2] = $x[3] = "...";
         }
         if ($x[2]) {
-            $ak .= ' data-landmark="' . $x[2] . '"';
+            $ak .= " data-landmark=\"{$x[2]}\"";
         }
         if ($x[3]) {
-            $bk .= ' data-landmark="' . $x[3] . '"';
+            $bk .= " data-landmark=\"{$x[3]}\"";
         }
 
         $nx = null;
@@ -2243,7 +2239,7 @@ class PsetView {
         $links = array();
         $nnote = $this->_diff_lnorder->get_next($note->file, $note->lineid);
         if ($nnote) {
-            $links[] = '<a href="#L' . $nnote->lineid . '_'
+            $links[] = "<a href=\"#L{$nnote->lineid}F"
                 . html_id_encode($nnote->file) . '">Next &gt;</a>';
         } else {
             $links[] = '<a href="#">Top</a>';
@@ -2326,14 +2322,14 @@ class PsetViewAnnoState {
     /** @var string */
     public $file;
     /** @var string */
-    public $fileid;
+    public $diffid;
     /** @var ?list<GradeEntryConfig> */
     public $grade_first;
 
     /** @param string $file
-     * @param string $fileid */
-    function __construct($file, $fileid) {
+     * @param string $diffid */
+    function __construct($file, $diffid) {
         $this->file = $file;
-        $this->fileid = $fileid;
+        $this->diffid = $diffid;
     }
 }

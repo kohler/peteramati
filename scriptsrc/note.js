@@ -8,7 +8,7 @@ import { hoturl_gradeapi } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { render_text } from "./render.js";
 import { text_eq } from "./utils.js";
-import { Linediff } from "./diff.js";
+import { Filediff, Linediff } from "./diff.js";
 
 
 export class Note {
@@ -22,8 +22,7 @@ export class Note {
     }
 
     get file() {
-        const e = this.element || this.source;
-        return e.closest(".pa-filediff").getAttribute("data-pa-file");
+        return Filediff.closest(this.element || this.source).file;
     }
 
     get lineid() {

@@ -348,10 +348,4 @@ class RunnerState {
 
         return $answer;
     }
-
-    function cleanup() {
-        $runlog = new RunLogger($this->repo(), $this->pset());
-        unlink($runlog->pid_file());
-        @unlink($runlog->job_prefix($this->checkt) . ".in");
-    }
 }

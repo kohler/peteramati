@@ -2,7 +2,6 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { html_id_encode } from "./encoders.js";
 import { sprintf } from "./utils.js";
 import { hasClass } from "./ui.js";
 import { render_text } from "./render.js";
@@ -235,17 +234,17 @@ export function render_terminal(container, string, options) {
             styles = ansi_combine(styles, m[1]);
             file = m[2];
         }
-        let filematch = Filediff.find(file);
+        let filematch = Filediff.by_file(file);
         if (!filematch && options && options.directory) {
             file = options.directory + file;
-            filematch = Filediff.find(file);
+            filematch = Filediff.by_file(file);
         }
         if (filematch) {
             if (prefix.length) {
                 addlinepart(node, prefix);
             }
-            var anchor = "Lb" + line + "_" + html_id_encode(file);
-            var a = $("<a href=\"#" + anchor + "\" class=\"uu pa-goto\"></a>");
+            var anchor = "Lb".concat(line, filematch.element.id);
+            var a = $("<a href=\"#".concat(anchor, "\" class=\"uu pa-goto\"></a>"));
             a.text(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;

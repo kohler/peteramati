@@ -93,6 +93,9 @@ class Conf {
     public $validate_timeout;
     public $validate_overall_timeout;
 
+    /** @var bool
+     * @readonly */
+    public $multiuser_page = false;
     /** @var bool */
     private $_header_printed = false;
     /** @var ?list<array{string,string}> */
@@ -1391,6 +1394,12 @@ class Conf {
     }
 
 
+    /** @suppress */
+    function set_multiuser_page() {
+        assert(!$this->_header_printed);
+        $this->multiuser_page = true;
+    }
+
     function cacheableImage($name, $alt, $title = null, $class = null, $style = null) {
         $t = "<img src=\"" . Navigation::siteurl() . "images/$name\" alt=\"$alt\"";
         if ($title)
@@ -1847,12 +1856,15 @@ class Conf {
 
         // <body>
         echo "</head>\n<body", ($id ? " id=\"$id\"" : "");
-        if (($options["body_class"] ?? null) || $this->_active_list) {
-            echo ' class="', $options["body_class"] ?? "";
-            if ($this->_active_list) {
-                echo isset($options["body_class"]) ? " " : "", "has-hotlist";
-            }
-            echo '"';
+        $class = $options["body_class"] ?? "";
+        if ($this->multiuser_page) {
+            $class = $class === "" ? "pa-multiuser" : "$class pa-multiuser";
+        }
+        if ($this->_active_list) {
+            $class = $class === "" ? "has-hotlist" : "$class has-hotlist";
+        }
+        if ($class !== "") {
+            echo ' class="', $class, '"';
         }
         if ($this->_active_list) {
             echo ' data-hotlist="', htmlspecialchars($this->_active_list->listid), '"';

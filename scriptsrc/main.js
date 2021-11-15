@@ -576,55 +576,6 @@ handle_ui.on("pa-signin-radio", function () {
 });
 
 
-/*
-var pa_observe_diff = (function () {
-var observers = new WeakMap;
-function make_observer_fn(ds) {
-    var tops = [], top = null;
-    return function (entries) {
-        for (var i = 0; i !== entries.length; ++i) {
-            var e = entries[i], p = tops.indexOf(e.target);
-            if (e.isIntersecting && p < 0) {
-                tops.push(e.target);
-            } else if (!e.isIntersecting && p >= 0) {
-                tops.splice(p, 1);
-            }
-        }
-        tops.sort(function (a, b) {
-            return a.offsetTop < b.offsetTop ? -1 : 1;
-        });
-        if (tops.length && tops[0] !== top) {
-            top = tops[0];
-            var e = top, t = top.getAttribute("data-pa-file");
-            while (e && (e = e.parentElement.closest(".pa-diffcontext"))) {
-                if (e.hasAttribute("data-pa-diffcontext"))
-                    t = e.getAttribute("data-pa-diffcontext") + "/" + t;
-                else
-                    t = e.getAttribute("data-pa-user") + "/" + t;
-            }
-            $(ds).find(".pa-diffbar-top").removeClass("hidden").text(t);
-        }
-    };
-}
-return function () {
-    if (!this || this === window || this === document) {
-        $(".need-pa-observe-diff").each(pa_observe_diff);
-    } else {
-        removeClass(this, "need-pa-observe-diff");
-        var ds = this.closest(".pa-diffset");
-        if (ds && window.IntersectionObserver) {
-            if (!observers.has(ds)) {
-                observers.set(ds, new IntersectionObserver(make_observer_fn(ds), {threshold: 0.01}));
-            }
-            observers.get(ds).observe(this);
-        }
-    }
-};
-})();
-$(pa_observe_diff);
-*/
-
-
 handle_ui.on("pa-gradevalue", function () {
     var f = this.closest("form"), ge, self = this;
     if (f && hasClass(f, "pa-grade")) {
@@ -2512,7 +2463,7 @@ handle_ui.on("js-multiresolveflag", function () {
 window.$pa = {
     beforeunload: pa_beforeunload,
     checklatest: pa_checklatest,
-    filediff: Filediff.find,
+    filediff_closest: Filediff.closest,
     gradeentry_closest: GradeEntry.closest,
     fold: fold,
     grgraph: grgraph,

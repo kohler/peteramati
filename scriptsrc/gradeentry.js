@@ -246,11 +246,11 @@ export class GradeEntry {
         if (gl && hasClass(gl, "want-landmark-links")) {
             let want_gbr = "";
             const m = /^(.*):(\d+)$/.exec(this.landmark);
-            if (m && Filediff.find(m[1])) {
+            if (m && Filediff.by_file(m[1])) {
                 const pi = pde.closest(".pa-psetinfo"),
                     directory = pi.getAttribute("data-pa-directory") || "",
                     filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
-                want_gbr = '@<a href="#La'.concat(m[2], '_', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
+                want_gbr = '@<a href="#La'.concat(m[2], 'F', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
             }
             const $pgbr = $(pde).find(".pa-gradeboxref");
             if (want_gbr === "") {
