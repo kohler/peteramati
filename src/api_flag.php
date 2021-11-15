@@ -12,7 +12,7 @@ class Flag_API {
      * @param int $when
      * @return bool */
     static function update_flag(PsetView $info, $flagid, $create, $uid, $reason, $resolve, $when) {
-        $flags = (array) $info->current_jnote("flags");
+        $flags = (array) $info->commit_jnote("flags");
         if (!$create && !isset($flags[$flagid])) {
             return false;
         }
@@ -28,7 +28,7 @@ class Flag_API {
         if ($resolve && !($flag["resolved"] ?? false)) {
             $flag["resolved"] = [$when, $uid];
         }
-        $info->update_current_notes(["flags" => [$flagid => $flag]]);
+        $info->update_commit_notes(["flags" => [$flagid => $flag]]);
         return true;
     }
 
@@ -46,7 +46,7 @@ class Flag_API {
             self::update_flag($info, $create ? "t$when" : $flagid, $create,
                               $user->contactId, trim($qreq->reason ?? ""), !!$qreq->resolve, $when);
         }
-        return ["ok" => true, "flags" => $info->current_jnote("flags")];
+        return ["ok" => true, "flags" => $info->commit_jnote("flags")];
     }
 
     static function multiresolve(Contact $viewer, Qrequest $qreq, APIData $api) {
@@ -102,7 +102,7 @@ class Flag_API {
                 continue;
             }
             $info->force_set_hash($commit->hash);
-            $flags = (array) $info->current_jnote("flags");
+            $flags = (array) $info->commit_jnote("flags");
             if (isset($flags[$flag->flagid])) {
                 $work[] = [$info, $flag];
             } else {

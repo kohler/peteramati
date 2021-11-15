@@ -687,7 +687,7 @@ if ($Pset->gitless) {
         && !$Info->is_handout_commit()) {
         $runnerbuttons[] = '<div class="g"></div>';
         $all_resolved = true;
-        foreach ($Info->current_jnote("flags") ?? [] as $k => $v) {
+        foreach ($Info->commit_jnote("flags") ?? [] as $k => $v) {
             $resolved = $v->resolved ?? false;
             $all_resolved = $all_resolved && $resolved;
             $conversation = "";

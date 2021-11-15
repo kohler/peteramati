@@ -37,7 +37,7 @@ function _update_schema_regrade_flags(Conf $conf) {
             $info = PsetView::make($pset, $u, $u);
             $info->force_set_hash($row->hash);
             $update = ["flags" => ["t" . $row->requested_at => ["uid" => $u->contactId]]];
-            $info->update_current_notes($update);
+            $info->update_commit_notes($update);
         }
     }
     Dbl::free($result);

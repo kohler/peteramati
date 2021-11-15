@@ -2584,7 +2584,7 @@ class Conf {
         } else if ($need_hash) {
             $api->commit = $this->check_api_hash($api->hash, $api);
             if (!$api->commit) {
-                return ["ok" => false, "error" => ($api->hash ? "Missing commit." : "Disconnected commit.")];
+                return ["ok" => false, "error" => $api->hash ? "Missing commit." : "Disconnected commit."];
             }
         }
         if (($req = $uf->require ?? [])) {

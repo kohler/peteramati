@@ -54,7 +54,7 @@ class Grade_API {
             if (array_key_exists($k, $g)) {
                 $gv = $g[$k];
                 if (!$has_agv
-                    && ($notes = $info->current_jnotes())
+                    && ($notes = $info->grade_jnotes())
                     && isset($notes->autogrades)) {
                     $agv = $notes->autogrades->$k ?? null;
                 }
