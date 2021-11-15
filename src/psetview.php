@@ -2098,15 +2098,11 @@ class PsetView {
         if ($dinfo->highlight) {
             echo " need-highlight";
         }
-        echo '"';
 
-        if ($this->conf->default_format) {
-            echo ' data-default-format="', $this->conf->default_format, '"';
-        }
         if ($dinfo->language) {
-            echo ' data-language="', htmlspecialchars($dinfo->language), '"';
+            echo '" data-language="', htmlspecialchars($dinfo->language);
         }
-        echo ">"; // end div#F_...
+        echo '">'; // end div#F_...
         if ($has_grade_range) {
             echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
                 '</div><div class="pa-dg">';

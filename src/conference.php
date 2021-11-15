@@ -1869,6 +1869,9 @@ class Conf {
         if ($this->_active_list) {
             echo ' data-hotlist="', htmlspecialchars($this->_active_list->listid), '"';
         }
+        if ($this->default_format) {
+            echo ' data-default-format="', $this->default_format, '"';
+        }
         echo " onload=\"\$pa.onload()\" data-now=\"", Conf::$now, "\">\n";
 
         // jQuery

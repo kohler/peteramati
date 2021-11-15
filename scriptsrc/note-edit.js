@@ -39,11 +39,12 @@ function render_form($tr, note, transition) {
         $content.slideUp(80).queue(function () { $content.remove(); });
     }
 
-    let gi = GradeSheet.closest(curline.element);
-    var format = note ? note.format : null;
-    if (format == null)
-        format = $tr.closest(".pa-filediff").attr("data-default-format");
-    var t = '<form method="post" action="' +
+    let gi = GradeSheet.closest(curline.element),
+        format = note ? note.format : null;
+    if (format == null) {
+        format = document.body.getAttribute("data-default-format");
+    }
+    let t = '<form method="post" action="' +
         escape_entities(hoturl_gradeapi(gi.element, "=api/linenote", {file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})) +
         '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">' +
         '<textarea class="pa-note-entry" name="note"></textarea>' +

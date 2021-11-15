@@ -225,7 +225,7 @@ export class Note {
         }
         data.format = this.format;
         if (data.format == null) {
-            data.format = fd.getAttribute("data-default-format");
+            data.format = document.body.getAttribute("data-default-format");
         }
 
         if (grb) {
