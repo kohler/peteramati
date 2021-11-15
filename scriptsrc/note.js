@@ -110,7 +110,15 @@ export class Note {
             const source = new Linediff(this.source),
                 lineid = source.note_lineid,
                 insertion = source.upper_bound(lineid);
-            this.element = $('<div class="pa-dl pa-gw" data-landmark="'.concat(lineid, '"><div class="pa-notebox"></div></div>'))[0];
+            this.element = document.createElement("div");
+            this.element.className = "pa-dl pa-gw";
+            this.element.setAttribute("data-landmark", lineid);
+            if (this.version || this.text !== "") {
+                this.element.setAttribute("data-pa-note", JSON.stringify([this.iscomment, this.text, this.users, this.version, this.format]));
+            }
+            let box = document.createElement("div");
+            box.className = "pa-notebox";
+            this.element.appendChild(box);
             this.source.parentElement.insertBefore(this.element, insertion ? insertion.element : null);
         }
         return this.element;
@@ -158,7 +166,7 @@ export class Note {
             const authorids = $.isArray(this.users) ? this.users : [this.users],
                 authors = [];
             for (let i in authorids) {
-                const p = siteinfo.pc[authorids[i]];
+                const p = siteinfo.pc ? siteinfo.pc[authorids[i]] : null;
                 if (p) {
                     if (p.nick) {
                         authors.push(p.nick);

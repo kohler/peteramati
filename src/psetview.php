@@ -510,7 +510,7 @@ class PsetView {
 
 
     /** @return ?object */
-    function current_jnotes() {
+    private function current_jnotes() {
         if ($this->pset->gitless) {
             return $this->user_jnotes();
         } else {
@@ -518,21 +518,21 @@ class PsetView {
         }
     }
 
-    /** @param non-empty-string $key */
-    function current_jnote($key) {
-        $xn = $this->current_jnotes();
-        return $xn ? $xn->$key ?? null : null;
-    }
 
     /** @param string $file
      * @param string $lineid
      * @return LineNote */
-    function current_line_note($file, $lineid) {
-        $n1 = $this->current_jnotes();
-        $n2 = $n1 ? $n1->linenotes ?? null : null;
-        $n3 = $n2 ? $n2->$file ?? null : null;
-        $ln = $n3 ? $n3->$lineid ?? null : null;
-        if ($ln) {
+    function line_note($file, $lineid) {
+        if ($this->pset->gitless_grades
+            && str_starts_with($file, '/g/')) {
+            $n1 = $this->user_jnotes();
+        } else {
+            $n1 = $this->commit_jnotes();
+        }
+        if ($n1
+            && ($n2 = $n1->linenotes ?? null)
+            && ($n3 = $n2->$file ?? null)
+            && ($ln = $n3->$lineid ?? null)) {
             return LineNote::make_json($file, $lineid, $ln);
         } else {
             return new LineNote($file, $lineid);
@@ -1048,15 +1048,6 @@ class PsetView {
 
 
     /** @param array $updates */
-    function update_current_notes($updates) {
-        if ($this->pset->gitless) {
-            $this->update_user_notes($updates);
-        } else {
-            $this->update_commit_notes($updates);
-        }
-    }
-
-    /** @param array $updates */
     function update_grade_notes($updates) {
         if ($this->pset->gitless_grades) {
             $this->update_user_notes($updates);
@@ -1303,11 +1294,6 @@ class PsetView {
     function viewer_is_grader() {
         return $this->viewer->contactId > 0
             && $this->viewer->contactId === $this->gradercid();
-    }
-
-    /** @return bool */
-    function can_edit_line_note($file, $lineid) {
-        return $this->pc_view;
     }
 
 
@@ -1717,6 +1703,7 @@ class PsetView {
         $this->ensure_grades();
         if ($this->_g !== null || $this->is_grading_commit()) {
             $this->grade_export_grades($gexp);
+            $this->grade_export_linenotes($gexp);
         }
         if (!($flags & self::GRADEJSON_NO_FORMULAS)
             && $this->pset->has_formula) {
@@ -1761,6 +1748,16 @@ class PsetView {
         }
     }
 
+    function grade_export_linenotes(GradeExport $gexp) {
+        if ($this->pset->has_answers
+            && ($this->pset->gitless_grades
+                ? ($xln = $this->user_jnote("linenotes"))
+                : $this->hash() && ($xln = $this->commit_jnote("linenotes")))) {
+            $gexp->lnorder = $this->empty_line_notes();
+            $gexp->lnorder->add_json_map($xln);
+        }
+    }
+
     function grade_export_formulas(GradeExport $gexp) {
         if ($this->pset->has_formula) {
             foreach ($gexp->value_entries() as $i => $ge) {
@@ -1800,17 +1797,23 @@ class PsetView {
 
 
     /** @return LineNotesOrder */
-    function viewable_line_notes() {
-        if ($this->viewer->can_view_comments($this->pset)) {
-            return new LineNotesOrder($this->commit_jnote("linenotes"), $this->can_view_grades(), $this->pc_view);
-        } else {
-            return $this->empty_line_notes();
-        }
+    function empty_line_notes() {
+        return new LineNotesOrder($this->can_view_grades(), $this->can_view_note_authors());
     }
 
     /** @return LineNotesOrder */
-    function empty_line_notes() {
-        return new LineNotesOrder(null, $this->can_view_grades(), $this->pc_view);
+    function viewable_line_notes() {
+        $ln = $this->empty_line_notes();
+        if ($this->viewer->can_view_comments($this->pset)) {
+            if ($this->hash() !== null) {
+                $ln->add_json_map($this->commit_jnote("linenotes") ?? []);
+            }
+            if ($this->pset->has_answers
+                && $this->pset->gitless_grades) {
+                $ln->add_json_map($this->user_jnote("linenotes") ?? []);
+            }
+        }
+        return $ln;
     }
 
     /** @param float $prio */
@@ -2229,7 +2232,7 @@ class PsetView {
             echo ' hidden';
         }
         echo '" data-landmark="', $note->lineid,
-            '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render_json($this->can_view_note_authors()))),
+            '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render())),
             '"><div class="pa-notebox">';
         if ((string) $note->text === "") {
             echo '</div></div>';
@@ -2237,7 +2240,7 @@ class PsetView {
         }
         echo '<div class="pa-notecontent">';
         $links = array();
-        $nnote = $this->_diff_lnorder->get_next($note->file, $note->lineid);
+        $nnote = $this->_diff_lnorder->get_next($note);
         if ($nnote) {
             $links[] = "<a href=\"#L{$nnote->lineid}F"
                 . html_id_encode($nnote->file) . '">Next &gt;</a>';

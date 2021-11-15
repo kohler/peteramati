@@ -206,13 +206,13 @@ class DiffInfo implements Iterator {
         $l = 0;
         $r = $this->_diffsz;
         while ($l < $r) {
-            $m = $l + ((($r - $l) >> 2) & ~3);
+            $m0 = $m = $l + ((($r - $l) >> 2) & ~3);
             while ($m + 4 < $r && $this->_diff[$m + $off] === null) {
                 $m += 4;
             }
             $ln = $this->_diff[$m + $off];
             if ($ln === null || $ln >= $line) {
-                $r = $m;
+                $r = $m0;
             } else {
                 $l = $m + 4;
             }
@@ -233,6 +233,32 @@ class DiffInfo implements Iterator {
         assert($lineid[0] === "a" || $lineid[0] === "b");
         $l = $this->line_lower_bound($lineid[0] === "a" ? 1 : 2, (int) substr($lineid, 1));
         return $l < $this->_diffsz && $this->_diff[$l] !== "@";
+    }
+
+    /** @param string $a
+     * @param string $b
+     * @return int */
+    function compare_lineid($a, $b) {
+        $oa = $a[0] === "a" ? 1 : 2;
+        $ob = $b[0] === "a" ? 1 : 2;
+        $na = (int) substr($a, 1);
+        $nb = (int) substr($b, 1);
+        if ($oa === $ob) {
+            return $na - $nb;
+        } else {
+            $la = $this->line_lower_bound($oa, $na);
+            $lb = $this->line_lower_bound($ob, $nb);
+            if ($la !== $lb) {
+                return $la < $lb ? -1 : 1;
+            } else if ($la < $this->_diffsz) {
+                $da = $na - $this->_diff[$oa];
+                $db = $nb - $this->_diff[$ob];
+                if ($da !== $db) {
+                    return $da < $db ? -1 : 1;
+                }
+            }
+            return $ob - $oa;
+        }
     }
 
     private function fix_context($pos) {

@@ -1394,7 +1394,7 @@ class Conf {
     }
 
 
-    /** @suppress */
+    /** @suppress PhanAccessReadOnlyProperty */
     function set_multiuser_page() {
         assert(!$this->_header_printed);
         $this->multiuser_page = true;
@@ -2624,7 +2624,7 @@ class Conf {
             "gradestatistics" => "3 GradeStatistics_API::run",
             "jserror" => "1 JSError_API::jserror",
             "latestcommit" => "1 Repo_API::latestcommit",
-            "linenote" => "15 Grade_API::linenote",
+            "linenote" => "3 Grade_API::linenote",
             "multigrade" => "3 Grade_API::multigrade",
             "multiresolveflag" => "0 Flag_API::multiresolve",
             "repositories" => "17 Repo_API::user_repositories"

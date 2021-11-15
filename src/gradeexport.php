@@ -41,6 +41,8 @@ class GradeExport implements JsonSerializable {
     public $editable;
     /** @var ?bool */
     public $editable_answers;
+    /** @var ?LineNotesOrder */
+    public $lnorder;
     /** @var ?list<GradeEntryConfig> */
     private $visible_values;
     /** @var ?list<int> */
@@ -193,6 +195,14 @@ class GradeExport implements JsonSerializable {
             }
             if ($this->editable_answers !== null) {
                 $r["editable_answers"] = $this->editable_answers;
+            }
+            if ($this->lnorder !== null) {
+                foreach ($this->value_entries() as $ge) {
+                    foreach ($this->lnorder->file("/g/{$ge->key}") as $lineid => $note) {
+                        if (($j = $note->render()))
+                            $r["linenotes"]["/g/{$ge->key}"][$lineid] = $j;
+                    }
+                }
             }
         }
         if (!$this->slice || $this->visible_values !== null) {

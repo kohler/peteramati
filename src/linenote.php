@@ -1,4 +1,7 @@
 <?php
+// linenote.php -- CS61-monster class representing a line note
+// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
+// See LICENSE for open-source distribution terms
 
 class LineNote implements JsonUpdatable {
     /** @var string */
@@ -13,7 +16,14 @@ class LineNote implements JsonUpdatable {
     public $version;
     /** @var ?int */
     public $format;
+    /** @var list<int> */
     public $users = [];
+
+    // set by LineNotesOrder
+    /** @var ?int */
+    public $seqpos;
+    /** @var ?bool */
+    public $view_authors;
 
     /** @param string $file
      * @param string $lineid */
@@ -76,29 +86,32 @@ class LineNote implements JsonUpdatable {
         return true;
     }
 
+    /** @return int|non-empty-list */
     function jsonSerialize() {
         if ((string) $this->text === "") {
             return $this->version;
         } else {
-            $j = [$this->iscomment, $this->text,
-                  count($this->users) === 1 ? $this->users[0] : $this->users];
-            if ($this->version || $this->format !== null) {
-                $j[] = $this->version;
-            }
+            $u = count($this->users) === 1 ? $this->users[0] : $this->users;
             if ($this->format !== null) {
-                $j[] = $this->format;
+                return [$this->iscomment, $this->text, $u, $this->version, $this->format];
+            } else if ($this->version) {
+                return [$this->iscomment, $this->text, $u, $this->version];
+            } else {
+                return [$this->iscomment, $this->text, $u];
             }
-            return $j;
         }
     }
 
-    function render_json($can_view_authors) {
-        if (!$can_view_authors) {
-            $j = [$this->iscomment, $this->text];
-            if ($this->format !== null) {
-                array_push($j, null, null, $this->format);
+    /** @return null|int|non-empty-list */
+    function render() {
+        if ($this->view_authors === false) {
+            if ((string) $this->text === "") {
+                return null;
+            } else if ($this->format !== null) {
+                return [$this->iscomment, $this->text, null, null, $this->format];
+            } else {
+                return [$this->iscomment, $this->text];
             }
-            return $j;
         } else {
             return $this->jsonSerialize();
         }

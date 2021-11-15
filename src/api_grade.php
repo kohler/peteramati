@@ -60,6 +60,9 @@ class Grade_API {
                 }
                 if ($ge->allow_edit($gv, $oldgv, $agv, $info)) {
                     $v["grades"][$k] = $gv ?? (isset($agv) ? false : null);
+                    if ($ge->answer) {
+                        $v["linenotes"]["/g/{$ge->key}"] = null;
+                    }
                 } else {
                     $errf[$k] = $ge->parse_value_error();
                 }
@@ -251,26 +254,45 @@ class Grade_API {
     }
 
     /** @param PsetView $info
-     * @param Contact $user */
-    static private function apply_linenote($info, $user, $apply, &$lnotes) {
+     * @param Contact $user
+     * @return array{ok:false,error:string}|array{ok:true,note:LineNote} */
+    static private function apply_linenote($info, $user, $apply) {
+        // check filename and line number
         if (!isset($apply->file)
             || !isset($apply->line)
             || !$apply->file
-            || !$apply->line
-            || !preg_match('/\A[ab]\d+\z/', $apply->line)) {
+            || strlen($apply->line) < 2
+            || ($apply->line[0] !== "a" && $apply->line[0] !== "b")
+            || !ctype_digit(substr($apply->line, 1))) {
             return ["ok" => false, "error" => "Invalid request."];
-        } else if (!$info->can_edit_line_note($apply->file, $apply->line)) {
-            return ["ok" => false, "error" => "Permission error."];
-        } else if ($info->is_handout_commit()) {
-            return ["ok" => false, "error" => "This is a handout commit."];
         }
 
-        $note = $info->current_line_note($apply->file, $apply->line);
+        // check permissions and filename
+        if (!$info->pc_view) {
+            return ["ok" => false, "error" => "Permission error."];
+        } else if (str_starts_with($apply->file, "/g/")) {
+            if (!($ge = $info->pset->grades[substr($apply->file, 3)])
+                || !$ge->answer) {
+                return ["ok" => false, "error" => "No such grade."];
+            }
+        } else if (str_starts_with($apply->file, "/")) {
+            return ["ok" => false, "error" => "Invalid request."];
+        } else if (!$info->repo) {
+            return ["ok" => false, "error" => "Missing repository."];
+        } else if ($info->hash() === null) {
+            return ["ok" => false, "error" => "Missing commit."];
+        } else if ($info->is_handout_commit()) {
+            return ["ok" => false, "error" => "Refusing to leave note on handout commit."];
+        }
+
+        // find or create note
+        $note = $info->line_note($apply->file, $apply->line);
         if (isset($apply->oldversion)
             && $apply->oldversion != +$note->version) {
             return ["ok" => false, "error" => "Edit conflict, you need to reload."];
         }
 
+        // modify note
         if (array_search($user->contactId, $note->users) === false) {
             $note->users[] = $user->contactId;
         }
@@ -280,51 +302,59 @@ class Grade_API {
         if (isset($apply->format) && ctype_digit($apply->format)) {
             $note->format = intval($apply->format);
         }
-
-        if (!isset($lnotes[$apply->file])) {
-            $lnotes[$apply->file] = [];
-        }
-        $lnotes[$apply->file][$apply->line] = $note;
-        return false;
+        return ["ok" => true, "note" => $note];
     }
 
     static function linenote(Contact $user, Qrequest $qreq, APIData $api) {
-        $info = PsetView::make($api->pset, $api->user, $user);
-        $info->set_commit($api->commit);
         if ($qreq->line && ctype_digit($qreq->line)) {
             $qreq->line = "b" . $qreq->line;
         }
-        $lnotes = [];
 
+        // set up info, repo, commit
+        $info = PsetView::make($api->pset, $api->user, $user);
+        assert($api->repo === null || $api->repo === $info->repo);
+        $api->repo = $info->repo;
+        assert($info->repo !== null || $api->commit === null);
+        if ($info->repo
+            && $api->hash
+            && !$api->commit
+            && !($api->commit = $info->conf->check_api_hash($api->hash, $api))) {
+            return ["ok" => false, "error" => "Disconnected commit."];
+        }
+        if ($api->commit) {
+            $info->set_commit($api->commit);
+        } else if (!$api->pset->has_answers) {
+            return ["ok" => false, "error" => "Missing commit."];
+        }
+
+        // apply line notes
         if ($qreq->method() === "POST") {
-            if (($ans = self::apply_linenote($info, $user, $qreq, $lnotes))) {
+            $ans = self::apply_linenote($info, $user, $qreq);
+            if (!$ans["ok"]) {
                 return $ans;
             }
-            $info->update_current_notes(["linenotes" => $lnotes]);
+            $ln = $ans["note"];
+            if ($info->pset->gitless_grades
+                && str_starts_with($ln->file, "/")) {
+                $info->update_user_notes(["linenotes" => [$ln->file => [$ln->lineid => $ln]]]);
+            } else {
+                $info->update_commit_notes(["linenotes" => [$ln->file => [$ln->lineid => $ln]]]);
+            }
         }
 
         if (!$user->can_view_comments($api->pset, $info)) {
             return ["ok" => false, "error" => "Permission error."];
         }
-        $can_view_grades = $info->can_view_grades();
-        $can_view_note_authors = $info->can_view_note_authors();
+
         $notes = [];
-        foreach ((array) $info->current_jnote("linenotes") as $file => $linemap) {
-            if (($qreq->file && $file !== $qreq->file)
-                || ($lnotes && !isset($lnotes[$file]))) {
-                continue;
-            }
-            $filenotes = [];
-            foreach ((array) $linemap as $lineid => $note) {
-                $note = LineNote::make_json($file, $lineid, $note);
-                if (($can_view_grades || $note->iscomment)
-                    && (!$qreq->line || $qreq->line === $lineid)
-                    && (!$lnotes || isset($lnotes[$file][$lineid]))) {
-                    $filenotes[$lineid] = $note->render_json($can_view_note_authors);
+        $lnorder = $info->viewable_line_notes();
+        foreach ($lnorder->fileorder() as $file => $order) {
+            if (!$qreq->file || $file === $qreq->file) {
+                foreach ($lnorder->file($file) as $lineid => $note) {
+                    if ((!$qreq->line || $lineid === $qreq->line)
+                        && ($j = $note->render()))
+                        $notes[$file][$lineid] = $j;
                 }
-            }
-            if (!empty($filenotes)) {
-                $notes[$file] = $filenotes;
             }
         }
         return ["ok" => true, "linenotes" => $notes];
