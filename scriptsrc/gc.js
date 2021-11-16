@@ -136,7 +136,7 @@ GradeClass.add("text", {
     },
     mount_edit: function (elt, id) {
         addClass(elt, "pa-textv");
-        return '<textarea class="uich pa-pv pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        return '<textarea class="uich pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     justify: "left",
     sort: "forward",
@@ -149,7 +149,7 @@ GradeClass.add("shorttext", {
         addClass(elt, "pa-gradevalue");
     },
     mount_edit: function (elt, id) {
-        return '<textarea class="uich pa-pv pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        return '<textarea class="uich pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     justify: "left",
     sort: "forward",

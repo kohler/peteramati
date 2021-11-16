@@ -28,7 +28,7 @@ GradeClass.add("markdown", {
     },
     mount_edit: function (elt, id) {
         addClass(elt, "pa-textv");
-        return '<p class="pa-preview-notice"><span>Markdown styling and LaTeX math supported · </span><a href="" class="ui js-toggle-gc-markdown-preview" tabindex="-1">Preview</a></p><textarea class="uich pa-pv pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        return '<p class="pa-preview-notice"><span>Markdown styling and LaTeX math supported · </span><a href="" class="ui js-toggle-gc-markdown-preview" tabindex="-1">Preview</a></p><textarea class="uich pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
     update_show: function (ve, v) {
         if (v == null || v === "") {

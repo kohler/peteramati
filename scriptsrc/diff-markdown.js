@@ -246,7 +246,7 @@ Filediff.define_method("markdown", function () {
         e = n;
     }
     // render to markdown
-    let dx = document.createElement("div"), d;
+    let dx = document.createElement("div"), d, lr;
     mdcontext = elt;
     dx.innerHTML = make_markdownit().render(l.join(""));
     mdcontext = null;
@@ -298,7 +298,7 @@ Filediff.define_method("markdown", function () {
             lp.className += klass === 2 ? " pa-gc" : " pa-gi";
         }
 
-        const lr = document.createElement("div");
+        lr = document.createElement("div");
         lr.className = drclass;
         if (d === dx.firstChild) {
             dx.removeChild(d);
@@ -312,6 +312,10 @@ Filediff.define_method("markdown", function () {
         lp.appendChild(lb);
         lp.appendChild(lr);
         elt.insertBefore(lp, e);
+    }
+
+    if (lr) {
+        addClass(lr, "pa-dr-last");
     }
     addClass(elt, "pa-markdown");
 });

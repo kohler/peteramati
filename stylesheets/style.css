@@ -2241,6 +2241,9 @@ td.mhcb {
 .pa-pv > p:last-child {
 	margin-bottom: 0;
 }
+.pa-dr-last > p:last-child {
+	margin-bottom: 0.25rem;
+}
 .pa-pv {
 	min-width: 168px;
 	width: calc(100% - 168px);
@@ -2303,6 +2306,9 @@ td.mhcb {
 }
 .pa-pv > textarea {
 	vertical-align: top;
+}
+.pa-textv {
+	align-self: flex-start;
 }
 .pa-textv > textarea {
 	width: 100%;
