@@ -1176,6 +1176,11 @@ class PsetView {
     }
 
     /** @return bool */
+    function can_view_score() {
+        return $this->pc_view || $this->user_can_view_score();
+    }
+
+    /** @return bool */
     function user_can_view_score() {
         if ($this->_user_can_view_score === null) {
             $this->set_user_can_view_grade();
