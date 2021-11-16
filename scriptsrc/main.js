@@ -764,7 +764,7 @@ function find_top_element_position($es) {
 function reset_top_element_position(tep) {
     if (tep) {
         const bottom = tep.element.getBoundingClientRect().bottom;
-        window.scrollBy(0, bottom - tep.bottom);
+        window.scrollBy(0, Math.ceil(bottom - tep.bottom));
     }
 }
 
@@ -778,6 +778,7 @@ handle_ui.on("pa-grade-toggle-description", function (event) {
         $(this).find(".pa-grade-toggle-description").toggleClass("btn-primary", !show);
     });
     reset_top_element_position(tep);
+    tooltip.erase();
 });
 
 handle_ui.on("pa-grade-toggle-markdown", function (event) {
@@ -801,6 +802,7 @@ handle_ui.on("pa-grade-toggle-markdown", function (event) {
         $(this).find(".pa-grade-toggle-markdown").toggleClass("btn-primary", show);
     });
     reset_top_element_position(tep);
+    tooltip.erase();
 });
 
 handle_ui.on("pa-grade-toggle-answer", function (event) {
@@ -820,6 +822,7 @@ handle_ui.on("pa-grade-toggle-answer", function (event) {
         $(this).find(".pa-grade-toggle-answer").toggleClass("btn-primary", mode !== 0);
     });
     reset_top_element_position(tep);
+    tooltip.erase();
 });
 
 function pa_resolve_gradelist() {
