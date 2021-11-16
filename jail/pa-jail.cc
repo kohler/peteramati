@@ -531,7 +531,7 @@ void mountslot::add_mountopt(const char* inopt) {
 }
 
 const char* mountslot::mount_data() const {
-    return data.empty() ? NULL : data.c_str();
+    return data.empty() ? nullptr : data.c_str();
 }
 
 static int mount_status = 0; // 0: add, 1: run pre-fork, 2: in child
@@ -609,7 +609,7 @@ static int populate_mount_table() {
 #if __APPLE__
 int mount(const char*, const char* target, const char* fstype,
           unsigned long flags, const void*) {
-    return ::mount(fstype, target, flags, NULL);
+    return ::mount(fstype, target, flags, nullptr);
 }
 
 int umount(const char* dir) {
@@ -762,7 +762,7 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
     pid_t child = fork();
     if (child == 0) {
         const char* args[6] = {
-            "/bin/cp", "-p", src.c_str(), dst.c_str(), NULL
+            "/bin/cp", "-p", src.c_str(), dst.c_str(), nullptr
         };
         execv("/bin/cp", (char**) args);
         exit(1);
@@ -1496,8 +1496,9 @@ static std::string absolute(const std::string& dir) {
     if (!dir.empty() && dir[0] == '/')
         return dir;
     char buf[BUFSIZ];
-    if (getcwd(buf, BUFSIZ - 1) == NULL)
+    if (getcwd(buf, BUFSIZ - 1) == nullptr) {
         perror_die("getcwd");
+    }
     char* endbuf = buf + strlen(buf);
     while (endbuf - buf > 1 && endbuf[-1] == '/')
         --endbuf;
@@ -1682,7 +1683,7 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
         while (struct passwd* pw = getpwent()) {
             std::string name;
             if (pw->pw_dir && strncmp(pw->pw_dir, "/home/", 6) == 0
-                && strchr(pw->pw_dir + 6, '/') == NULL) {
+                && strchr(pw->pw_dir + 6, '/') == nullptr) {
                 name = pw->pw_dir + 6;
             } else {
                 name = pw->pw_name;
@@ -2021,7 +2022,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         }
         --argc, ++argv;
     }
-    newenv_.push_back(NULL);
+    newenv_.push_back(nullptr);
 
     // create command
     if (!argc) {
@@ -2123,7 +2124,7 @@ int jailownerinfo::exec_go() {
     if (verbose) {
         fprintf(verbosefile, "mount --make-rslave /\n");
     }
-    if (mount("none", "/", NULL, MS_REC | MS_SLAVE, NULL) != 0) {
+    if (mount("none", "/", nullptr, MS_REC | MS_SLAVE, nullptr) != 0) {
         perror_die("mount --make-rslave /");
     }
 
@@ -2153,7 +2154,7 @@ int jailownerinfo::exec_go() {
 
     // create a pty
     int ptymaster = -1;
-    char* ptyslavename = NULL;
+    char* ptyslavename = nullptr;
     if (verbose) {
         fprintf(verbosefile, "su %s\nmake-pty\n", uid_to_name(owner_));
     }
@@ -2175,7 +2176,7 @@ int jailownerinfo::exec_go() {
         if (unlockpt(ptymaster) == -1) {
             perror_die("unlockpt");
         }
-        if ((ptyslavename = ptsname(ptymaster)) == NULL) {
+        if ((ptyslavename = ptsname(ptymaster)) == nullptr) {
             perror_die("ptsname");
         }
     }
@@ -2308,7 +2309,7 @@ void jailownerinfo::start_sigpipe() {
     sigemptyset(&mask);
     sigaddset(&mask, SIGCHLD);
     sigaddset(&mask, SIGTERM);
-    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
+    if (sigprocmask(SIG_BLOCK, &mask, nullptr) == -1) {
         perror_die("sigprocmask");
     }
     sigfd = signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
@@ -2327,8 +2328,8 @@ void jailownerinfo::start_sigpipe() {
     sa.sa_handler = sighandler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    sigaction(SIGCHLD, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGCHLD, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
 #endif
 
     if (inputfd_ > 0 || stdin_tty_) {
@@ -2566,7 +2567,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         // transfer data
         any = to_slave_.transfer_in(inputfd_) || any;
         if (to_slave_.head_ != to_slave_.tail_
-            && memmem(&to_slave_.buf_[to_slave_.head_], to_slave_.tail_ - to_slave_.head_, "\x1b\x03", 2) != NULL) {
+            && memmem(&to_slave_.buf_[to_slave_.head_], to_slave_.tail_ - to_slave_.head_, "\x1b\x03", 2) != nullptr) {
             exec_done(child, 128 + SIGTERM);
         }
         any = to_slave_.transfer_out(ptymaster) || any;
@@ -2665,43 +2666,43 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
 }
 
 static struct option longoptions_before[] = {
-    { "verbose", no_argument, NULL, 'V' },
-    { "dry-run", no_argument, NULL, 'n' },
-    { "help", no_argument, NULL, 'H' },
-    { NULL, 0, NULL, 0 }
+    { "verbose", no_argument, nullptr, 'V' },
+    { "dry-run", no_argument, nullptr, 'n' },
+    { "help", no_argument, nullptr, 'H' },
+    { nullptr, 0, nullptr, 0 }
 };
 
 #define ARG_ONLCR    1000
 #define ARG_NO_ONLCR 1001
 static struct option longoptions_run[] = {
-    { "verbose", no_argument, NULL, 'V' },
-    { "dry-run", no_argument, NULL, 'n' },
-    { "help", no_argument, NULL, 'H' },
-    { "skeleton", required_argument, NULL, 'S' },
-    { "pid-file", required_argument, NULL, 'p' },
-    { "pid-contents", required_argument, NULL, 'P' },
-    { "contents-file", required_argument, NULL, 'f' },
-    { "contents", required_argument, NULL, 'F' },
-    { "manifest-file", required_argument, NULL, 'f' },
-    { "manifest", required_argument, NULL, 'F' },
-    { "fg", no_argument, NULL, 'g' },
-    { "timeout", required_argument, NULL, 'T' },
-    { "idle-timeout", required_argument, NULL, 'I' },
-    { "input", required_argument, NULL, 'i' },
-    { "chown-home", no_argument, NULL, 'h' },
-    { "chown-user", required_argument, NULL, 'u' },
-    { "onlcr", no_argument, NULL, ARG_ONLCR },
-    { "no-onlcr", no_argument, NULL, ARG_NO_ONLCR },
-    { "timing-file", required_argument, NULL, 't' },
-    { NULL, 0, NULL, 0 }
+    { "verbose", no_argument, nullptr, 'V' },
+    { "dry-run", no_argument, nullptr, 'n' },
+    { "help", no_argument, nullptr, 'H' },
+    { "skeleton", required_argument, nullptr, 'S' },
+    { "pid-file", required_argument, nullptr, 'p' },
+    { "pid-contents", required_argument, nullptr, 'P' },
+    { "contents-file", required_argument, nullptr, 'f' },
+    { "contents", required_argument, nullptr, 'F' },
+    { "manifest-file", required_argument, nullptr, 'f' },
+    { "manifest", required_argument, nullptr, 'F' },
+    { "fg", no_argument, nullptr, 'g' },
+    { "timeout", required_argument, nullptr, 'T' },
+    { "idle-timeout", required_argument, nullptr, 'I' },
+    { "input", required_argument, nullptr, 'i' },
+    { "chown-home", no_argument, nullptr, 'h' },
+    { "chown-user", required_argument, nullptr, 'u' },
+    { "onlcr", no_argument, nullptr, ARG_ONLCR },
+    { "no-onlcr", no_argument, nullptr, ARG_NO_ONLCR },
+    { "timing-file", required_argument, nullptr, 't' },
+    { nullptr, 0, nullptr, 0 }
 };
 
 static struct option longoptions_rm[] = {
-    { "verbose", no_argument, NULL, 'V' },
-    { "dry-run", no_argument, NULL, 'n' },
-    { "help", no_argument, NULL, 'H' },
-    { "force", no_argument, NULL, 'f' },
-    { NULL, 0, NULL, 0 }
+    { "verbose", no_argument, nullptr, 'V' },
+    { "dry-run", no_argument, nullptr, 'n' },
+    { "help", no_argument, nullptr, 'H' },
+    { "force", no_argument, nullptr, 'f' },
+    { nullptr, 0, nullptr, 0 }
 };
 
 static struct option* longoptions_action[] = {
@@ -2723,7 +2724,7 @@ int main(int argc, char** argv) {
     int ch;
     while (1) {
         while ((ch = getopt_long(argc, argv, shortoptions_action[(int) action],
-                                 longoptions_action[(int) action], NULL)) != -1) {
+                                 longoptions_action[(int) action], nullptr)) != -1) {
             if (ch == 'V') {
                 verbose = true;
             } else if (ch == 'S') {
