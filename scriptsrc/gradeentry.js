@@ -421,7 +421,7 @@ export class GradeSheet {
         if (x.autogrades) {
             this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x);
         }
-        while (this.grades && this.gversion.length !== this.grades.length) {
+        while (this.grades && this.gversion.length < this.grades.length) {
             this.gversion.push(0);
         }
         for (let k in x) {
