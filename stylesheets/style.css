@@ -2299,10 +2299,13 @@ td.mhcb {
 	font-size: 65%;
 	font-style: italic;
 	text-align: right;
-	margin-bottom: 0.25rem;
+	margin-bottom: 0.125rem;
 }
 .pa-pv > textarea {
 	vertical-align: top;
+}
+.pa-textv > textarea {
+	width: 100%;
 }
 .pa-p + .pa-ans {
 	margin-top: 1rem;

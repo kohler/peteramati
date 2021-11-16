@@ -47,7 +47,7 @@ function render_form($tr, note, transition) {
     let t = '<form method="post" action="' +
         escape_entities(hoturl_gradeapi(gi.element, "=api/linenote", {file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})) +
         '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">' +
-        '<textarea class="pa-note-entry" name="note"></textarea>' +
+        '<textarea class="pa-note-entry need-autogrow" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +
         '<div class="aabut"><button class="btn-primary" type="submit">Save comment</button></div>' +
         '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';

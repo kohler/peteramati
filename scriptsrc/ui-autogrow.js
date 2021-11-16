@@ -2,11 +2,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { removeClass } from "./ui.js";
-
-
-// based on https://github.com/jaz303/jquery-grab-bag
-let autogrowers = null, shadows = {};
+let autogrowers, shadows = {};
 
 function get_shadow(elt, width) {
     const css = window.getComputedStyle(elt);
@@ -45,14 +41,13 @@ function get_shadow(elt, width) {
 }
 
 function resizer() {
-    for (var i = autogrowers.length - 1; i >= 0; --i) {
-        autogrowers[i]();
+    for (let ag of autogrowers) {
+        ag[1]();
     }
 }
 
-function remover($self, shadow) {
-    var f = $self.data("autogrower");
-    $self.removeData("autogrower");
+function remover(self, shadow) {
+    $(self).removeData("autogrower");
     if (shadow) {
         if (shadow instanceof Element) {
             shadow.remove();
@@ -61,20 +56,14 @@ function remover($self, shadow) {
             delete shadows[shadow.signature];
         }
     }
-    shadow && shadow.remove();
-    for (var i = autogrowers.length - 1; i >= 0; --i) {
-        if (autogrowers[i] === f) {
-            autogrowers[i] = autogrowers[autogrowers.length - 1];
-            autogrowers.pop();
-        }
-    }
+    autogrowers && autogrowers.delete(self);
 }
 
 function make_textarea_autogrower(self) {
     var shadow, minHeight, lineHeight;
     return function (event) {
         if (event === false) {
-            return remover($(self), shadow);
+            return remover(self, shadow);
         }
         var width = self.clientWidth;
         if (width <= 0) {
@@ -104,7 +93,7 @@ function make_input_autogrower(self) {
     var shadow, minWidth, maxWidth;
     return function (event) {
         if (event === false) {
-            return remover($(self), shadow);
+            return remover(self, shadow);
         }
         var width = 0;
         try {
@@ -132,8 +121,8 @@ function make_input_autogrower(self) {
 $.fn.autogrow = function () {
     this.each(function () {
         var $self = $(this), f = $self.data("autogrower");
-        removeClass(this, "need-autogrow");
-        if (!f) {
+        if (!f && this.classList.contains("need-autogrow")) {
+            this.classList.remove("need-autogrow");
             if (this.tagName === "TEXTAREA") {
                 f = make_textarea_autogrower(this);
             } else if (this.tagName === "INPUT" && this.type === "text") {
@@ -142,10 +131,10 @@ $.fn.autogrow = function () {
             if (f) {
                 $self.data("autogrower", f).on("change input", f);
                 if (!autogrowers) {
-                    autogrowers = [];
+                    autogrowers = new Map;
                     $(window).resize(resizer);
                 }
-                autogrowers.push(f);
+                autogrowers.set(this, f);
             }
         }
         if (f && $self.val() !== "") {

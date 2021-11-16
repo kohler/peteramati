@@ -80,7 +80,7 @@ handle_ui.on("js-pset-setcommit", function () {
 handle_ui.on("js-pset-flag", function () {
     let self = this, form = self.closest("form");
     if (this.name === "flag" && !form.elements.flagreason) {
-        $(self).before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" /> &nbsp;</span>');
+        $(self).before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" class="need-autogrow"> &nbsp;</span>');
         $(form.elements.flagreason).on("keypress", function (evt) {
             if (!event_modkey(evt) && event_key(evt) === "Enter") {
                 evt.preventDefault();

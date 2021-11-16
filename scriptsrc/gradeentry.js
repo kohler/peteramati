@@ -161,6 +161,9 @@ export class GradeEntry {
         if (typeof t === "string") {
             pde.innerHTML = t;
         }
+        if (edit) {
+            $(pde).find(".need-autogrow").autogrow();
+        }
     }
 
     update_edit(pde, v, opts) {
@@ -202,6 +205,7 @@ export class GradeEntry {
             ve.setAttribute("data-default-value", this.simple_text(v));
         }
         this.landmark && this.update_landmark(pde);
+        $(pde).find("input, textarea").autogrow();
     }
 
     update_show(pde, v) {
@@ -468,6 +472,7 @@ export class GradeSheet {
             toggleClass(elt, "e", mode !== 0);
             elt.replaceChild(pdx, pde);
             ge.mount_at(pdx, id, mode !== 0);
+            $(pde).find("input, textarea").unautogrow();
         }
     }
 
