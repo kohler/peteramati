@@ -472,6 +472,7 @@ export class GradeSheet {
             toggleClass(elt, "e", mode !== 0);
             elt.replaceChild(pdx, pde);
             ge.mount_at(pdx, id, mode !== 0);
+            elt.removeAttribute("data-pa-gv");
             $(pde).find("input, textarea").unautogrow();
         }
     }
