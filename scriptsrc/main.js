@@ -733,20 +733,58 @@ function gradelist_resolve_section(gi, ge, insp) {
     }
 }
 
+function find_top_element_position($es) {
+    let section, e, bottom;
+    $es.each(function () {
+        section = this;
+        if (this.getBoundingClientRect().bottom > 40)
+            return false;
+    });
+    e = section.firstChild;
+    while (e) {
+        if (e.nodeType === Node.ELEMENT_NODE) {
+            if (hasClass(e, "pa-p")
+                && !hasClass(e, "pa-sticky")
+                && (bottom = e.getBoundingClientRect().bottom) > 40) {
+                return {element: e, bottom: bottom};
+            } else if (hasClass(e, "pa-dg")
+                       && e.firstChild) {
+                e = e.firstChild;
+                continue;
+            }
+        }
+        while (!e.nextSibling && !hasClass(e.parentElement, "pa-gsection")) {
+            e = e.parentElement;
+        }
+        e = e.nextSibling;
+    }
+    return null;
+}
+
+function reset_top_element_position(tep) {
+    if (tep) {
+        const bottom = tep.element.getBoundingClientRect().bottom;
+        window.scrollBy(0, bottom - tep.bottom);
+    }
+}
+
 handle_ui.on("pa-grade-toggle-description", function (event) {
     const me = this.closest(".pa-gsection"),
         $es = event.metaKey ? $(".pa-gsection") : $(me),
-        show = hasClass(me, "pa-hide-description");
+        show = hasClass(me, "pa-hide-description"),
+        tep = find_top_element_position($es);
     $es.each(function () {
         toggleClass(this, "pa-hide-description", !show);
         $(this).find(".pa-grade-toggle-description").toggleClass("btn-primary", !show);
     });
+    reset_top_element_position(tep);
 });
 
 handle_ui.on("pa-grade-toggle-markdown", function (event) {
     const me = this.closest(".pa-gsection"),
         $es = event.metaKey ? $(".pa-gsection") : $(me),
-        show = !hasClass(this, "btn-primary");
+        show = !hasClass(this, "btn-primary"),
+        tep = find_top_element_position($es);
     $es.each(function () {
         const gi = GradeSheet.closest(this);
         $(this).find(".pa-grade").each(function () {
@@ -755,30 +793,33 @@ handle_ui.on("pa-grade-toggle-markdown", function (event) {
                 && hasClass(this, "pa-markdown") !== show) {
                 toggleClass(this, "pa-markdown", show);
                 if (!hasClass(this, "e")) {
-                    gi.remount_at(this, false);
+                    gi.remount_at(this, 0);
                     gi.update_at(this);
                 }
             }
         });
         $(this).find(".pa-grade-toggle-markdown").toggleClass("btn-primary", show);
     });
+    reset_top_element_position(tep);
 });
 
 handle_ui.on("pa-grade-toggle-answer", function (event) {
     const me = this.closest(".pa-gsection"),
         $es = event.metaKey ? $(".pa-gsection") : $(me),
-        edit = !hasClass(this, "btn-primary");
+        mode = hasClass(this, "btn-primary") ? 0 : 2,
+        tep = find_top_element_position($es);
     $es.each(function () {
         const gi = GradeSheet.closest(this);
         $(this).find(".pa-grade").each(function () {
             const ge = gi.entries[this.getAttribute("data-pa-grade")];
             if (ge.answer) {
-                gi.remount_at(this, edit);
+                gi.remount_at(this, mode);
                 gi.update_at(this);
             }
         });
-        $(this).find(".pa-grade-toggle-answer").toggleClass("btn-primary", edit);
+        $(this).find(".pa-grade-toggle-answer").toggleClass("btn-primary", mode !== 0);
     });
+    reset_top_element_position(tep);
 });
 
 function pa_resolve_gradelist() {
