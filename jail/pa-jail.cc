@@ -2212,7 +2212,12 @@ int jailownerinfo::exec_go() {
         } else if (child == 0) {
             child = getpid();
 #if __linux__
-            // sigfd is close-on-exec
+            // sigfd is close-on-exec, but need to unblock signals
+            sigset_t mask;
+            sigemptyset(&mask);
+            if (sigprocmask(SIG_SETMASK, &mask, nullptr) == -1) {
+                perror_die("sigprocmask");
+            }
 #else
             close(sigpipe[0]);
             close(sigpipe[1]);
