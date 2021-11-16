@@ -594,7 +594,7 @@ function echo_all_grades($info) {
     } else if ($info->can_edit_scores() && $info->pset->late_hours_entry()) {
         echo '<div class="pa-grade pa-p e" data-pa-grade="late_hours">',
             '<label class="pa-pt" for="late_hours">late hours</label>',
-            '<form class="ui-submitpa-pv"><span class="pa-gradewidth">',
+            '<form class="ui-submit pa-pv"><span class="pa-gradewidth">',
             Ht::entry("late_hours", $lhd && isset($lhd->hours) ? $lhd->hours : "",
                       ["class" => "uich pa-gradevalue pa-gradewidth", "id" => "late_hours"]),
             '</span> <span class="pa-gradedesc"></span>';
