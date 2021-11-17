@@ -51,7 +51,7 @@ export class Filediff {
                 $.ajax(hoturl_gradeapi(this.element, "api/filediff"), {
                     type: "GET", cache: false, dataType: "json",
                     data: {
-                        file: html_id_decode(this.element.id.substr(2)),
+                        file: this.file,
                         base_hash: p.getAttribute("data-pa-base-hash"),
                         hash: p.getAttribute("data-pa-hash")
                     },
@@ -93,6 +93,9 @@ export class Filediff {
         } else {
             return html_id_decode(id.substring(1));
         }
+    }
+    lineid_anchor(lineid) {
+        return "L".concat(lineid, this.element.id);
     }
     lines() {
         return Linediff.all(this.element.firstChild);

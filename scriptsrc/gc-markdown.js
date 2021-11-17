@@ -6,7 +6,6 @@ import { GradeClass } from "./gc.js";
 import { render_text } from "./render.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { Filediff } from "./diff.js";
-import { html_id_encode } from "./encoders.js";
 import { Note } from "./note.js";
 
 
@@ -38,12 +37,8 @@ GradeClass.add("markdown", {
             addClass(ve, "align-self-start");
             const div = document.createElement("div");
             div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (this._all.editable_scores ? " pa-editablenotes live" : "");
-            let fileid = "/g/" + html_id_encode(this.key);
-            if (hasClass(document.body, "pa-multiuser")) {
-                div.id = "U".concat(html_id_encode(this._all.user), "/F", fileid);
-            } else {
-                div.id = "F" + fileid;
-            }
+            let fileid = "/g/" + this.key;
+            div.id = this._all.file_anchor(fileid);
             let pos1 = 0, lineno = 1;
             while (pos1 !== v.length) {
                 let pos2 = v.indexOf("\n", pos1);

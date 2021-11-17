@@ -526,6 +526,14 @@ export class GradeSheet {
         return this.maxtotal;
     }
 
+    file_anchor(file) {
+        if (hasClass(document.body, "pa-multiuser")) {
+            return "U".concat(html_id_encode(this.user), "/F", html_id_encode(file));
+        } else {
+            return "F" + html_id_encode(file);
+        }
+    }
+
     get has_sections() {
         for (let i = 0; i !== this.order.length; ++i) {
             const ge = this.entries[this.order[i]];
