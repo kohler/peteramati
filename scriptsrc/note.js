@@ -94,7 +94,7 @@ export class Note {
                 e = e.nextSibling;
             } else if (hasClass(e, "pa-gw")) {
                 return Note.at(e);
-            } else if (e === t || hasClass(e, "pa-gn") || hasClass(e, "pa-gx")) {
+            } else if (e === t || hasClass(e, "pa-gn") || hasClass(e, "pa-gx") || hasClass(e, "hidden")) {
                 e = e.nextSibling;
             } else {
                 break;
