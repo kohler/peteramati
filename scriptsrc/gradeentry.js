@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { escape_entities, unescape_entities, html_id_encode } from "./encoders.js";
-import { hasClass, toggleClass } from "./ui.js";
+import { hasClass, toggleClass, input_set_default_value } from "./ui.js";
 import { Filediff, Linediff } from "./diff.js";
 import { Note } from "./note.js";
 import { GradeClass } from "./gc.js";
@@ -202,7 +202,7 @@ export class GradeEntry {
 
         let ve;
         if (opts.reset && (ve = pde.querySelector(".pa-gradevalue"))) {
-            ve.setAttribute("data-default-value", this.simple_text(v));
+            input_set_default_value(ve, this.simple_text(v));
         }
         this.landmark && this.update_landmark(pde);
         $(pde).find("input, textarea").autogrow();
@@ -481,19 +481,24 @@ export class GradeSheet {
         }
     }
 
-    update_at(elt) {
+    update_at(elt, opts) {
         const k = elt.getAttribute("data-pa-grade"), islh = k === "late_hours";
-        let ge, gpos;
+        opts = opts ? Object.assign({}, opts) : {};
+        let ge, gpos, gv;
         if (islh) {
-            GradeEntry.late_hours().update_at(elt, this.late_hours, {autograde: this.auto_late_hours});
+            ge = GradeEntry.late_hours();
+            gv = this.late_hours;
+            opts.autograde = this.auto_late_hours;
         } else if ((ge = this.entries[k])
                    && (gpos = this.gpos[k]) != null
                    && elt.getAttribute("data-pa-gv") != this.gversion[gpos]) {
-            const v = this.grades ? this.grades[gpos] : null,
-                av = this.autogrades ? this.autogrades[gpos] : null;
-            ge.update_at(elt, v, {autograde: av});
+            gv = this.grades ? this.grades[gpos] : null;
+            opts.autograde = this.autogrades ? this.autogrades[gpos] : null;
             elt.setAttribute("data-pa-gv", this.gversion[gpos]);
+        } else {
+            return;
         }
+        ge.update_at(elt, gv, opts);
     }
 
     grade_value(ge) {

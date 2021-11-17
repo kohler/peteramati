@@ -158,18 +158,6 @@ function input_differs(elt) {
     }
 }
 
-$(function () {
-    $("form.need-unload-protection").each(function () {
-        var form = this;
-        removeClass(form, "need-unload-protection");
-        $(form).on("submit", function () { addClass(this, "submitting"); });
-        $(window).on("beforeunload", function () {
-            if (hasClass(form, "alert") && !hasClass(form, "submitting"))
-                return "If you leave this page now, your edits may be lost.";
-        });
-    });
-});
-
 function focus_at(felt) {
     felt.jquery && (felt = felt[0]);
     felt.focus();
@@ -997,7 +985,7 @@ function pa_loadgrades() {
     });
 
     $(this).find(".pa-grade").each(function () {
-        gi.update_at(this);
+        gi.update_at(this, {reset: true});
     });
 
     // print totals
@@ -1062,19 +1050,20 @@ function pa_beforeunload() {
         if (!text_eq(this.value, note.text) && !hasClass(tr, "pa-save-failed"))
             ok = false;
     });
-    if (!ok)
+    if (!ok) {
         return (event.returnValue = "You have unsaved notes. You will lose them if you leave the page now.");
+    }
 }
 
 function runmany61() {
     var $manybutton = $("#runmany61");
     var $f = $manybutton.closest("form");
-    if (!$f.prop("unload61")) {
+    if (!$f.prop("pa-runmany-unload")) {
         $(window).on("beforeunload", function () {
             if ($f.prop("outstanding") || $("#runmany61_users").text())
                 return "Several server requests are outstanding.";
         });
-        $f.prop("unload61", "1");
+        $f.prop("pa-runmany-unload", "1");
     }
     if (!$f.prop("outstanding")) {
         var users = $("#runmany61_users").text().split(/[\s,;]+/);

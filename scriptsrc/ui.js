@@ -112,3 +112,37 @@ export function fold61(sel, arrowholder, direction) {
     );
     return false;
 }
+
+
+function input_is_checkboxlike(elt) {
+    return elt.type === "checkbox" || elt.type === "radio";
+}
+
+export function input_default_value(elt) {
+    if (input_is_checkboxlike(elt)) {
+        if (elt.hasAttribute("data-default-checked")) {
+            return elt.getAttribute("data-default-checked") !== "false";
+        } else if (elt.hasAttribute("data-default-value")) {
+            return elt.value == elt.getAttribute("data-default-value");
+        } else {
+            return elt.defaultChecked;
+        }
+    } else {
+        if (elt.hasAttribute("data-default-value")) {
+            return elt.getAttribute("data-default-value");
+        } else {
+            return elt.defaultValue;
+        }
+    }
+}
+
+export function input_set_default_value(elt, val) {
+    if (input_is_checkboxlike(elt)) {
+        elt.removeAttribute("data-default-checked");
+        elt.defaultChecked = val == "";
+    } else {
+        elt.removeAttribute("data-default-value");
+        elt.value = elt.value; // set dirty value flag
+        elt.defaultValue = val;
+    }
+}
