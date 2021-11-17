@@ -118,8 +118,6 @@ class Pset {
     public $grades_visible;
     /** @var int */
     public $grades_visible_at;
-    /** @var ?int */
-    public $grades_total;
     /** @var bool */
     public $grades_history = false;
     /** @var ?string */
@@ -368,7 +366,6 @@ class Pset {
         } else {
             $this->grades = self::position_sort("grades", $this->grades ?? []);
         }
-        $this->grades_total = self::cnum($p, "grades_total");
         $this->grades_history = self::cbool($p, "grades_history") ?? false;
         $this->grades_selection_function = self::cstr($p, "grades_selection_function");
         $gv = self::cdate($p, "grades_visible", "show_grades_to_students");
@@ -715,23 +712,16 @@ class Pset {
     /** @param bool $pcview
      * @return int|float */
     function max_grade($pcview) {
-        if (isset($this->grades_total)) {
-            return $this->grades_total;
-        } else {
-            $i = $pcview ? 1 : 0;
-            if (!isset($this->_max_grade[$i])) {
-                $max = 0;
-                foreach ($this->visible_grades($pcview) as $ge) {
-                    if ($ge->max
-                        && !$ge->no_total
-                        && ($pcview || $ge->max_visible)
-                        && !$ge->is_extra)
-                        $max += $ge->max;
-                }
-                $this->_max_grade[$i] = $max;
+        $i = $pcview ? 1 : 0;
+        if (!isset($this->_max_grade[$i])) {
+            $max = 0;
+            foreach ($this->visible_grades($pcview) as $ge) {
+                if ($ge->max && !$ge->no_total && !$ge->is_extra)
+                    $max += $ge->max;
             }
-            return $this->_max_grade[$i];
+            $this->_max_grade[$i] = $max;
         }
+        return $this->_max_grade[$i];
     }
 
 

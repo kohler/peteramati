@@ -24,9 +24,9 @@ export const GradeClass = {
             x = '';
         }
         if (window.$pa.long_page) {
-            return '<span class="pa-gradewidth"><textarea class="ta1 uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '" rows="1" wrap="none" cols="10000"></textarea></span> <span class="pa-gradedesc">', x, '</span>');
+            return '<textarea class="ta1 uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '" rows="1" wrap="none" cols="10000"></textarea> <span class="pa-gradedesc">', x, '</span>');
         } else {
-            return '<span class="pa-gradewidth"><input type="text" class="uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '"></span> <span class="pa-gradedesc">', x, '</span>');
+            return '<input type="text" class="uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '"> <span class="pa-gradedesc">', x, '</span>');
         }
     },
 

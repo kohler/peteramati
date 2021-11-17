@@ -649,19 +649,15 @@ class PsetView {
 
     /** @return int|float */
     function grade_max_total() {
-        if ($this->pset->grades_total !== null) {
-            return $this->pset->grades_total;
-        } else {
-            if ($this->_gmaxtot === null) {
-                $this->_gmaxtot = 0;
-                foreach ($this->visible_grades() as $ge) {
-                    if (!$ge->no_total && !$ge->is_extra && $ge->max_visible) {
-                        $this->_gmaxtot += $ge->max;
-                    }
+        if ($this->_gmaxtot === null) {
+            $this->_gmaxtot = 0;
+            foreach ($this->visible_grades() as $ge) {
+                if (!$ge->no_total && !$ge->is_extra && $ge->max_visible) {
+                    $this->_gmaxtot += $ge->max;
                 }
             }
-            return $this->_gmaxtot;
         }
+        return $this->_gmaxtot;
     }
 
     private function ensure_visible_total() {

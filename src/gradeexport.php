@@ -216,19 +216,12 @@ class GradeExport implements JsonSerializable {
         }
         if (!$this->slice || $this->visible_values !== null) {
             $entries = $order = [];
-            $maxtotal = 0;
             foreach ($this->visible_entries() as $ge) {
                 if ($this->known_entries === null
                     || $this->known_entries[$ge->pcview_index] === false) {
                     $entries[$ge->key] = $ge->json($this->pc_view);
                 }
                 $order[] = $ge->key;
-                if ($ge->max
-                    && !$ge->is_extra
-                    && !$ge->no_total
-                    && ($this->pc_view || $ge->max_visible)) {
-                    $maxtotal += $ge->max;
-                }
             }
             if (!$this->slice) {
                 if (!empty($entries)) {
@@ -243,11 +236,6 @@ class GradeExport implements JsonSerializable {
                 foreach ($this->value_entries() as $ge) {
                     $r["value_order"][] = $ge->key;
                 }
-            }
-            if ($this->pset->grades_total !== null) {
-                $r["maxtotal"] = $this->pset->grades_total;
-            } else if ($maxtotal > 0) {
-                $r["maxtotal"] = round_grade($maxtotal);
             }
             if ($this->pset->grades_history) {
                 $r["history"] = true;

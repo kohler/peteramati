@@ -14,7 +14,7 @@ let id_counter = 0, late_hours_entry;
 const gradesheet_props = {
     "uid": true, "user": true,
     "late_hours": true, "auto_late_hours": true, "updateat": true,
-    "version": true, "maxtotal": true, "history": true, "total": true,
+    "version": true, "history": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,
     "user_visible_scores": true, "editable_scores": true, "editable_answers": true,
     "linenotes": true
@@ -176,7 +176,7 @@ export class GradeEntry {
                 has_max && pde.parentElement.removeChild(pde.nextSibling);
             } else if (!has_max) {
                 const e = document.createElement("div");
-                e.classList = "pa-pv pa-gradeabovemax";
+                e.classList = "pa-pvnote pa-gradeabovemax";
                 e.textContent = "Grade is above max";
                 pde.parentElement.insertBefore(e, pde.nextSibling);
             }
@@ -334,7 +334,11 @@ export class GradeEntry {
             if (!$gnv.length) {
                 const $gs = hasClass(gh, "pa-grade") ? $(gh) : $(gh).find(".pa-grade");
                 $gs.each(function () {
-                    let e = this.lastChild.firstChild;
+                    let e = this.firstChild;
+                    while (e && !hasClass(e, "pa-pv")) {
+                        e = e.nextSibling;
+                    }
+                    e = e.firstChild;
                     while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
                         e = e.nextSibling;
                     }
@@ -413,7 +417,7 @@ export class GradeSheet {
                 this.gpos[this.value_order[i]] = i;
                 ++this.gversion[i];
             }
-            this.grades = this.autogrades = null;
+            this.grades = this.autogrades = this.maxtotal = null;
         }
         if (x.grades) {
             this.grades = this.merge_grades(this.grades, x.grades, x);
@@ -492,15 +496,34 @@ export class GradeSheet {
         }
     }
 
-    get_total(noextra) {
+    grade_value(ge) {
+        const i = this.grades ? this.gpos[ge.key] : null;
+        return i != null ? this.grades[i] : null;
+    }
+
+    grade_total(noextra) {
         let total = 0;
-        for (let i = 0; i !== this.order.length; ++i) {
-            const ge = this.entries[this.order[i]];
-            if (ge && ge.in_total && (!noextra || !this.is_extra)) {
+        for (let i = 0; i !== this.value_order.length; ++i) {
+            const ge = this.entries[this.value_order[i]];
+            if (ge && ge.in_total && (!noextra || !ge.is_extra)) {
                 total += (this.grades && this.grades[i]) || 0;
             }
         }
         return Math.round(total * 1000) / 1000;
+    }
+
+    get grade_maxtotal() {
+        if (this.maxtotal === null) {
+            let maxtotal = 0;
+            for (let i = 0; i !== this.value_order.length; ++i) {
+                const ge = this.entries[this.value_order[i]];
+                if (ge && ge.in_total && !ge.is_extra && ge.max) {
+                    maxtotal += ge.max;
+                }
+            }
+            this.maxtotal = Math.round(maxtotal * 1000) / 1000;
+        }
+        return this.maxtotal;
     }
 
     get has_sections() {
@@ -513,15 +536,10 @@ export class GradeSheet {
         return false;
     }
 
-    grade_value(ge) {
-        const i = this.grades ? this.gpos[ge.key] : null;
-        return i != null ? this.grades[i] : null;
-    }
-
     has(f) {
         for (let i = 0; i !== this.value_order.length; ++i) {
-            const xge = this.entries[this.value_order[i]];
-            if (f(xge, this))
+            const gei = this.entries[this.value_order[i]];
+            if (f(gei, this))
                 return true;
         }
         return false;
@@ -530,10 +548,10 @@ export class GradeSheet {
     section_has(ge, f) {
         let start = this.gpos[ge.key];
         while (start != null && start < this.value_order.length) {
-            const xge = this.entries[this.value_order[start]];
-            if (xge !== ge && xge.type === "section") {
+            const gei = this.entries[this.value_order[start]];
+            if (gei !== ge && gei.type === "section") {
                 break;
-            } else if (f(xge, this)) {
+            } else if (f(gei, this)) {
                 return true;
             }
             ++start;
@@ -543,8 +561,8 @@ export class GradeSheet {
 
     section_wants_sidebar(ge) {
         let answer = 0;
-        return this.editable_scores && this.section_has(ge, xge => {
-            answer |= xge.answer ? 1 : 2;
+        return this.editable_scores && this.section_has(ge, gei => {
+            answer |= gei.answer ? 1 : 2;
             return answer === 3;
         });
     }

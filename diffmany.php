@@ -76,8 +76,8 @@ class DiffMany {
             '" class="pa-psetinfo pa-psetinfo-partial pa-diffcontext',
             '" data-pa-pset="', htmlspecialchars($pset->urlkey),
             '" data-pa-user="', $linkpart_html;
-        if (!$pset->gitless && $info->commit_hash()) {
-            echo '" data-pa-hash="', htmlspecialchars($info->commit_hash());
+        if (!$pset->gitless && $info->hash()) {
+            echo '" data-pa-hash="', htmlspecialchars($info->hash());
         }
         if (!$pset->gitless && $pset->directory) {
             echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);
@@ -112,7 +112,7 @@ class DiffMany {
         }
         echo '<hr class="c" />';
 
-        if (!$pset->gitless && $info->commit()) {
+        if (!$pset->gitless && $info->hash()) {
             $lnorder = $info->visible_line_notes();
             $onlyfiles = $this->files;
             $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
@@ -134,7 +134,7 @@ class DiffMany {
                     $info->echo_file_diff($file, $dinfo, $lnorder, [
                         "expand" => true, "hide_left" => true,
                         "no_heading" => count($this->files) == 1,
-                        "diffcontext" => $linkpart_html . "/"
+                        "diffcontext" => "$linkpart_html / "
                     ]);
                 }
                 if ($info->can_edit_scores() && !$pset->has_grade_landmark_range) {

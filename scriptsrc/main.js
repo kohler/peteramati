@@ -590,12 +590,7 @@ handle_ui.on("pa-gradevalue", function () {
 function save_grade(self) {
     var $f = $(self);
     $f.find(".pa-gradediffers, .pa-save-message").remove();
-    var $gd = $f.find(".pa-gradedesc");
-    if (!$gd.length) {
-        $f.find(".pa-gradevalue").after(' <span class="pa-gradedesc"></span>');
-        $gd = $f.find(".pa-gradedesc");
-    }
-    $gd.append('<span class="pa-save-message"><span class="spinner"></span></span>');
+    $f.append('<span class="pa-save-message compact"><span class="spinner"></span></span>');
 
     var gi = GradeSheet.closest(self), g = {}, og = {};
     $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
@@ -619,11 +614,11 @@ function save_grade(self) {
         .then(function (data) {
             $f.removeData("paOutstandingPromise");
             if (data.ok) {
-                $f.find(".pa-save-message").html('<span class="savesuccess"></span>').addClass("fadeout");
+                $f.find(".pa-save-message").addClass("compact fadeout").html('<span class="savesuccess"></span>');
                 GradeSheet.store(self.closest(".pa-psetinfo"), data);
                 resolve(self);
             } else {
-                $f.find(".pa-save-message").html('<strong class="err">' + data.error + '</strong>');
+                $f.find(".pa-save-message").removeClass("compact").html('<strong class="err">' + data.error + '</strong>');
                 reject(self);
             }
         });
@@ -656,9 +651,9 @@ function pa_resolve_grade() {
             const lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
             for (let i = 0; i !== lb.length; ++i) {
                 if (typeof lb[i] === "string") {
-                    $(e).find(".pa-pv").first().append(lb[i]);
+                    $(e).find(".pa-pv").append(lb[i]);
                 } else if (lb[i].className) {
-                    $(e).find(".pa-pv").first().append('<button type="button" class="btn uic uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
+                    $(e).find(".pa-pv").append('<button type="button" class="btn uic uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
                 }
             }
         }
@@ -715,6 +710,12 @@ function gradelist_resolve_section(gi, ge, insp) {
         e.firstChild.className = "pa-pt";
         e.firstChild.textContent = "—";
         insp.insertBefore(e, insp.firstChild);
+    }
+    if (hasClass(document.body, "pa-multiuser") && gi.user) {
+        let sp = document.createElement("span");
+        sp.className = "pa-fileref-context";
+        sp.innerText = gi.user + " / ";
+        e.firstChild.insertBefore(sp, e.firstChild.firstChild);
     }
 
     addClass(insp, "pa-with-sticky");
@@ -1000,7 +1001,7 @@ function pa_loadgrades() {
     });
 
     // print totals
-    const tm = [gi.get_total(), gi.maxtotal], total = "" + tm[0];
+    const tm = [gi.grade_total(), gi.grade_maxtotal], total = "" + tm[0];
     let drawgraph = false;
     if (tm[0]) {
         $(this).find(".pa-gradelist:not(.pa-gradebox)").each(function () {
