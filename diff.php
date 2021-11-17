@@ -69,7 +69,7 @@ ContactView::echo_heading($User);
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey),
     '" data-pa-base-hash="', htmlspecialchars($commita->hash),
     '" data-pa-hash="', htmlspecialchars($commitb->hash),
-    '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($Info->info_export()));
+    '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($Info->info_json()));
 if (!$Pset->gitless && $Pset->directory) {
     echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
 }

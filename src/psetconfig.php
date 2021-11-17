@@ -801,7 +801,7 @@ class Pset {
             return $this->_file_ignore_regex;
         }
         $regex = self::basic_file_ignore_regex();
-        if ($this->conf->setting("__gitignore_pset{$this->id}_at", 0) < Conf::$now - 900) {
+        if (($this->conf->setting("__gitignore_pset{$this->id}_at") ?? 0) < Conf::$now - 900) {
             $hrepo = $this->handout_repo();
             $result = "";
             $branch = $this->handout_branch;

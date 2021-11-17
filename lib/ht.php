@@ -560,12 +560,6 @@ class Ht {
         return self::unstash();
     }
 
-    /** @return string
-     * @deprecated */
-    static function take_stash() {
-        return self::unstash();
-    }
-
 
     /** @param string $s
      * @param int $pos1

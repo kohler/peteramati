@@ -558,13 +558,14 @@ class Contact {
             $url = $this->conf->selfurl($Qreq, [], Conf::HOTURL_RAW | Conf::HOTURL_SITE_RELATIVE);
             $_SESSION["login_bounce"] = array($this->conf->dsn, $url, Navigation::page(), $_POST);
             if (check_post()) {
-                error_go(false, "You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.");
+                $this->conf->msg("You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.", 2);
             } else {
-                error_go(false, "You must sign in to access that page.");
+                $this->conf->msg("You must sign in to access that page.", 2);
             }
         } else {
-            error_go(false, "You don’t have permission to access that page.");
+            $this->conf->msg("You don’t have permission to access that page.", 2);
         }
+        $this->conf->redirect();
     }
 
     function save() {

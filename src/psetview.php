@@ -1687,18 +1687,6 @@ class PsetView {
     }
 
 
-    /** @return object */
-    function info_export() {
-        $r = (object) [];
-        $r->uid = $this->user->contactId;
-        $r->user = $this->viewer->user_linkpart($this->user);
-        if ($this->user_can_view_score()) {
-            $r->user_visible_scores = true;
-        }
-        return $r;
-    }
-
-
     const GRADEJSON_SLICE = 1;
     const GRADEJSON_OVERRIDE_VIEW = 2;
     const GRADEJSON_NO_LATE_HOURS = 4;
@@ -1821,6 +1809,16 @@ class PsetView {
             $gexp->suppress_known_entries($known_entries);
         }
         return $gexp->jsonSerialize();
+    }
+
+    /** @return array */
+    function info_json() {
+        $r = ["uid" => $this->user->contactId,
+              "user" => $this->viewer->user_linkpart($this->user)];
+        if ($this->user_can_view_score()) {
+            $r["user_visible_scores"] = true;
+        }
+        return $r;
     }
 
 

@@ -66,6 +66,7 @@ class Conf {
     public $sversion;
     private $_gsettings = [];
     private $_gsettings_data = [];
+    /** @var array|true */
     private $_gsettings_loaded = [];
 
     public $dbname;
@@ -100,8 +101,6 @@ class Conf {
     private $_header_printed = false;
     /** @var ?list<array{string,string}> */
     private $_save_msgs;
-    /** @var ?array<string,array<int,true>> */
-    private $_save_logs = false;
     /** @var false|null|array<string,mixed> */
     private $_session_list = false;
     public $_session_handler;
@@ -511,8 +510,8 @@ class Conf {
 
     /** @param string $name
      * @return ?int */
-    function setting($name, $defval = null) {
-        return $this->settings[$name] ?? $defval;
+    function setting($name) {
+        return $this->settings[$name] ?? null;
     }
 
     /** @param string $name
@@ -986,12 +985,6 @@ class Conf {
                         $row->nicknameAmbiguous = $by_nick_text[$lnick]->nicknameAmbiguous = true;
                     $by_nick_text[$lnick] = $row;
                 }
-                if ($row->contactTags)
-                    foreach (explode(" ", $row->contactTags) as $t) {
-                        list($tag, $value) = TagInfo::split_index($t);
-                        if ($tag)
-                            $this->_pc_tags_cache[strtolower($tag)] = $tag;
-                    }
             }
             Dbl::free($result);
             uasort($pc, "Contact::compare");
@@ -1699,6 +1692,25 @@ class Conf {
         }
     }
 
+    /** @param ?string $url */
+    function redirect($url = null) {
+        $this->transfer_messages_to_session();
+        Navigation::redirect($url ?? $this->hoturl("index"));
+    }
+
+    /** @param string $page
+     * @param null|string|array $param */
+    function redirect_hoturl($page, $param = null) {
+        $this->redirect($this->hoturl($page, $param, self::HOTURL_RAW));
+    }
+
+    /** @param Qrequest $qreq
+     * @param ?array $param */
+    function redirect_self(Qrequest $qreq, $param = null) {
+        $this->redirect($this->selfurl($qreq, $param, self::HOTURL_RAW));
+    }
+
+
 
     /** @param non-empty-string $url
      * @return string */
@@ -2002,9 +2014,9 @@ class Conf {
             // help, sign out
             $x = ($id == "search" ? "t=$id" : ($id == "settings" ? "t=chair" : ""));
             if (!$Me->has_email() && !isset($this->opt["httpAuthLogin"]))
-                $profile_parts[] = '<a href="' . hoturl("index", "signin=1") . '">Sign&nbsp;in</a>';
+                $profile_parts[] = '<a href="' . $this->hoturl("index", "signin=1") . '">Sign&nbsp;in</a>';
             if (!$Me->is_empty() || isset($this->opt["httpAuthLogin"]))
-                $profile_parts[] = '<a href="' . hoturl_post("index", "signout=1") . '">Sign&nbsp;out</a>';
+                $profile_parts[] = '<a href="' . $this->hoturl_post("index", "signout=1") . '">Sign&nbsp;out</a>';
 
             if (!empty($profile_parts))
                 echo join(' <span class="barsep">·</span> ', $profile_parts);
@@ -2075,7 +2087,7 @@ class Conf {
         if ($footy)
             echo "<div id='footer_crp'>$footy</div>";
         echo "<div class='clear'></div></div>\n";
-        echo Ht::take_stash(), "</body>\n</html>\n";
+        echo Ht::unstash(), "</body>\n</html>\n";
     }
 
     function stash_hotcrp_pc(Contact $user) {
@@ -2158,20 +2170,6 @@ class Conf {
     // Action recording
     //
 
-    function save_logs($on) {
-        if ($on && $this->_save_logs === false)
-            $this->_save_logs = array();
-        else if (!$on && $this->_save_logs !== false) {
-            $x = $this->_save_logs;
-            $this->_save_logs = false;
-            foreach ($x as $cid_text => $pids) {
-                $pos = strpos($cid_text, "|");
-                $this->log(substr($cid_text, $pos + 1),
-                           substr($cid_text, 0, $pos), $pids);
-            }
-        }
-    }
-
     function log($text, $who, $pids = null) {
         if (!$who)
             $who = 0;
@@ -2185,12 +2183,6 @@ class Conf {
         $ps = array();
         foreach ($pids as $p)
             $ps[] = is_object($p) ? $p->paperId : $p;
-
-        if ($this->_save_logs !== false) {
-            foreach ($ps as $p)
-                $this->_save_logs["$who|$text"][] = $p;
-            return;
-        }
 
         if (count($ps) == 0)
             $ps = "null";
@@ -2416,14 +2408,14 @@ class Conf {
             $hset = $this->setting_json("handoutrepos");
             $save = false;
             if (!$hset) {
-                $save = $hset = (object) array();
+                $save = $hset = (object) [];
             }
-            if (!($hme = $hset->$hrepoid ?? null)) {
-                $save = $hme = $hset->$hrepoid = (object) array();
+            if (!($hme = $hset->{"$hrepoid"} ?? null)) {
+                $save = $hme = $hset->{"$hrepoid"} = (object) array();
             }
-            if ((int) ($hme->$cacheid ?? 0) + 300 < Conf::$now
+            if ((int) ($hme->{"$cacheid"} ?? 0) + 300 < Conf::$now
                 && !$this->opt("disableRemote")) {
-                $save = $hme->$cacheid = Conf::$now;
+                $save = $hme->{"$cacheid"} = Conf::$now;
                 $hrepo->reposite->gitfetch($hrepo->repoid, $cacheid, false);
             }
             if ($save) {

@@ -11,7 +11,7 @@ class LoginHelper {
         if ($explicit && $user->conf->opt("httpAuthLogin")) {
             ensure_session(ENSURE_SESSION_REGENERATE_ID);
             $_SESSION["reauth"] = true;
-            go();
+            Navigation::redirect();
         } else if ($explicit) {
             kill_session();
         }
@@ -114,10 +114,10 @@ class LoginHelper {
             $reg = Contact::safe_registration($_REQUEST);
             $reg->no_validate_email = true;
             if (!($user = Contact::create($conf, $reg))) {
-                return Conf::msg_error($conf->db_error_html(true, "while adding your account"));
+                return Conf::msg_error($conf->db_error_html(true));
             }
-            if ($conf->setting("setupPhase", false)) {
-                return self::first_user($user, $msg);
+            if ($conf->setting("setupPhase")) {
+                return self::first_user($user, "", false);
             }
         }
 
@@ -181,7 +181,7 @@ class LoginHelper {
         $user->save_session("password_reset", null);
 
         // give chair privilege to first user (external login or contactdb)
-        if ($conf->setting("setupPhase", false)) {
+        if ($conf->setting("setupPhase")) {
             self::first_user($user, "", false);
         }
 
@@ -212,7 +212,7 @@ class LoginHelper {
             $user->save_session("freshlogin", true);
             $where = hoturl("index");
         }
-        go($where);
+        Navigation::redirect($where);
         exit;
     }
 
@@ -257,14 +257,14 @@ class LoginHelper {
         // create database account
         if (!$user || !$user->has_account_here()) {
             if (!($user = Contact::create($conf, Contact::safe_registration($_REQUEST))))
-                return Conf::msg_error($conf->db_error_html(true, "while adding your account"));
+                return Conf::msg_error($conf->db_error_html(true));
         }
 
         $user->sendAccountInfo("create", true);
         $msg = "Successfully created an account for " . htmlspecialchars($qreq->email) . ".";
 
         // handle setup phase
-        if ($conf->setting("setupPhase", false)) {
+        if ($conf->setting("setupPhase")) {
             self::first_user($user, $msg, true);
             return $user;
         }

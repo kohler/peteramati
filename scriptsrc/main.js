@@ -647,7 +647,6 @@ function pa_resolve_grade() {
     if (ge && gi) {
         const e = ge.render(gi);
         this.parentElement.replaceChild(this, e);
-        $(e).find(".need-autogrow").autogrow();
         gi.update_at(e);
         if (ge.landmark_range && this.closest(".pa-gradebox")) {
             // XXX maybe calling compute_landmark_range_grade too often
@@ -958,7 +957,6 @@ function pa_resolve_gradelist() {
     remove_from(insp, ch);
     sectioned && remove_from(this, insp.nextSibling);
     remove_from(sidebar, sidebare);
-    $(this).find(".need-autogrow").autogrow();
 }
 
 $(function () {

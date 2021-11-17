@@ -62,10 +62,6 @@ assert($Me->privChair);
 if (isset($_REQUEST["clearbug"]) && check_post()) {
     $Conf->save_setting("bug_" . $_REQUEST["clearbug"], null);
 }
-if (isset($_REQUEST["clearnewpcrev"]) && ctype_digit($_REQUEST["clearnewpcrev"])
-    && check_post() && $Conf->setting("pcrev_informtime", 0) <= $_REQUEST["clearnewpcrev"]) {
-    $Conf->save_setting("pcrev_informtime", $_REQUEST["clearnewpcrev"]);
-}
 if (isset($_REQUEST["clearbug"]) || isset($_REQUEST["clearnewpcrev"])) {
     redirectSelf(array("clearbug" => null, "clearnewpcrev" => null));
 }

@@ -254,6 +254,24 @@ class GitHub_RepositorySite extends RepositorySite {
         return Messages::$main->expand_html($name, $this->message_defs($user));
     }
 
+    function gitfetch($repoid, $cacheid, $foreground) {
+        if (($id = $this->conf->opt("githubOAuthClientId"))
+            && ($token = $this->conf->opt("githubOAuthToken"))
+            && $token !== Conf::INVALID_TOKEN) {
+            putenv("GIT_USERNAME=$id");
+            putenv("GIT_PASSWORD=$token");
+            $command = escapeshellarg(SiteLoader::$root . "/src/gitfetch")
+                . " -m " . escapeshellarg($this->conf->default_main_branch)
+                . " $repoid $cacheid " . escapeshellarg($this->https_url())
+                . " 1>&2" . ($foreground ? "" : " &");
+            shell_exec($command);
+            putenv("GIT_USERNAME");
+            putenv("GIT_PASSWORD");
+            return true;
+        } else {
+            return false;
+        }
+    }
     function validate_open(MessageSet $ms = null) {
         if (!($owner_name = $this->owner_name())) {
             return -1;
@@ -293,22 +311,6 @@ class GitHub_RepositorySite extends RepositorySite {
             $status = 1;
         }
         return $status;
-    }
-    function gitfetch($repoid, $cacheid, $foreground) {
-        if (!($id = $this->conf->opt("githubOAuthClientId"))
-            || !($token = $this->conf->opt("githubOAuthToken"))
-            || $token === Conf::INVALID_TOKEN) {
-            return false;
-        }
-        putenv("GIT_USERNAME=$id");
-        putenv("GIT_PASSWORD=$token");
-        $command = escapeshellarg(SiteLoader::$root . "/src/gitfetch")
-            . " -m " . escapeshellarg($this->conf->default_main_branch)
-            . " $repoid $cacheid " . escapeshellarg($this->https_url())
-            . " 1>&2" . ($foreground ? "" : " &");
-        shell_exec($command);
-        putenv("GIT_USERNAME");
-        putenv("GIT_PASSWORD");
     }
     function validate_ownership_always() {
         return false;

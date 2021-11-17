@@ -5,27 +5,37 @@
 
 require_once("src/initweb.php");
 
-if ($Conf->external_login())
-    error_go(false, "Password reset links aren’t used for this conference. Contact your system administrator if you’ve forgotten your password.");
+if ($Conf->external_login()) {
+    $Conf->msg("Password reset links aren’t used for this conference. Contact your system administrator if you’ve forgotten your password.", 2);
+    $Conf->redirect();
+}
 
 $resetcap = $Qreq->resetcap;
-if ($resetcap === null && preg_match(',\A/(U?1[-\w]+)(?:/|\z),i', Navigation::path(), $m))
+if ($resetcap === null && preg_match(',\A/(U?1[-\w]+)(?:/|\z),i', Navigation::path(), $m)) {
     $resetcap = $m[1];
-if (!$resetcap)
-    error_go(false, "You didn’t enter the full password reset link into your browser. Make sure you include the reset code (the string of letters, numbers, and other characters at the end).");
+}
+if (!$resetcap) {
+    $Conf->msg("You didn’t enter the full password reset link into your browser. Make sure you include the reset code (the string of letters, numbers, and other characters at the end).", 2);
+    $Conf->redirect();
+}
 
 $iscdb = substr($resetcap, 0, 1) === "U";
 $capmgr = $Conf->capability_manager($resetcap);
 $capdata = $capmgr->check($resetcap);
-if (!$capdata || $capdata->capabilityType != CAPTYPE_RESETPASSWORD)
-    error_go(false, "That password reset code has expired, or you didn’t enter it correctly.");
+if (!$capdata || $capdata->capabilityType != CAPTYPE_RESETPASSWORD) {
+    $Conf->msg("That password reset code has expired, or you didn’t enter it correctly.", 2);
+    $Conf->redirect();
+}
 
-if ($iscdb)
+if ($iscdb) {
     $Acct = Contact::contactdb_find_by_id($capdata->contactId);
-else
+} else {
     $Acct = $Conf->user_by_id($capdata->contactId);
-if (!$Acct)
-    error_go(false, "That password reset code refers to a user who no longer exists. Either create a new account or contact the conference administrator.");
+}
+if (!$Acct) {
+    $Conf->msg("That password reset code refers to a user who no longer exists. Either create a new account or contact the conference administrator.", 2);
+    $Conf->redirect();
+}
 
 // don't show information about the current user, if there is one
 $Me = new Contact;
@@ -51,7 +61,7 @@ if (isset($_POST["go"]) && check_post()) {
         $Conf->confirmMsg("Your password has been changed. You may now sign in to the conference site.");
         $capmgr->delete($capdata);
         $Conf->save_session("password_reset", (object) array("time" => Conf::$now, "email" => $Acct->email, "password" => $_POST["password"]));
-        go(hoturl("index"));
+        $Conf->redirect();
     }
     $password_class = " error";
 }

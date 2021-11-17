@@ -64,6 +64,13 @@ class RepositorySite {
         return ["REPOGITURL" => null, "REPOBASE" => null];
     }
 
+    /** @param int $repoid
+     * @param string $cacheid
+     * @param bool $foreground
+     * @return bool */
+    function gitfetch($repoid, $cacheid, $foreground) {
+        return false;
+    }
     /** @return int */
     function validate_open(MessageSet $ms = null) {
         return -1;

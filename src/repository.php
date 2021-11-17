@@ -13,7 +13,7 @@ class Repository {
     public $url;
     /** @var RepositorySite */
     public $reposite;
-    /** @var int */
+    /** @var string */
     public $cacheid;
     /** @var int */
     public $open;
