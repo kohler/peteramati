@@ -2424,14 +2424,15 @@ function pa_render_pset_table(pconf, data) {
             s._spos = dmap.length;
             dmap.push(s);
             ++trn;
-            if (s.boringness !== was_boringness && trn != 1)
+            if (s.boringness !== was_boringness && trn != 1) {
                 a.push('<tr class="gt-boring"><td colspan="' + col.length + '"><hr></td></tr>');
+            }
             was_boringness = s.boringness;
             var stds = render_tds(s, trn);
-            var t = '<tr class="k' + (trn % 2) + '" data-pa-spos="' + s._spos;
+            var t = '<tr class="k'.concat(trn % 2, '" data-pa-spos="', s._spos);
             if (s.uid)
                 t += '" data-pa-uid="' + s.uid;
-            a.push(t + '">' + stds.join('') + '</tr>');
+            a.push(t.concat('">', stds.join(''), '</tr>'));
             for (var j = 0; s.partners && j < s.partners.length; ++j) {
                 var ss = s.partners[j];
                 ss._spos = dmap.length;
@@ -2441,10 +2442,10 @@ function pa_render_pset_table(pconf, data) {
                     if (sstds[k] === stds[k])
                         sstds[k] = '<td></td>';
                 }
-                t = '<tr class="k' + (trn % 2) + ' gtrow-partner" data-pa-spos="' + ss._spos;
+                t = '<tr class="k'.concat(trn % 2, ' gtrow-partner" data-pa-spos="', ss._spos);
                 if (ss.uid)
                     t += '" data-pa-uid="' + ss.uid;
-                a.push(t + '" data-pa-partner="1">' + sstds.join('') + '</tr>');
+                a.push(t.concat('" data-pa-partner="1">', sstds.join(''), '</tr>'));
             }
             if (a.length > 50) {
                 $(a.join('')).appendTo(tbody);

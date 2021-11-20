@@ -1669,11 +1669,15 @@ class PsetView {
     }
 
 
+    /** @return string */
+    function user_linkpart() {
+        return $this->viewer->user_linkpart($this->user);
+    }
+
     /** @param ?array<string,null|int|string> $args
      * @return array<string,null|int|string> */
     function hoturl_args($args = null) {
-        $xargs = ["pset" => $this->pset->urlkey,
-                  "u" => $this->viewer->user_linkpart($this->user)];
+        $xargs = ["pset" => $this->pset->urlkey, "u" => $this->user_linkpart()];
         if ($this->_hash) {
             $xargs["commit"] = $this->commit_hash();
         }
@@ -1723,7 +1727,7 @@ class PsetView {
             $gexp->set_visible_grades($this->visible_grades());
         }
         $gexp->uid = $this->user->contactId;
-        $gexp->user = $this->viewer->user_linkpart($this->user);
+        $gexp->user = $this->user_linkpart();
 
         $this->ensure_grades();
         if ($this->_g !== null || $this->is_grading_commit()) {
@@ -1824,8 +1828,7 @@ class PsetView {
 
     /** @return array */
     function info_json() {
-        $r = ["uid" => $this->user->contactId,
-              "user" => $this->viewer->user_linkpart($this->user)];
+        $r = ["uid" => $this->user->contactId, "user" => $this->user_linkpart()];
         if ($this->user_can_view_score()) {
             $r["user_visible_scores"] = true;
         }
@@ -1993,7 +1996,7 @@ class PsetView {
 
         $tabid = "F" . html_id_encode($file);
         if ($this->conf->multiuser_page) {
-            $tabid = "U" . html_id_encode($this->viewer->user_linkpart($this->user)) . "/{$tabid}";
+            $tabid = "U" . html_id_encode($this->user_linkpart()) . "/{$tabid}";
         }
         $linenotes = $lnorder->file($file);
         if ($this->can_view_note_authors()) {

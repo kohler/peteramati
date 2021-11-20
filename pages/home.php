@@ -747,7 +747,6 @@ if (!$Me->is_empty() && $User->is_student()) {
 }
 
 function render_flag_row(Pset $pset, Contact $s = null, FlagTableRow $row, $anonymous) {
-    global $Conf, $Me;
     $j = $s ? StudentSet::json_basics($s, $anonymous) : [];
     if (($gcid = $row->jnote("gradercid") ?? null)) {
         $j["gradercid"] = $gcid;
@@ -937,7 +936,7 @@ function show_pset_actions($pset) {
     }
 
     echo "</form>";
-    echo Ht::unstash_script("$('.need-pa-pset-actions').each(\$pa.pset_actions)");
+    echo Ht::unstash_script('$(".need-pa-pset-actions").each($pa.pset_actions)');
 }
 
 function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,

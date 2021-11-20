@@ -862,29 +862,29 @@ class Conf {
      * @return ?Contact */
     function user_by_id($id) {
         $result = $this->qe("select ContactInfo.* from ContactInfo where contactId=?", $id);
-        $acct = Contact::fetch($result, $this);
+        $u = Contact::fetch($result, $this);
         Dbl::free($result);
-        return $acct;
+        return $u;
     }
 
     /** @param string $email
      * @return ?Contact */
     function user_by_email($email) {
-        $acct = null;
+        $u = null;
         if (($email = trim((string) $email)) !== "") {
             $result = $this->qe("select * from ContactInfo where email=?", $email);
-            $acct = Contact::fetch($result, $this);
+            $u = Contact::fetch($result, $this);
             Dbl::free($result);
         }
-        return $acct;
+        return $u;
     }
 
     /** @return ?Contact */
     function user_by_query($qpart, $args) {
         $result = $this->qe_apply("select ContactInfo.* from ContactInfo where $qpart", $args);
-        $acct = Contact::fetch($result, $this);
+        $u = Contact::fetch($result, $this);
         Dbl::free($result);
-        return $acct && $acct->contactId ? $acct : null;
+        return $u && $u->contactId ? $u : null;
     }
 
     /** @return ?Contact */
