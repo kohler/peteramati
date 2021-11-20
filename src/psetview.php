@@ -1499,13 +1499,15 @@ class PsetView {
     }
 
 
-    /** @param RunnerConfig $runner
+    /** @param string $runner_name
      * @return string|false */
-    function runner_output_for($runner) {
+    function runner_output_for($runner_name) {
         $cnotes = $this->commit_jnotes();
-        if ($cnotes && isset($cnotes->run) && isset($cnotes->run->{$runner->name})) {
+        if ($cnotes
+            && isset($cnotes->run)
+            && isset($cnotes->run->{$runner_name})) {
             $runlog = new RunLogger($this->repo, $this->pset);
-            $fn = $runlog->output_file($cnotes->run->{$runner->name});
+            $fn = $runlog->output_file($cnotes->run->{$runner_name});
             $s = @file_get_contents($fn);
             $this->last_runner_error = $s === false ? self::ERROR_LOGMISSING : 0;
             return $s;
@@ -1629,7 +1631,7 @@ class PsetView {
         foreach ($this->pset->runners as $runner) {
             if ($runner->transfer_warnings
                 && $this->viewer->can_view_transferred_warnings($this->pset, $runner, $this->user)
-                && ($output = $this->runner_output_for($runner))) {
+                && ($output = $this->runner_output_for($runner->name))) {
                 $this->transfer_warning_lines(explode("\n", $output), $runner->transfer_warnings_priority ?? 0.0);
             }
         }

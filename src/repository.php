@@ -847,9 +847,13 @@ class Repository {
                 $di = new DiffInfo($file, $diffconfig);
                 $di->set_repoa($this, $pset, $hasha, $line, $pset->is_handout($commita));
                 // decide whether file is collapsed
-                if ($no_user_collapse && !$diffconfig->collapse_default) {
+                if ($no_user_collapse
+                    && $diffconfig
+                    && !$diffconfig->collapse_default) {
                     $di->set_collapse($diffconfig->collapse_default);
-                } else if ($di->collapse && $needfiles && ($needfiles[$file] ?? false)) {
+                } else if ($di->collapse
+                           && $needfiles
+                           && ($needfiles[$file] ?? false)) {
                     $di->set_collapse(null);
                 }
                 // store diff if collapsed, skip if ignored
