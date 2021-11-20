@@ -148,6 +148,37 @@ class PsetView {
         return $info;
     }
 
+    /** @return ?UserPsetInfo */
+    private function upi() {
+        if (($this->_havepi & 1) === 0) {
+            $this->_havepi |= 1;
+            $this->_upi = $this->pset->upi_for($this->user);
+        }
+        return $this->_upi;
+    }
+
+    /** @return ?RepositoryPsetInfo */
+    private function rpi() {
+        if (($this->_havepi & 2) === 0) {
+            $this->_havepi |= 2;
+            if ($this->repo) {
+                $this->_rpi = $this->pset->rpi_for($this->repo, $this->branchid);
+            }
+        }
+        return $this->_rpi;
+    }
+
+    /** @return ?CommitPsetInfo */
+    private function cpi() {
+        if (($this->_havepi & 4) === 0) {
+            $this->_havepi |= 4;
+            if ($this->repo && $this->_hash) {
+                $this->_cpi = $this->pset->cpi_at($this->_hash);
+            }
+        }
+        return $this->_cpi;
+    }
+
 
     /** @return list<int> */
     function backpartners() {
@@ -194,9 +225,7 @@ class PsetView {
 
     /** @return ?CommitRecord */
     function latest_commit() {
-        $cs = $this->repo ? $this->repo->commits($this->pset, $this->branch) : [];
-        reset($cs);
-        return current($cs);
+        return $this->repo ? $this->repo->latest_commit($this->pset, $this->branch) : null;
     }
 
     /** @return ?non-empty-string */
@@ -205,36 +234,21 @@ class PsetView {
         return $lc ? $lc->hash : null;
     }
 
-
-    /** @return ?UserPsetInfo */
-    private function upi() {
-        if (($this->_havepi & 1) === 0) {
-            $this->_havepi |= 1;
-            $this->_upi = $this->pset->upi_for($this->user);
-        }
-        return $this->_upi;
+    /** @return ?CommitRecord */
+    function latest_nontrivial_commit() {
+        return $this->repo ? $this->repo->latest_nontrivial_commit($this->pset, $this->branch) : null;
     }
 
-    /** @return ?RepositoryPsetInfo */
-    private function rpi() {
-        if (($this->_havepi & 2) === 0) {
-            $this->_havepi |= 2;
-            if ($this->repo) {
-                $this->_rpi = $this->pset->rpi_for($this->repo, $this->branchid);
-            }
-        }
-        return $this->_rpi;
+    /** @return ?CommitRecord */
+    function grading_commit() {
+        $h = $this->grading_hash();
+        return $h ? $this->connected_commit($h) : null;
     }
 
-    /** @return ?CommitPsetInfo */
-    private function cpi() {
-        if (($this->_havepi & 4) === 0) {
-            $this->_havepi |= 4;
-            if ($this->repo && $this->_hash) {
-                $this->_cpi = $this->pset->cpi_at($this->_hash);
-            }
-        }
-        return $this->_cpi;
+    /** @return ?non-empty-string */
+    function grading_hash() {
+        $rpi = $this->pset->gitless_grades ? null : $this->rpi();
+        return $rpi && !$rpi->placeholder ? $rpi->gradehash : null;
     }
 
 
@@ -258,6 +272,7 @@ class PsetView {
             }
         }
     }
+
 
     /** @return ?non-empty-string */
     function hash() {
@@ -294,6 +309,16 @@ class PsetView {
 
     function set_commit(CommitRecord $commit) {
         $this->force_set_hash($commit->hash);
+    }
+
+    function set_grading_or_latest_nontrivial_commit() {
+        if (($hash = $this->grading_hash())) {
+            $this->force_set_hash($hash);
+        } else if (($c = $this->latest_nontrivial_commit())) {
+            $this->force_set_hash($c->hash);
+        } else {
+            $this->force_set_hash(null);
+        }
     }
 
     /** @param ?string $reqhash
@@ -392,18 +417,6 @@ class PsetView {
         } else {
             return new CommitRecord(0, "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "", CommitRecord::HANDOUTHEAD);
         }
-    }
-
-    /** @return ?CommitRecord */
-    function grading_commit() {
-        $h = $this->grading_hash();
-        return $h ? $this->connected_commit($h) : null;
-    }
-
-    /** @return ?non-empty-string */
-    function grading_hash() {
-        $rpi = $this->pset->gitless_grades ? null : $this->rpi();
-        return $rpi && !$rpi->placeholder ? $rpi->gradehash : null;
     }
 
 

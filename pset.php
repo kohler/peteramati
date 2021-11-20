@@ -25,7 +25,7 @@ $Info = PsetView::make($Pset, $User, $Me, $Qreq->newcommit ?? $Qreq->commit, "ps
 if (($Qreq->newcommit ?? $Qreq->commit) && !$Info->hash()) {
     if ($Info->repo) {
         $Conf->errorMsg("Commit " . htmlspecialchars($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository.");
-        $Info->set_hash(null); // XXX
+        $Info->set_grading_or_latest_nontrivial_commit(); // XXX
         unset($Qreq->newcommit, $Qreq->commit);
     } else {
         $Conf->errorMsg("No repository has been configured for this pset.");

@@ -182,7 +182,7 @@ class Grade_API {
                     $errno = max($errno, $hash ? 4 : 3);
                     continue;
                 }
-                $info->force_set_hash($commit->hash);
+                $info->set_commit($commit);
                 if (($ugs[$uid]->commit_is_grade ?? false)
                     && $commit->hash !== $info->grading_hash()) {
                     $errno = max($errno, 2);

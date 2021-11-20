@@ -18,6 +18,10 @@ class CommitRecord implements JsonSerializable {
     public $_is_handout;
     /** @var ?Pset */
     public $_is_handout_pset;
+    /** @var ?bool */
+    public $_is_merge;
+    /** @var ?bool */
+    public $_is_trivial_merge;
     const HANDOUTHEAD = "*handout*";
     /** @param int $commitat
      * @param non-empty-string $hash

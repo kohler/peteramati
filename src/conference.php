@@ -36,7 +36,7 @@ class APIData {
         if ($this->repo) {
             $this->commit = $this->conf->check_api_hash($this->hash, $this);
             if ($this->commit) {
-                $info->force_set_hash($this->commit->hash);
+                $info->set_commit($this->commit);
                 return null;
             } else if ($this->hash) {
                 return ["ok" => false, "error" => "Disconnected commit."];

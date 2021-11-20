@@ -101,7 +101,7 @@ class Flag_API {
                 $errors[] = $flag;
                 continue;
             }
-            $info->force_set_hash($commit->hash);
+            $info->set_commit($commit);
             $flags = (array) $info->commit_jnote("flags");
             if (isset($flags[$flag->flagid])) {
                 $work[] = [$info, $flag];

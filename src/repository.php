@@ -35,18 +35,23 @@ class Repository {
     /** @var int */
     public $infosnapat;
     public $notes;
+    /** @var ?string */
     public $heads;
 
     /** @var bool */
     public $is_handout = false;
     /** @var array<int,bool> */
     public $viewable_by = [];
+    /** @var array<string,string> */
     public $_truncated_hashes = [];
+    /** @var array<string,bool> */
     public $_truncated_psetdir = [];
     /** @var array<string,CommitRecord> */
     private $_commits = [];
     /** @var array<string,array<string,CommitRecord>> */
     private $_commit_lists = [];
+    /** @var array<string,bool> */
+    private $_commit_lists_cc = [];
 
     /** @var list<array{string,string,list<string>,int}> */
     static private $_file_contents = [];
@@ -342,12 +347,12 @@ class Repository {
     }
 
     /** @param array<string,CommitRecord> &$list
-     * @param ?string $head */
+     * @param string $head */
     private function load_commits_from_head(&$list, $head) {
-        $s = $this->gitrun("git log --simplify-merges -m --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
+        $s = $this->gitrun("git log -m --name-only --format='%x00%ct %H %s%n%P' " . escapeshellarg($head));
         if ($s === "") {
             $this->refresh(30, true);
-            $s = $this->gitrun("git log --simplify-merges -m --name-only --format='%x00%ct %H %s' " . escapeshellarg($head));
+            $s = $this->gitrun("git log -m --name-only --format='%x00%ct %H %s%n%P' " . escapeshellarg($head));
         }
         $p = 0;
         $l = strlen($s);
@@ -359,8 +364,10 @@ class Repository {
             }
             if (($sp1 = strpos($s, " ", $p0)) !== false
                 && ($sp2 = strpos($s, " ", $sp1 + 1)) !== false
-                && ($nl = strpos($s, "\n", $sp2 + 1)) !== false
-                && $nl < $p) {
+                && ($nl1 = strpos($s, "\n", $sp2 + 1)) !== false
+                && $nl1 < $p
+                && ($nl2 = strpos($s, "\n", $nl1 + 1)) !== false
+                && $nl2 < $p) {
                 $time = substr($s, $p0, $sp1 - $p0);
                 $hash = substr($s, $sp1 + 1, $sp2 - ($sp1 + 1));
                 if (strlen($time) > 8
@@ -374,17 +381,51 @@ class Repository {
                         $newcr = null;
                         $list[$hash] = $cr;
                     } else {
-                        $subject = substr($s, $sp2 + 1, $nl - ($sp2 + 1));
+                        $subject = substr($s, $sp2 + 1, $nl1 - ($sp2 + 1));
                         /** @phan-suppress-next-line PhanTypeMismatchArgument */
                         $newcr = new CommitRecord((int) $time, $hash, $subject, $head);
                         $this->_commits[$hash] = $cr = $list[$hash] = $newcr;
+                        $cr->_is_merge = strpos(substr($s, $nl1 + 1, $nl2 - ($nl1 + 1)), " ") !== false;
                     }
                     if ($newcr) {
-                        self::set_directory($cr, $s, $nl, $p);
+                        self::set_directory($cr, $s, $nl2, $p);
                     }
                 }
             }
         }
+    }
+
+    /** @param array<string,CommitRecord> &$list
+     * @param string $head */
+    private function load_trivial_merges_from_head(&$list, $head) {
+        $s = $this->gitrun("git log --cc --name-only --format='%x00%H' " . escapeshellarg($head));
+        $p = 0;
+        $l = strlen($s);
+        $cr = $newcr = null;
+        while ($p < $l && $s[$p] === "\0") {
+            $p0 = $p + 1;
+            if (($p = strpos($s, "\0", $p0)) === false) {
+                $p = $l;
+            }
+            if (($nl1 = strpos($s, "\n", $p0)) !== false
+                && $nl1 < $p) {
+                $hash = substr($s, $p0, $nl1 - $p0);
+                if (($cr = $this->_commits[$hash] ?? null)) {
+                    while ($nl1 < $p && $s[$nl1] === "\n") {
+                        ++$nl1;
+                    }
+                    $cr->_is_trivial_merge = $nl1 === $p;
+                }
+            }
+        }
+    }
+
+    /** @param string $branch
+     * @return list<string> */
+    private function heads_on($branch) {
+        $heads = explode(" ", $this->heads ?? "");
+        $heads[0] = "%REPO%/$branch";
+        return $heads;
     }
 
     /** @param ?string $branch
@@ -397,9 +438,7 @@ class Repository {
         } else {
             // XXX should gitrun once, not multiple times
             $list = [];
-            $heads = explode(" ", $this->heads);
-            $heads[0] = "%REPO%/$branch";
-            foreach ($heads as $h) {
+            foreach ($this->heads_on($branch) as $h) {
                 $this->load_commits_from_head($list, $h);
             }
             $this->_commit_lists[$branch] = $list;
@@ -442,9 +481,32 @@ class Repository {
     /** @param ?string $branch
      * @return ?CommitRecord */
     function latest_commit(Pset $pset = null, $branch = null) {
-        $c = $this->commits($pset, $branch);
-        reset($c);
-        return current($c);
+        foreach ($this->commits($pset, $branch) as $c) {
+            return $c;
+        }
+        return null;
+    }
+
+    /** @param ?string $branch
+     * @return ?CommitRecord */
+    function latest_nontrivial_commit(Pset $pset = null, $branch = null) {
+        $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
+        $trivial_merges_known = !!($this->_commit_lists_cc[$branch] ?? false);
+
+        foreach ($this->commits($pset, $branch) as $c) {
+            if ($c->_is_merge && !$trivial_merges_known) {
+                $cx = $this->commits(null, $branch);
+                foreach ($this->heads_on($branch) as $h) {
+                    $this->load_trivial_merges_from_head($cx, $h);
+                }
+                $trivial_merges_known = $this->_commit_lists_cc[$branch] = true;
+            }
+            if (!$c->_is_trivial_merge) {
+                return $c;
+            }
+        }
+
+        return null;
     }
 
     /** @param string $hashpart
@@ -492,19 +554,11 @@ class Repository {
         }
     }
 
-    function author_emails($pset = null, $branch = null, $limit = null) {
-        $dir = "";
-        if (is_object($pset) && $pset->directory_noslash !== "") {
-            $dir = " -- " . escapeshellarg($pset->directory_noslash);
-        } else if (is_string($pset) && $pset !== "") {
-            $dir = " -- " . escapeshellarg($pset);
-        }
+    function author_emails($branch = null, $limit = null) {
         $limit = $limit ? " -n$limit" : "";
         $users = [];
-        $heads = explode(" ", $this->heads);
-        $heads[0] = "%REPO%/" . ($branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch));
-        foreach ($heads as $h) {
-            $result = $this->gitrun("git log$limit --simplify-merges --format=%ae " . escapeshellarg($h) . $dir);
+        foreach ($this->heads_on($branch ?? $this->conf->default_main_branch) as $h) {
+            $result = $this->gitrun("git log$limit --format=%ae " . escapeshellarg($h));
             foreach (explode("\n", $result) as $line) {
                 if ($line !== "")
                     $users[strtolower($line)] = $line;
@@ -739,17 +793,17 @@ class Repository {
             } else if ($line[0] === "+" && $di && $blineno) {
                 $di->add("+", $alineno, $blineno, substr($line, 1));
                 ++$blineno;
-            } else if ($line[0] === "@" && $di && preg_match('_\A@@ -(\d+),\d+ \+(\d+)(?:|,\d+) @@_', $line, $m)) {
+            } else if ($line[0] === "@" && $di && preg_match('/\A@@ -(\d+),\d+ \+(\d+)(?:|,\d+) @@/', $line, $m)) {
                 $alineno = +$m[1];
                 $blineno = +$m[2];
                 $di->add("@", null, null, $line);
-            } else if ($line[0] === "d" && preg_match('_\Adiff --git a/(.*) b/\1\z_', $line, $m)) {
+            } else if ($line[0] === "d" && preg_match('/\Adiff --git a\/(.*) b\/\1\z/', $line, $m)) {
                 if ($di) {
                     $di->finish();
                 }
                 $di = $diffargs[$m[1]];
                 $alineno = $blineno = null;
-            } else if ($line[0] === "B" && $di && preg_match('_\ABinary files_', $line)) {
+            } else if ($line[0] === "B" && $di && preg_match('/\ABinary files/', $line)) {
                 $di->add("@", null, null, $line);
             } else if ($line[0] === "\\" && strpos($line, "No newline") !== false) {
                 $di->set_ends_without_newline();

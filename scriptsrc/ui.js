@@ -142,6 +142,7 @@ export function input_set_default_value(elt, val) {
         elt.defaultChecked = val == "";
     } else {
         elt.removeAttribute("data-default-value");
+        // eslint-disable-next-line no-self-assign
         elt.value = elt.value; // set dirty value flag
         elt.defaultValue = val;
     }

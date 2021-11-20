@@ -642,7 +642,7 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
                     $value = substr($ghash, 0, 7) . " (disconnected commit)";
                 }
                 $want_latest = !$info->is_latest_commit();
-            } else if (($c = $info->latest_commit())) {
+            } else if (($c = $info->latest_nontrivial_commit())) {
                 $title = "latest commit";
                 $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);
                 $xnotes[] = "committed " . ago($c->commitat);
@@ -670,7 +670,7 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
 
         self::echo_group($title, $value, $notes);
 
-        if ($want_latest && ($c = $info->latest_commit())) {
+        if ($want_latest && ($c = $info->latest_nontrivial_commit())) {
             $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);
             self::echo_group("latest commit", $value, ["committed " . ago($c->commitat)]);
         }

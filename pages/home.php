@@ -159,7 +159,7 @@ function set_grader(Qrequest $qreq) {
         if ($info->repo) {
             $info->repo->refresh(2700, true);
         }
-        $info->set_hash(null);
+        $info->set_grading_or_latest_nontrivial_commit();
         if (!$info->hash()) {
             error_log("cannot set_hash for $user->email");
             continue;
