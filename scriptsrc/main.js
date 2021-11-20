@@ -2081,8 +2081,8 @@ function pa_render_pset_table(pconf, data) {
             if ($gsi[i].checked)
                 ge.push(pconf.grades.entries[$gsi[i].name]);
         }
-        for (let i = 0; i !== gdialog_su.length; ++i) {
-            us.push(gdialog_su[i].uid);
+        for (let su of gdialog_su) {
+            us.push(su.uid);
         }
         if (ge.length === 0) {
             alert("No grades selected.");
@@ -2117,8 +2117,7 @@ function pa_render_pset_table(pconf, data) {
                     } else {
                         v = $(this).val();
                     }
-                    for (let i = 0; i !== gdialog_su.length; ++i) {
-                        let su = gdialog_su[i];
+                    for (let su of gdialog_su) {
                         byuid[su.uid] = byuid[su.uid] || {grades: {}, oldgrades: {}};
                         byuid[su.uid].grades[k] = v;
                         byuid[su.uid].oldgrades[k] = su.grades[ge.gpos];
@@ -2141,10 +2140,12 @@ function pa_render_pset_table(pconf, data) {
                 }
             });
         } else {
-            for (let i = 0; i !== gdialog_su.length; ++i) {
-                if (gdialog_su[i].gradehash) {
-                    byuid[gdialog_su[i].uid].commit = gdialog_su[i].gradehash;
-                    byuid[gdialog_su[i].uid].commit_is_grade = 1;
+            for (let su of gdialog_su) {
+                if (su.gradehash) {
+                    byuid[su.uid].commit = su.gradehash;
+                    byuid[su.uid].commit_is_grade = 1;
+                } else if (su.hash) {
+                    byuid[su.uid].commit = su.hash;
                 }
             }
             api_conditioner(hoturl_post("api/multigrade", {pset: pconf.key}),
