@@ -2497,7 +2497,7 @@ handle_ui.on("js-multiresolveflag", function () {
 window.$pa = {
     beforeunload: pa_beforeunload,
     checklatest: pa_checklatest,
-    filediff_closest: Filediff.closest,
+    decorate_diff_page: Filediff.decorate_page,
     gradeentry_closest: GradeEntry.closest,
     fold: fold,
     grgraph: grgraph,

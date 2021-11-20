@@ -220,7 +220,8 @@ function fix_list_item(d) {
 
 Filediff.define_method("markdown", function () {
     const elt = this.element;
-    if (hasClass(elt, "pa-markdown") || hasClass(elt, "pa-highlight")) {
+    if (hasClass(elt, "pa-markdown")
+        || hasClass(elt, "pa-highlight")) {
         return;
     }
     const hidelm = hasClass(elt, "pa-hide-landmarks"),
@@ -318,6 +319,7 @@ Filediff.define_method("markdown", function () {
         addClass(lr, "pa-dr-last");
     }
     addClass(elt, "pa-markdown");
+    removeClass(elt, "need-markdown");
 });
 
 Filediff.define_method("unmarkdown", function () {
@@ -350,8 +352,9 @@ Filediff.define_method("highlight", function () {
     }
     if (!lang
         || !hljs.getLanguage(lang)
-        || hasClass(elt, "pa-markdown"))
+        || hasClass(elt, "pa-markdown")) {
         return;
+    }
     // collect content
     const langclass = "language-" + lang;
     let e = elt.firstChild, hlstatei = null, hlstated = null;
@@ -402,6 +405,14 @@ Filediff.define_method("unhighlight", function () {
     removeClass(elt, "pa-highlight");
 });
 
+Filediff.add_decorator(function (fd) {
+    if (hasClass(fd.element, "need-markdown")) {
+        fd.markdown();
+    } else if (hasClass(fd.element, "need-highlight")) {
+        fd.highlight();
+    }
+});
+
 
 handle_ui.on("pa-diff-toggle-markdown", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-markdown") : $(this),
@@ -421,10 +432,4 @@ handle_ui.on("pa-diff-toggle-markdown", function (evt) {
         $.post(hoturl_gradeapi(fd.element, "=api/diffconfig"),
             {file: fd.file, markdown: show ? 1 : 0});
     }
-});
-
-$(function () {
-    $(".pa-filediff.need-highlight:not(.need-load)").each(function () {
-        new Filediff(this).highlight();
-    });
 });

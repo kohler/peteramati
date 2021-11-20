@@ -2109,7 +2109,9 @@ class PsetView {
             echo " pa-line-digits-", ceil(log10($maxline));
         }
         if ($dinfo->highlight) {
-            echo " need-highlight";
+            echo " need-decorate need-highlight";
+        } else if ($hide_left && $dinfo->markdown) {
+            echo " need-decorate need-markdown";
         }
 
         if ($dinfo->language) {
@@ -2139,8 +2141,8 @@ class PsetView {
             echo "<script>\$pa.render_text_page()</script>\n";
             $this->need_format = false;
         }
-        if (!$only_content && $hide_left && $dinfo->markdown) {
-            echo '<script>$pa.filediff_closest(document.getElementById("', $tabid, '")).markdown()</script>';
+        if (!$only_content && ($dinfo->highlight || ($hide_left && $dinfo->markdown))) {
+            echo "<script>\$pa.decorate_diff_page()</script>\n";
         }
     }
 

@@ -10,6 +10,7 @@ import { html_id_encode, html_id_decode } from "./encoders.js";
 
 const BACKWARD = 1;
 const ANYFILE = 2;
+const decorators = [];
 
 export class Filediff {
     constructor(e) {
@@ -41,6 +42,9 @@ export class Filediff {
         }
         return e ? new Filediff(e) : null;
     }
+    static add_decorator(f) {
+        decorators.push(f);
+    }
     load() {
         if (!hasClass(this.element, "need-load")) {
             return new ImmediatePromise(this);
@@ -59,15 +63,26 @@ export class Filediff {
                         if (data.ok && data.content_html) {
                             const result = $(data.content_html);
                             $(this.element).html(result.children());
-                            if (hasClass(this.element, "need-highlight") && this.highlight) {
-                                this.highlight();
-                            }
+                            this.decorate();
                         }
                         resolve(this);
                     }
                 })
             });
         }
+    }
+    decorate() {
+        for (let df of decorators) {
+            df(this);
+        }
+    }
+    static decorate_page() {
+        $(".pa-filediff.need-decorate").each(function () {
+            removeClass(this, "need-decorate");
+            if (!hasClass(this, "need-load")) {
+                (new Filediff(this)).decorate();
+            }
+        });
     }
     toggle(show) {
         if (show == null) {
@@ -398,3 +413,5 @@ if (!hasClass(document.body, "want-grgraph-hash")) {
 handle_ui.on("pa-gx", function (evt) {
     new Linediff(evt.currentTarget).expand();
 });
+
+$(Filediff.decorate_page);
