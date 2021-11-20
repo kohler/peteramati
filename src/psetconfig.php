@@ -529,6 +529,11 @@ class Pset {
     }
 
     /** @return bool */
+    function student_can_view_scores() {
+        return $this->student_can_view() && $this->grades_visible;
+    }
+
+    /** @return bool */
     function student_can_view_grades() {
         return $this->student_can_view()
             && ($this->has_answers || $this->grades_visible);

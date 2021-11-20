@@ -953,7 +953,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
         if ($t0 - $MicroNow < 0.2
             && !$info->user->dropped
             && !$Profile
-            && $pset->student_can_view_grades()) {
+            && $pset->student_can_view_scores()) {
             $info->update_placeholder(function ($info, $rpi) use ($t0) {
                 $placeholder_at = $rpi ? $rpi->placeholder_at : 0;
                 if ($rpi && !$rpi->placeholder) {

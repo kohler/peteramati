@@ -1159,7 +1159,7 @@ class PsetView {
             $maybe = $xpi
                 && ($xpi->hidegrade < 0
                     || ($xpi->hidegrade == 0
-                        && $this->pset->student_can_view_grades()));
+                        && $this->pset->student_can_view_scores()));
             if ($maybe || $this->pset->student_can_edit_answers()) {
                 foreach ($this->visible_grades(false) as $ge) {
                     if ($ge->answer || $ge->concealed) {
