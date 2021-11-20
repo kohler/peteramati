@@ -110,9 +110,9 @@ class DiffMany {
         if ($user !== $this->viewer && !$user->is_anonymous) {
             echo '<h3>', Text::user_html($user), '</h3>';
         }
-        echo '<hr class="c" />';
+        echo '<hr class="c">';
 
-        if (!$pset->gitless && $info->hash()) {
+        if (!$pset->gitless && $info->hash() && $info->commit()) {
             $lnorder = $info->visible_line_notes();
             $onlyfiles = $this->files;
             $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
@@ -132,8 +132,9 @@ class DiffMany {
                 }
                 foreach ($diff as $file => $dinfo) {
                     $info->echo_file_diff($file, $dinfo, $lnorder, [
-                        "expand" => true, "hide_left" => true,
-                        "no_heading" => count($this->files) == 1,
+                        "expand" => true,
+                        "hide_left" => true,
+                        "no_heading" => count($this->files ?? []) == 1,
                         "diffcontext" => "$linkpart_html / "
                     ]);
                 }
@@ -224,7 +225,7 @@ class DiffMany {
         }
 
         Ht::stash_script('$(window).on("beforeunload",$pa.beforeunload)');
-        echo "</div><div class='clear'></div>\n";
+        echo "</div><hr class=\"c\">\n";
         $this->conf->footer();
     }
 }

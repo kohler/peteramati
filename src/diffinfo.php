@@ -42,8 +42,10 @@ class DiffInfo implements Iterator {
     private $_diff = [];
     /** @var int */
     private $_diffsz = 0;
+    /** @var ?array<int,int> */
     private $_dflags;
-    private $_itpos;
+    /** @var int */
+    private $_itpos = 0;
 
     /** @var ?Repository */
     private $_repoa;
@@ -136,7 +138,7 @@ class DiffInfo implements Iterator {
             $this->collapse = true;
         }
         if ($this->binary
-            ? preg_match('_ and /dev/null differ$_', $this->_diff[3])
+            ? preg_match('/ and \/dev\/null differ$/', $this->_diff[3])
             : $n >= 4 && $this->_diff[$n - 2] === 0) {
             $this->removed = true;
         }

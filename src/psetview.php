@@ -1985,8 +1985,7 @@ class PsetView {
 
         $this->_diff_tabwidth = $dinfo->tabwidth;
         $this->_diff_lnorder = $lnorder;
-        $expand = $args["expand"] ?? !$dinfo->collapse;
-        assert(!$expand || $dinfo->loaded);
+        $expand = ($args["expand"] ?? !$dinfo->collapse) && $dinfo->loaded;
         $only_content = !!($args["only_content"] ?? false);
         $no_heading = ($args["no_heading"] ?? false) || $only_content;
         $no_grades = ($args["only_diff"] ?? false) || $only_content;
