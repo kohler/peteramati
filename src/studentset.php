@@ -3,7 +3,7 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-class StudentSet implements Iterator, Countable {
+class StudentSet implements ArrayAccess, Iterator, Countable {
     /** @var Conf
      * @readonly */
     public $conf;
@@ -99,7 +99,8 @@ class StudentSet implements Iterator, Countable {
         return $ss;
     }
 
-    /** @return StudentSet */
+    /** @param list<Contact> $users
+     * @return StudentSet */
     static function make_for(Contact $viewer, $users) {
         $ss = new StudentSet($viewer, 0);
         foreach ($users as $u) {
@@ -255,6 +256,26 @@ class StudentSet implements Iterator, Countable {
         } else {
             return PsetView::make_from_set_at($this, $user, $pset);
         }
+    }
+
+    /** @return bool */
+    function offsetExists($offset) {
+        return isset($this->_u[$offset])
+            && $this->pset
+            && $this->info(intval($offset));
+    }
+
+    /** @return ?PsetView */
+    function offsetGet($offset) {
+        return $this->info(intval($offset));
+    }
+
+    function offsetSet($offset, $value) {
+        throw new Error;
+    }
+
+    function offsetUnset($offset) {
+        throw new Error;
     }
 
 

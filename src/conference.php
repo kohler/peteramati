@@ -867,6 +867,18 @@ class Conf {
         return $u;
     }
 
+    /** @param list<int> $ids
+     * @return array<int,Contact> */
+    function users_by_id($ids) {
+        $result = $this->qe("select ContactInfo.* from ContactInfo where contactId?a", $ids);
+        $us = [];
+        while (($u = Contact::fetch($result, $this))) {
+            $us[$u->contactId] = $u;
+        }
+        Dbl::free($result);
+        return $us;
+    }
+
     /** @param string $email
      * @return ?Contact */
     function user_by_email($email) {
