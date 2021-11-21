@@ -733,8 +733,7 @@ class Pset {
     /** @param Contact $student
      * @return ?UserPsetInfo */
     function upi_for($student) {
-        $result = $this->conf->qe("select * from ContactGrade
-            where cid=? and pset=?",
+        $result = $this->conf->qe("select * from ContactGrade where cid=? and pset=?",
             $student->contactId, $this->psetid);
         $upi = UserPsetInfo::fetch($result);
         Dbl::free($result);
@@ -745,8 +744,7 @@ class Pset {
      * @param int $branchid
      * @return ?RepositoryPsetInfo */
     function rpi_for($repo, $branchid) {
-        $result = $this->conf->qe("select * from RepositoryGrade
-            where repoid=? and branchid=? and pset=?",
+        $result = $this->conf->qe("select * from RepositoryGrade where repoid=? and branchid=? and pset=?",
             $repo->repoid, $branchid, $this->psetid);
         $rpi = RepositoryPsetInfo::fetch($result);
         Dbl::free($result);
@@ -757,8 +755,7 @@ class Pset {
      * @return ?CommitPsetInfo */
     function cpi_at($bhash) {
         assert(!$this->gitless);
-        $result = $this->conf->qe("select * from CommitNotes
-            where pset=? and bhash=?",
+        $result = $this->conf->qe("select * from CommitNotes where pset=? and bhash=?",
             $this->psetid, strlen($bhash) === 40 ? hex2bin($bhash) : $bhash);
         $cpi = CommitPsetInfo::fetch($result);
         Dbl::free($result);

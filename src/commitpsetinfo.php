@@ -8,83 +8,93 @@ class CommitPsetInfo {
     public $pset;
     /** @var non-empty-string */
     public $bhash;
-    /** @var non-empty-string */
-    public $hash;
+    /** @var int */
+    public $repoid;
     /** @var ?int */
     public $commitat;
     /** @var int */
-    public $repoid;
+    public $notesversion = 0;
     /** @var ?string */
     public $notes;
-    /** @var ?string */
-    private $notesOverflow;
-    /** @var ?object */
-    private $jnotes;
     /** @var int */
-    public $notesversion;
+    public $hasflags = 0;
+    /** @var int */
+    public $hasactiveflags = 0;
+    /** @var int */
+    public $haslinenotes = 0;
     /** @var ?string */
     public $xnotes;
-    /** @var ?string */
-    private $xnotesOverflow;
+
+    /** @var non-empty-string */
+    public $hash;
+    /** @var ?object */
+    private $jnotes;
     /** @var ?object */
     private $jxnotes;
-    /** @var int */
-    public $hasflags;
-    /** @var int */
-    public $hasactiveflags;
-    /** @var int */
-    public $haslinenotes;
     /** @var ?CommitPsetInfo */
     public $sset_next;
     /** @var ?CommitPsetInfo */
     public $sset_repo_next;
+    /** @var bool */
+    public $phantom = true;
 
-    private function merge() {
-        $this->pset = (int) $this->pset;
-        /** @phan-suppress-next-line PhanTypeMismatchProperty */
-        $this->hash = bin2hex($this->bhash);
-        $this->commitat = isset($this->commitat) ? (int) $this->commitat : null;
-        $this->repoid = (int) $this->repoid;
-        $this->notesversion = (int) $this->notesversion;
-        $this->hasflags = (int) $this->hasflags;
-        $this->hasactiveflags = (int) $this->hasactiveflags;
-        $this->haslinenotes = (int) $this->haslinenotes;
-        $this->notes = $this->notesOverflow ?? $this->notes;
-        $this->notesOverflow = null;
-        $this->xnotes = $this->xnotesOverflow ?? $this->xnotes;
-        $this->xnotesOverflow = null;
+    /** @param int $pset
+     * @param non-empty-string $hash
+     * @param int $repoid */
+    function __construct($pset, $hash, $repoid) {
+        $this->pset = $pset;
+        if (strlen($hash) === 40) {
+            /** @phan-suppress-next-line PhanTypeMismatchProperty */
+            $this->bhash = hex2bin($hash);
+            $this->hash = $hash;
+        } else {
+            $this->bhash = $hash;
+            /** @phan-suppress-next-line PhanTypeMismatchProperty */
+            $this->hash = bin2hex($hash);
+        }
+        $this->repoid = $repoid;
     }
 
     /** @return ?CommitPsetInfo */
     static function fetch($result) {
-        $rp = $result->fetch_object("CommitPsetInfo");
-        if ($rp) {
-            $rp->merge();
+        if (($x = $result->fetch_object())) {
+            $cpi = new CommitPsetInfo((int) $x->pset, $x->bhash, (int) $x->repoid);
+            $cpi->merge($x);
+            $cpi->phantom = false;
+            return $cpi;
+        } else {
+            return null;
         }
-        return $rp;
     }
 
-    /** @param non-empty-string $hash
-     * @return CommitPsetInfo */
-    static function make_new(Pset $pset, Repository $repo, $hash) {
-        assert(strlen($hash) === 40 || strlen($hash) === 20);
-        $cpi = new CommitPsetInfo;
-        $cpi->pset = $pset->id;
-        if (strlen($hash) === 40) {
-            /** @phan-suppress-next-line PhanTypeMismatchProperty */
-            $cpi->bhash = hex2bin($hash);
-            $cpi->hash = $hash;
-        } else {
-            $cpi->bhash = $hash;
-            /** @phan-suppress-next-line PhanTypeMismatchProperty */
-            $cpi->hash = bin2hex($hash);
+    function reload(Conf $conf) {
+        $x = $conf->fetch_first_object("select * from CommitNotes where pset=? and bhash=?",
+            $this->pset, $this->bhash);
+        $this->merge($x ?? new CommitPsetInfo($this->pset, $this->bhash, $this->repoid));
+        $this->phantom = !$x;
+    }
+
+    /** @param object $x */
+    private function merge($x) {
+        assert($this->pset === (int) $x->pset && $this->bhash === $x->bhash);
+        $this->repoid = (int) $x->repoid;
+        $this->commitat = isset($x->commitat) ? (int) $x->commitat : null;
+        $this->notesversion = (int) $x->notesversion;
+        $this->notes = $x->notesOverflow ?? $x->notes;
+        $this->hasflags = (int) $x->hasflags;
+        $this->hasactiveflags = (int) $x->hasactiveflags;
+        $this->haslinenotes = (int) $x->haslinenotes;
+        $this->xnotes = $x->xnotesOverflow ?? $x->xnotes;
+        $this->jnotes = null;
+        $this->jxnotes = null;
+    }
+
+    function materialize(Conf $conf) {
+        if ($this->phantom) {
+            $conf->qe("insert into CommitNotes set pset=?, bhash=?, repoid=? on duplicate key update pset=pset",
+                $this->pset, $this->bhash, $this->repoid);
+            $this->reload($conf);
         }
-        $cpi->repoid = $repo->repoid;
-        $cpi->notesversion = 0;
-        $cpi->hasflags = 0;
-        $cpi->hasactiveflags = 0;
-        $cpi->haslinenotes = 0;
-        return $cpi;
     }
 
 
@@ -106,10 +116,11 @@ class CommitPsetInfo {
     /** @param ?string $notes
      * @param ?object $jnotes
      * @param int $notesversion */
-    function assign_notes($notes, $jnotes, $notesversion) {
+    function assign_notes($notes, $jnotes) {
         $this->notes = $notes;
         $this->jnotes = $jnotes;
-        $this->notesversion = $notesversion;
+        $this->notesversion = $this->phantom ? 1 : $this->notesversion + 1;
+        $this->phantom = false;
     }
 
 
@@ -131,6 +142,7 @@ class CommitPsetInfo {
     /** @param ?string $xnotes
      * @param ?object $jxnotes */
     function assign_xnotes($xnotes, $jxnotes) {
+        assert(!$this->phantom);
         $this->xnotes = $xnotes;
         $this->jxnotes = $jxnotes;
     }

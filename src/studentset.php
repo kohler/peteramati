@@ -39,8 +39,6 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     /** @var ?array<string,PsetView> */
     private $_infos;
 
-    const NO_UPI = 1;
-
     const COLLEGE = 1;
     const EXTENSION = 2;
     const ENROLLED = 4;
@@ -181,7 +179,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
             }
         }
 
-        $this->_flags[$pset->id] = $any_upi ? 0 : self::NO_UPI;
+        $this->_flags[$pset->id] = 0;
     }
 
     /** @param ?bool $anonymous */
@@ -286,41 +284,53 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         return $repoid ? $this->_repo[$repoid] ?? null : null;
     }
 
-    /** @return ?UserPsetInfo */
+    /** @return UserPsetInfo */
     function upi_for(Contact $user, Pset $pset) {
         $this->load_pset($pset);
-        if (($this->_flags[$pset->id] ?? 0) & self::NO_UPI) {
-            return null;
-        } else {
-            $upi = $this->_upi[$user->contactId] ?? null;
-            while ($upi && $upi->pset !== $pset->id) {
-                $upi = $upi->sset_next;
-            }
-            return $upi;
+        $upi = $this->_upi[$user->contactId] ?? null;
+        while ($upi && $upi->pset !== $pset->id) {
+            $upi = $upi->sset_next;
         }
+        if (!$upi) {
+            $upi = new UserPsetInfo($user->contactId, $pset->id);
+            $upi->sset_next = $this->_upi[$user->contactId] ?? null;
+            $this->_upi[$user->contactId] = $upi;
+        }
+        return $upi;
     }
 
     /** @return ?RepositoryPsetInfo */
     function rpi_for(Contact $user, Pset $pset) {
         if (!$pset->gitless_grades) {
             $this->load_pset($pset);
-            $repoid = $user->link(LINK_REPO, $pset->id);
-            $branchid = $user->branchid($pset);
-            $rpi = $this->_rpi[$repoid] ?? null;
-            while ($rpi && ($rpi->pset !== $pset->id || $rpi->branchid !== $branchid)) {
-                $rpi = $rpi->sset_next;
+            if (($repoid = $user->link(LINK_REPO, $pset->id))) {
+                $branchid = $user->branchid($pset);
+                $rpi = $this->_rpi[$repoid] ?? null;
+                while ($rpi && ($rpi->pset !== $pset->id || $rpi->branchid !== $branchid)) {
+                    $rpi = $rpi->sset_next;
+                }
+                if (!$rpi) {
+                    $rpi = new RepositoryPsetInfo($repoid, $branchid, $pset->id);
+                    $rpi->sset_next = $this->_rpi[$repoid] ?? null;
+                    $this->_rpi[$repoid] = $rpi;
+                }
+                return $rpi;
             }
-            return $rpi;
-        } else {
-            return null;
         }
+        return null;
     }
 
-    /** @return ?CommitPsetInfo */
-    function cpi_for($bhash, Pset $pset) {
+    /** @param non-empty-string $bhash
+     * @return CommitPsetInfo */
+    function cpi_for(Pset $pset, $bhash, Repository $repo) {
         $cpi = $this->_cpi[$bhash] ?? null;
         while ($cpi && $cpi->pset !== $pset->id) {
             $cpi = $cpi->sset_next;
+        }
+        if (!$cpi) {
+            $cpi = new CommitPsetInfo($pset->id, $bhash, $repo->repoid);
+            $cpi->sset_next = $this->_cpi[$bhash] ?? null;
+            $this->_cpi[$bhash] = $cpi;
         }
         return $cpi;
     }

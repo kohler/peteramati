@@ -12,76 +12,90 @@ class RepositoryPsetInfo {
     public $pset;
     /** @var ?non-empty-string */
     public $gradebhash;
-    /** @var ?non-empty-string */
-    public $gradehash;
     /** @var ?int */
     public $commitat;
     /** @var ?int */
     public $gradercid;
     /** @var int */
-    public $hidegrade;
+    public $hidegrade = 0;
     /** @var int */
-    public $placeholder;
+    public $placeholder = 1;
     /** @var ?int */
     public $placeholder_at;
+    /** @var ?int */
+    public $emptydiff_at;
+    /** @var ?int */
+    public $rpnotesversion;
     /** @var ?string */
     public $rpnotes;
     /** @var ?string */
-    private $rpnotesOverflow;
+    public $rpxnotes;
+
+    /** @var ?non-empty-string */
+    public $gradehash;
     /** @var ?object */
     private $jrpnotes;
-    /** @var ?string */
-    public $rpxnotes;
-    /** @var ?string */
-    private $rpxnotesOverflow;
     /** @var ?object */
     private $jrpxnotes;
-    /** @var ?int */
-    public $rpnotesversion;
-    /** @var ?int */
-    public $emptydiff_at;
-
     /** @var ?RepositoryPsetInfo */
     public $sset_next;
+    /** @var bool */
+    public $phantom = true;
 
-    private function merge() {
-        $this->repoid = (int) $this->repoid;
-        $this->branchid = (int) $this->branchid;
-        $this->pset = (int) $this->pset;
-        if (isset($this->gradebhash)) {
-            /** @phan-suppress-next-line PhanTypeMismatchProperty */
-            $this->gradehash = bin2hex($this->gradebhash);
-        }
-        if (isset($this->commitat)) {
-            $this->commitat = (int) $this->commitat;
-        }
-        if (isset($this->gradercid)) {
-            $this->gradercid = (int) $this->gradercid;
-        }
-        $this->hidegrade = (int) $this->hidegrade;
-        $this->placeholder = (int) $this->placeholder;
-        if (isset($this->placeholder_at)) {
-            $this->placeholder_at = (int) $this->placeholder_at;
-        }
-        $this->rpnotes = $this->rpnotesOverflow ?? $this->rpnotes;
-        $this->rpnotesOverflow = null;
-        if (isset($this->rpnotesversion)) {
-            $this->rpnotesversion = (int) $this->rpnotesversion;
-        }
-        $this->rpxnotes = $this->rpxnotesOverflow ?? $this->rpxnotes;
-        $this->rpxnotesOverflow = null;
-        if (isset($this->emptydiff_at)) {
-            $this->emptydiff_at = (int) $this->emptydiff_at;
-        }
+    /** @param int $repoid
+     * @param int $branchid
+     * @param int $pset */
+    function __construct($repoid, $branchid, $pset) {
+        $this->repoid = $repoid;
+        $this->branchid = $branchid;
+        $this->pset = $pset;
     }
 
     /** @return ?RepositoryPsetInfo */
     static function fetch($result) {
-        $rp = $result->fetch_object("RepositoryPsetInfo");
-        if ($rp) {
-            $rp->merge();
+        if (($x = $result->fetch_object())) {
+            $rpi = new RepositoryPsetInfo((int) $x->repoid, (int) $x->branchid, (int) $x->pset);
+            $rpi->merge($x);
+            $rpi->phantom = false;
+            return $rpi;
+        } else {
+            return null;
         }
-        return $rp;
+    }
+
+    function reload(Conf $conf) {
+        $x = $conf->fetch_first_object("select * from RepositoryGrade where repoid=? and branchid=? and pset=?",
+            $this->repoid, $this->branchid, $this->pset);
+        $this->merge($x ?? new RepositoryPsetInfo($this->repoid, $this->branchid, $this->pset));
+        $this->phantom = !$x;
+    }
+
+    /** @param object $x */
+    private function merge($x) {
+        assert($this->repoid === (int) $x->repoid
+               && $this->branchid === (int) $x->branchid
+               && $this->pset === (int) $x->pset);
+        $this->gradebhash = $x->gradebhash;
+        $this->commitat = isset($x->commitat) ? (int) $x->commitat : null;
+        $this->gradercid = isset($x->gradercid) ? (int) $x->gradercid : null;
+        $this->hidegrade = (int) $x->hidegrade;
+        $this->placeholder = (int) $x->placeholder;
+        $this->placeholder_at = isset($x->placeholder_at) ? (int) $x->placeholder_at : null;
+        $this->emptydiff_at = isset($x->emptydiff_at) ? (int) $x->emptydiff_at : null;
+        $this->rpnotesversion = isset($x->rpnotesversion) ? (int) $x->rpnotesversion : null;
+        $this->rpnotes = $x->rpnotesOverflow ?? $x->rpnotes;
+        $this->rpxnotes = $x->rpxnotesOverflow ?? $x->rpxnotes;
+        $this->gradehash = isset($x->gradebhash) ? bin2hex($x->gradebhash) : null;
+        $this->jrpnotes = null;
+        $this->jrpxnotes = null;
+    }
+
+    function materialize(Conf $conf) {
+        if ($this->phantom) {
+            $conf->qe("insert into RepositoryGrade set repoid=?, branchid=?, pset=?, placeholder=1 on duplicate key update repoid=repoid",
+                $this->repoid, $this->branchid, $this->pset);
+            $this->reload($conf);
+        }
     }
 
 
@@ -94,12 +108,12 @@ class RepositoryPsetInfo {
     }
 
     /** @param ?string $rpnotes
-     * @param ?object $jrpnotes
-     * @param int $rpnotesversion */
-    function assign_rpnotes($rpnotes, $jrpnotes, $rpnotesversion) {
+     * @param ?object $jrpnotes */
+    function assign_rpnotes($rpnotes, $jrpnotes) {
         $this->rpnotes = $rpnotes;
         $this->jrpnotes = $jrpnotes;
-        $this->rpnotesversion = $rpnotesversion;
+        $this->rpnotesversion = $this->phantom ? 1 : $this->rpnotesversion + 1;
+        $this->phantom = false;
     }
 
 
@@ -114,6 +128,7 @@ class RepositoryPsetInfo {
     /** @param ?string $rpxnotes
      * @param ?object $jrpxnotes */
     function assign_rpxnotes($rpxnotes, $jrpxnotes) {
+        assert(!$this->phantom);
         $this->rpxnotes = $rpxnotes;
         $this->jrpxnotes = $jrpxnotes;
     }

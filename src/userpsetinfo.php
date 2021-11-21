@@ -17,72 +17,79 @@ class UserPsetInfo {
     /** @var ?int */
     public $studentupdateat;
     /** @var int */
-    public $hidegrade;
+    public $notesversion = 0;
     /** @var ?string */
     public $notes;
-    /** @var ?string */
-    private $notesOverflow;
-    /** @var ?object */
-    private $jnotes;
+    /** @var int */
+    public $hidegrade = 0;
+    /** @var int */
+    public $hasactiveflags = 0;
     /** @var ?string */
     public $xnotes;
-    /** @var ?string */
-    private $xnotesOverflow;
+
+    /** @var ?object */
+    private $jnotes;
     /** @var ?object */
     private $jxnotes;
-    /** @var int */
-    public $notesversion;
-    /** @var int */
-    public $hasactiveflags;
     /** @var ?list<UserPsetHistory> */
     private $_history;
     /** @var ?int */
     private $_history_v0;
     /** @var ?UserPsetInfo */
     public $sset_next;
+    /** @var bool */
+    public $phantom = true;
 
-    private function merge() {
-        $this->cid = (int) $this->cid;
-        $this->pset = (int) $this->pset;
-        $this->notesversion = (int) $this->notesversion;
-        if (isset($this->updateat)) {
-            $this->updateat = (int) $this->updateat;
-        }
-        if (isset($this->updateby)) {
-            $this->updateby = (int) $this->updateby;
-        }
-        if (isset($this->studentupdateat)) {
-            $this->studentupdateat = (int) $this->studentupdateat;
-        }
-        if (isset($this->gradercid)) {
-            $this->gradercid = (int) $this->gradercid;
-        }
-        $this->hidegrade = (int) $this->hidegrade;
-        $this->hasactiveflags = (int) $this->hasactiveflags;
-        $this->notes = $this->notesOverflow ?? $this->notes;
-        $this->notesOverflow = null;
-        $this->xnotes = $this->xnotesOverflow ?? $this->xnotes;
-        $this->xnotesOverflow = null;
+    /** @param int $cid
+     * @param int $pset */
+    function __construct($cid, $pset) {
+        $this->cid = $cid;
+        $this->pset = $pset;
     }
 
     /** @return ?UserPsetInfo */
     static function fetch($result) {
-        $upi = $result->fetch_object("UserPsetInfo");
-        if ($upi) {
-            $upi->merge();
+        if (($x = $result->fetch_object())) {
+            $upi = new UserPsetInfo((int) $x->cid, (int) $x->pset);
+            $upi->merge($x);
+            $upi->phantom = false;
+            return $upi;
+        } else {
+            return null;
         }
-        return $upi;
     }
 
-    /** @return UserPsetInfo */
-    static function make_new(Pset $pset, Contact $user) {
-        $upi = new UserPsetInfo;
-        $upi->cid = $user->contactId;
-        $upi->pset = $pset->id;
-        $upi->notesversion = 0;
-        $upi->hidegrade = 0;
-        $upi->hasactiveflags = 0;
-        return $upi;
+    function reload(Conf $conf) {
+        $x = $conf->fetch_first_object("select * from ContactGrade where cid=? and pset=?",
+            $this->cid, $this->pset);
+        $this->merge($x ?? new UserPsetInfo($this->cid, $this->pset));
+        $this->phantom = !$x;
+    }
+
+    /** @param object $x */
+    private function merge($x) {
+        assert($this->cid === (int) $x->cid && $this->pset === (int) $x->pset);
+        $this->updateat = isset($x->updateat) ? (int) $x->updateat : null;
+        $this->updateby = isset($x->updateby) ? (int) $x->updateby : null;
+        $this->studentupdateat = isset($x->studentupdateat) ? (int) $x->studentupdateat : null;
+        $this->gradercid = isset($x->gradercid) ? (int) $x->gradercid : null;
+        $this->notesversion = (int) $x->notesversion;
+        $this->notes = $x->notesOverflow ?? $x->notes;
+        $this->hidegrade = (int) $x->hidegrade;
+        $this->hasactiveflags = (int) $x->hasactiveflags;
+        $this->xnotes = $x->xnotesOverflow ?? $x->xnotes;
+        $this->jnotes = null;
+        $this->jxnotes = null;
+        $this->_history = null;
+        $this->_history_v0 = null;
+    }
+
+    function materialize(Conf $conf) {
+        if ($this->phantom) {
+            $conf->qe("insert into ContactGrade set cid=?, pset=? on duplicate key update cid=cid",
+                $this->cid, $this->pset);
+            $this->reload($conf);
+        }
     }
 
 
@@ -102,12 +109,12 @@ class UserPsetInfo {
     }
 
     /** @param ?string $notes
-     * @param ?object $jnotes
-     * @param int $notesversion */
-    function assign_notes($notes, $jnotes, $notesversion) {
+     * @param ?object $jnotes */
+    function assign_notes($notes, $jnotes) {
         $this->notes = $notes;
         $this->jnotes = $jnotes;
-        $this->notesversion = $notesversion;
+        $this->notesversion = $this->phantom ? 1 : $this->notesversion + 1;
+        $this->phantom = false;
     }
 
 
@@ -174,6 +181,7 @@ class UserPsetInfo {
     /** @param ?string $xnotes
      * @param ?object $jxnotes */
     function assign_xnotes($xnotes, $jxnotes) {
+        assert(!$this->phantom);
         $this->xnotes = $xnotes;
         $this->jxnotes = $jxnotes;
     }
