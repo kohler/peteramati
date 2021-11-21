@@ -115,9 +115,9 @@ class Pset {
      * @readonly */
     public $grades_vf;
     /** @var bool */
-    public $grades_visible;
+    public $scores_visible;
     /** @var int */
-    public $grades_visible_at;
+    public $scores_visible_at;
     /** @var bool */
     public $grades_history = false;
     /** @var ?string */
@@ -368,12 +368,12 @@ class Pset {
         }
         $this->grades_history = self::cbool($p, "grades_history") ?? false;
         $this->grades_selection_function = self::cstr($p, "grades_selection_function");
-        $gv = self::cdate($p, "grades_visible", "show_grades_to_students");
-        $this->grades_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
-        $this->grades_visible_at = is_int($gv) ? $gv : 0;
+        $gv = self::cdate($p, "scores_visible", "grades_visible", "show_grades_to_students");
+        $this->scores_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
+        $this->scores_visible_at = is_int($gv) ? $gv : 0;
         $this->grades_vf = [];
         $vis1 = !$this->disabled && $this->visible;
-        $vis2 = $vis1 && $this->grades_visible;
+        $vis2 = $vis1 && $this->scores_visible;
         foreach (array_values($this->grades) as $i => $ge) {
             $ge->pcview_index = $i;
             if ($ge->visible && $vis1 && ($vis2 || $ge->answer || $ge->concealed)) {
@@ -529,18 +529,18 @@ class Pset {
     }
 
     /** @return bool */
-    function student_can_view_scores() {
-        return $this->student_can_view() && $this->grades_visible;
+    function student_scores_visible() {
+        return $this->student_can_view() && $this->scores_visible;
     }
 
     /** @return bool */
     function student_can_view_grades() {
         return $this->student_can_view()
-            && ($this->has_answers || $this->grades_visible);
+            && ($this->has_answers || $this->scores_visible);
     }
 
     /** @return bool */
-    function student_can_edit_answers() {
+    function student_answers_editable() {
         return $this->student_can_view()
             && $this->has_answers
             && !$this->frozen;

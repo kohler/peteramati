@@ -684,7 +684,7 @@ function gradelist_resolve_section(gi, ge, insp) {
     if (gi.section_has(ge, xge => xge.type === "markdown")) {
         t += '<button class="btn ui pa-grade-toggle-markdown need-tooltip" aria-label="Toggle Markdown">M</button>';
     }
-    if (gi.editable_scores && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
+    if (gi.scores_editable && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
         t += '<button class="btn ui pa-grade-toggle-answer need-tootlip" aria-label="Toggle answer editing">E</button>';
     }
     let e = insp.firstChild;
@@ -854,11 +854,11 @@ function pa_resolve_gradelist() {
         sidebare = null,
         sectioned = gi.has(xge => xge.description || xge.answer ||
                 xge.type === "section" ||
-                (xge.type === "markdown" && gi.editable_answers === false)),
-        section_class = "pa-dg pa-gsection".concat(gi.editable_scores ? " pa-hide-description" : "");
+                (xge.type === "markdown" && gi.answers_editable === false)),
+        section_class = "pa-dg pa-gsection".concat(gi.scores_editable ? " pa-hide-description" : "");
     for (let i = 0; i !== gi.order.length; ++i) {
         const k = gi.order[i], ge = gi.entries[k];
-        if (!gi.editable_scores && ge.concealed) {
+        if (!gi.scores_editable && ge.concealed) {
             continue;
         }
 
@@ -1184,7 +1184,7 @@ function pa_render_pset_table(pconf, data) {
         $overlay = null, name_col, slist_input,
         $gdialog, gdialog_self, gdialog_su,
         flagged = pconf.flagged_commits,
-        visible = pconf.grades_visible,
+        visible = pconf.scores_visible,
         table_entries, need_ngrades,
         sort = {
             f: flagged ? "at" : "username", last: true, rev: 1

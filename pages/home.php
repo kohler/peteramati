@@ -370,22 +370,25 @@ function reconfig($user, $qreq) {
     $old_pset = new Pset($user->conf, $psetkey, $json->$psetkey);
 
     $o = (object) array();
-    $o->disabled = $o->visible = $o->grades_visible = null;
+    $o->disabled = $o->visible = $o->grades_visible = $o->scores_visible = null;
     $state = $_POST["state"] ?? null;
+    if ($state === "grades_visible") {
+        $state = "scores_visible";
+    }
     if ($state === "disabled") {
         $o->disabled = true;
     } else if ($old_pset->disabled) {
         $o->disabled = false;
     }
-    if ($state === "visible" || $state === "grades_visible") {
+    if ($state === "visible" || $state === "scores_visible") {
         $o->visible = true;
     } else if (!$old_pset->disabled && $old_pset->visible) {
         $o->visible = false;
     }
-    if ($state === "grades_visible") {
-        $o->grades_visible = true;
-    } else if ($state === "visible" && $old_pset->grades_visible) {
-        $o->grades_visible = false;
+    if ($state === "scores_visible") {
+        $o->scores_visible = true;
+    } else if ($state === "visible" && $old_pset->scores_visible) {
+        $o->scores_visible = false;
     }
 
     if (($_POST["frozen"] ?? null) === "yes") {
@@ -651,7 +654,7 @@ function home_psetview(Pset $pset, Contact $user, Contact $viewer) {
             && $viewer === $user
             && !$pset->partner
             && !$pset->upi_for($user)
-            && !$pset->student_can_edit_answers())) {
+            && !$pset->student_answers_editable())) {
         return null;
     } else {
         return PsetView::make($pset, $user, $viewer);
@@ -908,15 +911,15 @@ function show_pset_actions($pset) {
     $options = array("disabled" => "Disabled",
                      "invisible" => "Hidden",
                      "visible" => "Visible without grades",
-                     "grades_visible" => "Visible with grades");
+                     "scores_visible" => "Visible with grades");
     if ($pset->disabled) {
         $state = "disabled";
     } else if (!$pset->visible) {
         $state = "invisible";
-    } else if (!$pset->grades_visible) {
+    } else if (!$pset->scores_visible) {
         $state = "visible";
     } else {
-        $state = "grades_visible";
+        $state = "scores_visible";
     }
     echo Ht::select("state", $options, $state);
 
@@ -953,7 +956,7 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
         if ($t0 - $MicroNow < 0.2
             && !$info->user->dropped
             && !$Profile
-            && $pset->student_can_view_scores()) {
+            && $pset->student_scores_visible()) {
             $info->update_placeholder(function ($info, $rpi) use ($t0) {
                 $placeholder_at = $rpi ? $rpi->placeholder_at : 0;
                 if ($rpi && !$rpi->placeholder) {
@@ -1095,7 +1098,7 @@ function show_pset_table($sset) {
 
     $rows = array();
     $incomplete = $incompleteu = [];
-    $grades_visible = false;
+    $scores_visible = false;
     $jx = [];
     $gradercounts = [];
     $gex = new GradeExport($pset, true);
@@ -1124,7 +1127,7 @@ function show_pset_table($sset) {
                 $incompleteu[] = "~" . urlencode($u);
             }
             if ($s->user_can_view_grade()) {
-                $grades_visible = true;
+                $scores_visible = true;
             }
         }
     }
@@ -1153,7 +1156,8 @@ function show_pset_table($sset) {
         "gitless" => $pset->gitless,
         "gitless_grades" => $pset->gitless_grades,
         "key" => $pset->urlkey,
-        "title" => $pset->title
+        "title" => $pset->title,
+        "scores_visible" => $pset->student_scores_visible()
     ];
     if ($anonymous) {
         $jd["can_override_anonymous"] = true;
@@ -1171,8 +1175,8 @@ function show_pset_table($sset) {
     } else if ($nintotal == 1) {
         $jd["total_key"] = $last_in_total;
     }
-    if ($grades_visible) {
-        $jd["grades_visible"] = true;
+    if ($scores_visible) {
+        $jd["scores_visible"] = true;
     }
     echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){$pa.render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 

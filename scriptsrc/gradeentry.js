@@ -16,7 +16,7 @@ const gradesheet_props = {
     "late_hours": true, "auto_late_hours": true, "updateat": true,
     "version": true, "history": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,
-    "user_visible_scores": true, "editable_scores": true, "editable_answers": true,
+    "user_scores_visible": true, "scores_editable": true, "answers_editable": true,
     "linenotes": true
 };
 
@@ -121,12 +121,12 @@ export class GradeEntry {
     render(gi, mode) {
         if (mode == null) {
             mode = !this.readonly
-                && (this.answer ? gi.editable_answers : gi.editable_scores) ? 2 : 0;
+                && (this.answer ? gi.answers_editable : gi.scores_editable) ? 2 : 0;
         }
         const id = "pe-ge" + ++id_counter;
         let hsv;
         if (this.visible == null) {
-            hsv = !this.answer && gi.user_visible_scores === false;
+            hsv = !this.answer && gi.user_scores_visible === false;
         } else {
             hsv = this.visible === false || this.visible === "none";
         }
@@ -574,7 +574,7 @@ export class GradeSheet {
 
     section_wants_sidebar(ge) {
         let answer = 0;
-        return this.editable_scores && this.section_has(ge, gei => {
+        return this.scores_editable && this.section_has(ge, gei => {
             answer |= gei.answer ? 1 : 2;
             return answer === 3;
         });

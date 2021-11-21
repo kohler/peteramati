@@ -277,7 +277,7 @@ this format.
 
 These other problem set components relate to grade display.
 
-* `grades_visible`: boolean or date
+* `scores_visible`: boolean or date
 
     Set to true to make grades visible to students. Implies `visible: true`.
 

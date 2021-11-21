@@ -51,7 +51,7 @@ function render_form($tr, note, transition) {
         '<div class="aab aabr pa-note-aa">' +
         '<div class="aabut"><button class="btn-primary" type="submit">Save comment</button></div>' +
         '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
-    if (!gi.user_visible_scores) {
+    if (!gi.user_scores_visible) {
         t += '<div class="aabut"><label><input type="checkbox" name="iscomment" value="1">Show immediately</label></div>';
     }
     var $form = $(t + '</div></form>').appendTo($td);

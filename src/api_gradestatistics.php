@@ -121,8 +121,8 @@ class GradeStatistics_API {
         }
         $has_extra = $has_xextra = false;
 
-        if ($pset->grades_visible_at) {
-            $notdropped = "(not c.dropped or c.dropped<$pset->grades_visible_at)";
+        if ($pset->scores_visible_at) {
+            $notdropped = "(not c.dropped or c.dropped<{$pset->scores_visible_at})";
         } else {
             $notdropped = "not c.dropped";
         }

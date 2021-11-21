@@ -1137,8 +1137,8 @@ class PsetView {
             $maybe = $xpi
                 && ($xpi->hidegrade < 0
                     || ($xpi->hidegrade == 0
-                        && $this->pset->student_can_view_scores()));
-            if ($maybe || $this->pset->student_can_edit_answers()) {
+                        && $this->pset->student_scores_visible()));
+            if ($maybe || $this->pset->student_answers_editable()) {
                 foreach ($this->visible_grades(false) as $ge) {
                     if ($ge->answer || $ge->concealed) {
                         $this->_user_can_view_grade = true;
@@ -1199,7 +1199,7 @@ class PsetView {
     /** @return bool */
     function can_edit_grade() {
         return $this->can_view_grade()
-            && ($this->pc_view || $this->pset->student_can_edit_answers());
+            && ($this->pc_view || $this->pset->student_answers_editable());
     }
 
     /** @return bool */
@@ -1731,12 +1731,12 @@ class PsetView {
             $gexp->updateat = $ts;
         }
         if ($this->user_can_view_score()) {
-            $gexp->user_visible_scores = true;
+            $gexp->user_scores_visible = true;
         }
         if ($this->can_edit_scores()) {
-            $gexp->editable_scores = true;
+            $gexp->scores_editable = true;
         } else {
-            $gexp->editable_answers = !$this->pset->frozen;
+            $gexp->answers_editable = !$this->pset->frozen;
         }
         // maybe hide extra-credits that are missing
         if (!$gexp->pc_view) {
@@ -1808,7 +1808,7 @@ class PsetView {
     function info_json() {
         $r = ["uid" => $this->user->contactId, "user" => $this->user_linkpart()];
         if ($this->user_can_view_score()) {
-            $r["user_visible_scores"] = true;
+            $r["user_scores_visible"] = true;
         }
         return $r;
     }

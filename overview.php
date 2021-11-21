@@ -26,7 +26,7 @@ foreach ($Conf->psets() as $pset) {
         if ($pset->anonymous)
             $any_anonymous = true;
         echo '<div class="pa-grgraph';
-        if (!$pset->grades_visible)
+        if (!$pset->scores_visible)
             echo ' pa-pset-hidden';
         echo '" data-pa-pset="', $pset->urlkey, '">';
         echo '<a class="qq ui js-grgraph-flip prev" href="">&lt;</a>';

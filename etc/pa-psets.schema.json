@@ -80,7 +80,7 @@
                 "deadline": {},
                 "grades": {},
                 "grade_order": {},
-                "grades_visible": {},
+                "scores_visible": {},
                 "grade_statistics_visible": {},
                 "grade_cdf_cutoff": {},
                 "separate_extension_grades": {},

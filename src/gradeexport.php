@@ -40,11 +40,11 @@ class GradeExport implements JsonSerializable {
     /** @var null|int */
     public $auto_late_hours;
     /** @var ?bool */
-    public $user_visible_scores;
+    public $user_scores_visible;
     /** @var ?bool */
-    public $editable_scores;
+    public $scores_editable;
     /** @var ?bool */
-    public $editable_answers;
+    public $answers_editable;
     /** @var ?LineNotesOrder */
     public $lnorder;
     /** @var ?list<GradeEntryConfig> */
@@ -196,14 +196,14 @@ class GradeExport implements JsonSerializable {
             if ($this->answer_version !== null) {
                 $r["answer_version"] = $this->answer_version;
             }
-            if ($this->user_visible_scores !== null) {
-                $r["user_visible_scores"] = $this->user_visible_scores;
+            if ($this->user_scores_visible !== null) {
+                $r["user_scores_visible"] = $this->user_scores_visible;
             }
-            if ($this->editable_scores !== null) {
-                $r["editable_scores"] = $this->editable_scores;
+            if ($this->scores_editable !== null) {
+                $r["scores_editable"] = $this->scores_editable;
             }
-            if ($this->editable_answers !== null) {
-                $r["editable_answers"] = $this->editable_answers;
+            if ($this->answers_editable !== null) {
+                $r["answers_editable"] = $this->answers_editable;
             }
             if ($this->lnorder !== null) {
                 foreach ($this->value_entries() as $ge) {
