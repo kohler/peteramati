@@ -2332,12 +2332,12 @@ function pa_render_pset_table(pconf, data) {
         } else if (this.name === "save-grader"
                    && f.elements.gradertype.value === "clear") {
             for (let su of gdialog_su) {
-                us[su.uid].grader = 0;
+                us[su.uid].gradercid = 0;
             }
         } else if (this.name === "save-grader"
                    && f.elements.gradertype.value === "previous") {
             for (let su of gdialog_su) {
-                us[su.uid].grader = "previous";
+                us[su.uid].gradercid = "previous";
             }
         } else if (this.name === "save-grader") {
             let gr = [], gri = [], grn = 0;
