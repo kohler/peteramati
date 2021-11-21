@@ -1957,6 +1957,12 @@ class Conf {
         if ($Me && $Me->is_pclike()) {
             $siteinfo["user"]["is_pclike"] = true;
         }
+        if ($Me && $Me->privChair) {
+            $siteinfo["user"]["is_admin"] = true;
+        }
+        if ($Me) {
+            $siteinfo["user"]["cid"] = $Me->contactId;
+        }
         foreach ($this->_siteinfo ?? [] as $k => $v) {
             $siteinfo[$k] = $v;
         }
@@ -2628,6 +2634,7 @@ class Conf {
             "filediff" => "15 Repo_API::filediff",
             "flag" => "15 Flag_API::flag",
             "grade" => "3 Grade_API::grade",
+            "gradesettings" => "3 Grade_API::gradesettings",
             "gradestatistics" => "3 GradeStatistics_API::run",
             "jserror" => "1 JSError_API::jserror",
             "latestcommit" => "1 Repo_API::latestcommit",

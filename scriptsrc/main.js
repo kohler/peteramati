@@ -1180,7 +1180,7 @@ handle_ui.on("pa-anonymized-link", function (event) {
 });
 
 function pa_render_pset_table(pconf, data) {
-    var $j = $(this), table_width = 0, dmap = [],
+    var $j = $(this), table_width = 0, smap = [],
         $overlay = null, name_col, slist_input,
         $gdialog, gdialog_self, gdialog_su,
         flagged = pconf.flagged_commits,
@@ -1345,11 +1345,17 @@ function pa_render_pset_table(pconf, data) {
         },
         grader: {
             th: '<th class="gt-grader l plsortable" data-pa-sort="grader" scope="col">Grader</th>',
+            td_html: function (s) {
+                if (s.gradercid && siteinfo.pc[s.gradercid]) {
+                    return grader_name(siteinfo.pc[s.gradercid]);
+                } else if (s.gradercid) {
+                    return "???";
+                } else {
+                    return "";
+                }
+            },
             td: function (s) {
-                var t = s.gradercid ? "???" : "";
-                if (s.gradercid && siteinfo.pc[s.gradercid])
-                    t = grader_name(siteinfo.pc[s.gradercid]);
-                return '<td class="gt-grader">' + t + '</td>';
+                return '<td class="gt-grader">'.concat(this.td_html(s), '</td>');
             },
             tw: 6,
             sort_forward: true,
@@ -1436,15 +1442,15 @@ function pa_render_pset_table(pconf, data) {
             th: function () {
                 return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="grade', this.gidx, '" scope="col" title="', escape_entities(this.ge.title_text), '">', this.ge.abbr(), '</th>');
             },
-            td: function (s, rownum, text) {
-                let gr = s.grades[this.gidx],
-                    gt = escape_entities(this.ge.tcell(gr));
-                if (text) {
-                    return gt;
-                } else {
-                    const hl = s.highlight_grades && s.highlight_grades[this.gkey];
-                    return (hl ? '<td class="gt-highlight ' : '<td class="').concat(this.className, '">', gt, '</td>');
-                }
+            td_text: function (s) {
+                const gr = s.grades[this.gidx];
+                return this.ge.tcell(gr);
+            },
+            td: function (s) {
+                const gr = s.grades[this.gidx],
+                    hl = s.highlight_grades && s.highlight_grades[this.gkey];
+                return '<td class="'.concat(hl ? 'gt-highlight ' : '', this.className, '">',
+                    escape_entities(this.ge.tcell(gr)), '</td>');
             },
             tw: function () {
                 const w = this.ge.abbr().length * 0.5 + 1.5;
@@ -1788,7 +1794,7 @@ function pa_render_pset_table(pconf, data) {
         if (display_last_first !== displaying_last_first) {
             displaying_last_first = display_last_first;
             $b.find(".gt-name, .gt-name2").html(function () {
-                var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
+                var s = smap[this.parentNode.getAttribute("data-pa-spos")];
                 return render_display_name(s, hasClass(this, "gt-name2"));
             });
         }
@@ -1806,23 +1812,23 @@ function pa_render_pset_table(pconf, data) {
         slist_input && assign_slist();
         wstorage.site(true, "pa-pset" + pconf.id + "-table", JSON.stringify(sort));
     }
-    function make_umap() {
-        var umap = {}, tr = $j.find("tbody")[0].firstChild;
+    function make_uid2tr() {
+        var uid2tr = {}, tr = $j.find("tbody")[0].firstChild;
         while (tr) {
-            umap[tr.getAttribute("data-pa-uid")] = tr;
+            uid2tr[tr.getAttribute("data-pa-uid")] = tr;
             tr = tr.nextSibling;
         }
-        return umap;
+        return uid2tr;
     }
     function rerender_usernames() {
         var $x = $overlay ? $([$j[0], $overlay[0]]) : $j;
         $x.find("td.gt-username").each(function () {
-            var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
+            var s = smap[this.parentNode.getAttribute("data-pa-spos")];
             $(this).html(render_username_td(s));
         });
         $x.find("th.gt-username > span.heading").html(anonymous || !sort.email ? "Username" : "Email");
         $x.find("td.gt-name2").each(function () {
-            var s = dmap[this.parentNode.getAttribute("data-pa-spos")];
+            var s = smap[this.parentNode.getAttribute("data-pa-spos")];
             $(this).html(render_display_name(s, true));
         });
         $x.find("th.gt-name2 > span.heading").html(anonymous ? "Username" : "Name");
@@ -1841,7 +1847,7 @@ function pa_render_pset_table(pconf, data) {
         display_anon();
         rerender_usernames();
         $j.find("tbody input.gt-check").each(function () {
-            var s = dmap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
+            var s = smap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
             this.setAttribute("name", render_checkbox_name(s));
         });
         sort_data();
@@ -1893,7 +1899,7 @@ function pa_render_pset_table(pconf, data) {
                 t += '"><td></td>';
                 for (let i = li; i !== ri; ++i) {
                     t += '<td style="height:' + tr.childNodes[i].clientHeight +
-                        'px"' + col[i].td.call(col[i], dmap[spos], "").substring(3);
+                        'px"' + col[i].td.call(col[i], smap[spos], "").substring(3);
                 }
                 a.push(t + '</tr>');
             }
@@ -2026,20 +2032,16 @@ function pa_render_pset_table(pconf, data) {
         resort();
     }
 
-    function gdialog_change() {
-        toggleClass(this.closest(".pa-pv"), "pa-grade-changed",
-                    this.hasAttribute("data-pa-unmixed") || input_differs(this));
-    }
-    function grade_update(umap, rv, gorder) {
-        var tr = umap[rv.uid],
-            su = dmap[tr.getAttribute("data-pa-spos")],
-            ngrades_nonempty = 0;
-        for (var i = 0; i !== gorder.length; ++i) {
-            var k = gorder[i], ge = pconf.grades.entries[k], c;
+    function grade_update(uid2tr, rv, gorder) {
+        const tr = uid2tr[rv.uid],
+            su = smap[tr.getAttribute("data-pa-spos")];
+        let ngrades_nonempty = 0;
+        for (let i = 0; i !== gorder.length; ++i) {
+            let k = gorder[i], ge = pconf.grades.entries[k], c;
             if (ge && ge.gpos != null && (c = col[ge.colpos])) {
                 if (su.grades[ge.gpos] !== rv.grades[i]) {
                     su.grades[ge.gpos] = rv.grades[i];
-                    tr.childNodes[ge.colpos].innerText = c.td.call(c, su, null, true);
+                    tr.childNodes[ge.colpos].innerText = c.td_text.call(c, su);
                 }
                 if (rv.grades[i] != null && rv.grades[i] !== "") {
                     ++ngrades_nonempty;
@@ -2059,6 +2061,20 @@ function pa_render_pset_table(pconf, data) {
                 tr.childNodes[ngrades_colpos].innerText = su.ngrades_nonempty || "";
         }
     }
+    function gradesetting_update(uid2tr, rv) {
+        const tr = uid2tr[rv.uid],
+            su = smap[tr.getAttribute("data-pa-spos")],
+            gradercol = colmap.grader,
+            notescol = colmap.notes;
+        Object.assign(su, rv);
+        if (gradercol) {
+            tr.childNodes[gradercol.index].innerHTML = gradercol.td_html.call(gradercol, su);
+        }
+        if (notescol) {
+            tr.childNodes[notescol.index].innerHTML = notescol.td_html.call(notescol, su);
+        }
+    }
+
     function gdialog_store_start(rv) {
         $gdialog.find(".has-error").removeClass("has-error");
         if (rv.ok) {
@@ -2073,7 +2089,7 @@ function pa_render_pset_table(pconf, data) {
             }
         }
     }
-    function gdialog_grademany() {
+    function gdialog_gradesheet_submit() {
         const $gsi = $gdialog.find(".pa-gdialog-gradesheet input"),
             ge = [], us = [];
         for (let i = 0; i !== $gsi.length; ++i) {
@@ -2103,7 +2119,7 @@ function pa_render_pset_table(pconf, data) {
         let any = false, byuid = {};
         if (gradesheet_mode) {
             if (!next) {
-                gdialog_grademany();
+                gdialog_gradesheet_submit();
                 return;
             }
         } else {
@@ -2134,7 +2150,7 @@ function pa_render_pset_table(pconf, data) {
             .then(function (rv) {
                 gdialog_store_start(rv);
                 if (rv.ok) {
-                    grade_update(make_umap(), rv, rv.value_order || rv.order);
+                    grade_update(make_uid2tr(), rv, rv.value_order || rv.order);
                     next();
                 }
             });
@@ -2152,9 +2168,9 @@ function pa_render_pset_table(pconf, data) {
             .then(function (rv) {
                 gdialog_store_start(rv);
                 if (rv.ok) {
-                    const umap = make_umap();
-                    for (let i in rv.us) {
-                        grade_update(umap, rv.us[i], rv.value_order || rv.order);
+                    const uid2tr = make_uid2tr();
+                    for (let rvu of rv.us) {
+                        grade_update(uid2tr, rvu, rv.value_order || rv.order);
                     }
                     next();
                 }
@@ -2164,9 +2180,6 @@ function pa_render_pset_table(pconf, data) {
     function gdialog_traverse() {
         const next_spos = this.getAttribute("data-pa-spos");
         gdialog_store(function () { gdialog_fill([next_spos]); });
-    }
-    function gdialog_clear_error() {
-        removeClass(this, "has-error");
     }
     function gdialog_fill_user(su1) {
         let t;
@@ -2192,7 +2205,7 @@ function pa_render_pset_table(pconf, data) {
     function gdialog_fill(spos) {
         gdialog_su = [];
         for (let i = 0; i !== spos.length; ++i) {
-            gdialog_su.push(dmap[spos[i]]);
+            gdialog_su.push(smap[spos[i]]);
         }
         $gdialog.find("h2").html(escape_entities(pconf.title) + " : " +
             gdialog_su.map(function (su) {
@@ -2240,16 +2253,23 @@ function pa_render_pset_table(pconf, data) {
         } else if (event.key === "Esc" || event.key === "Escape") {
             event.stopImmediatePropagation();
             $gdialog.close();
-        } else if (event.key === "Backspace" && this.hasAttribute("placeholder")) {
-            gdialog_input.call(this);
+        } else if (event.key === "Backspace"
+                   && this.hasAttribute("placeholder")
+                   && this.closest(".pa-gradelist")) {
+            gdialog_gradelist_input.call(this);
         }
     }
-    function gdialog_input() {
+    function gdialog_gradelist_input() {
+        removeClass(this, "has-error");
         if (this.hasAttribute("placeholder")) {
             this.setAttribute("data-pa-unmixed", 1);
             this.removeAttribute("placeholder");
-            gdialog_change.call(this);
+            gdialog_gradelist_change.call(this);
         }
+    }
+    function gdialog_gradelist_change() {
+        toggleClass(this.closest(".pa-pv"), "pa-grade-changed",
+                    this.hasAttribute("data-pa-unmixed") || input_differs(this));
     }
     function gdialog_section_click(event) {
         if (event.type === "click" && !event.shiftKey) {
@@ -2265,25 +2285,19 @@ function pa_render_pset_table(pconf, data) {
     }
     function gdialog_mode_values() {
         const gl = $gdialog.find(".pa-gradelist")[0];
-        if (gl.firstChild === null) {
+        if (!gl.firstChild) {
             const gi = GradeSheet.closest(gl);
             for (let i = 0; i !== table_entries.length; ++i) {
                 gl.appendChild(table_entries[i].render(gi, 1));
             }
         }
+        $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         gl.classList.remove("hidden");
-        if (gl.nextSibling.classList.contains("pa-gdialog-gradesheet")) {
-            gl.nextSibling.classList.add("hidden");
-        }
-        $gdialog.find("button[name=bsubmit]").text("Save");
+        $gdialog.find("button[name=bsubmit]").text("Save").removeClass("hidden");
     }
     function gdialog_mode_gradesheet() {
-        const gl = $gdialog.find(".pa-gradelist")[0];
-        let gs = gl.nextSibling;
-        if (!gs || !gs.classList.contains("pa-gdialog-gradesheet")) {
-            gs = document.createElement("div");
-            gs.className = "pa-gdialog-gradesheet";
-            gl.parentElement.insertBefore(gs, gl.nextSibling);
+        const gs = $gdialog.find(".pa-gdialog-gradesheet")[0];
+        if (!gs.firstChild) {
             const yc = new HtmlCollector;
             let in_section = false;
             for (let i = 0; i !== pconf.grades.order.length; ++i) {
@@ -2295,14 +2309,189 @@ function pa_render_pset_table(pconf, data) {
             }
             gs.innerHTML = yc.render();
         }
-        gl.classList.add("hidden");
+        $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         gs.classList.remove("hidden");
-        $gdialog.find("button[name=bsubmit]").text("Edit gradesheet");
+        $gdialog.find("button[name=bsubmit]").text("Edit gradesheet").removeClass("hidden");
+    }
+    function gdialog_settings_submit() {
+        const gs = $gdialog.find(".pa-gdialog-settings")[0],
+            f = gs.closest("form"),
+            us = {};
+        for (let su of gdialog_su) {
+            us[su.uid] = {uid: su.uid};
+        }
+        if (this.name === "save-gvis") {
+            let gvisarg;
+            $(gs).find(".pa-gvis").each(function () {
+                if (this.checked && !this.indeterminate)
+                    gvisarg = JSON.parse(this.value);
+            });
+            for (let su of gdialog_su) {
+                us[su.uid].pinned_scores_visible = gvisarg;
+            }
+        } else if (this.name === "save-grader"
+                   && f.elements.gradertype.value === "clear") {
+            for (let su of gdialog_su) {
+                us[su.uid].grader = 0;
+            }
+        } else if (this.name === "save-grader"
+                   && f.elements.gradertype.value === "previous") {
+            for (let su of gdialog_su) {
+                us[su.uid].grader = "previous";
+            }
+        } else if (this.name === "save-grader") {
+            let gr = [], gri = [], grn = 0;
+            $(gs).find(".pa-grader").each(function () {
+                if (this.checked && !this.indeterminate) {
+                    gr.push(+this.name.substring(6));
+                    gri.push(1);
+                    ++grn;
+                }
+            });
+            if (grn) {
+                for (let su of gdialog_su) {
+                    let trigger = Math.floor(Math.random() * grn), gi = 0;
+                    while (trigger >= gri[gi]) {
+                        trigger -= Math.max(gri[gi], 0);
+                        ++gi;
+                    }
+                    us[su.uid].gradercid = gr[gi];
+                    grn -= Math.min(gri[gi], 1);
+                    --gri[gi];
+                    if (grn <= 0) {
+                        grn = 0;
+                        for (gi in gri) {
+                            ++gri[gi];
+                            grn += Math.max(gri[gi], 0);
+                        }
+                    }
+                }
+            }
+        }
+        let usc = Object.values(us), usci = 0;
+        function more() {
+            const byuid = usc.slice(usci, 32);
+            usci += byuid.length;
+            api_conditioner(hoturl_post("api/gradesettings", {pset: pconf.key}),
+                {us: JSON.stringify(byuid)})
+            .then(function (rv) {
+                gdialog_store_start(rv);
+                if (rv.ok && rv.us) {
+                    const uid2tr = make_uid2tr();
+                    for (let rvu of Object.values(rv.us)) {
+                        gradesetting_update(uid2tr, rvu);
+                    }
+                }
+                if (rv.ok && usci < usc.length) {
+                    more();
+                } else {
+                    $gdialog.close();
+                }
+            })
+        }
+        more();
+    }
+    function gdialog_settings_gvis_click() {
+        const gs = $gdialog.find(".pa-gdialog-settings")[0];
+        $(gs).find(".pa-gvis").prop("checked", false).prop("indeterminate", false);
+        this.checked = true;
+    }
+    function gdialog_settings_grader_click() {
+        const gs = $gdialog.find(".pa-gdialog-settings")[0], self = this;
+        $(gs).find(".pa-grader:indeterminate").each(function () {
+            if (self !== this && this.indeterminate) {
+                this.checked = false;
+            }
+            this.indeterminate = false;
+        });
+        if (this.checked) {
+            gs.closest("form").elements.gradertype.value = "set";
+        } else {
+            setTimeout(function () {
+                if ($(gs).find(".pa-grader:checked").length === 0)
+                    gs.closest("form").elements.gradertype.value = "clear";
+            }, 0);
+        }
+    }
+    function gdialog_mode_settings() {
+        const gs = $gdialog.find(".pa-gdialog-settings")[0], f = gs.closest("form");
+        if (!gs.firstChild) {
+            const yc = new HtmlCollector;
+            yc.push('<fieldset class="mb-3"><legend>Grade visibility</legend>', '</fieldset>');
+            yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="true" class="uic pa-gvis"></span>Visible</label>');
+            yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="false" class="uic pa-gvis"></span>Hidden</label>');
+            yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="null" class="uic pa-gvis"></span>Default (' + (pconf.scores_visible ? 'visible' : 'hidden') + ')</label>');
+            yc.push('<div class="popup-actions"><button type="button" class="btn btn-primary" name="save-gvis">Save</button></div>');
+            yc.pop();
+
+            yc.push('<fieldset><legend>Grader</legend>', '</fieldset>');
+            yc.push('<label class="checki"><span class="checkc"><input type="radio" name="gradertype" value="clear" class="uic"></span>Clear</label>');
+            //yc.push('<label class="checki"><span class="checkc"><input type="radio" name="gradertype" value="previous" class="uic"></span>Adopt from previous problem set</label>');
+            yc.push('<label class="checki"><span class="checkc"><input type="radio" name="gradertype" value="set" class="uic"></span>Set grader</label>');
+            yc.push('<div class="checki mt-1 multicol-3">', '</div>');
+            for (let i = 0; i !== siteinfo.pc.__order__.length; ++i) {
+                const cid = siteinfo.pc.__order__[i], pc = siteinfo.pc[cid];
+                yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="grader'.concat(cid, '" class="uic js-range-click pa-grader" data-range-type="grader"></span>', escape_entities(pc.name), '<span class="ct small dim"></span></label>'));
+            }
+            yc.pop();
+            yc.push('<div class="popup-actions"><button type="button" class="btn btn-primary" name="save-grader">Save</button></div>');
+            gs.innerHTML = yc.render();
+            $(gs).on("click", "button", gdialog_settings_submit);
+            $(gs).on("click", ".pa-grader", gdialog_settings_grader_click);
+            $(gs).on("click", ".pa-gvis", gdialog_settings_gvis_click);
+        }
+
+        const gvis = {}, ggr = {}, ggra = {};
+        for (let su of gdialog_su) {
+            if (su.pinned_scores_visible == null) {
+                gvis["null"] = (gvis["null"] || 0) + 1;
+            } else if (su.pinned_scores_visible) {
+                gvis["true"] = (gvis["true"] || 0) + 1;
+            } else {
+                gvis["false"] = (gvis["false"] || 0) + 1;
+            }
+            const grcid = su.gradercid || 0;
+            ggr[grcid] = (ggr[grcid] || 0) + 1;
+        }
+        for (let su of smap) {
+            const grcid = su.gradercid || 0;
+            ggra[grcid] = (ggra[grcid] || 0) + 1;
+        }
+        $(gs).find("input").prop("checked", false).prop("indeterminate", false);
+        for (let x in gvis) {
+            $(gs).find(".pa-gvis[value=" + x + "]").prop("checked", !!gvis[x]).prop("indeterminate", gvis[x] && gvis[x] !== gdialog_su.length);
+        }
+        $(gs).find("input[name=gradertype][value=" + ((ggr[0] || 0) === gdialog_su.length ? "clear" : "set") + "]").prop("checked", true);
+        for (let x in ggr) {
+            if (x != 0) {
+                const e = f.elements["grader" + x];
+                e.checked = true;
+                e.indeterminate = ggr[x] !== gdialog_su.length;
+            }
+        }
+        $(gs).find(".pa-grader").each(function () {
+            const grcid = +this.name.substring(6),
+                ngr = ggr[grcid] || 0, ngra = ggra[grcid] || 0,
+                elt = this.closest(".checki").lastChild;
+            if (ngra && ngr === ngra) {
+                elt.textContent = " (".concat(ngra, ")");
+            } else if (ngra) {
+                elt.textContent = " (".concat(ngr, "/", ngra, ")");
+            } else {
+                elt.textContent = "";
+            }
+        });
+
+        $gdialog.find(".pa-gdialog-tab").addClass("hidden");
+        gs.classList.remove("hidden");
+        $gdialog.find("button[name=bsubmit]").addClass("hidden");
     }
     function gdialog_mode() {
         $gdialog.find(".nav-pills button").removeClass("btn-primary");
         if (this.name === "mode-gradesheet") {
             gdialog_mode_gradesheet();
+        } else if (this.name === "mode-settings") {
+            gdialog_mode_settings();
         } else {
             gdialog_mode_values();
         }
@@ -2316,8 +2505,16 @@ function pa_render_pset_table(pconf, data) {
             hc.push('<strong class="gt-name-email"></strong>');
         hc.push('<div class="pa-messages"></div>');
 
-        hc.push('<div class="nav-pills"><button type="button" class="btn btn-primary no-focus" name="mode-values">Values</button><button type="button" class="btn no-focus" name="mode-gradesheet">Gradesheet</button></div>');
-        hc.push('<div class="pa-gradelist is-modal"></div>');
+        hc.push('<div class="nav-pills">', '</div>');
+        hc.push('<button type="button" class="btn btn-primary no-focus is-mode" name="mode-values">Values</button>');
+        hc.push('<button type="button" class="btn no-focus is-mode" name="mode-gradesheet">Gradesheet</button>');
+        hc.push('<button type="button" class="btn no-focus is-mode" name="mode-settings">Settings</button>');
+        hc.pop();
+
+        hc.push('<div class="pa-gdialog-tab pa-gradelist is-modal"></div>');
+        hc.push('<div class="pa-gdialog-tab pa-gdialog-gradesheet multicol-3 hidden"></div>');
+        hc.push('<div class="pa-gdialog-tab pa-gdialog-settings hidden"></div>');
+
         hc.push_actions();
         hc.push('<button type="button" name="bsubmit" class="btn-primary">Save</button>');
         hc.push('<button type="button" name="cancel">Cancel</button>');
@@ -2327,14 +2524,14 @@ function pa_render_pset_table(pconf, data) {
         $gdialog.find("form").addClass("pa-psetinfo").data("pa-gradeinfo", pconf.grades);
         gdialog_mode_values();
         $gdialog.on("click", ".pa-gdialog-section", gdialog_section_click);
-        $gdialog.on("change blur", ".pa-gradevalue", gdialog_change);
-        $gdialog.on("input change", ".pa-gradevalue", gdialog_clear_error);
+        $gdialog.on("change blur", ".pa-gradevalue", gdialog_gradelist_change);
+        $gdialog.on("input change", ".pa-gradevalue", gdialog_gradelist_input);
         $gdialog.on("keydown", gdialog_key);
         $gdialog.on("keydown", "input, textarea, select", gdialog_key);
-        $gdialog.on("input", "input, textarea, select", gdialog_input);
+        //$gdialog.find(".pa-gradelist").on("input", "input, textarea, select", gdialog_gradelist_input);
         $gdialog.find("button[name=bsubmit]").on("click", function () { gdialog_store(null); });
         $gdialog.find("button[name=prev], button[name=next]").on("click", gdialog_traverse);
-        $gdialog.find("button[name=mode-values], button[name=mode-gradesheet]").on("click", gdialog_mode);
+        $gdialog.find("button.is-mode").on("click", gdialog_mode);
         const checked_spos = $j.find(".papsel:checked").toArray().map(function (x) {
                 return x.parentElement.parentElement.getAttribute("data-pa-spos");
             }),
@@ -2421,8 +2618,8 @@ function pa_render_pset_table(pconf, data) {
         displaying_last_first = sort.f === "name" && sort.last;
         for (let i = 0; i !== data.length; ++i) {
             var s = data[i];
-            s._spos = dmap.length;
-            dmap.push(s);
+            s._spos = smap.length;
+            smap.push(s);
             ++trn;
             if (s.boringness !== was_boringness && trn != 1) {
                 a.push('<tr class="gt-boring"><td colspan="' + col.length + '"><hr></td></tr>');
@@ -2435,8 +2632,8 @@ function pa_render_pset_table(pconf, data) {
             a.push(t.concat('">', stds.join(''), '</tr>'));
             for (var j = 0; s.partners && j < s.partners.length; ++j) {
                 var ss = s.partners[j];
-                ss._spos = dmap.length;
-                dmap.push(ss);
+                ss._spos = smap.length;
+                smap.push(ss);
                 var sstds = render_tds(s.partners[j], "");
                 for (var k = 0; k < sstds.length; ++k) {
                     if (sstds[k] === stds[k])
@@ -2468,7 +2665,7 @@ function pa_render_pset_table(pconf, data) {
     $j.data("paTable", {
         name_text: function (uid) {
             var spos = $j.find("tr[data-pa-uid=" + uid + "]").attr("data-pa-spos");
-            return spos ? render_name_text(dmap[spos]) : null;
+            return spos ? render_name_text(smap[spos]) : null;
         },
         s: function (spos) {
             return data[spos];

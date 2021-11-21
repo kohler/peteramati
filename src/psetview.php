@@ -1477,7 +1477,9 @@ class PsetView {
         }
     }
 
-    function set_grades_hidden($hidegrade) {
+    /** @param ?bool $vso */
+    function set_pinned_scores_visible($vso) {
+        $hidegrade = $vso === null ? 0 : ($vso ? -1 : 1);
         if ($this->pset->gitless_grades) {
             $upi = $this->upi();
             if ($upi->hidegrade !== $hidegrade) {

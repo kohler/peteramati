@@ -141,6 +141,26 @@ class Grade_API {
         return $j;
     }
 
+    /** @return ?array */
+    static function parse_users($us) {
+        $ux = $us ? json_decode($us) : null;
+        if (is_object($ux)) {
+            return (array) $ux;
+        } else if (is_array($ux)) {
+            $uy = [];
+            foreach ($ux as $u) {
+                if (isset($u->uid) && is_int($u->uid) && !isset($uy[$u->uid])) {
+                    $uy[$u->uid] = $u;
+                } else {
+                    return null;
+                }
+            }
+            return $uy;
+        } else {
+            return null;
+        }
+    }
+
     /** @return StudentSet */
     static function student_set($uids, Contact $viewer, APIData $api) {
         $uidlist = [];
@@ -170,13 +190,9 @@ class Grade_API {
     }
 
     static function multigrade(Contact $viewer, Qrequest $qreq, APIData $api) {
-        if (!isset($qreq->us)
-            || !($ugs = json_decode($qreq->us))
-            || !is_object($ugs)) {
+        if (($ugs = self::parse_users($qreq->us)) === null) {
             return ["ok" => false, "error" => "Missing parameter."];
-        }
-        $ugs = (array) $ugs;
-        if ($qreq->is_post() && !$qreq->valid_post()) {
+        } else if ($qreq->is_post() && !$qreq->valid_post()) {
             return ["ok" => false, "error" => "Missing credentials."];
         }
         try {
@@ -194,26 +210,24 @@ class Grade_API {
                 || ($qreq->is_post() && !$info->can_edit_scores())) {
                 return ["ok" => false, "error" => "Permission error for user " . $info->user_linkpart() . "."];
             }
-            if (!$api->pset->gitless) {
+            if (!$api->pset->gitless_grades) {
                 if (!$info->repo) {
                     self::update_error($error, 5, $info->user_linkpart());
                     continue;
                 }
-                $commit = null;
-                if (($hash = $ugs[$uid]->commit ?? null)) {
-                    $commit = $info->pset->handout_commit($hash)
-                        ?? $info->repo->connected_commit($hash, $info->pset, $info->branch);
+                if (isset($ugs[$uid]->commit) && $ugs[$uid]->commit !== $info->hash()) {
+                    $info->set_hash($ugs[$uid]->commit);
                 }
-                if (!$commit) {
-                    self::update_error($error, $hash ? 4 : 3, $info->user_linkpart());
+                if (!$info->hash()) {
+                    self::update_error($error, isset($ugs[$uid]->commit) ? 4 : 3, $info->user_linkpart());
                     continue;
                 }
-                $info->set_commit($commit);
                 if (($ugs[$uid]->commit_is_grade ?? false)
-                    && $commit->hash !== $info->grading_hash()) {
+                    && !$info->is_grading_commit()) {
                     self::update_error($error, 2, $info->user_linkpart());
                 }
-                if ($qreq->is_post() && $info->is_handout_commit()) {
+                if ($qreq->is_post()
+                    && $info->is_handout_commit()) {
                     self::update_error($error, 1, $info->user_linkpart());
                 }
             }
@@ -234,6 +248,8 @@ class Grade_API {
         }
 
         // XXX match commit with grading commit
+        $jx = (new GradeExport($api->pset, true))->jsonSerialize();
+        $jx["ok"] = true;
         if ($qreq->is_post()) {
             // parse grade elements
             $g = $ag = $og = $errf = [];
@@ -258,10 +274,8 @@ class Grade_API {
                 $v[$uid] = self::apply_grades($sset[$uid], $g[$uid], $ag[$uid], $og[$uid], $errf);
             }
             if (!empty($errf)) {
-                $j = (array) $info->grade_json();
-                $j["ok"] = false;
-                $j["error"] = "Grade edit conflict, your update was ignored.";
-                return $j;
+                $jx["ok"] = false;
+                $jx["error"] = "Grade edit conflict, your update was ignored.";
             } else {
                 foreach ($ugs as $uid => $gx) {
                     if (!empty($v[$uid]))
@@ -269,11 +283,83 @@ class Grade_API {
                 }
             }
         }
-        $j = (new GradeExport($api->pset, true))->jsonSerialize();
+        $jx["us"] = [];
+        foreach ($sset as $uid => $info) {
+            $jx["us"][$uid] = $info->grade_json(PsetView::GRADEJSON_SLICE);
+        }
+        return $jx;
+    }
+
+    static function gradesettings(Contact $viewer, Qrequest $qreq, APIData $api) {
+        if (($ugs = self::parse_users($qreq->us)) === null) {
+            return ["ok" => false, "error" => "Missing parameter."];
+        } else if ($qreq->is_post() && !$qreq->valid_post()) {
+            return ["ok" => false, "error" => "Missing credentials."];
+        } else if (!$viewer->privChair) {
+            return ["ok" => false, "error" => "Permission error."];
+        }
+        try {
+            $sset = self::student_set(array_keys($ugs), $viewer, $api);
+            $sset->set_pset($api->pset);
+        } catch (Error $err) {
+            return ["ok" => false, "error" => $err->getMessage()];
+        }
+
+        $error = [0, ""];
+        foreach ($sset as $uid => $info) {
+            // XXX extract the following into a function
+            // XXX branch nonsense
+            if (!$api->pset->gitless_grades) {
+                if (!$info->repo) {
+                    self::update_error($error, 5, $info->user_linkpart());
+                    continue;
+                }
+            }
+        }
+
+        if (count($sset) === 0) {
+            return ["ok" => false, "error" => "No users."];
+        } else if ($error[0] === 5) {
+            return ["ok" => false, "error" => "Missing repository (" . join(", ", $error[1]) . ")."];
+        }
+
+        // XXX match commit with grading commit
+        $pcm = $api->conf->pc_members_and_admins();
+        if ($qreq->is_post()) {
+            foreach ($sset as $uid => $info) {
+                $ug = $ugs[$uid];
+                if (isset($ug->pinned_scores_visible)
+                    && !is_bool($ug->pinned_scores_visible)) {
+                    return ["ok" => false, "error" => "Invalid request."];
+                }
+                if (isset($ug->gradercid)
+                    && (!is_int($ug->gradercid)
+                        || ($ug->gradercid !== 0 && !isset($pcm[$ug->gradercid])))) {
+                    return ["ok" => false, "error" => "Invalid request."];
+                }
+            }
+            foreach ($sset as $uid => $info) {
+                $ug = $ugs[$uid];
+                if (property_exists($ug, "pinned_scores_visible")) {
+                    $info->set_pinned_scores_visible($ug->pinned_scores_visible);
+                }
+                if (isset($ug->gradercid)) {
+                    if (!$api->pset->gitless_grades && !$info->grading_hash()) {
+                        $info->repo->refresh(2700, true);
+                        $info->set_latest_nontrivial_commit($sset);
+                    }
+                    $info->change_grader($ug->gradercid);
+                }
+            }
+        }
         $j["ok"] = true;
         $j["us"] = [];
         foreach ($sset as $uid => $info) {
-            $j["us"][$uid] = $info->grade_json(PsetView::GRADEJSON_SLICE);
+            $j["us"][$uid] = [
+                "uid" => $uid,
+                "pinned_scores_visible" => $info->pinned_scores_visible(),
+                "gradercid" => $info->gradercid()
+            ];
         }
         return $j;
     }

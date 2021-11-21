@@ -254,14 +254,7 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         || $pset->disabled) {
         return $conf->errorMsg("No such pset");
     }
-    $hiddengrades = null;
-    if ($qreq->action === "showgrades") {
-        $hiddengrades = -1;
-    } else if ($qreq->action === "hidegrades") {
-        $hiddengrades = 1;
-    } else if ($qreq->action === "defaultgrades") {
-        $hiddengrades = 0;
-    } else if ($qreq->action === "clearrepo") {
+    if ($qreq->action === "clearrepo") {
         foreach (qreq_users($qreq) as $user) {
             $user->set_repo($pset, null);
             $user->clear_links(LINK_BRANCH, $pset->id);
@@ -295,14 +288,6 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         }
     } else if ($qreq->action === "diffmany") {
         Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
-    }
-    if ($hiddengrades !== null) {
-        foreach (qreq_users($qreq) as $user) {
-            $info = PsetView::make($pset, $user, $viewer);
-            if ($info->grading_hash()) {
-                $info->set_grades_hidden($hiddengrades);
-            }
-        }
     }
     redirectSelf();
 }

@@ -60,6 +60,12 @@ input[type=text], input[type=email], input[type=password], input[type=date], tex
 	border: 1px solid silver;
 	padding: 3px 5px;
 }
+fieldset {
+	border-radius: 3px;
+	border-style: solid;
+	border-color: #aaa;
+	border-width: 1px;
+}
 
 
 /* page background */
@@ -163,9 +169,6 @@ tr.pl:hover a.pnum, tr.pl:hover a.ptitle, a.ptitle.uu,
 .childfold:hover a.q, a.maillink:hover, a:hover u.x, .ul {
 	text-decoration: underline;
 }
-a.small {
-	font-size: smaller;
-}
 .strut {
 	display: inline-block;
 	line-height: 1.8;
@@ -255,6 +258,12 @@ label.checki {
 .n {
 	font-weight: normal;
 }
+.dim {
+	color: #777777;
+}
+.small {
+	font-size: smaller;
+}
 
 .cR {
 	background-color: #ffd8d8;
@@ -319,8 +328,50 @@ form {
 .align-self-start {
 	align-self: flex-start !important;
 }
+.mt-0 {
+	margin-top: 0 !important;
+}
+.mt-1 {
+	margin-top: 0.25em !important;
+	margin-top: 0.25rem !important;
+}
+.mt-2 {
+	margin-top: 0.5em !important;
+	margin-top: 0.5rem !important;
+}
+.mt-3 {
+	margin-top: 1em !important;
+	margin-top: 1rem !important;
+}
+.mt-4 {
+	margin-top: 1.5em !important;
+	margin-top: 1.5rem !important;
+}
+.mb-0 {
+	margin-bottom: 0 !important;
+}
+.mb-1 {
+	margin-bottom: 0.25em !important;
+	margin-bottom: 0.25rem !important;
+}
+.mb-2 {
+	margin-bottom: 0.5em !important;
+	margin-bottom: 0.5rem !important;
+}
+.mb-3 {
+	margin-bottom: 1em !important;
+	margin-bottom: 1rem !important;
+}
+.mb-4 {
+	margin-bottom: 1.5em !important;
+	margin-bottom: 1.5rem !important;
+}
 .ml-0 {
 	margin-left: 0 !important;
+}
+.ml-1 {
+	margin-left: 0.25em !important;
+	margin-left: 0.25rem !important;
 }
 .ml-2 {
 	margin-left: 0.5em !important;
@@ -1291,7 +1342,7 @@ div.pcconfaff {
 	font-size: 69%;
 }
 
-.pa-gdialog-gradesheet {
+.multicol-3 {
 	columns: 15rem 3;
 }
 
