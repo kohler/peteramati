@@ -1128,6 +1128,16 @@ class PsetView {
         return $this->_can_view_grade;
     }
 
+    /** @return ?bool */
+    function pinned_scores_visible() {
+        $xpi = $this->pset->gitless ? $this->upi() : $this->rpi();
+        if ($xpi && $xpi->hidegrade != 0) {
+            return $xpi->hidegrade < 0;
+        } else {
+            return null;
+        }
+    }
+
     private function set_user_can_view_grade() {
         $this->_user_can_view_grade = $this->_user_can_view_score = false;
         if ($this->pset->student_can_view()

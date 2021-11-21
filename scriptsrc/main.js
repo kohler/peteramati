@@ -1193,6 +1193,10 @@ function pa_render_pset_table(pconf, data) {
         anonymous = pconf.anonymous,
         col, colmap, total_colpos, ngrades_colpos;
 
+    function scores_visible_for(s) {
+        return s.pinned_scores_visible == null ? visible : s.pinned_scores_visible;
+    }
+
     var col_renderers = {
         checkbox: {
             th: '<th class="gt-checkbox" scope="col"></th>',
@@ -1369,21 +1373,15 @@ function pa_render_pset_table(pconf, data) {
         },
         notes: {
             th: '<th class="gt-notes c plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
+            td_html: function (s) {
+                let t = scores_visible_for(s) ? '⎚' : '';
+                flagged && s.is_grade && (t += '✱');
+                s.has_notes && (t += '♪');
+                !flagged && s.has_nongrader_notes && (t += '<sup>*</sup>');
+                return t;
+            },
             td: function (s) {
-                var t = '';
-                if (s.grades_visible) {
-                    t += '⎚';
-                }
-                if (flagged && s.is_grade) {
-                    t += '✱';
-                }
-                if (s.has_notes) {
-                    t += '♪';
-                }
-                if (!flagged && s.has_nongrader_notes) {
-                    t += '<sup>*</sup>';
-                }
-                return '<td class="gt-notes c">'.concat(t, '</td>');
+                return '<td class="gt-notes c">'.concat(this.td_html(s), '</td>');
             },
             tw: 2
         },
@@ -1960,8 +1958,9 @@ function pa_render_pset_table(pconf, data) {
             data.sort(user_compare);
         } else if (f === "gradestatus") {
             data.sort(function (a, b) {
-                if (a.grades_visible != b.grades_visible) {
-                    return a.grades_visible ? -1 : 1;
+                const av = scores_visible_for(a), bv = scores_visible_for(b);
+                if (av !== bv) {
+                    return av ? -1 : 1;
                 } else if (a.has_notes != b.has_notes) {
                     return a.has_notes ? -1 : 1;
                 } else {
@@ -2206,7 +2205,7 @@ function pa_render_pset_table(pconf, data) {
         }
 
         $gdialog.find(".pa-gradelist").toggleClass("pa-pset-hidden",
-            !!gdialog_su.find(function (su) { return !su.grades_visible; }));
+            !!gdialog_su.find(function (su) { return !scores_visible_for(su); }));
         $gdialog.find(".pa-grade").each(function () {
             let k = this.getAttribute("data-pa-grade"),
                 ge = pconf.grades.entries[k],

@@ -950,6 +950,9 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
     if (($gcid = $info->gradercid())) {
         $j["gradercid"] = $gcid;
     }
+    if (($svh = $info->pinned_scores_visible()) !== null) {
+        $j["pinned_scores_visible"] = $svh;
+    }
 
     // are any commits committed?
     if (!$pset->gitless_grades && $info->repo) {
@@ -1014,9 +1017,6 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
                     $j["highlight_grades"][$ge->key] = true;
                 }
             }
-        }
-        if ($info->user_can_view_grade()) {
-            $j["grades_visible"] = true;
         }
         if (($lh = $info->fast_late_hours())) {
             $j["late_hours"] = $lh;
