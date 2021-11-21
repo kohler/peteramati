@@ -159,6 +159,7 @@ $(document).on("click", "a", function (evt) {
 
 $(document).on("submit", "form", function (evt) {
     if (hasClass(this, "ui-submit")) {
+        evt.preventDefault();
         handle_ui.call(this, evt);
     } else {
         handle_list(this, this.getAttribute("action"));

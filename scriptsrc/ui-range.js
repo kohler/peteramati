@@ -118,7 +118,7 @@ handle_ui.on("js-range-click", function (event) {
             cbgs[j].checked = state;
         }
     }
-});
+}, -1);
 
 $(function () {
     $(".is-range-group").each(function () {
