@@ -116,80 +116,6 @@ function qreq_users(Qrequest $qreq) {
     return $users;
 }
 
-function set_grader(Qrequest $qreq) {
-    global $Conf, $Me;
-    if (!($pset = $Conf->pset_by_key($qreq->pset))) {
-        return $Conf->errorMsg("No such pset");
-    } else if ($pset->gitless) {
-        return $Conf->errorMsg("Pset has no repository");
-    }
-
-    // collect grader weights
-    $graderw = [];
-    foreach ($Conf->pc_members_and_admins() as $pcm) {
-        if ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC)) {
-            if (in_array($pcm->email, ["cassels@college.harvard.edu", "tnguyenhuy@college.harvard.edu", "skandaswamy@college.harvard.edu"])) {
-                $graderw[$pcm->contactId] = 1.0 / 1.5;
-            } else if ($pcm->email === "yihehuang@g.harvard.edu") {
-                continue;
-            } else {
-                $graderw[$pcm->contactId] = 1.0;
-            }
-            continue;
-        }
-        if (strcasecmp($pcm->email, $qreq->grader) == 0
-            || $qreq->grader === "__random__"
-            || ($qreq->grader === "__random_tf__" && ($pcm->roles & Contact::ROLE_PC))) {
-            $graderw[$pcm->contactId] = 1.0;
-        }
-    }
-
-    // enumerate grader positions
-    $graderp = [];
-    foreach ($graderw as $cid => $w) {
-        if ($w > 0)
-            $graderp[$cid] = 0.0;
-    }
-    if (!$qreq->grader || empty($graderp))
-        return $Conf->errorMsg("No grader");
-
-    foreach (qreq_users($qreq) as $user) {
-        // XXX check if can_set_grader
-        $info = PsetView::make($pset, $user, $Me, "none");
-        if ($info->repo) {
-            $info->repo->refresh(2700, true);
-        }
-        $info->set_grading_or_latest_nontrivial_commit();
-        if (!$info->hash()) {
-            error_log("cannot set_hash for $user->email");
-            continue;
-        }
-        // sort by position
-        asort($graderp);
-        // pick one of the lowest positions
-        $gs = [];
-        $gpos = null;
-        foreach ($graderp as $cid => $pos) {
-            if ($gpos === null || $gpos == $pos) {
-                $gs[] = $cid;
-                $gpos = $pos;
-            } else {
-                break;
-            }
-        }
-        // account for grader
-        $g = $gs[mt_rand(0, count($gs) - 1)];
-        $info->change_grader($g);
-        $graderp[$g] += $graderw[$g];
-    }
-
-    redirectSelf();
-}
-
-if ($Me->isPC && $Qreq->valid_post() && $Qreq->setgrader) {
-    set_grader($Qreq);
-}
-
 
 /** @return ?Pset */
 function older_enabled_repo_same_handout($pset) {
@@ -1165,20 +1091,6 @@ function show_pset_table($sset) {
     }
     echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){$pa.render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 
-    if ($sset->viewer->privChair && !$pset->gitless_grades) {
-        $sel = array("none" => "N/A");
-        foreach ($sset->conf->pc_members_and_admins() as $uid => $pcm) {
-            $n = ($gradercounts[$uid] ?? 0) ? " ({$gradercounts[$uid]})" : "";
-            $sel[$pcm->email] = Text::name_html($pcm) . $n;
-        }
-        $sel["__random__"] = "Random";
-        $sel["__random_tf__"] = "Random TF";
-        echo '<span class="nb" style="padding-right:2em">',
-            Ht::select("grader", $sel, "none"),
-            ' &nbsp;', Ht::submit("setgrader", "Set grader"),
-            '</span>';
-    }
-
     $actions = [];
     if ($sset->viewer->isPC) {
         $stage = -1;
@@ -1211,9 +1123,6 @@ function show_pset_table($sset) {
             $actions[] = null;
         }
         $stage = 2;
-        $actions["showgrades"] = "Show grades";
-        $actions["hidegrades"] = "Hide grades";
-        $actions["defaultgrades"] = "Default grades";
         if (!$pset->gitless) {
             $actions["clearrepo"] = "Clear repo";
             if (older_enabled_repo_same_handout($pset)) {
