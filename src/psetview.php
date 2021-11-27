@@ -1509,7 +1509,7 @@ class PsetView {
         if ($cnotes
             && isset($cnotes->run)
             && isset($cnotes->run->{$runner_name})) {
-            $runlog = new RunLogger($this->repo, $this->pset);
+            $runlog = new RunLogger($this->pset, $this->repo);
             $fn = $runlog->output_file($cnotes->run->{$runner_name});
             $s = @file_get_contents($fn);
             $this->last_runner_error = $s === false ? self::ERROR_LOGMISSING : 0;

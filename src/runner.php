@@ -1,6 +1,6 @@
 <?php
 // runner.php -- Peteramati runner state
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class RunnerState {
@@ -34,7 +34,7 @@ class RunnerState {
         assert(!$runner->command || $this->repoid);
 
         if ($this->repo && !$this->pset->gitless) {
-            $this->runlog = new RunLogger($this->repo, $this->pset);
+            $this->runlog = new RunLogger($this->pset, $this->repo);
             $logdir = $this->runlog->log_dir();
             if (!is_dir($logdir)) {
                 $old_umask = umask(0);
@@ -77,82 +77,6 @@ class RunnerState {
             $this->queueid = null;
         }
         return $this->queueid !== null;
-    }
-
-    /** @return RunResponse */
-    function generic_json() {
-        $rr = new RunResponse;
-        $rr->ok = true;
-        $rr->repoid = $this->repoid;
-        $rr->pset = $this->pset->urlkey;
-        $rr->timestamp = $this->checkt;
-        return $rr;
-    }
-
-    /** @return ?RunResponse */
-    function full_json($offset = null) {
-        if (!$this->checkt) {
-            return null;
-        }
-        $json = $this->generic_json();
-        $json->done = $this->runlog->active_job() !== $this->checkt;
-        if ($json->done) {
-            $json->status = "done";
-        } else if (Conf::$now - $this->checkt <= 600) {
-            $json->status = "working";
-        } else {
-            $json->status = "old";
-        }
-        if ($offset !== null) {
-            $logbase = $this->runlog->job_prefix($this->checkt);
-            $data = @file_get_contents("{$logbase}.log", false, null, max($offset, 0));
-            if ($data === false) {
-                $json->ok = false;
-                $json->error = true;
-                $json->message = "No such log";
-                return $json;
-            }
-            // Fix up $data if it is not valid UTF-8.
-            if (!is_valid_utf8($data)) {
-                $data = UnicodeHelper::utf8_truncate_invalid($data);
-                if (!is_valid_utf8($data)) {
-                    $data = UnicodeHelper::utf8_replace_invalid($data);
-                }
-            }
-            // Get time data, if it exists
-            if ($this->runner->timed_replay) {
-                $json->timed = true;
-            }
-            if ($json->done
-                && $offset <= 0
-                && $this->runner->timed_replay
-                && ($time = @file_get_contents("{$logbase}.log.time")) !== false) {
-                $json->time_data = $time;
-                if ($this->runner->timed_replay !== true) {
-                    $json->time_factor = $this->runner->timed_replay;
-                }
-            }
-            $json->data = $data;
-            $json->offset = max($offset, 0);
-        }
-        return $json;
-    }
-
-    function write($data) {
-        if (!$this->checkt) {
-            return false;
-        }
-        $logbase = $this->runlog->job_prefix($this->checkt);
-        $proc = proc_open(SiteLoader::$root . "/jail/pa-writefifo " . escapeshellarg("{$logbase}.in"),
-                          [["pipe", "r"]], $pipes);
-        if ($pipes[0]) {
-            fwrite($pipes[0], $data);
-            fclose($pipes[0]);
-        }
-        if ($proc) {
-            proc_close($proc);
-        }
-        return true;
     }
 
 
@@ -318,21 +242,21 @@ class RunnerState {
         if (($rct == $this->checkt && ($qreq->stop ?? "") !== "" && $qreq->stop !== "0")
             || ($rct == $this->checkt && ($qreq->write ?? "") !== "")) {
             if (($qreq->write ?? "") !== "") {
-                $this->write($qreq->write);
+                $this->runlog->job_write($this->checkt, $qreq->write);
             }
             if ($qreq->stop) {
                 // "ESC Ctrl-C" is captured by pa-jail
-                $this->write("\x1b\x03");
+                $this->runlog->job_write($this->checkt, "\x1b\x03");
             }
             $now = microtime(true);
             do {
                 usleep(10);
-                $answer = $this->full_json($offset);
+                $answer = $this->runlog->job_response($this->runner, $this->checkt, $offset);
             } while ($qreq->stop
                      && ($rct = $this->runlog->active_job()) == $this->checkt
                      && microtime(true) - $now < 0.1);
         } else {
-            $answer = $this->full_json($offset);
+            $answer = $this->runlog->job_response($this->runner, $this->checkt, $offset);
         }
 
         if ($answer->status !== "working" && $this->queueid > 0) {

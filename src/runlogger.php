@@ -1,17 +1,17 @@
 <?php
 // runlogger.php -- Peteramati class managing run logs
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class RunLogger {
-    /** @var Repository */
-    public $repo;
     /** @var Pset */
     public $pset;
+    /** @var Repository */
+    public $repo;
 
-    function __construct(Repository $repo, Pset $pset) {
-        $this->repo = $repo;
+    function __construct(Pset $pset, Repository $repo) {
         $this->pset = $pset;
+        $this->repo = $repo;
     }
 
     /** @return string */
@@ -101,6 +101,21 @@ class RunLogger {
     }
 
     /** @param int $jobid
+     * @param string $data */
+    function job_write($jobid, $data) {
+        $logbase = $this->job_prefix($jobid);
+        $proc = proc_open(SiteLoader::$root . "/jail/pa-writefifo " . escapeshellarg("{$logbase}.in"),
+                          [["pipe", "r"]], $pipes);
+        if ($pipes[0]) {
+            fwrite($pipes[0], $data);
+            fclose($pipes[0]);
+        }
+        if ($proc) {
+            proc_close($proc);
+        }
+    }
+
+    /** @param int $jobid
      * @return ?object */
     function job_info($jobid) {
         if (($t = @file_get_contents($this->output_file($jobid), false, null, 0, 4096))
@@ -112,5 +127,52 @@ class RunLogger {
         } else {
             return null;
         }
+    }
+
+    /** @param int $jobid
+     * @return ?RunResponse */
+    function job_response(RunnerConfig $runner, $jobid, $offset = null) {
+        $rr = RunResponse::make_base($runner, $this->repo, $jobid);
+        $rr->done = $this->active_job() !== $jobid;
+        if ($rr->done) {
+            $rr->status = "done";
+        } else if (Conf::$now - $jobid <= 600) {
+            $rr->status = "working";
+        } else {
+            $rr->status = "old";
+        }
+        if ($offset !== null) {
+            $logbase = $this->job_prefix($jobid);
+            $data = @file_get_contents("{$logbase}.log", false, null, max($offset, 0));
+            if ($data === false) {
+                $rr->ok = false;
+                $rr->error = true;
+                $rr->message = "No such log";
+                return $rr;
+            }
+            // Fix up $data if it is not valid UTF-8.
+            if (!is_valid_utf8($data)) {
+                $data = UnicodeHelper::utf8_truncate_invalid($data);
+                if (!is_valid_utf8($data)) {
+                    $data = UnicodeHelper::utf8_replace_invalid($data);
+                }
+            }
+            // Get time data, if it exists
+            if ($runner->timed_replay) {
+                $rr->timed = true;
+            }
+            if ($rr->done
+                && $offset <= 0
+                && $runner->timed_replay
+                && ($time = @file_get_contents("{$logbase}.log.time")) !== false) {
+                $rr->time_data = $time;
+                if ($runner->timed_replay !== true) {
+                    $rr->time_factor = $runner->timed_replay;
+                }
+            }
+            $rr->data = $data;
+            $rr->offset = max($offset, 0);
+        }
+        return $rr;
     }
 }

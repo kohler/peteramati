@@ -8,14 +8,14 @@ class RunResponse implements JsonSerializable {
     public $ok;
     /** @var ?bool */
     public $error;
-    /** @var int */
-    public $repoid;
     /** @var string */
     public $pset;
-    /** @var ?string */
-    public $hash;
     /** @var string */
     public $runner;
+    /** @var int */
+    public $repoid;
+    /** @var ?string */
+    public $hash;
     /** @var ?array */
     public $settings;
     /** @var int */
@@ -40,6 +40,16 @@ class RunResponse implements JsonSerializable {
     public $message;
     /** @var ?mixed */
     public $result;
+
+    static function make_base(RunnerConfig $runner, Repository $repo, $jobid) {
+        $rr = new RunResponse;
+        $rr->ok = true;
+        $rr->pset = $runner->pset->urlkey;
+        $rr->runner = $runner->name;
+        $rr->repoid = $repo->repoid;
+        $rr->timestamp = $jobid;
+        return $rr;
+    }
 
     function jsonSerialize() {
         $a = [];

@@ -57,10 +57,10 @@ class QueueItem {
     public $runnable;
 
     // object links
-    /** @var ?Repository */
-    private $_repo;
     /** @var ?Pset */
     private $_pset;
+    /** @var ?Repository */
+    private $_repo;
     /** @var ?RunnerConfig */
     private $_runner;
     /** @var int */
@@ -219,7 +219,7 @@ class QueueItem {
             throw new RunnerException("The pa-jail program has not been compiled");
         }
 
-        $runlog = new RunLogger($repo, $pset);
+        $runlog = new RunLogger($pset, $repo);
         if ($runlog->active_job()) {
             throw new RunnerException("Recent job still running");
         }
@@ -465,7 +465,7 @@ class QueueItem {
 
     function cleanup() {
         if ($this->_runstatus === 1) {
-            $runlog = new RunLogger($this->repo(), $this->pset());
+            $runlog = new RunLogger($this->pset(), $this->repo());
             unlink($runlog->pid_file());
             @unlink($runlog->job_prefix($this->runat) . ".in");
         }

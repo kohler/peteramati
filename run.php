@@ -148,12 +148,13 @@ class RunRequest {
 
         // maybe eval
         if (!$this->runner->command && $this->runner->eval) {
-            $rstate->set_checkt(time());
-            $json = $rstate->generic_json();
-            $json->done = true;
-            $json->status = "done";
-            $rstate->evaluate($json);
-            json_exit($json);
+            $jobid = time();
+            $rstate->set_checkt($jobid);
+            $rr = RunResponse::make_base($this->runner, $info->repo, $jobid);
+            $rr->done = true;
+            $rr->status = "done";
+            $rstate->evaluate($rr);
+            json_exit($rr);
         }
 
 
@@ -161,7 +162,7 @@ class RunRequest {
         try {
             if (!$info->repo || !$info->pset) {
                 self::quit("Nothing to do");
-            } else if (($checkt = (new RunLogger($info->repo, $info->pset))->active_job())) {
+            } else if (($checkt = (new RunLogger($info->pset, $info->repo))->active_job())) {
                 self::quit("Recent job still running.", ["errorcode" => APIData::ERRORCODE_RUNCONFLICT, "checkt" => $checkt, "status" => "workingconflict"]);
             }
             session_write_close();

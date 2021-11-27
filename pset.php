@@ -1,6 +1,6 @@
 <?php
 // pset.php -- Peteramati problem set page
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
@@ -755,9 +755,10 @@ if ($Pset->gitless) {
 
     // print runners
     if ($Info->is_handout_commit()) { // XXX this is a hack
-        $crunners = null;
+        $crunners = $runlogger = null;
     } else {
         $crunners = $Info->commit_jnote("run");
+        $runlogger = new RunLogger($Pset, $Info->repo);
     }
     $runcategories = [];
     $any_runners = false;
@@ -769,7 +770,7 @@ if ($Pset->gitless) {
 
         $rj = null;
         if ($crunners !== null && ($checkt = $crunners->{$r->category} ?? null)) {
-            $rj = (new RunnerState($Info, $r, $checkt))->full_json();
+            $rj = $runlogger->job_response($r, $checkt);
         }
         if (!$rj && !$Me->can_run($Pset, $r, $User)) {
             continue;
