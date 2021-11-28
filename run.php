@@ -149,11 +149,10 @@ class RunRequest {
         // maybe eval
         if (!$this->runner->command && $this->runner->eval) {
             $jobid = time();
-            $rstate->set_checkt($jobid);
             $rr = RunResponse::make_base($this->runner, $info->repo, $jobid);
             $rr->done = true;
             $rr->status = "done";
-            $rstate->evaluate($rr);
+            $rr->result = $info->runner_evaluate($this->runner, $jobid);
             json_exit($rr);
         }
 

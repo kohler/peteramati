@@ -19,12 +19,9 @@ class RunnerState {
     /** @var ?RunLogger */
     public $runlog;
     /** @var ?int */
-    public $checkt;
-    /** @var ?int */
     public $queueid;
 
-    /** @param ?int $checkt */
-    function __construct(PsetView $info, RunnerConfig $runner, $checkt = null) {
+    function __construct(PsetView $info, RunnerConfig $runner) {
         $this->conf = $info->conf;
         $this->info = $info;
         $this->repo = $info->repo;
@@ -44,27 +41,8 @@ class RunnerState {
                 umask($old_umask);
             }
         }
-
-        if ($checkt) {
-            $this->set_checkt($checkt);
-        }
     }
 
-
-    /** @param int|string $checkt
-     * @return bool */
-    function set_checkt($checkt) {
-        if (is_int($checkt) && $checkt > 0) {
-            $this->checkt = $checkt;
-        } else if (ctype_digit($checkt)) {
-            $this->checkt = intval($checkt);
-        } else if (preg_match('/\.(\d+)\.log(?:\.lock|\.pid)?\z/', (string) $checkt, $m)) {
-            $this->checkt = intval($m[1]);
-        } else {
-            $this->checkt = null;
-        }
-        return $this->checkt !== null;
-    }
 
     /** @param int|string $queueid
      * @return bool */
@@ -193,18 +171,6 @@ class RunnerState {
     }
 
 
-    function evaluate($answer) {
-        if (isset($this->runner->require)) {
-            if ($this->runner->require[0] === "/") {
-                require_once($this->runner->require);
-            } else {
-                require_once(SiteLoader::$root . "/" . $this->runner->require);
-            }
-        }
-        $answer->result = call_user_func($this->runner->eval, $this->info);
-    }
-
-
     /** @param Qrequest $qreq
      * @return object */
     function check($qreq) {
@@ -235,28 +201,27 @@ class RunnerState {
                 return (object) ["ok" => false, "error" => "Invalid “check” argument", "error_html" => "Invalid “check” argument"];
             }
         }
-        $this->set_checkt($checkt);
 
         $offset = cvtint($qreq->offset, 0);
         $rct = $this->runlog->active_job();
-        if (($rct == $this->checkt && ($qreq->stop ?? "") !== "" && $qreq->stop !== "0")
-            || ($rct == $this->checkt && ($qreq->write ?? "") !== "")) {
+        if (($rct == $checkt && ($qreq->stop ?? "") !== "" && $qreq->stop !== "0")
+            || ($rct == $checkt && ($qreq->write ?? "") !== "")) {
             if (($qreq->write ?? "") !== "") {
-                $this->runlog->job_write($this->checkt, $qreq->write);
+                $this->runlog->job_write($checkt, $qreq->write);
             }
             if ($qreq->stop) {
                 // "ESC Ctrl-C" is captured by pa-jail
-                $this->runlog->job_write($this->checkt, "\x1b\x03");
+                $this->runlog->job_write($checkt, "\x1b\x03");
             }
             $now = microtime(true);
             do {
                 usleep(10);
-                $answer = $this->runlog->job_response($this->runner, $this->checkt, $offset);
+                $answer = $this->runlog->job_response($this->runner, $checkt, $offset);
             } while ($qreq->stop
-                     && ($rct = $this->runlog->active_job()) == $this->checkt
+                     && ($rct = $this->runlog->active_job()) == $checkt
                      && microtime(true) - $now < 0.1);
         } else {
-            $answer = $this->runlog->job_response($this->runner, $this->checkt, $offset);
+            $answer = $this->runlog->job_response($this->runner, $checkt, $offset);
         }
 
         if ($answer->status !== "working" && $this->queueid > 0) {
@@ -266,7 +231,7 @@ class RunnerState {
             $viewer = $this->info->viewer;
             if ($viewer->can_run($this->pset, $this->runner, $this->info->user)
                 && $this->runner->eval) {
-                $this->evaluate($answer);
+                $answer->result = $this->info->runner_evaluate($this->runner, $checkt);
             }
         }
 

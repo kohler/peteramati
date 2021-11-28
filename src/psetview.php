@@ -1502,6 +1502,20 @@ class PsetView {
     }
 
 
+    /** @param RunnerConfig $runner
+     * @param int $jobid
+     * @return mixed */
+    function runner_evaluate(RunnerConfig $runner, $jobid) {
+        if (isset($runner->require)) {
+            if ($runner->require[0] === "/") {
+                require_once($runner->require);
+            } else {
+                require_once(SiteLoader::$root . "/" . $runner->require);
+            }
+        }
+        return call_user_func($runner->eval, $this, $runner, $jobid);
+    }
+
     /** @param string $runner_name
      * @return string|false */
     function runner_output_for($runner_name) {
