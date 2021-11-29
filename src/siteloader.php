@@ -1,6 +1,6 @@
 <?php
 // siteloader.php -- HotCRP autoloader
-// Copyright (c) 2006-2020 Eddie Kohler; see LICENSE.
+// Copyright (c) 2006-2021 Eddie Kohler; see LICENSE.
 
 class SiteLoader {
     static $map = [
@@ -12,7 +12,7 @@ class SiteLoader {
         "LoginHelper" => "lib/login.php",
         "MimeText" => "lib/mailer.php",
         "Pset" => "src/psetconfig.php",
-        "RunnerState" => "src/runner.php",
+        "QueueStatus" => "src/queueitem.php",
         "ZipDocument" => "lib/documenthelper.php"
     ];
 

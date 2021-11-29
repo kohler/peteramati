@@ -14,6 +14,19 @@ class RunLogger {
         $this->repo = $repo;
     }
 
+    /** @return bool */
+    function mkdirs() {
+        $logdir = $this->log_dir();
+        if (!is_dir($logdir)) {
+            $old_umask = umask(0);
+            if (!mkdir($logdir, 02770, true)) {
+                return false;
+            }
+            umask($old_umask);
+        }
+        return true;
+    }
+
     /** @return string */
     function log_dir() {
         $root = SiteLoader::$root;
@@ -82,7 +95,7 @@ class RunLogger {
 
     /** @return int|false */
     function active_job() {
-        return $this->active_job_at($this->pid_file());
+        return self::active_job_at($this->pid_file());
     }
 
     /** @return list<int> */
@@ -98,6 +111,26 @@ class RunLogger {
         }
         rsort($a);
         return $a;
+    }
+
+    /** @param ?string $hash
+     * @return int|false */
+    function complete_job(RunnerConfig $runner, $hash = null) {
+        $n = 0;
+        $envts = $runner->environment_timestamp();
+        foreach ($this->past_jobs() as $t) {
+            if ($t > $envts
+                && ($s = $this->job_info($t))
+                && $s->runner === $runner->name
+                && ($hash === null || $s->hash === $hash)
+                && $this->active_job() !== $t) {
+                return $t;
+            } else if ($n >= 200) {
+                break;
+            }
+            ++$n;
+        }
+        return false;
     }
 
     /** @param int $jobid
@@ -116,23 +149,26 @@ class RunLogger {
     }
 
     /** @param int $jobid
-     * @return ?object */
+     * @return ?RunResponse */
     function job_info($jobid) {
-        if (($t = @file_get_contents($this->output_file($jobid), false, null, 0, 4096))
+        if (($t = @file_get_contents($this->output_file($jobid), false, null, 0, 8192))
             && str_starts_with($t, "++ {")
             && ($pos = strpos($t, "\n"))
             && ($j = json_decode(substr($t, 3, $pos - 3)))
             && is_object($j)) {
-            return $j;
+            return RunResponse::make_log($j);
         } else {
             return null;
         }
     }
 
     /** @param int $jobid
+     * @param ?int $offset
      * @return ?RunResponse */
     function job_response(RunnerConfig $runner, $jobid, $offset = null) {
-        $rr = RunResponse::make_base($runner, $this->repo, $jobid);
+        $rr = RunResponse::make($runner, $this->repo);
+        $rr->ok = true;
+        $rr->timestamp = $jobid;
         $rr->done = $this->active_job() !== $jobid;
         if ($rr->done) {
             $rr->status = "done";

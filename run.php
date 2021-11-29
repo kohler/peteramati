@@ -1,6 +1,6 @@
 <?php
 // run.php -- Peteramati runner page
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
@@ -23,6 +23,12 @@ class RunRequest {
     public $runner;
     /** @var bool */
     public $is_ensure;
+
+    /** @param string $err
+     * @return array */
+    static function error($err = null) {
+        return ["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err];
+    }
 
     static function quit($err = null, $js = null) {
         json_exit(["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err] + ($js ?? []));
@@ -60,7 +66,7 @@ class RunRequest {
         if ($qreq->runmany) {
             $rreq->runmany();
         } else {
-            $rreq->run();
+            json_exit($rreq->run());
         }
     }
 
@@ -83,103 +89,127 @@ class RunRequest {
     function run() {
         $qreq = $this->qreq;
         if ($qreq->run === null || !$qreq->valid_post()) {
-            self::quit("Permission error.");
+            return self::error("Permission error.");
         } else if (($err = $this->check_view(false))) {
-            self::quit($err);
+            return self::error($err);
         }
 
         $info = PsetView::make($this->pset, $this->user, $this->viewer, $qreq->newcommit ?? $qreq->commit);
         if (!$this->pset->gitless && !$info->hash()) {
             if (!$info->repo) {
-                self::quit("No repository.");
+                return self::error("No repository.");
             } else if ($qreq->newcommit ?? $qreq->commit) {
-                self::quit("Commit " . ($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
+                return self::error("Commit " . ($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
             } else {
-                self::quit("No commits in repository.");
+                return self::error("No commits in repository.");
             }
+        }
+        if (isset($qreq->queueid) && !ctype_digit($qreq->queueid)) {
+            return self::error("Bad queueid.");
+        }
+        if (isset($qreq->check) && !ctype_digit($qreq->check)) {
+            return self::error("Bad check timestamp.");
         }
 
         // can we run this?
         if ($this->runner->command) {
             if (!$info->repo) {
-                self::quit("No repository.");
+                return self::error("No repository.");
             } else if (!$info->commit()) {
-                self::quit("No commit to run.");
+                return self::error("No commit to run.");
             } else if (!$info->can_view_repo_contents()) {
-                self::quit("Unconfirmed repository.");
+                return self::error("Unconfirmed repository.");
             }
         }
         if (!$this->viewer->can_run($this->pset, $this->runner, $this->user)) {
-            self::quit("You can’t run that command.");
+            return self::error("You can’t run that command.");
         }
 
-        // extract request info
-        $rstate = new RunnerState($info, $this->runner);
-        $rstate->set_queueid($qreq->get("queueid"));
-
-        // recent or checkup
-        if ($qreq->check) {
-            json_exit($rstate->check($qreq));
+        // load queue item
+        $qi = null;
+        if (isset($qreq->queueid) && isset($qreq->check)) {
+            $qi = QueueItem::by_id($this->conf, intval($qreq->queueid), $info);
         }
-
-        // ensure
-        if ($qreq->ensure) {
-            $answer = $rstate->check(new Qrequest("GET", ["check" => "recent"]));
-            if ($answer->ok || !($answer->run_empty ?? false)) {
-                json_exit($answer);
+        if (!$qi && isset($qreq->check)) {
+            if (!($qi = QueueItem::for_logged_jobid($info, intval($qreq->check)))) {
+                return self::error("Unknown check timestamp {$qreq->check}.");
+            }
+        }
+        if (!$qi && isset($qreq->queueid)) {
+            if (!($qi = QueueItem::by_id($this->conf, intval($qreq->queueid), $info))) {
+                return self::error("Unknown queueid {$qreq->queueid}.");
+            }
+        }
+        if (!$qi && ($this->is_ensure || isset($qreq->ensure))) {
+            $runlog = new RunLogger($info->pset, $info->repo);
+            if (($jobid = $runlog->complete_job($this->runner, $info->hash()))) {
+                $qi = QueueItem::for_logged_jobid($info, $jobid);
             }
         }
 
-        // check runnability
-        if ($this->runner->command) {
-            if (!$this->pset->run_dirpattern) {
-                self::quit("Configuration error (run_dirpattern).");
-            } else if (!$this->pset->run_jailfiles) {
-                self::quit("Configuration error (run_jailfiles).");
+        // check with existing queue item
+        if ($qi) {
+            if ($qi->psetid !== $info->pset->id
+                || $qi->repoid !== ($info->repo ? $info->repo->repoid : 0)
+                || $qi->runnername !== $this->runner->name) {
+                return self::error("Wrong runner.");
+            }
+            if ($qi->runat) {
+                return $qi->logged_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
             }
         }
-
-        // queue
-        $queue = $rstate->make_queue();
-        if ($queue && !$queue->runnable) {
-            json_exit(["onqueue" => true, "queueid" => $queue->queueid, "nahead" => $queue->nahead, "headage" => ($queue->head_runat ? Conf::$now - $queue->head_runat : null)]);
-        }
-
 
         // maybe eval
-        if (!$this->runner->command && $this->runner->eval) {
-            $jobid = time();
-            $rr = RunResponse::make_base($this->runner, $info->repo, $jobid);
+        if (!$this->runner->command) {
+            assert(!!$this->runner->eval);
+            $rr = RunResponse::make($this->runner, $info->repo);
             $rr->done = true;
+            $rr->timestamp = time();
             $rr->status = "done";
-            $rr->result = $info->runner_evaluate($this->runner, $jobid);
-            json_exit($rr);
+            $rr->result = $info->runner_evaluate($this->runner, $rr->timestamp);
+            return $rr;
         }
 
-
-        // otherwise run
-        try {
-            if (!$info->repo || !$info->pset) {
-                self::quit("Nothing to do");
-            } else if (($checkt = (new RunLogger($info->pset, $info->repo))->active_job())) {
-                self::quit("Recent job still running.", ["errorcode" => APIData::ERRORCODE_RUNCONFLICT, "checkt" => $checkt, "status" => "workingconflict"]);
+        // otherwise check runnability and enqueue
+        if (!$qi) {
+            if (!$this->pset->run_dirpattern) {
+                return self::error("Configuration error (run_dirpattern).");
+            } else if (!$this->pset->run_jailfiles) {
+                return self::error("Configuration error (run_jailfiles).");
+            } else if (!$info->repo || !$info->pset) {
+                return self::error("Nothing to do.");
             }
-            session_write_close();
+            $qi = QueueItem::make_info($info, $this->runner);
+            $qi->flags = $this->viewer->privChair ? QueueItem::FLAG_UNWATCHED : 0;
+            $qi->enqueue();
+            $qi->schedule(100);
+        } else {
+            $qi->update();
+        }
+        assert($qi->status === 0 && $qi->runat === 0 && $qi->runorder > 0);
+        session_write_close();
 
-            // run
-            $queue->start();
-
-            // save information about execution
-            $info->update_commit_notes(["run" => [$this->runner->category => $queue->runat]]);
-
-            json_exit(["ok" => true,
-                       "done" => false,
-                       "status" => "working",
-                       "repoid" => $info->repo->repoid,
-                       "pset" => $info->pset->id,
-                       "timestamp" => $queue->runat]);
+        // process queue
+        try {
+            $qs = new QueueStatus;
+            $result = $info->conf->qe("select * from ExecutionQueue where status>=0 and runorder<=? order by runorder asc, queueid asc limit 100", $qi->runorder);
+            while (($qix = QueueItem::fetch($info->conf, $result))) {
+                if ($qix->queueid === $qi->queueid) {
+                    $qix = $qi;
+                }
+                if ($qix->substantiate($qs)
+                    && $qix === $qi) {
+                    return $qi->logged_response();
+                }
+            }
+            Dbl::free($result);
+            return [
+                "queueid" => $qi->queueid,
+                "onqueue" => true,
+                "nahead" => $qs->nahead
+            ];
         } catch (Exception $e) {
-            self::quit($e->getMessage());
+            return self::error($e->getMessage());
         }
     }
 

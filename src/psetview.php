@@ -272,6 +272,11 @@ class PsetView {
         return $this->_hash;
     }
 
+    /** @return ?non-empty-string */
+    function bhash() {
+        return $this->_hash !== null ? hex2bin($this->_hash) : null;
+    }
+
     /** @return non-empty-string */
     function commit_hash() {
         assert($this->_hash !== null);

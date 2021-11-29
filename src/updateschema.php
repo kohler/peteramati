@@ -1,6 +1,6 @@
 <?php
-// updateschema.php -- HotCRP function for updating old schemata
-// HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
+// updateschema.php -- Peteramati function for updating old schemata
+// Peteramati is Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 function _update_schema_haslinenotes($conf) {
@@ -775,6 +775,14 @@ function updateSchema($conf) {
     if ($conf->sversion === 152
         && $conf->ql_ok("alter table `ExecutionQueue` add `runsettings` varbinary(8192) DEFAULT NULL")) {
         $conf->update_schema_version(153);
+    }
+    if ($conf->sversion === 153
+        && $conf->ql_ok("alter table `ExecutionQueue` drop `inputfifo`")
+        && $conf->ql_ok("alter table `ExecutionQueue` add `runorder` bigint NOT NULL DEFAULT '0'")
+        && $conf->ql_ok("alter table `ExecutionQueue` add `chain` bigint DEFAULT NULL")
+        && $conf->ql_ok("alter table `ExecutionQueue` drop `autorun`")
+        && $conf->ql_ok("alter table `ExecutionQueue` add `flags` int NOT NULL DEFAULT '0'")) {
+        $conf->update_schema_version(154);
     }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");

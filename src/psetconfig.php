@@ -168,17 +168,17 @@ class Pset {
     /** @var ?string */
     public $run_skeletondir;
     /** @var ?string */
+    public $run_binddir;
+    /** @var ?string */
     public $run_jailfiles;
     /** @var null|string|list<string> */
     public $run_jailmanifest;
-    /** @var ?string */
-    public $run_binddir;
+    /** @var ?bool */
+    public $run_xterm_js;
     /** @var ?float */
     public $run_timeout;
     /** @var ?float */
     public $run_idle_timeout;
-    /** @var ?bool */
-    public $run_xterm_js;
     /** @var bool */
     public $has_transfer_warnings;
     /** @var bool */
@@ -1751,7 +1751,7 @@ class RunnerConfig {
 
         $this->pset = $pset;
         $this->name = isset($r->name) ? $r->name : $name;
-        if (!is_string($this->name) || !preg_match(',\A[A-Za-z][0-9A-Za-z_]*\z,', $this->name)) {
+        if (!is_string($this->name) || !preg_match('/\A[A-Za-z][0-9A-Za-z_]*\z/', $this->name)) {
             throw new PsetConfigException("runner name format error", $loc);
         }
 
@@ -1762,7 +1762,7 @@ class RunnerConfig {
         } else {
             $this->category = $this->name;
         }
-        if (!is_string($this->category) || !preg_match(',\A[0-9A-Za-z_]+\z,', $this->category)) {
+        if (!is_string($this->category) || !preg_match('/\A[0-9A-Za-z_]+\z/', $this->category)) {
             throw new PsetConfigException("runner category format error", $loc);
         }
 

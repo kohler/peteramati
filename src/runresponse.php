@@ -41,14 +41,41 @@ class RunResponse implements JsonSerializable {
     /** @var ?mixed */
     public $result;
 
-    static function make_base(RunnerConfig $runner, Repository $repo, $jobid) {
+    /** @param ?Repository $repo
+     * @return RunResponse */
+    static function make(RunnerConfig $runner, $repo) {
         $rr = new RunResponse;
         $rr->ok = true;
         $rr->pset = $runner->pset->urlkey;
         $rr->runner = $runner->name;
-        $rr->repoid = $repo->repoid;
-        $rr->timestamp = $jobid;
+        $rr->repoid = $repo ? $repo->repoid : 0;
         return $rr;
+    }
+
+    /** @param object $x
+     * @return ?RunResponse */
+    static function make_log($x) {
+        if (is_string($x->pset ?? null) && is_string($x->runner ?? null)) {
+            $rr = new RunResponse;
+            $rr->pset = $x->pset;
+            $rr->runner = $x->runner;
+            $rr->repoid = is_int($x->repoid ?? null) ? $x->repoid : 0;
+            if (is_string($x->hash ?? null)) {
+                $rr->hash = $x->hash;
+            }
+            if (is_object($x->settings ?? null)) {
+                $rr->settings = (array) $x->settings;
+            }
+            if (is_int($x->timestamp ?? null)) {
+                $rr->timestamp = $x->timestamp;
+            }
+            if (is_int($x->queueid ?? null)) {
+                $rr->queueid = $x->queueid;
+            }
+            return $rr;
+        } else {
+            return null;
+        }
     }
 
     function jsonSerialize() {

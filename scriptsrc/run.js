@@ -417,8 +417,8 @@ export function run(button, opts) {
                     x = data.message;
                 }
                 if (data.errorcode === 1001 // ERRORCODE_RUNCONFLICT
-                    && data.checkt) {
-                    kill_checkt = data.checkt;
+                    && data.conflict_timestamp) {
+                    kill_checkt = data.conflict_timestamp;
                 }
             }
             append("\x1b[1;3;31m" + x + "\x1b[m\r\n");

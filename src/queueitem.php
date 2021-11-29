@@ -22,12 +22,20 @@ class QueueItem {
     public $repoid;
     /** @var ?string */
     public $bhash;
+    /** @var ?string */
+    public $runsettings;
 
     /** @var string */
     public $queueclass;
     /** @var ?int */
     public $nconcurrent;
+    /** @var int */
+    public $flags;
+    /** @var ?int */
+    public $chain;
 
+    /** @var int */
+    public $runorder;
     /** @var int */
     public $insertat;
     /** @var int */
@@ -35,32 +43,17 @@ class QueueItem {
     /** @var int */
     public $runat;
     /** @var int */
-    public $autorun;
-    /** @var int */
     public $status;
     /** @var ?string */
     public $lockfile;
-    /** @var ?string */
-    public $inputfifo;
-    /** @var ?string */
-    public $runsettings;
-
-    // loaded from joins
-    /** @var ?int */
-    public $nahead;
-    /** @var ?int */
-    public $head_runat;
-    /** @var ?int */
-    public $ahead_nconcurrent;
-
-    /** @var ?bool */
-    public $runnable;
 
     // object links
     /** @var ?Pset */
     private $_pset;
     /** @var ?Repository */
     private $_repo;
+    /** @var ?PsetView */
+    private $_info;
     /** @var ?RunnerConfig */
     private $_runner;
     /** @var int */
@@ -78,6 +71,8 @@ class QueueItem {
     /** @var ?int */
     private $_runstatus;
 
+    const FLAG_UNWATCHED = 1;
+
 
     function __construct(Conf $conf) {
         $this->conf = $conf;
@@ -94,39 +89,180 @@ class QueueItem {
         if ($this->nconcurrent !== null) {
             $this->nconcurrent = (int) $this->nconcurrent;
         }
+        $this->flags = (int) $this->flags;
+        if ($this->chain !== null) {
+            $this->chain = (int) $this->chain;
+        }
 
+        $this->runorder = (int) $this->runorder;
         $this->insertat = (int) $this->insertat;
         $this->updateat = (int) $this->updateat;
         $this->runat = (int) $this->runat;
         $this->status = (int) $this->status;
-        $this->autorun = (int) $this->autorun;
-
-        if ($this->nahead !== null) {
-            $this->nahead = (int) $this->nahead;
-        }
-        if ($this->head_runat !== null) {
-            $this->head_runat = (int) $this->head_runat;
-        }
-        if ($this->ahead_nconcurrent !== null) {
-            $this->ahead_nconcurrent = (int) $this->ahead_nconcurrent;
-        }
     }
 
-    /** @return ?QueueItem */
-    static function fetch(Conf $conf, $result) {
+
+    /** @param ?PsetView $info
+     * @return ?QueueItem */
+    static function fetch(Conf $conf, $result, $info = null) {
         $qi = $result ? $result->fetch_object("QueueItem", [$conf]) : null;
-        '@phan-var-force ?Repository $repo';
         if ($qi && !is_int($qi->queueid)) {
             $qi->db_load();
+            $info && $qi->associate_info($info);
         }
         return $qi;
     }
 
     /** @param int $queueid
+     * @param ?PsetView $info
      * @return ?QueueItem */
-    static function by_id($queueid, Conf $conf) {
-        $result = $conf->qe("select * from QueueItem where queueid=?", $queueid);
-        return self::fetch($conf, $result);
+    static function by_id(Conf $conf, $queueid, $info = null) {
+        $result = $conf->qe("select * from ExecutionQueue where queueid=?", $queueid);
+        return self::fetch($conf, $result, $info);
+    }
+
+    /** @param PsetView $info
+     * @param ?RunnerConfig $runner
+     * @return QueueItem */
+    static function make_info($info, $runner = null) {
+        $qi = new QueueItem($info->conf);
+        $qi->reqcid = $info->viewer->contactId;
+        $qi->cid = $info->user->contactId;
+        $qi->psetid = $info->pset->id;
+        $qi->repoid = $info->repo ? $info->repo->repoid : 0;
+        $qi->bhash = $info->bhash();
+        if ($qi->bhash
+            && ($rs = $info->commit_jnote("runsettings"))) {
+            $qi->runsettings = json_encode_db($rs);
+        }
+
+        $qi->queueclass = "";
+        if ($runner) {
+            $qi->runnername = $runner->name;
+            $qi->nconcurrent = 0;
+            if ($runner->nconcurrent !== null) {
+                $qi->nconcurrent = $runner->nconcurrent;
+            } else {
+                $qname = $runner->queue ?? "default";
+                $qname = $qname !== "" ? $qname : "default";
+                $qc = $info->conf->config->_queues->{$qname} ?? null;
+                if (is_object($qc) && is_int($qc->nconcurrent ?? null)) {
+                    $qi->nconcurrent = $qc->nconcurrent;
+                }
+            }
+            if ($qi->nconcurrent <= 0) {
+                $qi->nconcurrent = 10000;
+            }
+            $qi->flags = 0;
+        }
+
+        $qi->associate_info($info, $runner);
+        return $qi;
+    }
+
+    /** @param PsetView $info
+     * @param int $jobid
+     * @return QueueItem */
+    static function for_logged_jobid($info, $jobid) {
+        $runlog = new RunLogger($info->pset, $info->repo);
+        if (($j = $runlog->job_info($jobid))
+            && is_string($j->runner ?? null)
+            && is_string($j->pset ?? null)
+            && ($j->pset === $info->pset->urlkey
+                || $info->conf->pset_by_key($j->pset) === $info->pset)) {
+            $qi = self::make_info($info);
+            $qi->queueid = $j->queueid ?? null;
+            $qi->runnername = $j->runner;
+            $qi->runat = $j->timestamp ?? null;
+            $qi->runsettings = isset($j->settings) ? (array) $j->settings : null;
+            return $qi;
+        } else {
+            return null;
+        }
+    }
+
+
+    function enqueue() {
+        assert(!$this->queueid);
+        $this->insertat = $this->updateat = Conf::$now;
+        $this->runat = $this->runorder = 0;
+        $this->status = -1;
+        $this->conf->qe("insert into ExecutionQueue set reqcid=?, cid=?,
+            runnername=?, psetid=?, repoid=?, bhash=?, runsettings=?,
+            queueclass=?, nconcurrent=?, flags=?, chain=?,
+            insertat=?, updateat=?,
+            runat=?, runorder=?, status=?",
+            $this->reqcid, $this->cid,
+            $this->runnername, $this->psetid, $this->repoid, $this->bhash, $this->runsettings,
+            $this->queueclass, $this->nconcurrent, $this->flags, $this->chain,
+            $this->insertat, $this->updateat,
+            $this->runat, $this->runorder, $this->status);
+        $this->queueid = $this->conf->dblink->insert_id;
+    }
+
+    /** @param int $priority */
+    function schedule($priority) {
+        assert(!!$this->queueid);
+        if ($this->status === -1) {
+            $this->conf->qe("update ExecutionQueue q,
+                (select max(runorder) mro from ExecutionQueue where status>=0) mroq
+                set q.status=0, q.runorder=greatest(coalesce(mroq.mro,0),?)+?
+                where q.queueid=? and q.status=-1",
+                Conf::$now, $priority, $this->queueid);
+            if (($row = $this->conf->fetch_first_row("select status, runorder from ExecutionQueue where queueid=?", $this->queueid))) {
+                $this->status = (int) $row[0];
+                $this->runorder = (int) $row[1];
+            }
+        }
+    }
+
+    function update() {
+        assert(!!$this->queueid);
+        $result = $this->conf->qe("update ExecutionQueue set updateat=? where queueid=? and updateat<?", Conf::$now, $this->queueid, Conf::$now);
+        if ($result->affected_rows) {
+            $this->updateat = Conf::$now;
+        }
+        Dbl::free($result);
+    }
+
+    /** @param QueueStatus $qs
+     * @return bool */
+    function substantiate($qs) {
+        assert(!!$this->queueid && $this->status >= 0 && $this->runorder > 0);
+        if ($this->runat > 0) {
+            // remove dead items from queue
+            // - pidfile contains "0\n": child has exited, remove it
+            // - pidfile specified but not there
+            // XXX do not use run timeouts
+            if ($this->lockfile
+                && RunLogger::active_job_at($this->lockfile) !== $this->runat) {
+                $this->conf->qe("delete from ExecutionQueue where queueid=?", $this->queueid);
+            } else {
+                if ($qs->nconcurrent === 0 || $qs->nconcurrent > $this->nconcurrent) {
+                    $qs->nconcurrent = $this->nconcurrent;
+                }
+                ++$qs->nrunning;
+                ++$qs->nahead;
+            }
+            return true;
+        } else if (($this->flags & self::FLAG_UNWATCHED) === 0
+                   && $this->updateat < Conf::$now - 30) {
+            if ($this->updateat < Conf::$now - 240) {
+                $this->conf->qe("delete from ExecutionQueue where queueid=?", $this->queueid);
+            }
+            ++$qs->nahead;
+            return false;
+        } else if ($qs->nrunning >= $this->nconcurrent) {
+            ++$qs->nahead;
+            return false;
+        } else if ($this->start_command()) {
+            ++$qs->nrunning;
+            ++$qs->nahead;
+            return true;
+        } else {
+            ++$qs->nahead;
+            return false;
+        }
     }
 
 
@@ -149,10 +285,19 @@ class QueueItem {
     }
 
 
-    /** @return ?Repository */
-    function repo() {
+    /** @return ?Pset */
+    function pset() {
         if (($this->_ocache & 1) === 0) {
             $this->_ocache |= 1;
+            $this->_pset = $this->conf->pset_by_id($this->psetid);
+        }
+        return $this->_pset;
+    }
+
+    /** @return ?Repository */
+    function repo() {
+        if (($this->_ocache & 2) === 0) {
+            $this->_ocache |= 2;
             if ($this->repoid > 0) {
                 $this->_repo = Repository::by_id($this->repoid, $this->conf);
             }
@@ -160,19 +305,23 @@ class QueueItem {
         return $this->_repo;
     }
 
-    /** @return ?Pset */
-    function pset() {
-        if (($this->_ocache & 2) === 0) {
-            $this->_ocache |= 2;
-            $this->_pset = $this->conf->pset_by_id($this->psetid);
+    /** @return ?PsetView */
+    function info() {
+        if (($this->_ocache & 4) === 0) {
+            $this->_ocache |= 4;
+            if (($p = $this->pset())
+                && ($u = $this->conf->user_by_id($this->cid))) {
+                $hash = $this->bhash !== null ? bin2hex($this->bhash) : null;
+                $this->_info = PsetView::make($p, $u, $u, $hash);
+            }
         }
-        return $this->_pset;
+        return $this->_info;
     }
 
     /** @return ?RunnerConfig */
     function runner() {
-        if (($this->_ocache & 4) === 0) {
-            $this->_ocache |= 4;
+        if (($this->_ocache & 8) === 0) {
+            $this->_ocache |= 8;
             if (($p = $this->pset())) {
                 $this->_runner = $p->runners[$this->runnername] ?? null;
             }
@@ -180,12 +329,33 @@ class QueueItem {
         return $this->_runner;
     }
 
+    /** @param ?PsetView $info
+     * @param ?RunnerConfig $runner */
+    function associate_info($info, $runner = null) {
+        if ($info && $info->pset->id === $this->psetid) {
+            $this->_pset = $info->pset;
+            $this->_ocache |= 1;
+        }
+        if ($info && $info->repo && $info->repo->repoid === $this->repoid) {
+            $this->_repo = $info->repo;
+            $this->_ocache |= 2;
+        }
+        if ($info && $this->_pset === $info->pset && $this->_repo === $info->repo) {
+            $this->_info = $info;
+            $this->_ocache |= 4;
+        }
+        if ($runner && $runner->name === $this->runnername) {
+            $this->_runner = $runner;
+            $this->_ocache |= 8;
+        }
+    }
+
 
     /** @return RunResponse */
     function response() {
         $rr = new RunResponse;
-        $rr->repoid = $this->repoid;
         $rr->pset = $this->pset()->urlkey;
+        $rr->repoid = $this->repoid;
         if ($this->queueid) {
             $rr->queueid = $this->queueid;
         }
@@ -203,8 +373,8 @@ class QueueItem {
     }
 
 
-    function start() {
-        assert($this->runat === 0);
+    function start_command() {
+        assert($this->runat === 0 && $this->status === 0 && !!$this->queueid);
 
         $repo = $this->repo();
         $pset = $this->pset();
@@ -215,13 +385,17 @@ class QueueItem {
 
         if (!chdir(SiteLoader::$root)) {
             throw new RunnerException("Can’t cd to main directory");
-        } else if (!is_executable("jail/pa-jail")) {
+        }
+        if (!is_executable("jail/pa-jail")) {
             throw new RunnerException("The pa-jail program has not been compiled");
         }
 
         $runlog = new RunLogger($pset, $repo);
+        if (!$runlog->mkdirs()) {
+            throw new RunnerException("Can’t create log directory");
+        }
         if ($runlog->active_job()) {
-            throw new RunnerException("Recent job still running");
+            return false;
         }
 
         // collect user information
@@ -248,7 +422,7 @@ class QueueItem {
         $this->_jailhomedir = "{$this->_jaildir}/" . preg_replace('/\A\/+/', '', $userhome);
 
         // create logfile and pidfile
-        $this->runat = time(); // XXX conflict
+        $this->runat = time();
         $logbase = $runlog->job_prefix($this->runat);
         $this->_logfile = "{$logbase}.log";
         $timingfile = "{$logbase}.log.time";
@@ -262,10 +436,19 @@ class QueueItem {
             touch($timingfile);
         }
         $this->_logstream = fopen($this->_logfile, "a");
-        if ($this->queueid) {
-            Dbl::qe("update ExecutionQueue set runat=?, status=1, lockfile=?, inputfifo=? where queueid=?",
-                    $this->runat, $pidfile, $inputfifo, $this->queueid);
+
+        $result = $this->conf->qe("update ExecutionQueue set runat=?, status=1, lockfile=? where queueid=? and status=0",
+            $this->runat, $pidfile, $this->queueid);
+        if (!$result->affected_rows) {
+            if (($row = $this->conf->fetch_first_row("select runat, status, lockfile from ExecutionQueue where queueid=?", $this->queueid))) {
+                $this->runat = (int) $row[0];
+                $this->status = (int) $row[1];
+                $this->lockfile = $row[2];
+            }
+            return $this->status > 0;
         }
+        $this->status = 1;
+        $this->lockfile = $pidfile;
         $this->_runstatus = 1;
         register_shutdown_function([$this, "cleanup"]);
 
@@ -342,7 +525,12 @@ class QueueItem {
             . " TERM=xterm-256color"
             . " " . escapeshellarg($this->expand($runner->command));
         $this->_runstatus = 0;
-        return $this->run_and_log($command);
+        $this->run_and_log($command);
+
+        // save information about execution
+        $this->info()->update_commit_notes(["run" => [$this->runner()->category => $this->runat]]);
+
+        return true;
     }
 
     /** @param string $command
@@ -463,6 +651,46 @@ class QueueItem {
         file_put_contents("{$this->_jailhomedir}/config.sh", join("", $sh));
     }
 
+
+    /** @param int $offset
+     * @param ?string $write
+     * @param bool $stop
+     * @return RunResponse */
+    function logged_response($offset = 0, $write = null, $stop = false) {
+        $runlog = new RunLogger($this->pset(), $this->repo());
+        if ((($write ?? "") !== "" || $stop)
+            && $runlog->active_job() === $this->runat) {
+            if (($write ?? "") !== "") {
+                $runlog->job_write($this->runat, $write);
+            }
+            if ($stop) {
+                // "ESC Ctrl-C" is captured by pa-jail
+                $runlog->job_write($this->runat, "\x1b\x03");
+            }
+            $now = microtime(true);
+            do {
+                usleep(10);
+                $rr = $runlog->job_response($this->runner(), $this->runat, $offset);
+            } while ($stop
+                     && $runlog->active_job() === $this->runat
+                     && microtime(true) - $now < 0.1);
+        } else {
+            $rr = $runlog->job_response($this->runner(), $this->runat, $offset);
+        }
+
+        if ($rr->status !== "working" && $this->queueid > 0) {
+            $this->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repoid);
+        }
+
+        if ($rr->status === "done"
+            && $this->runner()->eval
+            && ($info = $this->info())) {
+            $rr->result = $info->runner_evaluate($this->runner(), $this->runat);
+        }
+
+        return $rr;
+    }
+
     function cleanup() {
         if ($this->_runstatus === 1) {
             $runlog = new RunLogger($this->pset(), $this->repo());
@@ -470,4 +698,13 @@ class QueueItem {
             @unlink($runlog->job_prefix($this->runat) . ".in");
         }
     }
+}
+
+class QueueStatus {
+    /** @var int */
+    public $nrunning = 0;
+    /** @var int */
+    public $nahead = 0;
+    /** @var int */
+    public $nconcurrent = 100000;
 }

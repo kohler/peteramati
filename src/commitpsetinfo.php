@@ -1,6 +1,6 @@
 <?php
 // commitpsetinfo.php -- Peteramati helper class representing commit/pset
-// Peteramati is Copyright (c) 2013-2019 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class CommitPsetInfo {
@@ -114,8 +114,7 @@ class CommitPsetInfo {
     }
 
     /** @param ?string $notes
-     * @param ?object $jnotes
-     * @param int $notesversion */
+     * @param ?object $jnotes */
     function assign_notes($notes, $jnotes) {
         $this->notes = $notes;
         $this->jnotes = $jnotes;
