@@ -784,6 +784,15 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table `ExecutionQueue` add `flags` int NOT NULL DEFAULT '0'")) {
         $conf->update_schema_version(154);
     }
+    if ($conf->sversion === 154
+        && $conf->ql_ok("alter table `ContactInfo` add `last_runorder` bigint NOT NULL DEFAULT '0'")) {
+        $conf->update_schema_version(155);
+    }
+    if ($conf->sversion === 155
+        && $conf->ql_ok("update ExecutionQueue set runorder=? where status<0", Conf::$now + 1000000000)
+        && $conf->ql_ok("alter table `ExecutionQueue` add key `runorder` (`runorder`)")) {
+        $conf->update_schema_version(156);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

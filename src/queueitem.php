@@ -185,7 +185,8 @@ class QueueItem {
     function enqueue() {
         assert(!$this->queueid);
         $this->insertat = $this->updateat = Conf::$now;
-        $this->runat = $this->runorder = 0;
+        $this->runat = 0;
+        $this->runorder = Conf::$now + 1000000000;
         $this->status = -1;
         $this->conf->qe("insert into ExecutionQueue set reqcid=?, cid=?,
             runnername=?, psetid=?, repoid=?, bhash=?, runsettings=?,
@@ -200,18 +201,27 @@ class QueueItem {
         $this->queueid = $this->conf->dblink->insert_id;
     }
 
-    /** @param int $priority */
-    function schedule($priority) {
+    /** @param int $priority
+     * @param ?int $userid */
+    function schedule($priority, $userid = null) {
         assert(!!$this->queueid);
         if ($this->status === -1) {
-            $this->conf->qe("update ExecutionQueue q,
-                (select max(runorder) mro from ExecutionQueue where status>=0) mroq
-                set q.status=0, q.runorder=greatest(coalesce(mroq.mro,0),?)+?
-                where q.queueid=? and q.status=-1",
-                Conf::$now, $priority, $this->queueid);
+            if (($userid ?? 0) > 0) {
+                $this->conf->qe("update ExecutionQueue
+                    set status=0, runorder=greatest(coalesce((select last_runorder from ContactInfo where contactId=?),0),?)+?
+                    where queueid=? and status=-1",
+                    $userid, Conf::$now, $priority, $this->queueid);
+            } else {
+                $this->conf->qe("update ExecutionQueue set status=0, runorder=? where queueid=? and status=-1",
+                    Conf::$now + $priority, $this->queueid);
+            }
             if (($row = $this->conf->fetch_first_row("select status, runorder from ExecutionQueue where queueid=?", $this->queueid))) {
                 $this->status = (int) $row[0];
                 $this->runorder = (int) $row[1];
+                if (($userid ?? 0) > 0) {
+                    $this->conf->qe("update ContactInfo set last_runorder=? where contactId=? and last_runorder<?",
+                        $this->runorder, $userid, $this->runorder);
+                }
             }
         }
     }
@@ -229,6 +239,7 @@ class QueueItem {
      * @return bool */
     function substantiate($qs) {
         assert(!!$this->queueid && $this->status >= 0 && $this->runorder > 0);
+        assert(($this->status === 0) === ($this->runat > 0));
         if ($this->runat > 0) {
             // remove dead items from queue
             // - pidfile contains "0\n": child has exited, remove it
@@ -236,7 +247,7 @@ class QueueItem {
             // XXX do not use run timeouts
             if ($this->lockfile
                 && RunLogger::active_job_at($this->lockfile) !== $this->runat) {
-                $this->conf->qe("delete from ExecutionQueue where queueid=?", $this->queueid);
+                $this->delete(false);
             } else {
                 if ($qs->nconcurrent === 0 || $qs->nconcurrent > $this->nconcurrent) {
                     $qs->nconcurrent = $this->nconcurrent;
@@ -247,8 +258,8 @@ class QueueItem {
             return true;
         } else if (($this->flags & self::FLAG_UNWATCHED) === 0
                    && $this->updateat < Conf::$now - 30) {
-            if ($this->updateat < Conf::$now - 240) {
-                $this->conf->qe("delete from ExecutionQueue where queueid=?", $this->queueid);
+            if ($this->updateat < Conf::$now - 180) {
+                $this->delete(true);
             }
             ++$qs->nahead;
             return false;
@@ -262,6 +273,23 @@ class QueueItem {
         } else {
             ++$qs->nahead;
             return false;
+        }
+    }
+
+    /** @param bool $only_old */
+    private function delete($only_old) {
+        assert($this->queueid > 0);
+        if ($only_old) {
+            $result = $this->conf->qe("delete from ExecutionQueue where queueid=? and status=0 and updateat<$?", $this->queueid, Conf::$now - 180);
+        } else {
+            $result = $this->conf->qe("delete from ExecutionQueue where queueid=?", $this->queueid);
+        }
+        if ($result->affected_rows) {
+            $this->queueid = 0;
+            if ($this->chain) {
+                $this->conf->qe("update ExecutionQueue set status=0, runorder=? where status=-1 and chain=? order by queueid asc limit 1",
+                    Conf::$now, $this->chain);
+            }
         }
     }
 
@@ -382,6 +410,7 @@ class QueueItem {
         if (!$repo || !$pset || !$runner) {
             throw new RunnerException("Bad queue item");
         }
+        $info = $this->info();
 
         if (!chdir(SiteLoader::$root)) {
             throw new RunnerException("Can’t cd to main directory");
@@ -410,8 +439,8 @@ class QueueItem {
             throw new RunnerException("Bad run_username");
         }
 
-        $info = posix_getpwnam($username);
-        $userhome = $info ? $info["dir"] : "/home/jail61";
+        $pwnam = posix_getpwnam($username);
+        $userhome = $pwnam ? $pwnam["dir"] : "/home/jail61";
         $userhome = preg_replace('/\/+\z/', '', $userhome);
 
         // collect directory information
@@ -436,9 +465,10 @@ class QueueItem {
             touch($timingfile);
         }
         $this->_logstream = fopen($this->_logfile, "a");
+        $this->bhash = $info->bhash(); // resolve blank hash
 
-        $result = $this->conf->qe("update ExecutionQueue set runat=?, status=1, lockfile=? where queueid=? and status=0",
-            $this->runat, $pidfile, $this->queueid);
+        $result = $this->conf->qe("update ExecutionQueue set runat=?, status=1, lockfile=?, bhash=? where queueid=? and status=0",
+            $this->runat, $pidfile, $this->queueid, $this->bhash);
         if (!$result->affected_rows) {
             if (($row = $this->conf->fetch_first_row("select runat, status, lockfile from ExecutionQueue where queueid=?", $this->queueid))) {
                 $this->runat = (int) $row[0];
@@ -679,7 +709,7 @@ class QueueItem {
         }
 
         if ($rr->status !== "working" && $this->queueid > 0) {
-            $this->conf->qe("delete from ExecutionQueue where queueid=? and repoid=?", $this->queueid, $this->repoid);
+            $this->delete(false);
         }
 
         if ($rr->status === "done"

@@ -74,6 +74,7 @@ class Contact {
     public $github_username;
     public $anon_username;
     public $contactImageId;
+    public $last_runorder;
     public $is_anonymous = false;
 
     public $visited = false;
