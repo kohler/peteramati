@@ -641,7 +641,7 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
                 } else {
                     $value = substr($ghash, 0, 7) . " (disconnected commit)";
                 }
-                $want_latest = !$info->is_latest_commit();
+                $want_latest = !$info->is_lateish_commit();
             } else if (($c = $info->latest_nontrivial_commit())) {
                 $title = "latest commit";
                 $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);

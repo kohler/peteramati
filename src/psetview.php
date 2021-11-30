@@ -232,6 +232,12 @@ class PsetView {
         return $this->repo ? $this->repo->latest_nontrivial_commit($this->pset, $this->branch) : null;
     }
 
+    /** @return ?non-empty-string */
+    function latest_nontrivial_hash() {
+        $lc = $this->latest_nontrivial_commit();
+        return $lc ? $lc->hash : null;
+    }
+
     /** @return ?CommitRecord */
     function grading_commit() {
         $h = $this->grading_hash();
@@ -334,22 +340,15 @@ class PsetView {
     /** @param ?string $reqhash
      * @return void */
     function set_hash($reqhash) {
-        $hash = null;
-        if ($this->repo && $reqhash !== "none") {
-            if ($reqhash !== null && $reqhash !== "") {
-                if (($c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch))) {
-                    $hash = $c->hash;
-                }
-            } else {
-                $hash = $this->grading_hash() ?? $this->latest_hash();
-            }
+        if (!$this->repo || $reqhash === "none") {
+            $this->force_set_hash(null);
+        } else if ($reqhash === null || $reqhash === "") {
+            $this->set_grading_or_latest_nontrivial_commit();
+        } else if (($c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch))) {
+            $this->set_commit($c);
+        } else {
+            $this->force_set_hash(null);
         }
-        $this->force_set_hash($hash);
-    }
-
-    /** @return bool */
-    function is_latest_commit() {
-        return $this->_hash && $this->_hash === $this->latest_hash();
     }
 
     /** @return bool */
@@ -364,6 +363,13 @@ class PsetView {
                 && ($rpi = $this->rpi())
                 && !$rpi->placeholder
                 && $rpi->gradehash === $this->_hash);
+    }
+
+    /** @return bool */
+    function is_lateish_commit() {
+        return $this->_hash
+            && ($this->_hash === $this->latest_hash()
+                || $this->_hash === $this->latest_nontrivial_hash());
     }
 
     /** @return ?int */

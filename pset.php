@@ -425,7 +425,7 @@ function echo_commit($info, $qreq) {
             ];
         }
     }
-    if (!$info->is_latest_commit()) {
+    if (!$info->is_lateish_commit()) {
         $remarks[] = [true, "This is not "
                       . "<a class=\"uu\" href=\"" . $info->hoturl("pset", ["commit" => $info->latest_hash()]) . "\">the latest commit</a>"
                       . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", ["commit1" => $info->latest_hash()]) . "\">see diff</a>)</span>."];
@@ -445,7 +445,7 @@ function echo_commit($info, $qreq) {
         $extra = count($extra) ? ' <span style="font-weight:normal">(' . join(", ", $extra) . ')</span>' : "";
         $remarks[] = [!$pset->obscure_late_hours, "This commit uses " . plural($lhd->hours, "late hour") . $extra . "."];
     }
-    if (($info->is_latest_commit() || $info->viewer->isPC)
+    if (($info->is_lateish_commit() || $info->viewer->isPC)
         && $pset->handout_repo_url) {
         $last_handout = $pset->latest_handout_commit();
         $last_myhandout = $last_handout ? $info->derived_handout_hash() : null;
