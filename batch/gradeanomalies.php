@@ -1,6 +1,6 @@
 <?php
-// facefetch.php -- Peteramati script for fetching & storing faces
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// gradeanomalies.php -- Peteramati script for reporting grading anomalies
+// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 $ConfSitePATH = preg_replace('/\/batch\/[^\/]+/', '', __FILE__);

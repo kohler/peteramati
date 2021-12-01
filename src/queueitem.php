@@ -303,8 +303,7 @@ class QueueItem {
             $x = str_replace('${CONFDIR}', "conf/", $x);
             $x = str_replace('${SRCDIR}', "src/", $x);
             $x = str_replace('${HOSTTYPE}', $this->conf->opt("hostType") ?? "", $x);
-            if ($this->bhash !== null) {
-                $hash = bin2hex($this->bhash);
+            if (($hash = $this->hash()) !== null) {
                 $x = str_replace('${COMMIT}', $hash, $x);
                 $x = str_replace('${HASH}', $hash, $x);
             }
@@ -312,6 +311,10 @@ class QueueItem {
         return $x;
     }
 
+    /** @return ?string */
+    function hash() {
+        return $this->bhash !== null ? bin2hex($this->bhash) : null;
+    }
 
     /** @return ?Pset */
     function pset() {
@@ -339,8 +342,7 @@ class QueueItem {
             $this->_ocache |= 4;
             if (($p = $this->pset())
                 && ($u = $this->conf->user_by_id($this->cid))) {
-                $hash = $this->bhash !== null ? bin2hex($this->bhash) : null;
-                $this->_info = PsetView::make($p, $u, $u, $hash);
+                $this->_info = PsetView::make($p, $u, $u, $this->hash());
             }
         }
         return $this->_info;
@@ -392,7 +394,7 @@ class QueueItem {
         }
         $rr->runner = $this->runnername;
         if ($this->bhash !== null) {
-            $rr->hash = bin2hex($this->bhash);
+            $rr->hash = $this->hash();
         }
         if (($rs = $this->runsettings ? json_decode($this->runsettings) : null)) {
             $rr->settings = (array) $rs;
@@ -591,7 +593,7 @@ class QueueItem {
         $pset = $this->pset();
         $runner = $this->runner();
         assert($repo !== null && $pset !== null && $runner !== null && $this->bhash !== null);
-        $hash = bin2hex($this->bhash);
+        $hash = $this->hash();
 
         $checkoutdir = $clonedir = $this->_jailhomedir . "/repo";
         if ($repo->truncated_psetdir($pset)

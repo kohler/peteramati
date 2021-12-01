@@ -12,8 +12,6 @@ class PsetView {
     public $user;
     /** @var Contact */
     public $viewer;
-    /** @var ?string */
-    public $mode;
     /** @var bool */
     public $pc_view;
     /** @var ?Repository */
@@ -97,13 +95,11 @@ class PsetView {
     }
 
     /** @param ?string $hash
-     * @param ?string $mode
      * @return PsetView */
     static function make(Pset $pset, Contact $user, Contact $viewer,
-                         $hash = null, $mode = null) {
+                         $hash = null) {
         $info = new PsetView($pset, $user, $viewer);
         $info->partner = $user->partner($pset->id);
-        $info->mode = $mode;
         if (!$pset->gitless) {
             $info->repo = $user->repo($pset->id);
             $info->branchid = $user->branchid($pset);
