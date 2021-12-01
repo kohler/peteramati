@@ -15,7 +15,9 @@ class RunQueueBatch {
     /** @var bool */
     public $verbose = false;
     /** @var list<QueueItem> */
-    public $running = [];
+    private $running = [];
+    /** @var bool */
+    private $any_completed = false;
 
     /** @param bool $all */
     function __construct(Conf $conf, $all) {
@@ -50,6 +52,7 @@ class RunQueueBatch {
             if ($this->verbose) {
                 $this->report($qix, $old_status);
             }
+            $this->any_completed = $this->any_completed || $qix->queueid <= 0;
         }
         return $qs->nrunning >= $qs->nconcurrent;
     }
@@ -79,7 +82,12 @@ class RunQueueBatch {
     function run() {
         $this->load();
         while (!empty($this->running)) {
+            $this->any_completed = false;
             while ($this->check()) {
+                sleep(5);
+                Conf::set_current_time(time());
+            }
+            if (!$this->any_completed) {
                 sleep(5);
                 Conf::set_current_time(time());
             }
