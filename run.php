@@ -263,7 +263,7 @@ class RunRequest {
                 $users = preg_split('/\s+/', $this->qreq->slist ?? $this->qreq->users, -1, PREG_SPLIT_NO_EMPTY);
             }
             $nu = 0;
-            $chain = random_int(1, min(PHP_INT_MAX, (1 << 52) - 1));
+            $chain = QueueItem::new_chain();
             foreach ($users as $uname) {
                 if (($u = $this->conf->user_by_whatever($uname))) {
                     $info = PsetView::make($this->pset, $u, $this->viewer);

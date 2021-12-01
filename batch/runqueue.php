@@ -1,5 +1,5 @@
 <?php
-// runqueue.php -- Peteramati script for reporting grading anomalies
+// runqueue.php -- Peteramati script for progressing the execution queue
 // HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
@@ -7,19 +7,18 @@ $ConfSitePATH = preg_replace('/\/batch\/[^\/]+/', '', __FILE__);
 require_once("$ConfSitePATH/src/init.php");
 require_once("$ConfSitePATH/lib/getopt.php");
 
-$arg = getopt_rest($argv, "a", ["all"]);
-
 class RunQueueBatch {
     /** @var Conf */
     public $conf;
     /** @var bool */
     public $all;
     /** @var list<QueueItem> */
-    public $running;
+    public $running = [];
 
-    function __construct(Conf $conf, $arg) {
+    /** @param bool $all */
+    function __construct(Conf $conf, $all) {
         $this->conf = $conf;
-        $this->all = isset($arg["a"]) || isset($arg["all"]);
+        $this->all = $all;
     }
 
     function load() {
@@ -28,19 +27,15 @@ class RunQueueBatch {
             $qs = new QueueStatus;
             $result = $this->conf->qe("select * from ExecutionQueue where status>=0 order by runorder asc, queueid asc limit 100", $qi->runorder);
             while (($qix = QueueItem::fetch($info->conf, $result))) {
-                if ($qix->status === 0 && $qs->nrunning >= $qs->nconcurrent) {
-                    break;
-                }
-                $qix->substantiate($qs);
-                if ($qix->status > 0) {
-                    $this->running[] = $qix;
+                if ($qix->status > 0 || $qs->nrunning < $qs->nconcurrent) {
+                    $qix->substantiate($qs);
+                    if ($qix->status > 0) {
+                        $this->running[] = $qix;
+                    }
                 }
             }
             Dbl::free($result);
-        } catch (Exception $e) {
-            fwrite(STDERR, $e->getMessage());
-            exit(1);
-        }        
+        }      
     }
 
     function check() {
@@ -55,11 +50,23 @@ class RunQueueBatch {
         $this->load();
         while (!empty($this->running)) {
             while ($this->check()) {
+                sleep(5);
             }
             $this->load();
         }
-        exit(0);
+    }
+
+    /** @return RunQueueBatch */
+    static function parse_args(Conf $conf, $argv) {
+        $arg = getopt_rest($argv, "a", ["all"]);
+        return new RunQueueBatch($conf, isset($arg["all"]) || isset($arg["a"]));
     }
 }
 
-(new RunQueueBatch($Conf, $arg))->run();
+try {
+    RunQueueBatch::parse_args($Conf, $argv)->run();
+    exit(0);
+} catch (Exception $e) {
+    fwrite(STDERR, $e->getMessage() . "\n");
+    exit(1);
+}

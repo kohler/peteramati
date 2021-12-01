@@ -40,7 +40,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     private $_infos;
 
     const COLLEGE = 1;
-    const EXTENSION = 2;
+    const DCE = 2;
     const ENROLLED = 4;
     const DROPPED = 8;
     const TF = 16;
@@ -55,10 +55,10 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         $this->viewer = $viewer;
         if ($flags !== 0) {
             $w = [];
-            $cf = $flags & (self::COLLEGE | self::EXTENSION);
+            $cf = $flags & (self::COLLEGE | self::DCE);
             if ($cf === self::COLLEGE) {
                 $w[] = "college";
-            } else if ($cf === self::EXTENSION) {
+            } else if ($cf === self::DCE) {
                 $w[] = "extension";
             }
             $ef = $flags & (self::ENROLLED | self::DROPPED);

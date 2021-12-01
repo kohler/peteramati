@@ -1220,7 +1220,7 @@ if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
             if (!$sset) {
                 $ssflags = 0;
                 if ($Qreq->extension) {
-                    $ssflags |= StudentSet::EXTENSION;
+                    $ssflags |= StudentSet::DCE;
                 }
                 if ($Qreq->college) {
                     $ssflags |= StudentSet::COLLEGE;

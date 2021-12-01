@@ -266,7 +266,7 @@ function download_psets_report($request) {
         if ($rep === "college") {
             $ssflags |= StudentSet::COLLEGE;
         } else if ($rep === "extension") {
-            $ssflags |= StudentSet::EXTENSION;
+            $ssflags |= StudentSet::DCE;
         } else if ($rep === "nonanonymous") {
             $anonymous = false;
         }
