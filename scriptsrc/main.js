@@ -1070,8 +1070,8 @@ function pa_runmany(chain) {
                 type: "POST", cache: false, dataType: "json", timeout: 30000,
                 success: function (data) {
                     if (data && data.ok) {
-                        $f[0].elements.u = data.u;
-                        $f[0].elements.pset = data.pset;
+                        $f[0].elements.u.value = data.u;
+                        $f[0].elements.pset.value = data.pset;
                         let $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(data.u) + "/pset/" + data.pset + "\" class=\"q ansib ansifg7\"></a>");
                         $x.text(data.u);
                         $("#pa-runmany-user").text(data.u);

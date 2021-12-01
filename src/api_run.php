@@ -25,7 +25,7 @@ class Run_API {
             return [
                 "ok" => true,
                 "queueid" => $qi->queueid,
-                "u" => $user->user_linkpart($u, !!$anon);
+                "u" => $user->user_linkpart($u, !!$anon),
                 "pset" => $pset->urlkey,
                 "runner" => $qi->runnername,
                 "timestamp" => $qi->runat

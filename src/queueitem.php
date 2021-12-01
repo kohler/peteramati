@@ -295,7 +295,7 @@ class QueueItem {
     private function delete($only_old) {
         assert($this->queueid > 0);
         if ($only_old) {
-            $result = $this->conf->qe("delete from ExecutionQueue where queueid=? and status=0 and updateat<$?", $this->queueid, Conf::$now - 180);
+            $result = $this->conf->qe("delete from ExecutionQueue where queueid=? and status=0 and updateat<?", $this->queueid, Conf::$now - 180);
         } else {
             $result = $this->conf->qe("delete from ExecutionQueue where queueid=?", $this->queueid);
         }
@@ -498,7 +498,7 @@ class QueueItem {
         $this->bhash = $info->bhash(); // resolve blank hash
 
         $result = $this->conf->qe("update ExecutionQueue set runat=?, status=1, lockfile=?, bhash=? where queueid=? and status=0",
-            $this->runat, $pidfile, $this->queueid, $this->bhash);
+            $this->runat, $pidfile, $this->bhash, $this->queueid);
         if (!$result->affected_rows) {
             if (($row = $this->conf->fetch_first_row("select runat, status, lockfile from ExecutionQueue where queueid=?", $this->queueid))) {
                 $this->runat = (int) $row[0];

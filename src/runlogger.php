@@ -102,7 +102,7 @@ class RunLogger {
     function past_jobs() {
         $a = [];
         foreach (glob($this->log_file(".*.log")) as $f) {
-            $rp = strlen($f);
+            $rp = strlen($f) - 4;
             $lp = strrpos($f, ".", -5);
             $t = substr($f, $lp + 1, $rp - $lp - 1);
             if (ctype_digit($t)) {
