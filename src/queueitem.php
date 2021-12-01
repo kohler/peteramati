@@ -293,10 +293,9 @@ class QueueItem {
             }
         } else if (($this->flags & self::FLAG_ENSURE) !== 0
                    && ($jobid = $this->info()->complete_run($this->runner()))) {
-            if ($this->lockfile) {
-                $this->delete(false);
-            }
+            $this->delete(false);
             $this->runat = $jobid;
+            $this->status = 2;
             return;
         } else if ($qs->nrunning < min($nconcurrent, $qs->nconcurrent)) {
             $this->start_command();

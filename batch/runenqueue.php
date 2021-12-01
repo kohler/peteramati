@@ -60,12 +60,13 @@ class RunEnqueueBatch {
         $sset->set_pset($this->pset);
         $nu = 0;
         $chain = QueueItem::new_chain();
+        $usermatch = $this->usermatch ? "*{$this->usermatch}*" : null;
         foreach ($sset as $info) {
             if ($info->is_grading_commit()
-                && ($this->usermatch === null
-                    || fnmatch($this->usermatch, $info->user->email)
-                    || fnmatch($this->usermatch, $info->user->github_username)
-                    || fnmatch($this->usermatch, $info->user->anon_username))) {
+                && ($usermatch === null
+                    || fnmatch($usermatch, $info->user->email)
+                    || fnmatch($usermatch, $info->user->github_username)
+                    || fnmatch($usermatch, $info->user->anon_username))) {
                 $qi = QueueItem::make_info($info, $this->runner);
                 $qi->chain = $chain;
                 $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
@@ -75,7 +76,7 @@ class RunEnqueueBatch {
                     $qi->schedule(0);
                 }
                 if ($this->verbose) {
-                    fwrite(STDERR, "{$this->pset->urlkey}/{$info->user->username}/" . $info->hash() . ": schedule {$this->runner->name}\n");
+                    fwrite(STDERR, "~{$info->user->username}/{$this->pset->urlkey}/" . $info->hash() . "/{$this->runner->name}: schedule\n");
                 }
                 ++$nu;
             }
