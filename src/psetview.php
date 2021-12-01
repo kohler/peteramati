@@ -1510,6 +1510,12 @@ class PsetView {
 
 
     /** @param RunnerConfig $runner
+     * @return int|false */
+    function complete_run(RunnerConfig $runner) {
+        return (new RunLogger($this->pset, $this->repo))->complete_job($runner, $this->hash());
+    }
+
+    /** @param RunnerConfig $runner
      * @param int $jobid
      * @return mixed */
     function runner_evaluate(RunnerConfig $runner, $jobid) {

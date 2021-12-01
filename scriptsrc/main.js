@@ -1081,29 +1081,9 @@ function pa_runmany(chain) {
                 }
             });
         } else {
-            $("#pa-runmany-user").text("<done>");
+            setTimeout(check, 4);
         }
     }
-    /*if (!$f.prop("outstanding")) {
-
-        var users = $("#pa-runmany-list").text().split(/[\s,;]+/);
-        var user;
-        while (!user && users.length) {
-            user = users.shift();
-        }
-        if (!user) {
-            $("#pa-runmany-user").text("<done>");
-            $("#pa-runmany-list").text("");
-            return;
-        }
-        $("#pa-runmany-user").text(user);
-        $f.find("[name='u']").val(user);
-        $("#pa-runmany-list").text(users.join(" "));
-        var $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(user) + "/pset/" + $f.find("[name='pset']").val() + "\" class=\"q ansib ansifg7\"></a>");
-        $x.text(user);
-        run($manybutton[0], {noclear: true, headline: $x[0]});
-    }
-    setTimeout(pa_runmany, 10, chain);*/
     check();
 }
 

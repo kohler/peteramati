@@ -48,7 +48,7 @@ class RunRequest {
         foreach ($this->pset->runners as $r) {
             if ($qreq->run === $r->name) {
                 $this->runner = $r;
-                $this->is_ensure = false;
+                $this->is_ensure = !!$qreq->ensure;
                 break;
             } else if ($qreq->run === "{$r->name}.ensure") {
                 $this->runner = $r;
@@ -144,11 +144,8 @@ class RunRequest {
                 return self::error("Unknown queueid {$qreq->queueid}.");
             }
         }
-        if (!$qi && ($this->is_ensure || isset($qreq->ensure))) {
-            $runlog = new RunLogger($info->pset, $info->repo);
-            if (($jobid = $runlog->complete_job($this->runner, $info->hash()))) {
-                $qi = QueueItem::for_logged_jobid($info, $jobid);
-            }
+        if (!$qi && $this->is_ensure) {
+            $qi = QueueItem::for_complete_job($info, $this->runner);
         }
 
         // check with existing queue item
@@ -185,7 +182,8 @@ class RunRequest {
                 return self::error("Nothing to do.");
             }
             $qi = QueueItem::make_info($info, $this->runner);
-            $qi->flags = $this->viewer->privChair ? QueueItem::FLAG_UNWATCHED : 0;
+            $qi->flags = ($this->viewer->privChair ? QueueItem::FLAG_UNWATCHED : 0)
+                | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
             $qi->enqueue();
             $qi->schedule(100);
         } else {
@@ -199,10 +197,9 @@ class RunRequest {
             $qs = new QueueStatus;
             $result = $info->conf->qe("select * from ExecutionQueue where status>=0 and runorder<=? order by runorder asc, queueid asc limit 100", $qi->runorder);
             while (($qix = QueueItem::fetch($info->conf, $result))) {
-                if ($qix->queueid === $qi->queueid) {
-                    $qix = $qi;
-                }
-                if ($qix === $qi && $qix->substantiate($qs)) {
+                $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
+                $qix->substantiate($qs);
+                if ($qix === $qi && $qi->status > 0) {
                     return $qi->logged_response();
                 }
             }
@@ -220,72 +217,66 @@ class RunRequest {
     function runmany() {
         if (!$this->viewer->isPC) {
             self::quit("Command reserved for TFs.");
-        } else if (!$this->qreq->valid_post()) {
-            self::quit("Session out of date.");
         } else if (($err = $this->check_view(true))) {
             self::quit($err);
-        }
-
-        $t = $this->pset->title;
-        if ($this->is_ensure) {
-            $t .= " Ensure";
-        }
-        $t .= " {$this->runner->title}";
-        $this->conf->header(htmlspecialchars($t), "home");
-
-        echo '<h2 id="pa-runmany-who"></h2>',
-            Ht::form($this->conf->hoturl_post("run")),
-            '<div class="f-contain">',
-            Ht::hidden("u", ""),
-            Ht::hidden("pset", $this->pset->urlkey);
-        if ($this->is_ensure) {
-            echo Ht::hidden("ensure", 1);
-        }
-        echo Ht::hidden("run", $this->runner->name, ["id" => "pa-runmany", "data-pa-run-category" => $this->runner->category_argument()]),
-            '</div></form>';
-
-        echo '<div id="run-' . $this->runner->category . '">',
-            '<div class="pa-run pa-run-short" id="pa-run-' . $this->runner->category . '">',
-            '<pre class="pa-runpre"></pre></div>',
-            '</div>';
-
-        echo '<div id="pa-runmany-list">';
-        $users = [];
-        foreach ($this->qreq as $k => $v) {
-            if (substr($k, 0, 2) === "s:"
-                && $v
-                && ($uname = urldecode(substr($k, 2)))) {
-                $users[] = $uname;
+        } else if (isset($this->qreq->chain) && ctype_digit($this->qreq->chain)) {
+            $t = $this->pset->title;
+            if ($this->is_ensure) {
+                $t .= " Ensure";
             }
-        }
-        if (empty($users) && ($this->qreq->slist ?? $this->qreq->users)) {
-            $users = preg_split('/\s+/', $this->qreq->slist ?? $this->qreq->users, -1, PREG_SPLIT_NO_EMPTY);
-        }
-        $ulinks = $uerrors = [];
-        $chain = random_int(1, PHP_INT_MAX);
-        foreach ($users as $uname) {
-            if (($u = $this->conf->user_by_whatever($uname))) {
-                $ulinks[] = $this->viewer->user_linkpart($u);
-                $info = PsetView::make($this->pset, $u, $this->viewer);
-                $qi = QueueItem::make_info($info, $this->runner);
-                $qi->chain = $chain;
-                $qi->runorder = QueueItem::unscheduled_runorder(count($ulinks) * 10);
-                $qi->enqueue();
-            } else {
-                $uerrors[] = "Unknown user “" . htmlspecialchars($uname) . "”.";
-            }
-        }
-        echo htmlspecialchars(join(" ", $ulinks)), '</div>';
-        if (empty($ulinks)) {
-            $uerrors[] = "No users selected.";
-        }
-        if (!empty($userrors)) {
-            echo '<p class="is-error">', join("<br>", $uerrors), '</p>';
-        }
+            $t .= " {$this->runner->title}";
+            $this->conf->header(htmlspecialchars($t), "home");
 
-        Ht::stash_script("\$pa.runmany({$chain})");
-        echo '<div class="clear"></div>', "\n";
-        $this->conf->footer();
+            echo '<h2 id="pa-runmany-who"></h2>',
+                Ht::form($this->conf->hoturl_post("run")),
+                '<div class="f-contain">',
+                Ht::hidden("u", ""),
+                Ht::hidden("pset", $this->pset->urlkey);
+            if ($this->is_ensure) {
+                echo Ht::hidden("ensure", 1);
+            }
+            echo Ht::hidden("run", $this->runner->name, ["id" => "pa-runmany", "data-pa-run-category" => $this->runner->category_argument()]),
+                '</div></form>';
+
+            echo '<div id="run-' . $this->runner->category . '">',
+                '<div class="pa-run pa-run-short" id="pa-run-' . $this->runner->category . '">',
+                '<pre class="pa-runpre"></pre></div>',
+                '</div>';
+
+            echo '<div id="pa-runmany-list"></div>';
+
+            Ht::stash_script("\$pa.runmany({$this->qreq->chain})");
+            echo "<hr class=\"c\">\n";
+            $this->conf->footer();
+        } else if (!$this->qreq->valid_post()) {
+            self::quit("Session out of date.");
+        } else {
+            $users = [];
+            foreach ($this->qreq as $k => $v) {
+                if (substr($k, 0, 2) === "s:"
+                    && $v
+                    && ($uname = urldecode(substr($k, 2)))) {
+                    $users[] = $uname;
+                }
+            }
+            if (empty($users) && ($this->qreq->slist ?? $this->qreq->users)) {
+                $users = preg_split('/\s+/', $this->qreq->slist ?? $this->qreq->users, -1, PREG_SPLIT_NO_EMPTY);
+            }
+            $nu = 0;
+            $chain = random_int(1, min(PHP_INT_MAX, (1 << 52) - 1));
+            foreach ($users as $uname) {
+                if (($u = $this->conf->user_by_whatever($uname))) {
+                    $info = PsetView::make($this->pset, $u, $this->viewer);
+                    $qi = QueueItem::make_info($info, $this->runner);
+                    $qi->chain = $chain;
+                    $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
+                    $qi->flags = QueueItem::FLAG_UNWATCHED | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+                    $qi->enqueue();
+                    ++$nu;
+                }
+            }
+            Navigation::redirect($this->conf->hoturl("run", ["pset" => $this->pset->urlkey, "run" => $this->runner->name, "runmany" => 1, "chain" => $chain], Conf::HOTURL_RAW));
+        }
     }
 }
 

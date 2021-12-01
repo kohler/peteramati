@@ -74,6 +74,7 @@ class QueueItem {
     private $_runstatus;
 
     const FLAG_UNWATCHED = 1;
+    const FLAG_ENSURE = 2;
 
 
     function __construct(Conf $conf) {
@@ -190,6 +191,19 @@ class QueueItem {
         }
     }
 
+    /** @param PsetView $info
+     * @param RunnerConfig $runner
+     * @return QueueItem */
+    static function for_complete_job($info, $runner) {
+        if (($jobid = $info->complete_run($runner))) {
+            $qi = QueueItem::for_logged_jobid($info, $jobid);
+            $qi && $qi->associate_info($info, $runner);
+            return $qi;
+        } else {
+            return null;
+        }
+    }
+
     /** @param int $delta
      * @return int */
     static function unscheduled_runorder($delta = 0) {
@@ -250,11 +264,11 @@ class QueueItem {
         Dbl::free($result);
     }
 
-    /** @param QueueStatus $qs
-     * @return bool */
+    /** @param QueueStatus $qs */
     function substantiate($qs) {
         assert(!!$this->queueid && $this->status >= 0 && $this->runorder > 0);
         assert(($this->status === 0) === ($this->runat > 0));
+        $nconcurrent = ($this->nconcurrent ?? 0) <= 0 ? 100000 : $this->nconcurrent;
         if ($this->runat > 0) {
             // remove dead items from queue
             // - pidfile contains "0\n": child has exited, remove it
@@ -263,31 +277,30 @@ class QueueItem {
             if ($this->lockfile
                 && RunLogger::active_job_at($this->lockfile) !== $this->runat) {
                 $this->delete(false);
-            } else {
-                if ($qs->nconcurrent === 0 || $qs->nconcurrent > $this->nconcurrent) {
-                    $qs->nconcurrent = $this->nconcurrent;
-                }
-                ++$qs->nrunning;
-                ++$qs->nahead;
+                return;
             }
-            return true;
         } else if (($this->flags & self::FLAG_UNWATCHED) === 0
                    && $this->updateat < Conf::$now - 30) {
             if ($this->updateat < Conf::$now - 180) {
                 $this->delete(true);
+                return;
             }
-            ++$qs->nahead;
-            return false;
-        } else if ($qs->nrunning >= $this->nconcurrent) {
-            ++$qs->nahead;
-            return false;
-        } else if ($this->start_command()) {
+        } else if (($this->flags & self::FLAG_ENSURE) !== 0
+                   && ($jobid = $this->info()->complete_run($this->runner()))) {
+            if ($this->lockfile) {
+                $this->delete(false);
+            }
+            $this->runat = $jobid;
+            return;
+        } else if ($qs->nrunning < min($nconcurrent, $qs->nconcurrent)) {
+            $this->start_command();
+        }
+        ++$qs->nahead;
+        if ($this->runat > 0) {
             ++$qs->nrunning;
-            ++$qs->nahead;
-            return true;
-        } else {
-            ++$qs->nahead;
-            return false;
+        }
+        if ($this->nconcurrent > 0) {
+            $qs->nconcurrent = max(min($nconcurrent, $qs->nconcurrent), $qs->nrunning);
         }
     }
 

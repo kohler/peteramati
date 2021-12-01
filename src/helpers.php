@@ -255,6 +255,9 @@ class JsonResult {
                 $values = null;
             }
         }
+        if ($values instanceof JsonSerializable) {
+            $values = $values->jsonSerialize();
+        }
         if ($values === true || $values === false) {
             $this->content = ["ok" => $values];
         } else if ($values === null) {
