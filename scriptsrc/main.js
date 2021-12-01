@@ -1055,34 +1055,56 @@ function pa_beforeunload() {
     }
 }
 
-function runmany61() {
-    var $manybutton = $("#runmany61");
-    var $f = $manybutton.closest("form");
+function pa_runmany(chain) {
+    let $manybutton = $("#pa-runmany"), $f = $manybutton.closest("form");
     if (!$f.prop("pa-runmany-unload")) {
         $(window).on("beforeunload", function () {
-            if ($f.prop("outstanding") || $("#runmany61_users").text())
+            if ($f.prop("outstanding") || $("#pa-runmany-list").text())
                 return "Several server requests are outstanding.";
         });
         $f.prop("pa-runmany-unload", "1");
     }
-    if (!$f.prop("outstanding")) {
-        var users = $("#runmany61_users").text().split(/[\s,;]+/);
+    function check() {
+        if (!$f.prop("outstanding")) {
+            $.ajax(hoturl_post("api/runchainhead", {chain: chain}), {
+                type: "POST", cache: false, dataType: "json", timeout: 30000,
+                success: function (data) {
+                    if (data && data.ok) {
+                        $f[0].elements.u = data.u;
+                        $f[0].elements.pset = data.pset;
+                        let $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(data.u) + "/pset/" + data.pset + "\" class=\"q ansib ansifg7\"></a>");
+                        $x.text(data.u);
+                        $("#pa-runmany-user").text(data.u);
+                        run($manybutton[0], {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: $x[0]});
+                        setTimeout(check, 10);
+                    }
+                }
+            });
+        } else {
+            $("#pa-runmany-user").text("<done>");
+        }
+    }
+    /*if (!$f.prop("outstanding")) {
+
+        var users = $("#pa-runmany-list").text().split(/[\s,;]+/);
         var user;
-        while (!user && users.length)
+        while (!user && users.length) {
             user = users.shift();
+        }
         if (!user) {
-            $("#runmany61_who").text("<done>");
-            $("#runmany61_users").text("");
+            $("#pa-runmany-user").text("<done>");
+            $("#pa-runmany-list").text("");
             return;
         }
-        $("#runmany61_who").text(user);
+        $("#pa-runmany-user").text(user);
         $f.find("[name='u']").val(user);
-        $("#runmany61_users").text(users.join(" "));
+        $("#pa-runmany-list").text(users.join(" "));
         var $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(user) + "/pset/" + $f.find("[name='pset']").val() + "\" class=\"q ansib ansifg7\"></a>");
         $x.text(user);
         run($manybutton[0], {noclear: true, headline: $x[0]});
     }
-    setTimeout(runmany61, 10);
+    setTimeout(pa_runmany, 10, chain);*/
+    check();
 }
 
 $(function () {
@@ -2707,7 +2729,7 @@ window.$pa = {
     pset_actions: pa_pset_actions,
     render_text_page: render_text.on_page,
     render_pset_table: pa_render_pset_table,
-    runmany: runmany61,
+    runmany: pa_runmany,
     store_gradeinfo: GradeSheet.store,
     text_eq: text_eq
 };

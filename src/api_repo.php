@@ -1,6 +1,6 @@
 <?php
 // api/api_repo.php -- Peteramati API for repositories
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class Repo_API {

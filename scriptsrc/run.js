@@ -17,10 +17,17 @@ export function run(button, opts) {
         thepre = $(therun).find("pre");
     let thexterm,
         checkt,
-        kill_checkt;
+        kill_checkt,
+        queueid = null;
+
+    if (opts.queueid) {
+        queueid = opts.queueid;
+    }
 
     if (opts.unfold && therun.dataset.paTimestamp) {
         checkt = +therun.dataset.paTimestamp;
+    } else if (opts.timestamp) {
+        checkt = opts.timestamp;
     } else {
         if ($f.prop("outstanding")) {
             return true;
@@ -150,7 +157,7 @@ export function run(button, opts) {
     }
 
     let ibuffer = "", // initial buffer; holds data before any results arrive
-        offset = -1, backoff = 50, queueid = null, times = null;
+        offset = -1, backoff = 50, times = null;
 
     function hide_cursor() {
         if (thexterm) {

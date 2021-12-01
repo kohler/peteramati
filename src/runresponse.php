@@ -10,6 +10,8 @@ class RunResponse implements JsonSerializable {
     public $error;
     /** @var string */
     public $pset;
+    /** @var ?string */
+    public $u;
     /** @var string */
     public $runner;
     /** @var int */

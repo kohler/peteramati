@@ -50,6 +50,8 @@ class QueueItem {
     // object links
     /** @var ?Pset */
     private $_pset;
+    /** @var ?Contact */
+    private $_user;
     /** @var ?Repository */
     private $_repo;
     /** @var ?PsetView */
@@ -121,6 +123,13 @@ class QueueItem {
         return self::fetch($conf, $result, $info);
     }
 
+    /** @param int $chain
+     * @return ?QueueItem */
+    static function by_chain(Conf $conf, $chain) {
+        $result = $conf->qe("select * from ExecutionQueue where chain=? order by runorder asc, queueid asc limit 1", $chain);
+        return self::fetch($conf, $result, null);
+    }
+
     /** @param PsetView $info
      * @param ?RunnerConfig $runner
      * @return QueueItem */
@@ -181,12 +190,18 @@ class QueueItem {
         }
     }
 
+    /** @param int $delta
+     * @return int */
+    static function unscheduled_runorder($delta = 0) {
+        return Conf::$now + $delta + 1000000000;
+    }
+
 
     function enqueue() {
         assert(!$this->queueid);
         $this->insertat = $this->updateat = Conf::$now;
         $this->runat = 0;
-        $this->runorder = Conf::$now + 1000000000;
+        $this->runorder = $this->runorder ?? self::unscheduled_runorder();
         $this->status = -1;
         $this->conf->qe("insert into ExecutionQueue set reqcid=?, cid=?,
             runnername=?, psetid=?, repoid=?, bhash=?, runsettings=?,
@@ -287,7 +302,7 @@ class QueueItem {
         if ($result->affected_rows) {
             $this->queueid = 0;
             if ($this->chain) {
-                $this->conf->qe("update ExecutionQueue set status=0, runorder=? where status=-1 and chain=? order by queueid asc limit 1",
+                $this->conf->qe("update ExecutionQueue set status=0, runorder=? where status=-1 and chain=? order by runorder asc, queueid asc limit 1",
                     Conf::$now, $this->chain);
             }
         }
@@ -323,6 +338,15 @@ class QueueItem {
             $this->_pset = $this->conf->pset_by_id($this->psetid);
         }
         return $this->_pset;
+    }
+
+    /** @return ?Contact */
+    function user() {
+        if (($this->_ocache & 16) === 0) {
+            $this->_ocache |= 16;
+            $this->_user = $this->conf->user_by_id($this->cid);
+        }
+        return $this->_user;
     }
 
     /** @return ?Repository */
@@ -365,6 +389,10 @@ class QueueItem {
         if ($info && $info->pset->id === $this->psetid) {
             $this->_pset = $info->pset;
             $this->_ocache |= 1;
+        }
+        if ($info && $info->user->contactId === $this->cid) {
+            $this->_user = $info->user;
+            $this->_ocache |= 16;
         }
         if ($info && $info->repo && $info->repo->repoid === $this->repoid) {
             $this->_repo = $info->repo;

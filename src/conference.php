@@ -2641,7 +2641,8 @@ class Conf {
             "linenote" => "3 Grade_API::linenote",
             "multigrade" => "3 Grade_API::multigrade",
             "multiresolveflag" => "0 Flag_API::multiresolve",
-            "repositories" => "17 Repo_API::user_repositories"
+            "repositories" => "17 Repo_API::user_repositories",
+            "runchainhead" => "1 Run_API::runchainhead"
         ];
         if (($olist = $this->opt("apiFunctions"))) {
             expand_json_includes_callback($olist, [$this, "_add_api_json"]);

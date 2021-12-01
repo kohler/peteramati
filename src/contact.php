@@ -285,13 +285,14 @@ class Contact {
         }
     }
 
+    /** @param bool $is_anonymous */
     function set_anonymous($is_anonymous) {
-        if ($is_anonymous !== $this->is_anonymous) {
-            $this->is_anonymous = $is_anonymous;
-            if ($this->is_anonymous)
+        if ($this->is_anonymous !== $is_anonymous) {
+            if (($this->is_anonymous = $is_anonymous)) {
                 $this->username = $this->anon_username;
-            else
+            } else {
                 $this->username = $this->github_username ? : $this->seascode_username;
+            }
             self::set_sorter($this, $this->conf);
         }
     }

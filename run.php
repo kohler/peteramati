@@ -104,10 +104,14 @@ class RunRequest {
                 return self::error("No commits in repository.");
             }
         }
-        if (isset($qreq->queueid) && !ctype_digit($qreq->queueid)) {
+        if ($qreq->queueid === "") {
+            unset($qreq->queueid);
+        } else if (isset($qreq->queueid) && !ctype_digit($qreq->queueid)) {
             return self::error("Bad queueid.");
         }
-        if (isset($qreq->check) && !ctype_digit($qreq->check)) {
+        if ($qreq->check === "") {
+            unset($qreq->check);
+        } else if (isset($qreq->check) && !ctype_digit($qreq->check)) {
             return self::error("Bad check timestamp.");
         }
 
@@ -154,6 +158,7 @@ class RunRequest {
                 || $qi->runnername !== $this->runner->name) {
                 return self::error("Wrong runner.");
             }
+            $qi->substantiate(new QueueStatus);
             if ($qi->runat) {
                 return $qi->logged_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
             }
@@ -197,8 +202,7 @@ class RunRequest {
                 if ($qix->queueid === $qi->queueid) {
                     $qix = $qi;
                 }
-                if ($qix->substantiate($qs)
-                    && $qix === $qi) {
+                if ($qix === $qi && $qix->substantiate($qs)) {
                     return $qi->logged_response();
                 }
             }
@@ -229,7 +233,7 @@ class RunRequest {
         $t .= " {$this->runner->title}";
         $this->conf->header(htmlspecialchars($t), "home");
 
-        echo '<h2 id="runmany61_who"></h2>',
+        echo '<h2 id="pa-runmany-who"></h2>',
             Ht::form($this->conf->hoturl_post("run")),
             '<div class="f-contain">',
             Ht::hidden("u", ""),
@@ -237,7 +241,7 @@ class RunRequest {
         if ($this->is_ensure) {
             echo Ht::hidden("ensure", 1);
         }
-        echo Ht::hidden("run", $this->runner->name, ["id" => "runmany61", "data-pa-run-category" => $this->runner->category_argument()]),
+        echo Ht::hidden("run", $this->runner->name, ["id" => "pa-runmany", "data-pa-run-category" => $this->runner->category_argument()]),
             '</div></form>';
 
         echo '<div id="run-' . $this->runner->category . '">',
@@ -245,7 +249,7 @@ class RunRequest {
             '<pre class="pa-runpre"></pre></div>',
             '</div>';
 
-        echo '<div id="runmany61_users">';
+        echo '<div id="pa-runmany-list">';
         $users = [];
         foreach ($this->qreq as $k => $v) {
             if (substr($k, 0, 2) === "s:"
@@ -258,9 +262,15 @@ class RunRequest {
             $users = preg_split('/\s+/', $this->qreq->slist ?? $this->qreq->users, -1, PREG_SPLIT_NO_EMPTY);
         }
         $ulinks = $uerrors = [];
+        $chain = random_int(1, PHP_INT_MAX);
         foreach ($users as $uname) {
             if (($u = $this->conf->user_by_whatever($uname))) {
                 $ulinks[] = $this->viewer->user_linkpart($u);
+                $info = PsetView::make($this->pset, $u, $this->viewer);
+                $qi = QueueItem::make_info($info, $this->runner);
+                $qi->chain = $chain;
+                $qi->runorder = QueueItem::unscheduled_runorder(count($ulinks) * 10);
+                $qi->enqueue();
             } else {
                 $uerrors[] = "Unknown user “" . htmlspecialchars($uname) . "”.";
             }
@@ -273,7 +283,7 @@ class RunRequest {
             echo '<p class="is-error">', join("<br>", $uerrors), '</p>';
         }
 
-        Ht::stash_script('$pa.runmany()');
+        Ht::stash_script("\$pa.runmany({$chain})");
         echo '<div class="clear"></div>', "\n";
         $this->conf->footer();
     }
