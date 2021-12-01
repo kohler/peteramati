@@ -182,7 +182,7 @@ class RunRequest {
                 return self::error("Nothing to do.");
             }
             $qi = QueueItem::make_info($info, $this->runner);
-            $qi->flags = ($this->viewer->privChair ? QueueItem::FLAG_UNWATCHED : 0)
+            $qi->flags |= ($this->viewer->privChair ? QueueItem::FLAG_UNWATCHED : 0)
                 | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
             $qi->enqueue();
             $qi->schedule(100);
@@ -270,7 +270,8 @@ class RunRequest {
                     $qi = QueueItem::make_info($info, $this->runner);
                     $qi->chain = $chain;
                     $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
-                    $qi->flags = QueueItem::FLAG_UNWATCHED | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+                    $qi->flags |= QueueItem::FLAG_UNWATCHED
+                        | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
                     $qi->enqueue();
                     ++$nu;
                 }

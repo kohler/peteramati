@@ -70,7 +70,8 @@ class RunEnqueueBatch {
                 $qi = QueueItem::make_info($info, $this->runner);
                 $qi->chain = $chain;
                 $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
-                $qi->flags = QueueItem::FLAG_UNWATCHED | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+                $qi->flags |= QueueItem::FLAG_UNWATCHED
+                    | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
                 $qi->enqueue();
                 if ($nu === 0) {
                     $qi->schedule(0);

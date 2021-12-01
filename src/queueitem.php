@@ -75,6 +75,7 @@ class QueueItem {
 
     const FLAG_UNWATCHED = 1;
     const FLAG_ENSURE = 2;
+    const FLAG_ANONYMOUS = 4;
 
 
     function __construct(Conf $conf) {
@@ -151,6 +152,7 @@ class QueueItem {
             && ($rs = $info->commit_jnote("runsettings"))) {
             $qi->runsettings = json_encode_db($rs);
         }
+        $qi->flags = $info->user->is_anonymous ? self::FLAG_ANONYMOUS : 0;
 
         $qi->queueclass = "";
         if ($runner) {
@@ -169,7 +171,6 @@ class QueueItem {
             if ($qi->nconcurrent <= 0) {
                 $qi->nconcurrent = 10000;
             }
-            $qi->flags = 0;
         }
 
         $qi->associate_info($info, $runner);
@@ -363,6 +364,7 @@ class QueueItem {
         if (($this->_ocache & 16) === 0) {
             $this->_ocache |= 16;
             $this->_user = $this->conf->user_by_id($this->cid);
+            $this->_user->set_anonymous(($this->flags & self::FLAG_ANONYMOUS) !== 0);
         }
         return $this->_user;
     }
@@ -382,8 +384,7 @@ class QueueItem {
     function info() {
         if (($this->_ocache & 4) === 0) {
             $this->_ocache |= 4;
-            if (($p = $this->pset())
-                && ($u = $this->conf->user_by_id($this->cid))) {
+            if (($p = $this->pset()) && ($u = $this->user())) {
                 $this->_info = PsetView::make($p, $u, $u, $this->hash());
             }
         }
