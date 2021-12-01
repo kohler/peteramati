@@ -132,7 +132,7 @@ class QueueItem {
     }
 
     /** @return int */
-    static function make_chain() {
+    static function new_chain() {
         // make sure JS can represent chain as int
         return random_int(1, min(PHP_INT_MAX, (1 << 52) - 1));
     }
