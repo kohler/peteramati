@@ -5,13 +5,18 @@
 
 $ConfSitePATH = preg_replace('/\/batch\/[^\/]+/', '', __FILE__);
 require_once("$ConfSitePATH/src/init.php");
-require_once("$ConfSitePATH/lib/getopt.php");
 
 class RunQueueBatch {
     /** @var Conf */
     public $conf;
     /** @var bool */
-    public $all;
+    public $is_query = false;
+    /** @var bool */
+    public $is_clean = false;
+    /** @var bool */
+    public $is_execute = false;
+    /** @var bool */
+    public $is_execute1 = false;
     /** @var bool */
     public $verbose = false;
     /** @var list<QueueItem> */
@@ -19,10 +24,41 @@ class RunQueueBatch {
     /** @var bool */
     private $any_completed = false;
 
-    /** @param bool $all */
-    function __construct(Conf $conf, $all) {
+    function __construct(Conf $conf) {
         $this->conf = $conf;
-        $this->all = $all;
+    }
+
+    function query() {
+        $result = $this->conf->qe("select * from ExecutionQueue where status>=0 order by runorder asc, queueid asc");
+        $n = 1;
+        while (($qix = QueueItem::fetch($this->conf, $result))) {
+            if ($qix->status < 0) {
+                $s = "waiting";
+            } else if ($qix->status === 0) {
+                $s = "scheduled";
+            } else {
+                $s = "running since {$qix->runat} (" . (Conf::$now - $qix->runat) . "s)";
+            }
+            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " $s\n");
+            ++$n;
+        }
+        Dbl::free($result);
+    }
+
+    function clean() {
+        $qs = new QueueStatus;
+        $result = $this->conf->qe("select * from ExecutionQueue where status>=0 order by runorder asc, queueid asc");
+        $n = 1;
+        while (($qix = QueueItem::fetch($this->conf, $result))) {
+            if ($qix->status > 0 || $qix->irrelevant()) {
+                $old_status = $qix->status;
+                $qix->substantiate($qs);
+                if ($this->verbose && $qix->deleted) {
+                    $this->report($qix, $old_status);
+                }
+            }
+        }
+        Dbl::free($result);
     }
 
     function load() {
@@ -52,34 +88,12 @@ class RunQueueBatch {
             if ($this->verbose) {
                 $this->report($qix, $old_status);
             }
-            $this->any_completed = $this->any_completed || $qix->queueid <= 0;
+            $this->any_completed = $this->any_completed || $qix->deleted;
         }
         return $qs->nrunning >= $qs->nconcurrent;
     }
 
-    /** @param QueueItem $qi
-     * @param int $old_status */
-    function report($qi, $old_status) {
-        $info = $qi->info();
-        $id = "~{$info->user->username}/{$info->pset->urlkey}/" . $qi->hash() . "/{$qi->runnername}";
-        if ($old_status > 0 && $qi->queueid <= 0) {
-            fwrite(STDERR, "$id: completed\n");
-        } else if ($old_status > 0) {
-            fwrite(STDERR, "$id: running since {$qi->runat} (" . (Conf::$now - $qi->runat) . "s)\n");
-        } else if ($qi->queueid <= 0) {
-            fwrite(STDERR, "$id: removed\n");
-        } else if ($qi->status > 0) {
-            fwrite(STDERR, "$id: started at {$qi->runat}\n");
-        } else if ($old_status === 0) {
-            fwrite(STDERR, "$id: waiting for {$qi->runorder}\n");
-        } else if ($old_status < 0 && $qi->status === 0) {
-            fwrite(STDERR, "$id: scheduled\n");
-        } else {
-            fwrite(STDERR, "$id: delayed\n");
-        }
-    }
-
-    function run() {
+    function execute() {
         $this->load();
         while (!empty($this->running)) {
             $this->any_completed = false;
@@ -95,11 +109,69 @@ class RunQueueBatch {
         }
     }
 
+    /** @param QueueItem $qi
+     * @param int $old_status */
+    function report($qi, $old_status) {
+        $id = $qi->unparse_key();
+        if ($old_status > 0 && $qi->deleted) {
+            fwrite(STDERR, "$id: completed\n");
+        } else if ($old_status > 0) {
+            fwrite(STDERR, "$id: running since {$qi->runat} (" . (Conf::$now - $qi->runat) . "s)\n");
+        } else if ($qi->deleted) {
+            fwrite(STDERR, "$id: removed\n");
+        } else if ($qi->status > 0) {
+            fwrite(STDERR, "$id: started at {$qi->runat}\n");
+        } else if ($old_status === 0) {
+            fwrite(STDERR, "$id: waiting for {$qi->runorder}\n");
+        } else if ($old_status < 0 && $qi->status === 0) {
+            fwrite(STDERR, "$id: scheduled\n");
+        } else {
+            fwrite(STDERR, "$id: delayed\n");
+        }
+    }
+
+    function run() {
+        if ($this->is_query) {
+            $this->query();
+        }
+        if ($this->is_clean) {
+            $this->clean();
+        }
+        if ($this->is_execute1) {
+            $this->load();
+        }
+        if ($this->is_execute) {
+            $this->execute();
+        }
+    }
+
     /** @return RunQueueBatch */
     static function parse_args(Conf $conf, $argv) {
-        $arg = getopt_rest($argv, "aV", ["all", "verbose"]);
-        $rqb = new RunQueueBatch($conf, isset($arg["all"]) || isset($arg["a"]));
-        if (isset($arg["verbose"]) || isset($arg["V"])) {
+        $arg = (new Getopt)->long(
+            "x,execute Execute queue to completion [default]",
+            "1 Execute queue once",
+            "q,query Print queue",
+            "c,clean Clean queue",
+            "V,verbose",
+            "help"
+        )->helpopt("help")->description("php batch/runqueue.php")->parse($argv);
+        $rqb = new RunQueueBatch($conf);
+        if (isset($arg["q"]) || isset($arg["c"]) || isset($arg["1"])) {
+            $rqb->is_execute = false;
+        }
+        if (isset($arg["q"])) {
+            $rqb->is_query = true;
+        }
+        if (isset($arg["c"])) {
+            $rqb->is_clean = true;
+        }
+        if (isset($arg["1"])) {
+            $rqb->is_execute1 = true;
+        }
+        if (isset($arg["x"])) {
+            $rqb->is_execute = true;
+        }
+        if (isset($arg["V"])) {
             $rqb->verbose = true;
         }
         return $rqb;

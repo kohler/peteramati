@@ -5,9 +5,8 @@
 
 $ConfSitePATH = preg_replace('/\/batch\/[^\/]+/', '', __FILE__);
 require_once("$ConfSitePATH/src/init.php");
-require_once("$ConfSitePATH/lib/getopt.php");
 
-$arg = getopt_rest($argv, "hn:l:aV", array("help", "name:", "limit:", "all",
+$arg = Getopt::rest($argv, "hn:l:aV", array("help", "name:", "limit:", "all",
      "college", "extension", "tf", "verbose"));
 $verbose = isset($arg["V"]) || isset($arg["verbose"]);
 if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {

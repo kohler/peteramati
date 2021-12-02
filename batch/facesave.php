@@ -5,9 +5,8 @@
 
 $ConfSitePATH = preg_replace(',/batch/[^/]+,', '', __FILE__);
 require_once("$ConfSitePATH/src/init.php");
-require_once("$ConfSitePATH/lib/getopt.php");
 
-$arg = getopt_rest($argv, "hn:e:a", array("help", "name:", "email:", "all"));
+$arg = Getopt::rest($argv, "hn:e:a", ["help", "name:", "email:", "all"]);
 if (isset($arg["email"]) && !isset($arg["e"])) {
     $arg["e"] = $arg["email"];
 }

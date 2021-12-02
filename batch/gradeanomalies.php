@@ -5,9 +5,8 @@
 
 $ConfSitePATH = preg_replace('/\/batch\/[^\/]+/', '', __FILE__);
 require_once("$ConfSitePATH/src/init.php");
-require_once("$ConfSitePATH/lib/getopt.php");
 
-$arg = getopt_rest($argv, "n:", ["name:"]);
+$arg = Getopt::rest($argv, "n:", ["name:"]);
 
 class GradeAnomalies {
     /** @var Conf */

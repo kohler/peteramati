@@ -11,6 +11,8 @@ class QueueItem {
     public $queueid;
     /** @var int */
     public $reqcid;
+    /** @var bool */
+    public $deleted = false;
 
     /** @var string */
     public $runnername;
@@ -103,6 +105,78 @@ class QueueItem {
         $this->updateat = (int) $this->updateat;
         $this->runat = (int) $this->runat;
         $this->status = (int) $this->status;
+    }
+
+
+    /** @return ?Pset */
+    function pset() {
+        if (($this->_ocache & 1) === 0) {
+            $this->_ocache |= 1;
+            $this->_pset = $this->conf->pset_by_id($this->psetid);
+        }
+        return $this->_pset;
+    }
+
+    /** @return ?Contact */
+    function user() {
+        if (($this->_ocache & 16) === 0) {
+            $this->_ocache |= 16;
+            $this->_user = $this->conf->user_by_id($this->cid);
+            $this->_user->set_anonymous(($this->flags & self::FLAG_ANONYMOUS) !== 0);
+        }
+        return $this->_user;
+    }
+
+    /** @return ?Repository */
+    function repo() {
+        if (($this->_ocache & 2) === 0) {
+            $this->_ocache |= 2;
+            if ($this->repoid > 0) {
+                $this->_repo = Repository::by_id($this->repoid, $this->conf);
+            }
+        }
+        return $this->_repo;
+    }
+
+    /** @return ?PsetView */
+    function info() {
+        if (($this->_ocache & 4) === 0) {
+            $this->_ocache |= 4;
+            if (($p = $this->pset()) && ($u = $this->user())) {
+                $this->_info = PsetView::make($p, $u, $u, $this->hash());
+            }
+        }
+        return $this->_info;
+    }
+
+    /** @return ?string */
+    function hash() {
+        return $this->bhash !== null ? bin2hex($this->bhash) : null;
+    }
+
+    /** @return ?RunnerConfig */
+    function runner() {
+        if (($this->_ocache & 8) === 0) {
+            $this->_ocache |= 8;
+            if (($p = $this->pset())) {
+                $this->_runner = $p->runners[$this->runnername] ?? null;
+            }
+        }
+        return $this->_runner;
+    }
+
+    /** @return string */
+    function unparse_key() {
+        $info = $this->info();
+        $hash = $this->hash();
+        return "~{$info->user->username}/{$info->pset->urlkey}/{$hash}/{$this->runnername}";
+    }
+
+    /** @return bool */
+    function irrelevant() {
+        return $this->status <= 0
+            && ($this->flags & self::FLAG_UNWATCHED) === 0
+            && $this->updateat < Conf::$now - 180;
     }
 
 
@@ -263,7 +337,7 @@ class QueueItem {
     }
 
     function update() {
-        assert(!!$this->queueid);
+        assert(!!$this->queueid && !$this->deleted);
         $result = $this->conf->qe("update ExecutionQueue set updateat=? where queueid=? and updateat<?", Conf::$now, $this->queueid, Conf::$now);
         if ($result->affected_rows) {
             $this->updateat = Conf::$now;
@@ -273,8 +347,8 @@ class QueueItem {
 
     /** @param QueueStatus $qs */
     function substantiate($qs) {
-        assert(!!$this->queueid && $this->status >= 0 && $this->runorder > 0);
-        assert(($this->status === 0) === ($this->runat > 0));
+        assert(!!$this->queueid && !$this->deleted);
+        assert(($this->status > 0) === ($this->runat > 0));
         $nconcurrent = ($this->nconcurrent ?? 0) <= 0 ? 100000 : $this->nconcurrent;
         if ($this->runat > 0) {
             // remove dead items from queue
@@ -288,7 +362,7 @@ class QueueItem {
             }
         } else if (($this->flags & self::FLAG_UNWATCHED) === 0
                    && $this->updateat < Conf::$now - 30) {
-            if ($this->updateat < Conf::$now - 180) {
+            if ($this->irrelevant()) {
                 $this->delete(true);
                 return;
             }
@@ -312,14 +386,14 @@ class QueueItem {
 
     /** @param bool $only_old */
     private function delete($only_old) {
-        assert($this->queueid > 0);
+        assert(!!$this->queueid && !$this->deleted);
         if ($only_old) {
             $result = $this->conf->qe("delete from ExecutionQueue where queueid=? and status=0 and updateat<?", $this->queueid, Conf::$now - 180);
         } else {
             $result = $this->conf->qe("delete from ExecutionQueue where queueid=?", $this->queueid);
         }
         if ($result->affected_rows) {
-            $this->queueid = 0;
+            $this->deleted = true;
             if ($this->chain) {
                 $this->conf->qe("update ExecutionQueue set status=0, runorder=? where status=-1 and chain=? order by runorder asc, queueid asc limit 1",
                     Conf::$now, $this->chain);
@@ -343,63 +417,6 @@ class QueueItem {
             }
         }
         return $x;
-    }
-
-    /** @return ?string */
-    function hash() {
-        return $this->bhash !== null ? bin2hex($this->bhash) : null;
-    }
-
-    /** @return ?Pset */
-    function pset() {
-        if (($this->_ocache & 1) === 0) {
-            $this->_ocache |= 1;
-            $this->_pset = $this->conf->pset_by_id($this->psetid);
-        }
-        return $this->_pset;
-    }
-
-    /** @return ?Contact */
-    function user() {
-        if (($this->_ocache & 16) === 0) {
-            $this->_ocache |= 16;
-            $this->_user = $this->conf->user_by_id($this->cid);
-            $this->_user->set_anonymous(($this->flags & self::FLAG_ANONYMOUS) !== 0);
-        }
-        return $this->_user;
-    }
-
-    /** @return ?Repository */
-    function repo() {
-        if (($this->_ocache & 2) === 0) {
-            $this->_ocache |= 2;
-            if ($this->repoid > 0) {
-                $this->_repo = Repository::by_id($this->repoid, $this->conf);
-            }
-        }
-        return $this->_repo;
-    }
-
-    /** @return ?PsetView */
-    function info() {
-        if (($this->_ocache & 4) === 0) {
-            $this->_ocache |= 4;
-            if (($p = $this->pset()) && ($u = $this->user())) {
-                $this->_info = PsetView::make($p, $u, $u, $this->hash());
-            }
-        }
-        return $this->_info;
-    }
-
-    /** @return ?RunnerConfig */
-    function runner() {
-        if (($this->_ocache & 8) === 0) {
-            $this->_ocache |= 8;
-            if (($p = $this->pset())) {
-                $this->_runner = $p->runners[$this->runnername] ?? null;
-            }
-        }
-        return $this->_runner;
     }
 
     /** @param ?PsetView $info
@@ -451,7 +468,7 @@ class QueueItem {
 
 
     function start_command() {
-        assert($this->runat === 0 && $this->status === 0 && !!$this->queueid);
+        assert($this->runat === 0 && $this->status === 0 && !!$this->queueid && !$this->deleted);
 
         $repo = $this->repo();
         $pset = $this->pset();

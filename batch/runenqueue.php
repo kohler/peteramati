@@ -7,8 +7,6 @@ $ConfSitePATH = preg_replace('/\/batch\/[^\/]+/', '', __FILE__);
 require_once("$ConfSitePATH/src/init.php");
 require_once("$ConfSitePATH/lib/getopt.php");
 
-$arg = getopt_rest($argv, "p:r:", ["pset:", "run:", "runner:"]);
-
 class RunEnqueueBatch {
     /** @var Conf */
     public $conf;
@@ -87,28 +85,33 @@ class RunEnqueueBatch {
 
     /** @return RunEnqueueBatch */
     static function make_args(Conf $conf, $argv) {
-        $arg = getopt_rest($argv, "p:r:u:eV", ["pset:", "run:", "runner:", "user:", "ensure", "verbose"]);
-        $psetkey = $arg["pset"] ?? $arg["p"] ?? "";
-        if ($psetkey === "") {
+        $arg = (new Getopt)->long(
+            "p:,pset: Problem set",
+            "r:,runner:,run: Runner name",
+            "e,ensure Run only if needed",
+            "u:,user: Match these users",
+            "V,verbose",
+            "help"
+        )->helpopt("help")->parse($argv);
+        if (($arg["p"] ?? "") === "") {
             throw new Error("missing `--pset`");
         }
-        $pset = $conf->pset_by_key($psetkey);
+        $pset = $conf->pset_by_key($arg["p"]);
         if (!$pset) {
             throw new Error("no such pset");
         }
-        $runnerkey = $arg["runner"] ?? $arg["run"] ?? $arg["r"] ?? "";
-        if ($runnerkey === "") {
+        if (($arg["r"] ?? "") === "") {
             throw new Error("missing `--runner`");
         }
-        $runner = $pset->runners[$runnerkey] ?? null;
+        $runner = $pset->runners[$arg["r"]] ?? null;
         if (!$runner) {
             throw new Error("no such runner");
         }
-        $reb = new RunEnqueueBatch($pset, $runner, $arg["user"] ?? $arg["u"] ?? null);
-        if (isset($arg["ensure"]) || isset($arg["e"])) {
+        $reb = new RunEnqueueBatch($pset, $runner, $arg["u"] ?? null);
+        if (isset($arg["e"])) {
             $reb->is_ensure = true;
         }
-        if (isset($arg["verbose"]) || isset($arg["V"])) {
+        if (isset($arg["V"])) {
             $reb->verbose = true;
         }
         return $reb;
