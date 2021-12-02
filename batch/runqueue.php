@@ -29,9 +29,10 @@ class RunQueueBatch {
     }
 
     function query() {
-        $result = $this->conf->qe("select * from ExecutionQueue where status>=0 order by runorder asc, queueid asc");
+        $result = $this->conf->qe("select * from ExecutionQueue order by runorder asc, queueid asc");
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
+            $chain = $qix->chain ? " C{$qix->chain}" : "";
             if ($qix->status < 0) {
                 $s = "waiting";
             } else if ($qix->status === 0) {
@@ -39,7 +40,7 @@ class RunQueueBatch {
             } else {
                 $s = "running @{$qix->runat} (" . unparse_interval(Conf::$now - $qix->runat) . ")";
             }
-            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " $s\n");
+            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s}{$chain}\n");
             ++$n;
         }
         Dbl::free($result);
@@ -113,20 +114,21 @@ class RunQueueBatch {
      * @param int $old_status */
     function report($qi, $old_status) {
         $id = $qi->unparse_key();
+        $chain = $qi->chain ? " C{$qi->chain}" : "";
         if ($old_status > 0 && $qi->deleted) {
             fwrite(STDERR, "$id: completed\n");
         } else if ($old_status > 0) {
-            fwrite(STDERR, "$id: running @{$qi->runat} (" . unparse_interval(Conf::$now - $qi->runat) . ")\n");
+            fwrite(STDERR, "$id: running @{$qi->runat} (" . unparse_interval(Conf::$now - $qi->runat) . "){$chain}\n");
         } else if ($qi->deleted) {
             fwrite(STDERR, "$id: removed\n");
         } else if ($qi->status > 0) {
-            fwrite(STDERR, "$id: started @{$qi->runat}\n");
+            fwrite(STDERR, "$id: started @{$qi->runat}{$chain}\n");
         } else if ($old_status === 0) {
-            fwrite(STDERR, "$id: waiting @{$qi->runorder}\n");
+            fwrite(STDERR, "$id: waiting @{$qi->runorder}{$chain}\n");
         } else if ($old_status < 0 && $qi->status === 0) {
-            fwrite(STDERR, "$id: scheduled\n");
+            fwrite(STDERR, "$id: scheduled{$chain}\n");
         } else {
-            fwrite(STDERR, "$id: delayed\n");
+            fwrite(STDERR, "$id: delayed{$chain}\n");
         }
     }
 

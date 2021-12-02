@@ -18,6 +18,8 @@ class RunEnqueueBatch {
     public $is_ensure = false;
     /** @var bool */
     public $verbose = false;
+    /** @var ?int */
+    public $chainid;
     /** @var int */
     public $sset_flags;
     /** @var ?string */
@@ -57,7 +59,8 @@ class RunEnqueueBatch {
         $sset = new StudentSet($viewer, $this->sset_flags);
         $sset->set_pset($this->pset);
         $nu = 0;
-        $chain = QueueItem::new_chain();
+        $chain = $this->chainid ?? QueueItem::new_chain();
+        $chainstr = $this->chainid ? " C{$this->chainid}" : "";
         $usermatch = $this->usermatch ? "*{$this->usermatch}*" : null;
         foreach ($sset as $info) {
             if ($info->is_grading_commit()
@@ -66,19 +69,24 @@ class RunEnqueueBatch {
                     || fnmatch($usermatch, $info->user->github_username)
                     || fnmatch($usermatch, $info->user->anon_username))) {
                 $qi = QueueItem::make_info($info, $this->runner);
-                $qi->chain = $chain;
+                $qi->chain = $chain > 0 ? $chain : null;
                 $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
                 $qi->flags |= QueueItem::FLAG_UNWATCHED
                     | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
                 $qi->enqueue();
-                if ($nu === 0) {
-                    $qi->schedule(0);
+                if (!$qi->chain) {
+                    $qi->schedule($nu);
                 }
                 if ($this->verbose) {
-                    fwrite(STDERR, "~{$info->user->username}/{$this->pset->urlkey}/" . $info->hash() . "/{$this->runner->name}: schedule\n");
+                    fwrite(STDERR, $qi->unparse_key() . ": create{$chainstr}\n");
                 }
                 ++$nu;
             }
+        }
+        if ($chain > 0
+            && ($qi = QueueItem::by_chain($this->conf, $chain))
+            && $qi->status < 0) {
+            $qi->schedule(0);
         }
         return $nu;
     }
@@ -90,6 +98,7 @@ class RunEnqueueBatch {
             "r:,runner:,run: Runner name",
             "e,ensure Run only if needed",
             "u:,user: Match these users",
+            "c:,chain: Set chain ID",
             "V,verbose",
             "help"
         )->helpopt("help")->parse($argv);
@@ -113,6 +122,15 @@ class RunEnqueueBatch {
         }
         if (isset($arg["V"])) {
             $reb->verbose = true;
+        }
+        if (isset($arg["c"])) {
+            $chain = $arg["c"][0] === "C" ? substr($arg["c"], 1) : $arg["c"];
+            if (ctype_digit($chain)
+                && QueueItem::valid_chain(intval($chain))) {
+                $reb->chainid = intval($chain);
+            } else {
+                throw new Error("bad `--chain`");
+            }
         }
         return $reb;
     }

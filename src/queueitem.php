@@ -167,9 +167,10 @@ class QueueItem {
 
     /** @return string */
     function unparse_key() {
-        $info = $this->info();
+        $pset = $this->pset();
+        $uname = $this->conf->cached_username_by_id($this->cid, ($this->flags & self::FLAG_ANONYMOUS) !== 0);
         $hash = $this->hash();
-        return "~{$info->user->username}/{$info->pset->urlkey}/{$hash}/{$this->runnername}";
+        return "~{$uname}/{$pset->urlkey}/{$hash}/{$this->runnername}";
     }
 
     /** @return bool */
@@ -210,6 +211,12 @@ class QueueItem {
     static function new_chain() {
         // make sure JS can represent chain as int
         return random_int(1, min(PHP_INT_MAX, (1 << 52) - 1));
+    }
+
+    /** @param int $chain
+     * @return bool */
+    static function valid_chain($chain) {
+        return $chain >= 0 && $chain <= PHP_INT_MAX && $chain <= (1 << 52) - 1;
     }
 
     /** @param PsetView $info

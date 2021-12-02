@@ -139,6 +139,10 @@ class Conf {
     private $_pc_members_cache;
     private $_pc_tags_cache;
     private $_pc_members_and_admins_cache;
+    /** @var ?array<int,string> */
+    private $_username_cache;
+    /** @var ?array<int,string> */
+    private $_anon_username_cache;
     /** @var ?Contact */
     private $_site_contact;
     /** @var array<string,Repository> */
@@ -426,6 +430,7 @@ class Conf {
         if (!$this->sort_by_last != !$sort_by_last) {
             $this->_pc_members_cache = $this->_pc_members_and_admins_cache = null;
         }
+        $this->_username_cache = $this->_anon_username_cache = null;
         $this->sort_by_last = $sort_by_last;
         $this->default_format = (int) ($this->opt["defaultFormat"] ?? 0);
         $this->_site_contact = null;
@@ -970,6 +975,28 @@ class Conf {
         $row = $result->fetch_row();
         Dbl::free($result);
         return $row ? (int) $row[0] : false;
+    }
+
+    /** @param int $uid
+     * @param bool $anonymous
+     * @return string */
+    function cached_username_by_id($uid, $anonymous = false) {
+        if ($this->_username_cache === null) {
+            $this->_username_cache = $this->_anon_username_cache = [];
+            $result = $this->qe("select contactId, github_username, email, anon_username from ContactInfo");
+            while (($row = $result->fetch_row())) {
+                $u = intval($row[0]);
+                if ($row[1] === null || $row[1] === "") {
+                    $this->_username_cache[$u] = $row[2];
+                } else {
+                    $this->_username_cache[$u] = $row[1];
+                }
+                $this->_anon_username_cache[$u] = $row[3];
+            }
+            Dbl::free($result);
+        }
+        $unc = $anonymous ? $this->_anon_username_cache : $this->_username_cache;
+        return $unc[$uid] ?? "[user{$uid}]";
     }
 
     /** @return associative-array<int,Contact> */
