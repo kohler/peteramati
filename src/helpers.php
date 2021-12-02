@@ -677,3 +677,28 @@ function git_refname_is_full_hash($refname) {
 function round_grade($g) {
     return $g !== null ? round($g * 1000) / 1000 : null;
 }
+
+/** @param int|float $t
+ * @return string */
+function unparse_interval($t) {
+    $s = "";
+    if ($t >= 259200) {
+        $n = floor($t / 86400);
+        $s .= "{$n}d";
+        $t -= $n * 86400;
+    }
+    if ($t >= 3600) {
+        $n = floor($t / 3600);
+        $s .= "{$n}h";
+        $t -= $n * 3600;
+    }
+    if ($t >= 60) {
+        $n = floor($t / 60);
+        $s .= "{$n}m";
+        $t -= $n * 60;
+    }
+    if ($t !== 0) {
+        $s .= "{$t}s";
+    }
+    return $s;
+}

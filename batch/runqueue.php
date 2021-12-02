@@ -37,7 +37,7 @@ class RunQueueBatch {
             } else if ($qix->status === 0) {
                 $s = "scheduled";
             } else {
-                $s = "running since {$qix->runat} (" . (Conf::$now - $qix->runat) . "s)";
+                $s = "running @{$qix->runat} (" . unparse_interval(Conf::$now - $qix->runat) . ")";
             }
             fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " $s\n");
             ++$n;
@@ -116,13 +116,13 @@ class RunQueueBatch {
         if ($old_status > 0 && $qi->deleted) {
             fwrite(STDERR, "$id: completed\n");
         } else if ($old_status > 0) {
-            fwrite(STDERR, "$id: running since {$qi->runat} (" . (Conf::$now - $qi->runat) . "s)\n");
+            fwrite(STDERR, "$id: running @{$qi->runat} (" . unparse_interval(Conf::$now - $qi->runat) . ")\n");
         } else if ($qi->deleted) {
             fwrite(STDERR, "$id: removed\n");
         } else if ($qi->status > 0) {
-            fwrite(STDERR, "$id: started at {$qi->runat}\n");
+            fwrite(STDERR, "$id: started @{$qi->runat}\n");
         } else if ($old_status === 0) {
-            fwrite(STDERR, "$id: waiting for {$qi->runorder}\n");
+            fwrite(STDERR, "$id: waiting @{$qi->runorder}\n");
         } else if ($old_status < 0 && $qi->status === 0) {
             fwrite(STDERR, "$id: scheduled\n");
         } else {
