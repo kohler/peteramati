@@ -3,8 +3,7 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-$ConfSitePATH = preg_replace('/\/batch\/[^\/]+/', '', __FILE__);
-require_once("$ConfSitePATH/src/init.php");
+require_once(dirname(__DIR__) . "/src/init.php");
 
 $arg = Getopt::rest($argv, "n:", ["name:"]);
 

@@ -2089,23 +2089,6 @@ class Conf {
             }
             $this->_save_msgs = null;
         }
-        if (isset($_COOKIE["hotcrpmessage"])) {
-            $message = json_decode(rawurldecode($_COOKIE["hotcrpmessage"]));
-            if (is_array($message)) {
-                if (count($message) === 2
-                    && (is_int($message[1]) || $message[1] === "confirm")) {
-                    $message = [$message];
-                }
-                foreach ($message as $m) {
-                    if (is_array($m)
-                        && (is_int($m[1]) || $m[1] === "confirm")
-                        && ($t = CleanHTML::basic_clean_all($m[0])) !== false) {
-                        $this->msg($t, $m[1]);
-                    }
-                }
-                $this->set_cookie("hotcrpmessage", "", Conf::$now - 3600);
-            }
-        }
         echo "</div>\n";
 
         echo "</div>\n<div class='body'>\n";

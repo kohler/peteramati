@@ -3,7 +3,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-class LineNote implements JsonUpdatable {
+class LineNote implements JsonIsReplacement {
     /** @var string */
     public $file;
     /** @var string */
@@ -81,10 +81,6 @@ class LineNote implements JsonUpdatable {
         return "<a class=\"pa-noteref\" href=\"#L{$this->lineid}F{$fileid}\">{$f}:{$l}</a>";
     }
 
-
-    function jsonIsReplacement() {
-        return true;
-    }
 
     /** @return int|non-empty-list */
     function jsonSerialize() {

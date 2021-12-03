@@ -43,26 +43,16 @@ setlocale(LC_CTYPE, "C");
 
 // Set up conference options (also used in mailer.php)
 
-function read_included_options(&$files) {
-    global $Opt;
-    if (is_string($files)) {
-        $files = [$files];
-    }
-    for ($i = 0; $i != count($files); ++$i) {
-        foreach (SiteLoader::expand_includes($files[$i]) as $f)
-            if (!@include $f)
-                $Opt["missing"][] = $f;
-    }
-}
-
-function expand_json_includes_callback($includelist, $callback, $extra_arg = null, $no_validate = false) {
+function expand_json_includes_callback($includelist, $callback) {
     $includes = [];
     foreach (is_array($includelist) ? $includelist : [$includelist] as $k => $str) {
         $expandable = null;
         if (is_string($str)) {
             if (str_starts_with($str, "@")) {
                 $expandable = substr($str, 1);
-            } else if (!preg_match('/\A[\s\[\{]/', $str)) {
+            } else if (!str_starts_with($str, "{")
+                       && (!str_starts_with($str, "[") || !str_ends_with(rtrim($str), "]"))
+                       && !ctype_space($str[0])) {
                 $expandable = $str;
             }
         }
@@ -78,27 +68,25 @@ function expand_json_includes_callback($includelist, $callback, $extra_arg = nul
     foreach ($includes as $xentry) {
         list($entry, $landmark) = $xentry;
         if (is_string($entry)) {
-            if (($x = json_decode($entry)) !== false) {
-                $entry = $x;
-            } else {
-                if (json_last_error()) {
-                    Json::decode($entry);
-                    error_log("$landmark: Invalid JSON. " . Json::last_error_msg());
+            $x = json_decode($entry);
+            if ($x === null && json_last_error()) {
+                $x = Json::decode($entry);
+                if ($x === null) {
+                    error_log("$landmark: Invalid JSON: " . Json::last_error_msg());
                 }
+            }
+            $entry = $x;
+        }
+        foreach (is_array($entry) ? $entry : [$entry] as $k => $v) {
+            if ($v === null || $v === false) {
                 continue;
             }
-        }
-        if (is_object($entry)
-            && !$no_validate
-            && !isset($entry->id)
-            && !isset($entry->factory)
-            && !isset($entry->factory_class)
-            && !isset($entry->callback)) {
-            $entry = get_object_vars($entry);
-        }
-        foreach (is_array($entry) ? $entry : [$entry] as $obj) {
-            if ((!is_object($obj) && !$no_validate) || !call_user_func($callback, $obj, $extra_arg))
-                error_log("$landmark: Invalid expansion " . json_encode($obj) . ".");
+            if (is_object($v)) {
+                $v->__subposition = ++Conf::$next_xt_subposition;
+            }
+            if (!call_user_func($callback, $v, $k, $landmark)) {
+                error_log((Conf::$main ? Conf::$main->dbname . ": " : "") . "$landmark: Invalid expansion " . json_encode($v) . "\n" . debug_string_backtrace());
+            }
         }
     }
 }
@@ -123,7 +111,7 @@ function read_main_options() {
             Multiconference::init();
         }
         if ($Opt["include"] ?? false) {
-            read_included_options($Opt["include"]);
+            SiteLoader::read_included_options();
         }
     }
     if (!($Opt["loaded"] ?? false) || ($Opt["missing"] ?? false)) {

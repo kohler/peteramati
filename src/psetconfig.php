@@ -428,7 +428,7 @@ class Pset {
         $default_runner = $p->default_runner ?? null;
         $this->has_transfer_warnings = $this->has_xterm_js = false;
         if (is_array($runners) || is_object($runners)) {
-            foreach ((array) $p->runners as $k => $v) {
+            foreach ((array) $runners as $k => $v) {
                 $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v, $default_runner, $this);
                 if (isset($this->all_runners[$r->name])) {
                     throw new PsetConfigException("runner `$r->name` reused", "runners", $k);

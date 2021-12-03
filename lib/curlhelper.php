@@ -1,38 +1,62 @@
 <?php
+// curlhelper.php -- Peteramati helper for following a web request
+// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// See LICENSE for open-source distribution terms
 
 libxml_use_internal_errors(true);
 
 class CurlHelper {
+    /** @var CurlHandle */
     public $curlh;
+    /** @var string|false */
     private $cookiefile;
+    /** @var bool */
     private $temp_cookiefile;
+    /** @var ?resource */
     private $headerf;
+    /** @var ?resource */
     private $bodyf;
 
+    /** @var ?int */
     public $status_code;
+    /** @var string */
     public $header_string;
+    /** @var string */
     public $location;
+    /** @var string */
     public $full_content_type;
+    /** @var string */
     public $content_type;
+    /** @var string */
     public $content_encoding;
 
+    /** @var string */
     public $encoded_content_string;
+    /** @var string */
     public $content_string;
     /** @var ?DOMDocument */
     public $content_dom;
+    /** @var ?array */
     public $content_dom_errors;
+    /** @var ?mixed */
     public $content_json;
 
+    /** @var ?string */
     public $next_url;
+    /** @var null|'GET'|'POST' */
     private $next_method;
+    /** @var ?array */
     private $next_parameters;
+    /** @var bool */
     public $next_www_form_encoded = false;
     public $next_origin;
     public $next_referer;
     private $next_headers = [];
 
+    /** @var bool */
     static public $verbose = false;
 
+    /** @param ?string $cookiefile */
     function __construct($cookiefile = null) {
         $this->temp_cookiefile = !$cookiefile;
         $this->cookiefile = $cookiefile ? : tempnam("/tmp", "hotcrp_cookiejar");
@@ -48,7 +72,7 @@ class CurlHelper {
         $this->curlh = curl_init();
         curl_setopt($this->curlh, CURLOPT_COOKIEFILE, $this->cookiefile);
         curl_setopt($this->curlh, CURLOPT_COOKIEJAR, $this->cookiefile);
-        curl_setopt($this->curlh, CURLOPT_USERAGENT, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36");
+        curl_setopt($this->curlh, CURLOPT_USERAGENT, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15");
         curl_setopt($this->curlh, CURLOPT_AUTOREFERER, true);
         curl_setopt($this->curlh, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($this->curlh, CURLOPT_MAXREDIRS, 40);
@@ -65,15 +89,25 @@ class CurlHelper {
         ftruncate($this->bodyf, 0);
     }
 
+    /** @return ?string */
     function location_host() {
         $x = parse_url($this->location);
         return $x["host"] ?? null;
     }
 
+    /** @return string */
+    function location_query() {
+        $x = parse_url($this->location);
+        return isset($x["query"]) ? "?" . $x["query"] : "";
+    }
+
+    /** @param int|float $timeout_sec */
     function set_timeout($timeout_sec) {
         curl_setopt($this->curlh, CURLOPT_TIMEOUT, $timeout_sec);
     }
 
+    /** @param ?string $user
+     * @param ?string $pwd */
     function set_user_password($user = null, $pwd = null) {
         if ((string) $user !== "") {
             $user .= (string) $pwd === "" ? "" : ":" . $pwd;
@@ -81,49 +115,91 @@ class CurlHelper {
         curl_setopt($this->curlh, CURLOPT_USERPWD, (string) $user);
     }
 
+    /** @param string $url
+     * @param string $method
+     * @param array $parameters */
     function set_next($url, $method = "GET", $parameters = []) {
         $this->next_url = $url;
         $this->next_method = $method;
         $this->next_parameters = $parameters;
     }
 
-    /** @param DOMElement $form */
+    /** @param DOMElement $form
+     * @return Generator<DOMElement> */
+    static function typed_form_inputs($form) {
+        $es = $form->getElementsByTagName("input");
+        for ($i = 0; $i !== $es->length; ++$i) {
+            $e = $es->item($i);
+            '@phan-var-force DOMElement $e';
+            yield $e;
+        }
+        $es = $form->getElementsByTagName("select");
+        for ($i = 0; $i !== $es->length; ++$i) {
+            $e = $es->item($i);
+            '@phan-var-force DOMElement $e';
+            if ($e->hasAttribute("multiple")) {
+                $e->setAttribute("type", "select-multiple");
+            } else {
+                $e->setAttribute("type", "select");
+            }
+            yield $e;
+        }
+        $es = $form->getElementsByTagName("textarea");
+        for ($i = 0; $i !== $es->length; ++$i) {
+            $e = $es->item($i);
+            '@phan-var-force DOMElement $e';
+            $e->setAttribute("type", "textarea");
+            $e->setAttribute("value", $e->textContent);
+            yield $e;
+        }
+        $es = $form->getElementsByTagName("button");
+        for ($i = 0; $i !== $es->length; ++$i) {
+            $e = $es->item($i);
+            '@phan-var-force DOMElement $e';
+            $attr = strtolower($e->getAttribute("type") ?? "");
+            if ($attr !== "submit" && $attr !== "reset" && $attr !== "button" && $attr !== "menu") {
+                $e->setAttribute("type", "submit");
+            }
+            yield $e;
+        }
+    }
+
+    /** @param DOMElement $form
+     * @return array */
     static function form_parameters($form) {
         $param = [];
-        foreach ($form->getElementsByTagName("input") as $input) {
+        foreach (self::typed_form_inputs($form) as $input) {
             $name = $input->getAttribute("name");
-            $type = $input->getAttribute("type");
-            $value = $input->getAttribute("value");
-            if (!$name || array_search($type, ["button", "file", "image", "reset", "submit"])) {
+            if (!$name) {
                 continue;
             }
-            if ($type == "checkbox" || $type == "radio") {
-                if ($input->getAttribute("checked")) {
-                    $param[$name] = $value;
+            $type = $input->getAttribute("type");
+            $value = null;
+            if ($type === "textarea") {
+                $value = $input->textContent;
+            } else if ($type === "select") {
+                foreach ($input->getElementsByTagName("option") as $opt) {
+                    if ($opt->hasAttribute("selected"))
+                        $value = $opt->getAttribute("value");
                 }
-            } else {
+            } else if ($type === "checkbox" || $type === "radio") {
+                if ($input->hasAttribute("checked"))
+                    $value = $input->getAttribute("value");
+            } else if ($type !== "button" && $type !== "file"
+                       && $type !== "image" && $type !== "reset"
+                       && $type !== "reset") {
+                $value = $input->getAttribute("value");
+            }
+            if ($value !== null) {
                 $param[$name] = $value;
-            }
-        }
-        foreach ($form->getElementsByTagName("textarea") as $input) {
-            $name = $input->getAttribute("name");
-            if ($name) {
-                $param[$name] = $input->textContent;
-            }
-        }
-        foreach ($form->getElementsByTagName("select") as $input) {
-            $name = $input->getAttribute("name");
-            foreach ($input->getElementsByTagName("option") as $opt) {
-                if ($opt->getAttribute("selected") && $name) {
-                    $param[$name] = $opt->getAttribute("value");
-                }
             }
         }
         return $param;
     }
 
-    /** @param DOMElement $form */
-    function set_next_form($form, $parameters) {
+    /** @param DOMElement $form
+     * @param array $parameters */
+    function set_next_form_parameters($form, $parameters) {
         $this->next_url = $this->resolve($form->getAttribute("action"));
         $this->next_method = strtoupper($form->getAttribute("method"));
         if ($this->next_method !== "POST" && $this->next_method !== "GET") {
@@ -132,36 +208,63 @@ class CurlHelper {
         $this->next_parameters = $parameters;
     }
 
-    function set_next_param($name, $value = null) {
-        if (func_num_args() == 1 && is_array($name)) {
-            foreach ($name as $n => $v)
-                if ($v !== null)
-                    $this->next_parameters[$n] = $v;
-                else
-                    unset($this->next_parameters[$n]);
-        } else if ($value !== null)
-            $this->next_parameters[$name] = $value;
-        else
-            unset($this->next_parameters[$name]);
+    /** @param DOMElement $form */
+    function set_next_form($form) {
+        $this->set_next_form_parameters($form, self::form_parameters($form));
     }
 
+    /** @param string|array $name
+     * @param ?string $value */
+    function set_next_param($name, $value = null) {
+        if (func_num_args() == 1 && is_array($name)) {
+            foreach ($name as $n => $v) {
+                if ($v !== null) {
+                    $this->next_parameters[$n] = $v;
+                } else {
+                    unset($this->next_parameters[$n]);
+                }
+            }
+        } else if ($value !== null) {
+            $this->next_parameters[$name] = $value;
+        } else {
+            unset($this->next_parameters[$name]);
+        }
+    }
+
+    /** @param array $param
+     * @return string */
     static function www_form_encode($param) {
         $x = [];
-        foreach ($param as $k => $v)
+        foreach ($param as $k => $v) {
             $x[] = urlencode($k) . "=" . urlencode($v);
+        }
         return join("&", $x);
     }
 
+    /** @param string $name
+     * @param ?string $value */
     function set_next_header($name, $value) {
         $lname = strtolower($name);
-        if ((string) $value === "")
+        if ((string) $value === "") {
             unset($this->next_headers[$lname]);
-        else
+        } else {
             $this->next_headers[$lname] = "$name: $value";
+        }
     }
 
-    function go() {
-        assert(!!$this->next_url);
+    /** @return string */
+    private function full_next_url() {
+        $url = $this->next_url;
+        if (!empty($this->next_parameters)
+            && $this->next_method === "GET") {
+            $sep = strpos($url, "?") === false ? "?" : "&";
+            $url .= $sep . self::www_form_encode($this->next_parameters);
+        }
+        return $url;
+    }
+
+    /** @return list<string> */
+    private function full_next_headers() {
         $headers = $this->next_headers;
         if ($this->next_origin && !isset($headers["origin"])) {
             $headers["origin"] = "Origin: $this->next_origin";
@@ -170,7 +273,28 @@ class CurlHelper {
             $headers["referer"] = "Referer: $this->next_referer";
         }
         ksort($headers);
-        curl_setopt($this->curlh, CURLOPT_HTTPHEADER, array_values($headers));
+        return array_values($headers);
+    }
+
+    /** @return string */
+    private function full_next_body() {
+        if ($this->next_parameters !== null
+            && $this->next_method !== "GET") {
+            return self::www_form_encode($this->next_parameters);
+        } else {
+            return "";
+        }
+    }
+
+    /** @return string */
+    function unparse_next_request() {
+        return $this->next_method . " " . $this->full_next_url() . "\n"
+            . join("\n", $this->full_next_headers());
+    }
+
+    function go() {
+        assert(!!$this->next_url);
+        curl_setopt($this->curlh, CURLOPT_HTTPHEADER, $this->full_next_headers());
         $this->init_files();
         curl_setopt($this->curlh, CURLOPT_WRITEHEADER, $this->headerf);
         curl_setopt($this->curlh, CURLOPT_FILE, $this->bodyf);
@@ -180,22 +304,13 @@ class CurlHelper {
             curl_setopt($this->curlh, CURLOPT_HTTPGET, true);
         }
 
-        $parameters = $this->next_parameters;
-        if ((is_array($parameters) && empty($parameters)) || $parameters === "") {
-            $parameters = null;
-        }
-
-        $url = $this->next_url;
-        if ($parameters !== null && $this->next_method === "GET") {
-            $url .= strpos($url, "?") === false ? "?" : "&";
-            $url .= self::www_form_encode($parameters);
-            $parameters = null;
-        }
-        if ($parameters !== null && is_array($parameters) && $this->next_www_form_encoded) {
-            $parameters = self::www_form_encode($parameters);
-        }
-        if ($parameters !== null) {
-            curl_setopt($this->curlh, CURLOPT_POSTFIELDS, $parameters);
+        $url = $this->full_next_url();
+        if ($this->next_parameters !== null && $this->next_method !== "GET") {
+            if ($this->next_www_form_encoded) {
+                curl_setopt($this->curlh, CURLOPT_POSTFIELDS, self::www_form_encode($this->next_parameters));
+            } else {
+                curl_setopt($this->curlh, CURLOPT_POSTFIELDS, $this->next_parameters);
+            }
         }
 
         curl_setopt($this->curlh, CURLOPT_URL, $url);
@@ -206,8 +321,13 @@ class CurlHelper {
         curl_exec($this->curlh);
         if (self::$verbose) {
             $pout = "";
-            if ($parameters !== null)
-                $pout = is_string($parameters) ? $parameters : json_encode($parameters);
+            if (!empty($this->next_parameters) && $this->next_method !== "GET") {
+                if ($this->next_www_form_encoded) {
+                    $pout = self::www_form_encode($this->next_parameters);
+                } else {
+                    $pout = json_encode($this->next_parameters);
+                }
+            }
             error_log(curl_getinfo($this->curlh, CURLINFO_HEADER_OUT) . $pout);
         }
 
@@ -215,11 +335,13 @@ class CurlHelper {
         $this->status_code = curl_getinfo($this->curlh, CURLINFO_HTTP_CODE);
         $this->header_string = stream_get_contents($this->headerf);
         $this->location = $url;
-        if (preg_match_all(',^Location:\s*(\S+),mi', $this->header_string, $m)) {
-            $this->location = $this->resolve($m[1][count($m[1]) - 1]);
+        if (preg_match_all('/^Location:\s*(\S+)/mi', $this->header_string, $m)) {
+            for ($i = 0; $i !== count($m[1]); ++$i) {
+                $this->location = $this->resolve($m[1][$i]);
+            }
         }
         $this->full_content_type = "application/octet-stream";
-        if (preg_match_all(',^Content-type:([^\r\n]*),mi', $this->header_string, $m)) {
+        if (preg_match_all('/^Content-type:([^\r\n]*)/mi', $this->header_string, $m)) {
             $this->full_content_type = trim($m[1][count($m[1]) - 1]);
         }
         $this->content_type = $this->full_content_type;
@@ -227,7 +349,7 @@ class CurlHelper {
             $this->content_type = $m[1];
         }
         $this->content_encoding = null;
-        if (preg_match_all(',^Content-encoding:([^\r\n]*),mi', $this->header_string, $m)) {
+        if (preg_match_all('/^Content-encoding:([^\r\n]*)/mi', $this->header_string, $m)) {
             $this->content_encoding = trim(join(", ", $m[1]));
         }
 
@@ -241,11 +363,11 @@ class CurlHelper {
         }
 
         $this->content_dom = $this->content_dom_errors = null;
-        if (preg_match(',\A(?:text/html|(?:text|application)/xml),i', $this->content_type)) {
+        if (preg_match('/\A(?:text\/html|(?:text|application)\/xml)/i', $this->content_type)) {
             $this->load_content_dom();
         }
         $this->content_json = null;
-        if (preg_match(',\A(?:application/json|text/json)\z,i', $this->content_type)) {
+        if (preg_match('/\A(?:application\/json|text\/json)\z/i', $this->content_type)) {
             $this->content_json = json_decode($this->content_string);
         }
 
@@ -310,15 +432,22 @@ class CurlHelper {
         if (isset($locp["port"])) {
             $lochost .= ":" . $locp["port"];
         }
-        if ($url[0] === "/") {
+        if ($url === "") {
+            $lochost .= $locp["path"] ?? "";
+            if (isset($locp["query"])) {
+                $lochost .= "?" . $locp["query"];
+            }
+            return $lochost;
+        } else if ($url[0] === "/") {
+            return $lochost . $url;
+        } else {
+            $lochost .= preg_replace('/\/+[^\/]+\z/', "/", $locp["path"] ?? "");
+            while (substr($url, 0, 3) === "../") {
+                $lochost = preg_replace('/\/+[^\/]+\/+\z/', "/", $lochost);
+                $url = substr($url, 3);
+            }
             return $lochost . $url;
         }
-        $lochost .= preg_replace(',/+[^/]+\z,', "/", $locp["path"] ?? "");
-        while (substr($url, 0, 3) === "../") {
-            $lochost = preg_replace(',/+[^/]+/+\z,', "/", $lochost);
-            $url = substr($url, 3);
-        }
-        return $lochost . $url;
     }
 
     function cleanup() {
@@ -332,55 +461,66 @@ class CurlHelper {
         }
     }
 
+    /** @return object */
     function save_state() {
         return (object) ["location" => $this->location, "referer" => $this->next_referer, "origin" => $this->next_origin];
     }
 
+    /** @param object $state */
     function restore_state($state) {
         $this->location = $state->location ?? null;
         $this->next_referer = $state->referer ?? null;
-        $this->next_origin = $state->next_origin ?? null;
+        $this->next_origin = $state->origin ?? null;
     }
 
     function next_cookie($name = null) {
         $locp = parse_url($this->next_url);
-        $rhost = $locp["host"];
+        $rscheme = $locp["scheme"] ?? "";
+        $rhost = $locp["host"] ?? "";
         $rhostlen = strlen($rhost);
-        $rpath = $locp["path"];
-        if ($rpath !== "" && preg_match('{\A(/.*?)/[^/]*\z}', $rpath, $m))
+        $rpath = $locp["path"] ?? "";
+        if ($rpath !== "" && preg_match('{\A(/.*?)/[^/]*\z}', $rpath, $m)) {
             $rpath = $m[1];
-        else
+        } else {
             $rpath = "/";
+        }
         $now = 0;
         $result = [];
         foreach (curl_getinfo($this->curlh, CURLINFO_COOKIELIST) as $cookiestr) {
             list($chost, $ctailmatch, $cpath, $csecure, $cexpires, $cname, $cvalue) = explode("\t", $cookiestr);
-            if ($name !== null && $cname !== $name)
+            if ($name !== null && $cname !== $name) {
                 continue;
-            if ($csecure === "TRUE" && $locp["scheme"] !== "https")
+            }
+            if ($csecure === "TRUE" && $rscheme !== "https") {
                 continue;
+            }
             $chttponly = str_starts_with($chost, "#HttpOnly_");
-            if ($chttponly)
+            if ($chttponly) {
                 $chost = substr($chost, 10);
+            }
             $chostlen = strlen($chost);
             if (strcasecmp($rhost, $chost) != 0
                 && ($rhostlen <= $chostlen
                     || strcasecmp(substr($rhost, $rhostlen - $chostlen), $chost) != 0
-                    || $rhost[$rhostlen - $chostlen - 1] != "."))
+                    || $rhost[$rhostlen - $chostlen - 1] != ".")) {
                 continue;
+            }
             if (strcasecmp($cpath, $rpath) != 0
                 && (!str_starts_with($cpath, $rpath)
-                    || (!str_ends_with($rpath, "/") && $cpath[strlen($rpath)] !== "/")))
+                    || (!str_ends_with($rpath, "/") && $cpath[strlen($rpath)] !== "/"))) {
                 continue;
+            }
             if ($cexpires) {
                 $now = $now ? : time();
-                if ($cexpires < $now)
+                if ($cexpires < $now) {
                     continue;
+                }
             }
-            if ($cname === $name)
+            if ($cname === $name) {
                 return $cvalue;
-            else
+            } else {
                 $result[$cname] = $cvalue;
+            }
         }
         return $result;
     }

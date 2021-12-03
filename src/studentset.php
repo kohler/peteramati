@@ -10,9 +10,11 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     /** @var Contact
      * @readonly */
     public $viewer;
-    /** @var ?Pset */
+    /** @var ?Pset
+     * @readonly */
     public $pset;
-    /** @var int */
+    /** @var int
+     * @readonly */
     private $_psetid;
     /** @var bool */
     private $_anonymous;
@@ -193,7 +195,9 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         }
 
         $this->load_pset($pset);
+        /** @phan-suppress-next-line PhanAccessReadOnlyProperty */
         $this->pset = $pset;
+        /** @phan-suppress-next-line PhanAccessReadOnlyProperty */
         $this->_psetid = $pset->id;
         if ($this->_anonymous !== $anonymous) {
             $this->_anonymous = $anonymous;

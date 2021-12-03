@@ -1298,18 +1298,19 @@ class Contact {
     function sendAccountInfo($sendtype, $sensitive) {
         assert(!$this->disabled);
         $rest = array();
-        if ($sendtype == "create" && $this->prefer_contactdb_password())
+        if ($sendtype == "create" && $this->prefer_contactdb_password()) {
             $template = "@activateaccount";
-        else if ($sendtype == "create")
+        } else if ($sendtype == "create") {
             $template = "@createaccount";
-        else if ($this->plaintext_password()
-                 && ($this->conf->opt("safePasswords") <= 1 || $sendtype != "forgot"))
+        } else if ($this->plaintext_password()
+                   && ($this->conf->opt("safePasswords") <= 1 || $sendtype != "forgot")) {
             $template = "@accountinfo";
-        else {
-            if ($this->contactDbId && $this->prefer_contactdb_password())
+        } else {
+            if ($this->contactDbId && $this->prefer_contactdb_password()) {
                 $capmgr = $this->conf->capability_manager("U");
-            else
+            } else {
                 $capmgr = $this->conf->capability_manager();
+            }
             $rest["capability"] = $capmgr->create(CAPTYPE_RESETPASSWORD, array("user" => $this, "timeExpires" => time() + 259200));
             $this->conf->log("Created password reset " . substr($rest["capability"], 0, 8) . "...", $this);
             $template = "@resetpassword";

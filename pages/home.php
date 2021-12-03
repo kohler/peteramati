@@ -915,16 +915,19 @@ function render_pset_row(Pset $pset, StudentSet $sset, PsetView $info,
         $info->grade_export_grades($gex);
         $info->grade_export_formulas($gex);
         $j["grades"] = $gex->grades;
-        if (!$info->user->dropped && $info->viewer_is_grader()) {
+        $want_incomplete = !$info->user->dropped && $info->viewer_is_grader();
+        if ($want_incomplete || $gex->autogrades !== null) {
+            $gv = $gex->grades;
+            '@phan-var-force list $gv';
+            $agv = $gex->autogrades ?? [];
             foreach ($gex->value_entries() as $i => $ge) {
-                if ($gex->grades[$i] === null && $ge->grader_entry_required())
+                if ($want_incomplete
+                    && !isset($gv[$i])
+                    && $ge->grader_entry_required()) {
                     $info->user->incomplete = "grade missing";
-            }
-        }
-        if ($gex->autogrades !== null) {
-            foreach ($gex->value_entries() as $i => $ge) {
-                if ($gex->autogrades[$i] !== null
-                    && $gex->autogrades[$i] !== $gex->grades[$i]) {
+                }
+                if (isset($agv[$i])
+                    && $agv[$i] !== $gv[$i]) {
                     $j["highlight_grades"][$ge->key] = true;
                 }
             }

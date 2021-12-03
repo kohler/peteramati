@@ -3,9 +3,7 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-$ConfSitePATH = preg_replace('/\/batch\/[^\/]+/', '', __FILE__);
-require_once("$ConfSitePATH/src/init.php");
-require_once("$ConfSitePATH/lib/getopt.php");
+require_once(dirname(__DIR__) . "/src/init.php");
 
 class RunEnqueueBatch {
     /** @var Conf */
@@ -43,14 +41,6 @@ class RunEnqueueBatch {
         if ($this->sset_flags === StudentSet::ENROLLED) {
             $this->usermatch = $usermatch;
         }
-    }
-
-    function check() {
-        $qs = new QueueStatus;
-        foreach ($this->running as $qix) {
-            $qix->substantiate($qs);
-        }
-        return $qs->nrunning >= $qs->nconcurrent;
     }
 
     /** @return int */

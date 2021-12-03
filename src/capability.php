@@ -20,19 +20,18 @@ class CapabilityManager {
         $paperId = $options["paperId"] ?? 0;
         $timeExpires = $options["timeExpires"] ?? time() + 259200;
         $data = $options["data"] ?? null;
-        $ok = false;
 
-        for ($tries = 0; !$ok && $tries < 4; ++$tries)
+        for ($tries = 0; $tries < 4; ++$tries) {
             if (($salt = random_bytes(16)) !== false) {
                 $result = Dbl::ql($this->dblink, "insert into Capability set capabilityType=?, contactId=?, paperId=?, timeExpires=?, salt=?, data=?", $capabilityType, $contactId, $paperId, $timeExpires, $salt, $data);
-                $ok = $result && $result->affected_rows > 0;
+                if ($result && $result->affected_rows > 0) {
+                    return $this->prefix . "1"
+                        . str_replace(["+", "/", "="], ["-a", "-b", ""], base64_encode($salt));
+                }
             }
+        }
 
-        if (!$ok)
-            return false;
-        return $this->prefix . "1"
-            . str_replace(array("+", "/", "="),
-                          array("-a", "-b", ""), base64_encode($salt));
+        return false;
     }
 
     public function check($capabilityText) {

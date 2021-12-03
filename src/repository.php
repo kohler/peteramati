@@ -44,7 +44,7 @@ class Repository {
     public $viewable_by = [];
     /** @var array<string,string> */
     public $_truncated_hashes = [];
-    /** @var array<string,bool> */
+    /** @var array<int,bool> */
     public $_truncated_psetdir = [];
     /** @var array<string,CommitRecord> */
     private $_commits = [];

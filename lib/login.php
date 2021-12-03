@@ -67,15 +67,8 @@ class LoginHelper {
         // to determine if the user is registered
         if (!isset($qreq->email)
             || ($qreq->email = trim($qreq->email)) === "") {
-            Ht::error_at("email", $conf->opt("ldapLogin") ? "Enter your LDAP username." : "Enter your email address.");
+            Ht::error_at("email", "Enter your email address.");
             return false;
-        }
-
-        // do LDAP login before validation, since we might create an account
-        if ($conf->opt("ldapLogin")) {
-            $qreq->action = "login";
-            if (!self::ldap_login($qreq))
-                return null;
         }
 
         // look up user in our database
@@ -214,18 +207,6 @@ class LoginHelper {
         }
         Navigation::redirect($where);
         exit;
-    }
-
-    static private function ldap_login($qreq) {
-        global $ConfSitePATH;
-        // check for bogus configurations
-        if (!function_exists("ldap_connect") || !function_exists("ldap_bind"))
-            return Conf::msg_error("Internal error: <code>\$Opt[\"ldapLogin\"]</code> is set, but this PHP installation doesn’t support LDAP. Logins will fail until this error is fixed.");
-
-        // the body is elsewhere because we need LDAP constants, which might[?]
-        // cause errors absent LDAP support
-        require_once("$ConfSitePATH/lib/ldaplogin.php");
-        return ldapLoginAction($qreq);
     }
 
     static private function unquote_double_quoted_request($qreq) {
