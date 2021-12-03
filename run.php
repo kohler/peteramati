@@ -235,11 +235,11 @@ class RunRequest {
             if ($this->is_ensure) {
                 echo Ht::hidden("ensure", 1);
             }
-            echo Ht::hidden("run", $this->runner->name, ["id" => "pa-runmany", "data-pa-run-category" => $this->runner->category_argument()]),
+            echo Ht::hidden("run", $this->runner->name, ["id" => "pa-runmany"]),
                 '</div></form>';
 
-            echo '<div id="run-' . $this->runner->category . '">',
-                '<div class="pa-run pa-run-short" id="pa-run-' . $this->runner->category . '">',
+            echo '<div id="run-', $this->runner->name, '">',
+                '<div class="pa-run pa-run-short" id="pa-run-', $this->runner->name, '">',
                 '<pre class="pa-runpre"></pre></div>',
                 '</div>';
 

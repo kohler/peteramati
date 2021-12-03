@@ -665,11 +665,11 @@ if ($Pset->gitless) {
     foreach ($Pset->runners as $r) {
         if ($Me->can_view_run($Pset, $r, $User)) {
             if ($Me->can_run($Pset, $r, $User)) {
-                $b = Ht::button(htmlspecialchars($r->title),
-                                array("value" => $r->name,
-                                      "class" => "btn ui pa-runner",
-                                      "data-pa-run-category" => $r->category_argument(),
-                                      "data-pa-run-grade" => isset($r->eval) ? "true" : null));
+                $b = Ht::button(htmlspecialchars($r->title), [
+                    "value" => $r->name,
+                    "class" => "btn ui pa-runner",
+                    "data-pa-run-grade" => isset($r->eval) ? "true" : null
+                ]);
                 $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
                 $last_run = true;
             } else {
@@ -764,13 +764,13 @@ if ($Pset->gitless) {
     $any_runners = false;
     foreach ($Pset->runners as $r) {
         if (!$Me->can_view_run($Pset, $r, $User)
-            || isset($runcategories[$r->category])) {
+            || isset($runcategories[$r->name])) {
             continue;
         }
 
         $rj = null;
         if ($crunners !== null
-            && ($checkt = $crunners->{$r->category} ?? null)
+            && ($checkt = $crunners->{$r->name} ?? null)
             && (is_int($checkt) || is_array($checkt))) {
             $rj = $runlogger->job_full_response(is_int($checkt) ? $checkt : $checkt[0], $r);
         }
@@ -782,15 +782,15 @@ if ($Pset->gitless) {
             $any_runners = true;
         }
 
-        $runcategories[$r->category] = true;
-        echo '<div id="run-' . $r->category . '" class="pa-runout';
+        $runcategories[$r->name] = true;
+        echo '<div id="run-', $r->name, '" class="pa-runout';
         if (!$rj || !isset($rj->timestamp)) {
             echo ' hidden';
         }
         echo '"><h3><a class="qq ui pa-run-show" href="">',
             '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($r->output_title), '</a></h3>',
-            '<div class="pa-run pa-run-short hidden" id="pa-run-', $r->category, '"';
+            '<div class="pa-run pa-run-short hidden" id="pa-run-', $r->name, '"';
         if ($r->xterm_js || ($r->xterm_js === null && $Pset->run_xterm_js)) {
             echo ' data-pa-xterm-js="true"';
         }

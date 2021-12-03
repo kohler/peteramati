@@ -1700,9 +1700,6 @@ class RunnerConfig {
     public $name;
     /** @var string
      * @readonly */
-    public $category;
-    /** @var string
-     * @readonly */
     public $title;
     /** @var string
      * @readonly */
@@ -1754,16 +1751,8 @@ class RunnerConfig {
         if (!is_string($this->name) || !preg_match('/\A[A-Za-z][0-9A-Za-z_]*\z/', $this->name)) {
             throw new PsetConfigException("runner name format error", $loc);
         }
-
-        if (isset($r->category)) {
-            $this->category = $r->category;
-        } else if ($defr && isset($defr->category)) {
-            $this->category = $defr->category;
-        } else {
-            $this->category = $this->name;
-        }
-        if (!is_string($this->category) || !preg_match('/\A[0-9A-Za-z_]+\z/', $this->category)) {
-            throw new PsetConfigException("runner category format error", $loc);
+        if (isset($r->category) || ($defr && isset($defr->category))) {
+            throw new PsetConfigException("runner has category");
         }
 
         $this->title = Pset::cstr($loc, $r, "title") ?? $this->name;
@@ -1806,11 +1795,6 @@ class RunnerConfig {
         } else {
             $this->timed_replay = !!Pset::cbool($loc, $rs, "timed_replay");
         }
-    }
-
-    /** @return ?string */
-    function category_argument() {
-        return $this->category === $this->name ? null : $this->category;
     }
 
     /** @param string $x

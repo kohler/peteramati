@@ -629,7 +629,7 @@ class QueueItem {
         $this->run_and_log($command);
 
         // save information about execution
-        $this->info()->update_commit_notes(["run" => [$this->runner()->category => $this->runat]]);
+        $this->info()->update_commit_notes(["run" => [$this->runner()->name => $this->runat]]);
 
         return true;
     }
