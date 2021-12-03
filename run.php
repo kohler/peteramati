@@ -135,7 +135,7 @@ class RunRequest {
             $qi = QueueItem::by_id($this->conf, intval($qreq->queueid), $info);
         }
         if (!$qi && isset($qreq->check)) {
-            if (!($qi = QueueItem::for_logged_jobid($info, intval($qreq->check)))) {
+            if (!($qi = QueueItem::for_logged_job($info, intval($qreq->check)))) {
                 return self::error("Unknown check timestamp {$qreq->check}.");
             }
         }
@@ -157,7 +157,7 @@ class RunRequest {
             }
             $qi->substantiate(new QueueStatus);
             if ($qi->runat) {
-                return $qi->logged_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
+                return $qi->full_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
             }
         }
 
@@ -200,7 +200,7 @@ class RunRequest {
                 $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
                 $qix->substantiate($qs);
                 if ($qix === $qi && $qi->status > 0) {
-                    return $qi->logged_response();
+                    return $qi->full_response();
                 }
             }
             Dbl::free($result);

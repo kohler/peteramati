@@ -1511,8 +1511,67 @@ class PsetView {
 
     /** @param RunnerConfig $runner
      * @return int|false */
-    function complete_run(RunnerConfig $runner) {
+    function complete_job(RunnerConfig $runner) {
         return (new RunLogger($this->pset, $this->repo))->complete_job($runner, $this->hash());
+    }
+
+    function update_recorded_jobs() {
+        if ($this->repo && ($h = $this->hash())) {
+            $rl = new RunLogger($this->pset, $this->repo);
+            $aj = $rl->active_job();
+            $runs = [];
+            foreach ($rl->past_jobs() as $jobid) {
+                if (($rr = $runlog->job_brief_response($jobid))
+                    && $rr->hash === $h
+                    && $jobid !== $aj) {
+                    if (!isset($runs[$rr->runner])) {
+                        $runs[$rr->runner] = $jobid;
+                    } else if (is_int($runs[$rr->runner])) {
+                        $runs[$rr->runner] = [$runs[$rr->runner], $jobid];
+                    } else {
+                        $runs[$rr->runner][] = $jobid;
+                    }
+                }
+            }
+            $this->update_commit_notes(["run" => $runs]);
+        }
+    }
+
+    /** @param string $runner_name
+     * @return int|false */
+    function latest_recorded_job($runner_name) {
+        $cnotes = $this->commit_jnotes();
+        if ($cnotes && isset($cnotes->run) && is_object($cnotes->run)) {
+            $r = $cnotes->run->{$runner_name} ?? null;
+            if (is_int($r)) {
+                return $r;
+            } else if (is_array($r)) {
+                return $r[0];
+            }
+        }
+        return false;
+    }
+
+    /** @param string $runner_name
+     * @return string|false */
+    function latest_recorded_job_output($runner_name) {
+        if (($jobid = $this->latest_recorded_job($runner_name))) {
+            $runlog = new RunLogger($this->pset, $this->repo);
+            $fn = $runlog->output_file($jobid);
+            $s = @file_get_contents($fn);
+            $this->last_runner_error = $s === false ? self::ERROR_LOGMISSING : 0;
+            return $s;
+        } else {
+            $this->last_runner_error = self::ERROR_NOTRUN;
+            return false;
+        }
+    }
+
+    /** @param string $runner_name
+     * @return string|false
+     * @deprecated */
+    function runner_output_for($runner_name) {
+        return $this->latest_recorded_job_output($runner_name);
     }
 
     /** @param RunnerConfig $runner
@@ -1527,24 +1586,6 @@ class PsetView {
             }
         }
         return call_user_func($runner->eval, $this, $runner, $jobid);
-    }
-
-    /** @param string $runner_name
-     * @return string|false */
-    function runner_output_for($runner_name) {
-        $cnotes = $this->commit_jnotes();
-        if ($cnotes
-            && isset($cnotes->run)
-            && isset($cnotes->run->{$runner_name})) {
-            $runlog = new RunLogger($this->pset, $this->repo);
-            $fn = $runlog->output_file($cnotes->run->{$runner_name});
-            $s = @file_get_contents($fn);
-            $this->last_runner_error = $s === false ? self::ERROR_LOGMISSING : 0;
-            return $s;
-        } else {
-            $this->last_runner_error = self::ERROR_NOTRUN;
-            return false;
-        }
     }
 
 
@@ -1661,7 +1702,7 @@ class PsetView {
         foreach ($this->pset->runners as $runner) {
             if ($runner->transfer_warnings
                 && $this->viewer->can_view_transferred_warnings($this->pset, $runner, $this->user)
-                && ($output = $this->runner_output_for($runner->name))) {
+                && ($output = $this->latest_recorded_job_output($runner->name))) {
                 $this->transfer_warning_lines(explode("\n", $output), $runner->transfer_warnings_priority ?? 0.0);
             }
         }

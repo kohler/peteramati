@@ -120,7 +120,7 @@ class RunLogger {
         $envts = $runner->environment_timestamp();
         foreach ($this->past_jobs() as $t) {
             if ($t > $envts
-                && ($s = $this->job_info($t))
+                && ($s = $this->job_brief_response($t))
                 && $s->runner === $runner->name
                 && ($hash === null || $s->hash === $hash)
                 && $this->active_job() !== $t) {
@@ -150,7 +150,7 @@ class RunLogger {
 
     /** @param int $jobid
      * @return ?RunResponse */
-    function job_info($jobid) {
+    function job_brief_response($jobid) {
         if (($t = @file_get_contents($this->output_file($jobid), false, null, 0, 8192))
             && str_starts_with($t, "++ {")
             && ($pos = strpos($t, "\n"))
@@ -165,7 +165,7 @@ class RunLogger {
     /** @param int $jobid
      * @param ?int $offset
      * @return ?RunResponse */
-    function job_response(RunnerConfig $runner, $jobid, $offset = null) {
+    function job_full_response($jobid, RunnerConfig $runner, $offset = null) {
         $rr = RunResponse::make($runner, $this->repo);
         $rr->ok = true;
         $rr->timestamp = $jobid;

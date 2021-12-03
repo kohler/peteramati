@@ -261,11 +261,9 @@ class QueueItem {
     /** @param PsetView $info
      * @param int $jobid
      * @return QueueItem */
-    static function for_logged_jobid($info, $jobid) {
+    static function for_logged_job($info, $jobid) {
         $runlog = new RunLogger($info->pset, $info->repo);
-        if (($j = $runlog->job_info($jobid))
-            && is_string($j->runner ?? null)
-            && is_string($j->pset ?? null)
+        if (($j = $runlog->job_brief_response($jobid))
             && ($j->pset === $info->pset->urlkey
                 || $info->conf->pset_by_key($j->pset) === $info->pset)) {
             $qi = self::make_info($info);
@@ -283,8 +281,8 @@ class QueueItem {
      * @param RunnerConfig $runner
      * @return QueueItem */
     static function for_complete_job($info, $runner) {
-        if (($jobid = $info->complete_run($runner))) {
-            $qi = QueueItem::for_logged_jobid($info, $jobid);
+        if (($jobid = $info->complete_job($runner))) {
+            $qi = QueueItem::for_logged_job($info, $jobid);
             $qi && $qi->associate_info($info, $runner);
             return $qi;
         } else {
@@ -374,7 +372,7 @@ class QueueItem {
                 return;
             }
         } else if (($this->flags & self::FLAG_ENSURE) !== 0
-                   && ($jobid = $this->info()->complete_run($this->runner()))) {
+                   && ($jobid = $this->info()->complete_job($this->runner()))) {
             $this->delete(false);
             $this->runat = $jobid;
             $this->status = 2;
@@ -759,7 +757,7 @@ class QueueItem {
      * @param ?string $write
      * @param bool $stop
      * @return RunResponse */
-    function logged_response($offset = 0, $write = null, $stop = false) {
+    function full_response($offset = 0, $write = null, $stop = false) {
         $runlog = new RunLogger($this->pset(), $this->repo());
         if ((($write ?? "") !== "" || $stop)
             && $runlog->active_job() === $this->runat) {
@@ -773,7 +771,7 @@ class QueueItem {
             $now = microtime(true);
             do {
                 usleep(10);
-                $rr = $runlog->job_response($this->runner(), $this->runat, $offset);
+                $rr = $runlog->job_full_response($this->runat, $this->runner(), $offset);
             } while ($stop
                      && $runlog->active_job() === $this->runat
                      && microtime(true) - $now < 0.1);

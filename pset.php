@@ -769,8 +769,10 @@ if ($Pset->gitless) {
         }
 
         $rj = null;
-        if ($crunners !== null && ($checkt = $crunners->{$r->category} ?? null)) {
-            $rj = $runlogger->job_response($r, $checkt);
+        if ($crunners !== null
+            && ($checkt = $crunners->{$r->category} ?? null)
+            && (is_int($checkt) || is_array($checkt))) {
+            $rj = $runlogger->job_full_response(is_int($checkt) ? $checkt : $checkt[0], $r);
         }
         if (!$rj && !$Me->can_run($Pset, $r, $User)) {
             continue;
