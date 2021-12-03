@@ -1517,10 +1517,10 @@ class PsetView {
 
     function update_recorded_jobs() {
         if ($this->repo && ($h = $this->hash())) {
-            $rl = new RunLogger($this->pset, $this->repo);
-            $aj = $rl->active_job();
+            $runlog = new RunLogger($this->pset, $this->repo);
+            $aj = $runlog->active_job();
             $runs = [];
-            foreach ($rl->past_jobs() as $jobid) {
+            foreach ($runlog->past_jobs() as $jobid) {
                 if (($rr = $runlog->job_brief_response($jobid))
                     && $rr->hash === $h
                     && $jobid !== $aj) {

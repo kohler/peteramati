@@ -776,7 +776,7 @@ class QueueItem {
                      && $runlog->active_job() === $this->runat
                      && microtime(true) - $now < 0.1);
         } else {
-            $rr = $runlog->job_response($this->runner(), $this->runat, $offset);
+            $rr = $runlog->job_full_response($this->runat, $this->runner(), $offset);
         }
 
         if ($rr->status !== "working" && $this->queueid > 0) {
