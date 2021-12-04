@@ -334,7 +334,7 @@ class GradeFormulaCompiler {
 
     function check_all() {
         foreach ($this->conf->psets() as $pset) {
-            if ($pset->has_formula) {
+            if (!$pset->disabled && $pset->has_formula) {
                 foreach ($pset->grades() as $ge) {
                     if ($ge->is_formula()) {
                         $this->parse($ge->formula_expression(), $ge, "{$pset->nonnumeric_key}.{$ge->key}");

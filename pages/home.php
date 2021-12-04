@@ -468,7 +468,7 @@ if ($Me->isPC && $User === $Me) {
 if (($v = $Conf->setting_data("homemsg"))) {
     $Conf->infoMsg($v);
 }
-if ($Me->isPC) {
+if ($Me->privChair) {
     $gc = new GradeFormulaCompiler($Conf);
     $gc->check_all();
     $t = "";
