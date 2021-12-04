@@ -439,12 +439,29 @@ export function run(button, opts) {
             if (!m) {
                 setTimeout(send, 0);
                 return;
-            } else {
-                const nc = m[1].length + m[2].length + m[3].length + m[4].length * 2,
-                    nb = m[1].length + 2 * m[2].length + 3 * m[3].length + 2 * m[4].length;
-                data.data = data.data.substring(nc);
-                data.offset += nb;
             }
+            let nc = 0;
+            if (m[1].length) {
+                const n = Math.min(offset - data.offset, m[1].length);
+                nc += n;
+                data.offset += n;
+            }
+            if (m[2].length) {
+                const n = Math.min(offset - data.offset, m[2].length * 2);
+                nc += n / 2;
+                data.offset += n;
+            }
+            if (m[3].length) {
+                const n = Math.min(offset - data.offset, m[3].length * 3);
+                nc += n / 3;
+                data.offset += n;
+            }
+            if (m[4].length) {
+                const n = Math.min(offset - data.offset, m[4].length * 4);
+                nc += n / 2; // surrogate pairs
+                data.offset += n;
+            }
+            data.data = data.data.substring(nc);
         }
         // Stay on alternate screen when done (rather than clearing it)
         if (data.data
