@@ -304,12 +304,14 @@ class QueueItem {
         $this->runorder = $this->runorder ?? self::unscheduled_runorder();
         $this->status = -1;
         $this->conf->qe("insert into ExecutionQueue set reqcid=?, cid=?,
-            runnername=?, psetid=?, repoid=?, bhash=?, runsettings=?,
+            runnername=?, psetid=?, repoid=?,
+            bhash=?, runsettings=?,
             queueclass=?, nconcurrent=?, flags=?, chain=?,
             insertat=?, updateat=?,
             runat=?, runorder=?, status=?",
             $this->reqcid, $this->cid,
-            $this->runnername, $this->psetid, $this->repoid, $this->bhash, $this->runsettings,
+            $this->runnername, $this->psetid, $this->repoid,
+            $this->bhash, $this->runsettings,
             $this->queueclass, $this->nconcurrent, $this->flags, $this->chain,
             $this->insertat, $this->updateat,
             $this->runat, $this->runorder, $this->status);
@@ -389,7 +391,7 @@ class QueueItem {
     }
 
     /** @param bool $only_old */
-    private function delete($only_old) {
+    function delete($only_old) {
         assert(!!$this->queueid && !$this->deleted);
         if ($only_old) {
             $result = $this->conf->qe("delete from ExecutionQueue where queueid=? and status=0 and updateat<?", $this->queueid, Conf::$now - 180);
@@ -477,8 +479,12 @@ class QueueItem {
         $repo = $this->repo();
         $pset = $this->pset();
         $runner = $this->runner();
-        if (!$repo || !$pset || !$runner) {
-            throw new RunnerException("Bad queue item");
+        if (!$repo) {
+            throw new RunnerException("No repository.");
+        } else if (!$pset) {
+            throw new RunnerException("Bad queue item pset.");
+        } else if (!$runner) {
+            throw new RunnerException("Bad queue item runner.");
         }
         $info = $this->info();
 

@@ -95,15 +95,6 @@ class RunRequest {
         }
 
         $info = PsetView::make($this->pset, $this->user, $this->viewer, $qreq->newcommit ?? $qreq->commit);
-        if (!$this->pset->gitless && !$info->hash()) {
-            if (!$info->repo) {
-                return self::error("No repository.");
-            } else if ($qreq->newcommit ?? $qreq->commit) {
-                return self::error("Commit " . ($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
-            } else {
-                return self::error("No commits in repository.");
-            }
-        }
         if ($qreq->queueid === "") {
             unset($qreq->queueid);
         } else if (isset($qreq->queueid) && !ctype_digit($qreq->queueid)) {
@@ -116,19 +107,15 @@ class RunRequest {
         }
 
         // can we run this?
-        if ($this->runner->command) {
-            if (!$info->repo) {
-                return self::error("No repository.");
-            } else if (!$info->commit()) {
-                return self::error("No commit to run.");
-            } else if (!$info->can_view_repo_contents()) {
-                return self::error("Unconfirmed repository.");
-            }
-        }
         if (isset($qreq->check) && !$this->runner->evaluate_function
             ? !$this->viewer->can_view_run($this->pset, $this->runner, $this->user)
             : !$this->viewer->can_run($this->pset, $this->runner, $this->user)) {
             return self::error("You can’t run that command.");
+        }
+        if ($this->runner->command
+            && $info->repo
+            && !$info->can_view_repo_contents()) {
+            return self::error("You can’t view this repository.");
         }
 
         // load queue item
@@ -148,6 +135,19 @@ class RunRequest {
         }
         if (!$qi && $this->is_ensure) {
             $qi = QueueItem::for_complete_job($info, $this->runner);
+        }
+
+        // complain if unrunnable
+        if ($this->runner->command
+            && (!$info->repo || !$info->commit())) {
+            $qi && $qi->delete(false);
+            if (!$info->repo) {
+                return self::error("No repository.");
+            } else if ($qreq->newcommit ?? $qreq->commit) {
+                return self::error("Commit " . ($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
+            } else {
+                return self::error("No commits in repository.");
+            }
         }
 
         // check with existing queue item
@@ -195,25 +195,30 @@ class RunRequest {
         session_write_close();
 
         // process queue
-        try {
-            $qs = new QueueStatus;
-            $result = $info->conf->qe("select * from ExecutionQueue where status>=0 and runorder<=? order by runorder asc, queueid asc limit 100", $qi->runorder);
-            while (($qix = QueueItem::fetch($info->conf, $result))) {
+        $qs = new QueueStatus;
+        $result = $info->conf->qe("select * from ExecutionQueue where status>=0 and runorder<=? order by runorder asc, queueid asc limit 100", $qi->runorder);
+        while (($qix = QueueItem::fetch($info->conf, $result))) {
+            try {
                 $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
                 $qix->substantiate($qs);
                 if ($qix === $qi && $qi->status > 0) {
                     return $qi->full_response();
                 }
+            } catch (Exception $e) {
+                $qix->delete(false);
+                if ($qix === $qi) {
+                    return self::error($e->getMessage());
+                } else {
+                    error_log($qix->unparse_key() . ": " . $e->getMessage());
+                }
             }
-            Dbl::free($result);
-            return [
-                "queueid" => $qi->queueid,
-                "onqueue" => true,
-                "nahead" => $qs->nahead
-            ];
-        } catch (Exception $e) {
-            return self::error($e->getMessage());
         }
+        Dbl::free($result);
+        return [
+            "queueid" => $qi->queueid,
+            "onqueue" => true,
+            "nahead" => $qs->nahead
+        ];
     }
 
     function runmany() {
