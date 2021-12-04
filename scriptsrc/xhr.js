@@ -84,17 +84,20 @@ export function after_outstanding(f) {
 let cond_out = 0, cond_waiting = [];
 
 export function api_conditioner(url, data, method) {
+    if (typeof method === "string") {
+        method = {method: method};
+    }
     return new Promise(function (resolve) {
         function process() {
             ++cond_out;
-            $.ajax(url, {
-                data: data, method: method || "POST", cache: false, dataType: "json",
+            $.ajax(url, Object.assign({
+                data: data, method: "POST", cache: false, dataType: "json",
                 success: function (data) {
                     resolve(data);
                     --cond_out;
                     cond_waiting.length && cond_waiting.shift()();
                 }
-            });
+            }, method || {}));
         }
         cond_out < 5 ? process() : cond_waiting.push(process);
     });

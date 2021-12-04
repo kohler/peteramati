@@ -2379,7 +2379,8 @@ function pa_render_pset_table(pconf, data) {
             const byuid = usc.slice(usci, usci + 16);
             usci += byuid.length;
             api_conditioner(hoturl("=api/gradesettings", {pset: pconf.key}),
-                {us: JSON.stringify(byuid)})
+                {us: JSON.stringify(byuid)},
+                {timeout: 20000})
             .then(function (rv) {
                 gdialog_store_start(rv);
                 if (rv.ok && rv.us) {
