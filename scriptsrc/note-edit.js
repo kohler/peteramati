@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { escape_entities } from "./encoders.js";
-import { hoturl_gradeapi } from "./hoturl.js";
+import { hoturl } from "./hoturl.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { Linediff } from "./diff.js";
@@ -45,7 +45,7 @@ function render_form($tr, note, transition) {
         format = document.body.getAttribute("data-default-format");
     }
     let t = '<form method="post" action="' +
-        escape_entities(hoturl_gradeapi(gi.element, "=api/linenote", {file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})) +
+        escape_entities(hoturl("=api/linenote", {psetinfo: gi.element, file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})) +
         '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">' +
         '<textarea class="pa-note-entry need-autogrow" name="note"></textarea>' +
         '<div class="aab aabr pa-note-aa">' +

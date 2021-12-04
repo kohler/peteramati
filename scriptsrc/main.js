@@ -10,7 +10,7 @@ import { event_key } from "./ui-key.js";
 import "./ui-autogrow.js";
 import "./ui-range.js";
 import "./ui-sessionlist.js";
-import { hoturl, hoturl_post, hoturl_gradeapi, hoturl_post_go } from "./hoturl.js";
+import { hoturl, hoturl_post_go } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
 import { tooltip } from "./tooltip.js";
@@ -597,7 +597,7 @@ function save_grade(self) {
     });
 
     $f.data("paOutstandingPromise", new Promise(function (resolve, reject) {
-        api_conditioner(hoturl_gradeapi($f[0], "=api/grade"),
+        api_conditioner(hoturl("=api/grade", {psetinfo: $f[0]}),
             {grades: g, oldgrades: og})
         .then(function (data) {
             $f.removeData("paOutstandingPromise");
@@ -1066,7 +1066,7 @@ function pa_runmany(chain) {
     }
     function check() {
         if (!$f.prop("outstanding")) {
-            $.ajax(hoturl_post("api/runchainhead", {chain: chain}), {
+            $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
                 type: "POST", cache: false, dataType: "json", timeout: 30000,
                 success: function (data) {
                     if (data && data.ok) {
@@ -1149,7 +1149,7 @@ function pa_checklatest(pset) {
             timeout = setTimeout(docheck, (now - start) * 1.25);
         else
             timeout = null;
-        $.ajax(hoturl_post("api/latestcommit", {u: siteinfo.uservalue, pset: pset}), {
+        $.ajax(hoturl("=api/latestcommit", {u: siteinfo.uservalue, pset: pset}), {
                 type: "GET", cache: false, dataType: "json", success: checkdata
             });
     }
@@ -2113,7 +2113,7 @@ function pa_render_pset_table(pconf, data) {
             for (let i = 1; i !== ge.length; ++i) {
                 opt.grade += " " + ge[i].key;
             }
-            hoturl_post_go("diffmany", opt);
+            hoturl_post_go("=diffmany", opt);
         }
     }
     function gdialog_store(next) {
@@ -2147,7 +2147,7 @@ function pa_render_pset_table(pconf, data) {
         if (!any) {
             next();
         } else if (gdialog_su.length === 1) {
-            api_conditioner(hoturl_post("api/grade", url_gradeparts(gdialog_su[0])),
+            api_conditioner(hoturl("=api/grade", url_gradeparts(gdialog_su[0])),
                 byuid[gdialog_su[0].uid])
             .then(function (rv) {
                 gdialog_store_start(rv);
@@ -2165,7 +2165,7 @@ function pa_render_pset_table(pconf, data) {
                     byuid[su.uid].commit = su.hash;
                 }
             }
-            api_conditioner(hoturl_post("api/multigrade", {pset: pconf.key}),
+            api_conditioner(hoturl("=api/multigrade", {pset: pconf.key}),
                 {us: JSON.stringify(byuid)})
             .then(function (rv) {
                 gdialog_store_start(rv);
@@ -2374,7 +2374,7 @@ function pa_render_pset_table(pconf, data) {
         function more() {
             const byuid = usc.slice(usci, 32);
             usci += byuid.length;
-            api_conditioner(hoturl_post("api/gradesettings", {pset: pconf.key}),
+            api_conditioner(hoturl("=api/gradesettings", {pset: pconf.key}),
                 {us: JSON.stringify(byuid)})
             .then(function (rv) {
                 gdialog_store_start(rv);
@@ -2685,7 +2685,7 @@ handle_ui.on("js-multiresolveflag", function () {
         flags.push({psetid: s.psetid, uid: s.uid, hash: s.hash, flagid: s.flagid});
     });
     if (flags.length !== 0) {
-        $.ajax(hoturl_post("api/multiresolveflag"), {
+        $.ajax(hoturl("=api/multiresolveflag"), {
                 type: "POST", cache: false, data: {flags: JSON.stringify(flags)}
             });
     } else {
@@ -2701,6 +2701,7 @@ window.$pa = {
     gradeentry_closest: GradeEntry.closest,
     fold: fold,
     grgraph: grgraph,
+    hoturl: hoturl,
     note_near: Note.near,
     on: handle_ui.on,
     onload: hotcrp_load,

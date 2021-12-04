@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
-import { hoturl_post } from "./hoturl.js";
+import { hoturl } from "./hoturl.js";
 import { wstorage } from "./utils.js";
 import { GradeGraph } from "./grgraph.js";
 import { GradeKde, GradeStats } from "./gradestats.js";
@@ -209,7 +209,7 @@ function draw_grgraph() {
 
 export function grgraph() {
     const self = this, p = self.getAttribute("data-pa-pset");
-    $.ajax(hoturl_post("api/gradestatistics", p ? {pset: p} : {}), {
+    $.ajax(hoturl("=api/gradestatistics", p ? {pset: p} : {}), {
         type: "GET", cache: true, dataType: "json",
         success: function (d) {
             if (d.series && d.series.all) {

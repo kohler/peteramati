@@ -4,7 +4,7 @@
 
 import { hasClass, addClass, removeClass } from "./ui.js";
 import { escape_entities } from "./encoders.js";
-import { hoturl_gradeapi } from "./hoturl.js";
+import { hoturl } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { render_text } from "./render.js";
 import { text_eq } from "./utils.js";
@@ -234,8 +234,8 @@ export class Note {
 
         return new Promise(function (resolve, reject) {
             api_conditioner(
-                hoturl_gradeapi(pi, "=api/linenote", {
-                    file: self.file, line: self.lineid, oldversion: self.version || 0
+                hoturl("=api/linenote", {
+                    psetinfo: pi, file: self.file, line: self.lineid, oldversion: self.version || 0
                 }), data
             ).then(function (data) {
                 self.element && removeClass(self.element, "pa-outstanding");

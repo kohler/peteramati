@@ -4,7 +4,7 @@
 
 import { ImmediatePromise } from "./utils.js";
 import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui } from "./ui.js";
-import { hoturl_gradeapi } from "./hoturl.js";
+import { hoturl } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
 
 
@@ -52,7 +52,7 @@ export class Filediff {
             const p = this.element.closest(".pa-psetinfo");
             removeClass(this.element, "need-load");
             return new Promise(resolve => {
-                $.ajax(hoturl_gradeapi(this.element, "api/filediff"), {
+                $.ajax(hoturl("api/filediff", {psetinfo: this.element}), {
                     type: "GET", cache: false, dataType: "json",
                     data: {
                         file: this.file,
@@ -230,10 +230,12 @@ export class Linediff {
             return new ImmediatePromise(this); // xxx
         }
         e.removeAttribute("data-expandmark");
-        const a0 = +m[1], b0 = +m[2], args = {file: this.file, fromline: b0};
+        const a0 = +m[1], b0 = +m[2], args = {
+            psetinfo: this.element, file: this.file, fromline: b0
+        };
         m[3] !== "" && (args.linecount = +m[3]);
         return new Promise(resolve => {
-            $.ajax(hoturl_gradeapi(e, "api/blob", args), {
+            $.ajax(hoturl("api/blob", args), {
                 success: function (data) {
                     if (data.ok && data.data) {
                         const lines = data.data.replace(/\n$/, "").split("\n");
@@ -368,7 +370,7 @@ handle_ui.on("pa-diff-unfold", function (evt) {
         Filediff.by_hash(this.hash).load().then(fd => fd.toggle(direction));
     });
     if (!evt.metaKey) {
-        $.post(hoturl_gradeapi(fd.element, "=api/diffconfig", {file: fd.file, collapse: show ? 0 : 1}));
+        $.post(hoturl("=api/diffconfig", {psetinfo: fd.element, file: fd.file, collapse: show ? 0 : 1}));
     }
 });
 

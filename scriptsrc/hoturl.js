@@ -48,6 +48,27 @@ function hoturl_clean(x, page_component) {
     }
 }
 
+function hoturl_psetinfo(elt, page, args) {
+    const p = elt.closest(".pa-psetinfo");
+    let v = p.getAttribute("data-pa-user");
+    args.push("u=" + encodeURIComponent(v || siteinfo.uservalue));
+    if ((v = p.getAttribute("data-pa-pset"))) {
+        args.push("pset=" + encodeURIComponent(v));
+    }
+    if ((v = p.getAttribute("data-pa-hash"))) {
+        args.push("commit=" + encodeURIComponent(v));
+    }
+    let sheet;
+    if ((page === "api/grade" || page === "=api/grade")
+        && (sheet = $(p).data("pa-gradeinfo"))) {
+        const enames = [];
+        for (let i in sheet.entries) {
+            enames.push(i);
+        }
+        args.push("knowngrades=" + encodeURIComponent(enames.join(" ")));
+    }
+}
+
 export function hoturl(page, options) {
     var k, v, m, x, anchor = "";
     if (siteinfo.site_relative == null || siteinfo.suffix == null) {
@@ -65,13 +86,21 @@ export function hoturl(page, options) {
         x.v = [];
         for (k in options) {
             v = options[k];
-            if (v == null)
-                /* skip */;
-            else if (k === "anchor")
+            if (v == null) {
+                /* do nothing */
+            } else if (k === "anchor") {
                 anchor = "#" + v;
-            else
+            } else if (k === "psetinfo" && v instanceof Element) {
+                hoturl_psetinfo(v, page, x.v);
+            } else {
                 x.v.push(encodeURIComponent(k).concat("=", encodeURIComponent(v).replace(/%20/g, "+")));
+            }
         }
+    }
+
+    if (page.startsWith("=")) {
+        x.v.push("post=" + siteinfo.postvalue);
+        page = page.substring(1);
     }
 
     if (page === "help") {
@@ -100,36 +129,6 @@ export function hoturl(page, options) {
         x.t += "?" + x.v.join("&");
     }
     return siteinfo.site_relative + x.pt + x.t + anchor;
-}
-
-export function hoturl_post(page, options) {
-    options = serialize_object(options);
-    options += (options ? "&" : "") + "post=" + siteinfo.postvalue;
-    return hoturl(page, options);
-}
-
-export function hoturl_gradeapi(e, fn, args) {
-    const p = e.closest(".pa-psetinfo");
-    args = args || {};
-    let v = p.getAttribute("data-pa-user");
-    args.u = v || siteinfo.uservalue;
-    if ((v = p.getAttribute("data-pa-pset"))) {
-        args.pset = v;
-    }
-    if ((v = p.getAttribute("data-pa-hash"))) {
-        args.commit = v;
-    }
-    const post = fn.charAt(0) === "=";
-    post && (fn = fn.substring(1));
-    let sheet;
-    if (fn === "api/grade" && (sheet = $(p).data("pa-gradeinfo"))) {
-        const enames = [];
-        for (let i in sheet.entries) {
-            enames.push(i);
-        }
-        args.knowngrades = enames.join(" ");
-    }
-    return post ? hoturl_post(fn, args) : hoturl(fn, args);
 }
 
 export function url_absolute(url, loc) {
@@ -164,7 +163,7 @@ export function hoturl_post_go(page, options) {
     form.setAttribute("method", "post");
     form.setAttribute("enctype", "multipart/form-data");
     form.setAttribute("accept-charset", "UTF-8");
-    form.action = hoturl_post(page, options);
+    form.action = hoturl(page, options);
     const input = document.createElement("input");
     input.type = "hidden";
     input.name = "____empty____";
