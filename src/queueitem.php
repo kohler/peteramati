@@ -555,6 +555,9 @@ class QueueItem {
 
         // print json to first line
         $json = $this->response();
+        if (($hostname = gethostname()) !== false) {
+            $json->host = gethostbyname($hostname);
+        }
         fwrite($this->_logstream, "++ " . json_encode($json) . "\n");
 
         // create jail
@@ -629,7 +632,7 @@ class QueueItem {
         $this->run_and_log($command);
 
         // save information about execution
-        $this->info()->update_commit_notes(["run" => [$this->runner()->name => $this->runat]]);
+        $this->info()->add_recorded_job($runner->name, $this->runat);
 
         return true;
     }

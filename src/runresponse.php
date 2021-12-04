@@ -24,6 +24,8 @@ class RunResponse implements JsonSerializable {
     public $timestamp;
     /** @var ?int */
     public $queueid;
+    /** @var ?string */
+    public $host;
     /** @var ?bool */
     public $done;
     /** @var null|'done'|'working'|'old' */

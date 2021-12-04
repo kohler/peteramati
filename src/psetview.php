@@ -1515,6 +1515,37 @@ class PsetView {
         return (new RunLogger($this->pset, $this->repo))->complete_job($runner, $this->hash());
     }
 
+    /** @param int $jobid
+     * @param mixed $jlist
+     * @return int|list */
+    static function add_joblist($jobid, $jlist) {
+        if (is_array($jlist)) {
+            $i = 0;
+            while ($i !== count($jlist) && $jobid < $jlist[$i]) {
+                ++$i;
+            }
+            array_splice($jlist, $i, 0, [$jobid]);
+            return $jlist;
+        } else if (is_int($jlist)) {
+            return $jobid < $jlist ? [$jlist, $jobid] : [$jobid, $jlist];
+        } else {
+            return $jobid;
+        }
+    }
+
+    /** @param string $runner_name
+     * @param int $jobid */
+    function add_recorded_job($runner_name, $jobid) {
+        $cnotes = $this->commit_jnotes();
+        if ($cnotes && isset($cnotes->run) && is_object($cnotes->run)) {
+            $jlist = $cnotes->run->{$runner_name} ?? null;
+        } else {
+            $jlist = null;
+        }
+        $jlist = self::add_joblist($jobid, $jlist);
+        $this->update_commit_notes(["run" => [$runner_name => $jlist]]);
+    }
+
     function update_recorded_jobs() {
         if ($this->repo && ($h = $this->hash())) {
             $runlog = new RunLogger($this->pset, $this->repo);
@@ -1524,13 +1555,7 @@ class PsetView {
                 if (($rr = $runlog->job_brief_response($jobid))
                     && $rr->hash === $h
                     && $jobid !== $aj) {
-                    if (!isset($runs[$rr->runner])) {
-                        $runs[$rr->runner] = $jobid;
-                    } else if (is_int($runs[$rr->runner])) {
-                        $runs[$rr->runner] = [$runs[$rr->runner], $jobid];
-                    } else {
-                        $runs[$rr->runner][] = $jobid;
-                    }
+                    $runs[$rr->runner] = self::add_joblist($jobid, $runs[$rr->runner] ?? null);
                 }
             }
             $this->update_commit_notes(["run" => $runs]);
