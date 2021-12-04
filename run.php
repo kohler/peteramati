@@ -274,13 +274,15 @@ class RunRequest {
             foreach ($users as $uname) {
                 if (($u = $this->conf->user_by_whatever($uname))) {
                     $info = PsetView::make($this->pset, $u, $this->viewer);
-                    $qi = QueueItem::make_info($info, $this->runner);
-                    $qi->chain = $chain;
-                    $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
-                    $qi->flags |= QueueItem::FLAG_UNWATCHED
-                        | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
-                    $qi->enqueue();
-                    ++$nu;
+                    if (!$runner->command || $info->repo) {
+                        $qi = QueueItem::make_info($info, $this->runner);
+                        $qi->chain = $chain;
+                        $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
+                        $qi->flags |= QueueItem::FLAG_UNWATCHED
+                            | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+                        $qi->enqueue();
+                        ++$nu;
+                    }
                 }
             }
             Navigation::redirect($this->conf->hoturl("run", ["pset" => $this->pset->urlkey, "run" => $this->runner->name, "runmany" => 1, "chain" => $chain], Conf::HOTURL_RAW));
