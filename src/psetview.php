@@ -1509,10 +1509,15 @@ class PsetView {
     }
 
 
+    /** @return RunLogger */
+    function run_logger() {
+        return new RunLogger($this->pset, $this->repo);
+    }
+
     /** @param RunnerConfig $runner
      * @return int|false */
     function complete_job(RunnerConfig $runner) {
-        return (new RunLogger($this->pset, $this->repo))->complete_job($runner, $this->hash());
+        return $this->run_logger()->complete_job($runner, $this->hash());
     }
 
     /** @param int $jobid
@@ -1548,7 +1553,7 @@ class PsetView {
 
     function update_recorded_jobs() {
         if ($this->repo && ($h = $this->hash())) {
-            $runlog = new RunLogger($this->pset, $this->repo);
+            $runlog = $this->run_logger();
             $aj = $runlog->active_job();
             $runs = [];
             foreach ($runlog->past_jobs() as $jobid) {
@@ -1563,26 +1568,32 @@ class PsetView {
     }
 
     /** @param string $runner_name
-     * @return int|false */
-    function latest_recorded_job($runner_name) {
+     * @return list<int> */
+    function recorded_jobs($runner_name) {
         $cnotes = $this->commit_jnotes();
         if ($cnotes && isset($cnotes->run) && is_object($cnotes->run)) {
             $r = $cnotes->run->{$runner_name} ?? null;
             if (is_int($r)) {
-                return $r;
+                return [$r];
             } else if (is_array($r)) {
-                return $r[0];
+                return $r;
             }
         }
-        return false;
+        return [];
+    }
+
+    /** @param string $runner_name
+     * @return int|false */
+    function latest_recorded_job($runner_name) {
+        $rjs = $this->recorded_jobs($runner_name);
+        return $rjs[0] ?? false;
     }
 
     /** @param string $runner_name
      * @return string|false */
     function latest_recorded_job_output($runner_name) {
         if (($jobid = $this->latest_recorded_job($runner_name))) {
-            $runlog = new RunLogger($this->pset, $this->repo);
-            $fn = $runlog->output_file($jobid);
+            $fn = $this->run_logger()->output_file($jobid);
             $s = @file_get_contents($fn);
             $this->last_runner_error = $s === false ? self::ERROR_LOGMISSING : 0;
             return $s;
