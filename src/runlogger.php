@@ -208,6 +208,7 @@ class RunLogger {
             }
             $rr->data = $data;
             $rr->offset = max($offset, 0);
+            $rr->end_offset = $rr->offset + strlen($data);
         }
         return $rr;
     }

@@ -434,9 +434,17 @@ export function run(button, opts) {
         }
 
         checkt = checkt || data.timestamp;
-        if (data.data && data.offset < offset) {
-            data.data = data.data.substring(offset - data.offset);
-            data.offset = offset;
+        while (data.data && data.offset < offset) {
+            let m = data.data.match(/^([\x00-\x7F]*)([\u0080-\u07FF]*)([\u0800-\uD7FF\uE000-\uFFFF]*)((?:[\uD800-\uDBFF][\uDC00-\uDFFF])*)/);
+            if (!m) {
+                setTimeout(send, 0);
+                return;
+            } else {
+                const nc = m[1].length + m[2].length + m[3].length + m[4].length * 2,
+                    nb = m[1].length + 2 * m[2].length + 3 * m[3].length + 2 * m[4].length;
+                data.data = data.data.substring(nc);
+                data.offset += nb;
+            }
         }
         // Stay on alternate screen when done (rather than clearing it)
         if (data.data
@@ -445,7 +453,12 @@ export function run(button, opts) {
             data.data = data.data.substring(0, data.data.length - x[0].length);
         }
         if (data.data != null) {
-            offset = data.offset + data.data.length;
+            if (data.end_offset > data.offset
+                && data.end_offset >= data.offset + data.data.length) {
+                offset = data.end_offset;
+            } else {
+                offset = data.offset + data.data.length;
+            }
             if (data.done && data.time_data != null && ibuffer === "") {
                 // Parse timing data
                 append_timed(data);
