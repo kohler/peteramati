@@ -839,7 +839,7 @@ class PsetView {
             $notesb = strlen($notes) > 32000 ? $notes : null;
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if ($upi->phantom) {
-                $result = Dbl::qx($this->conf->dblink, "insert into ContactGrade
+                $result = Dbl::qx($this->conf->dblink, "insert ignore into ContactGrade
                     set cid=?, pset=?, updateat=?, updateby=?, studentupdateat=?,
                     notes=?, notesOverflow=?, hasactiveflags=?",
                     $this->user->contactId, $this->pset->id,
@@ -920,7 +920,7 @@ class PsetView {
             $notesa = strlen($notes) > 16000 ? null : $notes;
             $notesb = strlen($notes) > 16000 ? $notes : null;
             if ($rpi->phantom) {
-                $result = Dbl::qe($this->conf->dblink, "insert into RepositoryGrade set
+                $result = Dbl::qe($this->conf->dblink, "insert ignore into RepositoryGrade set
                     repoid=?, branchid=?, pset=?,
                     placeholder=1, placeholder_at=?, rpnotes=?, rpnotesOverflow=?",
                     $rpi->repoid, $rpi->branchid, $rpi->pset,
@@ -974,7 +974,7 @@ class PsetView {
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if ($cpi->phantom) {
                 $commit = $commit ?? $this->connected_commit($hash);
-                $result = $this->conf->qe("insert into CommitNotes set pset=?, bhash=?,
+                $result = $this->conf->qe("insert ignore into CommitNotes set pset=?, bhash=?,
                     repoid=?, commitat=?,
                     notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?",
                     $cpi->pset, $cpi->bhash,
@@ -1436,11 +1436,12 @@ class PsetView {
         } else if ($this->_hash !== null) {
             $bhash = hex2bin($this->_hash);
             $rpi = $this->rpi();
-            if ($rpi->gradercid !== $gcid && $rpi->gradebhash === $bhash) {
+            if ($rpi->gradebhash === $bhash && ($rpi->gradercid !== $gcid || $rpi->placeholder)) {
                 $rpi->materialize($this->conf);
-                $this->conf->qe("update RepositoryGrade set gradercid=? where repoid=? and branchid=? and pset=? and gradebhash=?",
+                $this->conf->qe("update RepositoryGrade set gradercid=?, placeholder=0 where repoid=? and branchid=? and pset=? and gradebhash=?",
                     $gcid, $rpi->repoid, $rpi->branchid, $rpi->pset, $bhash);
                 $rpi->gradercid = $gcid;
+                $rpi->placeholder = 0;
             }
             $this->update_commit_notes(["gradercid" => $gcid]);
         } else {
@@ -1461,12 +1462,12 @@ class PsetView {
                 $this->user->invalidate_grades($this->pset->id);
             }
         } else if ($this->_hash !== null) {
-            $bhash = hex2bin($this->_hash);
+            $bhash = $this->bhash();
             $cn = $this->commit_jnotes();
             $gcid = $cn ? $cn->gradercid ?? null : null;
             $commit = $this->connected_commit($this->_hash);
             $rpi = $this->rpi();
-            if ($rpi->gradebhash !== $bhash) {
+            if ($rpi->gradebhash !== $bhash || $rpi->placeholder) {
                 $rpi->materialize($this->conf);
                 $this->conf->qe("update RepositoryGrade set gradebhash=?, commitat=?, gradercid=?, placeholder=0, emptydiff_at=null where repoid=? and branchid=? and pset=?",
                     $bhash, $commit ? $commit->commitat : null, $gcid ?? $rpi->gradercid,

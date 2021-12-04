@@ -2370,9 +2370,13 @@ function pa_render_pset_table(pconf, data) {
                 }
             }
         }
-        let usc = Object.values(us), usci = 0;
+        const usc = [];
+        for (let su of gdialog_su) {
+            usc.push(us[su.uid]);
+        }
+        let usci = 0;
         function more() {
-            const byuid = usc.slice(usci, 32);
+            const byuid = usc.slice(usci, usci + 16);
             usci += byuid.length;
             api_conditioner(hoturl("=api/gradesettings", {pset: pconf.key}),
                 {us: JSON.stringify(byuid)})

@@ -304,23 +304,8 @@ class Grade_API {
         } catch (Error $err) {
             return ["ok" => false, "error" => $err->getMessage()];
         }
-
-        $error = [0, ""];
-        foreach ($sset as $uid => $info) {
-            // XXX extract the following into a function
-            // XXX branch nonsense
-            if (!$api->pset->gitless_grades) {
-                if (!$info->repo) {
-                    self::update_error($error, 5, $info->user_linkpart());
-                    continue;
-                }
-            }
-        }
-
         if (count($sset) === 0) {
             return ["ok" => false, "error" => "No users."];
-        } else if ($error[0] === 5) {
-            return ["ok" => false, "error" => "Missing repository (" . join(", ", $error[1]) . ")."];
         }
 
         // XXX match commit with grading commit
@@ -340,6 +325,9 @@ class Grade_API {
             }
             foreach ($sset as $uid => $info) {
                 $ug = $ugs[$uid];
+                if (!$api->pset->gitless_grades && !$info->repo) {
+                    continue;
+                }
                 if (property_exists($ug, "pinned_scores_visible")) {
                     $info->set_pinned_scores_visible($ug->pinned_scores_visible);
                 }
@@ -347,18 +335,30 @@ class Grade_API {
                     if (!$api->pset->gitless_grades && !$info->grading_hash()) {
                         $info->repo->refresh(2700, true);
                         $info->set_latest_nontrivial_commit($sset);
+                        if ($info->hash()) {
+                            $info->mark_grading_commit();
+                        }
                     }
-                    $info->change_grader($ug->gradercid);
+                    if ($api->pset->gitless_grades || $info->hash()) {
+                        $info->change_grader($ug->gradercid);
+                    }
                 }
             }
         }
         $j = ["ok" => true, "us" => []];
         foreach ($sset as $uid => $info) {
-            $j["us"][$uid] = [
-                "uid" => $uid,
-                "pinned_scores_visible" => $info->pinned_scores_visible(),
-                "gradercid" => $info->gradercid()
-            ];
+            if (!$api->pset->gitless_grades && !$info->repo) {
+                $j["us"][$uid] = [
+                    "uid" => $uid,
+                    "error" => "No repository"
+                ];
+            } else {
+                $j["us"][$uid] = [
+                    "uid" => $uid,
+                    "pinned_scores_visible" => $info->pinned_scores_visible(),
+                    "gradercid" => $info->gradercid()
+                ];
+            }
         }
         return $j;
     }
