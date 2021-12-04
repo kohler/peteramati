@@ -2588,7 +2588,7 @@ class Conf {
 
     // API
 
-    private function call_api($uf, Contact $user, Qrequest $qreq, APIData $api) {
+    function call_api($uf, Contact $user, Qrequest $qreq, APIData $api) {
         if (!$uf) {
             return ["ok" => false, "error" => "API function not found."];
         } else if (!($uf->get ?? null) && !$qreq->valid_post()) {
@@ -2611,11 +2611,11 @@ class Conf {
             }
         }
         if (($req = $uf->require ?? [])) {
-            foreach (expand_includes($req) as $f) {
+            foreach (SiteLoader::expand_includes($req) as $f) {
                 require_once $f;
             }
         }
-        return call_user_func($uf->callback, $user, $qreq, $api, $uf);
+        return call_user_func($uf->function, $user, $qreq, $api, $uf);
     }
     /** @return ?CommitRecord */
     function check_api_hash($input_hash, APIData $api) {
@@ -2629,8 +2629,9 @@ class Conf {
         return $commit;
     }
     function _add_api_json($fj) {
-        if (is_string($fj->fn) && !isset($this->_api_map[$fj->fn])
-            && isset($fj->callback)) {
+        if (is_string($fj->fn)
+            && !isset($this->_api_map[$fj->fn])
+            && isset($fj->function)) {
             $this->_api_map[$fj->fn] = $fj;
             return true;
         } else {
@@ -2672,7 +2673,7 @@ class Conf {
         if ($uf && is_string($uf)) {
             $space = strpos($uf, " ");
             $flags = (int) substr($uf, 0, $space);
-            $uf = $this->_api_map[$fn] = (object) ["callback" => substr($uf, $space + 1)];
+            $uf = $this->_api_map[$fn] = (object) ["function" => substr($uf, $space + 1)];
             if ($flags & 1) {
                 $uf->get = true;
             }
@@ -2690,33 +2691,5 @@ class Conf {
             }
         }
         return $uf;
-    }
-    function call_api_exit($uf, Contact $user, Qrequest $qreq, APIData $info) {
-        if (is_string($uf)) {
-            $uf = $this->api($uf);
-        }
-        if ($uf && ($uf->redirect ?? false) && $qreq->redirect
-            && preg_match('@\A(?![a-z]+:|/).+@', $qreq->redirect)) {
-            try {
-                JsonResultException::$capturing = true;
-                $j = $this->call_api($uf, $user, $qreq, $info);
-            } catch (JsonResultException $ex) {
-                $j = $ex->result;
-            }
-            if (is_object($j) && $j instanceof JsonResult) {
-                $j = $j->content;
-            }
-            if (!($j->ok ?? false) && !($j->error ?? false)) {
-                Conf::msg_error("Internal error.");
-            } else if (($x = $j->error ?? false)) {
-                Conf::msg_error(htmlspecialchars($x));
-            } else if (($x = $j->error_html ?? false)) {
-                Conf::msg_error($x);
-            }
-            Navigation::redirect_site($qreq->redirect);
-        } else {
-            $j = $this->call_api($uf, $user, $qreq, $info);
-            json_exit($j);
-        }
     }
 }

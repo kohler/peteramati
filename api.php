@@ -4,59 +4,117 @@
 
 require_once("src/initweb.php");
 
-// parse request
-function prepare_api_request(Conf $conf, Qrequest $qreq) {
-    if ($qreq->base !== null) {
-        $conf->set_siteurl($qreq->base);
-    }
-    if ($qreq->path_component(0)
-        && substr($qreq->path_component(0), 0, 1) === "~") {
-        $qreq->u = substr(urldecode($qreq->shift_path_components(1)), 2);
-    }
-    if (($x = $qreq->shift_path_components(1))) {
-        $qreq->fn = substr(urldecode($x), 1);
-    }
-    if (($x = $qreq->shift_path_components(1))) {
-        if (!$qreq->pset) {
-            $qreq->pset = substr(urldecode($x), 1);
+class APIRequest {
+    /** @var Conf */
+    public $conf;
+    /** @var Contact */
+    public $viewer;
+    /** @var Qrequest */
+    public $qreq;
+
+    function __construct(Contact $viewer, Qrequest $qreq) {
+        $this->conf = $viewer->conf;
+        $this->viewer = $viewer;
+        $this->qreq = $qreq;
+
+        if ($qreq->base !== null) {
+            $conf->set_siteurl($qreq->base);
+        }
+        if ($qreq->path_component(0)
+            && substr($qreq->path_component(0), 0, 1) === "~") {
+            $qreq->u = substr(urldecode($qreq->shift_path_components(1)), 2);
         }
         if (($x = $qreq->shift_path_components(1))) {
-            if (!$qreq->commit) {
-                $qreq->commit = substr(urldecode($x), 1);
+            $qreq->fn = urldecode(substr($x, 1));
+        }
+        if (($x = $qreq->shift_path_components(1))) {
+            if (!$qreq->pset) {
+                $qreq->pset = urldecode(substr($x, 1));
+            }
+            if (($x = $qreq->shift_path_components(1))) {
+                if (!$qreq->commit) {
+                    $qreq->commit = urldecode(substr($x, 1));
+                }
             }
         }
     }
-}
-prepare_api_request($Conf, $Qreq);
 
-// check user
-$api = new APIData($Me);
-if ($Qreq->u && !($api->user = ContactView::prepare_user($Qreq->u))) {
-    json_exit(["ok" => false, "error" => "User permission error."]);
-}
+    function run() {
+        $api = new APIData($this->viewer);
 
-// check pset
-if ($Qreq->pset && !($api->pset = $Conf->pset_by_key($Qreq->pset))) {
-    json_exit(["ok" => false, "error" => "No such pset."]);
-}
-if ($api->pset && $api->pset->disabled) {
-    if ($Me->isPC) {
-        json_exit(["ok" => false, "error" => "Pset disabled."]);
-    } else {
-        json_exit(["ok" => false, "error" => "No such pset."]);
+        // check user
+        if ($this->qreq->u) {
+            $user = $this->conf->user_by_whatever($this->qreq->u);
+            if (!$this->viewer->isPC
+                && (!$user || $user->contactId !== $this->viewer->contactId)) {
+                return ["ok" => false, "error" => "User permission error."];
+            } else if (!$user) {
+                return ["ok" => false, "error" => "No such user."];
+            } else {
+                $user->set_anonymous(substr($this->qreq->u, 0, 5) === "[anon");
+                $api->user = $user;
+            }
+        }
+
+        // check pset
+        if ($this->qreq->pset
+            && !($api->pset = $this->conf->pset_by_key($this->qreq->pset))) {
+            return ["ok" => false, "error" => "No such pset."];
+        }
+        if ($api->pset && $api->pset->disabled) {
+            if ($this->viewer->isPC) {
+                return ["ok" => false, "error" => "Pset disabled."];
+            } else {
+                return ["ok" => false, "error" => "No such pset."];
+            }
+        } else if ($api->pset && !$api->pset->visible && !$this->viewer->isPC) {
+            return ["ok" => false, "error" => "No such pset."];
+        }
+
+        // check commit
+        if ($api->pset && !$api->pset->gitless && !$this->viewer->is_empty()) {
+            $api->repo = $api->user->repo($api->pset);
+            $api->branch = $api->user->branch($api->pset);
+        }
+        if ($api->repo && $this->qreq->commit) {
+            $api->hash = $this->qreq->commit;
+        }
+
+        // call api
+        $uf = $this->conf->api($this->qreq->fn);
+        if (!$uf
+            && $api->pset) {
+            $uf = $api->pset->api[$this->qreq->fn] ?? null;
+        }
+        if (!$uf
+            && is_object($this->conf->config->_api ?? null)) {
+            $uf = $this->conf->config->_api->{$this->qreq->fn} ?? null;
+        }
+        if ($uf
+            && ($uf->redirect ?? false)
+            && $this->qreq->redirect
+            && preg_match('/\A(?![a-z]+:|\/).+/', $this->qreq->redirect)) {
+            try {
+                JsonResultException::$capturing = true;
+                $j = $this->conf->call_api($uf, $this->viewer, $this->qreq, $api);
+            } catch (JsonResultException $ex) {
+                $j = $ex->result;
+            }
+            if (is_object($j) && $j instanceof JsonResult) {
+                $j = $j->content;
+            }
+            if (!($j->ok ?? false) && !($j->error ?? false)) {
+                Conf::msg_error("Internal error.");
+            } else if (($x = $j->error ?? false)) {
+                Conf::msg_error(htmlspecialchars($x));
+            } else if (($x = $j->error_html ?? false)) {
+                Conf::msg_error($x);
+            }
+            Navigation::redirect_site($this->qreq->redirect);
+        } else {
+            return $this->conf->call_api($uf, $this->viewer, $this->qreq, $api);
+        }
     }
-} else if ($api->pset && !$api->pset->visible && !$Me->isPC) {
-    json_exit(["ok" => false, "error" => "No such pset."]);
 }
 
-// check commit
-if ($api->pset && !$api->pset->gitless && !$Me->is_empty()) {
-    $api->repo = $api->user->repo($api->pset);
-    $api->branch = $api->user->branch($api->pset);
-}
-if ($api->repo && $Qreq->commit) {
-    $api->hash = $Qreq->commit;
-}
-
-// call api
-$Conf->call_api_exit($Qreq->fn, $Me, $Qreq, $api);
+json_exit((new APIRequest($Me, $Qreq))->run());

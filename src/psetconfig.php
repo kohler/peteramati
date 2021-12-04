@@ -197,6 +197,9 @@ class Pset {
     /** @var array<string,DiffConfig> */
     private $_file_diffinfo = [];
 
+    /** @var array<string,object> */
+    public $api = [];
+
     public $config_signature;
     public $config_mtime;
 
@@ -480,6 +483,25 @@ class Pset {
         }
         if (($ignore = $p->ignore ?? null)) {
             $this->ignore = self::cstr_or_str_list($p, "ignore");
+        }
+
+        // api
+        $api = $p->api ?? null;
+        if (is_array($api) || is_object($api)) {
+            foreach ((array) $api as $k => $v) {
+                if (!is_object($v)
+                    || (is_int($k) && !is_string($v->name ?? null))
+                    || (is_string($k) && isset($v->name) && $k !== $v->name)) {
+                    throw new PsetConfigException("api name error", "api", $k);
+                }
+                $name = is_int($k) ? $v->name : $k;
+                if (isset($this->api[$name])) {
+                    throw new PsetConfigException("api `$name` reused", "api", $k);
+                }
+                $this->api[$name] = $v;
+            }
+        } else if ($api) {
+            throw new PsetConfigException("`api` format error", "api");
         }
 
         $this->config_signature = self::cstr($p, "config_signature");
