@@ -3,7 +3,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-class LineNote implements JsonIsReplacement {
+class LineNote implements JsonIsReplacement, JsonSerializable {
     /** @var string */
     public $file;
     /** @var string */
