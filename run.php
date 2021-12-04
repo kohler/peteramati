@@ -274,7 +274,7 @@ class RunRequest {
             foreach ($users as $uname) {
                 if (($u = $this->conf->user_by_whatever($uname))) {
                     $info = PsetView::make($this->pset, $u, $this->viewer);
-                    if (!$runner->command || $info->repo) {
+                    if (!$this->runner->command || $info->repo) {
                         $qi = QueueItem::make_info($info, $this->runner);
                         $qi->chain = $chain;
                         $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
