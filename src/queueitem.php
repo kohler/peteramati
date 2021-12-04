@@ -353,7 +353,6 @@ class QueueItem {
     /** @param QueueStatus $qs */
     function substantiate($qs) {
         assert(!!$this->queueid && !$this->deleted);
-        assert(($this->status > 0) === ($this->runat > 0));
         $nconcurrent = ($this->nconcurrent ?? 0) <= 0 ? 100000 : $this->nconcurrent;
         if ($this->runat > 0) {
             // remove dead items from queue
