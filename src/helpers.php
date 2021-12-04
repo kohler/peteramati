@@ -1,34 +1,6 @@
 <?php
 // helpers.php -- HotCRP non-class helper functions
-// Copyright (c) 2006-2020 Eddie Kohler; see LICENSE.
-
-function defappend(&$var, $str) {
-    if (!isset($var))
-        $var = "";
-    $var .= $str;
-}
-
-function arrayappend(&$var, $value) {
-    if (isset($var))
-        $var[] = $value;
-    else
-        $var = array($value);
-}
-
-/** @return array */
-function mkarray($value) {
-    if (is_array($value)) {
-        return $value;
-    } else {
-        return array($value);
-    }
-}
-
-function &array_ensure(&$arr, $key, $val) {
-    if (!isset($arr[$key]))
-        $arr[$key] = $val;
-    return $arr[$key];
-}
+// Copyright (c) 2006-2021 Eddie Kohler; see LICENSE.
 
 function ago($t) {
     if ($t + 60 >= Conf::$now)
@@ -194,13 +166,9 @@ function hoturl_add_raw($url, $component) {
     return $url . (strpos($url, "?") === false ? "?" : "&") . $component;
 }
 
+/** @deprecated */
 function hoturl($page, $param = null) {
     return Conf::$main->hoturl($page, $param);
-}
-
-/** @deprecated */
-function hoturl_post($page, $param = null) {
-    return Conf::$main->hoturl($page, $param, Conf::HOTURL_POST);
 }
 
 

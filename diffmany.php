@@ -92,11 +92,11 @@ class DiffMany {
 
         $u = $this->viewer->user_linkpart($user);
         if ($user !== $this->viewer && !$user->is_anonymous && $user->contactImageId) {
-            echo '<img class="pa-smallface" src="' . hoturl("face", ["u" => $u, "imageid" => $user->contactImageId]) . '" />';
+            echo '<img class="pa-smallface" src="' . $info->conf->hoturl("face", ["u" => $u, "imageid" => $user->contactImageId]) . '" />';
         }
 
         echo '<h2 class="homeemail"><a href="',
-            hoturl("pset", array("u" => $u, "pset" => $pset->urlkey)), '">', htmlspecialchars($u), '</a>';
+            $info->conf->hoturl("pset", ["u" => $u, "pset" => $pset->urlkey]), '">', htmlspecialchars($u), '</a>';
         if ($user->extension) {
             echo " (X)";
         }

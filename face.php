@@ -40,22 +40,23 @@ if (isset($Qreq->imageid)) {
 if (!$Me->isPC)
     $Me->escape();
 
-function output($User) {
-    global $Me;
-    $u = $Me->user_linkpart($User);
+/** @param Contact $user
+ * @param Contact $viewer */
+function face_output($user, $viewer) {
+    $u = $viewer->user_linkpart($user);
     echo '<div class="pa-facebook-entry">',
-        '<a href="', hoturl("index", ["u" => $u]), '">',
-        '<img class="pa-face" src="' . hoturl("face", ["u" => $u, "imageid" => $User->contactImageId ? : 0]) . '" border="0" />',
+        '<a href="', $viewer->conf->hoturl("index", ["u" => $u]), '">',
+        '<img class="pa-face" src="' . $viewer->conf->hoturl("face", ["u" => $u, "imageid" => $user->contactImageId ? : 0]) . '" border="0" />',
         '</a>',
-        '<h2><a class="q" href="', hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
-    if ($Me->privChair) {
-        echo "&nbsp;", become_user_link($User);
+        '<h2><a class="q" href="', $viewer->conf->hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+    if ($viewer->privChair) {
+        echo "&nbsp;", become_user_link($user);
     }
     echo '</h2>';
-    if ($User !== $Me) {
-        echo Text::name_html($User),
-            ($User->extension ? " (X)" : ""),
-            ($User->email ? " &lt;" . htmlspecialchars($User->email) . "&gt;" : "");
+    if ($user !== $viewer) {
+        echo Text::name_html($user),
+            ($user->extension ? " (X)" : ""),
+            ($user->email ? " &lt;" . htmlspecialchars($user->email) . "&gt;" : "");
     }
     echo '</div>';
 }
@@ -65,7 +66,7 @@ $Conf->header("Thefacebook", "face");
 $result = Dbl::qe("select contactId, email, firstName, lastName, github_username, contactImageId, extension from ContactInfo where roles=0");
 echo '<div class="pa-facebook">';
 while (($user = Contact::fetch($result, $Conf))) {
-    output($user);
+    face_output($user, $Me);
 }
 echo '</div>';
 

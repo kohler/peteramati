@@ -257,7 +257,7 @@ function session_list_link($where, PsetView $info, $isprev) {
     } else {
         return "";
     }
-    return '<a href="' . hoturl("pset", $x) . '" class="track">'
+    return '<a href="' . $info->conf->hoturl("pset", $x) . '" class="track">'
         . ($isprev ? "« " : "") . $t . ($isprev ? "" : " »") . '</a>';
 }
 

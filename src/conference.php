@@ -172,6 +172,7 @@ class Conf {
     static public $now;
 
     static public $hoturl_defaults = null;
+    static public $next_xt_subposition = 0;
 
     const INVALID_TOKEN = "INVALID";
 
@@ -380,6 +381,16 @@ class Conf {
         }
         if (!isset($this->opt["scriptAssetsUrl"])) {
             $this->opt["scriptAssetsUrl"] = $this->opt["assetsUrl"];
+        }
+
+        // clean stylesheets and scripts
+        $this->opt["stylesheets"] = $this->opt["stylesheets"] ?? [];
+        if (is_string($this->opt["stylesheets"])) {
+            $this->opt["stylesheets"] = [$this->opt["stylesheets"]];
+        }
+        $this->opt["javascripts"] = $this->opt["javascripts"] ?? [];
+        if (is_string($this->opt["javascripts"])) {
+            $this->opt["javascripts"] = [$this->opt["javascripts"]];
         }
 
         // set safePasswords
@@ -1818,13 +1829,13 @@ class Conf {
         return $this->make_script_file($jquery, true, $integrity);
     }
 
+    /** @param string $file */
     function add_stylesheet($file) {
-        $this->opt["stylesheets"] = mkarray($this->opt("stylesheets") ?? []);
         $this->opt["stylesheets"][] = $file;
     }
 
+    /** @param string $file */
     function add_javascript($file) {
-        $this->opt["javascripts"] = mkarray($this->opt("javascripts") ?? []);
         $this->opt["javascripts"][] = $file;
     }
 
@@ -1868,7 +1879,7 @@ class Conf {
             echo $this->make_css_link("stylesheets/mobile.css", "screen and (max-width: 768px)"), "\n";
         }
         echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/katex.min.css", null, "sha384-R4558gYOUz8mP9YWpZJjofhk+zx0AS11p36HnD2ZKj/6JR5z27gSSULCNHIRReVs");
-        foreach (mkarray($this->opt("stylesheets") ?? []) as $css) {
+        foreach ($this->opt["stylesheets"] as $css) {
             echo $this->make_css_link($css), "\n";
         }
 
@@ -1946,7 +1957,7 @@ class Conf {
         Ht::stash_html($this->make_script_file("scripts/highlight.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it-katexx.min.js", true) . "\n");
         Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/katex.min.js" integrity="sha384-z1fJDqw8ZApjGO3/unPWUPsIymfsJmyrDVWC8Tv/a1HeOtGmkwNd/7xUS0Xcnvsx" crossorigin="anonymous"></script>');
-        foreach (mkarray($this->opt("javascripts") ?? []) as $scriptfile) {
+        foreach ($this->opt["javascripts"] as $scriptfile) {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
         }
 
@@ -2028,9 +2039,9 @@ class Conf {
 
         echo "<div id='header'>\n<div id='header_left_conf'><h1>";
         if ($title && ($title == "Home" || $title == "Sign in"))
-            echo "<a class='qq' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
+            echo "<a class='qq' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
         else
-            echo "<a class='uu' href='", hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
+            echo "<a class='uu' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
         echo "</h1></div><div id='header_right'>";
         if ($Me && !$Me->is_empty()) {
             // profile link

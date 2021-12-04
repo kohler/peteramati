@@ -18,7 +18,7 @@ class APIRequest {
         $this->qreq = $qreq;
 
         if ($qreq->base !== null) {
-            $conf->set_siteurl($qreq->base);
+            $this->conf->set_siteurl($qreq->base);
         }
         if ($qreq->path_component(0)
             && substr($qreq->path_component(0), 0, 1) === "~") {

@@ -203,7 +203,7 @@ class LoginHelper {
             $where = $_SESSION["login_bounce"][1];
         } else {
             $user->save_session("freshlogin", true);
-            $where = hoturl("index");
+            $where = $user->conf->hoturl("index");
         }
         Navigation::redirect($where);
         exit;

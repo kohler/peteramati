@@ -1020,7 +1020,7 @@ class Contact {
         if ($acct->save_json($cj, null, $send)) {
             if ($Me && $Me->privChair) {
                 $type = $acct->disabled ? "disabled " : "";
-                $conf->infoMsg("Created {$type}account for <a href=\"" . hoturl("profile", "u=" . urlencode($acct->email)) . "\">" . Text::user_html_nolink($acct) . "</a>.");
+                $conf->infoMsg("Created {$type}account for <a href=\"" . $conf->hoturl("profile", "u=" . urlencode($acct->email)) . "\">" . Text::user_html_nolink($acct) . "</a>.");
             }
             return $acct;
         } else {
@@ -1032,7 +1032,7 @@ class Contact {
     function mark_create($send_email, $message_chair) {
         global $Me;
         if ($Me && $Me->privChair && $message_chair)
-            $this->conf->infoMsg("Created account for <a href=\"" . hoturl("profile", "u=" . urlencode($this->email)) . "\">" . Text::user_html_nolink($this) . "</a>.");
+            $this->conf->infoMsg("Created account for <a href=\"" . $this->conf->hoturl("profile", "u=" . urlencode($this->email)) . "\">" . Text::user_html_nolink($this) . "</a>.");
         if ($send_email)
             $this->sendAccountInfo("create", false);
         if ($Me && $Me->has_email() && $Me->email !== $this->email)
@@ -1487,14 +1487,17 @@ class Contact {
             && ($this->isPC || $pset->student_can_view_grades());
     }
 
+    /** @return bool */
     function can_view_grader(Pset $pset, Contact $user = null) {
         return $this->isPC;
     }
 
+    /** @return bool */
     function can_set_grader(Pset $pset, Contact $user = null) {
         return $this->isPC;
     }
 
+    /** @return bool */
     function can_view_comments(Pset $pset, PsetView $info = null) {
         return $this->can_view_pset($pset)
             && ($this->isPC || !$pset->hide_comments)

@@ -413,9 +413,9 @@ if ($Me->privChair && (!$User || $User === $Me)) {
     echo "<div id='homeadmin'>
   <h3>administration</h3>
   <ul>
-    <!-- <li><a href='", hoturl("settings"), "'>Settings</a></li>
-    <li><a href='", hoturl("users", "t=all"), "'>Users</a></li> -->
-    <li><a href='", hoturl("mail"), "'>Send mail</a></li>\n";
+    <!-- <li><a href='", $Conf->hoturl("settings"), "'>Settings</a></li>
+    <li><a href='", $Conf->hoturl("users", "t=all"), "'>Users</a></li> -->
+    <li><a href='", $Conf->hoturl("mail"), "'>Send mail</a></li>\n";
 
     $pclike = Contact::ROLE_PCLIKE;
     $result = $Conf->qe("select exists (select * from ContactInfo where password='' and disabled=0 and (roles=0 or (roles&$pclike)=0) and college=1), exists (select * from ContactInfo where password='' and disabled=0 and (roles=0 or (roles&$pclike)=0) and extension=1), exists (select * from ContactInfo where password='' and disabled=0 and roles!=0 and (roles&$pclike)!=0), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and (roles=0 or (roles&$pclike)=0) and lastLogin=0 and college=1), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and (roles=0 or (roles&$pclike)=0) and lastLogin=0 and extension=1), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and roles!=0 and (roles&$pclike)!=0 and lastLogin=0)");
@@ -532,10 +532,10 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
     echo "<div id='homeinfo'>";
     $u = $Me->user_linkpart($User);
     if ($User !== $Me && !$User->is_anonymous && $User->contactImageId) {
-        echo '<img class="pa-face float-left" src="' . hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
+        echo '<img class="pa-face float-left" src="' . $Conf->hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
     }
     echo '<h2 class="homeemail"><a class="q" href="',
-        hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+        $Conf->hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
     if ($Me->privChair) {
         echo "&nbsp;", become_user_link($User);
     }
@@ -1032,7 +1032,7 @@ function show_pset_table($sset) {
             $jx[] = $j;
             if ($s->user->incomplete) {
                 $u = $sset->viewer->user_linkpart($s->user);
-                $t = '<a href="' . hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
+                $t = '<a href="' . $sset->conf->hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
                     . htmlspecialchars($u);
                 if ($s->user->incomplete !== true) {
                     $t .= " (" . $s->user->incomplete . ")";

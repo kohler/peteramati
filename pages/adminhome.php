@@ -33,13 +33,13 @@ function admin_home_messages($conf) {
     }
     // Conference names
     if ($conf->opt["shortNameDefaulted"] ?? false) {
-        $m[] = "<a href=\"" . hoturl("settings", "group=msg") . "\">Set the conference abbreviation</a> to a short name for your conference, such as “OSDI ’14”.";
+        $m[] = "<a href=\"" . $conf->hoturl("settings", "group=msg") . "\">Set the conference abbreviation</a> to a short name for your conference, such as “OSDI ’14”.";
     } else if (simplify_whitespace($conf->opt["shortName"] ?? "") !== ($conf->opt["shortName"] ?? "")) {
-        $m[] = "The <a href=\"" . hoturl("settings", "group=msg") . "\">conference abbreviation</a> setting has a funny value. To fix it, remove leading and trailing spaces, use only space characters (no tabs or newlines), and make sure words are separated by single spaces (never two or more).";
+        $m[] = "The <a href=\"" . $conf->hoturl("settings", "group=msg") . "\">conference abbreviation</a> setting has a funny value. To fix it, remove leading and trailing spaces, use only space characters (no tabs or newlines), and make sure words are separated by single spaces (never two or more).";
     }
     $site_contact = $conf->site_contact();
     if (!$site_contact->email || $site_contact->email == "you@example.com") {
-        $m[] = "<a href=\"" . hoturl("settings", "group=msg") . "\">Set the conference contact’s name and email</a> so submitters can reach someone if things go wrong.";
+        $m[] = "<a href=\"" . $conf->hoturl("settings", "group=msg") . "\">Set the conference contact’s name and email</a> so submitters can reach someone if things go wrong.";
     }
     // Weird URLs?
     foreach (array("conferenceSite", "paperSite") as $k) {

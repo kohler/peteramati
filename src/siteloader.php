@@ -63,13 +63,16 @@ class SiteLoader {
         return [];
     }
 
-    /** @param string|list<string> $files
+    /** @param null|string|list<string> $files
      * @return list<string> */
     static function expand_includes($files, $expansions = []) {
         global $Opt;
-        if (!is_array($files)) {
+        if (empty($files)) {
+            return [];
+        } else if (!is_array($files)) {
             $files = [$files];
         }
+
         $confname = $Opt["confid"] ?? $Opt["dbName"] ?? null;
         $expansions["confid"] = $expansions["confname"] = $confname;
         $expansions["siteclass"] = $Opt["siteclass"] ?? null;
@@ -127,6 +130,13 @@ class SiteLoader {
             }
         }
         return $results;
+    }
+
+    /** @param null|string|list<string> $files */
+    static function require_includes($files) {
+        foreach (self::expand_includes($files) as $f) {
+            require_once $f;
+        }
     }
 
     /** @param string $file */
