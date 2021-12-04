@@ -302,7 +302,7 @@ function echo_grade_cdf($info) {
     echo '<a class="qq ui js-grgraph-flip next" href="">&gt;</a>';
     echo '<h4 class="title pa-grgraph-type"></h4>';
     if ($info->can_view_grade_statistics_graph()) {
-        echo '<div class="plot" style="width:350px;height:200px"></div>';
+        echo '<div class="pa-plot" style="width:350px;height:200px"></div>';
     }
     echo '<div class="statistics"></div></div>';
     Ht::stash_script("\$(\"#pa-grade-statistics\").each(\$pa.grgraph)");

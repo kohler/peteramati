@@ -78,7 +78,7 @@ function draw_grgraph() {
         want_noextra = plot_type.indexOf("-noextra") >= 0
             || (want_all && d.series.noextra && !want_extension);
 
-    let $plot = $(self).find(".plot");
+    let $plot = $(self).find(".pa-plot");
     if (!$plot.length) {
         $plot = $(self);
     }

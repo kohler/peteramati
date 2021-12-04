@@ -3198,7 +3198,7 @@ table.hidegrades .pa-gradenote {
 .pa-gradegrid > .pa-grgraph {
 	padding: 0.25rem 0.5rem;
 }
-.pa-gradegrid > .pa-grgraph > .plot {
+.pa-gradegrid > .pa-grgraph > .pa-plot {
 	height: 20vh;
 }
 .pa-gradegrid > .pa-grgraph.pa-pset-hidden {
@@ -3211,6 +3211,14 @@ table.hidegrades .pa-gradenote {
 .pa-gradegrid {
 	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
+}
+
+.plot {
+	display: block;
+	font: 10px system-ui,sans-serif;
+	max-width: 100%;
+	height: auto;
+	height: intrinsic;
 }
 
 /* ANSI escapes */
