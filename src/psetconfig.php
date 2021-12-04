@@ -1725,17 +1725,15 @@ class RunnerConfig {
     public $title;
     /** @var string
      * @readonly */
-    public $output_title;
+    public $display_title;
     /** @var ?bool */
     public $disabled;
     /** @var ?bool */
     public $visible;
     /** @var ?bool */
-    public $output_visible;
+    public $display_visible;
     /** @var ?float */
     public $position;
-    /** @var ?string */
-    public $command;
     /** @var ?string */
     public $username;
     /** @var ?list<RunOverlayConfig> */
@@ -1757,7 +1755,11 @@ class RunnerConfig {
     /** @var ?string */
     public $require;
     /** @var ?string */
-    public $eval;
+    public $command;
+    /** @var ?string */
+    public $evaluate_function;
+    /** @var ?string */
+    public $display_function;
     /** @var null|bool|float */
     public $timed_replay;
 
@@ -1778,10 +1780,10 @@ class RunnerConfig {
         }
 
         $this->title = Pset::cstr($loc, $r, "title") ?? $this->name;
-        $this->output_title = Pset::cstr($loc, $r, "output_title") ?? "{$this->title} output";
+        $this->display_title = Pset::cstr($loc, $r, "display_title", "output_title") ?? "{$this->title} output";
         $this->disabled = Pset::cbool($loc, $rs, "disabled");
         $this->visible = Pset::cdate_or_grades($loc, $rs, "visible", "show_to_students");
-        $this->output_visible = Pset::cdate_or_grades($loc, $rs, "output_visible", "show_output_to_students", "show_results_to_students");
+        $this->display_visible = Pset::cdate_or_grades($loc, $rs, "display_visible", "output_visible", "show_output_to_students", "show_results_to_students");
         $this->timeout = Pset::cinterval($loc, $rs, "timeout", "run_timeout");
         $this->idle_timeout = Pset::cinterval($loc, $rs, "idle_timeout");
         $this->xterm_js = Pset::cbool($loc, $rs, "xterm_js");
@@ -1796,7 +1798,8 @@ class RunnerConfig {
         $this->command = Pset::cstr($loc, $rs, "command");
         $this->username = Pset::cstr($loc, $rs, "username", "run_username");
         $this->require = Pset::cstr($loc, $rs, "require", "load");
-        $this->eval = Pset::cstr($loc, $rs, "eval");
+        $this->evaluate_function = Pset::cstr($loc, $rs, "evaluate_function", "eval");
+        $this->display_function = Pset::cstr($loc, $rs, "display_function", "output_function");
         $this->queue = Pset::cstr($loc, $rs, "queue");
         $this->nconcurrent = Pset::cint($loc, $rs, "nconcurrent");
         $this->position = Pset::cnum($loc, $rs, "position");

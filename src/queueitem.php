@@ -781,12 +781,13 @@ class QueueItem {
             $rr = $runlog->job_full_response($this->runat, $this->runner(), $offset);
         }
 
-        if ($rr->status !== "working" && $this->queueid > 0) {
+        if ($rr->status !== "working"
+            && $this->queueid > 0) {
             $this->delete(false);
         }
 
         if ($rr->status === "done"
-            && $this->runner()->eval
+            && $this->runner()->evaluate_function
             && ($info = $this->info())) {
             $rr->result = $info->runner_evaluate($this->runner(), $this->runat);
         }

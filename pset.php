@@ -618,6 +618,135 @@ function show_pset($info) {
     ContactView::echo_downloads_group($info);
 }
 
+/** @param PsetView $info */
+function echo_runner_buttons($info) {
+    $pset = $info->pset;
+    $user = $info->user;
+    $viewer = $info->viewer;
+
+    $runnerbuttons = [];
+    $last_run = false;
+    foreach ($pset->runners as $r) {
+        if ($viewer->can_view_run($pset, $r, $user)) {
+            if ($viewer->can_run($pset, $r, $user)) {
+                $b = Ht::button(htmlspecialchars($r->title), [
+                    "value" => $r->name,
+                    "class" => "btn ui pa-runner",
+                    "data-pa-run-grade" => isset($r->evaluate_function) ? "true" : null
+                ]);
+                $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
+                $last_run = true;
+            } else {
+                $runnerbuttons[] = '<input type="hidden" class="pa-runner" value="' . htmlspecialchars($r->name) . '">';
+            }
+        }
+    }
+    if (count($runnerbuttons) && $viewer->isPC && $viewer != $user && $last_run) {
+        $runnerbuttons[] = " &nbsp;"
+            . Ht::button("+", ["class" => "btn ui pa-runconfig ui font-weight-bold",
+                               "name" => "define"]);
+    }
+    if ((($viewer->isPC && $viewer != $user) || $viewer == $user)
+        && !$info->is_handout_commit()) {
+        $runnerbuttons[] = '<div class="g"></div>';
+        $all_resolved = true;
+        foreach ($info->commit_jnote("flags") ?? [] as $k => $v) {
+            $resolved = $v->resolved ?? false;
+            $all_resolved = $all_resolved && $resolved;
+            $conversation = "";
+            if ($v->conversation ?? false) {
+                $conversation = htmlspecialchars((string) $v->conversation[0][2]);
+            }
+            if ($resolved && $conversation === "") {
+                continue;
+            }
+            $x = $resolved ? "Resolved" : "<strong>Flagged</strong>";
+            if ($conversation !== "") {
+                $x .= " (" . $conversation . ")";
+            }
+            if (!$resolved) {
+                $x .= '<span style="display:inline-block;margin-left:1em">'
+                    . Ht::button("Resolve", ["name" => "resolveflag", "class" => "ui js-pset-flag", "data-flagid" => $k])
+                    . '</span>';
+            }
+            $runnerbuttons[] = $x . "<br />";
+        }
+        if ($all_resolved) {
+            $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "class" => "ui js-pset-flag", "name" => "flag"]);
+        }
+    }
+    if (!empty($runnerbuttons)) {
+        echo Ht::form($info->hoturl_post("run")),
+            '<div class="f-contain">';
+        ContactView::echo_group("", join("", $runnerbuttons));
+        echo "</div></form>\n";
+        if ($viewer->isPC && $viewer != $user) {
+            echo Ht::form($info->hoturl_post("pset", array("saverunsettings" => 1, "ajax" => 1))),
+                '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
+            // XXX always using grading commit's settings?
+            if (($runsettings = $info->commit_jnote("runsettings"))) {
+                echo '<script>$pa.load_runsettings(', json_encode_browser($runsettings), ')</script>';
+            }
+        }
+        Ht::stash_script("\$('button.pa-runner').prop('disabled',false)");
+    }
+}
+
+/** @param PsetView $info
+ * @param RunnerConfig $runner */
+function default_runner_output($info, $runner) {
+    $rr = null;
+    if (!$info->is_handout_commit()
+        && ($jobid = $info->latest_recorded_job($runner->name))) {
+        $rr = $info->run_logger()->job_full_response($jobid, $runner);
+    }
+    if (!$rr
+        && !$info->viewer->can_run($info->pset, $runner, $info->user)) {
+        return;
+    }
+    echo '<div id="run-', $runner->name, '" class="pa-runout';
+    if (!$rr || !isset($rr->timestamp)) {
+        echo ' hidden';
+    }
+    echo '"><h3><a class="qq ui pa-run-show" href="">',
+        '<span class="foldarrow">&#x25B6;</span>',
+        htmlspecialchars($runner->display_title), '</a></h3>',
+        '<div class="pa-run pa-run-short hidden" id="pa-run-', $runner->name, '"';
+    if ($runner->xterm_js
+        || ($runner->xterm_js === null && $info->pset->run_xterm_js)) {
+        echo ' data-pa-xterm-js="true"';
+    }
+    if ($rr && isset($rr->timestamp)) {
+        echo ' data-pa-timestamp="', $rr->timestamp, '"';
+    }
+    // XXX following never runs currently (job_full_response returns null)
+    if ($rr && isset($rr->data) && ($pos = strpos($rr->data, "\n\n"))) {
+        echo ' data-pa-content="', htmlspecialchars(substr($rr->data, $pos + 2)), '"';
+    }
+    echo '><pre class="pa-runpre"></pre></div></div>', "\n";
+}
+
+/** @param PsetView $info */
+function echo_runner_output($info) {
+    $pset = $info->pset;
+    $user = $info->user;
+    $viewer = $info->viewer;
+    $n = 0;
+    foreach ($pset->runners as $runner) {
+        if ($viewer->can_view_run($pset, $runner, $user)) {
+            echo $n ? '' : '<div class="pa-runoutlist">';
+            ++$n;
+            if ($runner->display_function) {
+                $runner->require && SiteLoader::require_includes($runner->require);
+                call_user_func($runner->display_function, $info, $runner);
+            } else {
+                default_runner_output($info, $runner);
+            }
+        }
+    }
+    echo $n ? '</div>' : '';
+}
+
 show_pset($Info);
 
 if ($Info->can_edit_scores()) {
@@ -659,73 +788,8 @@ if ($Pset->gitless) {
     echo_grade_cdf_here($Info);
     echo_commit($Info, $Qreq);
 
-    // print runners
-    $runnerbuttons = array();
-    $last_run = false;
-    foreach ($Pset->runners as $r) {
-        if ($Me->can_view_run($Pset, $r, $User)) {
-            if ($Me->can_run($Pset, $r, $User)) {
-                $b = Ht::button(htmlspecialchars($r->title), [
-                    "value" => $r->name,
-                    "class" => "btn ui pa-runner",
-                    "data-pa-run-grade" => isset($r->eval) ? "true" : null
-                ]);
-                $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
-                $last_run = true;
-            } else {
-                $runnerbuttons[] = '<input type="hidden" class="pa-runner" value="' . htmlspecialchars($r->name) . '">';
-            }
-        }
-    }
-    if (count($runnerbuttons) && $Me->isPC && $Me != $User && $last_run) {
-        $runnerbuttons[] = " &nbsp;"
-            . Ht::button("+", ["class" => "btn ui pa-runconfig ui font-weight-bold",
-                               "name" => "define"]);
-    }
-    if ((($Me->isPC && $Me != $User) || $Me == $User)
-        && !$Info->is_handout_commit()) {
-        $runnerbuttons[] = '<div class="g"></div>';
-        $all_resolved = true;
-        foreach ($Info->commit_jnote("flags") ?? [] as $k => $v) {
-            $resolved = $v->resolved ?? false;
-            $all_resolved = $all_resolved && $resolved;
-            $conversation = "";
-            if ($v->conversation ?? false) {
-                $conversation = htmlspecialchars((string) $v->conversation[0][2]);
-            }
-            if ($resolved && $conversation === "") {
-                continue;
-            }
-            $x = $resolved ? "Resolved" : "<strong>Flagged</strong>";
-            if ($conversation !== "") {
-                $x .= " (" . $conversation . ")";
-            }
-            if (!$resolved) {
-                $x .= '<span style="display:inline-block;margin-left:1em">'
-                    . Ht::button("Resolve", ["name" => "resolveflag", "class" => "ui js-pset-flag", "data-flagid" => $k])
-                    . '</span>';
-            }
-            $runnerbuttons[] = $x . "<br />";
-        }
-        if ($all_resolved) {
-            $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "class" => "ui js-pset-flag", "name" => "flag"]);
-        }
-    }
-    if (!empty($runnerbuttons)) {
-        echo Ht::form($Info->hoturl_post("run")),
-            '<div class="f-contain">';
-        ContactView::echo_group("", join("", $runnerbuttons));
-        echo "</div></form>\n";
-        if ($Me->isPC && $Me != $User) {
-            echo Ht::form($Info->hoturl_post("pset", array("saverunsettings" => 1, "ajax" => 1))),
-                '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
-            // XXX always using grading commit's settings?
-            if (($runsettings = $Info->commit_jnote("runsettings"))) {
-                echo '<script>$pa.load_runsettings(', json_encode_browser($runsettings), ')</script>';
-            }
-        }
-        Ht::stash_script("\$('button.pa-runner').prop('disabled',false)");
-    }
+    // print runner buttons
+    echo_runner_buttons($Info);
 
     // print current grader
     echo_grader($Info);
@@ -754,57 +818,7 @@ if ($Pset->gitless) {
     }
 
     // print runners
-    if ($Info->is_handout_commit()) { // XXX this is a hack
-        $crunners = $runlogger = null;
-    } else {
-        $crunners = $Info->commit_jnote("run");
-        $runlogger = new RunLogger($Pset, $Info->repo);
-    }
-    $runcategories = [];
-    $any_runners = false;
-    foreach ($Pset->runners as $r) {
-        if (!$Me->can_view_run($Pset, $r, $User)
-            || isset($runcategories[$r->name])) {
-            continue;
-        }
-
-        $rj = null;
-        if ($crunners !== null
-            && ($checkt = $crunners->{$r->name} ?? null)
-            && (is_int($checkt) || is_array($checkt))) {
-            $rj = $runlogger->job_full_response(is_int($checkt) ? $checkt : $checkt[0], $r);
-        }
-        if (!$rj && !$Me->can_run($Pset, $r, $User)) {
-            continue;
-        }
-        if (!$any_runners) {
-            echo '<div class="pa-runoutlist">';
-            $any_runners = true;
-        }
-
-        $runcategories[$r->name] = true;
-        echo '<div id="run-', $r->name, '" class="pa-runout';
-        if (!$rj || !isset($rj->timestamp)) {
-            echo ' hidden';
-        }
-        echo '"><h3><a class="qq ui pa-run-show" href="">',
-            '<span class="foldarrow">&#x25B6;</span>',
-            htmlspecialchars($r->output_title), '</a></h3>',
-            '<div class="pa-run pa-run-short hidden" id="pa-run-', $r->name, '"';
-        if ($r->xterm_js || ($r->xterm_js === null && $Pset->run_xterm_js)) {
-            echo ' data-pa-xterm-js="true"';
-        }
-        if ($rj && isset($rj->timestamp)) {
-            echo ' data-pa-timestamp="', $rj->timestamp, '"';
-        }
-        if ($rj && isset($rj->data) && ($pos = strpos($rj->data, "\n\n"))) {
-            echo ' data-pa-content="', htmlspecialchars(substr($rj->data, $pos + 2)), '"';
-        }
-        echo '><pre class="pa-runpre"></pre></div></div>', "\n";
-    }
-    if ($any_runners) {
-        echo '</div>';
-    }
+    echo_runner_output($Info);
 
     // line notes
     if (!empty($diff)) {

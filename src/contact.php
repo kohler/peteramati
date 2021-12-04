@@ -1508,8 +1508,11 @@ class Contact {
                         || ($info->repo && $info->user_can_view_repo_contents()))));
     }
 
-    function can_run(Pset $pset, RunnerConfig $runner = null, $user = null) {
-        if (!$runner || $runner->disabled) {
+    /** @param ?Contact $user
+     * @return bool */
+    function can_run(Pset $pset, RunnerConfig $runner, $user = null) {
+        if ($runner->disabled
+            || (!$runner->command && !$runner->evaluate_function)) {
             return false;
         } else if ($this->isPC) {
             return true;
@@ -1525,7 +1528,7 @@ class Contact {
             return true;
         } else {
             return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
-                || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset));
+                || ($runner->display_visible && $this->show_setting_on($runner->display_visible, $pset));
         }
     }
 
@@ -1536,7 +1539,7 @@ class Contact {
             return true;
         } else {
             return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
-                || ($runner->output_visible && $this->show_setting_on($runner->output_visible, $pset))
+                || ($runner->display_visible && $this->show_setting_on($runner->display_visible, $pset))
                 || ($runner->transfer_warnings === "grades" && $this->show_setting_on($runner->transfer_warnings, $pset));
         }
     }

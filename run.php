@@ -125,7 +125,9 @@ class RunRequest {
                 return self::error("Unconfirmed repository.");
             }
         }
-        if (!$this->viewer->can_run($this->pset, $this->runner, $this->user)) {
+        if (isset($qreq->check) && !$this->runner->evaluate_function
+            ? !$this->viewer->can_view_run($this->pset, $this->runner, $this->user)
+            : !$this->viewer->can_run($this->pset, $this->runner, $this->user)) {
             return self::error("You can’t run that command.");
         }
 
@@ -161,9 +163,9 @@ class RunRequest {
             }
         }
 
-        // maybe eval
+        // maybe evaluate
         if (!$this->runner->command) {
-            assert(!!$this->runner->eval);
+            assert(!!$this->runner->evaluate_function);
             $rr = RunResponse::make($this->runner, $info->repo);
             $rr->done = true;
             $rr->timestamp = time();
