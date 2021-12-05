@@ -31,7 +31,7 @@ class RunQueueBatch {
      * @return string */
     static function unparse_time($t) {
         $s = "@{$t}";
-        if ($t && $t < Conf::$now) {
+        if ($t && $t <= Conf::$now) {
             $s .= " (" . unparse_interval(Conf::$now - $t) . ")";
         }
         return $s;
