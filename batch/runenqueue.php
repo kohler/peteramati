@@ -20,6 +20,8 @@ class RunEnqueueBatch {
     public $chainid;
     /** @var ?list<string> */
     public $tags;
+    /** @var ?array<string,string> */
+    public $runsettings;
     /** @var int */
     public $sset_flags;
     /** @var ?string */
@@ -66,6 +68,9 @@ class RunEnqueueBatch {
                 $qi->flags |= QueueItem::FLAG_UNWATCHED
                     | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
                 $qi->tags = $this->tags;
+                foreach ($this->runsettings ?? [] as $k => $v) {
+                    $qi->runsettings[$k] = $v;
+                }
                 $qi->enqueue();
                 if (!$qi->chain) {
                     $qi->schedule($nu);
@@ -93,6 +98,7 @@ class RunEnqueueBatch {
             "u:,user: Match these users",
             "c:,chain: Set chain ID",
             "t[],tag[] Add tag",
+            "s[],setting[] Set NAME=VALUE",
             "V,verbose",
             "help"
         )->helpopt("help")->parse($argv);
@@ -132,6 +138,14 @@ class RunEnqueueBatch {
                     throw new Error("bad `--tag`");
                 }
                 $reb->tags[] = $tag;
+            }
+        }
+        if (isset($arg["s"])) {
+            foreach ($arg["s"] as $setting) {
+                if (!preg_match('/\A([A-Za-z][_A-Za-z0-9]*)=([-._A-Za-z0-9]*)\z/', $setting, $m)) {
+                    throw new Error("bad `--setting`");
+                }
+                $reb->runsettings[$m[1]] = $m[2];
             }
         }
         return $reb;

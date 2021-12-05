@@ -106,15 +106,18 @@ class QueueItem {
             $this->chain = (int) $this->chain;
         }
         if ($this->runsettings !== null) {
+            /** @phan-suppress-next-line PhanTypeMismatchArgumentInternal */
             $j = json_decode($this->runsettings);
             $this->runsettings = is_object($j) ? (array) $j : null;
         }
-        if (($tags = $this->tags) !== null) {
-            $this->tags = null;
-            foreach (explode(" ", $tags) as $t) {
+        if ($this->tags !== null) {
+            $ts = [];
+            /** @phan-suppress-next-line PhanTypeMismatchArgumentInternal */
+            foreach (explode(" ", $this->tags) as $t) {
                 if ($t !== "")
-                    $this->tags[] = $t;
+                    $ts[] = $t;
             }
+            $this->tags = empty($ts) ? null : $ts;
         }
 
         $this->runorder = (int) $this->runorder;

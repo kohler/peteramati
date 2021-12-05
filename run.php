@@ -202,9 +202,9 @@ class RunRequest {
             $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
             if (!$qix->substantiate($qs)) {
                 if ($qix === $qi) {
-                    return self::error($e->getMessage());
+                    return self::error($qix->last_error);
                 } else {
-                    error_log($qix->unparse_key() . ": " . $e->getMessage());
+                    error_log($qix->unparse_key() . ": " . $qix->last_error);
                 }
             } else if ($qix === $qi && $qi->status > 0) {
                 return $qi->full_response();
