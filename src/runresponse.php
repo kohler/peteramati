@@ -93,6 +93,18 @@ class RunResponse implements JsonSerializable {
         }
     }
 
+    /** @param string $tag
+     * @return bool */
+    function has_tag($tag) {
+        if ($this->tags) {
+            foreach ($this->tags as $t) {
+                if (strcasecmp($t, $tag) === 0)
+                    return true;
+            }
+        }
+        return false;
+    }
+
     function jsonSerialize() {
         $a = [];
         foreach (get_object_vars($this) as $k => $v) {
