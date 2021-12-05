@@ -658,7 +658,7 @@ function unparse_interval($t) {
         $s .= "{$n}m";
         $t -= $n * 60;
     }
-    if ($t !== 0) {
+    if ($t !== 0 || $s === "") {
         $s .= "{$t}s";
     }
     return $s;
