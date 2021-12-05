@@ -20,6 +20,8 @@ class RunResponse implements JsonSerializable {
     public $hash;
     /** @var ?array */
     public $settings;
+    /** @var ?list<string> */
+    public $tags;
     /** @var int */
     public $timestamp;
     /** @var ?int */
@@ -71,6 +73,13 @@ class RunResponse implements JsonSerializable {
             }
             if (is_object($x->settings ?? null)) {
                 $rr->settings = (array) $x->settings;
+            }
+            if (isset($x->tags)) {
+                if (is_array($x->tags)) {
+                    $rr->tags = $x->tags;
+                } else if (is_string($x->tags)) {
+                    $rr->tags = [$x->tags];
+                }
             }
             if (is_int($x->timestamp ?? null)) {
                 $rr->timestamp = $x->timestamp;

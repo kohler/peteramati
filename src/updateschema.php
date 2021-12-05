@@ -793,6 +793,10 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table `ExecutionQueue` add key `runorder` (`runorder`)")) {
         $conf->update_schema_version(156);
     }
+    if ($conf->sversion === 156
+        && $conf->ql_ok("update ExecutionQueue add `tags` varbinary(4096) DEFAULT NULL")) {
+        $conf->update_schema_version(157);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

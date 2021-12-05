@@ -24,8 +24,10 @@ class QueueItem {
     public $repoid;
     /** @var ?string */
     public $bhash;
-    /** @var ?string */
+    /** @var ?array */
     public $runsettings;
+    /** @var ?list<string> */
+    public $tags;
 
     /** @var string */
     public $queueclass;
@@ -98,6 +100,17 @@ class QueueItem {
         $this->flags = (int) $this->flags;
         if ($this->chain !== null) {
             $this->chain = (int) $this->chain;
+        }
+        if ($this->runsettings !== null) {
+            $j = json_decode($this->runsettings);
+            $this->runsettings = is_object($j) ? (array) $j : null;
+        }
+        if (($tags = $this->tags) !== null) {
+            $this->tags = null;
+            foreach (explode(" ", $tags) as $t) {
+                if ($t !== "")
+                    $this->tags[] = $t;
+            }
         }
 
         $this->runorder = (int) $this->runorder;
@@ -229,9 +242,8 @@ class QueueItem {
         $qi->psetid = $info->pset->id;
         $qi->repoid = $info->repo ? $info->repo->repoid : 0;
         $qi->bhash = $info->bhash();
-        if ($qi->bhash
-            && ($rs = $info->commit_jnote("runsettings"))) {
-            $qi->runsettings = json_encode_db($rs);
+        if ($qi->bhash) {
+            $qi->runsettings = (array) $info->commit_jnote("runsettings");
         }
         $qi->flags = $info->user->is_anonymous ? self::FLAG_ANONYMOUS : 0;
 
@@ -263,14 +275,15 @@ class QueueItem {
      * @return QueueItem */
     static function for_logged_job($info, $jobid) {
         $runlog = new RunLogger($info->pset, $info->repo);
-        if (($j = $runlog->job_brief_response($jobid))
-            && ($j->pset === $info->pset->urlkey
-                || $info->conf->pset_by_key($j->pset) === $info->pset)) {
+        if (($rr = $runlog->job_brief_response($jobid))
+            && ($rr->pset === $info->pset->urlkey
+                || $info->conf->pset_by_key($rr->pset) === $info->pset)) {
             $qi = self::make_info($info);
-            $qi->queueid = $j->queueid ?? null;
-            $qi->runnername = $j->runner;
-            $qi->runat = $j->timestamp ?? null;
-            $qi->runsettings = isset($j->settings) ? (array) $j->settings : null;
+            $qi->queueid = $rr->queueid;
+            $qi->runnername = $rr->runner;
+            $qi->runat = $rr->timestamp;
+            $qi->runsettings = $rr->settings;
+            $qi->tags = $rr->tags;
             return $qi;
         } else {
             return null;
@@ -305,13 +318,14 @@ class QueueItem {
         $this->status = -1;
         $this->conf->qe("insert into ExecutionQueue set reqcid=?, cid=?,
             runnername=?, psetid=?, repoid=?,
-            bhash=?, runsettings=?,
+            bhash=?, runsettings=?, tags=?,
             queueclass=?, nconcurrent=?, flags=?, chain=?,
             insertat=?, updateat=?,
             runat=?, runorder=?, status=?",
             $this->reqcid, $this->cid,
             $this->runnername, $this->psetid, $this->repoid,
-            $this->bhash, $this->runsettings,
+            $this->bhash, $this->runsettings ? json_encode_db($this->runsettings) : null,
+            $this->tags ? " " . join(" ", $this->tags) . " " : null,
             $this->queueclass, $this->nconcurrent, $this->flags, $this->chain,
             $this->insertat, $this->updateat,
             $this->runat, $this->runorder, $this->status);
@@ -466,9 +480,8 @@ class QueueItem {
         if ($this->bhash !== null) {
             $rr->hash = $this->hash();
         }
-        if (($rs = $this->runsettings ? json_decode($this->runsettings) : null)) {
-            $rr->settings = (array) $rs;
-        }
+        $rr->settings = $this->runsettings;
+        $rr->tags = $this->tags;
         return $rr;
     }
 

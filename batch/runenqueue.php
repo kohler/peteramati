@@ -18,6 +18,8 @@ class RunEnqueueBatch {
     public $verbose = false;
     /** @var ?int */
     public $chainid;
+    /** @var ?list<string> */
+    public $tags;
     /** @var int */
     public $sset_flags;
     /** @var ?string */
@@ -63,6 +65,7 @@ class RunEnqueueBatch {
                 $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
                 $qi->flags |= QueueItem::FLAG_UNWATCHED
                     | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+                $qi->tags = $this->tags;
                 $qi->enqueue();
                 if (!$qi->chain) {
                     $qi->schedule($nu);
@@ -89,6 +92,7 @@ class RunEnqueueBatch {
             "e,ensure Run only if needed",
             "u:,user: Match these users",
             "c:,chain: Set chain ID",
+            "t[],tag[] Add tag",
             "V,verbose",
             "help"
         )->helpopt("help")->parse($argv);
@@ -120,6 +124,14 @@ class RunEnqueueBatch {
                 $reb->chainid = intval($chain);
             } else {
                 throw new Error("bad `--chain`");
+            }
+        }
+        if (isset($arg["t"])) {
+            foreach ($arg["t"] as $tag) {
+                if (!preg_match('/\A' . TAG_REGEX_NOTWIDDLE . '\z/', $tag)) {
+                    throw new Error("bad `--tag`");
+                }
+                $reb->tags[] = $tag;
             }
         }
         return $reb;
