@@ -34,12 +34,16 @@ class RunQueueBatch {
             $chain = $qix->chain ? " C{$qix->chain}" : "";
             if ($qix->status < 0) {
                 $s = "waiting";
+                $t = $qix->insertat;
             } else if ($qix->status === 0) {
                 $s = "scheduled";
+                $t = $qix->scheduleat ? : $qix->updateat ? : $qix->insertat;
             } else {
-                $s = "running @{$qix->runat} (" . unparse_interval(Conf::$now - $qix->runat) . ")";
+                $s = "running";
+                $t = $qix->runat;
             }
-            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s}{$chain}\n");
+            $tn = unparse_interval(Conf::$now - $t);
+            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s} @{$t} ({$tn}){$chain}\n");
             ++$n;
         }
         Dbl::free($result);

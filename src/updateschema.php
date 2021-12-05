@@ -797,6 +797,10 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table ExecutionQueue add `tags` varbinary(4096) DEFAULT NULL")) {
         $conf->update_schema_version(157);
     }
+    if ($conf->sversion === 157
+        && $conf->ql_ok("alter table `ExecutionQueue` add `scheduleat` bigint NOT NULL DEFAULT '0'")) {
+        $conf->update_schema_version(158);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

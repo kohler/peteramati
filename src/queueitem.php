@@ -43,6 +43,8 @@ class QueueItem {
     /** @var int */
     public $insertat;
     /** @var int */
+    public $scheduleat;
+    /** @var int */
     public $updateat;
     /** @var int */
     public $runat;
@@ -115,6 +117,7 @@ class QueueItem {
 
         $this->runorder = (int) $this->runorder;
         $this->insertat = (int) $this->insertat;
+        $this->scheduleat = (int) $this->scheduleat;
         $this->updateat = (int) $this->updateat;
         $this->runat = (int) $this->runat;
         $this->status = (int) $this->status;
@@ -339,16 +342,17 @@ class QueueItem {
         if ($this->status === -1) {
             if (($userid ?? 0) > 0) {
                 $this->conf->qe("update ExecutionQueue
-                    set status=0, runorder=greatest(coalesce((select last_runorder from ContactInfo where contactId=?),0),?)+?
+                    set status=0, scheduleat=?, runorder=greatest(coalesce((select last_runorder from ContactInfo where contactId=?),0),?)+?
                     where queueid=? and status=-1",
-                    $userid, Conf::$now, $priority, $this->queueid);
+                    Conf::$now, $userid, Conf::$now, $priority, $this->queueid);
             } else {
                 $this->conf->qe("update ExecutionQueue set status=0, runorder=? where queueid=? and status=-1",
                     Conf::$now + $priority, $this->queueid);
             }
-            if (($row = $this->conf->fetch_first_row("select status, runorder from ExecutionQueue where queueid=?", $this->queueid))) {
+            if (($row = $this->conf->fetch_first_row("select status, scheduleat, runorder from ExecutionQueue where queueid=?", $this->queueid))) {
                 $this->status = (int) $row[0];
-                $this->runorder = (int) $row[1];
+                $this->scheduleat = (int) $row[1];
+                $this->runorder = (int) $row[2];
                 if (($userid ?? 0) > 0) {
                     $this->conf->qe("update ContactInfo set last_runorder=? where contactId=? and last_runorder<?",
                         $this->runorder, $userid, $this->runorder);

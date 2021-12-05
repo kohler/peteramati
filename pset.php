@@ -190,7 +190,7 @@ function upload_grades($pset, $text, $fname) {
 if ($Me->isPC && check_post() && isset($Qreq->uploadgrades)
     && file_uploaded($_FILES["file"])) {
     if (($text = file_get_contents($_FILES["file"]["tmp_name"])) === false) {
-    	$Conf->errorMsg("Internal error: cannot read file.");
+        $Conf->errorMsg("Internal error: cannot read file.");
     } else if (upload_grades($Pset, $text, $_FILES["file"]["name"])) {
         redirectSelf();
     }
