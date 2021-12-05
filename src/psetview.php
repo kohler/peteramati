@@ -59,12 +59,16 @@ class PsetView {
     private $_ag;
     /** @var ?array<int,true> */
     private $_has_fg;
+    /** @var ?int */
+    private $_gtottime;
     /** @var null|int|float */
     private $_gmaxtot;
     /** @var null|int|float */
     private $_gtot;
     /** @var null|int|float */
     private $_gtotne;
+    /** @var ?bool */
+    private $_gallreq;
 
     /** @var bool */
     private $need_format = false;
@@ -307,7 +311,7 @@ class PsetView {
                 $this->_cpi = null;
             }
             $this->_derived_handout_commit = false;
-            $this->_gtime = null;
+            $this->_gtime = $this->_gtottime = null;
             $this->_has_formula = false;
         }
     }
@@ -603,7 +607,7 @@ class PsetView {
     private function ensure_grades() {
         if ($this->_gtime !== $this->user->gradeUpdateTime) {
             $this->_gtime = $this->user->gradeUpdateTime;
-            $this->_ag = $this->_gtot = $this->_gtotne = null;
+            $this->_ag = $this->_gtottime = null;
             $this->_has_formula = false;
             $jn = $this->grade_jnotes();
             if ($jn && ($ag = $jn->autogrades ?? null)) {
@@ -669,37 +673,37 @@ class PsetView {
         }
     }
 
-    /** @return int|float */
-    function grade_max_total() {
-        if ($this->_gmaxtot === null) {
-            $this->_gmaxtot = 0;
-            foreach ($this->visible_grades() as $ge) {
-                if (!$ge->no_total && !$ge->is_extra && $ge->max_visible) {
-                    $this->_gmaxtot += $ge->max;
-                }
-            }
-        }
-        return $this->_gmaxtot;
-    }
-
     private function ensure_visible_total() {
-        if ($this->_gtot === null
-            || $this->_gtime !== $this->user->gradeUpdateTime) {
+        if ($this->_gtottime !== $this->user->gradeUpdateTime) {
             $this->ensure_grades();
-            $this->_gtot = $this->_gtotne = null;
-            if ($this->_g !== null) {
-                foreach ($this->visible_grades() as $ge) {
-                    if (!$ge->no_total && ($v = $this->_g[$ge->pcview_index]) !== null) {
+            $this->_gtottime = $this->user->gradeUpdateTime;
+            $this->_gtot = $this->_gtotne = $this->_gmaxtot = null;
+            $this->_gallreq = true;
+            foreach ($this->visible_grades() as $ge) {
+                if (!$ge->no_total) {
+                    $v = $this->_g ? $this->_g[$ge->pcview_index] : null;
+                    if ($v !== null) {
                         $this->_gtot = ($this->_gtot ?? 0) + $v;
-                        if (!$ge->is_extra) {
-                            $this->_gtotne = ($this->_gtotne ?? 0) + $v;
-                        }
+                    }
+                    if ($v !== null && !$ge->is_extra) {
+                        $this->_gtotne = ($this->_gtotne ?? 0) + $v;
+                    }
+                    if ($v === null && $ge->required && !$ge->answer) {
+                        $this->_gallreq = false;
+                    } else if (!$ge->is_extra && $ge->max_visible) {
+                        $this->_gmaxtot = ($this->_gmaxtot ?? 0) + $ge->max;
                     }
                 }
                 $this->_gtot = round_grade($this->_gtot);
                 $this->_gtotne = round_grade($this->_gtotne);
             }
         }
+    }
+
+    /** @return null|int|float */
+    function grade_max_total() {
+        $this->ensure_visible_total();
+        return $this->_gmaxtot;
     }
 
     /** @return null|int|float */
@@ -712,6 +716,12 @@ class PsetView {
     function visible_total_noextra() {
         $this->ensure_visible_total();
         return $this->_gtotne;
+    }
+
+    /** @return bool */
+    function has_visible_required_scores() {
+        $this->ensure_visible_total();
+        return $this->_gallreq;
     }
 
 

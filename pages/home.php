@@ -588,7 +588,11 @@ function show_home_pset(PsetView $info) {
         $c = "gradesmissing";
     }
     if ($info->user_can_view_score() && $info->can_view_nonempty_score()) {
-        $x[] = "grade ready";
+        if ($info->has_visible_required_scores()) {
+            $x[] = "grade ready";
+        } else {
+            $x[] = "grade partially ready";
+        }
         $c = "gradesready";
     }
     if ($x) {

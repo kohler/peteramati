@@ -1152,6 +1152,9 @@ class GradeEntryConfig {
     /** @var bool
      * @readonly */
     public $concealed;
+    /** @var bool
+     * @readonly */
+    public $required;
     /** @var ?string */
     public $round;
     /** @var ?list<string> */
@@ -1319,9 +1322,8 @@ class GradeEntryConfig {
         } else {
             $this->visible = $this->_visible_defaulted = true;
         }
-        if (isset($g->concealed)) {
-            $this->concealed = Pset::cbool($loc, $g, "concealed");
-        }
+        $this->concealed = Pset::cbool($loc, $g, "concealed");
+        $this->required = Pset::cbool($loc, $g, "required");
         if (isset($g->max_visible)) {
             $this->max_visible = Pset::cbool($loc, $g, "max_visible");
         } else if (isset($g->hide_max)) {
@@ -1699,6 +1701,9 @@ class GradeEntryConfig {
         }
         if ($this->concealed) {
             $gej["concealed"] = true;
+        }
+        if ($this->required) {
+            $gej["required"] = true;
         }
         if ($this->answer)  {
             $gej["answer"] = true;

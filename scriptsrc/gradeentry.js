@@ -218,9 +218,9 @@ export class GradeEntry {
             if (ve.innerText !== gt) {
                 ve.innerText = gt;
             }
-            hidden = gt === "" && !this.max;
+            hidden = gt === "" && (!this.max || this.required) && !this.answer;
         }
-        hidden != null && toggleClass(pde, "hidden", hidden);
+        hidden != null && toggleClass(pde.closest(".pa-grade"), "hidden", hidden);
         this.landmark && this.update_landmark(pde);
     }
 
@@ -522,7 +522,8 @@ export class GradeSheet {
             let maxtotal = 0;
             for (let i = 0; i !== this.value_order.length; ++i) {
                 const ge = this.entries[this.value_order[i]];
-                if (ge && ge.in_total && !ge.is_extra && ge.max) {
+                if (ge && ge.in_total && !ge.is_extra && ge.max
+                    && (!ge.required || (this.grades && this.grades[i] !== null))) {
                     maxtotal += ge.max;
                 }
             }
