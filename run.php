@@ -157,8 +157,9 @@ class RunRequest {
                 || $qi->runnername !== $this->runner->name) {
                 return self::error("Wrong runner.");
             }
-            $qi->substantiate(new QueueStatus);
-            if ($qi->runat) {
+            if (!$qi->substantiate(new QueueStatus)) {
+                return self::error($qi->last_error);
+            } else if ($qi->runat) {
                 return $qi->full_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
             }
         }
@@ -198,19 +199,15 @@ class RunRequest {
         $qs = new QueueStatus;
         $result = $info->conf->qe("select * from ExecutionQueue where status>=0 and runorder<=? order by runorder asc, queueid asc limit 100", $qi->runorder);
         while (($qix = QueueItem::fetch($info->conf, $result))) {
-            try {
-                $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
-                $qix->substantiate($qs);
-                if ($qix === $qi && $qi->status > 0) {
-                    return $qi->full_response();
-                }
-            } catch (Exception $e) {
-                $qix->delete(false);
+            $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
+            if (!$qix->substantiate($qs)) {
                 if ($qix === $qi) {
                     return self::error($e->getMessage());
                 } else {
                     error_log($qix->unparse_key() . ": " . $e->getMessage());
                 }
+            } else if ($qix === $qi && $qi->status > 0) {
+                return $qi->full_response();
             }
         }
         Dbl::free($result);

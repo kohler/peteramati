@@ -112,10 +112,10 @@ class RunQueueBatch {
         $this->load();
         while (!empty($this->running)) {
             $this->any_completed = false;
-            while ($this->check()) {
+            do {
                 sleep(5);
                 Conf::set_current_time(time());
-            }
+            } while ($this->check());
             if (!$this->any_completed) {
                 sleep(5);
                 Conf::set_current_time(time());

@@ -78,6 +78,8 @@ class QueueItem {
     private $_logstream;
     /** @var ?int */
     private $_runstatus;
+    /** @var ?string */
+    public $last_error;
 
     const FLAG_UNWATCHED = 1;
     const FLAG_ENSURE = 2;
@@ -370,7 +372,8 @@ class QueueItem {
         Dbl::free($result);
     }
 
-    /** @param QueueStatus $qs */
+    /** @param QueueStatus $qs
+     * @return bool */
     function substantiate($qs) {
         assert(!!$this->queueid && !$this->deleted);
         $nconcurrent = ($this->nconcurrent ?? 0) <= 0 ? 100000 : $this->nconcurrent;
@@ -382,22 +385,28 @@ class QueueItem {
             if ($this->lockfile
                 && RunLogger::active_job_at($this->lockfile) !== $this->runat) {
                 $this->delete(false);
-                return;
+                return true;
             }
         } else if (($this->flags & self::FLAG_UNWATCHED) === 0
                    && $this->updateat < Conf::$now - 30) {
             if ($this->irrelevant()) {
                 $this->delete(true);
-                return;
+                return true;
             }
         } else if (($this->flags & self::FLAG_ENSURE) !== 0
                    && ($jobid = $this->info()->complete_job($this->runner()))) {
             $this->delete(false);
             $this->runat = $jobid;
             $this->status = 2;
-            return;
+            return true;
         } else if ($qs->nrunning < min($nconcurrent, $qs->nconcurrent)) {
-            $this->start_command();
+            try {
+                $this->start_command();
+            } catch (Exception $e) {
+                $this->last_error = $e->getMessage();
+                $this->delete(false);
+                return false;
+            }
         }
         ++$qs->nahead;
         if ($this->runat > 0) {
@@ -406,6 +415,7 @@ class QueueItem {
         if ($this->nconcurrent > 0) {
             $qs->nconcurrent = max(min($nconcurrent, $qs->nconcurrent), $qs->nrunning);
         }
+        return true;
     }
 
     /** @param bool $only_old */
@@ -506,15 +516,15 @@ class QueueItem {
         $info = $this->info();
 
         if (!chdir(SiteLoader::$root)) {
-            throw new RunnerException("Can’t cd to main directory");
+            throw new RunnerException("Can’t cd to main directory.");
         }
         if (!is_executable("jail/pa-jail")) {
-            throw new RunnerException("The pa-jail program has not been compiled");
+            throw new RunnerException("The pa-jail program has not been compiled.");
         }
 
         $runlog = new RunLogger($pset, $repo);
         if (!$runlog->mkdirs()) {
-            throw new RunnerException("Can’t create log directory");
+            throw new RunnerException("Can’t create log directory.");
         }
         if ($runlog->active_job()) {
             return false;
@@ -529,7 +539,7 @@ class QueueItem {
             $username = "jail61user";
         }
         if (!preg_match('/\A\w+\z/', $username)) {
-            throw new RunnerException("Bad run_username");
+            throw new RunnerException("Bad run_username.");
         }
 
         $pwnam = posix_getpwnam($username);
@@ -539,7 +549,7 @@ class QueueItem {
         // collect directory information
         $this->_jaildir = preg_replace('/\/+\z/', '', $this->expand($pset->run_dirpattern));
         if (!$this->_jaildir) {
-            throw new RunnerException("Bad run_dirpattern");
+            throw new RunnerException("Bad run_dirpattern.");
         }
         $this->_jailhomedir = "{$this->_jaildir}/" . preg_replace('/\A\/+/', '', $userhome);
 
@@ -585,7 +595,7 @@ class QueueItem {
         // create jail
         $this->remove_old_jails();
         if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->_jaildir) . " " . escapeshellarg($username))) {
-            throw new RunnerException("Can’t initialize jail");
+            throw new RunnerException("Can’t initialize jail.");
         }
 
         // check out code
@@ -629,7 +639,7 @@ class QueueItem {
             }
             $homedir = $this->_jaildir;
         } else {
-            throw new RunnerException("Missing jail population configuration");
+            throw new RunnerException("Missing jail population configuration.");
         }
 
         $jmanifest = $runner->jailmanifest();
@@ -674,7 +684,7 @@ class QueueItem {
 
             $newdir = $this->_jaildir . "~." . gmdate("Ymd\\THis", Conf::$now);
             if ($this->run_and_log("jail/pa-jail mv " . escapeshellarg($this->_jaildir) . " " . escapeshellarg($newdir))) {
-                throw new RunnerException("Can’t remove old jail");
+                throw new RunnerException("Can’t remove old jail.");
             }
 
             $this->run_and_log("jail/pa-jail rm " . escapeshellarg($newdir), true);
@@ -697,7 +707,7 @@ class QueueItem {
 
         fwrite($this->_logstream, "++ mkdir $checkoutdir\n");
         if (!mkdir($clonedir, 0777, true)) {
-            throw new RunnerException("Can’t initialize user repo in jail");
+            throw new RunnerException("Can’t initialize user repo in jail.");
         }
 
         $root = SiteLoader::$root;
@@ -706,7 +716,7 @@ class QueueItem {
         // need a branch to check out a specific commit
         $branch = "jailcheckout_" . Conf::$now;
         if ($this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch $branch $hash")) {
-            throw new RunnerException("Can’t create branch for checkout");
+            throw new RunnerException("Can’t create branch for checkout.");
         }
 
         // make the checkout
@@ -718,11 +728,11 @@ class QueueItem {
         $this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch -D $branch");
 
         if ($status) {
-            throw new RunnerException("Can’t check out code into jail");
+            throw new RunnerException("Can’t check out code into jail.");
         }
 
         if ($this->run_and_log("cd " . escapeshellarg($clonedir) . " && rm -rf .git .gitcheckout")) {
-            throw new RunnerException("Can’t clean up checkout in jail");
+            throw new RunnerException("Can’t clean up checkout in jail.");
         }
 
         // create overlay
@@ -748,7 +758,7 @@ class QueueItem {
                 $x = !copy($path, $checkoutdir . substr($path, $rslash));
             }
             if ($x) {
-                throw new RunnerException("Can’t unpack overlay");
+                throw new RunnerException("Can’t unpack overlay.");
             }
         }
 
