@@ -275,7 +275,7 @@ class Repository {
         $repodir = SiteLoader::$root . "/repo/repo$this->cacheid";
         if (!file_exists("$repodir/.git/config")) {
             is_dir($repodir) || mkdir($repodir, 0770);
-            shell_exec("cd $repodir && git init --shared");
+            shell_exec("cd $repodir && git init --shared -b main");
         }
         $descriptors = [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]];
         $proc = proc_open($command, $descriptors, $pipes, $repodir);
@@ -684,7 +684,7 @@ class Repository {
             ++$suffixn;
             $suffix = "_" . $suffixn;
         }
-        $answer = shell_exec("cd $d && git init >/dev/null && git remote add origin " . SiteLoader::$root . "/repo/repo{$this->cacheid} >/dev/null && echo yes");
+        $answer = shell_exec("cd $d && git init -b main >/dev/null && git remote add origin " . SiteLoader::$root . "/repo/repo{$this->cacheid} >/dev/null && echo yes");
         return ($answer === "yes\n" ? $d : null);
     }
 

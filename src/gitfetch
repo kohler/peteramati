@@ -118,7 +118,7 @@ fi
 old_dir="`pwd`"
 cd "$repo_dir"
 if test ! -d .git; then
-    git init --shared=group || exit 1
+    git init --shared=group -b main || exit 1
 fi
 
 snaplong () {

@@ -694,7 +694,7 @@ class QueueItem {
 
         // make the checkout
         $status = $this->run_and_log("cd " . escapeshellarg($clonedir) . " && "
-                                     . "if test ! -d .git; then git init --shared=group; fi && "
+                                     . "if test ! -d .git; then git init --shared=group -b main; fi && "
                                      . "git fetch --depth=1 -p " . escapeshellarg($repodir) . " $branch && "
                                      . "git reset --hard $hash");
 
