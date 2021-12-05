@@ -232,6 +232,6 @@ class Getopt {
      * @param list<string> $longopts
      * @return array<string,string|list<string>> */
     static function rest($argv, $options, $longopts) {
-        return (new Getopt)->short($options)->long($longopts)->allmulti(true)->parse($argv);
+        return (new Getopt)->short($options)->long($longopts)->parse($argv);
     }
 }
