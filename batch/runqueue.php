@@ -76,21 +76,24 @@ class RunQueueBatch {
 
     function load() {
         $this->running = [];
+        $this->any_completed = false;
         $qs = new QueueStatus;
         $result = $this->conf->qe("select * from ExecutionQueue where status>=0 order by runorder asc, queueid asc limit 100");
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             if ($qix->status > 0 || $qs->nrunning < $qs->nconcurrent) {
                 $old_status = $qix->status;
                 $qix->substantiate($qs);
-                if ($qix->status > 0) {
+                if ($qix->status > 0 && !$qix->deleted) {
                     $this->running[] = $qix;
                 }
                 if ($this->verbose) {
                     $this->report($qix, $old_status);
                 }
+                $this->any_completed = $this->any_completed || $qix->deleted;
             }
         }
         Dbl::free($result);
+        return !empty($this->running);
     }
 
     function check() {
@@ -109,8 +112,8 @@ class RunQueueBatch {
     }
 
     function execute() {
-        $this->load();
-        while (!empty($this->running)) {
+        while ($this->load()
+               || ($this->any_completed && $this->load())) {
             $this->any_completed = false;
             do {
                 sleep(5);
@@ -120,7 +123,6 @@ class RunQueueBatch {
                 sleep(5);
                 Conf::set_current_time(time());
             }
-            $this->load();
         }
     }
 
