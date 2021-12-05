@@ -5,12 +5,19 @@
 
 require_once(dirname(__DIR__) . "/src/init.php");
 
-$arg = Getopt::rest($argv, "hn:l:aV", array("help", "name:", "limit:", "all",
-     "college", "extension", "tf", "verbose"));
-$verbose = isset($arg["V"]) || isset($arg["verbose"]);
-if (isset($arg["h"]) || isset($arg["help"]) || count($arg["_"]) > 1) {
-    fwrite(STDOUT, "Usage: php batch/facefetch.php [-l LIMIT] [FETCHSCRIPT]\n");
-    exit(0);
+$getopt = (new Getopt)->long(
+    "l:,limit: Max number of faces to fetch",
+    "college Fetch college faces only",
+    "extension Fetch DCE faces only",
+    "tf Fetch TF faces only",
+    "a,all Refetch existing faces",
+    "help,h",
+    "V,verbose"
+)->helpopt("help")->description("Usage: php batch/facefetch.php [-l LIMIT] [FETCHSCRIPT]\n");
+$arg = $getopt->parse($argv);
+$verbose = isset($arg["V"]);
+if (count($arg["_"]) > 1) {
+    $getopt->usage(1);
 }
 
 $fetchcommand = $Conf->config->_facefetch_command ?? null;
@@ -25,13 +32,10 @@ if (is_string($fetchcommand)) {
     $fetchcommand = [$fetchcommand];
 }
 
-if (!isset($arg["limit"])) {
-    $arg["limit"] = $arg["l"] ?? null;
-}
-$limit = (int) $arg["limit"];
+$limit = (int) $arg["l"];
 
 $where = [];
-if (!isset($arg["all"]) && !isset($arg["a"])) {
+if (!isset($arg["a"])) {
     $where[] = "contactImageId is null";
 }
 if (isset($arg["college"])) {

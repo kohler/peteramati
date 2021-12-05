@@ -9,6 +9,8 @@ class Getopt {
     private $helpopt;
     /** @var ?string */
     private $description;
+    /** @var bool */
+    private $allmulti = false;
 
     /** @param string $options
      * @return $this */
@@ -17,14 +19,19 @@ class Getopt {
         for ($i = 0; $i !== $olen; ) {
             if (ctype_alnum($options[$i])) {
                 $type = 0;
-                if ($i + 1 < $olen && $options[$i + 1] === ":") {
+                ++$i;
+                if ($i < $olen && $options[$i] === ":") {
+                    ++$i;
                     $type = 1;
-                    if ($i + 2 < $olen && $options[$i + 2] === ":") {
+                    if ($i < $olen && $options[$i] === ":") {
+                        ++$i;
                         $type = 2;
                     }
+                } else if ($i + 1 < $olen && $options[$i] === "[" && $options[$i+1] === "]") {
+                    $i += 2;
+                    $type = 3;
                 }
                 $this->po[$options[$i]] = [$options[$i], $type, null];
-                $i += $type + 1;
             } else {
                 throw new Error("Getopt \$options");
             }
@@ -51,17 +58,17 @@ class Getopt {
                 if (($co = strpos($s, ",", $p)) === false) {
                     $co = $l;
                 }
-                $t = 0;
-                if ($p + 1 < $co && $s[$co - 1] === ":") {
-                    $t = 1;
-                    if ($p + 2 < $co && $s[$co - 2] === ":") {
-                        $t = 2;
-                    }
+                $t = $d = 0;
+                if ($p + 1 < $co && $s[$co-1] === ":") {
+                    $d = $t = $p + 2 < $co && $s[$co-2] === ":" ? 2 : 1;
+                } else if ($p + 2 < $co && $s[$co-2] === "[" && $s[$co-1] === "]") {
+                    $d = 2;
+                    $t = 3;
                 }
-                if ($p + $t >= $co) {
+                if ($p + $d >= $co) {
                     throw new Error("Getopt \$longopts");
                 }
-                $n = substr($s, $p, $co - $p - $t);
+                $n = substr($s, $p, $co - $p - $d);
                 $po = $po ?? [$n, $t, $help];
                 if ($t !== $po[1]) {
                     throw new Error("Getopt \$longopts");
@@ -87,6 +94,13 @@ class Getopt {
         return $this;
     }
 
+    /** @param bool $allmulti
+     * @return $this */
+    function allmulti($allmulti) {
+        $this->allmulti = $allmulti;
+        return $this;
+    }
+
     /** @return string */
     function help() {
         $s = [];
@@ -97,7 +111,7 @@ class Getopt {
         $od = [];
         foreach ($this->po as $t => $po) {
             $n = strlen($t) === 1 ? "-{$t}" : "--{$t}";
-            if ($po[1] === 1) {
+            if ($po[1] === 1 || $po[1] === 3) {
                 $n .= " ARG";
             } else if ($po[1] === 2) {
                 $n .= "[=ARG]";
@@ -112,7 +126,7 @@ class Getopt {
                 $od[$po[0]][0] .= ", $n";
             }
         }
-        $s[] = "Usage:\n";
+        $s[] = "Options:\n";
         foreach ($od as $tx) {
             if (($tx[1] ?? "") !== "") {
                 $s[] = $tx[0];
@@ -134,6 +148,7 @@ class Getopt {
      * @return array<string,string|list<string>> */
     function parse($argv) {
         $res = [];
+        $pot = 0;
         for ($i = 1; $i < count($argv); ++$i) {
             $arg = $argv[$i];
             if ($arg === "--") {
@@ -144,27 +159,32 @@ class Getopt {
             } else if ($arg[1] === "-") {
                 $eq = strpos($arg, "=");
                 $name = substr($arg, 2, ($eq ? $eq : strlen($arg)) - 2);
-                if (!($po = $this->po[$name] ?? null)
-                    || ($eq !== false && $po[1] === 0)
-                    || ($eq === false && $i === count($argv) - 1 && $po[1] === 1)) {
+                if (!($po = $this->po[$name] ?? null)) {
                     break;
                 }
                 $name = $po[0];
+                $pot = $po[1];
+                if (($eq !== false && $pot === 0)
+                    || ($eq === false && $i === count($argv) - 1 && ($pot === 1 || $pot === 3))) {
+                    break;
+                }
                 if ($eq !== false) {
                     $value = substr($arg, $eq + 1);
-                } else if ($po[1] === 1) {
+                } else if ($pot === 1 || $pot === 3) {
                     $value = $argv[$i + 1];
                     ++$i;
                 } else {
                     $value = false;
                 }
             } else if (ctype_alnum($arg[1])) {
-                if (!($po = $this->po[$arg[1]])
-                    || (strlen($arg) == 2 && $po[1] === 1 && $i === count($argv) - 1)) {
+                if (!($po = $this->po[$arg[1]] ?? null)) {
                     break;
                 }
                 $name = $po[0];
-                if ($po[1] === 0 || ($po[1] === 2 && strlen($arg) == 2)) {
+                $pot = $po[1];
+                if (strlen($arg) == 2 && $pot === 1 && $i === count($argv) - 1) {
+                    break;
+                } else if ($pot === 0 || ($pot === 2 && strlen($arg) == 2)) {
                     $value = false;
                 } else if (strlen($arg) > 2 && $arg[2] === "=") {
                     $value = substr($arg, 3);
@@ -174,7 +194,7 @@ class Getopt {
                     $value = $argv[$i + 1];
                     ++$i;
                 }
-                if ($po[1] === 0 && strlen($arg) > 2) {
+                if ($pot === 0 && strlen($arg) > 2) {
                     $argv[$i] = "-" . substr($arg, 2);
                     --$i;
                 }
@@ -182,6 +202,8 @@ class Getopt {
                 break;
             }
             if (!array_key_exists($name, $res)) {
+                $res[$name] = $pot === 3 ? [$value] : $value;
+            } else if ($pot === 1 && !$this->allmulti) {
                 $res[$name] = $value;
             } else if (is_array($res[$name])) {
                 $res[$name][] = $value;
@@ -197,11 +219,19 @@ class Getopt {
         return $res;
     }
 
+    /** @param ?int $exit_status */
+    function usage($exit_status = null) {
+        fwrite($exit_status ? STDERR : STDOUT, $this->help());
+        if ($exit_status !== null) {
+            exit($exit_status);
+        }
+    }
+
     /** @param list<string> $argv
      * @param string $options
      * @param list<string> $longopts
      * @return array<string,string|list<string>> */
     static function rest($argv, $options, $longopts) {
-        return (new Getopt)->short($options)->long($longopts)->parse($argv);
+        return (new Getopt)->short($options)->long($longopts)->allmulti(true)->parse($argv);
     }
 }
