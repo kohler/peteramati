@@ -794,7 +794,7 @@ function updateSchema($conf) {
         $conf->update_schema_version(156);
     }
     if ($conf->sversion === 156
-        && $conf->ql_ok("update ExecutionQueue add `tags` varbinary(4096) DEFAULT NULL")) {
+        && $conf->ql_ok("alter table ExecutionQueue add `tags` varbinary(4096) DEFAULT NULL")) {
         $conf->update_schema_version(157);
     }
 
