@@ -3,22 +3,21 @@
 // HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
-define("TAG_REGEX", '~?~?[a-zA-Z!@*_:.][-a-zA-Z0-9!@*_:.\/]*');
-define("TAG_REGEX_OPTVALUE", '~?~?[a-zA-Z!@*_:.][-a-zA-Z0-9!@*_:.\/]*([#=](-\d)?\d*)?');
-define("TAG_MAXLEN", 40);
+const TAG_REGEX_NOTWIDDLE = '[a-zA-Z@*_:.][-+a-zA-Z0-9?!@*_:.\/]*';
+const TAG_MAXLEN = 40;
 
-define("CAPTYPE_RESETPASSWORD", 1);
+const CAPTYPE_RESETPASSWORD = 1;
 
 // see also forward_pset_links
-define("LINK_PARTNER", 1);
-define("LINK_BACKPARTNER", 2);
-define("LINK_REPO", 3);         // see also gitfetch
-define("LINK_REPOVIEW", 4);
-define("LINK_BRANCH", 5);
+const LINK_PARTNER = 1;
+const LINK_BACKPARTNER = 2;
+const LINK_REPO = 3;         // see also gitfetch
+const LINK_REPOVIEW = 4;
+const LINK_BRANCH = 5;
 
-define("HASNOTES_GRADE", 1);
-define("HASNOTES_COMMENT", 2);
-define("HASNOTES_ANY", 3);
+const HASNOTES_GRADE = 1;
+const HASNOTES_COMMENT = 2;
+const HASNOTES_ANY = 3;
 
 global $OK;
 $OK = 1;
