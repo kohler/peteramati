@@ -696,6 +696,8 @@ class PsetView {
                         }
                     }
                 }
+                $this->_gtot = round_grade($this->_gtot);
+                $this->_gtotne = round_grade($this->_gtotne);
             }
         }
     }

@@ -167,6 +167,7 @@ class CommitPsetInfo {
                         }
                     }
                 }
+                $t = round_grade($t);
             }
         }
         return $t;
