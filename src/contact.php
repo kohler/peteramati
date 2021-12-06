@@ -69,10 +69,13 @@ class Contact {
     public $college;
     public $extension;
     public $dropped;
+    /** @var ?string */
     public $username;
-    public $seascode_username;
+    /** @var ?string */
     public $github_username;
+    /** @var string */
     public $anon_username;
+    /** @var ?int */
     public $contactImageId;
     public $last_runorder;
     public $is_anonymous = false;
@@ -197,9 +200,6 @@ class Contact {
         if (isset($user->extension)) {
             $this->extension = !!$user->extension;
         }
-        if (isset($user->seascode_username)) {
-            $this->seascode_username = $user->seascode_username;
-        }
         if (isset($user->github_username)) {
             $this->github_username = $user->github_username;
         }
@@ -226,7 +226,7 @@ class Contact {
         if (isset($user->is_site_contact)) {
             $this->is_site_contact = $user->is_site_contact;
         }
-        $this->username = $this->github_username ? : $this->seascode_username;
+        $this->username = $this->github_username;
     }
 
     private function db_load() {
@@ -257,7 +257,7 @@ class Contact {
         if (isset($this->roles)) {
             $this->assign_roles((int) $this->roles);
         }
-        $this->username = $this->github_username ? : $this->seascode_username;
+        $this->username = $this->github_username;
     }
 
     static function set_main_user(Contact $user = null) {
@@ -291,7 +291,7 @@ class Contact {
             if (($this->is_anonymous = $is_anonymous)) {
                 $this->username = $this->anon_username;
             } else {
-                $this->username = $this->github_username ? : $this->seascode_username;
+                $this->username = $this->github_username;
             }
             self::set_sorter($this, $this->conf);
         }
@@ -961,7 +961,7 @@ class Contact {
     static function safe_registration($reg) {
         $safereg = (object) array();
         foreach (["email", "firstName", "lastName", "name", "preferredEmail",
-                  "affiliation", "collaborators", "seascode_username", "github_username",
+                  "affiliation", "collaborators", "github_username",
                   "unaccentedName"] as $k) {
             if (isset($reg[$k]))
                 $safereg->$k = $reg[$k];
@@ -1366,7 +1366,7 @@ class Contact {
     }
 
     function change_username($prefix, $username) {
-        assert($prefix === "github" || $prefix === "seascode");
+        assert($prefix === "github");
         $k = $prefix . "_username";
         $this->$k = $username;
         if ($this->conf->qe("update ContactInfo set $k=? where contactId=?", $username, $this->contactId)) {
@@ -1560,7 +1560,7 @@ class Contact {
         if (!$this->isPC && !($_SESSION["last_actas"] ?? null)) {
             return null;
         } else {
-            return $user->github_username ? : ($user->seascode_username ? : $user->huid);
+            return $user->github_username ? : $user->huid;
         }
     }
 }

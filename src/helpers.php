@@ -329,14 +329,13 @@ function foldbutton($foldtype, $title, $foldnum = 0) {
     return "<a href=\"javascript:void fold('$foldtype',0$foldnum)\" class='foldbutton fn$foldclass'$showtitle>+</a><a href=\"javascript:void fold('$foldtype',1$foldnum)\" class='foldbutton fx$foldclass'$hidetitle>&minus;</a>";
 }
 
+/** @param string|Contact $link
+ * @param string $text
+ * @return string */
 function become_user_link($link, $text = "user") {
-    global $Conf;
-    if (is_object($link) && $link->seascode_username)
-        $link = $link->seascode_username;
-    else if (is_object($link))
-        $link = $link->email;
-    return "<a class=\"actas\" href=\"" . $Conf->selfurl(null, ["actas" => $link]) . "\">"
-        . $Conf->cacheableImage("viewas.png", "[Become user]", "Act as " . htmlspecialchars($text)) . "</a>";
+    $link = is_object($link) ? $link->email : $link;
+    return "<a class=\"actas\" href=\"" . Conf::$main->selfurl(null, ["actas" => $link]) . "\">"
+        . Conf::$main->cacheableImage("viewas.png", "[Become user]", "Act as " . htmlspecialchars($text)) . "</a>";
 }
 
 function highlightMatch($match, $text, &$n = null) {

@@ -474,8 +474,6 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         $j = ["uid" => $s->contactId];
         if ($s->github_username) {
             $j["username"] = $s->github_username;
-        } else if ($s->seascode_username) {
-            $j["username"] = $s->seascode_username;
         } else {
             $j["username"] = $s->email ? : $s->huid;
         }

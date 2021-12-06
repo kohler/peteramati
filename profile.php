@@ -51,10 +51,11 @@ $xsep = " <span class='barsep'>&nbsp;|&nbsp;</span> ";
 
 echo "<div id='homeinfo'>";
 echo "<h2 class='homeemail'>", Text::user_html($User), "</h2>";
-if ($User->seascode_username || $User->huid) {
-    echo '<h3><a href="', $Conf->hoturl("index", array("u" => $Me->user_linkpart($User))), '">', htmlspecialchars($User->seascode_username ? : $User->huid), '</a>';
-    if ($Me->privChair)
+if ($User->username || $User->huid) {
+    echo '<h3><a href="', $Conf->hoturl("index", array("u" => $Me->user_linkpart($User))), '">', htmlspecialchars($User->username ? : $User->huid), '</a>';
+    if ($Me->privChair) {
         echo "&nbsp;", become_user_link($User);
+    }
     echo "</h3>";
 }
 if ($User->dropped)

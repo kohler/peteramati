@@ -76,7 +76,7 @@ elif [ -n "$username" ]; then
     result=`echo "select r.repoid, r.cacheid, r.url from Repository r
         join ContactInfo c
         join ContactLink l on (c.contactId=l.cid and l.type=3 and l.link=r.repoid)
-    where (c.seascode_username='$quoted' or c.github_username='$quoted')$psetquoted
+    where (c.github_username='$quoted')$psetquoted
 	order by r.snapcheckat asc limit 1" |
         ${LIBDIR}runsql.sh -N`
     repoid="`echo "$result" | awk '{ print $1 }'`"

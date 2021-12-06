@@ -6,13 +6,16 @@
 class RepositorySite {
     /** @var string */
     public $url;
+    /** @var string */
     public $siteclass;
-    static public $sitemap = ["github" => "GitHub_RepositorySite", "harvardseas" => "HarvardSEAS_RepositorySite"];
+    static public $sitemap = ["github" => "GitHub_RepositorySite"];
 
+    /** @return bool */
     static function is_primary(Repository $repo = null) {
         return $repo === null
             || $repo->reposite->siteclass === $repo->conf->repository_site_classes()[0];
     }
+    /** @return list<string> */
     static function site_classes(Conf $conf) {
         return array_map(function ($abbr) {
             return RepositorySite::$sitemap[$abbr];

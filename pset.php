@@ -159,8 +159,6 @@ function upload_grades($pset, $text, $fname) {
             $user = $Conf->user_by_email($who);
         } else if (($who = $line["github_username"]) && $who !== "-") {
             $user = $Conf->user_by_whatever($who, Conf::USERNAME_GITHUB);
-        } else if (($who = $line["seascode_username"]) && $who !== "-") {
-            $user = $Conf->user_by_whatever($who, Conf::USERNAME_HARVARDSEAS);
         } else if (($who = $line["huid"]) && $who !== "-") {
             $user = $Conf->user_by_whatever($who, Conf::USERNAME_HUID);
         } else if (($who = $line["username"]) && $who !== "-") {

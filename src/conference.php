@@ -155,10 +155,10 @@ class Conf {
     private $_repository_site_classes;
     private $_branch_map;
     const USERNAME_GITHUB = 1;
-    const USERNAME_HARVARDSEAS = 2;
-    const USERNAME_EMAIL = 4;
-    const USERNAME_HUID = 8;
-    const USERNAME_USERNAME = 16;
+    const USERNAME_EMAIL = 2;
+    const USERNAME_HUID = 4;
+    const USERNAME_USERNAME = 8;
+    /** @var int */
     private $_username_classes = 0;
 
     /** @var false|null|SessionList */
@@ -243,7 +243,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 158) {
+        if ($this->sversion < 159) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -426,9 +426,6 @@ class Conf {
         $this->_username_classes = 0;
         if (in_array("github", $this->_repository_site_classes)) {
             $this->_username_classes |= self::USERNAME_GITHUB;
-        }
-        if (in_array("harvardseas", $this->_repository_site_classes)) {
-            $this->_username_classes |= self::USERNAME_HARVARDSEAS;
         }
 
         // check tokens
@@ -915,7 +912,8 @@ class Conf {
         return $u && $u->contactId ? $u : null;
     }
 
-    /** @return ?Contact */
+    /** @param int $types
+     * @return ?Contact */
     function user_by_whatever($whatever, $types = 0) {
         if ($types === 0) {
             $types = $this->_username_classes | self::USERNAME_HUID | self::USERNAME_EMAIL;
@@ -934,10 +932,6 @@ class Conf {
         } else if (strpos($whatever, "@") === false) {
             if ($types & self::USERNAME_GITHUB) {
                 $q[] = "github_username=" . Dbl::utf8ci("?");
-                $qv[] = $whatever;
-            }
-            if ($types & self::USERNAME_HARVARDSEAS) {
-                $q[] = "seascode_username=?";
                 $qv[] = $whatever;
             }
             if (($types & self::USERNAME_HUID) && ctype_digit($whatever)) {
@@ -1429,11 +1423,13 @@ class Conf {
         return $t === null || $t <= 0 || $t >= Conf::$now;
     }
 
+    /** @return list<string> */
     function repository_site_classes() {
-        if (isset($this->opt["repositorySites"]) && is_array($this->opt["repositorySites"]))
+        if (isset($this->opt["repositorySites"]) && is_array($this->opt["repositorySites"])) {
             return $this->opt["repositorySites"];
-        else
+        } else {
             return ["github"];
+        }
     }
 
 
