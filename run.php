@@ -168,8 +168,8 @@ class RunRequest {
         if (!$this->runner->command) {
             assert(!!$this->runner->evaluate_function);
             $rr = RunResponse::make($this->runner, $info->repo);
-            $rr->done = true;
             $rr->timestamp = time();
+            $rr->done = true;
             $rr->status = "done";
             $rr->result = $info->runner_evaluate($this->runner, $rr->timestamp);
             return $rr;

@@ -4,23 +4,30 @@
 // See LICENSE for open-source distribution terms
 
 class PsetView {
-    /** @var Conf */
+    /** @var Conf
+     * @readonly */
     public $conf;
-    /** @var Pset */
+    /** @var Pset
+     * @readonly */
     public $pset;
-    /** @var Contact */
+    /** @var Contact
+     * @readonly */
     public $user;
-    /** @var Contact */
+    /** @var Contact
+     * @readonly */
     public $viewer;
     /** @var bool */
     public $pc_view;
-    /** @var ?Repository */
+    /** @var ?Repository
+     * @readonly */
     public $repo;
     /** @var ?Contact */
     public $partner;
-    /** @var ?string */
+    /** @var ?string
+     * @readonly */
     public $branch;
-    /** @var ?int */
+    /** @var ?int
+     * @readonly */
     public $branchid;
     /** @var ?bool */
     private $partner_same;
@@ -80,6 +87,8 @@ class PsetView {
     public $last_runner_error;
     /** @var array<string,array<int,PsetViewLineWarnings>> */
     private $transferred_warnings;
+    /** @var ?RunLogger */
+    private $_run_logger;
     public $viewed_gradeentries = [];
 
     /** @var int */
@@ -99,7 +108,8 @@ class PsetView {
     }
 
     /** @param ?string $hash
-     * @return PsetView */
+     * @return PsetView
+     * @suppress PhanAccessReadOnlyProperty */
     static function make(Pset $pset, Contact $user, Contact $viewer,
                          $hash = null) {
         $info = new PsetView($pset, $user, $viewer);
@@ -116,7 +126,8 @@ class PsetView {
     }
 
     /** @param ?string $bhash
-     * @return PsetView */
+     * @return PsetView
+     * @suppress PhanAccessReadOnlyProperty */
     static function make_from_set_at(StudentSet $sset, Contact $user, Pset $pset,
                                      $bhash = null) {
         $info = new PsetView($pset, $user, $sset->viewer);
@@ -1524,7 +1535,8 @@ class PsetView {
 
     /** @return RunLogger */
     function run_logger() {
-        return new RunLogger($this->pset, $this->repo);
+        $this->_run_logger = $this->_run_logger ?? new RunLogger($this->pset, $this->repo);
+        return $this->_run_logger;
     }
 
     /** @param RunnerConfig $runner
@@ -1567,12 +1579,11 @@ class PsetView {
     function update_recorded_jobs() {
         if ($this->repo && ($h = $this->hash())) {
             $runlog = $this->run_logger();
-            $aj = $runlog->active_job();
             $runs = [];
             foreach ($runlog->past_jobs() as $jobid) {
-                if (($rr = $runlog->job_brief_response($jobid))
+                if (($rr = $runlog->job_response($jobid))
                     && $rr->hash === $h
-                    && $jobid !== $aj) {
+                    && $rr->done) {
                     $runs[$rr->runner] = self::add_joblist($jobid, $runs[$rr->runner] ?? null);
                 }
             }

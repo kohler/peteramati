@@ -8,6 +8,8 @@ class RunLogger {
     public $pset;
     /** @var Repository */
     public $repo;
+    /** @var null|int|false */
+    private $_active_job;
 
     function __construct(Pset $pset, Repository $repo) {
         $this->pset = $pset;
@@ -95,7 +97,12 @@ class RunLogger {
 
     /** @return int|false */
     function active_job() {
-        return self::active_job_at($this->pid_file());
+        $this->_active_job = $this->_active_job ?? self::active_job_at($this->pid_file());
+        return $this->_active_job;
+    }
+
+    function invalidate_active_job() {
+        $this->_active_job = null;
     }
 
     /** @return list<int> */
@@ -120,10 +127,10 @@ class RunLogger {
         $envts = $runner->environment_timestamp();
         foreach ($this->past_jobs() as $t) {
             if ($t > $envts
-                && ($s = $this->job_brief_response($t))
-                && $s->runner === $runner->name
-                && ($hash === null || $s->hash === $hash)
-                && $this->active_job() !== $t) {
+                && ($rr = $this->job_response($t))
+                && $rr->runner === $runner->name
+                && ($hash === null || $rr->hash === $hash)
+                && $rr->done) {
                 return $t;
             } else if ($n >= 200) {
                 break;
@@ -149,67 +156,72 @@ class RunLogger {
     }
 
     /** @param int $jobid
-     * @return ?RunResponse */
-    function job_brief_response($jobid) {
-        if (($t = @file_get_contents($this->output_file($jobid), false, null, 0, 8192))
-            && str_starts_with($t, "++ {")
-            && ($pos = strpos($t, "\n"))
-            && ($j = json_decode(substr($t, 3, $pos - 3)))
-            && is_object($j)) {
-            return RunResponse::make_log($j);
-        } else {
-            return null;
-        }
-    }
-
-    /** @param int $jobid
      * @param ?int $offset
      * @return ?RunResponse */
-    function job_full_response($jobid, RunnerConfig $runner, $offset = null) {
-        $rr = RunResponse::make($runner, $this->repo);
+    function job_response($jobid, $offset = null) {
+        $logbase = $this->job_prefix($jobid);
+        $logfile = "{$logbase}.log";
+        if (($shortread = $offset === null || $offset > 32768)) {
+            $s = @file_get_contents($logfile, false, null, 0, 8192);
+        } else {
+            $s = @file_get_contents($logfile, false, null, 0);
+        }
+
+        if ($s === false
+            || !str_starts_with($s, "++ {")
+            || ($pos = strpos($s, "\n")) === false
+            || !($j = json_decode(substr($s, 3, $pos - 3)))) {
+            $rr = new RunResponse;
+            $rr->ok = false;
+            $rr->pset = $this->pset->urlkey;
+            $rr->repoid = $this->repo ? $this->repo->repoid : 0;
+            $rr->error = true;
+            $rr->message = $s === false ? "Log missing." : "Log corrupted.";
+            return $rr;
+        }
+
+        $rr = RunResponse::make_log($j);
         $rr->ok = true;
         $rr->timestamp = $jobid;
         $rr->done = $this->active_job() !== $jobid;
-        if ($rr->done) {
-            $rr->status = "done";
-        } else if (Conf::$now - $jobid <= 600) {
-            $rr->status = "working";
-        } else {
-            $rr->status = "old";
-        }
+
         if ($offset !== null) {
-            $logbase = $this->job_prefix($jobid);
-            $data = @file_get_contents("{$logbase}.log", false, null, max($offset, 0));
-            if ($data === false) {
-                $rr->ok = false;
-                $rr->error = true;
-                $rr->message = "No such log";
-                return $rr;
+            if ($shortread) {
+                $s = @file_get_contents($logfile, false, null, $offset);
+            } else {
+                $s = substr($s, $offset);
             }
+            if ($s === false) {
+                $s = "";
+            }
+
             // Fix up $data if it is not valid UTF-8.
-            if (!is_valid_utf8($data)) {
-                $data = UnicodeHelper::utf8_truncate_invalid($data);
-                if (!is_valid_utf8($data)) {
-                    $data = UnicodeHelper::utf8_replace_invalid($data);
+            if (!is_valid_utf8($s)) {
+                $s = UnicodeHelper::utf8_truncate_invalid($s);
+                if (!is_valid_utf8($s)) {
+                    $s = UnicodeHelper::utf8_replace_invalid($s);
                 }
             }
-            // Get time data, if it exists
-            if ($runner->timed_replay) {
-                $rr->timed = true;
-            }
-            if ($rr->done
-                && $offset <= 0
-                && $runner->timed_replay
-                && ($time = @file_get_contents("{$logbase}.log.time")) !== false) {
-                $rr->time_data = $time;
-                if ($runner->timed_replay !== true) {
-                    $rr->time_factor = $runner->timed_replay;
-                }
-            }
-            $rr->data = $data;
+
+            $rr->data = $s;
             $rr->offset = max($offset, 0);
-            $rr->end_offset = $rr->offset + strlen($data);
+            $rr->end_offset = $rr->offset + strlen($s);
+
+            // Get time data, if it exists
+            $runner = $this->pset->all_runners[$rr->runner];
+            if ($runner && $runner->timed_replay) {
+                $rr->timed = true;
+                if ($offset <= 0
+                    && $rr->done
+                    && ($time = @file_get_contents("{$logbase}.log.time")) !== false) {
+                    $rr->time_data = $time;
+                    if ($runner->timed_replay !== true) {
+                        $rr->time_factor = $runner->timed_replay;
+                    }
+                }
+            }
         }
+
         return $rr;
     }
 }

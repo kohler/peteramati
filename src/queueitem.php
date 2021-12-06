@@ -282,8 +282,7 @@ class QueueItem {
      * @param int $jobid
      * @return QueueItem */
     static function for_logged_job($info, $jobid) {
-        $runlog = new RunLogger($info->pset, $info->repo);
-        if (($rr = $runlog->job_brief_response($jobid))
+        if (($rr = $info->run_logger()->job_response($jobid))
             && ($rr->pset === $info->pset->urlkey
                 || $info->conf->pset_by_key($rr->pset) === $info->pset)) {
             $qi = self::make_info($info);
@@ -525,10 +524,11 @@ class QueueItem {
             throw new RunnerException("The pa-jail program has not been compiled.");
         }
 
-        $runlog = new RunLogger($pset, $repo);
+        $runlog = $info->run_logger();
         if (!$runlog->mkdirs()) {
             throw new RunnerException("Can’t create log directory.");
         }
+        $runlog->invalidate_active_job();
         if ($runlog->active_job()) {
             return false;
         }
@@ -796,7 +796,12 @@ class QueueItem {
      * @param bool $stop
      * @return RunResponse */
     function full_response($offset = 0, $write = null, $stop = false) {
-        $runlog = new RunLogger($this->pset(), $this->repo());
+        if ($this->_info) {
+            $runlog = $this->_info->run_logger();
+        } else {
+            $runlog = new RunLogger($this->pset(), $this->repo());
+        }
+
         if ((($write ?? "") !== "" || $stop)
             && $runlog->active_job() === $this->runat) {
             if (($write ?? "") !== "") {
@@ -809,20 +814,29 @@ class QueueItem {
             $now = microtime(true);
             do {
                 usleep(10);
-                $rr = $runlog->job_full_response($this->runat, $this->runner(), $offset);
+                $runlog->invalidate_active_job();
+                $rr = $runlog->job_response($this->runat, $offset);
             } while ($stop
-                     && $runlog->active_job() === $this->runat
+                     && !$rr->done
                      && microtime(true) - $now < 0.1);
         } else {
-            $rr = $runlog->job_full_response($this->runat, $this->runner(), $offset);
+            $rr = $runlog->job_response($this->runat, $offset);
         }
 
-        if ($rr->status !== "working"
+        if ($rr->done) {
+            $rr->status = "done";
+        } else if (Conf::$now - $this->runat <= 600) {
+            $rr->status = "working";
+        } else {
+            $rr->status = "old";
+        }
+
+        if ($rr->done
             && $this->queueid > 0) {
             $this->delete(false);
         }
 
-        if ($rr->status === "done"
+        if ($rr->done
             && $this->runner()->evaluate_function
             && ($info = $this->info())) {
             $rr->result = $info->runner_evaluate($this->runner(), $this->runat);

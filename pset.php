@@ -698,7 +698,7 @@ function default_runner_output($info, $runner) {
     $rr = null;
     if (!$info->is_handout_commit()
         && ($jobid = $info->latest_recorded_job($runner->name))) {
-        $rr = $info->run_logger()->job_full_response($jobid, $runner);
+        $rr = $info->run_logger()->job_response($jobid);
     }
     if (!$rr
         && !$info->viewer->can_run($info->pset, $runner, $info->user)) {
@@ -719,7 +719,7 @@ function default_runner_output($info, $runner) {
     if ($rr && isset($rr->timestamp)) {
         echo ' data-pa-timestamp="', $rr->timestamp, '"';
     }
-    // XXX following never runs currently (job_full_response returns null)
+    // XXX following never runs currently (job_response returns null data)
     if ($rr && isset($rr->data) && ($pos = strpos($rr->data, "\n\n"))) {
         echo ' data-pa-content="', htmlspecialchars(substr($rr->data, $pos + 2)), '"';
     }
