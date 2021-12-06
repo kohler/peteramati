@@ -68,7 +68,7 @@ class RunEnqueueBatch {
             if ($this->hash === "latest") {
                 $info->set_latest_nontrivial_commit();
             } else if ($this->hash && $this->hash !== "grading") {
-                if (($c = $info->connected_commit($this->hash, $info->pset, $info->branch))) {
+                if (($c = $info->connected_commit($this->hash))) {
                     $info->set_commit($c);
                 } else {
                     continue;
