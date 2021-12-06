@@ -26,6 +26,8 @@ class RunEnqueueBatch {
     public $sset_flags;
     /** @var ?string */
     public $usermatch;
+    /** @var ?string */
+    public $hash;
 
     function __construct(Pset $pset, RunnerConfig $runner, $usermatch = null) {
         $this->conf = $pset->conf;
@@ -57,29 +59,41 @@ class RunEnqueueBatch {
         $chainstr = $this->chainid ? " C{$this->chainid}" : "";
         $usermatch = $this->usermatch ? "*{$this->usermatch}*" : null;
         foreach ($sset as $info) {
-            if ($info->is_grading_commit()
-                && ($usermatch === null
-                    || fnmatch($usermatch, $info->user->email)
-                    || fnmatch($usermatch, $info->user->github_username)
-                    || fnmatch($usermatch, $info->user->anon_username))) {
-                $qi = QueueItem::make_info($info, $this->runner);
-                $qi->chain = $chain > 0 ? $chain : null;
-                $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
-                $qi->flags |= QueueItem::FLAG_UNWATCHED
-                    | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
-                $qi->tags = $this->tags;
-                foreach ($this->runsettings ?? [] as $k => $v) {
-                    $qi->runsettings[$k] = $v;
-                }
-                $qi->enqueue();
-                if (!$qi->chain) {
-                    $qi->schedule($nu);
-                }
-                if ($this->verbose) {
-                    fwrite(STDERR, $qi->unparse_key() . ": create{$chainstr}\n");
-                }
-                ++$nu;
+            if ($usermatch !== null
+                && !fnmatch($usermatch, $info->user->email)
+                && !fnmatch($usermatch, $info->user->github_username)
+                && !fnmatch($usermatch, $info->user->anon_username)) {
+                continue;
             }
+            if ($this->hash === "latest") {
+                $info->set_latest_nontrivial_commit();
+            } else if ($this->hash && $this->hash !== "grading") {
+                if (($c = $info->connected_commit($this->hash, $info->pset, $info->branch))) {
+                    $info->set_commit($c);
+                } else {
+                    continue;
+                }
+            }
+            if (!$info->hash()) {
+                continue;
+            }
+            $qi = QueueItem::make_info($info, $this->runner);
+            $qi->chain = $chain > 0 ? $chain : null;
+            $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
+            $qi->flags |= QueueItem::FLAG_UNWATCHED
+                | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+            $qi->tags = $this->tags;
+            foreach ($this->runsettings ?? [] as $k => $v) {
+                $qi->runsettings[$k] = $v;
+            }
+            $qi->enqueue();
+            if (!$qi->chain) {
+                $qi->schedule($nu);
+            }
+            if ($this->verbose) {
+                fwrite(STDERR, $qi->unparse_key() . ": create{$chainstr}\n");
+            }
+            ++$nu;
         }
         if ($chain > 0
             && ($qi = QueueItem::by_chain($this->conf, $chain))
@@ -96,6 +110,7 @@ class RunEnqueueBatch {
             "r:,runner:,run: Runner name",
             "e,ensure Run only if needed",
             "u:,user: Match these users",
+            "H:,hash:,commit: Use this commit",
             "c:,chain: Set chain ID",
             "t[],tag[] Add tag",
             "s[],setting[] Set NAME=VALUE",
@@ -147,6 +162,12 @@ class RunEnqueueBatch {
                 }
                 $reb->runsettings[$m[1]] = $m[2];
             }
+        }
+        if (isset($arg["H"])) {
+            if ($arg["H"] === "" || !ctype_xdigit($arg["H"])) {
+                throw new Error("bad `--commit`");
+            }
+            $reb->hash = strtolower($arg["H"]);
         }
         return $reb;
     }
