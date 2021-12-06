@@ -528,10 +528,12 @@ class QueueItem {
         if (!$runlog->mkdirs()) {
             throw new RunnerException("Can’t create log directory.");
         }
+
         $runlog->invalidate_active_job();
         if ($runlog->active_job()) {
             return false;
         }
+        $runlog->invalidate_active_job();
 
         // collect user information
         if ($runner->username) {
