@@ -2208,6 +2208,12 @@ class PsetView {
         if ($hide_left) {
             echo " pa-hide-left";
         }
+        if ($dinfo->tabwidth !== 4) {
+            echo " pa-tabwidth-", $dinfo->tabwidth;
+        }
+        if ($dinfo->wdiff) {
+            echo " pa-wdiff";
+        }
         if ($this->pc_view) {
             echo " uim pa-editablenotes live";
         }

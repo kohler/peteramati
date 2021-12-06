@@ -751,13 +751,10 @@ class Repository {
         }
     }
 
-    /** @param array<string,DiffInfo> $diffargs */
-    private function parse_diff($diffargs, Pset $pset, $hasha_arg, $hashb_arg, $options) {
-        $command = "git diff";
-        if ($options["wdiff"] ?? false) {
-            $command .= " -w";
-        }
-        $command .= " {$hasha_arg} {$hashb_arg} --";
+    /** @param array<string,DiffInfo> $diffargs
+     * @param string $diffoptions */
+    private function parse_diff($diffargs, Pset $pset, $hasha_arg, $hashb_arg, $diffoptions = "") {
+        $command = "git diff{$diffoptions} {$hasha_arg} {$hashb_arg} --";
         foreach ($diffargs as $fn => $dix) {
             $command .= " " . escapeshellarg(quotemeta($fn));
         }
@@ -853,6 +850,7 @@ class Repository {
         $no_user_collapse = $options["no_user_collapse"] ?? false;
         $needfiles = self::fix_diff_files($options["needfiles"] ?? null);
         $onlyfiles = self::fix_diff_files($options["onlyfiles"] ?? null);
+        $wdiff = !!($options["wdiff"] ?? false);
 
         // read "full" files
         if (!$ignore_diffconfig && !$no_full) {
@@ -900,6 +898,7 @@ class Repository {
                 // create diff record
                 $di = new DiffInfo($file, $diffconfig);
                 $di->set_repoa($this, $pset, $hasha, $line, $pset->is_handout($commita));
+                $di->set_wdiff($wdiff);
                 // decide whether file is collapsed
                 if ($no_user_collapse
                     && $diffconfig
@@ -942,7 +941,7 @@ class Repository {
             for ($i = 0; $i < $nd; ++$i) {
                 $darg[substr($xdiffs[$i]->filename, strlen($truncpfx))] = $xdiffs[$i];
                 if (count($darg) >= 200 || $i == $nd - 1) {
-                    $this->parse_diff($darg, $pset, $hasha_arg, $hashb_arg, $options);
+                    $this->parse_diff($darg, $pset, $hasha_arg, $hashb_arg, $wdiff ? " -w" : "");
                     $darg = [];
                 }
             }
@@ -959,6 +958,7 @@ class Repository {
                 if ($file && !isset($diffs[$file])) {
                     $diffs[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
                     $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $pset->is_handout($commita));
+                    $di->set_wdiff($wdiff);
                     $di->finish();
                 }
             }

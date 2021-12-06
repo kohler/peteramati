@@ -49,10 +49,11 @@ export class Filediff {
         if (!hasClass(this.element, "need-load")) {
             return new ImmediatePromise(this);
         } else {
-            const p = this.element.closest(".pa-psetinfo");
+            const p = this.element.closest(".pa-psetinfo"),
+                wdiff = hasClass(this.element, "pa-wdiff");
             removeClass(this.element, "need-load");
             return new Promise(resolve => {
-                $.ajax(hoturl("api/filediff", {psetinfo: this.element}), {
+                $.ajax(hoturl("api/filediff", {psetinfo: p, wdiff: wdiff ? 1 : null}), {
                     type: "GET", cache: false, dataType: "json",
                     data: {
                         file: this.file,

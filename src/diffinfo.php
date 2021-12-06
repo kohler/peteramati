@@ -28,6 +28,8 @@ class DiffInfo implements Iterator {
     public $highlight_allowed;
     /** @var int */
     public $tabwidth = 4;
+    /** @var bool */
+    public $wdiff = false;
     /** @var ?string */
     public $language;
     /** @var bool */
@@ -92,6 +94,11 @@ class DiffInfo implements Iterator {
         $this->_hasha = $hasha;
         $this->_filenamea = $filenamea;
         $this->_hasha_hrepo = $hasha_hrepo;
+    }
+
+    /** @param bool $wdiff */
+    function set_wdiff($wdiff) {
+        $this->wdiff = $wdiff;
     }
 
     /** @param ?bool $collapse */

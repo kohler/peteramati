@@ -171,7 +171,7 @@ class Repo_API {
         }
         $info->set_commit($api->commit);
         $lnorder = $info->visible_line_notes();
-        $diff = $info->repo->diff($api->pset, $base_commit, $info->commit(), array("needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file]));
+        $diff = $info->repo->diff($api->pset, $base_commit, $info->commit(), ["needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file], "wdiff" => !!$qreq->wdiff]);
         if (empty($diff)) {
             return ["ok" => false, "error" => "No diff."];
         }
