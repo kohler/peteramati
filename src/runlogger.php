@@ -187,9 +187,9 @@ class RunLogger {
 
         if ($offset !== null) {
             if ($shortread) {
-                $s = @file_get_contents($logfile, false, null, $offset);
+                $s = @file_get_contents($logfile, false, null, max($offset, 0));
             } else {
-                $s = substr($s, $offset);
+                $s = substr($s, max($offset, 0));
             }
             if ($s === false) {
                 $s = "";
