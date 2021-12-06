@@ -923,18 +923,28 @@ class Conf {
         $q = $qv = [];
         $whatever = trim($whatever);
         $user_type = 0;
+        $guess = Contact::$main_user;
         if ($whatever === "") {
             return null;
         } else if (str_starts_with($whatever, "[anon")) {
+            if ($guess && $guess->anon_username === $whatever) {
+                return $guess;
+            }
             $q[] = "anon_username=?";
             $qv[] = $whatever;
             $user_type = 1;
         } else if (strpos($whatever, "@") === false) {
             if ($types & self::USERNAME_GITHUB) {
+                if ($guess && $guess->github_username === $whatever) {
+                    return $guess;
+                }
                 $q[] = "github_username=" . Dbl::utf8ci("?");
                 $qv[] = $whatever;
             }
             if (($types & self::USERNAME_HUID) && ctype_digit($whatever)) {
+                if ($guess && $guess->huid === intval($whatever)) {
+                    return $guess;
+                }
                 $q[] = "huid=?";
                 $qv[] = $whatever;
             }
@@ -943,6 +953,9 @@ class Conf {
             if (str_ends_with($whatever, "@*")) {
                 $q[] = "email like '" . sqlq_for_like(substr($whatever, 0, -1)) . "%'";
             } else {
+                if ($guess && $guess->email === $whatever) {
+                    return $guess;
+                }
                 $q[] = "email=?";
                 $qv[] = $whatever;
             }

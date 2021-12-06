@@ -104,7 +104,10 @@ class PsetView {
         $this->user = $user;
         $this->viewer = $viewer;
         $this->pc_view = $viewer->isPC;
-        assert($viewer === $user || $this->pc_view);
+        assert($viewer->contactId === $user->contactId || $this->pc_view);
+        if ($viewer->contactId === $user->contactId && $viewer !== $user) {
+            error_log("Unexpectedly different Contact\n" . debug_string_backtrace());
+        }
     }
 
     /** @param ?string $hash
