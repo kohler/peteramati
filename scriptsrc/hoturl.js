@@ -50,8 +50,10 @@ function hoturl_clean(x, page_component) {
 
 function hoturl_psetinfo(elt, page, args) {
     const p = elt.closest(".pa-psetinfo");
-    let v = p.getAttribute("data-pa-user");
-    args.push("u=" + encodeURIComponent(v || siteinfo.uservalue));
+    let v;
+    if ((v = p.getAttribute("data-pa-user") || siteinfo.uservalue)) {
+        args.push("u=" + encodeURIComponent(v));
+    }
     if ((v = p.getAttribute("data-pa-pset"))) {
         args.push("pset=" + encodeURIComponent(v));
     }
