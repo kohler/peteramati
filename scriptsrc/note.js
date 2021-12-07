@@ -6,7 +6,7 @@ import { hasClass, addClass, removeClass } from "./ui.js";
 import { escape_entities } from "./encoders.js";
 import { hoturl } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
-import { render_text } from "./render.js";
+import { ftext } from "./render.js";
 import { text_eq } from "./utils.js";
 import { Filediff, Linediff } from "./diff.js";
 
@@ -14,11 +14,12 @@ import { Filediff, Linediff } from "./diff.js";
 export class Note {
     constructor() {
         this.iscomment = false;
-        this.text = "";
+        this.ftext = "";
+        this.format = null;
     }
 
     empty() {
-        return this.text === "";
+        return this.ftext === "";
     }
 
     get file() {
@@ -33,6 +34,19 @@ export class Note {
         }
     }
 
+    get aline() {
+        return new Linediff(this.element || this.source).aline;
+    }
+
+    aline_within(bound) {
+        return new Linediff(this.element || this.source).aline_within(bound);
+    }
+
+    get editable_text() {
+        const ft = ftext.parse(this.ftext);
+        return ft[1];
+    }
+
     static parse(x) {
         const n = new Note;
         if (typeof x === "string" && x !== "") {
@@ -43,30 +57,31 @@ export class Note {
     }
 
     assign(x) {
+        let myftext = [null, ""];
         if (typeof x === "number") {
             this.iscomment = false;
-            this.text = "";
+            this.ftext = "";
             this.users = null;
             this.version = x;
-            this.format = null;
         } else if (Array.isArray(x)) {
             this.iscomment = x[0];
-            this.text = x[1];
+            this.ftext = x[1];
+            myftext = ftext.parse(x[1]);
             this.users = x[2] || null;
-            this.version = (x[3] && typeof x[3] === "number" ? x[3] : null);
-            this.format = (x[4] && typeof x[4] === "number" ? x[4] : null);
+            this.version = x[3] && typeof x[3] === "number" ? x[3] : null;
         }
+        this.format = myftext[0];
 
         const elt = this.element;
         if (elt) {
-            if (this.text === "" && this.version == null) {
+            if (this.ftext === "" && this.version == null) {
                 elt.removeAttribute("data-pa-note");
-            } else if (this.text === "" && this.users == null) {
+            } else if (this.ftext === "" && this.users == null) {
                 elt.setAttribute("data-pa-note", "" + this.version);
             } else {
-                const a = [this.iscomment, this.text];
-                if (this.users != null || this.version != null || this.format != null) {
-                    a.push(this.users, this.version, this.format);
+                const a = [this.iscomment, this.ftext];
+                if (this.users != null || this.version != null) {
+                    a.push(this.users, this.version);
                 }
                 elt.setAttribute("data-pa-note", JSON.stringify(a));
             }
@@ -113,8 +128,8 @@ export class Note {
             this.element = document.createElement("div");
             this.element.className = "pa-dl pa-gw";
             this.element.setAttribute("data-landmark", lineid);
-            if (this.version || this.text !== "") {
-                this.element.setAttribute("data-pa-note", JSON.stringify([this.iscomment, this.text, this.users, this.version, this.format]));
+            if (this.version || this.ftext !== "") {
+                this.element.setAttribute("data-pa-note", JSON.stringify([this.iscomment, this.ftext, this.users, this.version]));
             }
             let box = document.createElement("div");
             box.className = "pa-notebox";
@@ -126,7 +141,7 @@ export class Note {
 
     cancel_edit() {
         if (this.element && hasClass(this.element, "editing")) {
-            $(this.element).find("textarea").val(this.text);
+            $(this.element).find("textarea").val(this.editable_text);
         }
         return this;
     }
@@ -136,7 +151,7 @@ export class Note {
 
         if (hasClass(this.element, "editing")) {
             const $text = $(this.element).find("textarea");
-            if ($text.length && !text_eq(this.text, $text.val().replace(/\s+$/, ""))) {
+            if ($text.length && !text_eq(this.editable_text, $text.val().replace(/\s+$/, ""))) {
                 return false;
             }
             removeClass(this.element, "editing");
@@ -151,7 +166,7 @@ export class Note {
             $content.remove();
         }
 
-        if (this.text === "") {
+        if (this.ftext === "") {
             fix_links_at(this.element);
             if (transition) {
                 $(this.element).children().slideUp(80);
@@ -181,18 +196,10 @@ export class Note {
                 t += '<div class="pa-note-author">[' + authors.join(', ') + ']</div>';
             }
         }
-        t = t.concat('<div class="pa-dr pa-note pa-', this.iscomment ? 'comment' : 'grade', 'note');
-        if (this.format) {
-            t = t.concat('" data-format="', this.format);
-        }
-        t += '"></div></div>';
+        t = t.concat('<div class="pa-dr pa-note pa-', this.iscomment ? 'comment' : 'grade', 'note"></div></div>');
         $td.append(t);
 
-        if (!this.format) {
-            $td.find(".pa-note").addClass("format0").text(this.text);
-        } else {
-            render_text(this.format, this.text, $td.find(".pa-note")[0]);
-        }
+        ftext.render(this.ftext, $td.find(".pa-note")[0]);
 
         fix_links_at(this.element);
         if (transition) {
@@ -204,7 +211,7 @@ export class Note {
         return true;
     }
 
-    save(text, iscomment) {
+    save_ftext(ftext, iscomment) {
         if (this.element) {
             if (hasClass(this.element, "pa-outstanding")) {
                 return Promise.reject(new Error("Outstanding request"));
@@ -219,13 +226,12 @@ export class Note {
             pi = fd.closest(".pa-psetinfo"),
             grb = tr.closest(".pa-grade-range-block");
 
-        const data = {note: text};
+        const data = {ftext: ftext}, aline = this.aline_within(1000);
         if (iscomment) {
             data.iscomment = 1;
         }
-        data.format = this.format;
-        if (data.format == null) {
-            data.format = document.body.getAttribute("data-default-format");
+        if (aline) {
+            data.aline = aline;
         }
 
         if (grb) {
@@ -260,6 +266,16 @@ export class Note {
                 }
             });
         });
+    }
+
+    save_text(text, iscomment) {
+        let format = this.format;
+        if (format == null) {
+            format = +document.body.getAttribute("data-default-format");
+            if (isNaN(format))
+                format = 0;
+        }
+        return this.save_ftext(ftext.unparse(format, text), iscomment);
     }
 }
 

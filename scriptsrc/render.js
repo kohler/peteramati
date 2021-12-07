@@ -25,8 +25,22 @@ function render_with(r, text, context) {
     }
 }
 
+export function parse_ftext(t) {
+    let fmt = 0, pos = 0;
+    while (true) {
+        const ch = t.charCodeAt(pos);
+        if (pos === 0 ? ch !== 60 : ch !== 62 && (ch < 48 || ch > 57)) {
+            return [0, t];
+        } else if (pos !== 0 && ch >= 48 && ch <= 57) {
+            fmt = 10 * fmt + ch - 48;
+        } else if (ch === 62) {
+            return pos === 1 ? [0, t] : [fmt, t.substring(pos + 1)];
+        }
+        ++pos;
+    }
+}
 
-let default_format = 0;
+
 const renderers = {};
 
 export function render_text(format, text, context) {
@@ -42,8 +56,16 @@ render_text.add_format = function (r) {
 
 render_text.on_page = function () {
     $(".need-format").each(function () {
-        const format = this.getAttribute("data-format") || default_format,
-            content = this.getAttribute("data-content") || this.textContent;
+        let format = this.getAttribute("data-format"),
+            content = this.getAttribute("data-content");
+        if (content == null) {
+            content = this.textContent;
+        }
+        if (format == null) {
+            const ft = parse_ftext(content);
+            format = ft[0];
+            content = ft[1];
+        }
         render_text(format, content, this);
     });
 };
@@ -103,17 +125,18 @@ render_text.add_format({
 
 
 export function render_ftext(ftext, context) {
-    let ch, pos, dig, r;
-    if (ftext.charAt(0) === "<"
-        && (ch = ftext.charAt(1)) >= "0"
-        && ch <= "9"
-        && (pos = ftext.indexOf(">")) >= 2
-        && /^\d+$/.test((dig = ftext.substring(1, pos)))
-        && (r = renderers[+dig])) {
-        return render_with(r, ftext.substring(pos + 1), context);
-    } else {
-        return render_with(renderers[0], ftext, context);
-    }
+    const ft = parse_ftext(ftext);
+    return render_with(renderers[ft[0]] || renderers[0], ft[1], context);
 }
+
+
+export const ftext = {
+    parse: parse_ftext,
+    unparse: function (format, text) {
+        return format || text.startsWith("<") ? "<".concat(format || 0, ">", text) : text;
+    },
+    render: render_ftext
+};
+
 
 $(render_text.on_page);

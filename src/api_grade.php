@@ -373,7 +373,8 @@ class Grade_API {
             || !$apply->file
             || strlen($apply->line) < 2
             || ($apply->line[0] !== "a" && $apply->line[0] !== "b")
-            || !ctype_digit(substr($apply->line, 1))) {
+            || !ctype_digit(substr($apply->line, 1))
+            || (isset($apply->aline) && !ctype_digit($apply->aline))) {
             return ["ok" => false, "error" => "Invalid request."];
         }
 
@@ -407,10 +408,11 @@ class Grade_API {
             $note->users[] = $user->contactId;
         }
         $note->iscomment = isset($apply->iscomment) && $apply->iscomment;
-        $note->text = rtrim(cleannl($apply->text ?? $apply->note ?? ""));
+        // XXX apply->note, apply->text obsolete
+        $note->ftext = rtrim(cleannl($apply->ftext ?? $apply->note ?? $apply->text ?? ""));
         $note->version = intval($note->version) + 1;
-        if (isset($apply->format) && ctype_digit($apply->format)) {
-            $note->format = intval($apply->format);
+        if (isset($apply->aline)) {
+            $note->aline = intval($apply->aline);
         }
         return ["ok" => true, "note" => $note];
     }

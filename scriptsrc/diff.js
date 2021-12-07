@@ -167,6 +167,20 @@ export class Linediff {
             return "b".concat(e.firstChild.nextSibling.getAttribute("data-landmark"));
         }
     }
+    get aline() {
+        return this.aline_within(Infinity);
+    }
+    aline_within(bound) {
+        let e = this.element;
+        while (e && bound >= 0) {
+            if (hasClass(e, "pa-gc")) {
+                return +e.firstChild.getAttribute("data-landmark");
+            }
+            e = e.previousSibling;
+            --bound;
+        }
+        return 0;
+    }
     get hash() {
         const e = this.element, fd = Filediff.closest(e), uf = fd.element.id;
         if (e.hasAttribute("data-landmark")) {

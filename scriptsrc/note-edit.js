@@ -57,9 +57,10 @@ function render_form($tr, note, transition) {
     var $form = $(t + '</div></form>').appendTo($td);
 
     var $ta = $form.find("textarea");
-    if (note && note.text !== null) {
-        $ta.text(note.text);
-        $ta[0].setSelectionRange && $ta[0].setSelectionRange(note.text.length, note.text.length);
+    if (note && note.ftext !== null) {
+        const text = note.editable_text;
+        $ta.text(text);
+        $ta[0].setSelectionRange && $ta[0].setSelectionRange(text.length, text.length);
     }
     $ta.autogrow().keydown(textarea_keydown);
     $form.find("input[name=iscomment]").prop("checked", !!(note && note.iscomment));
@@ -160,7 +161,7 @@ function pa_save_my_note(elt) {
             iscomment = f.elements.iscomment && f.elements.iscomment.checked;
         $(f).find(".pa-save-message").remove();
         $(f).find(".aab").append('<div class="aabut pa-save-message">Saving…</div>');
-        Note.at(elt).save(text, iscomment).then(() => {
+        Note.at(elt).save_text(text, iscomment).then(() => {
             const click_tr = curline ? curline.visible_source() : null;
             if (click_tr) {
                 capture(click_tr.element, true);

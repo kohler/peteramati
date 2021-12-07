@@ -2386,13 +2386,13 @@ class PsetView {
 
     private function echo_linenote(LineNote $note) {
         echo '<div class="pa-dl pa-gw'; /* NB script depends on this class exactly */
-        if ((string) $note->text === "") {
+        if ((string) $note->ftext === "") {
             echo ' hidden';
         }
         echo '" data-landmark="', $note->lineid,
             '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render())),
             '"><div class="pa-notebox">';
-        if ((string) $note->text === "") {
+        if ((string) $note->ftext === "") {
             echo '</div></div>';
             return;
         }
@@ -2425,13 +2425,13 @@ class PsetView {
             }
         }
         echo '<div class="pa-dr pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
-        if ($note->format) {
-            echo ' need-format" data-format="', $note->format;
+        if (str_starts_with($note->ftext, "<")) {
+            echo ' need-format';
             $this->need_format = true;
         } else {
             echo ' format0';
         }
-        echo '">', htmlspecialchars($note->text), '</div>';
+        echo '">', htmlspecialchars($note->ftext), '</div>';
         echo '</div></div></div>';
     }
 
