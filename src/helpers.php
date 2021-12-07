@@ -52,6 +52,7 @@ class JsonReplacement implements JsonSerializable, JsonIsReplacement {
     function __construct($x) {
         $this->x = $x;
     }
+    #[\ReturnTypeWillChange]
     function jsonSerialize() {
         return $this->x;
     }

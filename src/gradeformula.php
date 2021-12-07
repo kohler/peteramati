@@ -50,6 +50,7 @@ abstract class GradeFormula implements JsonSerializable {
         return $this->_allv;
     }
 
+    #[\ReturnTypeWillChange]
     function jsonSerialize() {
         $x = [$this->_op];
         foreach ($this->_a as $a) {
@@ -259,7 +260,7 @@ class Number_GradeFormula extends GradeFormula {
     function evaluate(Contact $student) {
         return $this->v;
     }
-    function jsonSerialize() {
+    function jsonSerialize(): float {
         return $this->v;
     }
 }
@@ -287,7 +288,7 @@ class PsetTotal_GradeFormula extends GradeFormula {
     function export_grade_names(&$v) {
         $v[] = "{$this->pset->id}.total" . ($this->noextra ? "_noextra" : "");
     }
-    function jsonSerialize() {
+    function jsonSerialize(): string {
         return $this->pset->nonnumeric_key . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "_norm" : "");
     }
 }
@@ -317,7 +318,7 @@ class CategoryTotal_GradeFormula extends GradeFormula {
             $v[] = "{$pset->id}.total" . ($this->noextra ? "_noextra" : "");
         }
     }
-    function jsonSerialize() {
+    function jsonSerialize(): string {
         return $this->category . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "" : "_raw");
     }
 }

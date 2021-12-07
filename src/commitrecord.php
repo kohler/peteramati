@@ -49,7 +49,7 @@ class CommitRecord implements JsonSerializable {
             return in_array($dir, $this->directory);
         }
     }
-    function jsonSerialize() {
+    function jsonSerialize(): string {
         return $this->hash;
     }
 }

@@ -22,6 +22,7 @@ class GitHubResponse implements JsonSerializable {
     function __construct($url) {
         $this->url = $url;
     }
+    #[\ReturnTypeWillChange]
     function jsonSerialize() {
         return $this->response ?? ["status" => $this->status, "content" => $this->content];
     }

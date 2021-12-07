@@ -156,6 +156,7 @@ class GradeExport implements JsonSerializable {
     }
 
     /** @return array */
+    #[\ReturnTypeWillChange]
     function jsonSerialize() {
         $r = [];
         if (isset($this->uid)) {

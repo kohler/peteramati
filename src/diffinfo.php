@@ -456,7 +456,7 @@ class DiffInfo implements Iterator {
 
 
     /** @return array{string,?int,?int,string,?int} */
-    function current() {
+    function current(): array {
         $x = array_slice($this->_diff, $this->_itpos, 4);
         if ($this->_dflags !== null && isset($this->_dflags[$this->_itpos])) {
             $x[] = $this->_dflags[$this->_itpos];
@@ -464,19 +464,19 @@ class DiffInfo implements Iterator {
         return $x;
     }
     /** @return int */
-    function key() {
+    function key(): int {
         return $this->_itpos >> 2;
     }
     /** @return void */
-    function next() {
+    function next(): void {
         $this->_itpos += 4;
     }
     /** @return void */
-    function rewind() {
+    function rewind(): void {
         $this->_itpos = 0;
     }
     /** @return bool */
-    function valid() {
+    function valid(): bool {
         return $this->_itpos < $this->_diffsz;
     }
     /** @return string */

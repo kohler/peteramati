@@ -19,7 +19,7 @@ class LateHoursData implements JsonSerializable {
             && !isset($this->timestamp) && !isset($this->deadline);
     }
 
-    function jsonSerialize() {
+    function jsonSerialize(): array {
         $j = [];
         if (isset($this->hours)) {
             $j["hours"] = $this->hours;

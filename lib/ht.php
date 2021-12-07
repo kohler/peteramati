@@ -200,7 +200,9 @@ class Ht {
                 if ($first_value === false) {
                     $first_value = $value;
                 }
-                if (strcmp((string) $value, $selected) === 0 && !$has_selected) {
+                if ($selected !== null
+                    && strcmp((string) $value, $selected) === 0
+                    && !$has_selected) {
                     $x .= ' selected';
                     $has_selected = true;
                 }

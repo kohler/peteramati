@@ -91,24 +91,24 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
             return null;
         }
     }
-    function offsetExists($offset) {
+    function offsetExists($offset): bool {
         return property_exists($this, $offset);
     }
-    function& offsetGet($offset) {
+    function& offsetGet($offset): string {
         $x = null;
         if (property_exists($this, $offset)) {
             $x =& $this->$offset;
         }
         return $x;
     }
-    function offsetSet($offset, $value) {
+    function offsetSet($offset, $value): void {
         $this->$offset = $value;
         unset($this->____a[$offset]);
     }
-    function offsetUnset($offset) {
+    function offsetUnset($offset): void {
         unset($this->$offset);
     }
-    function getIterator() {
+    function getIterator(): Traversable {
         return new ArrayIterator($this->as_array());
     }
     function __set($name, $value) {
@@ -161,11 +161,10 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
             $this->$name = $value;
         }
     }
-    /** @return int */
-    function count() {
+    function count(): int {
         return count(get_object_vars($this)) - 8;
     }
-    function jsonSerialize() {
+    function jsonSerialize(): array {
         return $this->as_array();
     }
     /** @return array<string,mixed> */

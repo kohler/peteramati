@@ -83,6 +83,7 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
 
 
     /** @return int|non-empty-list */
+    #[\ReturnTypeWillChange]
     function jsonSerialize() {
         if ((string) $this->text === "") {
             return $this->version;

@@ -260,23 +260,22 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         }
     }
 
-    /** @return bool */
-    function offsetExists($offset) {
+    function offsetExists($offset): bool {
         return isset($this->_u[$offset])
             && $this->pset
             && $this->info(intval($offset));
     }
 
     /** @return ?PsetView */
-    function offsetGet($offset) {
+    function offsetGet($offset): ?object {
         return $this->info(intval($offset));
     }
 
-    function offsetSet($offset, $value) {
+    function offsetSet($offset, $value): void {
         throw new Error;
     }
 
-    function offsetUnset($offset) {
+    function offsetUnset($offset): void {
         throw new Error;
     }
 
@@ -422,17 +421,17 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
 
 
     /** @return PsetView */
-    function current() {
+    function current(): object {
         return PsetView::make_from_set_at($this, $this->_ua[$this->_upos], $this->pset);
     }
 
     /** @return int */
-    function key() {
+    function key(): int {
         return $this->_ua[$this->_upos]->contactId;
     }
 
     /** @return void */
-    function next() {
+    function next(): void {
         ++$this->_upos;
         while ($this->_upos < count($this->_ua)
                && ($u = $this->_ua[$this->_upos])
@@ -452,20 +451,20 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     }
 
     /** @return void */
-    function rewind() {
+    function rewind(): void {
         assert($this->_infos === null);
         $this->_upos = -1;
         $this->next();
     }
 
     /** @return bool */
-    function valid() {
+    function valid(): bool {
         return $this->_upos < count($this->_ua);
     }
 
 
     /** @return int */
-    function count() {
+    function count(): int {
         return count($this->_ua);
     }
 

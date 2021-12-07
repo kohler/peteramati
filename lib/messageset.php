@@ -23,7 +23,7 @@ class MessageItem implements JsonSerializable {
         $this->status = $status;
     }
 
-    function jsonSerialize() {
+    function jsonSerialize(): object {
         $x = [];
         if ($this->field !== null) {
             $x["field"] = $this->field;

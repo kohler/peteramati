@@ -105,7 +105,7 @@ class RunResponse implements JsonSerializable {
         return false;
     }
 
-    function jsonSerialize() {
+    function jsonSerialize(): array {
         $a = [];
         foreach (get_object_vars($this) as $k => $v) {
             if ($v !== null)
