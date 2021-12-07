@@ -243,7 +243,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 159) {
+        if ($this->sversion < 160) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -2669,7 +2669,7 @@ class Conf {
             "gradestatistics" => "3 GradeStatistics_API::run",
             "jserror" => "1 JSError_API::jserror",
             "latestcommit" => "1 Repo_API::latestcommit",
-            "linenote" => "3 Grade_API::linenote",
+            "linenote" => "3 LineNote_API::linenote",
             "multigrade" => "3 Grade_API::multigrade",
             "multiresolveflag" => "0 Flag_API::multiresolve",
             "repositories" => "17 Repo_API::user_repositories",

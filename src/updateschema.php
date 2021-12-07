@@ -806,6 +806,10 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table `ContactInfo` drop `seascode_username`")) {
         $conf->update_schema_version(159);
     }
+    if ($conf->sversion === 159
+        && $conf->ql_ok("alter table `CommitNotes` add `updateat` bigint NOT NULL DEFAULT '0'")) {
+        $conf->update_schema_version(160);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

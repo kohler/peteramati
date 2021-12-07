@@ -1000,21 +1000,23 @@ class PsetView {
             $hasactiveflags = self::notes_hasactiveflags($new_notes);
             if ($cpi->phantom) {
                 $commit = $commit ?? $this->connected_commit($hash);
-                $result = $this->conf->qe("insert ignore into CommitNotes set pset=?, bhash=?,
-                    repoid=?, commitat=?,
-                    notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?",
-                    $cpi->pset, $cpi->bhash,
-                    $this->repo->repoid, $commit ? $commit->commitat : null,
-                    $notes, $haslinenotes, $hasflags, $hasactiveflags);
+                $commitat = $commit ? $commit->commitat : null;
+                $result = $this->conf->qe("insert ignore into CommitNotes set
+                    pset=?, bhash=?, repoid=?, commitat=?,
+                    notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?,
+                    notesversion=?, updateat=?",
+                    $cpi->pset, $cpi->bhash, $this->repo->repoid, $commitat,
+                    $notes, $haslinenotes, $hasflags, $hasactiveflags,
+                    1, Conf::$now);
             } else if ($old_notes === $notes) {
                 return;
             } else {
                 $result = $this->conf->qe("update CommitNotes set
                     notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?,
-                    notesversion=?
+                    notesversion=?, updateat=?
                     where pset=? and bhash=? and notesversion=?",
                     $notes, $haslinenotes, $hasflags, $hasactiveflags,
-                    $cpi->notesversion + 1,
+                    $cpi->notesversion + 1, Conf::$now,
                     $cpi->pset, $cpi->bhash, $cpi->notesversion);
             }
             if ($result && $result->affected_rows) {

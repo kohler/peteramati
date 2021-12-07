@@ -24,6 +24,10 @@ class CommitPsetInfo {
     public $haslinenotes = 0;
     /** @var ?string */
     public $xnotes;
+    /** @var int */
+    public $updateat = 0;
+    /** @var ?string */
+    public $repourl;
 
     /** @var non-empty-string */
     public $hash;
@@ -84,9 +88,13 @@ class CommitPsetInfo {
         $this->hasflags = (int) $x->hasflags;
         $this->hasactiveflags = (int) $x->hasactiveflags;
         $this->haslinenotes = (int) $x->haslinenotes;
+        $this->updateat = (int) $x->updateat;
         $this->xnotes = $x->xnotesOverflow ?? $x->xnotes;
         $this->jnotes = null;
         $this->jxnotes = null;
+        if (isset($x->repourl)) {
+            $this->repourl = $x->repourl;
+        }
     }
 
     function materialize(Conf $conf) {
@@ -97,6 +105,11 @@ class CommitPsetInfo {
         }
     }
 
+
+    /** @return non-empty-string */
+    function hash() {
+        return bin2hex($this->bhash);
+    }
 
     /** @return ?object */
     function jnotes() {

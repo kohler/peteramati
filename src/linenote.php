@@ -73,6 +73,15 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
         return (string) $this->ftext === "";
     }
 
+    /** @return int */
+    function aline() {
+        if (str_starts_with($this->lineid, "a")) {
+            return intval(substr($this->lineid, 1));
+        } else {
+            return (int) $this->aline;
+        }
+    }
+
 
     /** @return string */
     function render_line_link_html(Pset $pset = null) {
