@@ -531,6 +531,9 @@ export function run(button, opts) {
             a.run = category;
         }
         a.offset = offset;
+        if (args && args.offset != null) {
+            a.offset = args.offset;
+        }
         if (checkt) {
             a.check = checkt;
         } else if (args && args.stop && kill_checkt) {
