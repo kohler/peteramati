@@ -244,7 +244,7 @@ export function render_terminal(container, string, options) {
                 addlinepart(node, prefix);
             }
             var anchor = filematch.lineid_anchor("b" + line);
-            var a = $("<a href=\"#".concat(anchor, "\" class=\"uu pa-goto\"></a>"));
+            var a = $("<a href=\"#".concat(anchor, "\" class=\"u pa-goto\"></a>"));
             a.text(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;

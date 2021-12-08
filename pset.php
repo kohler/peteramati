@@ -296,8 +296,8 @@ function echo_grade_cdf($info) {
     if (is_string($Qreq->gg)) {
         echo '" data-pa-gg-type="', htmlspecialchars($Qreq->gg);
     }
-    echo '"><a class="qq ui js-grgraph-flip prev" href="">&lt;</a>';
-    echo '<a class="qq ui js-grgraph-flip next" href="">&gt;</a>';
+    echo '"><button type="button" class="btn-qlink ui js-grgraph-flip prev">&lt;</button>';
+    echo '<button type="button" class="btn-qlink ui js-grgraph-flip next">&gt;</button>';
     echo '<h4 class="title pa-grgraph-type"></h4>';
     if ($info->can_view_grade_statistics_graph()) {
         echo '<div class="pa-plot" style="width:350px;height:200px"></div>';
@@ -416,7 +416,7 @@ function echo_commit($info, $qreq) {
                 ? ["commit" => $gc->hash, "commit1" => $tc->hash]
                 : ["commit" => $tc->hash, "commit1" => $gc->hash];
             $remarks[] = [true, "This is not "
-                . "<a class=\"uu\" href=\"" . $info->hoturl("pset", ["commit" => $gc->hash])
+                . "<a class=\"u\" href=\"" . $info->hoturl("pset", ["commit" => $gc->hash])
                 . "\">the commit currently marked for grading</a>"
                 . " <span class=\"n\">(<a href=\"" . $info->hoturl("diff", $args)
                 . "\">see diff</a>)</span>."
@@ -425,7 +425,7 @@ function echo_commit($info, $qreq) {
     }
     if (!$info->is_lateish_commit()) {
         $remarks[] = [true, "This is not "
-                      . "<a class=\"uu\" href=\"" . $info->hoturl("pset", ["commit" => $info->latest_hash()]) . "\">the latest commit</a>"
+                      . "<a class=\"u\" href=\"" . $info->hoturl("pset", ["commit" => $info->latest_hash()]) . "\">the latest commit</a>"
                       . " <span style=\"font-weight:normal\">(<a href=\"" . $info->hoturl("diff", ["commit1" => $info->latest_hash()]) . "\">see diff</a>)</span>."];
     }
     $lhd = $info->late_hours_data();
@@ -706,9 +706,9 @@ function default_runner_output($info, $runner) {
     if (!$rr || !isset($rr->timestamp)) {
         echo ' hidden';
     }
-    echo '"><h3><a class="qq ui pa-run-show" href="">',
+    echo '"><h3><button type="button" class="btn-qlink ui pa-run-show">',
         '<span class="foldarrow">&#x25B6;</span>',
-        htmlspecialchars($runner->display_title), '</a></h3>',
+        htmlspecialchars($runner->display_title), '</button></h3>',
         '<div class="pa-run pa-run-short hidden" id="pa-run-', $runner->name, '"';
     if ($runner->xterm_js
         || ($runner->xterm_js === null && $info->pset->run_xterm_js)) {

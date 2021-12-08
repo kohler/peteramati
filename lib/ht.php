@@ -153,7 +153,8 @@ class Ht {
      * @return string */
     static function select($name, $opt, $selected = null, $js = null) {
         if (is_array($selected) && $js === null) {
-            list($js, $selected) = array($selected, null);
+            $js = $selected;
+            $selected = null;
         }
         $disabled = $js["disabled"] ?? null;
         if (is_array($disabled)) {
@@ -169,7 +170,7 @@ class Ht {
             } else if (is_array($info)) {
                 $info = (object) $info;
             } else if (is_scalar($info)) {
-                $info = (object) array("label" => $info);
+                $info = (object) ["label" => $info];
                 if (is_array($disabled) && isset($disabled[$value])) {
                     $info->disabled = $disabled[$value];
                 }
@@ -293,7 +294,7 @@ class Ht {
             $js = $html;
             $html = "";
         } else if ($js === null) {
-            $js = array();
+            $js = [];
         }
         $type = isset($js["type"]) ? $js["type"] : "button";
         if (!isset($js["value"]) && isset($js["name"]) && $type !== "button") {
@@ -331,7 +332,7 @@ class Ht {
             $js = $value;
             $value = null;
         } else if ($js === null) {
-            $js = array();
+            $js = [];
         }
         $js["class"] = trim(($js["class"] ?? "") . " hidden");
         return self::submit($name, $value, $js);
@@ -380,35 +381,6 @@ class Ht {
             . '>' . htmlspecialchars($value) . '</textarea>';
     }
 
-    static function actions($actions, $js = array(), $extra_text = "") {
-        if (empty($actions)) {
-            return "";
-        }
-        $actions = array_values($actions);
-        $js = $js ? : array();
-        if (!isset($js["class"])) {
-            $js["class"] = "aab";
-        }
-        $t = "<div" . self::extra($js) . ">";
-        foreach ($actions as $i => $a) {
-            if ($a !== "") {
-                $t .= '<div class="aabut';
-                if ($i + 1 < count($actions) && $actions[$i + 1] === "") {
-                    $t .= " aabutsp";
-                }
-                if (is_array($a) && count($a) > 2 && (string) $a[2] !== "") {
-                    $t .= " " . $a[2];
-                }
-                $t .= '">' . (is_array($a) ? $a[0] : $a);
-                if (is_array($a) && count($a) > 1 && (string) $a[1] !== "") {
-                    $t .= '<div class="hint">' . $a[1] . '</div>';
-                }
-                $t .= '</div>';
-            }
-        }
-        return $t . $extra_text . "</div>\n";
-    }
-
     /** @param string|list<string> $html
      * @return string */
     static function pre($html) {
@@ -448,7 +420,7 @@ class Ht {
      * @return string */
     static function img($src, $alt, $js = null) {
         if (is_string($js)) {
-            $js = array("class" => $js);
+            $js = ["class" => $js];
         }
         if (self::$img_base && !preg_match(',\A(?:https?:/|/),i', $src)) {
             $src = self::$img_base . $src;

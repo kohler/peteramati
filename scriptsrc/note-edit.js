@@ -44,16 +44,17 @@ function render_form($tr, note, transition) {
     if (format == null) {
         format = document.body.getAttribute("data-default-format");
     }
-    let t = '<form method="post" action="' +
-        escape_entities(hoturl("=api/linenote", {psetinfo: gi.element, file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})) +
-        '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">' +
-        '<textarea class="pa-note-entry need-autogrow" name="note"></textarea>' +
-        '<div class="aab aabr pa-note-aa">' +
-        '<div class="aabut"><button class="btn-primary" type="submit">Save comment</button></div>' +
-        '<div class="aabut"><button type="button" name="cancel">Cancel</button></div>';
+    let t = '<form method="post" action="'.concat(
+        escape_entities(hoturl("=api/linenote", {psetinfo: gi.element, file: curline.file, line: curline.note_lineid, oldversion: (note && note.version) || 0, format: format})),
+        '" enctype="multipart/form-data" accept-charset="UTF-8" class="ui-submit pa-noteform">',
+        '<textarea class="pa-note-entry need-autogrow" name="note"></textarea>',
+        '<div class="aab aabr pa-note-aa justify-content-between">',
+        '<div class="aabutr order-100"><button class="btn-primary" type="submit">Save comment</button></div>',
+        '<div class="aabutr order-99"><button type="button" name="cancel">Cancel</button></div>');
     if (!gi.user_scores_visible) {
-        t += '<div class="aabut"><label><input type="checkbox" name="iscomment" value="1">Show immediately</label></div>';
+        t += '<div class="aabut"><label class="checki"><input type="checkbox" name="iscomment" value="1" class="checkc">Show immediately</label></div>';
     }
+    t += '<div class="aabut flex-grow-1"></div>';
     var $form = $(t + '</div></form>').appendTo($td);
 
     var $ta = $form.find("textarea");

@@ -2048,9 +2048,9 @@ class Conf {
 
         echo "<div id='header'>\n<div id='header_left_conf'><h1>";
         if ($title && ($title == "Home" || $title == "Sign in"))
-            echo "<a class='qq' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
+            echo "<a class='q' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
         else
-            echo "<a class='uu' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
+            echo "<a class='u' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
         echo "</h1></div><div id='header_right'>";
         if ($Me && !$Me->is_empty()) {
             // profile link

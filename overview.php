@@ -11,11 +11,11 @@ $Conf->header("Overview", "home", ["body_class" => "want-grgraph-hash"]);
 
 echo '<form class="pa-grade-overview">';
 echo '<div class="pa-grade-overview-users"><div class="pa-grade-overview-users-inner">',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="93.5-" data-pa-highlight-type="h00"><strong class="hl-h00">A</strong></label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="90-93.5" data-pa-highlight-type="h01"><strong class="hl-h01">A-</strong></label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="86.5-90" data-pa-highlight-type="h02"><strong class="hl-h02">B+</strong></label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="83.5-86.5" data-pa-highlight-type="h03"><strong class="hl-h03">B</strong></label> ',
-    '<label><input type="checkbox" class="uich js-grgraph-highlight-course" data-pa-highlight-range="80-83.5" data-pa-highlight-type="h04"><strong class="hl-h04">B-</strong></label> ',
+    '<label class="checki d-inline-block"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="93.5-" data-pa-highlight-type="h00"><strong class="hl-h00">A</strong></label> ',
+    '<label class="checki d-inline-block"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="90-93.5" data-pa-highlight-type="h01"><strong class="hl-h01">A-</strong></label> ',
+    '<label class="checki d-inline-block"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="86.5-90" data-pa-highlight-type="h02"><strong class="hl-h02">B+</strong></label> ',
+    '<label class="checki d-inline-block"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="83.5-86.5" data-pa-highlight-type="h03"><strong class="hl-h03">B</strong></label> ',
+    '<label class="checki d-inline-block"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="80-83.5" data-pa-highlight-type="h04"><strong class="hl-h04">B-</strong></label> ',
     '<table class="pap gtable" id="pa-overview-table"></table>',
     '</div></div>';
 echo '<div class="pa-gradegrid">';
@@ -29,8 +29,8 @@ foreach ($Conf->psets() as $pset) {
         if (!$pset->scores_visible)
             echo ' pa-pset-hidden';
         echo '" data-pa-pset="', $pset->urlkey, '">';
-        echo '<a class="qq ui js-grgraph-flip prev" href="">&lt;</a>';
-        echo '<a class="qq ui js-grgraph-flip next" href="">&gt;</a>';
+        echo '<button type="button" class="btn-qlink ui js-grgraph-flip prev">&lt;</button>';
+        echo '<button type="button" class="btn-qlink ui js-grgraph-flip next">&gt;</button>';
         echo '<h4 class="title">', htmlspecialchars($pset->title), '</h4>';
         echo '<div class="pa-plot pa-grgraph-min-yaxis"></div>';
         echo '<div class="statistics"></div></div>';

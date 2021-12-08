@@ -1263,7 +1263,7 @@ function pa_render_pset_table(pconf, data) {
             th: function () {
                 var t = '<span class="heading">' + (anonymous || !sort.email ? "Username" : "Email") + '</span>';
                 if (pconf.anonymous && pconf.can_override_anonymous)
-                    t += ' <a href="" class="uu n js-switch-anon">[anon]</a>';
+                    t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
                 else if (pconf.anonymous)
                     t += ' <span class="n">[anon]</span>';
                 return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
@@ -1289,7 +1289,7 @@ function pa_render_pset_table(pconf, data) {
             th: function () {
                 var t = '<span class="heading">' + (anonymous ? "Username" : "Name") + '</span>';
                 if (pconf.anonymous && pconf.can_override_anonymous)
-                    t += ' <a href="" class="uu n js-switch-anon">[anon]</a>';
+                    t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
                 return '<th class="gt-name2 l plsortable" data-pa-sort="name2" scope="col">' + t + '</th>';
             },
             td: function (s) {
@@ -1415,7 +1415,7 @@ function pa_render_pset_table(pconf, data) {
         gdialog: {
             th: '<th></th>',
             td: function () {
-                return '<td><a href="" class="ui x js-gdialog" tabindex="-1" scope="col">Ⓖ</a></td>';
+                return '<td><button type="button" class="btn-link ui x js-gdialog" tabindex="-1" scope="col">Ⓖ</button></td>';
             },
             tw: 1.5,
             pin: true
@@ -2551,7 +2551,7 @@ function pa_render_pset_table(pconf, data) {
         }
         hc.show();
     }
-    $j.parent().on("click", "a.js-gdialog", function (event) {
+    $j.parent().on("click", ".js-gdialog", function (event) {
         gdialog.call(this);
         event.preventDefault();
     });

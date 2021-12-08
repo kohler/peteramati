@@ -2181,7 +2181,7 @@ class PsetView {
         if (!$no_heading) {
             echo '<div class="pa-dg pa-with-fixed">',
                 // NB Javascript depend on `h3 > a:first-child[href=#FILEID]`
-                '<h3 class="pa-fileref"><a class="qq ui pa-diff-unfold" href="#', $tabid, '"><span class="foldarrow">',
+                '<h3 class="pa-fileref"><a class="q ui pa-diff-unfold" href="#', $tabid, '"><span class="foldarrow">',
                 ($expand && $dinfo->loaded ? "&#x25BC;" : "&#x25B6;"),
                 "</span>";
             if ($args["diffcontext"] ?? false) {
@@ -2189,11 +2189,11 @@ class PsetView {
             }
             echo htmlspecialchars($dinfo->title ? : $file), "</a>";
             $bts = [];
-            $bts[] = '<a href="" class="ui pa-diff-toggle-hide-left btn'
+            $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-left'
                 . ($hide_left ? "" : " btn-primary")
-                . ' need-tooltip" aria-label="Toggle diff view">±</a>';
+                . ' need-tooltip" aria-label="Toggle diff view">±</button>';
             if (!$dinfo->removed && $dinfo->markdown_allowed) {
-                $bts[] = '<button class="btn ui pa-diff-toggle-markdown need-tooltip'
+                $bts[] = '<button type="button" class="btn ui pa-diff-toggle-markdown need-tooltip'
                     . ($hide_left && $dinfo->markdown ? " btn-primary" : "")
                     . '" aria-label="Toggle Markdown"><span class="icon-markdown"></span></button>';
             }

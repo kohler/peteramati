@@ -144,7 +144,7 @@ class ContactView {
             && !$user->is_anonymous
             && $user->github_username
             && $Me->conf->opt("githubOrganization")) {
-            echo ' <a class="q small ui js-repo-list need-tooltip" href="" data-tooltip="List repositories" data-pa-user="' . htmlspecialchars($user->github_username) . '">®</a>';
+            echo ' <button type="button" class="btn-qlink small ui js-repo-list need-tooltip" data-tooltip="List repositories" data-pa-user="', htmlspecialchars($user->github_username), '">®</button>';
         }
         echo '</h2>';
 
