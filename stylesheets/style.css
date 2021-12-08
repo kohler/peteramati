@@ -2728,7 +2728,7 @@ tr.gtrow-partner {
 }
 .pa-sidebar > .pa-gradebox {
 	position: sticky;
-	top: 2rem;
+	top: 2.125rem;
 	display: block;
 	padding-right: 0.8rem;
 	font-size: 90%;
@@ -2931,13 +2931,10 @@ table.hidegrades .pa-gradenote {
 }
 .pa-gradebox {
 	display: inline-block;
-	background: #f3f3f3;
-	background:
-	    linear-gradient(180deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x top center,
-	    linear-gradient(0deg, rgba(120,80,120,0.2), rgba(0,0,0,0)) repeat-x bottom center,
-	    #f3f3f3;
-	background-size: 100% 7px, 100% 5px, 100% 100%;
-	padding: 0.8rem 168px 0.3rem 0.8rem;
+	border: 1px solid #d0d4e8;
+	border-radius: 4px;
+	background: #f8fcff;
+	padding: 0.65rem 168px 0.3rem 0.8rem;
 }
 .pa-gradebox > .pa-p {
 	margin-left: 0;
