@@ -156,6 +156,9 @@ class LineNote_API {
             || (isset($qreq->neighborhood) && !ctype_digit($qreq->neighborhood))) {
             return ["ok" => false, "error" => "Invalid request."];
         }
+        if (!$user->isPC) {
+            return ["ok" => false, "error" => "Permission error."];
+        }
         $fln = [];
         $linea = isset($qreq->linea) ? intval($qreq->linea) : null;
         $neighborhood = isset($qreq->neighborhood) ? intval($qreq->neighborhood) : 5;
