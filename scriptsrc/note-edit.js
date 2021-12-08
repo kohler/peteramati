@@ -9,6 +9,7 @@ import { event_key, event_modkey } from "./ui-key.js";
 import { Linediff } from "./diff.js";
 import { Note } from "./note.js";
 import { GradeSheet } from "./gradeentry.js";
+import { ftext } from "./render.js";
 
 
 let curline, down_event, scrolled_x, scrolled_y, scrolled_at;
@@ -50,7 +51,8 @@ function render_form($tr, note, transition) {
         '<textarea class="pa-note-entry need-autogrow" name="note"></textarea>',
         '<div class="aab aabr pa-note-aa justify-content-between">',
         '<div class="aabutr order-100"><button class="btn-primary" type="submit">Save comment</button></div>',
-        '<div class="aabutr order-99"><button type="button" name="cancel">Cancel</button></div>');
+        '<div class="aabutr order-99"><button type="button" name="cancel">Cancel</button></div>',
+        '<div class="aabut"><button type="button" class="btn-xlink ui pa-load-note-neighbors">↡</button></div>');
     if (!gi.user_scores_visible) {
         t += '<div class="aabut"><label class="checki"><input type="checkbox" name="iscomment" value="1" class="checkc">Show immediately</label></div>';
     }
@@ -196,7 +198,8 @@ function pa_linenote(event) {
     if (event.button !== 0
         || !dl
         || hasClass(dl, "pa-gx")
-        || event.target.matches("button, a, textarea")) {
+        || event.target.matches("button, a, textarea")
+        || event.target.closest(".pa-note-suggestions")) {
         return;
     }
     var line = locate(event.target),
@@ -250,3 +253,81 @@ function make_linenote(event) {
 }
 
 handle_ui.on("pa-editablenotes", pa_linenote);
+
+
+function display_note_suggestions(form, ns) {
+    let $f = $(form).find(".pa-note-suggestions");
+    if (!$f.length) {
+        $f = $('<div class="pa-note-suggestions mt-4"></div>').insertBefore($(form).find(".pa-note-aa"));
+    }
+    $f.empty();
+    for (const n of ns) {
+        const li = document.createElement("div");
+        li.className = "pa-note-suggestion";
+        li.setAttribute("data-content", n.ftext);
+        $f[0].appendChild(li);
+        const bbox = document.createElement("div"),
+            b1 = document.createElement("button"),
+            b2 = document.createElement("button"),
+            tx = document.createElement("div");
+        bbox.className = "btnbox small";
+        bbox.append(b1, b2);
+        tx.className = "flex-grow-1";
+        li.append(bbox, tx);
+        b1.type = b2.type = "button";
+        b1.className = "ui pa-accept-suggestion";
+        b2.className = "ui pa-reject-suggestion";
+        b1.textContent = "✅";
+        b2.textContent = "❌";
+        ftext.render(n.ftext, tx);
+    }
+}
+
+handle_ui.on("pa-load-note-neighbors", function () {
+    const ld = Linediff.closest(this),
+        linea = ld.linea,
+        pi = this.closest(".pa-psetinfo"),
+        pset = pi.getAttribute("data-pa-pset"),
+        repourl = pi.getAttribute("data-pa-repourl"),
+        form = this.closest("form");
+    this.disabled = true;
+    $.ajax(hoturl("api/linenotesuggest", {file: ld.file, linea: linea, pset: pset}), {
+        success: function (data) {
+            const ns = [];
+            if (data.ok && data.notelist && data.notelist.length) {
+                for (const n of data.notelist) {
+                    if (n.repourl !== repourl)
+                        ns.push(n);
+                }
+            }
+            ns.sort(function (a, b) {
+                if (a.pin && !b.pin) {
+                    return -1;
+                } else if (b.pin && !a.pin) {
+                    return 1;
+                } else {
+                    const adist = Math.abs(linea - a.linea),
+                        bdist = Math.abs(linea - b.linea);
+                    if (adist !== bdist) {
+                        return adist < bdist ? -1 : 1;
+                    } else if (a.linea !== b.linea) {
+                        return a.linea < b.linea ? -1 : 1;
+                    } else {
+                        return 0;
+                    }
+                }
+            });
+            display_note_suggestions(form, ns);
+        }
+    });
+});
+
+handle_ui.on("pa-accept-suggestion", function () {
+    let e = this.closest(".pa-note-suggestion"),
+        f = e.closest("form");
+    f.elements.note.value = ftext.parse(e.getAttribute("data-content"))[1];
+});
+
+handle_ui.on("pa-reject-suggestion", function () {
+    this.closest(".pa-note-suggestion").remove();
+});

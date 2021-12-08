@@ -15,7 +15,7 @@ class LineNote_API {
             || strlen($apply->line) < 2
             || ($apply->line[0] !== "a" && $apply->line[0] !== "b")
             || !ctype_digit(substr($apply->line, 1))
-            || (isset($apply->aline) && !ctype_digit($apply->aline))) {
+            || (isset($apply->linea) && !ctype_digit($apply->linea))) {
             return ["ok" => false, "error" => "Invalid request."];
         }
 
@@ -52,8 +52,8 @@ class LineNote_API {
         // XXX apply->note, apply->text obsolete
         $note->ftext = rtrim(cleannl($apply->ftext ?? $apply->note ?? $apply->text ?? ""));
         $note->version = intval($note->version) + 1;
-        if (isset($apply->aline)) {
-            $note->aline = intval($apply->aline);
+        if (isset($apply->linea)) {
+            $note->linea = intval($apply->linea);
         }
         return ["ok" => true, "note" => $note];
     }
@@ -115,46 +115,55 @@ class LineNote_API {
 
 
     /** @param string $file
-     * @param int $aline
-     * @param int $neighborhood
-     * @param int $start
-     * @return \Generator<array{CommitPsetInfo,LineNote}> */
-    static function linenotesnear_iterator(Pset $pset, $file, $aline, $neighborhood, $start = 0) {
-        $end = $start;
-        while ($start === $end) {
-            $result = $pset->conf->qe("select CommitNotes.*, Repository.url repourl from CommitNotes left join Repository on (Repository.repoid=CommitNotes.repoid) where pset=? and haslinenotes order by updateat desc, repoid asc, bhash asc limit $start,20", $pset->id);
-            $end = $start + 20;
-            while (($cpi = CommitPsetInfo::fetch($result))) {
-                if (($linenotes = $cpi->jnote("linenotes"))
-                    && ($xn = $linenotes->{$file} ?? null)) {
-                    $fln = [];
-                    foreach ((array) $xn as $lineid => $jnote) {
-                        if (!is_int($jnote)
-                            && ($ln = LineNote::make_json($file, $lineid, $jnote))
-                            && (!$aline
-                                || (($lna = $ln->aline()) && abs($aline - $lna) <= $neighborhood))) {
-                            $fln[] = $ln;
-                        }
-                    }
-                    usort($fln, function ($a, $b) {
-                        $aa = $a->aline();
-                        $ba = $a->aline();
-                        if ($aa && $ba && $aa !== $ba) {
-                            return $aa <=> $ba;
-                        } else {
-                            return strnatcmp($a->lineid, $b->lineid);
-                        }
-                    });
-                    foreach ($fln as $ln) {
-                        yield [$cpi, $ln];
+     * @param ?int $linea
+     * @param ?int $neighborhood
+     * @return list<array{CommitPsetInfo,LineNote}> */
+    static function all_linenotes_near(Pset $pset, $file, $linea, $neighborhood = null) {
+        $result = $pset->conf->qe("select CommitNotes.*, Repository.url repourl from CommitNotes left join Repository on (Repository.repoid=CommitNotes.repoid) where pset=? and haslinenotes order by updateat desc, repoid asc, bhash asc", $pset->id);
+        $fln = [];
+        while (($cpi = CommitPsetInfo::fetch($result))) {
+            if (($linenotes = $cpi->jnote("linenotes"))
+                && ($xn = $linenotes->{$file} ?? null)) {
+                foreach ((array) $xn as $lineid => $jnote) {
+                    if (!is_int($jnote)
+                        && ($ln = LineNote::make_json($file, $lineid, $jnote))
+                        && ($linea === null
+                            || $neighborhood === null
+                            || (($lna = $ln->linea()) && abs($linea - $lna) <= $neighborhood))) {
+                        $fln[] = [$cpi, $ln];
                     }
                 }
-                ++$start;
             }
-            Dbl::free($result);
         }
+        Dbl::free($result);
+
+        usort($fln, function ($a, $b) {
+            $aa = $a[1]->linea();
+            $ba = $b[1]->linea();
+            if ($aa && $ba && $aa !== $ba) {
+                return $aa <=> $ba;
+            } else {
+                return strnatcmp($a[1]->lineid, $b[1]->lineid);
+            }
+        });
+        return $fln;
     }
 
     static function linenotesnear(Contact $user, Qrequest $qreq, APIData $api) {
+        // check filename and line number
+        if (!isset($qreq->file)
+            || (isset($qreq->linea) && !ctype_digit($qreq->linea))
+            || (isset($qreq->neighborhood) && !ctype_digit($qreq->neighborhood))) {
+            return ["ok" => false, "error" => "Invalid request."];
+        }
+        $fln = [];
+        $linea = isset($qreq->linea) ? intval($qreq->linea) : null;
+        $neighborhood = isset($qreq->neighborhood) ? intval($qreq->neighborhood) : 5;
+        foreach (self::all_linenotes_near($api->pset, $qreq->file, $linea, $neighborhood) as $cpiln) {
+            $rm = $cpiln[1]->render_map();
+            $rm["repourl"] = $cpiln[0]->repourl;
+            $fln[] = $rm;
+        }
+        return ["ok" => true, "notelist" => $fln];
     }
 }

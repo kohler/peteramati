@@ -34,12 +34,12 @@ export class Note {
         }
     }
 
-    get aline() {
-        return new Linediff(this.element || this.source).aline;
+    get linea() {
+        return new Linediff(this.element || this.source).linea;
     }
 
-    aline_within(bound) {
-        return new Linediff(this.element || this.source).aline_within(bound);
+    linea_within(bound) {
+        return new Linediff(this.element || this.source).linea_within(bound);
     }
 
     get editable_text() {
@@ -226,12 +226,12 @@ export class Note {
             pi = fd.closest(".pa-psetinfo"),
             grb = tr.closest(".pa-grade-range-block");
 
-        const data = {ftext: ftext}, aline = this.aline_within(1000);
+        const data = {ftext: ftext}, linea = this.linea_within(1000);
         if (iscomment) {
             data.iscomment = 1;
         }
-        if (aline) {
-            data.aline = aline;
+        if (linea) {
+            data.linea = linea;
         }
 
         if (grb) {

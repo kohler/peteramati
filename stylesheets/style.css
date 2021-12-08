@@ -2782,6 +2782,15 @@ tr.gtrow-partner {
 		transform: rotate(360deg);
 	}
 }
+.pa-note-suggestions {
+	font-size: smaller;
+}
+.pa-note-suggestion {
+	display: flex;
+	align-items: baseline;
+	margin-bottom: 0.25rem;
+	gap: 0.5rem;
+}
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-noteref, .pa-gradeboxref, .pa-warnbox {
 	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;

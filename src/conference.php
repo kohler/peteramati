@@ -2670,6 +2670,7 @@ class Conf {
             "jserror" => "1 JSError_API::jserror",
             "latestcommit" => "1 Repo_API::latestcommit",
             "linenote" => "3 LineNote_API::linenote",
+            "linenotesuggest" => "3 LineNote_API::linenotesnear",
             "multigrade" => "3 Grade_API::multigrade",
             "multiresolveflag" => "0 Flag_API::multiresolve",
             "repositories" => "17 Repo_API::user_repositories",

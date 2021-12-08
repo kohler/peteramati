@@ -15,9 +15,11 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
     /** @var ?int */
     public $version;
     /** @var ?int */
-    public $aline;
+    public $linea;
     /** @var list<int> */
     public $users = [];
+    /** @var bool */
+    public $pin = false;
 
     // set by LineNotesOrder
     /** @var ?int */
@@ -53,16 +55,21 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
             } else {
                 $ln->ftext = $x[1];
             }
-            if (isset($x[2]) && is_int($x[2])) {
-                $ln->users[] = $x[2];
-            } else if (isset($x[2]) && is_array($x[2])) {
-                $ln->users = $x[2];
+            $x2 = $x[2] ?? null;
+            if (is_int($x2)) {
+                $ln->users[] = $x2;
+            } else if (is_array($x2)) {
+                $ln->users = $x2;
             }
             if (isset($x[3])) {
                 $ln->version = $x[3];
             }
             if (is_int($x4) && $x4 > 5 && $lineid[0] === "b") {
-                $ln->aline = $x4;
+                $ln->linea = $x4;
+            }
+            $x5 = $x[5] ?? null;
+            if (is_object($x5) && $x5->pin === true) {
+                $ln->pin = true;
             }
         }
         return $ln;
@@ -74,11 +81,11 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
     }
 
     /** @return int */
-    function aline() {
+    function linea() {
         if (str_starts_with($this->lineid, "a")) {
             return intval(substr($this->lineid, 1));
         } else {
-            return (int) $this->aline;
+            return (int) $this->linea;
         }
     }
 
@@ -103,8 +110,14 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
             return $this->version;
         } else {
             $u = count($this->users) === 1 ? $this->users[0] : $this->users;
-            if ($this->aline) {
-                return [$this->iscomment, $this->ftext, $u, $this->version, $this->aline];
+            $x = null;
+            if ($this->pin) {
+                $x["pin"] = true;
+            }
+            if ($x !== null) {
+                return [$this->iscomment, $this->ftext, $u, $this->version, $this->linea, $x];
+            } else if ($this->linea) {
+                return [$this->iscomment, $this->ftext, $u, $this->version, $this->linea];
             } else if ($this->version) {
                 return [$this->iscomment, $this->ftext, $u, $this->version];
             } else {
@@ -127,5 +140,25 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
             $u = count($this->users) === 1 ? $this->users[0] : $this->users;
             return [$this->iscomment, $this->ftext, $u, $this->version];
         }
+    }
+
+    /** @return array */
+    function render_map() {
+        $j = [
+            "file" => $this->file,
+            "lineid" => $this->lineid,
+            "ftext" => $this->ftext,
+            "version" => $this->version
+        ];
+        if ($this->iscomment) {
+            $j["iscomment"] = true;
+        }
+        if ($this->linea) {
+            $j["linea"] = $this->linea;
+        }
+        if ($this->pin) {
+            $j["pin"] = true;
+        }
+        return $j;
     }
 }

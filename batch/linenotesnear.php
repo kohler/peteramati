@@ -11,7 +11,7 @@ class LineNotesNearBatch {
     /** @var string */
     public $file;
     /** @var ?int */
-    public $aline;
+    public $linea;
     /** @var ?string */
     public $lineid;
 
@@ -20,12 +20,12 @@ class LineNotesNearBatch {
     }
 
     function run() {
-        $csv = (new CsvGenerator)->select(["repourl","hash","file","lineid","aline","ftext"], true);
-        foreach (LineNote_API::linenotesnear_iterator($this->pset, $this->file, $this->aline,
-                                                      $this->aline ? 5 : 0) as $cpiln) {
+        $csv = (new CsvGenerator)->select(["repourl","hash","file","lineid","linea","ftext"], true);
+        foreach (LineNote_API::all_linenotes_near($this->pset, $this->file, $this->linea,
+                                                  $this->linea ? 5 : 0) as $cpiln) {
             list($cpi, $ln) = $cpiln;
             if (!$this->lineid || $ln->lineid === $this->lineid) {
-                $csv->add_row([$cpi->repourl, $cpi->hash(), $ln->file, $ln->lineid, $ln->aline, $ln->ftext]);
+                $csv->add_row([$cpi->repourl, $cpi->hash(), $ln->file, $ln->lineid, $ln->linea, $ln->ftext]);
             }
         }
         $csv->flush();
@@ -59,7 +59,7 @@ class LineNotesNearBatch {
         }
         if (isset($arg["l"])) {
             if (ctype_digit($arg["l"])) {
-                $lnb->aline = intval($arg["l"]);
+                $lnb->linea = intval($arg["l"]);
             } else if (preg_match('/\A[ab]\d+\z/', $arg["l"])) {
                 $lnb->lineid = $arg["l"];
             } else {

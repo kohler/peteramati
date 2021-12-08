@@ -148,6 +148,10 @@ export class Linediff {
         }
         this.element = e;
     }
+    static closest(e) {
+        const el = e.closest(".pa-dl");
+        return el ? new Linediff(el) : null;
+    }
     get file() {
         return Filediff.closest(this.element).file;
     }
@@ -167,10 +171,10 @@ export class Linediff {
             return "b".concat(e.firstChild.nextSibling.getAttribute("data-landmark"));
         }
     }
-    get aline() {
-        return this.aline_within(Infinity);
+    get linea() {
+        return this.linea_within(Infinity);
     }
-    aline_within(bound) {
+    linea_within(bound) {
         let e = this.element;
         while (e && bound >= 0) {
             if (hasClass(e, "pa-gc")) {
