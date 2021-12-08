@@ -1415,7 +1415,7 @@ function pa_render_pset_table(pconf, data) {
         gdialog: {
             th: '<th></th>',
             td: function () {
-                return '<td><button type="button" class="btn-link ui x js-gdialog" tabindex="-1" scope="col">Ⓖ</button></td>';
+                return '<td><button type="button" class="btn-xlink ui js-gdialog" tabindex="-1" scope="col">Ⓖ</button></td>';
             },
             tw: 1.5,
             pin: true
