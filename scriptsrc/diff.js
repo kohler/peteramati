@@ -132,6 +132,18 @@ export class Filediff {
             throw null;
         });
     }
+    get psetinfo() {
+        if (this._psetinfo === undefined) {
+            this._psetinfo = this.element.closest(".pa-psetinfo");
+        }
+        return this._psetinfo;
+    }
+    get pset() {
+        return this.psetinfo.getAttribute("data-pa-pset");
+    }
+    get repourl() {
+        return this.psetinfo.getAttribute("data-pa-repourl");
+    }
     static define_method(name, f) {
         if (!Object.prototype.hasOwnProperty.call(Filediff.prototype, name)) {
             Object.defineProperty(Filediff.prototype, name, {
@@ -152,8 +164,14 @@ export class Linediff {
         const el = e.closest(".pa-dl");
         return el ? new Linediff(el) : null;
     }
+    get filediff() {
+        if (this._filediff === undefined) {
+            this._filediff = Filediff.closest(this.element);
+        }
+        return this._filediff;
+    }
     get file() {
-        return Filediff.closest(this.element).file;
+        return this.filediff.file;
     }
     get note_lineid() {
         const e = this.element;
@@ -185,8 +203,14 @@ export class Linediff {
         }
         return 0;
     }
+    get pset() {
+        return this.filediff.pset;
+    }
+    get repourl() {
+        return this.filediff.repourl;
+    }
     get hash() {
-        const e = this.element, fd = Filediff.closest(e), uf = fd.element.id;
+        const e = this.element, fd = this.filediff, uf = fd.element.id;
         if (e.hasAttribute("data-landmark")) {
             return "#L".concat(e.getAttribute("data-landmark"), uf);
         } else if (hasClass(e, "pa-gd")) {

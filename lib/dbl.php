@@ -34,6 +34,10 @@ class Dbl_Result {
         $r->errno = 0;
         return $r;
     }
+    /** @return list<array<int,?string>> */
+    function fetch_all() {
+        return [];
+    }
     /** @return ?array<int,?string> */
     function fetch_row() {
         return null;
@@ -102,14 +106,17 @@ class Dbl {
     const F_ECHO = 128;
     const F_NOEXEC = 256;
 
+    /** @var int */
     static public $nerrors = 0;
     static public $default_dblink;
+    /** @var callable */
     static private $error_handler = "Dbl::default_error_handler";
     /** @var false|array<string,array{float,int,string}> */
     static private $query_log = false;
     /** @var false|string */
     static private $query_log_key = false;
     static private $query_log_file = null;
+    /** @var bool */
     static public $check_warnings = true;
     static public $landmark_sanitizer = "/^Dbl::/";
 
@@ -635,7 +642,7 @@ class Dbl {
             || ($result instanceof Dbl_Result && $result->errno);
     }
 
-    // array of all first columns
+    /** @return Dbl_Result */
     static private function do_make_result($args, $flags = self::F_ERROR) {
         if (count($args) == 1 && !is_string($args[0])) {
             return $args[0];
@@ -702,8 +709,9 @@ class Dbl {
     static function fetch_first_columns(/* $result | [$dblink,] $query, ... */) {
         $result = self::do_make_result(func_get_args());
         $x = array();
-        while ($result && ($row = $result->fetch_row()))
+        while ($result && ($row = $result->fetch_row())) {
             $x[] = $row[0];
+        }
         $result && $result->close();
         return $x;
     }
@@ -738,9 +746,9 @@ class Dbl {
      * @param string $update_query
      * @param array $update_query_args
      * @return null|int|string */
-    static function compare_and_swap($dblink, $value_query, $value_query_args,
+    static function compare_exchange($dblink, $value_query, $value_query_args,
                                      $callback, $update_query, $update_query_args) {
-        while (true) {
+        for ($n = 0; $n < 200; ++$n) {
             $result = self::qe_apply($dblink, $value_query, $value_query_args);
             $value = self::fetch_value($result);
             $new_value = call_user_func($callback, $value);
@@ -754,6 +762,7 @@ class Dbl {
                 return $new_value;
             }
         }
+        throw new Exception("Dbl::compare_exchange failure on query `" . Dbl::format_query_args($dblink, $value_query, $value_query_args) . "`");
     }
 
     static function log_queries($limit, $file = false) {
@@ -772,7 +781,7 @@ class Dbl {
     static function shutdown() {
         if (self::$query_log) {
             uasort(self::$query_log, function ($a, $b) {
-                return $b[0] < $a[0] ? -1 : $b[0] > $a[0];
+                return $b[0] <=> $a[0];
             });
             $self = Navigation::self();
             $i = 1;
@@ -802,7 +811,7 @@ class Dbl {
         $dblink = count($args) > 1 ? $args[0] : self::$default_dblink;
         $utf8 = $dblink->server_version >= 50503 ? "utf8mb4" : "utf8";
         $qstr = count($args) > 1 ? $args[1] : $args[0];
-        return "_" . $utf8 . $qstr;
+        return "_{$utf8}{$qstr}";
     }
 
     /** @return string */
@@ -811,70 +820,8 @@ class Dbl {
         $dblink = count($args) > 1 ? $args[0] : self::$default_dblink;
         $utf8 = $dblink->server_version >= 50503 ? "utf8mb4" : "utf8";
         $qstr = count($args) > 1 ? $args[1] : $args[0];
-        return "_" . $utf8 . $qstr . " collate " . $utf8 . "_general_ci";
+        return "_{$utf8}{$qstr} collate {$utf8}_general_ci";
     }
-}
-
-// number of rows returned by a select query, or 'false' if result is an error
-/** @deprecated */
-function edb_nrows($result) {
-    return $result ? $result->num_rows : false;
-}
-
-// next row as an array, or 'false' if no more rows or result is an error
-/** @deprecated */
-function edb_row($result) {
-    return $result ? $result->fetch_row() : false;
-}
-
-// array of all rows as arrays
-/** @deprecated */
-function edb_rows($result) {
-    $x = array();
-    while ($result && ($row = $result->fetch_row())) {
-        $x[] = $row;
-    }
-    Dbl::free($result);
-    return $x;
-}
-
-// array of all first columns as arrays
-/** @deprecated */
-function edb_first_columns($result) {
-    $x = array();
-    while ($result && ($row = $result->fetch_row())) {
-        $x[] = $row[0];
-    }
-    Dbl::free($result);
-    return $x;
-}
-
-// map of all rows
-/** @deprecated */
-function edb_map($result) {
-    $x = array();
-    while ($result && ($row = $result->fetch_row())) {
-        $x[$row[0]] = (count($row) == 2 ? $row[1] : array_slice($row, 1));
-    }
-    Dbl::free($result);
-    return $x;
-}
-
-// next row as an object, or 'false' if no more rows or result is an error
-/** @deprecated */
-function edb_orow($result) {
-    return $result ? $result->fetch_object() : false;
-}
-
-// array of all rows as objects
-/** @deprecated */
-function edb_orows($result) {
-    $x = array();
-    while ($result && ($row = $result->fetch_object())) {
-        $x[] = $row;
-    }
-    Dbl::free($result);
-    return $x;
 }
 
 // quoting for SQL

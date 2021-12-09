@@ -149,24 +149,125 @@ class LineNote_API {
         return $fln;
     }
 
-    static function linenotesnear(Contact $user, Qrequest $qreq, APIData $api) {
-        // check filename and line number
+    /** @param list<object> &$fln
+     * @param object $rm */
+    static function linenotesuggest_add(&$fln, $rm, $linea) {
+        for ($i = 0; $i !== count($fln) && $fln[$i]->ftext !== $rm->ftext; ++$i) {
+        }
+        if ($i === count($fln)) {
+            $fln[] = clone $rm;
+        } else {
+            $fln[$i]->n += ($rm->n ?? 0);
+            if ($linea && abs($linea - $fln[$i]->linea) > abs($linea - $rm->linea)) {
+                $fln[$i]->linea = $rm->linea;
+            }
+            foreach (["like", "dislike"] as $xmark) {
+                if (isset($rm->$xmark))
+                    $fln[$i]->$xmark = $rm->$xmark;
+            }
+        }
+    }
+
+    static function linenotesuggest(Contact $user, Qrequest $qreq, APIData $api) {
+        // check arguments
+        if (!$user->isPC) {
+            return ["ok" => false, "error" => "Permission error."];
+        }
         if (!isset($qreq->file)
             || (isset($qreq->linea) && !ctype_digit($qreq->linea))
             || (isset($qreq->neighborhood) && !ctype_digit($qreq->neighborhood))) {
             return ["ok" => false, "error" => "Invalid request."];
         }
-        if (!$user->isPC) {
-            return ["ok" => false, "error" => "Permission error."];
-        }
         $fln = [];
         $linea = isset($qreq->linea) ? intval($qreq->linea) : null;
         $neighborhood = isset($qreq->neighborhood) ? intval($qreq->neighborhood) : 5;
         foreach (self::all_linenotes_near($api->pset, $qreq->file, $linea, $neighborhood) as $cpiln) {
-            $rm = $cpiln[1]->render_map();
-            $rm["repourl"] = $cpiln[0]->repourl;
-            $fln[] = $rm;
+            $rm = (object) $cpiln[1]->render_map();
+            $rm->n = 1;
+            self::linenotesuggest_add($fln, $rm, $linea);
         }
+
+        $data = $user->conf->fetch_value("select data from GroupSettings where name=?", "linenotemarks.p{$api->pset->id}");
+        foreach (json_decode($data ?? '[]') as $rm) {
+            if ($rm->file === $qreq->file
+                && (!isset($linea) || !isset($rm->linea) || abs($linea - $rm->linea) <= $neighborhood)) {
+                self::linenotesuggest_add($fln, $rm, $linea);
+            }
+        }
+
         return ["ok" => true, "notelist" => $fln];
+    }
+
+    static private function markedlinenote_add_cid($arr, $cid) {
+        if (array_search($cid, $arr) === false) {
+            $arr[] = $cid;
+        }
+        return $arr;
+    }
+
+    static function linenotemark(Contact $user, Qrequest $qreq, APIData $api) {
+        // check arguments
+        if (!$user->isPC) {
+            return ["ok" => false, "error" => "Permission error."];
+        }
+        if (!isset($qreq->file)
+            || (isset($qreq->linea) && !ctype_digit($qreq->linea))
+            || !isset($qreq->ftext)
+            || ctype_space($qreq->ftext)
+            || !isset($qreq->mark)
+            || ($qreq->mark !== "like" && $qreq->mark !== "dislike" && $qreq->mark !== "none")) {
+            return ["ok" => false, "error" => "Invalid arguments."];
+        }
+        $ftext = rtrim(cleannl($qreq->ftext));
+        $file = $qreq->file;
+        $linea = intval($qreq->linea);
+        $mark = $qreq->mark;
+        $gsname = "linenotemarks.p{$api->pset->id}";
+        for ($ntries = 0; $ntries !== 200; ++$ntries) {
+            $row = $user->conf->fetch_first_row("select value, data from GroupSettings where name=?", $gsname);
+            $value = $row ? intval($row[0]) : 0;
+            $data = $row ? json_decode($row[1]) : [];
+            if (!$value) {
+                $user->conf->qe("insert ignore into GroupSettings set name=?, value=?, data=?", $gsname, 0, '[]');
+            }
+
+            for ($i = 0; $i !== count($data); ++$i) {
+                if ($data[$i]->ftext === $ftext
+                    && $data[$i]->file === $file
+                    && ($data[$i]->linea ?? null) === $linea) {
+                    break;
+                }
+            }
+            if ($i === count($data)) {
+                $data[] = (object) ["ftext" => $ftext, "file" => $file];
+                if ($linea !== null) {
+                    $data[$i]->linea = $linea;
+                }
+            }
+            $di = $data[$i];
+            foreach (["like", "dislike"] as $xmark) {
+                if ($mark === $xmark) {
+                    $di->$xmark = self::markedlinenote_add_cid($di->$xmark ?? [], $user->contactId);
+                } else if (isset($di->$xmark)
+                           && ($j = array_search($user->contactId, $di->$xmark)) !== false) {
+                    array_splice($di->$xmark, $j, 1);
+                }
+            }
+            if (empty($di->like ?? null) && empty($di->dislike ?? null)) {
+                array_splice($data, $i, 1);
+            }
+
+            $new_data = json_encode_db($data);
+            if ($data === $new_data) {
+                return ["ok" => true];
+            }
+
+            $result = $user->conf->qe("update GroupSettings set value=?, data=? where name=? and value=?",
+                $value + 1, $new_data, $gsname, $value);
+            if ($result->affected_rows > 0) {
+                return ["ok" => true];
+            }
+        }
+        throw new Error("compare_exchange failure");
     }
 }

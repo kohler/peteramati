@@ -247,7 +247,7 @@ class Repository {
         if (Conf::$now - $when > ($ownership > 0 ? 86400 : 30) || $always) {
             $ownership = $this->validate_ownership($user, $partner, $ms);
             if (!$always) {
-                Dbl::compare_and_swap($user->conf->dblink,
+                Dbl::compare_exchange($user->conf->dblink,
                     "select notes from Repository where repoid=?", [$this->repoid],
                     function ($value) use ($user, $ownership) {
                         $value = json_decode($value, true) ? : [];
