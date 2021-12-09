@@ -177,6 +177,9 @@ tr.pl:hover a.pnum, tr.pl:hover a.ptitle, a.ptitle.uu,
 .childfold:hover a.q, a.maillink:hover, a:hover u.x, .ul {
 	text-decoration: underline;
 }
+.btn-xlink:disabled {
+	text-decoration: none;
+}
 .strut {
 	display: inline-block;
 	line-height: 1.8;
@@ -908,6 +911,9 @@ button.btn-link:disabled, button.btn-ulink:disabled, button.btn-qlink:disabled, 
 	cursor: pointer;
 	font-weight: inherit;
 	display: inline;
+}
+button.btn-link:disabled, button.btn-ulink:disabled, button.btn-qlink:disabled, button.btn-xlink:disabled {
+	cursor: inherit;
 }
 button.btn-link:hover {
 	background: initial;
