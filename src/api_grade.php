@@ -285,7 +285,7 @@ class Grade_API {
         }
         $jx["us"] = [];
         foreach ($sset as $uid => $info) {
-            $jx["us"][$uid] = $info->grade_json(PsetView::GRADEJSON_SLICE);
+            $jx["us"][] = $info->grade_json(PsetView::GRADEJSON_SLICE);
         }
         return $jx;
     }
@@ -348,12 +348,12 @@ class Grade_API {
         $j = ["ok" => true, "us" => []];
         foreach ($sset as $uid => $info) {
             if (!$api->pset->gitless_grades && !$info->repo) {
-                $j["us"][$uid] = [
+                $j["us"][] = [
                     "uid" => $uid,
                     "error" => "No repository"
                 ];
             } else {
-                $j["us"][$uid] = [
+                $j["us"][] = [
                     "uid" => $uid,
                     "pinned_scores_visible" => $info->pinned_scores_visible(),
                     "gradercid" => $info->gradercid()

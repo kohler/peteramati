@@ -226,7 +226,7 @@ class LineNote_API {
         for ($ntries = 0; $ntries !== 200; ++$ntries) {
             $row = $user->conf->fetch_first_row("select value, data from GroupSettings where name=?", $gsname);
             $value = $row ? intval($row[0]) : 0;
-            $data = $row ? json_decode($row[1]) : [];
+            $data = $row ? json_decode($row[1]) ?? [] : [];
             if (!$value) {
                 $user->conf->qe("insert ignore into GroupSettings set name=?, value=?, data=?", $gsname, 0, '[]');
             }

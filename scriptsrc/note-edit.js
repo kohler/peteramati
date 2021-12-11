@@ -262,7 +262,6 @@ function display_note_suggestions(form, ns, clear) {
     } else if (clear) {
         $f.empty();
     }
-    console.log($f[0]);
     for (const n of ns) {
         const li = document.createElement("div");
         li.className = "pa-note-suggestion";
@@ -333,7 +332,6 @@ function note_suggestions(form, notelist) {
             newstatus = note.status;
         }
     }
-    console.log([oldindex, newindex]);
     display_note_suggestions(form, notelist.slice(oldindex, newindex), oldstatus === 4);
     $(form).data("paNoteSuggestionStatus", newstatus)
         .find(".pa-load-note-suggestions")
@@ -371,7 +369,6 @@ handle_ui.on("pa-load-note-suggestions", function () {
                         }
                     }
                     notelist.sort(my_note_compare(linea));
-                    console.log(notelist);
                     $(form).data("paNoteSuggestions", notelist);
                     note_suggestions(form, notelist);
                 }

@@ -21,8 +21,8 @@ Installation
 ------------
 
 1. Run `lib/createdb.sh` to create the database. Use `lib/createdb.sh
-OPTIONS` to pass options to MySQL, such as `--user` and `--password`.
-Many MySQL installations require privilege to create tables, so you
+OPTIONS` to pass options to MariaDB, such as `--user` and `--password`.
+Many MariaDB installations require privilege to create tables, so you
 may need `sudo lib/createdb.sh OPTIONS`. Run `lib/createdb.sh --help`
 for more information. You will need to decide on a name for your
 database (no spaces allowed).

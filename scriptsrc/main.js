@@ -2388,7 +2388,7 @@ function pa_render_pset_table(pconf, data) {
                 gdialog_store_start(rv);
                 if (rv.ok && rv.us) {
                     const uid2tr = make_uid2tr();
-                    for (let rvu of Object.values(rv.us)) {
+                    for (let rvu of rv.us) {
                         gradesetting_update(uid2tr, rvu);
                     }
                 }
