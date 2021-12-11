@@ -51,7 +51,7 @@ class PsetView {
     private $_user_can_view_grade;
     /** @var ?bool */
     private $_user_can_view_score;
-    /** @var ?list<int> */
+    /** @var list<int> */
     private $_grades_vf;
     /** @var int */
     private $_grades_suppressed = 0; // 1: set, 2: selecting, 4: some suppressed
@@ -1098,12 +1098,13 @@ class PsetView {
     private function grades_vf() {
         if ($this->_grades_suppressed === 0) {
             $this->_grades_suppressed = 3;
+            $this->_grades_vf = $this->pset->grades_vf($this->pinned_scores_visible());
             if ($this->pset->grades_selection_function) {
                 call_user_func($this->pset->grades_selection_function, $this);
             }
             $this->_grades_suppressed &= ~2;
         }
-        return $this->_grades_vf ?? $this->pset->grades_vf;
+        return $this->_grades_vf;
     }
 
     /** @param string $key */
@@ -1113,7 +1114,6 @@ class PsetView {
         }
         $ge = $this->pset->grades[$key];
         if ($ge->pcview_index !== null) {
-            $this->_grades_vf = $this->_grades_vf ?? $this->pset->grades_vf;
             $this->_grades_vf[$ge->pcview_index] = 0;
             $this->_grades_suppressed |= 4;
         }
@@ -1121,7 +1121,9 @@ class PsetView {
 
     /** @return list<GradeEntryConfig> */
     function visible_grades($pc_view = null) {
-        $gvf = $this->grades_vf();
+        if ($this->_grades_suppressed === 0) {
+            $this->grades_vf(); // call the selection function
+        }
         if (($this->_grades_suppressed & 4) === 0
             && ($pc_view ?? $this->pc_view)) {
             return $this->pset->visible_grades(true);
@@ -1129,9 +1131,8 @@ class PsetView {
             $f = $pc_view ?? $this->pc_view ? 2 : 1;
             $g = [];
             foreach ($this->pset->visible_grades(true) as $i => $ge) {
-                if ($gvf[$i] & $f) {
+                if ($this->_grades_vf[$i] & $f)
                     $g[] = $ge;
-                }
             }
             return $g;
         }
@@ -1178,19 +1179,12 @@ class PsetView {
         if ($this->pset->student_can_view()
             && ($this->pset->gitless_grades
                 || ($this->repo && $this->user_can_view_repo_contents()))) {
-            $xpi = $this->pset->gitless ? $this->upi() : $this->rpi();
-            $maybe = $xpi
-                && ($xpi->hidegrade < 0
-                    || ($xpi->hidegrade == 0
-                        && $this->pset->student_scores_visible()));
-            if ($maybe || $this->pset->student_answers_editable()) {
+            if (($this->pinned_scores_visible() ?? $this->pset->student_scores_visible())
+                || $this->pset->student_answers_editable()) {
                 foreach ($this->visible_grades(false) as $ge) {
                     if ($ge->answer || $ge->concealed) {
                         $this->_user_can_view_grade = true;
-                        if (!$maybe) {
-                            return;
-                        }
-                    } else if ($maybe) {
+                    } else {
                         $this->_user_can_view_grade = $this->_user_can_view_score = true;
                         return;
                     }
@@ -1839,6 +1833,7 @@ class PsetView {
             $gexp->slice = true;
         } else {
             $gexp = new GradeExport($this->pset, $override_view || $this->pc_view);
+            $gexp->set_exported_entries($this->grades_vf());
         }
         if ($this->pset->grades_selection_function) {
             $gexp->set_visible_grades($this->visible_grades());

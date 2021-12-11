@@ -2339,7 +2339,7 @@ td.mhcb {
 	color: #555;
 	font-size: 93.75%;
 }
-.pa-pdesc.pa-pdesc-external {
+.pa-pdesc.pa-ptop {
 	margin-top: -0.5rem;
 	margin-bottom: 0.5rem;
 }
@@ -2442,11 +2442,7 @@ td.mhcb {
 .pa-plist {
 	margin-bottom: 1rem;
 }
-.pa-gradelist.pa-pset-hidden > .pa-p:last-child,
-.pa-grp-hidden > .pa-p {
-	margin-bottom: 0;
-}
-.pa-grp-hidden, .pa-pset-hidden, .is-main > .pa-p-hidden, .is-modal > .pa-p-hidden {
+.pa-grp-hidden {
 	background-color: #f3f3f3;
 	color: #888888;
 	margin-left: -24px;
@@ -2456,55 +2452,33 @@ td.mhcb {
 .pa-p-hidden {
 	color: #888888;
 }
-.is-modal > .pa-p-hidden {
+.pa-gradelist.is-main {
+	margin-left: -1.5rem;
+	margin-right: -1.5rem;
+}
+.is-main > .pa-p, .is-main > .pa-ptop {
+	padding-left: 1.5rem;
+	padding-right: 1.5rem;
+}
+.is-main > .pa-p-hidden, .is-modal > .pa-p-hidden {
+	background-color: #f3f3f3;
+	padding-top: 0.5rem;
+	padding-bottom: 0.5rem;
+	margin-bottom: 0;
+}
+.is-main > .pa-p-hidden + .pa-p-hidden, .is-modal > .pa-p-hidden + .pa-p-hidden {
+	padding-top: 0;
+}
+.pa-gradelist.is-modal {
 	margin-left: -1rem;
 	margin-right: -1rem;
+}
+.is-modal > .pa-p, .is-modal > .pa-ptop {
 	padding-left: 1rem;
 	padding-right: 1rem;
 }
 .pa-scores-hidden > .pa-score {
 	color: #888888;
-}
-.is-main.pa-scores-hidden {
-	margin-left: -1.5rem;
-	padding-left: 1.5rem;
-	margin-right: -1.5rem;
-	padding-right: 1.5rem;
-}
-.is-main.pa-scores-hidden .pa-score + .pa-score {
-	padding-top: 0;
-}
-.is-main.pa-scores-hidden .pa-score {
-	background-color: #f3f3f3;
-	padding: 0.5rem 1.5rem;
-	margin: 0 -1.5rem;
-}
-.pa-pset-hidden > .pa-p-hidden {
-	margin-left: 0;
-	margin-right: 0;
-	padding: 0;
-}
-.is-main > .pa-p-hidden + .pa-p-hidden,
-.is-modal > .pa-p-hidden + .pa-p-hidden {
-	margin-top: -1rem;
-}
-.pa-pset-hidden > .pa-p-hidden + .pa-p-hidden {
-	margin-top: 0;
-}
-.pa-pset-hidden.is-modal {
-	background-color: #e8e8e8;
-	color: #777777;
-	margin-left: -1rem;
-	margin-right: -1rem;
-	padding: 0.5rem 1rem;
-}
-.pa-gradelist.pa-pset-hidden {
-	padding-bottom: 0.5rem;
-	margin-bottom: 0.5rem;
-}
-.pa-pset-hidden > .pa-grp-hidden {
-	padding-top: 0;
-	padding-bottom: 0;
 }
 .pa-inf:first-child, .pa-inf-error:first-child, .pa-gradeabovemax {
 	padding-top: 4px;
@@ -2598,18 +2572,23 @@ tr.gtrow-partner {
 	display: none;
 }
 
-.pa-fileref-context {
-	font-weight: 500;
-}
-.pa-fileref, .pa-sticky {
+.pa-sticky, .pa-fileref {
 	position: sticky;
 	z-index: 1;
 	top: 0;
-	padding: 4px 24px;
-	margin: 0 0 0.5rem -24px;
+	padding-top: 4px;
+	padding-bottom: 4px;
 	display: flex;
 	align-items: baseline;
-	background: #fff;
+	background: white;
+}
+.pa-fileref-context {
+	font-weight: 500;
+}
+.pa-fileref {
+	padding-left: 24px;
+	padding-right: 24px;
+	margin: 0 0 0.5rem -24px;
 }
 
 .pa-filediff {
@@ -3230,7 +3209,7 @@ table.hidegrades .pa-gradenote {
 	padding-left: 1rem;
 	padding-bottom: 0.5rem;
 }
-.pa-grade-statistics.pa-pset-hidden {
+.pa-grade-statistics.pa-grp-hidden {
 	margin-left: 0;
 	padding-left: 1rem;
 }
@@ -3279,7 +3258,7 @@ table.hidegrades .pa-gradenote {
 .pa-gradegrid > .pa-grgraph > .pa-plot {
 	height: 20vh;
 }
-.pa-gradegrid > .pa-grgraph.pa-pset-hidden {
+.pa-gradegrid > .pa-grgraph.pa-grp-hidden {
 	margin: 0;
 }
 @media screen and (min-width: 600px) {

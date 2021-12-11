@@ -123,11 +123,17 @@ export class GradeEntry {
             mode = !this.readonly
                 && (this.answer ? gi.answers_editable : gi.scores_editable) ? 2 : 0;
         }
-        const id = "pe-ge" + ++id_counter;
-        const pge = document.createElement("div"),
+        const id = "pe-ge" + ++id_counter,
+            pge = document.createElement("div"),
             le = document.createElement("label"),
             pde = document.createElement(mode === 2 ? "form" : "div");
-        pge.className = "pa-grade pa-p".concat(this.answer ? " pa-ans" : " pa-score", mode ? " e" : "");
+        let klass = "pa-grade pa-p".concat(mode ? " e" : "", this.answer ? " pa-ans" : "");
+        if ((this.visible == null && !this.answer && gi.user_scores_visible === false)
+            || this.visible === false
+            || this.visible === "none") {
+            klass += " pa-p-hidden";
+        }
+        pge.className = klass;
         pge.setAttribute("data-pa-grade", this.key);
         le.className = "pa-pt";
         le.htmlFor = id;

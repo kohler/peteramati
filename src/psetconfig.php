@@ -113,7 +113,7 @@ class Pset {
     public $grades;
     /** @var list<int>
      * @readonly */
-    public $grades_vf;
+    private $_grades_vf;
     /** @var bool */
     public $scores_visible;
     /** @var int */
@@ -374,17 +374,10 @@ class Pset {
         $gv = self::cdate($p, "scores_visible", "grades_visible", "show_grades_to_students");
         $this->scores_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->scores_visible_at = is_int($gv) ? $gv : 0;
-        $this->grades_vf = [];
-        $vis1 = !$this->disabled && $this->visible;
-        $vis2 = $vis1 && $this->scores_visible;
         foreach (array_values($this->grades) as $i => $ge) {
             $ge->pcview_index = $i;
-            if ($ge->visible && $vis1 && ($vis2 || $ge->answer || $ge->concealed)) {
-                $this->grades_vf[] = 3;
-            } else {
-                $this->grades_vf[] = 2;
-            }
         }
+        $this->_grades_vf = $this->grades_vf($this->scores_visible);
 
         $gsv = self::cdate_or_grades($p, "grade_statistics_visible", "grade_cdf_visible");
         if ($gsv === true) {
@@ -568,6 +561,26 @@ class Pset {
             && !$this->frozen;
     }
 
+    /** @param ?bool $scores_visible
+     * @return list<int> */
+    function grades_vf($scores_visible = null) {
+        if ($scores_visible === null) {
+            return $this->_grades_vf;
+        } else {
+            $vis = $this->student_can_view();
+            $scores_visible = $scores_visible ?? $this->scores_visible;
+            $vf = [];
+            foreach ($this->grades as $ge) {
+                if ($ge->visible && $vis && ($scores_visible || $ge->answer || $ge->concealed)) {
+                    $vf[] = 3;
+                } else {
+                    $vf[] = 2;
+                }
+            }
+            return $vf;
+        }
+    }
+
 
     /** @return ?Repository */
     function handout_repo(Repository $inrepo = null) {
@@ -721,9 +734,8 @@ class Pset {
         } else if (!$this->disabled && $this->visible) {
             $g = [];
             foreach (array_values($this->grades) as $i => $ge) {
-                if ($this->grades_vf[$i] & 1) {
+                if ($this->_grades_vf[$i] & 1)
                     $g[] = $ge;
-                }
             }
             return $g;
         } else {
@@ -1648,8 +1660,9 @@ class GradeEntryConfig {
     }
 
     /** @param bool $pcview
+     * @param ?int $vf
      * @return array<string,mixed> */
-    function json($pcview) {
+    function json($pcview, $vf = null) {
         $gej = ["key" => $this->key, "title" => $this->title];
         if ($this->type !== null) {
             if ($this->type === "select") {
@@ -1696,7 +1709,7 @@ class GradeEntryConfig {
         if ($this->landmark_range_file) {
             $gej["landmark_range"] = $this->landmark_range_file . ":" . $this->landmark_range_first . ":" . $this->landmark_range_last;
         }
-        if (!$this->visible) {
+        if ($vf === null ? !$this->visible : ($vf & 1) === 0) {
             $gej["visible"] = false;
         }
         if ($this->concealed) {

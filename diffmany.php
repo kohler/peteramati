@@ -145,8 +145,7 @@ class DiffMany {
 
             $this->all_viewed += $info->viewed_gradeentries; // XXX off if want all grades
         } else {
-            echo '<div class="pa-gradelist is-main',
-                ($info->user_can_view_score() ? "" : " pa-scores-hidden"), '"></div>';
+            echo '<div class="pa-gradelist is-main"></div>';
             $want_grades = true;
         }
 
@@ -169,8 +168,10 @@ class DiffMany {
             Ht::stash_html($this->conf->make_script_file($gs));
         }
         Ht::stash_script("\$pa.long_page = true");
+        $gexp = new GradeExport($this->pset, $this->viewer->isPC);
+        $gexp->set_exported_entries(null);
         echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
-             htmlspecialchars(json_encode(new GradeExport($this->pset, $this->viewer->isPC))),
+             htmlspecialchars(json_encode($gexp)),
              "\">";
 
         if (trim((string) $this->qreq->users) === "") {

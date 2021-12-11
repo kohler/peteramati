@@ -710,7 +710,7 @@ function gradelist_resolve_section(gi, ge, insp) {
     addClass(e, "pa-sticky");
     const desc = e.firstChild.nextSibling;
     if (desc && hasClass(desc, "pa-pdesc")) {
-        addClass(desc, "pa-pdesc-external");
+        addClass(desc, "pa-ptop");
         insp.insertBefore(desc, e.nextSibling);
     }
     if (t !== "") {
@@ -821,9 +821,6 @@ function pa_resolve_gradelist() {
     if (!gi) {
         return;
     }
-    if (gi.user_scores_visible === false) {
-        addClass(this, "pa-scores-hidden");
-    }
     // obtain list of grades
     const grl = {};
     let ch = this.firstChild;
@@ -858,7 +855,9 @@ function pa_resolve_gradelist() {
         sectioned = gi.has(xge => xge.description || xge.answer ||
                 xge.type === "section" ||
                 (xge.type === "markdown" && gi.answers_editable === false)),
-        section_class = "pa-dg pa-gsection".concat(gi.scores_editable ? " pa-hide-description" : "");
+        dg_class = "pa-dg".concat(hasClass(this, "is-main") ? " is-main" : ""),
+        section_class = dg_class.concat(" pa-gsection",
+            gi.scores_editable ? " pa-hide-description" : "");
     for (let i = 0; i !== gi.order.length; ++i) {
         const k = gi.order[i], ge = gi.entries[k];
         if (!gi.scores_editable && ge.concealed) {
@@ -887,7 +886,7 @@ function pa_resolve_gradelist() {
                     sb.className = "pa-sidebar";
                     new_section.appendChild(sb);
                     const sdiv = document.createElement("div");
-                    sdiv.className = "pa-dg";
+                    sdiv.className = dg_class;
                     new_section.appendChild(sdiv);
                 }
             }
@@ -2222,8 +2221,6 @@ function pa_render_pset_table(pconf, data) {
             $gdialog.find(".gt-name-email").addClass("hidden");
         }
 
-        $gdialog.find(".pa-gradelist").toggleClass("pa-scores-hidden",
-            !!gdialog_su.find(function (su) { return !scores_visible_for(su); }));
         $gdialog.find(".pa-grade").each(function () {
             let k = this.getAttribute("data-pa-grade"),
                 ge = pconf.grades.entries[k],

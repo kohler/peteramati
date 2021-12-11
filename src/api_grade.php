@@ -248,7 +248,9 @@ class Grade_API {
         }
 
         // XXX match commit with grading commit
-        $jx = (new GradeExport($api->pset, true))->jsonSerialize();
+        $gexp = new GradeExport($api->pset, true);
+        $gexp->set_exported_entries(null);
+        $jx = $gexp->jsonSerialize();
         $jx["ok"] = true;
         if ($qreq->is_post()) {
             // parse grade elements

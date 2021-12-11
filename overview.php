@@ -27,7 +27,7 @@ foreach ($Conf->psets() as $pset) {
             $any_anonymous = true;
         echo '<div class="pa-grgraph';
         if (!$pset->scores_visible)
-            echo ' pa-pset-hidden';
+            echo ' pa-grp-hidden';
         echo '" data-pa-pset="', $pset->urlkey, '">';
         echo '<button type="button" class="btn-qlink ui js-grgraph-flip prev">&lt;</button>';
         echo '<button type="button" class="btn-qlink ui js-grgraph-flip next">&gt;</button>';

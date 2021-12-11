@@ -576,7 +576,7 @@ function show_home_pset(PsetView $info) {
     echo "<hr>\n";
     $user_can_view = $info->user->can_view_pset($info->pset);
     if (!$user_can_view) {
-        echo '<div class="pa-pset-hidden">';
+        echo '<div class="pa-grp-hidden">';
     }
     $pseturl = $info->hoturl("pset", ["commit" => null]);
     echo "<h2><a class=\"btn\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
@@ -1021,6 +1021,7 @@ function show_pset_table($sset) {
     $gradercounts = [];
     $gex = new GradeExport($pset, true);
     $gex->set_exported_values($pset->tabular_grades());
+    $gex->set_exported_entries(null);
     foreach ($sset as $s) {
         if (!$s->user->visited) {
             $j = render_pset_row($pset, $sset, $s, $gex, $anonymous);

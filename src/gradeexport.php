@@ -51,6 +51,10 @@ class GradeExport implements JsonSerializable {
     private $visible_values;
     /** @var ?list<int> */
     private $known_entries;
+    /** @var ?list<int> */
+    private $export_grades_vf;
+    /** @var bool */
+    private $export_entries = false;
 
     /** @param bool $pc_view */
     function __construct(Pset $pset, $pc_view) {
@@ -71,6 +75,12 @@ class GradeExport implements JsonSerializable {
         assert($this->pc_view && $this->visible_values === null);
         $this->set_visible_grades($vges);
         $this->value_slice = true;
+    }
+
+    /** @param ?list<int> $export_grades_vf */
+    function set_exported_entries($export_grades_vf) {
+        $this->export_entries = true;
+        $this->export_grades_vf = $export_grades_vf;
     }
 
     /** @return list<GradeEntryConfig> */
@@ -215,21 +225,21 @@ class GradeExport implements JsonSerializable {
                 }
             }
         }
-        if (!$this->slice || $this->visible_values !== null) {
-            $entries = $order = [];
+        assert(!$this->export_entries || !$this->slice);
+        if ($this->export_entries) {
+            $entries = [];
+            $grades_vf = $this->export_grades_vf ?? $this->pset->grades_vf();
             foreach ($this->visible_entries() as $ge) {
                 if ($this->known_entries === null
-                    || $this->known_entries[$ge->pcview_index] === false) {
-                    $entries[$ge->key] = $ge->json($this->pc_view);
-                }
-                $order[] = $ge->key;
+                    || $this->known_entries[$ge->pcview_index] === false)
+                    $entries[$ge->key] = $ge->json($this->pc_view, $grades_vf[$ge->pcview_index]);
             }
-            if (!$this->slice) {
-                if (!empty($entries)) {
-                    $r["entries"] = $entries;
-                } else if (empty($order)) {
-                    $r["entries"] = (object) $entries;
-                }
+            $r["entries"] = empty($entries) ? (object) [] : $entries;
+        }
+        if ($this->export_entries || $this->visible_values !== null) {
+            $order = [];
+            foreach ($this->visible_entries() as $ge) {
+                $order[] = $ge->key;
             }
             $r["order"] = $order;
             if ($this->value_slice) {
