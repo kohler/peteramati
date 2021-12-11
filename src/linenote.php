@@ -18,8 +18,6 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
     public $linea;
     /** @var list<int> */
     public $users = [];
-    /** @var bool */
-    public $pin = false;
 
     // set by LineNotesOrder
     /** @var ?int */
@@ -67,10 +65,6 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
             if (is_int($x4) && $x4 > 5 && $lineid[0] === "b") {
                 $ln->linea = $x4;
             }
-            $x5 = $x[5] ?? null;
-            if (is_object($x5) && $x5->pin === true) {
-                $ln->pin = true;
-            }
         }
         return $ln;
     }
@@ -110,13 +104,7 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
             return $this->version;
         } else {
             $u = count($this->users) === 1 ? $this->users[0] : $this->users;
-            $x = null;
-            if ($this->pin) {
-                $x["pin"] = true;
-            }
-            if ($x !== null) {
-                return [$this->iscomment, $this->ftext, $u, $this->version, $this->linea, $x];
-            } else if ($this->linea) {
+            if ($this->linea) {
                 return [$this->iscomment, $this->ftext, $u, $this->version, $this->linea];
             } else if ($this->version) {
                 return [$this->iscomment, $this->ftext, $u, $this->version];
@@ -155,9 +143,6 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
         }
         if ($this->linea) {
             $j["linea"] = $this->linea;
-        }
-        if ($this->pin) {
-            $j["pin"] = true;
         }
         return $j;
     }
