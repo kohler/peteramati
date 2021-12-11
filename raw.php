@@ -31,7 +31,7 @@ if (isset($Qreq->u)
 }
 assert($User == $Me || $Me->isPC);
 
-$Pset = ContactView::find_pset_redirect($Qreq->pset);
+$Pset = ContactView::find_pset_redirect($Me, $Qreq->pset);
 
 // repo
 $Info = raw_user_pset_info();

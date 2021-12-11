@@ -103,17 +103,17 @@ class ContactView {
         return $user;
     }
 
-    static function find_pset_redirect($psetkey) {
-        global $Conf;
-        $pset = $Conf->pset_by_key($psetkey);
+    /** @param Contact $viewer */
+    static function find_pset_redirect($viewer, $psetkey) {
+        $pset = $viewer->conf->pset_by_key($psetkey);
         if ((!$pset || $pset->disabled)
             && ($psetkey !== null && $psetkey !== "" && $psetkey !== false)) {
-            $Conf->errorMsg("No such problem set “" . htmlspecialchars($psetkey) . "”.");
+            $viewer->conf->errorMsg("No such problem set “" . htmlspecialchars($psetkey) . "”.");
         }
-        if (!$pset || $pset->disabled) {
-            foreach ($Conf->psets() as $p) {
-                if (!$p->disabled)
-                    redirectSelf(array("pset" => $p->urlkey));
+        if (!$pset || !$viewer->can_view_pset($pset)) {
+            foreach ($viewer->conf->psets() as $p) {
+                if ($viewer->can_view_pset($p))
+                    redirectSelf(["pset" => $p->urlkey]);
             }
             Navigation::redirect("index");
         }

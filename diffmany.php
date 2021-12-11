@@ -230,4 +230,4 @@ class DiffMany {
     }
 }
 
-(new DiffMany(ContactView::find_pset_redirect($Qreq->pset), $Qreq, $Me))->run();
+(new DiffMany(ContactView::find_pset_redirect($Me, $Qreq->pset), $Qreq, $Me))->run();

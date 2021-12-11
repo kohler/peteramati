@@ -18,7 +18,7 @@ if (isset($Qreq->u)
 assert($User === $Me || $Me->isPC);
 $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
 
-$Pset = ContactView::find_pset_redirect($Qreq->pset);
+$Pset = ContactView::find_pset_redirect($Me, $Qreq->pset);
 if ($Pset->gitless) {
     $Conf->errorMsg("That problem set does not use git.");
     $Me->escape(); // XXX stay on this page

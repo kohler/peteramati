@@ -43,7 +43,7 @@ class RunRequest {
             json_exit(["ok" => false]);
         }
         assert($this->user === $this->viewer || $this->viewer->isPC);
-        $this->pset = ContactView::find_pset_redirect($qreq->pset);
+        $this->pset = ContactView::find_pset_redirect($this->viewer, $qreq->pset);
 
         foreach ($this->pset->runners as $r) {
             if ($qreq->run === $r->name) {

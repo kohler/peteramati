@@ -18,7 +18,7 @@ if (isset($Qreq->u)
 assert($User === $Me || $Me->isPC);
 $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
 
-$Pset = ContactView::find_pset_redirect($Qreq->pset);
+$Pset = ContactView::find_pset_redirect($Me, $Qreq->pset);
 
 // load user repo and current commit
 $Info = PsetView::make($Pset, $User, $Me, $Qreq->newcommit ?? $Qreq->commit);
