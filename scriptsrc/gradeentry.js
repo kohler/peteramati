@@ -124,16 +124,10 @@ export class GradeEntry {
                 && (this.answer ? gi.answers_editable : gi.scores_editable) ? 2 : 0;
         }
         const id = "pe-ge" + ++id_counter;
-        let hsv;
-        if (this.visible == null) {
-            hsv = !this.answer && gi.user_scores_visible === false;
-        } else {
-            hsv = this.visible === false || this.visible === "none";
-        }
         const pge = document.createElement("div"),
             le = document.createElement("label"),
             pde = document.createElement(mode === 2 ? "form" : "div");
-        pge.className = "pa-grade pa-p".concat(hsv ? "pa-p-hidden" : "", this.answer ? " pa-ans" : "", mode ? " e" : "");
+        pge.className = "pa-grade pa-p".concat(this.answer ? " pa-ans" : " pa-score", mode ? " e" : "");
         pge.setAttribute("data-pa-grade", this.key);
         le.className = "pa-pt";
         le.htmlFor = id;

@@ -821,6 +821,9 @@ function pa_resolve_gradelist() {
     if (!gi) {
         return;
     }
+    if (gi.user_scores_visible === false) {
+        addClass(this, "pa-scores-hidden");
+    }
     // obtain list of grades
     const grl = {};
     let ch = this.firstChild;
@@ -2219,7 +2222,7 @@ function pa_render_pset_table(pconf, data) {
             $gdialog.find(".gt-name-email").addClass("hidden");
         }
 
-        $gdialog.find(".pa-gradelist").toggleClass("pa-pset-hidden",
+        $gdialog.find(".pa-gradelist").toggleClass("pa-scores-hidden",
             !!gdialog_su.find(function (su) { return !scores_visible_for(su); }));
         $gdialog.find(".pa-grade").each(function () {
             let k = this.getAttribute("data-pa-grade"),

@@ -146,7 +146,7 @@ class DiffMany {
             $this->all_viewed += $info->viewed_gradeentries; // XXX off if want all grades
         } else {
             echo '<div class="pa-gradelist is-main',
-                ($info->user_can_view_score() ? "" : " pa-pset-hidden"), '"></div>';
+                ($info->user_can_view_score() ? "" : " pa-scores-hidden"), '"></div>';
             $want_grades = true;
         }
 
