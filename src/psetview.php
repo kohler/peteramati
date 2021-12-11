@@ -840,7 +840,7 @@ class PsetView {
         $this->_user_can_view_grade = null;
         $this->_user_can_view_score = null;
         if (($this->_grades_suppressed & 2) === 0) {
-            $this->_grades_vf = null;
+            $this->_grades_vf = [];
             $this->_grades_suppressed = 0;
         }
     }
@@ -1079,7 +1079,7 @@ class PsetView {
         // NB automatically unsuppresses all grades
         if ($this->pset->grades_selection_function
             && ($this->_grades_suppressed & 2) === 0) {
-            $this->_grades_vf = null;
+            $this->_grades_vf = [];
             $this->_grades_suppressed = 0;
         }
     }

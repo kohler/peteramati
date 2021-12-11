@@ -20,12 +20,16 @@ class LineNotesNearBatch {
     }
 
     function run() {
-        $csv = (new CsvGenerator)->select(["repourl","hash","file","lineid","linea","ftext"], true);
+        $upi = $this->pset->gitless_grades && str_starts_with($this->file, "/");
+        $hdr = $upi ? ["email"] : ["repourl", "hash"];
+        array_push($hdr, "file", "lineid", "linea", "ftext");
+        $csv = (new CsvGenerator)->select($hdr, true);
         foreach (LineNote_API::all_linenotes_near($this->pset, $this->file, $this->linea,
-                                                  $this->linea ? 5 : 0) as $cpiln) {
-            list($cpi, $ln) = $cpiln;
+                                                  $this->linea ? 5 : 0) as $ln) {
             if (!$this->lineid || $ln->lineid === $this->lineid) {
-                $csv->add_row([$cpi->repourl, $cpi->hash(), $ln->file, $ln->lineid, $ln->linea, $ln->ftext]);
+                $row = $upi ? [$ln->upi->email] : [$ln->cpi->repourl, $ln->cpi->hash()];
+                array_push($row, $ln->file, $ln->lineid, $ln->linea, $ln->ftext);
+                $csv->add_row($row);
             }
         }
         $csv->flush();

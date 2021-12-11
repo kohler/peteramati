@@ -25,6 +25,12 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
     /** @var ?bool */
     public $view_authors;
 
+    // set externally
+    /** @var ?CommitPsetInfo */
+    public $cpi;
+    /** @var ?UserPsetInfo */
+    public $upi;
+
     /** @param string $file
      * @param string $lineid */
     function __construct($file, $lineid) {

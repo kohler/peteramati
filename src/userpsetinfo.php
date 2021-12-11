@@ -26,6 +26,8 @@ class UserPsetInfo {
     public $hasactiveflags = 0;
     /** @var ?string */
     public $xnotes;
+    /** @var ?string */
+    public $email;
 
     /** @var ?object */
     private $jnotes;
@@ -78,6 +80,9 @@ class UserPsetInfo {
         $this->hidegrade = (int) $x->hidegrade;
         $this->hasactiveflags = (int) $x->hasactiveflags;
         $this->xnotes = $x->xnotesOverflow ?? $x->xnotes;
+        if (isset($x->email)) {
+            $this->email = $x->email;
+        }
         $this->jnotes = null;
         $this->jxnotes = null;
         $this->_history = null;

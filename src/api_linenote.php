@@ -114,43 +114,70 @@ class LineNote_API {
     }
 
 
-    /** @param string $file
-     * @param ?int $linea
+    /** @param list<LineNote> &$lns
+     * @param array $xn
+     * @param string $file
+     * @param int $linea
      * @param ?int $neighborhood
-     * @return list<array{CommitPsetInfo,LineNote}> */
-    static function all_linenotes_near(Pset $pset, $file, $linea, $neighborhood = null) {
-        $result = $pset->conf->qe("select CommitNotes.*, Repository.url repourl from CommitNotes left join Repository on (Repository.repoid=CommitNotes.repoid) where pset=? and haslinenotes order by updateat desc, repoid asc, bhash asc", $pset->id);
-        $fln = [];
-        while (($cpi = CommitPsetInfo::fetch($result))) {
-            if (($linenotes = $cpi->jnote("linenotes"))
-                && ($xn = $linenotes->{$file} ?? null)) {
-                foreach ((array) $xn as $lineid => $jnote) {
-                    if (!is_int($jnote)
-                        && ($ln = LineNote::make_json($file, $lineid, $jnote))
-                        && ($linea === null
-                            || $neighborhood === null
-                            || (($lna = $ln->linea()) && abs($linea - $lna) <= $neighborhood))) {
-                        $fln[] = [$cpi, $ln];
-                    }
+     * @param CommitPsetInfo|UserPsetInfo $xpi */
+    static private function add_linenotes(&$lns, $xn, $file, $linea, $neighborhood, $xpi) {
+        foreach ((array) $xn as $lineid => $jnote) {
+            if (!is_int($jnote)
+                && ($ln = LineNote::make_json($file, $lineid, $jnote))
+                && (!$linea
+                    || $neighborhood === null
+                    || (($lna = $ln->linea()) && abs($linea - $lna) <= $neighborhood))) {
+                if ($xpi instanceof CommitPsetInfo) {
+                    $ln->cpi = $xpi;
+                } else {
+                    $ln->upi = $xpi;
                 }
+                $lns[] = $ln;
             }
         }
-        Dbl::free($result);
+    }
+
+    /** @param string $file
+     * @param int $linea
+     * @param ?int $neighborhood
+     * @return list<LineNote> */
+    static function all_linenotes_near(Pset $pset, $file, $linea, $neighborhood = null) {
+        $fln = [];
+        if ($pset->gitless_grades && str_starts_with($file, "/")) {
+            $result = $pset->conf->qe("select ContactGrade.*, ContactInfo.email from ContactGrade left join ContactInfo on (ContactInfo.contactId=ContactGrade.cid) where pset=? order by updateat desc, cid asc", $pset->id);
+            while (($upi = UserPsetInfo::fetch($result))) {
+                if (($linenotes = $upi->jnote("linenotes"))
+                    && ($xn = $linenotes->{$file} ?? null)) {
+                    self::add_linenotes($fln, (array) $xn, $file, $linea, $neighborhood, $upi);
+                }
+            }
+            Dbl::free($result);
+        } else {
+            $result = $pset->conf->qe("select CommitNotes.*, Repository.url repourl from CommitNotes left join Repository on (Repository.repoid=CommitNotes.repoid) where pset=? and haslinenotes order by updateat desc, repoid asc, bhash asc", $pset->id);
+            while (($cpi = CommitPsetInfo::fetch($result))) {
+                if (($linenotes = $cpi->jnote("linenotes"))
+                    && ($xn = $linenotes->{$file} ?? null)) {
+                    self::add_linenotes($fln, (array) $xn, $file, $linea, $neighborhood, $cpi);
+                }
+            }
+            Dbl::free($result);
+        }
 
         usort($fln, function ($a, $b) {
-            $aa = $a[1]->linea();
-            $ba = $b[1]->linea();
+            $aa = $a->linea();
+            $ba = $b->linea();
             if ($aa && $ba && $aa !== $ba) {
                 return $aa <=> $ba;
             } else {
-                return strnatcmp($a[1]->lineid, $b[1]->lineid);
+                return strnatcmp($a->lineid, $b->lineid);
             }
         });
         return $fln;
     }
 
     /** @param list<object> &$fln
-     * @param object $rm */
+     * @param object $rm
+     * @param int $linea */
     static function linenotesuggest_add(&$fln, $rm, $linea) {
         for ($i = 0; $i !== count($fln) && $fln[$i]->ftext !== $rm->ftext; ++$i) {
         }
@@ -179,10 +206,10 @@ class LineNote_API {
             return ["ok" => false, "error" => "Invalid request."];
         }
         $fln = [];
-        $linea = isset($qreq->linea) ? intval($qreq->linea) : null;
+        $linea = intval($qreq->linea ?? "0");
         $neighborhood = isset($qreq->neighborhood) ? intval($qreq->neighborhood) : 5;
-        foreach (self::all_linenotes_near($api->pset, $qreq->file, $linea, $neighborhood) as $cpiln) {
-            $rm = (object) $cpiln[1]->render_map();
+        foreach (self::all_linenotes_near($api->pset, $qreq->file, $linea, $neighborhood) as $ln) {
+            $rm = (object) $ln->render_map();
             $rm->n = 1;
             self::linenotesuggest_add($fln, $rm, $linea);
         }
@@ -190,7 +217,7 @@ class LineNote_API {
         $data = $user->conf->fetch_value("select data from GroupSettings where name=?", "linenotemarks.p{$api->pset->id}");
         foreach (json_decode($data ?? '[]') as $rm) {
             if ($rm->file === $qreq->file
-                && (!isset($linea) || !isset($rm->linea) || abs($linea - $rm->linea) <= $neighborhood)) {
+                && (!$linea || !isset($rm->linea) || abs($linea - $rm->linea) <= $neighborhood)) {
                 self::linenotesuggest_add($fln, $rm, $linea);
             }
         }
@@ -220,7 +247,7 @@ class LineNote_API {
         }
         $ftext = rtrim(cleannl($qreq->ftext));
         $file = $qreq->file;
-        $linea = intval($qreq->linea);
+        $linea = intval($qreq->linea ?? "0");
         $mark = $qreq->mark;
         $gsname = "linenotemarks.p{$api->pset->id}";
         for ($ntries = 0; $ntries !== 200; ++$ntries) {
@@ -234,13 +261,13 @@ class LineNote_API {
             for ($i = 0; $i !== count($data); ++$i) {
                 if ($data[$i]->ftext === $ftext
                     && $data[$i]->file === $file
-                    && ($data[$i]->linea ?? null) === $linea) {
+                    && ($data[$i]->linea ?? 0) === $linea) {
                     break;
                 }
             }
             if ($i === count($data)) {
                 $data[] = (object) ["ftext" => $ftext, "file" => $file];
-                if ($linea !== null) {
+                if ($linea) {
                     $data[$i]->linea = $linea;
                 }
             }
