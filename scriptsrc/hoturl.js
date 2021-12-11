@@ -72,20 +72,19 @@ function hoturl_psetinfo(elt, page, args) {
 }
 
 export function hoturl(page, options) {
-    var k, v, m, x, anchor = "";
+    let k, v, m, x, xv, anchor = "";
     if (siteinfo.site_relative == null || siteinfo.suffix == null) {
         siteinfo.site_relative = siteinfo.suffix = "";
     }
 
-    x = {pt: "", t: page + siteinfo.suffix};
     if (typeof options === "string") {
         if ((m = options.match(/^(.*?)(#.*)$/))) {
             options = m[1];
             anchor = m[2];
         }
-        x.v = options.split(/&/);
+        xv = options.split(/&/);
     } else {
-        x.v = [];
+        xv = [];
         for (k in options) {
             v = options[k];
             if (v == null) {
@@ -93,24 +92,25 @@ export function hoturl(page, options) {
             } else if (k === "anchor") {
                 anchor = "#" + v;
             } else if (k === "psetinfo" && v instanceof Element) {
-                hoturl_psetinfo(v, page, x.v);
+                hoturl_psetinfo(v, page, xv);
             } else {
-                x.v.push(encodeURIComponent(k).concat("=", encodeURIComponent(v).replace(/%20/g, "+")));
+                xv.push(encodeURIComponent(k).concat("=", encodeURIComponent(v).replace(/%20/g, "+")));
             }
         }
     }
 
     if (page.startsWith("=")) {
-        x.v.push("post=" + siteinfo.postvalue);
+        xv.push("post=" + siteinfo.postvalue);
         page = page.substring(1);
     }
+    x = {pt: "", v: xv, t: page + siteinfo.suffix};
 
     if (page === "help") {
         hoturl_clean(x, /^t=(\w+)$/);
     } else if (page.substr(0, 3) === "api") {
         if (page.length > 3) {
             x.t = "api" + siteinfo.suffix;
-            x.v.push("fn=" + page.substr(4));
+            xv.push("fn=" + page.substr(4));
         }
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
         hoturl_clean(x, /^fn=(\w+)$/);
@@ -125,10 +125,10 @@ export function hoturl(page, options) {
     }
 
     if (siteinfo.defaults) {
-        x.v.push(serialize_object(siteinfo.defaults));
+        xv.push(serialize_object(siteinfo.defaults));
     }
-    if (x.v.length) {
-        x.t += "?" + x.v.join("&");
+    if (xv.length) {
+        x.t += "?" + xv.join("&");
     }
     return siteinfo.site_relative + x.pt + x.t + anchor;
 }
