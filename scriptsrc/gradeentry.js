@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { escape_entities, unescape_entities, html_id_encode } from "./encoders.js";
-import { hasClass, toggleClass, input_set_default_value } from "./ui.js";
+import { hasClass, toggleClass, removeClass, input_set_default_value } from "./ui.js";
 import { Filediff, Linediff } from "./diff.js";
 import { Note } from "./note.js";
 import { GradeClass } from "./gc.js";
@@ -469,6 +469,7 @@ export class GradeSheet {
             pdx.className = mode === 2 ? "ui-submit pa-pv" : "pa-pv";
             toggleClass(elt, "e", mode !== 0);
             elt.replaceChild(pdx, pde);
+            mode === 2 && removeClass(elt, "hidden");
             ge.mount_at(pdx, id, mode !== 0);
             elt.removeAttribute("data-pa-gv");
             $(pde).find("input, textarea").unautogrow();
