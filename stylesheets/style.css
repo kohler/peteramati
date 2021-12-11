@@ -10,7 +10,7 @@ html {
 *, *:before, *:after {
 	box-sizing: inherit;
 }
-p {
+p, pre {
 	margin-top: 0;
 }
 table, tr, td, th {
@@ -19,6 +19,9 @@ table, tr, td, th {
 	border: 0 none;
 	border-collapse: collapse;
 	empty-cells: show;
+}
+table {
+	line-height: inherit;
 }
 .p {
 	margin-bottom: 1em;
@@ -74,6 +77,16 @@ html, .text-default {
 		"Helvetica Neue", Arial, sans-serif,
 		"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 	line-height: 1.4;
+}
+.text-serif {
+	font-family: serif;
+}
+code, kbd, pre, samp, .text-monospace {
+	font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	font-size: 90%;
+}
+select, button {
+	color: #222222;
 }
 body {
 	color: #333333;
@@ -2831,7 +2844,7 @@ tr.gtrow-partner {
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-noteref, .pa-gradeboxref, .pa-warnbox {
-	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
+	font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 	line-height: 1.65;
 	font-size: 87.5%;
 }
