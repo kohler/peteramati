@@ -678,14 +678,14 @@ handle_ui.on("pa-grade-button", function (event) {
 
 function gradelist_resolve_section(gi, ge, insp) {
     let t = "";
-    if (gi.section_has(ge, xge => xge.description)) {
+    if (gi.scores_editable && gi.section_has(ge, xge => xge.description)) {
         t += '<button class="btn ui pa-grade-toggle-description need-tooltip'.concat(insp.closest(".pa-gsection").classList.contains("pa-hide-description") ? ' btn-primary' : '', '" aria-label="Toggle description">…</button>');
     }
-    if (gi.section_has(ge, xge => xge.type === "markdown")) {
+    if (!gi.answers_editable && gi.section_has(ge, xge => xge.type === "markdown")) {
         t += '<button class="btn ui pa-grade-toggle-markdown need-tooltip" aria-label="Toggle Markdown">M</button>';
     }
     if (gi.scores_editable && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
-        t += '<button class="btn ui pa-grade-toggle-answer need-tootlip" aria-label="Toggle answer editing">E</button>';
+        t += '<button class="btn ui pa-grade-toggle-answer need-tooltip" aria-label="Toggle answer editing">E</button>';
     }
     let e = insp.firstChild;
     if (!e.classList.contains("pa-p-section")) {
