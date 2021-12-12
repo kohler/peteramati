@@ -1306,6 +1306,9 @@ class GradeEntry {
             $this->type_tabular = $this->type_numeric = true;
             $allow_total = false;
             $this->vtype = self::VTTIME;
+        } else if ($type === "duration") {
+            $this->type_tabular = $this->type_numeric = $allow_total = true;
+            $this->vtype = self::VTDURATION;
         } else if (in_array($type, ["text", "shorttext", "markdown", "section"], true)) {
             $this->type_tabular = $this->type_numeric = $allow_total = false;
         } else if ($type === "select"
@@ -1575,6 +1578,48 @@ class GradeEntry {
         }
     }
 
+    /** @param null|int|float|string $v
+     * @return null|int|float|false */
+    static function parse_duration_value($v) {
+        if ($v === null || is_int($v) || is_float($v)) {
+            return $v;
+        } else if (($v = trim($v)) === "") {
+            return null;
+        } else if (preg_match('/\A[-+]?\d+\z/', $v)) {
+            return intval($v);
+        } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
+            return floatval($v);
+        } else {
+            $d = 0;
+            $lastmul = 0;
+            $v = strtolower($v);
+            while ($v !== "") {
+                if (!preg_match('/\A((?:\d+\.?|\.\d)\d*)\s*([hdwms])(?=\s*[\d.]|\z)(.*)\z/', $v, $m)) {
+                    return false;
+                }
+                if ($m[2] === "s") {
+                    $mul = 1;
+                } else if ($m[2] === "m") {
+                    $mul = 60;
+                } else if ($m[2] === "h") {
+                    $mul = 3600;
+                } else if ($m[2] === "d") {
+                    $mul = 86400;
+                } else {
+                    $mul = 86400 * 7;
+                }
+                if ($lastmul >= $mul) {
+                    return false;
+                }
+                $lastmul = $mul;
+                $d += floatval($m[1]) * $mul;
+                $v = $m[3];
+            }
+            $di = (int) $d;
+            return (float) $di === $d ? $di : $d;
+        }
+    }
+
     /** @param bool $isnew */
     function parse_value($v, $isnew) {
         if ($this->type === "formula") {
@@ -1601,7 +1646,13 @@ class GradeEntry {
             } else if ($this->type === "letter") {
                 $v = self::parse_letter_value($v);
                 if ($v === false) {
-                    $this->_last_error = "Letter grade expected.";
+                    $this->_last_error = "Invalid letter grade.";
+                }
+                return $v;
+            } else if ($this->type === "duration") {
+                $v = self::parse_duration_value($v);
+                if ($v === false) {
+                    $this->_last_error = "Invalid duration.";
                 }
                 return $v;
             } else {
