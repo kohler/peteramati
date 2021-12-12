@@ -131,6 +131,7 @@ class UserPsetInfo {
 
     /** @param string $clause */
     private function load_history(Conf $conf, $clause) {
+        $this->_history = $this->_history ?? [];
         while ($this->_history_v0 + count($this->_history) < $this->notesversion) {
             $this->_history[] = null;
         }
