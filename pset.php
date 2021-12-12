@@ -32,6 +32,13 @@ if (($Qreq->newcommit ?? $Qreq->commit) && !$Info->hash()) {
         ContactView::error_exit("404 Not Found", htmlspecialchars($Pset->title));
     }
 }
+if ($Pset->grades_history) {
+    if (isset($Qreq->studentversion) && ctype_digit($Qreq->studentversion)) {
+        $Info->set_user_notesversion(intval($Qreq->studentversion), true);
+    } else if (isset($Qreq->notesversion) && ctype_digit($Qreq->notesversion)) {
+        $Info->set_user_notesversion(intval($Qreq->notesversion), false);
+    }
+}
 $Conf->set_active_list(SessionList::find($Me, $Qreq));
 
 // maybe set commit

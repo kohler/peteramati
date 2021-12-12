@@ -34,6 +34,8 @@ class PsetView {
 
     /** @var ?UserPsetInfo */
     private $_upi;
+    /** @var ?int */
+    private $_vupi;
     /** @var ?RepositoryPsetInfo */
     private $_rpi;
     /** @var ?CommitPsetInfo */
@@ -492,8 +494,18 @@ class PsetView {
 
     /** @return ?object */
     function user_jnotes() {
-        $upi = $this->upi();
+        $upi = $this->_vupi ?? $this->upi();
         return $upi ? $upi->jnotes() : null;
+    }
+
+    /** @param ?int $notesversion
+     * @param bool $student_only */
+    function set_user_notesversion($notesversion, $student_only = false) {
+        if (($upi = $this->upi()) && $notesversion < $upi->notesversion) {
+            $this->_vupi = $upi->version_at($notesversion, $student_only, $this->conf);
+        } else {
+            $this->_vupi = null;
+        }
     }
 
     /** @return ?object */
@@ -852,6 +864,8 @@ class PsetView {
         $upi = $this->upi();
         $is_student = $is_student ?? !$this->viewer->isPC;
         assert(!!$upi);
+        assert($this->_vupi === null
+               || (!$is_student && $this->_vupi->studentnotesversion !== null));
 
         // compare-and-swap loop
         while (true) {
@@ -902,12 +916,15 @@ class PsetView {
                 $upi->studentupdateat, $unotesa, $unotesb);
         }
 
-        $upi->assign_notes($notes, $new_notes);
+        $upi->assign_notes($notes, $new_notes); // also updates `notesversion`
         $upi->updateat = Conf::$now;
         $upi->updateby = $this->viewer->contactId;
         $is_student && ($upi->studentupdateat = Conf::$now);
         $upi->hasactiveflags = $hasactiveflags;
         $this->clear_can_view_grade();
+        if ($this->_vupi) {
+            $this->_vupi = $upi->version_at($this->_vupi->studentnotesversion, true, $this->conf);
+        }
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
             $this->_gtime = null;
             $this->user->invalidate_grades($this->pset->id);
@@ -1351,7 +1368,7 @@ class PsetView {
      * @return ?int */
     private function student_timestamp($force) {
         if ($this->pset->gitless) {
-            $upi = $this->upi();
+            $upi = $this->_vupi ?? $this->upi();
             return $upi ? $upi->studentupdateat : null;
         } else if ($this->_hash
                    && ($rpi = $this->rpi())

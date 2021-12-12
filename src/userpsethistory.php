@@ -22,8 +22,6 @@ class UserPsetHistory {
     private $jnotes;
     /** @var int */
     public $notesversion;
-    /** @var ?object */
-    public $computed_jnotes;
 
     private function merge() {
         $this->cid = (int) $this->cid;
@@ -46,15 +44,16 @@ class UserPsetHistory {
     }
 
     /** @return ?object */
-    function jnotes() {
+    function jrevdelta() {
         if ($this->jnotes === null && $this->notes !== null) {
             $this->jnotes = json_decode($this->notes);
         }
         return $this->jnotes;
     }
 
-    /** @param object $jnotes */
-    function apply_reverse($jnotes) {
-        return json_update($jnotes, $this->jnotes());
+    /** @param object $jnotes
+     * @return object */
+    function apply_revdelta($jnotes) {
+        return json_update($jnotes, $this->jrevdelta());
     }
 }

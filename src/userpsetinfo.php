@@ -1,6 +1,6 @@
 <?php
 // userpsetinfo.php -- Peteramati helper class representing user/pset
-// Peteramati is Copyright (c) 2013-2019 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class UserPsetInfo {
@@ -37,10 +37,14 @@ class UserPsetInfo {
     private $_history;
     /** @var ?int */
     private $_history_v0;
+    /** @var ?bool */
+    private $_history_student;
     /** @var ?UserPsetInfo */
     public $sset_next;
     /** @var bool */
     public $phantom = true;
+    /** @var ?int */
+    public $studentnotesversion;
 
     /** @param int $cid
      * @param int $pset */
@@ -86,7 +90,8 @@ class UserPsetInfo {
         $this->jnotes = null;
         $this->jxnotes = null;
         $this->_history = null;
-        $this->_history_v0 = null;
+        $this->_history_v0 = $this->notesversion;
+        $this->_history_student = null;
     }
 
     function materialize(Conf $conf) {
@@ -119,52 +124,72 @@ class UserPsetInfo {
         $this->notes = $notes;
         $this->jnotes = $jnotes;
         $this->notesversion = $this->phantom ? 1 : $this->notesversion + 1;
+        $this->_history_v0 = $this->_history_v0 ?? $this->notesversion;
         $this->phantom = false;
     }
 
 
-    /** @param int $version */
-    function jnotes_as_of($version, Conf $conf) {
-        if ($version > $this->notesversion) {
-            return null;
+    /** @param string $clause */
+    private function load_history(Conf $conf, $clause) {
+        while ($this->_history_v0 + count($this->_history) < $this->notesversion) {
+            $this->_history[] = null;
         }
-        if ($this->_history === null || $this->_history_v0 < $version) {
-            $v0 = $version - ($version & 7);
-            $v1 = $this->_history_v0 ?? PHP_INT_MAX;
-            $result = $conf->qe("select * from ContactGradeHistory where cid=? and pset=? and notesversion>=? and notesversion<? order by notesversion asc", $this->cid, $this->pset, $v0, $v1);
-            $hs = array_fill(0, $this->notesversion - $v0 + 1, null);
-            foreach ($this->_history ?? [] as $h) {
-                if ($h)
-                    $hs[$h->notesversion - $v0] = $h;
+        $result = $conf->qe("select * from ContactGradeHistory where cid=? and pset=? and $clause and notesversion<? order by notesversion asc", $this->cid, $this->pset, $this->_history_v0);
+        while (($h = UserPsetHistory::fetch($result))) {
+            if ($h->notesversion < $this->_history_v0) {
+                $this->_history = array_merge(
+                    array_fill(0, $this->_history_v0 - $h->notesversion, null),
+                    $this->_history ?? []);
+                $this->_history_v0 = $h->notesversion;
             }
-            while (($h = UserPsetHistory::fetch($result))) {
-                $hs[$h->notesversion - $v0] = $h;
-            }
-            $this->_history = $hs;
-            $this->_history_v0 = $v0;
+            $this->_history[$h->notesversion - $this->_history_v0] = $h;
         }
-        $h = $this->_history[$version - $this->_history_v0] ?? null;
-        if ($h && !isset($h->computed_jnotes)) {
-            $v1 = $version + 1;
-            while ($v1 < $this->notesversion) {
-                $hx = $this->_history[$v1 - $this->_history_v0] ?? null;
-                if (!$hx) {
-                    return null;
-                } else if (isset($hx->computed_jnotes)) {
-                    break;
+        Dbl::free($result);
+    }
+
+    /** @param ?int $version
+     * @param ?bool $student_only
+     * @return UserPsetInfo */
+    function version_at($version, $student_only, Conf $conf) {
+        if (($version ?? $this->notesversion) >= $this->notesversion) {
+            return $this;
+        }
+        if (!$student_only && $this->_history_student) {
+            $this->_history = null;
+            $this->_history_v0 = $this->notesversion;
+        }
+        if ($this->_history_v0 > $version) {
+            $this->_history_student = $student_only && $this->_history_student !== false;
+            if ($this->_history_student) {
+                $this->load_history($conf, "notesversion>={$version} and notesversion<{$this->_history_v0} and updateby={$this->cid}");
+            } else {
+                $this->load_history($conf, "notesversion>={$version} and notesversion<{$this->_history_v0}");
+            }
+        }
+        if ($this->_history_v0 + count($this->_history) < $this->notesversion) {
+            $this->load_history($conf, "notesversion>=" . ($this->_history_v0 + count($this->_history)));
+        }
+        $vupi = new UserPsetInfo($this->cid, $this->pset);
+        $vupi->updateat = $this->updateat;
+        $vupi->studentupdateat = $this->studentupdateat;
+        $vupi->notesversion = $this->notesversion;
+        if ($student_only) {
+            $vupi->studentnotesversion = $version;
+        }
+        $jnotes = $this->jnotes();
+        for ($v1 = $this->notesversion - 1; $v1 >= $version; --$v1) {
+            if (($h = $this->_history[$v1 - $this->_history_v0])
+                && (!$student_only || $h->updateby === $this->cid)) {
+                $jnotes = $h->apply_revdelta($jnotes);
+                $vupi->studentupdateat = $h->studentupdateat;
+                if ($vupi->notesversion === $v1 + 1) {
+                    $vupi->notesversion = $v1;
+                    $vupi->updateat = $h->updateat;
                 }
             }
-            if ($v1 === $this->notesversion) {
-                $jnotes = $this->jnotes();
-            } else {
-                $jnotes = $this->_history[$v1 - $this->_history_v0]->jnotes();
-            }
-            for (--$v1; $v1 >= $version; --$v1) {
-                $jnotes = $this->_history[$v1 - $this->_history_v0]->apply_reverse($jnotes);
-            }
-            $h->computed_jnotes = $jnotes;
         }
-        return $h ? $h->computed_jnotes : null;
+        $vupi->jnotes = $jnotes;
+        return $vupi;
     }
 
 
