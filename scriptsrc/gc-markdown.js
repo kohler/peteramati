@@ -29,16 +29,17 @@ GradeClass.add("markdown", {
         addClass(elt, "pa-textv");
         return '<p class="pa-preview-notice"><span>Markdown styling and LaTeX math supported · </span><a href="" class="ui js-toggle-gc-markdown-preview" tabindex="-1">Preview</a></p><textarea class="uich pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
     },
-    update_show: function (ve, v) {
+    update_show: function (ve, v, opts) {
         if (v == null || v === "") {
             ve.innerHTML = "";
         } else if (this.answer) {
+            const gi = opts.gradesheet;
             addClass(ve, "bg-none");
             addClass(ve, "align-self-start");
             const div = document.createElement("div");
-            div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (this._all.scores_editable ? " pa-editablenotes live" : "");
+            div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (gi.scores_editable ? " pa-editablenotes live" : "");
             let fileid = "/g/" + this.key;
-            div.id = this._all.file_anchor(fileid);
+            div.id = gi.file_anchor(fileid);
             let pos1 = 0, lineno = 1;
             while (pos1 !== v.length) {
                 let pos2 = v.indexOf("\n", pos1);
@@ -66,8 +67,8 @@ GradeClass.add("markdown", {
                 fd.markdown();
             }
             let ln;
-            if (this._all.linenotes
-                && (ln = this._all.linenotes[fileid])) {
+            if (gi.linenotes
+                && (ln = gi.linenotes[fileid])) {
                 for (let lineid in ln) {
                     add_note_at(fd, lineid, Note.parse(ln[lineid]));
                 }

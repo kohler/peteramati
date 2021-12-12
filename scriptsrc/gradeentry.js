@@ -208,11 +208,11 @@ export class GradeEntry {
         $(pde).find("input, textarea").autogrow();
     }
 
-    update_show(pde, v) {
+    update_show(pde, v, opts) {
         const ve = pde.classList.contains("pa-gradevalue") ? pde : pde.querySelector(".pa-gradevalue");
         let hidden;
         if (this.gc.update_show) {
-            hidden = this.gc.update_show.call(this, ve, v);
+            hidden = this.gc.update_show.call(this, ve, v, opts);
         } else {
             const gt = this.text(v);
             if (ve.innerText !== gt) {
@@ -483,23 +483,25 @@ export class GradeSheet {
     }
 
     update_at(elt, opts) {
-        const k = elt.getAttribute("data-pa-grade"), islh = k === "late_hours";
-        opts = opts ? Object.assign({}, opts) : {};
+        const k = elt.getAttribute("data-pa-grade"),
+            islh = k === "late_hours",
+            xopts = {gradesheet: this};
+        opts && Object.assign(xopts, opts);
         let ge, gpos, gv;
         if (islh) {
             ge = GradeEntry.late_hours();
             gv = this.late_hours;
-            opts.autograde = this.auto_late_hours;
+            xopts.autograde = this.auto_late_hours;
         } else if ((ge = this.entries[k])
                    && (gpos = this.gpos[k]) != null
                    && elt.getAttribute("data-pa-gv") != this.gversion[gpos]) {
             gv = this.grades ? this.grades[gpos] : null;
-            opts.autograde = this.autogrades ? this.autogrades[gpos] : null;
+            xopts.autograde = this.autogrades ? this.autogrades[gpos] : null;
             elt.setAttribute("data-pa-gv", this.gversion[gpos]);
         } else {
             return;
         }
-        ge.update_at(elt, gv, opts);
+        ge.update_at(elt, gv, xopts);
     }
 
     grade_value(ge) {
