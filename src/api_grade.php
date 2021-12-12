@@ -70,12 +70,12 @@ class Grade_API {
         }
         if (array_key_exists("late_hours", $g)
             && $info->pc_view // XXX separate permission check?
-            && ($gv = GradeEntryConfig::parse_numeric_value($g["late_hours"])) !== false) {
+            && ($gv = GradeEntry::parse_numeric_value($g["late_hours"])) !== false) {
             $curlhd = $info->late_hours_data() ? : (object) [];
             $lh = $curlhd->hours ?? 0;
             $alh = $curlhd->autohours ?? $lh;
             if (isset($og["late_hours"])
-                && ($ogv = GradeEntryConfig::parse_numeric_value($og["late_hours"])) !== null
+                && ($ogv = GradeEntry::parse_numeric_value($og["late_hours"])) !== null
                 && $ogv !== false
                 && abs($ogv - $lh) >= 0.0001) {
                 $errf["late_hours"] = true;

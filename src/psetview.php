@@ -751,7 +751,7 @@ class PsetView {
     }
 
 
-    /** @param string|GradeEntryConfig $ge
+    /** @param string|GradeEntry $ge
      * @return null|int|float|string */
     function grade_value($ge) {
         if (is_string($ge)) {
@@ -779,7 +779,7 @@ class PsetView {
         return $gv;
     }
 
-    /** @param string|GradeEntryConfig $ge
+    /** @param string|GradeEntry $ge
      * @return null|int|float|string */
     function autograde_value($ge) {
         if (is_string($ge)) {
@@ -1136,7 +1136,7 @@ class PsetView {
         }
     }
 
-    /** @return list<GradeEntryConfig> */
+    /** @return list<GradeEntry> */
     function visible_grades($pc_view = null) {
         if ($this->_grades_suppressed === 0) {
             $this->grades_vf(); // call the selection function
@@ -1156,7 +1156,7 @@ class PsetView {
     }
 
     /** @param string $key
-     * return ?GradeEntryConfig */
+     * return ?GradeEntry */
     function gradelike_by_key($key) {
         $ge = $this->pset->gradelike_by_key($key);
         if ($ge && $ge->pcview_index !== null) {
@@ -1279,7 +1279,7 @@ class PsetView {
         return $this->pc_view;
     }
 
-    /** @return \Generator<GradeEntryConfig> */
+    /** @return \Generator<GradeEntry> */
     private function nonempty_visible_grades() {
         if ($this->can_view_grade()) {
             $this->ensure_grades();
@@ -2473,11 +2473,11 @@ class PsetViewLineWarnings {
 }
 
 class PsetViewLineAnno {
-    /** @var ?list<GradeEntryConfig> */
+    /** @var ?list<GradeEntry> */
     public $grade_entries;
-    /** @var ?list<GradeEntryConfig> */
+    /** @var ?list<GradeEntry> */
     public $grade_first;
-    /** @var ?list<GradeEntryConfig> */
+    /** @var ?list<GradeEntry> */
     public $grade_last;
     /** @var ?list<string> */
     public $warnings;
@@ -2498,7 +2498,7 @@ class PsetViewAnnoState {
     public $file;
     /** @var string */
     public $diffid;
-    /** @var ?list<GradeEntryConfig> */
+    /** @var ?list<GradeEntry> */
     public $grade_first;
 
     /** @param string $file

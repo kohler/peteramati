@@ -4,10 +4,10 @@
 // See LICENSE for open-source distribution terms
 
 class GradeEntry_GradeFormula extends GradeFormula {
-    /** @var GradeEntryConfig */
+    /** @var GradeEntry */
     private $ge;
 
-    /** @param GradeEntryConfig $ge */
+    /** @param GradeEntry $ge */
     function __construct($ge) {
         parent::__construct("g", []);
         $this->ge = $ge;

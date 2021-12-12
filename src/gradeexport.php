@@ -47,7 +47,7 @@ class GradeExport implements JsonSerializable {
     public $answers_editable;
     /** @var ?LineNotesOrder */
     public $lnorder;
-    /** @var ?list<GradeEntryConfig> */
+    /** @var ?list<GradeEntry> */
     private $visible_values;
     /** @var ?list<int> */
     private $known_entries;
@@ -62,7 +62,7 @@ class GradeExport implements JsonSerializable {
         $this->pc_view = $pc_view;
     }
 
-    /** @param iterable<GradeEntryConfig> $vges */
+    /** @param iterable<GradeEntry> $vges */
     function set_visible_grades($vges) {
         assert(!isset($this->grades));
         /** @phan-suppress-next-line PhanTypeMismatchArgumentInternal */
@@ -70,7 +70,7 @@ class GradeExport implements JsonSerializable {
         $this->has_total = false;
     }
 
-    /** @param iterable<GradeEntryConfig> $vges */
+    /** @param iterable<GradeEntry> $vges */
     function set_exported_values($vges) {
         assert($this->pc_view && $this->visible_values === null);
         $this->set_visible_grades($vges);
@@ -83,7 +83,7 @@ class GradeExport implements JsonSerializable {
         $this->export_grades_vf = $export_grades_vf;
     }
 
-    /** @return list<GradeEntryConfig> */
+    /** @return list<GradeEntry> */
     function visible_entries() {
         if ($this->value_slice || $this->visible_values === null) {
             return $this->pset->visible_grades($this->pc_view);
@@ -92,7 +92,7 @@ class GradeExport implements JsonSerializable {
         }
     }
 
-    /** @return list<GradeEntryConfig> */
+    /** @return list<GradeEntry> */
     function value_entries() {
         return $this->visible_values ?? $this->pset->visible_grades($this->pc_view);
     }

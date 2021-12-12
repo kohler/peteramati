@@ -24,7 +24,7 @@ class DiffMany {
     private $suppress_grades = [];
     /** @var int */
     public $psetinfo_idx = 0;
-    /** @var array<string,GradeEntryConfig> */
+    /** @var array<string,GradeEntry> */
     public $all_viewed = [];
 
     function __construct(Pset $pset, Qrequest $qreq, Contact $viewer) {

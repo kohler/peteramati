@@ -824,7 +824,7 @@ class Contact {
     }
 
     /** @return ?GradeExport */
-    private function ensure_gcache(Pset $pset, $flags, GradeEntryConfig $ge = null) {
+    private function ensure_gcache(Pset $pset, $flags, GradeEntry $ge = null) {
         $flagbase = PsetView::GRADEJSON_NO_LATE_HOURS | PsetView::GRADEJSON_NO_FORMULAS;
         assert(($flags & $flagbase) === $flags);
 
@@ -864,7 +864,7 @@ class Contact {
         return $this->_gcache[$pset->id];
     }
 
-    function gcache_entry(Pset $pset, GradeEntryConfig $ge) {
+    function gcache_entry(Pset $pset, GradeEntry $ge) {
         $lh = $ge->key === "late_hours";
         $flags = ($lh ? 0 : PsetView::GRADEJSON_NO_LATE_HOURS)
             | ($ge->is_formula() ? 0 : PsetView::GRADEJSON_NO_FORMULAS);

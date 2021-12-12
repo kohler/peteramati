@@ -106,9 +106,9 @@ class Pset {
     public $deadline_extension;
     public $obscure_late_hours = false;
 
-    /** @var array<string,GradeEntryConfig> */
+    /** @var array<string,GradeEntry> */
     public $all_grades = [];
-    /** @var array<string,GradeEntryConfig>
+    /** @var array<string,GradeEntry>
      * @readonly */
     public $grades;
     /** @var list<int>
@@ -147,7 +147,7 @@ class Pset {
     /** @var array{null|int|float,null|int|float} */
     private $_max_grade = [null, null];
     public $grade_script;
-    /** @var GradeEntryConfig */
+    /** @var GradeEntry */
     private $_late_hours;
 
     /** @var array<string,DownloadEntryConfig> */
@@ -331,7 +331,7 @@ class Pset {
         $grades = $p->grades ?? null;
         if (is_array($grades) || is_object($grades)) {
             foreach ((array) $p->grades as $k => $v) {
-                $g = new GradeEntryConfig(is_int($k) ? $k + 1 : $k, $v, $this);
+                $g = new GradeEntry(is_int($k) ? $k + 1 : $k, $v, $this);
                 if (isset($this->all_grades[$g->key])
                     || $g->key === "late_hours") {
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
@@ -398,7 +398,7 @@ class Pset {
 
         if (($this->deadline || $this->deadline_college || $this->deadline_extension)
             && !self::cbool($p, "no_late_hours")) {
-            $this->_late_hours = GradeEntryConfig::make_late_hours($this);
+            $this->_late_hours = GradeEntry::make_late_hours($this);
         }
 
         // downloads
@@ -618,13 +618,13 @@ class Pset {
     }
 
 
-    /** @return iterable<GradeEntryConfig> */
+    /** @return iterable<GradeEntry> */
     function grades() {
         return $this->grades;
     }
 
     /** @param string $key
-     * @return ?GradeEntryConfig */
+     * @return ?GradeEntry */
     function gradelike_by_key($key) {
         if (isset($this->all_grades[$key])) {
             return $this->all_grades[$key];
@@ -650,7 +650,7 @@ class Pset {
 
     /** @param string $keys
      * @param bool $expand_section
-     * @return list<GradeEntryConfig> */
+     * @return list<GradeEntry> */
     function grades_by_key_list($keys, $expand_section) {
         $ges = [];
         $keys = simplify_whitespace(str_replace(",", " ", $keys));
@@ -694,7 +694,7 @@ class Pset {
         return $ges;
     }
 
-    /** @return iterable<GradeEntryConfig> */
+    /** @return iterable<GradeEntry> */
     function tabular_grades() {
         foreach ($this->grades as $ge) {
             if ($ge->type_tabular)
@@ -702,7 +702,7 @@ class Pset {
         }
     }
 
-    /** @return iterable<GradeEntryConfig> */
+    /** @return iterable<GradeEntry> */
     function formula_grades() {
         if ($this->has_formula) {
             foreach ($this->grades as $ge) {
@@ -727,7 +727,7 @@ class Pset {
     }
 
     /** @param bool $pcview
-     * @return list<GradeEntryConfig> */
+     * @return list<GradeEntry> */
     function visible_grades($pcview) {
         if ($pcview) {
             return array_values($this->grades);
@@ -743,7 +743,7 @@ class Pset {
         }
     }
 
-    /** @return GradeEntryConfig */
+    /** @return GradeEntry */
     function late_hours_entry() {
         return $this->_late_hours;
     }
@@ -1122,7 +1122,7 @@ class DownloadEntryConfig {
     }
 }
 
-class GradeEntryConfig {
+class GradeEntry {
     /** @var Pset
      * @readonly */
     public $pset;
@@ -1404,7 +1404,7 @@ class GradeEntryConfig {
     }
 
     static function make_late_hours(Pset $pset) {
-        $ge = new GradeEntryConfig("x_late_hours", (object) [
+        $ge = new GradeEntry("x_late_hours", (object) [
             "no_total" => true, "position" => PHP_INT_MAX, "title" => "late hours"
         ], $pset);
         /** @phan-suppress-next-line PhanAccessReadOnlyProperty */

@@ -6,7 +6,7 @@
 require_once(SiteLoader::$root . "/src/gradeformula.php");
 
 class GradeFormulaCompilerState {
-    /** @var ?GradeEntryConfig */
+    /** @var ?GradeEntry */
     public $context;
     /** @var string */
     public $str;
@@ -18,7 +18,7 @@ class GradeFormulaCompilerState {
     public $ident;
 
     /** @param string $str
-     * @param ?GradeEntryConfig $context
+     * @param ?GradeEntry $context
      * @param ?string $ident */
     function __construct($str, $context, $ident) {
         $this->context = $context;
@@ -80,7 +80,7 @@ class GradeFormulaCompiler {
     }
 
     /** @return ?GradeFormula */
-    private function parse_grade_entry(GradeEntryConfig $ge) {
+    private function parse_grade_entry(GradeEntry $ge) {
         if ($ge->is_formula()) {
             $e = $ge->formula();
             if (!$e || $e instanceof Error_GradeFormula) {
@@ -312,10 +312,10 @@ class GradeFormulaCompiler {
     }
 
     /** @param ?string $s
-     * @param ?GradeEntryConfig $context
+     * @param ?GradeEntry $context
      * @param ?string $ident
      * @return ?GradeFormula */
-    function parse($s, GradeEntryConfig $context = null, $ident = null) {
+    function parse($s, GradeEntry $context = null, $ident = null) {
         if ($s === null) {
             return null;
         }

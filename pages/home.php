@@ -152,7 +152,7 @@ function download_pset_report(Pset $pset, Qrequest $qreq, $report) {
     foreach ($sset as $info) {
         $x = [];
         foreach ($fobj as $f) {
-            if ($f instanceof GradeEntryConfig) {
+            if ($f instanceof GradeEntry) {
                 if (($v = $info->grade_value($f)) !== null) {
                     $x[$f->key] = $f->unparse_value($v);
                 }
