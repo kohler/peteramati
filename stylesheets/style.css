@@ -3092,10 +3092,12 @@ table.hidegrades .pa-gradenote {
 
 .pa-gradewidth {
 	min-width: 3rem;
-	width: 6rem;
 	padding-right: 6px;
 	margin-right: 0.5rem;
 	display: inline-block;
+}
+input.pa-gradewidth, textarea.pa-gradewidth {
+	width: 6rem;
 }
 .pa-sidebar .pa-gradewidth {
 	width: 5rem;

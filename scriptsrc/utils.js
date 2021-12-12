@@ -172,6 +172,21 @@ export function strftime(fmt, d) {
     return t;
 }
 
+export function sec2text(s) {
+    if (s >= 3600 && s % 900 == 0) {
+        return (s / 3600) + "h";
+    } else if (s >= 3600) {
+        s = Math.round(s / 60);
+        return sprintf("%dh%dm", s / 60, s % 60);
+    } else if (s > 360) {
+        return sprintf("%dm", Math.round(s / 60));
+    } else {
+        s = Math.round(s);
+        return sprintf("%dm%ds", s / 60, s % 60);
+    }
+}
+
+
 if (!window.JSON || !window.JSON.parse) {
     window.JSON = {parse: $.parseJSON};
 }

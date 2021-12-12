@@ -4,7 +4,7 @@
 
 import { GradeClass } from "./gc.js";
 import { handle_ui, addClass, removeClass } from "./ui.js";
-import { sprintf, strftime } from "./utils.js";
+import { sprintf, strftime, sec2text } from "./utils.js";
 
 
 const timefmt = "%Y-%m-%d %H:%M";
@@ -127,18 +127,6 @@ handle_ui.on("js-timermark", function () {
     elt.value = this.value;
     $(elt).trigger("change");
 });
-
-function sec2text(s) {
-    if (s >= 3600 && s % 900 == 0) {
-        return (s / 3600) + "h";
-    } else if (s >= 3600) {
-        return sprintf("%dh%dm", s / 3600, (s / 60) % 60);
-    } else if (s > 360) {
-        return sprintf("%dm", s / 60);
-    } else {
-        return sprintf("%dm%ds", s / 60, s % 60);
-    }
-}
 
 function timermark_interval(ge, tm, gv, timeout) {
     const delta = +document.body.getAttribute("data-time-skew"),

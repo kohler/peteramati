@@ -865,14 +865,23 @@ class Contact {
     }
 
     function gcache_entry(Pset $pset, GradeEntry $ge) {
-        $lh = $ge->key === "late_hours";
-        $flags = ($lh ? 0 : PsetView::GRADEJSON_NO_LATE_HOURS)
-            | ($ge->is_formula() ? 0 : PsetView::GRADEJSON_NO_FORMULAS);
-        if (($gexp = $this->ensure_gcache($pset, $flags, $ge))) {
-            return $lh ? $gexp->late_hours : $gexp->grades[$ge->pcview_index] ?? null;
+        if ($ge->gtype === GradeEntry::GTYPE_LATE_HOURS) {
+            $flags = PsetView::GRADEJSON_NO_FORMULAS;
+        } else if ($ge->gtype === GradeEntry::GTYPE_FORMULA) {
+            $flags = PsetView::GRADEJSON_NO_LATE_HOURS;
         } else {
-            return null;
+            $flags = PsetView::GRADEJSON_NO_FORMULAS | PsetView::GRADEJSON_NO_LATE_HOURS;
         }
+        if (($gexp = $this->ensure_gcache($pset, $flags, $ge))) {
+            if ($ge->pcview_index !== null) {
+                return $gexp->grades[$ge->pcview_index] ?? null;
+            } else if ($ge->gtype === GradeEntry::GTYPE_LATE_HOURS) {
+                return $gexp->late_hours;
+            } else if ($ge->gtype === GradeEntry::GTYPE_STUDENT_TIMESTAMP) {
+                return $gexp->student_timestamp;
+            }
+        }
+        return null;
     }
 
     /** @param bool $noextra

@@ -757,26 +757,33 @@ class PsetView {
         if (is_string($ge)) {
             $ge = $this->pset->gradelike_by_key($ge);
         }
-        if (!$ge || $ge->pcview_index === null) {
+        if (!$ge) {
             return null;
-        }
-        $this->ensure_grades();
-        $gv = $this->_g[$ge->pcview_index] ?? null;
-        if ($gv === null && $ge->is_formula()) {
-            if (!$this->_has_formula) {
-                $this->ensure_formulas();
-                $gv = $this->_g[$ge->pcview_index] ?? null;
-            }
-            if ($gv === null && !isset($this->_has_fg[$ge->pcview_index])) {
-                $gv = $ge->formula()->evaluate($this->user);
-                if ($gv !== null) {
-                    $this->_g[$ge->pcview_index] = $gv;
-                } else {
-                    $this->_has_fg[$ge->pcview_index] = true;
+        } else if ($ge->pcview_index !== null) {
+            $this->ensure_grades();
+            $gv = $this->_g[$ge->pcview_index] ?? null;
+            if ($gv === null && $ge->is_formula()) {
+                if (!$this->_has_formula) {
+                    $this->ensure_formulas();
+                    $gv = $this->_g[$ge->pcview_index] ?? null;
+                }
+                if ($gv === null && !isset($this->_has_fg[$ge->pcview_index])) {
+                    $gv = $ge->formula()->evaluate($this->user);
+                    if ($gv !== null) {
+                        $this->_g[$ge->pcview_index] = $gv;
+                    } else {
+                        $this->_has_fg[$ge->pcview_index] = true;
+                    }
                 }
             }
+            return $gv;
+        } else if ($ge->gtype === GradeEntry::GTYPE_LATE_HOURS) {
+            return $this->late_hours();
+        } else if ($ge->gtype === GradeEntry::GTYPE_STUDENT_TIMESTAMP) {
+            return $this->student_timestamp(true);
+        } else {
+            return null;
         }
-        return $gv;
     }
 
     /** @param string|GradeEntry $ge
@@ -785,12 +792,17 @@ class PsetView {
         if (is_string($ge)) {
             $ge = $this->pset->gradelike_by_key($ge);
         }
-        $gv = null;
-        if ($ge && $ge->pcview_index !== null && !$ge->is_formula()) {
+        if (!$ge) {
+            return null;
+        } else if ($ge->pcview_index !== null && !$ge->is_formula()) {
             $this->ensure_grades();
-            $gv = $this->_ag !== null ? $this->_ag[$ge->pcview_index] : null;
+            return $this->_ag !== null ? $this->_ag[$ge->pcview_index] : null;
+        } else if ($ge->gtype === GradeEntry::GTYPE_LATE_HOURS) {
+            $ld = $this->late_hours_data();
+            return $ld ? $ld->autohours : null;
+        } else {
+            return null;
         }
-        return $gv;
     }
 
 
@@ -1124,12 +1136,12 @@ class PsetView {
         return $this->_grades_vf;
     }
 
-    /** @param string $key */
+    /** @param string|GradeEntry $key */
     function suppress_grade($key) {
         if ($this->_grades_suppressed === 0) {
             $this->grades_vf(); // call the selection function
         }
-        $ge = $this->pset->grades[$key];
+        $ge = is_string($key) ? $this->pset->grades[$key] : $key;
         if ($ge->pcview_index !== null) {
             $this->_grades_vf[$ge->pcview_index] = 0;
             $this->_grades_suppressed |= 4;

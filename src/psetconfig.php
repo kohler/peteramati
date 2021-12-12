@@ -149,6 +149,8 @@ class Pset {
     public $grade_script;
     /** @var GradeEntry */
     private $_late_hours;
+    /** @var ?GradeEntry */
+    private $_student_timestamp;
 
     /** @var array<string,DownloadEntryConfig> */
     public $downloads = [];
@@ -398,7 +400,7 @@ class Pset {
 
         if (($this->deadline || $this->deadline_college || $this->deadline_extension)
             && !self::cbool($p, "no_late_hours")) {
-            $this->_late_hours = GradeEntry::make_late_hours($this);
+            $this->_late_hours = GradeEntry::make_special($this, "late_hours", "late hours", GradeEntry::GTYPE_LATE_HOURS);
         }
 
         // downloads
@@ -630,6 +632,8 @@ class Pset {
             return $this->all_grades[$key];
         } else if ($key === "late_hours") {
             return $this->late_hours_entry();
+        } else if ($key === "student_timestamp") {
+            return $this->student_timestamp_entry();
         } else {
             return null;
         }
@@ -746,6 +750,15 @@ class Pset {
     /** @return GradeEntry */
     function late_hours_entry() {
         return $this->_late_hours;
+    }
+
+    /** @return GradeEntry */
+    function student_timestamp_entry() {
+        if (!$this->_student_timestamp) {
+            $this->_student_timestamp = GradeEntry::make_special($this, "student_timestamp", "timestamp", GradeEntry::GTYPE_STUDENT_TIMESTAMP);
+            $this->_student_timestamp->vtype = GradeEntry::VTTIME;
+        }
+        return $this->_student_timestamp;
     }
 
     /** @param bool $pcview
@@ -1141,6 +1154,12 @@ class GradeEntry {
     /** @var string
      * @readonly */
     public $type;
+    /** @var int
+     * @readonly */
+    public $gtype = 0;
+    /** @var int
+     * @readonly */
+    public $vtype;
     /** @var bool
      * @readonlg */
     public $type_tabular;
@@ -1211,6 +1230,16 @@ class GradeEntry {
     /** @var object */
     public $config;
 
+    const GTYPE_FORMULA = 1;
+    const GTYPE_LATE_HOURS = 2;
+    const GTYPE_STUDENT_TIMESTAMP = 3;
+
+    const VTNUMBER = 0;
+    const VTBOOL = 1;
+    const VTLETTER = 2;
+    const VTTIME = 3;
+    const VTDURATION = 4;
+
     static public $letter_map = [
         "A+" => 98, "A" => 95, "A-" => 92, "A–" => 92, "A−" => 92,
         "B+" => 88, "B" => 85, "B-" => 82, "B–" => 82, "B−" => 82,
@@ -1238,7 +1267,8 @@ class GradeEntry {
             || $this->key[0] === "_"
             || $this->key === "total"
             || $this->key === "late_hours"
-            || $this->key === "auto_late_hours") {
+            || $this->key === "auto_late_hours"
+            || $this->key === "student_timestamp") {
             throw new PsetConfigException("grade entry key format error", $loc);
         }
         $this->name = $this->key;
@@ -1257,34 +1287,43 @@ class GradeEntry {
         $type = null;
         if (isset($g->type)) {
             $type = Pset::cstr($loc, $g, "type");
-            if ($type === "number" || $type === "numeric") {
-                $type = null;
-                $this->type_tabular = $this->type_numeric = $allow_total = true;
-            } else if (in_array($type, ["checkbox", "checkboxes", "stars"], true)) {
-                $this->type_tabular = $this->type_numeric = $allow_total = true;
-            } else if (in_array($type, ["letter", "timermark"], true)) {
-                $this->type_tabular = $this->type_numeric = true;
-                $allow_total = false;
-            } else if (in_array($type, ["text", "shorttext", "markdown", "section"], true)) {
-                $this->type_tabular = $this->type_numeric = $allow_total = false;
-            } else if ($type === "select"
-                       && isset($g->options)
-                       && is_array($g->options)) {
-                // XXX check components are strings all different
-                $this->options = $g->options;
-                $this->type_tabular = true;
-                $this->type_numeric = $allow_total = false;
-            } else if ($type === "formula"
-                       && isset($g->formula)
-                       && is_string($g->formula)) {
-                $this->formula = $g->formula;
-                $this->type_tabular = $this->type_numeric = true;
-                $allow_total = false;
-            } else {
-                throw new PsetConfigException("unknown grade entry type", $loc);
-            }
-        } else {
+        } else if (isset($g->formula) && is_string($g->formula)) {
+            $type = "formula";
+        }
+        if ($type === "number" || $type === "numeric" || $type === null) {
+            $type = null;
             $this->type_tabular = $this->type_numeric = $allow_total = true;
+        } else if ($type === "checkbox") {
+            $this->type_tabular = $this->type_numeric = $allow_total = true;
+            $this->vtype = self::VTBOOL;
+        } else if ($type === "letter") {
+            $this->type_tabular = $this->type_numeric = true;
+            $allow_total = false;
+            $this->vtype = self::VTLETTER;
+        } else if (in_array($type, ["checkboxes", "stars"], true)) {
+            $this->type_tabular = $this->type_numeric = $allow_total = true;
+        } else if ($type === "timermark") {
+            $this->type_tabular = $this->type_numeric = true;
+            $allow_total = false;
+            $this->vtype = self::VTTIME;
+        } else if (in_array($type, ["text", "shorttext", "markdown", "section"], true)) {
+            $this->type_tabular = $this->type_numeric = $allow_total = false;
+        } else if ($type === "select"
+                   && isset($g->options)
+                   && is_array($g->options)) {
+            // XXX check components are strings all different
+            $this->options = $g->options;
+            $this->type_tabular = true;
+            $this->type_numeric = $allow_total = false;
+        } else if ($type === "formula"
+                   && isset($g->formula)
+                   && is_string($g->formula)) {
+            $this->formula = $g->formula;
+            $this->type_tabular = $this->type_numeric = true;
+            $this->gtype = self::GTYPE_FORMULA;
+            $allow_total = false;
+        } else {
+            throw new PsetConfigException("unknown grade entry type", $loc);
         }
         $this->type = $type;
 
@@ -1403,12 +1442,17 @@ class GradeEntry {
         $this->config = $g;
     }
 
-    static function make_late_hours(Pset $pset) {
-        $ge = new GradeEntry("x_late_hours", (object) [
-            "no_total" => true, "position" => PHP_INT_MAX, "title" => "late hours"
+    /** @param string $key
+     * @param string $title
+     * @param int $gtype
+     * @return GradeEntry
+     * @suppress PhanAccessReadOnlyProperty */
+    static function make_special(Pset $pset, $key, $title, $gtype) {
+        $ge = new GradeEntry("x_{$key}", (object) [
+            "no_total" => true, "position" => PHP_INT_MAX, "title" => $title
         ], $pset);
-        /** @phan-suppress-next-line PhanAccessReadOnlyProperty */
-        $ge->key = "late_hours";
+        $ge->key = $key;
+        $ge->gtype = $gtype;
         return $ge;
     }
 
@@ -1419,7 +1463,7 @@ class GradeEntry {
         }
         $x = $g->$k;
         if (is_string($x)
-            && preg_match('{\A(.*?):(\d+)(:\d+|)(:\d+|)\z}', $x, $m)) {
+            && preg_match('/\A(.*?):(\d+)(:\d+|)(:\d+|)\z/', $x, $m)) {
             $x = [$m[1], intval($m[2])];
             if ($m[3] !== "") {
                 $x[] = intval(substr($m[3], 1));
@@ -1652,6 +1696,7 @@ class GradeEntry {
             if ($this->formula !== null) {
                 $fc = new GradeFormulaCompiler($this->pset->conf);
                 $this->_formula = $fc->parse($this->formula, $this) ?? new Error_GradeFormula;
+                $this->vtype = $this->_formula->vtype;
             } else {
                 $this->_formula = new GradeEntry_GradeFormula($this);
             }
@@ -1670,10 +1715,14 @@ class GradeEntry {
                 $gej["options"] = $this->options;
             } else if ($this->formula !== null) {
                 $f = $this->formula();
-                if ($f->vtype === GradeFormula::VTBOOL) {
+                if ($f->vtype === self::VTBOOL) {
                     $gej["type"] = "checkbox";
-                } else if ($f->vtype === GradeFormula::VTLETTER) {
+                } else if ($f->vtype === self::VTLETTER) {
                     $gej["type"] = "letter";
+                } else if ($f->vtype === self::VTTIME) {
+                    $gej["type"] = "time";
+                } else if ($f->vtype === self::VTDURATION) {
+                    $gej["type"] = "duration";
                 } else {
                     $gej["type"] = "formula";
                 }

@@ -17,10 +17,6 @@ abstract class GradeFormula implements JsonSerializable {
     /** @var ?array<int,mixed> */
     protected $_allv;
 
-    const VTNUMBER = 0;
-    const VTBOOL = 1;
-    const VTLETTER = 2;
-
     static public $evaluation_stack = [];
 
     /** @param string $op
@@ -103,7 +99,7 @@ class Not_GradeFormula extends GradeFormula {
     /** @param GradeFormula $e */
     function __construct($e) {
         parent::__construct("!", [$e]);
-        $this->vtype = self::VTBOOL;
+        $this->vtype = GradeEntry::VTBOOL;
     }
     function evaluate(Contact $student) {
         $v0 = $this->_a[0]->evaluate($student);
@@ -117,6 +113,13 @@ class Bin_GradeFormula extends GradeFormula {
      * @param GradeFormula $e2 */
     function __construct($op, $e1, $e2) {
         parent::__construct($op, [$e1, $e2]);
+        if ($e1->vtype === GradeEntry::VTTIME || $e2->vtype === GradeEntry::VTTIME) {
+            if ($op === "-") {
+                $this->vtype = GradeEntry::VTDURATION;
+            } else {
+                $this->vtype = GradeEntry::VTTIME;
+            }
+        }
     }
     function evaluate(Contact $student) {
         if (($v0 = $this->_a[0]->evaluate($student)) === null
@@ -146,7 +149,7 @@ class Relation_GradeFormula extends GradeFormula {
      * @param GradeFormula $e2 */
     function __construct($op, $e1, $e2) {
         parent::__construct($op, [$e1, $e2]);
-        $this->vtype = self::VTBOOL;
+        $this->vtype = GradeEntry::VTBOOL;
     }
     function evaluate(Contact $student) {
         $v0 = $this->_a[0]->evaluate($student);

@@ -11,11 +11,7 @@ class GradeEntry_GradeFormula extends GradeFormula {
     function __construct($ge) {
         parent::__construct("g", []);
         $this->ge = $ge;
-        if ($ge->type === "letter") {
-            $this->vtype = GradeFormula::VTLETTER;
-        } else if ($ge->type === "checkbox") {
-            $this->vtype = GradeFormula::VTBOOL;
-        }
+        $this->vtype = $ge->vtype;
         assert(!$ge->formula);
     }
     function evaluate(Contact $student) {
