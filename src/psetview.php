@@ -1862,7 +1862,7 @@ class PsetView {
             $gexp->version = $xpi->notesversion;
         }
         if (($ts = $this->student_timestamp(false))) {
-            $gexp->updateat = $ts;
+            $gexp->student_timestamp = $ts;
         }
         if ($this->user_can_view_score()) {
             $gexp->user_scores_visible = true;

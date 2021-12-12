@@ -34,7 +34,7 @@ class GradeExport implements JsonSerializable {
     /** @var ?int */
     public $answer_version;
     /** @var ?int */
-    public $updateat;
+    public $student_timestamp;
     /** @var null|int */
     public $late_hours;
     /** @var null|int */
@@ -198,8 +198,8 @@ class GradeExport implements JsonSerializable {
             if ($this->auto_late_hours !== null) {
                 $r["auto_late_hours"] = $this->auto_late_hours;
             }
-            if ($this->updateat) {
-                $r["updateat"] = $this->updateat;
+            if ($this->student_timestamp) {
+                $r["student_timestamp"] = $this->student_timestamp;
             }
             if ($this->version !== null) {
                 $r["version"] = $this->version;
