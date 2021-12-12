@@ -96,7 +96,7 @@ GradeClass.add("timermark", {
             e.classList.toggle("hidden", !v !== (e.value === "1"));
         });
         const tm = elt.querySelector(".pa-timermark-result");
-        tm.classList.toggle("hidden", !v && !to);
+        tm.classList.toggle("hidden", !v && !timeout);
         const ve = elt.querySelector(".pa-gradevalue"),
             to = $(ve).data("pa-timermark-interval");
         to && clearInterval(to);
