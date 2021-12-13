@@ -25,6 +25,7 @@ export class GradeEntry {
         Object.assign(this, x);
         this.type = this.type || "numeric";
         this.gc = GradeClass.find(this.type);
+        this.normal = true;
         this._abbr = null;
         this._all = null;
     }
@@ -369,6 +370,28 @@ export class GradeEntry {
         return sum;
     }
 
+    value_in(gi) {
+        const i = gi.grades ? gi.gpos[this.key] : null;
+        return i != null ? gi.grades[i] : null;
+    }
+
+    autovalue_in(gi) {
+        const i = gi.autogrades ? gi.gpos[this.key] : null;
+        return i != null ? gi.autogrades[i] : null;
+    }
+
+    gversion_in(gi) {
+        const i = gi.gpos[this.key];
+        return i != null ? gi.gversion[i] : null;
+    }
+
+    has_newer_value_in(gi) {
+        return this.answer
+            && gi.student_grade_updates
+            && this.key in gi.student_grade_updates
+            && this.value_in(gi) !== gi.student_grade_updates[this.key];
+    }
+
     static closest(elt) {
         const e = elt.closest(".pa-grade"),
             gi = GradeSheet.closest(e);
@@ -376,8 +399,21 @@ export class GradeEntry {
     }
 
     static late_hours() {
-        late_hours_entry = late_hours_entry || new GradeEntry({key: "late_hours", title: "late hours"});
+        late_hours_entry = late_hours_entry || new LateHoursEntry;
         return late_hours_entry;
+    }
+}
+
+class LateHoursEntry extends GradeEntry {
+    constructor() {
+        super({key: "late_hours", title: "late hours"});
+        this.normal = false;
+    }
+    value_in(gi) {
+        return gi.late_hours;
+    }
+    autovalue_in(gi) {
+        return gi.auto_late_hours;
     }
 }
 
@@ -459,9 +495,19 @@ export class GradeSheet {
         }
     }
 
+    xentry(key) {
+        const ge = this.entries[key];
+        if (ge) {
+            return ge;
+        } else if (key === "late_hours") {
+            return GradeEntry.late_hours();
+        } else {
+            return null;
+        }
+    }
+
     remount_at(elt, mode) {
-        const k = elt.getAttribute("data-pa-grade"), islh = k === "late_hours",
-            ge = islh ? GradeEntry.late_hours() : this.entries[k];
+        const ge = this.xentry(elt.getAttribute("data-pa-grade"));
         if (ge) {
             let pde = elt.firstChild, id;
             while (!hasClass(pde, "pa-pv")) {
@@ -486,42 +532,25 @@ export class GradeSheet {
     }
 
     update_at(elt, opts) {
-        const k = elt.getAttribute("data-pa-grade"),
-            islh = k === "late_hours",
-            xopts = {gradesheet: this};
-        opts && Object.assign(xopts, opts);
-        let ge, gpos, gv;
-        if (islh) {
-            ge = GradeEntry.late_hours();
-            gv = this.late_hours;
-            xopts.autograde = this.auto_late_hours;
-        } else if ((ge = this.entries[k])
-                   && (gpos = this.gpos[k]) != null
-                   && elt.getAttribute("data-pa-gv") != this.gversion[gpos]) {
-            gv = this.grades ? this.grades[gpos] : null;
-            xopts.autograde = this.autogrades ? this.autogrades[gpos] : null;
-            if (this.student_grade_updates
-                && ge.answer
-                && k in this.student_grade_updates
-                && this.student_grade_updates[k] !== gv) {
+        const ge = this.xentry(elt.getAttribute("data-pa-grade"));
+        let gver;
+        if (ge && ((gver = ge.gversion_in(this)) === null
+                   || elt.getAttribute("data-pa-gv") != gver)) {
+            const xopts = {gradesheet: this, autograde: ge.autovalue_in(this)};
+            let gval = ge.value_in(this);
+            opts && Object.assign(xopts, opts);
+            if (ge.has_newer_value_in(this)) {
                 const label = elt.firstChild;
                 if (label.classList.contains("pa-is-grade-update")) {
-                    gv = this.student_grade_updates[k];
+                    gval = this.student_grade_updates[ge.key];
                 } else if (!label.classList.contains("uic")) {
                     label.classList.add("pa-has-grade-update", "uic", "need-tooltip");
                     label.setAttribute("aria-label", "Toggle latest version");
                 }
             }
-            elt.setAttribute("data-pa-gv", this.gversion[gpos]);
-        } else {
-            return;
+            gver !== null && elt.setAttribute("data-pa-gv", gver);
+            ge.update_at(elt, gval, xopts);
         }
-        ge.update_at(elt, gv, xopts);
-    }
-
-    grade_value(ge) {
-        const i = this.grades ? this.gpos[ge.key] : null;
-        return i != null ? this.grades[i] : null;
     }
 
     grade_total(noextra) {

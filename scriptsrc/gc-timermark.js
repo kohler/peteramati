@@ -14,7 +14,7 @@ function timeout_value(ge, gi) {
     if (ge.timeout_entry
         && gi
         && (toge = gi.entries[ge.timeout_entry])
-        && (tov = gi.grade_value(toge)) != null) {
+        && (tov = toge.value_in(gi)) != null) {
         return tov;
     } else {
         return ge.timeout;

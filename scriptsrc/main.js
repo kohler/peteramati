@@ -582,11 +582,9 @@ function save_grade(self) {
 
     var gi = GradeSheet.closest(self), g = {}, og = {};
     $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
-        let ge = gi.entries[this.name], gv;
-        if (ge && (gv = gi.grade_value(ge)) != null) {
+        let ge = gi.xentry(this.name), gv;
+        if (ge && (gv = ge.value_in(gi)) != null) {
             og[this.name] = gv;
-        } else if (this.name === "late_hours" && gi.late_hours != null) {
-            og[this.name] = gi.late_hours;
         }
         if ((this.type !== "checkbox" && this.type !== "radio")
             || this.checked) {
