@@ -29,13 +29,13 @@ export function run(button, opts) {
     } else if (opts.timestamp) {
         checkt = opts.timestamp;
     } else {
-        if ($f.prop("outstanding")) {
+        if (hasClass($f[0], "pa-run-active")) {
             return true;
         }
         $f.find("button").prop("disabled", true);
-        $f.prop("outstanding", true);
     }
     delete therun.dataset.paTimestamp;
+    addClass($f[0], "pa-run-active");
 
     therunout && removeClass(therunout, "hidden");
     fold61(therun, therunout, true);
@@ -169,7 +169,7 @@ export function run(button, opts) {
 
     function done() {
         $f.find("button").prop("disabled", false);
-        $f.prop("outstanding", false);
+        removeClass($f[0], "pa-run-active");
         hide_cursor();
         if (button.hasAttribute("data-pa-run-grade")) {
             grades_fetch(button.closest(".pa-psetinfo"));
@@ -554,7 +554,7 @@ export function run(button, opts) {
             },
             error: function () {
                 $f.find(".ajaxsave61").html("Failed");
-                $f.prop("outstanding", false);
+                removeClass($f[0], "pa-run-active");
             }
         });
     }

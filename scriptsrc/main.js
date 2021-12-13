@@ -1059,27 +1059,25 @@ function pa_runmany(chain) {
     let $manybutton = $("#pa-runmany"), $f = $manybutton.closest("form");
     if (!$f.prop("pa-runmany-unload")) {
         $(window).on("beforeunload", function () {
+            // XXXXXXX
             if ($f.prop("outstanding") || $("#pa-runmany-list").text())
                 return "Several server requests are outstanding.";
         });
         $f.prop("pa-runmany-unload", "1");
     }
     function check() {
-        if (!$f.prop("outstanding")) {
-            $f.prop("outstanding", true);
+        if (!hasClass($f[0], "pa-run-active")) {
             $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
                 type: "POST", cache: false, dataType: "json", timeout: 30000,
                 success: function (data) {
-                    $f.prop("outstanding", false);
                     if (data && data.ok) {
                         $f[0].elements.u.value = data.u;
                         $f[0].elements.pset.value = data.pset;
                         let $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(data.u) + "/pset/" + data.pset + "\" class=\"q ansib ansifg7\"></a>");
                         $x.text(data.u);
-                        $("#pa-runmany-user").text(data.u);
                         run($manybutton[0], {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: $x[0]});
-                        setTimeout(check, 4000);
                     }
+                    setTimeout(check, 4000);
                 }
             });
         } else {
