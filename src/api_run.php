@@ -8,9 +8,10 @@ class Run_API {
         if (!$qreq->chain || !ctype_digit($qreq->chain)) {
             return ["ok" => false, "error" => "Invalid request."];
         }
-        $qi = QueueItem::by_chain($user->conf, intval($qreq->chain));
+        $chain = intval($qreq->chain);
+        $qi = QueueItem::by_chain($user->conf, $chain);
         if (!$qi) {
-            return ["ok" => false, "error" => "Chain done.", "chain" => false];
+            return ["ok" => false, "error" => "Chain done.", "njobs" => 0];
         } else if (!$user->isPC && $qi->reqcid !== $user->contactId) {
             return ["ok" => false, "error" => "Permission error."];
         } else if (!($pset = $qi->pset())) {
@@ -28,7 +29,8 @@ class Run_API {
                 "u" => $user->user_linkpart($u, !!$anon),
                 "pset" => $pset->urlkey,
                 "runner" => $qi->runnername,
-                "timestamp" => $qi->runat
+                "timestamp" => $qi->runat,
+                "njobs" => $user->conf->fetch_ivalue("select count(*) from ExecutionQueue where chain=?", $chain)
             ];
         }
     }
