@@ -810,6 +810,12 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table `CommitNotes` add `updateat` bigint NOT NULL DEFAULT '0'")) {
         $conf->update_schema_version(160);
     }
+    if ($conf->sversion === 160
+        && $conf->ql_ok("alter table `ContactGrade` add `pinsnv` int DEFAULT NULL")
+        && $conf->ql_ok("alter table `ContactGradeHistory` change `notes` `antiupdate` varbinary(32767) DEFAULT NULL")
+        && $conf->ql_ok("alter table `ContactGradeHistory` change `notesOverflow` `antiupdateOverflow` longblob DEFAULT NULL")) {
+        $conf->update_schema_version(161);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }

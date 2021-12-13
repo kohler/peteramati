@@ -34,8 +34,10 @@ class PsetView {
 
     /** @var ?UserPsetInfo */
     private $_upi;
-    /** @var ?int */
+    /** @var ?UserPsetInfo */
     private $_vupi;
+    /** @var ?int */
+    private $_snv;
     /** @var ?RepositoryPsetInfo */
     private $_rpi;
     /** @var ?CommitPsetInfo */
@@ -168,6 +170,19 @@ class PsetView {
             $this->_upi->reload($this->conf);
         }
         return $this->_upi;
+    }
+
+    /** @return UserPsetInfo */
+    private function vupi() {
+        if (!$this->_vupi) {
+            $upi = $this->upi();
+            if (($this->_snv ?? $upi->pinsnv ?? $upi->notesversion) >= $upi->notesversion) {
+                $this->_vupi = $upi;
+            } else {
+                $this->_vupi = $upi->version_at($this->_snv ?? $upi->pinsnv, true, $this->conf);
+            }
+        }
+        return $this->_vupi;
     }
 
     /** @return ?RepositoryPsetInfo */
@@ -494,24 +509,33 @@ class PsetView {
 
     /** @return ?object */
     function user_jnotes() {
-        $upi = $this->_vupi ?? $this->upi();
-        return $upi ? $upi->jnotes() : null;
+        return $this->vupi()->jnotes();
     }
 
-    /** @param ?int $notesversion
-     * @param bool $student_only */
-    function set_user_notesversion($notesversion, $student_only = false) {
-        if (($upi = $this->upi()) && $notesversion < $upi->notesversion) {
-            $this->_vupi = $upi->version_at($notesversion, $student_only, $this->conf);
-        } else {
-            $this->_vupi = null;
+    /** @param ?int $snv */
+    function set_user_snv($snv) {
+        $this->_vupi = null;
+        $this->_snv = $snv;
+    }
+
+    /** @param bool $newer */
+    function adjust_user_snv($newer) {
+        $upi = $this->upi();
+        $vupi = $this->vupi();
+        $delta = $newer ? 1 : -1;
+        $nv = ($vupi->studentnotesversion ?? $vupi->notesversion) + $delta;
+        while ($nv > 0
+               && $nv < $upi->notesversion
+               && (!($h = $upi->history_at($nv, true, $this->conf))
+                   || ($h->updateby !== $upi->cid))) {
+            $nv += $delta;
         }
+        $this->set_user_snv(min(max($nv, 0), $upi->notesversion));
     }
 
     /** @return ?object */
     function user_jxnotes() {
-        $upi = $this->upi();
-        return $upi ? $upi->jxnotes() : null;
+        return $this->vupi()->jxnotes();
     }
 
     /** @param non-empty-string $key */
@@ -567,6 +591,38 @@ class PsetView {
             return $this->user_jnotes();
         } else {
             return $this->commit_jnotes();
+        }
+    }
+
+
+    /** @return ?int */
+    function notesversion() {
+        if ($this->pset->gitless) {
+            return $this->upi()->notesversion;
+        } else {
+            assert(!$this->pset->gitless_grades);
+            $cpi = $this->cpi();
+            return $cpi ? $cpi->notesversion : null;
+        }
+    }
+
+    /** @return ?int */
+    function studentnotesversion() {
+        if ($this->pset->gitless) {
+            $vupi = $this->vupi();
+            return $vupi->studentnotesversion ?? $vupi->notesversion;
+        } else {
+            return $this->notesversion();
+        }
+    }
+
+    /** @return ?int */
+    function pinsnv() {
+        if ($this->pset->gitless) {
+            $upi = $this->upi();
+            return $upi->pinsnv ?? $upi->notesversion;
+        } else {
+            return $this->notesversion();
         }
     }
 
@@ -876,8 +932,8 @@ class PsetView {
         $upi = $this->upi();
         $is_student = $is_student ?? !$this->viewer->isPC;
         assert(!!$upi);
-        assert($this->_vupi === null
-               || (!$is_student && $this->_vupi->studentnotesversion !== null));
+        $snv = $this->_snv ?? $upi->pinsnv ?? $upi->notesversion;
+        assert($snv === $upi->notesversion || !$is_student);
 
         // compare-and-swap loop
         while (true) {
@@ -922,7 +978,7 @@ class PsetView {
             $unotes = json_encode_db(json_antiupdate($upi->jnotes(), $updates));
             $unotesa = strlen($unotes) > 32000 ? null : $unotes;
             $unotesb = strlen($unotes) > 32000 ? $unotes : null;
-            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, studentupdateat=?, notes=?, notesOverflow=?",
+            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, studentupdateat=?, antiupdate=?, antiupdateOverflow=?",
                 $this->user->contactId, $this->pset->id,
                 $upi->notesversion, $upi->updateat ?? 0, $upi->updateby ?? 0,
                 $upi->studentupdateat, $unotesa, $unotesb);
@@ -934,9 +990,7 @@ class PsetView {
         $is_student && ($upi->studentupdateat = Conf::$now);
         $upi->hasactiveflags = $hasactiveflags;
         $this->clear_can_view_grade();
-        if ($this->_vupi) {
-            $this->_vupi = $upi->version_at($this->_vupi->studentnotesversion, true, $this->conf);
-        }
+        $this->_vupi = null;
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
             $this->_gtime = null;
             $this->user->invalidate_grades($this->pset->id);
@@ -1558,6 +1612,13 @@ class PsetView {
         }
     }
 
+    function pin_snv() {
+        assert(!!$this->pset->gitless);
+        $snv = $this->studentnotesversion();
+        $nv = $this->notesversion();
+        $this->conf->qe("update ContactGrade set pinsnv=?, xnotes=null, xnotesOverflow=null where cid=? and pset=?", $snv !== null && $snv < $nv ? $snv : null, $this->user->contactId, $this->pset->id);
+    }
+
 
     /** @return RunLogger */
     function run_logger() {
@@ -1818,6 +1879,12 @@ class PsetView {
         $xargs = ["pset" => $this->pset->urlkey, "u" => $this->user_linkpart()];
         if ($this->_hash) {
             $xargs["commit"] = $this->commit_hash();
+        }
+        if ($this->pset->gitless) {
+            $vupi = $this->vupi();
+            if ($vupi->studentnotesversion !== null) {
+                $xargs["snv"] = $vupi->studentnotesversion;
+            }
         }
         foreach ($args ?? [] as $k => $v) {
             $xargs[$k] = $v;

@@ -26,6 +26,8 @@ class UserPsetInfo {
     public $hasactiveflags = 0;
     /** @var ?string */
     public $xnotes;
+    /** @var ?int */
+    public $pinsnv;
     /** @var ?string */
     public $email;
 
@@ -39,6 +41,8 @@ class UserPsetInfo {
     private $_history_v0;
     /** @var ?bool */
     private $_history_student;
+    /** @var ?int */
+    private $_history_width;
     /** @var ?UserPsetInfo */
     public $sset_next;
     /** @var bool */
@@ -84,6 +88,7 @@ class UserPsetInfo {
         $this->hidegrade = (int) $x->hidegrade;
         $this->hasactiveflags = (int) $x->hasactiveflags;
         $this->xnotes = $x->xnotesOverflow ?? $x->xnotes;
+        $this->pinsnv = isset($x->pinsnv) ? (int) $x->pinsnv : null;
         if (isset($x->email)) {
             $this->email = $x->email;
         }
@@ -148,28 +153,45 @@ class UserPsetInfo {
         Dbl::free($result);
     }
 
-    /** @param ?int $version
+    /** @param int $version
      * @param ?bool $student_only
-     * @return UserPsetInfo */
-    function version_at($version, $student_only, Conf $conf) {
-        if (($version ?? $this->notesversion) >= $this->notesversion) {
-            return $this;
-        }
+     * @return UserPsetHistory */
+    function history_at($version, $student_only, Conf $conf) {
+        assert(!$this->phantom);
         if (!$student_only && $this->_history_student) {
-            $this->_history = null;
+            $this->_history = [];
             $this->_history_v0 = $this->notesversion;
         }
         if ($this->_history_v0 > $version) {
             $this->_history_student = $student_only && $this->_history_student !== false;
+            $this->_history_width = min(($this->_history_width ?? 8) * 2, 128);
+            $vx = max($version - $this->_history_width, 0);
             if ($this->_history_student) {
-                $this->load_history($conf, "notesversion>={$version} and notesversion<{$this->_history_v0} and updateby={$this->cid}");
+                $this->load_history($conf, "notesversion>={$vx} and notesversion<{$this->_history_v0} and updateby={$this->cid}");
             } else {
-                $this->load_history($conf, "notesversion>={$version} and notesversion<{$this->_history_v0}");
+                $this->load_history($conf, "notesversion>={$vx} and notesversion<{$this->_history_v0}");
             }
         }
-        if ($this->_history_v0 + count($this->_history) < $this->notesversion) {
+        if ($this->_history_v0 + count($this->_history) < $version) {
             $this->load_history($conf, "notesversion>=" . ($this->_history_v0 + count($this->_history)));
         }
+        if ($version >= $this->_history_v0) {
+            return $this->_history[$version - $this->_history_v0] ?? null;
+        } else {
+            return null;
+        }
+    }
+
+    /** @param ?int $version
+     * @param ?bool $student_only
+     * @return UserPsetInfo */
+    function version_at($version, $student_only, Conf $conf) {
+        assert(!$this->phantom);
+        if (($version ?? $this->notesversion) >= $this->notesversion) {
+            return $this;
+        }
+        $this->history_at($version, $student_only, $conf);
+        $this->history_at($this->notesversion - 1, $student_only, $conf);
         $vupi = new UserPsetInfo($this->cid, $this->pset);
         $vupi->updateat = $this->updateat;
         $vupi->studentupdateat = $this->studentupdateat;
@@ -179,7 +201,8 @@ class UserPsetInfo {
         }
         $jnotes = $this->jnotes();
         for ($v1 = $this->notesversion - 1; $v1 >= $version; --$v1) {
-            if (($h = $this->_history[$v1 - $this->_history_v0])
+            if ($v1 >= $this->_history_v0
+                && ($h = $this->_history[$v1 - $this->_history_v0])
                 && (!$student_only || $h->updateby === $this->cid)) {
                 $jnotes = $h->apply_revdelta($jnotes);
                 $vupi->studentupdateat = $h->studentupdateat;
@@ -190,6 +213,7 @@ class UserPsetInfo {
             }
         }
         $vupi->jnotes = $jnotes;
+        $vupi->phantom = true;
         return $vupi;
     }
 

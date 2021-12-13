@@ -15,11 +15,11 @@ class UserPsetHistory {
     /** @var ?int */
     public $studentupdateat;
     /** @var ?string */
-    public $notes;
+    public $antiupdate;
     /** @var ?string */
-    private $notesOverflow;
+    private $antiupdateOverflow;
     /** @var ?object */
-    private $jnotes;
+    private $jantiupdate;
     /** @var int */
     public $notesversion;
 
@@ -30,8 +30,8 @@ class UserPsetHistory {
         $this->updateat = (int) $this->updateat;
         $this->updateby = (int) $this->updateby;
         $this->studentupdateat = (int) $this->studentupdateat;
-        $this->notes = $this->notesOverflow ?? $this->notes;
-        $this->notesOverflow = null;
+        $this->antiupdate = $this->antiupdateOverflow ?? $this->antiupdate;
+        $this->antiupdateOverflow = null;
     }
 
     /** @return ?UserPsetHistory */
@@ -44,16 +44,16 @@ class UserPsetHistory {
     }
 
     /** @return ?object */
-    function jrevdelta() {
-        if ($this->jnotes === null && $this->notes !== null) {
-            $this->jnotes = json_decode($this->notes);
+    function jantiupdate() {
+        if ($this->jantiupdate === null && $this->antiupdate !== null) {
+            $this->jantiupdate = json_decode($this->antiupdate);
         }
-        return $this->jnotes;
+        return $this->jantiupdate;
     }
 
     /** @param object $jnotes
      * @return object */
     function apply_revdelta($jnotes) {
-        return json_update($jnotes, $this->jrevdelta());
+        return json_update($jnotes, $this->jantiupdate());
     }
 }
