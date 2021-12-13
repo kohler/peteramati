@@ -2391,10 +2391,15 @@ function pa_render_pset_table(pconf, data) {
                 }
             }
         }
+        this.disabled = true;
         const usc = [];
         for (let su of gdialog_su) {
             usc.push(us[su.uid]);
         }
+        const progress = document.createElement("progress");
+        progress.max = usc.length;
+        progress.className = "float-right";
+        this.after(progress);
         let usci = 0;
         function more() {
             const byuid = usc.slice(usci, usci + 16);
@@ -2404,6 +2409,7 @@ function pa_render_pset_table(pconf, data) {
                 {timeout: 20000})
             .then(function (rv) {
                 gdialog_store_start(rv);
+                progress.value = usci;
                 if (rv.ok && rv.us) {
                     const uid2tr = make_uid2tr();
                     for (let rvu of rv.us) {
