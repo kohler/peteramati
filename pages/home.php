@@ -52,7 +52,7 @@ if ($Conf->opt("httpAuthLogin")) {
 // set interesting user
 $User = null;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u))) {
+    && !($User = ContactView::prepare_user($Qreq->u, $Me))) {
     redirectSelf(["u" => null]);
 }
 if (!$Me->isPC || !$User) {
@@ -72,13 +72,13 @@ if (!$Me->is_empty()
 }
 
 if (!$Me->is_empty() && $Qreq->set_repo !== null) {
-    ContactView::set_repo_action($User, $Qreq);
+    ContactView::set_repo_action($User, $Me, $Qreq);
 }
 if (!$Me->is_empty() && $Qreq->set_branch !== null) {
-    ContactView::set_branch_action($User, $Qreq);
+    ContactView::set_branch_action($User, $Me, $Qreq);
 }
 if ($Qreq->set_partner !== null) {
-    ContactView::set_partner_action($User, $Qreq);
+    ContactView::set_partner_action($User, $Me, $Qreq);
 }
 
 if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
@@ -200,12 +200,12 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         $g = $pset->all_grades[substr($qreq->action, 10)];
         assert($g && $g->collate);
         if (!!$g->landmark_range_file) {
-            Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
+            Navigation::redirect($conf->hoturl("=diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
         } else {
-            Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "grade" => $g->key, "users" => join(" ", qreq_usernames($qreq))]));
+            Navigation::redirect($conf->hoturl("=diffmany", ["pset" => $pset->urlkey, "grade" => $g->key, "users" => join(" ", qreq_usernames($qreq))]));
         }
     } else if (str_starts_with($qreq->action, "diffmany_")) {
-        Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
+        Navigation::redirect($conf->hoturl("=diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
     } else if (str_starts_with($qreq->action, "report_")) {
         foreach ($pset->reports as $r) {
             if (substr($qreq->action, 7) === $r->key) {
@@ -213,7 +213,7 @@ function doaction(Contact $viewer, Qrequest $qreq) {
             }
         }
     } else if ($qreq->action === "diffmany") {
-        Navigation::redirect($conf->hoturl_post("diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
+        Navigation::redirect($conf->hoturl("=diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
     }
     redirectSelf();
 }
@@ -425,13 +425,13 @@ if ($Me->privChair && (!$User || $User === $Me)) {
 
     $m = [];
     if ($row[0]) {
-        $m[] = '<a href="' . $Conf->hoturl_post("index", "enable_user=college-empty") . '">college users</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", "enable_user=college-empty") . '">college users</a>';
     }
     if ($row[1]) {
-        $m[] = '<a href="' . $Conf->hoturl_post("index", "enable_user=extension-empty") . '">extension users</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", "enable_user=extension-empty") . '">extension users</a>';
     }
     if ($row[2]) {
-        $m[] = '<a href="' . $Conf->hoturl_post("index", "enable_user=ta-empty") . '">TAs</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", "enable_user=ta-empty") . '">TAs</a>';
     }
     if (!empty($m)) {
         echo '    <li>Enable ', join(", ", $m), "</li>\n";
@@ -439,15 +439,15 @@ if ($Me->privChair && (!$User || $User === $Me)) {
 
     $m = [];
     if ($row[3])
-        $m[] = '<a href="' . $Conf->hoturl_post("index", "send_account_info=college-nologin") . '">college users</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", "send_account_info=college-nologin") . '">college users</a>';
     if ($row[4])
-        $m[] = '<a href="' . $Conf->hoturl_post("index", "send_account_info=extension-nologin") . '">extension users</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", "send_account_info=extension-nologin") . '">extension users</a>';
     if ($row[5])
-        $m[] = '<a href="' . $Conf->hoturl_post("index", "send_account_info=ta-nologin") . '">TAs</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", "send_account_info=ta-nologin") . '">TAs</a>';
     if (!empty($m))
         echo '    <li>Send account info to ', join(", ", $m), "</li>\n";
 
-    echo "    <li><a href='", $Conf->hoturl_post("index", "report=nonanonymous"), "'>Overall grade report</a> (<a href='", $Conf->hoturl_post("index", "report=nonanonymous+college"), "'>college</a>, <a href='", $Conf->hoturl_post("index", "report=nonanonymous+extension"), "'>extension</a>)</li>
+    echo "    <li><a href='", $Conf->hoturl("=index", "report=nonanonymous"), "'>Overall grade report</a> (<a href='", $Conf->hoturl("=index", "report=nonanonymous+college"), "'>college</a>, <a href='", $Conf->hoturl("=index", "report=nonanonymous+extension"), "'>extension</a>)</li>
     <!-- <li><a href='", $Conf->hoturl("log"), "'>Action log</a></li> -->
   </ul>
 </div>\n";
@@ -493,7 +493,7 @@ Sign in to tell us about your code.';
     echo "</div>
 <hr class='home' />
 <div class='homegrp' id='homeaccount'>\n",
-        Ht::form($Conf->hoturl_post("index")),
+        Ht::form($Conf->hoturl("=index")),
         "<div class='f-contain foldo fold2o' id='logingroup'>
 <input type='hidden' name='cookie' value='1' />
 <div class=\"", Ht::control_class("email", "f-ii"), "\">
@@ -651,15 +651,15 @@ if (!$Me->is_empty() && $User->is_student()) {
     if ($Me->isPC) {
         echo "<div style='margin-top:5em'></div>\n";
         if ($User->dropped) {
-            echo Ht::form($Conf->hoturl_post("index", ["set_undrop" => 1, "u" => $Me->user_linkpart($User)])),
+            echo Ht::form($Conf->hoturl("=index", ["set_undrop" => 1, "u" => $Me->user_linkpart($User)])),
                 "<div>", Ht::submit("Undrop"), "</div></form>";
         } else {
-            echo Ht::form($Conf->hoturl_post("index", ["set_drop" => 1, "u" => $Me->user_linkpart($User)])),
+            echo Ht::form($Conf->hoturl("=index", ["set_drop" => 1, "u" => $Me->user_linkpart($User)])),
                 "<div>", Ht::submit("Drop"), "</div></form>";
         }
     }
     if ($Me->privChair && $User->can_enable()) {
-        echo Ht::form($Conf->hoturl_post("index", ["enable_user" => 1, "u" => $Me->user_linkpart($User)])),
+        echo Ht::form($Conf->hoturl("=index", ["enable_user" => 1, "u" => $Me->user_linkpart($User)])),
             Ht::submit("Enable"), "</form>";
     }
 }
@@ -822,7 +822,7 @@ function show_flags($result, $all) {
 function show_pset_actions($pset) {
     global $Conf;
 
-    echo Ht::form($Conf->hoturl_post("index", ["pset" => $pset->urlkey, "reconfig" => 1]), ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
+    echo Ht::form($Conf->hoturl("=index", ["pset" => $pset->urlkey, "reconfig" => 1]), ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
     $options = array("disabled" => "Disabled",
                      "invisible" => "Hidden",
                      "visible" => "Visible without grades",
@@ -850,7 +850,7 @@ function show_pset_actions($pset) {
 
     if (!$pset->disabled) {
         echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
-        echo Ht::link("Grade report", $Conf->hoturl_post("index", ["pset" => $pset->urlkey, "report" => 1]), ["class" => "btn"]);
+        echo Ht::link("Grade report", $Conf->hoturl("=index", ["pset" => $pset->urlkey, "report" => 1]), ["class" => "btn"]);
     }
 
     echo "</form>";
@@ -1060,7 +1060,7 @@ function show_pset_table($sset) {
     }
 
     if ($checkbox) {
-        echo Ht::form($sset->conf->hoturl_post("index", ["pset" => $pset->urlkey, "save" => 1, "college" => $Qreq->college, "extension" => $Qreq->extension]));
+        echo Ht::form($sset->conf->hoturl("=index", ["pset" => $pset->urlkey, "save" => 1, "college" => $Qreq->college, "extension" => $Qreq->extension]));
         if ($pset->anonymous) {
             echo Ht::hidden("anonymous", $anonymous ? 1 : 0);
         }
@@ -1162,7 +1162,7 @@ function show_pset_table($sset) {
     if (count($sel) > 1) {
         echo '<span class="nb" style="padding-right:2em">',
             Ht::select("run", $sel + $esel),
-            ' &nbsp;', Ht::submit("Run all", ["formaction" => $pset->conf->hoturl_post("run", ["pset" => $pset->urlkey, "runmany" => 1])]),
+            ' &nbsp;', Ht::submit("Run all", ["formaction" => $pset->conf->hoturl("=run", ["pset" => $pset->urlkey, "runmany" => 1])]),
             '</span>';
     }
 

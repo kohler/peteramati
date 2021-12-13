@@ -1367,9 +1367,8 @@ table.floatleft {
 	float: left;
 	margin: 0;
 }
-div.floatright {
+.float-right {
 	float: right;
-	margin: 0;
 }
 
 h2 {

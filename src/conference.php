@@ -1585,6 +1585,10 @@ class Conf {
         global $Me;
         $nav = Navigation::get();
         $amp = ($flags & self::HOTURL_RAW ? "&" : "&amp;");
+        if (str_starts_with($page, "=")) {
+            $page = substr($page, 1);
+            $flags |= self::HOTURL_POST;
+        }
         $t = $page . $nav->php_suffix;
         $are = '/\A(|.*?(?:&|&amp;))';
         $zre = '(?:&(?:amp;)?|\z)(.*)\z/';
@@ -1593,17 +1597,19 @@ class Conf {
         if (is_array($param)) {
             $x = "";
             foreach ($param as $k => $v) {
-                if ($v === null || $v === false)
-                    /* skip */;
-                else if ($k === "anchor")
+                if ($v === null || $v === false) {
+                } else if ($k === "anchor") {
                     $anchor = "#" . urlencode($v);
-                else
+                } else {
                     $x .= ($x === "" ? "" : $amp) . $k . "=" . urlencode($v);
+                }
             }
-            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS))
-                foreach (Conf::$hoturl_defaults as $k => $v)
+            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
+                foreach (Conf::$hoturl_defaults as $k => $v) {
                     if (!array_key_exists($k, $param))
                         $x .= ($x === "" ? "" : $amp) . $k . "=" . $v;
+                }
+            }
             $param = $x;
         } else {
             $param = (string) $param;
@@ -1611,13 +1617,16 @@ class Conf {
                 $anchor = substr($param, $pos);
                 $param = substr($param, 0, $pos);
             }
-            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS))
-                foreach (Conf::$hoturl_defaults as $k => $v)
+            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
+                foreach (Conf::$hoturl_defaults as $k => $v) {
                     if (!preg_match($are . preg_quote($k) . '=/', $param))
                         $param .= ($param === "" ? "" : $amp) . $k . "=" . $v;
+                }
+            }
         }
-        if ($flags & self::HOTURL_POST)
+        if ($flags & self::HOTURL_POST) {
             $param .= ($param === "" ? "" : $amp) . "post=" . post_value();
+        }
         // create slash-based URLs if appropriate
         if ($param) {
             $has_commit = false;
@@ -2081,7 +2090,7 @@ class Conf {
             if (!$Me->has_email() && !isset($this->opt["httpAuthLogin"]))
                 $profile_parts[] = '<a href="' . $this->hoturl("index", "signin=1") . '">Sign&nbsp;in</a>';
             if (!$Me->is_empty() || isset($this->opt["httpAuthLogin"]))
-                $profile_parts[] = '<a href="' . $this->hoturl_post("index", "signout=1") . '">Sign&nbsp;out</a>';
+                $profile_parts[] = '<a href="' . $this->hoturl("=index", "signout=1") . '">Sign&nbsp;out</a>';
 
             if (!empty($profile_parts))
                 echo join(' <span class="barsep">·</span> ', $profile_parts);

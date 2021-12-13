@@ -134,7 +134,7 @@ class GitHub_RepositorySite extends RepositorySite {
         global $Me;
         if (!$first && !$user->github_username)
             return;
-        echo Ht::form($user->conf->hoturl_post("index", array("set_username" => 1, "u" => $Me->user_linkpart($user), "reposite" => "github"))),
+        echo Ht::form($user->conf->hoturl("=index", array("set_username" => 1, "u" => $Me->user_linkpart($user), "reposite" => "github"))),
             '<div class="f-contain">';
         $notes = array();
         if (!$user->github_username)

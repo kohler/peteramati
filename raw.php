@@ -26,12 +26,12 @@ ContactView::set_path_request(array("/@", "/@/p", "/@/p/h/f", "/@/p/f",
 // user, pset, runner
 $User = $Me;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u))) {
+    && !($User = ContactView::prepare_user($Qreq->u, $Me))) {
     exit;
 }
 assert($User == $Me || $Me->isPC);
 
-$Pset = ContactView::find_pset_redirect($Me, $Qreq->pset);
+$Pset = ContactView::find_pset_redirect($Qreq->pset, $Me);
 
 // repo
 $Info = raw_user_pset_info();

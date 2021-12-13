@@ -11,7 +11,7 @@ global $User, $Pset, $Info;
 
 $User = $Me;
 if (isset($Qreq->u)) {
-    $User = ContactView::prepare_user($Qreq->u);
+    $User = ContactView::prepare_user($Qreq->u, $Me);
 }
 
 if (isset($Qreq->imageid)) {

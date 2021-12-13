@@ -1344,8 +1344,7 @@ class PsetView {
     /** @return int */
     function gradercid() {
         if ($this->pset->gitless_grades) {
-            $upi = $this->upi();
-            return $upi ? $upi->gradercid : 0;
+            return $this->upi()->gradercid;
         } else {
             $rpi = $this->rpi();
             if ((!$rpi || $this->_hash !== $rpi->gradehash)
@@ -1380,8 +1379,7 @@ class PsetView {
      * @return ?int */
     private function student_timestamp($force) {
         if ($this->pset->gitless) {
-            $upi = $this->_vupi ?? $this->upi();
-            return $upi ? $upi->studentupdateat : null;
+            return $this->vupi()->studentupdateat;
         } else if ($this->_hash
                    && ($rpi = $this->rpi())
                    && $rpi->gradehash === $this->_hash) {
@@ -1836,7 +1834,8 @@ class PsetView {
 
     /** @param string $base
      * @param ?array<string,null|int|string> $args
-     * @return string */
+     * @return string
+     * @deprecated */
     function hoturl_post($base, $args = null) {
         return $this->conf->hoturl_post($base, $this->hoturl_args($args));
     }

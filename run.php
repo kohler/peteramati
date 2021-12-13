@@ -39,11 +39,11 @@ class RunRequest {
         $this->user = $this->viewer = $viewer;
         $this->qreq = $qreq;
         if ($qreq->u !== null
-            && !($this->user = ContactView::prepare_user($qreq->u))) {
+            && !($this->user = ContactView::prepare_user($qreq->u, $viewer))) {
             json_exit(["ok" => false]);
         }
         assert($this->user === $this->viewer || $this->viewer->isPC);
-        $this->pset = ContactView::find_pset_redirect($this->viewer, $qreq->pset);
+        $this->pset = ContactView::find_pset_redirect($qreq->pset, $viewer);
 
         foreach ($this->pset->runners as $r) {
             if ($qreq->run === $r->name) {
@@ -232,7 +232,7 @@ class RunRequest {
             $this->conf->header(htmlspecialchars($t), "home");
 
             echo '<h2 id="pa-runmany-who"></h2>',
-                Ht::form($this->conf->hoturl_post("run")),
+                Ht::form($this->conf->hoturl("=run")),
                 '<div class="f-contain">',
                 Ht::hidden("u", ""),
                 Ht::hidden("pset", $this->pset->urlkey);

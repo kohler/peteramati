@@ -12,13 +12,13 @@ global $User, $Pset, $Info, $Qreq;
 
 $User = $Me;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u))) {
+    && !($User = ContactView::prepare_user($Qreq->u, $Me))) {
     redirectSelf(["u" => null]);
 }
 assert($User === $Me || $Me->isPC);
 $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
 
-$Pset = ContactView::find_pset_redirect($Me, $Qreq->pset);
+$Pset = ContactView::find_pset_redirect($Qreq->pset, $Me);
 if ($Pset->gitless) {
     $Conf->errorMsg("That problem set does not use git.");
     $Me->escape(); // XXX stay on this page
@@ -64,7 +64,7 @@ if ($commitb->hash === $Info->grading_hash()) {
 
 
 $Conf->header(htmlspecialchars($Pset->title), "home");
-ContactView::echo_heading($User);
+ContactView::echo_heading($User, $Me);
 
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey),
     '" data-pa-base-hash="', htmlspecialchars($commita->hash),

@@ -77,34 +77,37 @@ class ContactView {
         }
     }
 
-    static function prepare_user(&$usertext, $pset = null) {
-        global $Conf, $Me;
-        $user = $Me;
+    /** @param Contact $viewer
+     * @param ?Pset $pset
+     * @return ?Contact */
+    static function prepare_user(&$usertext, $viewer, $pset = null) {
+        $user = $viewer;
         if (isset($usertext) && $usertext) {
-            $user = $Conf->user_by_whatever($usertext);
+            $user = $viewer->conf->user_by_whatever($usertext);
             if (!$user) {
-                $Conf->errorMsg("No such user “" . htmlspecialchars($usertext) . "”.");
-            } else if ($user->contactId == $Me->contactId) {
-                $user = $Me;
-            } else if (!$Me->isPC) {
-                $Conf->errorMsg("You can’t see that user’s information.");
+                $viewer->conf->errorMsg("No such user “" . htmlspecialchars($usertext) . "”.");
+            } else if ($user->contactId == $viewer->contactId) {
+                $user = $viewer;
+            } else if (!$viewer->isPC) {
+                $viewer->conf->errorMsg("You can’t see that user’s information.");
                 $user = null;
             } else {
                 $user->set_anonymous(substr($usertext, 0, 5) === "[anon"
                                      || ($pset && $pset->anonymous));
             }
         }
-        if ($user && ($Me->isPC || $Me->chairContact)) {
-            if ($pset && $pset->anonymous)
+        if ($user && ($viewer->isPC || $viewer->chairContact)) {
+            if ($pset && $pset->anonymous) {
                 $usertext = $user->anon_username;
-            else
+            } else {
                 $usertext = $user->username ? : $user->email;
+            }
         }
         return $user;
     }
 
     /** @param Contact $viewer */
-    static function find_pset_redirect($viewer, $psetkey) {
+    static function find_pset_redirect($psetkey, $viewer) {
         $pset = $viewer->conf->pset_by_key($psetkey);
         if ((!$pset || $pset->disabled)
             && ($psetkey !== null && $psetkey !== "" && $psetkey !== false)) {
@@ -124,11 +127,11 @@ class ContactView {
         return $pset;
     }
 
-    /** @param Contact $user */
-    static function echo_heading($user) {
-        global $Me;
-        $u = $Me->user_linkpart($user);
-        if ($user !== $Me && !$user->is_anonymous && $user->contactImageId) {
+    /** @param Contact $user
+     * @param Contact $viewer */
+    static function echo_heading($user, $viewer) {
+        $u = $viewer->user_linkpart($user);
+        if ($user !== $viewer && !$user->is_anonymous && $user->contactImageId) {
             echo '<img class="pa-smallface float-left" src="' . $user->conf->hoturl("face", array("u" => $u, "imageid" => $user->contactImageId)) . '" />';
         }
 
@@ -136,19 +139,19 @@ class ContactView {
             $user->conf->hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
         if ($user->extension)
             echo " (X)";
-        /*if ($Me->privChair && $user->is_anonymous)
+        /*if ($viewer->privChair && $user->is_anonymous)
             echo " ",*/
-        if ($Me->privChair)
+        if ($viewer->privChair)
             echo "&nbsp;", become_user_link($user);
-        if ($Me->isPC
+        if ($viewer->isPC
             && !$user->is_anonymous
             && $user->github_username
-            && $Me->conf->opt("githubOrganization")) {
+            && $viewer->conf->opt("githubOrganization")) {
             echo ' <button type="button" class="btn-qlink small ui js-repo-list need-tooltip" data-tooltip="List repositories" data-pa-user="', htmlspecialchars($user->github_username), '">®</button>';
         }
         echo '</h2>';
 
-        if ($user !== $Me && !$user->is_anonymous) {
+        if ($user !== $viewer && !$user->is_anonymous) {
             echo '<h3>', Text::user_html($user);
             if ($user->studentYear) {
                 if (strlen($user->studentYear) <= 2
@@ -255,18 +258,20 @@ class ContactView {
         echo "\n";
     }
 
-    static function set_partner_action($user, $qreq) {
-        global $Conf, $Me;
-        if (!($Me->has_account_here()
+    /** @param Contact $user
+     * @param Contact $viewer
+     * @param Qrequest $qreq */
+    static function set_partner_action($user, $viewer, $qreq) {
+        if (!($viewer->has_account_here()
               && $qreq->valid_post()
-              && ($pset = $Conf->pset_by_key($qreq->pset)))) {
+              && ($pset = $viewer->conf->pset_by_key($qreq->pset)))) {
             return;
         }
-        if (!$Me->can_set_repo($pset, $user)) {
-            return $Conf->errorMsg("You can’t edit repository information for that problem set now.");
+        if (!$viewer->can_set_repo($pset, $user)) {
+            return $viewer->conf->errorMsg("You can’t edit repository information for that problem set now.");
         }
         if ($user->set_partner($pset, $_REQUEST["partner"])) {
-            redirectSelf();
+            $viewer->conf->redirect_self($qreq);
         }
     }
 
@@ -464,14 +469,17 @@ class ContactView {
         }
     }
 
-    static function set_repo_action($user, $qreq) {
-        global $Conf, $Me;
-        if (!($Me->has_account_here()
+    /** @param Contact $user
+     * @param Contact $viewer
+     * @param Qrequest $qreq */
+    static function set_repo_action($user, $viewer, $qreq) {
+        $conf = $viewer->conf;
+        if (!($viewer->has_account_here()
               && $qreq->valid_post()
-              && ($pset = $Conf->pset_by_key($qreq->pset)))) {
+              && ($pset = $conf->pset_by_key($qreq->pset)))) {
             return;
         }
-        if (!$Me->can_set_repo($pset, $user)) {
+        if (!$viewer->can_set_repo($pset, $user)) {
             return Conf::msg_error("You can’t edit repository information for that problem set now.");
         }
 
@@ -479,7 +487,7 @@ class ContactView {
         $repo_url = trim($qreq->repo);
         if ($repo_url === "") {
             $user->set_repo($pset, null);
-            redirectSelf();
+            $conf->redirect_self($conf);
         }
 
         // extend it to full url
@@ -525,7 +533,7 @@ class ContactView {
                     $repo->check_open();
                 }
                 if ($user->set_repo($pset, $repo)) {
-                    redirectSelf();
+                    $conf->redirect_self($qreq);
                 }
                 return;
             }
@@ -541,16 +549,16 @@ class ContactView {
     }
 
     /** @param Contact $user
+     * @param Contact $viewer
      * @param Qrequest $qreq */
-    static function set_branch_action($user, $qreq) {
-        global $Me;
-        if (!($Me->has_account_here()
+    static function set_branch_action($user, $viewer, $qreq) {
+        if (!($viewer->has_account_here()
               && $qreq->valid_post()
               && ($pset = $user->conf->pset_by_key($qreq->pset))
               && !$pset->no_branch)) {
             return;
         }
-        if (!$Me->can_set_repo($pset, $user)) {
+        if (!$viewer->can_set_repo($pset, $user)) {
             return Conf::msg_error("You can’t edit repository information for that problem set now.");
         }
 
@@ -571,7 +579,7 @@ class ContactView {
         } else {
             $user->set_link(LINK_BRANCH, $pset->id, $branchid);
         }
-        redirectSelf();
+        $viewer->conf->redirect_self($qreq);
     }
 
     static function late_hour_note(PsetView $info) {

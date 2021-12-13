@@ -12,7 +12,7 @@ global $User, $Pset, $Info, $Commit;
 $User = $Me;
 if (isset($_REQUEST["u"])
     && (!$Me->isPC
-        || !($User = ContactView::prepare_user($_REQUEST["u"]))))
+        || !($User = ContactView::prepare_user($_REQUEST["u"], $Me))))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
 assert($Me->privChair);
