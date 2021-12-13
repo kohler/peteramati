@@ -49,8 +49,17 @@ class LineNote_API {
             $note->users[] = $user->contactId;
         }
         $note->iscomment = isset($apply->iscomment) && $apply->iscomment;
+
         // XXX apply->note, apply->text obsolete
-        $note->ftext = rtrim(cleannl($apply->ftext ?? $apply->note ?? $apply->text ?? ""));
+        $t = rtrim(cleannl($apply->ftext ?? $apply->note ?? $apply->text ?? ""));
+        // format-only, such as `<1>`, becomes empty string
+        $len = strlen($t);
+        if ($len >= 3 && $len <= 10 && $t[0] === "<" && $t[$len - 1] === ">"
+            && ctype_digit(substr($t, 1, $len - 2))) {
+            $t = "";
+        }
+        $note->ftext = $t;
+
         $note->version = intval($note->version) + 1;
         if (isset($apply->linea)) {
             $note->linea = intval($apply->linea);
