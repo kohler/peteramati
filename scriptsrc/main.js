@@ -1078,12 +1078,12 @@ function pa_runmany(chain) {
                         $x.text(data.u);
                         $("#pa-runmany-user").text(data.u);
                         run($manybutton[0], {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: $x[0]});
-                        setTimeout(check, 10);
+                        setTimeout(check, 4000);
                     }
                 }
             });
         } else {
-            setTimeout(check, 4);
+            setTimeout(check, 2000);
         }
     }
     check();
