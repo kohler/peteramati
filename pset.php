@@ -364,13 +364,13 @@ class PsetRequest {
             $snv = $this->info->studentnotesversion();
             $nv = $this->info->notesversion();
             if ($snv > 1) {
-                $b[] = Ht::link("&lt;", $this->info->hoturl("pset", ["oldersnv" => 1]), ["class" => "btn"]);
+                $b[] = Ht::link("←", $this->info->hoturl("pset", ["oldersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
             }
             if ($snv !== $this->info->pinsnv()) {
-                $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl("=pset", ["pinsnv" => 1])]);
+                $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip", "aria-label" => "Mark these answers for grading"]);
             }
             if ($snv < $nv) {
-                $b[] = Ht::link("&gt;", $this->info->hoturl("pset", ["newersnv" => 1]), ["class" => "btn"]);
+                $b[] = Ht::link("→", $this->info->hoturl("pset", ["newersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
             }
             if (!empty($b)) {
                 echo '<form class="float-right ml-4"><div class="btnbox">',

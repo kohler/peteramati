@@ -21,6 +21,8 @@ class GradeExport implements JsonSerializable {
     public $grades;
     /** @var ?list<mixed> */
     public $autogrades;
+    /** @var ?array */
+    public $student_grade_updates;
     /** @var null|int|float */
     public $total;
     /** @var null|int|float */
@@ -179,6 +181,9 @@ class GradeExport implements JsonSerializable {
             }
             if ($this->pc_view && !empty($this->autogrades)) {
                 $r["autogrades"] = $this->autogrades;
+            }
+            if (!empty($this->student_grade_updates)) {
+                $r["student_grade_updates"] = $this->student_grade_updates;
             }
             if (!$this->has_total) {
                 $this->total();

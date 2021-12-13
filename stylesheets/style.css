@@ -2332,6 +2332,18 @@ td.mhcb {
 .pa-pt > p:first-child:last-child {
 	margin-bottom: 0;
 }
+.pa-has-grade-update::after {
+	content: "←";
+	font-size: 82.5%;
+	vertical-align: sub;
+	color: #449999;
+}
+.pa-is-grade-update::after {
+	content: "→";
+	font-size: 82.5%;
+	vertical-align: sub;
+	color: #cc9966;
+}
 .pa-pdesc {
 	width: 100%;
 	margin-bottom: 0.25rem;

@@ -6,7 +6,7 @@ import { wstorage, sprintf, strftime } from "./utils.js";
 import { hasClass, addClass, removeClass, fold61, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { render_terminal } from "./render-terminal.js";
-import { grades_fetch } from "./grades.js";
+import { grades_fetch } from "./grade-ui.js";
 
 export function run(button, opts) {
     const $f = $(button).closest("form"),
@@ -172,7 +172,7 @@ export function run(button, opts) {
         $f.prop("outstanding", false);
         hide_cursor();
         if (button.hasAttribute("data-pa-run-grade")) {
-            grades_fetch.call(button.closest(".pa-psetinfo"));
+            grades_fetch(button.closest(".pa-psetinfo"));
         }
     }
 

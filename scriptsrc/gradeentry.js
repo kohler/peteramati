@@ -425,6 +425,9 @@ export class GradeSheet {
         if (x.autogrades) {
             this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x);
         }
+        if (x.student_grade_updates) {
+            this.student_grade_updates = x.student_grade_updates;
+        }
         while (this.grades && this.gversion.length < this.grades.length) {
             this.gversion.push(0);
         }
@@ -497,6 +500,18 @@ export class GradeSheet {
                    && elt.getAttribute("data-pa-gv") != this.gversion[gpos]) {
             gv = this.grades ? this.grades[gpos] : null;
             xopts.autograde = this.autogrades ? this.autogrades[gpos] : null;
+            if (this.student_grade_updates
+                && ge.answer
+                && k in this.student_grade_updates
+                && this.student_grade_updates[k] !== gv) {
+                const label = elt.firstChild;
+                if (label.classList.contains("pa-is-grade-update")) {
+                    gv = this.student_grade_updates[k];
+                } else if (!label.classList.contains("uic")) {
+                    label.classList.add("pa-has-grade-update", "uic", "need-tooltip");
+                    label.setAttribute("aria-label", "Toggle latest version");
+                }
+            }
             elt.setAttribute("data-pa-gv", this.gversion[gpos]);
         } else {
             return;

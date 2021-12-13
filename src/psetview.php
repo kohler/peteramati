@@ -1940,6 +1940,7 @@ class PsetView {
         if ($this->_g !== null || $this->is_grading_commit()) {
             $this->grade_export_grades($gexp);
             $this->grade_export_linenotes($gexp);
+            $this->grade_export_updates($gexp);
         }
         if (!($flags & self::GRADEJSON_NO_FORMULAS)
             && $this->pset->has_formula) {
@@ -1982,6 +1983,22 @@ class PsetView {
             $gexp->grades[] = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
             if ($this->_ag !== null) {
                 $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
+            }
+        }
+    }
+
+    function grade_export_updates(GradeExport $gexp) {
+        if ($this->pset->grades_history && $this->pset->gitless) {
+            $vupi = $this->vupi();
+            if ($vupi->studentnotesversion !== null) {
+                $jnn = $this->upi()->jnote("grades");
+                $jno = $vupi->jnote("grades");
+                foreach ($gexp->value_entries() as $ge) {
+                    if ($ge->answer
+                        && ($jnn->{$ge->key} ?? null) !== ($jno->{$ge->key} ?? null)) {
+                        $gexp->student_grade_updates[$ge->key] = $jnn->{$ge->key};
+                    }
+                }
             }
         }
     }
