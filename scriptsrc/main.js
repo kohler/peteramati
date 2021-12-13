@@ -1066,9 +1066,11 @@ function pa_runmany(chain) {
     }
     function check() {
         if (!$f.prop("outstanding")) {
+            $f.prop("outstanding", true);
             $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
                 type: "POST", cache: false, dataType: "json", timeout: 30000,
                 success: function (data) {
+                    $f.prop("outstanding", false);
                     if (data && data.ok) {
                         $f[0].elements.u.value = data.u;
                         $f[0].elements.pset.value = data.pset;
