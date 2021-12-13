@@ -1056,32 +1056,55 @@ function pa_beforeunload() {
 }
 
 function pa_runmany(chain) {
-    let $manybutton = $("#pa-runmany"), $f = $manybutton.closest("form");
-    if (!$f.prop("pa-runmany-unload")) {
+    const f = document.getElementById("pa-runmany-form");
+    let timeout;
+    if (f && !$(f).data("paRunmanyUnload")) {
         $(window).on("beforeunload", function () {
-            // XXXXXXX
-            if ($f.prop("outstanding") || $("#pa-runmany-list").text())
+            const progress = document.getElementById("pa-runmany-progress");
+            if (progress && progress.max < progress.value) {
                 return "Several server requests are outstanding.";
+            }
         });
-        $f.prop("pa-runmany-unload", "1");
+        $(f).data("paRunmanyUnload", true);
     }
     function check() {
-        if (!hasClass($f[0], "pa-run-active")) {
+        if (!hasClass(f, "pa-run-active")) {
             $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
                 type: "POST", cache: false, dataType: "json", timeout: 30000,
-                success: function (data) {
-                    if (data && data.ok) {
-                        $f[0].elements.u.value = data.u;
-                        $f[0].elements.pset.value = data.pset;
-                        let $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(data.u) + "/pset/" + data.pset + "\" class=\"q ansib ansifg7\"></a>");
-                        $x.text(data.u);
-                        run($manybutton[0], {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: $x[0]});
-                    }
-                    setTimeout(check, 4000);
-                }
+                success: success
             });
-        } else {
-            setTimeout(check, 2000);
+        } else if (!timeout) {
+            timeout = setTimeout(check, 2000);
+        }
+    }
+    function progress(njobs) {
+        let progress = document.getElementById("pa-runmany-progress");
+        if (!progress) {
+            $("#run-" + f.elements.run.value).after('<div>Progress: <progress id="pa-runmany-progress" class="ml-3 mr-3"></progress></div>');
+            progress = document.getElementById("pa-runmany-progress");
+        }
+        progress.max = Math.max(progress.max, njobs + 1);
+        progress.value = progress.max - njobs;
+        progress.textContent = sprintf("%d%%", progress.value / progress.max);
+        if (njobs === 0) {
+            progress.after("Done!");
+        }
+    }
+    function success(data) {
+        timeout && clearTimeout(timeout);
+        timeout = null;
+        if (data && data.ok && data.queueid) {
+            f.elements.u.value = data.u;
+            f.elements.pset.value = data.pset;
+            let $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(data.u) + "/pset/" + data.pset + "\" class=\"q ansib ansifg7\"></a>");
+            $x.text(data.u);
+            run(f.elements.run, {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: $x[0], done_function: check});
+        }
+        if (data && data.njobs != null) {
+            progress(data.njobs);
+        }
+        if (!data || data.njobs !== 0) {
+            timeout = setTimeout(check, 4000);
         }
     }
     check();

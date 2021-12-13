@@ -11,7 +11,7 @@ class Run_API {
         $chain = intval($qreq->chain);
         $qi = QueueItem::by_chain($user->conf, $chain);
         if (!$qi) {
-            return ["ok" => false, "error" => "Chain done.", "njobs" => 0];
+            return ["ok" => true, "done" => true, "njobs" => 0];
         } else if (!$user->isPC && $qi->reqcid !== $user->contactId) {
             return ["ok" => false, "error" => "Permission error."];
         } else if (!($pset = $qi->pset())) {

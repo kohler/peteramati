@@ -232,7 +232,7 @@ class RunRequest {
             $this->conf->header(htmlspecialchars($t), "home");
 
             echo '<h2 id="pa-runmany-who"></h2>',
-                Ht::form($this->conf->hoturl("=run")),
+                Ht::form($this->conf->hoturl("=run"), ["id" => "pa-runmany-form"]),
                 '<div class="f-contain">',
                 Ht::hidden("u", ""),
                 Ht::hidden("pset", $this->pset->urlkey);
@@ -246,8 +246,6 @@ class RunRequest {
                 '<div class="pa-run pa-run-short" id="pa-run-', $this->runner->name, '">',
                 '<pre class="pa-runpre"></pre></div>',
                 '</div>';
-
-            echo '<div id="pa-runmany-list"></div>';
 
             Ht::stash_script("\$pa.runmany({$this->qreq->chain})");
             echo "<hr class=\"c\">\n";

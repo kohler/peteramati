@@ -18,27 +18,24 @@ export function run(button, opts) {
     let thexterm,
         checkt,
         kill_checkt,
-        queueid = null;
+        queueid = opts.queueid || null;
 
-    if (opts.queueid) {
-        queueid = opts.queueid;
-    }
+    therunout && removeClass(therunout, "hidden");
+    fold61(therun, therunout, true);
 
     if (opts.unfold && therun.dataset.paTimestamp) {
         checkt = +therun.dataset.paTimestamp;
     } else if (opts.timestamp) {
         checkt = opts.timestamp;
-    } else {
-        if (hasClass($f[0], "pa-run-active")) {
-            return true;
-        }
-        $f.find("button").prop("disabled", true);
     }
+
+    if (hasClass($f[0], "pa-run-active")) {
+        return true;
+    }
+    $f.find("button").prop("disabled", true);
     delete therun.dataset.paTimestamp;
     addClass($f[0], "pa-run-active");
 
-    therunout && removeClass(therunout, "hidden");
-    fold61(therun, therunout, true);
     if (!checkt && !opts.noclear) {
         thepre.html("");
         addClass(thepre[0].parentElement, "pa-run-short");
@@ -174,6 +171,7 @@ export function run(button, opts) {
         if (button.hasAttribute("data-pa-run-grade")) {
             grades_fetch(button.closest(".pa-psetinfo"));
         }
+        opts.done_function && opts.done_function();
     }
 
     function append(str) {
