@@ -107,6 +107,21 @@ function json_update($j, $updates) {
     return array_values($j);
 }
 
+function is_json_null_update($j) {
+    if (is_object($j) || is_associative_array($j)) {
+        if (is_object($j)) {
+            $j = get_object_vars($j);
+        }
+        foreach ($j as $k => $v) {
+            if (!is_json_null_update($v))
+                return false;
+        }
+        return true;
+    } else {
+        return $j === null;
+    }
+}
+
 function json_antiupdate($j, $updates) {
     if (is_object($j)) {
         $j = get_object_vars($j);
@@ -136,7 +151,7 @@ function json_antiupdate($j, $updates) {
                 continue;
             }
         } else {
-            if ($v !== null) {
+            if (!is_json_null_update($v)) {
                 $av = null;
             } else {
                 continue;

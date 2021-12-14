@@ -840,6 +840,10 @@ function updateSchema($conf) {
         && _update_schema_clean_history($conf)) {
         $conf->update_schema_version(162);
     }
+    if ($conf->sversion === 162
+        && _update_schema_clean_history($conf)) {
+        $conf->update_schema_version(163);
+    }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
 }
