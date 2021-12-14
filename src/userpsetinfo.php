@@ -172,7 +172,7 @@ class UserPsetInfo {
                 $this->load_history($conf, "notesversion>={$vx} and notesversion<{$this->_history_v0}");
             }
         }
-        if ($this->_history_v0 + count($this->_history) < $version) {
+        if ($this->_history_v0 + count($this->_history) <= $version) {
             $this->load_history($conf, "notesversion>=" . ($this->_history_v0 + count($this->_history)));
         }
         if ($version >= $this->_history_v0) {
