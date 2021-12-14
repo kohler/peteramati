@@ -243,7 +243,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 161) {
+        if ($this->sversion < 162) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
             updateSchema($this);
@@ -1726,16 +1726,19 @@ class Conf {
         $x = [];
         foreach ($qreq as $k => $v) {
             $ak = self::$selfurl_safe[$k] ?? null;
-            if ($ak === true)
+            if ($ak === true) {
                 $ak = $k;
+            }
             if ($ak
                 && ($ak === $k || !isset($qreq[$ak]))
                 && !array_key_exists($ak, $params)
-                && !is_array($v))
+                && !is_array($v)) {
                 $x[$ak] = $v;
+            }
         }
-        foreach ($params as $k => $v)
+        foreach ($params as $k => $v) {
             $x[$k] = $v;
+        }
         return $this->hoturl(Navigation::page(), $x, $flags);
     }
 

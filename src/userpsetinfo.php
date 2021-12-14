@@ -145,7 +145,7 @@ class UserPsetInfo {
             if ($h->notesversion < $this->_history_v0) {
                 $this->_history = array_merge(
                     array_fill(0, $this->_history_v0 - $h->notesversion, null),
-                    $this->_history ?? []);
+                    $this->_history);
                 $this->_history_v0 = $h->notesversion;
             }
             $this->_history[$h->notesversion - $this->_history_v0] = $h;

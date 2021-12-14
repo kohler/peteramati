@@ -255,6 +255,26 @@ function update_schema_studentupdateat($conf) {
     return true;
 }
 
+function _update_schema_clean_history(Conf $conf) {
+    $result = $conf->ql_ok("select * from ContactGradeHistory where antiupdate like '%\"linenotes\":null%' and cid=updateby");
+    $qstager = Dbl::make_multi_ql_stager($conf->dblink);
+    while (($uph = UserPsetHistory::fetch($result))) {
+        $j = $uph->jantiupdate();
+        if (property_exists($j, "linenotes") && $j->linenotes === null) {
+            unset($j->linenotes);
+            $note = json_encode_db($j);
+            if ($note && strlen($note) > 32000) {
+                $qstager("update ContactGradeHistory set antiupdate=null, antiupdateOverflow=? where cid=? and pset=? and notesversion=?", [$note, $uph->cid, $uph->pset, $uph->notesversion]);
+            } else {
+                $qstager("update ContactGradeHistory set antiupdate=?, antiupdateOverflow=null where cid=? and pset=? and notesversion=?", [$note, $uph->cid, $uph->pset, $uph->notesversion]);
+            }
+        }
+    }
+    Dbl::free($result);
+    $qstager(true);
+    return true;
+}
+
 function updateSchema($conf) {
     global $OK;
     // avoid error message about timezone, set to $Opt
@@ -815,6 +835,10 @@ function updateSchema($conf) {
         && $conf->ql_ok("alter table `ContactGradeHistory` change `notes` `antiupdate` varbinary(32767) DEFAULT NULL")
         && $conf->ql_ok("alter table `ContactGradeHistory` change `notesOverflow` `antiupdateOverflow` longblob DEFAULT NULL")) {
         $conf->update_schema_version(161);
+    }
+    if ($conf->sversion === 161
+        && _update_schema_clean_history($conf)) {
+        $conf->update_schema_version(162);
     }
 
     $conf->ql_ok("delete from Settings where name='__schema_lock'");
