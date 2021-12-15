@@ -115,10 +115,11 @@ class PsetView {
     }
 
     /** @param ?string $hash
+     * @param bool $refresh
      * @return PsetView
      * @suppress PhanAccessReadOnlyProperty */
     static function make(Pset $pset, Contact $user, Contact $viewer,
-                         $hash = null) {
+                         $hash = null, $refresh = false) {
         $info = new PsetView($pset, $user, $viewer);
         $info->partner = $user->partner($pset->id);
         if (!$pset->gitless) {
@@ -126,7 +127,11 @@ class PsetView {
             $info->branchid = $user->branchid($pset);
             $info->branch = $info->conf->branch($info->branchid);
         }
-        if ($hash !== "none") {
+        if ($hash !== "none"
+            && $info->repo
+            && !$info->set_hash($hash)
+            && $refresh) {
+            $info->repo->refresh(10, true);
             $info->set_hash($hash);
         }
         return $info;
@@ -369,16 +374,20 @@ class PsetView {
     }
 
     /** @param ?string $reqhash
-     * @return void */
+     * @return bool */
     function set_hash($reqhash) {
         if (!$this->repo || $reqhash === "none") {
             $this->force_set_hash(null);
+            return true;
         } else if ($reqhash === null || $reqhash === "") {
             $this->set_grading_or_latest_nontrivial_commit();
+            return $this->hash() !== null;
         } else if (($c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch))) {
             $this->set_commit($c);
+            return true;
         } else {
             $this->force_set_hash(null);
+            return false;
         }
     }
 

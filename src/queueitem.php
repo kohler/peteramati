@@ -164,7 +164,7 @@ class QueueItem {
         if (($this->_ocache & 4) === 0) {
             $this->_ocache |= 4;
             if (($p = $this->pset()) && ($u = $this->user())) {
-                $this->_info = PsetView::make($p, $u, $u, $this->hash());
+                $this->_info = PsetView::make($p, $u, $u, $this->hash(), true);
             }
         }
         return $this->_info;
