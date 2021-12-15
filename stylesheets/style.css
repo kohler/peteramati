@@ -3122,6 +3122,9 @@ table.hidegrades .pa-gradenote {
 input.pa-gradewidth, textarea.pa-gradewidth {
 	width: 6rem;
 }
+.has-editable-scores span.pa-gradewidth {
+	min-width: 6rem;
+}
 .pa-sidebar .pa-gradewidth {
 	width: 5rem;
 }

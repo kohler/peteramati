@@ -570,7 +570,9 @@ export class GradeSheet {
             for (let i = 0; i !== this.value_order.length; ++i) {
                 const ge = this.entries[this.value_order[i]];
                 if (ge && ge.in_total && !ge.is_extra && ge.max
-                    && (!ge.required || (this.grades && this.grades[i] !== null))) {
+                    && (!ge.required
+                        || this.scores_editable
+                        || (this.grades && this.grades[i] !== null))) {
                     maxtotal += ge.max;
                 }
             }

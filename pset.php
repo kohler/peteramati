@@ -467,29 +467,32 @@ class PsetRequest {
     }
 
     private function echo_all_grades() {
-        if ($this->info->is_handout_commit()) {
+        $info = $this->info;
+        if ($info->is_handout_commit()) {
             return;
         }
 
-        $has_grades = $this->info->can_view_nonempty_grade();
-        if ($has_grades || $this->info->can_edit_grade()) {
-            if ($this->pset->grade_script && $this->info->can_edit_grade()) {
+        $has_grades = $info->can_view_nonempty_grade();
+        if ($has_grades || $info->can_edit_grade()) {
+            if ($this->pset->grade_script && $info->can_edit_grade()) {
                 foreach ($this->pset->grade_script as $gs) {
                     Ht::stash_html($this->conf->make_script_file($gs));
                 }
             }
-            echo '<div class="pa-gradelist is-main want-pa-landmark-links"></div>';
-            Ht::stash_script('$pa.store_gradeinfo($(".pa-psetinfo")[0],' . json_encode_browser($this->info->grade_json()) . ');');
+            echo '<div class="pa-gradelist is-main want-pa-landmark-links',
+                $info->can_edit_scores() ? " has-editable-scores" : "",
+                '"></div>';
+            Ht::stash_script('$pa.store_gradeinfo($(".pa-psetinfo")[0],' . json_encode_browser($info->grade_json()) . ');');
             if ($this->pset->has_grade_landmark) {
                 Ht::stash_script('$(function(){$(".pa-psetinfo").each($pa.loadgrades)})');
             }
             echo Ht::unstash();
         }
 
-        $lhd = $this->info->late_hours_data();
-        if ($lhd && $this->info->can_view_grade() && !$this->info->can_edit_scores()) {
+        $lhd = $info->late_hours_data();
+        if ($lhd && $info->can_view_grade() && !$info->can_edit_scores()) {
             if (($has_grades
-                 && $this->info->can_view_nonempty_score())
+                 && $info->can_view_nonempty_score())
                 || (isset($lhd->hours)
                     && $lhd->hours > 0
                     && !$this->pset->obscure_late_hours)) {
@@ -498,7 +501,7 @@ class PsetRequest {
                     '<div class="pa-pv pa-gradevalue" id="late_hours">', $lhd->hours ?? 0, '</div>',
                     '</div>';
             }
-        } else if ($this->info->can_edit_scores() && $this->pset->late_hours_entry()) {
+        } else if ($info->can_edit_scores() && $this->pset->late_hours_entry()) {
             echo '<div class="pa-grade pa-p e" data-pa-grade="late_hours">',
                 '<label class="pa-pt" for="late_hours">late hours</label>',
                 '<form class="ui-submit pa-pv"><span class="pa-gradewidth">',
