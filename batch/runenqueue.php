@@ -24,12 +24,13 @@ class RunEnqueueBatch {
     public $runsettings;
     /** @var int */
     public $sset_flags;
-    /** @var ?string */
-    public $usermatch;
+    /** @var list<string> */
+    public $usermatch = [];
     /** @var ?string */
     public $hash;
 
-    function __construct(Pset $pset, RunnerConfig $runner, $usermatch = null) {
+    /** @param list<string> $usermatch */
+    function __construct(Pset $pset, RunnerConfig $runner, $usermatch = []) {
         $this->conf = $pset->conf;
         $this->pset = $pset;
         $this->runner = $runner;
@@ -39,14 +40,26 @@ class RunEnqueueBatch {
         } else {
             $this->sset_flags |= StudentSet::ENROLLED;
         }
-        if ($usermatch === "college") {
+        if (count($usermatch) === 1 && $usermatch[0] === "college") {
             $this->sset_flags |= StudentSet::COLLEGE;
-        } else if ($usermatch === "extension") {
+        } else if (count($usermatch) === 1 && $usermatch[0] === "extension") {
             $this->sset_flags |= StudentSet::DCE;
         }
         if ($this->sset_flags === StudentSet::ENROLLED) {
-            $this->usermatch = $usermatch;
+            foreach ($usermatch as $s) {
+                $this->usermatch[] = "*{$s}*";
+            }
         }
+    }
+
+    /** @param string $s
+     * @return bool */
+    function match($s) {
+        foreach ($this->usermatch as $m) {
+            if (fnmatch($m, $s))
+                return true;
+        }
+        return empty($this->usermatch);
     }
 
     /** @return int */
@@ -57,12 +70,11 @@ class RunEnqueueBatch {
         $nu = 0;
         $chain = $this->chainid ?? QueueItem::new_chain();
         $chainstr = $this->chainid ? " C{$this->chainid}" : "";
-        $usermatch = $this->usermatch ? "*{$this->usermatch}*" : null;
         foreach ($sset as $info) {
-            if ($usermatch !== null
-                && !fnmatch($usermatch, $info->user->email)
-                && !fnmatch($usermatch, $info->user->github_username)
-                && !fnmatch($usermatch, $info->user->anon_username)) {
+            if (!empty($this->usermatch)
+                && !$this->match($info->user->email)
+                && !$this->match($info->user->github_username)
+                && !$this->match($info->user->anon_username)) {
                 continue;
             }
             if ($this->hash === "latest") {
@@ -109,7 +121,7 @@ class RunEnqueueBatch {
             "p:,pset: Problem set",
             "r:,runner:,run: Runner name",
             "e,ensure Run only if needed",
-            "u:,user: Match these users",
+            "u[],user[] Match these users",
             "H:,hash:,commit: Use this commit",
             "c:,chain: Set chain ID",
             "t[],tag[] Add tag",
@@ -131,7 +143,7 @@ class RunEnqueueBatch {
         if (!$runner) {
             throw new Error("no such runner");
         }
-        $reb = new RunEnqueueBatch($pset, $runner, $arg["u"] ?? null);
+        $reb = new RunEnqueueBatch($pset, $runner, $arg["u"] ?? []);
         if (isset($arg["e"])) {
             $reb->is_ensure = true;
         }
