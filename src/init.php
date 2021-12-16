@@ -246,19 +246,6 @@ function load_pset_info() {
         Messages::$main->define($k, $v);
     }
 
-    // also create log/ and repo/ directories
-    foreach ([SiteLoader::$root . "/log", SiteLoader::$root . "/repo"] as $d) {
-        if (!is_dir($d) && !mkdir($d, 02770, true)) {
-            $e = error_get_last();
-            Multiconference::fail_message("`$d` missing and cannot be created (" . $e["message"] . ").");
-        }
-        if (!file_exists("$d/.htaccess")
-            && ($x = file_get_contents(SiteLoader::$root . "/src/.htaccess")) !== false
-            && file_put_contents("$d/.htaccess", $x) != strlen($x)) {
-            Multiconference::fail_message("Error creating `$d/.htaccess`");
-        }
-    }
-
     // if any anonymous problem sets, create anonymous usernames
     foreach ($Conf->psets() as $p) {
         if (!$p->disabled && $p->anonymous) {

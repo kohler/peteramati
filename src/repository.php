@@ -165,6 +165,7 @@ class Repository {
             if ($foreground) {
                 set_time_limit(30);
             }
+            $this->ensure_repodir();
             $this->reposite->gitfetch($this->repoid, $this->cacheid, $foreground);
             if ($foreground) {
                 $this->_commits = $this->_commit_lists = $this->_commit_lists_cc = [];
@@ -273,12 +274,23 @@ class Repository {
     }
 
 
+    /** @return string */
+    function ensure_repodir() {
+        $subdir = "/repo/repo{$this->cacheid}";
+        $repodir = SiteLoader::$root . $subdir;
+        if (!file_exists("{$repodir}/.git/config")) {
+            if (!mk_site_subdir($subdir, 02770)) {
+                return "";
+            }
+            shell_exec("cd $repodir && git init --shared -b main");
+        }
+        return $repodir;
+    }
+
     function gitrun($command, $want_stderr = false) {
         $command = str_replace("%REPO%", "repo" . $this->repoid, $command);
-        $repodir = SiteLoader::$root . "/repo/repo$this->cacheid";
-        if (!file_exists("$repodir/.git/config")) {
-            is_dir($repodir) || mkdir($repodir, 0770);
-            shell_exec("cd $repodir && git init --shared -b main");
+        if (!($repodir = $this->ensure_repodir())) {
+            throw new Error("cannot safely create repository directory");
         }
         $descriptors = [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]];
         $proc = proc_open($command, $descriptors, $pipes, $repodir);
@@ -687,6 +699,7 @@ class Repository {
             ++$suffixn;
             $suffix = "_" . $suffixn;
         }
+        chmod($d, 02770);
         $answer = shell_exec("cd $d && git init -b main >/dev/null && git remote add origin " . SiteLoader::$root . "/repo/repo{$this->cacheid} >/dev/null && echo yes");
         return ($answer === "yes\n" ? $d : null);
     }

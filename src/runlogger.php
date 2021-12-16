@@ -19,14 +19,8 @@ class RunLogger {
     /** @return bool */
     function mkdirs() {
         $logdir = $this->log_dir();
-        if (!is_dir($logdir)) {
-            $old_umask = umask(0);
-            if (!mkdir($logdir, 02770, true)) {
-                return false;
-            }
-            umask($old_umask);
-        }
-        return true;
+        return is_dir($logdir)
+            || mk_site_subdir(substr($logdir, strlen(SiteLoader::$root)), 02770);
     }
 
     /** @return string */
