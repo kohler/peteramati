@@ -312,6 +312,24 @@ class QueueItem {
     }
 
 
+    /** @return ?RunResponse */
+    function compatible_response() {
+        $info = $this->info();
+        $runner = $this->runner();
+        if ($info && $runner && !$this->runsettings) {
+            foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
+                foreach ($this->tags as $t) {
+                    if (!$rr->has_tag($t))
+                        continue 2;
+                }
+                if (!$rr->settings) {
+                    return $rr;
+                }
+            }
+        }
+        return null;
+    }
+
     function enqueue() {
         assert(!$this->queueid);
         $this->insertat = $this->updateat = Conf::$now;
@@ -369,22 +387,6 @@ class QueueItem {
         Dbl::free($result);
     }
 
-    /** @return ?RunResponse */
-    private function ensured_response() {
-        $info = $this->info();
-        $runner = $this->runner();
-        if ($info && $runner) {
-            foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
-                foreach ($this->tags as $t) {
-                    if (!$rr->has_tag($t))
-                        continue 2;
-                }
-                return $rr;
-            }
-        }
-        return null;
-    }
-
     /** @param QueueStatus $qs
      * @return bool */
     function substantiate($qs) {
@@ -407,7 +409,7 @@ class QueueItem {
                 return true;
             }
         } else if (($this->flags & self::FLAG_ENSURE) !== 0
-                   && ($rr = $this->ensured_response())) {
+                   && ($rr = $this->compatible_response())) {
             $this->delete(false);
             $this->runat = $rr->timestamp;
             $this->status = 2;

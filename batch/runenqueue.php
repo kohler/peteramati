@@ -98,14 +98,16 @@ class RunEnqueueBatch {
             foreach ($this->runsettings ?? [] as $k => $v) {
                 $qi->runsettings[$k] = $v;
             }
-            $qi->enqueue();
-            if (!$qi->chain) {
-                $qi->schedule($nu);
+            if (!$this->is_ensure || !$qi->compatible_response()) {
+                $qi->enqueue();
+                if (!$qi->chain) {
+                    $qi->schedule($nu);
+                }
+                if ($this->verbose) {
+                    fwrite(STDERR, $qi->unparse_key() . ": create{$chainstr}\n");
+                }
+                ++$nu;
             }
-            if ($this->verbose) {
-                fwrite(STDERR, $qi->unparse_key() . ": create{$chainstr}\n");
-            }
-            ++$nu;
         }
         if ($chain > 0
             && ($qi = QueueItem::by_chain($this->conf, $chain))
