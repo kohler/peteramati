@@ -1635,12 +1635,6 @@ class PsetView {
         return $this->_run_logger;
     }
 
-    /** @param RunnerConfig $runner
-     * @return int|false */
-    function complete_job(RunnerConfig $runner) {
-        return $this->run_logger()->complete_job($runner, $this->hash());
-    }
-
     /** @param int $jobid
      * @param mixed $jlist
      * @return int|list */

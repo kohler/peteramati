@@ -115,23 +115,19 @@ class RunLogger {
     }
 
     /** @param ?string $hash
-     * @return int|false */
-    function complete_job(RunnerConfig $runner, $hash = null) {
+     * @return \Generator<RunResponse> */
+    function completed_responses(RunnerConfig $runner = null, $hash = null) {
         $n = 0;
-        $envts = $runner->environment_timestamp();
+        $envts = $runner ? $runner->environment_timestamp() : 0;
         foreach ($this->past_jobs() as $t) {
             if ($t > $envts
                 && ($rr = $this->job_response($t))
-                && $rr->runner === $runner->name
-                && ($hash === null || $rr->hash === $hash)
-                && $rr->done) {
-                return $t;
-            } else if ($n >= 200) {
-                break;
+                && $rr->done
+                && ($runner === null || $rr->runner === $runner->name)
+                && ($hash === null || $rr->hash === $hash)) {
+                yield $rr;
             }
-            ++$n;
         }
-        return false;
     }
 
     /** @param int $jobid

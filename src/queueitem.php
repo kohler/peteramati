@@ -279,35 +279,30 @@ class QueueItem {
     }
 
     /** @param PsetView $info
-     * @param int $jobid
+     * @param RunResponse $rr
      * @return QueueItem */
-    static function for_logged_job($info, $jobid) {
-        if (($rr = $info->run_logger()->job_response($jobid))
-            && ($rr->pset === $info->pset->urlkey
-                || $info->conf->pset_by_key($rr->pset) === $info->pset)) {
-            $qi = self::make_info($info);
-            $qi->queueid = $rr->queueid;
-            $qi->runnername = $rr->runner;
-            $qi->runat = $rr->timestamp;
-            $qi->runsettings = $rr->settings;
-            $qi->tags = $rr->tags;
-            return $qi;
-        } else {
-            return null;
-        }
+    static function for_run_response($info, $rr) {
+        assert($rr->pset === $info->pset->urlkey
+               || $info->conf->pset_by_key($rr->pset) === $info->pset);
+        $qi = self::make_info($info);
+        $qi->queueid = $rr->queueid;
+        $qi->runnername = $rr->runner;
+        $qi->runat = $rr->timestamp;
+        $qi->runsettings = $rr->settings;
+        $qi->tags = $rr->tags;
+        return $qi;
     }
 
     /** @param PsetView $info
      * @param RunnerConfig $runner
      * @return QueueItem */
     static function for_complete_job($info, $runner) {
-        if (($jobid = $info->complete_job($runner))) {
-            $qi = QueueItem::for_logged_job($info, $jobid);
-            $qi && $qi->associate_info($info, $runner);
+        foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
+            $qi = self::for_run_response($info, $rr);
+            $qi->associate_info($info, $runner);
             return $qi;
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @param int $delta
@@ -374,6 +369,22 @@ class QueueItem {
         Dbl::free($result);
     }
 
+    /** @return ?RunResponse */
+    private function ensured_response() {
+        $info = $this->info();
+        $runner = $this->runner();
+        if ($info && $runner) {
+            foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
+                foreach ($this->tags as $t) {
+                    if (!$rr->has_tag($t))
+                        continue 2;
+                }
+                return $rr;
+            }
+        }
+        return null;
+    }
+
     /** @param QueueStatus $qs
      * @return bool */
     function substantiate($qs) {
@@ -396,9 +407,9 @@ class QueueItem {
                 return true;
             }
         } else if (($this->flags & self::FLAG_ENSURE) !== 0
-                   && ($jobid = $this->info()->complete_job($this->runner()))) {
+                   && ($rr = $this->ensured_response())) {
             $this->delete(false);
-            $this->runat = $jobid;
+            $this->runat = $rr->timestamp;
             $this->status = 2;
             return true;
         } else if ($qs->nrunning < min($nconcurrent, $qs->nconcurrent)) {

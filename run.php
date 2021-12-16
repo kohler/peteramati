@@ -124,9 +124,14 @@ class RunRequest {
             $qi = QueueItem::by_id($this->conf, intval($qreq->queueid), $info);
         }
         if (!$qi && isset($qreq->check)) {
-            if (!($qi = QueueItem::for_logged_job($info, intval($qreq->check)))) {
+            $rr = $info->run_logger()->job_response(intval($qreq->check));
+            if (!$rr
+                || ($rr->pset !== $info->pset->urlkey
+                    && $info->pset_by_key($rr->pset) !== $info->pset)
+                || $rr->runner !== $this->runner->name) {
                 return self::error("Unknown check timestamp {$qreq->check}.");
             }
+            $qi = QueueItem::for_run_response($info, $rr);
         }
         if (!$qi && isset($qreq->queueid)) {
             if (!($qi = QueueItem::by_id($this->conf, intval($qreq->queueid), $info))) {
