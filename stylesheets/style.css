@@ -2837,12 +2837,20 @@ tr.gtrow-partner {
 }
 .pa-note-suggestions {
 	font-size: smaller;
+	max-height: 60vh;
+	overflow-y: auto;
 }
 .pa-note-suggestion {
 	display: flex;
 	align-items: baseline;
 	margin-bottom: 0.25rem;
 	gap: 0.5rem;
+}
+.pa-use-suggestion.taken {
+	background-image: linear-gradient(#ffe3fa, #f5d3f0);
+}
+.pa-use-suggestion.taken:hover, .pa-use-suggestion.taken:hover {
+	background-image: linear-gradient(#f2d3f5, #edcef0);
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-noteref, .pa-gradeboxref, .pa-warnbox {
