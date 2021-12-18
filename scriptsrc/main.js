@@ -2037,7 +2037,7 @@ function pa_render_pset_table(pconf, data) {
         if (sf !== sort.f) {
             sort.f = sf;
             const col = colmap[sf];
-            sort.rev = col.sort_forward ? 1 : -1;
+            sort.rev = col && col.sort_forward ? 1 : -1;
         } else if (sf === "name" || (sf === "name2" && !anonymous)) {
             sort.rev = -sort.rev;
             if (sort.rev === 1) {
