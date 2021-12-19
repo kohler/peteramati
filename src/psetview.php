@@ -127,12 +127,8 @@ class PsetView {
             $info->branchid = $user->branchid($pset);
             $info->branch = $info->conf->branch($info->branchid);
         }
-        if ($hash !== "none"
-            && $info->repo
-            && !$info->set_hash($hash)
-            && $refresh) {
-            $info->repo->refresh(10, true);
-            $info->set_hash($hash);
+        if ($hash !== "none" && $info->repo) {
+            $info->set_hash($hash, $refresh);
         }
         return $info;
     }
@@ -374,20 +370,28 @@ class PsetView {
     }
 
     /** @param ?string $reqhash
+     * @param bool $refresh
      * @return bool */
-    function set_hash($reqhash) {
+    function set_hash($reqhash, $refresh = false) {
         if (!$this->repo || $reqhash === "none") {
             $this->force_set_hash(null);
             return true;
         } else if ($reqhash === null || $reqhash === "") {
             $this->set_grading_or_latest_nontrivial_commit();
             return $this->hash() !== null;
-        } else if (($c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch))) {
-            $this->set_commit($c);
-            return true;
         } else {
-            $this->force_set_hash(null);
-            return false;
+            $c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch);
+            if (!$c && $refresh) {
+                $this->repo->refresh(10, true);
+                $c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch);
+            }
+            if ($c) {
+                $this->set_commit($c);
+                return true;
+            } else {
+                $this->force_set_hash(null);
+                return false;
+            }
         }
     }
 

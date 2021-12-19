@@ -559,7 +559,7 @@ class Repository {
         list($cx, $definitive) = self::find_listed_commit($hashpart, $this->_commits);
         if ($definitive) {
             return $cx;
-        } else if (!isset($this->_commit_lists["/{$this->conf->default_main_branch}"])) {
+        } else if (!isset($this->_commit_lists[$this->conf->default_main_branch])) {
             // check if all commits are loaded
             $this->commits();
             return $this->connected_commit($hashpart);
