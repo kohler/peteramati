@@ -62,6 +62,15 @@ class RunEnqueueBatch {
         return empty($this->usermatch);
     }
 
+    /** @param Contact $user
+     * @param bool $anonymous
+     * @return string */
+    private function unparse_key($user, $anonymous) {
+        $uname = $this->conf->cached_username_by_id($user->contactId, $anonymous);
+        $hash = $this->hash ? : "grading";
+        return "~{$uname}/{$this->pset->urlkey}/{$hash}/{$this->runner->name}";
+    }
+
     /** @return int */
     function run() {
         $viewer = $this->conf->site_contact();
@@ -71,20 +80,26 @@ class RunEnqueueBatch {
         $chain = $this->chainid ?? QueueItem::new_chain();
         $chainstr = $this->chainid ? " C{$this->chainid}" : "";
         foreach ($sset as $info) {
-            if (!empty($this->usermatch)
-                && !$this->match($info->user->email)
-                && !$this->match($info->user->github_username)
-                && !$this->match($info->user->anon_username)) {
+            if (empty($this->usermatch)) {
+                $anon = $this->pset->anonymous;
+            } else if ($this->match($info->user->email)
+                       || $this->match($info->user->email)
+                       || $this->match($info->user->github_username)) {
+                $anon = false;
+            } else if ($this->match($info->user->anon_username)) {
+                $anon = true;
+            } else {
                 continue;
             }
             if ($this->hash === "latest") {
                 $info->set_latest_nontrivial_commit();
-            } else if ($this->hash && $this->hash !== "grading") {
-                if (($c = $info->connected_commit($this->hash))) {
-                    $info->set_commit($c);
-                } else {
-                    continue;
+            } else if ($this->hash
+                       && $this->hash !== "grading"
+                       && !$info->set_hash($this->hash, true)) {
+                if ($this->verbose) {
+                    fwrite(STDERR, $this->unparse_key($info->user, $anon) . ": no such commit on {$info->branch}{$chainstr}\n");
                 }
+                continue;
             }
             if (!$info->hash()) {
                 continue;
