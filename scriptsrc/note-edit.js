@@ -369,7 +369,7 @@ function linenotemark(context, mark) {
 handle_ui.on("pa-use-suggestion", function () {
     const e = this.closest(".pa-note-suggestion"),
         f = e.closest("form");
-    if (e.classList.contains("like")) {
+    if (this.classList.contains("like")) {
         linenotemark(e, "like");
         f.elements.note.value = ftext.parse(e.getAttribute("data-content"))[1];
     } else {
