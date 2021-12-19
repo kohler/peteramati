@@ -2505,11 +2505,11 @@ class PsetView {
             '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render())),
             '"><div class="pa-notebox">';
         if ((string) $note->ftext === "") {
-            echo '</div></div>';
+            echo '</div></div>'; // pa-notebox, pa-dl
             return;
         }
         echo '<div class="pa-notecontent">';
-        $links = array();
+        $links = [];
         $nnote = $this->_diff_lnorder->get_next($note);
         if ($nnote) {
             $links[] = "<a href=\"#L{$nnote->lineid}F"
@@ -2544,7 +2544,7 @@ class PsetView {
             echo ' format0';
         }
         echo '">', htmlspecialchars($note->ftext), '</div>';
-        echo '</div></div></div>';
+        echo '</div></div></div>'; // pa-notecontent, pa-notebox, pa-dl
     }
 
     static function echo_pa_sidebar_gradelist() {

@@ -59,9 +59,11 @@ dl.dd {
 a > img {
 	border: none;
 }
-input[type=text], input[type=email], input[type=password], input[type=date], textarea {
+input[type=text], input[type=email], input[type=password], input[type=date],
+input[type=search], textarea {
 	border: 1px solid silver;
 	padding: 3px 5px;
+	font-size: 100%;
 }
 fieldset {
 	border-radius: 3px;
@@ -1277,12 +1279,14 @@ h3.has-error,
 .has-error input[type=email],
 .has-error input[type=password],
 .has-error input[type=date],
+.has-error input[type=search],
 .has-error textarea,
 .has-error select,
 input[type=text].has-error,
 input[type=email].has-error,
 input[type=password].has-error,
 input[type=date].has-error,
+input[type=search].has-error,
 textarea.has-error,
 select.has-error {
 	border: 1px solid red;
@@ -1299,12 +1303,14 @@ h3.has-warning,
 .has-warning input[type=email],
 .has-warning input[type=password],
 .has-warning input[type=date],
+.has-warning input[type=search],
 .has-warning textarea,
 .has-warning select,
 input[type=text].has-warning,
 input[type=email].has-warning,
 input[type=password].has-warning,
 input[type=date].has-warning,
+input[type=search].has-warning,
 textarea.has-warning,
 select.has-warning {
 	border: 1px solid #855c04;
@@ -1359,9 +1365,6 @@ span.textlite {
 	border: solid 1px #aaaadd;
 	padding: 0 4px;
 	background: #fcfcfc;
-}
-input[type=text], input[type=password], textarea {
-	font-size: 100%;
 }
 input.textlite-tt, textarea.tt {
 	font-family: monospace;
@@ -2805,7 +2808,7 @@ tr.gtrow-partner {
 .pa-notebox {
 	flex: 1 1 auto;
 	max-width: 100%;
-	padding: 0.8em 1em 0.8em 6.5em;
+	padding: 0.8rem 1rem 0.8rem 6.5rem;
 	background: #f3d1fc;
 	background:
 	    left top / 100% 5px no-repeat linear-gradient(180deg, rgba(180,120,180,0.2), rgba(0,0,0,0)),
@@ -2843,12 +2846,20 @@ tr.gtrow-partner {
 	font-size: smaller;
 	max-height: 60vh;
 	overflow-y: auto;
+	margin-left: -0.5rem;
+	margin-top: -0.5rem;
+	padding-left: 0.5rem;
+	padding-top: 0.5rem;
 }
 .pa-note-suggestion {
 	display: flex;
 	align-items: baseline;
 	margin-bottom: 0.25rem;
 	gap: 0.5rem;
+}
+.pa-search-suggestions {
+	margin-left: 0;
+	font-size: smaller !important;
 }
 .pa-use-suggestion.taken {
 	background-image: linear-gradient(#ffe3fa, #f5d3f0);

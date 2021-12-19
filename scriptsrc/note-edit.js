@@ -270,7 +270,15 @@ function my_note_feedback(ln) {
 function display_note_suggestions(form, ns) {
     let $f = $(form).find(".pa-note-suggestions");
     if (!$f.length) {
-        $f = $('<div class="pa-note-suggestions mt-4"></div>').insertBefore($(form).find(".pa-note-aa"));
+        const sugui = document.createElement("div"),
+            search = document.createElement("input");
+        sugui.className = "pa-note-suggestions mt-4";
+        search.type = "search";
+        search.className = "uikd uii pa-search-suggestions mb-3";
+        search.placeholder = "Search…";
+        sugui.append(search);
+        $(sugui).insertBefore($(form).find(".pa-note-aa"));
+        $f = $(sugui);
     }
     for (const n of ns) {
         const mf = my_note_feedback(n),
@@ -375,5 +383,30 @@ handle_ui.on("pa-use-suggestion", function () {
     } else {
         linenotemark(e, "dislike");
         e.remove();
+    }
+});
+
+function regexp_quote(s) {
+    return String(s).replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1').replace(/\x08/g, '\\x08');
+}
+
+handle_ui.on("pa-search-suggestions", function (event) {
+    if (event.type === "input") {
+        const el = this.closest(".pa-note-suggestions");
+        let patterns = "";
+        for (const str of this.value.split(/\s+/)) {
+            str !== "" && (patterns = patterns.concat("(?=.*", regexp_quote(str), ")"));
+        }
+        const regex = patterns ? new RegExp(patterns, "i") : null;
+        for (let ne = el.firstChild; ne; ne = ne.nextSibling) {
+            if (ne.classList.contains("pa-note-suggestion")) {
+                const hidden = regex && !regex.test(ne.getAttribute("data-content"));
+                ne.classList.toggle("hidden", hidden);
+            }
+        }
+    } else if (event.type === "keydown"
+               && !(event_modkey(event) & (event_modkey.SHIFT | event_modkey.ALT))
+               && event_key(event) === "Enter") {
+        event.preventDefault();
     }
 });
