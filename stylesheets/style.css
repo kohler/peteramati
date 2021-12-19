@@ -2863,7 +2863,8 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	font-size: 87.5%;
 }
 .pa-note {
-	font-family: Georgia, serif;
+	font-family: Charter, Georgia, serif;
+	font-variant-numeric: lining-nums;
 	line-height: 1.35;
 }
 .format0, .format4 {
