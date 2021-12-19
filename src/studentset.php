@@ -90,7 +90,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     }
 
     /** @return StudentSet */
-    static function make_empty_for(Contact $viewer, Contact $user) {
+    static function make_empty_for(Contact $user, Contact $viewer) {
         $ss = new StudentSet($viewer, 0);
         $ss->_u[$user->contactId] = $user;
         $ss->_ua[] = $user;
@@ -101,7 +101,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
 
     /** @param list<Contact> $users
      * @return StudentSet */
-    static function make_for(Contact $viewer, $users) {
+    static function make_for($users, Contact $viewer) {
         $ss = new StudentSet($viewer, 0);
         foreach ($users as $u) {
             $ss->_u[$u->contactId] = $u;

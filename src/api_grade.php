@@ -177,7 +177,7 @@ class Grade_API {
             if ($u->contactId !== $viewer->contactId && !$viewer->isPC)
                 throw new Error("Permission error.");
         }
-        return StudentSet::make_for($viewer, $us);
+        return StudentSet::make_for($us, $viewer);
     }
 
     static function update_error(&$error, $errno, $s) {

@@ -445,6 +445,10 @@ blockquote.group-only {
 	margin-right: 5em !important;
 	margin-right: 5rem !important;
 }
+.pr-3 {
+	padding-right: 1em !important;
+	padding-right: 1rem !important;
+}
 .order-100 {
 	order: 100 !important;
 }

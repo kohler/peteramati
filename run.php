@@ -127,7 +127,7 @@ class RunRequest {
             $rr = $info->run_logger()->job_response(intval($qreq->check));
             if (!$rr
                 || ($rr->pset !== $info->pset->urlkey
-                    && $info->pset_by_key($rr->pset) !== $info->pset)
+                    && $this->conf->pset_by_key($rr->pset) !== $info->pset)
                 || $rr->runner !== $this->runner->name) {
                 return self::error("Unknown check timestamp {$qreq->check}.");
             }

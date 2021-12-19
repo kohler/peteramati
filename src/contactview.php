@@ -175,8 +175,9 @@ class ContactView {
 
     static function echo_group($key, $value, $notes = null) {
         echo "<div class=\"pa-p\"><div class=\"pa-pt\">", $key, "</div><div class=\"pa-pv\">";
-        if ($notes && $value && !str_starts_with($value, '<div'))
+        if ($notes && $value && !str_starts_with($value, '<div')) {
             $value = "<div>" . $value . "</div>";
+        }
         echo $value;
         foreach ($notes ? : [] as $v) {
             $v = is_array($v) ? $v : array(false, $v);
@@ -487,7 +488,7 @@ class ContactView {
         $repo_url = trim($qreq->repo);
         if ($repo_url === "") {
             $user->set_repo($pset, null);
-            $conf->redirect_self($conf);
+            $conf->redirect_self($qreq);
         }
 
         // extend it to full url

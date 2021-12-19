@@ -35,7 +35,7 @@ class RunEnqueueBatch {
         $this->pset = $pset;
         $this->runner = $runner;
         $this->sset_flags = 0;
-        if ($usermatch === "dropped") {
+        if (count($usermatch) === 1 && $usermatch[0] === "dropped") {
             $this->sset_flags |= StudentSet::DROPPED;
         } else {
             $this->sset_flags |= StudentSet::ENROLLED;
