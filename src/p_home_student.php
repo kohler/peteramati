@@ -91,7 +91,7 @@ class Home_Student_Page {
         if ($info->repo && $user_can_view) {
             ContactView::echo_group("", '<strong><a href="' . $pseturl . '">view code</a></strong>');
         }
-        echo $user_can_view ? "\n" : "<div>\n";
+        echo $user_can_view ? "\n" : "</div>\n";
     }
 
     /** @return ?PsetView */

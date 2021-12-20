@@ -853,9 +853,8 @@ function pa_resolve_gradelist() {
         sectioned = gi.has(xge => xge.description || xge.answer ||
                 xge.type === "section" ||
                 (xge.type === "markdown" && gi.answers_editable === false)),
-        dg_class = "pa-dg".concat(hasClass(this, "is-main") ? " is-main" : ""),
-        section_class = dg_class.concat(" pa-gsection",
-            gi.scores_editable ? " pa-hide-description" : "");
+        is_main = hasClass(this, "is-main"),
+        section_class = "pa-dg pa-gsection ".concat(gi.scores_editable ? " pa-hide-description" : "", is_main ? " is-main" : "");
     for (let i = 0; i !== gi.order.length; ++i) {
         const k = gi.order[i], ge = gi.entries[k];
         if (!gi.scores_editable && ge.concealed) {
@@ -884,7 +883,7 @@ function pa_resolve_gradelist() {
                     sb.className = "pa-sidebar";
                     new_section.appendChild(sb);
                     const sdiv = document.createElement("div");
-                    sdiv.className = dg_class;
+                    sdiv.className = "pa-dg is-mainsb";
                     new_section.appendChild(sdiv);
                 }
             }

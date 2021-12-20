@@ -2490,13 +2490,20 @@ td.mhcb {
 	padding-left: 1.5rem;
 	padding-right: 1.5rem;
 }
-.is-main > .pa-p-hidden, .is-modal > .pa-p-hidden {
+.is-mainsb > .pa-p, .is-mainsb > .pa-ptop {
+	padding-left: 1.5rem;
+}
+.is-main > .pa-p-hidden,
+.is-mainsb > .pa-p-hidden,
+.is-modal > .pa-p-hidden {
 	background-color: #f3f3f3;
 	padding-top: 0.5rem;
 	padding-bottom: 0.5rem;
 	margin-bottom: 0;
 }
-.is-main > .pa-p-hidden + .pa-p-hidden, .is-modal > .pa-p-hidden + .pa-p-hidden {
+.is-main > .pa-p-hidden + .pa-p-hidden,
+.is-mainsb > .pa-p-hidden + .pa-p-hidden,
+.is-modal > .pa-p-hidden + .pa-p-hidden {
 	padding-top: 0;
 }
 .pa-gradelist.is-modal {
@@ -2774,6 +2781,10 @@ tr.gtrow-partner {
 .pa-with-sidebar {
 	display: flex;
 	flex-direction: row-reverse;
+	align-items: flex-start;
+}
+.is-main.pa-with-sidebar {
+	margin-right: 1.5rem;
 }
 .pa-with-sidebar > .pa-dg {
 	flex: 1 1 auto;
@@ -2802,6 +2813,9 @@ tr.gtrow-partner {
 }
 .pa-with-sidebar > .pa-dg {
 	max-width: 100%;
+}
+.is-mainsb > .pa-p-hidden {
+	margin-right: -1.5rem;
 }
 }
 @media screen and (min-width: 1024px) {
