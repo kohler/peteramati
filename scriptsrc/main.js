@@ -1231,7 +1231,8 @@ function pa_render_pset_table(pconf, data) {
                         this.className || "uic js-range-click papsel",
                         '" data-range-type="s61"></td>');
             },
-            tw: 1.5
+            tw: 1.5,
+            pin: true
         },
         flagcheckbox: {
             th: '<th class="gt-checkbox" scope="col"></th>',
@@ -1249,7 +1250,8 @@ function pa_render_pset_table(pconf, data) {
             td: function (s, rownum) {
                 return rownum == "" ? '<td></td>' : '<td class="gt-rownumber">' + rownum + '.</td>';
             },
-            tw: Math.ceil(Math.log10(Math.max(data.length, 1))) * 0.75 + 1
+            tw: Math.ceil(Math.log10(Math.max(data.length, 1))) * 0.75 + 1,
+            pin: true
         },
         pset: {
             th: '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>',
@@ -1435,9 +1437,9 @@ function pa_render_pset_table(pconf, data) {
             tw: 20
         },
         gdialog: {
-            th: '<th></th>',
+            th: '<th class="gt-gdialog"></th>',
             td: function () {
-                return '<td><button type="button" class="btn-xlink ui js-gdialog" tabindex="-1" scope="col">Ⓖ</button></td>';
+                return '<td class="gt-gdialog"><button type="button" class="btn-xlink ui js-gdialog" tabindex="-1" scope="col">Ⓖ</button></td>';
             },
             tw: 1.5,
             pin: true
