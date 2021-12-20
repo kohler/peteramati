@@ -2611,30 +2611,45 @@ function pa_render_pset_table(pconf, data) {
         observer.observe($j.parent()[0]);
     }
     function render_tds(s, rownum) {
-        var a = [];
-        for (var i = 0; i !== col.length; ++i)
+        const a = [];
+        for (let i = 0; i !== col.length; ++i) {
             a.push(col[i].td.call(col[i], s, rownum));
+        }
         return a;
     }
+    function render_trs(tbody, a) {
+        const tpl = document.createElement("template");
+        tpl.innerHTML = a.join("");
+        tbody.appendChild(tpl.content);
+        return [];
+    }
     function render() {
-        var thead = $('<thead><tr class="gt k0"></tr></thead>')[0],
-            tfixed = $j.hasClass("want-gtable-fixed"),
+        const tfixed = $j.hasClass("want-gtable-fixed"),
             rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
-        for (let i = 0; i !== col.length; ++i) {
-            var th = col[i].th.call(col[i]), $th = $(th);
+        let a = ['<tr class="gt k0">'];
+        for (const c of col) {
+            a.push(c.th.call(c));
             if (tfixed) {
-                col[i].left = table_width;
-                var w = col[i].tw;
+                let w = c.tw;
                 if (typeof w !== "number") {
-                    w = w.call(col[i]);
+                    w = w.call(c);
                 }
                 w *= rem;
-                col[i].width = w;
-                $th.css("width", w + "px");
+                c.left = table_width;
+                c.width = w;
                 table_width += w;
             }
-            thead.firstChild.appendChild($th[0]);
         }
+        const thead = document.createElement("thead");
+        a = render_trs(thead, a);
+        if (tfixed) {
+            let td = thead.firstChild.firstChild;
+            for (const c of col) {
+                td.style.width = c.width + "px";
+                td = td.nextSibling;
+            }
+        }
+
         display_anon();
         $j[0].appendChild(thead);
         $j.toggleClass("gt-useemail", !!sort.email);
@@ -2644,15 +2659,16 @@ function pa_render_pset_table(pconf, data) {
             $j.removeClass("want-gtable-fixed").css("table-layout", "fixed");
         }
 
-        var tbody = $('<tbody class="has-hotlist"></tbody>')[0],
-            trn = 0, was_boringness = 0, a = [];
+        const tbody = $('<tbody class="has-hotlist"></tbody>')[0];
         $j[0].appendChild(tbody);
         if (!pconf.no_sort) {
             sort_data();
         }
         displaying_last_first = sort.f === "name" && sort.last;
+
+        let trn = 0, was_boringness = 0;
         for (let i = 0; i !== data.length; ++i) {
-            var s = data[i];
+            const s = data[i];
             s._spos = smap.length;
             smap.push(s);
             ++trn;
@@ -2660,32 +2676,33 @@ function pa_render_pset_table(pconf, data) {
                 a.push('<tr class="gt-boring"><td colspan="' + col.length + '"><hr></td></tr>');
             }
             was_boringness = s.boringness;
-            var stds = render_tds(s, trn);
-            var t = '<tr class="gt k'.concat(trn % 2, '" data-pa-spos="', s._spos);
-            if (s.uid)
+            const stds = render_tds(s, trn);
+            let t = '<tr class="gt k'.concat(trn % 2, '" data-pa-spos="', s._spos);
+            if (s.uid) {
                 t += '" data-pa-uid="' + s.uid;
+            }
             a.push(t.concat('">', stds.join(''), '</tr>'));
-            for (var j = 0; s.partners && j < s.partners.length; ++j) {
-                var ss = s.partners[j];
+            for (let j = 0; s.partners && j < s.partners.length; ++j) {
+                const ss = s.partners[j];
                 ss._spos = smap.length;
                 smap.push(ss);
-                var sstds = render_tds(s.partners[j], "");
-                for (var k = 0; k < sstds.length; ++k) {
+                const sstds = render_tds(s.partners[j], "");
+                for (let k = 0; k < sstds.length; ++k) {
                     if (sstds[k] === stds[k])
                         sstds[k] = '<td></td>';
                 }
                 t = '<tr class="gt k'.concat(trn % 2, ' gtrow-partner" data-pa-spos="', ss._spos);
-                if (ss.uid)
+                if (ss.uid) {
                     t += '" data-pa-uid="' + ss.uid;
+                }
                 a.push(t.concat('" data-pa-partner="1">', sstds.join(''), '</tr>'));
             }
             if (a.length > 50) {
-                $(a.join('')).appendTo(tbody);
-                a = [];
+                a = render_trs(tbody, a);
             }
         }
         if (a.length !== 0) {
-            $(a.join('')).appendTo(tbody);
+            render_trs(tbody, a);
         }
         slist_input && assign_slist();
 
