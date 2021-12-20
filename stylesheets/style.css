@@ -3001,6 +3001,9 @@ table.hidegrades .pa-gradenote {
 	color: #990000;
 	text-decoration: none;
 }
+.pa-flag-open {
+	color: #009966;
+}
 .pa-note-links, .pa-note-aa, .pa-note-author {
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
 		"Helvetica Neue", Arial, sans-serif,

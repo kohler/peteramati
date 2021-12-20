@@ -66,7 +66,9 @@ class Home_Student_Page {
                 $start = $ftr->flag->started ?? 0;
                 $resolved = $ftr->flag->resolved ?? [0];
                 echo '<td class="pr-3">', $start ? date("j M H:i", $start) : '',
-                    ' (', $resolved[0] ? 'resolved ' . date("j M H:i", $resolved[0]) : 'open', ')</td>';
+                    $resolved[0] ? '(resolved ' . data("j M H:i", $resolved[0]) . ')'
+                        : '<span class="pa-flag-open">(open)</span>',
+                    '</td>';
                 $conversation = $ftr->flag->conversation ?? [];
                 if (!empty($conversation)) {
                     echo '<td>', htmlspecialchars($conversation[0][2]), '</td>';

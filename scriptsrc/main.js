@@ -1211,7 +1211,7 @@ function pa_render_pset_table(pconf, data) {
         visible = pconf.scores_visible,
         table_entries, need_ngrades,
         sort = {
-            f: flagged ? "at" : "username", last: true, rev: 1
+            f: flagged ? "at" : "name", last: false, rev: 1
         },
         active_nameflag = -1, displaying_last_first = null,
         anonymous = pconf.anonymous,
@@ -1566,7 +1566,7 @@ function pa_render_pset_table(pconf, data) {
         var x = wstorage.site(true, "pa-pset" + pconf.id + "-table");
         x && (sort = JSON.parse(x));
         if (!sort.f || !/^\w+$/.test(sort.f)) {
-            sort.f = "username";
+            sort.f = "name";
         }
         if (sort.rev !== 1 && sort.rev !== -1) {
             sort.rev = 1;
