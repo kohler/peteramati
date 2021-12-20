@@ -201,11 +201,22 @@ export class GradeEntry {
         // grade value
         this.gc.update_edit.call(this, pde, v, opts);
 
-        let ve;
-        if (opts.reset && (ve = pde.querySelector(".pa-gradevalue"))) {
-            input_set_default_value(ve, this.simple_text(v));
+        // reset, tabIndex
+        if (opts.reset || opts.sidebar) {
+            const ve = pde.querySelector(".pa-gradevalue");
+            if (ve && opts.reset) {
+                input_set_default_value(ve, this.simple_text(v));
+            }
+            if (ve && opts.sidebar) {
+                ve.tabIndex = -1;
+                ve.classList.add("uikd", "pa-sidebar-tab");
+            }
         }
+
+        // landmark
         this.landmark && this.update_landmark(pde);
+
+        // finally grow
         $(pde).find("input, textarea").autogrow();
     }
 

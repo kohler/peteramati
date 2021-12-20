@@ -564,7 +564,7 @@ handle_ui.on("pa-signin-radio", function () {
 });
 
 
-handle_ui.on("pa-gradevalue", function () {
+handle_ui.on("change.pa-gradevalue", function () {
     var f = this.closest("form"), ge, self = this;
     if (f && hasClass(f, "pa-pv")) {
         $(f).submit();
@@ -939,7 +939,7 @@ function pa_resolve_gradelist() {
             } else {
                 const e = ge.render(gi);
                 sidebar.insertBefore(e, sidebare);
-                gi.update_at(e);
+                gi.update_at(e, {sidebar: true});
             }
         }
     }

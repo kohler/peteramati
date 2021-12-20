@@ -63,7 +63,7 @@ event_key.printable = function (evt) {
     return !nonprintable_map[event_key(evt)]
         && (typeof evt === "string" || !(evt.ctrlKey || evt.metaKey));
 };
-event_key.modifier = function (evt) {
+event_key.is_modifier = function (evt) {
     return nonprintable_map[event_key(evt)] > 1;
 };
 event_key.is_default_a = function (evt, a) {

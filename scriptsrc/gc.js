@@ -2,7 +2,8 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { addClass } from "./ui.js";
+import { addClass, handle_ui } from "./ui.js";
+import { event_key } from "./ui-key.js";
 import { strftime, sec2text } from "./utils.js";
 
 let map = {};
@@ -190,4 +191,53 @@ GradeClass.add("section", {
         return false;
     },
     type_tabular: false
+});
+
+
+function sidebar_tab_traverse(e, bwd) {
+    let sb = e.closest(".pa-sidebar"),
+        sbtabs = sb.querySelectorAll(".pa-sidebar-tab"),
+        pos = Array.prototype.indexOf.call(sbtabs, e);
+    if (pos < 0) {
+        return null;
+    }
+    let allsb, sbpos;
+    while (true) {
+        pos += bwd ? -1 : 1;
+        if (pos < 0 || pos >= sbtabs.length) {
+            if (allsb == null) {
+                allsb = document.querySelectorAll(".pa-sidebar");
+                sbpos = Array.prototype.indexOf.call(allsb, sb);
+                if (sbpos < 0) {
+                    return null;
+                }
+            }
+            sbpos += bwd ? -1 : 1;
+            if (sbpos >= 0 && sbpos < allsb.length) {
+                sb = allsb[sbpos];
+                sbtabs = sb.querySelectorAll(".pa-sidebar-tab");
+                pos = bwd ? sbtabs.length : -1;
+            } else {
+                return null;
+            }
+        } else if (sbtabs[pos].offsetParent) {
+            return sbtabs[pos];
+        }
+    }
+}
+
+handle_ui.on("keydown.pa-sidebar-tab", function (event) {
+    if (event_key(event) === "Tab"
+        && !event.ctrlKey
+        && !event.altKey
+        && !event.metaKey) {
+        const e = sidebar_tab_traverse(this, event.shiftKey);
+        if (e) {
+            e.focus();
+            if (e.setSelectionRange) {
+                e.setSelectionRange(0, e.value.length);
+            }
+            event.preventDefault();
+        }
+    }
 });
