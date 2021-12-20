@@ -40,7 +40,7 @@ class Repo_API {
         $pset = $api->pset;
         $repo = $api->repo;
         if (!$repo) {
-            return ["pset" => $pset->urlkey, "hash" => false, "error" => "No repository configured."];
+            return ["pset" => $pset->urlkey, "commit" => false, "hash" => false, "error" => "No repository configured."];
         } else {
             if (!isset($repofreshes[$repo->url])) {
                 $repo->refresh($fresh, $sync);
@@ -48,12 +48,13 @@ class Repo_API {
             }
             $c = $repo->latest_commit($pset, $api->branch);
             if (!$c) {
-                return ["pset" => $pset->urlkey, "hash" => false, "error" => "No commits."];
+                return ["pset" => $pset->urlkey, "commit" => false, "hash" => false, "error" => "No commits."];
             } else if (!$user->can_view_repo_contents($repo, $api->branch)) {
-                return ["pset" => $pset->urlkey, "hash" => false, "error" => "Unconfirmed repository."];
+                return ["pset" => $pset->urlkey, "commit" => false, "hash" => false, "error" => "Unconfirmed repository."];
             } else {
                 return [
                     "pset" => $pset->urlkey,
+                    "commit" => $c->hash,
                     "hash" => $c->hash,
                     "subject" => $c->subject,
                     "commitat" => $c->commitat,
@@ -161,10 +162,10 @@ class Repo_API {
             return ["ok" => false, "error" => "Invalid request."];
         }
         $info = PsetView::make($api->pset, $api->user, $user);
-        if ((string) $qreq->base_hash === "") {
+        if (($qreq->base_commit ?? $qreq->base_hash ?? "") === "") {
             $base_commit = $info->base_handout_commit();
         } else {
-            $base_commit = $user->conf->check_api_hash($qreq->base_hash, $api);
+            $base_commit = $user->conf->check_api_hash($qreq->base_commit ?? $qreq->base_hash, $api);
         }
         if (!$base_commit) {
             return ["ok" => false, "error" => "Disconnected commit."];

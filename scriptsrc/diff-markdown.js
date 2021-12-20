@@ -73,7 +73,7 @@ function modify_landmark(base) {
 
 function modify_landmark_image(base) {
     function fix(pi, file) {
-        return siteinfo.site_relative + "~" + encodeURIComponent(siteinfo.uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-hash") + "/" + file;
+        return siteinfo.site_relative + "~" + encodeURIComponent(siteinfo.uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-commit") + "/" + file;
     }
     return function (tokens, idx, options, env, self) {
         var token = tokens[idx],

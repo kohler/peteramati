@@ -858,7 +858,7 @@ class PsetRequest {
         if (!$this->pset->gitless && $this->info->hash()) {
             echo '" data-pa-repourl="', htmlspecialchars($this->info->repo->url),
                 '" data-pa-branch="', htmlspecialchars($this->info->branch()),
-                '" data-pa-hash="', htmlspecialchars($this->info->commit_hash());
+                '" data-pa-commit="', htmlspecialchars($this->info->commit_hash());
         }
         if (!$this->pset->gitless && $this->pset->directory) {
             echo '" data-pa-directory="', htmlspecialchars($this->pset->directory_slash);

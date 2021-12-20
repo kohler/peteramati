@@ -35,7 +35,7 @@ class Home_TA_Page {
         }
         $j["psetid"] = $pset->id;
         $bhash = $row->bhash();
-        $j["hash"] = bin2hex($bhash);
+        $j["commit"] = bin2hex($bhash);
         $j["flagid"] = $row->flagid;
         if ($bhash !== null && $row->rpi && $row->rpi->gradebhash === $bhash) {
             $j["is_grade"] = true;
@@ -251,9 +251,9 @@ class Home_TA_Page {
                 });
             }
             if (($h = $info->grading_hash()) !== null) {
-                $j["gradehash"] = $h;
+                $j["gradecommit"] = $h;
             } else if (($h = $info->hash()) !== null) {
-                $j["hash"] = $h;
+                $j["commit"] = $h;
             }
             if ($h && $info->empty_diff_likely()) {
                 $j["emptydiff"] = true;

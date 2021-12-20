@@ -57,7 +57,7 @@ function hoturl_psetinfo(elt, page, args) {
     if ((v = p.getAttribute("data-pa-pset"))) {
         args.push("pset=" + encodeURIComponent(v));
     }
-    if ((v = p.getAttribute("data-pa-hash"))) {
+    if ((v = p.getAttribute("data-pa-commit"))) {
         args.push("commit=" + encodeURIComponent(v));
     }
     let sheet;

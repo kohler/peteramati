@@ -1148,10 +1148,10 @@ function pa_checklatest(pset) {
                     latesthash = this.getAttribute("data-pa-checkhash");
                 for (var c of d.commits) {
                     if (c.pset == pset
-                        && c.hash
-                        && c.hash !== latesthash
+                        && c.commit
+                        && c.commit !== latesthash
                         && c.snaphash !== latesthash) {
-                        $(this).find(".pa-pv").append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: c.hash}) + "\">Load them</a></div>");
+                        $(this).find(".pa-pv").append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: c.commit}) + "\">Load them</a></div>");
                         clearTimeout(timeout);
                         break;
                     }
@@ -1265,7 +1265,7 @@ function pa_render_pset_table(pconf, data) {
             td: function (s) {
                 return '<td class="gt-pset"><a href="' + escaped_href(s) + '" class="track">' +
                    escape_entities(siteinfo.psets[s.psetid].title) +
-                   (s.hash ? "/" + s.hash.substr(0, 7) : "") + '</a></td>';
+                   (s.commit ? "/" + s.commit.substr(0, 7) : "") + '</a></td>';
             },
             tw: 12,
             sort_forward: true,
@@ -1600,7 +1600,7 @@ function pa_render_pset_table(pconf, data) {
             if (s.dropped) {
                 s.boringness = 2;
             } else if (s.emptydiff
-                       || (!s.gradehash && !s.hash && !pconf.gitless_grades)) {
+                       || (!s.gradecommit && !s.commit && !pconf.gitless_grades)) {
                 s.boringness = 1;
             } else {
                 s.boringness = 0;
@@ -1698,10 +1698,10 @@ function pa_render_pset_table(pconf, data) {
             u: ukey(s),
             pset: s.psetid ? siteinfo.psets[s.psetid].urlkey : pconf.key
         };
-        if (s.hash && (!s.is_grade || flagged)) {
-            args.commit = s.hash;
-        } else if (s.gradehash) {
-            args.commit = s.gradehash;
+        if (s.commit && (!s.is_grade || flagged)) {
+            args.commit = s.commit;
+        } else if (s.gradecommit) {
+            args.commit = s.gradecommit;
             args.commit_is_grade = 1;
         }
         return args;
@@ -1772,8 +1772,8 @@ function pa_render_pset_table(pconf, data) {
                 t = "~".concat(encodeURIComponent(ukey(s)));
             if (flagged) {
                 t = t.concat("/pset/", siteinfo.psets[s.psetid].urlkey);
-                if (s.hash)
-                    t = t.concat("/", s.hash);
+                if (s.commit)
+                    t = t.concat("/", s.commit);
             }
             j.push(t);
         }
@@ -2211,11 +2211,11 @@ function pa_render_pset_table(pconf, data) {
             });
         } else {
             for (let su of gdialog_su) {
-                if (su.gradehash) {
-                    byuid[su.uid].commit = su.gradehash;
+                if (su.gradecommit) {
+                    byuid[su.uid].commit = su.gradecommit;
                     byuid[su.uid].commit_is_grade = 1;
-                } else if (su.hash) {
-                    byuid[su.uid].commit = su.hash;
+                } else if (su.commit) {
+                    byuid[su.uid].commit = su.commit;
                 }
             }
             api_conditioner(hoturl("=api/multigrade", {pset: pconf.key}),
@@ -2762,7 +2762,7 @@ handle_ui.on("js-multiresolveflag", function () {
         flags = [];
     $gt.find(".papsel:checked").each(function () {
         const s = pat.s(this.closest("tr").getAttribute("data-pa-spos"));
-        flags.push({psetid: s.psetid, uid: s.uid, hash: s.hash, flagid: s.flagid});
+        flags.push({psetid: s.psetid, uid: s.uid, commit: s.commit, flagid: s.flagid});
     });
     if (flags.length !== 0) {
         $.ajax(hoturl("=api/multiresolveflag"), {

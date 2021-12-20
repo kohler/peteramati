@@ -77,7 +77,7 @@ class DiffMany {
             '" data-pa-pset="', htmlspecialchars($pset->urlkey),
             '" data-pa-user="', $linkpart_html;
         if (!$pset->gitless && $info->hash()) {
-            echo '" data-pa-hash="', htmlspecialchars($info->hash());
+            echo '" data-pa-commit="', htmlspecialchars($info->hash());
         }
         if (!$pset->gitless && $pset->directory) {
             echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);

@@ -57,8 +57,8 @@ export class Filediff {
                     type: "GET", cache: false, dataType: "json",
                     data: {
                         file: this.file,
-                        base_hash: p.getAttribute("data-pa-base-hash"),
-                        hash: p.getAttribute("data-pa-hash")
+                        base_commit: p.getAttribute("data-pa-base-commit"),
+                        commit: p.getAttribute("data-pa-commit")
                     },
                     success: data => {
                         if (data.ok && data.content_html) {
