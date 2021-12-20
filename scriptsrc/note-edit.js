@@ -93,7 +93,7 @@ function arrowcapture(evt) {
          && ((Math.abs(evt.screenX - scrolled_x) <= 1 && Math.abs(evt.screenY - scrolled_y) <= 1)
              || evt.timeStamp - scrolled_at <= 500))
         || ((evt.type === "keydown" || evt.type === "keyup")
-            && event_key.modifier(evt))) {
+            && event_key.is_modifier(evt))) {
         return;
     } else if (evt.type !== "keydown"
                || ((key = event_key(evt)) !== "ArrowUp"
@@ -166,10 +166,8 @@ function pa_save_my_note(elt) {
         $(f).find(".pa-save-message").remove();
         $(f).find(".aab").append('<div class="aabut pa-save-message">Saving…</div>');
         Note.at(elt).save_text(text, iscomment).then(() => {
-            const click_tr = curline ? curline.visible_source() : null;
-            if (click_tr) {
-                capture(click_tr.element, true);
-            }
+            const ctr = curline ? curline.visible_source() : null;
+            ctr && capture(ctr.element, true);
         });
     }
 }
