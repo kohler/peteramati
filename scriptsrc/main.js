@@ -1890,7 +1890,7 @@ function pa_render_pset_table(pconf, data) {
         }
 
         t = '<table class="gtable gtable-fixed gtable-overlay new" style="position:absolute;left:-24px;width:' +
-            (tw + 24) + 'px"><thead><tr class="k0 kfade"><th style="width:24px"></th>';
+            (tw + 24) + 'px"><thead><tr class="gt k0 kfade"><th style="width:24px"></th>';
         for (let i = li; i !== ri; ++i) {
             t += '<th style="width:' + col[i].width + 'px"' +
                 col[i].th.call(col[i]).substring(3);
@@ -1913,7 +1913,7 @@ function pa_render_pset_table(pconf, data) {
                 a.push('<tr class="gt-boring"><td colspan="' + (ri - li + 1) + '"><hr></td></tr>');
             } else {
                 let spos = tr.getAttribute("data-pa-spos"),
-                    t = '<tr class="' + tr.className + ' kfade" data-pa-spos="' + spos;
+                    t = '<tr class="gt ' + tr.className + ' kfade" data-pa-spos="' + spos;
                 if (tr.hasAttribute("data-pa-uid")) {
                     t += '" data-pa-uid="' + tr.getAttribute("data-pa-uid");
                 }
@@ -2615,7 +2615,7 @@ function pa_render_pset_table(pconf, data) {
         return a;
     }
     function render() {
-        var thead = $('<thead><tr class="k0"></tr></thead>')[0],
+        var thead = $('<thead><tr class="gt k0"></tr></thead>')[0],
             tfixed = $j.hasClass("want-gtable-fixed"),
             rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
         for (let i = 0; i !== col.length; ++i) {
@@ -2659,7 +2659,7 @@ function pa_render_pset_table(pconf, data) {
             }
             was_boringness = s.boringness;
             var stds = render_tds(s, trn);
-            var t = '<tr class="k'.concat(trn % 2, '" data-pa-spos="', s._spos);
+            var t = '<tr class="gt k'.concat(trn % 2, '" data-pa-spos="', s._spos);
             if (s.uid)
                 t += '" data-pa-uid="' + s.uid;
             a.push(t.concat('">', stds.join(''), '</tr>'));
@@ -2672,7 +2672,7 @@ function pa_render_pset_table(pconf, data) {
                     if (sstds[k] === stds[k])
                         sstds[k] = '<td></td>';
                 }
-                t = '<tr class="k'.concat(trn % 2, ' gtrow-partner" data-pa-spos="', ss._spos);
+                t = '<tr class="gt k'.concat(trn % 2, ' gtrow-partner" data-pa-spos="', ss._spos);
                 if (ss.uid)
                     t += '" data-pa-uid="' + ss.uid;
                 a.push(t.concat('" data-pa-partner="1">', sstds.join(''), '</tr>'));

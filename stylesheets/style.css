@@ -2539,6 +2539,12 @@ td.mhcb {
 	font-size: 75%;
 	line-height: 1.5;
 }
+tr.gt > td, tr.gt > th {
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+	height: 1.125rem;
+}
 .gtable-container-0 {
 	margin-left: -24px;
 	margin-right: -24px;
@@ -2579,11 +2585,6 @@ td.mhcb {
 }
 .gt-username {
 	font-weight: bold;
-}
-.gt-username, .gt-grader, .gt-el {
-	text-overflow: ellipsis;
-	overflow: hidden;
-	white-space: nowrap;
 }
 .gt-rownumber, .gt-username, .gt-name, .gt-grader,
 .gt-grade, .gt-ngrades, .gt-total,
