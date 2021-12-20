@@ -1471,7 +1471,7 @@ function pa_render_pset_table(pconf, data) {
                 }
                 return -user_compare(a, b);
             },
-            tw: 3
+            tw: 3.5
         },
         grade: {
             th: function () {
