@@ -286,7 +286,7 @@ class PsetView {
     /** @param string $hashpart
      * @return ?CommitRecord */
     function find_commit($hashpart) {
-        if ($hashpart === "handout") {
+        if ($hashpart === "handout" || $hashpart === "base") {
             return $this->base_handout_commit();
         } else if ($hashpart === "head" || $hashpart === "latest") {
             return $this->latest_commit();
@@ -1954,6 +1954,9 @@ class PsetView {
             $this->grade_export_formulas($gexp);
         }
 
+        if (!$this->pset->gitless) {
+            $gexp->commit = $this->hash();
+        }
         if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
             $gexp->grading_hash = $this->grading_hash();
         }
@@ -2059,7 +2062,10 @@ class PsetView {
 
     /** @return array */
     function info_json() {
-        $r = ["uid" => $this->user->contactId, "user" => $this->user_linkpart()];
+        $r = ["pset" => $this->pset->urlkey, "uid" => $this->user->contactId, "user" => $this->user_linkpart()];
+        if (!$this->pset->gitless && $this->hash()) {
+            $r["commit"] = $this->hash();
+        }
         if ($this->user_can_view_score()) {
             $r["user_scores_visible"] = true;
         }

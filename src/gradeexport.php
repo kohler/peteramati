@@ -17,6 +17,12 @@ class GradeExport implements JsonSerializable {
     public $uid;
     /** @var ?string */
     public $user;
+    /** @var ?string */
+    public $commit;
+    /** @var ?string */
+    public $base_commit;
+    /** @var ?bool */
+    public $base_handout;
     /** @var ?list<mixed> */
     public $grades;
     /** @var ?list<mixed> */
@@ -172,8 +178,18 @@ class GradeExport implements JsonSerializable {
     function jsonSerialize() {
         $r = [];
         if (isset($this->uid)) {
+            $r["pset"] = $this->pset->urlkey;
             $r["uid"] = $this->uid;
             $r["user"] = $this->user;
+            if ($this->commit !== null) {
+                $r["commit"] = $this->commit;
+            }
+            if ($this->base_commit !== null) {
+                $r["base_commit"] = $this->base_commit;
+                if ($this->base_handout !== null) {
+                    $r["base_handout"] = $this->base_handout;
+                }
+            }
             if ($this->grades !== null) {
                 $r["grades"] = $this->grades;
             } else if ($this->pc_view && empty($this->autogrades)) {

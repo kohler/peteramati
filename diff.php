@@ -66,10 +66,13 @@ if ($commitb->hash === $Info->grading_hash()) {
 $Conf->header(htmlspecialchars($Pset->title), "home");
 ContactView::echo_heading($User, $Me);
 
+$infoj = $Info->info_json();
+$infoj["base_commit"] = $commita->hash;
+$infoj["base_handout"] = $Pset->is_handout($commita);
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey),
     '" data-pa-base-hash="', htmlspecialchars($commita->hash),
     '" data-pa-hash="', htmlspecialchars($commitb->hash),
-    '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($Info->info_json()));
+    '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($infoj));
 if (!$Pset->gitless && $Pset->directory) {
     echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
 }
@@ -78,9 +81,13 @@ if ($Info->user->extension) {
 }
 echo '">';
 
-echo "<table><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height:110%\">",
-    "<div class=\"pa-dl pa-gdsamp\" style=\"padding:2px 5px\"><big><code>", substr($commita->hash, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</big></div>",
-    "<div class=\"pa-dl pa-gisamp\" style=\"padding:2px 5px\"><big><code>", substr($commitb->hash, 0, 7), "</code> ", htmlspecialchars($commitb->subject), "</big></div>",
+echo "<table class=\"mb-4\"><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height:110%\">",
+    "<div class=\"pa-dl pa-gdsamp\" style=\"padding:2px 5px\"><big><a class=\"q\" href=\"",
+    $Info->hoturl("pset", ["commit" => $commita->hash]),
+    "\"><code>", substr($commita->hash, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</a></big></div>",
+    "<div class=\"pa-dl pa-gisamp\" style=\"padding:2px 5px\"><big><a class=\"q\" href=\"",
+    $Info->hoturl("pset", ["commit" => $commitb->hash]),
+    "\"><code>", substr($commitb->hash, 0, 7), "</code> ", htmlspecialchars($commitb->subject), "</a></big></div>",
     "</td></tr></table>";
 
 // collect diff and sort line notes

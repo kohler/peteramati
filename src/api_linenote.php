@@ -197,10 +197,30 @@ class LineNote_API {
             if ($linea && abs($linea - $fln[$i]->linea) > abs($linea - $rm->linea)) {
                 $fln[$i]->linea = $rm->linea;
             }
-            foreach (["like", "dislike"] as $xmark) {
-                if (isset($rm->$xmark))
-                    $fln[$i]->$xmark = $rm->$xmark;
+            if (isset($rm->like)) {
+                $fln[$i]->like = $rm->like;
             }
+            if (isset($rm->dislike)) {
+                $fln[$i]->dislike = $rm->dislike;
+            }
+        }
+    }
+
+    static private function get_linea(Contact $viewer, $file, $lineid, APIData $api) {
+        if (!$api->repo || !$api->hash) {
+            return ["ok" => false, "error" => "Missing commit.X{$api->hash}"];
+        }
+        $info = PsetView::make($api->pset, $api->user, $viewer);
+        if (($err = $api->prepare_commit($info))) {
+            return $err;
+        }
+        $diff = $info->repo->diff($api->pset, $info->derived_handout_commit(), $info->commit(), ["needfiles" => [$file], "onlyfiles" => [$file]]);
+        if (!isset($diff[$file])) {
+            return ["ok" => false, "error" => "No such file."];
+        } else if (($linea = $diff[$file]->linea_for($lineid)) !== null) {
+            return ["ok" => true, "linea" => $linea];
+        } else {
+            return ["ok" => false, "error" => "No such line."];
         }
     }
 
@@ -211,11 +231,24 @@ class LineNote_API {
         }
         if (!isset($qreq->file)
             || (isset($qreq->linea) && !ctype_digit($qreq->linea))
+            || (isset($qreq->line) && !preg_match('/\A[ab]\d+\z/', $qreq->line))
             || (isset($qreq->neighborhood) && !ctype_digit($qreq->neighborhood))) {
             return ["ok" => false, "error" => "Invalid request."];
         }
         $fln = [];
-        $linea = intval($qreq->linea ?? "0");
+        if (isset($qreq->linea)) {
+            $linea = intval($qreq->linea);
+        } else if (isset($qreq->line) && $qreq->line[0] === "a") {
+            $linea = intval(substr($qreq->linea, 1));
+        } else if (isset($qreq->line) && !str_starts_with($qreq->file, "/")) {
+            $x = self::get_linea($user, $qreq->file, $qreq->line, $api);
+            if (!$x["ok"]) {
+                return $x;
+            }
+            $linea = $x["linea"];
+        } else {
+            $linea = 0;
+        }
         $neighborhood = isset($qreq->neighborhood) ? intval($qreq->neighborhood) : 5;
         foreach (self::all_linenotes_near($api->pset, $qreq->file, $linea, $neighborhood) as $ln) {
             $rm = (object) $ln->render_map();
@@ -231,7 +264,7 @@ class LineNote_API {
             }
         }
 
-        return ["ok" => true, "notelist" => $fln];
+        return ["ok" => true, "linea" => $linea, "notelist" => $fln];
     }
 
     static private function markedlinenote_add_cid($arr, $cid) {

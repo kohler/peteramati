@@ -12,7 +12,8 @@ import { render_ftext } from "./render.js";
 
 let id_counter = 0, late_hours_entry;
 const gradesheet_props = {
-    "uid": true, "user": true,
+    "pset": true, "uid": true, "user": true,
+    "commit": true, "base_commit": true, "base_handout": true,
     "late_hours": true, "auto_late_hours": true, "student_timestamp": true,
     "version": true, "history": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,

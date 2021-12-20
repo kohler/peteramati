@@ -237,6 +237,20 @@ class DiffInfo implements Iterator {
     }
 
     /** @param string $lineid
+     * @return ?int */
+    function linea_for($lineid) {
+        if ($lineid[0] === "a") {
+            return (int) substr($lineid, 1);
+        } else if ($lineid[0] === "b") {
+            $lineb = (int) substr($lineid, 1);
+            if (($l = $this->line_lower_bound(2, $lineb)) < $this->_diffsz) {
+                return $this->_diff[$l + 1] + ($lineb - $this->_diff[$l + 2]);
+            }
+        }
+        return null;
+    }
+
+    /** @param string $lineid
      * @return bool */
     function contains_lineid($lineid) {
         assert($lineid[0] === "a" || $lineid[0] === "b");

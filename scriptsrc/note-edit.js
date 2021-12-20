@@ -53,7 +53,7 @@ function render_form($tr, note, transition) {
         '<div class="aab aabr pa-note-aa justify-content-between">',
         '<div class="aabutr order-100"><button class="btn-primary" type="submit">Save comment</button></div>',
         '<div class="aabutr order-99"><button type="button" name="cancel">Cancel</button></div>',
-        '<div class="aabut"><button type="button" class="btn-xlink ui pa-load-note-suggestions">↡</button></div>');
+        '<div class="aabut"><button type="button" class="btn ui pa-load-note-suggestions">↡</button></div>');
     if (!gi.user_scores_visible) {
         t += '<div class="aabut"><label class="checki"><input type="checkbox" name="iscomment" value="1" class="checkc">Show immediately</label></div>';
     }
@@ -334,9 +334,20 @@ handle_ui.on("pa-load-note-suggestions", function () {
         note_suggestions(form, notelist);
     } else {
         const ld = Linediff.closest(this),
-            linea = ld.linea;
+            args = {file: ld.file, pset: ld.pset},
+            gi = GradeSheet.closest(this);
+        if (!gi || !gi.base_commit || gi.base_handout) {
+            args.linea = ld.linea;
+        } else if (gi.user && gi.commit) {
+            let x = ld.lineb;
+            if (x !== null) {
+                args.u = gi.user;
+                args.line = "b" + x;
+                args.commit = gi.commit;
+            }
+        }
         this.disabled = true;
-        $.ajax(hoturl("api/linenotesuggest", {file: ld.file, linea: linea, pset: ld.pset}), {
+        $.ajax(hoturl("api/linenotesuggest", args), {
             success: function (data) {
                 if (data.ok) {
                     notelist = data.notelist || [];
@@ -357,7 +368,7 @@ handle_ui.on("pa-load-note-suggestions", function () {
                             note.status = -2;
                         }
                     }
-                    notelist.sort(my_note_compare(linea));
+                    notelist.sort(my_note_compare(data.linea || 0));
                     $(form).data("paNoteSuggestions", notelist);
                     note_suggestions(form, notelist);
                 }

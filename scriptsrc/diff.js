@@ -190,7 +190,20 @@ export class Linediff {
         }
     }
     get linea() {
-        return this.linea_within(Infinity);
+        const e = this.element;
+        if (hasClass(e, "pa-gc") || (hasClass(e, "pa-gd") && !hasClass(e, "pa-dlr"))) {
+            return +e.firstChild.getAttribute("data-landmark");
+        } else {
+            return this.linea_within(Infinity);
+        }
+    }
+    get lineb() {
+        const lineid = this.note_lineid;
+        if (lineid.startsWith("b")) {
+            return +lineid.substring(1);
+        } else {
+            return null;
+        }
     }
     linea_within(bound) {
         let e = this.element;
@@ -202,6 +215,9 @@ export class Linediff {
             --bound;
         }
         return 0;
+    }
+    get psetinfo() {
+        return this.filediff.psetinfo;
     }
     get pset() {
         return this.filediff.pset;

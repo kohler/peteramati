@@ -40,7 +40,7 @@ class ContactView {
                     $settings["commit" . $commitsuf] = $x[$xpos];
                     $commitsuf = (int) $commitsuf + 1;
                 } else if (($p[$ppos] === "H" || $p[$ppos] === "h")
-                           && in_array($x[$xpos], ["handout", "latest", "grade", "grading", "head"])) {
+                           && in_array($x[$xpos], ["handout", "base", "latest", "grade", "grading", "head"])) {
                     $settings["commit" . $commitsuf] = $x[$xpos];
                     $commitsuf = (int) $commitsuf + 1;
                 } else if ($p[$ppos] === "u"
