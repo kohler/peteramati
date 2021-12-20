@@ -1224,20 +1224,27 @@ function pa_render_pset_table(pconf, data) {
     var col_renderers = {
         checkbox: {
             th: '<th class="gt-checkbox" scope="col"></th>',
-            td: function (s, rownum) {
-                return rownum == "" ? '<td></td>' :
-                    '<td class="gt-checkbox"><input type="checkbox" name="'.concat(
-                        render_checkbox_name(s), '" value="1" class="',
-                        this.className || "uic js-range-click papsel",
-                        '" data-range-type="s61"></td>');
+            td: function (s, rownum, mode) {
+                if (mode & 1) {
+                    return '<td></td>';
+                } else {
+                    let t = '<td class="gt-checkbox"><input type="checkbox" value="1"';
+                    if (mode & 2) {
+                        return t + ' class="uic js-range-click" data-range-type="s61o"></td>';
+                    } else {
+                        return t.concat(' name="', render_checkbox_name(s), '" class="',
+                                this.className || "uic js-range-click papsel",
+                                '" data-range-type="s61"></td>');
+                    }
+                }
             },
             tw: 1.5,
             pin: true
         },
         flagcheckbox: {
             th: '<th class="gt-checkbox" scope="col"></th>',
-            td: function (s, rownum) {
-                return rownum == "" ? '<td></td>' :
+            td: function (s, rownum, mode) {
+                return mode ? '<td></td>' :
                     '<td class="gt-checkbox"><input type="checkbox" name="s:'.concat(
                         s._spos, '" value="1" class="',
                         this.className || "uic js-range-click papsel",
@@ -1248,7 +1255,7 @@ function pa_render_pset_table(pconf, data) {
         rownumber: {
             th: '<th class="gt-rownumber" scope="col"></th>',
             td: function (s, rownum) {
-                return rownum == "" ? '<td></td>' : '<td class="gt-rownumber">' + rownum + '.</td>';
+                return '<td class="gt-rownumber">' + rownum + '.</td>';
             },
             tw: Math.ceil(Math.log10(Math.max(data.length, 1))) * 0.75 + 1,
             pin: true
@@ -1409,7 +1416,9 @@ function pa_render_pset_table(pconf, data) {
                 let t = scores_visible_for(s) ? '⎚' : '';
                 flagged && s.is_grade && (t += '✱');
                 s.has_notes && (t += '♪');
-                !flagged && s.has_nongrader_notes && (t += '<sup>*</sup>');
+                if (!flagged && s.has_nongrader_notes) {
+                    t += "+";
+                }
                 return t;
             },
             td: function (s) {
@@ -1882,7 +1891,7 @@ function pa_render_pset_table(pconf, data) {
         evt.preventDefault();
         evt.stopPropagation();
     }
-    function overlay_create() {
+    function make_overlay() {
         let li = 0, ri, tw = 0, t, a = [];
         while (li !== col.length && !col[li].pin) {
             ++li;
@@ -1907,31 +1916,37 @@ function pa_render_pset_table(pconf, data) {
 
         $j[0].parentNode.prepend($('<div style="position:sticky;left:0;z-index:2"></div>').append($overlay)[0]);
         $overlay.find("thead").on("click", "th", head_click);
+        $overlay.find("tbody").on("click", "input[type=checkbox]", checkbox_click);
         $overlay.find(".js-switch-anon").click(switch_anon);
 
         tr = $j.children("tbody")[0].firstChild;
+        let trn = 0;
         while (tr) {
             if (hasClass(tr, "gt-boring")) {
                 a.push('<tr class="gt-boring"><td colspan="' + (ri - li + 1) + '"><hr></td></tr>');
             } else {
                 let spos = tr.getAttribute("data-pa-spos"),
-                    t = '<tr class="gt ' + tr.className + ' kfade" data-pa-spos="' + spos;
+                    t = '<tr class="'.concat(tr.className, ' kfade" data-pa-spos="', spos);
                 if (tr.hasAttribute("data-pa-uid")) {
                     t += '" data-pa-uid="' + tr.getAttribute("data-pa-uid");
                 }
+                let mode = 2;
                 if (tr.hasAttribute("data-pa-partner")) {
                     t += '" data-pa-partner="1';
+                    mode |= 1;
+                } else {
+                    ++trn;
                 }
                 t += '"><td></td>';
                 for (let i = li; i !== ri; ++i) {
-                    t += '<td style="height:' + tr.childNodes[i].clientHeight +
-                        'px"' + col[i].td.call(col[i], smap[spos], "").substring(3);
+                    t += col[i].td.call(col[i], smap[spos], trn, mode);
                 }
                 a.push(t + '</tr>');
             }
             tr = tr.nextSibling;
         }
         $overlay.find("tbody").html(a.join(""));
+        $j.find("input[data-range-type=s61]:checked").each(checkbox_click);
         setTimeout(function () {
             $overlay && removeClass($overlay[0], "new");
         }, 0);
@@ -2056,6 +2071,20 @@ function pa_render_pset_table(pconf, data) {
         set_sort_nameflag();
         sort_data();
         resort();
+    }
+    function checkbox_click() {
+        const range = this.getAttribute("data-range-type");
+        if ((range === "s61" && $overlay) || range === "s61o") {
+            const wanto = range === "s61",
+                b0 = this.closest("tbody"),
+                b1 = (wanto ? $overlay : $j)[0].tBodies[0];
+            let r0 = b0.firstChild, r1 = b1.firstChild, rd = this.closest("tr");
+            while (r0 !== rd) {
+                r0 = r0.nextSibling;
+                r1 = r1.nextSibling;
+            }
+            r1.querySelector("[data-range-type=" + (wanto ? "s61o]" : "s61]")).checked = this.checked;
+        }
     }
 
     function grade_update(uid2tr, rv, gorder) {
@@ -2600,7 +2629,7 @@ function pa_render_pset_table(pconf, data) {
                 }
             }
             if (table_hit && !left_hit && !$overlay) {
-                overlay_create();
+                make_overlay();
             } else if (table_hit && left_hit && $overlay) {
                 $overlay.parent().remove();
                 $overlay = null;
@@ -2610,10 +2639,10 @@ function pa_render_pset_table(pconf, data) {
         observer.observe(overlay_div);
         observer.observe($j.parent()[0]);
     }
-    function render_tds(s, rownum) {
+    function render_tds(s, rownum, mode) {
         const a = [];
         for (let i = 0; i !== col.length; ++i) {
-            a.push(col[i].td.call(col[i], s, rownum));
+            a.push(col[i].td.call(col[i], s, rownum, mode));
         }
         return a;
     }
@@ -2686,7 +2715,7 @@ function pa_render_pset_table(pconf, data) {
                 const ss = s.partners[j];
                 ss._spos = smap.length;
                 smap.push(ss);
-                const sstds = render_tds(s.partners[j], "");
+                const sstds = render_tds(s.partners[j], trn, 1);
                 for (let k = 0; k < sstds.length; ++k) {
                     if (sstds[k] === stds[k])
                         sstds[k] = '<td></td>';
@@ -2705,6 +2734,7 @@ function pa_render_pset_table(pconf, data) {
             render_trs(tbody, a);
         }
         slist_input && assign_slist();
+        $j.find("tbody").on("click", "input[type=checkbox]", checkbox_click);
 
         if (tfixed && window.IntersectionObserver) {
             make_overlay_observer();

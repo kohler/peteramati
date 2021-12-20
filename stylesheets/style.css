@@ -2545,6 +2545,12 @@ tr.gt > td, tr.gt > th {
 	white-space: nowrap;
 	height: 1.125rem;
 }
+tr.gtrow-partner {
+	font-size: smaller;
+}
+tr.gtrow-partner > td, tr.gtrow-partner > th {
+	height: 1rem;
+}
 .gtable-container-0 {
 	margin-left: -24px;
 	margin-right: -24px;
@@ -2596,9 +2602,6 @@ tr.gt > td, tr.gt > th {
 }
 tr.gtrow-partner > .gt-username {
 	padding-left: 1em;
-}
-tr.gtrow-partner {
-	font-size: smaller;
 }
 .gt-total, .gt-ngrades {
 	font-weight: bold;
