@@ -389,7 +389,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
                     && ($c = $repo->connected_commit($cpi->hash))) {
                     $cpi->commitat = $c->commitat;
                     $mqe("update CommitNotes set commitat=? where pset=? and bhash=?",
-                         [$cpi->commitat, $cpi->pset, $cpi->bhash]);
+                         $cpi->commitat, $cpi->pset, $cpi->bhash);
                 }
             }
             $mqe(true);

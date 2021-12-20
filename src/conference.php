@@ -243,10 +243,10 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 163) {
+        if ($this->sversion < 164) {
             require_once("updateschema.php");
             $old_nerrors = Dbl::$nerrors;
-            updateSchema($this);
+            (new UpdateSchema($this))->run();
             Dbl::$nerrors = $old_nerrors;
         }
 
@@ -1150,7 +1150,6 @@ class Conf {
     }
 
     function invalidate_caches($caches = null) {
-        global $OK;
         $inserts = array();
         $removes = array();
         $time = time();

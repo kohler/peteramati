@@ -991,10 +991,10 @@ class PsetView {
             $unotes = json_encode_db(json_antiupdate($upi->jnotes(), $updates));
             $unotesa = strlen($unotes) > 32000 ? null : $unotes;
             $unotesb = strlen($unotes) > 32000 ? $unotes : null;
-            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, studentupdateat=?, antiupdate=?, antiupdateOverflow=?",
+            $this->conf->qe("insert into ContactGradeHistory set cid=?, pset=?, notesversion=?, updateat=?, updateby=?, studentupdateat=?, antiupdate=?, antiupdateOverflow=?, antiupdateby=?",
                 $this->user->contactId, $this->pset->id,
                 $upi->notesversion, $upi->updateat ?? 0, $upi->updateby ?? 0,
-                $upi->studentupdateat, $unotesa, $unotesb);
+                $upi->studentupdateat, $unotesa, $unotesb, $this->viewer->contactId);
         }
 
         $upi->assign_notes($notes, $new_notes); // also updates `notesversion`

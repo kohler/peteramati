@@ -606,7 +606,7 @@ class Dbl {
 
     static function make_multi_query_stager($dblink, $flags) {
         $qs = $qvs = [];
-        return function ($q, $qv = []) use ($dblink, $flags, &$qs, &$qvs) {
+        return function ($q, ...$qv) use ($dblink, $flags, &$qs, &$qvs) {
             if ($q && $q !== true) {
                 $qs[] = $q;
                 $qvs = array_merge($qvs, $qv);

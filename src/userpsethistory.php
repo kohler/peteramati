@@ -8,9 +8,13 @@ class UserPsetHistory {
     public $cid;
     /** @var int */
     public $pset;
-    /** @var ?int */
+    /** @var int */
+    public $notesversion;
+    /** @var int */
+    public $antiupdateby;
+    /** @var int */
     public $updateat;
-    /** @var ?int */
+    /** @var int */
     public $updateby;
     /** @var ?int */
     public $studentupdateat;
@@ -20,13 +24,12 @@ class UserPsetHistory {
     private $antiupdateOverflow;
     /** @var ?object */
     private $jantiupdate;
-    /** @var int */
-    public $notesversion;
 
     private function merge() {
         $this->cid = (int) $this->cid;
         $this->pset = (int) $this->pset;
         $this->notesversion = (int) $this->notesversion;
+        $this->antiupdateby = (int) $this->antiupdateby;
         $this->updateat = (int) $this->updateat;
         $this->updateby = (int) $this->updateby;
         $this->studentupdateat = (int) $this->studentupdateat;

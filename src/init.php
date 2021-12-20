@@ -258,10 +258,10 @@ function load_pset_info() {
 
     // update schema as required by psets
     if ($Conf->sversion === 107) {
-        updateSchema($Conf);
+        (new UpdateSchema($Conf))->run();
     }
     if ($Conf->sversion === 138) {
-        updateSchema($Conf);
+        (new UpdateSchema($Conf))->run();
     }
 }
 

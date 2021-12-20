@@ -167,7 +167,7 @@ class UserPsetInfo {
             $this->_history_width = min(($this->_history_width ?? 8) * 2, 128);
             $vx = max($version - $this->_history_width, 0);
             if ($this->_history_student) {
-                $this->load_history($conf, "notesversion>={$vx} and notesversion<{$this->_history_v0} and updateby={$this->cid}");
+                $this->load_history($conf, "notesversion>={$vx} and notesversion<{$this->_history_v0} and antiupdateby={$this->cid}");
             } else {
                 $this->load_history($conf, "notesversion>={$vx} and notesversion<{$this->_history_v0}");
             }
@@ -203,7 +203,7 @@ class UserPsetInfo {
         for ($v1 = $this->notesversion - 1; $v1 >= $version; --$v1) {
             if ($v1 >= $this->_history_v0
                 && ($h = $this->_history[$v1 - $this->_history_v0])
-                && (!$student_only || $h->updateby === $this->cid)) {
+                && (!$student_only || $h->antiupdateby === $this->cid)) {
                 $jnotes = $h->apply_revdelta($jnotes);
                 $vupi->studentupdateat = $h->studentupdateat;
                 if ($vupi->notesversion === $v1 + 1) {

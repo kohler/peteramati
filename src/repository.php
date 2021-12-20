@@ -673,8 +673,7 @@ class Repository {
             while (($rpi = RepositoryPsetInfo::fetch($result))) {
                 $c = $this->connected_commit(bin2hex($rpi->gradebhash));
                 $at = $c ? $c->commitat : 0;
-                $qstager("update RepositoryGrade set commitat=? where repoid=? and branchid=? and pset=? and gradebhash=?",
-                         [$at, $rpi->repoid, $rpi->branchid, $rpi->pset, $rpi->gradebhash]);
+                $qstager("update RepositoryGrade set commitat=? where repoid=? and branchid=? and pset=? and gradebhash=?", $at, $rpi->repoid, $rpi->branchid, $rpi->pset, $rpi->gradebhash);
             }
             Dbl::free($result);
             $qstager("update Repository set infosnapat=greatest(infosnapat,?) where repoid=?",
