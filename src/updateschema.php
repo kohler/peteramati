@@ -286,7 +286,7 @@ class UpdateSchema {
     private function v164_antiupdateby() {
         $mq = Dbl::make_multi_ql_stager($this->conf->dblink);
         $ps = [];
-        $result = $this->conf->ql_ok("select * from ContactGradeHistory");
+        $result = $this->conf->ql_ok("select cid, pset, notesversion, updateby from ContactGradeHistory");
         while (($uph = UserPsetHistory::fetch($result))) {
             $ps[$uph->pset] = true;
             if ($uph->notesversion > 0) {
@@ -294,7 +294,7 @@ class UpdateSchema {
             }
         }
         Dbl::free($result);
-        $result = $this->conf->ql_ok("select * from ContactGrade where pset?a", array_keys($ps));
+        $result = $this->conf->ql_ok("select cid, pset, notesversion, updateby, null as notes, 0 as hidegrade, 0 as hasactiveflags, null as xnotes from ContactGrade where pset?a", array_keys($ps));
         while (($upi = UserPsetInfo::fetch($result))) {
             if ($upi->notesversion > 0) {
                 $mq("update ContactGradeHistory set antiupdateby=? where cid=? and pset=? and notesversion=?", $upi->updateby, $upi->cid, $upi->pset, $upi->notesversion - 1);

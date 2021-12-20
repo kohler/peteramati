@@ -79,11 +79,11 @@ class UserPsetInfo {
     /** @param object $x */
     private function merge($x) {
         assert($this->cid === (int) $x->cid && $this->pset === (int) $x->pset);
+        $this->notesversion = (int) $x->notesversion;
         $this->updateat = isset($x->updateat) ? (int) $x->updateat : null;
         $this->updateby = isset($x->updateby) ? (int) $x->updateby : null;
         $this->studentupdateat = isset($x->studentupdateat) ? (int) $x->studentupdateat : null;
         $this->gradercid = isset($x->gradercid) ? (int) $x->gradercid : null;
-        $this->notesversion = (int) $x->notesversion;
         $this->notes = $x->notesOverflow ?? $x->notes;
         $this->hidegrade = (int) $x->hidegrade;
         $this->hasactiveflags = (int) $x->hasactiveflags;
