@@ -37,7 +37,7 @@ sub run_trace ($@) {
             my($dir) = dirname($0);
             @args = ("/usr/bin/dtruss", "-f", "-l");
         } else {
-            @args = ("/usr/bin/strace", "-e", "trace=file,process",
+            @args = ("/usr/bin/strace", "-e", "trace=%file,%process,fchdir,close,dup,dup2,dup3,fcntl",
                      "-q", "-f", "-o", "/dev/fd/" . fileno(OUT));
         }
         print STDERR join(" ", @args, @_), "\n" if $verbose;
@@ -271,17 +271,21 @@ if (@ARGV) {
     addfile($program, "exec", 0) if $program;
 }
 
-my(%pids, %tidhead, %cwd, $n, $na);
+my(%pids, %tidhead, %cwd, %fdp, $n, $na);
 $n = $na = 0;
 my($cwd) = `pwd`;
 chomp $cwd;
 
-sub resolve ($$) {
-    my($f, $pid) = @_;
-    if ($f !~ m,\A/,) {
-        $f = $cwd{$tidhead{$pid}} . "/" . $f;
-        $f =~ s,//,/,g;
+sub resolve ($$$) {
+    my($f, $pidh, $in) = @_;
+    if ($f !~ m{\A/}) {
+        if (!exists $fdp{$pidh}{$in}) {
+            print STDERR "CONFUSION $pidh $in DOES NOT EXIST ($fn)\n";
+            return "";
+        }
+        $f = $fdp{$pidh}{$in} . "/" . $f;
     }
+    $f =~ s{/(/|\./)+}{/}g;
     $f;
 }
 
@@ -312,25 +316,44 @@ while (defined($_ = <STDIN>)) {
     }
 
     $tidhead{$pid} = $pid if !exists $tidhead{$pid};
-    $cwd{$tidhead{$pid}} = $cwd if !exists $cwd{$tidhead{$pid}};
+    my($pidh) = $tidhead{$pid};
+    $fdp{$pidh} = {"AT_FDCWD" => $cwd} if !exists $fdp{$pidh};
 
     if (/^\d+\s*clone\(.*CLONE_THREAD.*\)\s*=\s*(\d+)/) {
-        $tidhead{$1} = $pid;
-        print STDERR "THREAD $1 <= $pid\n" if $verbose;
+        $tidhead{$1} = $pidh;
+        print STDERR "THREAD $1 <= $pidh\n" if $verbose;
     } elsif (/^\d+\s*vfork\(\)\s*=\s*(\d+)/
              || /^\d+\s*clone\(.*\)\s*=\s*(\d+)/) {
         $tidhead{$1} = $1;
-        $cwd{$1} = $cwd{$tidhead{$pid}};
+        $fdp{$1} = { %{$fdp{$pidh}} };
         print STDERR "FORK $1 <= $pid\n" if $verbose;
+    } elsif (/^\d+\s*close\((\d+).*\)/) {
+        undef $fdp{$pidh}{$1};
+    } elsif (/^\d+\s*open\(\s*"(.*?)\".*\)\s*=\s*([0-9]+|-1 \S+)/s) {
+        my $fn = resolve($1, $pidh, "AT_FDCWD");
+        $fdp{$pidh}{$2} = $fn if substr($2, 0, 1) ne "-";
+        addfile($fn, "open", 0) if $2 ne "-1 ENOENT";
+    } elsif (/^\d+\s*openat\((\d+|AT_FDCWD),\s*"(.*?)".*\)\s*=\s*([0-9]+|-1 \S+)/s) {
+        my $fn = resolve($2, $pidh, $1);
+        $fdp{$pidh}{$3} = $fn if substr($3, 0, 1) ne "-";
+        addfile($fn, "openat", 0) if $3 ne "-1 ENOENT";
     } elsif (/^\d+\s*chdir\("(.*)"\)\s*=\s*0/) {
-        $cwd{$tidhead{$pid}} = resolve($1, $pid);
-        print STDERR "CHDIR ", $tidhead{$pid}, " $cwd{$tidhead{$pid}}\n"
-            if $verbose;
-    } elsif (/^\d*\s*(access|chdir|chmod|exec[a-z]+|getcwd|lstat|open|readlink|stat\d*|statfs|truncate|unlink)\(\s*"(.*?)".*\)\s*=\s*([0-9]|-1 \S+)/s) {
-        addfile(resolve($2, $pid), $1, 0) if $3 ne "-1 ENOENT";
-    } elsif (/^\d*\s*(faccessat|newfstatat|openat|unlinkat|utimensat)\(AT_FDCWD,\s*"(.*?)".*\)\s*=\s*([0-9]|-1 \S+)/s) {
-        addfile(resolve($2, $pid), $1, 0) if $3 ne "-1 ENOENT";
-    } elsif ($verbose && !/^\d*\s*(?:wait4|exit_group|vfork|arch_prctl|mkdir|---|\+\+\+)/) {
+        my $fn = resolve($1, $pidh, "AT_FDCWD");
+        $fdp{$pidh}{"AT_FDCWD"} = $fn;
+        print STDERR "CHDIR $pidh $fn\n" if $verbose;
+    } elsif (/^\d+\s*fchdir\((\d+)\)\s*=\s*0/) {
+        my $fn = resolve("", $pidh, $1);
+        $fdp{$pidh}{"AT_FDCWD"} = $fn;
+        print STDERR "FCHDIR $pidh $fn\n" if $verbose;
+    } elsif (/^\d*\s*(access|chdir|chmod|exec[a-z]+|getcwd|lstat|readlink|rename|rmdir|stat\d*|statfs|truncate|unlink)\(\s*"(.*?)".*\)\s*=\s*([0-9]+|-1 \S+)/s) {
+        addfile(resolve($2, $pidh, "AT_FDCWD"), $1, 0) if $3 ne "-1 ENOENT";
+    } elsif (/^\d*\s*(faccessat|newfstatat|unlinkat|utimensat)\((\d+|AT_FDCWD),\s*"(.*?)".*\)\s*=\s*([0-9]+|-1 \S+)/s) {
+        addfile(resolve($3, $pidh, $2), $1, 0) if $4 ne "-1 ENOENT";
+    } elsif (/^\d+\s*dup[23]?\((\d).*\)\s*=\s*([0-9]+|-1 \S+)/s) {
+        $fdp{$pidh}{$3} = $fdp{$pidh}{$1} if substr($3, 0, 1) ne "-" && exists $fdp{$pidh}{$1};
+    } elsif (/^\d+\s*fcntl\((\d), F_DUPFD.*\)\s*=\s*([0-9]+|-1 \S+)/s) {
+        $fdp{$pidh}{$2} = $fdp{$pidh}{$1} if substr($2, 0, 1) ne "-" && exists $fdp{$pidh}{$1};
+    } elsif ($verbose && !/^\d*\s*(?:wait4|exit_group|vfork|arch_prctl|fcntl|mkdir|utimensat\(.*?,\s*NULL|---|\+\+\+)/) {
         print STDERR "CONFUSION ", $_;
     }
 }
