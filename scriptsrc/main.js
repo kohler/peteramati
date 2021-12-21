@@ -945,11 +945,52 @@ function pa_resolve_gradelist() {
     remove_from(insp, ch);
     sectioned && remove_from(this, insp.nextSibling);
     remove_from(sidebar, sidebare);
+
+    if (this.classList.contains("want-psetinfo-links")) {
+        const bb = document.createElement("div");
+        bb.className = "pa-psetinfo-links btnbox mt-2 mb-2 hidden";
+        this.append(bb);
+        for (const dir of [true, false]) {
+            const sib = psetinfo_sibling(this, dir);
+            if (sib) {
+                psetinfo_sibling_button(bb, dir);
+                psetinfo_sibling_button(sib.querySelector(".pa-psetinfo-links"), !dir);
+            }
+        }
+    }
 }
 
 $(function () {
     $(".need-pa-grade").each(pa_resolve_grade);
     $(".need-pa-gradelist").each(pa_resolve_gradelist);
+});
+
+function psetinfo_sibling(elt, prev) {
+    const sibling = prev ? "previousSibling" : "nextSibling",
+        pi = elt.closest(".pa-psetinfo");
+    let xpi = pi;
+    while (xpi && (xpi === pi || xpi.nodeType !== 1 || !xpi.classList.contains("pa-psetinfo"))) {
+        xpi = xpi[sibling];
+    }
+    return xpi;
+}
+
+function psetinfo_sibling_button(bbox, prev) {
+    if (bbox && !bbox.querySelector(prev ? ".prev" : ".next")) {
+        bbox.classList.remove("hidden");
+        const btn = document.createElement("button");
+        btn.textContent = prev ? "←" : "→";
+        btn.className = "ui pa-psetinfo-link " + (prev ? "prev" : "next");
+        btn.type = "button";
+        bbox[prev ? "prepend" : "append"](btn);
+    }
+}
+
+handle_ui.on("pa-psetinfo-link", function () {
+    const xpi = psetinfo_sibling(this, this.classList.contains("prev"));
+    if (xpi && xpi.id) {
+        location.hash = "#" + xpi.id;
+    }
 });
 
 function pa_render_total(gi, tm) {

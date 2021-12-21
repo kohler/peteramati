@@ -9,7 +9,7 @@ if ($Me->is_empty() || !$Me->isPC) {
     $Me->escape();
 }
 
-class DiffMany {
+class DiffMany_Page {
     /** @var Conf */
     public $conf;
     /** @var Pset */
@@ -127,7 +127,7 @@ class DiffMany {
 
             if (!empty($diff)) {
                 if ($info->can_edit_scores() && !$pset->has_grade_landmark_range) {
-                    PsetView::echo_pa_sidebar_gradelist();
+                    PsetView::echo_pa_sidebar_gradelist(" want-psetinfo-links");
                     $want_grades = true;
                 }
                 foreach ($diff as $file => $dinfo) {
@@ -231,4 +231,4 @@ class DiffMany {
     }
 }
 
-(new DiffMany(ContactView::find_pset_redirect($Qreq->pset, $Me), $Qreq, $Me))->run();
+(new DiffMany_Page(ContactView::find_pset_redirect($Qreq->pset, $Me), $Qreq, $Me))->run();

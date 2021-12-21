@@ -2563,10 +2563,10 @@ class PsetView {
         echo '</div></div></div>'; // pa-notecontent, pa-notebox, pa-dl
     }
 
-    static function echo_pa_sidebar_gradelist() {
+    static function echo_pa_sidebar_gradelist($ec = null) {
         echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
-            '<div class="pa-gradebox pa-ps need-pa-gradelist"></div>',
-            '</div><div class="pa-dg">';
+            '<div class="pa-gradebox pa-ps need-pa-gradelist',
+            $ec ? " $ec" : "", '"></div></div><div class="pa-dg">';
     }
     static function echo_close_pa_sidebar_gradelist() {
         echo '</div></div>';
