@@ -392,7 +392,7 @@ export function run(button, opts) {
                 ibuffer = "";
                 tpos = 0;
             }
-            const boffset = tpos < times.length ? times[tpos + 1] : data.size;
+            let boffset = tpos < times.length ? times[tpos + 1] : data.size;
 
             // flow control: give xterm.js 8MB of data at a time
             const maxdata = 8 << 20;
@@ -423,8 +423,12 @@ export function run(button, opts) {
 
             tlast = npos < times.length ? Math.min(time, times[npos]) : time;
             partial_time = time > tlast ? time : null;
-            append_data(data.data.substring(boffset, eoffset), data,
-                        partial_time ? () => { f(partial_time); } : null);
+            if (partial_time) {
+                const moffset = Math.min(boffset + (4 << 20), eoffset);
+                append_data(data.data.substring(boffset, moffset), data, () => { f(partial_time) });
+                boffset = moffset;
+            }
+            append_data(data.data.substring(boffset, eoffset), data);
             scroll_therun();
             set_time();
 
