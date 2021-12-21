@@ -72,7 +72,7 @@ static bool dryrun = false;
 static bool quiet = false;
 static bool doforce = false;
 static bool no_onlcr = false;
-static int tsize[2] = {80, 25};
+static long tsize[2] = {80, 25};
 static FILE* verbosefile = stdout;
 static int timingfd = -1;
 static std::string linkdir;
@@ -2741,7 +2741,7 @@ static bool range_strtol(long& v, const char* a, const char* b) {
         val = 10 * val + *a - '0';
         ++a;
     }
-    v = neg ? -val : val;
+    v = negative ? -val : val;
     return a == b;
 }
 
@@ -2791,8 +2791,8 @@ int main(int argc, char** argv) {
                 if (strcmp(optarg, "none") == 0) {
                     tsize[0] = tsize[1] = 0;
                 } else if ((ex = strchr(optarg, 'x'))
-                           && range_strtol(optarg, ex, tsize[0])
-                           && range_strtol(ex + 1, optarg + strlen(optarg), tsize[1])
+                           && range_strtol(tsize[0], optarg, ex)
+                           && range_strtol(tsize[1], ex + 1, optarg + strlen(optarg))
                            && tsize[0] > 0
                            && tsize[1] > 0) {
                     /* ok */

@@ -118,11 +118,17 @@ export function run(button, opts) {
         && window.Terminal) {
         removeClass(thepre[0].parentElement, "pa-run-short");
         addClass(thepre[0].parentElement, "pa-run-xterm-js");
-        let cols = therun.hasAttribute("data-pa-columns") && +therun.getAttribute("data-pa-columns"),
-            rows = therun.hasAttribute("data-pa-rows") && +therun.getAttribute("data-pa-rows");
-        (!cols || cols < 0 || cols != cols) && (cols = terminal_char_width(80, 132));
-        (!rows || rows < 0 || rows != rows) && (rows = 25);
-        thexterm = new Terminal({cols: cols, rows: rows});
+        const cols = +therun.getAttribute("data-pa-columns"),
+            rows = +therun.getAttribute("data-pa-rows"),
+            fontsize = +therun.getAttribute("data-pa-font-size"),
+            args = {
+                cols: !cols || cols < 0 || cols != cols ? terminal_char_width(80, 132) : cols,
+                rows: !rows || rows < 0 || rows != rows ? 25 : rows
+            };
+        if (fontsize && fontsize > 0 && fontsize == fontsize) {
+            args.fontSize = fontsize;
+        }
+        thexterm = new Terminal(args);
         thexterm.open(thepre[0]);
         thexterm.attachCustomKeyEventHandler(make_xterm_write_handler(write));
         if (opts.focus) {

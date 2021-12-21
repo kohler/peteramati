@@ -1866,10 +1866,12 @@ class RunnerConfig {
     public $nconcurrent;
     /** @var ?bool */
     public $xterm_js;
-    /** @var ?int */
+    /** @var int */
     public $rows;
-    /** @var ?int */
+    /** @var int */
     public $columns;
+    /** @var int */
+    public $font_size;
     /** @var null|bool|'grades' */
     public $transfer_warnings;
     /** @var ?float */
@@ -1909,8 +1911,9 @@ class RunnerConfig {
         $this->timeout = Pset::cinterval($loc, $rs, "timeout", "run_timeout");
         $this->idle_timeout = Pset::cinterval($loc, $rs, "idle_timeout");
         $this->xterm_js = Pset::cbool($loc, $rs, "xterm_js");
-        $this->rows = Pset::cint($loc, $rs, "rows");
-        $this->columns = Pset::cint($loc, $rs, "columns");
+        $this->rows = Pset::cint($loc, $rs, "rows") ?? 0;
+        $this->columns = Pset::cint($loc, $rs, "columns") ?? 0;
+        $this->font_size = Pset::cint($loc, $rs, "font_size") ?? 0;
         if (isset($r->transfer_warnings)
             ? $r->transfer_warnings === "grades"
             : $defr && isset($defr->transfer_warnings) && $defr->transfer_warnings === "grades") {
