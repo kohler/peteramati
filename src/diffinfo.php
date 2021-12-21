@@ -65,6 +65,10 @@ class DiffInfo implements Iterator {
 
     const LINE_NONL = 1;
 
+    static public $extension_position = [
+        ".hh" => -1, ".h" => -1, ".H" => -1, ".hpp" => -1
+    ];
+
     /** @param string $filename */
     function __construct($filename, DiffConfig $diffconfig = null) {
         $this->filename = $filename;
@@ -464,7 +468,24 @@ class DiffInfo implements Iterator {
         if ($a->position != $b->position) {
             return $a->position < $b->position ? -1 : 1;
         } else {
-            return strcmp($a->filename, $b->filename);
+            $adot = strrpos($a->filename, ".");
+            $adot = $adot === false ? strlen($a->filename) : $adot;
+            $bdot = strrpos($b->filename, ".");
+            $bdot = $bdot === false ? strlen($b->filename) : $bdot;
+            if ($adot === $bdot
+                && substr_compare($a->filename, $b->filename, 0, $adot) === 0) {
+                $aext = substr($a->filename, $adot);
+                $apos = self::$extension_position[$aext] ?? 0;
+                $bext = substr($b->filename, $bdot);
+                $bpos = self::$extension_position[$bext] ?? 0;
+                if ($apos != $bpos) {
+                    return $apos < $bpos ? -1 : 1;
+                } else {
+                    return strcmp($aext, $bext);
+                }
+            } else {
+                return strcmp($a->filename, $b->filename);
+            }
         }
     }
 
