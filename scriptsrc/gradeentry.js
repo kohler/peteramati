@@ -580,7 +580,7 @@ export class GradeSheet {
     }
 
     get grade_maxtotal() {
-        if (this.maxtotal === null) {
+        if (this.maxtotal == null) {
             let maxtotal = 0;
             for (let i = 0; i !== this.value_order.length; ++i) {
                 const ge = this.entries[this.value_order[i]];
