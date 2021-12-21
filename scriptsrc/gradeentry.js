@@ -437,6 +437,7 @@ export class GradeSheet {
     }
 
     extend(x, replace_order) {
+        const old_value_order = this.value_order;
         let need_gpos = false;
         if (x.entries) {
             for (let i in x.entries) {
@@ -465,7 +466,9 @@ export class GradeSheet {
                 this.gpos[this.value_order[i]] = i;
                 ++this.gversion[i];
             }
-            this.grades = this.autogrades = this.maxtotal = null;
+            if (old_value_order) {
+                this.grades = this.autogrades = this.maxtotal = null;
+            }
         }
         if (x.grades) {
             this.grades = this.merge_grades(this.grades, x.grades, x);
