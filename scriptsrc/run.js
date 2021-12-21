@@ -8,6 +8,55 @@ import { event_key, event_modkey } from "./ui-key.js";
 import { render_terminal } from "./render-terminal.js";
 import { grades_fetch } from "./grade-ui.js";
 
+function make_xterm_write_handler(write) {
+    return function (event) {
+        if (event.type === "keydown") {
+            let key = event_key(event), mod = event_modkey(event);
+            if (key.length === 1) {
+                if ((mod & 0xE) === 0 && event_key.printable(event)) {
+                    // keep `key`
+                } else if ((mod & 0xE) === event_modkey.CTRL
+                           && key >= "a"
+                           && key <= "z") {
+                    key = String.fromCharCode(key.charCodeAt(0) - 96);
+                } else if ((mod & 0xE) === event_modkey.META
+                           && key == "v") {
+                    navigator.clipboard.readText().then(tx => write(tx));
+                    event.preventDefault();
+                    return;
+                } else {
+                    key = "";
+                }
+            } else {
+                if (key === "Enter" && !mod) {
+                    key = "\r";
+                } else if (key === "Escape" && !mod) {
+                    key = "\x1B";
+                } else if (key === "Backspace" && !mod) {
+                    key = "\x7F";
+                } else if (key === "Tab" && !mod) {
+                    key = "\x09";
+                } else if (key === "ArrowUp" && !mod) {
+                    key = "\x1B[A";
+                } else if (key === "ArrowDown" && !mod) {
+                    key = "\x1B[B";
+                } else if (key === "ArrowRight" && !mod) {
+                    key = "\x1B[C";
+                } else if (key === "ArrowLeft" && !mod) {
+                    key = "\x1B[D";
+                } else {
+                    key = "";
+                }
+            }
+            if (key !== "") {
+                write(key);
+                event.preventDefault();
+            }
+        }
+        return false;
+    };
+}
+
 export function run(button, opts) {
     const $f = $(button).closest("form"),
         category = button.getAttribute("data-pa-run-category") || button.value,
@@ -69,54 +118,13 @@ export function run(button, opts) {
         && window.Terminal) {
         removeClass(thepre[0].parentElement, "pa-run-short");
         addClass(thepre[0].parentElement, "pa-run-xterm-js");
-        thexterm = new Terminal({cols: terminal_char_width(80, 132), rows: 25});
+        let cols = therun.hasAttribute("data-pa-columns") && +therun.getAttribute("data-pa-columns"),
+            rows = therun.hasAttribute("data-pa-rows") && +therun.getAttribute("data-pa-rows");
+        (!cols || cols < 0 || cols != cols) && (cols = terminal_char_width(80, 132));
+        (!rows || rows < 0 || rows != rows) && (rows = 25);
+        thexterm = new Terminal({cols: cols, rows: rows});
         thexterm.open(thepre[0]);
-        thexterm.attachCustomKeyEventHandler(function (event) {
-            if (event.type === "keydown") {
-                let key = event_key(event), mod = event_modkey(event);
-                if (key.length === 1) {
-                    if ((mod & 0xE) === 0 && event_key.printable(event)) {
-                        // keep `key`
-                    } else if ((mod & 0xE) === event_modkey.CTRL
-                               && key >= "a"
-                               && key <= "z") {
-                        key = String.fromCharCode(key.charCodeAt(0) - 96);
-                    } else if ((mod & 0xE) === event_modkey.META
-                               && key == "v") {
-                        navigator.clipboard.readText().then(tx => write(tx));
-                        event.preventDefault();
-                        return;
-                    } else {
-                        key = "";
-                    }
-                } else {
-                    if (key === "Enter" && !mod) {
-                        key = "\r";
-                    } else if (key === "Escape" && !mod) {
-                        key = "\x1B";
-                    } else if (key === "Backspace" && !mod) {
-                        key = "\x7F";
-                    } else if (key === "Tab" && !mod) {
-                        key = "\x09";
-                    } else if (key === "ArrowUp" && !mod) {
-                        key = "\x1B[A";
-                    } else if (key === "ArrowDown" && !mod) {
-                        key = "\x1B[B";
-                    } else if (key === "ArrowRight" && !mod) {
-                        key = "\x1B[C";
-                    } else if (key === "ArrowLeft" && !mod) {
-                        key = "\x1B[D";
-                    } else {
-                        key = "";
-                    }
-                }
-                if (key !== "") {
-                    write(key);
-                    event.preventDefault();
-                }
-            }
-            return false;
-        });
+        thexterm.attachCustomKeyEventHandler(make_xterm_write_handler(write));
         if (opts.focus) {
             thexterm.focus();
         }

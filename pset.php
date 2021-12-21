@@ -803,6 +803,12 @@ class PsetRequest {
             || ($runner->xterm_js === null && $info->pset->run_xterm_js)) {
             echo ' data-pa-xterm-js="true"';
         }
+        if (($runner->rows ?? 0) > 0) {
+            echo ' data-pa-rows="', $runner->rows, '"';
+        }
+        if (($runner->columns ?? 0) > 0) {
+            echo ' data-pa-columns="', $runner->columns, '"';
+        }
         if ($rr && isset($rr->timestamp)) {
             echo ' data-pa-timestamp="', $rr->timestamp, '"';
         }

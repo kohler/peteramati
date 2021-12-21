@@ -671,6 +671,11 @@ class QueueItem {
         if (($to = $runner->idle_timeout ?? $pset->run_idle_timeout) > 0) {
             $command .= " -I{$to}";
         }
+        if (($runner->rows ?? 0) > 0 || ($runner->columns ?? 0) > 0) {
+            $rows = ($runner->rows ?? 0) > 0 ? $runner->rows : 25;
+            $cols = ($runner->columns ?? 0) > 0 ? $runner->columns : 80;
+            $command .= " --size={$cols}x{$rows}";
+        }
         if ($inputfifo) {
             $command .= " -i" . escapeshellarg($inputfifo);
         }

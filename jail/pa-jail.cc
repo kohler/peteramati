@@ -72,6 +72,7 @@ static bool dryrun = false;
 static bool quiet = false;
 static bool doforce = false;
 static bool no_onlcr = false;
+static int tsize[2] = {80, 25};
 static FILE* verbosefile = stdout;
 static int timingfd = -1;
 static std::string linkdir;
@@ -2244,11 +2245,11 @@ int jailownerinfo::exec_go() {
 #endif
             tcsetpgrp(ptyslave, child);
 #ifdef TIOCGWINSZ
-            {
+            if (tsize[0] > 0) {
                 struct winsize ws;
                 ioctl(ptyslave, TIOCGWINSZ, &ws);
-                ws.ws_row = 25;
-                ws.ws_col = 80;
+                ws.ws_row = tsize[1];
+                ws.ws_col = tsize[0];
                 ioctl(ptyslave, TIOCSWINSZ, &ws);
             }
 #endif
@@ -2662,6 +2663,7 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
       --no-onlcr            don't translate \\n -> \\r\\n in output\n\
   -T, --timeout TIMEOUT     kill the jail after TIMEOUT seconds\n\
   -I, --idle-timeout TIMEOUT  kill the jail after TIMEOUT idle seconds\n\
+      --size WxH            set terminal size [80x25]\n\
       --fg                  run in the foreground\n");
         }
         fprintf(stderr, "  -n, --dry-run             print actions, don't run them\n\
@@ -2679,6 +2681,7 @@ static struct option longoptions_before[] = {
 
 #define ARG_ONLCR    1000
 #define ARG_NO_ONLCR 1001
+#define ARG_SIZE     1002
 static struct option longoptions_run[] = {
     { "verbose", no_argument, nullptr, 'V' },
     { "dry-run", no_argument, nullptr, 'n' },
@@ -2699,6 +2702,7 @@ static struct option longoptions_run[] = {
     { "onlcr", no_argument, nullptr, ARG_ONLCR },
     { "no-onlcr", no_argument, nullptr, ARG_NO_ONLCR },
     { "timing-file", required_argument, nullptr, 't' },
+    { "size", required_argument, nullptr, ARG_SIZE },
     { nullptr, 0, nullptr, 0 }
 };
 
@@ -2717,6 +2721,30 @@ static const char* shortoptions_action[] = {
     "+Vn", "VnS:f:F:p:P:T:I:qi:hu:t:", "VnS:f:F:p:P:T:I:qi:hu:t:", "Vnf", "Vn"
 };
 
+static bool opt_strtod(double& v) {
+    char* end;
+    v = strtod(optarg, &end);
+    return end != optarg && *end == '\0';
+}
+
+static bool range_strtol(long& v, const char* a, const char* b) {
+    bool negative = false;
+    if (a != b && (*a == '-' || *a == '+')) {
+        negative = *a == '-';
+        ++a;
+    }
+    if (a == b || *a < '0' || *a > '9') {
+        return false;
+    }
+    unsigned long val = 0;
+    while (a != b && *a >= '0' && *a <= '9') {
+        val = 10 * val + *a - '0';
+        ++a;
+    }
+    v = neg ? -val : val;
+    return a == b;
+}
+
 int main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
@@ -2727,7 +2755,7 @@ int main(int argc, char** argv) {
     pidcontents = "$$\n";
 
     int ch;
-    while (1) {
+    while (true) {
         while ((ch = getopt_long(argc, argv, shortoptions_action[(int) action],
                                  longoptions_action[(int) action], nullptr)) != -1) {
             if (ch == 'V') {
@@ -2758,6 +2786,19 @@ int main(int argc, char** argv) {
                 no_onlcr = false;
             } else if (ch == ARG_NO_ONLCR) {
                 no_onlcr = true;
+            } else if (ch == ARG_SIZE) {
+                const char* ex;
+                if (strcmp(optarg, "none") == 0) {
+                    tsize[0] = tsize[1] = 0;
+                } else if ((ex = strchr(optarg, 'x'))
+                           && range_strtol(optarg, ex, tsize[0])
+                           && range_strtol(ex + 1, optarg + strlen(optarg), tsize[1])
+                           && tsize[0] > 0
+                           && tsize[1] > 0) {
+                    /* ok */
+                } else {
+                    usage();
+                }
             } else if (ch == 'g') {
                 foreground = true;
             } else if (ch == 'h') {
@@ -2767,9 +2808,7 @@ int main(int argc, char** argv) {
             } else if (ch == 'u') {
                 chown_user_args.push_back(optarg);
             } else if (ch == 'T') {
-                char* end;
-                timeout = strtod(optarg, &end);
-                if (end == optarg || *end != 0) {
+                if (!opt_strtod(timeout)) {
                     usage();
                 }
             } else if (ch == 'I') {
