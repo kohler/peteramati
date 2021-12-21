@@ -768,7 +768,7 @@ class PsetRequest {
             ContactView::echo_group("", join("", $runnerbuttons));
             echo "</div></form>\n";
             if ($viewer->isPC && $viewer != $user) {
-                echo Ht::form($this->info->hoturl("=pset", array("saverunsettings" => 1, "ajax" => 1))),
+                echo Ht::form($this->info->hoturl("=pset", ["saverunsettings" => 1, "ajax" => 1])),
                     '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
                 // XXX always using grading commit's settings?
                 if (($runsettings = $this->info->commit_jnote("runsettings"))) {

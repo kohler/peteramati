@@ -843,7 +843,9 @@ class QueueItem {
             $rr = $runlog->job_response($this->runat, $offset);
         }
 
-        if ($rr->done) {
+        if ($rr->partial) {
+            $rr->status = "partial";
+        } else if ($rr->done) {
             $rr->status = "done";
         } else if (Conf::$now - $this->runat <= 600) {
             $rr->status = "working";

@@ -188,11 +188,12 @@ export function run(button, opts) {
         opts.done_function && opts.done_function();
     }
 
-    function append(str) {
+    function append(str, done) {
         if (thexterm) {
-            thexterm.write(str);
+            thexterm.write(str, done);
         } else {
             render_terminal(thepre[0], str, {cursor: true, directory: directory});
+            done && Promise.resolve(true).then(done);
         }
     }
 
@@ -209,7 +210,7 @@ export function run(button, opts) {
         }
     }
 
-    function append_data(str, data) {
+    function append_data(str, data, done) {
         if (ibuffer !== null) { // haven't started generating output
             ibuffer += str;
             var pos = ibuffer.indexOf("\n\n");
@@ -243,7 +244,7 @@ export function run(button, opts) {
             }
         }
         if (str !== "") {
-            append(str);
+            append(str, done);
         }
     }
 
@@ -265,16 +266,32 @@ export function run(button, opts) {
     }
 
     function append_timed(data, at_end) {
-        var erange, etime, ebutton, espeed,
-            tpos, tstart, tlast, timeout, running, factor;
+        let erange, etime, ebutton, espeed,
+            tpos, tstart, tlast, timeout, running, factor,
+            partial_outstanding = 0, partial_time;
         if (times) {
             return;
+        } else if (data.offset !== 0) {
+            throw new Error("fuck");
         }
+
+        {
+            const runspeed = wstorage.site_json(false, "pa-runspeed-" + category);
+            factor = data.time_factor;
+            if (runspeed && runspeed[1] >= (new Date).getTime() - 86400000) {
+                factor = runspeed[0];
+            } else if (runspeed) {
+                wstorage.site_json(false, "pa-runspeed-" + category, null);
+            }
+            if (factor < 0.1 || factor > 10) {
+                factor = 1;
+            }
+        }
+
         times = data.time_data;
         if (typeof times === "string") {
             times = parse_times(times);
         }
-        factor = data.time_factor;
         if (times.length > 2) {
             erange = $('<div class="pa-runrange"><button type="button" class="pa-runrange-play"></button><input type="range" class="pa-runrange-range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span><span class="pa-runrange-speed-slow" title="Slow">🐢</span><input type="range" class="pa-runrange-speed" min="0.1" max="10" step="0.1"><span class="pa-runrange-speed-fast" title="Fast">🐇</span></div>').prependTo(therun);
             etime = erange[0].lastChild;
@@ -308,18 +325,15 @@ export function run(button, opts) {
                     f(null);
                 }
             }, false);
-        }
-        if ((tpos = wstorage.site_json(false, "pa-runspeed-" + category))
-            && tpos[1] >= (new Date).getTime() - 86400000) {
-            factor = tpos[0];
-        }
-        if (factor < 0.1 || factor > 10) {
-            factor = 1;
-        }
-        if (espeed) {
             espeed.value = factor;
         }
-        data = {data: data.data, timestamp: data.timestamp};
+
+        data = {
+            data: data.data,
+            end_offset: data.end_offset,
+            size: data.size || data.end_offset,
+            timestamp: data.timestamp
+        };
 
         function set_time() {
             if (erange) {
@@ -328,40 +342,89 @@ export function run(button, opts) {
             }
         }
 
+        function load_more() {
+            if (!partial_outstanding) {
+                partial_outstanding = true;
+                send({offset: data.end_offset}, function (xdata) {
+                    if (xdata.ok && xdata.offset === data.end_offset) {
+                        data.data += xdata.data;
+                        data.end_offset = xdata.end_offset;
+                    } else if (!xdata.ok) {
+                        data.size = data.end_offset;
+                    }
+                    partial_outstanding = false;
+                    partial_time && f(partial_time);
+                });
+            }
+        }
+
         function f(time) {
             if (time === null) {
-                if (running)
+                if (running) {
                     time = ((new Date).getTime() - tstart) * factor;
-                else
+                } else {
                     return;
+                }
             }
-            var npos = tpos;
-            if (npos >= times.length || time < times[npos])
+
+            // find `npos`: the new time position
+            let npos = tpos;
+            if (npos >= times.length || time < times[npos]) {
                 npos = 0;
+            }
             if (npos + 2 < times.length && time >= times[npos]) {
-                var rpos = times.length;
+                let rpos = times.length;
                 while (npos < rpos) {
-                    var m = npos + (((rpos - npos) >> 1) & ~1);
-                    if (time <= times[m])
+                    const m = npos + (((rpos - npos) >> 1) & ~1);
+                    if (time <= times[m]) {
                         rpos = m;
-                    else
+                    } else {
                         npos = m + 2;
+                    }
                 }
             }
             while (npos < times.length && time >= times[npos]) {
                 npos += 2;
             }
-            tlast = time;
 
+            // find `tpos`, the first time position, and `boffset`, data position
             if (npos < tpos) {
                 ibuffer = "";
                 tpos = 0;
             }
+            const boffset = tpos < times.length ? times[tpos + 1] : data.size;
 
-            var str = data.data;
-            append_data(str.substring(tpos < times.length ? times[tpos + 1] : str.length,
-                                      npos < times.length ? times[npos + 1] : str.length),
-                        data);
+            // flow control: give xterm.js 8MB of data at a time
+            const maxdata = 8 << 20;
+            let eoffset = npos < times.length ? times[npos + 1] : data.size;
+            if (boffset + maxdata < eoffset) {
+                let lpos = tpos;
+                while (lpos < npos) {
+                    const m = lpos + (((npos - lpos) >> 1) & ~1);
+                    if (boffset + maxdata < times[m + 1]) {
+                        npos = m;
+                        eoffset = times[m + 1];
+                    } else {
+                        lpos = m + 2;
+                    }
+                }
+            }
+
+            // maybe load more data
+            if (data.end_offset < data.size) {
+                if (eoffset > data.end_offset) {
+                    partial_time = time;
+                    load_more();
+                    return;
+                } else if (eoffset > data.end_offset - (1 << 20)) {
+                    load_more();
+                }
+            }
+
+            tlast = npos < times.length ? Math.min(time, times[npos]) : time;
+            partial_time = time > tlast ? time : null;
+            append_data(data.data.substring(boffset, eoffset), data,
+                        partial_time ? () => { f(partial_time); } : null);
             scroll_therun();
             set_time();
 
@@ -369,12 +432,11 @@ export function run(button, opts) {
             if (timeout) {
                 timeout = clearTimeout(timeout);
             }
-            if (running) {
+            if (running && !partial_time) {
                 if (tpos < times.length) {
                     timeout = setTimeout(f, Math.min(100, (times[tpos] - (tpos ? times[tpos - 2] : 0)) / factor), null);
                 } else {
-                    if (ebutton)
-                        addClass(ebutton, "paused");
+                    ebutton && addClass(ebutton, "paused");
                     hide_cursor();
                 }
             }
@@ -477,6 +539,7 @@ export function run(button, opts) {
         }
         // Stay on alternate screen when done (rather than clearing it)
         if (data.data
+            && !data.partial
             && data.done
             && (x = data.data.match(/\x1b\[\?1049l(?:[\r\n]|\x1b\[\?1l|\x1b>)*$/))) {
             data.data = data.data.substring(0, data.data.length - x[0].length);
@@ -510,7 +573,7 @@ export function run(button, opts) {
         scroll_therun();
         if (data.status == "old") {
             setTimeout(send, 2000);
-        } else if (!data.done) {
+        } else if (!data.done || data.partial) {
             setTimeout(send, backoff);
         } else {
             done();
@@ -554,6 +617,7 @@ export function run(button, opts) {
         queueid && (a.queueid = queueid);
         Object.assign(a, send_args);
         delete send_args.write;
+        delete send_args.stop;
         ++send_out;
 
         jQuery.ajax($f.attr("action"), {

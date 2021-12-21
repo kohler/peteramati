@@ -30,14 +30,18 @@ class RunResponse implements JsonSerializable {
     public $host;
     /** @var ?bool */
     public $done;
-    /** @var null|'done'|'working'|'old' */
+    /** @var ?bool */
+    public $partial;
+    /** @var null|'done'|'partial'|'working'|'old' */
     public $status;
-    /** @var ?string */
-    public $data;
     /** @var ?int */
     public $offset;
     /** @var ?int */
     public $end_offset;
+    /** @var ?int */
+    public $size;
+    /** @var ?string */
+    public $data;
     /** @var ?bool */
     public $timed;
     /** @var ?string */

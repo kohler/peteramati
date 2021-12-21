@@ -11,6 +11,10 @@ class RunLogger {
     /** @var null|int|false */
     private $_active_job;
 
+    const FIRSTLINESZ = 8192;
+    const FIRSTMAXREADSZ = 1 << 20;
+    const MAXREADSZ = 2 << 20;
+
     function __construct(Pset $pset, Repository $repo) {
         $this->pset = $pset;
         $this->repo = $repo;
@@ -151,11 +155,12 @@ class RunLogger {
     function job_response($jobid, $offset = null) {
         $logbase = $this->job_prefix($jobid);
         $logfile = "{$logbase}.log";
-        if (($shortread = $offset === null || $offset > 32768)) {
-            $s = @file_get_contents($logfile, false, null, 0, 8192);
+        if ($offset === null || $offset > 32768) {
+            $readsz = self::FIRSTLINESZ;
         } else {
-            $s = @file_get_contents($logfile, false, null, 0);
+            $readsz = self::FIRSTMAXREADSZ;
         }
+        $s = @file_get_contents($logfile, false, null, 0, $readsz);
 
         if ($s === false
             || !str_starts_with($s, "++ {")
@@ -176,13 +181,19 @@ class RunLogger {
         $rr->done = $this->active_job() !== $jobid;
 
         if ($offset !== null) {
-            if ($shortread) {
-                $s = @file_get_contents($logfile, false, null, max($offset, 0));
-            } else {
+            if (strlen($s) < $readsz || $offset <= 0) {
+                $sshort = strlen($s) === $readsz;
                 $s = substr($s, max($offset, 0));
+            } else {
+                $s = @file_get_contents($logfile, false, null, $offset, self::MAXREADSZ);
+                $sshort = $s !== false && strlen($s) === self::MAXREADSZ;
             }
             if ($s === false) {
                 $s = "";
+            }
+            if ($sshort) {
+                $rr->partial = true;
+                $rr->size = filesize($logfile);
             }
 
             // Fix up $data if it is not valid UTF-8.
@@ -193,9 +204,9 @@ class RunLogger {
                 }
             }
 
-            $rr->data = $s;
             $rr->offset = max($offset, 0);
             $rr->end_offset = $rr->offset + strlen($s);
+            $rr->data = $s;
 
             // Get time data, if it exists
             $runner = $this->pset->all_runners[$rr->runner];
