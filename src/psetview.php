@@ -1995,7 +1995,8 @@ class PsetView {
         $gexp->grades = [];
         $gexp->autogrades = $this->_ag !== null ? [] : null;
         foreach ($gexp->value_entries() as $ge) {
-            $gexp->grades[] = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
+            $gv = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
+            $gexp->grades[] = $gv !== false ? $gv : null;
             if ($this->_ag !== null) {
                 $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
             }
