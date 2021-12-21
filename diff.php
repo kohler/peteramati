@@ -82,13 +82,11 @@ if ($Info->user->extension) {
 echo '">';
 
 echo "<table class=\"mb-4\"><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height:110%\">",
-    "<div class=\"pa-dl pa-gdsamp\" style=\"padding:2px 5px\"><big><a class=\"q\" href=\"",
-    $Info->hoturl("pset", ["commit" => $commita->hash]),
-    "\"><code>", substr($commita->hash, 0, 7), "</code> ", htmlspecialchars($commita->subject), "</a></big></div>",
-    "<div class=\"pa-dl pa-gisamp\" style=\"padding:2px 5px\"><big><a class=\"q\" href=\"",
-    $Info->hoturl("pset", ["commit" => $commitb->hash]),
-    "\"><code>", substr($commitb->hash, 0, 7), "</code> ", htmlspecialchars($commitb->subject), "</a></big></div>",
-    "</td></tr></table>";
+    "<div class=\"pa-dl pa-gdsamp\" style=\"padding:2px 5px\"><big>",
+    $Info->commit_link(substr($commita->hash, 0, 7), " " . htmlspecialchars($commita->subject), $commita->hash),
+    "</big></div><div class=\"pa-dl pa-gisamp\" style=\"padding:2px 5px\"><big>",
+    $Info->commit_link(substr($commitb->hash, 0, 7), " " . htmlspecialchars($commitb->subject), $commitb->hash),
+    "</big></div></td></tr></table>";
 
 // collect diff and sort line notes
 $lnorder = $Pset->is_handout($commitb) ? $Info->empty_line_notes() : $Info->visible_line_notes();

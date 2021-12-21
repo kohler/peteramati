@@ -155,31 +155,31 @@ td.spanner {
 
 
 /* generic horizontal styles */
-.btn-link {
+.btn-link, .link {
 	text-decoration: underline;
 }
 .btn-qlink, .btn-ulink {
 	color: inherit;
 }
-:link, :visited,
-.btn-link, .btn-xlink {
+:link, :visited, .link, .btn-link, .btn-xlink {
 	color: #004daa;
 }
-.track:visited {
+.track:visited, .xtrack:visited .link {
 	color: #660099;
 }
-a:hover,
+a:hover, a.track:hover, a:hover .link, a.xtrack:hover .link,
 .btn-link:hover, .btn-qlink:hover, .btn-xlink:hover {
 	color: #c45500;
 }
-a.q, a.u, a.btn {
+a.q, a.qx, a.u, a.btn {
 	color: inherit;
 }
-a:active, .u:active,
-.btn-link:active, .btn-ulink:active, .btn-qlink:active, .btn-xlink:active {
+a:active, a.track:active, a:active .link, a.xtrack:active .link,
+.btn-link:active, .btn-ulink:active, .btn-qlink:active, .btn-xlink:active,
+.u:active {
 	color: red;
 }
-a.q, a.x, a.btn,
+a.q, a.qx, a.x, a.btn,
 .btn-xlink,
 div.papmodex > a, div.leftmenu_item > a,
 a.pnum, a.ptitle, a.maillink, u.x, .noul {

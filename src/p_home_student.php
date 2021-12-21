@@ -60,9 +60,9 @@ class Home_Student_Page {
             });
             echo '<div class="pa-p"><div class="pa-pt">flags</div><div class="pa-pv"><table><tbody>';
             foreach ($flags as $ftr) {
-                echo '<tr><td class="pr-3"><a href="',
-                    $info->hoturl("pset", ["commit" => $ftr->hash()]),
-                    '">', substr($ftr->hash(), 0, 7), '</a></td>';
+                echo '<tr><td class="pr-3">',
+                    $info->commit_link(substr($ftr->hash(), 0, 7), "", $ftr->hash()),
+                    '</td>';
                 $start = $ftr->flag->started ?? 0;
                 $resolved = $ftr->flag->resolved ?? [0];
                 echo '<td class="pr-3">', $start ? date("j M H:i", $start) : '',

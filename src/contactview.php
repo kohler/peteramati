@@ -647,15 +647,15 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
             if (($ghash = $info->grading_hash())) {
                 $title = "grading commit";
                 if (($c = $info->grading_commit())) {
-                    $value = substr($ghash, 0, 7) . " " . htmlspecialchars($c->subject);
+                    $value = $info->commit_link(substr($ghash, 0, 7), htmlspecialchars(" {$c->subject}"), $ghash);
                     $xnotes[] = "committed " . ago($c->commitat);
                 } else {
-                    $value = substr($ghash, 0, 7) . " (disconnected commit)";
+                    $value = "<code>" . substr($ghash, 0, 7) . "</code> (disconnected commit)";
                 }
                 $want_latest = !$info->is_lateish_commit();
             } else if (($c = $info->latest_nontrivial_commit())) {
                 $title = "latest commit";
-                $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);
+                $value = $info->commit_link(substr($c->hash, 0, 7), htmlspecialchars(" {$c->subject}"), $c->hash);
                 $xnotes[] = "committed " . ago($c->commitat);
             } else {
                 $title = "latest commit";
@@ -682,7 +682,7 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
         self::echo_group($title, $value, $notes);
 
         if ($want_latest && ($c = $info->latest_nontrivial_commit())) {
-            $value = substr($c->hash, 0, 7) . " " . htmlspecialchars($c->subject);
+            $value = $info->commit_link(substr($c->hash, 0, 7), " " . htmlspecialchars($c->subject), $c->hash);
             self::echo_group("latest commit", $value, ["committed " . ago($c->commitat)]);
         }
 

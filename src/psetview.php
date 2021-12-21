@@ -1906,12 +1906,17 @@ class PsetView {
         return $this->conf->hoturl($base, $this->hoturl_args($args));
     }
 
-    /** @param string $base
-     * @param ?array<string,null|int|string> $args
-     * @return string
-     * @deprecated */
-    function hoturl_post($base, $args = null) {
-        return $this->conf->hoturl_post($base, $this->hoturl_args($args));
+    /** @param string $commit_html
+     * @param string $rest_html
+     * @param string $hash
+     * @return string */
+    function commit_link($commit_html, $rest_html, $hash) {
+        $url = $this->hoturl("pset", ["commit" => $hash]);
+        if ($rest_html) {
+            return "<a href=\"{$url}\" class=\"qx xtrack\"><code class=\"link\">{$commit_html}</code>{$rest_html}</a>";
+        } else {
+            return "<a href=\"{$url}\" class=\"track\"><code>{$commit_html}</code></a>";
+        }
     }
 
 
