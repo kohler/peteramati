@@ -146,7 +146,7 @@ class Home_TA_Page {
                     $partners[] = $c;
                 }
             }
-            usort($partners, "Contact::compare");
+            usort($partners, $this->conf->user_comparator());
 
             $j = $this->flag_row_json($pset, $partners[0], $row, $anon);
             for ($i = 1; $i < count($partners); ++$i) {

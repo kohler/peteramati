@@ -43,8 +43,13 @@ class Contact {
     public $nicknameAmbiguous;
     public $email = "";
     public $preferredEmail = "";
-    public $sorter = "";
+    /** @var string */
+    private $_sorter;
+    /** @var ?int */
+    private $_sortspec;
+    /** @var ?int */
     public $sort_position;
+
 
     public $affiliation = "";
 
@@ -175,7 +180,6 @@ class Contact {
                     $this->collaborators .= "$c\n";
             }
         }
-        self::set_sorter($this, $this->conf);
         if (isset($user->password)) {
             $this->password = (string) $user->password;
         }
@@ -235,7 +239,6 @@ class Contact {
         if ($this->unaccentedName === "") {
             $this->unaccentedName = Text::unaccented_name($this->firstName, $this->lastName);
         }
-        self::set_sorter($this, $this->conf);
         $this->password = (string) $this->password;
         if (isset($this->disabled)) {
             $this->disabled = !!$this->disabled;
@@ -293,38 +296,139 @@ class Contact {
             } else {
                 $this->username = $this->github_username;
             }
-            self::set_sorter($this, $this->conf);
+            $this->_sortspec = null;
         }
     }
 
-    static function set_sorter($c, Conf $conf) {
-        $sort_by_last = true;
-        if ($c->is_anonymous) {
-            $c->sorter = $c->anon_username;
-            return;
-        } else if (isset($c->unaccentedName) && $sort_by_last) {
-            $c->sorter = trim("$c->unaccentedName $c->email");
-            return;
+
+
+    // A sort specification is an integer divided into units of 3 bits.
+    // A unit of 1 === first, 2 === last, 3 === email, 4 === username.
+    // Least significant bits === most important sort.
+
+    /** @param string|?list<string> $args
+     * @return int */
+    static function parse_sortspec(Conf $conf, $args) {
+        $r = $seen = $shift = 0;
+        if (is_string($args)) {
+            $args = preg_split('/\s+/', $args);
         }
-        list($first, $middle) = Text::split_first_middle($c->firstName);
-        if ($sort_by_last) {
-            if (($m = Text::analyze_von($c->lastName))) {
-                $c->sorter = "$m[1] $first $m[0]";
-            } else {
-                $c->sorter = "$c->lastName $first";
+        while (!empty($args)) {
+            $w = array_shift($args);
+            if ($w === "name") {
+                array_unshift($args, $conf->sort_by_last ? "first" : "last");
+                $w = $conf->sort_by_last ? "last" : "first";
             }
-        } else {
-            $c->sorter = "$first $c->lastName";
+            if ($w === "first" || $w === "firstName") {
+                $bit = 1;
+            } else if ($w === "last" || $w === "lastName") {
+                $bit = 2;
+            } else if ($w === "email") {
+                $bit = 3;
+            } else if ($w === "username") {
+                $bit = 4;
+            } else {
+                $bit = 0;
+            }
+            if ($bit !== 0 && ($seen & (1 << $bit)) === 0) {
+                $seen |= 1 << $bit;
+                $r |= $bit << $shift;
+                $shift += 3;
+            }
         }
-        $c->sorter = trim($c->sorter . " " . $c->username . " " . $c->email);
-        if (preg_match('/[\x80-\xFF]/', $c->sorter)) {
-            $c->sorter = UnicodeHelper::deaccent($c->sorter);
+        if ($r === 0) { // default
+            $r = $conf->sort_by_last ? 0312 : 0321;
+        } else if (($seen & 016) === 002) { // first -> first last email
+            $r |= 032 << $shift;
+        } else if (($seen & 016) === 004) { // last -> last first email
+            $r |= 031 << $shift;
+        } else if (($seen & 010) === 0) { // always add email
+            $r |= 03 << $shift;
+        }
+        return $r;
+    }
+
+    /** @param int $sortspec
+     * @return string */
+    static function unparse_sortspec($sortspec) {
+        if ($sortspec === 0321 || $sortspec === 0312) {
+            return $sortspec === 0321 ? "first" : "last";
+        } else {
+            $r = [];
+            while ($sortspec !== 0 && ($sortspec !== 03 || empty($r))) {
+                $bit = $sortspec & 7;
+                $sortspec >>= 3;
+                if ($bit >= 1 && $bit <= 4) {
+                    $r[] = (["first", "last", "email", "username"])[$bit - 1];
+                }
+            }
+            return join(" ", $r);
         }
     }
 
-    static function compare($a, $b) {
-        return strnatcasecmp($a->sorter, $b->sorter);
+    /** @param Contact $c
+     * @param int $sortspec
+     * @return string */
+    static function make_sorter($c, $sortspec) {
+        if (!($c instanceof Contact)) {
+            error_log(debug_string_backtrace());
+        }
+        if ($c->is_anonymous) {
+            return $c->anon_username;
+        }
+        $r = [];
+        $first = $c->firstName;
+        $von = "";
+        while ($sortspec !== 0) {
+            if (($sortspec & 077) === 021 && isset($c->unaccentedName)) {
+                $r[] = $c->unaccentedName;
+                $sortspec >>= 6;
+                $first = "";
+            } else {
+                $bit = $sortspec & 7;
+                $sortspec >>= 3;
+                if ($bit === 1) {
+                    $s = $first . $von;
+                    $first = $von = "";
+                } else if ($bit === 2) {
+                    $s = $c->lastName;
+                    if ($first !== "" && ($m = Text::analyze_von($s))) {
+                        $s = $m[1];
+                        $von = " " . $m[0];
+                    }
+                } else if ($bit === 3) {
+                    $s = $c->email;
+                } else if ($bit === 4) {
+                    $s = $c->username;
+                } else {
+                    $s = "";
+                }
+                if ($s !== "") {
+                    $r[] = $s;
+                }
+            }
+        }
+        if ($von !== "") {
+            $r[] = $von;
+        }
+        return join(",", $r);
     }
+
+    /** @param Contact $c
+     * @param int $sortspec
+     * @return string */
+    static function get_sorter($c, $sortspec) {
+        if ($c instanceof Contact) {
+            if ($c->_sortspec !== $sortspec) {
+                $c->_sorter = self::make_sorter($c, $sortspec);
+                $c->_sortspec = $sortspec;
+            }
+            return $c->_sorter;
+        } else {
+            return self::make_sorter($c, $sortspec);
+        }
+    }
+
 
     private function assign_roles($roles) {
         $this->roles = $roles;

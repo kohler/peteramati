@@ -99,11 +99,13 @@ class Conf {
     public $multiuser_page = false;
     /** @var bool */
     private $_header_printed = false;
+    public $_session_handler;
     /** @var ?list<array{string,string}> */
     private $_save_msgs;
     /** @var false|null|array<string,mixed> */
     private $_session_list = false;
-    public $_session_handler;
+    /** @var ?Collator */
+    private $_collator;
 
     private $usertimeId = 1;
 
@@ -823,6 +825,28 @@ class Conf {
     }
 
 
+    /** @return Collator */
+    function collator() {
+        if (!$this->_collator) {
+            $this->_collator = new Collator("en_US.utf8");
+            $this->_collator->setAttribute(Collator::NUMERIC_COLLATION, Collator::ON);
+        }
+        return $this->_collator;
+    }
+
+    /** @param ?int $sortspec
+     * @return callable(Contact,Contact):int */
+    function user_comparator($sortspec = null) {
+        $sortspec = $sortspec ?? ($this->sort_by_last ? 0312 : 0321);
+        $collator = $this->collator();
+        return function ($a, $b) use ($sortspec, $collator) {
+            $as = Contact::get_sorter($a, $sortspec);
+            $bs = Contact::get_sorter($b, $sortspec);
+            return $collator->compare($as, $bs);
+        };
+    }
+
+
     // name
 
     /** @return string */
@@ -1044,14 +1068,14 @@ class Conf {
                 }
             }
             Dbl::free($result);
-            uasort($pc, "Contact::compare");
+            uasort($pc, $this->user_comparator());
             $order = 0;
             foreach ($pc as $row) {
                 $row->sort_position = $order;
                 ++$order;
             }
             $this->_pc_members_cache = $pc;
-            uasort($pca, "Contact::compare");
+            uasort($pca, $this->user_comparator());
             $this->_pc_members_and_admins_cache = $pca;
             ksort($this->_pc_tags_cache);
         }
