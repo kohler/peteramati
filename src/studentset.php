@@ -131,7 +131,11 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
             return;
         }
 
-        $result = $this->conf->qe("select * from ContactGrade where pset=?", $pset->id);
+        if (count($this->_u) > 40) {
+            $result = $this->conf->qe("select * from ContactGrade where pset=?", $pset->id);
+        } else {
+            $result = $this->conf->qe("select * from ContactGrade where pset=? and cid?a", $pset->id, array_keys($this->_u));
+        }
         $any_upi = false;
         while (($upi = UserPsetInfo::fetch($result))) {
             $upi->sset_next = $this->_upi[$upi->cid] ?? null;
@@ -139,27 +143,6 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
             $any_upi = true;
         }
         Dbl::free($result);
-
-        if (!$pset->gitless_grades) {
-            $result = $this->conf->qe("select * from RepositoryGrade where pset=?", $pset->id);
-            while (($rpi = RepositoryPsetInfo::fetch($result))) {
-                $rpi->sset_next = $this->_rpi[$rpi->repoid] ?? null;
-                $this->_rpi[$rpi->repoid] = $rpi;
-            }
-            Dbl::free($result);
-
-            $want_cbr = isset($this->_cpi_by_repo);
-            $result = $this->conf->qe("select * from CommitNotes where pset=?", $pset->id);
-            while (($cpi = CommitPsetInfo::fetch($result))) {
-                $cpi->sset_next = $this->_cpi[$cpi->bhash] ?? null;
-                $this->_cpi[$cpi->bhash] = $cpi;
-                if ($want_cbr) {
-                    $cpi->sset_repo_next = $this->_cpi_by_repo[$cpi->repoid] ?? null;
-                    $this->_cpi_by_repo[$cpi->repoid] = $cpi;
-                }
-            }
-            Dbl::free($result);
-        }
 
         if (!$pset->gitless) {
             $missing_repos = [];
@@ -182,6 +165,33 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
                 }
                 Dbl::free($result);
             }
+
+            if (count($this->_repo) > 40) {
+                $result = $this->conf->qe("select * from RepositoryGrade where pset=?", $pset->id);
+            } else {
+                $result = $this->conf->qe("select * from RepositoryGrade where pset=? and repoid?a", $pset->id, array_keys($this->_repo));
+            }
+            while (($rpi = RepositoryPsetInfo::fetch($result))) {
+                $rpi->sset_next = $this->_rpi[$rpi->repoid] ?? null;
+                $this->_rpi[$rpi->repoid] = $rpi;
+            }
+            Dbl::free($result);
+
+            $want_cbr = isset($this->_cpi_by_repo);
+            if (count($this->_repo) > 40) {
+                $result = $this->conf->qe("select * from CommitNotes where pset=?", $pset->id);
+            } else {
+                $result = $this->conf->qe("select * from CommitNotes where pset=? and repoid?a", $pset->id, array_keys($this->_repo));
+            }
+            while (($cpi = CommitPsetInfo::fetch($result))) {
+                $cpi->sset_next = $this->_cpi[$cpi->bhash] ?? null;
+                $this->_cpi[$cpi->bhash] = $cpi;
+                if ($want_cbr) {
+                    $cpi->sset_repo_next = $this->_cpi_by_repo[$cpi->repoid] ?? null;
+                    $this->_cpi_by_repo[$cpi->repoid] = $cpi;
+                }
+            }
+            Dbl::free($result);
         }
 
         $this->_flags[$pset->id] = 0;
@@ -344,7 +354,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     /** @return list<CommitPsetInfo> */
     function all_cpi_for(Contact $user, Pset $pset) {
         $cpis = [];
-        if (!$pset->gitless_grades) {
+        if (!$pset->gitless) {
             if (!isset($this->_cpi_by_repo)) {
                 $this->_cpi_by_repo = [];
                 foreach ($this->_cpi as $cpi) {
