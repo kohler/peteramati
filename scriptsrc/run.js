@@ -178,14 +178,18 @@ export function run(button, opts) {
         }
     }
 
-    function done() {
-        $f.find("button").prop("disabled", false);
-        removeClass($f[0], "pa-run-active");
-        hide_cursor();
-        if (button.hasAttribute("data-pa-run-grade")) {
-            grades_fetch(button.closest(".pa-psetinfo"));
+    function done(complete) {
+        if (hasClass($f[0], "pa-run-active")) {
+            removeClass($f[0], "pa-run-active");
+            $f.find("button").prop("disabled", false);
         }
-        opts.done_function && opts.done_function();
+        if (complete !== false) {
+            hide_cursor();
+            if (button.hasAttribute("data-pa-run-grade")) {
+                grades_fetch(button.closest(".pa-psetinfo")); // XXX not on replay
+            }
+            opts.done_function && opts.done_function();
+        }
     }
 
     function append(str, done) {
@@ -509,6 +513,8 @@ export function run(button, opts) {
             append("\x1b[1;3;31m" + x + "\x1b[m\r\n");
             scroll_therun();
             return done();
+        } else if (data.done) {
+            done(false);
         }
 
         checkt = checkt || data.timestamp;
