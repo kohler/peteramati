@@ -358,37 +358,35 @@ class PsetView {
         }
     }
 
-    function set_grading_or_latest_nontrivial_commit() {
+    /** @param ?StudentSet $sset */
+    function set_grading_or_latest_nontrivial_commit($sset = null) {
         if (($hash = $this->grading_hash())) {
-            $this->force_set_hash($hash);
+            $this->force_set_hash($hash, $sset);
         } else {
-            $this->set_latest_nontrivial_commit();
+            $this->set_latest_nontrivial_commit($sset);
         }
     }
 
-    /** @param ?string $reqhash
+    /** @param ?string $hashpart
      * @param bool $refresh
+     * @param ?StudentSet $sset
      * @return bool */
-    function set_hash($reqhash, $refresh = false) {
-        if (!$this->repo || $reqhash === "none") {
-            $this->force_set_hash(null);
+    function set_hash($hashpart, $refresh = false, $sset = null) {
+        if (!$this->repo || $hashpart === "none") {
+            $this->force_set_hash(null, $sset);
             return true;
-        } else if ($reqhash === null || $reqhash === "") {
-            $this->set_grading_or_latest_nontrivial_commit();
+        } else if ($hashpart === null || $hashpart === "") {
+            $this->set_grading_or_latest_nontrivial_commit($sset);
             return $this->hash() !== null;
+        } else if (($c = $this->find_commit($hashpart))) {
+            $this->force_set_hash($c->hash, $sset);
+            return true;
+        } else if ($refresh) {
+            $this->repo->refresh(10, true);
+            return $this->set_hash($hashpart, false, $sset);
         } else {
-            $c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch);
-            if (!$c && $refresh) {
-                $this->repo->refresh(10, true);
-                $c = $this->repo->connected_commit($reqhash, $this->pset, $this->branch);
-            }
-            if ($c) {
-                $this->set_commit($c);
-                return true;
-            } else {
-                $this->force_set_hash(null);
-                return false;
-            }
+            $this->force_set_hash(null, $sset);
+            return false;
         }
     }
 
