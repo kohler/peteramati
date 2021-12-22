@@ -91,11 +91,7 @@ class RunEnqueueBatch {
             } else {
                 continue;
             }
-            if ($this->hash === "latest") {
-                $info->set_latest_nontrivial_commit();
-            } else if ($this->hash
-                       && $this->hash !== "grading"
-                       && !$info->set_hash($this->hash, true)) {
+            if ($this->hash && !$info->set_hash($this->hash, true)) {
                 if ($this->verbose) {
                     fwrite(STDERR, $this->unparse_key($info->user, $anon) . ": no such commit on {$info->branch}{$chainstr}\n");
                 }
@@ -193,10 +189,10 @@ class RunEnqueueBatch {
             }
         }
         if (isset($arg["H"])) {
-            if ($arg["H"] === "" || !ctype_xdigit($arg["H"])) {
+            if (!($hp = CommitRecord::canonicalize_hashpart($arg["H"]))) {
                 throw new Error("bad `--commit`");
             }
-            $self->hash = strtolower($arg["H"]);
+            $self->hash = $hp;
         }
         return $self;
     }

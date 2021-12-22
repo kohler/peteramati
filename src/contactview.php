@@ -32,18 +32,14 @@ class ContactView {
                            && $conf->pset_by_key($x[$xpos])) {
                     $settings["pset"] = $x[$xpos];
                 } else if ($p[$ppos] === "H"
-                           && (strlen($x[$xpos]) === 40 || strlen($x[$xpos]) === 64)
-                           && ctype_xdigit($x[$xpos])) {
-                    $settings["commit" . $commitsuf] = $x[$xpos];
+                           // all special hashparts aren’t xdigit
+                           && (strlen($x[$xpos]) === 40 || strlen($x[$xpos]) === 64 || !ctype_xdigit($x[$xpos]))
+                           && ($hp = CommitRecord::canonicalize_hashpart($x[$xpos]))) {
+                    $settings["commit" . $commitsuf] = $hp;
                     $commitsuf = (int) $commitsuf + 1;
                 } else if ($p[$ppos] === "h"
-                           && strlen($x[$xpos]) >= 6
-                           && ctype_xdigit($x[$xpos])) {
-                    $settings["commit" . $commitsuf] = $x[$xpos];
-                    $commitsuf = (int) $commitsuf + 1;
-                } else if (($p[$ppos] === "H" || $p[$ppos] === "h")
-                           && in_array($x[$xpos], ["handout", "base", "latest", "grade", "grading", "head"])) {
-                    $settings["commit" . $commitsuf] = $x[$xpos];
+                           && ($hp = CommitRecord::canonicalize_hashpart($x[$xpos]))) {
+                    $settings["commit" . $commitsuf] = $hp;
                     $commitsuf = (int) $commitsuf + 1;
                 } else if ($p[$ppos] === "u"
                            && strlen($x[$xpos])) {

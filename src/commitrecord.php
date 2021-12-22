@@ -52,4 +52,25 @@ class CommitRecord implements JsonSerializable {
     function jsonSerialize(): string {
         return $this->hash;
     }
+    /** @param ?string $hashpart
+     * @return ?non-empty-string */
+    static function canonicalize_hashpart($hashpart) {
+        if ($hashpart === null || $hashpart === "") {
+            return null;
+        } else {
+            $hashpart = strtolower($hashpart);
+            // NB all special hashparts are not ctype_xdigit
+            if ($hashpart === "handout" || $hashpart === "base") {
+                return "handout";
+            } else if ($hashpart === "latest" || $hashpart === "head") {
+                return "latest";
+            } else if ($hashpart === "grading" || $hashpart === "grade") {
+                return "grading";
+            } else if (strlen($hashpart) >= 5 && ctype_xdigit($hashpart)) {
+                return $hashpart;
+            } else {
+                return null;
+            }
+        }
+    }
 }
