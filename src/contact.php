@@ -639,7 +639,6 @@ class Contact {
         foreach (array("email", "preferredEmail", "affiliation", "note") as $k)
             if ($this->$k)
                 $this->$k = trim($this->$k);
-        self::set_sorter($this, $this->conf);
     }
 
     function escape() {

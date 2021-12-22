@@ -233,7 +233,7 @@ class PsetView {
     /** @return array<string,CommitRecord> */
     function recent_commits() {
         if ($this->repo) {
-            return $this->repo->commits($this->pset, $this->branch);
+            return $this->repo->commits($this->pset, $this->branch, true);
         } else {
             return [];
         }
