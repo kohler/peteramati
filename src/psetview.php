@@ -327,15 +327,15 @@ class PsetView {
         return $this->_hash ? $this->connected_commit($this->_hash) : null;
     }
 
-    /** @param ?string $reqhash
+    /** @param ?string $hash
      * @param ?StudentSet $sset */
-    function force_set_hash($reqhash, $sset = null) {
-        assert($reqhash === null || (strlen($reqhash) === 40 && $this->repo));
+    function force_set_hash($hash, $sset = null) {
+        assert($hash === null || (strlen($hash) === 40 && $this->repo));
         assert(!$this->_is_sset || $sset);
-        if ($this->_hash !== $reqhash) {
-            $this->_hash = $reqhash;
-            if ($sset && $reqhash !== null) {
-                $this->_cpi = $sset->cpi_for($this->pset, $reqhash, $this->repo);
+        if ($this->_hash !== $hash) {
+            $this->_hash = $hash;
+            if ($sset && $hash !== null) {
+                $this->_cpi = $sset->cpi_for($this->pset, hex2bin($hash), $this->repo);
             } else {
                 $this->_cpi = null;
             }
