@@ -52,6 +52,8 @@ class Repository {
     private $_commit_lists = [];
     /** @var ?list<string> */
     private $_remaining_heads;
+    /** @var bool */
+    private $_snapshot_heads = null;
     /** @var array<string,bool> */
     private $_commit_lists_cc = [];
 
@@ -171,7 +173,7 @@ class Repository {
             $this->reposite->gitfetch($this->repoid, $this->cacheid, $foreground);
             if ($foreground) {
                 $this->_commits = $this->_commit_lists = $this->_commit_lists_cc = [];
-                $this->_remaining_heads = null;
+                $this->_remaining_heads = $this->_snapshot_heads = null;
             }
         } else {
             RepositorySite::disabled_remote_error($this->conf);
@@ -555,8 +557,11 @@ class Repository {
             // require at least 5 characters
             return [null, true];
         } else if (strlen($hashpart) === 40) {
-            $cr = $commitlist[$hashpart] ?? null;
-            return [$cr, !!$cr];
+            if (isset($commitlist[$hashpart])) {
+                return [$commitlist[$hashpart], true];
+            } else {
+                return [null, false];
+            }
         } else {
             $match = null;
             foreach ($commitlist as $h => $cx) {
@@ -598,7 +603,7 @@ class Repository {
         if ($this->_remaining_heads === null) {
             $this->_remaining_heads = [$this->conf->default_main_branch];
             $dir = $this->ensure_repodir() . "/.git/refs/remotes/repo{$this->repoid}/";
-            foreach (glob(addcslashes($dir, '*?\\[') . "*") as $x) {
+            foreach (glob("{$dir}*") as $x) {
                 $this->_remaining_heads[] = substr($x, strlen($dir));
             }
         }
@@ -612,7 +617,35 @@ class Repository {
             }
         }
         // check snapshots
-        return $this->find_snapshot($hashpart);
+        if ($this->_snapshot_heads === null) {
+            $pfx = $this->ensure_repodir() . "/.git/refs/tags/repo{$this->repoid}.snap";
+            foreach (glob("{$pfx}*") as $snapfile) {
+                $time = substr($snapfile, strlen($pfx));
+                if (strlen($time) === 15
+                    && ctype_digit(substr($time, 0, 8))
+                    && $time[8] === "."
+                    && ctype_digit(substr($time, 9))
+                    && ($x = file_get_contents($snapfile)) !== false
+                    && ($x = rtrim($x)) !== ""
+                    && strlen($x) >= 40
+                    && ctype_xdigit($x)
+                    && !isset($this->_commits[$x])) {
+                    $this->_snapshot_heads[] = $x;
+                }
+            }
+        }
+        while (!empty($this->_snapshot_heads)) {
+            $head = array_pop($this->_snapshot_heads);
+            list($cx, $found) = self::find_listed_commit($hashpart, $this->head_commits(".h/{$head}", $head));
+            if ($found) {
+                return $cx;
+            }
+        }
+        // nowhere else to look
+        if (!array_key_exists($hashpart, $this->_commits)) {
+            $this->_commits[$hashpart] = null;
+        }
+        return $this->_commits[$hashpart];
     }
 
     function author_emails($branch = null, $limit = null) {
@@ -642,74 +675,6 @@ class Repository {
             array_pop($x);
         }
         return $x;
-    }
-
-
-    function analyze_snapshots() {
-        if ($this->snapat <= $this->analyzedsnapat) {
-            return;
-        }
-        $timematch = " ";
-        if ($this->analyzedsnapat) {
-            $timematch = gmdate("Ymd.His", $this->analyzedsnapat);
-        }
-        $qv = [];
-        $analyzed_snaptime = 0;
-        foreach (glob(SiteLoader::$root . "/repo/repo$this->cacheid/.git/refs/tags/repo{$this->repoid}.snap*") as $snapfile) {
-            $time = substr($snapfile, strrpos($snapfile, ".snap") + 5);
-            if (strcmp($time, $timematch) <= 0
-                || !preg_match('/\A(\d\d\d\d)(\d\d)(\d\d)\.(\d\d)(\d\d)(\d\d)\z/', $time, $m)) {
-                continue;
-            }
-            $snaptime = gmmktime((int) $m[4], (int) $m[5], (int) $m[6], (int) $m[2], (int) $m[3], (int) $m[1]);
-            $analyzed_snaptime = max($snaptime, $analyzed_snaptime);
-            $head = file_get_contents($snapfile);
-            $result = $this->gitrun("git log -n20000 --simplify-merges --format=%H " . escapeshellarg($head));
-            foreach (explode("\n", $result) as $line) {
-                if (strlen($line) == 40
-                    && (!isset($qv[$line]) || $qv[$line][2] > $snaptime))
-                    $qv[$line] = [$this->repoid, hex2bin($line), $snaptime];
-            }
-        }
-        if (!empty($qv)) {
-            $this->conf->qe("insert into RepositoryCommitSnapshot (repoid, bhash, snapshot) values ?v on duplicate key update snapshot=least(snapshot,values(snapshot))", $qv);
-        }
-        if ($analyzed_snaptime) {
-            $this->conf->qe("update Repository set analyzedsnapat=greatest(analyzedsnapat,?) where repoid=?", $analyzed_snaptime, $this->repoid);
-        }
-    }
-
-    function find_snapshot($hash) {
-        if (array_key_exists($hash, $this->_commits)) {
-            return $this->_commits[$hash];
-        }
-        $this->analyze_snapshots();
-        $bhash = hex2bin(substr($hash, 0, strlen($hash) & ~1));
-        if (strlen($bhash) == 20) {
-            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and bhash=?", $this->repoid, $bhash);
-        } else {
-            $result = $this->conf->qe("select * from RepositoryCommitSnapshot where repoid=? and left(bhash,?)=?", $this->repoid, strlen($bhash), $bhash);
-        }
-        $match = null;
-        while ($result && ($row = $result->fetch_object())) {
-            $h = bin2hex($row->bhash);
-            if (str_starts_with($h, $hash)) {
-                if ($match) {
-                    $match = false;
-                    break;
-                }
-                $match = $row;
-            }
-        }
-        Dbl::free($result);
-        if ($match) {
-            $list = [];
-            $this->load_commits_from_head($list, "repo{$this->repoid}.snap" . gmdate("Ymd.His", $match->snapshot));
-        }
-        if (!array_key_exists($hash, $this->_commits)) {
-            $this->_commits[$hash] = null;
-        }
-        return $this->_commits[$hash];
     }
 
     function update_info() {

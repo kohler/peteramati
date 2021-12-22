@@ -35,6 +35,7 @@ class SiteLoader {
         if (self::$root === "") {
             self::$root = "/var/www/html";
         }
+        assert(strcspn(self::$root, "[]?*\\") == strlen(self::$root));
         $ConfSitePATH = self::$root;
     }
 
