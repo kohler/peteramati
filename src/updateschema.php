@@ -879,6 +879,11 @@ class UpdateSchema {
             && $this->v164_antiupdateby()) {
             $conf->update_schema_version(164);
         }
+        if ($conf->sversion === 164
+            && $conf->ql_ok("drop table if exists `RepositoryCommitSnapshot`")
+            && $conf->ql_ok("alter table `Repository` drop `analyzedsnapat`")) {
+            $conf->update_schema_version(165);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

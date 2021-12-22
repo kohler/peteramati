@@ -31,8 +31,6 @@ class Repository {
     /** @var ?string */
     public $snapcommitline;
     /** @var int */
-    public $analyzedsnapat;
-    /** @var int */
     public $infosnapat;
     public $notes;
     /** @var ?string */
@@ -79,7 +77,6 @@ class Repository {
         $this->snapcheckat = (int) $this->snapcheckat;
         $this->working = (int) $this->working;
         $this->snapcommitat = (int) $this->snapcommitat;
-        $this->analyzedsnapat = (int) $this->analyzedsnapat;
         $this->infosnapat = (int) $this->infosnapat;
         if ($this->notes !== null) {
             $this->notes = json_decode($this->notes, true);
