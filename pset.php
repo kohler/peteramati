@@ -42,7 +42,7 @@ class PsetRequest {
         $this->pset = ContactView::find_pset_redirect($qreq->pset, $viewer);
 
         // info, commit
-        $this->info = PsetView::make($this->pset, $this->user, $viewer, $qreq->newcommit ?? $qreq->commit);
+        $this->info = PsetView::make($this->pset, $this->user, $viewer, $qreq->newcommit ?? $qreq->commit, true);
         if (($qreq->newcommit ?? $qreq->commit) && !$this->info->hash()) {
             if ($this->info->repo) {
                 $this->conf->errorMsg("Commit " . htmlspecialchars($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
@@ -525,14 +525,17 @@ class PsetRequest {
         $this->info->update_placeholder(null);
 
         // current commit and commit selector
+        $rc = $this->info->recent_commits();
+        if (($k = $this->info->commit())) {
+            $rc[$k->hash] = $k;
+        }
         $sel = $bhashes = [];
         $curhead = $grouphead = null;
-        foreach ($this->info->recent_commits() as $k) {
+        foreach ($rc as $k) {
             // visually separate older heads
-            if ($curhead === null) {
-                $curhead = $k->fromhead;
-            }
-            if ($curhead !== $k->fromhead && !$pset->is_handout($k)) {
+            if ($curhead !== null
+                && $curhead !== $k->fromhead
+                && !$pset->is_handout($k)) {
                 if (!$grouphead) {
                     $sel["from.$k->fromhead"] = (object) [
                         "type" => "optgroup", "label" => "Other snapshots"
@@ -542,6 +545,7 @@ class PsetRequest {
                 }
                 $curhead = $grouphead = $k->fromhead;
             }
+            $curhead = $k->fromhead;
             // actual option
             $x = UnicodeHelper::utf8_prefix($k->subject, 72);
             if (strlen($x) !== strlen($k->subject)) {
@@ -550,6 +554,7 @@ class PsetRequest {
             $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
             $bhashes[] = hex2bin($k->hash);
         }
+
         $notesflag = HASNOTES_ANY;
         if (!$this->info->pc_view && !$this->info->can_view_score()) {
             $notesflag = HASNOTES_COMMENT;
@@ -579,6 +584,7 @@ class PsetRequest {
             && isset($sel[$h])) {
             $sel[$h] = preg_replace('/\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z/', '$1 &nbsp;✱$2', $sel[$h]);
         }
+        assert(isset($sel[$this->info->hash()]));
 
         if ($this->info->is_grading_commit()) {
             $key = "grading commit";
