@@ -62,38 +62,46 @@ class RunEnqueueBatch {
         return empty($this->usermatch);
     }
 
-    /** @param Contact $user
-     * @param bool $anonymous
+    /** @return bool */
+    function test_user(Contact $user) {
+        if (empty($this->usermatch)) {
+            $user->set_anonymous($this->pset->anonymous);
+            return true;
+        } else if ($this->match($user->email)
+                   || $this->match($user->github_username)) {
+            $user->set_anonymous(false);
+            return true;
+        } else if ($this->match($user->anon_username)) {
+            $user->set_anonymous(true);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /** @param PsetView $info
+     * @param ?string $hash
      * @return string */
-    private function unparse_key($user, $anonymous) {
-        $uname = $this->conf->cached_username_by_id($user->contactId, $anonymous);
-        $hash = $this->hash ? : "grading";
-        return "~{$uname}/{$this->pset->urlkey}/{$hash}/{$this->runner->name}";
+    private function unparse_key($info, $hash = null) {
+        $hash = $hash ?? $info->hash() ?? "none";
+        return "~{$info->user->username}/{$info->pset->urlkey}/{$hash}/{$this->runner->name}";
     }
 
     /** @return int */
     function run() {
         $viewer = $this->conf->site_contact();
-        $sset = new StudentSet($viewer, $this->sset_flags);
+        $sset = new StudentSet($viewer, $this->sset_flags, [$this, "test_user"]);
         $sset->set_pset($this->pset);
         $nu = 0;
         $chain = $this->chainid ?? QueueItem::new_chain();
         $chainstr = $this->chainid ? " C{$this->chainid}" : "";
         foreach ($sset as $info) {
-            if (empty($this->usermatch)) {
-                $anon = $this->pset->anonymous;
-            } else if ($this->match($info->user->email)
-                       || $this->match($info->user->email)
-                       || $this->match($info->user->github_username)) {
-                $anon = false;
-            } else if ($this->match($info->user->anon_username)) {
-                $anon = true;
-            } else {
+            if (!$info->repo) {
                 continue;
             }
             if ($this->hash && !$info->set_hash($this->hash, true)) {
                 if ($this->verbose) {
-                    fwrite(STDERR, $this->unparse_key($info->user, $anon) . ": no such commit on {$info->branch}{$chainstr}\n");
+                    fwrite(STDERR, $this->unparse_key($info, $this->hash) . ": no such commit on {$info->branch}{$chainstr}\n");
                 }
                 continue;
             }
