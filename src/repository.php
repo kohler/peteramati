@@ -54,6 +54,8 @@ class Repository {
     private $_snapshot_heads = null;
     /** @var array<string,bool> */
     private $_commit_lists_cc = [];
+    /** @var int */
+    private $_refresh_count = 0;
 
     /** @var list<array{string,string,list<string>,int}> */
     static private $_file_contents = [];
@@ -173,6 +175,7 @@ class Repository {
             if ($foreground) {
                 $this->_commits = $this->_commit_lists = $this->_commit_lists_cc = [];
                 $this->_remaining_heads = $this->_snapshot_heads = null;
+                ++$this->_refresh_count;
             }
         } else {
             RepositorySite::disabled_remote_error($this->conf);
@@ -367,55 +370,6 @@ class Repository {
 
     /** @param array<string,CommitRecord> &$list
      * @param string $head */
-    private function load_commits_from_head(&$list, $head) {
-        $s = $this->gitrun("git log -m --name-only --format='%x00%ct %H %s%n%P' " . escapeshellarg($head));
-        if ($s === "") {
-            $this->refresh(30, true);
-            $s = $this->gitrun("git log -m --name-only --format='%x00%ct %H %s%n%P' " . escapeshellarg($head));
-        }
-        $p = 0;
-        $l = strlen($s);
-        $cr = $newcr = null;
-        while ($p < $l && $s[$p] === "\0") {
-            $p0 = $p + 1;
-            if (($p = strpos($s, "\0", $p0)) === false) {
-                $p = $l;
-            }
-            if (($sp1 = strpos($s, " ", $p0)) !== false
-                && ($sp2 = strpos($s, " ", $sp1 + 1)) !== false
-                && ($nl1 = strpos($s, "\n", $sp2 + 1)) !== false
-                && $nl1 < $p
-                && ($nl2 = strpos($s, "\n", $nl1 + 1)) !== false
-                && $nl2 < $p) {
-                $time = substr($s, $p0, $sp1 - $p0);
-                $hash = substr($s, $sp1 + 1, $sp2 - ($sp1 + 1));
-                if (strlen($time) > 8
-                    && strlen($hash) >= 40
-                    && ctype_digit($time)
-                    && ctype_xdigit($hash)) {
-                    if ($cr && $cr->hash === $hash) {
-                        // another branch of the merge commit
-                    } else if (($cr = $this->_commits[$hash] ?? null)) {
-                        // assume already completely populated
-                        $newcr = null;
-                        $list[$hash] = $cr;
-                    } else {
-                        $subject = substr($s, $sp2 + 1, $nl1 - ($sp2 + 1));
-                        /** @phan-suppress-next-line PhanTypeMismatchArgument */
-                        $newcr = new CommitRecord((int) $time, $hash, $subject, $head);
-                        $this->_commits[$hash] = $cr = $list[$hash] = $newcr;
-                        $cr->_is_merge = strpos(substr($s, $nl1 + 1, $nl2 - ($nl1 + 1)), " ") !== false;
-                    }
-                    if ($newcr) {
-                        self::set_directory($cr, $s, $nl2, $p);
-                    }
-                }
-            }
-        }
-    }
-
-    /** @param array<string,CommitRecord> &$list
-     * @param string $head */
     private function load_trivial_merges_from_head(&$list, $head) {
         $s = $this->gitrun("git log --cc --name-only --format='%x00%H' " . escapeshellarg($head));
         $p = 0;
@@ -461,11 +415,63 @@ class Repository {
      * @param string $head
      * @return array<string,CommitRecord> */
     private function head_commits($key, $head) {
-        if (!isset($this->_commit_lists[$key])) {
-            $this->_commit_lists[$key] = [];
-            $this->load_commits_from_head($this->_commit_lists[$key], $head);
+        // check cache
+        if (isset($this->_commit_lists[$key])) {
+            return $this->_commit_lists[$key];
         }
-        return $this->_commit_lists[$key];
+
+        // read log
+        $s = $this->gitrun("git log -m --name-only --format='%x00%ct %H %s%n%P' " . escapeshellarg($head));
+        if ($s === "" && !$this->_refresh_count) {
+            $this->refresh(30, true);
+            $s = $this->gitrun("git log -m --name-only --format='%x00%ct %H %s%n%P' " . escapeshellarg($head));
+        }
+
+        // parse log
+        $p = 0;
+        $l = strlen($s);
+        $cr = $newcr = null;
+        $list = [];
+        while ($p < $l && $s[$p] === "\0") {
+            $p0 = $p + 1;
+            if (($p = strpos($s, "\0", $p0)) === false) {
+                $p = $l;
+            }
+            if (($sp1 = strpos($s, " ", $p0)) !== false
+                && ($sp2 = strpos($s, " ", $sp1 + 1)) !== false
+                && ($nl1 = strpos($s, "\n", $sp2 + 1)) !== false
+                && $nl1 < $p
+                && ($nl2 = strpos($s, "\n", $nl1 + 1)) !== false
+                && $nl2 < $p) {
+                $time = substr($s, $p0, $sp1 - $p0);
+                $hash = substr($s, $sp1 + 1, $sp2 - ($sp1 + 1));
+                if (strlen($time) > 8
+                    && strlen($hash) >= 40
+                    && ctype_digit($time)
+                    && ctype_xdigit($hash)) {
+                    if ($cr && $cr->hash === $hash) {
+                        // another branch of the merge commit
+                    } else if (($cr = $this->_commits[$hash] ?? null)) {
+                        // assume already completely populated
+                        $newcr = null;
+                        $list[$hash] = $cr;
+                    } else {
+                        $subject = substr($s, $sp2 + 1, $nl1 - ($sp2 + 1));
+                        /** @phan-suppress-next-line PhanTypeMismatchArgument */
+                        $newcr = new CommitRecord((int) $time, $hash, $subject, $head);
+                        $this->_commits[$hash] = $cr = $list[$hash] = $newcr;
+                        $cr->_is_merge = strpos(substr($s, $nl1 + 1, $nl2 - ($nl1 + 1)), " ") !== false;
+                    }
+                    if ($newcr) {
+                        self::set_directory($cr, $s, $nl2, $p);
+                    }
+                }
+            }
+        }
+
+        // update cache
+        $this->_commit_lists[$key] = $list;
+        return $list;
     }
 
     /** @param ?Pset $pset
@@ -609,7 +615,7 @@ class Repository {
         while (!empty($this->_remaining_heads)) {
             $h = array_shift($this->_remaining_heads);
             if (!isset($this->_commit_lists[$h])) {
-                list($cx, $found) = self::find_listed_commit($hashpart, $this->commits(null, $h));
+                list($cx, $found) = self::find_listed_commit($hashpart, $this->head_commits($h, "%REPO%/$h"));
                 if ($found) {
                     return $cx;
                 }
