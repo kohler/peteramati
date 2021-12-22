@@ -752,7 +752,8 @@ class Pset {
         return $this->_late_hours;
     }
 
-    /** @return GradeEntry */
+    /** @return GradeEntry
+     * @suppress PhanAccessReadOnlyProperty */
     function student_timestamp_entry() {
         if (!$this->_student_timestamp) {
             $this->_student_timestamp = GradeEntry::make_special($this, "student_timestamp", "timestamp", GradeEntry::GTYPE_STUDENT_TIMESTAMP);
@@ -1741,7 +1742,8 @@ class GradeEntry {
         return $this->formula;
     }
 
-    /** @return GradeFormula */
+    /** @return GradeFormula
+     * @suppress PhanAccessReadOnlyProperty */
     function formula() {
         if ($this->_formula === null) {
             if ($this->formula !== null) {

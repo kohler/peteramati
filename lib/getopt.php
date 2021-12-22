@@ -146,7 +146,7 @@ class Getopt {
     }
 
     /** @param list<string> $argv
-     * @return array<string,string|list<string>> */
+     * @return array<string,false|string|list<string>> */
     function parse($argv) {
         $res = [];
         $pot = 0;
@@ -231,7 +231,7 @@ class Getopt {
     /** @param list<string> $argv
      * @param string $options
      * @param list<string> $longopts
-     * @return array<string,string|list<string>> */
+     * @return array<string,false|string|list<string>> */
     static function rest($argv, $options, $longopts) {
         return (new Getopt)->short($options)->long($longopts)->parse($argv);
     }

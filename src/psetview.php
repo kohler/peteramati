@@ -240,9 +240,9 @@ class PsetView {
     }
 
     /** @return ?CommitRecord */
-    function connected_commit($hash) {
+    function connected_commit($hashpart) {
         if ($this->repo) {
-            return $this->repo->connected_commit($hash, $this->pset, $this->branch);
+            return $this->repo->connected_commit($hashpart, $this->pset, $this->branch);
         } else {
             return null;
         }
@@ -323,9 +323,6 @@ class PsetView {
 
     /** @return ?CommitRecord */
     function commit() {
-        if ($this->_hash === null) {
-            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . " " . $this->viewer->email);
-        }
         assert($this->_hash !== null);
         return $this->_hash ? $this->connected_commit($this->_hash) : null;
     }

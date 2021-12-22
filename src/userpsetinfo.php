@@ -192,6 +192,7 @@ class UserPsetInfo {
         }
         $this->history_at($version, $student_only, $conf);
         $this->history_at($this->notesversion - 1, $student_only, $conf);
+        assert($this->_history !== null);
         $vupi = new UserPsetInfo($this->cid, $this->pset);
         $vupi->updateat = $this->updateat;
         $vupi->studentupdateat = $this->studentupdateat;

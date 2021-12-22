@@ -111,7 +111,7 @@ class Face_Page {
             $viewer->escape();
         }
 
-        ContactView::set_path_request(array("/u"));
+        ContactView::set_path_request($qreq, ["/u"], $viewer->conf);
         $user = $viewer;
         if (isset($qreq->u)) {
             $user = ContactView::prepare_user($qreq->u, $viewer);

@@ -392,29 +392,6 @@ function json_encode_db($x, $flags = 0) {
 
 // array and object helpers
 
-/** @param object|array|null $var
- * @param string|int $idx
- * @return mixed
- * @deprecated */
-function get($var, $idx, $default = null) {
-    if (is_array($var)) {
-        return array_key_exists($idx, $var) ? $var[$idx] : $default;
-    } else if (is_object($var)) {
-        return property_exists($var, $idx) ? $var->$idx : $default;
-    } else {
-        assert($var === null);
-        return $default;
-    }
-}
-
-/** @param string $idx
- * @deprecated */
-function opt($idx, $default = null) {
-    global $Conf, $Opt;
-    $opt = $Conf ? $Conf->opt : $Opt;
-    return $opt[$idx] ?? $default;
-}
-
 function object_replace($a, $b) {
     foreach (is_object($b) ? get_object_vars($b) : $b as $k => $v) {
         if ($v === null) {
@@ -502,6 +479,7 @@ function assert_callback() {
 }
 //assert_options(ASSERT_CALLBACK, "assert_callback");
 
+/** @return string */
 function debug_string_backtrace() {
     $s = preg_replace_callback('/^\#(\d+)/m', function ($m) {
         return "#" . ($m[1] - 1);

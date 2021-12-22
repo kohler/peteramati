@@ -50,7 +50,7 @@ class Repository {
     private $_commit_lists = [];
     /** @var ?list<string> */
     private $_remaining_heads;
-    /** @var bool */
+    /** @var ?list<string> */
     private $_snapshot_heads = null;
     /** @var array<string,bool> */
     private $_commit_lists_cc = [];
@@ -158,6 +158,8 @@ class Repository {
     const VALIDATE_TOTAL_TIMEOUT = 15;
     static private $validate_time_used = 0;
 
+    /** @param int|float $delta
+     * @param bool $foreground */
     function refresh($delta, $foreground = false) {
         if ((!$this->snapcheckat || $this->snapcheckat + $delta <= Conf::$now)
             && !$this->conf->opt("disableRemote")) {
@@ -616,6 +618,7 @@ class Repository {
         // check snapshots
         if ($this->_snapshot_heads === null) {
             $pfx = $this->ensure_repodir() . "/.git/refs/tags/repo{$this->repoid}.snap";
+            $this->_snapshot_heads = [];
             foreach (glob("{$pfx}*") as $snapfile) {
                 $time = substr($snapfile, strlen($pfx));
                 if (strlen($time) === 15

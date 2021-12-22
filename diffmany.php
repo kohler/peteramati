@@ -4,7 +4,8 @@
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
-ContactView::set_path_request(["/p"]);
+global $Conf, $Qreq, $Me;
+ContactView::set_path_request($Qreq, ["/p"], $Conf);
 if ($Me->is_empty() || !$Me->isPC) {
     $Me->escape();
 }

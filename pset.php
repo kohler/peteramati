@@ -966,5 +966,5 @@ class PsetRequest {
 }
 
 
-ContactView::set_path_request(["/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"]);
+ContactView::set_path_request($Qreq, ["/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"], $Conf);
 PsetRequest::go($Me, $Qreq);

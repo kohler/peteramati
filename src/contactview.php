@@ -4,8 +4,10 @@
 // See LICENSE for open-source distribution terms
 
 class ContactView {
-    static function set_path_request($paths) {
-        global $Conf, $Qreq;
+    /** @param Qrequest $qreq
+     * @param list<string> $paths
+     * @param Conf $conf */
+    static function set_path_request($qreq, $paths, $conf) {
         $path = Navigation::path();
         if ($path === "") {
             return;
@@ -27,7 +29,7 @@ class ContactView {
                     ++$xpos;
                 } else if ($p[$ppos] === "p"
                            && isset($x[$xpos])
-                           && $Conf->pset_by_key($x[$xpos])) {
+                           && $conf->pset_by_key($x[$xpos])) {
                     $settings["pset"] = $x[$xpos];
                 } else if ($p[$ppos] === "H"
                            && (strlen($x[$xpos]) === 40 || strlen($x[$xpos]) === 64)
@@ -70,7 +72,7 @@ class ContactView {
             if ($settings && $xpos == count($x) - 1) {
                 foreach ($settings as $k => $v) {
                     if (!isset($_GET[$k]) && !isset($_POST[$k]))
-                        $_GET[$k] = $_REQUEST[$k] = $Qreq[$k] = $v;
+                        $_GET[$k] = $_REQUEST[$k] = $qreq[$k] = $v;
                 }
                 break;
             }

@@ -10,8 +10,8 @@ if (!$Conf) {
     exit;
 }
 
-global $Qreq, $MicroNow;
-ContactView::set_path_request(array("/u"));
+global $Qreq;
+ContactView::set_path_request($Qreq, ["/u"], $Conf);
 
 // signin links
 // auto-signin when email & password set

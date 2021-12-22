@@ -160,18 +160,18 @@ class RunEnqueueBatch {
         if (!$runner) {
             throw new Error("no such runner");
         }
-        $reb = new RunEnqueueBatch($pset, $runner, $arg["u"] ?? []);
+        $self = new RunEnqueueBatch($pset, $runner, $arg["u"] ?? []);
         if (isset($arg["e"])) {
-            $reb->is_ensure = true;
+            $self->is_ensure = true;
         }
         if (isset($arg["V"])) {
-            $reb->verbose = true;
+            $self->verbose = true;
         }
         if (isset($arg["c"])) {
             $chain = $arg["c"][0] === "C" ? substr($arg["c"], 1) : $arg["c"];
             if (ctype_digit($chain)
                 && QueueItem::valid_chain(intval($chain))) {
-                $reb->chainid = intval($chain);
+                $self->chainid = intval($chain);
             } else {
                 throw new Error("bad `--chain`");
             }
@@ -181,7 +181,7 @@ class RunEnqueueBatch {
                 if (!preg_match('/\A' . TAG_REGEX_NOTWIDDLE . '\z/', $tag)) {
                     throw new Error("bad `--tag`");
                 }
-                $reb->tags[] = $tag;
+                $self->tags[] = $tag;
             }
         }
         if (isset($arg["s"])) {
@@ -189,16 +189,16 @@ class RunEnqueueBatch {
                 if (!preg_match('/\A([A-Za-z][_A-Za-z0-9]*)=([-._A-Za-z0-9]*)\z/', $setting, $m)) {
                     throw new Error("bad `--setting`");
                 }
-                $reb->runsettings[$m[1]] = $m[2];
+                $self->runsettings[$m[1]] = $m[2];
             }
         }
         if (isset($arg["H"])) {
             if ($arg["H"] === "" || !ctype_xdigit($arg["H"])) {
                 throw new Error("bad `--commit`");
             }
-            $reb->hash = strtolower($arg["H"]);
+            $self->hash = strtolower($arg["H"]);
         }
-        return $reb;
+        return $self;
     }
 }
 

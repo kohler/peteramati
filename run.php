@@ -291,5 +291,5 @@ class RunRequest {
 }
 
 
-ContactView::set_path_request(array("/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"));
+ContactView::set_path_request($Qreq, ["/@", "/@/p", "/@/p/h", "/p", "/p/h", "/p/u/h"], $Conf);
 RunRequest::go($Me, $Qreq);
