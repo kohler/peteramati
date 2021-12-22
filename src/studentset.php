@@ -51,8 +51,9 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
 
     static private $all_set = null;
 
-    /** @param int $flags */
-    function __construct(Contact $viewer, $flags) {
+    /** @param int $flags
+     * @param ?callable(Contact):bool $filter */
+    function __construct(Contact $viewer, $flags, $filter = null) {
         $this->conf = $viewer->conf;
         $this->viewer = $viewer;
         if ($flags !== 0) {
@@ -76,8 +77,10 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
             }
             $result = $this->conf->qe("select *, coalesce((select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId),'') contactLinks from ContactInfo where " . join(" and ", $w));
             while (($u = Contact::fetch($result, $this->conf))) {
-                $this->_u[$u->contactId] = $u;
-                $u->student_set = $this;
+                if (!$filter || $filter($u)) {
+                    $this->_u[$u->contactId] = $u;
+                    $u->student_set = $this;
+                }
             }
             Dbl::free($result);
             $this->_ua = array_values($this->_u);
