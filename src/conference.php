@@ -1742,9 +1742,10 @@ class Conf {
         "forceShow" => true, "sort" => true, "t" => true, "group" => true
     ];
 
-    function selfurl(Qrequest $qreq = null, $params = [], $flags = 0) {
+    function selfurl(Qrequest $qreq = null, $params = null, $flags = 0) {
         global $Qreq;
         $qreq = $qreq ? : $Qreq;
+        $params = $params ?? [];
 
         $x = [];
         foreach ($qreq as $k => $v) {

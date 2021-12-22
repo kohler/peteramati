@@ -555,7 +555,8 @@ class Repository {
             // require at least 5 characters
             return [null, true];
         } else if (strlen($hashpart) === 40) {
-            return [$commitlist[$hashpart] ?? null, true];
+            $cr = $commitlist[$hashpart] ?? null;
+            return [$cr, !!$cr];
         } else {
             $match = null;
             foreach ($commitlist as $h => $cx) {
@@ -596,8 +597,8 @@ class Repository {
         // load all branches
         if ($this->_remaining_heads === null) {
             $this->_remaining_heads = [$this->conf->default_main_branch];
-            $dir = $this->ensure_repodir() . "/.git/refs/remotes/repo{$this->repoid}";
-            foreach (glob(addcslashes($dir, '*?\\[') . "/*") as $x) {
+            $dir = $this->ensure_repodir() . "/.git/refs/remotes/repo{$this->repoid}/";
+            foreach (glob(addcslashes($dir, '*?\\[') . "*") as $x) {
                 $this->_remaining_heads[] = substr($x, strlen($dir));
             }
         }
