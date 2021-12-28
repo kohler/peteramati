@@ -160,7 +160,7 @@ export function input_default_value(elt) {
 export function input_set_default_value(elt, val) {
     if (input_is_checkboxlike(elt)) {
         elt.removeAttribute("data-default-checked");
-        elt.defaultChecked = val == "";
+        elt.defaultChecked = val != null && val != "";
     } else {
         elt.removeAttribute("data-default-value");
         // eslint-disable-next-line no-self-assign
