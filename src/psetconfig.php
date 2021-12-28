@@ -1348,8 +1348,10 @@ class GradeEntry {
                 throw new PsetConfigException("grade entry type {$this->type} cannot be in total", $loc);
             }
             $this->no_total = true;
-        } else {
+        } else if (isset($g->no_total)) {
             $this->no_total = Pset::cbool($loc, $g, "no_total");
+        } else if (isset($g->in_total)) {
+            $this->no_total = !Pset::cbool($loc, $g, "in_total");
         }
 
         $this->max = Pset::cnum($loc, $g, "max");

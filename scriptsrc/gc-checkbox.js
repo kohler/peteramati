@@ -42,7 +42,7 @@ GradeClass.add("checkbox", {
         }
         if (ve.type === "checkbox") {
             ve.checked = !!v;
-            ve.indeterminate = opts.mixed;
+            ve.indeterminate = !!opts.mixed;
         } else if (ve.value !== v && (opts.reset || !$(ve).is(":focus"))) {
             ve.value = "" + v;
         }

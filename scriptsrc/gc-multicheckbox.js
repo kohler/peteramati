@@ -56,7 +56,7 @@ function make_multicheckbox(mark) {
                 if (this.name.startsWith(name)) {
                     const i = +this.name.substring(name.length);
                     this.checked = i < value;
-                    this.indeterminate = opts.mixed;
+                    this.indeterminate = !!opts.mixed;
                 }
             });
         },
