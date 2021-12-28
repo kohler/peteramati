@@ -212,11 +212,6 @@ class Home_TA_Page {
 
         echo ' &nbsp;', Ht::submit("reconfig", "Save");
 
-        if (!$pset->disabled) {
-            echo ' &nbsp;<span class="barsep">·</span>&nbsp; ';
-            echo Ht::link("Grade report", $this->conf->hoturl("=index", ["pset" => $pset->urlkey, "report" => 1]), ["class" => "btn"]);
-        }
-
         echo "</form>";
         echo Ht::unstash_script('$(".need-pa-pset-actions").each($pa.pset_actions)');
     }
