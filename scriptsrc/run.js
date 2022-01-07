@@ -541,7 +541,7 @@ export function run(button, opts) {
                 data.offset += n;
             }
             if (m[4].length) {
-                const n = Math.min(offset - data.offset, m[4].length * 4);
+                const n = Math.min(offset - data.offset, m[4].length * 2);
                 nc += n / 2; // surrogate pairs
                 data.offset += n;
             }
