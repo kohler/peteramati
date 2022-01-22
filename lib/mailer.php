@@ -46,7 +46,7 @@ class Mailer {
         $this->recipient = $recipient;
         foreach (array("width", "sensitivity", "reason", "adminupdate", "notes",
                        "capability") as $k)
-            $this->$k = get($settings, $k);
+            $this->$k = $settings->$k ?? null;
         if ($this->width === null)
             $this->width = 75;
         else if (!$this->width)
@@ -448,10 +448,10 @@ class Mailer {
         $recipient = $this->recipient;
         if (!$recipient || !$recipient->email)
             return Conf::msg_error("no email in Mailer::send");
-        if (get($recipient, "preferredEmail")) {
+        if (isset($recipient->preferredEmail)) {
             $recipient = (object) array("email" => $recipient->preferredEmail);
             foreach (array("firstName", "lastName", "name", "fullName") as $k)
-                if (get($this->recipient, $k))
+                if (isset($this->recipient->$k))
                     $recipient->$k = $this->recipient->$k;
         }
         $prep->to = array(Text::user_email_to($recipient));
