@@ -155,14 +155,11 @@ td.spanner {
 
 
 /* generic horizontal styles */
-.btn-link, .link {
-	text-decoration: underline;
+:link, :visited, .link, .btn-link, .btn-xlink {
+	color: #004daa;
 }
 .btn-qlink, .btn-ulink {
 	color: inherit;
-}
-:link, :visited, .link, .btn-link, .btn-xlink {
-	color: #004daa;
 }
 .track:visited, .xtrack:visited .link {
 	color: #660099;
@@ -186,13 +183,13 @@ a.pnum, a.ptitle, a.maillink, u.x, .noul {
 	text-decoration: none;
 }
 a.q:hover, a.x:hover,
-.btn-xlink:hover,
+.link, .btn-link, .btn-qlink, .btn-xlink:hover,
 div.papmodex:hover > a, div.leftmenu_item:hover > a,
 tr.pl:hover a.pnum, tr.pl:hover a.ptitle, a.ptitle.uu,
 .childfold:hover a.q, a.maillink:hover, a:hover u.x, .ul {
 	text-decoration: underline;
 }
-.btn-xlink:disabled {
+.btn-link:disabled, .btn-qlink:disabled, .btn-xlink:disabled {
 	text-decoration: none;
 }
 .strut {

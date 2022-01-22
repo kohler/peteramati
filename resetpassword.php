@@ -52,7 +52,7 @@ if (isset($_POST["go"]) && check_post()) {
         Conf::msg_error("Invalid password.");
     else {
         $flags = 0;
-        if ($_POST["password"] === get($_POST, "autopassword"))
+        if ($_POST["password"] === ($_POST["autopassword"] ?? null))
             $flags |= Contact::CHANGE_PASSWORD_PLAINTEXT;
         $Acct->change_password(null, $_POST["password"], $flags);
         if (!$iscdb || !($log_acct = $Conf->user_by_email($Acct->email)))

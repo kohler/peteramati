@@ -79,11 +79,9 @@ $config = [
         Config::projectPath(".phan/config.php"),
         Config::projectPath("lib/collatorshim.php"),
         Config::projectPath("lib/polyfills.php"),
-        Config::projectPath("lib/mailer.php"),
         Config::projectPath("mail.php"),
         Config::projectPath("resetpassword.php"),
         Config::projectPath("pages/oldreport.php"),
-        Config::projectPath("src/cs61mailer.php"),
         Config::projectPath("src/harvardseas_repositorysite.php")
     ],
 

@@ -24,13 +24,18 @@ class Mailer {
 
     protected $recipient = null;
 
-    protected $width = 75;
-    protected $sensitivity = null;
-    protected $reason = null;
-    protected $adminupdate = null;
-    protected $notes = null;
-    protected $preparation = null;
-    public $capability = null;
+    /** @var int */
+    protected $width;
+    /** @var bool|'display'|'high' */
+    protected $sensitive;
+    /** @var ?string */
+    protected $reason;
+    /** @var bool */
+    protected $adminupdate = false;
+    /** @var ?string */
+    protected $notes;
+    protected $preparation;
+    public $capability;
 
     protected $expansionType = null;
 
@@ -38,19 +43,25 @@ class Mailer {
 
     static private $eol = null;
 
-    function __construct($recipient = null, $settings = array()) {
-        $this->reset($recipient, $settings);
+    function __construct() {
+        $this->reset(null, []);
     }
 
-    function reset($recipient = null, $settings = array()) {
+    /** @param ?Contact $recipient
+     * @param array<string,mixed> $settings */
+    function reset($recipient = null, $settings = []) {
         $this->recipient = $recipient;
-        foreach (array("width", "sensitivity", "reason", "adminupdate", "notes",
-                       "capability") as $k)
-            $this->$k = get($settings, $k);
-        if ($this->width === null)
-            $this->width = 75;
-        else if (!$this->width)
+        $this->width = $settings["width"] ?? 72;
+        if ($this->width <= 0) {
             $this->width = 10000000;
+        }
+        //$this->flowed = !!$this->conf->opt("mailFormatFlowed");
+        //$this->censor = $settings["censor"] ?? self::CENSOR_NONE;
+        $this->reason = $settings["reason"] ?? null;
+        $this->adminupdate = $settings["adminupdate"] ?? false;
+        $this->notes = $settings["notes"] ?? null;
+        $this->capability = $settings["capability"] ?? null;
+        $this->sensitive = $settings["sensitive"] ?? false;
     }
 
     static function eol() {
@@ -213,9 +224,9 @@ class Mailer {
             $password = false;
             if (!$external_password) {
                 $pwd_plaintext = $this->recipient->plaintext_password();
-                if ($pwd_plaintext && !$this->sensitivity)
+                if ($pwd_plaintext && !$this->sensitive)
                     $password = $pwd_plaintext;
-                else if ($pwd_plaintext && $this->sensitivity === "display")
+                else if ($pwd_plaintext && $this->sensitive === "display")
                     $password = "HIDDEN";
             }
             $loginparts = "";
@@ -391,7 +402,7 @@ class Mailer {
         return $text;
     }
 
-
+    /** @return array<string,string> */
     static function get_template($templateName, $default = false) {
         global $Conf, $mailTemplates;
         $m = $mailTemplates[$templateName];
@@ -419,20 +430,24 @@ class Mailer {
                 || !preg_match(';\A(?:_.*|example\.(?:com|net|org))\z;i', substr($email, $at + 1)));
     }
 
+    /** @return MailPreparation */
     function create_preparation() {
         return new MailPreparation;
     }
 
-    function make_preparation($template, $rest = array()) {
+    /** @param array<string,mixed> $rest */
+    function make_preparation($template, $rest = []) {
         global $Conf;
 
         // look up template
-        if (is_string($template) && $template[0] == "@")
+        if (is_string($template) && $template[0] == "@") {
             $template = self::get_template(substr($template, 1));
+        }
         // add rest fields to template for expansion
-        foreach (self::$email_fields as $lcfield => $field)
+        foreach (self::$email_fields as $lcfield => $field) {
             if (isset($rest[$lcfield]))
                 $template[$lcfield] = $rest[$lcfield];
+        }
 
         // expand the template
         $prep = $this->preparation = $this->create_preparation();
@@ -448,10 +463,10 @@ class Mailer {
         $recipient = $this->recipient;
         if (!$recipient || !$recipient->email)
             return Conf::msg_error("no email in Mailer::send");
-        if (get($recipient, "preferredEmail")) {
+        if ($recipient->preferredEmail ?? false) {
             $recipient = (object) array("email" => $recipient->preferredEmail);
-            foreach (array("firstName", "lastName", "name", "fullName") as $k)
-                if (get($this->recipient, $k))
+            foreach (["firstName", "lastName", "name", "fullName"] as $k)
+                if (($this->recipient->$k ?? "") !== "")
                     $recipient->$k = $this->recipient->$k;
         }
         $prep->to = array(Text::user_email_to($recipient));
@@ -470,14 +485,14 @@ class Mailer {
                     $prep->headers[$lcfield] = $hdr . $eol;
                 else {
                     $prep->errors[$lcfield] = $text;
-                    if (!get($rest, "no_error_quit"))
+                    if (!($rest["no_error_quit"] ?? false))
                         Conf::msg_error("$field destination “<samp>" . htmlspecialchars($text) . "</samp>” isn't a valid email list.");
                 }
             }
         $prep->headers["mime-version"] = "MIME-Version: 1.0" . $eol;
         $prep->headers["content-type"] = "Content-Type: text/plain; charset=utf-8" . $eol;
 
-        if ($prep->errors && !get($rest, "no_error_quit"))
+        if ($prep->errors && !($rest["no_error_quit"] ?? false))
             return false;
         else
             return $prep;
@@ -486,16 +501,16 @@ class Mailer {
     static function preparation_differs($prep1, $prep2) {
         return $prep1->subject != $prep2->subject
             || $prep1->body != $prep2->body
-            || get($prep1->headers, "cc") != get($prep2->headers, "cc")
-            || get($prep1->headers, "reply-to") != get($prep2->headers, "reply-to")
+            || ($prep1->headers["cc"] ?? null) !== ($prep2->headers["cc"] ?? null)
+            || ($prep1->headers["reply-to"] ?? null) != ($prep2->headers["reply-to"] ?? null)
             || $prep1->preparation_owner != $prep2->preparation_owner;
     }
 
+    /** @param list<string> $to */
     static function merge_preparation_to($prep, $to) {
-        if (is_object($to) && isset($to->to))
-            $to = $to->to;
-        if (count($to) != 1 || count($prep->to) == 0
-            || $prep->to[count($prep->to) - 1] != $to[0])
+        if (count($to) !== 1
+            || count($prep->to) === 0
+            || $prep->to[count($prep->to) - 1] !== $to[0])
             $prep->to = array_merge($prep->to, $to);
     }
 

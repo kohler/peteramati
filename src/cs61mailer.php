@@ -8,48 +8,40 @@ class CS61Mailer extends Mailer {
     protected $permissionContact = null;
     protected $contacts = array();
 
-    protected $row = null;
-    protected $pset = null;
-    protected $_info = null;
+    protected $row;
+    /** @var ?Pset */
+    protected $pset;
+    /** @var ?PsetView */
+    protected $_info;
 
-    protected $_tagger = null;
-    protected $_tagless = array();
-    protected $_tags = array();
+    protected $_tagless = [];
+    protected $_tags = [];
 
 
-    function __construct($recipient = null, $row = null, $rest = array()) {
+    function __construct($recipient = null, $row = null, $rest = []) {
         parent::__construct();
         $this->reset($recipient, $row, $rest);
     }
 
-    function reset($recipient = null, $row = null, $rest = array()) {
+    /** @param ?Contact $recipient
+     * @param array<string,mixed> $rest */
+    function reset($recipient = null, $row = null, $rest = []) {
         global $Me, $Opt;
-        $this->recipient = $recipient;
-        $this->permissionContact = $rest["permissionContact"] ?? $recipient;
-        foreach (array("width", "sensitivity", "reason", "adminupdate", "notes",
-                       "capability", "pset") as $k)
-            $this->$k = @$rest[$k];
+        parent::reset($recipient, $rest);
+        $this->permissionContact = $rest["permissionContact"] ?? $this->recipient;
         $this->row = $row;
+        $this->pset = $rest["pset"] ?? null;
         $this->_info = null;
-        // Fix width
-        if ($this->width === null)
-            $this->width = 75;
-        else if (!$this->width)
-            $this->width = 10000000;
         // Do not put passwords in email that is cc'd elsewhere
         if ((!$Me || !$Me->privChair || @$Opt["chairHidePasswords"])
             && (@$rest["cc"] || @$rest["bcc"])
-            && (@$rest["sensitivity"] === null || @$rest["sensitivity"] === "display"))
-            $this->sensitivity = "high";
+            && (@$rest["sensitive"] === null || @$rest["sensitive"] === "display")) {
+            $this->sensitive = "high";
+        }
     }
 
 
-    private function tagger()  {
-        if (!$this->_tagger)
-            $this->_tagger = new Tagger($this->permissionContact);
-        return $this->_tagger;
-    }
-
+    /** @return ?PsetView */
     private function get_pset_info() {
         if (!$this->_info && $this->pset) {
             $this->_info = PsetView::make($this->pset, $this->recipient, $this->permissionContact);
@@ -108,10 +100,7 @@ class CS61Mailer extends Mailer {
             if ($this->pset->gitless)
                 return $isbool ? false : self::EXPANDVAR_CONTINUE;
             $info = $this->get_pset_info();
-            $recent = null;
-            if ($info && $info->hash()) {
-                $recent = $info->commit();
-            }
+            $recent = $info && $info->hash() ? $info->commit() : null;
             if (!$recent) {
                 if ($isbool) {
                     return false;
@@ -120,38 +109,36 @@ class CS61Mailer extends Mailer {
                 } else {
                     return "(no commit)";
                 }
-            }
-            if ($what == "%COMMITHASH%")
+            } else if ($what == "%COMMITHASH%") {
                 return $recent->hash;
-            if ($what == "%COMMITABBREV%")
+            } else if ($what == "%COMMITABBREV%") {
                 return substr($recent->hash, 0, 7);
-            if ($what == "%COMMIT%" && !$recent)
-                return substr($recent->hash, 0, 7);
-            else if (!$recent)
-                return $isbool ? false : "(unknown)";
-            else if ($what == "%COMMITTITLE%")
+            } else if ($what == "%COMMITTITLE%") {
                 return $recent->subject ? : "(empty)";
-            else if ($what == "%COMMIT%") {
-	        $subject = UnicodeHelper::utf8_prefix($recent->subject, 72);
-                if (strlen($subject) != strlen($recent->subject))
+            } else if ($what == "%COMMIT%") {
+                $subject = UnicodeHelper::utf8_prefix($recent->subject, 72);
+                if (strlen($subject) != strlen($recent->subject)) {
                     $subject .= "...";
+                }
                 return substr($recent->hash, 0, 7) . ($subject === "" ? "" : " $subject");
-            } else if ($what == "%COMMITDATE%")
+            } else if ($what == "%COMMITDATE%") {
                 return date("Y/m/d H:i:s", $recent->commitat);
-            else if ($what == "%LATEHOURS%") {
+            } else if ($what == "%LATEHOURS%") {
                 // XXX should use PsetView::late_hours
                 if ($this->pset->deadline_extension
                     && ($this->recipient->extension
-                        || ($info->partner && $info->partner->extension)))
+                        || ($info->partner && $info->partner->extension))) {
                     $deadline = $this->pset->deadline_extension;
-                else if ($this->pset->deadline_college)
+                } else if ($this->pset->deadline_college) {
                     $deadline = $this->pset->deadline_college;
-                else
+                } else {
                     $deadline = $this->pset->deadline;
-                if (!$deadline || $recent->commitat <= $deadline)
+                }
+                if (!$deadline || $recent->commitat <= $deadline) {
                     return $isbool ? false : "0";
-                else
+                } else {
                     return (string) (int) (($recent->commitat - $deadline + 3599) / 3600);
+                }
             }
         }
         if ($what == "%GRADEENTRIES%") {
@@ -196,6 +183,7 @@ class CS61Mailer extends Mailer {
         return $m;
     }
 
+    /** @return int */
     function nwarnings() {
         return count($this->_unexpanded) + count($this->_tagless);
     }
@@ -231,5 +219,3 @@ global $ConfSitePATH, $Opt;
 require_once("$ConfSitePATH/src/mailtemplate.php");
 if ((@include "$ConfSitePATH/conf/mailtemplate-local.php") !== false)
     /* do nothing */;
-if (@$Opt["mailtemplate_include"])
-    read_included_options($ConfSitePATH, $Opt["mailtemplate_include"]);

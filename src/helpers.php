@@ -81,11 +81,6 @@ function json_update($j, $updates) {
         }
     }
     foreach ($updates as $k => $v) {
-        if ($k === "") {
-            global $Me;
-            error_log(json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)) . ", user $Me->email");
-            continue;
-        }
         if (is_object($v) || is_associative_array($v)) {
             $v = json_update(isset($j[$k]) ? $j[$k] : null, $v);
         }
@@ -107,6 +102,8 @@ function json_update($j, $updates) {
     return array_values($j);
 }
 
+/** @param mixed $j
+ * @return bool */
 function is_json_null_update($j) {
     if (is_object($j) || is_associative_array($j)) {
         if (is_object($j)) {
