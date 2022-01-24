@@ -34,13 +34,14 @@ if (!$file) {
 }
 
 $prefix = "";
-if (preg_match(',\A(?:images|scripts|stylesheets)(?:/[^./][^/]+)+\z,', $file)
-    && preg_match(',.*(\.[a-z0-9]*)\z,', $file, $m)) {
+if (preg_match('/\A(?:images|scripts|stylesheets)(?:\/[^.\/][^\/]+)+\z/', $file)
+    && preg_match('/.*(\.[a-z0-9]*)\z/', $file, $m)) {
     $s = $m[1];
     if ($s === ".js") {
         header("Content-Type: text/javascript; charset=utf-8");
-        if (isset($_GET["strictjs"]) && $_GET["strictjs"])
+        if (isset($_GET["strictjs"]) && $_GET["strictjs"]) {
             $prefix = "\"use strict\";\n";
+        }
     } else if ($s === ".map" || $s === ".json") {
         header("Content-Type: application/json; charset=utf-8");
     } else if ($s === ".css") {
