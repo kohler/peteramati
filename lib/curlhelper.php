@@ -8,16 +8,16 @@ libxml_use_internal_errors(true);
 class CurlHelper {
     /** @var CurlHandle */
     public $curlh;
-    /** @var string|false */
+    /** @var string */
     private $cookiefile;
     /** @var bool */
     private $temp_cookiefile;
-    /** @var ?resource */
+    /** @var resource */
     private $headerf;
-    /** @var ?resource */
+    /** @var resource */
     private $bodyf;
 
-    /** @var ?int */
+    /** @var int */
     public $status_code;
     /** @var string */
     public $header_string;
@@ -27,7 +27,7 @@ class CurlHelper {
     public $full_content_type;
     /** @var string */
     public $content_type;
-    /** @var string */
+    /** @var ?string */
     public $content_encoding;
 
     /** @var string */
@@ -55,6 +55,8 @@ class CurlHelper {
 
     /** @var bool */
     static public $verbose = false;
+    /** @var ?callable(string) */
+    static public $log_function;
 
     /** @param ?string $cookiefile */
     function __construct($cookiefile = null) {
@@ -315,7 +317,7 @@ class CurlHelper {
 
         curl_setopt($this->curlh, CURLOPT_URL, $url);
         if (self::$verbose) {
-            error_log("===================================================================");
+            self::verbose_log("===================================================================\n");
             curl_setopt($this->curlh, CURLINFO_HEADER_OUT, true);
         }
         curl_exec($this->curlh);
@@ -328,7 +330,7 @@ class CurlHelper {
                     $pout = json_encode($this->next_parameters);
                 }
             }
-            error_log(curl_getinfo($this->curlh, CURLINFO_HEADER_OUT) . $pout);
+            self::verbose_log(curl_getinfo($this->curlh, CURLINFO_HEADER_OUT) . $pout . "\n");
         }
 
         rewind($this->headerf);
@@ -357,9 +359,9 @@ class CurlHelper {
         $this->content_string = $this->encoded_content_string = stream_get_contents($this->bodyf);
 
         if (self::$verbose) {
-            error_log("> > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > >");
-            error_log($this->header_string);
-            error_log($this->content_string);
+            self::verbose_log("> > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > >\n");
+            self::verbose_log($this->header_string);
+            self::verbose_log($this->content_string . "\n");
         }
 
         $this->content_dom = $this->content_dom_errors = null;
@@ -523,5 +525,16 @@ class CurlHelper {
             }
         }
         return $result;
+    }
+
+    /** @param string $s */
+    static function verbose_log($s) {
+        if ($s !== null && $s !== "" && self::$verbose) {
+            if (self::$log_function) {
+                call_user_func(self::$log_function, $s);
+            } else {
+                error_log(rtrim($s));
+            }
+        }
     }
 }

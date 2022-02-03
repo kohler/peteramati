@@ -173,26 +173,26 @@ class RunQueueBatch {
             "V,verbose",
             "help"
         )->helpopt("help")->description("php batch/runqueue.php")->parse($argv);
-        $rqb = new RunQueueBatch($conf);
+        $self = new RunQueueBatch($conf);
         if (isset($arg["q"]) || isset($arg["c"]) || isset($arg["1"])) {
-            $rqb->is_execute = false;
+            $self->is_execute = false;
         }
         if (isset($arg["q"])) {
-            $rqb->is_query = true;
+            $self->is_query = true;
         }
         if (isset($arg["c"])) {
-            $rqb->is_clean = true;
+            $self->is_clean = true;
         }
         if (isset($arg["1"])) {
-            $rqb->is_execute1 = true;
+            $self->is_execute1 = true;
         }
         if (isset($arg["x"])) {
-            $rqb->is_execute = true;
+            $self->is_execute = true;
         }
         if (isset($arg["V"])) {
-            $rqb->verbose = true;
+            $self->verbose = true;
         }
-        return $rqb;
+        return $self;
     }
 }
 
