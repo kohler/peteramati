@@ -1,7 +1,7 @@
 PREFIX ?= /usr/local
 BINDIR = $(DESTDIR)$(PREFIX)/bin
 
-all: pa-timeout pa-writefifo pa-jail pa-jail-owner
+all: pa-timeout pa-jail pa-jail-owner
 
 pa-jail: pa-jail.cc
 	$(CXX) -std=gnu++0x -W -Wall -g -O2 -o $@ $@.cc
@@ -26,10 +26,10 @@ pa-writefifo: pa-writefifo.c
 clean:
 	rm -f pa-jail pa-timeout pa-writefifo
 
-install: pa-jail pa-timeout pa-writefifo
+install: pa-jail pa-timeout
 	install -d $(BINDIR)
 	install -mu+rwxs,g+rxs,o+rx pa-jail $(BINDIR)
-	install pa-timeout pa-trace pa-writefifo $(BINDIR)
+	install pa-timeout pa-trace $(BINDIR)
 
 always:
 	@:

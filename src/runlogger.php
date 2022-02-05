@@ -137,15 +137,17 @@ class RunLogger {
     /** @param int $jobid
      * @param string $data */
     function job_write($jobid, $data) {
-        $logbase = $this->job_prefix($jobid);
-        $proc = proc_open(SiteLoader::$root . "/jail/pa-writefifo " . escapeshellarg("{$logbase}.in"),
-                          [["pipe", "r"]], $pipes);
-        if ($pipes[0]) {
-            fwrite($pipes[0], $data);
-            fclose($pipes[0]);
-        }
-        if ($proc) {
-            proc_close($proc);
+        $len = strlen($data);
+        if ($len !== 0
+            && ($file = @fopen($this->job_prefix($jobid) . ".in", "wn"))) {
+            while (true) {
+                $nw = fwrite($file, $pos ? substr($data, $pos) : $data, 16384);
+                if ($nw === false || $pos + $nw === $len) {
+                    break;
+                }
+                $pos += $nw;
+            }
+            fclose($file);
         }
     }
 
