@@ -2168,8 +2168,16 @@ int jailownerinfo::exec_go() {
             perror_die("setresuid");
         }
         // create pty
-        if ((ptymaster = posix_openpt(O_RDWR)) == -1) {
+        if ((ptymaster = posix_openpt(O_RDWR | O_NOCTTY)) == -1) {
             perror_die("posix_openpt");
+        }
+        struct termios tty;
+        if (tcgetattr(ptymaster, &tty) >= 0) {
+            tty.c_iflag |= BRKINT | IGNPAR | IMAXBEL;
+#ifdef IUTF8
+            tty.c_iflag |= IUTF8;
+#endif
+            tcsetattr(ptymaster, TCSANOW, &tty);
         }
         if (grantpt(ptymaster) == -1) {
             perror_die("grantpt");
@@ -2253,12 +2261,16 @@ int jailownerinfo::exec_go() {
                 ioctl(ptyslave, TIOCSWINSZ, &ws);
             }
 #endif
-            if (no_onlcr) {
-                struct termios tty;
-                if (tcgetattr(ptyslave, &tty) >= 0) {
+            struct termios tty;
+            if (tcgetattr(ptyslave, &tty) >= 0) {
+                tty.c_iflag |= BRKINT | IGNPAR | IMAXBEL;
+#ifdef IUTF8
+                tty.c_iflag |= IUTF8;
+#endif
+                if (no_onlcr) {
                     tty.c_oflag &= ~ONLCR;
-                    tcsetattr(ptyslave, TCSANOW, &tty);
                 }
+                tcsetattr(ptyslave, TCSANOW, &tty);
             }
 
             if (inputfd_ > 0 || stdin_tty_) {

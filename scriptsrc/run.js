@@ -28,6 +28,7 @@ function make_xterm_write_handler(write) {
                     key = "";
                 }
             } else {
+                // send escape sequences compatible with xterm256-color terminfo
                 if (key === "Enter" && !mod) {
                     key = "\r";
                 } else if (key === "Escape" && !mod) {
@@ -37,13 +38,17 @@ function make_xterm_write_handler(write) {
                 } else if (key === "Tab" && !mod) {
                     key = "\x09";
                 } else if (key === "ArrowUp" && !mod) {
-                    key = "\x1B[A";
+                    key = "\x1BOA";
                 } else if (key === "ArrowDown" && !mod) {
-                    key = "\x1B[B";
+                    key = "\x1BOB";
                 } else if (key === "ArrowRight" && !mod) {
-                    key = "\x1B[C";
+                    key = "\x1BOC";
                 } else if (key === "ArrowLeft" && !mod) {
-                    key = "\x1B[D";
+                    key = "\x1BOD";
+                } else if (key === "PageUp" && !mod) {
+                    key = "\x1B[5~";
+                } else if (key === "PageDown" && !mod) {
+                    key = "\x1B[6~";
                 } else {
                     key = "";
                 }
@@ -255,15 +260,15 @@ export function run(button, opts) {
     function parse_times(times) {
         let a = [0, 0], p = 0;
         while (p < times.length) {
-            const c = times.indexOf(",", p);
-            if (c < 0) {
-                break;
-            }
-            let n = times.indexOf("\n", c + 1);
+            let n = times.indexOf("\n", p + 1), c;
             if (n < 0) {
                 n = times.length;
             }
-            a.push(+times.substring(p, c), +times.substring(c + 1, n));
+            if (times.charCodeAt(p) !== 35 /* # */
+                && (c = times.indexOf(",", p)) >= 0
+                && c < n) {
+                a.push(+times.substring(p, c), +times.substring(c + 1, n));
+            }
             p = n + 1;
         }
         return a;

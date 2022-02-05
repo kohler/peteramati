@@ -140,6 +140,7 @@ class RunLogger {
         $len = strlen($data);
         if ($len !== 0
             && ($file = @fopen($this->job_prefix($jobid) . ".in", "wn"))) {
+            $pos = 0;
             while (true) {
                 $nw = fwrite($file, $pos ? substr($data, $pos) : $data, 16384);
                 if ($nw === false || $pos + $nw === $len) {
