@@ -49,7 +49,7 @@ if ($Conf->opt("httpAuthLogin")) {
 // set interesting user
 $User = null;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u, $Me))) {
+    && !($User = ContactView::prepare_user($Qreq, $Me))) {
     redirectSelf(["u" => null]);
 }
 if (!$Me->isPC || !$User) {

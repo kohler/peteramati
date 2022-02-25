@@ -5,11 +5,14 @@
 
 require_once("lib/navigation.php");
 
-function choose_page($page) {
+/** @param NavigationState $nav
+ * @return string */
+function choose_page($nav) {
+    $page = $nav->page;
     if ($page !== "" && $page[0] === "~") {
-        $xpage = Navigation::path_component(0, true);
-        Navigation::set_path("/" . $page . Navigation::path_suffix(1));
-        $page = Navigation::set_page($xpage ?? "index");
+        $xpage = $nav->path_component(0, true);
+        $nav->set_path("/" . $nav->raw_page . $nav->path_suffix(1));
+        $page = $nav->set_page($xpage ?? "index");
     }
     $i = strlen($page) - 4;
     if ($i > 0 && substr($page, $i) === ".php") {
@@ -23,7 +26,7 @@ function choose_page($page) {
         && strpos($page, "/") === false) {
         return $page . ".php";
     } else if ($page === "images" || $page === "scripts" || $page === "stylesheets") {
-        $_GET["file"] = $page . Navigation::path();
+        $_GET["file"] = $page . $nav->path;
         return "cacheable.php";
     } else {
         header("HTTP/1.0 404 Not Found");
@@ -31,7 +34,7 @@ function choose_page($page) {
     }
 }
 
-if (($page = choose_page(Navigation::page()))) {
+if (($page = choose_page(Navigation::get()))) {
     include $page;
 } else {
     require_once("pages/home.php");

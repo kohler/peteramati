@@ -1,6 +1,6 @@
 <?php
 // navigation.php -- HotCRP navigation helper functions
-// Copyright (c) 2006-2020 Eddie Kohler; see LICENSE.
+// Copyright (c) 2006-2022 Eddie Kohler; see LICENSE.
 
 class NavigationState {
     // Base URL:    PROTOCOL://HOST[:PORT]/BASEPATH/
@@ -17,11 +17,13 @@ class NavigationState {
     /** @var string */
     public $site_path_relative; // "/SITEPATH/", "../"+, or ""
     /** @var string */
-    public $base_path;          // "/BASEPATH/"; always ends in /; $site_path prefix
+    public $base_path;          // "/BASEPATH/"; always ends in /; prefix of $site_path
     /** @var string */
     public $base_path_relative; // "/BASEPATH/", "../"+, or ""
     /** @var string */
     public $page;               // "PAGE" or "index" (.php suffix stripped)
+    /** @var string */
+    public $raw_page;           // "PAGE" or "", with .php suffix if given
     /** @var string */
     public $path;               // "/PATH" or ""
     /** @var string */
@@ -35,24 +37,19 @@ class NavigationState {
 
     // server variables:
     //   required: SERVER_PORT, SCRIPT_FILENAME, SCRIPT_NAME, REQUEST_URI
-    //   optional: HTTP_HOST, SERVER_NAME, HTTPS, SERVER_SOFTWARE
+    //   optional: HTTP_HOST, SERVER_NAME, HTTPS, REQUEST_SCHEME
 
     function __construct($server, $index_name = "index") {
         if (!$server) {
             return;
         }
 
-        $this->host = null;
-        if (isset($server["HTTP_HOST"])) {
-            $this->host = $server["HTTP_HOST"];
-        }
-        if (!$this->host && isset($server["SERVER_NAME"])) {
-            $this->host = $server["SERVER_NAME"];
-        }
-
-        if (isset($server["HTTPS"])
-            && $server["HTTPS"] !== ""
-            && $server["HTTPS"] !== "off") {
+        $this->host = $server["HTTP_HOST"] ?? $server["SERVER_NAME"] ?? null;
+        if ((isset($server["HTTPS"])
+             && $server["HTTPS"] !== ""
+             && $server["HTTPS"] !== "off")
+            || ($server["HTTP_X_FORWARDED_PROTO"] ?? null) === "https"
+            || ($server["REQUEST_SCHEME"] ?? null) === "https") {
             $x = "https://";
             $xport = 443;
         } else {
@@ -111,15 +108,15 @@ class NavigationState {
                 return $m[0];
             }
         }, $uri_suffix);
-        preg_match(',\A(/[^/\?\#]*|)([^\?\#]*)(.*)\z,', $uri_suffix, $m);
+        preg_match('/\A(\/[^\/\?\#]*|)([^\?\#]*)(.*)\z/', $uri_suffix, $m);
         if ($m[1] !== "" && $m[1] !== "/") {
-            $this->page = substr($m[1], 1);
+            $this->raw_page = $this->page = substr($m[1], 1);
         } else {
+            $this->raw_page = "";
             $this->page = $index_name;
         }
-        if (($pagelen = strlen($this->page)) > 4
-            && substr($this->page, $pagelen - 4) === ".php") {
-            $this->page = substr($this->page, 0, $pagelen - 4);
+        if (str_ends_with($this->page, ".php")) {
+            $this->page = substr($this->page, 0, -4);
         }
         $this->path = $m[2];
         $this->shifted_path = "";
@@ -151,7 +148,7 @@ class NavigationState {
 
     /** @return string */
     function self() {
-        return "{$this->server}{$this->site_path}{$this->page}{$this->path}{$this->query}";
+        return "{$this->server}{$this->site_path}{$this->raw_page}{$this->path}{$this->query}";
     }
 
     /** @param bool $downcase_host
@@ -203,6 +200,22 @@ class NavigationState {
         return ($this->site_path_relative = $url);
     }
 
+    /** @param string $page
+     * @return string */
+    function set_page($page) {
+        $this->raw_page = $page;
+        if (str_ends_with($page, ".php")) {
+            $page = substr($page, 0, -4);
+        }
+        return ($this->page = $page);
+    }
+
+    /** @param string $path
+     * @return string */
+    function set_path($path) {
+        return ($this->path = $path);
+    }
+
     /** @param int $n
      * @param bool $decoded
      * @return ?string */
@@ -237,7 +250,7 @@ class NavigationState {
     function shift_path_components($n) {
         $nx = $n;
         $pos = 0;
-        $path = $this->page . $this->path;
+        $path = $this->raw_page . $this->path;
         while ($n > 0 && $pos < strlen($path)) {
             if (($pos = strpos($path, "/", $pos)) !== false) {
                 ++$pos;
@@ -260,22 +273,24 @@ class NavigationState {
         if ($pos < strlen($path) && ($spos = strpos($path, "/", $pos)) === false) {
             $spos = strlen($path);
         }
-        $this->page = ($pos === $spos ? "index" : substr($path, $pos, $spos - $pos));
-        if (($pagelen = strlen($this->page)) > 4
-            && substr($this->page, $pagelen - 4) === ".php") {
-            $this->page = substr($this->page, 0, $pagelen - 4);
+        if ($pos !== $spos) {
+            $this->raw_page = $this->page = substr($path, $pos, $spos - $pos);
+        } else {
+            $this->raw_page = "";
+            $this->page = "index";
+        }
+        if (str_ends_with($this->page, ".php")) {
+            $this->page = substr($this->page, 0, -4);
         }
         $this->path = (string) substr($path, $spos);
         return $this->page;
     }
 
-    /** @param null|false|string $url
+    /** @param string $url
+     * @param ?string $siteref
      * @return string */
-    function make_absolute($url) {
-        if ($url === false || $url === null) {
-            return $this->server . $this->site_path;
-        }
-        preg_match(',\A((?:https?://[^/]+)?)(/*)((?:[.][.]/)*)(.*)\z,i', $url, $m);
+    function make_absolute($url, $siteref = null) {
+        preg_match('/\A((?:https?:\/\/[^\/]+)?)(\/*)((?:\.\.\/)*)(.*)\z/i', $url, $m);
         if ($m[1] !== "") {
             return $url;
         } else if (strlen($m[2]) > 1) {
@@ -283,13 +298,27 @@ class NavigationState {
         } else if ($m[2] === "/") {
             return $this->server . $url;
         } else {
-            $site = substr($this->request_uri, 0, strlen($this->request_uri) - strlen($this->query));
-            $site = preg_replace('/\/[^\/]+\z/', "/", $site);
+            if ($siteref === null) {
+                $siteref = preg_replace('/\/[^\/]+\z/', "/",
+                    substr($this->request_uri, 0, strlen($this->request_uri) - strlen($this->query)));
+            }
             while ($m[3]) {
-                $site = preg_replace('/\/[^\/]+\/\z/', "/", $site);
+                $siteref = preg_replace('/\/[^\/]+\/\z/', "/", $siteref);
                 $m[3] = substr($m[3], 3);
             }
-            return $this->server . $site . $m[3] . $m[4];
+            return "{$this->server}{$siteref}{$m[3]}{$m[4]}";
+        }
+    }
+
+    /** @param bool $allow_http_if_localhost
+     * @return void */
+    function redirect_http_to_https($allow_http_if_localhost = false) {
+        if ($this->protocol == "http://"
+            && (!$allow_http_if_localhost
+                || ($_SERVER["REMOTE_ADDR"] !== "127.0.0.1"
+                    && $_SERVER["REMOTE_ADDR"] !== "::1"))) {
+            Navigation::redirect_absolute("https://" . ($this->host ? : "localhost")
+                . $this->siteurl_path("{$this->page}{$this->php_suffix}{$this->path}{$this->query}"));
         }
     }
 }
@@ -338,6 +367,11 @@ class Navigation {
     /** @return string */
     static function site_path() {
         return self::$s->site_path;
+    }
+
+    /** @return string */
+    static function base_path() {
+        return self::$s->base_path;
     }
 
     /** @param ?string $url
@@ -395,7 +429,7 @@ class Navigation {
     /** @param string $page
      * @return string */
     static function set_page($page) {
-        return (self::$s->page = $page);
+        return self::$s->set_page($page);
     }
 
     /** @param string $path
@@ -410,13 +444,15 @@ class Navigation {
     }
 
     /** @param string $url
+     * @param ?string $siteref
      * @return string */
-    static function make_absolute($url) {
-        return self::$s->make_absolute($url);
+    static function make_absolute($url, $siteref = null) {
+        return self::$s->make_absolute($url, $siteref);
     }
 
     /** @param ?string $url
-     * @return void */
+     * @return void
+     * @deprecated */
     static function redirect($url = null) {
         $url = self::make_absolute($url);
         // Might have an HTML-encoded URL; decode at least &amp;.
@@ -425,11 +461,18 @@ class Navigation {
         foreach (self::$redirect_callbacks ?? [] as $cb) {
             call_user_func($cb);
         }
-        if (preg_match('/\A[a-z]+:\/\//', $url)) {
-            header("Location: $url");
-        }
+        self::redirect_absolute($url);
+    }
 
-        echo "<!DOCTYPE html><html lang=\"en\"><head>
+    /** @param string $url
+     * @return void */
+    static function redirect_absolute($url) {
+        assert(str_starts_with($url, "https://") || str_starts_with($url, "http://"));
+        // Might have an HTML-encoded URL; decode at least &amp;.
+        $url = str_replace("&amp;", "&", $url);
+        header("Location: $url");
+        echo "<!DOCTYPE html>
+<html lang=\"en\"><head>
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
 <meta http-equiv=\"Content-Script-Type\" content=\"text/javascript\" />
 <title>Redirection</title>

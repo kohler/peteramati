@@ -75,30 +75,30 @@ class ContactView {
         }
     }
 
-    /** @param Contact $viewer
+    /** @param Qrequest $qreq
      * @param ?Pset $pset
      * @return ?Contact */
-    static function prepare_user(&$usertext, $viewer, $pset = null) {
+    static function prepare_user($qreq, $viewer, $pset = null) {
         $user = $viewer;
-        if (isset($usertext) && $usertext) {
-            $user = $viewer->conf->user_by_whatever($usertext);
+        if (isset($qreq->u) && $qreq->u) {
+            $user = $viewer->conf->user_by_whatever($qreq->u);
             if (!$user) {
-                $viewer->conf->errorMsg("No such user “" . htmlspecialchars($usertext) . "”.");
+                $viewer->conf->errorMsg("No such user “" . htmlspecialchars($qreq->u) . "”.");
             } else if ($user->contactId == $viewer->contactId) {
                 $user = $viewer;
             } else if (!$viewer->isPC) {
                 $viewer->conf->errorMsg("You can’t see that user’s information.");
                 $user = null;
             } else {
-                $user->set_anonymous(substr($usertext, 0, 5) === "[anon"
+                $user->set_anonymous(substr($qreq->u, 0, 5) === "[anon"
                                      || ($pset && $pset->anonymous));
             }
         }
         if ($user && ($viewer->isPC || $viewer->chairContact)) {
             if ($pset && $pset->anonymous) {
-                $usertext = $user->anon_username;
+                $qreq->u = $user->anon_username;
             } else {
-                $usertext = $user->username ? : $user->email;
+                $qreq->u = $user->username ? : $user->email;
             }
         }
         return $user;

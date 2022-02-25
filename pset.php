@@ -29,7 +29,7 @@ class PsetRequest {
 
         // user
         if (isset($qreq->u)) {
-            $this->user = ContactView::prepare_user($qreq->u, $viewer);
+            $this->user = ContactView::prepare_user($qreq, $viewer);
             if (!$this->user) {
                 $this->conf->redirect_self($qreq, ["u" => null]);
             }

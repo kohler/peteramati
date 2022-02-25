@@ -11,9 +11,9 @@ if ($Me->is_empty()) {
 }
 
 $User = $Me;
-if (isset($_REQUEST["u"])
+if (isset($Qreq->u)
     && (!$Me->isPC
-        || !($User = ContactView::prepare_user($_REQUEST["u"], $Me))))
+        || !($User = ContactView::prepare_user($Qreq, $Me))))
     redirectSelf(array("u" => null));
 assert($User == $Me || $Me->isPC);
 assert($Me->privChair);

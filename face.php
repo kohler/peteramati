@@ -114,7 +114,7 @@ class Face_Page {
         ContactView::set_path_request($qreq, ["/u"], $viewer->conf);
         $user = $viewer;
         if (isset($qreq->u)) {
-            $user = ContactView::prepare_user($qreq->u, $viewer);
+            $user = ContactView::prepare_user($qreq, $viewer);
         }
 
         if (isset($qreq->imageid)) {

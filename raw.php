@@ -26,7 +26,7 @@ ContactView::set_path_request($Qreq, ["/@", "/@/p", "/@/p/h/f", "/@/p/f",
 // user, pset, runner
 $User = $Me;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u, $Me))) {
+    && !($User = ContactView::prepare_user($Qreq, $Me))) {
     exit;
 }
 assert($User == $Me || $Me->isPC);

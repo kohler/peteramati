@@ -39,7 +39,7 @@ class RunRequest {
         $this->user = $this->viewer = $viewer;
         $this->qreq = $qreq;
         if ($qreq->u !== null
-            && !($this->user = ContactView::prepare_user($qreq->u, $viewer))) {
+            && !($this->user = ContactView::prepare_user($qreq, $viewer))) {
             json_exit(["ok" => false]);
         }
         assert($this->user === $this->viewer || $this->viewer->isPC);

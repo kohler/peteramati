@@ -12,7 +12,7 @@ if ($Me->is_empty()) {
 
 $User = $Me;
 if (isset($Qreq->u)
-    && !($User = ContactView::prepare_user($Qreq->u, $Me))) {
+    && !($User = ContactView::prepare_user($Qreq, $Me))) {
     redirectSelf(["u" => null]);
 }
 assert($User === $Me || $Me->isPC);

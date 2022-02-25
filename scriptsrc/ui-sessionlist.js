@@ -99,7 +99,7 @@ function set_cookie(info, sitehref) {
     if (siteinfo.site_relative && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base()))) {
         p += "; Path=" + m[1];
     }
-    document.cookie = "hotlist-info-" + cookie_set_at + "=" + encodeURIComponent(digest) + siteinfo.cookie_params + p;
+    document.cookie = "hotlist-info-".concat(cookie_set_at, "=", encodeURIComponent(digest), siteinfo.cookie_params, p);
 }
 
 function is_listable(sitehref) {
