@@ -5,24 +5,6 @@
 require_once("init.php");
 global $Conf, $Me, $Opt, $Qreq;
 
-// Check method: GET/HEAD/POST only, except OPTIONS is allowed for API calls
-if ($_SERVER["REQUEST_METHOD"] !== "GET"
-    && $_SERVER["REQUEST_METHOD"] !== "HEAD"
-    && $_SERVER["REQUEST_METHOD"] !== "POST"
-    && (Navigation::page() !== "api"
-        || $_SERVER["REQUEST_METHOD"] !== "OPTIONS")) {
-    header("HTTP/1.0 405 Method Not Allowed");
-    exit;
-}
-
-// Collect $Qreq
-$Qreq = Qrequest::make_global();
-
-// Check for redirect to https
-if ($Opt["redirectToHttps"] ?? false) {
-    Navigation::redirect_http_to_https($Opt["allowLocalHttp"] ?? false);
-}
-
 // Check and fix zlib output compression
 global $zlib_output_compression;
 $zlib_output_compression = false;
@@ -33,20 +15,41 @@ if ($zlib_output_compression) {
     header("Vary: Accept-Encoding", false);
 }
 
-// Mark as already expired to discourage caching, but allow the browser
-// to cache for history buttons
-header("Cache-Control: max-age=0,must-revalidate,private");
-
-// Don't set up a session if $Me is false
-if ($Me === false) {
-    return;
-}
-
-
 // Initialize user
-function initialize_user() {
-    global $Qreq;
+function initialize_request() {
     $conf = Conf::$main;
+    $nav = Navigation::get();
+
+    // check PHP suffix
+    if (($php_suffix = $conf->opt("phpSuffix")) !== null) {
+        $nav->php_suffix = $php_suffix;
+    }
+
+    // maybe redirect to https
+    if ($conf->opt("redirectToHttps")) {
+        $nav->redirect_http_to_https($conf->opt("allowLocalHttp"));
+    }
+
+    // collect $qreq
+    $qreq = Qrequest::make_global();
+
+    // check method
+    if ($qreq->method() !== "GET"
+        && $qreq->method() !== "POST"
+        && $qreq->method() !== "HEAD"
+        && ($qreq->method() !== "OPTIONS" || $nav->page !== "api")) {
+        header("HTTP/1.0 405 Method Not Allowed");
+        exit;
+    }
+
+    // mark as already expired to discourage caching, but allow the browser
+    // to cache for history buttons
+    header("Cache-Control: max-age=0,must-revalidate,private");
+
+    // skip user initialization if requested
+    if ($conf->opt["__no_main_user"] ?? null) {
+        return;
+    }
 
     // set up session
     if (($sh = $conf->opt["sessionHandler"] ?? null)) {
@@ -58,15 +61,11 @@ function initialize_user() {
     $sn = session_name();
 
     // check CSRF token, using old value of session ID
-    if ($Qreq->post && $sn) {
-        if (isset($_COOKIE[$sn])) {
-            $sid = $_COOKIE[$sn];
-            $l = strlen($Qreq->post);
-            if ($l >= 8 && $Qreq->post === substr($sid, strlen($sid) > 16 ? 8 : 0, $l))
-                $Qreq->approve_token();
-        } else if ($Qreq->post === "<empty-session>"
-                   || $Qreq->post === ".empty") {
-            $Qreq->approve_token();
+    if ($qreq->post && $sn && isset($_COOKIE[$sn])) {
+        $sid = $_COOKIE[$sn];
+        $l = strlen($qreq->post);
+        if ($l >= 8 && $qreq->post === substr($sid, strlen($sid) > 16 ? 8 : 0, $l)) {
+            $qreq->approve_token();
         }
     }
     ensure_session(ENSURE_SESSION_ALLOW_EMPTY);
@@ -77,7 +76,6 @@ function initialize_user() {
     }
 
     // determine user
-    $nav = Navigation::get();
     $trueemail = isset($_SESSION["u"]) ? $_SESSION["u"] : null;
 
     // look up and activate user
@@ -88,7 +86,7 @@ function initialize_user() {
     if (!$guser) {
         $guser = new Contact($trueemail ? (object) ["email" => $trueemail] : null);
     }
-    $guser = $guser->activate($Qreq, true);
+    $guser = $guser->activate($qreq, true);
     Contact::set_main_user($guser);
 
     // redirect if disabled
@@ -96,7 +94,7 @@ function initialize_user() {
         if ($nav->page === "api") {
             json_exit(["ok" => false, "error" => "Your account is disabled."]);
         } else if ($nav->page !== "index" && $nav->page !== "resetpassword") {
-            Navigation::redirect_site($conf->hoturl_site_relative_raw("index"));
+            $conf->redirect();
         }
     }
 
@@ -114,9 +112,9 @@ function initialize_user() {
             && $lb[2] !== "index"
             && $lb[2] == Navigation::page()) {
             foreach ($lb[3] as $k => $v)
-                if (!isset($Qreq[$k]))
-                    $Qreq[$k] = $v;
-            $Qreq->set_annex("after_login", true);
+                if (!isset($qreq[$k]))
+                    $qreq[$k] = $v;
+            $qreq->set_annex("after_login", true);
         }
         unset($_SESSION["login_bounce"]);
     }
@@ -138,7 +136,7 @@ function initialize_user() {
     }
 }
 
-initialize_user();
+initialize_request();
 
 
 // Extract an error that we redirected through

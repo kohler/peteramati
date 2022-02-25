@@ -285,7 +285,7 @@ class RunRequest {
                     }
                 }
             }
-            Navigation::redirect($this->conf->hoturl("run", ["pset" => $this->pset->urlkey, "run" => $this->runner->name, "runmany" => 1, "chain" => $chain], Conf::HOTURL_RAW));
+            $this->conf->redirect_hoturl("run", ["pset" => $this->pset->urlkey, "run" => $this->runner->name, "runmany" => 1, "chain" => $chain]);
         }
     }
 }

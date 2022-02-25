@@ -1,6 +1,6 @@
 <?php
 // redirect.php -- HotCRP redirection helper functions
-// Copyright (c) 2006-2020 Eddie Kohler; see LICENSE.
+// Copyright (c) 2006-2022 Eddie Kohler; see LICENSE.
 
 /** @return string */
 function make_session_name(Conf $conf, $n) {
@@ -9,9 +9,9 @@ function make_session_name(Conf $conf, $n) {
         $n = $x;
     }
     if (($x = $conf->opt("confid"))) {
-        $n = preg_replace(',\*|\$\{confid\}|\$confid\b,', $x, $n);
+        $n = preg_replace('/\*|\$\{confid\}|\$confid\b/', $x, $n);
     }
-    return preg_replace_callback(',[^-_A-Ya-z0-9],', function ($m) {
+    return preg_replace_callback('/[^-_A-Ya-z0-9]/', function ($m) {
         return "Z" . dechex(ord($m[0]));
     }, $n);
 }
@@ -21,8 +21,9 @@ function set_session_name(Conf $conf) {
         return false;
     }
 
-    $secure = $conf->opt("sessionSecure");
     $domain = $conf->opt("sessionDomain");
+    $secure = $conf->opt("sessionSecure") ?? false;
+    $samesite = $conf->opt("sessionSameSite") ?? "Lax";
 
     // maybe upgrade from an old session name to this one
     if (!isset($_COOKIE[$sn])
@@ -34,7 +35,7 @@ function set_session_name(Conf $conf) {
         hotcrp_setcookie($upgrade_sn, "", [
             "expires" => time() - 3600, "path" => "/",
             "domain" => $conf->opt("sessionUpgradeDomain") ?? ($domain ? : ""),
-            "secure" => !!$secure
+            "secure" => $secure
         ]);
     }
 
@@ -45,7 +46,7 @@ function set_session_name(Conf $conf) {
     session_name($sn);
     session_cache_limiter("");
     if (isset($_COOKIE[$sn])
-        && !preg_match(';\A[-a-zA-Z0-9,]{1,128}\z;', $_COOKIE[$sn])) {
+        && !preg_match('/\A[-a-zA-Z0-9,]{1,128}\z/', $_COOKIE[$sn])) {
         unset($_COOKIE[$sn]);
     }
 
@@ -53,14 +54,12 @@ function set_session_name(Conf $conf) {
     if (($lifetime = $conf->opt("sessionLifetime")) !== null) {
         $params["lifetime"] = $lifetime;
     }
-    if ($secure !== null) {
-        $params["secure"] = !!$secure;
-    }
+    $params["secure"] = $secure;
     if ($domain !== null || !isset($params["domain"])) {
         $params["domain"] = $domain;
     }
     $params["httponly"] = true;
-    if (($samesite = $conf->opt("sessionSameSite") ?? "Lax")) {
+    if ($samesite && ($secure || $samesite !== "None")) {
         $params["samesite"] = $samesite;
     }
     if (PHP_VERSION_ID >= 70300) {
@@ -72,17 +71,20 @@ function set_session_name(Conf $conf) {
     }
 }
 
-define("ENSURE_SESSION_ALLOW_EMPTY", 1);
-if (function_exists("session_create_id")) {
-    define("ENSURE_SESSION_REGENERATE_ID", 2);
-} else {
-    define("ENSURE_SESSION_REGENERATE_ID", 0);
-}
+const ENSURE_SESSION_ALLOW_EMPTY = 1;
+const ENSURE_SESSION_REGENERATE_ID = 2;
 
 function ensure_session($flags = 0) {
     global $Conf;
+    if (headers_sent($hsfn, $hsln)) {
+        error_log("$hsfn:$hsln: headers sent: " . debug_string_backtrace());
+    }
+    if (($flags & ENSURE_SESSION_REGENERATE_ID) !== 0
+        && !function_exists("session_create_id")) { // PHP 7.0 compatibility
+        $flags &= ~ENSURE_SESSION_REGENERATE_ID;
+    }
     if (session_id() !== ""
-        && !($flags & ENSURE_SESSION_REGENERATE_ID)) {
+        && ($flags & ENSURE_SESSION_REGENERATE_ID) === 0) {
         return;
     }
 
@@ -121,7 +123,7 @@ function ensure_session($flags = 0) {
     }
 
     // transfer data from previous session if regenerating id
-    foreach ($session_data ? : [] as $k => $v) {
+    foreach ($session_data as $k => $v) {
         $_SESSION[$k] = $v;
     }
 
@@ -169,6 +171,7 @@ function kill_session() {
     }
 }
 
+/** @deprecated */
 function check_post($qreq = null) {
     $pv = post_value();
     if ($qreq) {

@@ -110,7 +110,7 @@ class APIRequest {
             } else if (($x = $j->error_html ?? false)) {
                 Conf::msg_error($x);
             }
-            Navigation::redirect_site($this->qreq->redirect);
+            $this->conf->redirect($this->conf->make_absolute_site($this->qreq->redirect));
         } else {
             return $this->conf->call_api($uf, $this->viewer, $this->qreq, $api);
         }

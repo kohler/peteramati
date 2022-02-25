@@ -59,10 +59,10 @@ function admin_home_messages($conf) {
 
 assert($Me->privChair);
 
-if (isset($_REQUEST["clearbug"]) && check_post()) {
+if (isset($_REQUEST["clearbug"]) && $Qreq->valid_token()) {
     $Conf->save_setting("bug_" . $_REQUEST["clearbug"], null);
 }
 if (isset($_REQUEST["clearbug"]) || isset($_REQUEST["clearnewpcrev"])) {
-    redirectSelf(array("clearbug" => null, "clearnewpcrev" => null));
+    $Conf->redirect_self($Qreq, ["clearbug" => null, "clearnewpcrev" => null]);
 }
 admin_home_messages($Conf);

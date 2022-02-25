@@ -43,14 +43,14 @@ if ($Conf->opt("httpAuthLogin")) {
     LoginHelper::login_redirect($Me->conf, $Qreq);
 } else if ((isset($_REQUEST["signin"]) || isset($_REQUEST["signout"]))
            && isset($_REQUEST["post"])) {
-    redirectSelf();
+    $Conf->redirect_self($Qreq);
 }
 
 // set interesting user
 $User = null;
 if (isset($Qreq->u)
     && !($User = ContactView::prepare_user($Qreq, $Me))) {
-    redirectSelf(["u" => null]);
+    $Conf->redirect_self($Qreq, ["u" => null]);
 }
 if (!$Me->isPC || !$User) {
     $User = $Me;
@@ -64,7 +64,7 @@ if (!$Me->is_empty()
     && ($repoclass = RepositorySite::$sitemap[$Qreq->reposite ?? ""])
     && in_array($repoclass, RepositorySite::site_classes($Conf), true)) {
     if ($repoclass::save_username($User, $Qreq->username)) {
-        redirectSelf();
+        $Conf->redirect_self($Qreq);
     }
 }
 
@@ -85,7 +85,7 @@ if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
     $Conf->qe("update ContactInfo set dropped=? where contactId=?",
               isset($Qreq->set_drop) ? Conf::$now : 0, $User->contactId);
     $Conf->qe("delete from Settings where name like '__gradets.%'");
-    redirectSelf();
+    $Conf->redirect_self($Qreq);
 }
 
 
@@ -197,12 +197,12 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         $g = $pset->all_grades[substr($qreq->action, 10)];
         assert($g && $g->collate);
         if (!!$g->landmark_range_file) {
-            Navigation::redirect($conf->hoturl("=diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]));
+            $conf->redirect_hoturl("=diffmany", ["pset" => $pset->urlkey, "file" => $g->landmark_range_file, "lines" => "{$g->landmark_range_first}-{$g->landmark_range_last}", "users" => join(" ", qreq_usernames($qreq))]);
         } else {
-            Navigation::redirect($conf->hoturl("=diffmany", ["pset" => $pset->urlkey, "grade" => $g->key, "users" => join(" ", qreq_usernames($qreq))]));
+            $conf->redirect_hoturl("=diffmany", ["pset" => $pset->urlkey, "grade" => $g->key, "users" => join(" ", qreq_usernames($qreq))]);
         }
     } else if (str_starts_with($qreq->action, "diffmany_")) {
-        Navigation::redirect($conf->hoturl("=diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]));
+        $conf->redirect_hoturl("=diffmany", ["pset" => $pset->urlkey, "file" => substr($qreq->action, 9), "users" => join(" ", qreq_usernames($qreq))]);
     } else if (str_starts_with($qreq->action, "report_")) {
         foreach ($pset->reports as $r) {
             if (substr($qreq->action, 7) === $r->key) {
@@ -210,9 +210,9 @@ function doaction(Contact $viewer, Qrequest $qreq) {
             }
         }
     } else if ($qreq->action === "diffmany") {
-        Navigation::redirect($conf->hoturl("=diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]));
+        $conf->redirect_hoturl("=diffmany", ["pset" => $pset->urlkey, "users" => join(" ", qreq_usernames($qreq))]);
     }
-    redirectSelf();
+    $conf->redirect_self($qreq);
 }
 
 if ($Me->isPC && $Qreq->valid_post() && $Qreq->doaction) {
@@ -248,7 +248,7 @@ function save_config_overrides($psetkey, $overrides, $json = null) {
     $Conf->save_setting("psets_override", Conf::$now, $dbjson);
 
     unset($_GET["pset"], $_REQUEST["pset"], $Qreq->pset);
-    redirectSelf(array("anchor" => $psetkey));
+    $Conf->redirect_self($Qreq, ["#" => $psetkey]);
 }
 
 /** @param Conf $conf
@@ -383,7 +383,7 @@ if ($Me->privChair
         } else {
             UserActions::send_account_info($users, $Me);
         }
-        redirectSelf();
+        $Conf->redirect_self($Qreq);
     }
 }
 

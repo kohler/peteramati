@@ -14,20 +14,20 @@ $User = $Me;
 if (isset($Qreq->u)
     && (!$Me->isPC
         || !($User = ContactView::prepare_user($Qreq, $Me))))
-    redirectSelf(array("u" => null));
+    $Conf->redirect_self($Qreq, ["u" => null]);
 assert($User == $Me || $Me->isPC);
 assert($Me->privChair);
 
 
-if (@$_POST["enable"] && check_post()) {
+if (@$_POST["enable"] && $Qreq->valid_post()) {
     UserActions::enable(array($User->contactId), $Me);
-    redirectSelf();
+    $Conf->redirect_self($Qreq);
 }
-if (@$_POST["disable"] && check_post()) {
+if (@$_POST["disable"] && $Qreq->valid_post()) {
     UserActions::disable(array($User->contactId), $Me);
-    redirectSelf();
+    $Conf->redirect_self($Qreq);
 }
-if (@$_POST["update"] && check_post()) {
+if (@$_POST["update"] && $Qreq->valid_post()) {
     $ck = $cv = array();
 
     $roles = 0;
@@ -41,7 +41,7 @@ if (@$_POST["update"] && check_post()) {
 
     Dbl::qe_apply("update ContactInfo set " . join(",", $ck) . " where contactId=" . $User->contactId, $cv);
 
-    redirectSelf();
+    $Conf->redirect_self($Qreq);
 }
 
 

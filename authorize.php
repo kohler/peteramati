@@ -41,7 +41,7 @@ if ($Qreq->code) {
         && isset($response->response->access_token)) {
         $Conf->save_setting("opt.githubOAuthToken", 1, $response->response->access_token);
         $Conf->save_setting("__github_oauth", null);
-        Navigation::redirect_site("");
+        $Conf->redirect();
     } else {
         error_exit($Conf, "Failed response to authorization attempt.");
     }
@@ -49,7 +49,7 @@ if ($Qreq->code) {
 } else {
     $state = bin2hex(random_bytes(24));
     $Conf->save_setting("__github_oauth", Conf::$now, $state);
-    Navigation::redirect("https://github.com/login/oauth/authorize"
+    $Conf->redirect("https://github.com/login/oauth/authorize"
         . "?client_id=" . urlencode($clientid)
         . "&redirect_uri=" . urlencode($Conf->hoturl_absolute("authorize"))
         . "&scope=" . urlencode("repo read:org read:user user:email user:follow")

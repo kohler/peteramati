@@ -63,12 +63,12 @@ class PsetRequest {
             if (isset($qreq->oldersnv)) {
                 $this->info->adjust_user_snv(false);
                 if ($qreq->is_get() || $qreq->is_head()) {
-                    $this->conf->self_redirect($qreq, ["snv" => $this->info->studentnotesversion(), "oldersnv" => null, "newersnv" => null]);
+                    $this->conf->redirect_self($qreq, ["snv" => $this->info->studentnotesversion(), "oldersnv" => null, "newersnv" => null]);
                 }
             } else if (isset($qreq->newersnv)) {
                 $this->info->adjust_user_snv(true);
                 if ($qreq->is_get() || $qreq->is_head()) {
-                    $this->conf->self_redirect($qreq, ["snv" => $this->info->studentnotesversion(), "oldersnv" => null, "newersnv" => null]);
+                    $this->conf->redirect_self($qreq, ["snv" => $this->info->studentnotesversion(), "oldersnv" => null, "newersnv" => null]);
                 }
             }
         }
@@ -108,7 +108,7 @@ class PsetRequest {
             && $this->viewer !== $this->user) {
             $this->info->mark_grading_commit();
         }
-        Navigation::redirect($this->info->hoturl("pset"));
+        $this->conf->redirect($this->info->hoturl("pset"));
     }
 
     function handle_download() {

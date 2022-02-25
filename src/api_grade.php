@@ -97,7 +97,7 @@ class Grade_API {
         $known_entries = $qreq->knowngrades ? explode(" ", $qreq->knowngrades) : null;
         // XXX match commit with grading commit
         if ($qreq->is_post()) {
-            if (!check_post($qreq)) {
+            if (!$qreq->valid_post()) {
                 return ["ok" => false, "error" => "Missing credentials."];
             } else if ($info->is_handout_commit()) {
                 return ["ok" => false, "error" => "Cannot set grades on handout commit."];
@@ -108,11 +108,10 @@ class Grade_API {
             }
 
             // parse grade elements
-            $qreq->allow_a("grades", "autogrades", "oldgrades");
             $errf = [];
-            $g = self::parse_full_grades($info, $qreq->grades, $errf, true);
-            $ag = self::parse_full_grades($info, $qreq->autogrades, $errf, false);
-            $og = self::parse_full_grades($info, $qreq->oldgrades, $errf, false);
+            $g = self::parse_full_grades($info, $qreq->get_a("grades"), $errf, true);
+            $ag = self::parse_full_grades($info, $qreq->get_a("autogrades"), $errf, false);
+            $og = self::parse_full_grades($info, $qreq->get_a("oldgrades"), $errf, false);
             if (!empty($errf)) {
                 if (isset($errf["!invalid"])) {
                     return ["ok" => false, "error" => "Invalid request."];

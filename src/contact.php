@@ -662,7 +662,7 @@ class Contact {
             }
             $url = $this->conf->selfurl($Qreq, [], Conf::HOTURL_RAW | Conf::HOTURL_SITE_RELATIVE);
             $_SESSION["login_bounce"] = array($this->conf->dsn, $url, Navigation::page(), $_POST);
-            if (check_post()) {
+            if ($Qreq->valid_post()) {
                 $this->conf->msg("You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.", 2);
             } else {
                 $this->conf->msg("You must sign in to access that page.", 2);

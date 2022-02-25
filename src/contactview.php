@@ -106,6 +106,7 @@ class ContactView {
 
     /** @param Contact $viewer */
     static function find_pset_redirect($psetkey, $viewer) {
+        global $Qreq;
         $pset = $viewer->conf->pset_by_key($psetkey);
         if ((!$pset || $pset->disabled)
             && ($psetkey !== null && $psetkey !== "" && $psetkey !== false)) {
@@ -114,9 +115,9 @@ class ContactView {
         if (!$pset || !$viewer->can_view_pset($pset)) {
             foreach ($viewer->conf->psets() as $p) {
                 if ($viewer->can_view_pset($p))
-                    redirectSelf(["pset" => $p->urlkey]);
+                    $viewer->conf->redirect_self($Qreq, ["pset" => $p->urlkey]);
             }
-            Navigation::redirect("index");
+            $viewer->conf->redirect();
         }
         if ($pset) {
             /** @phan-suppress-next-line PhanAccessReadOnlyProperty */

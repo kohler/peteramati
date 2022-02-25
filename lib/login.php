@@ -11,7 +11,7 @@ class LoginHelper {
         if ($explicit && $user->conf->opt("httpAuthLogin")) {
             ensure_session(ENSURE_SESSION_REGENERATE_ID);
             $_SESSION["reauth"] = true;
-            Navigation::redirect();
+            $user->conf->redirect();
         } else if ($explicit) {
             kill_session();
         }
@@ -185,7 +185,7 @@ class LoginHelper {
         if ($qreq->go !== null) {
             $url .= "&go=" . urlencode($qreq->go);
         }
-        Navigation::redirect($url);
+        $conf->redirect($url);
     }
 
     static function check_postlogin(Contact $user, Qrequest $qreq) {
@@ -205,7 +205,7 @@ class LoginHelper {
             $user->save_session("freshlogin", true);
             $where = $user->conf->hoturl("index");
         }
-        Navigation::redirect($where);
+        $user->conf->redirect($where);
         exit;
     }
 

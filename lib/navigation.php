@@ -326,8 +326,6 @@ class NavigationState {
 class Navigation {
     /** @var ?NavigationState */
     static private $s;
-    /** @var ?list<callable> */
-    static public $redirect_callbacks;
 
     static function analyze($index_name = "index") {
         if (PHP_SAPI !== "cli") {
@@ -450,20 +448,6 @@ class Navigation {
         return self::$s->make_absolute($url, $siteref);
     }
 
-    /** @param ?string $url
-     * @return void
-     * @deprecated */
-    static function redirect($url = null) {
-        $url = self::make_absolute($url);
-        // Might have an HTML-encoded URL; decode at least &amp;.
-        $url = str_replace("&amp;", "&", $url);
-
-        foreach (self::$redirect_callbacks ?? [] as $cb) {
-            call_user_func($cb);
-        }
-        self::redirect_absolute($url);
-    }
-
     /** @param string $url
      * @return void */
     static function redirect_absolute($url) {
@@ -481,30 +465,6 @@ class Navigation {
 <p>You should be redirected <a href=\"", htmlspecialchars($url), "\">to here</a>.</p>
 </body></html>\n";
         exit();
-    }
-
-    /** @param string $site_url
-     * @return void */
-    static function redirect_site($site_url) {
-        self::redirect(self::site_absolute() . $site_url);
-    }
-
-    /** @param string $base_url
-     * @return void */
-    static function redirect_base($base_url) {
-        self::redirect(self::base_absolute() . $base_url);
-    }
-
-    /** @param bool $allow_http_if_localhost
-     * @return void */
-    static function redirect_http_to_https($allow_http_if_localhost = false) {
-        if (self::$s->protocol == "http://"
-            && (!$allow_http_if_localhost
-                || ($_SERVER["REMOTE_ADDR"] !== "127.0.0.1"
-                    && $_SERVER["REMOTE_ADDR"] !== "::1"))) {
-            self::redirect("https://" . (self::$s->host ? : "localhost")
-                           . self::siteurl_path(self::$s->page . self::$s->php_suffix . self::$s->path . self::$s->query));
-        }
     }
 }
 

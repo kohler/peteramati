@@ -13,7 +13,7 @@ if ($Me->is_empty()) {
 $User = $Me;
 if (isset($Qreq->u)
     && !($User = ContactView::prepare_user($Qreq, $Me))) {
-    redirectSelf(["u" => null]);
+    $Conf->redirect_self($Qreq, ["u" => null]);
 }
 assert($User === $Me || $Me->isPC);
 $Conf->set_siteinfo("uservalue", $Me->user_linkpart($User));
@@ -36,7 +36,7 @@ if (!$Qreq->commit || !$Qreq->commit1) {
         $Qreq->commit = $Info->derived_handout_hash();
     }
     if ($Qreq->commit && $Qreq->commit1) {
-        redirectSelf(["commit" => $Qreq->commit, "commit1" => $Qreq->commit1]);
+        $Conf->redirect_self($Qreq, ["commit" => $Qreq->commit, "commit1" => $Qreq->commit1]);
     } else {
         $Me->escape();
     }
