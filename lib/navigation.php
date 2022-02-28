@@ -206,8 +206,9 @@ class NavigationState {
      * @return string */
     function set_page($page) {
         $this->raw_page = $page;
-        if (str_ends_with($page, ".php")) {
-            $page = substr($page, 0, -4);
+        if (($pagelen = strlen($page)) > 4
+            && substr($page, $pagelen - 4) === ".php") {
+            $page = substr($page, 0, $pagelen - 4);
         }
         return ($this->page = $page);
     }
