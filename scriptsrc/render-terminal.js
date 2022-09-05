@@ -120,6 +120,10 @@ function ansistyle_combine(a1, a2) {
     }
 }
 
+function ansistyle_hexcolor(r, g, b) {
+    return "#".concat(r < 16 ? 0 : "", r.toString(16), g < 16 ? 0 : "", g.toString(16), b < 16 ? 0 : "", b.toString(16));
+}
+
 function ansistyle_render(text, style) {
     if (typeof text === "string") {
         text = document.createTextNode(text);
@@ -139,14 +143,14 @@ function ansistyle_render(text, style) {
         if (typeof style.fg === "number") {
             cl.push("ansifg" + style.fg);
         } else {
-            node.styles.foregroundColor = sprintf("#%02x%02x%02x", style.fg[0], style.fg[1], style.fg[2]);
+            node.styles.foregroundColor = ansistyle_hexcolor(style.fg[0], style.fg[1], style.fg[2]);
         }
     }
     if (style.bg) {
         if (typeof style.bg === "number") {
             cl.push("ansibg" + style.bg);
         } else {
-            node.styles.backgroundColor = sprintf("#%02x%02x%02x", style.bg[0], style.bg[1], style.bg[2]);
+            node.styles.backgroundColor = ansistyle_hexcolor(style.bg[0], style.bg[1], style.bg[2]);
         }
     }
     if (cl.length) {
