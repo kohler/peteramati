@@ -8,7 +8,7 @@ import { render_text } from "./render.js";
 import { Filediff } from "./diff.js";
 
 
-const styleset = {
+const ansistyle_map = {
     "0": false, "1": {b: true}, "2": {f: true}, "3": {i: true},
     "4": {u: true}, "5": {bl: true}, "7": {rv: true}, "8": {x: true},
     "9": {s: true}, "21": {du: true}, "22": {b: false, f: false},
@@ -23,12 +23,12 @@ const styleset = {
     "96": {fg: 14}, "97": {fg: 15},
     "100": {bg: 8}, "101": {bg: 9}, "102": {bg: 10}, "103": {bg: 11},
     "104": {bg: 12}, "105": {bg: 13}, "106": {bg: 14}, "107": {bg: 15}
-}, styleback = {
+}, ansistyle_keymap = {
     "b": 1, "f": 2, "i": 3, "u": 4, "bl": 5, "rv": 7, "x": 8, "s": 9,
     "du": 21
 };
 
-function parse_styles(dst, style) {
+function ansistyle_parse(dst, style) {
     if (arguments.length === 1) {
         style = dst;
         dst = null;
@@ -43,7 +43,7 @@ function parse_styles(dst, style) {
         a = style.split(";");
     }
     for (let i = 0; i < a.length; ++i) {
-        const cmp = styleset[parseInt(a[i])];
+        const cmp = ansistyle_map[parseInt(a[i])];
         if (cmp === false) {
             dst = null;
         } else if (!cmp) {
@@ -86,14 +86,14 @@ function parse_styles(dst, style) {
     return dst && $.isEmptyObject(dst) ? null : dst;
 }
 
-function unparse_styles(dst) {
+function ansistyle_unparse(dst) {
     if (!dst) {
         return "\x1b[m";
     }
     const a = [];
-    for (let key in styleback) {
+    for (let key in ansistyle_keymap) {
         if (dst[key])
-            a.push(styleback[key]);
+            a.push(ansistyle_keymap[key]);
     }
     if (dst.fg) {
         if (typeof dst.fg === "number") {
@@ -112,18 +112,26 @@ function unparse_styles(dst) {
     return "\x1b[" + a.join(";") + "m";
 }
 
-function style_text(text, style) {
+function ansistyle_combine(a1, a2) {
+    if (/^\x1b\[[\d;]*m$/.test(a2)) {
+        return ansistyle_unparse(ansistyle_parse(ansistyle_parse(null, a1), a2));
+    } else {
+        return a1;
+    }
+}
+
+function ansistyle_render(text, style) {
     if (typeof text === "string") {
         text = document.createTextNode(text);
     } else if (text instanceof jQuery) {
         text = text[0];
     }
     if (!style || style === "\x1b[m"
-        || (typeof style === "string" && !(style = parse_styles(style)))) {
+        || (typeof style === "string" && !(style = ansistyle_parse(style)))) {
         return text;
     }
     const node = document.createElement("span"), cl = [];
-    for (let key in styleback) {
+    for (let key in ansistyle_keymap) {
         if (style[key])
             cl.push("ansi" + key);
     }
@@ -148,14 +156,6 @@ function style_text(text, style) {
     return node;
 }
 
-function ansi_combine(a1, a2) {
-    if (/^\x1b\[[\d;]*m$/.test(a2)) {
-        return unparse_styles(parse_styles(parse_styles(null, a1), a2));
-    } else {
-        return a1;
-    }
-}
-
 export function render_terminal(container, string, options) {
     var return_html = false;
     if (typeof container === "string") {
@@ -177,7 +177,7 @@ export function render_terminal(container, string, options) {
         fragment = null;
 
     function addlinepart(node, text) {
-        node.appendChild(style_text(text, styles));
+        node.appendChild(ansistyle_render(text, styles));
     }
 
     function addfragment(node) {
@@ -206,7 +206,7 @@ export function render_terminal(container, string, options) {
                     if (lsplit[j + 1].endsWith("K")) {
                         clearafter = glen;
                     } else {
-                        curstyle = ansi_combine(curstyle, lsplit[j + 1]);
+                        curstyle = ansistyle_combine(curstyle, lsplit[j + 1]);
                     }
                 }
             }
@@ -231,7 +231,7 @@ export function render_terminal(container, string, options) {
     function add_file_link(node, prefix, file, line, link) {
         let m;
         while ((m = file.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
-            styles = ansi_combine(styles, m[1]);
+            styles = ansistyle_combine(styles, m[1]);
             file = m[2];
         }
         let filematch = Filediff.by_file(file);
@@ -261,7 +261,7 @@ export function render_terminal(container, string, options) {
             line = clean_cr(line);
 
         while ((m = line.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
-            styles = ansi_combine(styles, m[1]);
+            styles = ansistyle_combine(styles, m[1]);
             line = m[2];
         }
 
@@ -277,7 +277,7 @@ export function render_terminal(container, string, options) {
             render = line;
             if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
                 if (m[1] === "") {
-                    styles = ansi_combine(styles, m[2]);
+                    styles = ansistyle_combine(styles, m[2]);
                     line = m[3];
                     continue;
                 }
