@@ -2,7 +2,6 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { sprintf } from "./utils.js";
 import { hasClass } from "./ui.js";
 import { render_text } from "./render.js";
 import { Filediff } from "./diff.js";
