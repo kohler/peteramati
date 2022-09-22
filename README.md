@@ -97,7 +97,9 @@ collect user information.
 
 6. Create the first user on the site.
 
-	lib/runsql.sh --create-user email@example.com firstName=First lastName=Last roles=2
+    ```
+    $ lib/runsql.sh --create-user email@example.com firstName=First lastName=Last roles=2
+    ```
 
     The `roles` parameter controls the user's privileges; students are 0, TF/TAs are 1,
 and the instructor privileges are 2.
@@ -113,9 +115,8 @@ a skeleton directory.
 
     * Create the directory where your jails will be, such as `/jails`. Now, create file
       `/etc/pa-jail.conf`, and in it, add a line saying `enablejail /jails/*`.
-
-See [doc/runners.md](https://github.com/kohler/peteramati/blob/master/doc/runners.md) for
-more information about the jail layout.
+    * See [doc/runners.md](https://github.com/kohler/peteramati/blob/master/doc/runners.md) for
+      more information about the jail layout.
 
 9. Now configure the jail contents, which are defined by a manifest that contains a list of
 files to be copied into each jail when it is created. In the following, we will call this
@@ -131,7 +132,8 @@ but ensure to set no password for the user (it never needs to log in).
 [the examples](https://github.com/kohler/peteramati/blob/main/doc/psetsjson.md)
 and the [schema](https://github.com/kohler/peteramati/blob/main/etc/pa-psets.schema.json).
 
-In this file, make sure to add the following entries (usually under `_defaults`):
+    In this file, make sure to add the following entries (usually under `_defaults`):
+
     * `run_dirpattern`, which specifies where jails are. The format is something like
       `"/jails/repo${REPOID}.pset${PSET}"`, with `REPOID` and `PSET` set automatically
       by Peteramati.
@@ -142,14 +144,14 @@ In this file, make sure to add the following entries (usually under `_defaults`)
 12. Populate the `jfiles.txt` manifest with the files needed to run student code. To do so,
 use the `pa-trace` command in the `jail/` subdirectory of your Peteramati installation.
 
-For example, the following command adds all files required to run `/bin/ls` inside the
-jail:
-```
-jail$ ./pa-trace -o /home/kohler/class/cs61/jfiles.txt -x /jails /bin/ls
-```
+    For example, the following command adds all files required to run `/bin/ls` inside the
+    jail:
+    ```
+    jail$ ./pa-trace -o /home/kohler/class/cs61/jfiles.txt -x /jails /bin/ls
+    ```
 
-The `-x` argument tells `pa-trace` to avoid including files inside the `/jails`
-directory in the list in `jfiles.txt`.
+    The `-x` argument tells `pa-trace` to avoid including files inside the `/jails`
+    directory in the list in `jfiles.txt`.
 
 13. Your Peteramati installation is now ready for use!
 
