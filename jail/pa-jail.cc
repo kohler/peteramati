@@ -1950,6 +1950,9 @@ static void write_pid(int p) {
                 *sx++ = *s0++;
             }
         }
+        if (sx != buf && sx != buf + 1024 && sx[-1] != '\n') {
+            *sx++ = '\n';
+        }
         ssize_t w = write(pidfd, buf, sx - buf);
         if (w != ssize_t(sx - buf) || ftruncate(pidfd, w) != 0) {
             perror_die(pidfilename);
@@ -2764,7 +2767,7 @@ int main(int argc, char** argv) {
     double timeout = -1, idle_timeout = -1;
     std::string inputarg, linkarg, manifest;
     std::vector<std::string> chown_user_args;
-    pidcontents = "$$\n";
+    pidcontents = "$$";
 
     int ch;
     while (true) {
@@ -2901,7 +2904,7 @@ int main(int argc, char** argv) {
         fprintf(verbosefile, "touch %s\nflock %s\n", pidfilename.c_str(), pidfilename.c_str());
     }
     if (!pidfilename.empty() && !dryrun) {
-        pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
+        pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT, 0666);
         if (pidfd == -1) {
             perror_die(pidfilename);
         }
