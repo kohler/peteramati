@@ -2259,6 +2259,14 @@ class Conf {
     }
 
 
+    function clean_queue() {
+        if (($this->settings["__qcleanat"] ?? 0) < Conf::$now - 600) {
+            $this->__save_setting("__qcleanat", Conf::$now);
+            $this->qe("delete from ExecutionQueue where status>=? and updateat<? and runat<?", QueueItem::STATUS_CANCELLED, Conf::$now - 600, Conf::$now - 600);
+        }
+    }
+
+
     function register_pset(Pset $pset) {
         if (isset($this->_psets[$pset->id])) {
             throw new Exception("pset id `{$pset->id}` reused");

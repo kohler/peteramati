@@ -445,7 +445,7 @@ class Contact {
 
         // translate to email
         if (is_numeric($x)) {
-            $acct = $this->conf->user_by_id($x);
+            $acct = $this->conf->user_by_id((int) $x);
             $email = $acct ? $acct->email : null;
         } else if ($x === "admin") {
             $email = $this->email;

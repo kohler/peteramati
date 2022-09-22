@@ -68,13 +68,18 @@ class RunLogger {
         if (($f = @fopen($fn, "r"))) {
             $s = stream_get_contents($f);
             $runat = false;
+            if (($nl = strpos($s, "\n")) !== false) {
+                $s = substr($s, 0, $nl);
+            }
             if (($sp = strpos($s, " ")) > 0) {
                 $w = substr($s, 0, $sp);
-                if (ctype_digit($w)) {
-                    $runat = (int) $w;
-                }
+            } else {
+                $w = $s;
             }
-            if (flock($f, LOCK_SH | LOCK_NB)) {
+            if (ctype_digit($w)) {
+                $runat = (int) $w;
+            }
+            if ($sp > 0 && flock($f, LOCK_SH | LOCK_NB)) {
                 if ($runat
                     && strpos($s, "-i") !== false
                     && str_ends_with($fn, ".pid")) {
@@ -101,6 +106,12 @@ class RunLogger {
 
     function invalidate_active_job() {
         $this->_active_job = null;
+    }
+
+    /** @param int $jobid
+     * @return bool */
+    function job_complete($jobid) {
+        return $jobid === $this->active_job();
     }
 
     /** @return list<int> */
@@ -181,7 +192,7 @@ class RunLogger {
         $rr = RunResponse::make_log($j);
         $rr->ok = true;
         $rr->timestamp = $jobid;
-        $rr->done = $this->active_job() !== $jobid;
+        $rr->done = $this->job_complete($jobid);
 
         if ($offset !== null) {
             if (strlen($s) < $readsz || $offset <= 0) {

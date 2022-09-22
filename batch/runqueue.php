@@ -42,10 +42,10 @@ class RunQueueBatch {
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             $chain = $qix->chain ? " C{$qix->chain}" : "";
-            if ($qix->status < 0) {
+            if ($qix->unscheduled()) {
                 $s = "delayed";
                 $t = $qix->insertat;
-            } else if ($qix->status === 0) {
+            } else if ($qix->scheduled()) {
                 $s = "waiting";
                 $t = $qix->scheduleat;
             } else {
@@ -60,13 +60,15 @@ class RunQueueBatch {
 
     function clean() {
         $qs = new QueueStatus;
-        $result = $this->conf->qe("select * from ExecutionQueue where status>=0 order by runorder asc, queueid asc");
+        $result = $this->conf->qe("select * from ExecutionQueue
+                where status>=? and status<? order by runorder asc, queueid asc",
+            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_DONE);
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
-            if ($qix->status > 0 || $qix->irrelevant()) {
-                $old_status = $qix->status;
-                $qix->substantiate($qs);
-                if ($this->verbose && $qix->deleted) {
+            if ($qix->working() || $qix->abandoned()) {
+                $old_status = $qix->status();
+                $qix->step($qs);
+                if ($this->verbose && $qix->stopped()) {
                     $this->report($qix, $old_status);
                 }
             }
@@ -78,18 +80,20 @@ class RunQueueBatch {
         $this->running = [];
         $this->any_completed = false;
         $qs = new QueueStatus;
-        $result = $this->conf->qe("select * from ExecutionQueue where status>=0 order by runorder asc, queueid asc limit 100");
+        $result = $this->conf->qe("select * from ExecutionQueue
+                where status>=? and status<? order by runorder asc, queueid asc limit 100",
+            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_DONE);
         while (($qix = QueueItem::fetch($this->conf, $result))) {
-            if ($qix->status > 0 || $qs->nrunning < $qs->nconcurrent) {
-                $old_status = $qix->status;
-                $qix->substantiate($qs);
-                if ($qix->status > 0 && !$qix->deleted) {
+            if ($qix->working() || $qs->nrunning < $qs->nconcurrent) {
+                $old_status = $qix->status();
+                $qix->step($qs);
+                if ($qix->working()) {
                     $this->running[] = $qix;
                 }
                 if ($this->verbose) {
                     $this->report($qix, $old_status);
                 }
-                $this->any_completed = $this->any_completed || $qix->deleted;
+                $this->any_completed = $this->any_completed || $qix->stopped();
             }
         }
         Dbl::free($result);
@@ -99,13 +103,13 @@ class RunQueueBatch {
     function check() {
         $qs = new QueueStatus;
         foreach ($this->running as $qix) {
-            if (!$qix->deleted) {
-                $old_status = $qix->status;
-                $qix->substantiate($qs);
+            if (!$qix->stopped()) {
+                $old_status = $qix->status();
+                $qix->step($qs);
                 if ($this->verbose) {
                     $this->report($qix, $old_status);
                 }
-                $this->any_completed = $this->any_completed || $qix->deleted;
+                $this->any_completed = $this->any_completed || $qix->stopped();
             }
         }
         return $qs->nrunning >= $qs->nconcurrent;
@@ -131,17 +135,17 @@ class RunQueueBatch {
     function report($qi, $old_status) {
         $id = $qi->unparse_key();
         $chain = $qi->chain ? " C{$qi->chain}" : "";
-        if ($old_status > 0 && $qi->deleted) {
+        if ($old_status > 0 && $qi->stopped()) {
             fwrite(STDERR, "$id: completed\n");
         } else if ($old_status > 0) {
             fwrite(STDERR, "$id: running " . self::unparse_time($qi->runat) . "{$chain}\n");
-        } else if ($qi->deleted) {
+        } else if ($qi->stopped()) {
             fwrite(STDERR, "$id: removed\n");
-        } else if ($qi->status > 0) {
+        } else if ($qi->working()) {
             fwrite(STDERR, "$id: started " . self::unparse_time($qi->runat) . "{$chain}\n");
         } else if ($old_status === 0) {
             fwrite(STDERR, "$id: waiting " . self::unparse_time($qi->scheduleat) . "{$chain}\n");
-        } else if ($qi->status === 0) {
+        } else if ($qi->scheduled()) {
             fwrite(STDERR, "$id: scheduled " . self::unparse_time($qi->scheduleat) . "{$chain}\n");
         } else {
             fwrite(STDERR, "$id: delayed " . self::unparse_time($qi->insertat) . "{$chain}\n");

@@ -145,7 +145,9 @@ class RunRequest {
         // complain if unrunnable
         if ($this->runner->command
             && (!$info->repo || !$info->commit())) {
-            $qi && $qi->delete(false);
+            if ($qi) {
+                $qi->cancel();
+            }
             if (!$info->repo) {
                 return self::error("No repository.");
             } else if ($qreq->newcommit ?? $qreq->commit) {
@@ -162,22 +164,16 @@ class RunRequest {
                 || $qi->runnername !== $this->runner->name) {
                 return self::error("Wrong runner.");
             }
-            if (!$qi->substantiate(new QueueStatus)) {
+            if (!$qi->step(new QueueStatus)) {
                 return self::error($qi->last_error);
-            } else if ($qi->runat) {
+            } else if ($qi->has_response()) {
                 return $qi->full_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
             }
         }
 
         // maybe evaluate
         if (!$this->runner->command) {
-            assert(!!$this->runner->evaluate_function);
-            $rr = RunResponse::make($this->runner, $info->repo);
-            $rr->timestamp = time();
-            $rr->done = true;
-            $rr->status = "done";
-            $rr->result = $info->runner_evaluate($this->runner, $rr->timestamp);
-            return $rr;
+            return QueueItem::make_info($info, $this->runner)->full_response();
         }
 
         // otherwise check runnability and enqueue
@@ -192,26 +188,28 @@ class RunRequest {
             $qi = QueueItem::make_info($info, $this->runner);
             $qi->flags |= ($this->viewer->privChair ? QueueItem::FLAG_UNWATCHED : 0)
                 | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
-            $qi->enqueue();
             $qi->schedule(100);
         } else {
             $qi->update();
         }
-        assert($qi->status === 0 && $qi->runat === 0 && $qi->runorder > 0);
+        assert($qi->scheduled() && $qi->runat === 0 && $qi->runorder > 0);
         session_write_close();
 
         // process queue
         $qs = new QueueStatus;
-        $result = $info->conf->qe("select * from ExecutionQueue where status>=0 and runorder<=? order by runorder asc, queueid asc limit 100", $qi->runorder);
+        $result = $info->conf->qe("select * from ExecutionQueue
+                where status>=? and status<? and runorder<=?
+                order by runorder asc, queueid asc limit 100",
+            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_DONE, $qi->runorder);
         while (($qix = QueueItem::fetch($info->conf, $result))) {
             $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
-            if (!$qix->substantiate($qs)) {
+            if (!$qix->step($qs)) {
                 if ($qix === $qi) {
                     return self::error($qix->last_error);
                 } else {
                     error_log($qix->unparse_key() . ": " . $qix->last_error);
                 }
-            } else if ($qix === $qi && $qi->status > 0) {
+            } else if ($qix === $qi && $qi->has_response()) {
                 return $qi->full_response();
             }
         }

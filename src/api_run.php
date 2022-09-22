@@ -19,7 +19,7 @@ class Run_API {
         } else if (!($u = $qi->user())) {
             return ["ok" => false, "error" => "Invalid user."];
         } else {
-            if ($qi->status === -1) {
+            if ($qi->unscheduled()) {
                 $qi->schedule(0);
             }
             $anon = $qreq->anonymous ?? $pset->anonymous;

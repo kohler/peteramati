@@ -1,6 +1,6 @@
 <?php
 // queueitem.php -- Peteramati queue state
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class QueueItem {
@@ -11,8 +11,6 @@ class QueueItem {
     public $queueid;
     /** @var int */
     public $reqcid;
-    /** @var bool */
-    public $deleted = false;
 
     /** @var string */
     public $runnername;
@@ -49,7 +47,7 @@ class QueueItem {
     /** @var int */
     public $runat;
     /** @var int */
-    public $status;
+    private $status;
     /** @var ?string */
     public $lockfile;
 
@@ -66,6 +64,10 @@ class QueueItem {
     private $_runner;
     /** @var int */
     private $_ocache = 0;
+    /** @var ?int */
+    private $_evaluate_at;
+    /** @var mixed */
+    private $_evaluate;
 
     // running a command (`start` and helpers)
     /** @var string */
@@ -85,8 +87,15 @@ class QueueItem {
     const FLAG_ENSURE = 2;
     const FLAG_ANONYMOUS = 4;
 
+    const STATUS_UNSCHEDULED = -1;
+    const STATUS_SCHEDULED = 0;
+    const STATUS_WORKING = 1;
+    const STATUS_CANCELLED = 2;
+    const STATUS_DONE = 3;
+    const STATUS_EVALUATED = 4;
 
-    function __construct(Conf $conf) {
+
+    private function __construct(Conf $conf) {
         $this->conf = $conf;
     }
 
@@ -194,11 +203,56 @@ class QueueItem {
         return "~{$uname}/{$pset->urlkey}/{$hash}/{$this->runnername}";
     }
 
+    /** @return int */
+    function status() {
+        return $this->status;
+    }
+
     /** @return bool */
-    function irrelevant() {
-        return $this->status <= 0
+    function unscheduled() {
+        return $this->status === self::STATUS_UNSCHEDULED;
+    }
+
+    /** @return bool */
+    function scheduled() {
+        return $this->status === self::STATUS_SCHEDULED;
+    }
+
+    /** @return bool */
+    function working() {
+        return $this->status === self::STATUS_WORKING;
+    }
+
+    /** @return bool */
+    function has_response() {
+        return $this->status >= self::STATUS_WORKING;
+    }
+
+    /** @return bool */
+    function abandoned() {
+        return ($this->status === self::STATUS_UNSCHEDULED
+                || $this->status === self::STATUS_SCHEDULED)
             && ($this->flags & self::FLAG_UNWATCHED) === 0
             && $this->updateat < Conf::$now - 180;
+    }
+
+    /** @return bool */
+    function stopped() {
+        return $this->status >= self::STATUS_CANCELLED;
+    }
+
+    /** @return mixed */
+    private function evaluate() {
+        assert($this->status === self::STATUS_EVALUATED);
+        if ($this->_evaluate_at === null) {
+            $this->_evaluate_at = $this->runat;
+            if (($runner = $this->runner())
+                && $runner->evaluate_function
+                && ($info = $this->info())) {
+                $this->_evaluate = $info->runner_evaluate($runner, $this->runat);
+            }
+        }
+        return $this->_evaluate;
     }
 
 
@@ -206,7 +260,7 @@ class QueueItem {
      * @return ?QueueItem */
     static function fetch(Conf $conf, $result, $info = null) {
         $qi = $result ? $result->fetch_object("QueueItem", [$conf]) : null;
-        if ($qi && !is_int($qi->queueid)) {
+        if ($qi) {
             $qi->db_load();
             $info && $qi->associate_info($info);
         }
@@ -217,6 +271,7 @@ class QueueItem {
      * @param ?PsetView $info
      * @return ?QueueItem */
     static function by_id(Conf $conf, $queueid, $info = null) {
+        $conf->clean_queue();
         $result = $conf->qe("select * from ExecutionQueue where queueid=?", $queueid);
         return self::fetch($conf, $result, $info);
     }
@@ -224,6 +279,7 @@ class QueueItem {
     /** @param int $chain
      * @return ?QueueItem */
     static function by_chain(Conf $conf, $chain) {
+        $conf->clean_queue();
         $result = $conf->qe("select * from ExecutionQueue where chain=? order by runorder asc, queueid asc limit 1", $chain);
         return self::fetch($conf, $result, null);
     }
@@ -245,6 +301,7 @@ class QueueItem {
      * @return QueueItem */
     static function make_info($info, $runner = null) {
         $qi = new QueueItem($info->conf);
+        $qi->queueid = 0;
         $qi->reqcid = $info->viewer->contactId;
         $qi->cid = $info->user->contactId;
         $qi->psetid = $info->pset->id;
@@ -256,6 +313,7 @@ class QueueItem {
         $qi->flags = $info->user->is_anonymous ? self::FLAG_ANONYMOUS : 0;
 
         $qi->queueclass = "";
+        $qi->status = self::STATUS_UNSCHEDULED;
         if ($runner) {
             $qi->runnername = $runner->name;
             $qi->nconcurrent = 0;
@@ -331,11 +389,12 @@ class QueueItem {
     }
 
     function enqueue() {
-        assert(!$this->queueid);
+        assert($this->queueid === 0);
+        $this->conf->clean_queue();
         $this->insertat = $this->updateat = Conf::$now;
         $this->runat = 0;
         $this->runorder = $this->runorder ?? self::unscheduled_runorder();
-        $this->status = -1;
+        $this->status = self::STATUS_UNSCHEDULED;
         $this->conf->qe("insert into ExecutionQueue set reqcid=?, cid=?,
             runnername=?, psetid=?, repoid=?,
             bhash=?, runsettings=?, tags=?,
@@ -355,16 +414,25 @@ class QueueItem {
     /** @param int $priority
      * @param ?int $userid */
     function schedule($priority, $userid = null) {
-        assert(!!$this->queueid);
-        if ($this->status === -1) {
+        if ($this->queueid === 0) {
+            $this->enqueue();
+        }
+
+        if ($this->status === self::STATUS_UNSCHEDULED) {
             if (($userid ?? 0) > 0) {
                 $this->conf->qe("update ExecutionQueue
-                    set status=0, scheduleat=?, runorder=greatest(coalesce((select last_runorder from ContactInfo where contactId=?),0),?)+?
-                    where queueid=? and status=-1",
-                    Conf::$now, $userid, Conf::$now, $priority, $this->queueid);
+                        set status=?, scheduleat=?,
+                        runorder=greatest(coalesce((select last_runorder from ContactInfo where contactId=?),0),?)+?
+                        where queueid=? and status=?",
+                    self::STATUS_SCHEDULED, Conf::$now,
+                    $userid, Conf::$now, $priority,
+                    $this->queueid, self::STATUS_UNSCHEDULED);
             } else {
-                $this->conf->qe("update ExecutionQueue set status=0, runorder=? where queueid=? and status=-1",
-                    Conf::$now + $priority, $this->queueid);
+                $this->conf->qe("update ExecutionQueue
+                        set status=?, runorder=?
+                        where queueid=? and status=?",
+                    self::STATUS_SCHEDULED, Conf::$now + $priority,
+                    $this->queueid, self::STATUS_UNSCHEDULED);
             }
             if (($row = $this->conf->fetch_first_row("select status, scheduleat, runorder from ExecutionQueue where queueid=?", $this->queueid))) {
                 $this->status = (int) $row[0];
@@ -379,7 +447,7 @@ class QueueItem {
     }
 
     function update() {
-        assert(!!$this->queueid && !$this->deleted);
+        assert($this->queueid !== 0);
         $result = $this->conf->qe("update ExecutionQueue set updateat=? where queueid=? and updateat<?", Conf::$now, $this->queueid, Conf::$now);
         if ($result->affected_rows) {
             $this->updateat = Conf::$now;
@@ -387,67 +455,136 @@ class QueueItem {
         Dbl::free($result);
     }
 
+    /** @param int $new_status
+     * @param ?int $new_runat
+     * @param ?string $new_lockfile
+     * @return bool */
+    private function swap_status($new_status, $new_runat = null, $new_lockfile = null) {
+        $new_runat = $new_runat ?? $this->runat;
+        if ($this->queueid !== 0) {
+            $new_lockfile = $new_lockfile ?? $this->lockfile;
+            $result = $this->conf->qe("update ExecutionQueue
+                    set status=?, runat=?, lockfile=?, bhash=?
+                    where queueid=? and status=?",
+                $new_status, $new_runat, $new_lockfile, $this->bhash,
+                $this->queueid, $this->status);
+            $changed = $result->affected_rows;
+            Dbl::free($result);
+            if ($changed) {
+                $this->status = $new_status;
+                $this->runat = $new_runat;
+                $this->lockfile = $new_lockfile;
+            } else if (($row = $this->conf->fetch_first_row("select status, runat, lockfile from ExecutionQueue where queueid=?", $this->queueid))) {
+                $this->status = (int) $row[0];
+                $this->runat = (int) $row[1];
+                $this->lockfile = $row[2];
+            }
+        } else {
+            assert($new_lockfile === null);
+            $changed = $this->status !== $new_status;
+            if ($changed) {
+                $this->status = $new_status;
+                $this->runat = $new_runat;
+            }
+        }
+        if ($changed && $this->status >= self::STATUS_DONE) {
+            if ($this->status === self::STATUS_EVALUATED) {
+                // always evaluate at least once
+                $this->evaluate();
+            }
+            if ($this->queueid !== 0 && $this->chain) {
+                // free next element in chain
+                $this->conf->qe("update ExecutionQueue set status=?, runorder=?
+                        where status=? and chain=? and not exists (select * from ExecutionQueue where status>=? and status<? and chain=?)
+                        order by runorder asc, queueid asc limit 1",
+                    self::STATUS_SCHEDULED, Conf::$now,
+                    self::STATUS_UNSCHEDULED, $this->chain,
+                    self::STATUS_SCHEDULED, self::STATUS_DONE, $this->chain);
+            }
+        }
+        return !!$changed;
+    }
+
+    function cancel() {
+        $this->swap_status(self::STATUS_CANCELLED);
+    }
+
     /** @param QueueStatus $qs
      * @return bool */
-    function substantiate($qs) {
-        assert(!!$this->queueid && !$this->deleted);
-        $nconcurrent = ($this->nconcurrent ?? 0) <= 0 ? 100000 : $this->nconcurrent;
-        if ($this->runat > 0) {
-            // remove dead items from queue
-            // - pidfile contains "0\n": child has exited, remove it
-            // - pidfile specified but not there
-            // XXX do not use run timeouts
-            if ($this->lockfile
-                && RunLogger::active_job_at($this->lockfile) !== $this->runat) {
-                $this->delete(false);
-                return true;
-            }
-        } else if (($this->flags & self::FLAG_UNWATCHED) === 0
-                   && $this->updateat < Conf::$now - 30) {
-            if ($this->irrelevant()) {
-                $this->delete(true);
-                return true;
-            }
-        } else if (($this->flags & self::FLAG_ENSURE) !== 0
-                   && ($rr = $this->compatible_response())) {
-            $this->delete(false);
-            $this->runat = $rr->timestamp;
-            $this->status = 2;
+    function step($qs) {
+        assert($this->queueid !== 0);
+        assert(($this->runat > 0) === ($this->status > 0));
+
+        // cancelled & completed: step does nothing
+        if ($this->status >= self::STATUS_CANCELLED) {
             return true;
-        } else if ($qs->nrunning < min($nconcurrent, $qs->nconcurrent)) {
+        }
+
+        // cancel abandoned jobs
+        if ($this->abandoned()) {
+            $result = $this->conf->qe("update ExecutionQueue set status=?
+                    where queueid=? and status=? and updateat<?",
+                self::STATUS_CANCELLED,
+                $this->queueid, $this->status, Conf::$now - 180);
+            $changed = $result->affected_rows;
+            Dbl::free($result);
+            if ($changed) {
+                $this->status = self::STATUS_CANCELLED;
+                return true;
+            }
+        }
+
+        // do nothing for unscheduled jobs
+        // XXX should kickstart broken chain
+        if ($this->status === self::STATUS_UNSCHEDULED) {
+            return true;
+        }
+
+        // if ensure, check for compatible response
+        if ($this->status === self::STATUS_SCHEDULED
+            && ($this->flags & self::FLAG_ENSURE) !== 0
+            && ($rr = $this->compatible_response())) {
+            $this->swap_status(self::STATUS_DONE, $rr->timestamp);
+            if ($this->status >= self::STATUS_CANCELLED) {
+                return true;
+            }
+        }
+
+        // if not working, check if can start
+        $nconcurrent = ($this->nconcurrent ?? 0) <= 0 ? 100000 : $this->nconcurrent;
+        if ($this->status === self::STATUS_SCHEDULED
+            && $qs->nrunning < min($nconcurrent, $qs->nconcurrent)) {
             try {
+                // do not start_command if no command
                 $this->start_command();
             } catch (Exception $e) {
                 $this->last_error = $e->getMessage();
-                $this->delete(false);
+                $result = $this->conf->qe("update ExecutionQueue set status=? where queueid=?", self::STATUS_CANCELLED, $this->queueid);
+                $this->status = self::STATUS_CANCELLED;
                 return false;
             }
         }
-        ++$qs->nahead;
-        if ($this->runat > 0) {
-            ++$qs->nrunning;
-        }
-        if ($this->nconcurrent > 0) {
-            $qs->nconcurrent = max(min($nconcurrent, $qs->nconcurrent), $qs->nrunning);
-        }
-        return true;
-    }
 
-    /** @param bool $only_old */
-    function delete($only_old) {
-        assert(!!$this->queueid && !$this->deleted);
-        if ($only_old) {
-            $result = $this->conf->qe("delete from ExecutionQueue where queueid=? and status=0 and updateat<?", $this->queueid, Conf::$now - 180);
-        } else {
-            $result = $this->conf->qe("delete from ExecutionQueue where queueid=?", $this->queueid);
+        // if working, check for completion
+        if ($this->status === self::STATUS_WORKING
+            && $this->lockfile
+            && RunLogger::active_job_at($this->lockfile) !== $this->runat) {
+            // XXX this does not use run timeouts
+            $this->swap_status(self::STATUS_EVALUATED);
         }
-        if ($result->affected_rows) {
-            $this->deleted = true;
-            if ($this->chain) {
-                $this->conf->qe("update ExecutionQueue set status=0, runorder=? where status=-1 and chain=? order by runorder asc, queueid asc limit 1",
-                    Conf::$now, $this->chain);
+
+        if ($this->status === self::STATUS_SCHEDULED
+            || $this->status === self::STATUS_WORKING) {
+            // update queue
+            ++$qs->nahead;
+            if ($this->runat > 0) {
+                ++$qs->nrunning;
+            }
+            if ($this->nconcurrent > 0) {
+                $qs->nconcurrent = max(min($nconcurrent, $qs->nconcurrent), $qs->nrunning);
             }
         }
+        return true;
     }
 
 
@@ -515,8 +652,8 @@ class QueueItem {
     }
 
 
-    function start_command() {
-        assert($this->runat === 0 && $this->status === 0 && !!$this->queueid && !$this->deleted);
+    private function start_command() {
+        assert($this->runat === 0 && $this->status === self::STATUS_SCHEDULED);
 
         $repo = $this->repo();
         $pset = $this->pset();
@@ -528,7 +665,15 @@ class QueueItem {
         } else if (!$runner) {
             throw new RunnerException("Bad queue item runner.");
         }
-        $info = $this->info();
+
+        // if no command, skip right to evaluation
+        if (!$runner->command) {
+            $this->swap_status(self::STATUS_EVALUATED, time());
+            return true;
+        }
+
+        // otherwise must be enqueued
+        assert($this->queueid !== 0);
 
         if (!chdir(SiteLoader::$root)) {
             throw new RunnerException("Can’t cd to main directory.");
@@ -537,6 +682,7 @@ class QueueItem {
             throw new RunnerException("The pa-jail program has not been compiled.");
         }
 
+        $info = $this->info();
         $runlog = $info->run_logger();
         if (!$runlog->mkdirs()) {
             throw new RunnerException("Can’t create log directory.");
@@ -572,12 +718,12 @@ class QueueItem {
         $this->_jailhomedir = "{$this->_jaildir}/" . preg_replace('/\A\/+/', '', $userhome);
 
         // create logfile and pidfile
-        $this->runat = time();
-        $logbase = $runlog->job_prefix($this->runat);
+        $runat = time();
+        $logbase = $runlog->job_prefix($runat);
         $this->_logfile = "{$logbase}.log";
         $timingfile = "{$logbase}.log.time";
         $pidfile = $runlog->pid_file();
-        file_put_contents($pidfile, "");
+        file_put_contents($pidfile, "{$runat}\n");
         $inputfifo = "{$logbase}.in";
         if (!posix_mkfifo($inputfifo, 0660)) {
             $inputfifo = null;
@@ -588,18 +734,9 @@ class QueueItem {
         $this->_logstream = fopen($this->_logfile, "a");
         $this->bhash = $info->bhash(); // resolve blank hash
 
-        $result = $this->conf->qe("update ExecutionQueue set runat=?, status=1, lockfile=?, bhash=? where queueid=? and status=0",
-            $this->runat, $pidfile, $this->bhash, $this->queueid);
-        if (!$result->affected_rows) {
-            if (($row = $this->conf->fetch_first_row("select runat, status, lockfile from ExecutionQueue where queueid=?", $this->queueid))) {
-                $this->runat = (int) $row[0];
-                $this->status = (int) $row[1];
-                $this->lockfile = $row[2];
-            }
+        if (!$this->swap_status(self::STATUS_WORKING, $runat, $pidfile)) {
             return $this->status > 0;
         }
-        $this->status = 1;
-        $this->lockfile = $pidfile;
         $this->_runstatus = 1;
         register_shutdown_function([$this, "cleanup"]);
 
@@ -683,7 +820,7 @@ class QueueItem {
             . " " . escapeshellarg($username)
             . " TERM=xterm-256color"
             . " " . escapeshellarg($this->expand($runner->command));
-        $this->_runstatus = 0;
+        $this->_runstatus = 2;
         $this->run_and_log($command);
 
         // save information about execution
@@ -815,32 +952,50 @@ class QueueItem {
      * @param ?string $write
      * @param bool $stop
      * @return RunResponse */
-    function full_response($offset = 0, $write = null, $stop = false) {
+    private function command_response($offset, $write, $stop) {
         if ($this->_info) {
             $runlog = $this->_info->run_logger();
         } else {
             $runlog = new RunLogger($this->pset(), $this->repo());
         }
 
-        if ((($write ?? "") !== "" || $stop)
-            && $runlog->active_job() === $this->runat) {
-            if (($write ?? "") !== "") {
-                $runlog->job_write($this->runat, $write);
-            }
-            if ($stop) {
-                // "ESC Ctrl-C" is captured by pa-jail
-                $runlog->job_write($this->runat, "\x1b\x03");
-            }
-            $now = microtime(true);
-            do {
-                usleep(10);
-                $runlog->invalidate_active_job();
-                $rr = $runlog->job_response($this->runat, $offset);
-            } while ($stop
-                     && !$rr->done
-                     && microtime(true) - $now < 0.1);
-        } else {
+        if ((($write ?? "") === "" && !$stop)
+            || $runlog->active_job() !== $this->runat) {
+            return $runlog->job_response($this->runat, $offset);
+        }
+
+        if (($write ?? "") !== "") {
+            $runlog->job_write($this->runat, $write);
+        }
+        if ($stop) {
+            // "ESC Ctrl-C" is captured by pa-jail
+            $runlog->job_write($this->runat, "\x1b\x03");
+        }
+        $now = microtime(true);
+        do {
+            usleep(10);
+            $runlog->invalidate_active_job();
             $rr = $runlog->job_response($this->runat, $offset);
+        } while ($stop
+                 && !$rr->done
+                 && microtime(true) - $now < 0.1);
+        return $rr;
+    }
+
+    /** @param int $offset
+     * @param ?string $write
+     * @param bool $stop
+     * @return RunResponse */
+    function full_response($offset = 0, $write = null, $stop = false) {
+        $runner = $this->runner();
+        if ($runner->command) {
+            $rr = $this->command_response(0, null, $stop);
+        } else {
+            $this->runat = $this->runat ? : time();
+            $rr = RunResponse::make($runner, $this->repo());
+            $rr->timestamp = $this->runat;
+            $rr->done = true;
+            $rr->status = "done";
         }
 
         if ($rr->partial) {
@@ -854,14 +1009,14 @@ class QueueItem {
         }
 
         if ($rr->done
-            && $this->queueid > 0) {
-            $this->delete(false);
+            && $this->queueid > 0
+            && $this->status < self::STATUS_DONE) {
+            $this->swap_status(self::STATUS_EVALUATED);
         }
 
         if ($rr->done
-            && $this->runner()->evaluate_function
-            && ($info = $this->info())) {
-            $rr->result = $info->runner_evaluate($this->runner(), $this->runat);
+            && $this->runner()->evaluate_function) {
+            $rr->result = $this->evaluate();
         }
 
         return $rr;
