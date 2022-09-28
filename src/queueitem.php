@@ -26,6 +26,8 @@ class QueueItem {
     public $runsettings;
     /** @var ?list<string> */
     public $tags;
+    /** @var ?list */
+    public $ensure;
 
     /** @var string */
     public $queueclass;
@@ -128,6 +130,10 @@ class QueueItem {
             }
             $this->tags = empty($ts) ? null : $ts;
         }
+        if ($this->ensure !== null) {
+            /** @phan-suppress-next-line PhanTypeMismatchArgument */
+            $this->set_ensure($this->ensure);
+        }
 
         $this->runorder = (int) $this->runorder;
         $this->insertat = (int) $this->insertat;
@@ -201,6 +207,12 @@ class QueueItem {
         $uname = $this->conf->cached_username_by_id($this->cid, ($this->flags & self::FLAG_ANONYMOUS) !== 0);
         $hash = $this->hash();
         return "~{$uname}/{$pset->urlkey}/{$hash}/{$this->runnername}";
+    }
+
+    /** @param ?string $s */
+    private function set_ensure($s) {
+        $j = $s !== null ? json_decode($s) : null;
+        $this->ensure = is_array($j) ? $j : null;
     }
 
     /** @return int */
@@ -330,6 +342,7 @@ class QueueItem {
             if ($qi->nconcurrent <= 0) {
                 $qi->nconcurrent = 10000;
             }
+            $qi->ensure = $runner->ensure;
         }
 
         $qi->associate_info($info, $runner);
@@ -400,14 +413,16 @@ class QueueItem {
             bhash=?, runsettings=?, tags=?,
             queueclass=?, nconcurrent=?, flags=?, chain=?,
             insertat=?, updateat=?,
-            runat=?, runorder=?, status=?",
+            runat=?, runorder=?, status=?,
+            ensure=?",
             $this->reqcid, $this->cid,
             $this->runnername, $this->psetid, $this->repoid,
             $this->bhash, $this->runsettings ? json_encode_db($this->runsettings) : null,
             $this->tags ? " " . join(" ", $this->tags) . " " : null,
             $this->queueclass, $this->nconcurrent, $this->flags, $this->chain,
             $this->insertat, $this->updateat,
-            $this->runat, $this->runorder, $this->status);
+            $this->runat, $this->runorder, $this->status,
+            $this->ensure ? json_encode_db($this->ensure) : null);
         $this->queueid = $this->conf->dblink->insert_id;
     }
 
@@ -455,14 +470,23 @@ class QueueItem {
         Dbl::free($result);
     }
 
+    private function update_from_database() {
+        if (($row = $this->conf->fetch_first_row("select status, runat, lockfile, ensure
+                from ExecutionQueue where queueid=?", $this->queueid))) {
+            $this->status = (int) $row[0];
+            $this->runat = (int) $row[1];
+            $this->lockfile = $row[2];
+            $this->set_ensure($row[3]);
+        }
+    }
+
     /** @param int $new_status
-     * @param ?int $new_runat
-     * @param ?string $new_lockfile
+     * @param array{runat?:int,lockfile?:string} $fields
      * @return bool */
-    private function swap_status($new_status, $new_runat = null, $new_lockfile = null) {
-        $new_runat = $new_runat ?? $this->runat;
+    private function swap_status($new_status, $fields = []) {
+        $new_runat = $fields["runat"] ?? $this->runat;
         if ($this->queueid !== 0) {
-            $new_lockfile = $new_lockfile ?? $this->lockfile;
+            $new_lockfile = $fields["lockfile"] ?? $this->lockfile;
             $result = $this->conf->qe("update ExecutionQueue
                     set status=?, runat=?, lockfile=?, bhash=?
                     where queueid=? and status=?",
@@ -474,13 +498,11 @@ class QueueItem {
                 $this->status = $new_status;
                 $this->runat = $new_runat;
                 $this->lockfile = $new_lockfile;
-            } else if (($row = $this->conf->fetch_first_row("select status, runat, lockfile from ExecutionQueue where queueid=?", $this->queueid))) {
-                $this->status = (int) $row[0];
-                $this->runat = (int) $row[1];
-                $this->lockfile = $row[2];
+            } else {
+                $this->update_from_database();
             }
         } else {
-            assert($new_lockfile === null);
+            assert(!isset($fields["lockfile"]));
             $changed = $this->status !== $new_status;
             if ($changed) {
                 $this->status = $new_status;
@@ -544,7 +566,7 @@ class QueueItem {
         if ($this->status === self::STATUS_SCHEDULED
             && ($this->flags & self::FLAG_ENSURE) !== 0
             && ($rr = $this->compatible_response())) {
-            $this->swap_status(self::STATUS_DONE, $rr->timestamp);
+            $this->swap_status(self::STATUS_DONE, ["runat" => $rr->timestamp]);
             if ($this->status >= self::STATUS_CANCELLED) {
                 return true;
             }
@@ -668,8 +690,8 @@ class QueueItem {
 
         // if no command, skip right to evaluation
         if (!$runner->command) {
-            $this->swap_status(self::STATUS_EVALUATED, time());
-            return true;
+            $this->swap_status(self::STATUS_EVALUATED, ["runat" => time()]);
+            return;
         }
 
         // otherwise must be enqueued
@@ -690,7 +712,7 @@ class QueueItem {
 
         $runlog->invalidate_active_job();
         if ($runlog->active_job()) {
-            return false;
+            return;
         }
         $runlog->invalidate_active_job();
 
@@ -734,8 +756,8 @@ class QueueItem {
         $this->_logstream = fopen($this->_logfile, "a");
         $this->bhash = $info->bhash(); // resolve blank hash
 
-        if (!$this->swap_status(self::STATUS_WORKING, $runat, $pidfile)) {
-            return $this->status > 0;
+        if (!$this->swap_status(self::STATUS_WORKING, ["runat" => $runat, "lockfile" => $pidfile])) {
+            return;
         }
         $this->_runstatus = 1;
         register_shutdown_function([$this, "cleanup"]);
@@ -825,8 +847,6 @@ class QueueItem {
 
         // save information about execution
         $this->info()->add_recorded_job($runner->name, $this->runat);
-
-        return true;
     }
 
     /** @param string $command

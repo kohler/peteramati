@@ -884,6 +884,10 @@ class UpdateSchema {
             && $conf->ql_ok("alter table `Repository` drop `analyzedsnapat`")) {
             $conf->update_schema_version(165);
         }
+        if ($conf->sversion === 165
+            && $conf->ql_ok("alter table `ExecutionQueue` add `ensure` varbinary(8192) DEFAULT NULL")) {
+            $conf->update_schema_version(166);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

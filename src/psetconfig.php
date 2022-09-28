@@ -1882,6 +1882,8 @@ class RunnerConfig {
     public $transfer_warnings_priority;
     /** @var ?string */
     public $require;
+    /** @var ?list<string> */
+    public $ensure;
     /** @var ?string */
     public $command;
     /** @var ?string */
@@ -1929,6 +1931,10 @@ class RunnerConfig {
         $this->command = Pset::cstr($loc, $rs, "command");
         $this->username = Pset::cstr($loc, $rs, "username", "run_username");
         $this->require = Pset::cstr($loc, $rs, "require", "load");
+        $this->ensure = Pset::cstr_or_str_list($loc, $rs, "ensure");
+        if (is_string($this->ensure)) {
+            $this->ensure = [$this->ensure];
+        }
         $this->evaluate_function = Pset::cstr($loc, $rs, "evaluate_function", "eval");
         $this->display_function = Pset::cstr($loc, $rs, "display_function", "output_function");
         $this->queue = Pset::cstr($loc, $rs, "queue");
