@@ -450,9 +450,10 @@ class QueueItem {
                     $this->queueid, self::STATUS_UNSCHEDULED);
             } else {
                 $this->conf->qe("update ExecutionQueue
-                        set status=?, runorder=?
+                        set status=?, scheduleat=?, runorder=?
                         where queueid=? and status=?",
-                    self::STATUS_SCHEDULED, Conf::$now + $priority,
+                    self::STATUS_SCHEDULED, Conf::$now,
+                    Conf::$now + $priority,
                     $this->queueid, self::STATUS_UNSCHEDULED);
             }
             if (($row = $this->conf->fetch_first_row("select status, scheduleat, runorder from ExecutionQueue where queueid=?", $this->queueid))) {
@@ -530,9 +531,12 @@ class QueueItem {
     /** @param int $chain */
     static function step_chain(Conf $conf, $chain) {
         $conf->qe("update ExecutionQueue
-                set runat=if(status=?,?,runorder), status=if(status=?,?,status)
+                set runorder=if(status=?,?,runorder),
+                    scheduleat=if(status=?,?,scheduleat),
+                    status=if(status=?,?,status)
                 where status>=? and status<? and chain=?
                 order by status desc, runorder asc, queueid asc limit 1",
+            self::STATUS_UNSCHEDULED, Conf::$now,
             self::STATUS_UNSCHEDULED, Conf::$now,
             self::STATUS_UNSCHEDULED, self::STATUS_SCHEDULED,
             self::STATUS_UNSCHEDULED, self::STATUS_CANCELLED, $chain);
