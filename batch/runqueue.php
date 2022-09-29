@@ -12,6 +12,8 @@ class RunQueueBatch {
     public $is_query = false;
     /** @var bool */
     public $is_clean = false;
+    /** @var ?list<int> */
+    public $schedule_qid;
     /** @var bool */
     public $list_broken_chains = false;
     /** @var bool */
@@ -84,6 +86,17 @@ class RunQueueBatch {
                     $this->report($qix, $old_status);
                 }
             }
+        }
+        Dbl::free($result);
+    }
+
+    function schedule() {
+        $qs = new QueueStatus;
+        $result = $this->conf->qe("select * from ExecutionQueue
+                where status=? and queueid?a",
+            QueueItem::STATUS_UNSCHEDULED, $this->schedule_qid);
+        while (($qix = QueueItem::fetch($this->conf, $result))) {
+            $qix->schedule(0);
         }
         Dbl::free($result);
     }
@@ -207,6 +220,9 @@ class RunQueueBatch {
                 QueueItem::STATUS_CANCELLED,
                 QueueItem::STATUS_WORKING, $this->cancel_qid);
         }
+        if (!empty($this->schedule_qid)) {
+            $this->schedule();
+        }
         if ($this->is_query) {
             $this->query();
         }
@@ -228,6 +244,7 @@ class RunQueueBatch {
             "1 Execute queue once",
             "q,query Print queue",
             "c,clean Clean queue",
+            "schedule[] =QUEUEID Schedule QUEUEID",
             "cancel[] =QUEUEID Cancel QUEUEID (or C<CHAINID>)",
             "list-broken-chains List broken chains",
             "cancel-broken-chains Cancel all broken chains",
@@ -243,6 +260,13 @@ class RunQueueBatch {
         }
         if (isset($arg["c"])) {
             $self->is_clean = true;
+        }
+        foreach ($arg["schedule"] ?? [] as $x) {
+            if (preg_match('/\A[#]?(\d+)\z/', $x, $m)) {
+                $self->schedule_qid[] = intval($m[1]);
+            } else {
+                throw new CommandLineException("bad `--schedule` argument");
+            }
         }
         if (isset($arg["list-broken-chains"])) {
             $self->list_broken_chains = true;
