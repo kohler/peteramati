@@ -295,7 +295,10 @@ class QueueItem {
      * @return ?QueueItem */
     static function by_chain(Conf $conf, $chain) {
         $conf->clean_queue();
-        $result = $conf->qe("select * from ExecutionQueue where chain=? order by runorder asc, queueid asc limit 1", $chain);
+        $result = $conf->qe("select * from ExecutionQueue
+                where chain=? and status<?
+                order by runorder asc, queueid asc limit 1",
+            $chain, self::STATUS_CANCELLED);
         return self::fetch($conf, $result, null);
     }
 

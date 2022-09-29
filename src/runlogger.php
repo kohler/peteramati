@@ -111,7 +111,7 @@ class RunLogger {
     /** @param int $jobid
      * @return bool */
     function job_complete($jobid) {
-        return $jobid === $this->active_job();
+        return $jobid !== $this->active_job();
     }
 
     /** @return list<int> */
