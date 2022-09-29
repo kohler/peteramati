@@ -60,7 +60,7 @@ class GradeExport implements JsonSerializable {
     private $visible_entries;
     /** @var ?list<int> */
     private $known_entries;
-    /** @var ?list<0|4|5> */
+    /** @var ?list<0|4|5|6> */
     private $export_grades_vf;
     /** @var bool */
     private $export_entries = false;
@@ -86,7 +86,7 @@ class GradeExport implements JsonSerializable {
         $this->value_slice = true;
     }
 
-    /** @param ?list<0|4|5> $export_grades_vf */
+    /** @param ?list<0|4|5|6> $export_grades_vf */
     function set_exported_entries($export_grades_vf) {
         $this->export_entries = true;
         $this->export_grades_vf = $export_grades_vf;
@@ -254,7 +254,7 @@ class GradeExport implements JsonSerializable {
             foreach ($this->visible_entries() as $ge) {
                 if ($this->known_entries === null
                     || $this->known_entries[$ge->pcview_index] === false)
-                    $entries[$ge->key] = $ge->json($this->vf >= VF_TF, $grades_vf[$ge->pcview_index]);
+                    $entries[$ge->key] = $ge->json($this->vf & $grades_vf[$ge->pcview_index]);
             }
             $r["entries"] = empty($entries) ? (object) [] : $entries;
         }

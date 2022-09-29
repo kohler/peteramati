@@ -19,7 +19,9 @@ const HASNOTES_GRADE = 1;
 const HASNOTES_COMMENT = 2;
 const HASNOTES_ANY = 3;
 
-const VF_STUDENT = 1;
+const VF_STUDENT_ALWAYS = 1;
+const VF_STUDENT_ALLOWED = 2;
+const VF_STUDENT_ANY = 3;
 const VF_TF = 4;
 
 global $OK;

@@ -110,10 +110,10 @@ class Pset {
     public $all_grades = [];
     /** @var array<string,GradeEntry>
      * @readonly */
-    public $grades;
-    /** @var list<4|5>
+    public $grades = [];
+    /** @var list<4|5|6>
      * @readonly */
-    private $_grades_vf;
+    private $_grades_vf = [];
     /** @var bool */
     public $scores_visible;
     /** @var int */
@@ -344,9 +344,10 @@ class Pset {
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
                 }
                 $this->all_grades[$g->key] = $g;
-                if (!$g->disabled) {
-                    $this->grades[$g->key] = $g;
+                if ($g->disabled) {
+                    continue;
                 }
+                $this->grades[$g->key] = $g;
                 if ($g->collate) {
                     $this->has_grade_collate = true;
                 }
@@ -362,13 +363,6 @@ class Pset {
                 if ($g->is_extra) {
                     $this->has_extra = true;
                 }
-                if (($g->grade_vf() & VF_STUDENT_ANY) !== 0) {
-                    if ($g->answer) {
-                        $this->has_answers = true;
-                    } else if ($g->formula === null) {
-                        $this->has_assigned = true;
-                    }
-                }
             }
         } else if ($grades) {
             throw new PsetConfigException("`grades` format error`", "grades");
@@ -383,10 +377,19 @@ class Pset {
         $gv = self::cdate($p, "scores_visible", "grades_visible");
         $this->scores_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->scores_visible_at = is_int($gv) ? $gv : 0;
+        $vf_mask = $this->visible_student() ? ~0 : ~VF_STUDENT_ANY;
         foreach (array_values($this->grades) as $i => $ge) {
             $ge->pcview_index = $i;
+            $vf = $ge->vf() & $vf_mask;
+            $this->_grades_vf[] = $vf;
+            if (($vf & VF_STUDENT_ANY) !== 0) {
+                if ($ge->answer) {
+                    $this->has_answers = true;
+                } else if ($ge->formula === null) {
+                    $this->has_assigned = true;
+                }
+            }
         }
-        $this->_grades_vf = $this->grades_vf($this->scores_visible);
 
         $gsv = self::cdate_or_grades($p, "grade_statistics_visible");
         if ($gsv === true) {
@@ -570,24 +573,9 @@ class Pset {
             && !$this->frozen;
     }
 
-    /** @param ?bool $scores_visible
-     * @return list<4|5> */
-    function grades_vf($scores_visible = null) {
-        if ($scores_visible === null) {
-            return $this->_grades_vf;
-        } else {
-            $vis = $this->visible_student();
-            $scores_visible = $scores_visible ?? $this->scores_visible;
-            $vf = [];
-            foreach ($this->grades as $ge) {
-                if ($ge->visible && $vis && ($scores_visible || $ge->answer || $ge->concealed)) {
-                    $vf[] = VF_TF | VF_STUDENT;
-                } else {
-                    $vf[] = VF_TF;
-                }
-            }
-            return $vf;
-        }
+    /** @return list<4|5|6> */
+    function grades_vf() {
+        return $this->_grades_vf;
     }
 
 
@@ -737,12 +725,12 @@ class Pset {
         return $this->_has_uncacheable_formula;
     }
 
-    /** @param 1|4 $vf
+    /** @param 0|2|3|4|6|7 $vf
      * @return list<GradeEntry> */
     function visible_grades($vf) {
         if ($vf >= VF_TF) {
             return array_values($this->grades);
-        } else if (!$this->disabled && $this->visible) {
+        } else if ($this->visible_student()) {
             $g = [];
             foreach (array_values($this->grades) as $i => $ge) {
                 if (($this->_grades_vf[$i] & $vf) !== 0)
@@ -1193,9 +1181,9 @@ class GradeEntry {
     /** @var float|false
      * @readonly */
     public $position;
-    /** @var bool
+    /** @var ?bool
      * @readonly */
-    public $visible;
+    private $visible;
     /** @var bool
      * @readonly */
     public $concealed;
@@ -1387,10 +1375,6 @@ class GradeEntry {
             $this->visible = Pset::cbool($loc, $g, "visible");
         } else if (isset($g->hidden)) {
             $this->visible = !Pset::cbool($loc, $g, "hidden");
-        } else if (isset($g->hide)) {
-            $this->visible = !Pset::cbool($loc, $g, "hide"); // XXX
-        } else {
-            $this->visible = true;
         }
         $this->concealed = Pset::cbool($loc, $g, "concealed");
         $this->required = Pset::cbool($loc, $g, "required");
@@ -1492,6 +1476,18 @@ class GradeEntry {
             }
         }
         return $x;
+    }
+
+
+    /** @return 4|5|6 */
+    function vf() {
+        if ($this->visible === true || $this->answer || $this->concealed) {
+            return VF_TF | VF_STUDENT_ALWAYS;
+        } else if ($this->visible === null) {
+            return VF_TF | VF_STUDENT_ALLOWED;
+        } else {
+            return VF_TF;
+        }
     }
 
 
@@ -1717,7 +1713,7 @@ class GradeEntry {
         if (!$this->value_differs($newv, $oldv)
             || $info->pc_view) {
             return true;
-        } else if (!$this->visible || !$this->answer) {
+        } else if ($this->visible === false || !$this->answer) {
             $this->_last_error = "Cannot modify grade.";
             return false;
         } else if ($this->pset->frozen) {
@@ -1733,7 +1729,7 @@ class GradeEntry {
 
     /** @return bool */
     function student_can_edit() {
-        return $this->visible && $this->answer;
+        return $this->visible !== false && $this->answer;
     }
 
     /** @return bool */
@@ -1772,10 +1768,9 @@ class GradeEntry {
         return $this->_formula;
     }
 
-    /** @param bool $pcview
-     * @param null|0|4|5 $vf
+    /** @param 0|2|3|4|6|7 $vf
      * @return array<string,mixed> */
-    function json($pcview, $vf = null) {
+    function json($vf) {
         $gej = ["key" => $this->key, "title" => $this->title];
         if ($this->type !== null) {
             if ($this->type === "select") {
@@ -1802,7 +1797,7 @@ class GradeEntry {
         if ($this->round) {
             $gej["round"] = $this->round;
         }
-        if ($this->max && ($pcview || $this->max_visible)) {
+        if ($this->max && ($vf >= VF_TF || $this->max_visible)) {
             $gej["max"] = $this->max;
         }
         if ($this->table_color) {
@@ -1826,7 +1821,7 @@ class GradeEntry {
         if ($this->landmark_range_file) {
             $gej["landmark_range"] = $this->landmark_range_file . ":" . $this->landmark_range_first . ":" . $this->landmark_range_last;
         }
-        if ($vf === null ? !$this->visible : ($vf & VF_STUDENT) === 0) {
+        if (($this->vf() & $vf & ~VF_TF) === 0) {
             $gej["visible"] = false;
         }
         if ($this->concealed) {
@@ -1838,7 +1833,7 @@ class GradeEntry {
         if ($this->answer)  {
             $gej["answer"] = true;
         }
-        if (($pcview || $this->answer) && $this->description) {
+        if (($vf >= VF_TF || $this->answer) && $this->description) {
             $gej["description"] = $this->description;
         }
         return $gej;

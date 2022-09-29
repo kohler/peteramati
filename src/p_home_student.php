@@ -35,7 +35,7 @@ class Home_Student_Page {
             $c = "gradesmissing";
         }
         if ($info->user_can_view_score() && $info->can_view_nonempty_score()) {
-            if ($info->has_visible_required_scores()) {
+            if ($info->user_visible_grading_complete()) {
                 $x[] = "grade ready";
             } else {
                 $x[] = "grade partially ready";
@@ -82,7 +82,7 @@ class Home_Student_Page {
         if ($info->can_view_grade()
             && ($t = $info->visible_total()) !== null) {
             echo '<div class="pa-gradelist is-main mt-0"><div class="pa-p',
-                !$user_can_view || $info->user_can_view_score() ? '' : ' pa-p-hidden',
+                $info->user_visible_total() === $t ? '' : ' pa-p-hidden',
                 '"><div class="pa-pt">grade</div>',
                 '<div class="pa-pv"><strong>', $t, '</strong>';
             if (($max = $info->grade_max_total())) {

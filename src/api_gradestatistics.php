@@ -179,7 +179,7 @@ class GradeStatistics_API {
         $nge = 0;
         $lastge = null;
         $maxtotal = 0;
-        foreach ($pset->visible_grades($pcview ? VF_TF : VF_STUDENT) as $ge) {
+        foreach ($pset->visible_grades($pcview ? VF_TF : VF_STUDENT_ANY) as $ge) {
             if (!$ge->no_total) {
                 ++$nge;
                 $lastge = $ge;
@@ -197,7 +197,7 @@ class GradeStatistics_API {
             }
         }
         if ($nge === 1) {
-            $r->entry = $lastge->json($pcview);
+            $r->entry = $lastge->json($pcview ? VF_TF : VF_STUDENT_ANY);
         }
 
         return $r;
