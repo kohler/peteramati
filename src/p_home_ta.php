@@ -232,7 +232,7 @@ class Home_TA_Page {
         if (!$pset->gitless_grades && $info->repo) {
             if (!$info->user->dropped
                 && !$this->profile
-                && $pset->student_scores_visible()) {
+                && $pset->scores_visible_student()) {
                 $info->update_placeholder(function ($info, $rpi) {
                     $placeholder_at = $rpi ? $rpi->placeholder_at : 0;
                     if (($rpi && !$rpi->placeholder)
@@ -418,7 +418,7 @@ class Home_TA_Page {
             "gitless_grades" => $pset->gitless_grades,
             "key" => $pset->urlkey,
             "title" => $pset->title,
-            "scores_visible" => $pset->student_scores_visible()
+            "scores_visible" => $pset->scores_visible_student()
         ];
         if ($anonymous) {
             $jd["can_override_anonymous"] = true;

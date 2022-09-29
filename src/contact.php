@@ -1591,12 +1591,12 @@ class Contact {
     function can_view_pset(Pset $pset) {
         return (!$pset->disabled && $pset->gitless && $this->isPC)
             || (!$pset->admin_disabled && $this->privChair)
-            || $pset->student_can_view();
+            || $pset->visible_student();
     }
 
     function xxx_can_view_grades(Pset $pset) {
         return $this->can_view_pset($pset)
-            && ($this->isPC || $pset->student_can_view_grades());
+            && ($this->isPC || $pset->grades_visible_student());
     }
 
     /** @return bool */

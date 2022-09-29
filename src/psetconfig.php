@@ -546,24 +546,24 @@ class Pset {
 
 
     /** @return bool */
-    function student_can_view() {
+    function visible_student() {
         return !$this->disabled && $this->visible;
     }
 
     /** @return bool */
-    function student_scores_visible() {
-        return $this->student_can_view() && $this->scores_visible;
+    function scores_visible_student() {
+        return $this->visible_student() && $this->scores_visible;
     }
 
     /** @return bool */
-    function student_can_view_grades() {
-        return $this->student_can_view()
+    function grades_visible_student() {
+        return $this->visible_student()
             && ($this->has_answers || $this->scores_visible);
     }
 
     /** @return bool */
-    function student_answers_editable() {
-        return $this->student_can_view()
+    function answers_editable_student() {
+        return $this->visible_student()
             && $this->has_answers
             && !$this->frozen;
     }
@@ -574,7 +574,7 @@ class Pset {
         if ($scores_visible === null) {
             return $this->_grades_vf;
         } else {
-            $vis = $this->student_can_view();
+            $vis = $this->visible_student();
             $scores_visible = $scores_visible ?? $this->scores_visible;
             $vf = [];
             foreach ($this->grades as $ge) {

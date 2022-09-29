@@ -1267,11 +1267,11 @@ class PsetView {
 
     private function set_user_can_view_grade() {
         $this->_user_can_view_grade = $this->_user_can_view_score = false;
-        if ($this->pset->student_can_view()
+        if ($this->pset->visible_student()
             && ($this->pset->gitless_grades
                 || ($this->repo && $this->user_can_view_repo_contents()))) {
-            if (($this->pinned_scores_visible() ?? $this->pset->student_scores_visible())
-                || $this->pset->student_answers_editable()) {
+            if (($this->pinned_scores_visible() ?? $this->pset->scores_visible_student())
+                || $this->pset->answers_editable_student()) {
                 foreach ($this->visible_grades(false) as $ge) {
                     if ($ge->answer || $ge->concealed) {
                         $this->_user_can_view_grade = true;
@@ -1329,7 +1329,7 @@ class PsetView {
     /** @return bool */
     function can_edit_grade() {
         return $this->can_view_grade()
-            && ($this->pc_view || $this->pset->student_answers_editable());
+            && ($this->pc_view || $this->pset->answers_editable_student());
     }
 
     /** @return bool */
@@ -1971,7 +1971,7 @@ class PsetView {
             $gexp->student_timestamp = $ts;
         }
         if ($this->user_can_view_score()) {
-            $gexp->scores_student_visible = true;
+            $gexp->scores_visible_student = true;
         }
         if ($this->can_edit_scores()) {
             $gexp->scores_editable = true;
@@ -2068,7 +2068,7 @@ class PsetView {
             $r["commit"] = $this->hash();
         }
         if ($this->user_can_view_score()) {
-            $r["scores_student_visible"] = true;
+            $r["scores_visible_student"] = true;
         }
         return $r;
     }

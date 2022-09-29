@@ -48,7 +48,7 @@ class GradeExport implements JsonSerializable {
     /** @var null|int */
     public $auto_late_hours;
     /** @var ?bool */
-    public $scores_student_visible;
+    public $scores_visible_student;
     /** @var ?bool */
     public $scores_editable;
     /** @var ?bool */
@@ -56,7 +56,7 @@ class GradeExport implements JsonSerializable {
     /** @var ?LineNotesOrder */
     public $lnorder;
     /** @var ?list<GradeEntry> */
-    private $visible_values;
+    private $visible_entries;
     /** @var ?list<int> */
     private $known_entries;
     /** @var ?list<int> */
@@ -74,13 +74,13 @@ class GradeExport implements JsonSerializable {
     function set_visible_grades($vges) {
         assert(!isset($this->grades));
         /** @phan-suppress-next-line PhanTypeMismatchArgumentInternal */
-        $this->visible_values = is_list($vges) ? $vges : iterator_to_array($vges, false);
+        $this->visible_entries = is_list($vges) ? $vges : iterator_to_array($vges, false);
         $this->has_total = false;
     }
 
     /** @param iterable<GradeEntry> $vges */
     function set_exported_values($vges) {
-        assert($this->pc_view && $this->visible_values === null);
+        assert($this->pc_view && $this->visible_entries === null);
         $this->set_visible_grades($vges);
         $this->value_slice = true;
     }
@@ -93,16 +93,16 @@ class GradeExport implements JsonSerializable {
 
     /** @return list<GradeEntry> */
     function visible_entries() {
-        if ($this->value_slice || $this->visible_values === null) {
+        if ($this->value_slice || $this->visible_entries === null) {
             return $this->pset->visible_grades($this->pc_view);
         } else {
-            return $this->visible_values;
+            return $this->visible_entries;
         }
     }
 
     /** @return list<GradeEntry> */
     function value_entries() {
-        return $this->visible_values ?? $this->pset->visible_grades($this->pc_view);
+        return $this->visible_entries ?? $this->pset->visible_grades($this->pc_view);
     }
 
     /** @return list<mixed> */
@@ -126,7 +126,7 @@ class GradeExport implements JsonSerializable {
             }
         }
         if ($i !== $nges) {
-            $this->visible_values = $ges;
+            $this->visible_entries = $ges;
         }
     }
 
@@ -228,8 +228,8 @@ class GradeExport implements JsonSerializable {
             if ($this->answer_version !== null) {
                 $r["answer_version"] = $this->answer_version;
             }
-            if ($this->scores_student_visible !== null) {
-                $r["scores_student_visible"] = $this->scores_student_visible;
+            if ($this->scores_visible_student !== null) {
+                $r["scores_visible_student"] = $this->scores_visible_student;
             }
             if ($this->scores_editable !== null) {
                 $r["scores_editable"] = $this->scores_editable;
@@ -257,7 +257,7 @@ class GradeExport implements JsonSerializable {
             }
             $r["entries"] = empty($entries) ? (object) [] : $entries;
         }
-        if ($this->export_entries || $this->visible_values !== null) {
+        if ($this->export_entries || $this->visible_entries !== null) {
             $order = [];
             foreach ($this->visible_entries() as $ge) {
                 $order[] = $ge->key;

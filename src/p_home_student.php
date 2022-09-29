@@ -104,7 +104,7 @@ class Home_Student_Page {
                 || $this->viewer->isPC
                 || $pset->partner
                 || $pset->upi_for($this->user)
-                || $pset->student_answers_editable())) {
+                || $pset->answers_editable_student())) {
             return PsetView::make($pset, $this->user, $this->viewer);
         } else {
             return null;

@@ -54,7 +54,7 @@ function render_form($tr, note, transition) {
         '<div class="aabutr order-100"><button class="btn-primary" type="submit">Save comment</button></div>',
         '<div class="aabutr order-99"><button type="button" name="cancel">Cancel</button></div>',
         '<div class="aabut"><button type="button" class="btn ui pa-load-note-suggestions">↡</button></div>');
-    if (!gi.scores_student_visible) {
+    if (!gi.scores_visible_student) {
         t += '<div class="aabut"><label class="checki"><input type="checkbox" name="iscomment" value="1" class="checkc">Show immediately</label></div>';
     }
     t += '<div class="aabut flex-grow-1"></div>';
