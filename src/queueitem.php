@@ -255,7 +255,7 @@ class QueueItem {
 
     /** @return mixed */
     private function evaluate() {
-        assert($this->status === self::STATUS_EVALUATED);
+        assert($this->status >= self::STATUS_DONE);
         if ($this->_evaluate_at === null) {
             $this->_evaluate_at = $this->runat;
             if (($runner = $this->runner())
@@ -263,6 +263,9 @@ class QueueItem {
                 && ($info = $this->info())) {
                 $this->_evaluate = $info->runner_evaluate($runner, $this->runat);
             }
+        }
+        if ($this->status === self::STATUS_DONE) {
+            $this->swap_status(self::STATUS_EVALUATED);
         }
         return $this->_evaluate;
     }
@@ -510,7 +513,7 @@ class QueueItem {
             }
         }
         if ($changed && $this->status >= self::STATUS_DONE) {
-            if ($this->status === self::STATUS_EVALUATED) {
+            if ($this->status === self::STATUS_DONE) {
                 // always evaluate at least once
                 $this->evaluate();
             }
