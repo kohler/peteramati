@@ -994,17 +994,21 @@ handle_ui.on("pa-psetinfo-link", function () {
 });
 
 function pa_render_total(gi, tm) {
-    var t = '<div class="pa-total pa-p', ne = 0;
+    var t = '<div class="pa-total pa-p', ne = 0, nv = 0;
     for (var k in gi.entries) {
-        if (gi.entries[k].type_tabular)
+        if (gi.entries[k].in_total) {
             ++ne;
+            if (gi.entries[k].student_visible(gi))
+                ++nv;
+        }
     }
-    if (ne <= 1) {
+    if (ne <= 1)
         t += ' hidden';
-    }
-    return t + '"><div class="pa-pt">total</div>' +
-        '<div class="pa-pv"><span class="pa-gradevalue pa-gradewidth"></span> ' +
-        '<span class="pa-gradedesc">of ' + tm[1] + '</span></div></div>';
+    else if (nv < ne)
+        t += ' pa-p-hidden';
+    return t.concat('"><div class="pa-pt">total</div>',
+        '<div class="pa-pv"><span class="pa-gradevalue pa-gradewidth"></span> ',
+        '<span class="pa-gradedesc">of ', tm[1], '</span></div></div>');
 }
 
 function pa_loadgrades() {

@@ -2498,6 +2498,11 @@ td.mhcb {
 	padding-bottom: 0.5rem;
 	margin-bottom: 0;
 }
+.is-main > .pa-p-hidden + .pa-p,
+.is-mainsb > .pa-p-hidden + .pa-p,
+.is-modal > .pa-p-hidden + .pa-p {
+	padding-top: 0.5rem;
+}
 .is-main > .pa-p-hidden + .pa-p-hidden,
 .is-mainsb > .pa-p-hidden + .pa-p-hidden,
 .is-modal > .pa-p-hidden + .pa-p-hidden {

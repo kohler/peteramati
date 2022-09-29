@@ -1971,7 +1971,7 @@ class PsetView {
             $gexp->student_timestamp = $ts;
         }
         if ($this->user_can_view_score()) {
-            $gexp->user_scores_visible = true;
+            $gexp->scores_student_visible = true;
         }
         if ($this->can_edit_scores()) {
             $gexp->scores_editable = true;
@@ -2068,7 +2068,7 @@ class PsetView {
             $r["commit"] = $this->hash();
         }
         if ($this->user_can_view_score()) {
-            $r["user_scores_visible"] = true;
+            $r["scores_student_visible"] = true;
         }
         return $r;
     }

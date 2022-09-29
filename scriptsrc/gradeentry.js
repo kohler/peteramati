@@ -17,7 +17,7 @@ const gradesheet_props = {
     "late_hours": true, "auto_late_hours": true, "student_timestamp": true,
     "version": true, "history": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,
-    "user_scores_visible": true, "scores_editable": true, "answers_editable": true,
+    "scores_student_visible": true, "scores_editable": true, "answers_editable": true,
     "linenotes": true
 };
 
@@ -33,6 +33,12 @@ export class GradeEntry {
 
     get type_tabular() {
         return this.gc.type_tabular;
+    }
+
+    student_visible(gi) {
+        return this.visible === true
+            || (this.visible == null
+                && (this.answer || gi.scores_student_visible));
     }
 
     get title_html() {
@@ -130,9 +136,7 @@ export class GradeEntry {
             le = document.createElement("label"),
             pde = document.createElement(mode === 2 ? "form" : "div");
         let klass = "pa-grade pa-p".concat(mode ? " e" : "", this.answer ? " pa-ans" : "");
-        if ((this.visible == null && !this.answer && gi.user_scores_visible === false)
-            || this.visible === false
-            || this.visible === "none") {
+        if (!this.student_visible(gi)) {
             klass += " pa-p-hidden";
         }
         pge.className = klass;

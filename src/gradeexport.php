@@ -48,7 +48,7 @@ class GradeExport implements JsonSerializable {
     /** @var null|int */
     public $auto_late_hours;
     /** @var ?bool */
-    public $user_scores_visible;
+    public $scores_student_visible;
     /** @var ?bool */
     public $scores_editable;
     /** @var ?bool */
@@ -228,8 +228,8 @@ class GradeExport implements JsonSerializable {
             if ($this->answer_version !== null) {
                 $r["answer_version"] = $this->answer_version;
             }
-            if ($this->user_scores_visible !== null) {
-                $r["user_scores_visible"] = $this->user_scores_visible;
+            if ($this->scores_student_visible !== null) {
+                $r["scores_student_visible"] = $this->scores_student_visible;
             }
             if ($this->scores_editable !== null) {
                 $r["scores_editable"] = $this->scores_editable;

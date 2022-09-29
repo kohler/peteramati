@@ -210,6 +210,11 @@ class Pset {
     function __construct(Conf $conf, $pk, $p) {
         $this->conf = $conf;
 
+        // obsolete components
+        if (($k = self::ccomponent($p, "group_weight", "ui_disabled", "show_to_students", "freeze", "handout_repo_branch", "handout_commit_hash", "repo_transform_patterns", "college_deadline", "extension_deadline", "show_grades_to_students", "grade_cdf_visible"))) {
+            throw new PsetConfigException("obsolete pset component `{$k}`", $k);
+        }
+
         // pset id
         if (!isset($p->psetid) || !is_int($p->psetid) || $p->psetid <= 0) {
             throw new PsetConfigException("`psetid` must be positive integer", "psetid");
@@ -258,7 +263,7 @@ class Pset {
             $this->title = $this->key;
         }
         $this->category = self::cstr($p, "category", "group");
-        $this->weight = self::cnum($p, "weight", "group_weight");
+        $this->weight = self::cnum($p, "weight");
         if ($this->weight === null) {
             $this->weight = 1.0;
             $this->weight_default = true;
@@ -267,13 +272,13 @@ class Pset {
         $this->position = (float) (Pset::cnum($p, "position") ?? 0.0);
 
         $this->disabled = self::cbool($p, "disabled");
-        if (($this->admin_disabled = self::cbool($p, "admin_disabled", "ui_disabled"))) {
+        if (($this->admin_disabled = self::cbool($p, "admin_disabled"))) {
             $this->disabled = true;
         }
-        $v = self::cdate($p, "visible", "show_to_students");
+        $v = self::cdate($p, "visible");
         $this->visible = $v === true || (is_int($v) && $v > 0 && $v <= Conf::$now);
         $this->visible_at = is_int($v) ? $v : 0;
-        $this->frozen = self::cdate($p, "frozen", "freeze");
+        $this->frozen = self::cdate($p, "frozen");
         $this->partner = self::cbool($p, "partner");
         $this->no_branch = self::cbool($p, "no_branch");
         $this->anonymous = self::cbool($p, "anonymous");
@@ -299,11 +304,11 @@ class Pset {
         if (!$this->handout_repo_url && !$this->gitless) {
             throw new PsetConfigException("`handout_repo_url` missing", "handout_repo_url");
         }
-        $this->handout_branch = self::cstr($p, "handout_branch", "handout_repo_branch") ?? $this->main_branch;
-        $this->handout_hash = self::cstr($p, "handout_hash", "handout_commit_hash");
+        $this->handout_branch = self::cstr($p, "handout_branch") ?? $this->main_branch;
+        $this->handout_hash = self::cstr($p, "handout_hash");
         $this->handout_warn_hash = self::cstr($p, "handout_warn_hash");
         $this->handout_warn_merge = self::cbool($p, "handout_warn_merge");
-        $this->repo_guess_patterns = self::cstr_list($p, "repo_guess_patterns", "repo_transform_patterns");
+        $this->repo_guess_patterns = self::cstr_list($p, "repo_guess_patterns");
         $this->directory = $this->directory_slash = "";
         if (isset($p->directory) && is_string($p->directory)) {
             $this->directory = $p->directory;
@@ -322,8 +327,8 @@ class Pset {
 
         // deadlines
         $this->deadline = self::cdate($p, "deadline");
-        $this->deadline_college = self::cdate($p, "deadline_college", "college_deadline");
-        $this->deadline_extension = self::cdate($p, "deadline_extension", "college_extension");
+        $this->deadline_college = self::cdate($p, "deadline_college");
+        $this->deadline_extension = self::cdate($p, "deadline_extension");
         if (!$this->deadline) {
             $this->deadline = $this->deadline_college ? : $this->deadline_extension;
         }
@@ -373,7 +378,7 @@ class Pset {
         }
         $this->grades_history = self::cbool($p, "grades_history") ?? false;
         $this->grades_selection_function = self::cstr($p, "grades_selection_function");
-        $gv = self::cdate($p, "scores_visible", "grades_visible", "show_grades_to_students");
+        $gv = self::cdate($p, "scores_visible", "grades_visible");
         $this->scores_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->scores_visible_at = is_int($gv) ? $gv : 0;
         foreach (array_values($this->grades) as $i => $ge) {
@@ -381,7 +386,7 @@ class Pset {
         }
         $this->_grades_vf = $this->grades_vf($this->scores_visible);
 
-        $gsv = self::cdate_or_grades($p, "grade_statistics_visible", "grade_cdf_visible");
+        $gsv = self::cdate_or_grades($p, "grade_statistics_visible");
         if ($gsv === true) {
             $this->grade_statistics_visible = 1;
         } else if (($gsv ?? "grades") === "grades") {
@@ -980,6 +985,17 @@ class Pset {
                 }
             }
             $warn = $x;
+        }
+        return null;
+    }
+
+    /** @param object $x
+     * @param string ...$keys
+     * @return ?string */
+    static function ccomponent($x, ...$keys) {
+        foreach ($keys as $k) {
+            if (property_exists($x, $k))
+                return $k;
         }
         return null;
     }
@@ -1900,6 +1916,11 @@ class RunnerConfig {
         }
         $rs = $defr ? [$r, $defr] : $r;
 
+        // obsolete components
+        if (($k = Pset::ccomponent($r, "output_title", "show_to_students", "output_visible", "show_output_to_students", "show_results_to_students"))) {
+            throw new PsetConfigException("obsolete runner component `{$k}`", $loc);
+        }
+
         $this->pset = $pset;
         $this->name = isset($r->name) ? $r->name : $name;
         if (!is_string($this->name) || !preg_match('/\A[A-Za-z][0-9A-Za-z_]*\z/', $this->name)) {
@@ -1910,10 +1931,10 @@ class RunnerConfig {
         }
 
         $this->title = Pset::cstr($loc, $r, "title") ?? $this->name;
-        $this->display_title = Pset::cstr($loc, $r, "display_title", "output_title") ?? "{$this->title} output";
+        $this->display_title = Pset::cstr($loc, $r, "display_title") ?? "{$this->title} output";
         $this->disabled = Pset::cbool($loc, $rs, "disabled");
-        $this->visible = Pset::cdate_or_grades($loc, $rs, "visible", "show_to_students");
-        $this->display_visible = Pset::cdate_or_grades($loc, $rs, "display_visible", "output_visible", "show_output_to_students", "show_results_to_students");
+        $this->visible = Pset::cdate_or_grades($loc, $rs, "visible");
+        $this->display_visible = Pset::cdate_or_grades($loc, $rs, "display_visible");
         $this->timeout = Pset::cinterval($loc, $rs, "timeout", "run_timeout");
         $this->idle_timeout = Pset::cinterval($loc, $rs, "idle_timeout");
         $this->xterm_js = Pset::cbool($loc, $rs, "xterm_js");
@@ -2112,6 +2133,12 @@ class DiffConfig {
         if (!is_object($d)) {
             throw new PsetConfigException("diff format error", ["diffs", $match]);
         }
+
+        // obsolete components
+        if (($k = Pset::ccomponent($d, "boring", "gradeable"))) {
+            throw new PsetConfigException("obsolete diff component `{$k}`", ["diffs", $match]);
+        }
+
         $this->match = $d->match ?? $d->regex ?? $match;
         if (!is_string($this->match) || $this->match === "") {
             throw new PsetConfigException("`match` diff format error", ["diffs", $match]);
@@ -2232,17 +2259,17 @@ class FormulaConfig {
     /** @var object */
     public $config;
 
-    function __construct(Conf $conf, $name, $g, $subposition = 0) {
+    function __construct(Conf $conf, $name, $fj, $subposition = 0) {
         $this->conf = $conf;
         $loc = ["formulas", $name];
-        if (!is_object($g)) {
+        if (!is_object($fj)) {
             throw new PsetConfigException("formula format error", $loc);
         }
         if (is_string($name) && !ctype_digit($name)) {
             $this->name = $name;
         }
-        if (isset($g->name)) {
-            $this->name = $g->name;
+        if (isset($fj->name)) {
+            $this->name = $fj->name;
         }
         if (isset($this->name)
             && (!is_string($this->name)
@@ -2252,18 +2279,18 @@ class FormulaConfig {
                 || $this->name === "total")) {
             throw new PsetConfigException("formula name format error", $loc);
         }
-        $this->title = Pset::cstr($loc, $g, "title");
-        $this->description = Pset::cstr($loc, $g, "description");
-        if (isset($g->visible)) {
-            $this->visible = Pset::cbool($loc, $g, "visible");
-        } else if (isset($g->hidden)) {
-            $this->visible = !Pset::cbool($loc, $g, "hidden");
+        $this->title = Pset::cstr($loc, $fj, "title");
+        $this->description = Pset::cstr($loc, $fj, "description");
+        if (isset($fj->visible)) {
+            $this->visible = Pset::cbool($loc, $fj, "visible");
+        } else if (isset($fj->hidden)) {
+            $this->visible = !Pset::cbool($loc, $fj, "hidden");
         }
-        $this->nonzero = Pset::cbool($loc, $g, "nonzero");
-        $this->home_position = Pset::cnum($loc, $g, "home_position");
+        $this->nonzero = Pset::cbool($loc, $fj, "nonzero");
+        $this->home_position = Pset::cnum($loc, $fj, "home_position");
         $this->subposition = $subposition;
-        $this->formula = Pset::cstr($loc, $g, "formula");
-        $this->config = $g;
+        $this->formula = Pset::cstr($loc, $fj, "formula");
+        $this->config = $fj;
     }
 
     /** @return ?string */

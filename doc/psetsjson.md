@@ -250,6 +250,8 @@ this format.
     If set explicitly to false, then students cannot see the value of `max`
     (graders can). Defaults to true.
 
+* `formula`: string
+
 * `student`: boolean
 
     If true, then students can edit this grade.
