@@ -206,7 +206,7 @@ export function render_terminal(container, string, options) {
             parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/),
             r = [];
         for (let partno = 0; partno < parts.length; ++partno) {
-            var g = [], glen = 0, clearafter = null, link = null;
+            var g = [], glen = 0, clearafter = null;
             var lsplit = parts[partno].split(/(\x1b\[[\d;]*m|\x1b\[0?K)/);
             for (var j = 0; j < lsplit.length; j += 2) {
                 if (lsplit[j] !== "") {
@@ -254,9 +254,8 @@ export function render_terminal(container, string, options) {
             if (prefix.length) {
                 addlinepart(node, prefix);
             }
-            var anchor = filematch.lineid_anchor("b" + line);
-            a = document.createElement("a");
-            a.href = "#" + anchor;
+            var a = document.createElement("a");
+            a.href = "#" + filematch.lineid_anchor("b" + line);
             a.className = "u pa-goto";
             a.append(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
@@ -288,10 +287,10 @@ export function render_terminal(container, string, options) {
         var render, link = "";
         while (line !== "") {
             render = line;
-            if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K|\x1b\]8;;|\x1b\\\\)([^]*)$/))) {
+            if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K|\x1b\]8;;)([^]*)$/))) {
                 if (m[1] === "") {
                     if (m[2] === "\x1b]8;;") {
-                        if ((mm = m[3].match(/^(.*?)\x1b\\\\([^]*)$/))) {
+                        if ((mm = m[3].match(/^(.*?)(?:\x1b\\|\x07)([^]*)$/))) {
                             link = mm[1];
                             line = mm[2];
                         } else {
