@@ -519,12 +519,14 @@ class QueueItem {
             }
             if ($this->queueid !== 0 && $this->chain) {
                 // free next element in chain
-                $this->conf->qe("update ExecutionQueue set status=?, runorder=?
-                        where status=? and chain=? and not exists (select * from ExecutionQueue where status>=? and status<? and chain=?)
-                        order by runorder asc, queueid asc limit 1",
+                $this->conf->qe("update ExecutionQueue a
+                        left join ExecutionQueue b on (status>=? and status<? and chain=?)
+                        set a.status=?, a.runorder=?
+                        where a.status=? and a.chain=? and b.chain is null
+                        order by a.runorder asc, a.queueid asc limit 1",
+                    self::STATUS_SCHEDULED, self::STATUS_CANCELLED, $this->chain,
                     self::STATUS_SCHEDULED, Conf::$now,
-                    self::STATUS_UNSCHEDULED, $this->chain,
-                    self::STATUS_SCHEDULED, self::STATUS_CANCELLED, $this->chain);
+                    self::STATUS_UNSCHEDULED, $this->chain);
             }
         }
         return !!$changed;
