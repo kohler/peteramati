@@ -62,7 +62,7 @@ class RunQueueBatch {
         $qs = new QueueStatus;
         $result = $this->conf->qe("select * from ExecutionQueue
                 where status>=? and status<? order by runorder asc, queueid asc",
-            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_DONE);
+            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED);
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             if ($qix->working() || $qix->abandoned()) {
@@ -82,7 +82,7 @@ class RunQueueBatch {
         $qs = new QueueStatus;
         $result = $this->conf->qe("select * from ExecutionQueue
                 where status>=? and status<? order by runorder asc, queueid asc limit 100",
-            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_DONE);
+            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED);
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             if ($qix->working() || $qs->nrunning < $qs->nconcurrent) {
                 $old_status = $qix->status();

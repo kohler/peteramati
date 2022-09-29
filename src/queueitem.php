@@ -524,7 +524,7 @@ class QueueItem {
                         order by runorder asc, queueid asc limit 1",
                     self::STATUS_SCHEDULED, Conf::$now,
                     self::STATUS_UNSCHEDULED, $this->chain,
-                    self::STATUS_SCHEDULED, self::STATUS_DONE, $this->chain);
+                    self::STATUS_SCHEDULED, self::STATUS_CANCELLED, $this->chain);
             }
         }
         return !!$changed;
@@ -1033,11 +1033,12 @@ class QueueItem {
 
         if ($rr->done
             && $this->queueid > 0
-            && $this->status < self::STATUS_DONE) {
+            && $this->status < self::STATUS_CANCELLED) {
             $this->swap_status(self::STATUS_EVALUATED);
         }
 
         if ($rr->done
+            && $this->status >= self::STATUS_DONE
             && $this->runner()->evaluate_function) {
             $rr->result = $this->evaluate();
         }
