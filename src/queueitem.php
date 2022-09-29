@@ -367,6 +367,7 @@ class QueueItem {
         $qi->runat = $rr->timestamp;
         $qi->runsettings = $rr->settings;
         $qi->tags = $rr->tags;
+        $qi->status = $rr->done ? self::STATUS_DONE : self::STATUS_WORKING;
         return $qi;
     }
 
