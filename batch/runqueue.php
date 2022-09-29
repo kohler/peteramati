@@ -212,14 +212,14 @@ class RunQueueBatch {
         }
         foreach ($arg["s"] ?? [] as $x) {
             if (preg_match('/\AC?(\d+)\z/', $x, $m)) {
-                $self->step_chain[] = intval($m);
+                $self->step_chain[] = intval($m[1]);
             } else {
                 throw new CommandLineException("bad `--step` argument");
             }
         }
         foreach ($arg["cancel-chain"] ?? [] as $x) {
             if (preg_match('/\AC?(\d+)\z/', $x, $m)) {
-                $self->cancel_chain[] = intval($m);
+                $self->cancel_chain[] = intval($m[1]);
             } else {
                 throw new CommandLineException("bad `--cancel-chain` argument");
             }
