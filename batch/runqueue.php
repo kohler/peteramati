@@ -56,10 +56,10 @@ class RunQueueBatch {
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             $chain = $qix->chain ? " C{$qix->chain}" : "";
             if ($qix->unscheduled()) {
-                $s = "delayed";
+                $s = "waiting";
                 $t = $qix->insertat;
             } else if ($qix->scheduled()) {
-                $s = "waiting";
+                $s = "scheduled";
                 $t = $qix->scheduleat;
             } else {
                 $s = "running";
