@@ -179,8 +179,16 @@ export function render_terminal(container, string, options) {
     var styles = container.getAttribute("data-pa-terminal-style"),
         fragment = null;
 
-    function addlinepart(node, text) {
-        node.appendChild(ansistyle_render(text, styles));
+    function addlinepart(node, text, link) {
+        var n = ansistyle_render(text, styles);
+        if (link != null && link !== "") {
+            var a = document.createElement("a");
+            a.href = link;
+            a.append(n);
+            node.append(a);
+        } else {
+            node.append(n);
+        }
     }
 
     function addfragment(node) {
@@ -198,7 +206,7 @@ export function render_terminal(container, string, options) {
             parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/),
             r = [];
         for (let partno = 0; partno < parts.length; ++partno) {
-            var g = [], glen = 0, clearafter = null;
+            var g = [], glen = 0, clearafter = null, link = null;
             var lsplit = parts[partno].split(/(\x1b\[[\d;]*m|\x1b\[0?K)/);
             for (var j = 0; j < lsplit.length; j += 2) {
                 if (lsplit[j] !== "") {
@@ -247,8 +255,10 @@ export function render_terminal(container, string, options) {
                 addlinepart(node, prefix);
             }
             var anchor = filematch.lineid_anchor("b" + line);
-            var a = $("<a href=\"#".concat(anchor, "\" class=\"u pa-goto\"></a>"));
-            a.text(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
+            a = document.createElement("a");
+            a.href = "#" + anchor;
+            a.className = "u pa-goto";
+            a.append(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;
         }
@@ -256,7 +266,7 @@ export function render_terminal(container, string, options) {
     }
 
     function render_line(line, node) {
-        var m, isnew = !node, displaylen = 0;
+        var m, mm, isnew = !node, displaylen = 0;
         if (isnew)
             node = document.createElement("span");
 
@@ -275,11 +285,20 @@ export function render_terminal(container, string, options) {
             line = line.substr(displaylen);
         }
 
-        var render;
+        var render, link = "";
         while (line !== "") {
             render = line;
-            if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
+            if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K|\x1b\]8;;|\x1b\\\\)([^]*)$/))) {
                 if (m[1] === "") {
+                    if (m[2] === "\x1b]8;;") {
+                        if ((mm = m[3].match(/^(.*?)\x1b\\\\([^]*)$/))) {
+                            link = mm[1];
+                            line = mm[2];
+                        } else {
+                            line = "";
+                        }
+                        continue;
+                    }
                     styles = ansistyle_combine(styles, m[2]);
                     line = m[3];
                     continue;
@@ -289,14 +308,14 @@ export function render_terminal(container, string, options) {
             if (displaylen + render.length > 133
                 || (displaylen + render.length == 133 && render.charAt(132) !== "\n")) {
                 render = render.substr(0, 132 - displaylen);
-                addlinepart(node, render);
+                addlinepart(node, render, link);
                 node.className = "pa-rl-continues";
                 isnew && addfragment(node);
                 node = document.createElement("span");
                 isnew = true;
                 displaylen = 0;
             } else {
-                addlinepart(node, render);
+                addlinepart(node, render, link);
                 displaylen += render.length;
             }
             line = line.substr(render.length);
