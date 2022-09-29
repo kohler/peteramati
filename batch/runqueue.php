@@ -12,8 +12,10 @@ class RunQueueBatch {
     public $is_query = false;
     /** @var bool */
     public $is_clean = false;
-    /** @var ?int */
+    /** @var ?list<int> */
     public $step_chain;
+    /** @var ?list<int> */
+    public $cancel_chain;
     /** @var bool */
     public $is_execute = false;
     /** @var bool */
@@ -40,7 +42,10 @@ class RunQueueBatch {
     }
 
     function query() {
-        $result = $this->conf->qe("select * from ExecutionQueue order by runorder asc, queueid asc");
+        $result = $this->conf->qe("select * from ExecutionQueue
+                where status<?
+                order by runorder asc, queueid asc",
+            QueueItem::STATUS_CANCELLED);
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             $chain = $qix->chain ? " C{$qix->chain}" : "";
@@ -63,7 +68,8 @@ class RunQueueBatch {
     function clean() {
         $qs = new QueueStatus;
         $result = $this->conf->qe("select * from ExecutionQueue
-                where status>=? and status<? order by runorder asc, queueid asc",
+                where status>=? and status<?
+                order by runorder asc, queueid asc",
             QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED);
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
@@ -83,7 +89,9 @@ class RunQueueBatch {
         $this->any_completed = false;
         $qs = new QueueStatus;
         $result = $this->conf->qe("select * from ExecutionQueue
-                where status>=? and status<? order by runorder asc, queueid asc limit 100",
+                where status>=? and status<?
+                order by runorder asc, queueid asc
+                limit 100",
             QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED);
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             if ($qix->working() || $qs->nrunning < $qs->nconcurrent) {
@@ -155,8 +163,15 @@ class RunQueueBatch {
     }
 
     function run() {
-        if ($this->step_chain !== null) {
-            QueueItem::step_chain($this->conf, $this->step_chain);
+        foreach ($this->step_chain ?? [] as $chain) {
+            QueueItem::step_chain($this->conf, $chain);
+        }
+        foreach ($this->cancel_chain ?? [] as $chain) {
+            $this->conf->qe("update ExecutionQueue
+                    set status=?
+                    where status<? and chain=?",
+                QueueItem::STATUS_CANCELLED,
+                QueueItem::STATUS_WORKING, $chain);
         }
         if ($this->is_query) {
             $this->query();
@@ -179,7 +194,9 @@ class RunQueueBatch {
             "1 Execute queue once",
             "q,query Print queue",
             "c,clean Clean queue",
-            "s:,step: =CHAIN Step CHAIN",
+            "s[],step[] =CHAIN Step CHAIN",
+            "cancel-chain[] =CHAIN Cancel all unqueued members in CHAIN",
+            // "cancel[] =QUEUEID Cancel QUEUEID",
             "V,verbose",
             "help"
         )->helpopt("help")->description("php batch/runqueue.php")->parse($argv);
@@ -193,8 +210,19 @@ class RunQueueBatch {
         if (isset($arg["c"])) {
             $self->is_clean = true;
         }
-        if (isset($arg["s"]) && ctype_digit($arg["s"])) {
-            $self->step_chain = intval($arg["s"]);
+        foreach ($arg["s"] ?? [] as $x) {
+            if (ctype_digit($x)) {
+                $self->step_chain[] = intval($x);
+            } else {
+                throw new CommandLineException("bad `--step` argument");
+            }
+        }
+        foreach ($arg["cancel-chain"] ?? [] as $x) {
+            if (ctype_digit($x)) {
+                $self->cancel_chain[] = intval($x);
+            } else {
+                throw new CommandLineException("bad `--step` argument");
+            }
         }
         if (isset($arg["1"])) {
             $self->is_execute1 = true;

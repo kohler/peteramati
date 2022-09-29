@@ -38,7 +38,7 @@ class QueueItem {
     /** @var ?int */
     public $chain;
 
-    /** @var int */
+    /** @var ?int */
     public $runorder;
     /** @var int */
     public $insertat;
@@ -415,12 +415,12 @@ class QueueItem {
         $this->runorder = $this->runorder ?? self::unscheduled_runorder();
         $this->status = self::STATUS_UNSCHEDULED;
         $this->conf->qe("insert into ExecutionQueue set reqcid=?, cid=?,
-            runnername=?, psetid=?, repoid=?,
-            bhash=?, runsettings=?, tags=?,
-            queueclass=?, nconcurrent=?, flags=?, chain=?,
-            insertat=?, updateat=?,
-            runat=?, runorder=?, status=?,
-            ensure=?",
+                runnername=?, psetid=?, repoid=?,
+                bhash=?, runsettings=?, tags=?,
+                queueclass=?, nconcurrent=?, flags=?, chain=?,
+                insertat=?, updateat=?,
+                runat=?, runorder=?, status=?,
+                ensure=?",
             $this->reqcid, $this->cid,
             $this->runnername, $this->psetid, $this->repoid,
             $this->bhash, $this->runsettings ? json_encode_db($this->runsettings) : null,
