@@ -12,6 +12,8 @@ class RunQueueBatch {
     public $is_query = false;
     /** @var bool */
     public $is_clean = false;
+    /** @var ?int */
+    public $step_chain;
     /** @var bool */
     public $is_execute = false;
     /** @var bool */
@@ -153,6 +155,9 @@ class RunQueueBatch {
     }
 
     function run() {
+        if ($this->step_chain !== null) {
+            QueueItem::step_chain($this->conf, $this->step_chain);
+        }
         if ($this->is_query) {
             $this->query();
         }
@@ -174,6 +179,7 @@ class RunQueueBatch {
             "1 Execute queue once",
             "q,query Print queue",
             "c,clean Clean queue",
+            "s:,step: =CHAIN Step CHAIN",
             "V,verbose",
             "help"
         )->helpopt("help")->description("php batch/runqueue.php")->parse($argv);
@@ -186,6 +192,9 @@ class RunQueueBatch {
         }
         if (isset($arg["c"])) {
             $self->is_clean = true;
+        }
+        if (isset($arg["s"]) && ctype_digit($arg["s"])) {
+            $self->step_chain = intval($arg["s"]);
         }
         if (isset($arg["1"])) {
             $self->is_execute1 = true;
