@@ -12,10 +12,14 @@ class RunQueueBatch {
     public $is_query = false;
     /** @var bool */
     public $is_clean = false;
-    /** @var ?list<int> */
-    public $step_chain;
+    /** @var bool */
+    public $list_broken_chains = false;
+    /** @var bool */
+    public $cancel_broken_chains = false;
     /** @var ?list<int> */
     public $cancel_chain;
+    /** @var ?list<int> */
+    public $cancel_qid;
     /** @var bool */
     public $is_execute = false;
     /** @var bool */
@@ -162,16 +166,46 @@ class RunQueueBatch {
         }
     }
 
-    function run() {
-        foreach ($this->step_chain ?? [] as $chain) {
-            QueueItem::step_chain($this->conf, $chain);
+    /** @return list<int> */
+    function broken_chains() {
+        $result = $this->conf->qe("select chain, max(status)
+                from ExecutionQueue
+                where status<?
+                group by chain",
+            QueueItem::STATUS_CANCELLED);
+        $chains = [];
+        while (($row = $result->fetch_row())) {
+            $chainid = intval($row[0]);
+            $status = intval($row[1]);
+            if ($status < QueueItem::STATUS_SCHEDULED) {
+                $chains[] = $chainid;
+            }
         }
-        foreach ($this->cancel_chain ?? [] as $chain) {
+        Dbl::free($result);
+        return $chains;
+    }
+
+    function run() {
+        if ($this->list_broken_chains) {
+            foreach ($this->broken_chains() as $chain) {
+                fwrite(STDOUT, "C{$chain}\n");
+            }
+            exit(0);
+        }
+        if (!empty($this->cancel_chain) || $this->cancel_broken_chains) {
+            $cancel_chains = array_merge($this->cancel_chain ?? [], $this->broken_chains());
             $this->conf->qe("update ExecutionQueue
                     set status=?
-                    where status<? and chain=?",
+                    where status<? and chain?a",
                 QueueItem::STATUS_CANCELLED,
-                QueueItem::STATUS_WORKING, $chain);
+                QueueItem::STATUS_WORKING, $cancel_chains);
+        }
+        if (!empty($this->cancel_qid)) {
+            $this->conf->qe("update ExecutionQueue
+                    set status=?
+                    where status<? and queueid?a",
+                QueueItem::STATUS_CANCELLED,
+                QueueItem::STATUS_WORKING, $this->cancel_qid);
         }
         if ($this->is_query) {
             $this->query();
@@ -194,9 +228,9 @@ class RunQueueBatch {
             "1 Execute queue once",
             "q,query Print queue",
             "c,clean Clean queue",
-            "s[],step[] =CHAIN Step CHAIN",
-            "cancel-chain[] =CHAIN Cancel all unqueued members in CHAIN",
-            // "cancel[] =QUEUEID Cancel QUEUEID",
+            "cancel[] =QUEUEID Cancel QUEUEID (or C<CHAINID>)",
+            "list-broken-chains List broken chains",
+            "cancel-broken-chains Cancel all broken chains",
             "V,verbose",
             "help"
         )->helpopt("help")->description("php batch/runqueue.php")->parse($argv);
@@ -210,18 +244,21 @@ class RunQueueBatch {
         if (isset($arg["c"])) {
             $self->is_clean = true;
         }
-        foreach ($arg["s"] ?? [] as $x) {
-            if (preg_match('/\AC?(\d+)\z/', $x, $m)) {
-                $self->step_chain[] = intval($m[1]);
-            } else {
-                throw new CommandLineException("bad `--step` argument");
-            }
+        if (isset($arg["list-broken-chains"])) {
+            $self->list_broken_chains = true;
         }
-        foreach ($arg["cancel-chain"] ?? [] as $x) {
-            if (preg_match('/\AC?(\d+)\z/', $x, $m)) {
-                $self->cancel_chain[] = intval($m[1]);
+        if (isset($arg["cancel-broken-chains"])) {
+            $self->cancel_broken_chains = true;
+        }
+        foreach ($arg["cancel"] ?? [] as $x) {
+            if (preg_match('/\A[C#]?(\d+)\z/', $x, $m)) {
+                if (str_starts_with($x, "C")) {
+                    $self->cancel_chain[] = intval($m[1]);
+                } else {
+                    $self->cancel_qid[] = intval($m[1]);
+                }
             } else {
-                throw new CommandLineException("bad `--cancel-chain` argument");
+                throw new CommandLineException("bad `--cancel` argument");
             }
         }
         if (isset($arg["1"])) {
