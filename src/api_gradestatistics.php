@@ -60,6 +60,8 @@ class Series {
         }
     }
 
+    /** @param bool $pcview
+     * @return object */
     function summary($pcview = false) {
         $this->calculate();
         $r = (object) ["n" => $this->n, "cdf" => $this->cdf];
@@ -107,6 +109,7 @@ class Series {
 }
 
 class GradeStatistics_API {
+    /** @param bool $pcview */
     static function compute(Pset $pset, $pcview) {
         $series = new Series;
         $xseries = $noextra_series = $xnoextra_series = null;
@@ -176,7 +179,7 @@ class GradeStatistics_API {
         $nge = 0;
         $lastge = null;
         $maxtotal = 0;
-        foreach ($pset->visible_grades($pcview) as $ge) {
+        foreach ($pset->visible_grades($pcview ? VF_TF : VF_STUDENT) as $ge) {
             if (!$ge->no_total) {
                 ++$nge;
                 $lastge = $ge;

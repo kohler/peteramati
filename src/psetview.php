@@ -55,7 +55,7 @@ class PsetView {
     private $_user_can_view_grade;
     /** @var ?bool */
     private $_user_can_view_score;
-    /** @var list<int> */
+    /** @var list<0|4|5> */
     private $_grades_vf;
     /** @var int */
     private $_grades_suppressed = 0; // 1: set, 2: selecting, 4: some suppressed
@@ -1185,7 +1185,7 @@ class PsetView {
     }
 
 
-    /** @return list<int> */
+    /** @return list<0|4|5> */
     private function grades_vf() {
         if ($this->_grades_suppressed === 0) {
             $this->_grades_suppressed = 3;
@@ -1210,19 +1210,20 @@ class PsetView {
         }
     }
 
-    /** @return list<GradeEntry> */
-    function visible_grades($pc_view = null) {
+    /** @param null|1|4 $vf
+     * @return list<GradeEntry> */
+    function visible_grades($vf = null) {
         if ($this->_grades_suppressed === 0) {
             $this->grades_vf(); // call the selection function
         }
+        $vf = $vf ?? ($this->pc_view ? VF_TF : VF_STUDENT);
         if (($this->_grades_suppressed & 4) === 0
-            && ($pc_view ?? $this->pc_view)) {
-            return $this->pset->visible_grades(true);
+            && $vf >= VF_TF) {
+            return $this->pset->visible_grades(VF_TF);
         } else {
-            $f = $pc_view ?? $this->pc_view ? 2 : 1;
             $g = [];
-            foreach ($this->pset->visible_grades(true) as $i => $ge) {
-                if ($this->_grades_vf[$i] & $f)
+            foreach ($this->pset->visible_grades(VF_TF) as $i => $ge) {
+                if (($this->_grades_vf[$i] & $vf) !== 0)
                     $g[] = $ge;
             }
             return $g;
@@ -1233,9 +1234,12 @@ class PsetView {
      * return ?GradeEntry */
     function gradelike_by_key($key) {
         $ge = $this->pset->gradelike_by_key($key);
-        if ($ge && $ge->pcview_index !== null) {
-            $f = $this->pc_view ? 2 : 1;
-            return ($this->grades_vf())[$ge->pcview_index] & $f ? $ge : null;
+        if (!$ge || $ge->pcview_index === null) {
+            return null;
+        }
+        $f = $this->pc_view ? VF_TF : VF_STUDENT;
+        if ((($this->grades_vf())[$ge->pcview_index] & $f) !== 0) {
+            return $ge;
         } else {
             return null;
         }
@@ -1272,7 +1276,7 @@ class PsetView {
                 || ($this->repo && $this->user_can_view_repo_contents()))) {
             if (($this->pinned_scores_visible() ?? $this->pset->scores_visible_student())
                 || $this->pset->answers_editable_student()) {
-                foreach ($this->visible_grades(false) as $ge) {
+                foreach ($this->visible_grades(VF_STUDENT) as $ge) {
                     if ($ge->answer || $ge->concealed) {
                         $this->_user_can_view_grade = true;
                     } else {
@@ -1930,11 +1934,11 @@ class PsetView {
             return null;
         }
 
-        if ($flags & self::GRADEJSON_SLICE) {
-            $gexp = new GradeExport($this->pset, true);
+        if (($flags & self::GRADEJSON_SLICE) !== 0) {
+            $gexp = new GradeExport($this->pset, VF_TF);
             $gexp->slice = true;
         } else {
-            $gexp = new GradeExport($this->pset, $override_view || $this->pc_view);
+            $gexp = new GradeExport($this->pset, $override_view || $this->pc_view ? VF_TF : VF_STUDENT);
             $gexp->set_exported_entries($this->grades_vf());
         }
         if ($this->pset->grades_selection_function) {
@@ -1979,7 +1983,7 @@ class PsetView {
             $gexp->answers_editable = !$this->pset->frozen;
         }
         // maybe hide extra-credits that are missing
-        if (!$gexp->pc_view) {
+        if ($gexp->vf < VF_TF) {
             $gexp->suppress_absent_extra();
         }
         return $gexp;

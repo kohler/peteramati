@@ -994,7 +994,7 @@ class Contact {
         if (($gexp = $this->ensure_gcache($pset, PsetView::GRADEJSON_NO_LATE_HOURS, null))) {
             $v = $noextra ? $gexp->total_noextra() : $gexp->total();
             if ($v !== null && $norm) {
-                $v = round(($v * 1000.0) / $pset->max_grade(true)) / 10;
+                $v = round(($v * 1000.0) / $pset->max_grade(VF_TF)) / 10;
             }
             return $v;
         } else {

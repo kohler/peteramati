@@ -247,7 +247,7 @@ class Grade_API {
         }
 
         // XXX match commit with grading commit
-        $gexp = new GradeExport($api->pset, true);
+        $gexp = new GradeExport($api->pset, VF_TF);
         $gexp->set_exported_entries(null);
         $jx = $gexp->jsonSerialize();
         $jx["ok"] = true;

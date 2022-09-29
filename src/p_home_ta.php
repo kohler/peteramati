@@ -361,7 +361,7 @@ class Home_TA_Page {
         $scores_visible = false;
         $jx = [];
         $gradercounts = [];
-        $gex = new GradeExport($pset, true);
+        $gex = new GradeExport($pset, VF_TF);
         $gex->set_exported_values($pset->tabular_grades());
         $gex->set_exported_entries(null);
         foreach ($sset as $s) {

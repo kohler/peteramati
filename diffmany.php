@@ -169,7 +169,7 @@ class DiffMany_Page {
             Ht::stash_html($this->conf->make_script_file($gs));
         }
         Ht::stash_script("\$pa.long_page = true");
-        $gexp = new GradeExport($this->pset, $this->viewer->isPC);
+        $gexp = new GradeExport($this->pset, VF_TF);
         $gexp->set_exported_entries(null);
         echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
              htmlspecialchars(json_encode($gexp)),
