@@ -526,14 +526,13 @@ class QueueItem {
 
     /** @param int $chain */
     static function step_chain(Conf $conf, $chain) {
-        $conf->qe("update ExecutionQueue a
-                left join ExecutionQueue b on (status>=? and status<? and chain=?)
-                set a.status=?, a.runorder=?
-                where a.status=? and a.chain=? and b.chain is null
-                order by a.runorder asc, a.queueid asc limit 1",
-            self::STATUS_SCHEDULED, self::STATUS_CANCELLED, $chain,
-            self::STATUS_SCHEDULED, Conf::$now,
-            self::STATUS_UNSCHEDULED, $chain);
+        $conf->qe("update ExecutionQueue
+                set runat=if(status=?,?,runorder), status=if(status=?,?,status)
+                where status>=? and status<? and chain=?
+                order by status desc, runorder asc, queueid asc limit 1",
+            self::STATUS_UNSCHEDULED, Conf::$now,
+            self::STATUS_UNSCHEDULED, self::STATUS_SCHEDULED,
+            self::STATUS_UNSCHEDULED, self::STATUS_CANCELLED, $chain);
     }
 
     function cancel() {
