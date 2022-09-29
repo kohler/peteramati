@@ -211,17 +211,17 @@ class RunQueueBatch {
             $self->is_clean = true;
         }
         foreach ($arg["s"] ?? [] as $x) {
-            if (ctype_digit($x)) {
-                $self->step_chain[] = intval($x);
+            if (preg_match('/\AC?(\d+)\z/', $x, $m)) {
+                $self->step_chain[] = intval($m);
             } else {
                 throw new CommandLineException("bad `--step` argument");
             }
         }
         foreach ($arg["cancel-chain"] ?? [] as $x) {
-            if (ctype_digit($x)) {
-                $self->cancel_chain[] = intval($x);
+            if (preg_match('/\AC?(\d+)\z/', $x, $m)) {
+                $self->cancel_chain[] = intval($m);
             } else {
-                throw new CommandLineException("bad `--step` argument");
+                throw new CommandLineException("bad `--cancel-chain` argument");
             }
         }
         if (isset($arg["1"])) {
