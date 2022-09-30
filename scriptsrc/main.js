@@ -1033,14 +1033,15 @@ function pa_loadgrades() {
     });
 
     // print totals
-    const tm = [gi.grade_total(), gi.grade_maxtotal], total = "" + tm[0];
-    let drawgraph = false;
-    if (tm[0]) {
+    const tm = gi.total_incomplete ? [null, null] : [gi.grade_total(), gi.grade_maxtotal],
+          total = "" + tm[0];
+    if (tm[0] !== null) {
         $(this).find(".pa-gradelist:not(.pa-gradebox)").each(function () {
             const $t = $(this).find(".pa-total");
             $t.length || $(this).prepend(pa_render_total(gi, tm));
         });
     }
+    let drawgraph = false;
     $(this).find(".pa-total").each(function () {
         const $v = $(this).find(".pa-gradevalue");
         if ($v.text() !== total) {

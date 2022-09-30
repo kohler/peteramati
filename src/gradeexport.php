@@ -36,6 +36,8 @@ class GradeExport implements JsonSerializable {
     public $total_noextra;
     /** @var bool */
     private $has_total = false;
+    /** @var bool */
+    private $total_incomplete;
     /** @var ?string */
     public $grading_hash;
     /** @var ?int */
@@ -161,6 +163,17 @@ class GradeExport implements JsonSerializable {
             } else {
                 $this->total = $this->total_noextra = null;
             }
+            $this->total_incomplete = false;
+            if ($this->vf < VF_TF && $this->vf !== VF_STUDENT_ANY && $any) {
+                $grades_vf = $this->export_grades_vf ?? $this->pset->grades_vf();
+                foreach ($this->pset->visible_grades(VF_STUDENT_ANY) as $i => $ge) {
+                    if (!$ge->no_total
+                        && ($grades_vf[$i] & $this->vf) === 0) {
+                        $this->total_incomplete = true;
+                        break;
+                    }
+                }
+            }
             $this->has_total = true;
         }
         return $this->total;
@@ -204,6 +217,9 @@ class GradeExport implements JsonSerializable {
             }
             if (!$this->has_total) {
                 $this->total();
+            }
+            if ($this->total_incomplete) {
+                $r["total_incomplete"] = true;
             }
             if ($this->total !== null) {
                 $r["total"] = $this->total;

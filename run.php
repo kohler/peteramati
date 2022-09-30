@@ -173,7 +173,9 @@ class RunRequest {
 
         // maybe evaluate
         if (!$this->runner->command) {
-            return QueueItem::make_info($info, $this->runner)->full_response();
+            $qi = QueueItem::make_info($info, $this->runner);
+            $qi->step(new QueueStatus);
+            return $qi->full_response();
         }
 
         // otherwise check runnability and enqueue

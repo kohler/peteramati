@@ -1983,16 +1983,17 @@ class PsetView {
         if (!$override_view && !$this->can_view_grade()) {
             return null;
         }
+        $vf = $override_view ? VF_TF : $this->vf();
 
         if (($flags & self::GRADEJSON_SLICE) !== 0) {
             $gexp = new GradeExport($this->pset, VF_TF);
             $gexp->slice = true;
         } else {
-            $gexp = new GradeExport($this->pset, $override_view ? VF_TF : $this->vf());
+            $gexp = new GradeExport($this->pset, $vf);
             $gexp->set_exported_entries($this->grades_vf());
         }
         if ($this->pset->grades_selection_function) {
-            $gexp->set_visible_grades($this->visible_grades());
+            $gexp->set_visible_grades($this->visible_grades($vf));
         }
         $gexp->uid = $this->user->contactId;
         $gexp->user = $this->user_linkpart();

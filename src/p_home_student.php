@@ -83,7 +83,9 @@ class Home_Student_Page {
             && ($t = $info->visible_total()) !== null) {
             echo '<div class="pa-gradelist is-main mt-0"><div class="pa-p',
                 $info->user_visible_total() === $t ? '' : ' pa-p-hidden',
-                '"><div class="pa-pt">grade</div>',
+                '"><div class="pa-pt">',
+                $info->user_visible_grading_complete() ? "grade" : "partial grade",
+                '</div>',
                 '<div class="pa-pv"><strong>', $t, '</strong>';
             if (($max = $info->grade_max_total())) {
                 echo " / ", $max;

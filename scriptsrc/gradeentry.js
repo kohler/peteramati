@@ -15,7 +15,7 @@ const gradesheet_props = {
     "pset": true, "uid": true, "user": true,
     "commit": true, "base_commit": true, "base_handout": true,
     "late_hours": true, "auto_late_hours": true, "student_timestamp": true,
-    "version": true, "history": true, "total": true,
+    "version": true, "history": true, "total_incomplete": true, "total": true,
     "total_noextra": true, "grading_hash": true, "answer_version": true,
     "scores_visible_student": true, "scores_editable": true, "answers_editable": true,
     "linenotes": true
@@ -573,14 +573,17 @@ export class GradeSheet {
     }
 
     grade_total(noextra) {
-        let total = 0;
+        let total = null;
         for (let i = 0; i !== this.value_order.length; ++i) {
             const ge = this.entries[this.value_order[i]];
             if (ge && ge.in_total && (!noextra || !ge.is_extra)) {
-                total += (this.grades && this.grades[i]) || 0;
+                const gv = this.grades && this.grades[i];
+                if (gv != null) {
+                    total = (total || 0) + gv;
+                }
             }
         }
-        return Math.round(total * 1000) / 1000;
+        return total !== null ? Math.round(total * 1000) / 1000 : total;
     }
 
     get grade_maxtotal() {
