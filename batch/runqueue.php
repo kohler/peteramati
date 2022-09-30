@@ -32,6 +32,8 @@ class RunQueueBatch {
     private $running = [];
     /** @var bool */
     private $any_completed = false;
+    /** @var int */
+    private $nreports = 0;
 
     function __construct(Conf $conf) {
         $this->conf = $conf;
@@ -104,6 +106,7 @@ class RunQueueBatch {
     function load() {
         $this->running = [];
         $this->any_completed = false;
+        $this->nreports = 0;
         $qs = new QueueStatus;
         $result = $this->conf->qe("select * from ExecutionQueue
                 where status>=? and status<?
@@ -124,11 +127,15 @@ class RunQueueBatch {
             }
         }
         Dbl::free($result);
+        if ($this->verbose && $this->nreports > 0) {
+            fwrite(STDOUT, "\n");
+        }
         return !empty($this->running);
     }
 
     function check() {
         $qs = new QueueStatus;
+        $this->nreports = 0;
         foreach ($this->running as $qix) {
             if (!$qix->stopped()) {
                 $old_status = $qix->status();
@@ -138,6 +145,9 @@ class RunQueueBatch {
                 }
                 $this->any_completed = $this->any_completed || $qix->stopped();
             }
+        }
+        if ($this->verbose && $this->nreports > 0) {
+            fwrite(STDOUT, "\n");
         }
         return $qs->nrunning >= $qs->nconcurrent;
     }
@@ -160,6 +170,7 @@ class RunQueueBatch {
     /** @param QueueItem $qi
      * @param int $old_status */
     function report($qi, $old_status) {
+        ++$this->nreports;
         $id = $qi->unparse_key();
         $chain = $qi->chain ? " C{$qi->chain}" : "";
         if ($old_status > 0 && $qi->stopped()) {
