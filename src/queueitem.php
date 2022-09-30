@@ -1051,7 +1051,6 @@ class QueueItem {
         }
 
         if ($rr->done
-            && $this->status >= self::STATUS_DONE
             && $this->runner()->evaluate_function) {
             $rr->result = $this->evaluate();
         }
