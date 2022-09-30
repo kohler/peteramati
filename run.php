@@ -164,9 +164,7 @@ class RunRequest {
                 || $qi->runnername !== $this->runner->name) {
                 return self::error("Wrong runner.");
             }
-            if (!$qi->step(new QueueStatus)) {
-                return self::error($qi->last_error);
-            } else if ($qi->has_response()) {
+            if ($qi->has_response()) {
                 return $qi->full_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
             }
         }
