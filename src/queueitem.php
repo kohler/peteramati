@@ -396,7 +396,7 @@ class QueueItem {
         $runner = $this->runner();
         if ($info && $runner && !$this->runsettings) {
             foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
-                foreach ($this->tags as $t) {
+                foreach ($this->tags ?? [] as $t) {
                     if (!$rr->has_tag($t))
                         continue 2;
                 }
