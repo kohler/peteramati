@@ -252,9 +252,6 @@ class RunQueueBatch {
             "help"
         )->helpopt("help")->description("php batch/runqueue.php")->parse($argv);
         $self = new RunQueueBatch($conf);
-        if (isset($arg["q"]) || isset($arg["c"]) || isset($arg["1"])) {
-            $self->is_execute = false;
-        }
         if (isset($arg["q"])) {
             $self->is_query = true;
         }
@@ -290,6 +287,17 @@ class RunQueueBatch {
         }
         if (isset($arg["x"])) {
             $self->is_execute = true;
+        }
+        if (!$self->is_query
+            && !$self->is_clean
+            && !$self->is_execute1
+            && !$self->is_execute
+            && !$self->list_broken_chains
+            && !$self->cancel_broken_chains
+            && empty($self->schedule_qid)
+            && empty($self->cancel_chain)
+            && empty($self->cancel_qid)) {
+            $self->is_query = true;
         }
         if (isset($arg["V"])) {
             $self->verbose = true;
