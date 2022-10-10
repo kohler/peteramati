@@ -44,27 +44,21 @@ class RunRequest {
         }
         assert($this->user === $this->viewer || $this->viewer->isPC);
         $this->pset = ContactView::find_pset_redirect($qreq->pset, $viewer);
-
-        foreach ($this->pset->runners as $r) {
-            if ($qreq->run === $r->name) {
-                $this->runner = $r;
-                $this->is_ensure = !!$qreq->ensure;
-                break;
-            } else if ($qreq->run === "{$r->name}.ensure") {
-                $this->runner = $r;
-                $this->is_ensure = true;
-            }
-        }
+        $this->runner = $this->pset->runner_by_key($qreq->run);
         if (!$this->runner
             || (!$this->viewer->isPC && !$this->runner->visible)) {
             self::quit("No such command.");
         }
+
+        $this->is_ensure = str_ends_with($qreq->run, ".ensure") || $qreq->ensure;
     }
 
     static function go(Contact $user, Qrequest $qreq) {
         $rreq = new RunRequest($user, $qreq);
         if ($qreq->runmany) {
             $rreq->runmany();
+        } else if ($qreq->download) {
+            $rreq->download();
         } else {
             json_exit($rreq->run());
         }
@@ -238,7 +232,8 @@ class RunRequest {
                 Ht::form($this->conf->hoturl("=run"), ["id" => "pa-runmany-form"]),
                 '<div class="f-contain">',
                 Ht::hidden("u", ""),
-                Ht::hidden("pset", $this->pset->urlkey);
+                Ht::hidden("pset", $this->pset->urlkey),
+                Ht::hidden("jobs", "", ["disabled" => 1]);
             if ($this->is_ensure) {
                 echo Ht::hidden("ensure", 1);
             }
@@ -285,6 +280,64 @@ class RunRequest {
             }
             $this->conf->redirect_hoturl("run", ["pset" => $this->pset->urlkey, "run" => $this->runner->name, "runmany" => 1, "chain" => $chain]);
         }
+    }
+
+    function download() {
+        $qreq = $this->qreq;
+        if ($qreq->run === null || !$qreq->valid_token()) {
+            return self::error("Permission error.");
+        } else if (($err = $this->check_view(true))) {
+            return self::error($err);
+        } else if (!$qreq->jobs
+                   || !($jobs = json_decode($qreq->jobs))
+                   || !is_array($jobs)) {
+            return self::error("Bad `jobs` parameter.");
+        }
+
+        $boundary = "--peteramati-" . base64url_encode(random_bytes(24));
+
+        $mf = fopen("php://temp", "w+b");
+        foreach ($jobs as $i => $run) {
+            if (!is_object($run)
+                || !is_string($run->u ?? null)
+                || (!is_string($run->pset ?? null) && !is_int($run->pset ?? null))
+                || !is_string($run->run ?? null)
+                || !is_int($run->timestamp ?? null)) {
+                return self::error("Bad `jobs[{$i}]` parameter.");
+            }
+            $pset = $this->conf->pset_by_key($run->pset);
+            if (!$pset) {
+                return self::error("Bad `jobs[{$i}].pset` parameter.");
+            }
+            $user = ContactView::find_user($run->u, $this->viewer, $pset->anonymous);
+            if (!$user) {
+                return self::error("No such user `jobs[{$i}].u` ({$run->u}).");
+            }
+            $runner = $pset->runner_by_key($run->run);
+            if (!$runner) {
+                return self::error("No such runner `jobs[{$i}].run` ({$run->run}).");
+            }
+            if (!$this->viewer->can_view_run($pset, $runner, $user)) {
+                fwrite($mf, "{$boundary}\n" . json_encode($run) . ": Cannot view\n");
+                continue;
+            }
+            $repo = $user->repo($pset->id);
+            $rr = (new RunLogger($pset, $repo))->job_response($run->timestamp, 0, 100 << 20);
+            if (!$rr) {
+                fwrite($mf, "{$boundary}\n" . json_encode($run) . ": No such job\n");
+            } else {
+                fwrite($mf, "{$boundary}\n" . json_encode($run) . "\n");
+                fwrite($mf, $rr->data);
+            }
+            $rr = null;
+        }
+        fwrite($mf, "{$boundary}--\n");
+
+        header("Content-Type: text/plain");
+        header("Content-Disposition: attachment; filename=" . mime_quote_string($this->conf->download_prefix . $pset->urlkey . "-" . $this->runner->name . ".out"));
+        rewind($mf);
+        fpassthru($mf);
+        fclose($mf);
     }
 }
 

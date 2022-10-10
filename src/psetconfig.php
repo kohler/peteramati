@@ -948,6 +948,20 @@ class Pset {
     }
 
 
+    /** @param string $key
+     * @return ?RunnerConfig */
+    function runner_by_key($key) {
+        if (str_ends_with($key, ".ensure")) {
+            $key = substr($key, 0, -7);
+        }
+        foreach ($this->runners as $runner) {
+            if ($runner->name === $key)
+                return $runner;
+        }
+        return null;
+    }
+
+
     private static function ccheck($callable, $args) {
         $i = 0;
         $format = false;

@@ -165,14 +165,15 @@ class RunLogger {
 
     /** @param int $jobid
      * @param ?int $offset
+     * @param ?int $maxreadsz
      * @return ?RunResponse */
-    function job_response($jobid, $offset = null) {
+    function job_response($jobid, $offset = null, $maxreadsz = null) {
         $logbase = $this->job_prefix($jobid);
         $logfile = "{$logbase}.log";
         if ($offset === null || $offset > 32768) {
-            $readsz = self::FIRSTLINESZ;
+            $readsz = $maxreadsz ?? self::FIRSTLINESZ;
         } else {
-            $readsz = self::FIRSTMAXREADSZ;
+            $readsz = $maxreadsz ?? self::FIRSTMAXREADSZ;
         }
         $s = @file_get_contents($logfile, false, null, 0, $readsz);
 

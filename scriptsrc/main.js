@@ -1133,9 +1133,15 @@ function pa_runmany(chain) {
     function check() {
         if (!hasClass(f, "pa-run-active")) {
             const ji = take_jobinfo();
-            if (ji) {
+            if (ji && f.elements.jobs) {
                 doneinfo.push(ji);
-                f.setAttribute("pa-runmany-jobs", JSON.stringify(doneinfo));
+                f.elements.jobs.value = JSON.stringify(doneinfo);
+                if (doneinfo.length === 1) {
+                    const button = document.createElement("button");
+                    button.append("Download");
+                    button.className = "ui js-runmany-download";
+                    statusui().lastChild.append(button);
+                }
             }
             $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
                 type: "POST", cache: false, dataType: "json", timeout: 30000,
@@ -1145,11 +1151,27 @@ function pa_runmany(chain) {
             timeout = setTimeout(check, 2000);
         }
     }
+    function statusui() {
+        let e = document.getElementById("pa-runmany-statusui");
+        if (!e) {
+            e = document.createElement("div");
+            e.id = "pa-runmany-statusui";
+            e.className = "d-flex justify-content-between";
+            const progress = document.createElement("div"),
+                download = document.createElement("div");
+            progress.className = "flex-grow-1";
+            e.append(progress, download);
+            $("#run-" + f.elements.run.value).after(e);
+        }
+        return e;
+    }
     function progress(njobs) {
         let progress = document.getElementById("pa-runmany-progress");
         if (!progress) {
-            $("#run-" + f.elements.run.value).after('<div>Progress: <progress id="pa-runmany-progress" class="ml-3 mr-3"></progress></div>');
-            progress = document.getElementById("pa-runmany-progress");
+            progress = document.createElement("progress");
+            progress.id = "pa-runmany-progress";
+            progress.className = "ml-3 mr-3";
+            statusui().firstChild.append("Progress: ", progress);
         }
         progress.max = Math.max(progress.max, njobs + 1);
         progress.value = progress.max - njobs;
@@ -1177,6 +1199,21 @@ function pa_runmany(chain) {
     }
     check();
 }
+
+handle_ui.on("js-runmany-download", function () {
+    const f = document.getElementById("pa-runmany-form");
+    if (f.elements.jobs && f.elements.jobs.value) {
+        const download = document.createElement("input");
+        download.type = "hidden";
+        download.name = "download";
+        download.value = "1";
+        f.elements.jobs.disabled = false;
+        f.append(download);
+        f.submit();
+        f.elements.jobs.disabled = true;
+        f.removeChild(download);
+    }
+});
 
 $(function () {
 document.body.setAttribute("data-time-skew", Math.floor(new Date().getTime() / 1000) - +document.body.getAttribute("data-now"));

@@ -75,26 +75,37 @@ class ContactView {
         }
     }
 
+    /** @param string $u
+     * @param Contact $viewer
+     * @param bool $default_anonymous
+     * @return ?Contact */
+    static function find_user($u, $viewer, $default_anonymous = false) {
+        $user = $viewer->conf->user_by_whatever($u);
+        if (!$user) {
+            return null;
+        }
+        if ($user && $user->contactId === $viewer->contactId) {
+            return $viewer;
+        }
+        $user->set_anonymous(str_starts_with($u, "[anon") || $default_anonymous);
+        return $user;
+    }
+
     /** @param Qrequest $qreq
      * @param ?Pset $pset
      * @return ?Contact */
     static function prepare_user($qreq, $viewer, $pset = null) {
         $user = $viewer;
         if (isset($qreq->u) && $qreq->u) {
-            $user = $viewer->conf->user_by_whatever($qreq->u);
+            $user = self::find_user($qreq->u, $viewer, $pset && $pset->anonymous);
             if (!$user) {
                 $viewer->conf->errorMsg("No such user “" . htmlspecialchars($qreq->u) . "”.");
-            } else if ($user->contactId == $viewer->contactId) {
-                $user = $viewer;
-            } else if (!$viewer->isPC) {
+            } else if ($user->contactId !== $viewer->contactId && !$viewer->isPC) {
                 $viewer->conf->errorMsg("You can’t see that user’s information.");
                 $user = null;
-            } else {
-                $user->set_anonymous(substr($qreq->u, 0, 5) === "[anon"
-                                     || ($pset && $pset->anonymous));
             }
         }
-        if ($user && ($viewer->isPC || $viewer->chairContact)) {
+        if ($user && $viewer->isPC) {
             if ($pset && $pset->anonymous) {
                 $qreq->u = $user->anon_username;
             } else {
