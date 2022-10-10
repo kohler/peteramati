@@ -30,7 +30,7 @@ class Run_API {
                 "pset" => $pset->urlkey,
                 "runner" => $qi->runnername,
                 "timestamp" => $qi->runat,
-                "njobs" => $user->conf->fetch_ivalue("select count(*) from ExecutionQueue where chain=?", $chain)
+                "njobs" => $user->conf->fetch_ivalue("select count(*) from ExecutionQueue where chain=? and status<?", $chain, QueueItem::STATUS_CANCELLED)
             ];
         }
     }
