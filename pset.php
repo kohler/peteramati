@@ -804,7 +804,7 @@ class PsetRequest {
         echo '"><h3><button type="button" class="btn-qlink ui pa-run-show">',
             '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($runner->display_title), '</button></h3>',
-            '<div class="pa-run pa-run-short hidden" id="pa-run-', $runner->name, '"';
+            '<div class="pa-run pa-run-short need-run hidden" id="pa-run-', $runner->name, '"';
         if ($runner->xterm_js
             || ($runner->xterm_js === null && $info->pset->run_xterm_js)) {
             echo ' data-pa-xterm-js="true"';

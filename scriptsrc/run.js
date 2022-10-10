@@ -108,10 +108,11 @@ export function run(button, opts) {
         queueid = opts.queueid || null;
 
     therunout && removeClass(therunout, "hidden");
+    removeClass(therun, "need-run");
     fold61(therun, therunout, true);
 
-    if (opts.unfold && therun.dataset.paTimestamp) {
-        checkt = +therun.dataset.paTimestamp;
+    if (opts.unfold && therun.hasAttribute("data-pa-timestamp")) {
+        checkt = +therun.getAttribute("data-pa-timestamp");
     } else if (opts.timestamp) {
         checkt = opts.timestamp;
     }
@@ -120,8 +121,10 @@ export function run(button, opts) {
         return true;
     }
     $f.find("button").prop("disabled", true);
-    delete therun.dataset.paTimestamp;
     addClass($f[0], "pa-run-active");
+    if (!checkt) {
+        therun.removeAttribute("data-pa-timestamp");
+    }
 
     if (!checkt && !opts.noclear) {
         thepre.html("");
@@ -524,7 +527,10 @@ export function run(button, opts) {
                 }
                 t += ", oldest began about " + x + (x == 1 ? " second" : " seconds") + " ago";
             }
-            thepre[0].insertBefore(($("<span class='pa-runqueue'>" + t + "</span>"))[0], thepre[0].lastChild);
+            const span = document.createElement("span");
+            span.className = "pa-runqueue";
+            span.append(t);
+            thepre[0].insertBefore(span, thepre[0].lastChild);
             setTimeout(send, 10000);
             return;
         }
@@ -555,7 +561,10 @@ export function run(button, opts) {
             done(false);
         }
 
-        checkt = checkt || data.timestamp;
+        if (!checkt && data.timestamp) {
+            checkt = data.timestamp;
+            therun.setAttribute("data-pa-timestamp", data.timestamp);
+        }
 
         // Skip data up to UTF-8 `offset`
         if (data.data && data.offset < offset) {
@@ -702,7 +711,7 @@ handle_ui.on("pa-run-show", function () {
     const parent = this.closest(".pa-runout"),
         name = parent.id.substring(4),
         therun = document.getElementById("pa-run-" + name);
-    if (therun.dataset.paTimestamp && !$(therun).is(":visible")) {
+    if (therun.hasAttribute("data-pa-timestamp") && hasClass(therun, "need-run")) {
         const thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
         run(thebutton, {unfold: true});
     } else {

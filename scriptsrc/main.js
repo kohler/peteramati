@@ -1101,19 +1101,42 @@ function pa_beforeunload() {
 }
 
 function pa_runmany(chain) {
-    const f = document.getElementById("pa-runmany-form");
+    const f = document.getElementById("pa-runmany-form"),
+        doneinfo = [];
     let timeout;
-    if (f && !$(f).data("paRunmanyUnload")) {
+    if (f && !f.hasAttribute("data-pa-runmany-unload")) {
         $(window).on("beforeunload", function () {
             const progress = document.getElementById("pa-runmany-progress");
             if (progress && progress.max < progress.value) {
                 return "Several server requests are outstanding.";
             }
         });
-        $(f).data("paRunmanyUnload", true);
+        f.setAttribute("data-pa-runmany-unload", "");
+    }
+    function take_jobinfo() {
+        const button = f.elements.run,
+            category = button.getAttribute("data-pa-run-category") || button.value,
+            therun = document.getElementById("pa-run-" + category),
+            timestamp = therun ? therun.getAttribute("data-pa-timestamp") : null;
+        if (category && timestamp) {
+            therun.removeAttribute("data-pa-timestamp"); // don't retake
+            return {
+                u: f.elements.u.value,
+                pset: f.elements.pset.value,
+                run: category,
+                timestamp: +timestamp
+            };
+        } else {
+            return null;
+        }
     }
     function check() {
         if (!hasClass(f, "pa-run-active")) {
+            const ji = take_jobinfo();
+            if (ji) {
+                doneinfo.push(ji);
+                f.setAttribute("pa-runmany-jobs", JSON.stringify(doneinfo));
+            }
             $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
                 type: "POST", cache: false, dataType: "json", timeout: 30000,
                 success: success
