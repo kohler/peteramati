@@ -62,6 +62,39 @@ function make_xterm_write_handler(write) {
     };
 }
 
+function trim_data_to_offset(data, offset) {
+    const re = /^([\x00-\x7F]*)([\u0080-\u07FF]*)([\u0800-\uD7FF\uE000-\uFFFF]*)((?:[\uD800-\uDBFF][\uDC00-\uDFFF])*)/y;
+    let matchIndex = 0;
+    while (matchIndex < data.data.length && data.offset < offset) {
+        re.lastIndex = matchIndex;
+        const m = data.data.match(re);
+        if (!m) {
+            break;
+        }
+        if (m[1].length) {
+            const n = Math.min(offset - data.offset, m[1].length);
+            matchIndex += n;
+            data.offset += n;
+        }
+        if (m[2].length) {
+            const n = Math.min(offset - data.offset, m[2].length * 2);
+            matchIndex += n / 2;
+            data.offset += n;
+        }
+        if (m[3].length) {
+            const n = Math.min(offset - data.offset, m[3].length * 3);
+            matchIndex += n / 3;
+            data.offset += n;
+        }
+        if (m[4].length) {
+            const n = Math.min(offset - data.offset, m[4].length * 2);
+            matchIndex += n / 2; // surrogate pairs
+            data.offset += n;
+        }
+    }
+    data.data = data.data.substring(matchIndex);
+}
+
 export function run(button, opts) {
     const $f = $(button).closest("form"),
         category = button.getAttribute("data-pa-run-category") || button.value,
@@ -523,35 +556,16 @@ export function run(button, opts) {
         }
 
         checkt = checkt || data.timestamp;
-        while (data.data && data.offset < offset) {
-            let m = data.data.match(/^([\x00-\x7F]*)([\u0080-\u07FF]*)([\u0800-\uD7FF\uE000-\uFFFF]*)((?:[\uD800-\uDBFF][\uDC00-\uDFFF])*)/);
-            if (!m) {
+
+        // Skip data up to UTF-8 `offset`
+        if (data.data && data.offset < offset) {
+            trim_data_to_offset(data, offset);
+            if (data.offset < offset) {
                 setTimeout(send, 0);
                 return;
             }
-            let nc = 0;
-            if (m[1].length) {
-                const n = Math.min(offset - data.offset, m[1].length);
-                nc += n;
-                data.offset += n;
-            }
-            if (m[2].length) {
-                const n = Math.min(offset - data.offset, m[2].length * 2);
-                nc += n / 2;
-                data.offset += n;
-            }
-            if (m[3].length) {
-                const n = Math.min(offset - data.offset, m[3].length * 3);
-                nc += n / 3;
-                data.offset += n;
-            }
-            if (m[4].length) {
-                const n = Math.min(offset - data.offset, m[4].length * 2);
-                nc += n / 2; // surrogate pairs
-                data.offset += n;
-            }
-            data.data = data.data.substring(nc);
         }
+
         // Stay on alternate screen when done (rather than clearing it)
         if (data.data
             && !data.partial
