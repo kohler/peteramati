@@ -52,7 +52,7 @@
                     "description": "True if pset is not shown to users",
                     "type": "boolean"
                 },
-                "admin_disabled": {
+                "removed": {
                     "description": "True if pset is not shown to users or administrators",
                     "type": "boolean"
                 },

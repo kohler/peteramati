@@ -29,15 +29,26 @@ function make_multicheckbox(mark) {
             }
         },
         mount_edit: function (elt, id) {
-            let t = '<span class="pa-gradewidth"><input type="hidden" class="uich pa-gradevalue" name="'.concat(this.key, '">');
+            const chhidden = document.createElement("input");
+            chhidden.type = "hidden";
+            chhidden.className = "uich pa-gradevalue";
+            chhidden.name = this.key;
+            const chsp = document.createElement("span");
+            chsp.className = "pa-gradewidth";
+            chsp.append(chhidden);
             for (let i = 0; i < this.max; ++i) {
-                t = t.concat('<input type="checkbox" class="ui js-multicheckbox-grade ml-0" name="', this.key, ':', i, '" value="1"');
+                const ch = document.createElement("input");
+                ch.type ="checkbox";
+                ch.className = "ui js-multicheckbox-grade ml-0";
+                ch.name = this.key + ":" + i;
+                ch.value = 1;
+                ch.disabled = this.disabled;
                 if (i === this.max - 1) {
-                    t += ' id="' + id + '"';
+                    ch.id = id;
                 }
-                t += '>';
+                chsp.append(ch);
             }
-            return t.concat('</span>  <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
+            return Checkbox_GradeClass.finish_mount_edit(chsp);
         },
         update_edit: function (elt, v, opts) {
             const want_checkbox = v == null || v === "" || v === 0

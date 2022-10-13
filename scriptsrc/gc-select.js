@@ -8,12 +8,25 @@ import { escape_entities } from "./encoders.js";
 
 GradeClass.add("select", {
     mount_edit: function (elt, id) {
-        let t = '<span class="select"><select class="uich pa-gradevalue" name="'.concat(this.key, '" id="', id, '"><option value="">None</option>');
+        const sel = document.createElement("select");
+        sel.className = "uich pa-gradevalue";
+        sel.name = this.key;
+        sel.id = id;
+        sel.disabled = this.disabled;
+        const none = document.createElement("option");
+        none.value = "";
+        none.append("None");
+        sel.append(none);
         for (let i = 0; i !== this.options.length; ++i) {
-            const n = escape_entities(this.options[i]);
-            t = t.concat('<option value="', n, '">', n, '</option>');
+            const opt = document.createElement("option");
+            opt.value = this.options[i];
+            opt.append(this.options[i]);
+            sel.append(opt);
         }
-        return t + '</select></span>';
+        const sp = document.createElement("span");
+        sp.className = "select";
+        sp.append(sel);
+        return sp;
     },
     update_edit: function (elt, v, opts) {
         const gt = this.simple_text(v),

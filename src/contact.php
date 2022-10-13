@@ -1590,7 +1590,7 @@ class Contact {
 
     function can_view_pset(Pset $pset) {
         return (!$pset->disabled && $pset->gitless && $this->isPC)
-            || (!$pset->admin_disabled && $this->privChair)
+            || (!$pset->removed && $this->privChair)
             || $pset->visible_student();
     }
 

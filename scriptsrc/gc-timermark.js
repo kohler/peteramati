@@ -83,11 +83,33 @@ GradeClass.add("timermark", {
     },
     mount_edit: function (elt) {
         removeClass(elt, "pa-gradevalue");
-        let t = '<button class="ui js-timermark hidden mr-2" type="button" name="'.concat(this.key, ':b" value="1">Press to start</button>');
+        const but = document.createElement("button");
+        but.type = "button";
+        but.className = "ui js-timermark hidden mr-2";
+        but.name = this.key + ":b";
+        but.value = 1;
+        but.disabled = this.disabled;
+        but.append("Press to start");
+        const fr = new DocumentFragment;
+        fr.append(but);
         if (siteinfo.user.is_pclike) {
-            t = t.concat('<button class="ui js-timermark hidden mr-2" type="button" name="', this.key, ':r" value="0">Reset</button>');
+            const rbut = document.createElement("button");
+            rbut.type = "button";
+            rbut.className = "ui js-timermark hidden mr-2";
+            rbut.name = this.key + ":r";
+            rbut.value = 0;
+            rbut.disabled = this.disabled;
+            rbut.append("Reset");
+            fr.append(rbut);
         }
-        return t.concat('<span class="pa-timermark-result hidden"></span><input type="hidden" class="uich pa-gradevalue" name="', this.key, '">');
+        const sp = document.createElement("span");
+        sp.className = "pa-timermark-result hidden";
+        const gv = document.createElement("input");
+        gv.type = "hidden";
+        gv.className = "uich pa-gradevalue";
+        gv.name = this.key;
+        fr.append(sp, gv);
+        return fr;
     },
     update_edit: function (elt, v, opts) {
         const gi = opts.gradesheet;

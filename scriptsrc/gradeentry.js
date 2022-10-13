@@ -26,6 +26,7 @@ export class GradeEntry {
         Object.assign(this, x);
         this.type = this.type || "numeric";
         this.gc = GradeClass.find(this.type);
+        this.disabled = !!this.disabled;
         this.normal = true;
         this._abbr = null;
         this._all = null;
@@ -166,6 +167,8 @@ export class GradeEntry {
         }
         if (typeof t === "string") {
             pde.innerHTML = t;
+        } else if (t instanceof Node) {
+            pde.replaceChildren(t);
         }
         if (edit) {
             $(pde).find(".need-autogrow").autogrow();
@@ -231,11 +234,16 @@ export class GradeEntry {
         if (this.gc.update_show) {
             hidden = this.gc.update_show.call(this, ve, v, opts);
         } else {
-            const gt = this.text(v);
-            if (ve.innerText !== gt) {
-                ve.innerText = gt;
-            }
+            let gt = this.text(v);
             hidden = gt === "" && (!this.max || this.required) && !this.answer;
+            if (!hidden) {
+                if (gt === "") {
+                    gt = "—";
+                }
+                if (ve.textContent !== gt) {
+                    ve.textContent = gt;
+                }
+            }
         }
         hidden != null && toggleClass(pde.closest(".pa-grade"), "hidden", hidden);
         this.landmark && this.update_landmark(pde);

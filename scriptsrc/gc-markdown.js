@@ -27,7 +27,24 @@ GradeClass.add("markdown", {
     },
     mount_edit: function (elt, id) {
         addClass(elt, "pa-textv");
-        return '<p class="pa-preview-notice"><span>Markdown styling and LaTeX math supported · </span><a href="" class="ui js-toggle-gc-markdown-preview" tabindex="-1">Preview</a></p><textarea class="uich pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        const descspan = document.createElement("span");
+        descspan.append("Markdown styling and LaTeX math supported · ");
+        const desca = document.createElement("a");
+        a.href = "";
+        a.className = "ui js-toggle-gc-markdown-preview";
+        a.tabIndex = -1;
+        a.append("Preview");
+        const descp = document.createElement("p");
+        descp.className = "pa-preview-notice";
+        descp.append(descspan, desclink);
+        const ta = document.createElement("textarea");
+        ta.className = "uich pa-gradevalue need-autogrow";
+        ta.name = this.key;
+        ta.id = id;
+        ta.disabled = this.disabled;
+        const df = new DocumentFragment;
+        df.append(descp, ta);
+        return df;
     },
     update_show: function (ve, v, opts) {
         if (v == null || v === "") {

@@ -28,9 +28,17 @@ GradeClass.add("checkbox", {
         }
     },
     mount_edit: function (elt, id) {
-        return '<span class="pa-gradewidth"><input type="checkbox" class="ui pa-gradevalue ml-0" name="'.concat(
-            this.key, '" id="', id, '" value="', this.max, '"></span>',
-            ' <span class="pa-gradedesc">of ', this.max, ' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a></span>');
+        const ch = document.createElement("input");
+        ch.type = "checkbox";
+        ch.className = "ui pa-gradevalue ml-0";
+        ch.name = this.key;
+        ch.id = id;
+        ch.value = this.max;
+        ch.disabled = this.disabled;
+        const chsp = document.createElement("span");
+        chsp.className = "pa-gradewidth";
+        chsp.append(ch);
+        return Checkbox_GradeClass.finish_mount_edit(this, chsp);
     },
     update_edit: function (elt, v, opts) {
         const want_checkbox = v == null || v === "" || v === 0 || (this && v === this.max),
@@ -69,6 +77,19 @@ export class Checkbox_GradeClass {
         element.value = ge.max;
         element.className = (hasClass(element, "uich") ? "ui " : "") + "pa-gradevalue";
         $(element.closest(".pa-pv")).find(".pa-gradedesc").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
+    }
+    static finish_mount_edit(ge, chsp) {
+        const sp = document.createElement("span");
+        sp.className = "pa-gradedesc";
+        const a = document.createElement("a");
+        a.href = "";
+        a.className = "x ui pa-grade-uncheckbox";
+        a.tabIndex = -1;
+        a.append("#");
+        sp.append("of " + ge.max + " ", a);
+        const fr = new DocumentFragment;
+        fr.append(chsp, " ", sp);
+        return fr;
     }
 }
 

@@ -268,7 +268,7 @@ function forward_pset_links($conf, $pset, $from_pset) {
  * @param Qrequest $qreq */
 function reconfig($user, $qreq) {
     if (!($pset = $user->conf->pset_by_key($qreq->pset))
-        || $pset->admin_disabled) {
+        || $pset->removed) {
         return $user->conf->errorMsg("No such pset");
     }
     $psetkey = $pset->key;

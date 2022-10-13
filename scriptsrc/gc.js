@@ -17,19 +17,31 @@ export const GradeClass = {
     basic_text: v => (v == null ? "" : "" + v),
 
     basic_mount_edit: function (elt, id, opts) {
-        let x;
+        let sp = document.createElement("span");
+        sp.className = "pa-gradedesc";
         if (opts && opts.max_text) {
-            x = opts.max_text;
+            sp.append(opts.max_text);
         } else if (this.max) {
-            x = 'of ' + this.max;
-        } else {
-            x = '';
+            sp.append('of ' + this.max);
         }
+        const df = new DocumentFragment;
+        let e;
         if (window.$pa.long_page) {
-            return '<textarea class="ta1 uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '" rows="1" wrap="none" cols="10000"></textarea> <span class="pa-gradedesc">', x, '</span>');
+            e = document.createElement("textarea");
+            e.className = "ta1 uich pa-gradevalue pa-gradewidth";
+            e.setAttribute("rows", 1);
+            e.setAttribute("cols", 10000);
+            e.setAttribute("wrap", "none");
         } else {
-            return '<input type="text" class="uich pa-gradevalue pa-gradewidth" name="'.concat(this.key, '" id="', id, '"> <span class="pa-gradedesc">', x, '</span>');
+            e = document.createElement("input");
+            e.type = "text";
+            e.className = "uich pa-gradevalue pa-gradewidth";
         }
+        e.name = this.key;
+        e.id = id;
+        e.disabled = this.disabled;
+        df.append(e, " ", sp);
+        return df;
     },
 
     basic_mount_show: function (elt, id) {
@@ -158,7 +170,12 @@ GradeClass.add("text", {
     },
     mount_edit: function (elt, id) {
         addClass(elt, "pa-textv");
-        return '<textarea class="uich pa-gradevalue need-autogrow" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        const ta = document.createElement("textarea");
+        ta.className = "uich pa-gradevalue need-autogrow";
+        ta.name = this.key;
+        ta.id = id;
+        ta.disabled = this.disabled;
+        return ta;
     },
     justify: "left",
     sort: "forward",
@@ -171,7 +188,13 @@ GradeClass.add("shorttext", {
         addClass(elt, "pa-gradevalue");
     },
     mount_edit: function (elt, id) {
-        return '<textarea class="uich pa-gradevalue need-autogrow" rows="1" name="'.concat(this.key, '" id="', id, '"></textarea>');
+        const ta = document.createElement("textarea");
+        ta.className = "uich pa-gradevalue need-autogrow";
+        ta.setAttribute("rows", 1);
+        ta.name = this.key;
+        ta.id = id;
+        ta.disabled = this.disabled;
+        return ta;
     },
     justify: "left",
     sort: "forward",

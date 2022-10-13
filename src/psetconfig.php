@@ -61,7 +61,7 @@ class Pset {
     /** @var bool */
     public $disabled;
     /** @var bool */
-    public $admin_disabled;
+    public $removed;
     /** @var bool */
     public $visible;
     /** @var int */
@@ -272,7 +272,7 @@ class Pset {
         $this->position = (float) (Pset::cnum($p, "position") ?? 0.0);
 
         $this->disabled = self::cbool($p, "disabled");
-        if (($this->admin_disabled = self::cbool($p, "admin_disabled"))) {
+        if (($this->removed = self::cbool($p, "removed", "admin_disabled"))) {
             $this->disabled = true;
         }
         $v = self::cdate($p, "visible");
@@ -344,7 +344,7 @@ class Pset {
                     throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
                 }
                 $this->all_grades[$g->key] = $g;
-                if ($g->disabled) {
+                if ($g->removed) {
                     continue;
                 }
                 $this->grades[$g->key] = $g;
@@ -1188,6 +1188,9 @@ class GradeEntry {
     public $type_numeric;
     /** @var bool
      * @readonly */
+    public $removed;
+    /** @var bool
+     * @readonly */
     public $disabled;
     /** @var bool
      * @readonly */
@@ -1293,6 +1296,7 @@ class GradeEntry {
             $this->title = $this->key;
         }
         $this->description = Pset::cstr($loc, $g, "description", "edit_description");
+        $this->removed = Pset::cbool($loc, $g, "removed");
         $this->disabled = Pset::cbool($loc, $g, "disabled");
         $this->position = Pset::cnum($loc, $g, "position");
         if ($this->position === null && isset($g->priority)) {
@@ -1724,8 +1728,12 @@ class GradeEntry {
 
     /** @return bool */
     function allow_edit($newv, $oldv, $autov, PsetView $info) {
-        if (!$this->value_differs($newv, $oldv)
-            || $info->pc_view) {
+        if (!$this->value_differs($newv, $oldv)) {
+            return true;
+        } else if ($this->disabled) {
+            $this->_last_error = "Cannot modify grade.";
+            return false;
+        } else if ($info->pc_view) {
             return true;
         } else if ($this->visible === false || !$this->answer) {
             $this->_last_error = "Cannot modify grade.";
@@ -1743,12 +1751,15 @@ class GradeEntry {
 
     /** @return bool */
     function student_can_edit() {
-        return $this->visible !== false && $this->answer;
+        return $this->visible !== false
+            && $this->answer
+            && !$this->disabled;
     }
 
     /** @return bool */
     function grader_entry_required() {
         return !$this->answer
+            && !$this->disabled
             && !$this->is_extra
             && !$this->no_total
             && $this->type_numeric
@@ -1837,6 +1848,9 @@ class GradeEntry {
         }
         if (($this->vf() & $vf & ~VF_TF) === 0) {
             $gej["visible"] = false;
+        }
+        if ($this->disabled) {
+            $gej["disabled"] = true;
         }
         if ($this->concealed) {
             $gej["concealed"] = true;
