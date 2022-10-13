@@ -709,6 +709,7 @@ function gradelist_resolve_section(gi, ge, insp) {
     const desc = e.firstChild.nextSibling;
     if (desc && hasClass(desc, "pa-pdesc")) {
         addClass(desc, "pa-ptop");
+        hasClass(e, "pa-p-hidden") && addClass(desc, "pa-p-hidden");
         insp.insertBefore(desc, e.nextSibling);
     }
     if (t !== "") {

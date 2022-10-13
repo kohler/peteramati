@@ -135,12 +135,9 @@ export class GradeEntry {
         const id = "pe-ge" + ++id_counter,
             pge = document.createElement("div"),
             le = document.createElement("label"),
-            pde = document.createElement(mode === 2 ? "form" : "div");
-        let klass = "pa-grade pa-p".concat(mode ? " e" : "", this.answer ? " pa-ans" : "");
-        if (!this.student_visible(gi)) {
-            klass += " pa-p-hidden";
-        }
-        pge.className = klass;
+            pde = document.createElement(mode === 2 ? "form" : "div"),
+            hidden = this.student_visible(gi) ? "" : " pa-p-hidden";
+        pge.className = "pa-grade pa-p".concat(mode ? " e" : "", this.answer ? " pa-ans" : "", hidden);
         pge.setAttribute("data-pa-grade", this.key);
         le.className = "pa-pt";
         le.htmlFor = id;

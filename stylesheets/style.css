@@ -2370,6 +2370,9 @@ td.mhcb {
 	margin-top: -0.5rem;
 	margin-bottom: 0.5rem;
 }
+.pa-pdesc.pa-ptop.pa-p-hidden {
+	margin-top: 0;
+}
 .pa-pdesc > p:last-child,
 .pa-pv > p:last-child {
 	margin-bottom: 0;
@@ -2448,6 +2451,11 @@ td.mhcb {
 }
 .pa-p + .pa-ans {
 	margin-top: 1rem;
+}
+.pa-p-hidden + .pa-ans.pa-p-hidden,
+.is-main > .pa-p-hidden + .pa-ans.pa-p-hidden {
+	margin-top: 0;
+	padding-top: 0.5rem;
 }
 .pa-p > .pa-pv > .pa-preview-notice,
 .pa-p > .pa-pv > textarea,

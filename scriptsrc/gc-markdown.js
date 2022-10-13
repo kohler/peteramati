@@ -29,11 +29,11 @@ GradeClass.add("markdown", {
         addClass(elt, "pa-textv");
         const descspan = document.createElement("span");
         descspan.append("Markdown styling and LaTeX math supported · ");
-        const desca = document.createElement("a");
-        a.href = "";
-        a.className = "ui js-toggle-gc-markdown-preview";
-        a.tabIndex = -1;
-        a.append("Preview");
+        const desclink = document.createElement("a");
+        desclink.href = "";
+        desclink.className = "ui js-toggle-gc-markdown-preview";
+        desclink.tabIndex = -1;
+        desclink.append("Preview");
         const descp = document.createElement("p");
         descp.className = "pa-preview-notice";
         descp.append(descspan, desclink);

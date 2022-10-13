@@ -1499,7 +1499,9 @@ class GradeEntry {
 
     /** @return 4|5|6 */
     function vf() {
-        if ($this->visible === true || $this->answer || $this->concealed) {
+        if ($this->visible === true
+            || ($this->answer && $this->visible !== false)
+            || $this->concealed) {
             return VF_TF | VF_STUDENT_ALWAYS;
         } else if ($this->visible === null) {
             return VF_TF | VF_STUDENT_ALLOWED;
