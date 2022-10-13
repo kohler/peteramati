@@ -86,10 +86,30 @@ render_text.add_format({
 });
 
 let md, md2;
-function try_highlight(str, lang) {
+function try_highlight(str, lang, langAttr, token) {
     if (lang && hljs.getLanguage(lang)) {
         try {
-            return hljs.highlight(lang, str, true).value;
+            var str = hljs.highlight(lang, str, true).value,
+                classIndex = token ? token.attrIndex("class") : -1,
+                lineIndex = token ? token.attrIndex("data-lineno-start") : -1,
+                m, i, firstLine = 1, lines;
+            if (classIndex >= 0 && /^(.*(?: |^))need-lineno((?: |$).*)$/.test(token.attrs[classIndex][1])) {
+                if (lineIndex >= 0 && token.attrs[lineIndex][1]) {
+                    firstLine = +token.attrs[lineIndex][1];
+                }
+                if (firstLine !== firstLine) {
+                    firstLine = 1;
+                }
+                lines = str.split(/\n/);
+                if (lines.length > 0 && lines[lines.length - 1] === "") {
+                    lines.pop();
+                }
+                for (i = 0; i !== lines.length; ++i, ++firstLine) {
+                    lines[i] = '<span class="has-lineno" data-lineno="'.concat(firstLine, '">', lines[i], '</span>');
+                }
+                str = lines.join("\n") + "\n";
+            }
+            return str;
         } catch (ex) {
         }
     }
@@ -110,7 +130,7 @@ render_text.add_format({
     format: 3,
     render: function (text) {
         if (!md2) {
-            md2 = window.markdownit({highlight: try_highlight, linkify: true, html: true}).use(markdownit_katex);
+            md2 = window.markdownit({highlight: try_highlight, linkify: true, html: true, attributes: true}).use(markdownit_katex);
         }
         return md2.render(text);
     }

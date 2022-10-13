@@ -3357,6 +3357,23 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 }
 }
 
+.need-lineno {
+	white-space: pre-wrap;
+}
+.need-lineno > .has-lineno {
+	align-items: baseline;
+}
+.has-lineno::before {
+	content: attr(data-lineno);
+	opacity: 0.5;
+	font-size: smaller;
+	text-align: right;
+	width: 3.5rem;
+	padding-right: 1.5rem;
+	display: inline-block;
+	vertical-align: baseline;
+}
+
 .plot {
 	display: block;
 	font: 10px system-ui,sans-serif;
