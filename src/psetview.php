@@ -1391,6 +1391,31 @@ class PsetView {
         return $this->can_view_grade() && $this->pc_view;
     }
 
+    /** @param null|0|2|3|4|6|7 $vf
+     * @return ?int */
+    function timermark_timeout($vf) {
+        if (!$this->pset->has_timeout) {
+            return null;
+        }
+        $to = null;
+        $vf = $vf ?? $this->vf();
+        foreach ($this->visible_grades($vf) as $ge) {
+            if ($ge->type === "timermark"
+                && ($v0 = $this->grade_value($ge)) > 0) {
+                $t0 = $ge->timeout;
+                if ($ge->timeout_entry
+                    && ($ge1 = $this->gradelike_by_key($ge->timeout_entry))
+                    && ($t1 = $this->grade_value($ge1)) !== null) {
+                    $t0 = $t1;
+                }
+                if ($t0 && ($to === null || $v0 + $t0 < $to)) {
+                    $to = $v0 + $t0;
+                }
+            }
+        }
+        return $to;
+    }
+
 
     /** @return bool */
     function can_view_repo_contents($cached = false) {

@@ -3,7 +3,6 @@
 // See LICENSE for open-source distribution terms
 
 import { GradeClass } from "./gc.js";
-import { escape_entities } from "./encoders.js";
 
 
 GradeClass.add("select", {

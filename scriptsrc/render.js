@@ -89,10 +89,10 @@ let md, md2;
 function try_highlight(str, lang, langAttr, token) {
     if (lang && hljs.getLanguage(lang)) {
         try {
-            var str = hljs.highlight(lang, str, true).value,
+            var hlstr = hljs.highlight(lang, str, true).value,
                 classIndex = token ? token.attrIndex("class") : -1,
                 lineIndex = token ? token.attrIndex("data-lineno-start") : -1,
-                m, i, firstLine = 1, lines;
+                i, firstLine = 1, lines;
             if (classIndex >= 0 && /^(.*(?: |^))need-lineno((?: |$).*)$/.test(token.attrs[classIndex][1])) {
                 if (lineIndex >= 0 && token.attrs[lineIndex][1]) {
                     firstLine = +token.attrs[lineIndex][1];
@@ -100,16 +100,16 @@ function try_highlight(str, lang, langAttr, token) {
                 if (firstLine !== firstLine) {
                     firstLine = 1;
                 }
-                lines = str.split(/\n/);
+                lines = hlstr.split(/\n/);
                 if (lines.length > 0 && lines[lines.length - 1] === "") {
                     lines.pop();
                 }
                 for (i = 0; i !== lines.length; ++i, ++firstLine) {
                     lines[i] = '<span class="has-lineno" data-lineno="'.concat(firstLine, '">', lines[i], '</span>');
                 }
-                str = lines.join("\n") + "\n";
+                hlstr = lines.join("\n") + "\n";
             }
-            return str;
+            return hlstr;
         } catch (ex) {
         }
     }

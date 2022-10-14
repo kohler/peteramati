@@ -2,6 +2,10 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
+function encodeURIComponentPlus(s) {
+    return encodeURIComponent(s).replace(/%20/g, "+");
+}
+
 function serialize_object(x) {
     if (typeof x === "string") {
         return x;
@@ -9,7 +13,7 @@ function serialize_object(x) {
         var k, v, a = [""];
         for (k in x) {
             if ((v = x[k]) != null)
-                a.push(encodeURIComponent(k), "=", encodeURIComponent(v).replace(/%20/g, "+"), "&");
+                a.push(encodeURIComponent(k), "=", encodeURIComponentPlus(v), "&");
         }
         a[a.length - 1] = "";
         return a.join("");
@@ -67,7 +71,7 @@ function hoturl_psetinfo(elt, page, args) {
         for (let i in sheet.entries) {
             enames.push(i);
         }
-        args.push("knowngrades=" + encodeURIComponent(enames.join(" ")));
+        args.push("knowngrades=" + encodeURIComponentPlus(enames.join(" ")));
     }
 }
 
@@ -94,7 +98,7 @@ export function hoturl(page, options) {
             } else if (k === "psetinfo" && v instanceof Element) {
                 hoturl_psetinfo(v, page, xv);
             } else {
-                xv.push(encodeURIComponent(k).concat("=", encodeURIComponent(v).replace(/%20/g, "+")));
+                xv.push(encodeURIComponent(k).concat("=", encodeURIComponentPlus(v)));
             }
         }
     }

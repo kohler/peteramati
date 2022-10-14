@@ -598,13 +598,21 @@ function save_grade(self) {
         api_conditioner(hoturl("=api/grade", {psetinfo: $f[0]}),
             {grades: g, oldgrades: og})
         .then(function (data) {
+            var e, $sm = $f.find(".pa-save-message");
             $f.removeData("paOutstandingPromise");
             if (data.ok) {
-                $f.find(".pa-save-message").addClass("compact fadeout").html('<span class="savesuccess"></span>');
+                if (data.answer_timeout
+                    && (e = self.closest(".pa-grade"))
+                    && hasClass(e, "pa-ans")) {
+                    $sm.remove();
+                    $sm = $('<div class="pa-save-message"><strong class="err">Your exam period has closed.</strong> Your change was saved anyway, but the version used for grading will be selected from within the exam window.</div>').appendTo($f);
+                } else {
+                    $sm.addClass("compact fadeout").html('<span class="savesuccess"></span>');
+                }
                 GradeSheet.store(self.closest(".pa-psetinfo"), data);
                 resolve(self);
             } else {
-                $f.find(".pa-save-message").removeClass("compact").html('<strong class="err">' + data.error + '</strong>');
+                $sm.removeClass("compact").html('<strong class="err">' + data.error + '</strong>');
                 reject(self);
             }
         });

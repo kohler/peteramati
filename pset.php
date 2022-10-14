@@ -366,7 +366,8 @@ class PsetRequest {
             if ($snv > 1) {
                 $b[] = Ht::link("←", $this->info->hoturl("pset", ["oldersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
             }
-            if ($snv !== $this->info->pinsnv()) {
+            if ($snv !== $this->info->pinsnv()
+                && $this->info->pc_view) {
                 $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip", "aria-label" => "Mark these answers for grading"]);
             }
             if ($snv < $nv) {

@@ -119,14 +119,12 @@ GradeClass.add("timermark", {
         });
         const tm = elt.querySelector(".pa-timermark-result");
         tm.classList.toggle("hidden", !v && !timeout);
-        const ve = elt.querySelector(".pa-gradevalue"),
-            to = $(ve).data("pa-timermark-interval");
-        to && clearInterval(to);
+        tm.pa_tmto && clearTimeout(tm.pa_tmto);
+        tm.pa_tmto = null;
         if (v
             && timeout
             && v + timeout > +document.body.getAttribute("data-now")) {
             timermark_interval(this, tm, v, timeout);
-            $(ve).data("pa-timermark-interval", setInterval(timermark_interval, 15000, this, tm, v, timeout));
         } else if (v) {
             let t = strftime(timefmt, v);
             if (gi && (gi.student_timestamp || 0) > v) {
@@ -152,12 +150,22 @@ handle_ui.on("js-timermark", function () {
 
 function timermark_interval(ge, tm, gv, timeout) {
     const delta = +document.body.getAttribute("data-time-skew"),
-        left = gv + timeout - new Date().getTime() / 1000 + delta;
-    let t = strftime(timefmt, gv);
+        now = new Date().getTime(),
+        left = gv + timeout + delta - now / 1000;
+    let t = strftime(timefmt, gv), next;
     if (left > 360) {
         t = t.concat(" (", sec2text(left), " left)");
+        next = 30000 + Math.floor(left * 1000) % 1000;
     } else if (left > 0) {
         t = t.concat(" <strong class=\"overdue\">(", sec2text(left), " left)</strong>");
+        next = 500 + Math.floor(left * 1000) % 1000;
+    } else {
+        next = 0;
     }
     tm.innerHTML = t;
+    if (next) {
+        tm.pa_tmto = setTimeout(timermark_interval, next - 1, ge, tm, gv, timeout);
+    } else {
+        tm.pa_tmto = null;
+    }
 }

@@ -142,6 +142,8 @@ class Pset {
     public $has_assigned = false;
     /** @var bool */
     public $has_answers = false;
+    /** @var bool */
+    public $has_timeout = false;
     /** @var ?bool */
     private $_has_uncacheable_formula;
     /** @var ?array<null|int|float> */
@@ -362,6 +364,10 @@ class Pset {
                 }
                 if ($g->is_extra) {
                     $this->has_extra = true;
+                }
+                if ($g->type === "timermark"
+                    && (isset($g->timeout) || isset($g->timeout_entry))) {
+                    $this->has_timeout = true;
                 }
             }
         } else if ($grades) {
@@ -1626,7 +1632,7 @@ class GradeEntry {
             $lastmul = 0;
             $v = strtolower($v);
             while ($v !== "") {
-                if (!preg_match('/\A((?:\d+\.?|\.\d)\d*)\s*([hdwms])(?=\s*[\d.]|\z)(.*)\z/', $v, $m)) {
+                if (!preg_match('/\A((?:\d+\.?|\.\d)\d*)\s*([hdwms])\s*(?=[\d.]|\z)(.*)\z/', $v, $m)) {
                     return false;
                 }
                 if ($m[2] === "s") {

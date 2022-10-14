@@ -31,8 +31,9 @@ class Grade_API {
     }
 
     /** @param PsetView $info
-     * @param array<string,string> &$errf */
-    static private function apply_grades($info, $g, $ag, $og, &$errf) {
+     * @param array<string,string> &$errf
+     * @param bool &$diff */
+    static private function apply_grades($info, $g, $ag, $og, &$errf, &$diff) {
         $v = [];
         foreach ($info->pset->grades() as $ge) {
             $k = $ge->key;
@@ -63,6 +64,7 @@ class Grade_API {
                     if ($ge->answer) {
                         $v["linenotes"]["/g/{$ge->key}"] = null;
                     }
+                    $diff = $diff || $ge->value_differs($gv, $oldgv);
                 } else {
                     $errf[$k] = $ge->parse_value_error();
                 }
@@ -95,6 +97,7 @@ class Grade_API {
             return $err;
         }
         $known_entries = $qreq->knowngrades ? explode(" ", $qreq->knowngrades) : null;
+        $diff = false;
         // XXX match commit with grading commit
         if ($qreq->is_post()) {
             if (!$qreq->valid_post()) {
@@ -122,7 +125,7 @@ class Grade_API {
             }
 
             // assign grades
-            $v = self::apply_grades($info, $g, $ag, $og, $errf);
+            $v = self::apply_grades($info, $g, $ag, $og, $errf, $diff);
             if (!empty($errf)) {
                 $j = (array) $info->grade_json(0, $known_entries);
                 $j["ok"] = false;
@@ -137,6 +140,12 @@ class Grade_API {
         }
         $j = (array) $info->grade_json(0, $known_entries);
         $j["ok"] = true;
+        if ($diff
+            && !$info->pc_view
+            && ($to = $info->timermark_timeout(null))
+            && $to < Conf::$now) {
+            $j["answer_timeout"] = true;
+        }
         return $j;
     }
 
@@ -271,8 +280,9 @@ class Grade_API {
 
             // assign grades
             $v = [];
+            $diff = false;
             foreach ($ugs as $uid => $gx) {
-                $v[$uid] = self::apply_grades($sset[$uid], $g[$uid], $ag[$uid], $og[$uid], $errf);
+                $v[$uid] = self::apply_grades($sset[$uid], $g[$uid], $ag[$uid], $og[$uid], $errf, $diff);
             }
             if (!empty($errf)) {
                 $jx["ok"] = false;
