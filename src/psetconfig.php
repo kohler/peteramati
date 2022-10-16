@@ -563,7 +563,8 @@ class Pset {
 
     /** @return bool */
     function scores_visible_student() {
-        return $this->visible_student() && $this->scores_visible;
+        return $this->visible_student()
+            && $this->scores_visible;
     }
 
     /** @return bool */

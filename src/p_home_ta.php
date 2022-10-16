@@ -358,7 +358,6 @@ class Home_TA_Page {
 
         $rows = array();
         $incomplete = $incompleteu = [];
-        $scores_visible = false;
         $jx = [];
         $gradercounts = [];
         $gex = new GradeExport($pset, VF_TF);
@@ -386,9 +385,6 @@ class Home_TA_Page {
                     }
                     $incomplete[] = $t . '</a>';
                     $incompleteu[] = "~" . urlencode($u);
-                }
-                if ($s->user_can_view_grade()) {
-                    $scores_visible = true;
                 }
             }
         }
@@ -435,9 +431,6 @@ class Home_TA_Page {
             $jd["need_total"] = true;
         } else if ($nintotal == 1) {
             $jd["total_key"] = $last_in_total;
-        }
-        if ($scores_visible) {
-            $jd["scores_visible"] = true;
         }
         echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){$pa.render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
 
