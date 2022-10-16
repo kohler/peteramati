@@ -72,14 +72,14 @@ $infoj["base_handout"] = $Pset->is_handout($commita);
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey),
     '" data-pa-base-commit="', htmlspecialchars($commita->hash),
     '" data-pa-commit="', htmlspecialchars($commitb->hash),
-    '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($infoj));
+    '" data-pa-gradeinfo=\'', str_replace("'", "&#39;", json_encode_browser($infoj)), '\'';
 if (!$Pset->gitless && $Pset->directory) {
-    echo '" data-pa-directory="', htmlspecialchars($Pset->directory_slash);
+    echo ' data-pa-directory="', htmlspecialchars($Pset->directory_slash), '"';
 }
 if ($Info->user->extension) {
-    echo '" data-pa-user-extension="yes';
+    echo ' data-pa-user-extension="yes"';
 }
-echo '">';
+echo '>';
 
 echo "<table class=\"mb-4\"><tr><td><h2>diff</h2></td><td style=\"padding-left:10px;line-height:110%\">",
     "<div class=\"pa-dl pa-gdsamp\" style=\"padding:2px 5px\"><big>",

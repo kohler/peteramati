@@ -1323,7 +1323,8 @@ function pa_render_pset_table(pconf, data) {
         $overlay = null, name_col, slist_input,
         $gdialog, gdialog_self, gdialog_su,
         flagged = pconf.flagged_commits,
-        visible = pconf.scores_visible,
+        visible = false,
+        gradesheet = null,
         table_entries, need_ngrades,
         sort = {
             f: flagged ? "at" : "name", last: false, rev: 1
@@ -1333,54 +1334,68 @@ function pa_render_pset_table(pconf, data) {
         col, colmap, total_colpos, ngrades_colpos;
 
     function scores_visible_for(s) {
-        return s.pinned_scores_visible == null ? visible : s.pinned_scores_visible;
+        return s.scores_visible_student == null ? visible : s.scores_visible_student;
     }
 
     var col_renderers = {
         checkbox: {
             th: '<th class="gt-checkbox" scope="col"></th>',
-            td: function (s, rownum, mode) {
+            td: function (tde, s, rownum, mode) {
                 if (mode & 1) {
-                    return '<td></td>';
-                } else {
-                    let t = '<td class="gt-checkbox"><input type="checkbox" value="1"';
-                    if (mode & 2) {
-                        return t + ' class="uic js-range-click" data-range-type="s61o"></td>';
-                    } else {
-                        return t.concat(' name="', render_checkbox_name(s), '" class="',
-                                this.className || "uic js-range-click papsel",
-                                '" data-range-type="s61"></td>');
-                    }
+                    return;
                 }
+                tde.className = "gt-checkbox";
+                let cbe = document.createElement("input");
+                cbe.type = "checkbox";
+                cbe.value = 1;
+                if (mode & 2) {
+                    cbe.className = "uic js-range-click";
+                    cbe.setAttribute("data-range-type", "s61o");
+                } else {
+                    cbe.name = render_checkbox_name(s);
+                    cbe.className = this.className || "uic js-range-click papsel";
+                    cbe.setAttribute("data-range-type", "s61");
+                }
+                tde.appendChild(cbe);
             },
             tw: 1.5,
             pin: true
         },
         flagcheckbox: {
             th: '<th class="gt-checkbox" scope="col"></th>',
-            td: function (s, rownum, mode) {
-                return mode ? '<td></td>' :
-                    '<td class="gt-checkbox"><input type="checkbox" name="s:'.concat(
-                        s._spos, '" value="1" class="',
-                        this.className || "uic js-range-click papsel",
-                        '" data-range-type="s61"></td>');
+            td: function (tde, s, rownum, mode) {
+                if (mode) {
+                    return;
+                }
+                tde.className = "gt-checkbox";
+                let cbe = document.createElement("input");
+                cbe.type = "checkbox";
+                cbe.name = "s:" + s._spos;
+                cbe.value = 1;
+                cbe.className = this.className || "uic js-range-click papsel";
+                cbe.setAttribute("data-range-type", "s61");
+                tde.appendChild(cbe);
             },
             tw: 1.5
         },
         rownumber: {
             th: '<th class="gt-rownumber" scope="col"></th>',
-            td: function (s, rownum) {
-                return '<td class="gt-rownumber">' + rownum + '.</td>';
+            td: function (tde, s, rownum) {
+                tde.className = "gt-rownumber";
+                tde.textContent = rownum + ".";
             },
             tw: Math.ceil(Math.log10(Math.max(data.length, 1))) * 0.75 + 1,
             pin: true
         },
         pset: {
             th: '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>',
-            td: function (s) {
-                return '<td class="gt-pset"><a href="' + escaped_href(s) + '" class="track">' +
-                   escape_entities(siteinfo.psets[s.psetid].title) +
-                   (s.commit ? "/" + s.commit.substr(0, 7) : "") + '</a></td>';
+            td: function (tde, s) {
+                tde.className = "gt-pset";
+                let ae = document.createElement("a");
+                ae.href = href(s);
+                ae.classname = "track";
+                ae.append(siteinfo.psets[s.psetid].title + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
+                tde.append(ae);
             },
             tw: 12,
             sort_forward: true,
@@ -1393,8 +1408,10 @@ function pa_render_pset_table(pconf, data) {
         },
         at: {
             th: '<th class="gt-at l plsortable" data-pa-sort="at" scope="col">Flagged</th>',
-            td: function (s) {
-                return '<td class="gt-at">' + (s.at ? strftime("%#e %b %#k:%M", s.at) : "") + '</td>';
+            td: function (tde, s) {
+                tde.className = "gt-at";
+                if (s.at)
+                    tde.append(strftime("%#e %b %#k:%M", s.at));
             },
             tw: 8,
             sort_forward: true,
@@ -1414,8 +1431,9 @@ function pa_render_pset_table(pconf, data) {
                     t += ' <span class="n">[anon]</span>';
                 return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
             },
-            td: function (s) {
-                return '<td class="gt-username">' + render_username_td(s) + '</td>';
+            td: function (tde, s) {
+                tde.className = "gt-username";
+                render_username_td(tde, s);
             },
             tw: 12,
             pin: true,
@@ -1425,8 +1443,9 @@ function pa_render_pset_table(pconf, data) {
             th: function () {
                 return '<th class="gt-name l plsortable" data-pa-sort="name" scope="col">Name</th>';
             },
-            td: function (s) {
-                return '<td class="gt-name">' + render_display_name(s, false) + '</td>';
+            td: function (tde, s) {
+                tde.className = "gt-name";
+                render_display_name(tde, s, false);
             },
             tw: 14,
             sort_forward: true
@@ -1438,16 +1457,18 @@ function pa_render_pset_table(pconf, data) {
                     t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
                 return '<th class="gt-name2 l plsortable" data-pa-sort="name2" scope="col">' + t + '</th>';
             },
-            td: function (s) {
-                return '<td class="gt-name2">' + render_display_name(s, true) + '</td>';
+            td: function (tde, s) {
+                tde.className = "gt-name2";
+                render_display_name(tde, s, true);
             },
             tw: 14,
             sort_forward: true
         },
         extension: {
             th: '<th class="gt-extension l plsortable" data-pa-sort="extension" scope="col">X?</th>',
-            td: function (s) {
-                return s.x ? '<td class="gt-extension">X</td>' : '<td class="gt-extension"></td>';
+            td: function (tde, s) {
+                tde.className = "gt-extension";
+                s.x && tde.append("X");
             },
             tw: 2,
             sort_forward: true,
@@ -1460,7 +1481,7 @@ function pa_render_pset_table(pconf, data) {
         },
         year: {
             th: '<th class="gt-year c plsortable" data-pa-sort="year" scole="col">Yr</th>',
-            td: function (s) {
+            td: function (tde, s) {
                 var t = '';
                 if (s.year) {
                     if (typeof s.year === "number") {
@@ -1475,7 +1496,8 @@ function pa_render_pset_table(pconf, data) {
                         t = escape_entities(s.year);
                     }
                 }
-                return '<td class="gt-year c">'.concat(t, '</td>');
+                tde.className = "gt-year c";
+                tde.append(t);
             },
             tw: 2,
             sort_forward: true,
@@ -1493,17 +1515,13 @@ function pa_render_pset_table(pconf, data) {
         },
         grader: {
             th: '<th class="gt-grader l plsortable" data-pa-sort="grader" scope="col">Grader</th>',
-            td_html: function (s) {
+            td: function (tde, s) {
+                tde.className = "gt-grader";
                 if (s.gradercid && siteinfo.pc[s.gradercid]) {
-                    return grader_name(siteinfo.pc[s.gradercid]);
+                    tde.append(grader_name(siteinfo.pc[s.gradercid]));
                 } else if (s.gradercid) {
-                    return "???";
-                } else {
-                    return "";
+                    tde.append("???");
                 }
-            },
-            td: function (s) {
-                return '<td class="gt-grader">'.concat(this.td_html(s), '</td>');
             },
             tw: 6,
             sort_forward: true,
@@ -1513,8 +1531,9 @@ function pa_render_pset_table(pconf, data) {
         },
         latehours: {
             th: '<th class="gt-latehours r plsortable" data-pa-sort="latehours" scope="col" title="Late">⏰</th>',
-            td: function (s) {
-                return '<td class="gt-latehours r">'.concat(s.late_hours || "", '</td>');
+            td: function (tde, s) {
+                tde.className = "gt-latehours r";
+                tde.append(s.late_hours || "");
             },
             tw: 2.5,
             compare: function (a, b) {
@@ -1527,26 +1546,31 @@ function pa_render_pset_table(pconf, data) {
         },
         notes: {
             th: '<th class="gt-notes c plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
-            td_html: function (s) {
+            td: function (tde, s) {
+                tde.className = "gt-notes c";
                 let t = scores_visible_for(s) ? '⎚' : '';
-                flagged && s.is_grade && (t += '✱');
-                s.has_notes && (t += '♪');
+                if (flagged && s.is_grade) {
+                    t += '✱';
+                }
+                if (s.has_notes) {
+                    t += '♪';
+                }
                 if (!flagged && s.has_nongrader_notes) {
                     t += "+";
                 }
-                return t;
-            },
-            td: function (s) {
-                return '<td class="gt-notes c">'.concat(this.td_html(s), '</td>');
+                tde.append(t);
             },
             tw: 2
         },
         conversation: {
             th: '<th class="gt-conversation l plsortable" data-pa-sort="conversation" scope="col">Flag</th>',
-            td: function (s) {
-                return '<td class="gt-conversation l">'.concat(
-                    escape_entities(s.conversation || s.conversation_pfx || ""),
-                    (s.conversation_pfx ? "…" : ""), '</td>');
+            td: function (tde, s) {
+                tde.className = "gt-conversation l";
+                if (s.conversation) {
+                    tde.append(s.conversation);
+                } else if (s.conversation_pfx) {
+                    tde.append(s.conversation_pfx + "…");
+                }
             },
             compare: function (a, b) {
                 const sa = a.conversation || a.conversation_pfx || "",
@@ -1562,17 +1586,26 @@ function pa_render_pset_table(pconf, data) {
         },
         gdialog: {
             th: '<th class="gt-gdialog"></th>',
-            td: function () {
-                return '<td class="gt-gdialog"><button type="button" class="btn-xlink ui js-gdialog" tabindex="-1" scope="col">Ⓖ</button></td>';
+            td: function (tde) {
+                tde.className = "gt-gdialog";
+                const be = document.createElement("button");
+                be.type = "button";
+                be.className = "btn-xlink ui js-gdialog";
+                be.tabIndex = -1;
+                be.scope = "col";
+                be.append("Ⓖ");
+                tde.append(be);
             },
             tw: 1.5,
             pin: true
         },
         total: {
             th: '<th class="gt-total r plsortable" data-pa-sort="total" scope="col">Tot</th>',
-            td: function (s) {
-                const t = s.total == null ? "" : s.total;
-                return '<td class="gt-total r">'.concat(t, '</td>');
+            td: function (tde, s) {
+                tde.className = "gt-total r";
+                if (s.total != null) {
+                    tde.append(s.total);
+                }
             },
             compare: function (a, b) {
                 if (a.total == null || b.total == null) {
@@ -1592,15 +1625,11 @@ function pa_render_pset_table(pconf, data) {
             th: function () {
                 return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="grade', this.gidx, '" scope="col" title="', escape_entities(this.ge.title_text), '">', this.ge.abbr(), '</th>');
             },
-            td_text: function (s) {
-                const gr = s.grades[this.gidx];
-                return this.ge.tcell(gr);
-            },
-            td: function (s) {
+            td: function (tde, s) {
                 const gr = s.grades[this.gidx],
                     hl = s.highlight_grades && s.highlight_grades[this.gkey];
-                return '<td class="'.concat(hl ? 'gt-highlight ' : '', this.className, '">',
-                    escape_entities(this.ge.tcell(gr)), '</td>');
+                tde.className = this.className + (hl ? " gt-highlight" : "");
+                tde.replaceChildren(this.ge.tcell(gr));
             },
             tw: function () {
                 const w = this.ge.abbr().length * 0.5 + 1.5;
@@ -1609,8 +1638,10 @@ function pa_render_pset_table(pconf, data) {
         },
         ngrades: {
             th: '<th class="gt-ngrades r plsortable" data-pa-sort="ngrades" scope="col">#G</th>',
-            td: function (s) {
-                return '<td class="gt-ngrades r">' + (s.ngrades_nonempty || "") + '</td>';
+            td: function (tde, s) {
+                tde.className = "gt-ngrades r";
+                if (s.ngrades_nonempty)
+                    tde.append(s.ngrades_nonempty);
             },
             tw: 2,
             sort_forward: true,
@@ -1623,34 +1654,45 @@ function pa_render_pset_table(pconf, data) {
         },
         repo: {
             th: '<th class="gt-repo" scope="col"></th>',
-            td: function (s) {
-                var txt;
+            td: function (tde, s) {
+                tde.className = "gt-repo";
                 if (!s.repo) {
-                    txt = '';
-                } else if (anonymous) {
-                    txt = '<a href="" data-pa-link="'.concat(escape_entities(s.repo), '" class="ui pa-anonymized-link">repo</a>');
+                    return;
+                }
+                const ae = document.createElement("a");
+                if (anonymous) {
+                    ae.className = "ui pa-anonymized-link";
+                    ae.href = "";
+                    ae.setAttribute("data-pa-link", s.repo);
                 } else {
-                    txt = '<a class="track" href="'.concat(escape_entities(s.repo), '">repo</a>');
+                    ae.className = "track";
+                    ae.href = s.repo;
+                }
+                ae.append("repo");
+                tde.append(ae);
+                function strong(t) {
+                    const stre = document.createElement("strong");
+                    stre.className = "err";
+                    stre.append(t);
                 }
                 if (s.repo_broken) {
-                    txt += ' <strong class="err">broken</strong>';
+                    tde.append(" ", strong("broken"));
                 }
                 if (s.repo_unconfirmed) {
-                    txt += ' <strong class="err">unconfirmed</strong>';
+                    tde.append(" ", strong("unconfirmed"));
                 }
                 if (s.repo_too_open) {
-                    txt += ' <strong class="err">open</strong>';
+                    tde.append(" ", strong("open"));
                 }
                 if (s.repo_handout_old) {
-                    txt += ' <strong class="err">handout</strong>';
+                    tde.append(" ", strong("handout"));
                 }
                 if (s.repo_partner_error) {
-                    txt += ' <strong class="err">partner</strong>';
+                    tde.append(" ", strong("partner"));
                 }
                 if (s.repo_sharing) {
-                    txt += ' <strong class="err">sharing</strong>';
+                    tde.append(" ", strong("sharing"));
                 }
-                return '<td class="gt-repo">'.concat(txt, '</td>');
             },
             tw: 10
         }
@@ -1700,13 +1742,15 @@ function pa_render_pset_table(pconf, data) {
 
         table_entries = [];
         if (pconf.grades) {
-            pconf.grades = new GradeSheet(pconf.grades);
-            for (let i = 0; i !== pconf.grades.value_order.length; ++i) {
-                const k = pconf.grades.value_order[i], ge = pconf.grades.entries[k];
+            gradesheet = new GradeSheet(pconf.grades);
+            for (let i = 0; i !== gradesheet.value_order.length; ++i) {
+                const k = gradesheet.value_order[i],
+                    ge = gradesheet.entries[k];
                 if (ge.type_tabular) {
                     table_entries.push(ge);
                 }
             }
+            visible = gradesheet.scores_visible_student;
         }
 
         let ngrades_expected = -1, has_late_hours = false;
@@ -1768,11 +1812,11 @@ function pa_render_pset_table(pconf, data) {
             for (let i = 0; i !== table_entries.length; ++i) {
                 const ge = table_entries[i];
                 ge.gpos = i;
-                ge.colpos = col.length;
                 col.push(ge.configure_column({
                     type: "grade",
                     name: "grade" + i,
                     gidx: i,
+                    colpos: col.length,
                     gkey: ge.key
                 }, pconf));
             }
@@ -1821,23 +1865,25 @@ function pa_render_pset_table(pconf, data) {
         }
         return args;
     }
-    function escaped_href(s) {
-        return escape_entities(hoturl("pset", url_gradeparts(s)));
+    function href(s) {
+        return hoturl("pset", url_gradeparts(s));
     }
-    function render_student_link(t, s) {
-        return '<a href="'.concat(escaped_href(s), '" class="track',
-            s.dropped ? ' gt-dropped">' : '">', t, '</a>');
+    function make_student_ae(s) {
+        let ae = document.createElement("a");
+        ae.href = href(s);
+        ae.className = "track" + (s.dropped ? " gt-dropped" : "");
+        return ae;
     }
-    function render_username_td(s) {
-        var un;
+    function render_username_td(tde, s) {
+        let ae = make_student_ae(s);
         if (anonymous && s.anon_username) {
-            un = s.anon_username;
+            ae.append(s.anon_username);
         } else if (sort.email && s.email) {
-            un = s.email;
-        } else {
-            un = s.username || "";
+            ae.append(s.email);
+        } else if (s.username) {
+            ae.append(s.username);
         }
-        return render_student_link(escape_entities(un), s);
+        tde.replaceChildren(ae);
     }
     function render_name(s, last_first) {
         if (s.first != null && s.last != null) {
@@ -1853,9 +1899,15 @@ function pa_render_pset_table(pconf, data) {
             return "";
         }
     }
-    function render_display_name(s, is2) {
-        var t = escape_entities(is2 && anonymous ? s.anon_username || "?" : render_name(s, displaying_last_first));
-        return is2 ? render_student_link(t, s) : t;
+    function render_display_name(tde, s, is2) {
+        let t = is2 && anonymous ? s.anon_username || "?" : render_name(s, displaying_last_first);
+        if (is2) {
+            let ae = make_student_ae(s);
+            ae.textContent = t;
+            tde.replaceChildren(ae);
+        } else {
+            tde.replaceChildren(t);
+        }
     }
     function render_name_text(s) {
         if (s) {
@@ -1935,7 +1987,7 @@ function pa_render_pset_table(pconf, data) {
         }
 
         trn = 0;
-        $b.find(".gt-rownumber").html(function () {
+        $b.find(".gt-rownumber").text(function () {
             ++trn;
             return trn + ".";
         });
@@ -1943,9 +1995,9 @@ function pa_render_pset_table(pconf, data) {
         var display_last_first = sort.f && sort.last;
         if (display_last_first !== displaying_last_first) {
             displaying_last_first = display_last_first;
-            $b.find(".gt-name, .gt-name2").html(function () {
+            $b.find(".gt-name, .gt-name2").each(function () {
                 var s = smap[this.parentNode.getAttribute("data-pa-spos")];
-                return render_display_name(s, hasClass(this, "gt-name2"));
+                render_display_name(this, s, hasClass(this, "gt-name2"));
             });
         }
     }
@@ -1974,12 +2026,12 @@ function pa_render_pset_table(pconf, data) {
         var $x = $overlay ? $([$j[0], $overlay[0]]) : $j;
         $x.find("td.gt-username").each(function () {
             var s = smap[this.parentNode.getAttribute("data-pa-spos")];
-            $(this).html(render_username_td(s));
+            render_username_td(this, s);
         });
         $x.find("th.gt-username > span.heading").html(anonymous || !sort.email ? "Username" : "Email");
         $x.find("td.gt-name2").each(function () {
             var s = smap[this.parentNode.getAttribute("data-pa-spos")];
-            $(this).html(render_display_name(s, true));
+            render_display_name(this, s, true);
         });
         $x.find("th.gt-name2 > span.heading").html(anonymous ? "Username" : "Name");
     }
@@ -2007,7 +2059,7 @@ function pa_render_pset_table(pconf, data) {
         evt.stopPropagation();
     }
     function make_overlay() {
-        let li = 0, ri, tw = 0, t, a = [];
+        let li = 0, ri, tw = 0, t;
         while (li !== col.length && !col[li].pin) {
             ++li;
         }
@@ -2035,32 +2087,40 @@ function pa_render_pset_table(pconf, data) {
         $overlay.find(".js-switch-anon").click(switch_anon);
 
         tr = $j.children("tbody")[0].firstChild;
-        let trn = 0;
+        let tbodye = $overlay.find("tbody")[0], trn = 0;
+        tbodye.replaceChildren();
         while (tr) {
+            let tre = document.createElement("tr");
+            tre.className = tr.className;
             if (hasClass(tr, "gt-boring")) {
-                a.push('<tr class="gt-boring"><td colspan="' + (ri - li + 1) + '"><hr></td></tr>');
+                let tde = document.createElement("td");
+                tde.colSpan = ri - li + 1;
+                tde.append(document.createElement("hr"));
+                tre.push(tde);
             } else {
-                let spos = tr.getAttribute("data-pa-spos"),
-                    t = '<tr class="'.concat(tr.className, ' kfade" data-pa-spos="', spos);
+                let spos = tr.getAttribute("data-pa-spos");
+                tre.className += " kfade";
+                tre.setAttribute("data-pa-spos", spos);
                 if (tr.hasAttribute("data-pa-uid")) {
-                    t += '" data-pa-uid="' + tr.getAttribute("data-pa-uid");
+                    tre.setAttribute("data-pa-uid", tr.getAttribute("data-pa-uid"));
                 }
                 let mode = 2;
                 if (tr.hasAttribute("data-pa-partner")) {
-                    t += '" data-pa-partner="1';
+                    tre.setAttribute("data-pa-partner", 1);
                     mode |= 1;
                 } else {
                     ++trn;
                 }
-                t += '"><td></td>';
+                tre.append(document.createElement("td"));
                 for (let i = li; i !== ri; ++i) {
-                    t += col[i].td.call(col[i], smap[spos], trn, mode);
+                    let tde = document.createElement("td");
+                    col[i].td.call(col[i], tde, smap[spos], trn, mode);
+                    tre.append(tde);
                 }
-                a.push(t + '</tr>');
             }
+            tbodye.appendChild(tre);
             tr = tr.nextSibling;
         }
-        $overlay.find("tbody").html(a.join(""));
         $j.find("input[data-range-type=s61]:checked").each(checkbox_click);
         setTimeout(function () {
             $overlay && removeClass($overlay[0], "new");
@@ -2115,7 +2175,7 @@ function pa_render_pset_table(pconf, data) {
         if (colr && colr.compare) {
             data.sort(colr.compare);
         } else if (colr && colr.make_compare) {
-            data.sort(colr.make_compare(sort));
+            data.sort(colr.make_compare(sort, colr.subtype || null));
         } else if ((f === "name" || f === "name2") && !anonymous) {
             data.sort(user_compare);
         } else if (f === "gradestatus") {
@@ -2207,11 +2267,11 @@ function pa_render_pset_table(pconf, data) {
             su = smap[tr.getAttribute("data-pa-spos")];
         let ngrades_nonempty = 0;
         for (let i = 0; i !== gorder.length; ++i) {
-            let k = gorder[i], ge = pconf.grades.entries[k], c;
+            let k = gorder[i], ge = gradesheet.entries[k], c;
             if (ge && ge.gpos != null && (c = col[ge.colpos])) {
                 if (su.grades[ge.gpos] !== rv.grades[i]) {
                     su.grades[ge.gpos] = rv.grades[i];
-                    tr.childNodes[ge.colpos].innerText = c.td_text.call(c, su);
+                    c.td.call(c, tr.childNodes[ge.colpos], su);
                 }
                 if (rv.grades[i] != null && rv.grades[i] !== "") {
                     ++ngrades_nonempty;
@@ -2238,10 +2298,14 @@ function pa_render_pset_table(pconf, data) {
             notescol = colmap.notes;
         Object.assign(su, rv);
         if (gradercol) {
-            tr.childNodes[gradercol.index].innerHTML = gradercol.td_html.call(gradercol, su);
+            const tde = tr.childNodes[gradercol.index];
+            tde.replaceChildren();
+            gradercol.td.call(gradercol, tde, su);
         }
         if (notescol) {
-            tr.childNodes[notescol.index].innerHTML = notescol.td_html.call(notescol, su);
+            const tde = tr.childNodes[notescol.index];
+            tde.replaceChildren();
+            notescol.td.call(notescol, tde, su);
         }
     }
 
@@ -2264,7 +2328,7 @@ function pa_render_pset_table(pconf, data) {
             ge = [], us = [];
         for (let i = 0; i !== $gsi.length; ++i) {
             if ($gsi[i].checked)
-                ge.push(pconf.grades.entries[$gsi[i].name]);
+                ge.push(gradesheet.entries[$gsi[i].name]);
         }
         for (let su of gdialog_su) {
             us.push(su.uid);
@@ -2296,7 +2360,7 @@ function pa_render_pset_table(pconf, data) {
             $gdialog.find(".pa-gradevalue").each(function () {
                 if ((this.hasAttribute("data-pa-unmixed") || input_differs(this))
                     && !this.indeterminate) {
-                    let k = this.name, ge = pconf.grades.entries[k], v;
+                    let k = this.name, ge = gradesheet.entries[k], v;
                     if (this.type === "checkbox") {
                         v = this.checked ? this.value : "";
                     } else {
@@ -2389,7 +2453,7 @@ function pa_render_pset_table(pconf, data) {
 
         $gdialog.find(".pa-grade").each(function () {
             let k = this.getAttribute("data-pa-grade"),
-                ge = pconf.grades.entries[k],
+                ge = gradesheet.entries[k],
                 sv = gdialog_su[0].grades[ge.gpos],
                 opts = {reset: true, mixed: false};
             for (let i = 1; i !== gdialog_su.length; ++i) {
@@ -2468,8 +2532,8 @@ function pa_render_pset_table(pconf, data) {
         if (!gs.firstChild) {
             const yc = new HtmlCollector;
             let in_section = false;
-            for (let i = 0; i !== pconf.grades.order.length; ++i) {
-                const ge = pconf.grades.entries[pconf.grades.order[i]],
+            for (let i = 0; i !== gradesheet.order.length; ++i) {
+                const ge = gradesheet.entries[gradesheet.order[i]],
                     gcl = in_section && ge.type !== "section" ? "checki ml-4" : "checki",
                     ccl = ge.type === "section" ? " pa-gdialog-section" : "";
                 yc.push('<label class="'.concat(gcl, '"><span class="checkc"><input type="checkbox" name="', ge.key, '" class="uic js-range-click', ccl, '" data-range-type="mge"></span>', ge.title_html, '</label>'));
@@ -2495,7 +2559,7 @@ function pa_render_pset_table(pconf, data) {
                     gvisarg = JSON.parse(this.value);
             });
             for (let su of gdialog_su) {
-                us[su.uid].pinned_scores_visible = gvisarg;
+                us[su.uid].scores_visible_student = gvisarg;
             }
         } else if (this.name === "save-grader"
                    && f.elements.gradertype.value === "clear") {
@@ -2599,7 +2663,7 @@ function pa_render_pset_table(pconf, data) {
             yc.push('<fieldset class="mb-3"><legend>Grade visibility</legend>', '</fieldset>');
             yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="true" class="uic pa-gvis"></span>Visible</label>');
             yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="false" class="uic pa-gvis"></span>Hidden</label>');
-            yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="null" class="uic pa-gvis"></span>Default (' + (pconf.scores_visible ? 'visible' : 'hidden') + ')</label>');
+            yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="null" class="uic pa-gvis"></span>Default (' + (visible ? 'visible' : 'hidden') + ')</label>');
             yc.push('<div class="popup-actions"><button type="button" class="btn btn-primary" name="save-gvis">Save</button></div>');
             yc.pop();
 
@@ -2622,9 +2686,9 @@ function pa_render_pset_table(pconf, data) {
 
         const gvis = {}, ggr = {}, ggra = {};
         for (let su of gdialog_su) {
-            if (su.pinned_scores_visible == null) {
+            if (su.scores_visible_student == null) {
                 gvis["null"] = (gvis["null"] || 0) + 1;
-            } else if (su.pinned_scores_visible) {
+            } else if (su.scores_visible_student) {
                 gvis["true"] = (gvis["true"] || 0) + 1;
             } else {
                 gvis["false"] = (gvis["false"] || 0) + 1;
@@ -2700,7 +2764,7 @@ function pa_render_pset_table(pconf, data) {
         hc.push('<span class="btnbox"><button type="button" name="prev" class="btnl">&lt;</button><button type="button" name="next" class="btnl">&gt;</button></span>');
         $gdialog = hc.show(false);
         $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
-        $gdialog.find("form").addClass("pa-psetinfo").data("pa-gradeinfo", pconf.grades);
+        $gdialog.find("form").addClass("pa-psetinfo").data("pa-gradeinfo", gradesheet);
         gdialog_mode_values();
         $gdialog.on("click", ".pa-gdialog-section", gdialog_section_click);
         $gdialog.on("change blur", ".pa-gradevalue", gdialog_gradelist_change);
@@ -2754,18 +2818,17 @@ function pa_render_pset_table(pconf, data) {
         observer.observe(overlay_div);
         observer.observe($j.parent()[0]);
     }
-    function render_tds(s, rownum, mode) {
-        const a = [];
+    function render_tds(tre, s, rownum, mode) {
         for (let i = 0; i !== col.length; ++i) {
-            a.push(col[i].td.call(col[i], s, rownum, mode));
+            const tde = document.createElement("td");
+            col[i].td.call(col[i], tde, s, rownum, mode);
+            tre.appendChild(tde);
         }
-        return a;
     }
     function render_trs(tbody, a) {
         const tpl = document.createElement("template");
         tpl.innerHTML = a.join("");
         tbody.appendChild(tpl.content);
-        return [];
     }
     function render() {
         const tfixed = $j.hasClass("want-gtable-fixed"),
@@ -2785,7 +2848,8 @@ function pa_render_pset_table(pconf, data) {
             }
         }
         const thead = document.createElement("thead");
-        a = render_trs(thead, a);
+        render_trs(thead, a);
+        a = [];
         if (tfixed) {
             let td = thead.firstChild.firstChild;
             for (const c of col) {
@@ -2820,33 +2884,28 @@ function pa_render_pset_table(pconf, data) {
                 a.push('<tr class="gt-boring"><td colspan="' + col.length + '"><hr></td></tr>');
             }
             was_boringness = s.boringness;
-            const stds = render_tds(s, trn);
-            let t = '<tr class="gt k'.concat(trn % 2, '" data-pa-spos="', s._spos);
+            const tre = document.createElement("tr");
+            tre.className = "gt k".concat(trn % 2);
+            tre.setAttribute("data-pa-spos", s._spos);
             if (s.uid) {
-                t += '" data-pa-uid="' + s.uid;
+                tre.setAttribute("data-pa-uid", s.uid);
             }
-            a.push(t.concat('">', stds.join(''), '</tr>'));
+            render_tds(tre, s, trn);
+            tbody.appendChild(tre);
             for (let j = 0; s.partners && j < s.partners.length; ++j) {
                 const ss = s.partners[j];
                 ss._spos = smap.length;
                 smap.push(ss);
-                const sstds = render_tds(s.partners[j], trn, 1);
-                for (let k = 0; k < sstds.length; ++k) {
-                    if (sstds[k] === stds[k])
-                        sstds[k] = '<td></td>';
-                }
-                t = '<tr class="gt k'.concat(trn % 2, ' gtrow-partner" data-pa-spos="', ss._spos);
+                const trep = document.createElement("tr");
+                trep.className = "gt k".concat(trn % 2, " gtrow-partner");
+                trep.setAttribute("data-pa-spos", ss._spos);
                 if (ss.uid) {
-                    t += '" data-pa-uid="' + ss.uid;
+                    trep.setAttribute("data-pa-uid", ss.uid);
                 }
-                a.push(t.concat('" data-pa-partner="1">', sstds.join(''), '</tr>'));
+                trep.setAttribute("data-pa-partner", 1);
+                render_tds(trep, s.partners[j], trn, 1);
+                tbody.appendChild(trep);
             }
-            if (a.length > 50) {
-                a = render_trs(tbody, a);
-            }
-        }
-        if (a.length !== 0) {
-            render_trs(tbody, a);
         }
         slist_input && assign_slist();
         $j.find("tbody").on("click", "input[type=checkbox]", checkbox_click);

@@ -85,11 +85,12 @@ class DiffMany_Page {
         }
         if ($info->can_edit_scores()
             || ($info->can_view_grade() && $info->is_grading_commit())) {
-            echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->grade_json(PsetView::GRADEJSON_SLICE)));
+            $gj = $info->grade_json(PsetView::GRADEJSON_SLICE);
         } else {
-            echo '" data-pa-gradeinfo="', htmlspecialchars(json_encode_browser($info->info_json()));
+            $gj = $info->info_json();
         }
-        echo '">';
+        echo '" data-pa-gradeinfo=\'',
+            str_replace("'", "&#39;", json_encode_browser($gj)), '\'>';
 
         $u = $this->viewer->user_linkpart($user);
         if ($user !== $this->viewer && !$user->is_anonymous && $user->contactImageId) {
@@ -171,9 +172,8 @@ class DiffMany_Page {
         Ht::stash_script("\$pa.long_page = true");
         $gexp = new GradeExport($this->pset, VF_TF);
         $gexp->set_exported_entries(null);
-        echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo=\"",
-             htmlspecialchars(json_encode($gexp)),
-             "\">";
+        echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo='",
+             str_replace("'", "&#39;", json_encode_browser($gexp)), "'>";
 
         if (trim((string) $this->qreq->users) === "") {
             $want = [];

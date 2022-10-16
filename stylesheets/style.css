@@ -2622,6 +2622,9 @@ tr.gtrow-partner > .gt-username {
 .gt-anonymous .gt-name, .gt-anonymous .gt-year {
 	display: none;
 }
+.gt-at {
+	white-space: nowrap;
+}
 
 .pa-sticky, .pa-fileref {
 	position: sticky;

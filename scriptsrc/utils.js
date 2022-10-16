@@ -230,6 +230,12 @@ if (!String.prototype.trimStart) {
     };
 }
 
+if (!Object.hasOwn) {
+    Object.defineProperty(Object, "hasOwn", {
+        value: Object.prototype.hasOwnProperty, configurable: true, writable: true
+    });
+}
+
 
 export class ImmediatePromise {
     constructor(value) {

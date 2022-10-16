@@ -20,6 +20,7 @@ class SourceLocation implements JsonSerializable {
         $this->name = $name;
         $this->offset = $offset;
     }
+    #[\ReturnTypeWillChange]
     function jsonSerialize() {
         return get_object_vars($this);
     }
