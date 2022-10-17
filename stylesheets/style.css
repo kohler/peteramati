@@ -2348,13 +2348,13 @@ td.mhcb {
 .pa-pt > p:first-child:last-child {
 	margin-bottom: 0;
 }
-.pa-has-grade-update::after {
+.pa-grade-earlier::after {
 	content: "←";
 	font-size: 82.5%;
 	vertical-align: sub;
 	color: #449999;
 }
-.pa-is-grade-update::after {
+.pa-grade-latest::after {
 	content: "→";
 	font-size: 82.5%;
 	vertical-align: sub;

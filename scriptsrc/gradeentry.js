@@ -3,7 +3,8 @@
 // See LICENSE for open-source distribution terms
 
 import { escape_entities, unescape_entities, html_id_encode } from "./encoders.js";
-import { hasClass, toggleClass, removeClass, input_set_default_value } from "./ui.js";
+import { hasClass, addClass, toggleClass, removeClass,
+    input_default_value, input_set_default_value, input_differs } from "./ui.js";
 import { Filediff, Linediff } from "./diff.js";
 import { Note } from "./note.js";
 import { GradeClass } from "./gc.js";
@@ -20,6 +21,16 @@ const gradesheet_props = {
     "scores_visible_student": true, "scores_editable": true, "answers_editable": true,
     "linenotes": true
 };
+
+function pa_resetgrade() {
+    removeClass(this, "pa-resetgrade");
+    this.removeEventListener(this, pa_resetgrade, false);
+    if (!input_differs(this)) {
+        const gi = GradeSheet.closest(this),
+            gr = this.closest(".pa-grade");
+        queueMicrotask(function () { gi.update_at(gr); });
+    }
+}
 
 export class GradeEntry {
     constructor(x) {
@@ -173,7 +184,23 @@ export class GradeEntry {
     }
 
     update_edit(pde, v, opts) {
-        const $pde = $(pde);
+        const $pde = $(pde),
+            ve = pde.querySelector(".pa-gradevalue"),
+            vt = this.simple_text(v);
+
+        // check whether to skip update
+        if (hasClass(pde, "pa-saving")) {
+            return;
+        } else if (ve
+                   && ve.type !== "hidden"
+                   && ve.matches(":focus")) {
+            if (!hasClass(ve, "pa-resetgrade")
+                && vt !== input_default_value(ve)) {
+                addClass(ve, "pa-resetgrade");
+                ve.addEventListener("blur", pa_resetgrade, false);
+            }
+            return;
+        }
 
         // “grade is above max” message
         if (this.max) {
@@ -204,29 +231,32 @@ export class GradeEntry {
         }
 
         // grade value
-        this.gc.update_edit.call(this, pde, v, opts);
+        if (opts.reset || !ve || input_default_value(ve) !== vt) {
+            this.gc.update_edit.call(this, pde, v, opts);
+        }
 
         // reset, tabIndex
-        if (opts.reset || opts.sidebar) {
-            const ve = pde.querySelector(".pa-gradevalue");
-            if (ve && opts.reset) {
-                input_set_default_value(ve, this.simple_text(v));
-            }
-            if (ve && opts.sidebar) {
-                ve.tabIndex = -1;
-                ve.classList.add("uikd", "pa-sidebar-tab");
-            }
+        if (ve && opts.reset) {
+            input_set_default_value(ve, vt);
+        }
+        if (ve && opts.sidebar) {
+            ve.tabIndex = -1;
+            ve.classList.add("uikd", "pa-sidebar-tab");
         }
 
         // landmark
-        this.landmark && this.update_landmark(pde);
+        if (this.landmark) {
+            this.update_landmark(pde);
+        }
 
         // finally grow
         $(pde).find("input, textarea").autogrow();
     }
 
     update_show(pde, v, opts) {
-        const ve = pde.classList.contains("pa-gradevalue") ? pde : pde.querySelector(".pa-gradevalue");
+        const ve = pde.classList.contains("pa-gradevalue")
+            ? pde
+            : pde.querySelector(".pa-gradevalue");
         let hidden;
         if (this.gc.update_show) {
             hidden = this.gc.update_show.call(this, ve, v, opts);
@@ -401,16 +431,11 @@ export class GradeEntry {
         return i != null ? gi.autogrades[i] : null;
     }
 
-    gversion_in(gi) {
-        const i = gi.gpos[this.key];
-        return i != null ? gi.gversion[i] : null;
-    }
-
-    has_newer_value_in(gi) {
+    has_later_value_in(gi) {
         return this.answer
-            && gi.student_grade_updates
-            && this.key in gi.student_grade_updates
-            && this.value_in(gi) !== gi.student_grade_updates[this.key];
+            && gi.grades_latest
+            && this.key in gi.grades_latest
+            && this.value_in(gi) !== gi.grades_latest[this.key];
     }
 
     static closest(elt) {
@@ -441,7 +466,6 @@ class LateHoursEntry extends GradeEntry {
 export class GradeSheet {
     constructor(x) {
         this.entries = {};
-        this.gversion = [];
         x && this.extend(x);
     }
 
@@ -467,13 +491,9 @@ export class GradeSheet {
             }
         }
         if (need_gpos) {
-            while (this.gversion.length < this.value_order.length) {
-                this.gversion.push(0);
-            }
             this.gpos = {};
             for (let i = 0; i < this.value_order.length; ++i) {
                 this.gpos[this.value_order[i]] = i;
-                ++this.gversion[i];
             }
             if (old_value_order) {
                 this.grades = this.autogrades = this.maxtotal = null;
@@ -485,11 +505,8 @@ export class GradeSheet {
         if (x.autogrades) {
             this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x);
         }
-        if (x.student_grade_updates) {
-            this.student_grade_updates = x.student_grade_updates;
-        }
-        while (this.grades && this.gversion.length < this.grades.length) {
-            this.gversion.push(0);
+        if (x.grades_latest) {
+            this.grades_latest = x.grades_latest;
         }
         for (let k in x) {
             if (gradesheet_props[k])
@@ -511,7 +528,6 @@ export class GradeSheet {
                     }
                     if (myg[j] != ing[i]) {
                         myg[j] = ing[i];
-                        ++this.gversion[j];
                     }
                 }
             }
@@ -550,31 +566,29 @@ export class GradeSheet {
             elt.replaceChild(pdx, pde);
             mode === 2 && removeClass(elt, "hidden");
             ge.mount_at(pdx, id, mode !== 0);
-            elt.removeAttribute("data-pa-gv");
             $(pde).find("input, textarea").unautogrow();
         }
     }
 
     update_at(elt, opts) {
         const ge = this.xentry(elt.getAttribute("data-pa-grade"));
-        let gver;
-        if (ge && ((gver = ge.gversion_in(this)) === null
-                   || elt.getAttribute("data-pa-gv") != gver)) {
-            const xopts = {gradesheet: this, autograde: ge.autovalue_in(this)};
-            let gval = ge.value_in(this);
-            opts && Object.assign(xopts, opts);
-            if (ge.has_newer_value_in(this)) {
-                const label = elt.firstChild;
-                if (label.classList.contains("pa-is-grade-update")) {
-                    gval = this.student_grade_updates[ge.key];
-                } else if (!label.classList.contains("uic")) {
-                    label.classList.add("pa-has-grade-update", "uic", "need-tooltip");
-                    label.setAttribute("aria-label", "Toggle latest version");
-                }
+        // find value to assign
+        let gval = ge.value_in(this);
+        if (ge.has_later_value_in(this)) {
+            const label = elt.firstChild;
+            if (label.classList.contains("pa-grade-latest")) {
+                gval = this.grades_latest[ge.key];
+            } else if (!label.classList.contains("uic")) {
+                label.classList.add("pa-grade-earlier", "uic", "need-tooltip");
+                label.setAttribute("aria-label", "Toggle latest version");
             }
-            gver !== null && elt.setAttribute("data-pa-gv", gver);
-            ge.update_at(elt, gval, xopts);
         }
+        // perform update
+        const xopts = {gradesheet: this, autograde: ge.autovalue_in(this)};
+        if (opts) {
+            Object.assign(xopts, opts);
+        }
+        ge.update_at(elt, gval, xopts);
     }
 
     grade_total(noextra) {

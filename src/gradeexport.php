@@ -29,7 +29,7 @@ class GradeExport implements JsonSerializable {
     /** @var ?list<mixed> */
     public $autogrades;
     /** @var ?array */
-    public $student_grade_updates;
+    public $grades_latest;
     /** @var null|int|float */
     public $total;
     /** @var null|int|float */
@@ -191,8 +191,8 @@ class GradeExport implements JsonSerializable {
     #[\ReturnTypeWillChange]
     function jsonSerialize() {
         $r = [];
+        $r["pset"] = $this->pset->urlkey;
         if (isset($this->uid)) {
-            $r["pset"] = $this->pset->urlkey;
             $r["uid"] = $this->uid;
             $r["user"] = $this->user;
             if ($this->commit !== null) {
@@ -212,8 +212,8 @@ class GradeExport implements JsonSerializable {
             if ($this->vf >= VF_TF && !empty($this->autogrades)) {
                 $r["autogrades"] = $this->autogrades;
             }
-            if (!empty($this->student_grade_updates)) {
-                $r["student_grade_updates"] = $this->student_grade_updates;
+            if (!empty($this->grades_latest)) {
+                $r["grades_latest"] = $this->grades_latest;
             }
             if (!$this->has_total) {
                 $this->total();

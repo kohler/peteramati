@@ -246,7 +246,7 @@ class Home_TA_Page {
                 });
             }
             if (($h = $info->grading_hash()) !== null) {
-                $j["gradecommit"] = $h;
+                $j["grade_commit"] = $h;
             } else if (($h = $info->hash()) !== null) {
                 $j["commit"] = $h;
             }

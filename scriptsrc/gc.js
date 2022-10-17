@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { addClass, handle_ui } from "./ui.js";
+import { addClass, handle_ui, input_set_default_value } from "./ui.js";
 import { event_key } from "./ui-key.js";
 import { strftime, sec2text } from "./utils.js";
 
@@ -59,9 +59,8 @@ export const GradeClass = {
     basic_update_edit: function (elt, v, opts) {
         const ve = elt.querySelector(".pa-gradevalue"),
             gt = this.simple_text(v);
-        if ($(ve).val() !== gt && (opts.reset || !$(ve).is(":focus"))) {
-            $(ve).val(gt);
-        }
+        input_set_default_value(ve, gt);
+        ve.value = gt;
         if (opts.mixed != null) {
             opts.mixed ? ve.setAttribute("placeholder", "Mixed") : ve.removeAttribute("placeholder");
         }

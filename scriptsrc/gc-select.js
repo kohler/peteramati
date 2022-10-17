@@ -3,6 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { GradeClass } from "./gc.js";
+import { input_set_default_value } from "./ui.js";
 
 
 GradeClass.add("select", {
@@ -30,12 +31,14 @@ GradeClass.add("select", {
     update_edit: function (elt, v, opts) {
         const gt = this.simple_text(v),
             ve = elt.firstChild.firstChild;
-        if ($(ve).val() !== gt && (opts.reset || !$(ve).is(":focus"))) {
-            $(ve).val(gt);
-        }
+        input_set_default_value(ve, gt);
+        ve.value = gt;
         if (opts.reset && opts.mixed) {
             if (ve.options[0].value !== "") {
-                $(ve).prepend('<option value="">Mixed</option>');
+                const opt = document.createElement("option");
+                opt.value = "";
+                opt.append("Mixed");
+                ve.insertBefore(opt, ve.firstChild);
             }
             ve.selectedIndex = 0;
         } else if (gt !== "") {

@@ -59,7 +59,7 @@ function make_multicheckbox(mark) {
             } else if (want_checkbox && ve.type !== "hidden" && opts.reset) {
                 Checkbox_GradeClass.recheckbox(ve);
             }
-            if (ve.value !== v && (opts.reset || !$(ve).is(":focus"))) {
+            if (ve.value !== v) {
                 ve.value = v;
             }
             const name = ve.name + ":", value = Math.round(v || 0);

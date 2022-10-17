@@ -4,7 +4,8 @@
 
 import { wstorage, sprintf, strftime, text_eq } from "./utils.js";
 import {
-    hasClass, addClass, removeClass, toggleClass, classList, handle_ui
+    hasClass, addClass, removeClass, toggleClass, classList,
+    handle_ui, input_differs
     } from "./ui.js";
 import { event_key } from "./ui-key.js";
 import "./ui-autogrow.js";
@@ -128,36 +129,6 @@ function render_xmsg(status, msg) {
 
 
 // differences and focusing
-function input_is_checkboxlike(elt) {
-    return elt.type === "checkbox" || elt.type === "radio";
-}
-
-function input_default_value(elt) {
-    if (elt.hasAttribute("data-default-value")) {
-        return elt.getAttribute("data-default-value");
-    } else if (input_is_checkboxlike(elt)) {
-        var c;
-        if (elt.hasAttribute("data-default-checked"))
-            c = elt.getAttribute("data-default-checked");
-        else
-            c = elt.defaultChecked;
-        // XXX what if elt.value === ""?
-        return c ? elt.value : "";
-    } else {
-        return elt.defaultValue;
-    }
-}
-
-function input_differs(elt) {
-    var expected = input_default_value(elt);
-    if (input_is_checkboxlike(elt)) {
-        return elt.checked ? expected !== elt.value : expected !== "";
-    } else {
-        var current = elt.tagName === "SELECT" ? $(elt).val() : elt.value;
-        return !text_eq(current, expected);
-    }
-}
-
 function focus_at(felt) {
     felt.jquery && (felt = felt[0]);
     felt.focus();
@@ -565,17 +536,24 @@ handle_ui.on("pa-signin-radio", function () {
 
 
 handle_ui.on("change.pa-gradevalue", function () {
-    var f = this.closest("form"), ge, self = this;
+    var f = this.form, ge, self = this;
     if (f && hasClass(f, "pa-pv")) {
         $(f).submit();
     } else if (self.type === "hidden" && (ge = GradeEntry.closest(self))) {
-        setTimeout(function () { ge.gc.update_edit.call(ge, self, +self.value, {}) }, 0);
+        queueMicrotask(function () { ge.gc.update_edit.call(ge, self, +self.value, {}) });
     }
 });
 
 
-(function () {
+
 function save_grade(self) {
+    addClass(self, "pa-saving");
+    var p = $(self).data("paOutstandingPromise");
+    if (p) {
+        p.then(save_grade, reject_save_grade);
+        return;
+    }
+
     var $f = $(self);
     $f.find(".pa-gradediffers, .pa-save-message").remove();
     $f.append('<span class="pa-save-message compact"><span class="spinner"></span></span>');
@@ -600,6 +578,7 @@ function save_grade(self) {
         .then(function (data) {
             var e, $sm = $f.find(".pa-save-message");
             $f.removeData("paOutstandingPromise");
+            reject_save_grade(self);
             if (data.ok) {
                 if (data.answer_timeout
                     && (e = self.closest(".pa-grade"))
@@ -618,16 +597,16 @@ function save_grade(self) {
         });
     }));
 }
+
+function reject_save_grade(self) {
+    removeClass(self, "pa-saving");
+}
+
 handle_ui.on("pa-pv", function (event) {
     event.preventDefault();
-    var p = $(this).data("paOutstandingPromise");
-    if (p) {
-        p.then(save_grade);
-    } else {
-        save_grade(this);
-    }
+    save_grade(this);
 });
-})();
+
 
 function pa_resolve_grade() {
     removeClass(this, "need-pa-grade");
@@ -1759,7 +1738,7 @@ function pa_render_pset_table(pconf, data) {
             if (s.dropped) {
                 s.boringness = 2;
             } else if (s.emptydiff
-                       || (!s.gradecommit && !s.commit && !pconf.gitless_grades)) {
+                       || (!s.grade_commit && !s.commit && !pconf.gitless_grades)) {
                 s.boringness = 1;
             } else {
                 s.boringness = 0;
@@ -1859,8 +1838,8 @@ function pa_render_pset_table(pconf, data) {
         };
         if (s.commit && (!s.is_grade || flagged)) {
             args.commit = s.commit;
-        } else if (s.gradecommit) {
-            args.commit = s.gradecommit;
+        } else if (s.grade_commit) {
+            args.commit = s.grade_commit;
             args.commit_is_grade = 1;
         }
         return args;
@@ -2122,9 +2101,9 @@ function pa_render_pset_table(pconf, data) {
             tr = tr.nextSibling;
         }
         $j.find("input[data-range-type=s61]:checked").each(checkbox_click);
-        setTimeout(function () {
-            $overlay && removeClass($overlay[0], "new");
-        }, 0);
+        if ($overlay) {
+            queueMicrotask(function () { removeClass($overlay[0], "new"); });
+        }
     }
     function render_user_compare(u) {
         let t = "";
@@ -2390,8 +2369,8 @@ function pa_render_pset_table(pconf, data) {
             });
         } else {
             for (let su of gdialog_su) {
-                if (su.gradecommit) {
-                    byuid[su.uid].commit = su.gradecommit;
+                if (su.grade_commit) {
+                    byuid[su.uid].commit = su.grade_commit;
                     byuid[su.uid].commit_is_grade = 1;
                 } else if (su.commit) {
                     byuid[su.uid].commit = su.commit;

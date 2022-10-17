@@ -108,6 +108,7 @@ $(document).on("keydown", ".uikd", handle_ui);
 $(document).on("load", ".ui-load", handle_ui);
 $(document).on("mouseup mousedown", ".uim", handle_ui);
 $(document).on("unfold", ".ui-unfold", handle_ui);
+$(document).on("blur", ".ui-blur", handle_ui);
 
 
 let in_tab = false;
@@ -140,31 +141,60 @@ function input_is_checkboxlike(elt) {
 }
 
 export function input_default_value(elt) {
-    if (input_is_checkboxlike(elt)) {
+    if (elt.hasAttribute("data-default-value")) {
+        return elt.getAttribute("data-default-value");
+    } else if (input_is_checkboxlike(elt)) {
+        let checked = elt.defaultChecked;
         if (elt.hasAttribute("data-default-checked")) {
-            return elt.getAttribute("data-default-checked") !== "false";
-        } else if (elt.hasAttribute("data-default-value")) {
-            return elt.value == elt.getAttribute("data-default-value");
-        } else {
-            return elt.defaultChecked;
+            checked = elt.getAttribute("data-default-checked") !== "false";
         }
+        return checked ? elt.defaultValue : "";
     } else {
-        if (elt.hasAttribute("data-default-value")) {
-            return elt.getAttribute("data-default-value");
-        } else {
-            return elt.defaultValue;
-        }
+        return elt.defaultValue;
     }
 }
 
 export function input_set_default_value(elt, val) {
     if (input_is_checkboxlike(elt)) {
+        // set dirty checkedness flag:
+        elt.checked = elt.checked; // eslint-disable-line no-self-assign
         elt.removeAttribute("data-default-checked");
-        elt.defaultChecked = val != null && val != "";
-    } else {
         elt.removeAttribute("data-default-value");
-        // eslint-disable-next-line no-self-assign
-        elt.value = elt.value; // set dirty value flag
-        elt.defaultValue = val;
+        if (val == null || val == "") {
+            elt.defaultChecked = false;
+        } else if (val == elt.value) {
+            elt.defaultChecked = true;
+        } else {
+            elt.setAttribute("data-default-value", val);
+        }
+    } else {
+        // set dirty value flag:
+        elt.value = elt.value; // eslint-disable-line no-self-assign
+        if (elt.type !== "select") {
+            elt.removeAttribute("data-default-value");
+            elt.defaultValue = val;
+        } else {
+            elt.setAttribute("data-default-value", val);
+        }
+    }
+}
+
+function text_eq(a, b) {
+    if (a !== b) {
+        a = (a == null ? "" : a).replace(/\r\n?/g, "\n");
+        b = (b == null ? "" : b).replace(/\r\n?/g, "\n");
+    }
+    return a === b;
+}
+
+export function input_differs(elt) {
+    const expected = input_default_value(elt);
+    if (input_is_checkboxlike(elt)) {
+        const val = elt.checked ? elt.value : "";
+        return val !== expected;
+    } else if (elt.type === "button" || elt.type === "submit" || elt.type === "reset") {
+        return false;
+    } else {
+        return !text_eq(elt.value, expected);
     }
 }

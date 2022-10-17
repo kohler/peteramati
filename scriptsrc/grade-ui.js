@@ -16,13 +16,12 @@ export function grades_fetch(p) {
         });
 }
 
-function toggle_grade_update() {
+function toggle_grade_history() {
     const gelt = this.closest(".pa-grade");
-    gelt.removeAttribute("data-pa-gv");
-    this.classList.toggle("pa-has-grade-update");
-    this.classList.toggle("pa-is-grade-update");
+    this.classList.toggle("pa-grade-latest");
+    this.classList.toggle("pa-grade-earlier");
     GradeSheet.closest(this).update_at(gelt);
 }
 
-handle_ui.on("pa-has-grade-update", toggle_grade_update);
-handle_ui.on("pa-is-grade-update", toggle_grade_update);
+handle_ui.on("pa-grade-latest", toggle_grade_history);
+handle_ui.on("pa-grade-earlier", toggle_grade_history);
