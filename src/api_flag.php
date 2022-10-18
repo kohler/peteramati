@@ -67,7 +67,7 @@ class Flag_API {
         foreach ($flags as $flag) {
             if (!is_object($flag)
                 || !is_int($flag->uid ?? null)
-                || !is_int($flag->psetid ?? null)
+                || !is_int($flag->pset ?? null)
                 || !is_string($flag->commit ?? null)
                 || !ctype_xdigit($flag->commit)
                 || !is_string($flag->flagid ?? null)) {
@@ -77,7 +77,7 @@ class Flag_API {
                 || ($u->contactId !== $viewer->contactId && !$viewer->isPC)) {
                 return ["ok" => false, "error" => "Permission error."];
             }
-            if (!($pset = $viewer->conf->pset_by_id($flag->psetid))
+            if (!($pset = $viewer->conf->pset_by_id($flag->pset))
                 || $pset->gitless) {
                 return ["ok" => false, "error" => "Bad psetid."];
             }

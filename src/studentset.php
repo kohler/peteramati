@@ -485,15 +485,15 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     static function json_basics(Contact $s, $anonymous) {
         $j = ["uid" => $s->contactId];
         if ($s->github_username) {
-            $j["username"] = $s->github_username;
+            $j["user"] = $s->github_username;
         } else {
-            $j["username"] = $s->email ? : $s->huid;
+            $j["user"] = $s->email;
         }
         if ($s->email) {
             $j["email"] = $s->email;
         }
         if ($anonymous) {
-            $j["anon_username"] = $s->anon_username;
+            $j["anon_user"] = $s->anon_username;
         }
 
         if ((string) $s->firstName !== "" && (string) $s->lastName === "") {

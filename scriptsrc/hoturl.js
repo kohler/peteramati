@@ -66,7 +66,7 @@ function hoturl_psetinfo(elt, page, args) {
     }
     let sheet;
     if ((page === "api/grade" || page === "=api/grade")
-        && (sheet = $(p).data("pa-gradeinfo"))) {
+        && (sheet = p.pa__gradesheet)) {
         const enames = [];
         for (let i in sheet.entries) {
             enames.push(i);

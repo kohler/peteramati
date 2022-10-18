@@ -212,6 +212,9 @@ GradeClass.add("section", {
     update_show: function () {
         return false;
     },
+    update_edit: function () {
+        return false;
+    },
     type_tabular: false
 });
 

@@ -49,7 +49,7 @@ class PsetView {
     /** @var bool */
     private $_is_sset = false;
 
-    /** @var null|0|2|3|4|6|7 */
+    /** @var null|0|1|3|4|5|7 */
     private $_vf;
     /** @var null|0|4|5|6|7 */
     private $_gvf;
@@ -1221,7 +1221,7 @@ class PsetView {
         }
     }
 
-    /** @return 0|2|3|4|6|7 */
+    /** @return 0|1|3|4|5|7 */
     private function vf() {
         if ($this->_vf === null) {
             $this->_vf = 0;
@@ -1273,7 +1273,7 @@ class PsetView {
         }
     }
 
-    /** @param null|0|2|3|4|6|7 $vf
+    /** @param null|0|1|3|4|5|7 $vf
      * @return list<GradeEntry> */
     function visible_grades($vf = null) {
         if ($this->_grades_suppressed === 0) {
@@ -1391,10 +1391,10 @@ class PsetView {
         return $this->can_view_grade() && $this->pc_view;
     }
 
-    /** @param null|0|2|3|4|6|7 $vf
+    /** @param null|0|1|3|4|5|7 $vf
      * @return ?int */
     function timermark_timeout($vf) {
-        if (!$this->pset->has_timeout) {
+        if (!$this->pset->has_timermark) {
             return null;
         }
         $to = null;
@@ -1518,7 +1518,7 @@ class PsetView {
 
     /** @param bool $force
      * @return ?int */
-    private function student_timestamp($force) {
+    function student_timestamp($force) {
         if ($this->pset->gitless) {
             return $this->vupi()->studentupdateat;
         } else if ($this->_hash
@@ -2002,26 +2002,30 @@ class PsetView {
     const GRADEJSON_NO_EDITABLE_ANSWERS = 32;
 
     /** @param int $flags
+     * @param ?list<0|4|5|7> $values_vf
      * @return ?GradeExport */
-    function grade_export($flags = 0) {
+    function grade_export($flags = 0, $values_vf = null) {
         $override_view = ($flags & self::GRADEJSON_OVERRIDE_VIEW) !== 0;
         if (!$override_view && !$this->can_view_grade()) {
             return null;
         }
-        $vf = $override_view ? VF_TF : $this->vf();
 
-        if (($flags & self::GRADEJSON_SLICE) !== 0) {
-            $gexp = new GradeExport($this->pset, VF_TF);
-            $gexp->slice = true;
-        } else {
-            $gexp = new GradeExport($this->pset, $vf);
-            $gexp->set_exported_entries($this->grades_vf());
+        $vf = $this->vf();
+        if ($override_view || ($flags & self::GRADEJSON_SLICE) !== 0) {
+            $vf |= VF_TF;
         }
-        if ($this->pset->grades_selection_function) {
-            $gexp->set_visible_grades($this->visible_grades($vf));
-        }
+        $gexp = new GradeExport($this->pset, $vf);
         $gexp->uid = $this->user->contactId;
         $gexp->user = $this->user_linkpart();
+        if (($flags & self::GRADEJSON_SLICE) !== 0) {
+            $gexp->slice = true;
+        } else {
+            $gexp->export_entries();
+        }
+        $gexp->set_grades_vf($this->grades_vf());
+        if ($values_vf !== null) {
+            $gexp->set_fixed_values_vf($values_vf);
+        }
 
         $this->ensure_grades();
         if ($this->_g !== null || $this->is_grading_commit()) {
@@ -2038,7 +2042,7 @@ class PsetView {
             $gexp->commit = $this->hash();
         }
         if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
-            $gexp->grading_hash = $this->grading_hash();
+            $gexp->grade_commit = $this->grading_hash();
         }
         if (!($flags & self::GRADEJSON_NO_LATE_HOURS)) {
             $this->grade_export_late_hours($gexp);
@@ -2051,7 +2055,7 @@ class PsetView {
             $gexp->student_timestamp = $ts;
         }
         if ($this->user_can_view_score()) {
-            $gexp->scores_visible_student = true;
+            $gexp->scores_visible = true;
         }
         if ($this->can_edit_scores()) {
             $gexp->scores_editable = true;
@@ -2060,22 +2064,28 @@ class PsetView {
         }
         // maybe hide extra-credits that are missing
         if ($gexp->vf < VF_TF) {
-            $gexp->suppress_absent_extra();
+            $gexp->suppress_absent_extra_entries();
         }
         return $gexp;
     }
 
     function grade_export_grades(GradeExport $gexp) {
         $this->ensure_grades();
-        $gexp->grades = [];
-        $gexp->autogrades = $this->_ag !== null ? [] : null;
-        foreach ($gexp->value_entries() as $ge) {
-            $gv = $this->_g !== null ? $this->_g[$ge->pcview_index] : null;
-            $gexp->grades[] = $gv !== false ? $gv : null;
-            if ($this->_ag !== null) {
-                $gexp->autogrades[] = $this->_ag[$ge->pcview_index];
-            }
+        $vges = $gexp->value_entries();
+        $g = [];
+        foreach ($vges as $ge) {
+            $gv = $this->_g[$ge->pcview_index] ?? null;
+            $g[] = $gv !== false ? $gv : null;
         }
+        if ($this->_ag !== null) {
+            $ag = [];
+            foreach ($vges as $ge) {
+                $ag[] = $this->_ag[$ge->pcview_index];
+            }
+        } else {
+            $ag = null;
+        }
+        $gexp->set_grades_and_autogrades($g, $ag);
     }
 
     function grade_export_updates(GradeExport $gexp) {
@@ -2148,7 +2158,7 @@ class PsetView {
             $r["commit"] = $this->hash();
         }
         if ($this->user_can_view_score()) {
-            $r["scores_visible_student"] = true;
+            $r["scores_visible"] = true;
         }
         return $r;
     }

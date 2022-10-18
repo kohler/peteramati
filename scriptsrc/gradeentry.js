@@ -13,13 +13,21 @@ import { render_ftext } from "./render.js";
 
 let id_counter = 0, late_hours_entry;
 const gradesheet_props = {
-    "pset": true, "uid": true, "user": true,
-    "commit": true, "base_commit": true, "base_handout": true,
-    "late_hours": true, "auto_late_hours": true, "student_timestamp": true,
+    // must include props from GradeExport and from StudentSet::json_basics
+    "pset": true,
+    "uid": true, "user": true, "anon_user": true, "email": true, "first": true, "last": true,
+    "year": true, "x": true, "dropped": true,
+    "commit": true, "base_commit": true, "base_handout": true, "grade_commit": true, "emptydiff": true,
+    "late_hours": true, "auto_late_hours": true,
+    "student_timestamp": true, "grades_latest": true,
     "version": true, "history": true, "total_incomplete": true, "total": true,
-    "total_noextra": true, "grading_hash": true, "answer_version": true,
-    "scores_visible_student": true, "scores_editable": true, "answers_editable": true,
-    "linenotes": true
+    "total_noextra": true, "answer_version": true,
+    "scores_editable": true, "answers_editable": true,
+    "linenotes": true, "gradercid": true, "has_notes": true, "has_nongrader_notes": true,
+    "repo": true, "repo_broken": true, "repo_unconfirmed": true,
+    "repo_too_open": true, "repo_handout_old": true, "repo_partner_error": true,
+    "repo_sharing": true,
+    "flagid": true, "conversation": true, "conversation_pfx": true, "at": true
 };
 
 function pa_resetgrade() {
@@ -50,7 +58,7 @@ export class GradeEntry {
     student_visible(gi) {
         return this.visible === true
             || (this.visible == null
-                && (this.answer || gi.scores_visible_student));
+                && (this.answer || gi.scores_visible));
     }
 
     get title_html() {
@@ -421,13 +429,18 @@ export class GradeEntry {
         return sum;
     }
 
+    value_order_in(gi) {
+        const i = gi.vpos[this.key];
+        return i != null ? i : null;
+    }
+
     value_in(gi) {
-        const i = gi.grades ? gi.gpos[this.key] : null;
+        const i = gi.grades ? gi.vpos[this.key] : null;
         return i != null ? gi.grades[i] : null;
     }
 
     autovalue_in(gi) {
-        const i = gi.autogrades ? gi.gpos[this.key] : null;
+        const i = gi.autogrades ? gi.vpos[this.key] : null;
         return i != null ? gi.autogrades[i] : null;
     }
 
@@ -466,34 +479,46 @@ class LateHoursEntry extends GradeEntry {
 export class GradeSheet {
     constructor(x) {
         this.entries = {};
-        x && this.extend(x);
+        this.parent = null;
+        if (x) {
+            this.assign(x);
+        }
     }
 
-    extend(x, replace_order) {
+    make_child() {
+        const gi = new GradeSheet;
+        Object.assign(gi, this);
+        gi.parent = this;
+        return gi;
+    }
+
+    set_entry(ge) {
+        let gi = this;
+        while (gi.parent) {
+            gi = gi.parent;
+        }
+        gi.entries[ge.key] = ge;
+        ge._all = gi;
+    }
+
+    assign(x) {
         const old_value_order = this.value_order;
-        let need_gpos = false;
         if (x.entries) {
             for (let i in x.entries) {
-                this.entries[i] = new GradeEntry(x.entries[i]);
-                this.entries[i]._all = this;
+                this.set_entry(new GradeEntry(x.entries[i]));
             }
         }
-        if (x.value_order && (!this.explicit_value_order || replace_order)) {
-            this.value_order = x.value_order;
-            this.explicit_value_order = true;
-            need_gpos = true;
-        }
-        if (x.order && (!this.order || replace_order)) {
+        if (x.order) {
             this.order = x.order;
-            if (!this.explicit_value_order) {
-                this.value_order = x.order;
-                need_gpos = true;
-            }
         }
-        if (need_gpos) {
-            this.gpos = {};
-            for (let i = 0; i < this.value_order.length; ++i) {
-                this.gpos[this.value_order[i]] = i;
+        if (x.fixed_value_order && !this.parent) {
+            this.fixed_value_order = x.fixed_value_order;
+        }
+        this.value_order = this.fixed_value_order || this.order;
+        if (this.value_order !== old_value_order) {
+            this.vpos = {};
+            for (let i = 0; i !== this.value_order.length; ++i) {
+                this.vpos[this.value_order[i]] = i;
             }
             if (old_value_order) {
                 this.grades = this.autogrades = this.maxtotal = null;
@@ -505,30 +530,37 @@ export class GradeSheet {
         if (x.autogrades) {
             this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x);
         }
-        if (x.grades_latest) {
-            this.grades_latest = x.grades_latest;
+        if ("scores_visible" in x) {
+            if (this.parent) {
+                if ((this.scores_visible_pinned = x.scores_visible != null)) {
+                    this.scores_visible = x.scores_visible;
+                } else {
+                    this.scores_visible = this.parent.scores_visible;
+                }
+            } else {
+                this.scores_visible = x.scores_visible;
+            }
         }
         for (let k in x) {
             if (gradesheet_props[k])
                 this[k] = x[k];
         }
+        return this;
     }
 
     merge_grades(myg, ing, x) {
-        let inorder = x.value_order || x.order || this.value_order;
+        let inorder = x.fixed_value_order || x.order || this.value_order;
         if (!myg && inorder === this.value_order) {
             return ing;
         } else {
             myg = myg || [];
             for (let i in inorder) {
-                const j = this.gpos[inorder[i]];
+                const j = this.vpos[inorder[i]];
                 if (j != null) {
                     while (myg.length <= j) {
                         myg.push(null);
                     }
-                    if (myg[j] != ing[i]) {
-                        myg[j] = ing[i];
-                    }
+                    myg[j] = ing[i];
                 }
             }
             return myg;
@@ -650,7 +682,7 @@ export class GradeSheet {
     }
 
     section_has(ge, f) {
-        let start = this.gpos[ge.key];
+        let start = this.vpos[ge.key];
         while (start != null && start < this.value_order.length) {
             const gei = this.entries[this.value_order[start]];
             if (gei !== ge && gei.type === "section") {
@@ -671,42 +703,39 @@ export class GradeSheet {
         });
     }
 
-    static parse_json(x) {
-        return new GradeSheet(JSON.parse(x));
-    }
-
     static store(element, x) {
-        let gs = $(element).data("pa-gradeinfo");
-        if (!gs) {
-            gs = new GradeSheet;
-            gs.element = element;
-            $(element).data("pa-gradeinfo", gs);
+        if (!hasClass(element, "pa-psetinfo")) {
+            throw new Error("bad GradeSheet.store");
         }
-        gs.extend(x, !element.classList.contains("pa-psetinfo-partial"));
+        const gi = GradeSheet.closest(element);
+        gi.assign(x);
         window.$pa.loadgrades.call(element);
     }
 
     static closest(element) {
-        let e = element.closest(".pa-psetinfo"), gi = null;
-        while (e) {
-            let jx = $(e).data("pa-gradeinfo");
-            if (jx) {
-                if (gi) {
-                    gi.extend(jx);
-                } else if (jx instanceof GradeSheet) {
-                    gi = jx;
-                    break;
-                } else {
-                    gi = new GradeSheet(jx);
-                    gi.element = e;
-                    $(e).data("pa-gradeinfo", gi);
-                }
-            }
-            if (gi && !hasClass(e, "pa-psetinfo-partial")) {
-                break;
-            }
-            e = e.parentElement.closest(".pa-psetinfo");
+        element = element.closest(".pa-psetinfo");
+        if (!element) {
+            return null;
         }
+        if (element.pa__gradesheet) {
+            return element.pa__gradesheet;
+        }
+        let gi;
+        if (hasClass(element, "pa-psetinfo-partial")
+            && (gi = GradeSheet.closest(element.parentElement))) {
+            gi = gi.make_child();
+        }
+        gi = gi || new GradeSheet;
+        if (element.hasAttribute("data-pa-gradeinfo")) {
+            try {
+                let x = JSON.parse(element.getAttribute("data-pa-gradeinfo") || "{}");
+                gi.assign(x);
+            } catch (err) {
+            }
+        }
+        Object.defineProperty(element, "pa__gradesheet", {
+            value: gi, configurable: true, writable: true
+        });
         return gi;
     }
 }

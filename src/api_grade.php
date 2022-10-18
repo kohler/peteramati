@@ -257,7 +257,7 @@ class Grade_API {
 
         // XXX match commit with grading commit
         $gexp = new GradeExport($api->pset, VF_TF);
-        $gexp->set_exported_entries(null);
+        $gexp->export_entries();
         $jx = $gexp->jsonSerialize();
         $jx["ok"] = true;
         if ($qreq->is_post()) {
@@ -324,8 +324,8 @@ class Grade_API {
         if ($qreq->is_post()) {
             foreach ($sset as $uid => $info) {
                 $ug = $ugs[$uid];
-                if (isset($ug->pinned_scores_visible)
-                    && !is_bool($ug->pinned_scores_visible)) {
+                if (isset($ug->scores_visible)
+                    && !is_bool($ug->scores_visible)) {
                     return ["ok" => false, "error" => "Invalid request."];
                 }
                 if (isset($ug->gradercid)
@@ -339,8 +339,8 @@ class Grade_API {
                 if (!$api->pset->gitless_grades && !$info->repo) {
                     continue;
                 }
-                if (property_exists($ug, "pinned_scores_visible")) {
-                    $info->set_pinned_scores_visible($ug->pinned_scores_visible);
+                if (property_exists($ug, "scores_visible")) {
+                    $info->set_pinned_scores_visible($ug->scores_visible);
                 }
                 if (isset($ug->gradercid)) {
                     if (!$api->pset->gitless_grades && !$info->grading_hash()) {
@@ -366,7 +366,7 @@ class Grade_API {
             } else {
                 $j["us"][] = [
                     "uid" => $uid,
-                    "pinned_scores_visible" => $info->pinned_scores_visible(),
+                    "scores_visible" => $info->pinned_scores_visible(),
                     "gradercid" => $info->gradercid()
                 ];
             }

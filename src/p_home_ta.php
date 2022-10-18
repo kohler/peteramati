@@ -33,12 +33,12 @@ class Home_TA_Page {
         } else if ($row->rpi && $row->rpi->gradercid) {
             $j["gradercid"] = $row->rpi->gradercid;
         }
-        $j["psetid"] = $pset->id;
+        $j["pset"] = $pset->id;
         $bhash = $row->bhash();
         $j["commit"] = bin2hex($bhash);
         $j["flagid"] = $row->flagid;
-        if ($bhash !== null && $row->rpi && $row->rpi->gradebhash === $bhash) {
-            $j["is_grade"] = true;
+        if ($row->rpi && $row->rpi->gradebhash) {
+            $j["grade_commit"] = bin2hex($row->rpi->gradebhash);
         }
         if ($row->cpi->haslinenotes) {
             $j["has_notes"] = true;
@@ -225,7 +225,7 @@ class Home_TA_Page {
             $j["gradercid"] = $gcid;
         }
         if (($svh = $info->pinned_scores_visible()) !== null) {
-            $j["scores_visible_student"] = $svh;
+            $j["scores_visible"] = $svh;
         }
 
         // are any commits committed?
@@ -253,6 +253,9 @@ class Home_TA_Page {
             if ($h && $info->empty_diff_likely()) {
                 $j["emptydiff"] = true;
             }
+        }
+        if ($pset->has_timermark) {
+            $j["student_timestamp"] = $info->student_timestamp(false);
         }
 
         if ($gex->value_entries()) {
@@ -283,6 +286,7 @@ class Home_TA_Page {
                 $gv = $gex->grades;
                 '@phan-var-force list $gv';
                 $agv = $gex->autogrades ?? [];
+                $want_autogrades = false;
                 foreach ($gex->value_entries() as $i => $ge) {
                     if ($want_incomplete
                         && !isset($gv[$i])
@@ -291,8 +295,11 @@ class Home_TA_Page {
                     }
                     if (isset($agv[$i])
                         && $agv[$i] !== $gv[$i]) {
-                        $j["highlight_grades"][$ge->key] = true;
+                        $want_autogrades = true;
                     }
+                }
+                if ($want_autogrades) {
+                    $j["autogrades"] = $gex->autogrades;
                 }
             }
             if (($lh = $info->fast_late_hours())) {
@@ -361,8 +368,12 @@ class Home_TA_Page {
         $jx = [];
         $gradercounts = [];
         $gex = new GradeExport($pset, VF_TF);
-        $gex->set_exported_values($pset->tabular_grades());
-        $gex->set_exported_entries(null);
+        $gex->export_entries();
+        $vf = [];
+        foreach ($pset->grades as $ge) {
+            $vf[] = $ge->type_tabular ? $ge->vf() : 0;
+        }
+        $gex->set_fixed_values_vf($vf);
         foreach ($sset as $s) {
             if (!$s->user->visited) {
                 $j = $this->pset_row_json($pset, $sset, $s, $gex, $anonymous);
@@ -414,7 +425,7 @@ class Home_TA_Page {
             "gitless_grades" => $pset->gitless_grades,
             "key" => $pset->urlkey,
             "title" => $pset->title,
-            "scores_visible_student" => $pset->scores_visible_student()
+            "scores_visible" => $pset->scores_visible_student()
         ];
         if ($anonymous) {
             $jd["can_override_anonymous"] = true;
@@ -525,7 +536,9 @@ class Home_TA_Page {
         foreach ($this->conf->psets() as $pset) {
             if ($this->viewer->can_view_pset($pset)) {
                 $pj = [
-                    "title" => $pset->title, "urlkey" => $pset->urlkey,
+                    "pset" => $pset->urlkey,
+                    "psetid" => $pset->psetid,
+                    "title" => $pset->title,
                     "pos" => count($psetj)
                 ];
                 if ($pset->gitless) {
@@ -534,7 +547,7 @@ class Home_TA_Page {
                 if ($pset->gitless || $pset->gitless_grades) {
                     $pj["gitless_grades"] = true;
                 }
-                $psetj[$pset->psetid] = $pj;
+                $psetj[$pset->urlkey] = $pj;
             }
         }
         $this->conf->set_siteinfo("psets", $psetj);

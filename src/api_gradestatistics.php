@@ -111,6 +111,8 @@ class Series {
 class GradeStatistics_API {
     /** @param bool $pcview */
     static function compute(Pset $pset, $pcview) {
+        $vf = ($pcview ? VF_TF : 0) | VF_STUDENT_ANY;
+
         $series = new Series;
         $xseries = $noextra_series = $xnoextra_series = null;
         if ($pset->has_extra) {
@@ -179,7 +181,7 @@ class GradeStatistics_API {
         $nge = 0;
         $lastge = null;
         $maxtotal = 0;
-        foreach ($pset->visible_grades($pcview ? VF_TF : VF_STUDENT_ANY) as $ge) {
+        foreach ($pset->visible_grades($vf) as $ge) {
             if (!$ge->no_total) {
                 ++$nge;
                 $lastge = $ge;
@@ -197,7 +199,7 @@ class GradeStatistics_API {
             }
         }
         if ($nge === 1) {
-            $r->entry = $lastge->json($pcview ? VF_TF : VF_STUDENT_ANY);
+            $r->entry = $lastge->json($vf);
         }
 
         return $r;

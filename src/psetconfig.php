@@ -111,6 +111,9 @@ class Pset {
     /** @var array<string,GradeEntry>
      * @readonly */
     public $grades = [];
+    /** @var int
+     * @readonly */
+    public $ngrades;
     /** @var list<4|5|6>
      * @readonly */
     private $_grades_vf = [];
@@ -143,7 +146,7 @@ class Pset {
     /** @var bool */
     public $has_answers = false;
     /** @var bool */
-    public $has_timeout = false;
+    public $has_timermark = false;
     /** @var ?bool */
     private $_has_uncacheable_formula;
     /** @var ?array<null|int|float> */
@@ -367,7 +370,7 @@ class Pset {
                 }
                 if ($g->type === "timermark"
                     && (isset($g->timeout) || isset($g->timeout_entry))) {
-                    $this->has_timeout = true;
+                    $this->has_timermark = true;
                 }
             }
         } else if ($grades) {
@@ -378,6 +381,7 @@ class Pset {
         } else {
             $this->grades = self::position_sort("grades", $this->grades ?? []);
         }
+        $this->ngrades = count($this->grades);
         $this->grades_history = self::cbool($p, "grades_history") ?? false;
         $this->grades_selection_function = self::cstr($p, "grades_selection_function");
         $gv = self::cdate($p, "scores_visible", "grades_visible");
@@ -580,6 +584,17 @@ class Pset {
             && !$this->frozen;
     }
 
+
+    /** @param 0|1|2|4 $vf
+     * @return 0|1|3|4|5|7 */
+    function default_vf($vf) {
+        if ($this->visible_student()) {
+            return $vf | ($this->scores_visible ? VF_STUDENT_ANY : VF_STUDENT_ALWAYS);
+        } else {
+            return $vf & ~VF_STUDENT_ANY;
+        }
+    }
+
     /** @return list<4|5|6> */
     function grades_vf() {
         return $this->_grades_vf;
@@ -625,6 +640,12 @@ class Pset {
     /** @return iterable<GradeEntry> */
     function grades() {
         return $this->grades;
+    }
+
+    /** @param int $i
+     * @return ?GradeEntry */
+    function grade_by_pcindex($i) {
+        return (array_values($this->grades))[$i] ?? null;
     }
 
     /** @param string $key
@@ -732,7 +753,7 @@ class Pset {
         return $this->_has_uncacheable_formula;
     }
 
-    /** @param 0|2|3|4|6|7 $vf
+    /** @param 0|1|3|4|5|7 $vf
      * @return list<GradeEntry> */
     function visible_grades($vf) {
         if ($vf >= VF_TF) {
@@ -1802,7 +1823,7 @@ class GradeEntry {
         return $this->_formula;
     }
 
-    /** @param 0|2|3|4|6|7 $vf
+    /** @param 0|1|3|4|5|7 $vf
      * @return array<string,mixed> */
     function json($vf) {
         $gej = ["key" => $this->key, "title" => $this->title];

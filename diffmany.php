@@ -23,6 +23,8 @@ class DiffMany_Page {
     private $files;
     /** @var list<string> */
     private $suppress_grades = [];
+    /** @var ?list<0|4|5|7> */
+    private $values_vf;
     /** @var int */
     public $psetinfo_idx = 0;
     /** @var array<string,GradeEntry> */
@@ -51,9 +53,13 @@ class DiffMany_Page {
             foreach ($pset->grades_by_key_list($qreq->grade, true) as $ge) {
                 $grades[$ge->key] = true;
             }
+            $this->values_vf = [];
             foreach ($pset->grades as $ge) {
                 if (!isset($grades[$ge->key])) {
                     $this->suppress_grades[] = $ge->key;
+                    $this->values_vf[] = 0;
+                } else {
+                    $this->values_vf[] = $ge->vf();
                 }
             }
         }
@@ -85,7 +91,7 @@ class DiffMany_Page {
         }
         if ($info->can_edit_scores()
             || ($info->can_view_grade() && $info->is_grading_commit())) {
-            $gj = $info->grade_json(PsetView::GRADEJSON_SLICE);
+            $gj = $info->grade_json(PsetView::GRADEJSON_SLICE, $this->values_vf);
         } else {
             $gj = $info->info_json();
         }
@@ -171,7 +177,10 @@ class DiffMany_Page {
         }
         Ht::stash_script("\$pa.long_page = true");
         $gexp = new GradeExport($this->pset, VF_TF);
-        $gexp->set_exported_entries(null);
+        $gexp->export_entries();
+        if ($this->values_vf !== null) {
+            $gexp->set_fixed_values_vf($this->values_vf);
+        }
         echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo='",
              str_replace("'", "&#39;", json_encode_browser($gexp)), "'>";
 
