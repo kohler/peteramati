@@ -1025,7 +1025,7 @@ class QueueItem {
     function full_response($offset = 0, $write = null, $stop = false) {
         $runner = $this->runner();
         if ($runner->command) {
-            $rr = $this->command_response(0, null, $stop);
+            $rr = $this->command_response($offset, $write, $stop);
         } else {
             $this->runat = $this->runat ? : time();
             $rr = RunResponse::make($runner, $this->repo());
