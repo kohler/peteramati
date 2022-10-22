@@ -2080,7 +2080,7 @@ function pa_render_pset_table(pconf, data) {
                 let tde = document.createElement("td");
                 tde.colSpan = ri - li + 1;
                 tde.append(document.createElement("hr"));
-                tre.push(tde);
+                tre.append(tde);
             } else {
                 let spos = tr.getAttribute("data-pa-spos");
                 tre.className += " kfade";
