@@ -2482,8 +2482,17 @@ td.mhcb {
 .pa-p-hidden > .pa-pt::before {
 	content: "\1f512\fe0e";
 }
-.pa-p-hidden input {
+.is-main > .pa-p-hidden input,
+.is-mainsb > .pa-p-hidden input,
+.is-modal > .pa-p-hidden input,
+.is-main > .pa-p-hidden textarea,
+.is-mainsb > .pa-p-hidden textarea,
+.is-modal > .pa-p-hidden textarea {
 	background-color: #f7f7f7;
+}
+.pa-gradebox > .pa-p-hidden input,
+.pa-gradebox > .pa-p-hidden textarea {
+	background-color: #fafaff;
 }
 .pa-gradelist.is-main {
 	margin-left: -1.5rem;
@@ -2495,11 +2504,6 @@ td.mhcb {
 }
 .is-mainsb > .pa-p, .is-mainsb > .pa-ptop {
 	padding-left: 1.5rem;
-}
-.is-main > .pa-p-hidden > .pa-pt,
-.is-mainsb > .pa-p-hidden > .pa-pt,
-.is-modal > .pa-p-hidden > .pa-pt {
-	background-image: linear-gradient(to left, transparent, transparent 0.75rem, #f3f3f3 0.75rem, #f3f3f3 100%);
 }
 .pa-gradelist.is-modal {
 	margin-left: -1rem;
