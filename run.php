@@ -192,9 +192,9 @@ class RunRequest {
         // process queue
         $qs = new QueueStatus;
         $result = $info->conf->qe("select * from ExecutionQueue
-                where status>=? and status<? and runorder<=?
-                order by runorder asc, queueid asc limit 100",
-            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED, $qi->runorder);
+                where status>=? and (status<? or queueid=?) and runorder<=?
+                order by runorder asc, queueid asc limit 500",
+            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED, $qi->queueid, $qi->runorder);
         while (($qix = QueueItem::fetch($info->conf, $result))) {
             $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
             if (!$qix->step($qs)) {
