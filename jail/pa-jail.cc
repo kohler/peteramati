@@ -2163,9 +2163,12 @@ static int exec_clone_function(void* arg) {
 #endif
 
 static void write_pid(int p) {
-    if (pidfd >= 0) {
-        lseek(pidfd, 0, SEEK_SET);
-        char buf[1024], *sx = buf;
+    if (pidfd < 0) {
+        return;
+    }
+    lseek(pidfd, 0, SEEK_SET);
+    char buf[1024], *sx = buf;
+    if (p > 0) {
         const char* s0 = pidcontents.data(), *s1 = s0 + pidcontents.length();
         while (s0 != s1 && sx != buf + 1024) {
             if (*s0 == '$' && s0 + 1 != s1 && s0[1] == '$') {
@@ -2176,13 +2179,15 @@ static void write_pid(int p) {
                 *sx++ = *s0++;
             }
         }
-        if (sx != buf && sx != buf + 1024 && sx[-1] != '\n') {
-            *sx++ = '\n';
-        }
-        ssize_t w = write(pidfd, buf, sx - buf);
-        if (w != ssize_t(sx - buf) || ftruncate(pidfd, w) != 0) {
-            perror_die(pidfilename);
-        }
+    } else {
+        *sx++ = '*';
+    }
+    if (sx != buf && sx != buf + 1024 && sx[-1] != '\n') {
+        *sx++ = '\n';
+    }
+    ssize_t w = write(pidfd, buf, sx - buf);
+    if (w != ssize_t(sx - buf) || ftruncate(pidfd, w) != 0) {
+        perror_die(pidfilename);
     }
 }
 
@@ -3189,6 +3194,27 @@ int main(int argc, char** argv) {
         }
     }
 
+    // open pidfile as current user
+    if (!pidfilename.empty() && verbose) {
+        fprintf(verbosefile, "touch %s\nflock %s\n", pidfilename.c_str(), pidfilename.c_str());
+    }
+    if (!pidfilename.empty() && !dryrun) {
+        pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT, 0666);
+        if (pidfd == -1) {
+            perror_die(pidfilename);
+        }
+        while (true) {
+            int r = flock(pidfd, LOCK_EX);
+            if (r == 0) {
+                break;
+            } else if (r == -1 && errno != EINTR) {
+                write_pid(-1);
+                perror_die(pidfilename);
+            }
+        }
+        write_pid(-1);
+    }
+
     // open input file non-blocking as current user
     // if it is a named FIFO, open it read-write so we never get EOF
     int inputfd = 0;
@@ -3236,25 +3262,6 @@ int main(int argc, char** argv) {
         }
     } else if (!eventsourcefilename.empty() && verbose) {
         fprintf(verbosefile, "socket %s\n", eventsourcefilename.c_str());
-    }
-
-    // open pidfile as current user
-    if (!pidfilename.empty() && verbose) {
-        fprintf(verbosefile, "touch %s\nflock %s\n", pidfilename.c_str(), pidfilename.c_str());
-    }
-    if (!pidfilename.empty() && !dryrun) {
-        pidfd = open(pidfilename.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT, 0666);
-        if (pidfd == -1) {
-            perror_die(pidfilename);
-        }
-        while (true) {
-            int r = flock(pidfd, LOCK_EX);
-            if (r == 0) {
-                break;
-            } else if (r == -1 && errno != EINTR) {
-                perror_die(pidfilename);
-            }
-        }
     }
 
     // create timing file as current user

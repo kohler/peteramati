@@ -65,37 +65,34 @@ class RunLogger {
     /** @param string $fn
      * @return int|false */
     static function active_job_at($fn) {
-        if (($f = @fopen($fn, "r"))) {
-            $s = stream_get_contents($f);
-            $runat = false;
-            if (($nl = strpos($s, "\n")) !== false) {
-                $s = substr($s, 0, $nl);
-            }
-            if (($sp = strpos($s, " ")) > 0) {
-                $w = substr($s, 0, $sp);
-            } else {
-                $w = $s;
-            }
-            if (ctype_digit($w)) {
-                $runat = (int) $w;
-            }
-            if ($sp > 0 && flock($f, LOCK_SH | LOCK_NB)) {
-                if ($runat
-                    && strpos($s, "-i") !== false
-                    && str_ends_with($fn, ".pid")) {
-                    @unlink(substr($fn, 0, -4) . ".{$runat}.in");
-                }
-                unlink($fn);
-                flock($f, LOCK_UN);
-                $result = false;
-            } else {
-                $result = $runat ? : 1;
-            }
-            fclose($f);
-            return $result;
-        } else {
+        $f = @fopen($fn, "r");
+        if (!$f) {
             return false;
         }
+        $s = stream_get_contents($f);
+        if (($nl = strpos($s, "\n")) !== false) {
+            $s = substr($s, 0, $nl);
+        }
+        $w = $s;
+        if (($sp = strpos($s, " ")) !== false) {
+            $w = substr($s, 0, $sp);
+        }
+        $runat = ctype_digit($w) ? intval($w) : 0;
+        if (flock($f, LOCK_SH | LOCK_NB)
+            && $s !== "") {
+            if ($runat > 0
+                && strpos($s, "-i") !== false
+                && str_ends_with($fn, ".pid")) {
+                @unlink(substr($fn, 0, -4) . ".{$runat}.in");
+            }
+            unlink($fn);
+            flock($f, LOCK_UN);
+            $result = false;
+        } else {
+            $result = max($runat, 1);
+        }
+        fclose($f);
+        return $result;
     }
 
     /** @return int|false */
