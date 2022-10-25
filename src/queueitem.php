@@ -52,6 +52,8 @@ class QueueItem {
     private $status;
     /** @var ?string */
     public $lockfile;
+    /** @var ?string */
+    public $eventsource;
 
     // object links
     /** @var ?Pset */
@@ -368,6 +370,7 @@ class QueueItem {
         $qi->runsettings = $rr->settings;
         $qi->tags = $rr->tags;
         $qi->status = $rr->done ? self::STATUS_DONE : self::STATUS_WORKING;
+        $qi->eventsource = $rr->eventsource;
         return $qi;
     }
 
@@ -471,20 +474,37 @@ class QueueItem {
 
     function update() {
         assert($this->queueid !== 0);
-        $result = $this->conf->qe("update ExecutionQueue set updateat=? where queueid=? and updateat<?", Conf::$now, $this->queueid, Conf::$now);
+        $result = $this->conf->qe("update ExecutionQueue set updateat=? where queueid=? and updateat<?",
+                                  Conf::$now, $this->queueid, Conf::$now);
         if ($result->affected_rows) {
             $this->updateat = Conf::$now;
         }
         Dbl::free($result);
     }
 
+    /** @return ?string */
+    private function eventsource_dir() {
+        $esdir = $this->conf->opt("run_eventsourcedir");
+        if (!$esdir) {
+            return null;
+        }
+        if ($esdir[0] !== "/") {
+            $esdir = SiteLoader::$root . "/{$esdir}";
+        }
+        if (!str_ends_with($esdir, "/")) {
+            $esdir .= "/";
+        }
+        return $esdir;
+    }
+
     private function update_from_database() {
-        if (($row = $this->conf->fetch_first_row("select status, runat, lockfile, ensure
+        if (($row = $this->conf->fetch_first_row("select status, runat, lockfile, eventsource, ensure
                 from ExecutionQueue where queueid=?", $this->queueid))) {
             $this->status = (int) $row[0];
             $this->runat = (int) $row[1];
             $this->lockfile = $row[2];
-            $this->set_ensure($row[3]);
+            $this->eventsource = $row[3];
+            $this->set_ensure($row[4]);
         }
     }
 
@@ -492,13 +512,14 @@ class QueueItem {
      * @param array{runat?:int,lockfile?:string} $fields
      * @return bool */
     private function swap_status($new_status, $fields = []) {
-        $new_runat = $fields["runat"] ?? $this->runat;
+        $new_runat = array_key_exists("runat", $fields) ? $fields["runat"] : $this->runat;
         if ($this->queueid !== 0) {
-            $new_lockfile = $fields["lockfile"] ?? $this->lockfile;
+            $new_lockfile = array_key_exists("lockfile", $fields) ? $fields["lockfile"] : $this->lockfile;
+            $new_eventsource = array_key_exists("eventsource", $fields) ? $fields["eventsource"] : $this->eventsource;
             $result = $this->conf->qe("update ExecutionQueue
-                    set status=?, runat=?, lockfile=?, bhash=?
+                    set status=?, runat=?, lockfile=?, bhash=?, eventsource=?
                     where queueid=? and status=?",
-                $new_status, $new_runat, $new_lockfile, $this->bhash,
+                $new_status, $new_runat, $new_lockfile, $this->bhash, $new_eventsource,
                 $this->queueid, $this->status);
             $changed = $result->affected_rows;
             Dbl::free($result);
@@ -506,6 +527,7 @@ class QueueItem {
                 $this->status = $new_status;
                 $this->runat = $new_runat;
                 $this->lockfile = $new_lockfile;
+                $this->eventsource = $new_eventsource;
             } else {
                 $this->update_from_database();
             }
@@ -517,10 +539,13 @@ class QueueItem {
                 $this->runat = $new_runat;
             }
         }
-        if ($changed && $this->status >= self::STATUS_DONE) {
+        if ($changed && $this->status >= self::STATUS_CANCELLED) {
             if ($this->status === self::STATUS_DONE) {
                 // always evaluate at least once
                 $this->evaluate();
+            }
+            if ($this->eventsource && ($esdir = $this->eventsource_dir())) {
+                @unlink("{$esdir}{$this->eventsource}");
             }
             if ($this->queueid !== 0 && $this->chain) {
                 self::step_chain($this->conf, $this->chain);
@@ -669,24 +694,24 @@ class QueueItem {
     }
 
 
-    /** @return RunResponse */
-    function response() {
-        $rr = new RunResponse;
-        $rr->pset = $this->pset()->urlkey;
-        $rr->repoid = $this->repoid;
-        if ($this->queueid) {
-            $rr->queueid = $this->queueid;
-        }
+    /** @param ?string $esid */
+    private function log_identifier($esid) {
+        $rr = RunResponse::make_info($this->runner(), $this->info());
+        $rr->settings = $this->runsettings;
+        $rr->tags = $this->tags;
         if ($this->runat) {
             $rr->timestamp = $this->runat;
         }
-        $rr->runner = $this->runnername;
-        if ($this->bhash !== null) {
-            $rr->hash = $this->hash();
+        if ($this->queueid) {
+            $rr->queueid = $this->queueid;
         }
-        $rr->settings = $this->runsettings;
-        $rr->tags = $this->tags;
-        return $rr;
+        if ($esid !== null) {
+            $rr->eventsource = $esid;
+        }
+        if (($hostname = gethostname()) !== false) {
+            $rr->host = gethostbyname($hostname);
+        }
+        fwrite($this->_logstream, "++ " . json_encode($rr) . "\n");
     }
 
 
@@ -772,18 +797,24 @@ class QueueItem {
         $this->_logstream = fopen($this->_logfile, "a");
         $this->bhash = $info->bhash(); // resolve blank hash
 
-        if (!$this->swap_status(self::STATUS_WORKING, ["runat" => $runat, "lockfile" => $pidfile])) {
+        // maybe register eventsource
+        $esfile = $esid = null;
+        if (($esdir = $this->eventsource_dir())) {
+            $esid = bin2hex(random_bytes(16));
+            $esfile = "{$esdir}{$esid}";
+            if (file_exists($esfile)) {
+                $esfile = $esid = null;
+            }
+        }
+
+        if (!$this->swap_status(self::STATUS_WORKING, ["runat" => $runat, "lockfile" => $pidfile, "eventsource" => $esid])) {
             return;
         }
         $this->_runstatus = 1;
         register_shutdown_function([$this, "cleanup"]);
 
         // print json to first line
-        $json = $this->response();
-        if (($hostname = gethostname()) !== false) {
-            $json->host = gethostbyname($hostname);
-        }
-        fwrite($this->_logstream, "++ " . json_encode($json) . "\n");
+        $this->log_identifier($esid);
 
         // create jail
         $this->remove_old_jails();
@@ -804,6 +835,9 @@ class QueueItem {
             . ($inputfifo ? " -i" : "") . "'";
         if ($runner->timed_replay) {
             $command .= " -t" . escapeshellarg($timingfile);
+        }
+        if ($esfile !== null) {
+            $command .= " --event-source=" . escapeshellarg($esfile);
         }
 
         $skeletondir = $pset->run_skeletondir ? : $this->conf->opt("run_skeletondir");
@@ -1000,18 +1034,24 @@ class QueueItem {
             return $runlog->job_response($this->runat, $offset);
         }
 
+        $usleep = 0;
         if (($write ?? "") !== "") {
             $runlog->job_write($this->runat, $write);
+            $usleep = 10;
         }
         if ($stop) {
             // "ESC Ctrl-C" is captured by pa-jail
             $runlog->job_write($this->runat, "\x1b\x03");
+            $usleep = 10;
         }
         $now = microtime(true);
         do {
-            usleep(10);
+            if ($usleep > 0) {
+                usleep($usleep);
+            }
             $runlog->invalidate_active_job();
             $rr = $runlog->job_response($this->runat, $offset);
+            $usleep = 10;
         } while ($stop
                  && !$rr->done
                  && microtime(true) - $now < 0.1);

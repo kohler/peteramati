@@ -888,6 +888,11 @@ class UpdateSchema {
             && $conf->ql_ok("alter table `ExecutionQueue` add `ensure` varbinary(8192) DEFAULT NULL")) {
             $conf->update_schema_version(166);
         }
+        if ($conf->sversion === 166
+            && $conf->ql_ok("alter table `ExecutionQueue` change `lockfile` `lockfile` varbinary(1024) DEFAULT NULL")
+            && $conf->ql_ok("alter table `ExecutionQueue` add `eventsource` varbinary(1024) DEFAULT NULL")) {
+            $conf->update_schema_version(167);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

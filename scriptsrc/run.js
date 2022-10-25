@@ -96,16 +96,18 @@ function trim_data_to_offset(data, offset) {
 }
 
 export function run(button, opts) {
-    const $f = $(button).closest("form"),
+    const form = button.closest("form"),
         category = button.getAttribute("data-pa-run-category") || button.value,
-        directory = $(button).closest(".pa-psetinfo").attr("data-pa-directory"),
+        directory = button.closest(".pa-psetinfo").getAttribute("data-pa-directory"),
         therun = document.getElementById("pa-run-" + category),
         therunout = therun.closest(".pa-runout"),
         thepre = $(therun).find("pre");
     let thexterm,
         checkt,
         kill_checkt,
-        queueid = opts.queueid || null;
+        queueid = opts.queueid || null,
+        eventsource = null,
+        sendtimeout = null;
 
     therunout && removeClass(therunout, "hidden");
     removeClass(therun, "need-run");
@@ -117,11 +119,11 @@ export function run(button, opts) {
         checkt = opts.timestamp;
     }
 
-    if (hasClass($f[0], "pa-run-active")) {
+    if (hasClass(form, "pa-run-active")) {
         return true;
     }
-    $f.find("button").prop("disabled", true);
-    addClass($f[0], "pa-run-active");
+    $(form).find("button").prop("disabled", true);
+    addClass(form, "pa-run-active");
     if (!checkt) {
         therun.removeAttribute("data-pa-timestamp");
     }
@@ -154,8 +156,8 @@ export function run(button, opts) {
         return Math.max(min, Math.min(w, max));
     }
 
-    if (therun.dataset.paXtermJs
-        && therun.dataset.paXtermJs !== "false"
+    if (therun.getAttribute("data-pa-xterm-js")
+        && therun.getAttribute("data-pa-xterm-js") !== "false"
         && window.Terminal) {
         removeClass(thepre[0].parentElement, "pa-run-short");
         addClass(thepre[0].parentElement, "pa-run-xterm-js");
@@ -220,9 +222,9 @@ export function run(button, opts) {
     }
 
     function done(complete) {
-        if (hasClass($f[0], "pa-run-active")) {
-            removeClass($f[0], "pa-run-active");
-            $f.find("button").prop("disabled", false);
+        if (hasClass(form, "pa-run-active")) {
+            removeClass(form, "pa-run-active");
+            $(form).find("button").prop("disabled", false);
         }
         if (complete !== false) {
             hide_cursor();
@@ -231,6 +233,7 @@ export function run(button, opts) {
             }
             opts.done_function && opts.done_function();
         }
+        send_after(-1);
     }
 
     function append(str, done) {
@@ -510,35 +513,81 @@ export function run(button, opts) {
 
     let send_out = 0, send_args = {};
 
-    function succeed(data) {
-        var x, t;
+    function succeed_eventsource(msge) {
+        let ok = false;
+        if (msge && msge.data) {
+            try {
+                let json = JSON.parse(msge.data);
+                if (json
+                    && typeof json === "object"
+                    && json.data != null
+                    && json.offset != null) {
+                    if (json.ok == null) {
+                        json.ok = true;
+                    }
+                    if (json.offset <= offset) {
+                        succeed(json);
+                    } else {
+                        send({write: ""});
+                    }
+                    ok = true;
+                }
+            } catch (e) {
+            }
+        }
+        ok || error_eventsource();
+    }
 
+    function error_eventsource() {
+        if (eventsource) {
+            eventsource.close();
+            eventsource = false;
+            send();
+        }
+    }
+
+    function send_after(ms) {
+        if (sendtimeout) {
+            clearTimeout(sendtimeout);
+        }
+        if (ms >= 0) {
+            sendtimeout = setTimeout(send_from_timeout, ms);
+        } else {
+            sendtimeout = null;
+        }
+    }
+
+    function send_from_timeout() {
+        sendtimeout = null;
+        send();
+    }
+
+    function succeed(data) {
         if (queueid) {
             thepre.find("span.pa-runqueue").remove();
         }
         if (data && data.onqueue) {
             queueid = data.queueid;
-            t = "On queue, " + data.nahead + (data.nahead == 1 ? " job" : " jobs") + " ahead";
+            let t = "On queue, ".concat(data.nahead, (data.nahead == 1 ? " job" : " jobs"), " ahead");
             if (data.headage) {
-                if (data.headage < 10) {
-                    x = data.headage;
-                } else {
-                    x = Math.round(data.headage / 5 + 0.5) * 5;
+                let headage = data.headage;
+                if (headage > 10) {
+                    headage = Math.round(headage / 5 + 0.5) * 5;
                 }
-                t += ", oldest began about " + x + (x == 1 ? " second" : " seconds") + " ago";
+                t = t.concat(", oldest began about ", headage, (headage == 1 ? " second" : " seconds"), " ago");
             }
             const span = document.createElement("span");
             span.className = "pa-runqueue";
             span.append(t);
             thepre[0].insertBefore(span, thepre[0].lastChild);
-            setTimeout(send, 10000);
+            send_after(10000);
             return;
         }
 
-        stop_button(data && (data.status === "working" || data.status === "workingconflict"));
+        stop_button(data && (data.status == null || data.status === "working") && !data.done);
 
         if (!data || !data.ok) {
-            x = "Unknown error";
+            let x = "Unknown error";
             if (data && data.loggedout) {
                 x = "You have been logged out (perhaps due to inactivity). Please reload this page.";
             } else if (data) {
@@ -561,6 +610,14 @@ export function run(button, opts) {
             done(false);
         }
 
+        if (data.eventsource
+            && data.status === "working"
+            && eventsource == null) {
+            eventsource = new EventSource(window.siteinfo.base.concat("runevents/v1/", data.eventsource));
+            eventsource.onmessage = succeed_eventsource;
+            eventsource.onerror = error_eventsource;
+        }
+
         if (!checkt && data.timestamp) {
             checkt = data.timestamp;
             therun.setAttribute("data-pa-timestamp", data.timestamp);
@@ -570,35 +627,33 @@ export function run(button, opts) {
         if (data.data && data.offset < offset) {
             trim_data_to_offset(data, offset);
             if (data.offset < offset) {
-                setTimeout(send, 0);
+                send_after(0);
                 return;
             }
         }
 
         // Stay on alternate screen when done (rather than clearing it)
+        let m;
         if (data.data
             && !data.partial
             && data.done
-            && (x = data.data.match(/\x1b\[\?1049l(?:[\r\n]|\x1b\[\?1l|\x1b>)*$/))) {
-            data.data = data.data.substring(0, data.data.length - x[0].length);
+            && (m = data.data.match(/\x1b\[\?1049l(?:[\r\n]|\x1b\[\?1l|\x1b>)*$/))) {
+            data.data = data.data.substring(0, data.data.length - m[0].length);
         }
-        if (data.data != null) {
-            if (data.end_offset > data.offset
-                && data.end_offset >= data.offset + data.data.length) {
-                offset = data.end_offset;
-            } else {
-                offset = data.offset + data.data.length;
-            }
-            if (data.done && data.time_data != null && ibuffer === "") {
-                // Parse timing data
-                append_timed(data);
-                return;
-            }
-
+        if (data.done && data.time_data != null && ibuffer === "") {
+            // Parse timing data
+            append_timed(data);
+            return;
+        }
+        if (data.data != null && data.end_offset >= offset) {
+            offset = data.end_offset;
             append_data(data.data, data);
             backoff = 100;
         }
         if (data.result) {
+            if (!data.done || data.partial) {
+                throw new Error("data.result must only be present on last");
+            }
             if (ibuffer !== null) {
                 append_data("\n\n", data);
             }
@@ -609,10 +664,10 @@ export function run(button, opts) {
         }
 
         scroll_therun();
-        if (data.status == "old") {
-            setTimeout(send, 2000);
+        if (data.status === "old") {
+            send_after(2000);
         } else if (!data.done || data.partial) {
-            setTimeout(send, backoff);
+            send_after(backoff);
         } else {
             done();
             if (data.timed && !hasClass(therun.firstChild, "pa-runrange")) {
@@ -632,15 +687,16 @@ export function run(button, opts) {
         if (args && args.stop) {
             send_args.stop = 1;
         }
-        if (args && args.write) {
+        if (args && args.write != null) {
             send_args.write = (send_args.write || "").concat(args.write);
         }
-        if (send_args.write && send_out > 0) {
+        if ((send_args.write && send_out > 0)
+            || (!send_args.stop && send_args.write == null && eventsource)) {
             return;
         }
 
         let a = {};
-        if (!$f[0].run) {
+        if (!form.elements.run) {
             a.run = category;
         }
         a.offset = offset;
@@ -652,23 +708,25 @@ export function run(button, opts) {
         } else if (args && args.stop && kill_checkt) {
             a.check = kill_checkt;
         }
-        queueid && (a.queueid = queueid);
+        if (queueid) {
+            a.queueid = queueid;
+        }
         Object.assign(a, send_args);
         delete send_args.write;
         delete send_args.stop;
         ++send_out;
 
-        jQuery.ajax($f.attr("action"), {
-            data: $f.serializeWith(a),
+        jQuery.ajax(form.getAttribute("action"), {
+            data: $(form).serializeWith(a),
             type: "POST", cache: false, dataType: "json", timeout: 30000,
             success: function (data) {
                 --send_out;
                 (success || succeed)(data);
-                send_args.write && send({});
+                send_args.write && send();
             },
             error: function () {
-                $f.find(".ajaxsave61").html("Failed");
-                removeClass($f[0], "pa-run-active");
+                $(form).find(".ajaxsave61").html("Failed");
+                removeClass(form, "pa-run-active");
             }
         });
     }

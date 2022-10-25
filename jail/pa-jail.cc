@@ -7,7 +7,9 @@
 #include <sys/wait.h>
 #include <sys/mount.h>
 #include <sys/select.h>
+#include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <unistd.h>
 #include <cstdio>
 #include <cstdlib>
@@ -26,6 +28,7 @@
 #include <getopt.h>
 #include <fnmatch.h>
 #include <string>
+#include <list>
 #include <unordered_map>
 #include <vector>
 #include <iostream>
@@ -36,6 +39,7 @@
 #include <sched.h>
 #include <sys/signalfd.h>
 #include <sys/sysmacros.h>
+#include <sys/syscall.h>
 #elif __APPLE__
 #include <sys/param.h>
 #include <sys/ucred.h>
@@ -74,13 +78,15 @@ static bool doforce = false;
 static bool no_onlcr = false;
 static long tsize[2] = {80, 25};
 static FILE* verbosefile = stdout;
-static int timingfd = -1;
 static std::string linkdir;
 static std::string dstroot;
+static int pidfd = -1;
 static std::string pidfilename;
 static std::string pidcontents;
+static int timingfd = -1;
 static std::string timingfilename;
-static int pidfd = -1;
+static int eventsourcefd = -1;
+static std::string eventsourcefilename;
 static volatile sig_atomic_t got_sigterm = 0;
 #if __linux__
 static int sigfd = -1;
@@ -512,7 +518,8 @@ void mountslot::add_mountopt(const char* inopt) {
             opts &= ~MFLAG(RDONLY);
         }
     } else {
-        const char* mopt = data.c_str();
+        const char* mstart = data.c_str();
+        const char* mopt = mstart;
         while (*mopt) {
             const char* ok_first = mopt + strspn(mopt, ",");
             const char* ok_last = ok_first + strcspn(ok_first, ",=");
@@ -520,9 +527,10 @@ void mountslot::add_mountopt(const char* inopt) {
             if (ok_last - ok_first == inopt_len
                 && memcmp(inopt, ok_first, inopt_len) == 0) {
                 int offset = ok_first - data.data();
-                data = std::string(data.data(), mopt)
-                    + std::string(ov_last, data.data() + data.length());
-                mopt = data.c_str() + offset;
+                data = std::string(mstart, mopt)
+                    + std::string(ov_last, mstart + data.length());
+                mstart = data.c_str();
+                mopt = mstart + offset;
             } else {
                 mopt = ov_last;
             }
@@ -587,8 +595,9 @@ static int populate_mount_table() {
     mount_table_populated = true;
 #if __linux__
     FILE* f = setmntent("/proc/mounts", "r");
-    if (!f)
+    if (!f) {
         return perror_fail("open %s: %s\n", "/proc/mounts");
+    }
     while (struct mntent* me = getmntent(f)) {
         mountslot ms(me->mnt_fsname, me->mnt_type, me->mnt_opts);
         mount_table[me->mnt_dir] = ms;
@@ -1802,59 +1811,271 @@ void jaildirinfo::remove_recursive(int parentdirfd, std::string component,
 }
 
 
+struct jbuffer {
+    unsigned char* buf_;
+    size_t head_ = 0;
+    size_t tail_ = 0;
+    size_t cap_;
+    size_t bufpos_ = 0;
+    bool rclosed_ = false;
+    bool wclosed_ = false;
+    int rerrno_ = 0;
+
+    jbuffer(size_t cap)
+        : buf_(new unsigned char[cap]), cap_(cap) {
+    }
+    jbuffer(jbuffer&& x)
+        : buf_(x.buf_), head_(x.head_), tail_(x.tail_), cap_(x.cap_),
+          bufpos_(x.bufpos_), rclosed_(x.rclosed_), wclosed_(x.wclosed_), rerrno_(x.rerrno_) {
+        x.buf_ = nullptr;
+    }
+    jbuffer(const jbuffer&) = delete;
+    jbuffer& operator=(jbuffer&&) = default;
+    jbuffer& operator=(const jbuffer&) = delete;
+    ~jbuffer() {
+        delete[] buf_;
+    }
+
+    inline void append(char ch);
+    void append(const unsigned char* first, const unsigned char* last);
+    inline void append(const char* first, const char* last);
+    inline void append(const char* first, size_t n);
+    const unsigned char* append_json_chars(const unsigned char* first, const unsigned char* last);
+    void reserve(size_t n);
+    bool read(int from);
+    bool write(int to, size_t& to_off);
+    void consume_to(size_t off);
+
+    inline bool empty() const;
+    inline bool can_read() const;
+    inline bool can_write() const;
+    inline bool done() const;
+};
+
+void jbuffer::append(char ch) {
+    if (head_ == tail_) {
+        reserve(0);
+    }
+    buf_[tail_] = ch;
+    ++tail_;
+}
+
+void jbuffer::append(const unsigned char* first, const unsigned char* last) {
+    size_t n = last - first;
+    if (n > 0 && tail_ - head_ < n) {
+        reserve(n);
+    }
+    memcpy(buf_ + tail_, first, n);
+    tail_ += n;
+}
+
+void jbuffer::append(const char* first, const char* last) {
+    append(reinterpret_cast<const unsigned char*>(first),
+           reinterpret_cast<const unsigned char*>(last));
+}
+
+void jbuffer::append(const char* buf, size_t len) {
+    append(reinterpret_cast<const unsigned char*>(buf),
+           reinterpret_cast<const unsigned char*>(buf + len));
+}
+
+const unsigned char* jbuffer::append_json_chars(const unsigned char* first, const unsigned char* last) {
+    const unsigned char* stop = first;
+    const char hex[] = "0123456789ABCDEF";
+    while (first != last) {
+        if (*first == 0) {
+        skip:
+            append(stop, first);
+            append('\x7F');
+            ++first;
+            stop = first;
+        } else if (*first < 32 || *first == '\\' || *first == '\"') {
+            append(stop, first);
+            append('\\');
+            if (*first == '\b') {
+                append('b');
+            } else if (*first == '\f') {
+                append('f');
+            } else if (*first == '\n') {
+                append('n');
+            } else if (*first == '\r') {
+                append('r');
+            } else if (*first == '\t') {
+                append('t');
+            } else if (*first >= 32) {
+                append(*first);
+            } else {
+                append('u');
+                append('0');
+                append('0');
+                append(hex[*first / 16]);
+                append(hex[*first % 16]);
+            }
+            ++first;
+            stop = first;
+        } else if (*first < 0x80) {
+            ++first;
+        } else if (*first < 0xC2 || *first > 0xF4) {
+            goto skip;
+        } else if (last - first == 1) {
+            break;
+        } else if (first[1] < 0x80 || first[1] > 0xBF) {
+            goto skip;
+        } else if (*first < 0xE0) {
+            first += 2;
+        } else if ((*first == 0xE0 && first[1] < 0xA0)
+                   || (*first == 0xED && first[1] > 0x9F)
+                   || (*first == 0xF0 && first[1] < 0x90)
+                   || (*first == 0xF4 && first[1] > 0x8F)) {
+            goto skip;
+        } else if (last - first == 2) {
+            break;
+        } else if (first[2] < 0x80 || first[2] > 0xBF) {
+            goto skip;
+        } else if (*first < 0xF0) {
+            first += 3;
+        } else if (last - first == 3) {
+            break;
+        } else if (first[3] < 0x80 || first[2] > 0xBF) {
+            goto skip;
+        } else {
+            first += 4;
+        }
+    }
+    append(stop, first);
+    return first;
+}
+
+void jbuffer::reserve(size_t n) {
+    if (n == 0) {
+        n = std::min(cap_, size_t(131072));
+    }
+    size_t ncap = cap_;
+    while (tail_ + n > ncap) {
+        ncap = std::min(ncap * 2, ncap + 131072);
+    }
+    unsigned char* nbuf = new unsigned char[ncap];
+    memcpy(nbuf, buf_, tail_);
+    delete[] buf_;
+    buf_ = nbuf;
+    cap_ = ncap;
+}
+
+bool jbuffer::read(int from) {
+    bool any = false;
+    if (from >= 0 && !rclosed_ && tail_ != cap_) {
+        ssize_t nr = ::read(from, &buf_[tail_], cap_ - tail_);
+        if (nr != 0 && nr != -1) {
+            tail_ += nr;
+            any = true;
+        } else if (nr == 0) {
+            rclosed_ = true;
+        } else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
+            rclosed_ = true;
+            rerrno_ = errno;
+        }
+    }
+    return any;
+}
+
+bool jbuffer::write(int to, size_t& off) {
+    assert(off >= bufpos_ + head_ && off <= bufpos_ + tail_);
+    bool any = false;
+    if (to >= 0 && !wclosed_ && off != bufpos_ + tail_) {
+        ssize_t nw = ::write(to, &buf_[off - bufpos_], bufpos_ + tail_ - off);
+        if (nw != 0 && nw != -1) {
+            off += nw;
+            any = true;
+        } else if (errno != EINTR && errno != EAGAIN) {
+            wclosed_ = true;
+        }
+    }
+    return any;
+}
+
+void jbuffer::consume_to(size_t off) {
+    assert(off >= bufpos_ + head_ && off <= bufpos_ + tail_);
+    head_ = off - bufpos_;
+    if (tail_ >= 3 * cap_ / 4) {
+        memmove(buf_, &buf_[head_], tail_ - head_);
+        tail_ -= head_;
+        bufpos_ += head_;
+        head_ = 0;
+    }
+}
+
+bool jbuffer::empty() const {
+    return head_ == tail_;
+}
+
+bool jbuffer::can_read() const {
+    return !rclosed_ && !wclosed_ && tail_ != cap_;
+}
+
+bool jbuffer::can_write() const {
+    return !wclosed_ && head_ != tail_;
+}
+
+bool jbuffer::done() const {
+    return rclosed_ && head_ == tail_;
+}
+
+
+struct esfd {
+    int fd_;
+    jbuffer jbuf_;
+    size_t output_off_;
+    size_t off_ = 0;
+
+    esfd(int fd, size_t output_off)
+        : fd_(fd), jbuf_(4096), output_off_(output_off) {
+    }
+    void write_header();
+};
+
+void esfd::write_header() {
+    const char message[] = "HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: text/event-stream\r\nX-Accel-Buffering: no\r\n\r\n";
+    write(fd_, message, sizeof(message) - 1);
+}
+
 
 class jailownerinfo {
   public:
-    uid_t owner_;
-    gid_t group_;
+    uid_t owner_ = ROOT;
+    gid_t group_ = ROOT;
     std::string owner_home_;
     std::string owner_sh_;
 
     jailownerinfo();
     ~jailownerinfo();
+
     void init(const char* owner_name);
+    void set_inputfd(int inputfd);
     void exec(int argc, char** argv, jaildirinfo& jaildir,
-              int inputfd, double timeout, double idle_timeout, bool foreground);
+              double timeout, double idle_timeout, bool foreground);
     int exec_go();
 
   private:
     std::vector<const char*> newenv_;
-    char** argv_;
+    char** argv_ = nullptr;
     jaildirinfo* jaildir_;
-    int inputfd_;
+    int inputfd_ = -1;
     struct timeval start_time_;
     struct timeval expiry_;
     double idle_timeout_;
     struct timeval active_time_;
     struct timeval idle_expiry_;
-    struct buffer {
-        unsigned char* buf_;
-        size_t head_;
-        size_t tail_;
-        size_t end_;
-        size_t cap_;
-        bool input_closed_;
-        bool output_closed_;
-        int rerrno_;
-        buffer(size_t cap)
-            : buf_(new unsigned char[cap]), head_(0), tail_(0), end_(0), cap_(cap),
-              input_closed_(false), output_closed_(false), rerrno_(0) {
-        }
-        ~buffer() {
-            delete[] buf_;
-        }
-        bool transfer_in(int from);
-        bool transfer_out(int to);
-        bool done();
-    };
-    buffer to_slave_;
-    buffer from_slave_;
+    jbuffer to_slave_;
+    size_t to_slave_off_ = 0;
+    jbuffer from_slave_;
+    size_t from_slave_off_ = 0;
+    std::list<esfd> esfds_;
     bool stdin_tty_;
     bool stdout_tty_;
     bool stderr_tty_;
     int ttyfd_;
     struct termios ttyfd_termios_;
-    int child_status_;
+    int child_status_ = -1;
     bool has_blocked_;
 
     void start_sigpipe();
@@ -1866,8 +2087,7 @@ class jailownerinfo {
 };
 
 jailownerinfo::jailownerinfo()
-    : owner_(ROOT), group_(ROOT), argv_(),
-      to_slave_(4096), from_slave_(8192), child_status_(-1) {
+    : to_slave_(4096), from_slave_(8192) {
     stdin_tty_ = isatty(STDIN_FILENO);
     stdout_tty_ = isatty(STDOUT_FILENO);
     stderr_tty_ = isatty(STDERR_FILENO);
@@ -1878,10 +2098,16 @@ jailownerinfo::jailownerinfo()
     } else {
         ttyfd_ = -1;
     }
+    from_slave_.bufpos_ = from_slave_off_ = lseek(STDOUT_FILENO, 0, SEEK_CUR);
 }
 
 jailownerinfo::~jailownerinfo() {
     delete[] argv_;
+}
+
+void jailownerinfo::set_inputfd(int inputfd) {
+    assert(inputfd_ < 0);
+    inputfd_ = inputfd;
 }
 
 static bool check_shell(const char* shell) {
@@ -1974,7 +2200,7 @@ static int timer_difference_ms(const struct timeval& lhs, struct timeval rhs) {
 }
 
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         int inputfd, double timeout, double idle_timeout,
+                         double timeout, double idle_timeout,
                          bool foreground) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
@@ -2055,7 +2281,6 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 
     // store other arguments
     this->jaildir_ = &jaildir;
-    this->inputfd_ = inputfd;
     gettimeofday(&this->start_time_, nullptr);
     if (timeout > 0) {
         this->expiry_ = timer_add_delay(this->start_time_, timeout);
@@ -2118,6 +2343,8 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 }
 
 int jailownerinfo::exec_go() {
+    std::string jdir = jaildir_->dir;
+
 #if __linux__
     mount_status = 2;
 
@@ -2136,18 +2363,50 @@ int jailownerinfo::exec_go() {
     for (size_t i = 0; i != delayed_mounts.size(); i += 2) {
         handle_mount(delayed_mounts[i], delayed_mounts[i+1], true);
     }
-    handle_mount("/proc", jaildir_->dir + "proc", true);
-    handle_mount("/dev/pts", jaildir_->dir + "dev/pts", true);
-    handle_mount("/tmp", jaildir_->dir + "tmp", true);
-    handle_mount("/run", jaildir_->dir + "run", true);
+    handle_mount("/proc", jdir + "proc", true);
+    handle_mount("/dev/pts", jdir + "dev/pts", true);
+    handle_mount("/tmp", jdir + "tmp", true);
+    handle_mount("/run", jdir + "run", true);
+    std::string parent_mnt = jdir + "mnt/.parent";
+    v_ensuredir(parent_mnt, 0777, true);
 #endif
 
-    // chroot, remount /proc
+    // chroot
+#if __linux__
     if (verbose) {
-        fprintf(verbosefile, "cd %s\n", jaildir_->dir.c_str());
+        fprintf(verbosefile, "mount --bind %s\n", jdir.c_str());
     }
-    if (!dryrun && chdir(jaildir_->dir.c_str()) != 0) {
-        perror_die(jaildir_->dir);
+    if (!dryrun
+        && mount(jdir.c_str(), jdir.c_str(), nullptr, MS_BIND | MS_REC, nullptr) != 0) {
+        perror_die("mount --bind " + jdir);
+    }
+    if (verbose) {
+        fprintf(verbosefile, "pivot_root %s %s\n", jdir.c_str(), parent_mnt.c_str());
+    }
+    if (!dryrun
+        && syscall(SYS_pivot_root, jdir.c_str(), parent_mnt.c_str()) != 0) {
+        perror_die("pivot_root " + jdir + " " + parent_mnt);
+    }
+    if (verbose) {
+        fprintf(verbosefile, "cd /\n");
+    }
+    if (!dryrun && chdir("/") != 0) {
+        perror_die("cd");
+    }
+    std::string new_parent_mnt = parent_mnt.substr(jdir.size() - 1);
+    if (verbose) {
+        fprintf(verbosefile, "umount %s\n", new_parent_mnt.c_str());
+    }
+    if (!dryrun
+        && umount2(new_parent_mnt.c_str(), MNT_DETACH) != 0) {
+        perror_die("umount " + new_parent_mnt);
+    }
+#else
+    if (verbose) {
+        fprintf(verbosefile, "cd %s\n", jdir.c_str());
+    }
+    if (!dryrun && chdir(jdir.c_str()) != 0) {
+        perror_die(jdir);
     }
     if (verbose) {
         fprintf(verbosefile, "chroot .\n");
@@ -2155,6 +2414,7 @@ int jailownerinfo::exec_go() {
     if (!dryrun && chroot(".") != 0) {
         perror_die("chroot");
     }
+#endif
 
     // create a pty
     int ptymaster = -1;
@@ -2294,14 +2554,15 @@ int jailownerinfo::exec_go() {
                 signal(sig, SIG_DFL);
             }
 
-            if (execve(argv_[0], (char* const*) argv_,
-                       (char* const*) newenv_.data()) != 0) {
-                fprintf(stderr, "exec %s: %s\n", owner_sh_.c_str(), strerror(errno));
-                exit(126);
-            }
-        } else {
-            wait_background(child, ptymaster);
+            int r = execve(argv_[0], (char* const*) argv_,
+                           (char* const*) newenv_.data());
+
+            assert(r < 0);
+            fprintf(stderr, "exec %s: %s\n", owner_sh_.c_str(), strerror(errno));
+            exit(126);
         }
+
+        wait_background(child, ptymaster);
     }
 
     return 0;
@@ -2361,88 +2622,49 @@ void jailownerinfo::start_sigpipe() {
     }
 }
 
-bool jailownerinfo::buffer::transfer_in(int from) {
-    bool any = false;
-    if (end_ == cap_ && head_ != 0) {
-        memmove(buf_, &buf_[head_], end_ - head_);
-        tail_ -= head_;
-        end_ -= head_;
-        head_ = 0;
-    }
-
-    if (from >= 0 && !input_closed_ && end_ != cap_) {
-        ssize_t nr = read(from, &buf_[end_], cap_ - end_);
-        if (nr != 0 && nr != -1) {
-            end_ += nr;
-            any = true;
-        } else if (nr == 0) {
-            input_closed_ = true;
-        } else if (nr == -1 && errno != EINTR && errno != EAGAIN) {
-            input_closed_ = true;
-            rerrno_ = errno;
-        }
-        // end_ allows us to rewrite the buffer, but that
-        // functionality is currently unused
-        tail_ = end_;
-    }
-    return any;
-}
-
-bool jailownerinfo::buffer::transfer_out(int to) {
-    bool any = false;
-    if (to >= 0 && !output_closed_ && head_ != tail_) {
-        ssize_t nw = write(to, &buf_[head_], tail_ - head_);
-        if (nw != 0 && nw != -1) {
-            head_ += nw;
-            any = true;
-        } else if (errno != EINTR && errno != EAGAIN) {
-            output_closed_ = true;
-        }
-    }
-    return any;
-}
-
-bool jailownerinfo::buffer::done() {
-    return input_closed_ && head_ == tail_;
-}
 
 void jailownerinfo::block(int ptymaster) {
-    struct pollfd p[4];
+    std::vector<pollfd> p;
 
-#if __linux__
-    p[0].fd = sigfd;
-#else
-    p[0].fd = sigpipe[0];
+#if !__linux__
+    int sigfd = sigpipe[0];
 #endif
-    p[0].events = POLLIN;
-    int nfd = 1;
+    p.push_back({sigfd, POLLIN, 0});
 
-    if (!to_slave_.input_closed_ && !to_slave_.output_closed_) {
-        p[nfd].fd = inputfd_;
-        p[nfd].events = POLLIN;
-        ++nfd;
+    if (to_slave_.can_read()) {
+        p.push_back({inputfd_, POLLIN, 0});
     }
 
-    int ptymaster_events = 0;
-    if (!from_slave_.input_closed_ && !from_slave_.output_closed_) {
+    short ptymaster_events = 0;
+    if (from_slave_.can_read()) {
         ptymaster_events |= POLLIN;
     }
-    if (!to_slave_.output_closed_ && to_slave_.head_ != to_slave_.tail_) {
+    if (to_slave_.can_write()) {
         ptymaster_events |= POLLOUT;
     }
     if (ptymaster_events) {
-        p[nfd].fd = ptymaster;
-        p[nfd].events = ptymaster_events;
-        ++nfd;
+        p.push_back({ptymaster, ptymaster_events, 0});
     }
 
-    if (!from_slave_.output_closed_ && from_slave_.head_ != from_slave_.tail_) {
-        p[nfd].fd = STDOUT_FILENO;
-        p[nfd].events = POLLOUT;
-        ++nfd;
+    if (from_slave_.can_write()) {
+        p.push_back({STDOUT_FILENO, POLLOUT, 0});
+    }
+
+    size_t eventsourceindex = 0;
+    if (eventsourcefd >= 0) {
+        p.push_back({eventsourcefd, POLLIN, 0});
+        eventsourceindex = p.size() - 1;
+    }
+    for (auto& esf : esfds_) {
+        if (esf.jbuf_.can_write()) {
+            p.push_back({esf.fd_, POLLOUT, 0});
+        }
     }
 
     int timeout_ms = 3600000;
+    if (esfds_.size()) {
+        timeout_ms = 30000;
+    }
     struct timeval now;
     if (timerisset(&expiry_) || idle_timeout_ > 0) {
         gettimeofday(&now, nullptr);
@@ -2462,11 +2684,12 @@ void jailownerinfo::block(int ptymaster) {
         }
     }
 
-    if (poll(p, nfd, 0) == 0) {
+    if (poll(p.data(), p.size(), 0) == 0) {
         has_blocked_ = true;
-        poll(p, nfd, timeout_ms);
+        poll(p.data(), p.size(), timeout_ms);
     }
 
+    // read from signal pipe
     if (p[0].revents & POLLIN) {
 #if __linux__
         struct signalfd_siginfo ssi;
@@ -2483,6 +2706,18 @@ void jailownerinfo::block(int ptymaster) {
             /* skip */
         }
 #endif
+    }
+
+    // accept new eventsource connections
+    if (eventsourcefd >= 0
+        && (p[eventsourceindex].revents & POLLIN)) {
+        struct sockaddr_un sa;
+        socklen_t salen = sizeof(sa);
+        int cfd = accept(eventsourcefd, (sockaddr*) &sa, &salen);
+        if (cfd >= 0) {
+            esfds_.emplace_back(cfd, from_slave_.bufpos_ + from_slave_.head_);
+            esfds_.back().write_header();
+        }
     }
 }
 
@@ -2516,14 +2751,13 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
 }
 
 void jailownerinfo::write_timing() {
-    off_t out_offset = lseek(STDOUT_FILENO, 0, SEEK_CUR);
     struct timeval now, delta;
     gettimeofday(&now, nullptr);
     timersub(&now, &this->start_time_, &delta);
     unsigned long long deltamsecs = (delta.tv_sec * 1000000 + delta.tv_usec) / 1000;
     char timingstr[256];
     int written = 0;
-    int len = snprintf(timingstr, sizeof(timingstr), "%llu,%llu\n", deltamsecs, (unsigned long long) out_offset);
+    int len = snprintf(timingstr, sizeof(timingstr), "%llu,%llu\n", deltamsecs, (unsigned long long) from_slave_off_);
     assert(len < 256);
     while (written < len) {
         int r = write(timingfd, timingstr, len);
@@ -2559,12 +2793,19 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     fflush(stdout);
     if (inputfd_ == 0 && !stdin_tty_) {
         close(STDIN_FILENO);
-        to_slave_.input_closed_ = to_slave_.output_closed_ = true;
+        to_slave_.rclosed_ = to_slave_.wclosed_ = true;
     }
     if (inputfd_ == 0 && !stdout_tty_ && !stderr_tty_) {
         close(STDOUT_FILENO);
-        from_slave_.input_closed_ = from_slave_.output_closed_ = true;
+        from_slave_.rclosed_ = from_slave_.wclosed_ = true;
         from_slave_.rerrno_ = EIO; // don't misinterpret closed as error
+    }
+
+    // listen on unix socket
+    if (eventsourcefd > 0
+        && listen(eventsourcefd, 50) != 0) {
+        perror("listen");
+        exec_done(child, 127);
     }
 
     while (true) {
@@ -2576,7 +2817,7 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         }
 
         // if child has not died, and read produced error, report it
-        if (from_slave_.input_closed_ && from_slave_.rerrno_ != EIO) {
+        if (from_slave_.rclosed_ && from_slave_.rerrno_ != EIO) {
             fprintf(stderr, "read: %s%s", strerror(from_slave_.rerrno_), no_onlcr ? "\n" : "\r\n");
             exec_done(child, 125);
         }
@@ -2585,19 +2826,58 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         block(ptymaster);
         bool any = false;
 
-        // transfer data
-        any = to_slave_.transfer_in(inputfd_) || any;
-        if (to_slave_.head_ != to_slave_.tail_
+        // transfer data to and from slave
+        if (to_slave_.read(inputfd_)) {
+            any = true;
+        }
+        if (!to_slave_.empty()
             && memmem(&to_slave_.buf_[to_slave_.head_], to_slave_.tail_ - to_slave_.head_, "\x1b\x03", 2) != nullptr) {
             exec_done(child, 128 + SIGTERM);
         }
-        any = to_slave_.transfer_out(ptymaster) || any;
-        any = from_slave_.transfer_in(ptymaster) || any;
+        if (to_slave_.write(ptymaster, to_slave_off_)) {
+            to_slave_.consume_to(to_slave_off_);
+            any = true;
+        }
+        if (from_slave_.read(ptymaster)) {
+            any = true;
+        }
         if (has_blocked_ && timingfd != -1) {
             write_timing();
             has_blocked_ = false;
         }
-        any = from_slave_.transfer_out(STDOUT_FILENO) || any;
+        if (!from_slave_.empty()) {
+            size_t last_off = from_slave_.bufpos_ + from_slave_.tail_;
+            const unsigned char* last = from_slave_.buf_ + from_slave_.tail_;
+            for (auto& esf : esfds_) {
+                char xbuf[2048];
+                if (esf.output_off_ < last_off) {
+                    size_t n = sprintf(xbuf, "data:{\"offset\":%zu,\"data\":\"", esf.output_off_);
+                    esf.jbuf_.append(xbuf, n);
+                    const unsigned char* stop = esf.jbuf_.append_json_chars(from_slave_.buf_ + esf.output_off_ - from_slave_.bufpos_, last);
+                    size_t newoff = from_slave_.bufpos_ + (stop - from_slave_.buf_);
+                    n = sprintf(xbuf, "\",\"end_offset\":%zu}\nid:%zu\n\n", newoff, newoff);
+                    esf.jbuf_.append(xbuf, n);
+                    esf.output_off_ = newoff;
+                }
+            }
+        }
+        if (from_slave_.write(STDOUT_FILENO, from_slave_off_)) {
+            from_slave_.consume_to(from_slave_off_);
+            any = true;
+        }
+
+        // transfer events
+        for (auto it = esfds_.begin(); it != esfds_.end(); ) {
+            if (it->jbuf_.write(it->fd_, it->off_)) {
+                it->jbuf_.consume_to(it->off_);
+            }
+            if (it->jbuf_.wclosed_) {
+                close(it->fd_);
+                it = esfds_.erase(it);
+            } else {
+                ++it;
+            }
+        }
 
         // maybe reset idle timeout
         if (any && idle_timeout_ > 0) {
@@ -2628,9 +2908,16 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
         kill(child, SIGKILL);
     }
 #endif
-    fflush(stderr);
     if (ttyfd_ >= 0) {
         (void) tcsetattr(ttyfd_, TCSAFLUSH, &ttyfd_termios_);
+    }
+    fflush(stderr);
+    // close event sources
+    // XXX what if blocked?
+    for (auto it = esfds_.begin(); it != esfds_.end(); ) {
+        write(it->fd_, "data:{\"done\":true}\n\n", 20);
+        close(it->fd_);
+        it = esfds_.erase(it);
     }
     exit(exit_status);
 }
@@ -2675,6 +2962,7 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
             fprintf(stderr, "  -p, --pid-file PIDFILE    write jail process PID to PIDFILE\n\
   -P, --pid-contents STR    write STR to PIDFILE\n\
   -i, --input INPUTSOCKET   use TTY, read input from INPUTSOCKET\n\
+      --event-source SOCK   listen on UNIX SOCK for event source connections\n\
       --no-onlcr            don't translate \\n -> \\r\\n in output\n\
   -T, --timeout TIMEOUT     kill the jail after TIMEOUT seconds\n\
   -I, --idle-timeout TIMEOUT  kill the jail after TIMEOUT idle seconds\n\
@@ -2694,9 +2982,10 @@ static struct option longoptions_before[] = {
     { nullptr, 0, nullptr, 0 }
 };
 
-#define ARG_ONLCR    1000
-#define ARG_NO_ONLCR 1001
-#define ARG_SIZE     1002
+#define ARG_ONLCR        1000
+#define ARG_NO_ONLCR     1001
+#define ARG_SIZE         1002
+#define ARG_EVENT_SOURCE 1003
 static struct option longoptions_run[] = {
     { "verbose", no_argument, nullptr, 'V' },
     { "dry-run", no_argument, nullptr, 'n' },
@@ -2718,6 +3007,7 @@ static struct option longoptions_run[] = {
     { "no-onlcr", no_argument, nullptr, ARG_NO_ONLCR },
     { "timing-file", required_argument, nullptr, 't' },
     { "size", required_argument, nullptr, ARG_SIZE },
+    { "event-source", required_argument, nullptr, ARG_EVENT_SOURCE },
     { nullptr, 0, nullptr, 0 }
 };
 
@@ -2797,6 +3087,8 @@ int main(int argc, char** argv) {
                 pidcontents = optarg;
             } else if (ch == 'i') {
                 inputarg = optarg;
+            } else if (ch == ARG_EVENT_SOURCE) {
+                eventsourcefilename = optarg;
             } else if (ch == ARG_ONLCR) {
                 no_onlcr = false;
             } else if (ch == ARG_NO_ONLCR) {
@@ -2864,12 +3156,13 @@ int main(int argc, char** argv) {
     if (action == do_run && optind + 2 >= argc) {
         action = do_add;
     }
+    bool has_runarg = !linkarg.empty() || !manifest.empty() || !inputarg.empty() || !eventsourcefilename.empty();
     if ((action == do_rm && optind + 1 != argc)
         || (action == do_mv && optind + 2 != argc)
         || (action == do_add && optind != argc - 1 && optind + 2 != argc)
         || (action == do_run && optind + 3 > argc)
-        || (action == do_rm && (!linkarg.empty() || !manifest.empty() || !inputarg.empty()))
-        || (action == do_mv && (!linkarg.empty() || !manifest.empty() || !inputarg.empty()))
+        || (action == do_rm && has_runarg)
+        || (action == do_mv && has_runarg)
         || !argv[optind][0]
         || (action == do_mv && !argv[optind+1][0])) {
         usage();
@@ -2884,7 +3177,19 @@ int main(int argc, char** argv) {
         jailuser.init(argv[optind + 1]);
     }
 
-    // open infile non-blocking as current user
+    // revert to original user
+    caller_owner = getuid();
+    caller_group = getgid();
+    if (!dryrun) {
+        if (seteuid(caller_owner) != 0) {
+            perror_die("seteuid");
+        }
+        if (setegid(caller_group) != 0) {
+            perror_die("setegid");
+        }
+    }
+
+    // open input file non-blocking as current user
     // if it is a named FIFO, open it read-write so we never get EOF
     int inputfd = 0;
     if (!inputarg.empty() && !dryrun) {
@@ -2897,6 +3202,40 @@ int main(int argc, char** argv) {
         if (inputfd == -1) {
             perror_die(inputarg);
         }
+    }
+
+    // create event source socket as current user
+    if (!eventsourcefilename.empty() && !dryrun) {
+        if (verbose) {
+            fprintf(verbosefile, "socket %s\n", eventsourcefilename.c_str());
+        }
+        eventsourcefd = socket(AF_LOCAL, SOCK_STREAM, 0);
+        if (eventsourcefd == -1) {
+            perror_die("socket");
+        }
+
+        mode_t old_umask = umask(S_IROTH | S_IWOTH | S_IXOTH);
+        sockaddr_un eventsource_addr;
+        eventsource_addr.sun_family = AF_LOCAL;
+        if (eventsourcefilename.length() + 1 > sizeof(eventsource_addr.sun_path)) {
+            fprintf(stderr, "%s: socket name too long\n", eventsourcefilename.c_str());
+            exit(1);
+        }
+        strcpy(eventsource_addr.sun_path, eventsourcefilename.c_str());
+        int r = bind(eventsourcefd, (sockaddr*) &eventsource_addr, sizeof(eventsource_addr));
+        if (r < 0) {
+            perror_die("bind");
+        }
+        umask(old_umask);
+
+        int flags;
+        if (fcntl(eventsourcefd, F_SETFD, FD_CLOEXEC) == -1
+            || (flags = fcntl(eventsourcefd, F_GETFL)) == -1
+            || fcntl(eventsourcefd, F_SETFL, flags | O_NONBLOCK) == -1) {
+            perror_die("fcntl");
+        }
+    } else if (!eventsourcefilename.empty() && verbose) {
+        fprintf(verbosefile, "socket %s\n", eventsourcefilename.c_str());
     }
 
     // open pidfile as current user
@@ -2931,8 +3270,6 @@ int main(int argc, char** argv) {
 
     // escalate so that the real (not just effective) UID/GID is root. this is
     // so that the system processes will execute as root
-    caller_owner = getuid();
-    caller_group = getgid();
     if (!dryrun && setresgid(ROOT, ROOT, ROOT) < 0) {
         perror_die("setresgid");
     }
@@ -3061,7 +3398,8 @@ int main(int argc, char** argv) {
 
     // maybe execute a command in the jail
     if (optind + 2 < argc) {
-        jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, inputfd, timeout, idle_timeout, foreground);
+        jailuser.set_inputfd(inputfd);
+        jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, timeout, idle_timeout, foreground);
     }
 
     // close timing and lock file if appropriate

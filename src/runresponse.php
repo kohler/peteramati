@@ -27,6 +27,8 @@ class RunResponse implements JsonSerializable {
     /** @var ?int */
     public $queueid;
     /** @var ?string */
+    public $eventsource;
+    /** @var ?string */
     public $host;
     /** @var ?bool */
     public $done;
@@ -53,14 +55,14 @@ class RunResponse implements JsonSerializable {
     /** @var ?mixed */
     public $result;
 
-    /** @param ?Repository $repo
-     * @return RunResponse */
-    static function make(RunnerConfig $runner, $repo) {
+    /** @return RunResponse */
+    static function make_info(RunnerConfig $runner, PsetView $info) {
         $rr = new RunResponse;
         $rr->ok = true;
         $rr->pset = $runner->pset->urlkey;
         $rr->runner = $runner->name;
-        $rr->repoid = $repo ? $repo->repoid : 0;
+        $rr->repoid = $info->repo->repoid;
+        $rr->hash = $info->hash();
         return $rr;
     }
 
@@ -90,6 +92,9 @@ class RunResponse implements JsonSerializable {
             }
             if (is_int($x->queueid ?? null)) {
                 $rr->queueid = $x->queueid;
+            }
+            if (is_string($x->eventsource ?? null)) {
+                $rr->eventsource = $x->eventsource;
             }
             return $rr;
         } else {

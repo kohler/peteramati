@@ -4,7 +4,7 @@ BINDIR = $(DESTDIR)$(PREFIX)/bin
 all: pa-timeout pa-jail pa-jail-owner
 
 pa-jail: pa-jail.cc
-	$(CXX) -std=gnu++0x -W -Wall -g -O2 -o $@ $@.cc
+	$(CXX) -std=gnu++17 -W -Wall -g -O2 -o $@ $@.cc
 
 pa-jail-owner: pa-jail
 	@ok=`find $< -user root -a -group 0 -a -perm -u+s,g+rxs,g-w,o+rx,o-w -print`; \
