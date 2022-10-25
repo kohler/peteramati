@@ -268,8 +268,9 @@ static int v_mkdirat(int dirfd, const char* component, mode_t mode, const std::s
 static int v_ensuredir(std::string pathname, mode_t mode, bool nolink) {
     pathname = path_noendslash(pathname);
     auto it = dirtable.find(pathname);
-    if (it != dirtable.end())
+    if (it != dirtable.end()) {
         return it->second;
+    }
     struct stat st;
     int r = (nolink ? lstat : stat)(pathname.c_str(), &st);
     if (r == 0 && !S_ISDIR(st.st_mode)) {
@@ -280,8 +281,9 @@ static int v_ensuredir(std::string pathname, mode_t mode, bool nolink) {
         std::string parent_pathname = path_parentdir(pathname);
         if ((parent_pathname.length() == pathname.length()
              || v_ensuredir(parent_pathname, mode, false) >= 0)
-            && v_mkdir(pathname.c_str(), mode) == 0)
+            && v_mkdir(pathname.c_str(), mode) == 0) {
             r = 1;
+        }
     }
     dirtable.insert(std::make_pair(pathname, r == 1 ? 0 : r));
     return r;
@@ -695,6 +697,30 @@ static int handle_umount(const mount_table_type::iterator& it) {
         dst_table[it->first.c_str()] = 3;
     }
     return 0;
+}
+
+static std::string unmounted(std::string dir, bool no_change = false) {
+#ifdef MS_BIND
+    auto it = mount_table.find(dir);
+    if (it != mount_table.end()) {
+        return it->second.opts & MS_BIND ? it->second.fsname : dir;
+    }
+    for (auto dit = delayed_mounts.begin(); dit != delayed_mounts.end(); dit += 2) {
+        if (dit[1] == dir) {
+            it = mount_table.find(dit[0]);
+            return it->second.opts & MS_BIND ? dit[0] : dir;
+        }
+    }
+    if (no_change || dir.empty()) {
+        return dir;
+    } else if (dir.back() == '/') {
+        return unmounted(dir.substr(0, dir.length() - 1), true);
+    } else {
+        return unmounted(dir + '/', true);
+    }
+#else
+    return dir;
+#endif
 }
 
 
@@ -2349,9 +2375,20 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
 
 int jailownerinfo::exec_go() {
     std::string jdir = jaildir_->dir;
+    assert(jdir.back() == '/');
+    std::string unmounted_jdir = unmounted(jdir);
+    if (unmounted_jdir.back() != '/') {
+        unmounted_jdir += '/';
+    }
 
 #if __linux__
     mount_status = 2;
+
+    std::string parent_mnt = jdir + "mnt/.parent";
+    std::string unmounted_parent_mnt = unmounted_jdir + "mnt/.parent";
+    if (v_ensuredir(unmounted_parent_mnt, 0777, true) < 0) {
+        perror_die("mkdir -p " + unmounted_parent_mnt);
+    }
 
     // ensure we truly have a private mount namespace: no shared mounts
     // (some Linux distros, such as Ubuntu 15.10, have / a shared mount
@@ -2372,18 +2409,18 @@ int jailownerinfo::exec_go() {
     handle_mount("/dev/pts", jdir + "dev/pts", true);
     handle_mount("/tmp", jdir + "tmp", true);
     handle_mount("/run", jdir + "run", true);
-    std::string parent_mnt = jdir + "mnt/.parent";
-    v_ensuredir(parent_mnt, 0777, true);
 #endif
 
     // chroot
 #if __linux__
-    if (verbose) {
-        fprintf(verbosefile, "mount --bind %s\n", jdir.c_str());
-    }
-    if (!dryrun
-        && mount(jdir.c_str(), jdir.c_str(), nullptr, MS_BIND | MS_REC, nullptr) != 0) {
-        perror_die("mount --bind " + jdir);
+    if (unmounted_jdir == jdir) {
+        if (verbose) {
+            fprintf(verbosefile, "mount --bind %s\n", jdir.c_str());
+        }
+        if (!dryrun
+            && mount(jdir.c_str(), jdir.c_str(), nullptr, MS_BIND | MS_REC, nullptr) != 0) {
+            perror_die("mount --bind " + jdir);
+        }
     }
     if (verbose) {
         fprintf(verbosefile, "pivot_root %s %s\n", jdir.c_str(), parent_mnt.c_str());
