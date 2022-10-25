@@ -211,7 +211,7 @@ export function run(button, opts) {
     }
 
     let ibuffer = "", // initial buffer; holds data before any results arrive
-        offset = -1, backoff = 50, times = null;
+        offset = 0, backoff = 50, times = null;
 
     function hide_cursor() {
         if (thexterm) {
@@ -624,7 +624,8 @@ export function run(button, opts) {
         }
 
         // Skip data up to UTF-8 `offset`
-        if (data.data && data.offset < offset) {
+        if (data.data
+            && data.offset < offset) {
             trim_data_to_offset(data, offset);
             if (data.offset < offset) {
                 send_after(0);
@@ -640,16 +641,25 @@ export function run(button, opts) {
             && (m = data.data.match(/\x1b\[\?1049l(?:[\r\n]|\x1b\[\?1l|\x1b>)*$/))) {
             data.data = data.data.substring(0, data.data.length - m[0].length);
         }
-        if (data.done && data.time_data != null && ibuffer === "") {
+
+        // Pure replay -> append_timed
+        if (data.done
+            && data.time_data != null
+            && ibuffer === "") {
             // Parse timing data
             append_timed(data);
             return;
         }
-        if (data.data != null && data.end_offset >= offset) {
+
+        // Append data
+        if (data.data != null
+            && data.offset === offset
+            && data.end_offset >= offset) {
             offset = data.end_offset;
             append_data(data.data, data);
             backoff = 100;
         }
+
         if (data.result) {
             if (!data.done || data.partial) {
                 throw new Error("data.result must only be present on last");
