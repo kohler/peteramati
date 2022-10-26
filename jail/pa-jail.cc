@@ -1856,8 +1856,8 @@ struct jbuffer {
         x.buf_ = nullptr;
     }
     jbuffer(const jbuffer&) = delete;
-    jbuffer& operator=(jbuffer&&) = default;
     jbuffer& operator=(const jbuffer&) = delete;
+    jbuffer& operator=(jbuffer&&) = delete;
     ~jbuffer() {
         delete[] buf_;
     }
@@ -1888,7 +1888,7 @@ void jbuffer::append(char ch) {
 
 void jbuffer::append(const unsigned char* first, const unsigned char* last) {
     size_t n = last - first;
-    if (n > 0 && cap_ - tail_ < n) {
+    if (cap_ - tail_ < n) {
         reserve(n);
     }
     memcpy(buf_ + tail_, first, n);
@@ -2753,9 +2753,7 @@ void jailownerinfo::block(int ptymaster) {
     // accept new eventsource connections
     if (eventsourcefd >= 0
         && (p[eventsourceindex].revents & POLLIN)) {
-        struct sockaddr_un sa;
-        socklen_t salen = sizeof(sa);
-        int cfd = accept(eventsourcefd, (sockaddr*) &sa, &salen);
+        int cfd = accept(eventsourcefd, nullptr, nullptr);
         if (cfd >= 0) {
             esfds_.emplace_back(cfd, from_slave_.bufpos_ + from_slave_.head_);
             esfds_.back().write_header();
