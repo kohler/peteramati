@@ -1,10 +1,12 @@
 PREFIX ?= /usr/local
 BINDIR = $(DESTDIR)$(PREFIX)/bin
+# SANFLAGS = -fsanitize=address -fsanitize=undefined
+SANFLAGS =
 
 all: pa-timeout pa-jail pa-jail-owner
 
 pa-jail: pa-jail.cc
-	$(CXX) -std=gnu++17 -W -Wall -g -O2 -o $@ $@.cc
+	$(CXX) -std=gnu++17 -W -Wall -g -O2 $(SANFLAGS) -o $@ $@.cc
 
 pa-jail-owner: pa-jail
 	@ok=`find $< -user root -a -group 0 -a -perm -u+s,g+rxs,g-w,o+rx,o-w -print`; \

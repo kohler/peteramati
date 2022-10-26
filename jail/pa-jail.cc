@@ -1879,7 +1879,7 @@ struct jbuffer {
 };
 
 void jbuffer::append(char ch) {
-    if (head_ == tail_) {
+    if (tail_ == cap_) {
         reserve(0);
     }
     buf_[tail_] = ch;
@@ -1888,7 +1888,7 @@ void jbuffer::append(char ch) {
 
 void jbuffer::append(const unsigned char* first, const unsigned char* last) {
     size_t n = last - first;
-    if (n > 0 && tail_ - head_ < n) {
+    if (n > 0 && cap_ - tail_ < n) {
         reserve(n);
     }
     memcpy(buf_ + tail_, first, n);
