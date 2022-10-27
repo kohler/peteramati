@@ -1068,7 +1068,7 @@ class QueueItem {
             $rr = $this->command_response($offset, $write, $stop);
         } else {
             $this->runat = $this->runat ? : time();
-            $rr = RunResponse::make($runner, $this->repo());
+            $rr = RunResponse::make_info($runner, $this->info());
             $rr->timestamp = $this->runat;
             $rr->done = true;
             $rr->status = "done";
