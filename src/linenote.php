@@ -53,12 +53,7 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
             $ln->ftext = $x;
         } else if (is_array($x)) {
             $ln->iscomment = $x[0];
-            $x4 = $x[4] ?? null;
-            if (is_int($x4) && $x4 <= 5) {
-                $ln->ftext = "<{$x4}>{$x[1]}";
-            } else {
-                $ln->ftext = $x[1];
-            }
+            $ln->ftext = $x[1];
             $x2 = $x[2] ?? null;
             if (is_int($x2)) {
                 $ln->users[] = $x2;
@@ -68,7 +63,8 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
             if (isset($x[3])) {
                 $ln->version = $x[3];
             }
-            if (is_int($x4) && $x4 > 5 && $lineid[0] === "b") {
+            $x4 = $x[4] ?? null; // NB INCOMPAT NOTE: some old notes store format here
+            if (is_int($x4)) {
                 $ln->linea = $x4;
             }
         }
