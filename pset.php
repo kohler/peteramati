@@ -491,7 +491,7 @@ class PsetRequest {
         }
 
         $lhd = $info->late_hours_data();
-        if ($lhd && $info->can_view_grade() && !$info->can_edit_scores()) {
+        if ($lhd && $info->can_view_some_grade() && !$info->can_edit_scores()) {
             if (($has_grades
                  && $info->can_view_nonempty_score())
                 || (isset($lhd->hours)
@@ -557,7 +557,7 @@ class PsetRequest {
         }
 
         $notesflag = HASNOTES_ANY;
-        if (!$this->info->pc_view && !$this->info->can_view_score()) {
+        if (!$this->info->pc_view && !$this->info->can_view_any_grade()) {
             $notesflag = HASNOTES_COMMENT;
         }
         $result = $this->conf->qe("select bhash, haslinenotes, hasflags, hasactiveflags

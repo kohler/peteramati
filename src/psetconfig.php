@@ -585,13 +585,12 @@ class Pset {
     }
 
 
-    /** @param 0|1|2|4 $vf
-     * @return 0|1|3|4|5|7 */
-    function default_vf($vf) {
+    /** @return 0|1|3 */
+    function default_student_vf() {
         if ($this->visible_student()) {
-            return $vf | ($this->scores_visible ? VF_STUDENT_ANY : VF_STUDENT_ALWAYS);
+            return $this->scores_visible ? VF_STUDENT_ANY : VF_STUDENT_ALWAYS;
         } else {
-            return $vf & ~VF_STUDENT_ANY;
+            return 0;
         }
     }
 
@@ -1878,6 +1877,8 @@ class GradeEntry {
         }
         if (($this->vf() & $vf & ~VF_TF) === 0) {
             $gej["visible"] = false;
+        } else if (!$this->answer && ($vf & VF_STUDENT_ALLOWED) === 0) {
+            $gej["visible"] = true;
         }
         if ($this->disabled) {
             $gej["disabled"] = true;

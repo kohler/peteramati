@@ -57,8 +57,7 @@ export class GradeEntry {
 
     student_visible(gi) {
         return this.visible === true
-            || (this.visible == null
-                && (this.answer || gi.scores_visible));
+            || (this.visible == null && (this.answer || gi.scores_visible));
     }
 
     get title_html() {

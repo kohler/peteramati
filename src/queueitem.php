@@ -826,7 +826,7 @@ class QueueItem {
         $this->checkout_code();
 
         // save commit settings
-        $this->add_run_settings($json->settings ?? []);
+        $this->add_run_settings($this->runsettings ?? []);
 
         // actually run
         $command = "echo; jail/pa-jail run"

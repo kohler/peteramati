@@ -90,7 +90,7 @@ class DiffMany_Page {
             echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);
         }
         if ($info->can_edit_scores()
-            || ($info->can_view_grade() && $info->is_grading_commit())) {
+            || ($info->can_view_any_grade() && $info->is_grading_commit())) {
             $gj = $info->grade_json(PsetView::GRADEJSON_SLICE, $this->values_vf);
         } else {
             $gj = $info->info_json();
@@ -176,7 +176,7 @@ class DiffMany_Page {
             Ht::stash_html($this->conf->make_script_file($gs));
         }
         Ht::stash_script("\$pa.long_page = true");
-        $gexp = new GradeExport($this->pset, VF_TF);
+        $gexp = new GradeExport($this->pset);
         $gexp->export_entries();
         if ($this->values_vf !== null) {
             $gexp->set_fixed_values_vf($this->values_vf);

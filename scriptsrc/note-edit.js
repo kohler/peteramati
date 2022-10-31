@@ -197,7 +197,7 @@ function pa_linenote(event) {
     if (event.button !== 0
         || !dl
         || hasClass(dl, "pa-gx")
-        || event.target.matches("button, a, textarea")
+        || event.target.matches("button, a, textarea, input, label")
         || event.target.closest(".pa-note-suggestions")) {
         return;
     }

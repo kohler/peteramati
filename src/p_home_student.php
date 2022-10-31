@@ -30,11 +30,11 @@ class Home_Student_Page {
             htmlspecialchars($info->pset->title), "</a>";
         $x = [];
         $c = null;
-        if ($info->user_can_view_grade() && $info->needs_answers()) {
+        if ($info->user_can_view_some_grade() && $info->needs_answers()) {
             $x[] = "empty";
             $c = "gradesmissing";
         }
-        if ($info->user_can_view_score() && $info->can_view_nonempty_score()) {
+        if ($info->user_can_view_some_score() && $info->can_view_nonempty_score()) {
             if ($info->user_visible_grading_complete()) {
                 $x[] = "grade ready";
             } else {
@@ -79,7 +79,7 @@ class Home_Student_Page {
             }
             echo '</tbody></table></div></div>';
         }
-        if ($info->can_view_grade()
+        if ($info->can_view_some_grade()
             && ($t = $info->visible_total()) !== null) {
             echo '<div class="pa-gradelist is-main mt-0"><div class="pa-p',
                 $info->user_visible_total() === $t ? '' : ' pa-p-hidden',

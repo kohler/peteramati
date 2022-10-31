@@ -367,7 +367,7 @@ class Home_TA_Page {
         $incomplete = $incompleteu = [];
         $jx = [];
         $gradercounts = [];
-        $gex = new GradeExport($pset, VF_TF);
+        $gex = new GradeExport($pset);
         $gex->export_entries();
         $vf = [];
         foreach ($pset->grades as $ge) {

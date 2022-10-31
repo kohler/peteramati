@@ -596,7 +596,7 @@ class ContactView {
     static function late_hour_note(PsetView $info) {
         if (($lh = $info->late_hours())
             && $lh > 0
-            && (!$info->pset->obscure_late_hours || $info->can_view_grade())) {
+            && (!$info->pset->obscure_late_hours || $info->can_view_some_grade())) {
             $t = plural($lh, "late hour") . " used";
             if (!$info->pset->obscure_late_hours) {
                 $t = '<strong class="overdue">' . $t . '</strong>';

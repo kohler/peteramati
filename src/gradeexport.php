@@ -73,10 +73,10 @@ class GradeExport implements JsonSerializable {
     /** @var bool */
     private $_export_entries = false;
 
-    /** @param 1|3|4|5|7 $vf */
-    function __construct(Pset $pset, $vf) {
+    /** @param null|1|3|4|5|7 $vf */
+    function __construct(Pset $pset, $vf = null) {
         $this->pset = $pset;
-        $this->vf = $pset->default_vf($vf);
+        $this->vf = $vf ?? (VF_TF | $pset->default_student_vf());
         $this->_grades_vf = $pset->grades_vf();
     }
 

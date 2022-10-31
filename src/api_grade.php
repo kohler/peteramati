@@ -135,7 +135,7 @@ class Grade_API {
             } else if (!empty($v)) {
                 $info->update_grade_notes($v);
             }
-        } else if (!$info->can_view_grade()) {
+        } else if (!$info->can_view_some_grade()) {
             return ["ok" => false, "error" => "Permission error."];
         }
         $j = (array) $info->grade_json(0, $known_entries);
@@ -214,7 +214,7 @@ class Grade_API {
         foreach ($sset as $uid => $info) {
             // XXX extract the following into a function
             // XXX branch nonsense
-            if (!$info->can_view_grade()
+            if (!$info->can_view_some_grade()
                 || ($qreq->is_post() && !$info->can_edit_scores())) {
                 return ["ok" => false, "error" => "Permission error for user " . $info->user_linkpart() . "."];
             }
@@ -256,7 +256,7 @@ class Grade_API {
         }
 
         // XXX match commit with grading commit
-        $gexp = new GradeExport($api->pset, VF_TF);
+        $gexp = new GradeExport($api->pset);
         $gexp->export_entries();
         $jx = $gexp->jsonSerialize();
         $jx["ok"] = true;

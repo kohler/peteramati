@@ -2907,8 +2907,8 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	line-height: 1.5;
 	white-space: pre-wrap;
 }
-table.hidegrades .pa-gradenote {
-	color: #880000;
+.hidegrades .pa-gradenote {
+	color: #665555;
 }
 .pa-noteref {
 	font-size: smaller;
