@@ -1309,7 +1309,7 @@ class GradeEntry {
         }
         if (!is_string($this->key)
             // no spaces, no commas, no plusses
-            || !preg_match('/\A[-@~:\$A-Za-z0-9_]+\z/', $this->key)
+            || !preg_match('/\A(?![-_])(?:[@~:\$A-Za-z0-9_]|-(?![-_]))*+\z/', $this->key)
             || $this->key[0] === "_"
             || $this->key === "total"
             || $this->key === "late_hours"
@@ -1974,7 +1974,7 @@ class RunnerConfig {
 
         $this->pset = $pset;
         $this->name = isset($r->name) ? $r->name : $name;
-        if (!is_string($this->name) || !preg_match('/\A[A-Za-z][0-9A-Za-z_]*\z/', $this->name)) {
+        if (!is_string($this->name) || !preg_match('/\A[A-Za-z](?:[0-9A-Za-z_]|-(?![-_]))*+\z/', $this->name)) {
             throw new PsetConfigException("runner name format error", $loc);
         }
         if (isset($r->category) || ($defr && isset($defr->category))) {
