@@ -1,9 +1,9 @@
-import { terser } from "rollup-plugin-terser";
+import terser from "@rollup/plugin-terser";
 import eslint from "@rollup/plugin-eslint";
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
-const fs = require("fs");
-const crypto = require("crypto");
+import fs from "fs";
+import crypto from "crypto";
 
 
 // append mtime to sourcemap

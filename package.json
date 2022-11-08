@@ -13,11 +13,11 @@
         "xterm": "^4.15"
     },
     "devDependencies": {
-        "@rollup/plugin-commonjs": "^17.0.0",
-        "@rollup/plugin-eslint": "^8.0.1",
-        "@rollup/plugin-node-resolve": "^11.0.1",
-        "rollup": "^2.60",
-        "rollup-plugin-terser": "^7"
+        "@rollup/plugin-commonjs": "^23.0.2",
+        "@rollup/plugin-eslint": "^9.0.1",
+        "@rollup/plugin-node-resolve": "^15.0.1",
+        "@rollup/plugin-terser": "^0.1.0",
+        "rollup": "^2.79.1"
     },
     "eslintConfig": {
         "env": {
