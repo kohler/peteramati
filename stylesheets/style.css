@@ -2907,8 +2907,13 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	line-height: 1.5;
 	white-space: pre-wrap;
 }
-.hidegrades .pa-gradenote {
-	color: #665555;
+.pa-scores-hidden .pa-notecontent::before {
+	content: "\1f512\fe0e";
+	width: 2rem;
+	float: left;
+}
+.pa-scores-hidden .pa-gradenote {
+	color: #555;
 }
 .pa-noteref {
 	font-size: smaller;
@@ -3658,7 +3663,7 @@ a.help {
 	border-right: 1px solid #000080;
 	border-bottom: 1px solid transparent;
 	animation: spinner .6s linear infinite;
-	content: '';
+	content: "";
 }
 .savesuccess:before {
 	content: "\2713";

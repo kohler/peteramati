@@ -54,7 +54,7 @@ GradeClass.add("markdown", {
             addClass(ve, "bg-none");
             addClass(ve, "align-self-start");
             const div = document.createElement("div");
-            div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (gi.scores_editable ? " pa-editablenotes live" : "");
+            div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (gi.scores_editable ? " pa-editablenotes live" : "") + (gi.scores_visible ? "" : " pa-scores-hidden");
             let fileid = "/g/" + this.key;
             div.id = gi.file_anchor(fileid);
             let pos1 = 0, lineno = 1;

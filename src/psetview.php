@@ -2445,7 +2445,7 @@ class PsetView {
             echo " garrett";
         }
         if (($this->vf() & VF_STUDENT_ALLOWED) === 0) {
-            echo " hidegrades";
+            echo " pa-scores-hidden";
         }
         if (!$expand || !$dinfo->loaded) {
             echo " hidden";
