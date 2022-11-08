@@ -2907,7 +2907,7 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	line-height: 1.5;
 	white-space: pre-wrap;
 }
-.pa-scores-hidden .pa-notecontent::before {
+.pa-scores-hidden .pa-gradenote-marker::before {
 	content: "\1f512\fe0e";
 	width: 2rem;
 	float: left;

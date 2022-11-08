@@ -2638,15 +2638,19 @@ class PsetView {
             $autext = [];
             foreach ($note->users as $au) {
                 if (($p = $pcmembers[$au] ?? null)) {
-                    if ($p->nicknameAmbiguous)
+                    if ($p->nicknameAmbiguous) {
                         $autext[] = Text::name_html($p);
-                    else
+                    } else {
                         $autext[] = htmlspecialchars($p->nickname ? : $p->firstName);
+                    }
                 }
             }
             if (!empty($autext)) {
                 echo '<div class="pa-note-author">[', join(", ", $autext), ']</div>';
             }
+        }
+        if (!$note->iscomment) {
+            echo '<div class="pa-gradenote-marker"></div>';
         }
         echo '<div class="pa-dr pa-note', ($note->iscomment ? ' pa-commentnote' : ' pa-gradenote');
         if (str_starts_with($note->ftext, "<")) {
