@@ -10,6 +10,8 @@ class RunQueueBatch {
     public $conf;
     /** @var bool */
     public $is_query = false;
+    /** @var ?int */
+    public $count;
     /** @var bool */
     public $is_clean = false;
     /** @var ?list<int> */
@@ -52,7 +54,8 @@ class RunQueueBatch {
     function query() {
         $result = $this->conf->qe("select * from ExecutionQueue
                 where status<?
-                order by runorder asc, queueid asc",
+                order by runorder asc, queueid asc"
+                . ($this->count !== null ? " limit {$this->count}" : ""),
             QueueItem::STATUS_CANCELLED);
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
@@ -85,7 +88,7 @@ class RunQueueBatch {
                 $old_status = $qix->status();
                 $qix->step($qs);
                 if ($this->verbose && $qix->stopped()) {
-                    $this->report($qix, $old_status);
+                    $this->report(STDOUT, $qix, $old_status);
                 }
             }
         }
@@ -121,7 +124,7 @@ class RunQueueBatch {
                     $this->running[] = $qix;
                 }
                 if ($this->verbose) {
-                    $this->report($qix, $old_status);
+                    $this->report(STDOUT, $qix, $old_status);
                 }
                 $this->any_completed = $this->any_completed || $qix->stopped();
             }
@@ -141,7 +144,7 @@ class RunQueueBatch {
                 $old_status = $qix->status();
                 $qix->step($qs);
                 if ($this->verbose) {
-                    $this->report($qix, $old_status);
+                    $this->report(STDOUT, $qix, $old_status);
                 }
                 $this->any_completed = $this->any_completed || $qix->stopped();
             }
@@ -167,26 +170,27 @@ class RunQueueBatch {
         }
     }
 
-    /** @param QueueItem $qi
+    /** @param resource $f
+     * @param QueueItem $qi
      * @param int $old_status */
-    function report($qi, $old_status) {
+    function report($f, $qi, $old_status) {
         ++$this->nreports;
         $id = $qi->unparse_key();
         $chain = $qi->chain ? " C{$qi->chain}" : "";
         if ($old_status > 0 && $qi->stopped()) {
-            fwrite(STDERR, "$id: completed\n");
+            fwrite($f, "$id: completed\n");
         } else if ($old_status > 0) {
-            fwrite(STDERR, "$id: running " . self::unparse_time($qi->runat) . "{$chain}\n");
+            fwrite($f, "$id: running " . self::unparse_time($qi->runat) . "{$chain}\n");
         } else if ($qi->stopped()) {
-            fwrite(STDERR, "$id: removed\n");
+            fwrite($f, "$id: removed\n");
         } else if ($qi->working()) {
-            fwrite(STDERR, "$id: started " . self::unparse_time($qi->runat) . "{$chain}\n");
+            fwrite($f, "$id: started " . self::unparse_time($qi->runat) . "{$chain}\n");
         } else if ($old_status === 0) {
-            fwrite(STDERR, "$id: waiting " . self::unparse_time($qi->scheduleat) . "{$chain}\n");
+            fwrite($f, "$id: waiting " . self::unparse_time($qi->scheduleat) . "{$chain}\n");
         } else if ($qi->scheduled()) {
-            fwrite(STDERR, "$id: scheduled " . self::unparse_time($qi->scheduleat) . "{$chain}\n");
+            fwrite($f, "$id: scheduled " . self::unparse_time($qi->scheduleat) . "{$chain}\n");
         } else {
-            fwrite(STDERR, "$id: delayed " . self::unparse_time($qi->insertat) . "{$chain}\n");
+            fwrite($f, "$id: delayed " . self::unparse_time($qi->insertat) . "{$chain}\n");
         }
     }
 
@@ -251,9 +255,10 @@ class RunQueueBatch {
     /** @return RunQueueBatch */
     static function parse_args(Conf $conf, $argv) {
         $arg = (new Getopt)->long(
-            "x,execute Execute queue to completion [default]",
+            "q,query Print queue [default]",
+            "n:,count: {n} =N Print at most N items",
+            "x,execute Execute queue to completion",
             "1 Execute queue once",
-            "q,query Print queue",
             "c,clean Clean queue",
             "schedule[] =QUEUEID Schedule QUEUEID",
             "cancel[] =QUEUEID Cancel QUEUEID (or C<CHAINID>)",
@@ -312,6 +317,9 @@ class RunQueueBatch {
         }
         if (isset($arg["V"])) {
             $self->verbose = true;
+        }
+        if (isset($arg["n"])) {
+            $self->count = $arg["n"];
         }
         return $self;
     }
