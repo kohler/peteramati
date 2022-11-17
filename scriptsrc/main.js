@@ -1657,6 +1657,7 @@ function pa_render_pset_table(pconf, data) {
                     const stre = document.createElement("strong");
                     stre.className = "err";
                     stre.append(t);
+                    return stre;
                 }
                 if (s.repo_broken) {
                     tde.append(" ", strong("broken"));
@@ -2835,7 +2836,13 @@ function pa_render_pset_table(pconf, data) {
             smap.push(s);
             ++trn;
             if (s.boringness !== was_boringness && trn != 1) {
-                a.push('<tr class="gt-boring"><td colspan="' + col.length + '"><hr></td></tr>');
+                const tre = document.createElement("tr");
+                tre.className = "gt-boring";
+                const tde = document.createElement("td");
+                tde.colSpan = col.length;
+                tde.append(document.createElement("hr"));
+                tre.append(tde);
+                tbody.append(tre);
             }
             was_boringness = s.boringness;
             const tre = document.createElement("tr");
