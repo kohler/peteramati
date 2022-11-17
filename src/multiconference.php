@@ -1,6 +1,6 @@
 <?php
 // multiconference.php -- HotCRP multiconference installations
-// Copyright (c) 2006-2020 Eddie Kohler; see LICENSE.
+// Copyright (c) 2006-2022 Eddie Kohler; see LICENSE.
 
 class Multiconference {
     /** @var ?array<string,mixed> */
@@ -8,13 +8,14 @@ class Multiconference {
     /** @var array<string,?Conf> */
     static private $conf_cache;
 
-    static function init() {
+    /** @param ?string $confid */
+    static function init($confid = null) {
         global $Opt, $argv;
         assert(self::$original_opt === null);
         self::$original_opt = $Opt;
 
-        $confid = $Opt["confid"] ?? null;
-        if (!$confid && PHP_SAPI == "cli") {
+        $confid = $confid ?? $Opt["confid"] ?? null;
+        if ($confid === null && PHP_SAPI === "cli") {
             for ($i = 1; $i != count($argv); ++$i) {
                 if ($argv[$i] === "-n" || $argv[$i] === "--name") {
                     if (isset($argv[$i + 1]))
@@ -30,15 +31,15 @@ class Multiconference {
                     break;
                 }
             }
-        } else if (!$confid) {
+        } else if ($confid === null && PHP_SAPI !== "cli") {
             $base = Navigation::base_absolute(true);
             if (($multis = $Opt["multiconferenceAnalyzer"] ?? null)) {
                 foreach (is_array($multis) ? $multis : [$multis] as $multi) {
                     list($match, $replace) = explode(" ", $multi);
-                    if (preg_match("`\\A$match`", $base, $m)) {
+                    if (preg_match("`\\A{$match}`", $base, $m)) {
                         $confid = $replace;
                         for ($i = 1; $i < count($m); ++$i) {
-                            $confid = str_replace("\$$i", $m[$i], $confid);
+                            $confid = str_replace("\${$i}", $m[$i], $confid);
                         }
                         break;
                     }
@@ -49,10 +50,12 @@ class Multiconference {
         }
 
         if (!$confid) {
-            $confid = "__nonexistent__";
-        } else if (!preg_match('/\A[-a-zA-Z0-9_][-a-zA-Z0-9_.]*\z/', $confid)) {
+            $Opt["confid"] = "__nonexistent__";
+        } else if (preg_match('/\A[a-zA-Z0-9_][-a-zA-Z0-9_.]*\z/', $confid)) {
+            $Opt["confid"] = $confid;
+        } else {
             $Opt["__original_confid"] = $confid;
-            $confid = "__invalid__";
+            $Opt["confid"] = "__invalid__";
         }
 
         self::assign_confid($Opt, $confid);
@@ -222,5 +225,40 @@ class Multiconference {
             }
         }
         self::fail_message($errors);
+    }
+
+    /** @param Throwable $ex
+     * @suppress PhanUndeclaredProperty */
+    static function batch_exception_handler($ex) {
+        global $argv;
+        $s = $ex->getMessage();
+        if (defined("HOTCRP_TESTHARNESS")) {
+            $s = $ex->getFile() . ":" . $ex->getLine() . ": " . $s;
+        }
+        if (strpos($s, ":") === false) {
+            $script = $argv[0] ?? "";
+            if (($slash = strrpos($script, "/")) !== false) {
+                if (($slash === 5 && str_starts_with($script, "batch"))
+                    || ($slash > 5 && substr_compare($script, "/batch", $slash - 6, 6) === 0)) {
+                    $slash -= 6;
+                }
+                $script = substr($script, $slash + 1);
+            }
+            if ($script !== "") {
+                $s = "{$script}: {$s}";
+            }
+        }
+        if (substr($s, -1) !== "\n") {
+            $s = "{$s}\n";
+        }
+        if (property_exists($ex, "getopt")
+            && $ex->getopt instanceof Getopt) {
+            $s .= $ex->getopt->short_usage();
+        }
+        if (defined("HOTCRP_TESTHARNESS") || $ex instanceof Error) {
+            $s .= debug_string_backtrace($ex) . "\n";
+        }
+        fwrite(STDERR, $s);
+        exit(1);
     }
 }
