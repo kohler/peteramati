@@ -1602,7 +1602,7 @@ function pa_render_pset_table(pconf, data) {
         },
         grade: {
             th: function () {
-                return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="grade', this.gidx, '" scope="col" title="', escape_entities(this.ge.title_text), '">', this.ge.abbr(), '</th>');
+                return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="', this.name, '" scope="col" title="', escape_entities(this.ge.title_text), '">', this.ge.abbr(), '</th>');
             },
             td: function (tde, s) {
                 const gr = s.grades[this.gidx];
@@ -1816,15 +1816,16 @@ function pa_render_pset_table(pconf, data) {
 
         colmap = {};
         for (let i = 0; i !== col.length; ++i) {
-            if (typeof col[i] === "string") {
-                col[i] = {type: col[i], name: col[i]};
+            let c = col[i];
+            if (typeof c === "string") {
+                c = col[i] = {type: c, name: c};
             }
-            col[i].index = i;
-            Object.assign(col[i], col_renderers[col[i].type]);
-            if (typeof col[i].th === "string") {
-                col[i].th = string_function(col[i].th);
+            c.index = i;
+            Object.assign(c, col_renderers[c.type]);
+            if (typeof c.th === "string") {
+                c.th = string_function(c.th);
             }
-            colmap[col[i].name] = colmap[col[i].name] || col[i];
+            colmap[c.name] = colmap[c.name] || c;
         }
         name_col = colmap.name;
 
