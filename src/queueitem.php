@@ -222,6 +222,27 @@ class QueueItem {
         return $this->status;
     }
 
+    /** @param bool $verbose
+     * @return string */
+    function status_text($verbose = false) {
+        switch ($this->status) {
+        case self::STATUS_UNSCHEDULED:
+            return "unscheduled" . ($verbose && $this->abandoned() ? " abandoned" : "");
+        case self::STATUS_SCHEDULED:
+            return "scheduled" . ($verbose && $this->abandoned() ? " abandoned" : "");
+        case self::STATUS_WORKING:
+            return "working";
+        case self::STATUS_CANCELLED:
+            return "cancelled";
+        case self::STATUS_DONE:
+            return $verbose ? "done unevaluated" : "done";
+        case self::STATUS_EVALUATED:
+            return "done";
+        default:
+            return "unknown status {$this->status}";
+        }
+    }
+
     /** @return bool */
     function unscheduled() {
         return $this->status === self::STATUS_UNSCHEDULED;

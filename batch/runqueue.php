@@ -60,14 +60,12 @@ class RunQueueBatch {
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             $chain = $qix->chain ? " C{$qix->chain}" : "";
+            $s = $qix->status_text(true);
             if ($qix->unscheduled()) {
-                $s = "waiting";
                 $t = $qix->insertat;
             } else if ($qix->scheduled()) {
-                $s = "scheduled";
                 $t = $qix->scheduleat;
             } else {
-                $s = "running";
                 $t = $qix->runat;
             }
             fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s} " . self::unparse_time($t) . "{$chain}\n");

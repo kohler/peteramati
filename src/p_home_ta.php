@@ -219,7 +219,7 @@ class Home_TA_Page {
     /** @param bool $anonymous
      * @return array */
     function pset_row_json(Pset $pset, StudentSet $sset, PsetView $info,
-                           GradeExport $gex, $anonymous) {
+                           GradeExport $gexp, $anonymous) {
         $j = StudentSet::json_basics($info->user, $anonymous);
         if (($gcid = $info->gradercid())) {
             $j["gradercid"] = $gcid;
@@ -258,7 +258,7 @@ class Home_TA_Page {
             $j["student_timestamp"] = $info->student_timestamp(false);
         }
 
-        if ($gex->value_entries()) {
+        if ($gexp->value_entries()) {
             if (!$pset->gitless_grades) {
                 $gradercid = $info->gradercid();
                 $gi = $info->grade_jnotes();
@@ -278,16 +278,16 @@ class Home_TA_Page {
             if (($total = $info->visible_total()) !== null) {
                 $j["total"] = $total;
             }
-            $info->grade_export_grades($gex);
-            $info->grade_export_formulas($gex);
-            $j["grades"] = $gex->grades;
+            $info->grade_export_grades($gexp);
+            $info->grade_export_formulas($gexp);
+            $j["grades"] = $gexp->grades;
             $want_incomplete = !$info->user->dropped && $info->viewer_is_grader();
-            if ($want_incomplete || $gex->autogrades !== null) {
-                $gv = $gex->grades;
+            if ($want_incomplete || $gexp->autogrades !== null) {
+                $gv = $gexp->grades;
                 '@phan-var-force list $gv';
-                $agv = $gex->autogrades ?? [];
+                $agv = $gexp->autogrades ?? [];
                 $want_autogrades = false;
-                foreach ($gex->value_entries() as $i => $ge) {
+                foreach ($gexp->value_entries() as $i => $ge) {
                     if ($want_incomplete
                         && !isset($gv[$i])
                         && $ge->grader_entry_required()) {
@@ -299,7 +299,7 @@ class Home_TA_Page {
                     }
                 }
                 if ($want_autogrades) {
-                    $j["autogrades"] = $gex->autogrades;
+                    $j["autogrades"] = $gexp->autogrades;
                 }
             }
             if (($lh = $info->fast_late_hours())) {
@@ -367,23 +367,23 @@ class Home_TA_Page {
         $incomplete = $incompleteu = [];
         $jx = [];
         $gradercounts = [];
-        $gex = new GradeExport($pset);
-        $gex->export_entries();
+        $gexp = new GradeExport($pset);
+        $gexp->export_entries();
         $vf = [];
         foreach ($pset->grades as $ge) {
             $vf[] = $ge->type_tabular ? $ge->vf() : 0;
         }
-        $gex->set_fixed_values_vf($vf);
+        $gexp->set_fixed_values_vf($vf);
         foreach ($sset as $s) {
             if (!$s->user->visited) {
-                $j = $this->pset_row_json($pset, $sset, $s, $gex, $anonymous);
+                $j = $this->pset_row_json($pset, $sset, $s, $gexp, $anonymous);
                 if (!$s->user->dropped && isset($j["gradercid"])) {
                     $gradercounts[$j["gradercid"]] = ($gradercounts[$j["gradercid"]] ?? 0) + 1;
                 }
                 if (!$pset->partner_repo) {
                     foreach ($s->user->links(LINK_PARTNER, $pset->id) as $pcid) {
                         if (($ss = $sset->info($pcid)))
-                            $j["partners"][] = $this->pset_row_json($pset, $sset, $ss, $gex, $anonymous);
+                            $j["partners"][] = $this->pset_row_json($pset, $sset, $ss, $gexp, $anonymous);
                     }
                 }
                 $jx[] = $j;
@@ -420,7 +420,7 @@ class Home_TA_Page {
             "id" => $pset->id,
             "checkbox" => $checkbox,
             "anonymous" => $anonymous,
-            "grades" => $gex,
+            "grades" => $gexp,
             "gitless" => $pset->gitless,
             "gitless_grades" => $pset->gitless_grades,
             "key" => $pset->urlkey,
@@ -431,7 +431,7 @@ class Home_TA_Page {
             $jd["can_override_anonymous"] = true;
         }
         $i = $nintotal = $last_in_total = 0;
-        foreach ($gex->value_entries() as $ge) {
+        foreach ($gexp->value_entries() as $ge) {
             if (!$ge->no_total) {
                 ++$nintotal;
                 $last_in_total = $ge->key;
