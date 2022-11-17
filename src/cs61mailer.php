@@ -216,7 +216,7 @@ class CS61Mailer extends Mailer {
 }
 
 // load mail templates, including local ones if any
-global $ConfSitePATH, $Opt;
-require_once("$ConfSitePATH/src/mailtemplate.php");
-if ((@include "$ConfSitePATH/conf/mailtemplate-local.php") !== false)
+global $Opt;
+require_once(SiteLoader::$root . "/src/mailtemplate.php");
+if ((@include (SiteLoader::$root . "/conf/mailtemplate-local.php")) !== false)
     /* do nothing */;

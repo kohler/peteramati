@@ -38,6 +38,10 @@ require_once(SiteLoader::find("src/helpers.php"));
 require_once(SiteLoader::find("src/conference.php"));
 require_once(SiteLoader::find("src/contact.php"));
 Conf::set_current_time(time());
+if (PHP_SAPI === "cli") {
+    set_exception_handler("Multiconference::batch_exception_handler");
+    pcntl_signal(SIGPIPE, SIG_DFL);
+}
 
 
 // Set locale to C (so that, e.g., strtolower() on UTF-8 data doesn't explode)
