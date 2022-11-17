@@ -550,14 +550,6 @@ function tabLength($text, $all) {
     return $len;
 }
 
-/** @param string $varname */
-function ini_get_bytes($varname, $value = null) {
-    $val = trim($value !== null ? $value : ini_get($varname));
-    $last = strlen($val) ? strtolower($val[strlen($val) - 1]) : ".";
-    /** @phan-suppress-next-line PhanParamSuspiciousOrder */
-    return (int) ceil(floatval($val) * (1 << (+strpos(".kmg", $last) * 10)));
-}
-
 
 // Aims to return a random password string with at least
 // `$length * 5` bits of entropy.
