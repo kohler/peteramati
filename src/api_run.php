@@ -1,6 +1,6 @@
 <?php
 // api/api_run.php -- Peteramati API for runs
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class Run_API {

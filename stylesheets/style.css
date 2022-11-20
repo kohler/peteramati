@@ -134,6 +134,9 @@ h3 {
 	margin-top: 0;
 	margin-bottom: 1rem;
 }
+h3.pa-home-pset {
+	font-weight: 900;
+}
 .hdr-actions {
 	display: inline-block;
 	margin-left: 1.5rem;
@@ -2551,12 +2554,29 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 	height: 1rem;
 }
 .gtable-container-0 {
-	margin-left: -24px;
 	margin-right: -24px;
 	margin-bottom: 0.75rem;
+	display: flex;
+	position: relative;
+}
+.gtable-container-gutter {
+	padding-right: 16px;
+}
+.gtable-gutter-content {
+	position: sticky;
+	top: 1rem;
+	bottom: 0;
+	display: grid;
+	grid-template-columns: 1fr;
+}
+.gtable-gutter-pset {
+	margin-top: 1rem;
+	margin-left: 0.5rem;
+	writing-mode: vertical-rl;
+	transform: rotate(180deg);
+	font-weight: 900;
 }
 .gtable-container-1 {
-	padding-left: 24px;
 	padding-right: 24px;
 	overflow-x: scroll;
 	position: relative;
@@ -2580,18 +2600,19 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 	text-decoration: line-through;
 }
 .gt-checkbox {
-	text-align: right;
-	padding-left: 0.25rem;
-	padding-right: 0.25rem;
+	text-align: center;
+}
+th.gt-checkbox > input {
+	font-size: smaller;
 }
 .gt-rownumber {
 	text-align: right;
-	padding-left: 0.25rem;
+	font-variant-numeric: tabular-nums;
 }
 .gt-username {
 	font-weight: bold;
 }
-.gt-rownumber, .gt-username, .gt-name, .gt-grader,
+.gt-username, .gt-name, .gt-grader,
 .gt-grade, .gt-ngrades, .gt-total,
 .gt-conversation, .gt-repo, .gt-pset, .gt-at, .gt-latehours {
 	padding-right: 0.75rem;

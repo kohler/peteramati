@@ -40,6 +40,7 @@ if ("classList" in document.createElement("span")
     };
 }
 
+
 // ui
 const callbacks = {};
 
@@ -124,6 +125,7 @@ $(document).on("focus", "textarea.ta1", function () {
     }
 });
 
+
 export function fold61(sel, arrowholder, direction) {
     if (direction != null) {
         direction = !direction;
@@ -196,5 +198,81 @@ export function input_differs(elt) {
         return false;
     } else {
         return !text_eq(elt.value, expected);
+    }
+}
+
+
+// HtmlCollector
+
+export class HtmlCollector {
+    constructor() {
+        this.clear();
+    }
+
+    clear() {
+        this.open = [];
+        this.close = [];
+        this.html = "";
+        return this;
+    }
+
+    push(open, close) {
+        if (open && close) {
+            this.open.push(this.html + open);
+            this.close.push(close);
+            this.html = "";
+            return this.open.length - 1;
+        } else {
+            this.html += open;
+        }
+        return this;
+    }
+
+    pop(pos) {
+        let n = this.open.length;
+        if (pos == null) {
+            pos = Math.max(0, n - 1);
+        }
+        while (n > pos) {
+            --n;
+            this.html = this.open[n] + this.html + this.close[n];
+            this.open.pop();
+            this.close.pop();
+        }
+        return this;
+    }
+
+    pop_n(n) {
+        return this.pop(Math.max(0, this.open.length - n));
+    }
+
+    push_pop(text) {
+        this.html += text;
+        return this.pop();
+    }
+
+    pop_push(open, close) {
+        this.pop();
+        return this.push(open, close);
+    }
+
+    pop_collapse(pos) {
+        if (pos == null) {
+            pos = this.open.length ? this.open.length - 1 : 0;
+        }
+        while (this.open.length > pos) {
+            if (this.html !== "") {
+                this.html = this.open[this.open.length - 1] + this.html +
+                    this.close[this.open.length - 1];
+            }
+            this.open.pop();
+            this.close.pop();
+        }
+        return this;
+    }
+
+    render() {
+        this.pop(0);
+        return this.html;
     }
 }

@@ -2617,20 +2617,24 @@ class Conf {
 
     function call_api($uf, Contact $user, Qrequest $qreq, APIData $api) {
         if (!$uf) {
-            return ["ok" => false, "error" => "API function not found."];
-        } else if (!($uf->get ?? null) && !$qreq->valid_post()) {
-            return ["ok" => false, "error" => "Missing credentials."];
+            return ["ok" => false, "error" => "API function not found"];
+        } else if ($qreq->method() !== "GET" && $qreq->method() !== "POST") {
+            return ["ok" => false, "error" => "Method not supported"];
+        } else if ($qreq->is_post() && !$qreq->valid_token()) {
+            return ["ok" => false, "error" => "Missing credentials"];
+        } else if (!($uf->get ?? null) && !$qreq->is_post()) {
+            return ["ok" => false, "error" => "Method not supported"];
         }
         $need_hash = !!($uf->hash ?? false);
         $need_repo = !!($uf->repo ?? false);
         $need_pset = $need_repo || $need_hash || !!($uf->pset ?? false);
         $need_user = !!($uf->user ?? false);
         if ($need_user && !$api->user) {
-            return ["ok" => false, "error" => "Missing user."];
+            return ["ok" => false, "error" => "User not found"];
         } else if ($need_pset && !$api->pset) {
-            return ["ok" => false, "error" => "Missing pset."];
+            return ["ok" => false, "error" => "Pset not found"];
         } else if ($need_repo && !$api->repo) {
-            return ["ok" => false, "error" => "Missing repository."];
+            return ["ok" => false, "error" => "Repository not found"];
         } else if ($need_hash) {
             $api->commit = $this->check_api_hash($api->hash, $api);
             if (!$api->commit) {
@@ -2688,12 +2692,16 @@ class Conf {
             expand_json_includes_callback($olist, [$this, "_add_api_json"]);
         }
     }
+    /** @param string $fn
+     * @return bool */
     function has_api($fn) {
         if ($this->_api_map === null) {
             $this->fill_api_map();
         }
         return isset($this->_api_map[$fn]);
     }
+    /** @param string $fn
+     * @return ?object */
     function api($fn) {
         if ($this->_api_map === null) {
             $this->fill_api_map();

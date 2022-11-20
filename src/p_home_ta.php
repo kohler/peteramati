@@ -162,7 +162,8 @@ class Home_TA_Page {
         echo '<div>',
             "<h3>flagged commits</h3>",
             Ht::form(""),
-            '<div class="gtable-container-0"><div class="gtable-container-1">',
+            '<div class="gtable-container-0">',
+            '<div class="gtable-container-1">',
             '<table class="gtable" id="pa-pset-flagged"></table></div></div>',
             Ht::button("Resolve flags", ["class" => "btn ui js-multiresolveflag"]),
             '</form></div>', "\n";
@@ -344,13 +345,20 @@ class Home_TA_Page {
     /** @param StudentSet $sset */
     private function render_pset_table($sset) {
         $pset = $sset->pset;
-        echo '<div id="', $pset->urlkey, '">';
-        echo "<h3>", htmlspecialchars($pset->title), "</h3>";
+        $checkbox = $this->viewer->isPC
+            || (!$pset->gitless && $pset->runners);
+
+        echo '<form id="', $pset->urlkey, '">';
+        echo "<h3 class=\"pa-home-pset\">";
+        if ($this->viewer->privChair) {
+            echo '<button type="button" class="ui js-pset-gconfig mr-3">⚙️</button>';
+        }
+        echo htmlspecialchars($pset->title), "</h3>";
         if ($this->viewer->privChair) {
             $this->render_pset_actions($pset);
         }
         if ($pset->disabled) {
-            echo "</div>\n";
+            echo "</form>\n";
             return;
         }
 
@@ -360,10 +368,7 @@ class Home_TA_Page {
             $anonymous = !!$this->qreq->anonymous;
         }
 
-        $checkbox = $this->viewer->isPC
-            || (!$pset->gitless && $pset->runners);
-
-        $rows = array();
+        $rows = [];
         $incomplete = $incompleteu = [];
         $jx = [];
         $gradercounts = [];
@@ -415,7 +420,17 @@ class Home_TA_Page {
             }
         }
 
-        echo '<div class="gtable-container-0"><div class="gtable-container-1"><table class="gtable want-gtable-fixed" id="pa-pset' . $pset->id . '"></table></div></div>';
+        echo '<div class="gtable-container-0">',
+            '<div class="gtable-container-gutter">',
+            '<div class="gtable-gutter-content">',
+            '<button type="button" class="ui js-gdialog">🛎️</button>',
+            '<button type="button" class="ui js-gdialog">±</button>',
+            '<button type="button" class="ui js-gdialog">🏃🏽‍♀️</button>';
+        if (count($jx) > 20) {
+            echo '<div class="gtable-gutter-pset">', htmlspecialchars($pset->title), '</div>';
+        }
+        echo '</div></div>',
+            '<div class="gtable-container-1"><table class="gtable want-gtable-fixed" id="pa-pset' . $pset->id . '"></table></div></div>';
         $jd = [
             "id" => $pset->id,
             "checkbox" => $checkbox,
@@ -512,11 +527,7 @@ class Home_TA_Page {
                 '</span>';
         }
 
-        if ($checkbox) {
-            echo "</form>\n";
-        }
-
-        echo "</div>\n";
+        echo "</form>\n";
     }
 
 

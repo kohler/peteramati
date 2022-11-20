@@ -1,6 +1,6 @@
 <?php
-// api/api_linenote.php -- Peteramati API for grading
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// api/api_linenote.php -- Peteramati API for line notes
+// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class LineNote_API {

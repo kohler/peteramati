@@ -43,6 +43,7 @@ export function parse_ftext(t) {
 
 const renderers = {};
 
+
 export function render_text(format, text, context) {
     return render_with(renderers[format] || renderers[0], text, context);
 }
@@ -53,23 +54,6 @@ render_text.add_format = function (r) {
     }
     renderers[r.format] = r;
 };
-
-render_text.on_page = function () {
-    $(".need-format").each(function () {
-        let format = this.getAttribute("data-format"),
-            content = this.getAttribute("data-content");
-        if (content == null) {
-            content = this.textContent;
-        }
-        if (format == null) {
-            const ft = parse_ftext(content);
-            format = ft[0];
-            content = ft[1];
-        }
-        render_text(format, content, this);
-    });
-};
-
 
 function link_urls(t) {
     var re = /((?:https?|ftp):\/\/(?:[^\s<>\"&]|&amp;)*[^\s<>\"().,:;&])([\"().,:;]*)(?=[\s<>&]|$)/g;
@@ -144,6 +128,24 @@ render_text.add_format({
 });
 
 
+render_text.on_page = function () {
+    $(".need-format").each(function () {
+        let format = this.getAttribute("data-format"),
+            content = this.getAttribute("data-content");
+        if (content == null) {
+            content = this.textContent;
+        }
+        if (format == null) {
+            const ft = parse_ftext(content);
+            format = ft[0];
+            content = ft[1];
+        }
+        render_text(format, content, this);
+    });
+};
+
+$(render_text.on_page);
+
 export function render_ftext(ftext, context) {
     const ft = parse_ftext(ftext);
     return render_with(renderers[ft[0]] || renderers[0], ft[1], context);
@@ -159,4 +161,24 @@ export const ftext = {
 };
 
 
-$(render_text.on_page);
+// render_xmsg
+export function render_xmsg(status, msg) {
+    if (typeof msg === "string") {
+        msg = msg === "" ? [] : [msg];
+    }
+    if (msg.length === 0) {
+        return [];
+    }
+    const div = document.createElement("div");
+    if (status === 0 || status === 1 || status === 2) {
+        div.className = "msg msg-".concat(["info", "warning", "error"][status]);
+    } else {
+        div.className = "msg msg-error";
+    }
+    for (let i = 0; i !== msg.length; ++i) {
+        const p = document.createElement("p");
+        p.append(msg[i]);
+        div.append(p);
+    }
+    return div;
+}

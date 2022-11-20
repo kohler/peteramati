@@ -27,11 +27,11 @@ class RunRequest {
     /** @param string $err
      * @return array */
     static function error($err = null) {
-        return ["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err];
+        return ["ok" => false, "error" => $err];
     }
 
     static function quit($err = null, $js = null) {
-        json_exit(["ok" => false, "error" => htmlspecialchars($err), "error_text" => $err] + ($js ?? []));
+        json_exit(["ok" => false, "error" => $err] + ($js ?? []));
     }
 
     function __construct(Contact $viewer, Qrequest $qreq) {

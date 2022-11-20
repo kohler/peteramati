@@ -14,7 +14,7 @@ function raw_user_pset_info() {
     global $Conf, $User, $Pset, $Me, $Info, $Commit, $Qreq;
     $Info = PsetView::make($Pset, $User, $Me, $Qreq->newcommit ?? $Qreq->commit);
     if (!$Info->hash()) {
-        json_exit(["ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . htmlspecialchars($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository."]);
+        json_exit(["ok" => false, "error" => $Info->repo ? "No repository." : "Commit " . ($Qreq->newcommit ?? $Qreq->commit) . " isn’t connected to this repository."]);
     }
     return $Info;
 }

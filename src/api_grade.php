@@ -1,6 +1,6 @@
 <?php
 // api/api_grade.php -- Peteramati API for grading
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class Grade_API {

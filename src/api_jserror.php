@@ -1,5 +1,5 @@
 <?php
-// api/api_repo.php -- Peteramati API for Javascript errors
+// api/api_jserror.php -- Peteramati API for Javascript errors
 // HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
