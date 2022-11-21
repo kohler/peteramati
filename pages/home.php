@@ -114,21 +114,6 @@ function qreq_users(Qrequest $qreq) {
 }
 
 
-/** @return ?Pset */
-function older_enabled_repo_same_handout($pset) {
-    $result = false;
-    foreach ($pset->conf->psets() as $p) {
-        if ($p !== $pset
-            && !$p->disabled
-            && !$p->gitless
-            && $p->handout_repo_url === $pset->handout_repo_url
-            && (!$result || $result->deadline < $p->deadline)) {
-            $result = $p;
-        }
-    }
-    return $result;
-}
-
 function download_pset_report(Pset $pset, Qrequest $qreq, $report) {
     $sset = StudentSet::make_for(qreq_users($qreq), $pset->conf->site_contact());
     $sset->set_pset($pset, false);
@@ -177,23 +162,7 @@ function doaction(Contact $viewer, Qrequest $qreq) {
         || $pset->disabled) {
         return $conf->errorMsg("No such pset");
     }
-    if ($qreq->action === "clearrepo") {
-        foreach (qreq_users($qreq) as $user) {
-            $user->set_repo($pset, null);
-            $user->clear_links(LINK_BRANCH, $pset->id);
-        }
-    } else if ($qreq->action === "copyrepo") {
-        if (($old_pset = older_enabled_repo_same_handout($pset))) {
-            foreach (qreq_users($qreq) as $user) {
-                if (!$user->repo($pset->id)
-                    && ($r = $user->repo($old_pset->id))) {
-                    $user->set_repo($pset, $r);
-                    if (($b = $user->branchid($old_pset)))
-                        $user->set_link(LINK_BRANCH, $pset->id, $b);
-                }
-            }
-        }
-    } else if (str_starts_with($qreq->action, "grademany_")) {
+    if (str_starts_with($qreq->action, "grademany_")) {
         $g = $pset->all_grades[substr($qreq->action, 10)];
         assert($g && $g->collate);
         if (!!$g->landmark_range_file) {
@@ -217,114 +186,6 @@ function doaction(Contact $viewer, Qrequest $qreq) {
 
 if ($Me->isPC && $Qreq->valid_post() && $Qreq->doaction) {
     doaction($Me, $Qreq);
-}
-
-
-function psets_json_diff_from($original, $update) {
-    $res = null;
-    foreach (get_object_vars($update) as $k => $vu) {
-        $vo = $original->$k ?? null;
-        if (is_object($vo) && is_object($vu)) {
-            if (!($vu = psets_json_diff_from($vo, $vu))) {
-                continue;
-            }
-        } else if ($vo === $vu) {
-            continue;
-        }
-        $res = $res ?? (object) array();
-        $res->$k = $vu;
-    }
-    return $res;
-}
-
-function save_config_overrides($psetkey, $overrides, $json = null) {
-    global $Conf, $Qreq;
-
-    $dbjson = $Conf->setting_json("psets_override") ? : (object) array();
-    $all_overrides = (object) array();
-    $all_overrides->$psetkey = $overrides;
-    object_replace_recursive($dbjson, $all_overrides);
-    $dbjson = psets_json_diff_from($json ? : load_psets_json(true), $dbjson);
-    $Conf->save_setting("psets_override", Conf::$now, $dbjson);
-
-    unset($_GET["pset"], $_REQUEST["pset"], $Qreq->pset);
-    $Conf->redirect_self($Qreq, ["#" => $psetkey]);
-}
-
-/** @param Conf $conf
- * @param Pset $pset
- * @param Pset $from_pset */
-function forward_pset_links($conf, $pset, $from_pset) {
-    $links = [LINK_REPO, LINK_REPOVIEW, LINK_BRANCH];
-    if ($pset->partner && $from_pset->partner) {
-        array_push($links, LINK_PARTNER, LINK_BACKPARTNER);
-    }
-    $conf->qe("insert into ContactLink (cid, type, pset, link)
-        select l.cid, l.type, ?, l.link from ContactLink l where l.pset=? and l.type?a",
-              $pset->id, $from_pset->id, $links);
-}
-
-/** @param Contact $user
- * @param Qrequest $qreq */
-function reconfig($user, $qreq) {
-    if (!($pset = $user->conf->pset_by_key($qreq->pset))
-        || $pset->removed) {
-        return $user->conf->errorMsg("No such pset");
-    }
-    $psetkey = $pset->key;
-
-    $json = load_psets_json(true);
-    object_merge_recursive($json->$psetkey, $json->_defaults);
-    $old_pset = new Pset($user->conf, $psetkey, $json->$psetkey);
-
-    $o = (object) array();
-    $o->disabled = $o->visible = $o->grades_visible = $o->scores_visible = null;
-    $state = $_POST["state"] ?? null;
-    if ($state === "grades_visible") {
-        $state = "scores_visible";
-    }
-    if ($state === "disabled") {
-        $o->disabled = true;
-    } else if ($old_pset->disabled) {
-        $o->disabled = false;
-    }
-    if ($state === "visible" || $state === "scores_visible") {
-        $o->visible = true;
-    } else if (!$old_pset->disabled && $old_pset->visible) {
-        $o->visible = false;
-    }
-    if ($state === "scores_visible") {
-        $o->scores_visible = true;
-    } else if ($state === "visible" && $old_pset->scores_visible) {
-        $o->scores_visible = false;
-    }
-
-    if (($_POST["frozen"] ?? null) === "yes") {
-        $o->frozen = true;
-    } else {
-        $o->frozen = ($old_pset->frozen ? false : null);
-    }
-
-    if (($_POST["anonymous"] ?? null) === "yes") {
-        $o->anonymous = true;
-    } else {
-        $o->anonymous = ($old_pset->anonymous ? false : null);
-    }
-
-    if (($pset->disabled || !$pset->visible)
-        && (!$pset->disabled || (isset($o->disabled) && !$o->disabled))
-        && ($pset->visible || (isset($o->visible) && $o->visible))
-        && !$pset->gitless
-        && !$user->conf->fetch_ivalue("select exists (select * from ContactLink where pset=?)", $pset->id)
-        && ($older_pset = older_enabled_repo_same_handout($pset))) {
-        forward_pset_links($user->conf, $pset, $older_pset);
-    }
-
-    save_config_overrides($psetkey, $o, $json);
-}
-
-if ($Me->privChair && $Qreq->valid_post() && $Qreq->reconfig) {
-    reconfig($Me, $Qreq);
 }
 
 

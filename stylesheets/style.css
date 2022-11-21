@@ -342,6 +342,9 @@ form {
 .bg-none {
 	background-color: transparent !important;
 }
+.invisible {
+	visibility: hidden !important;
+}
 .d-inline {
 	display: inline !important;
 }
@@ -837,6 +840,7 @@ a.closebtn {
 	padding: 2px 1.5em 3px 7px;
 	font-family: inherit;
 	font-size: 100%;
+	width: 100%;
 }
 .select > select::-ms-expand {
 	display: none;
@@ -1415,6 +1419,9 @@ div.pcconfaff {
 	font-size: 69%;
 }
 
+.multicol-2 {
+	columns: 15rem 2;
+}
 .multicol-3 {
 	columns: 15rem 3;
 }
@@ -2928,6 +2935,9 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	line-height: 1.5;
 	white-space: pre-wrap;
 }
+.pa-scores-hidden-marker {
+	content: "\1f512\fe0e";
+}
 .pa-scores-hidden .pa-gradenote-marker::before {
 	content: "\1f512\fe0e";
 	width: 2rem;
@@ -3333,7 +3343,7 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 	padding-left: 1rem;
 }
 
-.pa-grade-overview {
+.d-grid-1, .pa-grade-overview {
 	display: grid;
 	grid-template-columns: 1fr;
 	position: relative;

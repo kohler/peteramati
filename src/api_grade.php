@@ -301,13 +301,54 @@ class Grade_API {
         return $jx;
     }
 
+    /** @param PsetView $info */
+    static private function gradesettings1($ug, $info, &$old_pset) {
+        $pset = $info->pset;
+        if (property_exists($ug, "scores_visible")
+            && ($pset->gitless_grades || $info->repo)) {
+            $info->set_pinned_scores_visible($ug->scores_visible);
+        }
+        if (isset($ug->gradercid)
+            && ($pset->gitless_grades || $info->repo)) {
+            if (!$pset->gitless_grades && !$info->grading_hash()) {
+                $info->repo->refresh(2700, true);
+                $info->set_latest_nontrivial_commit($sset);
+                if ($info->hash()) {
+                    $info->mark_grading_commit();
+                }
+            }
+            if ($pset->gitless_grades || $info->hash()) {
+                $info->change_grader($ug->gradercid);
+            }
+        }
+        if ((($ug->clearrepo ?? false) || ($ug->adoptoldrepo ?? false))
+            && !$pset->gitless) {
+            if (($ug->clearrepo ?? false) && $info->repo) {
+                $info->user->set_repo($pset, null);
+                $info->user->clear_links(LINK_BRANCH, $pset->id);
+                $info->reload_repo();
+            }
+            if (($ug->adoptoldrepo ?? false) && !$info->repo) {
+                $old_pset = $old_pset ?? PsetConfig_API::older_enabled_repo_same_handout($pset);
+                $old_repo = $old_pset ? $info->user->repo($old_pset->id) : null;
+                if ($old_repo) {
+                    $info->user->set_repo($pset, $old_repo);
+                    if (($b = $info->user->branchid($old_pset))) {
+                        $info->user->set_link(LINK_BRANCH, $old_pset->id, $b);
+                    }
+                    $info->reload_repo();
+                }
+            }
+        }
+    }
+
     static function gradesettings(Contact $viewer, Qrequest $qreq, APIData $api) {
         if (($ugs = self::parse_users($qreq->us)) === null) {
-            return ["ok" => false, "error" => "Missing parameter."];
+            return ["ok" => false, "error" => "Missing parameter"];
         } else if ($qreq->is_post() && !$qreq->valid_post()) {
-            return ["ok" => false, "error" => "Missing credentials."];
+            return ["ok" => false, "error" => "Missing credentials"];
         } else if (!$viewer->privChair) {
-            return ["ok" => false, "error" => "Permission error."];
+            return ["ok" => false, "error" => "Permission error"];
         }
         try {
             $sset = self::student_set(array_keys($ugs), $viewer, $api);
@@ -316,7 +357,7 @@ class Grade_API {
             return ["ok" => false, "error" => $err->getMessage()];
         }
         if (count($sset) === 0) {
-            return ["ok" => false, "error" => "No users."];
+            return ["ok" => false, "error" => "No users"];
         }
 
         // XXX match commit with grading commit
@@ -324,36 +365,24 @@ class Grade_API {
         if ($qreq->is_post()) {
             foreach ($sset as $uid => $info) {
                 $ug = $ugs[$uid];
-                if (isset($ug->scores_visible)
-                    && !is_bool($ug->scores_visible)) {
-                    return ["ok" => false, "error" => "Invalid request."];
+                if (isset($ug->scores_visible) && !is_bool($ug->scores_visible)) {
+                    return ["ok" => false, "error" => "Invalid `scores_visible` request"];
                 }
                 if (isset($ug->gradercid)
                     && (!is_int($ug->gradercid)
                         || ($ug->gradercid !== 0 && !isset($pcm[$ug->gradercid])))) {
-                    return ["ok" => false, "error" => "Invalid request."];
+                    return ["ok" => false, "error" => "Invalid `gradercid` request"];
+                }
+                if (isset($ug->clearrepo) && !is_bool($ug->clearrepo)) {
+                    return ["ok" => false, "error" => "Invalid `clearrepo` request"];
+                }
+                if (isset($ug->adoptoldrepo) && !is_bool($ug->adoptoldrepo)) {
+                    return ["ok" => false, "error" => "Invalid `adoptoldrepo` request"];
                 }
             }
+            $old_pset = null;
             foreach ($sset as $uid => $info) {
-                $ug = $ugs[$uid];
-                if (!$api->pset->gitless_grades && !$info->repo) {
-                    continue;
-                }
-                if (property_exists($ug, "scores_visible")) {
-                    $info->set_pinned_scores_visible($ug->scores_visible);
-                }
-                if (isset($ug->gradercid)) {
-                    if (!$api->pset->gitless_grades && !$info->grading_hash()) {
-                        $info->repo->refresh(2700, true);
-                        $info->set_latest_nontrivial_commit($sset);
-                        if ($info->hash()) {
-                            $info->mark_grading_commit();
-                        }
-                    }
-                    if ($api->pset->gitless_grades || $info->hash()) {
-                        $info->change_grader($ug->gradercid);
-                    }
-                }
+                self::gradesettings1($ugs[$uid], $info, $old_pset);
             }
         }
         $j = ["ok" => true, "us" => []];

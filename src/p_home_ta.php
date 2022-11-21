@@ -160,11 +160,11 @@ class Home_TA_Page {
         }
 
         echo '<div>',
+            Ht::form("", ["id" => "pa-pset-flagged"]),
             "<h3>flagged commits</h3>",
-            Ht::form(""),
             '<div class="gtable-container-0">',
             '<div class="gtable-container-1">',
-            '<table class="gtable" id="pa-pset-flagged"></table></div></div>',
+            '<table class="gtable"></table></div></div>',
             Ht::button("Resolve flags", ["class" => "btn ui js-multiresolveflag"]),
             '</form></div>', "\n";
         $jd = [
@@ -180,7 +180,8 @@ class Home_TA_Page {
         if ($nintotal) {
             $jd["need_total"] = 1;
         }
-        echo Ht::unstash(), '<script>$("#pa-pset-flagged").each(function(){$pa.render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
+        echo Ht::unstash(), '<script>$pa.pset_table($("#pa-pset-flagged")[0],',
+            json_encode_browser($jd), ',', json_encode_browser($jx), ')</script>';
         return true;
     }
 
@@ -220,8 +221,8 @@ class Home_TA_Page {
     /** @param bool $anonymous
      * @return array */
     function pset_row_json(Pset $pset, StudentSet $sset, PsetView $info,
-                           GradeExport $gexp, $anonymous) {
-        $j = StudentSet::json_basics($info->user, $anonymous);
+                           GradeExport $gexp) {
+        $j = StudentSet::json_basics($info->user, $pset->anonymous);
         if (($gcid = $info->gradercid())) {
             $j["gradercid"] = $gcid;
         }
@@ -342,36 +343,54 @@ class Home_TA_Page {
         return $j;
     }
 
+    /** @return array */
+    private function pconf(Pset $pset, GradeExport $gexp) {
+        $jd = [
+            "id" => $pset->id,
+            "checkbox" => $this->viewer->isPC,
+            "anonymous" => $pset->anonymous,
+            "grades" => $gexp,
+            "gitless" => $pset->gitless,
+            "gitless_grades" => $pset->gitless_grades,
+            "key" => $pset->urlkey,
+            "title" => $pset->title,
+            "disabled" => $pset->disabled,
+            "visible" => $pset->visible,
+            "scores_visible" => $pset->scores_visible_student(),
+            "frozen" => $pset->frozen
+        ];
+        if (!$pset->gitless
+            && PsetConfig_API::older_enabled_repo_same_handout($pset)) {
+            $jd["has_older_repo"] = true;
+        }
+        if ($pset->anonymous) {
+            $jd["can_override_anonymous"] = true;
+        }
+        $nintotal = $last_in_total = 0;
+        foreach ($gexp->value_entries() as $ge) {
+            if (!$ge->no_total) {
+                ++$nintotal;
+                $last_in_total = $ge->key;
+            }
+        }
+        if ($nintotal > 1) {
+            $jd["need_total"] = true;
+        } else if ($nintotal == 1) {
+            $jd["total_key"] = $last_in_total;
+        }
+        foreach ($pset->runners as $r) {
+            if ($this->viewer->can_run($pset, $r)) {
+                $jd["runners"][$r->name] = $r->title;
+            }
+        }
+        return $jd;
+    }
+
     /** @param StudentSet $sset */
     private function render_pset_table($sset) {
+        assert($this->viewer->isPC);
         $pset = $sset->pset;
-        $checkbox = $this->viewer->isPC
-            || (!$pset->gitless && $pset->runners);
 
-        echo '<form id="', $pset->urlkey, '">';
-        echo "<h3 class=\"pa-home-pset\">";
-        if ($this->viewer->privChair) {
-            echo '<button type="button" class="ui js-pset-gconfig mr-3">⚙️</button>';
-        }
-        echo htmlspecialchars($pset->title), "</h3>";
-        if ($this->viewer->privChair) {
-            $this->render_pset_actions($pset);
-        }
-        if ($pset->disabled) {
-            echo "</form>\n";
-            return;
-        }
-
-        // load students
-        $anonymous = $pset->anonymous;
-        if ($this->qreq->anonymous !== null && $this->viewer->privChair) {
-            $anonymous = !!$this->qreq->anonymous;
-        }
-
-        $rows = [];
-        $incomplete = $incompleteu = [];
-        $jx = [];
-        $gradercounts = [];
         $gexp = new GradeExport($pset);
         $gexp->export_entries();
         $vf = [];
@@ -379,16 +398,41 @@ class Home_TA_Page {
             $vf[] = $ge->type_tabular ? $ge->vf() : 0;
         }
         $gexp->set_fixed_values_vf($vf);
+
+        $jd = $this->pconf($pset, $gexp);
+
+        $psettitle = ($pset->disabled || !$pset->visible ? " pa-p-hidden" : "")
+            . "\">"
+            . ($pset->visible && !$pset->scores_visible ? '<span class="pa-scores-hidden-marker"></span>' : '')
+            . htmlspecialchars($pset->title);
+
+        echo '<form id="', $pset->urlkey, '">';
+        echo "<h3 class=\"pa-home-pset", $psettitle;
+        if ($this->viewer->privChair) {
+            echo '<button type="button" class="btn-t small ui js-pset-gconfig">⚙️</button>';
+        }
+        echo "</h3>";
+        if ($pset->disabled) {
+            echo Ht::unstash_script('$pa.pset_table($("#' . $pset->urlkey . '")[0],' . json_encode_browser($jd) . ',null)'),
+                "</form>\n";
+            return;
+        }
+
+        // load students
+        $rows = [];
+        $incomplete = $incompleteu = [];
+        $jx = [];
+        $gradercounts = [];
         foreach ($sset as $s) {
             if (!$s->user->visited) {
-                $j = $this->pset_row_json($pset, $sset, $s, $gexp, $anonymous);
+                $j = $this->pset_row_json($pset, $sset, $s, $gexp);
                 if (!$s->user->dropped && isset($j["gradercid"])) {
                     $gradercounts[$j["gradercid"]] = ($gradercounts[$j["gradercid"]] ?? 0) + 1;
                 }
                 if (!$pset->partner_repo) {
                     foreach ($s->user->links(LINK_PARTNER, $pset->id) as $pcid) {
                         if (($ss = $sset->info($pcid)))
-                            $j["partners"][] = $this->pset_row_json($pset, $sset, $ss, $gexp, $anonymous);
+                            $j["partners"][] = $this->pset_row_json($pset, $sset, $ss, $gexp);
                     }
                 }
                 $jx[] = $j;
@@ -413,52 +457,32 @@ class Home_TA_Page {
                 '<script>$("#incomplete_pset', $pset->id, '").remove().removeClass("hidden").appendTo("#incomplete_notices")</script>';
         }
 
-        if ($checkbox) {
+        if ($this->viewer->isPC) {
             echo Ht::form($sset->conf->hoturl("=index", ["pset" => $pset->urlkey, "save" => 1, "college" => $this->qreq->college, "extension" => $this->qreq->extension]));
             if ($pset->anonymous) {
-                echo Ht::hidden("anonymous", $anonymous ? 1 : 0);
+                echo Ht::hidden("anonymous", 1);
             }
         }
 
         echo '<div class="gtable-container-0">',
             '<div class="gtable-container-gutter">',
             '<div class="gtable-gutter-content">',
-            '<button type="button" class="ui js-gdialog">🛎️</button>',
-            '<button type="button" class="ui js-gdialog">±</button>',
-            '<button type="button" class="ui js-gdialog">🏃🏽‍♀️</button>';
+            '<button type="button" class="ui js-gdialog mb-2">🛎️</button>';
+        if (false) {
+            echo '<button type="button" class="ui js-ptable-diff mb-2">±</button>';
+        }
+        if (isset($jd["runners"])) {
+            echo '<button type="button" class="ui js-ptable-run mb-2">🏃🏽‍♀️</button>';
+        }
         if (count($jx) > 20) {
-            echo '<div class="gtable-gutter-pset">', htmlspecialchars($pset->title), '</div>';
+            echo '<div class="gtable-gutter-pset', $psettitle, '</div>';
         }
         echo '</div></div>',
-            '<div class="gtable-container-1"><table class="gtable want-gtable-fixed" id="pa-pset' . $pset->id . '"></table></div></div>';
-        $jd = [
-            "id" => $pset->id,
-            "checkbox" => $checkbox,
-            "anonymous" => $anonymous,
-            "grades" => $gexp,
-            "gitless" => $pset->gitless,
-            "gitless_grades" => $pset->gitless_grades,
-            "key" => $pset->urlkey,
-            "title" => $pset->title,
-            "scores_visible" => $pset->scores_visible_student()
-        ];
-        if ($anonymous) {
-            $jd["can_override_anonymous"] = true;
-        }
-        $i = $nintotal = $last_in_total = 0;
-        foreach ($gexp->value_entries() as $ge) {
-            if (!$ge->no_total) {
-                ++$nintotal;
-                $last_in_total = $ge->key;
-            }
-            ++$i;
-        }
-        if ($nintotal > 1) {
-            $jd["need_total"] = true;
-        } else if ($nintotal == 1) {
-            $jd["total_key"] = $last_in_total;
-        }
-        echo Ht::unstash(), '<script>$("#pa-pset', $pset->id, '").each(function(){$pa.render_pset_table.call(this,', json_encode_browser($jd), ',', json_encode_browser($jx), ')})</script>';
+            '<div class="gtable-container-1"><table class="gtable want-gtable-fixed"></table></div></div>';
+        echo Ht::unstash(),
+            '<script>$pa.pset_table($("#', $pset->key, '")[0],',
+            json_encode_browser($jd), ',',
+            json_encode_browser($jx), ')</script>';
 
         $actions = [];
         if ($this->viewer->isPC) {
@@ -488,42 +512,18 @@ class Home_TA_Page {
                     }
                 }
             }
-            if ($stage !== -1 && $stage !== 2) {
-                $actions[] = null;
-            }
-            $stage = 2;
-            if (!$pset->gitless) {
-                $actions["clearrepo"] = "Clear repo";
-                if (older_enabled_repo_same_handout($pset)) {
-                    $actions["copyrepo"] = "Adopt previous repo";
+            foreach ($pset->reports as $r) {
+                if ($stage !== -1 && $stage !== 2) {
+                    $actions[] = null;
                 }
-            }
-            if ($pset->reports) {
-                $actions[] = null;
-                foreach ($pset->reports as $r) {
-                    $actions["report_{$r->key}"] = $r->title;
-                }
+                $stage = 2;
+                $actions["report_{$r->key}"] = $r->title;
             }
         }
         if (!empty($actions)) {
             echo '<span class="nb" style="padding-right:2em">',
                 Ht::select("action", $actions),
                 ' &nbsp;', Ht::submit("doaction", "Go"),
-                '</span>';
-        }
-
-        $sel = ["__run_group" => ["optgroup", "Run"]];
-        $esel = ["__ensure_group" => ["optgroup", "Ensure"]];
-        foreach ($pset->runners as $r) {
-            if ($this->viewer->can_run($pset, $r)) {
-                $sel[$r->name] = htmlspecialchars($r->title);
-                $esel[$r->name . ".ensure"] = htmlspecialchars($r->title);
-            }
-        }
-        if (count($sel) > 1) {
-            echo '<span class="nb" style="padding-right:2em">',
-                Ht::select("run", $sel + $esel),
-                ' &nbsp;', Ht::submit("Run all", ["formaction" => $pset->conf->hoturl("=run", ["pset" => $pset->urlkey, "runmany" => 1])]),
                 '</span>';
         }
 

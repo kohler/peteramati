@@ -32,7 +32,7 @@ import "./gc-multicheckbox.js";
 import "./gc-select.js";
 import "./gc-markdown.js";
 import "./gc-timermark.js";
-import { pa_render_pset_table } from "./ptable.js";
+import { pa_pset_table } from "./ptable.js";
 import LinkifyIt from "linkify-it";
 window.markdownit.linkify = LinkifyIt();
 window.markdownit.linkify.set({fuzzyEmail: false, "---": true});
@@ -1121,8 +1121,8 @@ window.$pa = {
     loadgrades: pa_loadgrades,
     load_runsettings: run_settings_load,
     pset_actions: pa_pset_actions,
+    pset_table: pa_pset_table,
     render_text_page: render_text.on_page,
-    render_pset_table: pa_render_pset_table,
     runmany: pa_runmany,
     store_gradeinfo: GradeSheet.store,
     text_eq: text_eq

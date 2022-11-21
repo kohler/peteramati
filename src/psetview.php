@@ -209,6 +209,21 @@ class PsetView {
     }
 
 
+    /** @param bool $refresh */
+    function reload_repo($refresh = false) {
+        $this->repo = $this->_rpi = $this->_cpi = $this->_hash = null;
+        $this->_is_sset = $this->_derived_handout_commit = false;
+        if (!$this->pset->gitless) {
+            $this->repo = $this->user->repo($this->pset->id);
+            $this->branchid = $this->user->branchid($this->pset);
+            $this->branch = $this->conf->branch($this->branchid);
+        }
+        if ($this->repo) {
+            $this->set_hash(null, $refresh);
+        }
+    }
+
+
     /** @return list<int> */
     function backpartners() {
         return array_values(array_unique($this->user->links(LINK_BACKPARTNER, $this->pset->id)));

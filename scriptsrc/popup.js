@@ -39,21 +39,14 @@ export function popup_skeleton(options) {
         }
         return $d;
     }
-    function close() {
-        tooltip.erase();
-        $d.find("textarea, input").unautogrow();
-        $d.trigger("closedialog");
-        $d.remove();
-        removeClass(document.body, "modal-open");
-    }
     hc.show = function (visible) {
         if (!$d) {
             $d = $(hc.render()).appendTo(document.body);
             $d.find(".need-tooltip").each(tooltip);
             $d.on("click", function (event) {
-                event.target === $d[0] && close();
+                event.target === $d[0] && popup_close.call($d[0]);
             });
-            $d.find("button[name=cancel]").on("click", close);
+            $d.find("button[name=cancel]").on("click", popup_close);
             if (options.action) {
                 if (options.action instanceof HTMLFormElement) {
                     $d.find("form").attr({action: options.action.action, method: options.action.method});
@@ -66,7 +59,9 @@ export function popup_skeleton(options) {
                     $d.children().css(k, options[k]);
             }
             $d.show_errors = show_errors;
-            $d.close = close;
+            $d.close = function () {
+                popup_close.call($d[0]);
+            };
         }
         if (visible !== false) {
             popup_near($d, options.anchor || window);
@@ -76,6 +71,15 @@ export function popup_skeleton(options) {
         return $d;
     };
     return hc;
+}
+
+export function popup_close() {
+    const d = this.closest(".modal");
+    tooltip.erase();
+    $(d).find("textarea, input").unautogrow();
+    $(d).trigger("closedialog");
+    $(d).remove();
+    removeClass(document.body, "modal-open");
 }
 
 // differences and focusing

@@ -2685,6 +2685,7 @@ class Conf {
             "linenotemark" => "3 LineNote_API::linenotemark",
             "multigrade" => "3 Grade_API::multigrade",
             "multiresolveflag" => "0 Flag_API::multiresolve",
+            "psetconfig" => "3 PsetConfig_API::psetconfig",
             "repositories" => "17 Repo_API::user_repositories",
             "runchainhead" => "1 Run_API::runchainhead"
         ];

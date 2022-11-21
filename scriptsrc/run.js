@@ -98,7 +98,8 @@ function trim_data_to_offset(data, offset) {
 export function run(button, opts) {
     const form = button.closest("form"),
         category = button.getAttribute("data-pa-run-category") || button.value,
-        directory = button.closest(".pa-psetinfo").getAttribute("data-pa-directory"),
+        psetinfo = button.closest(".pa-psetinfo"),
+        directory = psetinfo ? psetinfo.getAttribute("data-pa-directory") : "",
         therun = document.getElementById("pa-run-" + category),
         therunout = therun.closest(".pa-runout"),
         thepre = $(therun).find("pre");
@@ -229,7 +230,7 @@ export function run(button, opts) {
         if (complete !== false) {
             hide_cursor();
             if (button.hasAttribute("data-pa-run-grade")) {
-                grades_fetch(button.closest(".pa-psetinfo")); // XXX not on replay
+                grades_fetch(psetinfo); // XXX not on replay
             }
             opts.done_function && opts.done_function();
         }
