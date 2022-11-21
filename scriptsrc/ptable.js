@@ -41,6 +41,22 @@ function grader_name(p) {
     return p.__nickname;
 }
 
+function render_year(yr, html) {
+    if (!yr) {
+        return "";
+    } else if (typeof yr === "number") {
+        if (yr >= 1 && yr <= 20 && Math.floor(yr) === yr) {
+            return String.fromCharCode(9311 + yr);
+        } else {
+            return yr.toString();
+        }
+    } else if (yr.length === 1 && yr >= "A" && yr <= "Z") {
+        return String.fromCharCode(9333 + yr.charCodeAt(0));
+    } else {
+        return html ? escape_entities(yr) : yr;
+    }
+}
+
 function user_compare(a, b) {
     return a._sort_user.localeCompare(b._sort_user);
 }
@@ -79,6 +95,7 @@ class PtableConf {
         this.scores_visible = !!pconf.scores_visible;
         this.frozen = !!pconf.frozen;
         this.anonymous = this.original_anonymous = !!pconf.anonymous;
+        this.has_nonanonymous = !this.anonymous || pconf.has_nonanonymous;
         this.can_override_anonymous = pconf.can_override_anonymous;
         this.flagged_commits = pconf.flagged_commits;
         this.last_first = null;
@@ -150,8 +167,8 @@ class PtableConf {
 
     render_user_td(tde, s) {
         const ae = this.make_pset_ae(s);
-        if (this.anonymous) {
-            ae.append(s.anon_user || "?");
+        if (this.anonymous && s.anon_user) {
+            ae.append(s.anon_user);
         } else if (this.sort.u === "email" && s.email) {
             ae.append(s.email);
         } else if (this.sort.u === "name") {
@@ -326,9 +343,10 @@ const gcoldef = {
 
     name2: {
         th: function (ptconf) {
-            var t = '<span class="heading">' + (ptconf.anonymous ? "Username" : "Name") + '</span>';
-            if (ptconf.original_anonymous && ptconf.can_override_anonymous)
+            let t = '<span class="heading">' + (ptconf.anonymous ? "Username" : "Name") + '</span>';
+            if (ptconf.original_anonymous && ptconf.can_override_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
+            }
             return '<th class="gt-name2 l plsortable" data-pa-sort="name2" scope="col">' + t + '</th>';
         },
         td: function (tde, s, ptconf) {
@@ -357,7 +375,7 @@ const gcoldef = {
     },
 
     extension: {
-        th: '<th class="gt-extension l plsortable" data-pa-sort="extension" scope="col">X?</th>',
+        th: '<th class="gt-extension plsortable" data-pa-sort="extension" scope="col">X?</th>',
         td: function (tde, s) {
             tde.className = "gt-extension";
             s.x && tde.append("X");
@@ -373,24 +391,10 @@ const gcoldef = {
     },
 
     year: {
-        th: '<th class="gt-year c plsortable" data-pa-sort="year" scole="col">Yr</th>',
+        th: '<th class="gt-year plsortable" data-pa-sort="year" scole="col">Yr</th>',
         td: function (tde, s) {
-            var t = '';
-            if (s.year) {
-                if (typeof s.year === "number") {
-                    if (s.year >= 1 && s.year <= 20) {
-                        t = String.fromCharCode(9311 + s.year);
-                    } else {
-                        t = s.year;
-                    }
-                } else if (s.year.length === 1 && s.year >= "A" && s.year <= "Z") {
-                    t = String.fromCharCode(9333 + s.year.charCodeAt(0));
-                } else {
-                    t = escape_entities(s.year);
-                }
-            }
             tde.className = "gt-year c";
-            tde.replaceChildren(t);
+            tde.replaceChildren(render_year(s.year));
         },
         tw: 2,
         sort_forward: true,
@@ -443,7 +447,7 @@ const gcoldef = {
     },
 
     notes: {
-        th: '<th class="gt-notes c plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
+        th: '<th class="gt-notes plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
         td: function (tde, s, ptconf) {
             tde.className = "gt-notes c";
             let t = s.scores_visible ? '⎚' : '';
@@ -1098,7 +1102,7 @@ function pa_render_pset_table(ptconf) {
                     sort.email = !sort.email;
                     sort.u = ptconf.anonymous || !ptconf.email ? "user" : "email";
                     rerender_usernames();
-                } else if (sf === "user" && !ptconf.anonymous) {
+                } else if (sf === "user" && (!ptconf.anonymous || ptconf.has_nonanonymous)) {
                     if (sort.u === "name") {
                         ptconf.last_first = sort.last = !sort.last;
                         if (!sort.last) {
@@ -1310,9 +1314,10 @@ tooltip.add_builder("pa-ptable-user", function () {
         ptconf = this.closest("form").pa__ptconf,
         su = ptconf.smap[spos];
     return {content: new Promise((resolve) => {
-        const maindiv = document.createElement("div");
+        const maindiv = document.createElement("div"),
+            anon = ptconf.anonymous && su.anon_user;
         maindiv.className = "d-flex align-items-center";
-        if (su.imageid && !ptconf.anonymous) {
+        if (su.imageid && !anon) {
             const ae = ptconf.make_student_ae(su),
                 img = document.createElement("img");
             img.className = "pa-tinyface";
@@ -1323,10 +1328,16 @@ tooltip.add_builder("pa-ptable-user", function () {
         const idiv = document.createElement("div");
         maindiv.append(idiv);
         const userae = ptconf.make_student_ae(su);
-        userae.className += " nou gt-username";
-        userae.append(ptconf.anonymous ? su.anon_user : su.user);
-        idiv.append(userae, document.createElement("br"));
-        if (!ptconf.anonymous) {
+        userae.className += " font-weight-bold";
+        userae.append(anon ? su.anon_user : su.user);
+        idiv.append(userae);
+        if (su.x) {
+            idiv.append(" (X)");
+        } else if (!anon && su.year) {
+            idiv.append(" " + render_year(su.year));
+        }
+        idiv.append(document.createElement("br"));
+        if (!anon) {
             const name = render_name(su, false);
             if (name !== "") {
                 const nameae = ptconf.make_student_ae(su);

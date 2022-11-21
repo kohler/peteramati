@@ -290,6 +290,9 @@ label.checki {
 .small {
 	font-size: smaller;
 }
+.font-weight-bold {
+	font-weight: bold;
+}
 
 .cR {
 	background-color: #ffd8d8;
@@ -2629,8 +2632,9 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 .gt-dropped {
 	text-decoration: line-through;
 }
-.gt-checkbox {
+.gt-checkbox, .gt-extension, .gt-year, .gt-notes {
 	text-align: center;
+	width: 2rem;
 }
 th.gt-checkbox > input {
 	font-size: smaller;

@@ -135,7 +135,7 @@ class Home_TA_Page {
                 || !($pset = $this->conf->pset_by_id($row->pset()))) {
                 continue;
             }
-            $anon = $anonymous === null ? $pset->anonymous : $anonymous;
+            $anon = $anonymous ?? $pset->anonymous;
             $any_anonymous = $any_anonymous || $anon;
             $any_nonanonymous = $any_nonanonymous || !$anon;
 
@@ -170,7 +170,7 @@ class Home_TA_Page {
         $jd = [
             "id" => "flagged",
             "flagged_commits" => true,
-            "anonymous" => true,
+            "anonymous" => $any_anonymous,
             "has_nonanonymous" => $any_nonanonymous,
             "checkbox" => true
         ];
