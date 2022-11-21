@@ -14,10 +14,11 @@ import { ptable_gdialog } from "./ptable-grades.js";
 
 function render_name(s, last_first) {
     if (s.first != null && s.last != null) {
-        if (last_first)
+        if (last_first) {
             return s.last.concat(", ", s.first);
-        else
+        } else {
             return s.first.concat(" ", s.last);
+        }
     } else if (s.first != null) {
         return s.first;
     } else if (s.last != null) {
@@ -81,7 +82,8 @@ class PtableConf {
         this.flagged_commits = pconf.flagged_commits;
         this.last_first = null;
         this.sort = {
-            f: this.flagged_commits ? "at" : "name", last: false, rev: 1
+            f: this.flagged_commits ? "at" : "name", last: false, rev: 1,
+            u: "name"
         };
         this.no_sort = pconf.no_sort;
         this.checkbox = !!pconf.checkbox;
@@ -138,6 +140,20 @@ class PtableConf {
         tde.replaceChildren(ae);
     }
 
+    render_user_td(tde, s) {
+        const ae = this.make_student_ae(s);
+        if (this.anonymous) {
+            ae.append(s.anon_user || "?");
+        } else if (this.sort.u === "email" && s.email) {
+            ae.append(s.email);
+        } else if (this.sort.u === "name") {
+            ae.append(render_name(s, this.last_first));
+        } else {
+            ae.append(s.user);
+        }
+        tde.replaceChildren(ae);
+    }
+
     render_display_name(tde, s, is2) {
         const t = is2 && this.anonymous
             ? s.anon_user || "?"
@@ -152,10 +168,12 @@ class PtableConf {
     }
 
     render_name_text(s) {
-        if (s) {
-            return (this.anonymous ? s.anon_user : render_name(s, this.last_first)) || "?";
-        } else {
+        if (!s) {
             return "[none]";
+        } else if (this.anonymous) {
+            return s.anon_user || "?";
+        } else {
+            return render_name(s, this.last_first) || "?";
         }
     }
 
@@ -240,15 +258,43 @@ const gcoldef = {
         }
     },
 
+    user: {
+        th: function (ptconf) {
+            let t = '<span class="heading">';
+            if (ptconf.anonymous || ptconf.sort.u === "user") {
+                t += "Username";
+            } else if (ptconf.sort.u === "email") {
+                t += "Email";
+            } else {
+                t += "Name";
+            }
+            t += '</span>';
+            if (ptconf.anonymous && ptconf.can_override_anonymous) {
+                t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
+            } else if (ptconf.original_anonymous) {
+                t += ' <span class="n">[anon]</span>';
+            }
+            return '<th class="gt-user l plsortable" data-pa-sort="user" scope="col">' + t + '</th>';
+        },
+        td: function (tde, s, ptconf) {
+            tde.className = "gt-user";
+            ptconf.render_user_td(tde, s);
+        },
+        tw: 14,
+        pin: true,
+        sort_forward: true
+    },
+
     username: {
         th: function (ptconf) {
-            var t = '<span class="heading">' +
+            let t = '<span class="heading">' +
                 (ptconf.anonymous || !ptconf.sort.email ? "Username" : "Email") +
                 '</span>';
-            if (ptconf.anonymous && ptconf.can_override_anonymous)
+            if (ptconf.anonymous && ptconf.can_override_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
-            else if (ptconf.original_anonymous)
+            } else if (ptconf.original_anonymous) {
                 t += ' <span class="n">[anon]</span>';
+            }
             return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
         },
         td: function (tde, s, ptconf) {
@@ -554,24 +600,17 @@ function pa_render_pset_table(ptconf) {
     function string_function(s) {
         return function () { return s; };
     }
-    function set_sort_nameflag() {
-        if (sort.f === "name" || sort.f === "name2" || sort.f === "username"
-            || sort.f === "email" || sort.nameflag == null) {
-            sort.nameflag = 0;
-            if (sort.f === "name" || sort.f === "name2") {
-                sort.nameflag |= 1;
-            }
-            if (sort.last) {
-                sort.nameflag |= 2;
-            }
-            if (sort.email) {
-                sort.nameflag |= 4;
-            }
-            if (ptconf.anonymous) {
-                sort.nameflag |= 8;
-            }
+
+    function sort_nameflag() {
+        if (sort.u === "name") {
+            return 1 | (sort.last ? 2 : 0);
+        } else if (sort.u === "email") {
+            return 4;
+        } else {
+            return ptconf.anonymous ? 8 : 0;
         }
     }
+
     function initialize() {
         let x = wstorage.site(true, "pa-pset" + ptconf.id + "-table");
         if (x) {
@@ -596,9 +635,6 @@ function pa_render_pset_table(ptconf) {
         }
         if (ptconf.anonymous && sort.override_anonymous) {
             ptconf.anonymous = false;
-        }
-        if (sort.nameflag == null) {
-            set_sort_nameflag();
         }
 
         table_entries = [];
@@ -660,7 +696,7 @@ function pa_render_pset_table(ptconf) {
                 col.push("pset");
                 col.push("at");
             }
-            col.push("username", "name", "extension", "year", "grader");
+            col.push("user", "extension", "year", "grader");
             if (has_late_hours) {
                 col.push("latehours");
             }
@@ -747,7 +783,8 @@ function pa_render_pset_table(ptconf) {
             i, j, trn = 0, was_boringness = false,
             last = tb.firstChild;
         for (i = 0; i !== data.length; ++i) {
-            var s = data[i];
+            const s = data[i];
+            ++trn;
             while ((j = last) && j.className === "gt-boring") {
                 last = last.nextSibling;
                 tb.removeChild(j);
@@ -756,21 +793,21 @@ function pa_render_pset_table(ptconf) {
                 tb.insertBefore($('<tr class="gt-boring"><td colspan="' + ncol + '"><hr></td></tr>')[0], last);
             }
             was_boringness = s.boringness;
-            var tr = rmap[s._spos];
+            const tr = rmap[s._spos];
             for (j = 0; j < tr.length; ++j) {
-                if (last !== tr[j])
+                if (last !== tr[j]) {
                     tb.insertBefore(tr[j], last);
-                else
+                } else {
                     last = last.nextSibling;
+                }
                 removeClass(tr[j], "k" + (1 - trn % 2));
                 addClass(tr[j], "k" + (trn % 2));
             }
-            ++trn;
         }
 
         render_rownumbers();
 
-        var last_first = sort.f && sort.last;
+        var last_first = sort.last;
         if (last_first !== ptconf.last_first) {
             ptconf.last_first = last_first;
             $b.find(".gt-name, .gt-name2").each(function () {
@@ -808,6 +845,7 @@ function pa_render_pset_table(ptconf) {
         slist_input && assign_slist();
         wstorage.site(true, "pa-pset" + ptconf.id + "-table", JSON.stringify(sort));
     }
+
     function rerender_usernames() {
         var $x = $overlay ? $([$j[0], $overlay[0]]) : $j;
         $x.find("td.gt-username").each(function () {
@@ -821,6 +859,23 @@ function pa_render_pset_table(ptconf) {
         });
         $x.find("th.gt-name2 > span.heading").html(ptconf.anonymous ? "Username" : "Name");
     }
+
+    function rerender_users() {
+        let $x = $overlay ? $([$j[0], $overlay[0]]) : $j, th;
+        $x.find("td.gt-user").each(function () {
+            const s = smap[this.parentNode.getAttribute("data-pa-spos")];
+            ptconf.render_user_td(this, s);
+        });
+        if (ptconf.anonymous || sort.u === "user") {
+            th = "Username";
+        } else if (sort.u === "email") {
+            th = "Email";
+        } else {
+            th = "Name";
+        }
+        $x.find("th.gt-user > span.heading").html(th);
+    }
+
     function display_anon() {
         $j.toggleClass("gt-anonymous", !!ptconf.anonymous);
         if (table_width && name_col) {
@@ -828,12 +883,14 @@ function pa_render_pset_table(ptconf) {
             $($j[0].firstChild).find(".gt-name").css("width", (ptconf.anonymous ? 0 : name_col.width) + "px");
         }
     }
+
     function switch_anon(evt) {
         ptconf.anonymous = !ptconf.anonymous;
         if (!ptconf.anonymous)
             sort.override_anonymous = true;
         display_anon();
         rerender_usernames();
+        rerender_users();
         $j.find("tbody input.gt-check").each(function () {
             var s = smap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
             this.setAttribute("name", ptconf.render_checkbox_name(s));
@@ -932,13 +989,15 @@ function pa_render_pset_table(ptconf) {
         return t.toLowerCase();
     }
     function set_user_sorters() {
-        if (sort.nameflag !== active_nameflag) {
-            active_nameflag = sort.nameflag;
-            for (var i = 0; i < data.length; ++i) {
+        const nf = sort_nameflag();
+        if (nf !== active_nameflag) {
+            active_nameflag = nf;
+            for (var i = 0; i !== data.length; ++i) {
                 data[i]._sort_user = render_user_compare(data[i]);
             }
         }
     }
+
     function sort_data() {
         let f = sort.f;
         set_user_sorters();
@@ -947,7 +1006,8 @@ function pa_render_pset_table(ptconf) {
             data.sort(colr.compare);
         } else if (colr && colr.make_compare) {
             data.sort(colr.make_compare(sort, colr.subtype || null));
-        } else if ((f === "name" || f === "name2") && !ptconf.anonymous) {
+        } else if (((f === "name" || f === "name2") && !ptconf.anonymous)
+                   || f === "user") {
             data.sort(user_compare);
         } else if (f === "gradestatus") {
             data.sort(function (a, b) {
@@ -992,32 +1052,53 @@ function pa_render_pset_table(ptconf) {
         $x.find("th[data-pa-sort='" + f + "']").addClass("plsortactive").
             toggleClass("plsortreverse", sort.rev < 0);
     }
+
     function head_click() {
-        if (!this.hasAttribute("data-pa-sort"))
+        if (!this.hasAttribute("data-pa-sort")) {
             return;
+        }
         const sf = this.getAttribute("data-pa-sort");
         if (sf !== sort.f) {
             sort.f = sf;
             const col = colmap[sf];
             sort.rev = col && col.sort_forward ? 1 : -1;
-        } else if (sf === "name" || (sf === "name2" && !ptconf.anonymous)) {
-            sort.rev = -sort.rev;
-            if (sort.rev === 1) {
-                sort.last = !sort.last;
+            if (sf === "name") {
+                sort.u = "name";
+            } else if (sf === "name2") {
+                sort.u = ptconf.anonymous ? "user" : "name";
+            } else if (sf === "email") {
+                sort.u = "email";
+            } else if (sf === "username") {
+                sort.u = ptconf.anonymous || !ptconf.email ? "user" : "email";
             }
-        } else if (sf === "username") {
-            if (sort.rev === -1 && !ptconf.anonymous) {
-                sort.email = !sort.email;
-                rerender_usernames();
-            }
-            sort.rev = -sort.rev;
         } else {
             sort.rev = -sort.rev;
+            if (sort.rev === 1) {
+                if (sf === "name" || (sf === "name2" && !ptconf.anonymous)) {
+                    ptconf.last_first = sort.last = !sort.last;
+                } else if (sf === "username" && !ptconf.anonymous) {
+                    sort.email = !sort.email;
+                    sort.u = ptconf.anonymous || !ptconf.email ? "user" : "email";
+                    rerender_usernames();
+                } else if (sf === "user" && !ptconf.anonymous) {
+                    if (sort.u === "name") {
+                        ptconf.last_first = sort.last = !sort.last;
+                        if (!sort.last) {
+                            sort.u = "email";
+                        }
+                    } else if (sort.u === "email") {
+                        sort.u = "user";
+                    } else {
+                        sort.u = "name";
+                    }
+                    rerender_users();
+                }
+            }
         }
-        set_sort_nameflag();
         sort_data();
         resort();
     }
+
     function checkbox_click() {
         const range = this.getAttribute("data-range-type");
         if ((range === "s61" && $overlay) || range === "s61o") {
@@ -1071,6 +1152,7 @@ function pa_render_pset_table(ptconf) {
         observer.observe(overlay_div);
         observer.observe($j.parent()[0]);
     }
+
     function render_tds(tre, s) {
         for (let i = 0; i !== col.length; ++i) {
             const tde = document.createElement("td");
@@ -1078,11 +1160,7 @@ function pa_render_pset_table(ptconf) {
             tre.appendChild(tde);
         }
     }
-    function render_trs(tbody, a) {
-        const tpl = document.createElement("template");
-        tpl.innerHTML = a.join("");
-        tbody.appendChild(tpl.content);
-    }
+
     function render() {
         const tfixed = $j.hasClass("want-gtable-fixed"),
             rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
@@ -1100,12 +1178,16 @@ function pa_render_pset_table(ptconf) {
                 table_width += w;
             }
         }
-        const thead = document.createElement("thead");
-        render_trs(thead, a);
-        a = [];
+        const thead = document.createElement("thead"),
+            tpl = document.createElement("template");
+        tpl.innerHTML = a.join("");
+        thead.appendChild(tpl.content);
+
+        let tw = 0;
         if (tfixed) {
             let td = thead.firstChild.firstChild;
             for (const c of col) {
+                tw += c.width;
                 td.style.width = c.width + "px";
                 td = td.nextSibling;
             }
@@ -1117,6 +1199,7 @@ function pa_render_pset_table(ptconf) {
         $j.find("thead").on("click", "th", head_click);
         $j.find(".js-switch-anon").click(switch_anon);
         if (tfixed) {
+            $j[0].style.width = tw + "px";
             $j.removeClass("want-gtable-fixed").css("table-layout", "fixed");
         }
 
@@ -1125,7 +1208,7 @@ function pa_render_pset_table(ptconf) {
         if (!ptconf.no_sort) {
             sort_data();
         }
-        ptconf.last_first = sort.f === "name" && sort.last;
+        ptconf.last_first = sort.last;
 
         let trn = 0, was_boringness = 0;
         for (let i = 0; i !== data.length; ++i) {

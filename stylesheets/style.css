@@ -2585,6 +2585,7 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 }
 .gtable-container-1 {
 	padding-right: 24px;
+	padding-bottom: 8px;
 	overflow-x: scroll;
 	position: relative;
 	z-index: 1;
@@ -2619,7 +2620,7 @@ th.gt-checkbox > input {
 .gt-username {
 	font-weight: bold;
 }
-.gt-username, .gt-name, .gt-grader,
+.gt-user, .gt-username, .gt-name, .gt-grader,
 .gt-grade, .gt-ngrades, .gt-total,
 .gt-conversation, .gt-repo, .gt-pset, .gt-at, .gt-latehours {
 	padding-right: 0.75rem;
@@ -2627,7 +2628,7 @@ th.gt-checkbox > input {
 .gt-grade, .gt-total, .gt-ngrades {
 	font-variant-numeric: tabular-nums;
 }
-tr.gtrow-partner > .gt-username {
+.gtrow-partner > .gt-username, .gtrow-partner > .gt-user {
 	padding-left: 1em;
 }
 .gt-total, .gt-ngrades {
