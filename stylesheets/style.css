@@ -366,6 +366,18 @@ blockquote.group-only {
 .align-top {
 	vertical-align: top !important;
 }
+.align-items-stretch {
+	align-items: stretch !important;
+}
+.align-items-center {
+	align-items: center !important;
+}
+.align-items-baseline {
+	align-items: baseline !important;
+}
+.align-self-center {
+	align-self: center !important;
+}
 .align-self-start {
 	align-self: flex-start !important;
 }
@@ -426,6 +438,10 @@ blockquote.group-only {
 	margin-left: 1.5em !important;
 	margin-left: 1.5rem !important;
 }
+.ml-5 {
+	margin-left: 2.25em !important;
+	margin-left: 2.25rem !important;
+}
 .ml-7 {
 	margin-left: 5em !important;
 	margin-left: 5rem !important;
@@ -449,6 +465,9 @@ blockquote.group-only {
 .mr-7 {
 	margin-right: 5em !important;
 	margin-right: 5rem !important;
+}
+.nomargin {
+	margin: 0 !important;
 }
 .pr-3 {
 	padding-right: 1em !important;
@@ -950,6 +969,9 @@ button:disabled, button:disabled:hover,
 	color: rgba(102, 102, 102, 0.5);
 	border-color: #c5c5c5;
 	background: rgba(222, 222, 222, 0.5);
+}
+.btn-disabled-gray:disabled {
+	filter: grayscale(80%);
 }
 button.btn-link, button.btn-ulink, button.btn-qlink, button.btn-xlink,
 button.btn-link:disabled, button.btn-ulink:disabled, button.btn-qlink:disabled, button.btn-xlink:disabled {
@@ -3532,6 +3554,10 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 	margin-right: 12px;
 	margin-bottom: 8px;
 	height: 96px;
+}
+.pa-tinyface {
+	margin-right: 12px;
+	height: 64px;
 }
 .pa-facebook {
 	display: flex;

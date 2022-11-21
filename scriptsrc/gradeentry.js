@@ -16,7 +16,7 @@ const gradesheet_props = {
     // must include props from GradeExport and from StudentSet::json_basics
     "pset": true,
     "uid": true, "user": true, "anon_user": true, "email": true, "first": true, "last": true,
-    "year": true, "x": true, "dropped": true,
+    "year": true, "x": true, "dropped": true, "imageid": true,
     "commit": true, "base_commit": true, "base_handout": true, "grade_commit": true, "emptydiff": true,
     "late_hours": true, "auto_late_hours": true,
     "student_timestamp": true, "grades_latest": true,

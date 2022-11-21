@@ -513,6 +513,9 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         if ($s->dropped) {
             $j["dropped"] = true;
         }
+        if ($s->contactImageId) {
+            $j["imageid"] = $s->contactImageId;
+        }
         return $j;
     }
 }

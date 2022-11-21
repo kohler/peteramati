@@ -41,18 +41,28 @@ function to_rgba(c) {
 }
 
 function make_model(color) {
-    return $('<div class="bubble hidden' + color + '"><div class="bubtail bubtail0' + color + '"></div></div>').appendTo(document.body);
+    const div = document.createElement("div");
+    div.className = "bubble hidden" + color;
+    const tail = document.createElement("div");
+    tail.className = "bubtail bubtail0 nomargin" + color;
+    div.appendChild(tail);
+    document.body.appendChild(div);
+    return div;
 }
 
 function calculate_sizes(color) {
-    var $model = make_model(color), tail = $model.children(), ds, x;
-    var sizes = [tail.width(), tail.height()];
-    for (ds = 0; ds < 4; ++ds) {
-        sizes[lcdir[ds]] = 0;
-        if ((x = $model.css("margin" + capdir[ds])) && (x = parseFloat(x)))
-            sizes[lcdir[ds]] = x;
+    const model = make_model(color),
+        $tail = $(model).children(),
+        sizes = [$tail.width(), $tail.height()],
+        css = window.getComputedStyle(model);
+    for (let ds = 0; ds !== 4; ++ds) {
+        let x = css["margin" + capdir[ds]];
+        if (!x || !(x = parseFloat(x))) {
+            x = 0;
+        }
+        sizes[lcdir[ds]] = x;
     }
-    $model.remove();
+    model.remove();
     return sizes;
 }
 
@@ -69,10 +79,22 @@ export function Bubble(content, bubopt) {
     var nearpos = null, dirspec = bubopt.dir, dir = null,
         color = bubopt.color ? " " + bubopt.color : "";
 
-    var bubdiv = $('<div class="bubble' + color + '" style="margin:0"><div class="bubtail bubtail0' + color + '" style="width:0;height:0"></div><div class="bubcontent"></div><div class="bubtail bubtail1' + color + '" style="width:0;height:0"></div></div>')[0];
+    let bubdiv = document.createElement("div");
+    bubdiv.className = "bubble nomargin" + color;
+    {
+        let bubtail0 = document.createElement("div");
+        bubtail0.className = "bubtail bubtail0 nomargin" + color;
+        let bubcontent = document.createElement("div");
+        let bubtail1 = document.createElement("div");
+        bubtail1.className = "bubtail bubtail1 nomargin" + color;
+        bubdiv.append(bubtail0, bubcontent, bubtail1);
+        bubtail0.style.width = bubtail0.style.height =
+            bubtail1.style.width = bubtail1.style.height = "0px";
+    }
     document.body.appendChild(bubdiv);
-    if (bubopt["pointer-events"])
+    if (bubopt["pointer-events"]) {
         $(bubdiv).css({"pointer-events": bubopt["pointer-events"]});
+    }
     var bubch = bubdiv.childNodes;
     var sizes = null;
     var divbw = null;
@@ -195,8 +217,7 @@ export function Bubble(content, bubopt) {
     }
 
     function show() {
-        if (!sizes)
-            sizes = calculate_sizes(color);
+        sizes = sizes || calculate_sizes(color);
 
         // parse dirspec
         if (dirspec == null)
@@ -387,26 +408,39 @@ let builders = {};
 function prepare_info(elt, info) {
     var xinfo = elt.getAttribute("data-tooltip-info");
     if (xinfo) {
-        if (typeof xinfo === "string" && xinfo.charAt(0) === "{")
+        if (typeof xinfo === "string" && xinfo.charAt(0) === "{") {
             xinfo = JSON.parse(xinfo);
-        else if (typeof xinfo === "string")
+        } else if (typeof xinfo === "string") {
             xinfo = {builder: xinfo};
+        }
         info = $.extend(xinfo, info);
     }
-    if (info.builder && builders[info.builder])
+    if (info.builder && builders[info.builder]) {
         info = builders[info.builder].call(elt, info) || info;
-    if (info.dir == null || elt.hasAttribute("data-tooltip-dir"))
+    }
+    if (info.dir == null || elt.hasAttribute("data-tooltip-dir")) {
         info.dir = elt.getAttribute("data-tooltip-dir") || "v";
-    if (info.type == null || elt.hasAttribute("data-tooltip-type"))
+    }
+    if (info.type == null || elt.hasAttribute("data-tooltip-type")) {
         info.type = elt.getAttribute("data-tooltip-type");
-    if (info.className == null || elt.hasAttribute("data-tooltip-class"))
-        info.className = elt.getAttribute("data-tooltip-class") || "dark";
-    if (elt.hasAttribute("data-tooltip"))
+    }
+    if (info.className == null || elt.hasAttribute("data-tooltip-class")) {
+        info.className = elt.getAttribute("data-tooltip-class") || "tooltip dark";
+    }
+    if (elt.hasAttribute("data-tooltip")) {
         info.content = elt.getAttribute("data-tooltip");
-    else if (info.content == null && elt.hasAttribute("aria-label"))
-        info.content = elt.getAttribute("aria-label");
-    else if (info.content == null && elt.hasAttribute("title"))
-        info.content = elt.getAttribute("title");
+    } else if (info.content == null) {
+        if (elt.hasAttribute("aria-label")) {
+            info.content = elt.getAttribute("aria-label");
+        } else if (elt.hasAttribute("title")) {
+            info.content = elt.getAttribute("title");
+        }
+    }
+    if (elt.hasAttribute("data-tooltip-delay")) {
+        info.delay = parseInt(elt.getAttribute("data-tooltip-delay"));
+    } else if (info.delay == null && (info.type == null || info.type === "hover")) {
+        info.delay = 150;
+    }
     return info;
 }
 
@@ -415,52 +449,54 @@ function show_tooltip(info) {
         return null;
     }
 
-    var $self = $(this);
-    info = prepare_info($self[0], $.extend({}, info || {}));
+    const self = this;
+    if (info && typeof info === "string") {
+        info = {builder: info};
+    } else {
+        info = Object.assign({}, info || {});
+    }
+    info = prepare_info(self, info);
     info.element = this;
 
-    var tt, bub = null, to = null, near = null,
-        refcount = 0, content = info.content;
+    var tt, bub = null, to = null, near = null, delayto = null,
+        refcount = 1, content = info.content;
+
+    if (info.delay) {
+        delayto = setTimeout(function () {
+            delayto = null;
+            content && !bub && show_bub();
+        }, info.delay);
+    }
 
     function erase() {
         to = clearTimeout(to);
         bub && bub.remove();
-        $self.removeData("tooltipState");
+        $(self).removeData("tooltipState");
         if (window.global_tooltip === tt) {
             window.global_tooltip = null;
         }
     }
 
     function show_bub() {
-        if (content && !bub) {
-            bub = Bubble(content, {color: "tooltip " + info.className, dir: info.dir});
-            near = info.near || info.element;
-            bub.near(near).hover(tt.enter, tt.exit);
-        } else if (content) {
-            bub.html(content);
-        } else if (bub) {
+        if (delayto || refcount === 0) {
+            // do not show
+            return;
+        }
+        if (!content) {
+            // remove
             bub && bub.remove();
             bub = near = null;
-        }
-    }
-
-    function complete(new_content) {
-        if (new_content instanceof Promise) {
-            new_content.then(complete);
-        } else {
-            var tx = window.global_tooltip;
-            content = new_content;
-            if (tx
-                && tx._element === info.element
-                && tx.html() === content
-                && !info.done) {
-                tt = tx;
-            } else {
-                tx && tx.erase();
-                $self.data("tooltipState", tt);
+        } else if (content instanceof Promise) {
+            content.then(function (nc) {
+                content = nc;
                 show_bub();
-                window.global_tooltip = tt;
-            }
+            });
+        } else if (bub) {
+            bub.html(content);
+        } else {
+            bub = Bubble(content, {color: info.className, dir: info.dir});
+            near = info.near || info.element;
+            bub.near(near).hover(tt.enter, tt.exit);
         }
     }
 
@@ -473,12 +509,13 @@ function show_tooltip(info) {
         exit: function () {
             var delay = info.type === "focus" ? 0 : 200;
             to = clearTimeout(to);
-            if (--refcount == 0 && info.type !== "sticky")
+            if (--refcount <= 0 && info.type !== "sticky") {
                 to = setTimeout(erase, delay);
+            }
             return tt;
         },
         erase: erase,
-        _element: $self[0],
+        _element: self,
         html: function (new_content) {
             if (new_content === undefined) {
                 return content;
@@ -496,14 +533,25 @@ function show_tooltip(info) {
         }
     };
 
-    complete(content);
-    info.done = true;
+    {
+        let tx = window.global_tooltip;
+        if (tx
+            && tx._element === info.element
+            && tx.html() === content) {
+            tt = tx;
+        } else {
+            tx && tx.erase();
+            $(self).data("tooltipState", tt);
+            show_bub();
+            window.global_tooltip = tt;
+        }
+    }
     return tt;
 }
 
 function ttenter() {
-    var tt = $(this).data("tooltipState") || show_tooltip.call(this);
-    tt && tt.enter();
+    const tt = $(this).data("tooltipState");
+    tt ? tt.enter() : show_tooltip.call(this);
 }
 
 function ttleave() {
@@ -514,17 +562,29 @@ function ttleave() {
 export function tooltip() {
     removeClass(this, "need-tooltip");
     var tt = this.getAttribute("data-tooltip-type");
-    if (tt === "focus")
+    if (tt === "focus") {
         $(this).on("focus", ttenter).on("blur", ttleave);
-    else
+    } else {
         $(this).hover(ttenter, ttleave);
+    }
 }
+
 tooltip.erase = function () {
     var tt = this === tooltip ? window.global_tooltip : $(this).data("tooltipState");
     tt && tt.erase();
 };
+
 tooltip.add_builder = function (name, f) {
     builders[name] = f;
+};
+
+tooltip.enter = function (e, info) {
+    const tt = $(e).data("tooltipState");
+    tt ? tt.enter() : show_tooltip.call(e, info);
+};
+
+tooltip.leave = function (e) {
+    ttleave.call(e);
 };
 
 $(function () { $(".need-tooltip").each(tooltip); });

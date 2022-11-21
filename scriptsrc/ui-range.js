@@ -104,18 +104,28 @@ handle_ui.on("js-range-click", function (event) {
                 if (state === null)
                     state = cbs[i].checked;
                 else if (state !== cbs[i].checked) {
-                    state = 2;
+                    state = "indeterminate";
                     break;
                 }
             }
         }
 
-        if (state === 2) {
+        let changed = false;
+        if (state === "indeterminate") {
+            changed = !cbgs[j].indeterminate;
             cbgs[j].indeterminate = true;
             cbgs[j].checked = true;
         } else {
+            changed = cbgs[j].indeterminate || cbgs[j].checked !== state;
             cbgs[j].indeterminate = false;
             cbgs[j].checked = state;
+        }
+        if (changed || cbgs[j] === event.target) {
+            const event = new CustomEvent("rangechange", {
+                bubbles: true, cancelable: true,
+                detail: {rangeType: kind, rangeGroup: group, newState: state}
+            });
+            $f[0].dispatchEvent(event);
         }
     }
 }, -1);

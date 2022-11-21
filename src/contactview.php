@@ -142,7 +142,7 @@ class ContactView {
     static function echo_heading($user, $viewer) {
         $u = $viewer->user_linkpart($user);
         if ($user !== $viewer && !$user->is_anonymous && $user->contactImageId) {
-            echo '<img class="pa-smallface float-left" src="' . $user->conf->hoturl("face", array("u" => $u, "imageid" => $user->contactImageId)) . '" />';
+            echo '<img class="pa-smallface float-left" src="' . $user->conf->hoturl("face", ["u" => $u, "imageid" => $user->contactImageId]) . '" />';
         }
 
         echo '<h2 class="homeemail"><a href="',

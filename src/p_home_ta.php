@@ -409,7 +409,7 @@ class Home_TA_Page {
         echo '<form id="', $pset->urlkey, '">';
         echo "<h3 class=\"pa-home-pset", $psettitle;
         if ($this->viewer->privChair) {
-            echo '<button type="button" class="btn-t small ui js-pset-gconfig">⚙️</button>';
+            echo '<button type="button" class="btn-t small ui js-pset-gconfig btn-disabled-gray">⚙️</button>';
         }
         echo "</h3>";
         if ($pset->disabled) {
@@ -467,12 +467,12 @@ class Home_TA_Page {
         echo '<div class="gtable-container-0">',
             '<div class="gtable-container-gutter">',
             '<div class="gtable-gutter-content">',
-            '<button type="button" class="ui js-gdialog mb-2">🛎️</button>';
+            '<button type="button" class="ui js-gdialog mb-2 btn-disabled-gray need-tooltip" aria-label="Set grades for selected students" disabled>🛎️</button>';
         if (false) {
             echo '<button type="button" class="ui js-ptable-diff mb-2">±</button>';
         }
         if (isset($jd["runners"])) {
-            echo '<button type="button" class="ui js-ptable-run mb-2">🏃🏽‍♀️</button>';
+            echo '<button type="button" class="ui js-ptable-run mb-2 btn-disabled-gray need-tooltip" aria-label="Run commands">🏃🏽‍♀️</button>';
         }
         if (count($jx) > 20) {
             echo '<div class="gtable-gutter-pset', $psettitle, '</div>';

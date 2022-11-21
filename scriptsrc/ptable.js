@@ -10,6 +10,7 @@ import { escape_entities } from "./encoders.js";
 import { GradeSheet } from "./gradeentry.js";
 import { popup_skeleton, popup_close } from "./popup.js";
 import { ptable_gdialog } from "./ptable-grades.js";
+import { tooltip } from "./tooltip.js";
 
 
 function render_name(s, last_first) {
@@ -123,13 +124,20 @@ class PtableConf {
 
     make_student_ae(s) {
         const ae = document.createElement("a");
+        ae.href = hoturl("index", {u: this.ukey(s)});
+        ae.className = "track";
+        return ae;
+    }
+
+    make_pset_ae(s) {
+        const ae = document.createElement("a");
         ae.href = this.href(s);
-        ae.className = "track" + (s.dropped ? " gt-dropped" : "");
+        ae.className = "pa-user track" + (s.dropped ? " gt-dropped" : "");
         return ae;
     }
 
     render_username_td(tde, s) {
-        const ae = this.make_student_ae(s);
+        const ae = this.make_pset_ae(s);
         if (this.anonymous && s.anon_user) {
             ae.append(s.anon_user);
         } else if (this.sort.email && s.email) {
@@ -141,7 +149,7 @@ class PtableConf {
     }
 
     render_user_td(tde, s) {
-        const ae = this.make_student_ae(s);
+        const ae = this.make_pset_ae(s);
         if (this.anonymous) {
             ae.append(s.anon_user || "?");
         } else if (this.sort.u === "email" && s.email) {
@@ -159,7 +167,7 @@ class PtableConf {
             ? s.anon_user || "?"
             : render_name(s, this.last_first);
         if (is2) {
-            const ae = this.make_student_ae(s);
+            const ae = this.make_pset_ae(s);
             ae.textContent = t;
             tde.replaceChildren(ae);
         } else {
@@ -269,7 +277,7 @@ const gcoldef = {
                 t += "Name";
             }
             t += '</span>';
-            if (ptconf.anonymous && ptconf.can_override_anonymous) {
+            if (ptconf.original_anonymous && ptconf.can_override_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
             } else if (ptconf.original_anonymous) {
                 t += ' <span class="n">[anon]</span>';
@@ -290,7 +298,7 @@ const gcoldef = {
             let t = '<span class="heading">' +
                 (ptconf.anonymous || !ptconf.sort.email ? "Username" : "Email") +
                 '</span>';
-            if (ptconf.anonymous && ptconf.can_override_anonymous) {
+            if (ptconf.original_anonymous && ptconf.can_override_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
             } else if (ptconf.original_anonymous) {
                 t += ' <span class="n">[anon]</span>';
@@ -319,7 +327,7 @@ const gcoldef = {
     name2: {
         th: function (ptconf) {
             var t = '<span class="heading">' + (ptconf.anonymous ? "Username" : "Name") + '</span>';
-            if (ptconf.anonymous && ptconf.can_override_anonymous)
+            if (ptconf.original_anonymous && ptconf.can_override_anonymous)
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
             return '<th class="gt-name2 l plsortable" data-pa-sort="name2" scope="col">' + t + '</th>';
         },
@@ -602,12 +610,14 @@ function pa_render_pset_table(ptconf) {
     }
 
     function sort_nameflag() {
-        if (sort.u === "name") {
+        if (ptconf.anonymous) {
+            return 8;
+        } else if (sort.u === "name") {
             return 1 | (sort.last ? 2 : 0);
         } else if (sort.u === "email") {
             return 4;
         } else {
-            return ptconf.anonymous ? 8 : 0;
+            return 0;
         }
     }
 
@@ -633,7 +643,9 @@ function pa_render_pset_table(ptconf) {
             || !sort.override_anonymous) {
             delete sort.override_anonymous;
         }
-        if (ptconf.anonymous && sort.override_anonymous) {
+        if (ptconf.anonymous
+            && sort.override_anonymous
+            && sort.override_anonymous + 3600 > (new Date).getTime() / 1000) {
             ptconf.anonymous = false;
         }
 
@@ -839,6 +851,7 @@ function pa_render_pset_table(ptconf) {
         }
         slist_input.value = j.join(" ");
     }
+
     function resort() {
         resort_table($j);
         $overlay && resort_table($overlay);
@@ -886,8 +899,11 @@ function pa_render_pset_table(ptconf) {
 
     function switch_anon(evt) {
         ptconf.anonymous = !ptconf.anonymous;
-        if (!ptconf.anonymous)
-            sort.override_anonymous = true;
+        if (ptconf.anonymous) {
+            delete sort.override_anonymous;
+        } else {
+            sort.override_anonymous = (new Date).getTime() / 1000;
+        }
         display_anon();
         rerender_usernames();
         rerender_users();
@@ -968,6 +984,7 @@ function pa_render_pset_table(ptconf) {
             queueMicrotask(function () { removeClass($overlay[0], "new"); });
         }
     }
+
     function render_user_compare(u) {
         let t = "";
         if ((active_nameflag & 8) && u.anon_user) {
@@ -981,13 +998,14 @@ function pa_render_pset_table(ptconf) {
             t += u.user || "";
         }
         if (u.pset != null) {
-            t += sprintf(" %5d", u.pset);
+            t += sprintf(" %5s", u.pset);
         }
         if (u.at != null) {
-            t += sprintf(" %11g", u.at);
+            t += sprintf(" %.11g", u.at);
         }
         return t.toLowerCase();
     }
+
     function set_user_sorters() {
         const nf = sort_nameflag();
         if (nf !== active_nameflag) {
@@ -1273,7 +1291,56 @@ function pa_render_pset_table(ptconf) {
         }
     });
     $j.children("tbody").on("pa-hotlist", make_hotlist);
+    $j.closest("form")[0].addEventListener("rangechange", function (evt) {
+        if (evt.detail.rangeType === "s61")
+            $(this).find(".js-gdialog").prop("disabled", !evt.detail.newState);
+    });
+    $j.on("mouseenter mouseleave", "a.pa-user", function (evt) {
+        if (evt.type === "mouseenter") {
+            tooltip.enter(this, "pa-ptable-user");
+        } else {
+            tooltip.leave(this);
+        }
+    });
 }
+
+
+tooltip.add_builder("pa-ptable-user", function () {
+    let spos = this.closest("tr").getAttribute("data-pa-spos"),
+        ptconf = this.closest("form").pa__ptconf,
+        su = ptconf.smap[spos];
+    return {content: new Promise((resolve) => {
+        const maindiv = document.createElement("div");
+        maindiv.className = "d-flex align-items-center";
+        if (su.imageid && !ptconf.anonymous) {
+            const ae = ptconf.make_student_ae(su),
+                img = document.createElement("img");
+            img.className = "pa-tinyface";
+            img.src = hoturl("face", {u: su.user, imageid: su.imageid});
+            ae.append(img);
+            maindiv.append(ae);
+        }
+        const idiv = document.createElement("div");
+        maindiv.append(idiv);
+        const userae = ptconf.make_student_ae(su);
+        userae.className += " nou gt-username";
+        userae.append(ptconf.anonymous ? su.anon_user : su.user);
+        idiv.append(userae, document.createElement("br"));
+        if (!ptconf.anonymous) {
+            const name = render_name(su, false);
+            if (name !== "") {
+                const nameae = ptconf.make_student_ae(su);
+                nameae.className = "q";
+                nameae.append(render_name(su, false));
+                idiv.append(nameae, document.createElement("br"));
+            }
+            if (su.email) {
+                idiv.append(su.email, document.createElement("br"));
+            }
+        }
+        resolve(maindiv);
+    }), delay: 400, className: "gray small ml-2", dir: "w"};
+});
 
 
 handle_ui.on("js-pset-gconfig", function () {
