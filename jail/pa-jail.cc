@@ -85,6 +85,7 @@ static std::string pidfilename;
 static std::string pidcontents;
 static int timingfd = -1;
 static std::string timingfilename;
+static std::string ready_marker;
 static int eventsourcefd = -1;
 static std::string eventsourcefilename;
 static volatile sig_atomic_t got_sigterm = 0;
@@ -2505,6 +2506,19 @@ int jailownerinfo::exec_go() {
         perror_die(owner_sh_);
     }
 
+    // print ready marker
+    if (!ready_marker.empty()) {
+        if (verbose) {
+            bool nl = ready_marker.back() == '\n';
+            fprintf(verbosefile, "echo %s%s%s", nl ? "" : "-n ", ready_marker.c_str(), nl ? "" : "\n");
+        }
+        if (!dryrun) {
+            fputs(ready_marker.c_str(), stdout);
+            fflush(stdout);
+        }
+    }
+
+    // run command
     if (verbose) {
         for (int i = 0; newenv_[i]; ++i) {
             fprintf(verbosefile, "%s ", newenv_[i]);
@@ -2982,21 +2996,22 @@ static void close_unwanted_fds() {
                    [-i INPUT] [-f FILE | -F DATA] [-S SKELETON] \\\n\
                    JAILDIR USER COMMAND\n\
        pa-jail mv SOURCE DEST\n\
-       pa-jail rm [-nf] JAILDIR\n");
+       pa-jail rm [-nf] [--bg] JAILDIR\n");
     } else if (action == do_mv) {
         fprintf(stderr, "Usage: pa-jail mv [-n] SOURCE DEST\n\
 Safely move a jail from SOURCE to DEST. SOURCE and DEST must be allowed\n\
 by /etc/pa-jail.conf.\n\
 \n\
-  -n, --dry-run     print the actions that would be taken, don't run them\n");
+  -n, --dry-run     Print actions that would be taken, don't run them\n");
     } else if (action == do_rm) {
-        fprintf(stderr, "Usage: pa-jail rm [-nf] JAILDIR\n\
+        fprintf(stderr, "Usage: pa-jail rm [-nf] [--bg] JAILDIR\n\
 Unmount and remove a jail. Like `rm -r[f] --one-file-system JAILDIR`.\n\
 JAILDIR must be allowed by /etc/pa-jail.conf.\n\
 \n\
-  -f, --force       do not complain if JAILDIR doesn't exist\n\
-  -n, --dry-run     print the actions that would be taken, don't run them\n\
-  -V, --verbose     print actions as well as running them\n");
+  -f, --force       Do not complain if JAILDIR doesn't exist\n\
+  -n, --dry-run     Print actions that would be taken, don't run them\n\
+  -V, --verbose     Print actions as well as running them\n\
+      --bg          Run in the background\n");
     } else {
         if (action == do_add) {
             fprintf(stderr, "Usage: pa-jail add [OPTIONS...] JAILDIR [USER]\n\
@@ -3006,23 +3021,24 @@ Create or augment a jail. JAILDIR must be allowed by /etc/pa-jail.conf.\n\n");
 Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
 /etc/pa-jail.conf.\n\n");
         }
-        fprintf(stderr, "  -f, --manifest-file FILE  populate jail with manifest from FILE\n");
-        fprintf(stderr, "  -F, --manifest MANIFEST   populate jail with MANIFEST\n");
-        fprintf(stderr, "  -h, --chown-home          change ownership of USER homedir\n");
-        fprintf(stderr, "  -S, --skeleton SKELDIR    populate jail from SKELDIR\n");
+        fprintf(stderr, "  -f, --manifest-file FILE  Populate jail with manifest from FILE\n");
+        fprintf(stderr, "  -F, --manifest MANIFEST   Populate jail with MANIFEST\n");
+        fprintf(stderr, "  -h, --chown-home          Change ownership of USER homedir\n");
+        fprintf(stderr, "  -S, --skeleton SKELDIR    Populate jail from SKELDIR\n");
         if (action == do_run) {
-            fprintf(stderr, "  -p, --pid-file PIDFILE    write jail process PID to PIDFILE\n\
-  -P, --pid-contents STR    write STR to PIDFILE\n\
-  -i, --input INPUTSOCKET   use TTY, read input from INPUTSOCKET\n\
-      --event-source SOCK   listen on UNIX SOCK for event source connections\n\
-      --no-onlcr            don't translate \\n -> \\r\\n in output\n\
-  -T, --timeout TIMEOUT     kill the jail after TIMEOUT seconds\n\
-  -I, --idle-timeout TIMEOUT  kill the jail after TIMEOUT idle seconds\n\
-      --size WxH            set terminal size [80x25]\n\
-      --fg                  run in the foreground\n");
+            fprintf(stderr, "  -p, --pid-file PIDFILE    Write jail process PID to PIDFILE\n\
+  -P, --pid-contents STR    Write STR to PIDFILE\n\
+  -i, --input INPUTSOCKET   Use TTY, read input from INPUTSOCKET\n\
+      --event-source SOCK   Listen on UNIX SOCK for event source connections\n\
+      --ready[=STR]         Write STR to stdout when ready\n\
+      --no-onlcr            Don't translate \\n -> \\r\\n in output\n\
+  -T, --timeout TIMEOUT     Kill the jail after TIMEOUT seconds\n\
+  -I, --idle-timeout TIMEOUT  Kill the jail after TIMEOUT idle seconds\n\
+      --size WxH            Set terminal size [80x25]\n\
+      --fg                  Run in the foreground\n");
         }
-        fprintf(stderr, "  -n, --dry-run             print actions, don't run them\n\
-  -V, --verbose             print actions and run them\n");
+        fprintf(stderr, "  -n, --dry-run             Print actions, don't run them\n\
+  -V, --verbose             Print actions and run them\n");
     }
     exit(1);
 }
@@ -3038,6 +3054,9 @@ static struct option longoptions_before[] = {
 #define ARG_NO_ONLCR     1001
 #define ARG_SIZE         1002
 #define ARG_EVENT_SOURCE 1003
+#define ARG_BG           1004
+#define ARG_READY        1005
+
 static struct option longoptions_run[] = {
     { "verbose", no_argument, nullptr, 'V' },
     { "dry-run", no_argument, nullptr, 'n' },
@@ -3060,19 +3079,22 @@ static struct option longoptions_run[] = {
     { "timing-file", required_argument, nullptr, 't' },
     { "size", required_argument, nullptr, ARG_SIZE },
     { "event-source", required_argument, nullptr, ARG_EVENT_SOURCE },
+    { "ready", optional_argument, nullptr, ARG_READY },
     { nullptr, 0, nullptr, 0 }
 };
 
 static struct option longoptions_rm[] = {
     { "verbose", no_argument, nullptr, 'V' },
     { "dry-run", no_argument, nullptr, 'n' },
+    { "bg", no_argument, nullptr, ARG_BG },
     { "help", no_argument, nullptr, 'H' },
     { "force", no_argument, nullptr, 'f' },
     { nullptr, 0, nullptr, 0 }
 };
 
 static struct option* longoptions_action[] = {
-    longoptions_before, longoptions_run, longoptions_run, longoptions_rm, longoptions_before
+    longoptions_before, longoptions_run, longoptions_run, longoptions_rm,
+    longoptions_before
 };
 static const char* shortoptions_action[] = {
     "+Vn", "VnS:f:F:p:P:T:I:qi:hu:t:", "VnS:f:F:p:P:T:I:qi:hu:t:", "Vnf", "Vn"
@@ -3160,6 +3182,10 @@ int main(int argc, char** argv) {
                 }
             } else if (ch == 'g') {
                 foreground = true;
+            } else if (ch == ARG_BG) {
+                foreground = false;
+            } else if (ch == ARG_READY) {
+                ready_marker = optarg ? optarg : "\n";
             } else if (ch == 'h') {
                 chown_home = true;
             } else if (ch == 'q') {
@@ -3189,6 +3215,7 @@ int main(int argc, char** argv) {
             usage();
         } else if (strcmp(argv[optind], "rm") == 0) {
             action = do_rm;
+            foreground = true;
         } else if (strcmp(argv[optind], "mv") == 0) {
             action = do_mv;
         } else if (strcmp(argv[optind], "init") == 0
@@ -3380,9 +3407,17 @@ int main(int argc, char** argv) {
 
     // kill the sandbox if asked
     if (action == do_rm) {
+        jaildir.dir = path_endslash(jaildir.dir);
+        if (!dryrun && !foreground) {
+            pid_t p = fork();
+            if (p > 0) {
+                exit(0);
+            } else if (p < 0) {
+                perror_die("fork");
+            }
+        }
         // unmount EVERYTHING mounted in the jail!
         // INCLUDING MY HOME DIRECTORY
-        jaildir.dir = path_endslash(jaildir.dir);
         populate_mount_table();
         for (auto it = mount_table.begin(); it != mount_table.end(); ++it) {
             if (it->first.length() >= jaildir.dir.length()
@@ -3458,7 +3493,8 @@ int main(int argc, char** argv) {
     // maybe execute a command in the jail
     if (optind + 2 < argc) {
         jailuser.set_inputfd(inputfd);
-        jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir, timeout, idle_timeout, foreground);
+        jailuser.exec(argc - (optind + 2), argv + optind + 2,
+                      jaildir, timeout, idle_timeout, foreground);
     }
 
     // close timing and lock file if appropriate

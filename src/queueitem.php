@@ -850,10 +850,11 @@ class QueueItem {
         $this->add_run_settings($this->runsettings ?? []);
 
         // actually run
-        $command = "echo; jail/pa-jail run"
+        $command = "jail/pa-jail run"
             . " -p" . escapeshellarg($pidfile)
             . " -P'{$this->runat} $$"
-            . ($inputfifo ? " -i" : "") . "'";
+            . ($inputfifo ? " -i" : "") . "'"
+            . " --ready";
         if ($runner->timed_replay) {
             $command .= " -t" . escapeshellarg($timingfile);
         }
@@ -921,25 +922,33 @@ class QueueItem {
     }
 
     /** @param string $command
-     * @param bool $bg
      * @return int */
-    private function run_and_log($command, $bg = false) {
+    private function run_and_log($command) {
         fwrite($this->_logstream, "++ $command\n");
-        system("($command) </dev/null >>" . escapeshellarg($this->_logfile) . " 2>&1" . ($bg ? " &" : ""), $status);
+        fflush($this->_logstream);
+        system("($command) </dev/null >>" . escapeshellarg($this->_logfile) . " 2>&1", $status);
         return $status;
     }
 
     private function remove_old_jails() {
+        $newdirpfx = $this->_jaildir . "~." . gmdate("Ymd\\THis", Conf::$now);
+        $tries = 0;
         while (is_dir($this->_jaildir)) {
-            Conf::set_current_time(time());
+            if ($tries > 10) {
+                throw new RunnerException("Can’t remove old jail.");
+            } else if ($tries > 0) {
+                usleep(100000 * (1 << min($tries, 4)));
+                Conf::set_current_time(time());
+            }
 
-            $newdir = $this->_jaildir . "~." . gmdate("Ymd\\THis", Conf::$now);
+            $newdir = $newdirpfx . ($tries ? ".{$tries}" : "");
             if ($this->run_and_log("jail/pa-jail mv " . escapeshellarg($this->_jaildir) . " " . escapeshellarg($newdir))) {
                 throw new RunnerException("Can’t remove old jail.");
             }
 
-            $this->run_and_log("jail/pa-jail rm " . escapeshellarg($newdir), true);
+            $this->run_and_log("jail/pa-jail rm --bg " . escapeshellarg($newdir));
             clearstatcache(false, $this->_jaildir);
+            ++$tries;
         }
     }
 
