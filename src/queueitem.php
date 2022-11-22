@@ -839,7 +839,7 @@ class QueueItem {
 
         // create jail
         $this->remove_old_jails();
-        if ($this->run_and_log("jail/pa-jail add " . escapeshellarg($this->_jaildir) . " " . escapeshellarg($username))) {
+        if ($this->run_and_log(["jail/pa-jail", "add", $this->_jaildir, $username])) {
             throw new RunnerException("Can’t initialize jail.");
         }
 
@@ -850,15 +850,15 @@ class QueueItem {
         $this->add_run_settings($this->runsettings ?? []);
 
         // actually run
-        $command = "jail/pa-jail run"
-            . " -p" . escapeshellarg($pidfile)
-            . " -P'{$this->runat} $$"
-            . ($inputfifo ? " -i" : "") . "'";
+        $cmdarg = [
+            "jail/pa-jail", "run", "-p{$pidfile}",
+            "-P{$this->runat} \$\$" . ($inputfifo ? " -i" : "")
+        ];
         if ($runner->timed_replay) {
-            $command .= " -t" . escapeshellarg($timingfile);
+            $cmdarg[] = "-t{$timingfile}";
         }
         if ($esfile !== null) {
-            $command .= " --event-source=" . escapeshellarg($esfile);
+            $cmdarg[] = "--event-source={$esfile}";
         }
 
         $skeletondir = $pset->run_skeletondir ? : $this->conf->opt("run_skeletondir");
@@ -877,13 +877,14 @@ class QueueItem {
                 $contents .= " $jhash $jfiles";
             }
             $contents .= "]\n{$userhome} <- {$this->_jailhomedir} [bind]";
-            $command .= " -u" . escapeshellarg($this->_jailhomedir)
-                . " -F" . escapeshellarg($contents);
+            $cmdarg[] = "-u{$this->_jailhomedir}";
+            $cmdarg[] = "-F{$contents}";
             $homedir = $binddir;
         } else if ($jfiles) {
-            $command .= " -h -f" . escapeshellarg($jfiles);
+            $cmdarg[] = "-h";
+            $cmdarg[] = "-f{$jfiles}";
             if ($skeletondir) {
-                $command .= " -S" . escapeshellarg($skeletondir);
+                $cmdarg[] = "-S{$skeletondir}";
             }
             $homedir = $this->_jaildir;
         } else {
@@ -892,29 +893,29 @@ class QueueItem {
 
         $jmanifest = $runner->jailmanifest();
         if ($jmanifest) {
-            $command .= " -F" . escapeshellarg(join("\n", $jmanifest));
+            $cmdarg[] = "-F" . join("\n", $jmanifest);
         }
 
         if (($to = $runner->timeout ?? $pset->run_timeout) > 0) {
-            $command .= " -T{$to}";
+            $cmdarg[] = "-T{$to}";
         }
         if (($to = $runner->idle_timeout ?? $pset->run_idle_timeout) > 0) {
-            $command .= " -I{$to}";
+            $cmdarg[] = "-I{$to}";
         }
         if (($runner->rows ?? 0) > 0 || ($runner->columns ?? 0) > 0) {
             $rows = ($runner->rows ?? 0) > 0 ? $runner->rows : 25;
             $cols = ($runner->columns ?? 0) > 0 ? $runner->columns : 80;
-            $command .= " --size={$cols}x{$rows}";
+            $cmdarg[] = "--size={$cols}x{$rows}";
         }
         if ($inputfifo) {
-            $command .= " -i" . escapeshellarg($inputfifo);
+            $cmdarg[] = "-i{$inputfifo}";
         }
-        $command .= " " . escapeshellarg($homedir)
-            . " " . escapeshellarg($username)
-            . " TERM=xterm-256color"
-            . " " . escapeshellarg($this->expand($runner->command));
+        $cmdarg[] = $homedir;
+        $cmdarg[] = $username;
+        $cmdarg[] = "TERM=xterm-256color";
+        $cmdarg[] = $this->expand($runner->command);
         $this->_runstatus = 2;
-        $this->run_and_log($command, true);
+        $this->run_and_log($cmdarg, null, true);
 
         // save information about execution
         $this->info()->add_recorded_job($runner->name, $this->runat);
@@ -923,10 +924,40 @@ class QueueItem {
     /** @param string $command
      * @param bool $ready
      * @return int */
-    private function run_and_log($command, $ready = false) {
+    private function run_and_log_x($command, $ready = false) {
         fwrite($this->_logstream, "++ " . $command . ($ready ? "\n\n" : "\n"));
         fflush($this->_logstream);
         system("($command) </dev/null >>" . escapeshellarg($this->_logfile) . " 2>&1", $status);
+        return $status;
+    }
+
+    /** @param list<string> $cmd
+     * @param ?string $cwd
+     * @param bool $ready
+     * @return int */
+    private function run_and_log($cmdarg, $cwd = null, $ready = false) {
+        $t = [];
+        foreach ($cmdarg as $s) {
+            $t[] = preg_match('/\A[-=+~_.\/a-zA-Z0-9]+\z/', $s) ? $s : escapeshellarg($s);
+        }
+        fwrite($this->_logstream, "++ " . join(" ", $t) . ($ready ? "\n\n" : "\n"));
+        fflush($this->_logstream);
+
+        if (PHP_VERSION_ID >= 70400) {
+            $cmd = $cmdarg;
+            $stderr = ["redirect", 1];
+        } else {
+            $cmd = join(" ", $t);
+            $stderr = ["file", $this->_logfile, "a"];
+        }
+        $pipes = null;
+        $proc = proc_open($cmd, [
+                0 => ["file", "/dev/null", "r"],
+                1 => ["file", $this->_logfile, "a"],
+                2 => $stderr
+            ], $pipes, $cwd);
+        $status = proc_close($proc);
+        error_log(json_encode($cmd) . " -> $status");
         return $status;
     }
 
@@ -942,11 +973,11 @@ class QueueItem {
             }
 
             $newdir = $newdirpfx . ($tries ? ".{$tries}" : "");
-            if ($this->run_and_log("jail/pa-jail mv " . escapeshellarg($this->_jaildir) . " " . escapeshellarg($newdir))) {
+            if ($this->run_and_log(["jail/pa-jail", "mv", $this->_jaildir, $newdir])) {
                 throw new RunnerException("Can’t remove old jail.");
             }
 
-            $this->run_and_log("jail/pa-jail rm --bg " . escapeshellarg($newdir));
+            $this->run_and_log(["jail/pa-jail", "rm", "--bg", $newdir]);
             clearstatcache(false, $this->_jaildir);
             ++$tries;
         }
@@ -975,23 +1006,29 @@ class QueueItem {
 
         // need a branch to check out a specific commit
         $branch = "jailcheckout_" . Conf::$now;
-        if ($this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch $branch $hash")) {
+        if ($this->run_and_log(["git", "branch", $branch, $hash], $repodir)) {
             throw new RunnerException("Can’t create branch for checkout.");
         }
 
         // make the checkout
-        $status = $this->run_and_log("cd " . escapeshellarg($clonedir) . " && "
-                                     . "if test ! -d .git; then git init --shared=group -b main; fi && "
-                                     . "git fetch --depth=1 -p " . escapeshellarg($repodir) . " $branch && "
-                                     . "git reset --hard $hash");
+        $status = 0;
+        if (!is_dir("{$clonedir}/.git")) {
+            $status = $this->run_and_log(["git", "init", "--shared=group", "-b", "main"], $clonedir);
+        }
+        if ($status === 0) {
+            $status = $this->run_and_log(["git", "fetch", "--depth=1", "-p", $repodir, $branch], $clonedir);
+        }
+        if ($status === 0) {
+            $status = $this->run_and_log(["git", "reset", "--hard", $hash], $clonedir);
+        }
 
-        $this->run_and_log("cd " . escapeshellarg($repodir) . " && git branch -D $branch");
+        $this->run_and_log(["git", "branch", "-D", $branch], $repodir);
 
-        if ($status) {
+        if ($status !== 0) {
             throw new RunnerException("Can’t check out code into jail.");
         }
 
-        if ($this->run_and_log("cd " . escapeshellarg($clonedir) . " && rm -rf .git .gitcheckout")) {
+        if ($this->run_and_log(["rm", "-rf", ".git", ".gitcheckout"], $clonedir)) {
             throw new RunnerException("Can’t clean up checkout in jail.");
         }
 
@@ -1007,11 +1044,12 @@ class QueueItem {
         foreach ($overlayfiles as $ro) {
             $path = $ro->absolute_path();
             if (preg_match('/(?:\.tar|\.tar\.[gx]z|\.t[bgx]z|\.tar\.bz2)\z/i', $ro->file)) {
-                $c = "cd " . escapeshellarg($checkoutdir) . " && tar -xf " . escapeshellarg($path);
+                $cmdarg = ["tar", "-xf", $path];
                 foreach ($ro->exclude ?? [] as $xf) {
-                    $c .= " --exclude " . escapeshellarg($xf);
+                    $cmdarg[] = "--exclude";
+                    $cmdarg[] = $xf;
                 }
-                $x = $this->run_and_log($c);
+                $x = $this->run_and_log($cmdarg, $checkoutdir);
             } else {
                 fwrite($this->_logstream, "++ cp " . escapeshellarg($path) . " " . escapeshellarg($checkoutdir) . "\n");
                 $rslash = strrpos($path, "/");
@@ -1026,7 +1064,7 @@ class QueueItem {
         if ($checkout_instructions) {
             foreach (explode("\n", $checkout_instructions) as $text) {
                 if (substr($text, 0, 3) === "rm:") {
-                    $this->run_and_log("cd " . escapeshellarg($checkoutdir) . " && rm -rf " . escapeshellarg(substr($text, 3)));
+                    $this->run_and_log(["rm", "-rf", substr($text, 3)], $checkoutdir);
                 }
             }
         }
