@@ -107,8 +107,7 @@ static int perror_fail(const char* format, const char* arg1) {
     return 1;
 }
 
-static __attribute__((noreturn))
-void die(const char* fmt, ...) {
+[[noreturn]] static void die(const char* fmt, ...) {
     va_list val;
     va_start(val, fmt);
     vfprintf(stderr, fmt, val);
@@ -116,13 +115,11 @@ void die(const char* fmt, ...) {
     exit(1);
 }
 
-static __attribute__((noreturn))
-void perror_die(const char* message) {
+[[noreturn]] static void perror_die(const char* message) {
     die("%s: %s\n", message, strerror(errno));
 }
 
-static inline __attribute__((noreturn))
-void perror_die(const std::string& message) {
+[[noreturn]] static inline void perror_die(const std::string& message) {
     perror_die(message.c_str());
 }
 
@@ -2109,7 +2106,7 @@ class jailownerinfo {
     int check_child_timeout(pid_t child, bool waitpid);
     void wait_background(pid_t child, int ptymaster);
     void write_timing();
-    void exec_done(pid_t child, int exit_status) __attribute__((noreturn));
+    [[noreturn]] void exec_done(pid_t child, int exit_status);
 };
 
 jailownerinfo::jailownerinfo()
@@ -2963,7 +2960,22 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
 }
 
 
-static __attribute__((noreturn)) void usage(jailaction action = do_start) {
+static void close_unwanted_fds() {
+    DIR* dir = opendir("/dev/fd");
+    while (auto de = readdir(dir)) {
+        if (isdigit((unsigned char) de->d_name[0])) {
+            char* ends;
+            unsigned long fd = strtoul(de->d_name, &ends, 10);
+            if (*ends == '\0' && fd > 2 && fd != (unsigned long) dirfd(dir)) {
+                close(fd);
+            }
+        }
+    }
+    closedir(dir);
+}
+
+
+[[noreturn]] static void usage(jailaction action = do_start) {
     if (action == do_start) {
         fprintf(stderr, "Usage: pa-jail add [-nh] [-f FILE | -F DATA] [-S SKELETON] JAILDIR [USER]\n\
        pa-jail run [--fg] [-nqhL] [-T TIMEOUT] [-I TIMEOUT] [-p PIDFILE] \\\n\
@@ -3227,6 +3239,11 @@ int main(int argc, char** argv) {
         if (setegid(caller_group) != 0) {
             perror_die("setegid");
         }
+    }
+
+    // close extra file descriptors
+    if (action == do_run) {
+        close_unwanted_fds();
     }
 
     // open pidfile as current user
