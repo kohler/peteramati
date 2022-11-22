@@ -95,6 +95,35 @@ function trim_data_to_offset(data, offset) {
     data.data = data.data.substring(matchIndex);
 }
 
+function utf8_length(str) {
+    const re = /^([\x00-\x7F]*)([\u0080-\u07FF]*)([\u0800-\uD7FF\uE000-\uFFFF]*)((?:[\uD800-\uDBFF][\uDC00-\uDFFF])*)/y;
+    let matchIndex = 0, offset = 0;
+    while (matchIndex < str.length) {
+        re.lastIndex = matchIndex;
+        const m = str.match(re);
+        if (!m) {
+            break;
+        }
+        if (m[1].length) {
+            matchIndex += m[1].length;
+            offset += m[1].length;
+        }
+        if (m[2].length) {
+            matchIndex += m[2].length;
+            offset += m[2].length * 2;
+        }
+        if (m[3].length) {
+            matchIndex += m[3].length;
+            offset += m[3].length * 3;
+        }
+        if (m[4].length) {
+            matchIndex += m[4].length;
+            offset += m[4].length * 2; // surrogate pairs
+        }
+    }
+    return offset;
+}
+
 export function run(button, opts) {
     const form = button.closest("form"),
         category = button.getAttribute("data-pa-run-category") || button.value,
@@ -212,6 +241,7 @@ export function run(button, opts) {
     }
 
     let ibuffer = "", // initial buffer; holds data before any results arrive
+        preamble_offset = null,
         offset = 0, backoff = 50, times = null;
 
     function hide_cursor() {
@@ -267,6 +297,7 @@ export function run(button, opts) {
                 return; // not ready yet
             }
 
+            preamble_offset = utf8_length(ibuffer.substr(0, pos + 2));
             str = ibuffer.substr(pos + 2);
             ibuffer = null;
 
@@ -523,6 +554,8 @@ export function run(button, opts) {
                     && typeof json === "object"
                     && json.data != null
                     && json.offset != null) {
+                    json.offset += preamble_offset;
+                    json.end_offset += preamble_offset;
                     if (json.ok == null) {
                         json.ok = true;
                     }

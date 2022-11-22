@@ -853,8 +853,7 @@ class QueueItem {
         $command = "jail/pa-jail run"
             . " -p" . escapeshellarg($pidfile)
             . " -P'{$this->runat} $$"
-            . ($inputfifo ? " -i" : "") . "'"
-            . " --ready";
+            . ($inputfifo ? " -i" : "") . "'";
         if ($runner->timed_replay) {
             $command .= " -t" . escapeshellarg($timingfile);
         }
@@ -915,16 +914,17 @@ class QueueItem {
             . " TERM=xterm-256color"
             . " " . escapeshellarg($this->expand($runner->command));
         $this->_runstatus = 2;
-        $this->run_and_log($command);
+        $this->run_and_log($command, true);
 
         // save information about execution
         $this->info()->add_recorded_job($runner->name, $this->runat);
     }
 
     /** @param string $command
+     * @param bool $ready
      * @return int */
-    private function run_and_log($command) {
-        fwrite($this->_logstream, "++ $command\n");
+    private function run_and_log($command, $ready = false) {
+        fwrite($this->_logstream, "++ " . $command . ($ready ? "\n\n" : "\n"));
         fflush($this->_logstream);
         system("($command) </dev/null >>" . escapeshellarg($this->_logfile) . " 2>&1", $status);
         return $status;

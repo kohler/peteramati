@@ -2055,11 +2055,22 @@ struct esfd {
         : fd_(fd), jbuf_(4096), output_off_(output_off) {
     }
     void write_header();
+    void write_event(jbuffer& jbuf);
 };
 
 void esfd::write_header() {
     const char message[] = "HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: text/event-stream\r\nX-Accel-Buffering: no\r\n\r\n";
     write(fd_, message, sizeof(message) - 1);
+}
+
+void esfd::write_event(jbuffer& jbuf) {
+    char xbuf[2048];
+    size_t n = sprintf(xbuf, "data:{\"offset\":%zu,\"data\":\"", output_off_);
+    jbuf_.append(xbuf, n);
+    const unsigned char* stop = jbuf_.append_json_chars(jbuf.buf_ + output_off_ - jbuf.bufpos_, jbuf.buf_ + jbuf.tail_);
+    size_t newoff = jbuf.bufpos_ + (stop - jbuf.buf_);
+    n = sprintf(xbuf, "\",\"end_offset\":%zu}\nid:%zu\n\n", newoff, newoff);
+    jbuf_.append(xbuf, n);
 }
 
 
@@ -2768,6 +2779,7 @@ void jailownerinfo::block(int ptymaster) {
         if (cfd >= 0) {
             esfds_.emplace_back(cfd, from_slave_.bufpos_ + from_slave_.head_);
             esfds_.back().write_header();
+            esfds_.back().write_event(from_slave_);
         }
     }
 }
@@ -2898,17 +2910,9 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         }
         if (!from_slave_.empty()) {
             size_t last_off = from_slave_.bufpos_ + from_slave_.tail_;
-            const unsigned char* last = from_slave_.buf_ + from_slave_.tail_;
             for (auto& esf : esfds_) {
-                char xbuf[2048];
                 if (esf.output_off_ < last_off) {
-                    size_t n = sprintf(xbuf, "data:{\"offset\":%zu,\"data\":\"", esf.output_off_);
-                    esf.jbuf_.append(xbuf, n);
-                    const unsigned char* stop = esf.jbuf_.append_json_chars(from_slave_.buf_ + esf.output_off_ - from_slave_.bufpos_, last);
-                    size_t newoff = from_slave_.bufpos_ + (stop - from_slave_.buf_);
-                    n = sprintf(xbuf, "\",\"end_offset\":%zu}\nid:%zu\n\n", newoff, newoff);
-                    esf.jbuf_.append(xbuf, n);
-                    esf.output_off_ = newoff;
+                    esf.write_event(from_slave_);
                 }
             }
         }
