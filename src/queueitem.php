@@ -956,9 +956,7 @@ class QueueItem {
                 1 => ["file", $this->_logfile, "a"],
                 2 => $stderr
             ], $pipes, $cwd);
-        $status = proc_close($proc);
-        error_log(json_encode($cmd) . " -> $status");
-        return $status;
+        return proc_close($proc);
     }
 
     private function remove_old_jails() {
