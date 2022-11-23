@@ -1274,15 +1274,10 @@ class Contact {
         return false;
     }
 
+    /** @return int */
     private function password_hash_method() {
         $m = $this->conf->opt("passwordHashMethod");
-        if (function_exists("password_verify") && !is_string($m))
-            return is_int($m) ? $m : PASSWORD_DEFAULT;
-        if (!function_exists("hash_hmac"))
-            return false;
-        if (is_string($m))
-            return $m;
-        return PHP_INT_SIZE == 8 ? "sha512" : "sha256";
+        return is_int($m) ? $m : PASSWORD_DEFAULT;
     }
 
     private function preferred_password_keyid($iscdb) {
@@ -1292,36 +1287,19 @@ class Contact {
             return $this->conf->opt("passwordHmacKeyid") ?? 0;
     }
 
-    private function check_password_encryption($hash, $iscdb) {
-        $safe = $this->conf->opt($iscdb ? "contactdb_safePasswords" : "safePasswords");
-        if ($safe < 1
-            || ($method = $this->password_hash_method()) === false
-            || ($hash !== "" && $safe == 1 && $hash[0] !== " "))
-            return false;
-        else if ($hash === "" || $hash[0] !== " ")
+    private function check_password_encryption($hash) {
+        $safe = $this->conf->opt("safePasswords");
+        if ($hash === "" || $hash[0] !== " " || $hash[1] === "\$") {
             return true;
-        else if (is_int($method))
-            return $hash[1] !== "\$"
-                || password_needs_rehash(substr($hash, 2), $method);
-        else {
-            $prefix = " " . $method . " " . $this->preferred_password_keyid($iscdb) . " ";
-            return !str_starts_with($hash, $prefix);
+        } else {
+            return password_needs_rehash(substr($hash, 2), $this->password_hash_method());
         }
     }
 
-    private function hash_password($input, $iscdb) {
-        $method = $this->password_hash_method();
-        if ($method === false)
-            return $input;
-        else if (is_int($method))
-            return " \$" . password_hash($input, $method);
-        else {
-            $keyid = $this->preferred_password_keyid($iscdb);
-            $key = $this->password_hmac_key($keyid);
-            $salt = random_bytes(16);
-            return " " . $method . " " . $keyid . " " . $salt
-                . hash_hmac($method, $salt . $input, $key, true);
-        }
+    /** @param string $input
+     * @return string */
+    private function hash_password($input) {
+        return " \$" . password_hash($input, $this->password_hash_method());
     }
 
     function check_password($input) {
@@ -1337,8 +1315,8 @@ class Contact {
         if ($cdbu && ($hash = $cdbu->password)
             && $cdbu->allow_contactdb_password()
             && ($cdbok = $this->check_hashed_password($input, $hash, $this->email))) {
-            if ($this->check_password_encryption($hash, true)) {
-                $hash = $this->hash_password($input, true);
+            if ($this->check_password_encryption($hash)) {
+                $hash = $this->hash_password($input);
                 Dbl::ql(self::contactdb(), "update ContactInfo set password=? where contactDbId=?", $hash, $cdbu->contactDbId);
                 $cdbu->password = $hash;
             }
@@ -1351,8 +1329,8 @@ class Contact {
         $localok = false;
         if ($this->contactId && ($hash = $this->password)
             && ($localok = $this->check_hashed_password($input, $hash, $this->email))) {
-            if ($this->check_password_encryption($hash, false)) {
-                $hash = $this->hash_password($input, false);
+            if ($this->check_password_encryption($hash)) {
+                $hash = $this->hash_password($input);
                 $this->conf->ql("update ContactInfo set password=? where contactId=?", $hash, $this->contactId);
                 $this->password = $hash;
             }
@@ -1382,8 +1360,8 @@ class Contact {
             && (!$old || $this->check_hashed_password($old, $cdbu->password, $this->email))) {
             $hash = $new;
             if ($hash && !($flags & self::CHANGE_PASSWORD_PLAINTEXT)
-                && $this->check_password_encryption("", true))
-                $hash = $this->hash_password($hash, true);
+                && $this->check_password_encryption(""))
+                $hash = $this->hash_password($hash);
             $cdbu->password = $hash;
             if (!$old || $old !== $new)
                 $cdbu->passwordTime = Conf::$now;
@@ -1397,8 +1375,8 @@ class Contact {
                    && (!$old || $this->check_hashed_password($old, $this->password, $this->email))) {
             $hash = $new;
             if ($hash && !($flags & self::CHANGE_PASSWORD_PLAINTEXT)
-                && $this->check_password_encryption("", false))
-                $hash = $this->hash_password($hash, false);
+                && $this->check_password_encryption(""))
+                $hash = $this->hash_password($hash);
             $this->password = $hash;
             if (!$old || $old !== $new)
                 $this->passwordTime = Conf::$now;
