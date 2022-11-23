@@ -15,12 +15,6 @@ An account has been created for you at the %CONFNAME% submissions site, includin
        Email: %EMAIL%
     Password: %OPT(PASSWORD)%
 
-Use the link below to sign in directly.
-
-%LOGINURL%
-
-If you already have an account under a different email address, you may merge this new account into that one. Go to your profile page and select \"Merge with another account\".
-
 Contact the site administrator, %ADMIN%, with any questions or concerns.
 
 - %CONFSHORTNAME% Submissions\n"),
@@ -34,10 +28,6 @@ Here is your account information for the %CONFNAME% submissions site.
         Site: %URL%/
        Email: %EMAIL%
     Password: %OPT(PASSWORD)%
-
-Use the link below to sign in directly.
-
-%LOGINURL%
 
 Contact the site administrator, %ADMIN%, with any questions or concerns.
 

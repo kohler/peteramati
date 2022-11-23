@@ -392,8 +392,10 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
     if ($User !== $Me && !$User->is_anonymous && $User->contactImageId) {
         echo '<img class="pa-face float-left" src="' . $Conf->hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
     }
-    echo '<h2 class="homeemail"><a class="q" href="',
-        $Conf->hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+    if ($u) {
+        echo '<h2 class="homeemail"><a class="q" href="',
+            $Conf->hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+    }
     if ($Me->privChair) {
         echo "&nbsp;", become_user_link($User);
     }
