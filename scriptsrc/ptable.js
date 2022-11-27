@@ -114,7 +114,8 @@ class PtableConf {
         this.data = data;
 
         this.mode = 0;
-        this.smap = [];
+        this.smap = [null];
+        this.uidmap = [];
     }
 
     ukey(s) {
@@ -192,19 +193,34 @@ class PtableConf {
         }
     }
 
-    render_name_text(s) {
+    render_tooltip_name(s) {
         if (!s) {
-            return "[none]";
-        } else if (this.anonymous) {
-            return s.anon_user || "?";
+            return "???";
+        } else if (this.anonymous && s.anon_user) {
+            return s.anon_user;
+        } else if (this.sort.u === "email" && s.email) {
+            return s.email;
+        } else if (this.sort.u === "name") {
+            return render_name(s, false);
         } else {
-            return render_name(s, this.last_first) || "?";
+            return s.user;
         }
     }
 
     render_checkbox_name(s) {
-        var u = this.anonymous ? s.anon_user || s.user : s.user;
+        let u = this.anonymous ? s.anon_user || s.user : s.user;
         return "s:" + encodeURIComponent(u).replace(/\./g, "%2E");
+    }
+
+    push(s) {
+        s._spos = this.smap.length;
+        this.smap.push(s);
+        if (s.uid > 0) {
+            if (s.uid >= this.uidmap.length) {
+                this.uidmap.length = s.uid + 1;
+            }
+            this.uidmap[s.uid] = s;
+        }
     }
 }
 
@@ -1175,7 +1191,8 @@ function pa_render_pset_table(ptconf) {
         observer.observe($j.parent()[0]);
     }
 
-    function render_tds(tre, s) {
+    function render_tds(tre, s, mode) {
+        ptconf.mode = mode;
         for (let i = 0; i !== col.length; ++i) {
             const tde = document.createElement("td");
             col[i].td.call(col[i], tde, s, ptconf);
@@ -1235,8 +1252,7 @@ function pa_render_pset_table(ptconf) {
         let trn = 0, was_boringness = 0;
         for (let i = 0; i !== data.length; ++i) {
             const s = data[i];
-            s._spos = smap.length;
-            smap.push(s);
+            ptconf.push(s);
             ++trn;
             if (s.boringness !== was_boringness && trn != 1) {
                 const tre = document.createElement("tr");
@@ -1254,13 +1270,11 @@ function pa_render_pset_table(ptconf) {
             if (s.uid) {
                 tre.setAttribute("data-pa-uid", s.uid);
             }
-            ptconf.mode = 0;
-            render_tds(tre, s);
+            render_tds(tre, s, 0);
             tbody.appendChild(tre);
             for (let j = 0; s.partners && j < s.partners.length; ++j) {
                 const ss = s.partners[j];
-                ss._spos = smap.length;
-                smap.push(ss);
+                ptconf.push(ss);
                 const trep = document.createElement("tr");
                 trep.className = "gt k".concat(trn % 2, " gtrow-partner");
                 trep.setAttribute("data-pa-spos", ss._spos);
@@ -1268,8 +1282,7 @@ function pa_render_pset_table(ptconf) {
                     trep.setAttribute("data-pa-uid", ss.uid);
                 }
                 trep.setAttribute("data-pa-partner", 1);
-                ptconf.mode = 1;
-                render_tds(trep, s.partners[j]);
+                render_tds(trep, s.partners[j], 1);
                 tbody.appendChild(trep);
             }
         }
@@ -1285,15 +1298,6 @@ function pa_render_pset_table(ptconf) {
     initialize();
     render();
 
-    $j.data("paTable", {
-        name_text: function (uid) {
-            var spos = $j.find("tr[data-pa-uid=" + uid + "]").attr("data-pa-spos");
-            return spos ? ptconf.render_name_text(smap[spos]) : null;
-        },
-        s: function (spos) {
-            return data[spos];
-        }
-    });
     $j.children("tbody").on("pa-hotlist", make_hotlist);
     $j.closest("form")[0].addEventListener("rangechange", function (evt) {
         if (evt.detail.rangeType === "s61")
@@ -1379,7 +1383,7 @@ handle_ui.on("js-pset-gconfig", function () {
 
     function gdialog() {
         const hc = popup_skeleton();
-        hc.push('<h2>' + escape_entities(ptconf.title) + ' Settings</h2>');
+        hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Settings</h2>');
         hc.push('<div class="pa-messages"></div>');
         hc.push('<div class="d-grid-1">', '</div>');
 

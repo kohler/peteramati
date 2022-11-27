@@ -1090,11 +1090,10 @@ handle_ui.on("pa-anonymized-link", function (event) {
 });
 
 handle_ui.on("js-multiresolveflag", function () {
-    const $gt = $(this.closest("form")).find(".gtable").first(),
-        pat = $gt.data("paTable"),
-        flags = [];
-    $gt.find(".papsel:checked").each(function () {
-        const s = pat.s(this.closest("tr").getAttribute("data-pa-spos"));
+    const form = this.closest("form"),
+        ptconf = form.pa__ptconf, flags = [];
+    $(form).find(".papsel:checked").each(function () {
+        const s = ptconf.smap[this.closest("tr").getAttribute("data-pa-spos")];
         flags.push({pset: s.pset, uid: s.uid, commit: s.commit, flagid: s.flagid});
     });
     if (flags.length !== 0) {

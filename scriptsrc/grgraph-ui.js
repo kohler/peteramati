@@ -140,7 +140,7 @@ function draw_grgraph() {
     }
 
     // load user grade
-    const sheet = pi.pa__gradesheet,
+    const sheet = pi ? pi.pa__gradesheet : null,
         total = sheet ? sheet.grade_total(want_noextra && !want_all) : null;
     if (total != null) {
         grgr.annotate_last_curve(total);

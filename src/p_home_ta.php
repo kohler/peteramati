@@ -161,7 +161,7 @@ class Home_TA_Page {
 
         echo '<div>',
             Ht::form("", ["id" => "pa-pset-flagged"]),
-            "<h3>flagged commits</h3>",
+            '<h3 class="pa-home-pset">flagged commits</h3>',
             '<div class="gtable-container-0">',
             '<div class="gtable-container-1">',
             '<table class="gtable"></table></div></div>',

@@ -684,10 +684,11 @@ export class GradeGraph {
                 ha[2].setAttribute("x", pt[0] - bb.width / 2 - 2);
                 ha[2].setAttribute("width", bb.width + 4);
 
-                var table, name;
+                let ptconf, s, name;
                 if (pt.pathNode.hasAttribute("data-pa-uid")
-                    && (table = $(".gtable").data("paTable"))
-                    && (name = table.name_text(pt.pathNode.getAttribute("data-pa-uid")))) {
+                    && (ptconf = this.closest("form").pa__ptconf)
+                    && (s = ptconf.uidmap[pt.pathNode.getAttribute("data-pa-uid")])
+                    && (name = ptconf.render_tooltip_name(s))) {
                     ha[4].firstChild.data = name;
                     ha[4].setAttribute("x", pt[0]);
                     ha[4].setAttribute("y", pt[1]);

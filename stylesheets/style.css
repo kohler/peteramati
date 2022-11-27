@@ -134,7 +134,7 @@ h3 {
 	margin-top: 0;
 	margin-bottom: 1rem;
 }
-h3.pa-home-pset {
+.pa-home-pset {
 	font-weight: 900;
 }
 .hdr-actions {
@@ -795,7 +795,7 @@ span.impending a {
 	border-bottom: 1px solid #b2a584;
 }
 .home-pset-links {
-	margin: 0 -24px;
+	margin: 0 -24px 1rem;
 	padding: 5px 24px;
 	background-color: #dffdf0;
 	border-top: 1px solid #b2a584;
