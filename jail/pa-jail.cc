@@ -11,11 +11,13 @@
 #include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstdarg>
 #include <cstring>
 #include <cerrno>
+#include <cmath>
 #include <csignal>
 #include <poll.h>
 #include <dirent.h>
@@ -24,7 +26,6 @@
 #include <grp.h>
 #include <fcntl.h>
 #include <utime.h>
-#include <cassert>
 #include <getopt.h>
 #include <fnmatch.h>
 #include <string>
@@ -1960,7 +1961,7 @@ const unsigned char* jbuffer::append_json_chars(const unsigned char* first, cons
             first += 3;
         } else if (last - first == 3) {
             break;
-        } else if (first[3] < 0x80 || first[2] > 0xBF) {
+        } else if (first[3] < 0x80 || first[3] > 0xBF) {
             goto skip;
         } else {
             first += 4;
@@ -2071,6 +2072,7 @@ void esfd::write_event(jbuffer& jbuf) {
     size_t newoff = jbuf.bufpos_ + (stop - jbuf.buf_);
     n = sprintf(xbuf, "\",\"end_offset\":%zu}\nid:%zu\n\n", newoff, newoff);
     jbuf_.append(xbuf, n);
+    output_off_ = newoff;
 }
 
 
