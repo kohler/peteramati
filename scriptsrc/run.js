@@ -335,10 +335,19 @@ export function run(button, opts) {
             if (n < 0) {
                 n = times.length;
             }
-            if (times.charCodeAt(p) !== 35 /* # */
+            const ch = times.charCodeAt(p);
+            if ((ch === 43 /* + */ || (ch >= 48 && ch <= 57 /* 0-9 */))
                 && (c = times.indexOf(",", p)) >= 0
                 && c < n) {
-                a.push(+times.substring(p, c), +times.substring(c + 1, n));
+                let time = +times.substring(p, c),
+                    offset = +times.substring(c + 1, n);
+                if (ch === 43) {
+                    time += a[a.length - 2];
+                }
+                if (times.charCodeAt(c + 1) === 43) {
+                    offset += a[a.length - 1];
+                }
+                a.push(time, offset);
             }
             p = n + 1;
         }
