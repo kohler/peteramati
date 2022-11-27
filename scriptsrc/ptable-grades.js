@@ -172,12 +172,6 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
 
     function gdialog_fill_user(su1) {
         let t;
-        if (su1.first || su1.last) {
-            t = su1.first.concat(" ", su1.last, " <", su1.email, ">");
-        } else {
-            t = "<".concat(su1.email, ">");
-        }
-        $gdialog.find(".gt-name-email").html(escape_entities(t)).removeClass("hidden");
         let tr = table.tBodies[0].firstChild, tr1;
         while (tr && tr.getAttribute("data-pa-spos") != su1._spos) {
             tr = tr.nextSibling;
@@ -185,25 +179,20 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
         for (tr1 = tr; tr1 && (tr1 === tr || !tr1.hasAttribute("data-pa-spos")); ) {
             tr1 = tr1.previousSibling;
         }
-        $gdialog.find("button[name=prev]").attr("data-pa-spos", tr1 ? tr1.getAttribute("data-pa-spos") : "").prop("disabled", !tr1);
+        $gdialog.find("button[name=prev]").attr("data-pa-spos", tr1 ? tr1.getAttribute("data-pa-spos") : "").prop("disabled", !tr1).removeClass("hidden");
         for (tr1 = tr; tr1 && (tr1 === tr || !tr1.hasAttribute("data-pa-spos")); ) {
             tr1 = tr1.nextSibling;
         }
-        $gdialog.find("button[name=next]").attr("data-pa-spos", tr1 ? tr1.getAttribute("data-pa-spos") : "").prop("disabled", !tr1);
+        $gdialog.find("button[name=next]").attr("data-pa-spos", tr1 ? tr1.getAttribute("data-pa-spos") : "").prop("disabled", !tr1).removeClass("hidden");
     }
     function gdialog_fill(spos) {
         gdialog_su = [];
         for (let i = 0; i !== spos.length; ++i) {
             gdialog_su.push(ptconf.smap[spos[i]]);
         }
-        $gdialog.find("h2").html(escape_entities(ptconf.title) + " : " +
-            gdialog_su.map(function (su) {
-                return escape_entities(ptconf.anonymous ? su.anon_user : su.user);
-            }).join(", "));
+        ptconf.render_gdialog_users($gdialog.find("h3")[0], gdialog_su);
         if (gdialog_su.length === 1) {
             gdialog_fill_user(gdialog_su[0]);
-        } else {
-            $gdialog.find(".gt-name-email").addClass("hidden");
         }
 
         $gdialog.find(".pa-grade").each(function () {
@@ -458,8 +447,10 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
             ggr[grcid] = (ggr[grcid] || 0) + 1;
         }
         for (let su of ptconf.smap) {
-            const grcid = su.gradercid || 0;
-            ggra[grcid] = (ggra[grcid] || 0) + 1;
+            if (su) {
+                const grcid = su.gradercid || 0;
+                ggra[grcid] = (ggra[grcid] || 0) + 1;
+            }
         }
         $(gs).find("input").prop("checked", false).prop("indeterminate", false);
         for (let x in gvis) {
@@ -504,10 +495,8 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
 
     function show() {
         const hc = popup_skeleton();
-        hc.push('<h2></h2>');
-        if (!ptconf.anonymous) {
-            hc.push('<strong class="gt-name-email"></strong>');
-        }
+        hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Grades</h2>');
+        hc.push('<h3 class="gdialog-userids hidden"></h3>');
         hc.push('<div class="pa-messages"></div>');
 
         hc.push('<div class="nav-pills">', '</div>');

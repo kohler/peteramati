@@ -212,6 +212,23 @@ class PtableConf {
         return "s:" + encodeURIComponent(u).replace(/\./g, "%2E");
     }
 
+    render_gdialog_users(h3, slist) {
+        if (slist.length === this.data.length || slist.length === 0) {
+            addClass(h3, "hidden");
+        } else {
+            removeClass(h3, "hidden");
+            let i = 0, n = [], max = slist.length === 20 ? 20 : 19;
+            while (i < max && i < slist.length) {
+                n.push(this.render_tooltip_name(slist[i]));
+                ++i;
+            }
+            if (i < slist.length) {
+                n.push("(".concat(slist.length - i, " more)"));
+            }
+            h3.replaceChildren(n.join(", "));
+        }
+    }
+
     push(s) {
         s._spos = this.smap.length;
         this.smap.push(s);
@@ -1463,31 +1480,22 @@ handle_ui.on("js-ptable-run", function () {
 
     function gdialog() {
         slist = [];
-        let aslist = [];
+        let sall = [];
         const table = $(f).find("table.gtable")[0],
             cbidx = ptconf.colmap.checkbox.index;
         for (let tr = table.tBodies[0].firstChild; tr; tr = tr.nextSibling) {
             const spos = tr.getAttribute("data-pa-spos"),
                 su = spos ? ptconf.smap[spos] : null;
             if (su) {
-                const ukey = ptconf.ukey(su);
-                aslist.push(ukey);
-                if (tr.children[cbidx].firstChild.checked) {
-                    slist.push(ukey);
-                }
+                sall.push(su);
+                tr.children[cbidx].firstChild.checked && slist.push(su);
             }
         }
-
-        let snames;
-        if (slist.length === 0) {
-            slist = aslist;
-            snames = "";
-        } else {
-            snames = " : " + escape_entities(slist.join(" "));
-        }
+        slist = slist.length ? slist : sall;
 
         const hc = popup_skeleton();
-        hc.push('<h2>' + escape_entities(ptconf.title) + ' Commands' + snames + '</h2>');
+        hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Commands</h2>');
+        hc.push('<h3 class="gdialog-userids"></h3>');
         hc.push('<div class="pa-messages"></div>');
 
         hc.push('<div class="mt-1 multicol-2">', '</div>');
@@ -1502,6 +1510,7 @@ handle_ui.on("js-ptable-run", function () {
         hc.push('<button type="button" name="run" class="btn-primary">Run</button>');
         hc.push('<button type="button" name="cancel">Cancel</button>');
         $gdialog = hc.show(false);
+        ptconf.render_gdialog_users($gdialog.find("h3")[0], slist);
         form = $gdialog.find("form")[0];
         $(form.elements.run).on("click", submit);
         hc.show();

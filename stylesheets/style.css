@@ -1420,8 +1420,9 @@ table.floatleft {
 }
 
 h2 {
-	margin-top: 0;
 	font-size: larger;
+	margin-top: 0;
+	margin-bottom: 0.5rem;
 }
 
 span.author, span.conflict {
@@ -2517,18 +2518,6 @@ td.mhcb {
 .pa-p-hidden > .pa-pt::before {
 	content: "\1f512\fe0e";
 }
-.is-main > .pa-p-hidden input,
-.is-mainsb > .pa-p-hidden input,
-.is-modal > .pa-p-hidden input,
-.is-main > .pa-p-hidden textarea,
-.is-mainsb > .pa-p-hidden textarea,
-.is-modal > .pa-p-hidden textarea {
-	background-color: #f7f7f7;
-}
-.pa-gradebox > .pa-p-hidden input,
-.pa-gradebox > .pa-p-hidden textarea {
-	background-color: #fafaff;
-}
 .pa-gradelist.is-main {
 	margin-left: -1.5rem;
 	margin-right: -1.5rem;
@@ -2668,6 +2657,10 @@ th.gt-checkbox > input {
 }
 .gt-at {
 	white-space: nowrap;
+}
+h3.gdialog-userids {
+	margin-top: -0.5rem;
+	font-size: 1rem;
 }
 
 .pa-sticky, .pa-fileref {
