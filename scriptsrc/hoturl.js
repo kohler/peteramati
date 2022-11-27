@@ -118,11 +118,11 @@ export function hoturl(page, options) {
         }
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
         hoturl_clean(x, /^fn=(\w+)$/);
-        hoturl_clean(x, /^pset=([^?&#]+)$/);
-        hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);
     } else if (page === "index") {
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
-    } else if (page === "pset" || page === "run") {
+    } else if (page === "run") {
+        hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
+    } else if (page === "pset") {
         hoturl_clean_before(x, /^u=([^?&#]+)$/, "~");
         hoturl_clean(x, /^pset=([^?&#]+)$/);
         hoturl_clean(x, /^commit=([0-9A-Fa-f]+)$/);

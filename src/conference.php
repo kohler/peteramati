@@ -1654,7 +1654,7 @@ class Conf {
                 $t = "~" . $m[2] . ($page === "index" ? "" : "/$t");
                 $param = $m[1] . $m[3];
             }
-            if (in_array($page, ["pset", "run", "diff", "raw", "file"])
+            if (in_array($page, ["pset", "diff", "raw", "file"])
                 && preg_match($are . 'pset=(\w+)' . $zre, $param, $m)) {
                 $t .= "/" . $m[2];
                 $param = $m[1] . $m[3];
