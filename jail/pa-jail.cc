@@ -2114,6 +2114,9 @@ class jailownerinfo {
     struct termios ttyfd_termios_;
     int child_status_ = -1;
     bool has_blocked_;
+    unsigned long long timing_msec_ = 0;
+    unsigned long long timing_offset_ = 0;
+    size_t timing_count_ = 0;
 
     void start_sigpipe();
     void block(int ptymaster);
@@ -2230,8 +2233,10 @@ static void write_pid(int p) {
 
 static struct timeval timer_add_delay(struct timeval tv, double delay) {
     struct timeval delta;
-    delta.tv_sec = (long) delay;
-    delta.tv_usec = (long) ((delay - delta.tv_sec) * 1000000);
+    double sec, usec;
+    usec = modf(delay, &sec);
+    delta.tv_sec = (long) sec;
+    delta.tv_usec = (long) (usec * 1'000'000);
     timeradd(&tv, &delta, &tv);
     return tv;
 }
@@ -2750,10 +2755,12 @@ void jailownerinfo::block(int ptymaster) {
         }
     }
 
-    if (poll(p.data(), p.size(), 0) == 0) {
+    int pollr = poll(p.data(), p.size(), 0);
+    if (pollr == 0) {
         has_blocked_ = true;
-        poll(p.data(), p.size(), timeout_ms);
+        pollr = poll(p.data(), p.size(), timeout_ms);
     }
+    assert(pollr >= 0);
 
     // read from signal pipe
     if (p[0].revents & POLLIN) {
@@ -2803,8 +2810,8 @@ int jailownerinfo::check_child_timeout(pid_t child, bool waitpid) {
         return 128 + SIGTERM;
     } else {
         struct timeval now;
-        if ((timerisset(&expiry_) || timerisset(&idle_expiry_))
-            && gettimeofday(&now, nullptr) == 0) {
+        if (timerisset(&expiry_) || timerisset(&idle_expiry_)) {
+            gettimeofday(&now, nullptr);
             if ((timerisset(&expiry_) && timercmp(&now, &expiry_, >))
                 || (timerisset(&idle_expiry_) && timercmp(&now, &idle_expiry_, >))) {
                 return 124;
@@ -2819,18 +2826,26 @@ void jailownerinfo::write_timing() {
     struct timeval now, delta;
     gettimeofday(&now, nullptr);
     timersub(&now, &this->start_time_, &delta);
-    unsigned long long deltamsecs = (delta.tv_sec * 1000000 + delta.tv_usec) / 1000;
+    unsigned long long deltamsecs = (delta.tv_sec * 1'000'000 + delta.tv_usec) / 1000;
     char timingstr[256];
-    int written = 0;
-    int len = snprintf(timingstr, sizeof(timingstr), "%llu,%llu\n", deltamsecs, (unsigned long long) from_slave_off_);
+    ssize_t len;
+    if (this->timing_count_ % 128 == 0) {
+        len = snprintf(timingstr, sizeof(timingstr), "%llu,%llu\n", deltamsecs, (unsigned long long) from_slave_off_);
+    } else {
+        len = snprintf(timingstr, sizeof(timingstr), "+%llu,+%llu\n", deltamsecs - this->timing_msec_, (unsigned long long) from_slave_off_ - this->timing_offset_);
+    }
     assert(len < 256);
+    ssize_t written = 0;
     while (written < len) {
-        int r = write(timingfd, timingstr, len);
-        if (r < 0) {
+        ssize_t nw = write(timingfd, timingstr, len);
+        if (nw < 0) {
             perror_die("Timing file");
         }
-        written += r;
+        written += nw;
     }
+    this->timing_msec_ = deltamsecs;
+    this->timing_offset_ = from_slave_off_;
+    ++this->timing_count_;
 }
 
 void jailownerinfo::wait_background(pid_t child, int ptymaster) {
@@ -2948,15 +2963,15 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
     if (timingfd != -1) {
         write_timing();
     }
-    const char* xmsg = nullptr;
+    std::string xmsg;
     if (exit_status == 124 && !quiet) {
         xmsg = "...timed out";
     } else if (exit_status == 128 + SIGTERM && !quiet) {
         xmsg = "...terminated";
     }
-    if (xmsg) {
+    if (!xmsg.empty()) {
         const char* nl = no_onlcr ? "\n" : "\r\n";
-        fprintf(stderr, inputfd_ > 0 || stderr_tty_ ? "%s\x1b[3;7;31m%s\x1b[K\x1b[0m%s\x1b[K%s" : "%s%s%s%s", nl, xmsg, nl, nl);
+        fprintf(stderr, inputfd_ > 0 || stderr_tty_ ? "%s\x1b[3;7;31m%s\x1b[K\x1b[0m%s\x1b[K%s" : "%s%s%s%s", nl, xmsg.c_str(), nl, nl);
     }
 #if __linux__
     (void) child;
@@ -2972,7 +2987,8 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
     // close event sources
     // XXX what if blocked?
     for (auto it = esfds_.begin(); it != esfds_.end(); ) {
-        write(it->fd_, "data:{\"done\":true}\n\n", 20);
+        ssize_t nw = write(it->fd_, "data:{\"done\":true}\n\n", 20);
+        assert(nw == 20);
         close(it->fd_);
         it = esfds_.erase(it);
     }
