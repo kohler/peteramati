@@ -438,6 +438,18 @@ export function run(button, opts) {
             }
         }
 
+        function tpos_offset(tpos) {
+            if (ibuffer !== null) {
+                const nlnl = data.data.indexOf("\n\n");
+                append_data(data.data.substring(0, nlnl + 2), data);
+            }
+            if (tpos < times.length) {
+                return preamble_offset + times[tpos + 1];
+            } else {
+                return data.size;
+            }
+        }
+
         function f(time) {
             if (time === null) {
                 if (running) {
@@ -472,18 +484,18 @@ export function run(button, opts) {
                 ibuffer = "";
                 tpos = 0;
             }
-            let boffset = tpos < times.length ? times[tpos + 1] : data.size;
+            let boffset = tpos_offset(tpos);
 
             // flow control: give xterm.js 8MB of data at a time
             const maxdata = 8 << 20;
-            let eoffset = npos < times.length ? times[npos + 1] : data.size;
+            let eoffset = tpos_offset(npos);
             if (boffset + maxdata < eoffset) {
                 let lpos = tpos;
                 while (lpos < npos) {
                     const m = lpos + (((npos - lpos) >> 1) & ~1);
-                    if (boffset + maxdata < times[m + 1]) {
+                    if (boffset + maxdata < times[m + 1] + preamble_offset) {
                         npos = m;
-                        eoffset = times[m + 1];
+                        eoffset = tpos_offset(m);
                     } else {
                         lpos = m + 2;
                     }

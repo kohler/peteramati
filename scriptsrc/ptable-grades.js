@@ -171,7 +171,6 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
     }
 
     function gdialog_fill_user(su1) {
-        let t;
         let tr = table.tBodies[0].firstChild, tr1;
         while (tr && tr.getAttribute("data-pa-spos") != su1._spos) {
             tr = tr.nextSibling;
