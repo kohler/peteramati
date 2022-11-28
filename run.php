@@ -182,7 +182,7 @@ class RunRequest {
             $qi = QueueItem::make_info($info, $this->runner);
             $qi->flags |= ($this->viewer->privChair ? QueueItem::FLAG_UNWATCHED : 0)
                 | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
-            $qi->schedule(100);
+            $qi->schedule(100, $this->viewer->contactId);
         } else {
             $qi->update();
         }
