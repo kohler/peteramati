@@ -130,7 +130,7 @@ class RunEnqueueBatch {
         }
         if ($chain > 0
             && ($qi = QueueItem::by_chain($this->conf, $chain))
-            && $qi->unscheduled()) {
+            && $qi->schedulable()) {
             $qi->schedule(0);
         }
         return $nu;

@@ -248,6 +248,11 @@ class QueueItem {
 
     /** @return bool */
     function unscheduled() {
+        return $this->status <= self::STATUS_UNSCHEDULED;
+    }
+
+    /** @return bool */
+    function schedulable() {
         return $this->status === self::STATUS_UNSCHEDULED;
     }
 
