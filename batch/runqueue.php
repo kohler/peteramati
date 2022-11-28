@@ -8,26 +8,12 @@ require_once(dirname(__DIR__) . "/src/init.php");
 class RunQueueBatch {
     /** @var Conf */
     public $conf;
-    /** @var bool */
-    public $is_query = false;
+    /** @var 'list'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains' */
+    public $mode;
     /** @var ?int */
     public $count;
-    /** @var bool */
-    public $is_clean = false;
-    /** @var ?list<int> */
-    public $schedule_qid;
-    /** @var bool */
-    public $list_broken_chains = false;
-    /** @var bool */
-    public $cancel_broken_chains = false;
-    /** @var ?list<int> */
-    public $cancel_chain;
-    /** @var ?list<int> */
-    public $cancel_qid;
-    /** @var bool */
-    public $is_execute = false;
-    /** @var bool */
-    public $is_execute1 = false;
+    /** @var list<string> */
+    public $words;
     /** @var bool */
     public $verbose = false;
     /** @var list<QueueItem> */
@@ -51,7 +37,7 @@ class RunQueueBatch {
         return $s;
     }
 
-    function query() {
+    function list() {
         $result = $this->conf->qe("select * from ExecutionQueue
                 where status<?
                 order by runorder asc, queueid asc"
@@ -93,15 +79,78 @@ class RunQueueBatch {
         Dbl::free($result);
     }
 
-    function schedule() {
-        $qs = new QueueStatus;
-        $result = $this->conf->qe("select * from ExecutionQueue
-                where status=? and queueid?a",
-            QueueItem::STATUS_UNSCHEDULED, $this->schedule_qid);
-        while (($qix = QueueItem::fetch($this->conf, $result))) {
-            $qix->schedule(0);
+    /** @return list<int> */
+    function broken_chains() {
+        $result = $this->conf->qe("select chain, max(status)
+                from ExecutionQueue
+                where status<?
+                group by chain",
+            QueueItem::STATUS_CANCELLED);
+        $chains = [];
+        while (($row = $result->fetch_row())) {
+            $chainid = intval($row[0]);
+            $status = intval($row[1]);
+            if ($status < QueueItem::STATUS_SCHEDULED) {
+                $chains[] = $chainid;
+            }
         }
         Dbl::free($result);
+        return $chains;
+    }
+
+    /** @return array{q:list<int>,c:list<int>} */
+    private function parse_words() {
+        $q = $c = [];
+        foreach ($this->words as $w) {
+            if ($w === "broken" && $this->mode === "cancel") {
+                $c = array_merge($c, $this->broken_chains());
+                continue;
+            }
+            $f = substr($w, 0, 1);
+            $n = substr($w, $f === "c" || $f === "C" || $f === "#" ? 1 : 0);
+            if ($n === "" || !ctype_digit($n)) {
+                throw new CommandLineException("`runqueue.php {$this->mode}` takes queue and chain IDs");
+            }
+            if ($f === "c" || $f === "C") {
+                $c[] = intval($n);
+            } else {
+                $q[] = intval($n);
+            }
+        }
+        return ["q" => $q, "c" => $c];
+    }
+
+    function schedule() {
+        $qc = $this->parse_words();
+        if (!empty($qc["c"])) {
+            $result = $this->conf->qe("select * from ExecutionQueue
+                where status<? and chain?a
+                order by runorder asc, queueid asc",
+                QueueItem::STATUS_CANCELLED, $qc["c"]);
+            $sqi = [];
+            while (($qix = QueueItem::fetch($this->conf, $result))) {
+                if ($qix->status() >= QueueItem::STATUS_SCHEDULED) {
+                    $sqi[$qix->chain] = null;
+                } else if (!array_key_exists($sqi[$qix->chain])) {
+                    $sqi[$qix->chain] = $qix;
+                }
+            }
+            Dbl::free($result);
+            foreach ($sqi as $qix) {
+                if ($qix) {
+                    $qc["q"][] = $qix->queueid;
+                }
+            }
+        }
+        if (!empty($qc["q"])) {
+            $result = $this->conf->qe("select * from ExecutionQueue
+                    where status<=? and queueid?a",
+                QueueItem::STATUS_UNSCHEDULED, $qc["q"]);
+            while (($qix = QueueItem::fetch($this->conf, $result))) {
+                $qix->schedule(0);
+            }
+            Dbl::free($result);
+        }
     }
 
     function load() {
@@ -168,6 +217,45 @@ class RunQueueBatch {
         }
     }
 
+    function cancel() {
+        $qc = $this->parse_words();
+        $qf = $qv = [];
+        if (!empty($qc["q"])) {
+            $qf[] = "queueid?a";
+            $qv[] = $qc["q"];
+        }
+        if (!empty($qc["c"])) {
+            $qf[] = "chain?a";
+            $qv[] = $qc["c"];
+        }
+        if (!empty($qf)) {
+            $this->conf->qe("update ExecutionQueue
+                    set status=?
+                    where status<? and (" . join(" or ", $qf) . ")",
+                QueueItem::STATUS_CANCELLED,
+                QueueItem::STATUS_WORKING, ...$qv);
+        }
+    }
+
+    function pause() {
+        $qc = $this->parse_words();
+        foreach ($qc["c"] as $chainid) {
+            $this->conf->qe("update ExecutionQueue
+                    set status=?
+                    where status<? and chain=?
+                    order by runorder asc, queueid asc limit 1",
+                QueueItem::STATUS_PAUSED,
+                QueueItem::STATUS_WORKING, $chainid);
+        }
+        if (!empty($qc["q"])) {
+            $this->conf->qe("update ExecutionQueue
+                    set status=?
+                    where status<? and queueid?a",
+                QueueItem::STATUS_PAUSED,
+                QueueItem::STATUS_WORKING, $qc["q"]);
+        }
+    }
+
     /** @param resource $f
      * @param QueueItem $qi
      * @param int $old_status */
@@ -192,126 +280,76 @@ class RunQueueBatch {
         }
     }
 
-    /** @return list<int> */
-    function broken_chains() {
-        $result = $this->conf->qe("select chain, max(status)
-                from ExecutionQueue
-                where status<?
-                group by chain",
-            QueueItem::STATUS_CANCELLED);
-        $chains = [];
-        while (($row = $result->fetch_row())) {
-            $chainid = intval($row[0]);
-            $status = intval($row[1]);
-            if ($status < QueueItem::STATUS_SCHEDULED) {
-                $chains[] = $chainid;
-            }
-        }
-        Dbl::free($result);
-        return $chains;
-    }
-
     function run() {
-        if ($this->list_broken_chains) {
+        if ($this->mode === "list") {
+            $this->list();
+        } else if ($this->mode === "clean") {
+            $this->clean();
+        } else if ($this->mode === "once") {
+            $this->load();
+        } else if ($this->mode === "complete") {
+            $this->execute();
+        } else if ($this->mode === "schedule") {
+            $this->schedule();
+        } else if ($this->mode === "cancel") {
+            $this->cancel();
+        } else if ($this->mode === "pause") {
+            $this->pause();
+        } else if ($this->mode === "list-broken-chains") {
             foreach ($this->broken_chains() as $chain) {
                 fwrite(STDOUT, "C{$chain}\n");
             }
-            exit(0);
-        }
-        if (!empty($this->cancel_chain) || $this->cancel_broken_chains) {
-            $cancel_chains = array_merge($this->cancel_chain ?? [], $this->broken_chains());
-            $this->conf->qe("update ExecutionQueue
-                    set status=?
-                    where status<? and chain?a",
-                QueueItem::STATUS_CANCELLED,
-                QueueItem::STATUS_WORKING, $cancel_chains);
-        }
-        if (!empty($this->cancel_qid)) {
-            $this->conf->qe("update ExecutionQueue
-                    set status=?
-                    where status<? and queueid?a",
-                QueueItem::STATUS_CANCELLED,
-                QueueItem::STATUS_WORKING, $this->cancel_qid);
-        }
-        if (!empty($this->schedule_qid)) {
-            $this->schedule();
-        }
-        if ($this->is_query) {
-            $this->query();
-        }
-        if ($this->is_clean) {
-            $this->clean();
-        }
-        if ($this->is_execute1) {
-            $this->load();
-        }
-        if ($this->is_execute) {
-            $this->execute();
+        } else if ($this->mode === "cancel-broken-chains") {
+            $this->words = ["broken"];
+            $this->cancel();
         }
     }
 
     /** @return RunQueueBatch */
     static function parse_args(Conf $conf, $argv) {
         $arg = (new Getopt)->long(
-            "q,query Print queue [default]",
+            "q,query !",
             "n:,count: {n} =N Print at most N items",
-            "x,execute Execute queue to completion",
-            "1 Execute queue once",
-            "c,clean Clean queue",
+            "x,execute !",
+            "1 Execute !",
+            "c,clean !",
             "schedule[] =QUEUEID Schedule QUEUEID",
             "cancel[] =QUEUEID Cancel QUEUEID (or C<CHAINID>)",
-            "list-broken-chains List broken chains",
-            "cancel-broken-chains Cancel all broken chains",
             "V,verbose",
             "help"
-        )->helpopt("help")->description("php batch/runqueue.php")->parse($argv);
+        )->helpopt("help")
+         ->subcommand(
+            "list Print queue (default)",
+            "clean Clean queue",
+            "once Execute queue once",
+            "complete Execute queue to completion",
+            "schedule Schedule jobs",
+            "cancel Cancel jobs or chains",
+            "pause Pause jobs or chains",
+            "list-broken-chains List broken chains",
+            "cancel-broken-chains Cancel all broken chains"
+        )->description("php batch/runqueue.php SUBCOMMAND [OPTIONS]")
+         ->parse($argv);
+
+        $modeargs = [
+            ["q", "list"], ["x", "complete"], ["1", "once"],
+            ["c", "clean"]
+        ];
         $self = new RunQueueBatch($conf);
-        if (isset($arg["q"])) {
-            $self->is_query = true;
+        if (isset($arg["_subcommand"])) {
+            $self->mode = $arg["_subcommand"];
         }
-        if (isset($arg["c"])) {
-            $self->is_clean = true;
-        }
-        foreach ($arg["schedule"] ?? [] as $x) {
-            if (preg_match('/\A[#]?(\d+)\z/', $x, $m)) {
-                $self->schedule_qid[] = intval($m[1]);
-            } else {
-                throw new CommandLineException("bad `--schedule` argument");
-            }
-        }
-        if (isset($arg["list-broken-chains"])) {
-            $self->list_broken_chains = true;
-        }
-        if (isset($arg["cancel-broken-chains"])) {
-            $self->cancel_broken_chains = true;
-        }
-        foreach ($arg["cancel"] ?? [] as $x) {
-            if (preg_match('/\A[C#]?(\d+)\z/', $x, $m)) {
-                if (str_starts_with($x, "C")) {
-                    $self->cancel_chain[] = intval($m[1]);
-                } else {
-                    $self->cancel_qid[] = intval($m[1]);
+        foreach ($modeargs as $ma) {
+            if (isset($arg[$ma[0]])) {
+                $self->mode = $self->mode ?? $ma[1];
+                if ($self->mode !== $ma[1]) {
+                    throw new CommandLineException("`-{$ma[0]}` option conflicts with subcommand");
                 }
-            } else {
-                throw new CommandLineException("bad `--cancel` argument");
             }
         }
-        if (isset($arg["1"])) {
-            $self->is_execute1 = true;
-        }
-        if (isset($arg["x"])) {
-            $self->is_execute = true;
-        }
-        if (!$self->is_query
-            && !$self->is_clean
-            && !$self->is_execute1
-            && !$self->is_execute
-            && !$self->list_broken_chains
-            && !$self->cancel_broken_chains
-            && empty($self->schedule_qid)
-            && empty($self->cancel_chain)
-            && empty($self->cancel_qid)) {
-            $self->is_query = true;
+        $self->words = $arg["_"];
+        if ($self->mode === null) {
+            $self->mode = "list";
         }
         if (isset($arg["V"])) {
             $self->verbose = true;

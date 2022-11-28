@@ -91,6 +91,7 @@ class QueueItem {
     const FLAG_ENSURE = 2;
     const FLAG_ANONYMOUS = 4;
 
+    const STATUS_PAUSED = -2;
     const STATUS_UNSCHEDULED = -1;
     const STATUS_SCHEDULED = 0;
     const STATUS_WORKING = 1;
@@ -226,6 +227,8 @@ class QueueItem {
      * @return string */
     function status_text($verbose = false) {
         switch ($this->status) {
+        case self::STATUS_PAUSED:
+            return "paused";
         case self::STATUS_UNSCHEDULED:
             return "unscheduled" . ($verbose && $this->abandoned() ? " abandoned" : "");
         case self::STATUS_SCHEDULED:
@@ -582,11 +585,12 @@ class QueueItem {
                     scheduleat=if(status=?,?,scheduleat),
                     status=if(status=?,?,status)
                 where status>=? and status<? and chain=?
-                order by status desc, runorder asc, queueid asc limit 1",
+                order by status>? desc, runorder asc, queueid asc limit 1",
             self::STATUS_UNSCHEDULED, Conf::$now,
             self::STATUS_UNSCHEDULED, Conf::$now,
             self::STATUS_UNSCHEDULED, self::STATUS_SCHEDULED,
-            self::STATUS_UNSCHEDULED, self::STATUS_CANCELLED, $chain);
+            self::STATUS_PAUSED, self::STATUS_CANCELLED, $chain,
+            self::STATUS_UNSCHEDULED);
     }
 
     function cancel() {
