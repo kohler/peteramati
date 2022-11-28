@@ -15,7 +15,7 @@ class Grade_API {
                 return [];
             }
         } else if (is_object($x)) {
-            $x = (array) $x;
+            $x = get_object_vars($x);
         } else if (!is_array($x)) {
             return [];
         }
@@ -301,8 +301,9 @@ class Grade_API {
         return $jx;
     }
 
-    /** @param PsetView $info */
-    static private function gradesettings1($ug, $info, &$old_pset) {
+    /** @param PsetView $info
+     * @param ?StudentSet $sset */
+    static private function gradesettings1($ug, $info, &$old_pset, $sset) {
         $pset = $info->pset;
         if (property_exists($ug, "scores_visible")
             && ($pset->gitless_grades || $info->repo)) {
@@ -382,7 +383,7 @@ class Grade_API {
             }
             $old_pset = null;
             foreach ($sset as $uid => $info) {
-                self::gradesettings1($ugs[$uid], $info, $old_pset);
+                self::gradesettings1($ugs[$uid], $info, $old_pset, $sset);
             }
         }
         $j = ["ok" => true, "us" => []];

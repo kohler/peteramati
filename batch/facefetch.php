@@ -17,7 +17,8 @@ $getopt = (new Getopt)->long(
 $arg = $getopt->parse($argv);
 $verbose = isset($arg["V"]);
 if (count($arg["_"]) > 1) {
-    $getopt->usage(1);
+    fwrite(STDERR, $getopt->help());
+    exit(1);
 }
 
 $fetchcommand = $Conf->config->_facefetch_command ?? null;

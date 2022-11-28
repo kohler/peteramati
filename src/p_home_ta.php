@@ -218,8 +218,7 @@ class Home_TA_Page {
         echo Ht::unstash_script('$(".need-pa-pset-actions").each($pa.pset_actions)');
     }
 
-    /** @param bool $anonymous
-     * @return array */
+    /** @return array */
     function pset_row_json(Pset $pset, StudentSet $sset, PsetView $info,
                            GradeExport $gexp) {
         $j = StudentSet::json_basics($info->user, $pset->anonymous);

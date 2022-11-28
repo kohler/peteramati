@@ -1279,10 +1279,9 @@ class Contact {
         }
     }
 
-    /** @return int */
+    /** @return int|string */
     private function password_hash_method() {
-        $m = $this->conf->opt("passwordHashMethod");
-        return is_int($m) ? $m : PASSWORD_DEFAULT;
+        return $this->conf->opt("passwordHashMethod") ?? PASSWORD_DEFAULT;
     }
 
     /** @param string $hash
@@ -1314,7 +1313,7 @@ class Contact {
         $cdbok = false;
         if ($cdbu && ($hash = $cdbu->password)
             && $cdbu->allow_contactdb_password()
-            && ($cdbok = $this->check_hashed_password($input, $hash, $this->email))) {
+            && ($cdbok = $this->check_hashed_password($input, $hash))) {
             if ($this->password_needs_rehash($hash)) {
                 $hash = $this->hash_password($input);
                 Dbl::ql(self::contactdb(), "update ContactInfo set password=? where contactDbId=?", $hash, $cdbu->contactDbId);
@@ -1328,7 +1327,7 @@ class Contact {
 
         $localok = false;
         if ($this->contactId && ($hash = $this->password)
-            && ($localok = $this->check_hashed_password($input, $hash, $this->email))) {
+            && ($localok = $this->check_hashed_password($input, $hash))) {
             if ($this->password_needs_rehash($hash)) {
                 $hash = $this->hash_password($input);
                 $this->conf->ql("update ContactInfo set password=? where contactId=?", $hash, $this->contactId);
@@ -1359,7 +1358,7 @@ class Contact {
         }
         if ($cdbu
             && (!$old || $cdbu->password)
-            && (!$old || $this->check_hashed_password($old, $cdbu->password, $this->email))) {
+            && (!$old || $this->check_hashed_password($old, $cdbu->password))) {
             $hash = $new;
             if ($hash
                 && !($flags & self::CHANGE_PASSWORD_PLAINTEXT)
@@ -1376,7 +1375,7 @@ class Contact {
                 $this->conf->ql("update ContactInfo set password=?, passwordTime=? where contactId=?", $this->password, $this->passwordTime, $this->contactId);
             }
         } else if ($this->contactId
-                   && (!$old || $this->check_hashed_password($old, $this->password, $this->email))) {
+                   && (!$old || $this->check_hashed_password($old, $this->password))) {
             $hash = $new;
             if ($hash && !($flags & self::CHANGE_PASSWORD_PLAINTEXT)
                 && $this->password_needs_rehash(""))

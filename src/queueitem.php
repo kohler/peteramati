@@ -931,7 +931,7 @@ class QueueItem {
         return $status;
     }
 
-    /** @param list<string> $cmd
+    /** @param list<string> $cmdarg
      * @param ?string $cwd
      * @param bool $ready
      * @return int */
