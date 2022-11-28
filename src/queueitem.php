@@ -472,7 +472,8 @@ class QueueItem {
             $this->enqueue();
         }
 
-        if ($this->status === self::STATUS_UNSCHEDULED) {
+        if ($this->status === self::STATUS_PAUSED
+            || $this->status === self::STATUS_UNSCHEDULED) {
             if (($userid ?? 0) > 0) {
                 $this->conf->qe("update ExecutionQueue
                         set status=?, scheduleat=?,
@@ -480,14 +481,14 @@ class QueueItem {
                         where queueid=? and status=?",
                     self::STATUS_SCHEDULED, Conf::$now,
                     $userid, Conf::$now, $priority,
-                    $this->queueid, self::STATUS_UNSCHEDULED);
+                    $this->queueid, $this->status);
             } else {
                 $this->conf->qe("update ExecutionQueue
                         set status=?, scheduleat=?, runorder=?
                         where queueid=? and status=?",
                     self::STATUS_SCHEDULED, Conf::$now,
                     Conf::$now + $priority,
-                    $this->queueid, self::STATUS_UNSCHEDULED);
+                    $this->queueid, $this->status);
             }
             if (($row = $this->conf->fetch_first_row("select status, scheduleat, runorder from ExecutionQueue where queueid=?", $this->queueid))) {
                 $this->status = (int) $row[0];
