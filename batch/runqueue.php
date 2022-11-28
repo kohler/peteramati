@@ -45,7 +45,6 @@ class RunQueueBatch {
             QueueItem::STATUS_CANCELLED);
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
-            $chain = $qix->chain ? " C{$qix->chain}" : "";
             $s = $qix->status_text(true);
             if ($qix->unscheduled()) {
                 $t = $qix->insertat;
@@ -54,7 +53,11 @@ class RunQueueBatch {
             } else {
                 $t = $qix->runat;
             }
-            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s} " . self::unparse_time($t) . "{$chain}\n");
+            $rest = $qix->chain ? " C{$qix->chain}" : "";
+            if (isset($qix->tags)) {
+                $rest .= " #" . join(" #", $qix->tags);
+            }
+            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s} " . self::unparse_time($t) . "{$rest}\n");
             ++$n;
         }
         Dbl::free($result);
