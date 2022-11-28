@@ -131,7 +131,7 @@ class RunQueueBatch {
             while (($qix = QueueItem::fetch($this->conf, $result))) {
                 if ($qix->status() >= QueueItem::STATUS_SCHEDULED) {
                     $sqi[$qix->chain] = null;
-                } else if (!array_key_exists($sqi[$qix->chain])) {
+                } else if (!array_key_exists($qix->chain, $sqi)) {
                     $sqi[$qix->chain] = $qix;
                 }
             }
