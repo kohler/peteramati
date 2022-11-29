@@ -178,11 +178,11 @@ class RunEnqueueBatch {
             throw new Error("no such runner");
         }
         $self = new RunEnqueueBatch($pset, $runner, $arg["u"] ?? []);
-        if (isset($arg["if-needed"])) {
-            if ($arg["if-needed"] === false) {
+        if (isset($arg["e"])) {
+            if ($arg["e"] === false) {
                 $self->if_needed = 1;
             } else {
-                $self->if_needed = $arg["if-needed"];
+                $self->if_needed = $arg["e"];
             }
         } else if (isset($arg["ensure"])) {
             $self->if_needed = 1;
