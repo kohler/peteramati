@@ -40,9 +40,9 @@ class RunQueueBatch {
     function list() {
         $result = $this->conf->qe("select * from ExecutionQueue
                 where status<?
-                order by runorder asc, queueid asc"
+                order by status>? desc, runorder asc, queueid asc"
                 . ($this->count !== null ? " limit {$this->count}" : ""),
-            QueueItem::STATUS_CANCELLED);
+            QueueItem::STATUS_CANCELLED, QueueItem::STATUS_UNSCHEDULED);
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             $s = $qix->status_text(true);
