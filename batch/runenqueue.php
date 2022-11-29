@@ -122,7 +122,9 @@ class RunEnqueueBatch {
             foreach ($this->runsettings ?? [] as $k => $v) {
                 $qi->runsettings[$k] = $v;
             }
-            if (!$this->if_needed || !$qi->compatible_response()) {
+            if ($this->if_needed === 0
+                || !$qi->compatible_response()
+                || ($this->if_needed > 1 && $qi->count_compatible_responses() < $this->if_needed)) {
                 $qi->enqueue();
                 if (!$qi->chain) {
                     $qi->schedule($nu);
@@ -146,14 +148,14 @@ class RunEnqueueBatch {
         $arg = (new Getopt)->long(
             "p:,pset: Problem set",
             "r:,runner:,run: Runner name",
-            "e::,if-needed:: {n} Run only if needed",
+            "e::,if-needed:: {n} =N Run only if needed",
             "ensure !",
             "u[],user[] Match these users",
             "H:,hash:,commit: Use this commit",
             "c:,chain: Set chain ID",
             "t[],tag[] Add tag",
             "s[],setting[] Set NAME=VALUE",
-            "eventsource Listen for eventsource connections",
+            "event-source,eventsource Listen for EventSource connections",
             "V,verbose",
             "help"
         )->helpopt("help")->parse($argv);
@@ -215,7 +217,7 @@ class RunEnqueueBatch {
             }
             $self->hash = $hp;
         }
-        if (isset($arg["eventsource"])) {
+        if (isset($arg["event-source"])) {
             $self->eventsource = true;
         }
         return $self;
