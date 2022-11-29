@@ -536,6 +536,23 @@ function str_list_lower_bound($needle, $haystack) {
     return $l;
 }
 
+/** @param int|float $needle
+ * @param list<int|float> $haystack
+ * @return int */
+function num_list_lower_bound($needle, $haystack) {
+    $l = 0;
+    $r = count($haystack);
+    while ($l < $r) {
+        $m = $l + (($r - $l) >> 1);
+        if ($needle <= $haystack[$m]) {
+            $r = $m;
+        } else {
+            $l = $m + 1;
+        }
+    }
+    return $l;
+}
+
 /** @param mixed $a */
 function array_to_object_recursive($a) {
     if (is_array($a) && is_associative_array($a)) {
