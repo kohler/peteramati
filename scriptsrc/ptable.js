@@ -1464,13 +1464,17 @@ handle_ui.on("js-ptable-run", function () {
         if (form.elements.runner.value) {
             const run = form.elements.runner.value +
                     (form.elements.ifneeded.checked ? ".ifneeded" : ""),
-                snames = slist.join(" "),
+                skeys = [],
                 param = {pset: ptconf.key, run: run, runmany: 1},
                 data = {};
-            if (snames.length <= 80) {
-                param.users = snames;
+            for (const su of slist) {
+                skeys.push(ptconf.ukey(su));
+            }
+            const users = skeys.join(" ");
+            if (users.length <= 160) {
+                param.users = users;
             } else {
-                data.users = snames;
+                data.users = users;
             }
             hoturl_post_go("=run", param, data);
         } else {
