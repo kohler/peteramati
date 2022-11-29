@@ -22,7 +22,7 @@ class RunRequest {
     /** @var RunnerConfig */
     public $runner;
     /** @var bool */
-    public $is_ensure;
+    public $if_needed;
 
     /** @param string $err
      * @return array */
@@ -50,7 +50,7 @@ class RunRequest {
             self::quit("No such command.");
         }
 
-        $this->is_ensure = str_ends_with($qreq->run, ".ensure") || $qreq->ensure;
+        $this->if_needed = str_ends_with($qreq->run, ".ifneeded") || $qreq->ifneeded;
     }
 
     static function go(Contact $user, Qrequest $qreq) {
@@ -132,7 +132,7 @@ class RunRequest {
                 return self::error("Unknown queueid {$qreq->queueid}.");
             }
         }
-        if (!$qi && $this->is_ensure) {
+        if (!$qi && $this->if_needed) {
             $qi = QueueItem::for_complete_job($info, $this->runner);
         }
 
@@ -180,8 +180,12 @@ class RunRequest {
                 return self::error("Nothing to do.");
             }
             $qi = QueueItem::make_info($info, $this->runner);
-            $qi->flags |= ($this->viewer->privChair ? QueueItem::FLAG_UNWATCHED : 0)
-                | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+            if ($this->viewer->privChair) {
+                $qi->flags |= QueueItem::FLAG_UNWATCHED;
+            }
+            if ($this->if_needed) {
+                $qi->ifneeded = 1;
+            }
             $qi->schedule(100, $this->viewer->contactId);
         } else {
             $qi->update();
@@ -222,8 +226,8 @@ class RunRequest {
             self::quit($err);
         } else if (isset($this->qreq->chain) && ctype_digit($this->qreq->chain)) {
             $t = $this->pset->title;
-            if ($this->is_ensure) {
-                $t .= " Ensure";
+            if ($this->if_needed) {
+                $t .= " (if needed)";
             }
             $t .= " {$this->runner->title}";
             $this->conf->header(htmlspecialchars($t), "home");
@@ -234,8 +238,8 @@ class RunRequest {
                 Ht::hidden("u", ""),
                 Ht::hidden("pset", $this->pset->urlkey),
                 Ht::hidden("jobs", "", ["disabled" => 1]);
-            if ($this->is_ensure) {
-                echo Ht::hidden("ensure", 1);
+            if ($this->if_needed) {
+                echo Ht::hidden("ifneeded", 1);
             }
             echo Ht::hidden("run", $this->runner->name, ["id" => "pa-runmany"]),
                 '</div></form>';
@@ -271,8 +275,10 @@ class RunRequest {
                         $qi = QueueItem::make_info($info, $this->runner);
                         $qi->chain = $chain;
                         $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
-                        $qi->flags |= QueueItem::FLAG_UNWATCHED
-                            | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+                        $qi->flags |= QueueItem::FLAG_UNWATCHED;
+                        if ($this->if_needed) {
+                            $qi->ifneeded = 1;
+                        }
                         $qi->enqueue();
                         ++$nu;
                     }

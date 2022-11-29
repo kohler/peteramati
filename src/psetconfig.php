@@ -978,8 +978,8 @@ class Pset {
     /** @param string $key
      * @return ?RunnerConfig */
     function runner_by_key($key) {
-        if (str_ends_with($key, ".ensure")) {
-            $key = substr($key, 0, -7);
+        if (($pos = strpos($key, ".")) !== false) {
+            $key = substr($key, 0, $pos);
         }
         foreach ($this->runners as $runner) {
             if ($runner->name === $key)

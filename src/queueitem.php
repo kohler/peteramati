@@ -28,6 +28,8 @@ class QueueItem {
     public $tags;
     /** @var ?list */
     public $ensure;
+    /** @var int */
+    public $ifneeded;
 
     /** @var string */
     public $queueclass;
@@ -88,8 +90,9 @@ class QueueItem {
     public $last_error;
 
     const FLAG_UNWATCHED = 1;
-    const FLAG_ENSURE = 2;
+    const FLAG_IFNEEDED = 2;
     const FLAG_ANONYMOUS = 4;
+    const FLAG_NOEVENTSOURCE = 8;
 
     const STATUS_PAUSED = -2;
     const STATUS_UNSCHEDULED = -1;
@@ -124,6 +127,7 @@ class QueueItem {
             $j = json_decode($this->runsettings);
             $this->runsettings = is_object($j) ? (array) $j : null;
         }
+        $this->ifneeded = (int) $this->ifneeded;
         if ($this->tags !== null) {
             $ts = [];
             /** @phan-suppress-next-line PhanTypeMismatchArgumentInternal */
@@ -360,6 +364,7 @@ class QueueItem {
             $qi->runsettings = (array) $info->commit_jnote("runsettings");
         }
         $qi->flags = $info->user->is_anonymous ? self::FLAG_ANONYMOUS : 0;
+        $qi->ifneeded = 0;
 
         $qi->queueclass = "";
         $qi->status = self::STATUS_UNSCHEDULED;
@@ -422,22 +427,51 @@ class QueueItem {
     }
 
 
+    /** @param RunResponse $rr
+     * @return bool */
+    private function is_compatible($rr) {
+        // assumes it’s in completed_responses()
+        foreach ($this->tags ?? [] as $t) {
+            if (!$rr->has_tag($t))
+                return false;
+        }
+        if (($this->runsettings !== null
+             || $rr->settings !== null)
+            && ($this->runsettings === null
+                || $rr->settings === null
+                || json_encode_db($this->runsettings) !== json_encode_db($rr->settings))) {
+            return false;
+        }
+        return true;
+    }
+
     /** @return ?RunResponse */
     function compatible_response() {
         $info = $this->info();
         $runner = $this->runner();
-        if ($info && $runner && !$this->runsettings) {
+        if ($info && $runner) {
             foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
-                foreach ($this->tags ?? [] as $t) {
-                    if (!$rr->has_tag($t))
-                        continue 2;
-                }
-                if (!$rr->settings) {
+                if ($this->is_compatible($rr)) {
                     return $rr;
                 }
             }
         }
         return null;
+    }
+
+    /** @return int */
+    function count_compatible_responses() {
+        $info = $this->info();
+        $runner = $this->runner();
+        $n = 0;
+        if ($info && $runner) {
+            foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
+                if ($this->is_compatible($rr)) {
+                    ++$n;
+                }
+            }
+        }
+        return $n;
     }
 
     function enqueue() {
@@ -453,7 +487,7 @@ class QueueItem {
                 queueclass=?, nconcurrent=?, flags=?, chain=?,
                 insertat=?, updateat=?,
                 runat=?, runorder=?, status=?,
-                ensure=?",
+                ensure=?, ifneeded=?",
             $this->reqcid, $this->cid,
             $this->runnername, $this->psetid, $this->repoid,
             $this->bhash, $this->runsettings ? json_encode_db($this->runsettings) : null,
@@ -461,7 +495,7 @@ class QueueItem {
             $this->queueclass, $this->nconcurrent, $this->flags, $this->chain,
             $this->insertat, $this->updateat,
             $this->runat, $this->runorder, $this->status,
-            $this->ensure ? json_encode_db($this->ensure) : null);
+            $this->ensure ? json_encode_db($this->ensure) : null, $this->ifneeded);
         $this->queueid = $this->conf->dblink->insert_id;
     }
 
@@ -634,10 +668,12 @@ class QueueItem {
             return true;
         }
 
-        // if ensure, check for compatible response
+        // on ifneeded, check for compatible response
         if ($this->status === self::STATUS_SCHEDULED
-            && ($this->flags & self::FLAG_ENSURE) !== 0
-            && ($rr = $this->compatible_response())) {
+            && $this->ifneeded !== 0
+            && ($rr = $this->compatible_response())
+            && ($this->ifneeded === 1
+                || $this->count_compatible_responses() >= $this->ifneeded)) {
             $this->swap_status(self::STATUS_DONE, ["runat" => $rr->timestamp]);
             if ($this->status >= self::STATUS_CANCELLED) {
                 return true;
@@ -830,7 +866,8 @@ class QueueItem {
 
         // maybe register eventsource
         $esfile = $esid = null;
-        if (($esdir = $this->eventsource_dir())) {
+        if (($this->flags & self::FLAG_NOEVENTSOURCE) === 0
+            && ($esdir = $this->eventsource_dir())) {
             $esid = bin2hex(random_bytes(16));
             $esfile = "{$esdir}{$esid}";
             if (file_exists($esfile)) {

@@ -12,8 +12,8 @@ class RunEnqueueBatch {
     public $pset;
     /** @var RunnerConfig */
     public $runner;
-    /** @var bool */
-    public $is_ensure = false;
+    /** @var int */
+    public $if_needed = 0;
     /** @var bool */
     public $verbose = false;
     /** @var ?int */
@@ -24,6 +24,8 @@ class RunEnqueueBatch {
     public $runsettings;
     /** @var int */
     public $sset_flags;
+    /** @var bool */
+    public $eventsource = false;
     /** @var list<string> */
     public $usermatch = [];
     /** @var ?string */
@@ -111,13 +113,16 @@ class RunEnqueueBatch {
             $qi = QueueItem::make_info($info, $this->runner);
             $qi->chain = $chain > 0 ? $chain : null;
             $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
-            $qi->flags |= QueueItem::FLAG_UNWATCHED
-                | ($this->is_ensure ? QueueItem::FLAG_ENSURE : 0);
+            $qi->flags |= QueueItem::FLAG_UNWATCHED;
+            if (!$this->eventsource) {
+                $qi->flags |= QueueItem::FLAG_NOEVENTSOURCE;
+            }
+            $qi->ifneeded = $this->if_needed;
             $qi->tags = $this->tags;
             foreach ($this->runsettings ?? [] as $k => $v) {
                 $qi->runsettings[$k] = $v;
             }
-            if (!$this->is_ensure || !$qi->compatible_response()) {
+            if (!$this->if_needed || !$qi->compatible_response()) {
                 $qi->enqueue();
                 if (!$qi->chain) {
                     $qi->schedule($nu);
@@ -141,12 +146,14 @@ class RunEnqueueBatch {
         $arg = (new Getopt)->long(
             "p:,pset: Problem set",
             "r:,runner:,run: Runner name",
-            "e,ensure Run only if needed",
+            "e::,if-needed:: {n} Run only if needed",
+            "ensure !",
             "u[],user[] Match these users",
             "H:,hash:,commit: Use this commit",
             "c:,chain: Set chain ID",
             "t[],tag[] Add tag",
             "s[],setting[] Set NAME=VALUE",
+            "eventsource Listen for eventsource connections",
             "V,verbose",
             "help"
         )->helpopt("help")->parse($argv);
@@ -165,8 +172,14 @@ class RunEnqueueBatch {
             throw new Error("no such runner");
         }
         $self = new RunEnqueueBatch($pset, $runner, $arg["u"] ?? []);
-        if (isset($arg["e"])) {
-            $self->is_ensure = true;
+        if (isset($arg["if-needed"])) {
+            if ($arg["if-needed"] === false) {
+                $self->if_needed = 1;
+            } else {
+                $self->if_needed = $arg["if-needed"];
+            }
+        } else if (isset($arg["ensure"])) {
+            $self->if_needed = 1;
         }
         if (isset($arg["V"])) {
             $self->verbose = true;
@@ -201,6 +214,9 @@ class RunEnqueueBatch {
                 throw new Error("bad `--commit`");
             }
             $self->hash = $hp;
+        }
+        if (isset($arg["eventsource"])) {
+            $self->eventsource = true;
         }
         return $self;
     }

@@ -1463,7 +1463,7 @@ handle_ui.on("js-ptable-run", function () {
     function submit() {
         if (form.elements.runner.value) {
             const run = form.elements.runner.value +
-                    (form.elements.ensure.checked ? ".ensure" : ""),
+                    (form.elements.ifneeded.checked ? ".ifneeded" : ""),
                 snames = slist.join(" "),
                 param = {pset: ptconf.key, run: run, runmany: 1},
                 data = {};
@@ -1504,7 +1504,7 @@ handle_ui.on("js-ptable-run", function () {
         }
         hc.pop();
 
-        hc.push('<label class="checki mt-2"><span class="checkc"><input type="checkbox" name="ensure" value="1"></span>Use prerecorded runs when available</label>');
+        hc.push('<label class="checki mt-2"><span class="checkc"><input type="checkbox" name="ifneeded" value="1"></span>Use prerecorded runs when available</label>');
 
         hc.push_actions();
         hc.push('<button type="button" name="run" class="btn-primary">Run</button>');
