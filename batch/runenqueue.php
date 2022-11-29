@@ -49,7 +49,11 @@ class RunEnqueueBatch {
         }
         if ($this->sset_flags === StudentSet::ENROLLED) {
             foreach ($usermatch as $s) {
-                $this->usermatch[] = "*{$s}*";
+                if (str_starts_with($s, "[anon")) {
+                    $this->usermatch[] = preg_replace('/([\[\]])/', '\\\\$1', $s . "*");
+                } else {
+                    $this->usermatch[] = "*{$s}*";
+                }
             }
         }
     }
