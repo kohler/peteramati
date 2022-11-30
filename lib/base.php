@@ -694,6 +694,22 @@ if (function_exists("pcntl_wifexited") && pcntl_wifexited(0) !== null) {
 }
 
 
+/** @return Exception */
+function error_get_last_as_exception($prefix) {
+    $msg = preg_replace('/.*: /', "", error_get_last()["message"]);
+    return new ErrorException($prefix . $msg);
+}
+
+/** @return string */
+function file_get_contents_throw($filename) {
+    $s = @file_get_contents($filename);
+    if ($s === false) {
+        throw error_get_last_as_exception("{$filename}: ");
+    }
+    return $s;
+}
+
+
 // setcookie helper
 
 if (PHP_VERSION_ID >= 70300) {

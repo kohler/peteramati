@@ -218,10 +218,14 @@ class Multiconference {
         } else if ($multiconference) {
             $errors[] = "The “{$confid}” conference does not exist. Check your URL to make sure you spelled it correctly.";
         } else {
-            $errors[] = "HotCRP was unable to load. A system administrator must fix this problem.";
-            $errors[] = "Error: Unable to connect to database " . Dbl::sanitize_dsn(Conf::$main->dsn);
+            $errors[] = "Peteramati was unable to load. A system administrator must fix this problem.";
             if (defined("HOTCRP_TESTHARNESS")) {
                 $errors[] = "You may need to run `lib/createdb.sh -c test/options.php` to create the database.";
+            }
+            if (($cp = Dbl::parse_connection_params($Opt))) {
+                error_log("Unable to connect to database " . $cp->sanitized_dsn());
+            } else {
+                error_log("Unable to connect to database");
             }
         }
         self::fail_message($errors);

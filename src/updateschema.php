@@ -156,7 +156,7 @@ class UpdateSchema {
                 error_log("RepositoryGrade[$pset,$repoid] conflict: branch " . $branch . " vs. " . $repos["$pset,$repoid"]);
             }
         }
-        $qstager(true);
+        $qstager(null);
         Dbl::free($result);
         return true;
     }
@@ -259,7 +259,7 @@ class UpdateSchema {
             }
             unset($items);
         }
-        $mqe(true);
+        $mqe(null);
         return true;
     }
 
@@ -279,7 +279,7 @@ class UpdateSchema {
             }
         }
         Dbl::free($result);
-        $qstager(true);
+        $qstager(null);
         return true;
     }
 
@@ -301,7 +301,7 @@ class UpdateSchema {
             }
         }
         Dbl::free($result);
-        $mq(true);
+        $mq(null);
         return true;
     }
 

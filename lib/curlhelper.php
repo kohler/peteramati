@@ -58,6 +58,10 @@ class CurlHelper {
     /** @var ?callable(string) */
     static public $log_function;
 
+    static function silent_unlink($filename) {
+        @unlink($filename);
+    }
+
     /** @param ?string $cookiefile */
     function __construct($cookiefile = null) {
         $this->temp_cookiefile = !$cookiefile;
@@ -69,6 +73,9 @@ class CurlHelper {
         if (!file_exists($this->cookiefile) || !is_writable($this->cookiefile)) {
             error_log("$this->cookiefile: Not writable");
             exit(1);
+        }
+        if ($this->temp_cookiefile) {
+            register_shutdown_function("CurlHelper::silent_unlink", $this->cookiefile);
         }
 
         $this->curlh = curl_init();

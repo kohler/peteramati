@@ -405,7 +405,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
                          $cpi->commitat, $cpi->pset, $cpi->bhash);
                 }
             }
-            $mqe(true);
+            $mqe(null);
         }
     }
 

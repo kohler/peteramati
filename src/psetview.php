@@ -209,7 +209,8 @@ class PsetView {
     }
 
 
-    /** @param bool $refresh */
+    /** @param bool $refresh
+     * @suppress PhanAccessReadOnlyProperty */
     function reload_repo($refresh = false) {
         $this->repo = $this->_rpi = $this->_cpi = $this->_hash = null;
         $this->_is_sset = $this->_derived_handout_commit = false;

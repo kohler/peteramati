@@ -55,8 +55,15 @@ class APIData {
 }
 
 class Conf {
-    /** @var ?mysqli */
+    /** @var ?mysqli
+     * @readonly */
     public $dblink;
+    /** @var string
+     * @readonly */
+    public $dbname;
+    /** @var string
+     * @readonly */
+    public $session_key;
 
     /** @var array<string,int> */
     private $settings;
@@ -69,7 +76,6 @@ class Conf {
     /** @var array|true */
     private $_gsettings_loaded = [];
 
-    public $dbname;
     public $dsn = null;
 
     /** @var string */
@@ -180,14 +186,14 @@ class Conf {
 
     function __construct($options, $make_dsn) {
         // unpack dsn, connect to database, load current settings
-        if ($make_dsn && ($this->dsn = Dbl::make_dsn($options))) {
-            list($this->dblink, $options["dbName"]) = Dbl::connect_dsn($this->dsn);
-        }
-        if (!isset($options["confid"])) {
-            $options["confid"] = $options["dbName"] ?? null;
+        if ($make_dsn) {
+            $cp = Dbl::parse_connection_params($options);
+            $this->dblink = $cp->connect();
+            $this->dbname = $cp->name;
+            $this->session_key = "@{$this->dbname}";
         }
         $this->opt = $options;
-        $this->dbname = $options["dbName"];
+        $this->opt["confid"] = $this->opt["confid"] ?? $this->dbname;
         if ($this->dblink && !Dbl::$default_dblink) {
             Dbl::set_default_dblink($this->dblink);
             Dbl::set_error_handler(array($this, "query_error_handler"));
@@ -1114,17 +1120,17 @@ class Conf {
     // session data
 
     function session($name, $defval = null) {
-        if (isset($_SESSION[$this->dsn][$name]))
-            return $_SESSION[$this->dsn][$name];
+        if (isset($_SESSION[$this->session_key][$name]))
+            return $_SESSION[$this->session_key][$name];
         else
             return $defval;
     }
 
     function save_session($name, $value) {
         if ($value !== null)
-            $_SESSION[$this->dsn][$name] = $value;
+            $_SESSION[$this->session_key][$name] = $value;
         else
-            unset($_SESSION[$this->dsn][$name]);
+            unset($_SESSION[$this->session_key][$name]);
     }
 
     function capability_text($prow, $capType) {
@@ -1767,7 +1773,7 @@ class Conf {
         if ($this->_save_msgs) {
             ensure_session();
             foreach ($this->_save_msgs as $m) {
-                $_SESSION[$this->dsn]["msgs"][] = $m;
+                $_SESSION[$this->session_key]["msgs"][] = $m;
             }
             $this->_save_msgs = null;
         }

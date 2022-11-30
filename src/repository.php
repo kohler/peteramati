@@ -694,8 +694,8 @@ class Repository {
             }
             Dbl::free($result);
             $qstager("update Repository set infosnapat=greatest(infosnapat,?) where repoid=?",
-                     [$this->snapat, $this->repoid]);
-            $qstager(true);
+                     $this->snapat, $this->repoid);
+            $qstager(null);
             return true;
         } else {
             return false;
