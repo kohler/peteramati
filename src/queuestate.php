@@ -32,7 +32,7 @@ class QueueState {
             $this->items[$this->head] = null;
             ++$this->head;
             if ($this->head > 200) {
-                $this->items = array_slice($this->items, $this->head - 1);
+                array_splice($this, 0, $this->head - 1, []);
                 $this->head = 1;
             }
             $qi->qstate = $this;
@@ -53,6 +53,7 @@ class QueueState {
                     || ($xqi->runorder === $nqi->runorder && $xqi->queueid > $nqi->queueid)) {
                     break;
                 }
+                ++$i;
             }
             if ($this->head > 0 && $i < count($this->items) - $i) {
                 for ($j = $this->head; $j !== $i; ++$j) {

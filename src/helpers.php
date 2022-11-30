@@ -669,6 +669,10 @@ function round_grade($g) {
  * @return string */
 function unparse_interval($t) {
     $s = "";
+    if ($t < 0) {
+        $s .= "-";
+        $t = -$t;
+    }
     if ($t >= 259200) {
         $n = floor($t / 86400);
         $s .= "{$n}d";

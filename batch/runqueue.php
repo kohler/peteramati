@@ -28,11 +28,13 @@ class RunQueueBatch {
     }
 
     /** @param int $t
+     * @param bool $neg
      * @return string */
-    static function unparse_time($t) {
+    static function unparse_time($t, $neg = false) {
         $s = "@{$t}";
-        if ($t && $t <= Conf::$now) {
-            $s .= " (" . unparse_interval(Conf::$now - $t) . ")";
+        if ($t && ($neg || $t <= Conf::$now)) {
+            $delta = $neg ? $t - Conf::$now : Conf::$now - $t;
+            $s .= " (" . unparse_interval($delta) . ")";
         }
         return $s;
     }
@@ -47,17 +49,17 @@ class RunQueueBatch {
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             $s = $qix->status_text(true);
             if ($qix->unscheduled()) {
-                $t = $qix->insertat;
+                $t = self::unparse_time($qix->insertat);
             } else if ($qix->scheduled()) {
-                $t = $qix->scheduleat;
+                $t = self::unparse_time($qix->runorder, true);
             } else {
-                $t = $qix->runat;
+                $t = self::unparse_time($qix->runat);
             }
             $rest = $qix->chain ? " C{$qix->chain}" : "";
             if (isset($qix->tags)) {
                 $rest .= " #" . join(" #", $qix->tags);
             }
-            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s} " . self::unparse_time($t) . "{$rest}\n");
+            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s} {$t}{$rest}\n");
             ++$n;
         }
         Dbl::free($result);
@@ -262,7 +264,7 @@ class RunQueueBatch {
      * @param int $old_status */
     function report($f, $qi, $old_status) {
         ++$this->nreports;
-        $id = $qi->unparse_key();
+        $id = "#{$qi->queueid} " . $qi->unparse_key();
         $chain = $qi->chain ? " C{$qi->chain}" : "";
         if ($old_status > 0 && $qi->stopped()) {
             fwrite($f, "$id: completed\n");
@@ -272,10 +274,8 @@ class RunQueueBatch {
             fwrite($f, "$id: removed\n");
         } else if ($qi->working()) {
             fwrite($f, "$id: started " . self::unparse_time($qi->runat) . "{$chain}\n");
-        } else if ($old_status === 0) {
-            fwrite($f, "$id: waiting " . self::unparse_time($qi->scheduleat) . "{$chain}\n");
         } else if ($qi->scheduled()) {
-            fwrite($f, "$id: scheduled " . self::unparse_time($qi->scheduleat) . "{$chain}\n");
+            fwrite($f, "$id: scheduled " . self::unparse_time($qi->runorder, true) . "{$chain}\n");
         } else {
             fwrite($f, "$id: delayed " . self::unparse_time($qi->insertat) . "{$chain}\n");
         }
