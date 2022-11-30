@@ -13,7 +13,7 @@ CREATE TABLE `ActionLog` (
   PRIMARY KEY (`logId`),
   KEY `contactId` (`contactId`),
   KEY `paperId` (`paperId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -27,7 +27,7 @@ CREATE TABLE `Branch` (
   `branch` varbinary(255) NOT NULL,
   PRIMARY KEY (`branchid`),
   UNIQUE KEY `branch` (`branch`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -44,7 +44,7 @@ CREATE TABLE `Capability` (
   `salt` varbinary(255) NOT NULL,
   `data` blob DEFAULT NULL,
   PRIMARY KEY (`salt`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -54,20 +54,21 @@ CREATE TABLE `Capability` (
 
 DROP TABLE IF EXISTS `CommitNotes`;
 CREATE TABLE `CommitNotes` (
-  `pset` int(11) NOT NULL DEFAULT '0',
+  `pset` int(11) NOT NULL DEFAULT 0,
   `bhash` varbinary(32) NOT NULL,
   `notes` varbinary(32767) DEFAULT NULL,
-  `haslinenotes` tinyint(1) NOT NULL DEFAULT '0',
-  `repoid` int(11) NOT NULL DEFAULT '0',
-  `notesversion` int(11) NOT NULL DEFAULT '1',
-  `hasactiveflags` tinyint(1) NOT NULL DEFAULT '0',
-  `hasflags` tinyint(1) NOT NULL DEFAULT '0',
+  `haslinenotes` tinyint(1) NOT NULL DEFAULT 0,
+  `repoid` int(11) NOT NULL DEFAULT 0,
+  `notesversion` int(11) NOT NULL DEFAULT 1,
+  `hasactiveflags` tinyint(1) NOT NULL DEFAULT 0,
+  `hasflags` tinyint(1) NOT NULL DEFAULT 0,
   `notesOverflow` longblob DEFAULT NULL,
   `commitat` bigint(20) DEFAULT NULL,
   `xnotes` varbinary(1024) DEFAULT NULL,
   `xnotesOverflow` longblob DEFAULT NULL,
+  `updateat` bigint(20) NOT NULL DEFAULT 0,
   PRIMARY KEY (`pset`,`bhash`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -81,17 +82,18 @@ CREATE TABLE `ContactGrade` (
   `pset` int(11) NOT NULL,
   `gradercid` int(11) DEFAULT NULL,
   `notes` varbinary(32767) DEFAULT NULL,
-  `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
-  `notesversion` int(11) NOT NULL DEFAULT '1',
-  `hasactiveflags` tinyint(1) NOT NULL DEFAULT '0',
+  `hidegrade` tinyint(1) NOT NULL DEFAULT 0,
+  `notesversion` int(11) NOT NULL DEFAULT 1,
+  `hasactiveflags` tinyint(1) NOT NULL DEFAULT 0,
   `updateat` bigint(20) DEFAULT NULL,
   `updateby` int(11) DEFAULT NULL,
   `notesOverflow` longblob DEFAULT NULL,
   `studentupdateat` bigint(20) DEFAULT NULL,
   `xnotes` varbinary(1024) DEFAULT NULL,
   `xnotesOverflow` longblob DEFAULT NULL,
+  `pinsnv` int(11) DEFAULT NULL,
   PRIMARY KEY (`cid`,`pset`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -105,12 +107,13 @@ CREATE TABLE `ContactGradeHistory` (
   `pset` int(11) NOT NULL,
   `notesversion` int(11) NOT NULL,
   `updateat` bigint(20) NOT NULL,
-  `notes` varbinary(32767) DEFAULT NULL,
-  `updateby` int(11) NOT NULL DEFAULT '0',
-  `notesOverflow` longblob DEFAULT NULL,
+  `antiupdate` varbinary(32767) DEFAULT NULL,
+  `updateby` int(11) NOT NULL DEFAULT 0,
+  `antiupdateOverflow` longblob DEFAULT NULL,
   `studentupdateat` bigint(20) DEFAULT NULL,
+  `antiupdateby` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`cid`,`pset`,`notesversion`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -126,7 +129,7 @@ CREATE TABLE `ContactImage` (
   `data` mediumblob DEFAULT NULL,
   PRIMARY KEY (`contactId`,`contactImageId`),
   UNIQUE KEY `contactImageId` (`contactImageId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -137,41 +140,40 @@ CREATE TABLE `ContactImage` (
 DROP TABLE IF EXISTS `ContactInfo`;
 CREATE TABLE `ContactInfo` (
   `contactId` int(11) NOT NULL AUTO_INCREMENT,
-  `visits` int(11) NOT NULL DEFAULT '0',
+  `visits` int(11) NOT NULL DEFAULT 0,
   `firstName` varchar(60) NOT NULL DEFAULT '',
   `lastName` varchar(60) NOT NULL DEFAULT '',
   `email` varchar(120) NOT NULL,
   `huid` varchar(10) DEFAULT NULL,
-  `seascode_username` varchar(120) DEFAULT NULL,
   `preferredEmail` varchar(120) DEFAULT NULL,
   `affiliation` varchar(2048) NOT NULL DEFAULT '',
   `password` varbinary(2048) NOT NULL,
   `note` longtext DEFAULT NULL,
-  `creationTime` bigint(11) NOT NULL DEFAULT '0',
-  `lastLogin` bigint(11) NOT NULL DEFAULT '0',
-  `defaultWatch` int(11) NOT NULL DEFAULT '2',
-  `roles` tinyint(1) NOT NULL DEFAULT '0',
-  `disabled` tinyint(1) NOT NULL DEFAULT '0',
+  `creationTime` bigint(11) NOT NULL DEFAULT 0,
+  `lastLogin` bigint(11) NOT NULL DEFAULT 0,
+  `defaultWatch` int(11) NOT NULL DEFAULT 2,
+  `roles` tinyint(1) NOT NULL DEFAULT 0,
+  `disabled` tinyint(1) NOT NULL DEFAULT 0,
   `contactTags` text DEFAULT NULL,
-  `college` tinyint(1) NOT NULL DEFAULT '0',
-  `extension` tinyint(1) NOT NULL DEFAULT '0',
-  `dropped` int(11) NOT NULL DEFAULT '0',
-  `passwordTime` bigint(11) NOT NULL DEFAULT '0',
+  `college` tinyint(1) NOT NULL DEFAULT 0,
+  `extension` tinyint(1) NOT NULL DEFAULT 0,
+  `dropped` int(11) NOT NULL DEFAULT 0,
+  `passwordTime` bigint(11) NOT NULL DEFAULT 0,
   `anon_username` varbinary(40) DEFAULT NULL,
   `contactImageId` int(11) DEFAULT NULL,
   `github_username` varbinary(120) DEFAULT NULL,
-  `passwordUseTime` bigint(11) NOT NULL DEFAULT '0',
-  `updateTime` bigint(11) NOT NULL DEFAULT '0',
+  `passwordUseTime` bigint(11) NOT NULL DEFAULT 0,
+  `updateTime` bigint(11) NOT NULL DEFAULT 0,
   `data` varbinary(32767) DEFAULT NULL,
   `studentYear` varbinary(4) DEFAULT NULL,
   `nickname` varchar(60) DEFAULT NULL,
-  `gradeUpdateTime` bigint(11) NOT NULL DEFAULT '0',
+  `gradeUpdateTime` bigint(11) NOT NULL DEFAULT 0,
+  `last_runorder` bigint(20) NOT NULL DEFAULT 0,
   PRIMARY KEY (`contactId`),
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `anon_username` (`anon_username`),
-  KEY `roles` (`roles`),
-  KEY `seascode_username` (`seascode_username`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  KEY `roles` (`roles`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -183,10 +185,10 @@ DROP TABLE IF EXISTS `ContactLink`;
 CREATE TABLE `ContactLink` (
   `cid` int(11) NOT NULL,
   `type` int(1) NOT NULL,
-  `pset` int(1) NOT NULL DEFAULT '0',
+  `pset` int(1) NOT NULL DEFAULT 0,
   `link` int(11) NOT NULL,
   PRIMARY KEY (`cid`,`type`,`pset`,`link`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -209,13 +211,20 @@ CREATE TABLE `ExecutionQueue` (
   `updateat` bigint(11) NOT NULL,
   `runat` bigint(11) NOT NULL,
   `status` int(1) NOT NULL,
-  `lockfile` varchar(1024) DEFAULT NULL,
-  `inputfifo` varchar(1024) DEFAULT NULL,
-  `autorun` tinyint(1) NOT NULL DEFAULT '0',
+  `lockfile` varbinary(1024) DEFAULT NULL,
   `runsettings` varbinary(8192) DEFAULT NULL,
+  `runorder` bigint(20) NOT NULL DEFAULT 0,
+  `chain` bigint(20) DEFAULT NULL,
+  `flags` int(11) NOT NULL DEFAULT 0,
+  `tags` varbinary(4096) DEFAULT NULL,
+  `scheduleat` bigint(20) NOT NULL DEFAULT 0,
+  `ensure` varbinary(8192) DEFAULT NULL,
+  `eventsource` varbinary(1024) DEFAULT NULL,
+  `ifneeded` tinyint(4) NOT NULL DEFAULT 0,
   PRIMARY KEY (`queueid`),
-  KEY `queueclass` (`queueclass`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  KEY `queueclass` (`queueclass`),
+  KEY `runorder` (`runorder`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -230,7 +239,7 @@ CREATE TABLE `GroupSettings` (
   `data` varbinary(32767) DEFAULT NULL,
   `dataOverflow` longblob DEFAULT NULL,
   PRIMARY KEY (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -242,13 +251,13 @@ DROP TABLE IF EXISTS `MailLog`;
 CREATE TABLE `MailLog` (
   `mailId` int(11) NOT NULL AUTO_INCREMENT,
   `recipients` varchar(200) NOT NULL,
-  `paperIds` text,
-  `cc` text,
-  `replyto` text,
-  `subject` text,
-  `emailBody` text,
+  `paperIds` text DEFAULT NULL,
+  `cc` text DEFAULT NULL,
+  `replyto` text DEFAULT NULL,
+  `subject` text DEFAULT NULL,
+  `emailBody` text DEFAULT NULL,
   PRIMARY KEY (`mailId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -262,34 +271,19 @@ CREATE TABLE `Repository` (
   `url` varbinary(512) NOT NULL,
   `cacheid` varchar(20) NOT NULL,
   `open` int(11) NOT NULL,
-  `opencheckat` bigint(11) NOT NULL DEFAULT '0',
+  `opencheckat` bigint(11) NOT NULL DEFAULT 0,
   `snaphash` binary(40) DEFAULT NULL,
   `snapat` bigint(11) DEFAULT NULL,
-  `snapcheckat` bigint(11) NOT NULL DEFAULT '0',
-  `working` int(1) NOT NULL DEFAULT '1',
-  `snapcommitat` bigint(11) NOT NULL DEFAULT '0',
+  `snapcheckat` bigint(11) NOT NULL DEFAULT 0,
+  `working` int(1) NOT NULL DEFAULT 1,
+  `snapcommitat` bigint(11) NOT NULL DEFAULT 0,
   `snapcommitline` varchar(100) DEFAULT NULL,
   `notes` varbinary(32767) DEFAULT NULL,
   `heads` varbinary(8192) DEFAULT NULL,
-  `analyzedsnapat` bigint(11) NOT NULL DEFAULT '0',
-  `infosnapat` bigint(11) NOT NULL DEFAULT '0',
+  `infosnapat` bigint(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`repoid`),
   UNIQUE KEY `url` (`url`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-
---
--- Table structure for table `RepositoryCommitSnapshot`
---
-
-DROP TABLE IF EXISTS `RepositoryCommitSnapshot`;
-CREATE TABLE `RepositoryCommitSnapshot` (
-  `repoid` int(11) NOT NULL,
-  `bhash` varbinary(32) NOT NULL,
-  `snapshot` bigint(11) NOT NULL,
-  PRIMARY KEY (`repoid`,`bhash`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -300,22 +294,22 @@ CREATE TABLE `RepositoryCommitSnapshot` (
 DROP TABLE IF EXISTS `RepositoryGrade`;
 CREATE TABLE `RepositoryGrade` (
   `repoid` int(11) NOT NULL,
-  `branchid` int(11) NOT NULL DEFAULT '0',
+  `branchid` int(11) NOT NULL DEFAULT 0,
   `pset` int(11) NOT NULL,
   `gradebhash` varbinary(32) DEFAULT NULL,
   `gradercid` int(11) DEFAULT NULL,
-  `hidegrade` tinyint(1) NOT NULL DEFAULT '0',
-  `placeholder` tinyint(1) NOT NULL DEFAULT '0',
+  `hidegrade` tinyint(1) NOT NULL DEFAULT 0,
+  `placeholder` tinyint(1) NOT NULL DEFAULT 0,
   `placeholder_at` bigint(11) DEFAULT NULL,
   `commitat` bigint(11) DEFAULT NULL,
   `rpnotes` varbinary(16384) DEFAULT NULL,
-  `rpnotesversion` int(11) NOT NULL DEFAULT '1',
+  `rpnotesversion` int(11) NOT NULL DEFAULT 1,
   `emptydiff_at` bigint(11) DEFAULT NULL,
   `rpxnotes` varbinary(1024) DEFAULT NULL,
   `rpnotesOverflow` longblob DEFAULT NULL,
   `rpxnotesOverflow` longblob DEFAULT NULL,
   PRIMARY KEY (`repoid`,`branchid`,`pset`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -329,12 +323,13 @@ CREATE TABLE `Settings` (
   `value` int(11) NOT NULL,
   `data` varbinary(32767) DEFAULT NULL,
   PRIMARY KEY (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
 
-insert into Settings (name, value) values ('allowPaperOption', 153);
+
+insert into Settings (name, value) values ('allowPaperOption', 168);
 delete from Settings where name='setupPhase';
 insert into Settings (name, value) values ('setupPhase', 1);
 -- collect PC conflicts from authors by default, but not collaborators
