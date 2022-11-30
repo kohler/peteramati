@@ -898,6 +898,10 @@ class UpdateSchema {
             && $conf->ql_ok("update ExecutionQueue set ifneeded=1 where flags!=0 and (flags&2)!=0")) {
             $conf->update_schema_version(168);
         }
+        if ($conf->sversion === 168
+            && $conf->ql_ok("alter table `ExecutionQueue` add `runstride` int NOT NULL DEFAULT 0")) {
+            $conf->update_schema_version(169);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

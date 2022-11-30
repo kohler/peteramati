@@ -43,6 +43,8 @@ class QueueItem {
     /** @var ?int */
     public $runorder;
     /** @var int */
+    public $runstride;
+    /** @var int */
     public $insertat;
     /** @var int */
     public $scheduleat;
@@ -143,6 +145,7 @@ class QueueItem {
         }
 
         $this->runorder = (int) $this->runorder;
+        $this->runstride = (int) $this->runstride;
         $this->insertat = (int) $this->insertat;
         $this->scheduleat = (int) $this->scheduleat;
         $this->updateat = (int) $this->updateat;
@@ -511,14 +514,14 @@ class QueueItem {
             if (($userid ?? 0) > 0) {
                 $this->conf->qe("update ExecutionQueue
                         set status=?, scheduleat=?,
-                        runorder=greatest(coalesce((select last_runorder from ContactInfo where contactId=?),0),?)+?
+                        runorder=greatest(coalesce((select last_runorder from ContactInfo where contactId=?),0),?)+?+runstride
                         where queueid=? and status=?",
                     self::STATUS_SCHEDULED, Conf::$now,
                     $userid, Conf::$now, $priority,
                     $this->queueid, $this->status);
             } else {
                 $this->conf->qe("update ExecutionQueue
-                        set status=?, scheduleat=?, runorder=?
+                        set status=?, scheduleat=?, runorder=?+runstride
                         where queueid=? and status=?",
                     self::STATUS_SCHEDULED, Conf::$now,
                     Conf::$now + $priority,
@@ -621,7 +624,7 @@ class QueueItem {
     /** @param int $chain */
     static function step_chain(Conf $conf, $chain) {
         $conf->qe("update ExecutionQueue
-                set runorder=if(status=?,?,runorder),
+                set runorder=if(status=?,?+runstride,runorder),
                     scheduleat=if(status=?,?,scheduleat),
                     status=if(status=?,?,status)
                 where status>=? and status<? and chain=?
