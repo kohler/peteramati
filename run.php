@@ -166,7 +166,7 @@ class RunRequest {
         // maybe evaluate
         if (!$this->runner->command) {
             $qi = $qi ?? QueueItem::make_info($info, $this->runner);
-            $qi->step(new QueueStatus);
+            $qi->step(new QueueState);
             return $qi->full_response();
         }
 
@@ -194,13 +194,22 @@ class RunRequest {
         session_write_close();
 
         // process queue
-        $qs = new QueueStatus;
+        $qs = new QueueState;
         $result = $info->conf->qe("select * from ExecutionQueue
-                where status>=? and (status<? or queueid=?) and runorder<=?
+                where (status>=? and status<? and runorder<=?) or queueid=?
                 order by runorder asc, queueid asc limit 500",
-            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED, $qi->queueid, $qi->runorder);
-        while (($qix = QueueItem::fetch($info->conf, $result))) {
-            $qix = $qix->queueid === $qi->queueid ? $qi : $qix;
+            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED,
+            $qi->runorder, $qi->queueid);
+        $qs = QueueState::fetch_list($result);
+        $nahead = 0;
+        $is_ahead = true;
+        while (($qix = $qs->shift())) {
+            if ($qix->queueid === $qi->queueid) {
+                $qix = $qi;
+                $is_ahead = false;
+            } else if ($is_ahead) {
+                ++$nahead;
+            }
             if (!$qix->step($qs)) {
                 if ($qix === $qi) {
                     return self::error($qix->last_error);
@@ -211,11 +220,10 @@ class RunRequest {
                 return $qi->full_response();
             }
         }
-        Dbl::free($result);
         return [
             "queueid" => $qi->queueid,
             "onqueue" => true,
-            "nahead" => $qs->nahead
+            "nahead" => $nahead
         ];
     }
 

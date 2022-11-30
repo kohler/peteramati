@@ -12,7 +12,6 @@ class SiteLoader {
         "LoginHelper" => "lib/login.php",
         "MimeText" => "lib/mailer.php",
         "Pset" => "src/psetconfig.php",
-        "QueueStatus" => "src/queueitem.php",
         "ZipDocument" => "lib/documenthelper.php",
         "Collator" => "lib/collatorshim.php"
     ];

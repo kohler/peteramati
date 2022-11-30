@@ -64,7 +64,7 @@ class RunQueueBatch {
     }
 
     function clean() {
-        $qs = new QueueStatus;
+        $qs = new QueueState;
         $result = $this->conf->qe("select * from ExecutionQueue
                 where status>=? and status<?
                 order by runorder asc, queueid asc",
@@ -160,13 +160,12 @@ class RunQueueBatch {
         $this->running = [];
         $this->any_completed = false;
         $this->nreports = 0;
-        $qs = new QueueStatus;
         $result = $this->conf->qe("select * from ExecutionQueue
                 where status>=? and status<?
-                order by runorder asc, queueid asc
-                limit 100",
-            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED);
-        while (($qix = QueueItem::fetch($this->conf, $result))) {
+                order by runorder asc, queueid asc limit ?",
+            QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED, 200);
+        $qs = QueueState::fetch_list($this->conf, $result);
+        while (($qix = $qs->shift())) {
             if ($qix->working() || $qs->nrunning < $qs->nconcurrent) {
                 $old_status = $qix->status();
                 $qix->step($qs);
@@ -179,7 +178,6 @@ class RunQueueBatch {
                 $this->any_completed = $this->any_completed || $qix->stopped();
             }
         }
-        Dbl::free($result);
         if ($this->verbose && $this->nreports > 0) {
             fwrite(STDOUT, "\n");
         }
@@ -187,7 +185,7 @@ class RunQueueBatch {
     }
 
     function check() {
-        $qs = new QueueStatus;
+        $qs = new QueueState;
         $this->nreports = 0;
         foreach ($this->running as $qix) {
             if (!$qix->stopped()) {

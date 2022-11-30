@@ -1,11 +1,13 @@
 <?php
-// queueitem.php -- Peteramati queue state
+// queueitem.php -- Peteramati execution queue entry
 // HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class QueueItem {
     /** @var Conf */
     public $conf;
+    /** @var ?QueueState */
+    public $qstate;
 
     /** @var int */
     public $queueid;
@@ -92,7 +94,6 @@ class QueueItem {
     public $last_error;
 
     const FLAG_UNWATCHED = 1;
-    const FLAG_IFNEEDED = 2;
     const FLAG_ANONYMOUS = 4;
     const FLAG_NOEVENTSOURCE = 8;
 
@@ -514,7 +515,7 @@ class QueueItem {
             if (($userid ?? 0) > 0) {
                 $this->conf->qe("update ExecutionQueue
                         set status=?, scheduleat=?,
-                        runorder=greatest(coalesce((select last_runorder from ContactInfo where contactId=?),0),?)+?+runstride
+                        runorder=greatest(coalesce((select last_runorder+1 from ContactInfo where contactId=?),0),?)+?+runstride
                         where queueid=? and status=?",
                     self::STATUS_SCHEDULED, Conf::$now,
                     $userid, Conf::$now, $priority,
@@ -527,13 +528,17 @@ class QueueItem {
                     Conf::$now + $priority,
                     $this->queueid, $this->status);
             }
-            if (($row = $this->conf->fetch_first_row("select status, scheduleat, runorder from ExecutionQueue where queueid=?", $this->queueid))) {
+            if (($row = $this->conf->fetch_first_row("select status, scheduleat, runorder, runstride from ExecutionQueue where queueid=?", $this->queueid))) {
                 $this->status = (int) $row[0];
                 $this->scheduleat = (int) $row[1];
                 $this->runorder = (int) $row[2];
+                $this->runstride = (int) $row[3];
                 if (($userid ?? 0) > 0) {
-                    $this->conf->qe("update ContactInfo set last_runorder=? where contactId=? and last_runorder<?",
-                        $this->runorder, $userid, $this->runorder);
+                    $last_runorder = $this->runorder - $this->runstride - $priority;
+                    $this->conf->qe("update ContactInfo
+                            set last_runorder=?
+                            where contactId=? and last_runorder<?",
+                        $last_runorder, $userid, $last_runorder);
                 }
             }
         }
@@ -541,8 +546,10 @@ class QueueItem {
 
     function update() {
         assert($this->queueid !== 0);
-        $result = $this->conf->qe("update ExecutionQueue set updateat=? where queueid=? and updateat<?",
-                                  Conf::$now, $this->queueid, Conf::$now);
+        $result = $this->conf->qe("update ExecutionQueue
+                set updateat=?
+                where queueid=? and updateat<?",
+            Conf::$now, $this->queueid, Conf::$now);
         if ($result->affected_rows) {
             $this->updateat = Conf::$now;
         }
@@ -615,15 +622,19 @@ class QueueItem {
                 @unlink("{$esdir}{$this->eventsource}");
             }
             if ($this->queueid !== 0 && $this->chain) {
-                self::step_chain($this->conf, $this->chain);
+                if (self::step_chain($this->conf, $this->chain)
+                    && $this->qstate) {
+                    $this->qstate->bump_chain($this->conf, $this->chain);
+                }
             }
         }
         return !!$changed;
     }
 
-    /** @param int $chain */
+    /** @param int $chain
+     * @return bool */
     static function step_chain(Conf $conf, $chain) {
-        $conf->qe("update ExecutionQueue
+        $result = $conf->qe("update ExecutionQueue
                 set runorder=if(status=?,?+runstride,runorder),
                     scheduleat=if(status=?,?,scheduleat),
                     status=if(status=?,?,status)
@@ -634,13 +645,14 @@ class QueueItem {
             self::STATUS_UNSCHEDULED, self::STATUS_SCHEDULED,
             self::STATUS_PAUSED, self::STATUS_CANCELLED, $chain,
             self::STATUS_UNSCHEDULED);
+        return $result->affected_rows > 0;
     }
 
     function cancel() {
         $this->swap_status(self::STATUS_CANCELLED);
     }
 
-    /** @param QueueStatus $qs
+    /** @param QueueState $qs
      * @return bool */
     function step($qs) {
         assert($this->queueid !== 0);
@@ -709,7 +721,6 @@ class QueueItem {
         if ($this->status === self::STATUS_SCHEDULED
             || $this->status === self::STATUS_WORKING) {
             // update queue
-            ++$qs->nahead;
             if ($this->runat > 0) {
                 ++$qs->nrunning;
             }
@@ -1221,13 +1232,4 @@ class QueueItem {
             @unlink($runlog->job_prefix($this->runat) . ".in");
         }
     }
-}
-
-class QueueStatus {
-    /** @var int */
-    public $nrunning = 0;
-    /** @var int */
-    public $nahead = 0;
-    /** @var int */
-    public $nconcurrent = 100000;
 }
