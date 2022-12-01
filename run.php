@@ -200,7 +200,7 @@ class RunRequest {
                 order by runorder asc, queueid asc limit 500",
             QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_CANCELLED,
             $qi->runorder, $qi->queueid);
-        $qs = QueueState::fetch_list($result);
+        $qs = QueueState::fetch_list($info->conf, $result);
         $nahead = 0;
         $is_ahead = true;
         while (($qix = $qs->shift())) {

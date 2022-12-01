@@ -32,7 +32,7 @@ class QueueState {
             $this->items[$this->head] = null;
             ++$this->head;
             if ($this->head > 200) {
-                array_splice($this, 0, $this->head - 1, []);
+                array_splice($this->items, 0, $this->head - 1, []);
                 $this->head = 1;
             }
             $qi->qstate = $this;
