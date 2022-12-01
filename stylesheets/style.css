@@ -1244,50 +1244,26 @@ ul.compact {
 
 
 /* vertically arranged forms */
-div.f-i:first-child {
-	margin-top: 0;
+.f-i, .f-checkbox, .f-m {
+	margin-bottom: 1.25em;
 }
-div.f-i:last-child {
-	margin-bottom: 0;
+label.f-c, .f-i > label {
+	display: table;
 }
-div#homeaccount div.f-ii, div#homeaccount div.f-i {
-	clear: none;
+.f-c, .f-i > label {
+	margin-bottom: 0.3em;
+	font-weight: 500;
 }
-div.f-ii {
-	width: auto;
-	clear: both;
-}
-div.f-i {
-	margin: 1ex 0;
-	width: auto;
-}
-div.f-ix {
-	margin: 0 1em 0 0;
-	width: auto;
-	float: left;
-}
-div.f-c, th.f-c, div.f-cl {
-	font-weight: bold;
-}
-div.f-c, th.f-c {
-	color: #555555;
-}
-div.f-c {
-	font-size: smaller;
-}
-th.f-c {
-	text-align: left;
-}
-div.f-h {
-	font-size: smaller;
-	color: #555555;
-	clear: both;
-}
-span.f-cx {
+.f-c.n, .f-i > label.n {
 	font-weight: normal;
 }
-div.f-cl span.f-cx {
-	font-size: smaller;
+.f-h, .f-hx, .field-d,
+.feedback, .feedback-group {
+	font-size: 92%;
+}
+.f-h {
+	margin-top: 0.25rem;
+	margin-bottom: 0.25rem;
 }
 
 

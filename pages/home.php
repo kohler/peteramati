@@ -352,33 +352,37 @@ Sign in to tell us about your code.';
 <hr class='home' />
 <div class='homegrp' id='homeaccount'>\n",
         Ht::form($Conf->hoturl("=index")),
-        "<div class='f-contain foldo fold2o' id='logingroup'>
-<input type='hidden' name='cookie' value='1' />
-<div class=\"", Ht::control_class("email", "f-ii"), "\">
-  <div class=\"f-c\"><span class='fx2'>",
-    ($Conf->opt("ldapLogin") ? "Username" : "Email/username"),
-    "</span><span class='fn2'>Email</span></div><div class=\"f-e\">",
-    Ht::entry("email", $Qreq->email, ["size" => 36, "tabindex" => 1, "autofocus" => !$passwordFocus, "autocomplete" => "email"]),
-    Ht::render_feedback_at("email"), "</div>
-</div>
-<div class=\"", Ht::control_class("password", "f-i fx"), "\">
-  <div class=\"f-c\">Password</div><div class=\"f-e\">",
-    Ht::password("password", "", ["size" => 36, "tabindex" => 1, "autofocus" => $passwordFocus, "autocomplete" => "current-password"]),
-    Ht::render_feedback_at("password"), "</div>
-</div>\n";
+        '<div class="f-contain foldo fold2o" id="logingroup">',
+        Ht::hidden("cookie", 1),
+        '<div class="', Ht::control_class("email", "f-i"), '">',
+        '<label for="email">',
+        '<span class="fx2">', $Conf->opt("ldapLogin") ? "Username" : "Email/username",
+        '</span><span class="fn2">Email</span></label>',
+        Ht::entry("email", $Qreq->email, ["size" => 36, "autofocus" => !$passwordFocus, "autocomplete" => "email"]),
+        Ht::render_feedback_at("email"),
+        '</div>',
+        '<div class="', Ht::control_class("password", "f-i fx"), '">',
+        '<label for="password">Password</label>',
+        Ht::password("password", "", ["size" => 36, "autofocus" => $passwordFocus, "autocomplete" => "current-password"]),
+        Ht::render_feedback_at("password"),
+        '</div></div>';
     if ($Conf->opt("ldapLogin")) {
         echo "<input type='hidden' name='action' value='login' />\n";
     } else {
-        echo "<div class='f-i'>\n  ",
-            Ht::radio("action", "login", true, ["id" => "signin_action_login", "tabindex" => 2, "class" => "uic pa-signin-radio"]),
-        "&nbsp;", Ht::label("<b>Sign me in</b>"), "<br />\n";
-        echo Ht::radio("action", "forgot", false, ["tabindex" => 2, "class" => "uic pa-signin-radio"]),
-            "&nbsp;", Ht::label("I forgot my password"), "<br />\n";
-        if (!$Conf->opt("disableNewUsers"))
-            echo Ht::radio("action", "new", false, ["id" => "signin_action_new", "tabindex" => 2, "class" => "uic pa-signin-radio"]),
-                "&nbsp;", Ht::label("Create an account"), "<br />\n";
-        Ht::stash_script("\$('#homeaccount input[name=action]:checked').click()");
-        echo "\n</div>\n";
+        echo '<div class="mb-4">',
+            '<label class="checki"><span class="checkc">',
+                Ht::radio("action", "login", true, ["id" => "signin_action_login", "class" => "uic pa-signin-radio"]),
+            '</span><strong>Sign me in</strong></label>',
+            '<label class="checki"><span class="checkc">',
+                Ht::radio("action", "forgot", false, ["class" => "uic pa-signin-radio"]),
+            '</span>I forgot my password</label>';
+        if (!$Conf->opt("disableNewUsers")) {
+            echo '<label class="checki"><span class="checkc">',
+                    Ht::radio("action", "new", false, ["id" => "signin_action_new", "class" => "uic pa-signin-radio"]),
+                '</span>Create an account</label>';
+        }
+        echo '</div>';
+        Ht::stash_script("$('#homeaccount input[name=action]:checked').click()");
     }
     echo '<div class="f-i"><button class="btn btn-primary" type="submit" name="signin" id="signin" tabindex="1" value="1">Sign in</button></div></div></form>',
         '<hr class="home"></div>', "\n";
