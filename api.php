@@ -61,7 +61,7 @@ class APIRequest {
             && !($api->pset = $this->conf->pset_by_key($this->qreq->pset))) {
             return ["ok" => false, "error" => "No such pset."];
         }
-        if ($api->pset && $api->pset->disabled) {
+        if ($api->pset && $api->pset->disabled && !$this->viewer->privChair) {
             if ($this->viewer->isPC) {
                 return ["ok" => false, "error" => "Pset disabled."];
             } else {
@@ -89,6 +89,11 @@ class APIRequest {
         if (!$uf
             && is_object($this->conf->config->_api ?? null)) {
             $uf = $this->conf->config->_api->{$this->qreq->fn} ?? null;
+        }
+        if ($uf
+            && $api->pset->disabled
+            && !($uf->anypset ?? false)) {
+            return ["ok" => false, "error" => "Pset disabled."];
         }
         if ($uf
             && ($uf->redirect ?? false)
