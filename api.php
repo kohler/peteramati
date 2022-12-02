@@ -91,6 +91,7 @@ class APIRequest {
             $uf = $this->conf->config->_api->{$this->qreq->fn} ?? null;
         }
         if ($uf
+            && $api->pset
             && $api->pset->disabled
             && !($uf->anypset ?? false)) {
             return ["ok" => false, "error" => "Pset disabled."];
