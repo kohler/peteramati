@@ -216,9 +216,17 @@ class Pset {
         $this->conf = $conf;
 
         // obsolete components
-        if (($k = self::ccomponent($p, "group_weight", "ui_disabled", "show_to_students", "freeze", "handout_repo_branch", "handout_commit_hash", "repo_transform_patterns", "college_deadline", "extension_deadline", "show_grades_to_students", "grade_cdf_visible"))) {
-            throw new PsetConfigException("obsolete pset component `{$k}`", $k);
-        }
+        Pset::check_obsolete($conf, $p, "pset", true, [
+            "group_weight" => "weight", "ui_disabled" => "admin_disabled",
+            "show_to_students" => "visible", "freeze" => "frozen",
+            "handout_repo_branch" => "handout_branch",
+            "handout_commit_hash" => "handout_hash",
+            "repo_transform_patterns" => "repo_guess_patterns",
+            "college_deadline" => "deadline_college",
+            "extension_deadline" => "deadline_extension",
+            "show_grades_to_students" => "scores_visible",
+            "grade_cdf_visible" => "grade_statistics_visible"
+        ]);
 
         // pset id
         if (!isset($p->psetid) || !is_int($p->psetid) || $p->psetid <= 0) {
@@ -1028,6 +1036,23 @@ class Pset {
                 return $k;
         }
         return null;
+    }
+
+    /** @param ?Conf $conf
+     * @param object $x
+     * @param bool $err
+     * @param array<string,string> $arr */
+    static function check_obsolete($conf, $x, $loc, $err, $arr) {
+        $err = $err && (!$conf || !$conf->opt("allowObsoleteConfig"));
+        foreach ($arr as $k1 => $k2) {
+            if (property_exists($x, $k1)) {
+                if ($err) {
+                    throw new PsetConfigException("obsolete " . (is_string($loc) ? $loc : $loc[0]) . " component `{$k1}`, use `{$k2}`", $loc);
+                } else if (!property_exists($x, $k2)) {
+                    $x->{$k2} = $x->{$k1};
+                }
+            }
+        }
     }
 
     /** @return ?bool */
@@ -1968,9 +1993,13 @@ class RunnerConfig {
         $rs = $defr ? [$r, $defr] : $r;
 
         // obsolete components
-        if (($k = Pset::ccomponent($r, "output_title", "show_to_students", "output_visible", "show_output_to_students", "show_results_to_students"))) {
-            throw new PsetConfigException("obsolete runner component `{$k}`", $loc);
-        }
+        Pset::check_obsolete($pset->conf, $r, $loc, true, [
+            "output_title" => "display_title",
+            "show_to_students" => "visible",
+            "output_visible" => "output_visible",
+            "show_output_to_students" => "output_visible",
+            "show_results_to_students" => "display_visible"
+        ]);
 
         $this->pset = $pset;
         $this->name = isset($r->name) ? $r->name : $name;
@@ -2186,9 +2215,9 @@ class DiffConfig {
         }
 
         // obsolete components
-        if (($k = Pset::ccomponent($d, "boring", "gradeable"))) {
-            throw new PsetConfigException("obsolete diff component `{$k}`", ["diffs", $match]);
-        }
+        Pset::check_obsolete(null, $d, ["diffs", $match], true, [
+            "boring" => "collapse", "gradeable" => "gradable"
+        ]);
 
         $this->match = $d->match ?? $d->regex ?? $match;
         if (!is_string($this->match) || $this->match === "") {
