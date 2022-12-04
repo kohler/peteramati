@@ -131,14 +131,14 @@ class Repo_API {
         if ($api->pset->is_handout($api->commit)) {
             $repo = $api->pset->handout_repo($api->repo);
         }
-        $command = "git show {$api->hash}:" . escapeshellarg($qreq->file);
+        $args = [];
         if ($qreq->fromline && intval($qreq->fromline) > 1) {
-            $command .= " | tail -n +" . intval($qreq->fromline);
+            $args["firstline"] = intval($qreq->fromline);
         }
         if ($qreq->linecount) {
-            $command .= " | head -n " . intval($qreq->linecount);
+            $args["linecount"] = intval($qreq->linecount);
         }
-        $x = $api->repo->gitrun($command, true);
+        $x = $api->repo->gitruninfo(["git", "show", "{$api->hash}:{$qreq->file}"], $args);
         if (!$x->status && ($x->stdout !== "" || $x->stderr === "")) {
             $data = $x->stdout;
             if (is_valid_utf8($data)) {
@@ -149,7 +149,7 @@ class Repo_API {
         } else if (strpos($x->stderr, "does not exist") !== false) {
             return ["ok" => false, "error" => "No such file."];
         } else {
-            error_log("$command: $x->stderr");
+            error_log(join(" ", $x->command) . ": " . $x->stderr);
             return ["ok" => false, "error" => "Problem."];
         }
     }
