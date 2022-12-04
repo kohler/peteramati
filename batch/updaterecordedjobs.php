@@ -1,11 +1,15 @@
 <?php
 // updaterecordedjobs.php -- Peteramati script for updating database information
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-require_once(dirname(__DIR__) . "/src/init.php");
+if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    require_once(dirname(__DIR__) . "/src/init.php");
+    exit(UpdateRecordedJobs_Batch::make_args(Conf::$main, $argv)->run_or_warn());
+}
 
-class UpdateRecordedJobsBatch {
+
+class UpdateRecordedJobs_Batch {
     /** @var Conf */
     public $conf;
     /** @var list<Pset> */
@@ -111,7 +115,16 @@ class UpdateRecordedJobsBatch {
         return $nu;
     }
 
-    /** @return UpdateRecordedJobsBatch */
+    /** @return int */
+    function run_or_warn() {
+        $n = $this->run();
+        if ($n === 0) {
+            fwrite(STDERR, "Nothing to do\n");
+        }
+        return $n > 0 ? 0 : 1;
+    }
+
+    /** @return UpdateRecordedJobs_Batch */
     static function make_args(Conf $conf, $argv) {
         $arg = (new Getopt)->long(
             "p[],pset[] Problem set",
@@ -126,9 +139,9 @@ class UpdateRecordedJobsBatch {
                 && !$pset->gitless) {
                 $psets[] = $pset;
             } else if ($pset) {
-                throw new Error("pset {$pkey} has no jobs");
+                throw new CommandLineException("pset {$pkey} has no jobs");
             } else {
-                throw new Error("no such pset");
+                throw new CommandLineException("no such pset");
             }
         }
         if (empty($psets)) {
@@ -137,28 +150,16 @@ class UpdateRecordedJobsBatch {
                     $psets[] = $pset;
             }
         }
-        $self = new UpdateRecordedJobsBatch($conf, $psets, $arg["u"] ?? []);
+        $self = new UpdateRecordedJobs_Batch($conf, $psets, $arg["u"] ?? []);
         if (isset($arg["V"])) {
             $self->verbose = true;
         }
         if (isset($arg["H"])) {
             if (!($hp = CommitRecord::canonicalize_hashpart($arg["H"]))) {
-                throw new Error("bad `--commit`");
+                throw new CommandLineException("bad `--commit`");
             }
             $self->hash = $hp;
         }
         return $self;
     }
-}
-
-try {
-    if (UpdateRecordedJobsBatch::make_args($Conf, $argv)->run() > 0) {
-        exit(0);
-    } else {
-        fwrite(STDERR, "nothing to do\n");
-        exit(1);
-    }
-} catch (Error $e) {
-    fwrite(STDERR, $e->getMessage() . "\n");
-    exit(1);
 }

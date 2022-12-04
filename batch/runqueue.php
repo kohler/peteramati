@@ -1,11 +1,15 @@
 <?php
 // runqueue.php -- Peteramati script for progressing the execution queue
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-require_once(dirname(__DIR__) . "/src/init.php");
+if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    require_once(dirname(__DIR__) . "/src/init.php");
+    exit(RunQueue_Batch::make_args(Conf::$main, $argv)->run());
+}
 
-class RunQueueBatch {
+
+class RunQueue_Batch {
     /** @var Conf */
     public $conf;
     /** @var 'list'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains' */
@@ -281,6 +285,7 @@ class RunQueueBatch {
         }
     }
 
+    /** @return int */
     function run() {
         if ($this->mode === "list") {
             $this->list();
@@ -304,10 +309,11 @@ class RunQueueBatch {
             $this->words = ["broken"];
             $this->cancel();
         }
+        return 0;
     }
 
-    /** @return RunQueueBatch */
-    static function parse_args(Conf $conf, $argv) {
+    /** @return RunQueue_Batch */
+    static function make_args(Conf $conf, $argv) {
         $arg = (new Getopt)->long(
             "q,query !",
             "n:,count: {n} =N Print at most N items",
@@ -336,7 +342,7 @@ class RunQueueBatch {
             ["q", "list"], ["x", "complete"], ["1", "once"],
             ["c", "clean"]
         ];
-        $self = new RunQueueBatch($conf);
+        $self = new RunQueue_Batch($conf);
         if (isset($arg["_subcommand"])) {
             $self->mode = $arg["_subcommand"];
         }
@@ -360,12 +366,4 @@ class RunQueueBatch {
         }
         return $self;
     }
-}
-
-try {
-    RunQueueBatch::parse_args($Conf, $argv)->run();
-    exit(0);
-} catch (Exception $e) {
-    fwrite(STDERR, $e->getMessage() . "\n");
-    exit(1);
 }

@@ -1,11 +1,16 @@
 <?php
 // linenotesnear.php -- Peteramati script for examining linenotes
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-require_once(dirname(__DIR__) . "/src/init.php");
+if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    require_once(dirname(__DIR__) . "/src/init.php");
+    date_default_timezone_set("GMT");
+    exit(LineNotesNear_Batch::make_args(Conf::$main, $argv)->run());
+}
 
-class LineNotesNearBatch {
+
+class LineNotesNear_Batch {
     /** @var Pset */
     public $pset;
     /** @var string */
@@ -19,6 +24,7 @@ class LineNotesNearBatch {
         $this->pset = $pset;
     }
 
+    /** @return int */
     function run() {
         $upi = $this->pset->gitless_grades && str_starts_with($this->file, "/");
         $hdr = $upi ? ["email"] : ["repourl", "hash"];
@@ -33,26 +39,29 @@ class LineNotesNearBatch {
             }
         }
         $csv->flush();
+        return 0;
     }
 
-    /** @return LineNotesNearBatch */
-    static function parse_args(Conf $conf, $argv) {
+    /** @return LineNotesNear_Batch */
+    static function make_args(Conf $conf, $argv) {
         $arg = (new Getopt)->long(
             "p:,pset: Problem set",
             "f:,file: File",
             "l:,line: Line number or line ID",
             "a,all Return all notes",
             "help"
-        )->helpopt("help")->description("php batch/linenotesnear.php")->parse($argv);
-        if (!$arg["p"] || !($pset = $conf->pset_by_key($arg["p"]))) {
-            throw new Error("no such `--pset`");
+        )->helpopt("help")
+         ->description("php batch/linenotesnear.php")
+         ->parse($argv);
+        if (!($arg["p"] ?? null) || !($pset = $conf->pset_by_key($arg["p"]))) {
+            throw new CommandLineException("no such `--pset`");
         }
-        $lnb = new LineNotesNearBatch($pset);
+        $lnb = new LineNotesNear_Batch($pset);
 
         if (!isset($arg["f"]) && empty($arg["_"])) {
-            throw new Error("missing file");
+            throw new CommandLineException("missing file");
         } else if (count($arg["_"]) !== (isset($arg["f"]) ? 0 : 1)) {
-            throw new Error("wrong number of arguments");
+            throw new CommandLineException("wrong number of arguments");
         }
         $lnb->file = isset($arg["f"]) ? $arg["f"] : $arg["_"][0];
 
@@ -67,18 +76,10 @@ class LineNotesNearBatch {
             } else if (preg_match('/\A[ab]\d+\z/', $arg["l"])) {
                 $lnb->lineid = $arg["l"];
             } else {
-                throw new Error("bad `--line`");
+                throw new CommandLineException("bad `--line`");
             }
         }
 
         return $lnb;
     }
-}
-
-try {
-    LineNotesNearBatch::parse_args($Conf, $argv)->run();
-    exit(0);
-} catch (Exception $e) {
-    fwrite(STDERR, $e->getMessage() . "\n");
-    exit(1);
 }

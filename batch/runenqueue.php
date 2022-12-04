@@ -1,11 +1,15 @@
 <?php
 // runenqueue.php -- Peteramati script for adding to the execution queue
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-require_once(dirname(__DIR__) . "/src/init.php");
+if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    require_once(dirname(__DIR__) . "/src/init.php");
+    exit(RunEnqueue_Batch::make_args(Conf::$main, $argv)->run_or_warn());
+}
 
-class RunEnqueueBatch {
+
+class RunEnqueue_Batch {
     /** @var Conf */
     public $conf;
     /** @var Pset */
@@ -147,7 +151,16 @@ class RunEnqueueBatch {
         return $nu;
     }
 
-    /** @return RunEnqueueBatch */
+    /** @return int */
+    function run_or_warn() {
+        $n = $this->run();
+        if ($n === 0) {
+            fwrite(STDERR, "nothing to do\n");
+        }
+        return $n > 0 ? 0 : 1;
+    }
+
+    /** @return RunEnqueue_Batch */
     static function make_args(Conf $conf, $argv) {
         $arg = (new Getopt)->long(
             "p:,pset: Problem set",
@@ -164,20 +177,20 @@ class RunEnqueueBatch {
             "help"
         )->helpopt("help")->parse($argv);
         if (($arg["p"] ?? "") === "") {
-            throw new Error("missing `--pset`");
+            throw new CommandLineException("missing `--pset`");
         }
         $pset = $conf->pset_by_key($arg["p"]);
         if (!$pset) {
-            throw new Error("no such pset");
+            throw new CommandLineException("no such pset");
         }
         if (($arg["r"] ?? "") === "") {
-            throw new Error("missing `--runner`");
+            throw new CommandLineException("missing `--runner`");
         }
         $runner = $pset->runners[$arg["r"]] ?? null;
         if (!$runner) {
-            throw new Error("no such runner");
+            throw new CommandLineException("no such runner");
         }
-        $self = new RunEnqueueBatch($pset, $runner, $arg["u"] ?? []);
+        $self = new RunEnqueue_Batch($pset, $runner, $arg["u"] ?? []);
         if (isset($arg["e"])) {
             if ($arg["e"] === false) {
                 $self->if_needed = 1;
@@ -196,13 +209,13 @@ class RunEnqueueBatch {
                 && QueueItem::valid_chain(intval($chain))) {
                 $self->chainid = intval($chain);
             } else {
-                throw new Error("bad `--chain`");
+                throw new CommandLineException("bad `--chain`");
             }
         }
         if (isset($arg["t"])) {
             foreach ($arg["t"] as $tag) {
                 if (!preg_match('/\A' . TAG_REGEX_NOTWIDDLE . '\z/', $tag)) {
-                    throw new Error("bad `--tag`");
+                    throw new CommandLineException("bad `--tag`");
                 }
                 $self->tags[] = $tag;
             }
@@ -210,14 +223,14 @@ class RunEnqueueBatch {
         if (isset($arg["s"])) {
             foreach ($arg["s"] as $setting) {
                 if (!preg_match('/\A([A-Za-z][_A-Za-z0-9]*)=([-._A-Za-z0-9]*)\z/', $setting, $m)) {
-                    throw new Error("bad `--setting`");
+                    throw new CommandLineException("bad `--setting`");
                 }
                 $self->runsettings[$m[1]] = $m[2];
             }
         }
         if (isset($arg["H"])) {
             if (!($hp = CommitRecord::canonicalize_hashpart($arg["H"]))) {
-                throw new Error("bad `--commit`");
+                throw new CommandLineException("bad `--commit`");
             }
             $self->hash = $hp;
         }
@@ -226,16 +239,4 @@ class RunEnqueueBatch {
         }
         return $self;
     }
-}
-
-try {
-    if (RunEnqueueBatch::make_args($Conf, $argv)->run() > 0) {
-        exit(0);
-    } else {
-        fwrite(STDERR, "nothing to do\n");
-        exit(1);
-    }
-} catch (Error $e) {
-    fwrite(STDERR, $e->getMessage() . "\n");
-    exit(1);
 }

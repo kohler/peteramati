@@ -8,6 +8,7 @@ if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     exit(BackupDB_Batch::make_args($argv)->run());
 }
 
+
 class BackupDB_Batch {
     /** @var Dbl_ConnectionParams */
     public $connp;
