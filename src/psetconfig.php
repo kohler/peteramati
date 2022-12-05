@@ -1047,7 +1047,10 @@ class Pset {
         foreach ($arr as $k1 => $k2) {
             if (property_exists($x, $k1)) {
                 if ($err) {
-                    throw new PsetConfigException("obsolete " . (is_string($loc) ? $loc : $loc[0]) . " component `{$k1}`, use `{$k2}`", $loc);
+                    $loca = is_array($loc) ? $loc : [$loc];
+                    $locb = $loca[0] === "pset" ? array_slice($loca, 1) : $loca;
+                    $locb[] = $k1;
+                    throw new PsetConfigException("obsolete {$loca[0]} component `{$k1}`, use `{$k2}`", $locb);
                 } else if (!property_exists($x, $k2)) {
                     $x->{$k2} = $x->{$k1};
                 }
