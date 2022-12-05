@@ -902,6 +902,11 @@ class UpdateSchema {
             && $conf->ql_ok("alter table `ExecutionQueue` add `runstride` int NOT NULL DEFAULT 0")) {
             $conf->update_schema_version(169);
         }
+        if ($conf->sversion === 169
+            && $conf->ql_ok("alter table Repository drop `snapcommitline`")
+            && $conf->ql_ok("alter table Repository drop `snapcommitat`")) {
+            $conf->update_schema_version(170);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

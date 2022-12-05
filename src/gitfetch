@@ -201,12 +201,6 @@ if [ $gitfetch_status = 0 ]; then
         new_head=y
     fi
     if [ -n "$new_head" -o -n "$force" ]; then
-        log="`git log -n1 --format='%ct %s' $cur_head`"
-        log_time=`echo "$log" | sed 's/^\([^ ]*\).*/\1/'`
-        log_line="`echo "$log" | sed 's/^[^ ]* //'`"
-        if [ -n "$log_time" ]; then
-            update="snapcommitat=$log_time, snapcommitline='`echo "$log_line" | head -c 100 | sql_quote`', $update"
-        fi
         find_distinct_heads
         update="heads='$distinct_heads', $update"
     fi
