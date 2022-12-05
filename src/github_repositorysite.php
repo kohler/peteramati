@@ -240,6 +240,19 @@ class GitHub_RepositorySite extends RepositorySite {
     function friendly_url() {
         return $this->base ? : $this->url;
     }
+    /** @return list<string> */
+    function credentialed_git_command() {
+        if (($id = $this->conf->opt("githubOAuthClientId"))
+            && ($token = $this->conf->opt("githubOAuthToken"))
+            && $token !== Conf::INVALID_TOKEN) {
+            return [
+                "git", "-c", "credential.helper=",
+                "-c", "credential.helper=!f () { echo username={$id}; echo password={$token}; }; f"
+            ];
+        } else {
+            return ["false"];
+        }
+    }
     function owner_name() {
         if (preg_match('{\A([^/"\\\\]+)/([^/"\\\\]+)\z}', $this->base, $m))
             return [$m[1], $m[2]];

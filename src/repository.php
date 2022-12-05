@@ -146,6 +146,10 @@ class Repository {
             return $this->url;
         }
     }
+    /** @return list<string> */
+    function credentialed_git_command() {
+        return $this->reposite->credentialed_git_command();
+    }
 
     function expand_message($name, Contact $user) {
         return Messages::$main->expand_html($name, $this->reposite->message_defs($user));
@@ -625,12 +629,7 @@ class Repository {
             $pfx = $this->ensure_repodir() . "/.git/refs/tags/repo{$this->repoid}.snap";
             $this->_snapshot_heads = [];
             foreach (glob("{$pfx}*") as $snapfile) {
-                $time = substr($snapfile, strlen($pfx));
-                if (strlen($time) === 15
-                    && ctype_digit(substr($time, 0, 8))
-                    && $time[8] === "."
-                    && ctype_digit(substr($time, 9))
-                    && ($x = file_get_contents($snapfile)) !== false
+                if (($x = file_get_contents($snapfile)) !== false
                     && ($x = rtrim($x)) !== ""
                     && strlen($x) >= 40
                     && ctype_xdigit($x)

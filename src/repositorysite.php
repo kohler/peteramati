@@ -62,6 +62,10 @@ class RepositorySite {
     function friendly_url() {
         return $this->url;
     }
+    /** @return list<string> */
+    function credentialed_git_command() {
+        return ["git"];
+    }
 
     function message_defs(Contact $user) {
         return ["REPOGITURL" => null, "REPOBASE" => null];
