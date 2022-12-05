@@ -269,7 +269,12 @@ class RepoFetch_Batch {
         }
     }
 
+    /** @return int */
     function run() {
+        if ($this->done) {
+            return 0;
+        }
+
         $repodir = $this->repo->ensure_repodir();
         if (!$repodir) {
             throw new CommandLineException("Cannot create repository");
@@ -320,6 +325,9 @@ class RepoFetch_Batch {
         if ($this->force) {
             $this->recheck_heads();
         }
+
+        $this->done = true;
+        return 0;
     }
 
 
