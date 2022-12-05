@@ -62,17 +62,9 @@ class RepoFetch_Batch {
     /** @param list<string> $command
      * @return string */
     static function unparse_command($command) {
-        $s = [];
-        foreach ($command as $w) {
-            if (str_starts_with($w, "credential.helper=!")) {
-                $s[] = "credential.helper=REDACTED";
-            } else if (preg_match('/\A[-_.,@=+\/:0-9a-zA-Z]+\z/', $w)) {
-                $s[] = $w;
-            } else {
-                $s[] = escapeshellarg($w);
-            }
-        }
-        return join(" ", $s);
+        return Subprocess::unparse_command(array_map(function ($w) {
+            return str_starts_with($w, "credential.helper=") ? "credential.helper=REDACTED" : $w;
+        }, $command));
     }
 
     /** @param list<string> $command

@@ -83,7 +83,8 @@ class Subprocess {
         if ($stdin !== null) {
             $descriptors[0] = ["pipe", "r"];
         }
-        $proc = proc_open($command, $descriptors, $pipes, $cwd);
+        $cmd = PHP_VERSION_ID >= 70400 ? $command : self::unparse_command($command);
+        $proc = proc_open($cmd, $descriptors, $pipes, $cwd);
         if ($stdin !== null) {
             stream_set_blocking($pipes[0], false);
         }
@@ -141,5 +142,16 @@ class Subprocess {
      * @param string $cwd */
     static function runok($command, $cwd) {
         return self::run($command, $cwd)->ok;
+    }
+
+
+    /** @param list<string> $command
+     * @return string */
+    static function unparse_command($command) {
+        $s = [];
+        foreach ($command as $w) {
+            $s[] = preg_match('/\A[-_.,:=+~\/a-zA-Z0-9]+\z/', $w) ? $w : escapeshellarg($w);
+        }
+        return join(" ", $s);
     }
 }

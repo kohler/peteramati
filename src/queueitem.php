@@ -982,33 +982,19 @@ class QueueItem {
         $this->info()->add_recorded_job($runner->name, $this->runat);
     }
 
-    /** @param string $command
-     * @param bool $ready
-     * @return int */
-    private function run_and_log_x($command, $ready = false) {
-        fwrite($this->_logstream, "++ " . $command . ($ready ? "\n\n" : "\n"));
-        fflush($this->_logstream);
-        system("($command) </dev/null >>" . escapeshellarg($this->_logfile) . " 2>&1", $status);
-        return $status;
-    }
-
     /** @param list<string> $cmdarg
      * @param ?string $cwd
      * @param bool $ready
      * @return int */
     private function run_and_log($cmdarg, $cwd = null, $ready = false) {
-        $t = [];
-        foreach ($cmdarg as $s) {
-            $t[] = preg_match('/\A[-=+~_.\/a-zA-Z0-9]+\z/', $s) ? $s : escapeshellarg($s);
-        }
-        fwrite($this->_logstream, "++ " . join(" ", $t) . ($ready ? "\n\n" : "\n"));
+        fwrite($this->_logstream, "++ " . Subprocess::unparse_command($cmdarg) . ($ready ? "\n\n" : "\n"));
         fflush($this->_logstream);
 
         if (PHP_VERSION_ID >= 70400) {
             $cmd = $cmdarg;
             $stderr = ["redirect", 1];
         } else {
-            $cmd = join(" ", $t);
+            $cmd = Subprocess::unparse_command($cmdarg);
             $stderr = ["file", $this->_logfile, "a"];
         }
         $pipes = null;
