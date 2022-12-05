@@ -308,6 +308,9 @@ class Repository {
      * @param array{firstline?:int,linecount?:int,cwd?:?string} $args
      * @return Subprocess */
     function gitruninfo($command, $args = []) {
+        if ($command[0] === "git") {
+            $command[0] = $this->conf->opt("gitCommand") ?? "git";
+        }
         $cwd = $args["cwd"] ?? $this->ensure_repodir();
         if (!$cwd) {
             throw new Error("Cannot safely create repository directory");

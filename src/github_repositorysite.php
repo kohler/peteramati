@@ -269,22 +269,20 @@ class GitHub_RepositorySite extends RepositorySite {
     }
 
     function gitfetch($repoid, $cacheid, $foreground) {
-        if (($id = $this->conf->opt("githubOAuthClientId"))
-            && ($token = $this->conf->opt("githubOAuthToken"))
-            && $token !== Conf::INVALID_TOKEN) {
-            putenv("GIT_USERNAME=$id");
-            putenv("GIT_PASSWORD=$token");
-            $command = escapeshellarg(SiteLoader::$root . "/src/gitfetch")
-                . " -m " . escapeshellarg($this->conf->default_main_branch)
-                . " $repoid $cacheid " . escapeshellarg($this->https_url())
-                . " 1>&2" . ($foreground ? "" : " &");
-            shell_exec($command);
-            putenv("GIT_USERNAME");
-            putenv("GIT_PASSWORD");
-            return true;
-        } else {
+        if (!$this->conf->opt("githubOAuthClientId")
+            || !($token = $this->conf->opt("githubOAuthToken"))
+            || $token === Conf::INVALID_TOKEN) {
             return false;
         }
+        $arg = $foreground ? [] : ["--bg"];
+        $php = $this->conf->opt("phpCommand") ?? "php";
+        $sp = Subprocess::run([
+            $php, "batch/repofetch.php", "-r", $repoid, ...$arg
+        ], SiteLoader::$root);
+        if (!$sp->ok) {
+            error_log("`php batch/repofetch.php -r {$repoid}` failed: {$sp->status}, {$sp->stderr}");
+        }
+        return true;
     }
     function validate_open(MessageSet $ms = null) {
         if (!($owner_name = $this->owner_name())) {
