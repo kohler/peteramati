@@ -45,8 +45,8 @@ class Grade_API {
         foreach ($x as $k => &$v) {
             if (($ge = $info->gradelike_by_key($k))) {
                 $v = $ge->parse_value($v, $isnew);
-                if ($v === false && !isset($this->errf[$k])) {
-                    $this->errf[$k] = $ge->parse_value_error();
+                if ($v instanceof GradeError && !isset($this->errf[$k])) {
+                    $this->errf[$k] = $v->message;
                 }
             }
         }
@@ -80,33 +80,38 @@ class Grade_API {
                     && isset($notes->autogrades)) {
                     $agv = $notes->autogrades->$k ?? null;
                 }
-                if ($ge->allow_edit($gv, $oldgv, $agv, $info)) {
+                $allowed = $ge->allow_edit($gv, $oldgv, $agv, $info);
+                if ($allowed === true) {
                     $v["grades"][$k] = $gv ?? (isset($agv) ? false : null);
                     if ($ge->answer) {
                         $v["linenotes"]["/g/{$ge->key}"] = null;
                     }
                     $this->diff = $this->diff || $ge->value_differs($gv, $oldgv);
                 } else {
-                    $this->errf[$k] = $ge->parse_value_error();
+                    $this->errf[$k] = $allowed->message;
                 }
             }
         }
-        if (array_key_exists("late_hours", $g)
-            && $info->pc_view // XXX separate permission check?
-            && ($gv = GradeEntry::parse_numeric_value($g["late_hours"])) !== false) {
-            $curlhd = $info->late_hours_data() ? : (object) [];
-            $lh = $curlhd->hours ?? 0;
-            $alh = $curlhd->autohours ?? $lh;
-            if (isset($og["late_hours"])
-                && ($ogv = GradeEntry::parse_numeric_value($og["late_hours"])) !== null
-                && $ogv !== false
-                && abs($ogv - $lh) >= 0.0001) {
-                $this->errf["late_hours"] = true;
-            } else if ($gv === null
-                       || abs($gv - $alh) < 0.0001) {
-                $v["late_hours"] = null;
+        if (array_key_exists("late_hours", $g) && $info->pc_view) {
+            // XXX separate permission check?
+            $gv = GradeEntry::parse_numeric_value($g["late_hours"]);
+            $ogv = isset($og["late_hours"]) ? GradeEntry::parse_numeric_value($og["late_hours"]) : null;
+            if ($gv instanceof GradeError) {
+                $this->errf["late_hours"] = $gv->message;
             } else {
-                $v["late_hours"] = $gv;
+                $curlhd = $info->late_hours_data() ? : (object) [];
+                $lh = $curlhd->hours ?? 0;
+                $alh = $curlhd->autohours ?? $lh;
+                if ($ogv
+                    && !($ogv instanceof GradeError)
+                    && abs($ogv - $lh) >= 0.0001) {
+                    $this->errf["late_hours"] = true;
+                } else if ($gv === null
+                           || abs($gv - $alh) < 0.0001) {
+                    $v["late_hours"] = null;
+                } else {
+                    $v["late_hours"] = $gv;
+                }
             }
         }
         return $v;

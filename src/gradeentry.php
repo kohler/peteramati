@@ -92,8 +92,6 @@ class GradeEntry {
     public $timeout;
     /** @var ?string */
     public $timeout_entry;
-    /** @var ?string */
-    private $_last_error;
     /** @var object */
     public $config;
 
@@ -398,7 +396,7 @@ class GradeEntry {
 
     /** @param string $v
      * @param bool $isnew
-     * @return null|int|false */
+     * @return null|int|GradeError */
     static function parse_timermark_value($v, $isnew) {
         $v = trim($v);
         if ($v === "" || $v === "0") {
@@ -408,25 +406,24 @@ class GradeEntry {
         } else if (ctype_digit($v)) {
             return (int) $v;
         } else {
-            return false;
+            return new GradeError("Invalid timermark.");
         }
     }
 
     /** @param string $v
-     * @return null|string|false */
+     * @return null|string|GradeError */
     function parse_select_value($v) {
         if ($v === "" || strcasecmp($v, "none") === 0) {
             return null;
         } else if (in_array((string) $v, $this->options)) {
             return $v;
         } else {
-            $this->_last_error = "Invalid grade.";
-            return false;
+            return new GradeError;
         }
     }
 
     /** @param string $v
-     * @return null|int|float|false */
+     * @return null|int|float|GradeError */
     static function parse_letter_value($v) {
         $v = trim($v);
         if ($v === "") {
@@ -438,12 +435,12 @@ class GradeEntry {
         } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
             return floatval($v);
         } else {
-            return false;
+            return new GradeError("Invalid letter grade.");
         }
     }
 
     /** @param null|int|float|string $v
-     * @return null|int|float|false */
+     * @return null|int|float|GradeError */
     static function parse_numeric_value($v) {
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
@@ -454,12 +451,12 @@ class GradeEntry {
         } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
             return floatval($v);
         } else {
-            return false;
+            return new GradeError("Number expected.");
         }
     }
 
     /** @param null|int|float|string $v
-     * @return null|int|float|false */
+     * @return null|int|float|GradeError */
     static function parse_duration_value($v) {
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
@@ -475,7 +472,7 @@ class GradeEntry {
             $v = strtolower($v);
             while ($v !== "") {
                 if (!preg_match('/\A((?:\d+\.?|\.\d)\d*)\s*([hdwms])\s*(?=[\d.]|\z)(.*)\z/', $v, $m)) {
-                    return false;
+                    return new GradeError("Invalid duration.");
                 }
                 if ($m[2] === "s") {
                     $mul = 1;
@@ -489,7 +486,7 @@ class GradeEntry {
                     $mul = 86400 * 7;
                 }
                 if ($lastmul >= $mul) {
-                    return false;
+                    return new GradeError("Invalid duration.");
                 }
                 $lastmul = $mul;
                 $d += floatval($m[1]) * $mul;
@@ -503,8 +500,7 @@ class GradeEntry {
     /** @param bool $isnew */
     function parse_value($v, $isnew) {
         if ($this->type === "formula") {
-            $this->_last_error = "Formula grades cannot be edited.";
-            return false;
+            return new GradeError("Formula grades cannot be edited.");
         }
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
@@ -516,34 +512,18 @@ class GradeEntry {
             } else if ($this->type === "shorttext") {
                 return $isnew ? self::parse_shorttext_value($v) : $v;
             } else if ($this->type === "timermark") {
-                $v = self::parse_timermark_value($v, $isnew);
-                if ($v === false) {
-                    $this->_last_error = "Invalid timermark.";
-                }
-                return $v;
+                return self::parse_timermark_value($v, $isnew);
             } else if ($this->type === "select") {
                 return $this->parse_select_value($v);
             } else if ($this->type === "letter") {
-                $v = self::parse_letter_value($v);
-                if ($v === false) {
-                    $this->_last_error = "Invalid letter grade.";
-                }
-                return $v;
+                return self::parse_letter_value($v);
             } else if ($this->type === "duration") {
-                $v = self::parse_duration_value($v);
-                if ($v === false) {
-                    $this->_last_error = "Invalid duration.";
-                }
-                return $v;
+                return self::parse_duration_value($v);
             } else {
-                $v = self::parse_numeric_value($v);
-                if ($v !== false) {
-                    return $v;
-                }
+                return self::parse_numeric_value($v);
             }
         }
-        $this->_last_error = $this->type === null ? "Number expected." : "Invalid grade.";
-        return false;
+        return new GradeError("Invalid grade.");
     }
 
     function unparse_value($v) {
@@ -554,11 +534,6 @@ class GradeEntry {
         } else {
             return $v;
         }
-    }
-
-    /** @return string */
-    function parse_value_error() {
-        return $this->_last_error;
     }
 
     /** @return bool */
@@ -576,24 +551,20 @@ class GradeEntry {
         }
     }
 
-    /** @return bool */
+    /** @return true|GradeError */
     function allow_edit($newv, $oldv, $autov, PsetView $info) {
         if (!$this->value_differs($newv, $oldv)) {
             return true;
         } else if ($this->disabled) {
-            $this->_last_error = "Cannot modify grade.";
-            return false;
+            return new GradeError("Cannot modify grade.");
         } else if ($info->pc_view) {
             return true;
         } else if ($this->visible === false || !$this->answer) {
-            $this->_last_error = "Cannot modify grade.";
-            return false;
+            return new GradeError("Cannot modify grade.");
         } else if ($this->pset->frozen) {
-            $this->_last_error = "You can’t edit your answers further.";
-            return false;
+            return new GradeError("You can’t edit your answers further.");
         } else if ($this->type === "timermark" && $oldv) {
-            $this->_last_error = "Time already started.";
-            return false;
+            return new GradeError("Time already started.");
         } else {
             return true;
         }
@@ -717,5 +688,15 @@ class GradeEntry {
             $gej["description"] = $this->description;
         }
         return $gej;
+    }
+}
+
+class GradeError {
+    /** @var string */
+    public $message;
+
+    /** @param ?string $m */
+    function __construct($m = null) {
+        $this->message = $m ?? "Invalid grade.";
     }
 }

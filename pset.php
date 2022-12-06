@@ -198,9 +198,11 @@ class PsetRequest {
         }
         $grades = [];
         foreach ($this->pset->grades() as $ge) {
-            if (isset($values[$ge->key])
-                && ($g = $ge->parse_value($values[$ge->key], !$isauto)) !== false) {
-                $grades[$ge->key] = $g;
+            if (isset($values[$ge->key])) {
+                $v = $ge->parse_value($values[$ge->key], !$isauto);
+                if (!($v instanceof GradeError)) {
+                    $grades[$ge->key] = $v;
+                }
             }
         }
         $updates = [($isauto ? "autogrades" : "grades") => $grades];
