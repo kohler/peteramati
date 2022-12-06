@@ -130,7 +130,7 @@ class RunLogger {
      * @return \Generator<RunResponse> */
     function completed_responses(RunnerConfig $runner = null, $hash = null) {
         $n = 0;
-        $envts = $runner ? $runner->environment_timestamp() : 0;
+        $envts = $runner ? $runner->rerun_timestamp() : 0;
         foreach ($this->past_jobs() as $t) {
             if ($t > $envts
                 && ($rr = $this->job_response($t))

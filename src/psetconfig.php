@@ -1246,6 +1246,8 @@ class RunnerConfig {
     public $queue;
     /** @var ?int */
     public $nconcurrent;
+    /** @var ?int */
+    public $rerun_timestamp;
     /** @var ?bool */
     public $xterm_js;
     /** @var int */
@@ -1303,6 +1305,14 @@ class RunnerConfig {
         $this->display_visible = Pset::cdate_or_grades($loc, $rs, "display_visible");
         $this->timeout = Pset::cinterval($loc, $rs, "timeout", "run_timeout");
         $this->idle_timeout = Pset::cinterval($loc, $rs, "idle_timeout");
+        if (isset($r->rerun_timestamp)) {
+            if ($r->rerun_timestamp === false) {
+                $this->rerun_timestamp = 0;
+            } else if ($r->rerun_timestamp !== true) {
+                $this->rerun_timestamp = Pset::cdate($loc, $rs, "rerun_timestamp");
+            }
+        }
+
         $this->xterm_js = Pset::cbool($loc, $rs, "xterm_js");
         $this->rows = Pset::cint($loc, $rs, "rows") ?? 0;
         $this->columns = Pset::cint($loc, $rs, "columns") ?? 0;
@@ -1390,13 +1400,15 @@ class RunnerConfig {
     }
 
     /** @return int */
-    function environment_timestamp() {
-        $t = 0;
-        if (($f = $this->jailfiles())) {
-            $t = max($t, (int) @filemtime($f));
-        }
-        foreach ($this->overlay() as $r) {
-            $t = max($t, (int) @filemtime($r->file));
+    function rerun_timestamp() {
+        if ($this->rerun_timestamp === null) {
+            $this->rerun_timestamp = 0;
+            if (($f = $this->jailfiles())) {
+                $this->rerun_timestamp = max($this->rerun_timestamp, (int) @filemtime($f));
+            }
+            foreach ($this->overlay() as $r) {
+                $this->rerun_timestamp = max($this->rerun_timestamp, (int) @filemtime($r->file));
+            }
         }
         return $t;
     }
