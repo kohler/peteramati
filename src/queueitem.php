@@ -699,8 +699,7 @@ class QueueItem {
         if ($this->status === self::STATUS_SCHEDULED
             && $this->ifneeded !== 0
             && ($rr = $this->compatible_response())
-            && ($this->ifneeded === 1
-                || $this->count_compatible_responses() >= $this->ifneeded)) {
+            && $this->count_compatible_responses(false, $this->ifneeded) >= $this->ifneeded) {
             $this->swap_status(self::STATUS_DONE, ["runat" => $rr->timestamp]);
             if ($this->status >= self::STATUS_CANCELLED) {
                 return true;
