@@ -4,14 +4,37 @@
 // See LICENSE for open-source distribution terms
 
 class Grade_API {
-    /** @param array<string,string> &$errf
-     * @param bool $isnew
+    /** @var array<string,true|string> */
+    public $errf = [];
+    /** @var bool */
+    public $diff = false;
+
+
+    /** @param array<string,string> $j
+     * @return array<string,mixed> */
+    function error_json($j = []) {
+        assert(!empty($this->errf));
+        $j["ok"] = false;
+        if (isset($this->errf["!invalid"])) {
+            $j["error"] = "Invalid request.";
+        } else {
+            if (count($this->errf) === 1) {
+                $j["error"] = (array_values($this->errf))[0];
+            } else {
+                $j["error"] = "Invalid grades.";
+            }
+            $j["errf"] = $this->errf;
+        }
+        return $j;
+    }
+
+    /** @param bool $isnew
      * @return array */
-    static private function parse_full_grades(PsetView $info, $x, &$errf, $isnew) {
+    private function parse_full_grades(PsetView $info, $x, $isnew) {
         if (is_string($x)) {
             $x = json_decode($x, true);
             if (!is_array($x)) {
-                $errf["!invalid"] = true;
+                $this->errf["!invalid"] = true;
                 return [];
             }
         } else if (is_object($x)) {
@@ -22,18 +45,16 @@ class Grade_API {
         foreach ($x as $k => &$v) {
             if (($ge = $info->gradelike_by_key($k))) {
                 $v = $ge->parse_value($v, $isnew);
-                if ($v === false && !isset($errf[$k])) {
-                    $errf[$k] = $ge->parse_value_error();
+                if ($v === false && !isset($this->errf[$k])) {
+                    $this->errf[$k] = $ge->parse_value_error();
                 }
             }
         }
         return $x;
     }
 
-    /** @param PsetView $info
-     * @param array<string,string> &$errf
-     * @param bool &$diff */
-    static private function apply_grades($info, $g, $ag, $og, &$errf, &$diff) {
+    /** @param PsetView $info */
+    private function apply_grades($info, $g, $ag, $og) {
         $v = [];
         foreach ($info->pset->grades() as $ge) {
             $k = $ge->key;
@@ -42,7 +63,7 @@ class Grade_API {
                 if ($ge->value_differs($oldgv, $og[$k])
                     && (!array_key_exists($k, $g)
                         || $ge->value_differs($oldgv, $g[$k]))) {
-                    $errf[$k] = "Edit conflict.";
+                    $this->errf[$k] = "Edit conflict.";
                 }
             }
             $has_agv = false;
@@ -64,9 +85,9 @@ class Grade_API {
                     if ($ge->answer) {
                         $v["linenotes"]["/g/{$ge->key}"] = null;
                     }
-                    $diff = $diff || $ge->value_differs($gv, $oldgv);
+                    $this->diff = $this->diff || $ge->value_differs($gv, $oldgv);
                 } else {
-                    $errf[$k] = $ge->parse_value_error();
+                    $this->errf[$k] = $ge->parse_value_error();
                 }
             }
         }
@@ -80,7 +101,7 @@ class Grade_API {
                 && ($ogv = GradeEntry::parse_numeric_value($og["late_hours"])) !== null
                 && $ogv !== false
                 && abs($ogv - $lh) >= 0.0001) {
-                $errf["late_hours"] = true;
+                $this->errf["late_hours"] = true;
             } else if ($gv === null
                        || abs($gv - $alh) < 0.0001) {
                 $v["late_hours"] = null;
@@ -97,7 +118,7 @@ class Grade_API {
             return $err;
         }
         $known_entries = $qreq->knowngrades ? explode(" ", $qreq->knowngrades) : null;
-        $diff = false;
+        $gapi = new Grade_API;
         // XXX match commit with grading commit
         if ($qreq->is_post()) {
             if (!$qreq->valid_post()) {
@@ -111,27 +132,17 @@ class Grade_API {
             }
 
             // parse grade elements
-            $errf = [];
-            $g = self::parse_full_grades($info, $qreq->get_a("grades"), $errf, true);
-            $ag = self::parse_full_grades($info, $qreq->get_a("autogrades"), $errf, false);
-            $og = self::parse_full_grades($info, $qreq->get_a("oldgrades"), $errf, false);
-            if (!empty($errf)) {
-                if (isset($errf["!invalid"])) {
-                    return ["ok" => false, "error" => "Invalid request."];
-                } else {
-                    reset($errf);
-                    return ["ok" => false, "error" => (count($errf) === 1 ? current($errf) : "Invalid grades."), "errf" => $errf];
-                }
+            $g = $gapi->parse_full_grades($info, $qreq->get_a("grades"), true);
+            $ag = $gapi->parse_full_grades($info, $qreq->get_a("autogrades"), false);
+            $og = $gapi->parse_full_grades($info, $qreq->get_a("oldgrades"), false);
+            if (!empty($gapi->errf)) {
+                return $gapi->error_json();
             }
 
             // assign grades
-            $v = self::apply_grades($info, $g, $ag, $og, $errf, $diff);
-            if (!empty($errf)) {
-                $j = (array) $info->grade_json(0, $known_entries);
-                $j["ok"] = false;
-                reset($errf);
-                $j["error"] = current($errf);
-                return $j;
+            $v = $gapi->apply_grades($info, $g, $ag, $og);
+            if (!empty($gapi->errf)) {
+                return $gapi->error_json((array) $info->grade_json(0, $known_entries));
             } else if (!empty($v)) {
                 $info->update_grade_notes($v);
             }
@@ -140,7 +151,7 @@ class Grade_API {
         }
         $j = (array) $info->grade_json(0, $known_entries);
         $j["ok"] = true;
-        if ($diff
+        if ($gapi->diff
             && !$info->pc_view
             && ($to = $info->timermark_timeout(null))
             && $to < Conf::$now) {
@@ -262,29 +273,24 @@ class Grade_API {
         $jx["ok"] = true;
         if ($qreq->is_post()) {
             // parse grade elements
-            $g = $ag = $og = $errf = [];
+            $g = $ag = $og = [];
+            $gapi = new Grade_API;
             foreach ($sset as $uid => $info) {
                 $gx = $ugs[$uid];
-                $g[$uid] = self::parse_full_grades($info, $gx->grades ?? null, $errf, true);
-                $ag[$uid] = self::parse_full_grades($info, $gx->autogrades ?? null, $errf, false);
-                $og[$uid] = self::parse_full_grades($info, $gx->oldgrades ?? null, $errf, false);
+                $g[$uid] = $gapi->parse_full_grades($info, $gx->grades ?? null, true);
+                $ag[$uid] = $gapi->parse_full_grades($info, $gx->autogrades ?? null, false);
+                $og[$uid] = $gapi->parse_full_grades($info, $gx->oldgrades ?? null, false);
             }
-            if (!empty($errf)) {
-                reset($errf);
-                if (isset($errf["!invalid"])) {
-                    return ["ok" => false, "error" => "Invalid request."];
-                } else {
-                    return ["ok" => false, "error" => (count($errf) === 1 ? current($errf) : "Invalid grades."), "errf" => $errf];
-                }
+            if (!empty($gapi->errf)) {
+                return $gapi->error_json();
             }
 
             // assign grades
             $v = [];
-            $diff = false;
             foreach ($ugs as $uid => $gx) {
-                $v[$uid] = self::apply_grades($sset[$uid], $g[$uid], $ag[$uid], $og[$uid], $errf, $diff);
+                $v[$uid] = $gapi->apply_grades($sset[$uid], $g[$uid], $ag[$uid], $og[$uid]);
             }
-            if (!empty($errf)) {
+            if (!empty($gapi->errf)) {
                 $jx["ok"] = false;
                 $jx["error"] = "Grade edit conflict, your update was ignored.";
             } else {
