@@ -1410,7 +1410,7 @@ class RunnerConfig {
                 $this->rerun_timestamp = max($this->rerun_timestamp, (int) @filemtime($r->file));
             }
         }
-        return $t;
+        return $this->rerun_timestamp;
     }
 }
 
