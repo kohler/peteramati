@@ -905,14 +905,11 @@ class Repository {
 
         $repodir = $truncpfx = "";
         if ($pset->directory_noslash !== "") {
-            $psetdir = escapeshellarg($pset->directory_noslash);
             if ($this->truncated_psetdir($pset)) {
                 $truncpfx = $pset->directory_noslash . "/";
             } else {
-                $repodir = $psetdir . "/";
+                $repodir = $pset->directory_noslash . "/";
             }
-        } else {
-            $psetdir = null;
         }
 
         $hasha = $commita->hash;
