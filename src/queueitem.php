@@ -444,11 +444,8 @@ class QueueItem {
                 return false;
             }
         }
-        if (($this->runsettings !== null
-             || $rr->settings !== null)
-            && ($this->runsettings === null
-                || $rr->settings === null
-                || json_encode_db($this->runsettings) !== json_encode_db($rr->settings))) {
+        if ((!empty($this->runsettings) || !empty($rr->settings))
+            && json_encode_db($this->runsettings) !== json_encode_db($rr->settings)) {
             if ($verbose) {
                 error_log("{$rr->timestamp}: incompatible settings, " . json_encode_db($rr->settings) . " vs. " . json_encode_db($this->runsettings));
             }

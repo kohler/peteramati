@@ -104,7 +104,7 @@ class RunEnqueue_Batch {
         $sset->set_pset($this->pset);
         $nu = 0;
         $chain = $this->chainid ?? QueueItem::new_chain();
-        $chainstr = $this->chainid ? " C{$this->chainid}" : "";
+        $chainstr = $chain ? " C{$chain}" : "";
         foreach ($sset as $info) {
             if (!$info->repo) {
                 continue;
