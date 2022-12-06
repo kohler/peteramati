@@ -201,6 +201,9 @@ class PsetRequest {
             if (isset($values[$ge->key])) {
                 $v = $ge->parse_value($values[$ge->key], !$isauto);
                 if (!($v instanceof GradeError)) {
+                    if ($v === false && $isauto) {
+                        $v = null;
+                    }
                     $grades[$ge->key] = $v;
                 }
             }

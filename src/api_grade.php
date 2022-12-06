@@ -80,9 +80,17 @@ class Grade_API {
                     && isset($notes->autogrades)) {
                     $agv = $notes->autogrades->$k ?? null;
                 }
+                if ($agv === false) {
+                    $agv = null;
+                }
+                if ($gv === null) {
+                    $gv = $agv;
+                } else if ($gv === false && $agv === null) {
+                    $gv = null;
+                }
                 $allowed = $ge->allow_edit($gv, $oldgv, $agv, $info);
                 if ($allowed === true) {
-                    $v["grades"][$k] = $gv ?? (isset($agv) ? false : null);
+                    $v["grades"][$k] = $gv;
                     if ($ge->answer) {
                         $v["linenotes"]["/g/{$ge->key}"] = null;
                     }

@@ -370,7 +370,7 @@ class GradeEntry {
     }
 
     /** @param string $v
-     * @return ?string */
+     * @return false|string */
     static function parse_text_value($v) {
         $l = $d = strlen($v);
         if ($l > 0 && $v[$l - 1] === "\n") {
@@ -380,7 +380,7 @@ class GradeEntry {
             --$l;
         }
         if ($l === 0) {
-            return null;
+            return false;
         } else if ($l === $d) {
             return $v;
         } else {
@@ -389,18 +389,19 @@ class GradeEntry {
     }
 
     /** @param string $v
-     * @return ?string */
+     * @return false|string */
     static function parse_shorttext_value($v) {
-        return rtrim($v);
+        $v = rtrim($v);
+        return $v === "" ? false : $v;
     }
 
     /** @param string $v
      * @param bool $isnew
-     * @return null|int|GradeError */
+     * @return false|int|GradeError */
     static function parse_timermark_value($v, $isnew) {
         $v = trim($v);
         if ($v === "" || $v === "0") {
-            return null;
+            return false;
         } else if ($isnew || $v === "now") {
             return Conf::$now;
         } else if (ctype_digit($v)) {
@@ -411,10 +412,10 @@ class GradeEntry {
     }
 
     /** @param string $v
-     * @return null|string|GradeError */
+     * @return false|string|GradeError */
     function parse_select_value($v) {
         if ($v === "" || strcasecmp($v, "none") === 0) {
-            return null;
+            return false;
         } else if (in_array((string) $v, $this->options)) {
             return $v;
         } else {
@@ -423,49 +424,65 @@ class GradeEntry {
     }
 
     /** @param string $v
-     * @return null|int|float|GradeError */
+     * @return null|false|int|float|GradeError */
     static function parse_letter_value($v) {
         $v = trim($v);
         if ($v === "") {
-            return null;
+            return false;
         } else if (isset(self::$letter_map[strtoupper($v)])) {
             return self::$letter_map[strtoupper($v)];
         } else if (preg_match('/\A[-+]?\d+\z/', $v)) {
             return intval($v);
         } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
             return floatval($v);
+        } else if (strcasecmp($v, "none") === 0) {
+            return false;
+        } else if (strcasecmp($v, "auto") === 0) {
+            return null;
         } else {
             return new GradeError("Invalid letter grade.");
         }
     }
 
     /** @param null|int|float|string $v
-     * @return null|int|float|GradeError */
+     * @return null|false|int|float|GradeError */
     static function parse_numeric_value($v) {
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
-        } else if (($v = trim($v)) === "") {
-            return null;
+        }
+        $v = trim($v);
+        if ($v === "") {
+            return false;
         } else if (preg_match('/\A[-+]?\d+\z/', $v)) {
             return intval($v);
         } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
             return floatval($v);
+        } else if (strcasecmp($v, "none") === 0) {
+            return false;
+        } else if (strcasecmp($v, "auto") === 0) {
+            return null;
         } else {
             return new GradeError("Number expected.");
         }
     }
 
     /** @param null|int|float|string $v
-     * @return null|int|float|GradeError */
+     * @return null|false|int|float|GradeError */
     static function parse_duration_value($v) {
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
-        } else if (($v = trim($v)) === "") {
-            return null;
+        }
+        $v = trim($v);
+        if ($v === "") {
+            return false;
         } else if (preg_match('/\A[-+]?\d+\z/', $v)) {
             return intval($v);
         } else if (preg_match('/\A[-+]?(?:\d+\.|\.\d)\d*\z/', $v)) {
             return floatval($v);
+        } else if (strcasecmp($v, "none") === 0) {
+            return false;
+        } else if (strcasecmp($v, "auto") === 0) {
+            return null;
         } else {
             $d = 0;
             $lastmul = 0;
@@ -527,6 +544,9 @@ class GradeEntry {
     }
 
     function unparse_value($v) {
+        if ($v === false) {
+            $v = null;
+        }
         if ($this->type === "letter"
             && $v !== null
             && ($k = array_search($v, self::$letter_map))) {
@@ -538,12 +558,14 @@ class GradeEntry {
 
     /** @return bool */
     function value_differs($v1, $v2) {
+        $v1 = $v1 ?? false;
+        $v2 = $v2 ?? false;
         if (in_array($this->type, ["checkbox", "checkboxes", "stars", "timermark"])
             && (int) $v1 === 0
             && (int) $v2 === 0) {
             return false;
-        } else if ($v1 === null
-                   || $v2 === null
+        } else if ($v1 === false
+                   || $v2 === false
                    || !$this->type_numeric) {
             return $v1 !== $v2;
         } else {
