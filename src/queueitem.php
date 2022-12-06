@@ -432,18 +432,26 @@ class QueueItem {
 
 
     /** @param RunResponse $rr
+     * @param bool $verbose
      * @return bool */
-    private function is_compatible($rr) {
+    private function is_compatible($rr, $verbose = false) {
         // assumes it’s in completed_responses()
         foreach ($this->tags ?? [] as $t) {
-            if (!$rr->has_tag($t))
+            if (!$rr->has_tag($t)) {
+                if ($verbose) {
+                    error_log("{$rr->timestamp}: incompatible, lacks tag {$t}");
+                }
                 return false;
+            }
         }
         if (($this->runsettings !== null
              || $rr->settings !== null)
             && ($this->runsettings === null
                 || $rr->settings === null
                 || json_encode_db($this->runsettings) !== json_encode_db($rr->settings))) {
+            if ($verbose) {
+                error_log("{$rr->timestamp}: incompatible settings, " . json_encode_db($rr->settings) . " vs. " . json_encode_db($this->runsettings));
+            }
             return false;
         }
         return true;
@@ -463,15 +471,22 @@ class QueueItem {
         return null;
     }
 
-    /** @return int */
-    function count_compatible_responses() {
+    /** @param bool $verbose
+     * @param ?int $max
+     * @return int */
+    function count_compatible_responses($verbose = false, $max = null) {
+        $max = $max ?? PHP_INT_MAX;
         $info = $this->info();
         $runner = $this->runner();
+        if (!$info || !$runner || $max <= 0) {
+            return 0;
+        }
         $n = 0;
-        if ($info && $runner) {
-            foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
-                if ($this->is_compatible($rr)) {
-                    ++$n;
+        foreach ($info->run_logger()->completed_responses($runner, $info->hash()) as $rr) {
+            if ($this->is_compatible($rr, $verbose)) {
+                ++$n;
+                if ($n === $max) {
+                    return $n;
                 }
             }
         }

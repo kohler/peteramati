@@ -130,15 +130,13 @@ class RunEnqueue_Batch {
             foreach ($this->runsettings ?? [] as $k => $v) {
                 $qi->runsettings[$k] = $v;
             }
-            if ($this->if_needed === 0
-                || !$qi->compatible_response()
-                || ($this->if_needed > 1 && $qi->count_compatible_responses() < $this->if_needed)) {
+            if ($qi->count_compatible_responses($this->verbose, $this->if_needed) < $this->if_needed) {
                 $qi->enqueue();
                 if (!$qi->chain) {
                     $qi->schedule($nu);
                 }
                 if ($this->verbose) {
-                    fwrite(STDERR, $qi->unparse_key() . ": create{$chainstr}\n");
+                    fwrite(STDERR, "#{$qi->queueid} " . $qi->unparse_key() . ": create{$chainstr}\n");
                 }
                 ++$nu;
             }
