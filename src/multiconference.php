@@ -158,7 +158,7 @@ class Multiconference {
                 $e = ($i ? "<div class=\"hint\">" : "<p>") . htmlspecialchars($e) . ($i ? "</div>" : "</p>");
             }
             echo join("", $errors);
-            Conf::$main->footer();
+            Qrequest::$main_request->print_footer();
         }
         exit;
     }

@@ -329,11 +329,10 @@ class MailSender {
         $nrows_left = $result->num_rows;
         $nwarnings = 0;
         $preperrors = array();
-        while (($row = $result->fetch_object())) {
+        while (($contact = Contact::fetch($result, $Conf))) {
             ++$nrows_done;
 
-            $contact = new Contact($row);
-            $mailer->reset($contact, $row, $rest);
+            $mailer->reset($contact, $contact, $rest);
             $prep = $mailer->make_preparation($template, $rest);
 
             if (@$prep->errors) {
@@ -375,7 +374,7 @@ class MailSender {
             $this->echo_actions();
         echo "</form>";
         echo Ht::unstash_script("\$pa.fold('mail', null);");
-        $Conf->footer();
+        $Qreq->print_footer();
         exit;
     }
 
@@ -600,4 +599,4 @@ echo "<div class='aa' style='clear:both'>\n",
 
 </div></form>\n";
 
-$Conf->footer();
+$Qreq->print_footer();

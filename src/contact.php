@@ -24,14 +24,23 @@ class Contact {
     /** The base authenticated user when "acting as"; otherwise null.
      * @var ?Contact */
     static public $base_auth_user;
+    /** @var int */
+    static public $next_xid = -2;
+    /** @var ?list<string> */
+    static public $session_users;
     /** @var bool */
     static public $allow_nonexistent_properties = false;
 
-    public $contactId = 0;
-    public $contactDbId = 0;
-    private $cid;               // for forward compatibility
     /** @var Conf */
     public $conf;
+
+    /** @var int */
+    public $contactId = 0;
+    /** @var int */
+    public $contactDbId = 0;
+    /** @var int */
+    public $contactXid = 0;
+    private $cid;               // for forward compatibility
     /** @var StudentSet */
     public $student_set;
 
@@ -109,144 +118,82 @@ class Contact {
     const ROLE_ADMIN = 2;
     const ROLE_CHAIR = 4;
     const ROLE_PCLIKE = 15;
-    public $_root_user = false;
+    /** @var int */
     public $roles = 0;
+    /** @var bool */
     public $isPC = false;
+    /** @var bool */
     public $privChair = false;
+    /** @var bool */
+    public $_root_user = false;
     public $contactTags = null;
     const CAP_AUTHORVIEW = 1;
     private $capabilities = null;
-    private $activated_ = false;
+
+    // $_activated values: 0: no, 1: yes; 2: is actas; 4: is token
+    /** @var int */
+    private $_activated = 0;
+    // $_admin_base_user: base authenticated user in case of actas
+    /** @var ?Contact */
+    private $_admin_base_user;
+    // defaults for hoturl
+    /** @var ?array<string,string> */
+    private $_hoturl_defaults;
 
     static private $contactdb_dblink = false;
     static private $active_forceShow = false;
 
 
-    function __construct($trueuser = null, Conf $conf = null) {
-        global $Conf;
-        $this->conf = $conf ?? $Conf;
-        if ($trueuser) {
-            $this->merge($trueuser);
-        } else if ($this->contactId || $this->contactDbId) {
-            $this->db_load();
-        }
+    /** @param Conf $conf */
+    private function __construct($conf) {
+        $this->conf = $conf;
     }
 
-    /** @return ?Contact */
-    static function fetch($result, Conf $conf) {
-        $user = $result ? $result->fetch_object("Contact", [null, $conf]) : null;
-        if ($user && !is_int($user->contactId)) {
-            $user->conf = $conf;
-            $user->db_load();
-        }
-        return $user;
+    /** @return Contact */
+    static function make(Conf $conf) {
+        $u = new Contact($conf);
+        $u->set_roles_properties();
+        $u->contactXid = self::$next_xid--;
+        return $u;
+    }
+
+    /** @param ?string $email
+     * @return Contact */
+    static function make_email(Conf $conf, $email) {
+        $u = new Contact($conf);
+        $u->email = $email ?? "";
+        $u->set_roles_properties();
+        $u->contactXid = self::$next_xid--;
+        return $u;
     }
 
     /** @param array{email?:string,firstName?:string,lastName?:string} $args
      * @return Contact */
     static function make_site_contact(Conf $conf, $args) {
-        $u = new Contact(null, $conf);
+        $u = new Contact($conf);
         $u->email = $args["email"] ?? "";
         $u->firstName = $args["firstName"] ?? "";
         $u->lastName = $args["lastName"] ?? "";
-        $u->assign_roles(self::ROLE_PC | self::ROLE_CHAIR);
+        $u->roles = self::ROLE_PC | self::ROLE_CHAIR;
         $u->_root_user = true;
+        $u->set_roles_properties();
+        $u->contactXid = self::$next_xid--;
         return $u;
     }
 
-    private function merge($user) {
-        if (is_array($user))
-            $user = (object) $user;
-        if (!isset($user->dsn) || $user->dsn == $this->conf->dsn) {
-            if (isset($user->contactId)) {
-                $this->contactId = $this->cid = (int) $user->contactId;
-            }
-            //else if (isset($user->cid))
-            //    $this->contactId = $this->cid = (int) $user->cid;
+    /** @param mysqli_result|Dbl_Result $result
+     * @return ?Contact */
+    static function fetch($result, Conf $conf) {
+        if (($u = $result->fetch_object("Contact", [$conf]))) {
+            $u->conf = $conf;
+            $u->fetch_incorporate();
+            $u->set_roles_properties();
+            $u->contactXid = $u->contactId ? : self::$next_xid--;
         }
-        if (isset($user->contactDbId)) {
-            $this->contactDbId = (int) $user->contactDbId;
-        }
-        if (isset($user->firstName) && isset($user->lastName)) {
-            $name = $user;
-        } else {
-            $name = Text::analyze_name($user);
-        }
-        $this->firstName = $name->firstName ?? "";
-        $this->lastName = $name->lastName ?? "";
-        $this->nickname = $name->nickname ?? "";
-        if (isset($user->unaccentedName)) {
-            $this->unaccentedName = $user->unaccentedName;
-        } else if (isset($name->unaccentedName)) {
-            $this->unaccentedName = $name->unaccentedName;
-        } else {
-            $this->unaccentedName = Text::unaccented_name($name);
-        }
-        foreach (["email", "preferredEmail", "affiliation"] as $k) {
-            if (isset($user->$k))
-                $this->$k = simplify_whitespace($user->$k);
-        }
-        if (isset($user->collaborators)) {
-            $this->collaborators = "";
-            foreach (preg_split('/[\r\n]+/', $user->collaborators) as $c) {
-                if (($c = simplify_whitespace($c)) !== "")
-                    $this->collaborators .= "$c\n";
-            }
-        }
-        if (isset($user->password)) {
-            $this->password = (string) $user->password;
-        }
-        if (isset($user->disabled)) {
-            $this->disabled = !!$user->disabled;
-        }
-        foreach (["defaultWatch", "passwordTime", "passwordUseTime",
-                  "updateTime", "creationTime", "gradeUpdateTime"] as $k) {
-            if (isset($user->$k))
-                $this->$k = (int) $user->$k;
-        }
-        if (property_exists($user, "contactTags")) {
-            $this->contactTags = $user->contactTags;
-        } else {
-            $this->contactTags = false;
-        }
-        if (isset($user->activity_at)) {
-            $this->activity_at = (int) $user->activity_at;
-        } else if (isset($user->lastLogin)) {
-            $this->activity_at = (int) $user->lastLogin;
-        }
-        if (isset($user->extension)) {
-            $this->extension = !!$user->extension;
-        }
-        if (isset($user->dropped)) {
-            $this->dropped = (int) $user->dropped;
-        }
-        if (isset($user->github_username)) {
-            $this->github_username = $user->github_username;
-        }
-        if (isset($user->anon_username)) {
-            $this->anon_username = $user->anon_username;
-        }
-        if (isset($user->contactImageId)) {
-            $this->contactImageId = (int) $user->contactImageId;
-        }
-        if (isset($user->roles) || isset($user->isPC) || isset($user->isAssistant)
-            || isset($user->isChair)) {
-            $roles = (int) ($user->roles ?? 0);
-            if ($user->isPC ?? false) {
-                $roles |= self::ROLE_PC;
-            }
-            if ($user->isAssistant ?? false) {
-                $roles |= self::ROLE_ADMIN;
-            }
-            if ($user->isChair ?? false) {
-                $roles |= self::ROLE_CHAIR;
-            }
-            $this->assign_roles($roles);
-        }
-        $this->username = $this->github_username;
+        return $u;
     }
 
-    private function db_load() {
+    private function fetch_incorporate() {
         $this->contactId = $this->cid = (int) $this->contactId;
         $this->contactDbId = (int) $this->contactDbId;
         if ($this->unaccentedName === "") {
@@ -277,6 +224,11 @@ class Contact {
             $this->assign_roles((int) $this->roles);
         }
         $this->username = $this->github_username;
+    }
+
+    private function set_roles_properties() {
+        $this->isPC = ($this->roles & self::ROLE_PCLIKE) !== 0;
+        $this->privChair = ($this->roles & (self::ROLE_ADMIN | self::ROLE_CHAIR)) !== 0;
     }
 
     static function set_main_user(Contact $user = null) {
@@ -455,6 +407,32 @@ class Contact {
 
     // initialization
 
+    /** @param Qrequest $qreq
+     * @return list<string> */
+    static function session_users($qreq) {
+        if (isset(self::$session_users)) {
+            return self::$session_users;
+        } else if (($us = $qreq->gsession("us")) !== null) {
+            return $us;
+        } else if (($u = $qreq->gsession("u")) !== null) {
+            return [$u];
+        } else {
+            return [];
+        }
+    }
+
+    /** @param Qrequest $qreq
+     * @param string $email
+     * @return int */
+    static function session_user_index($qreq, $email) {
+        foreach (self::session_users($qreq) as $i => $u) {
+            if (strcasecmp($u, $email) === 0) {
+                return $i;
+            }
+        }
+        return -1;
+    }
+
     /** @return Contact */
     private function actas_user($x) {
         assert(!self::$base_auth_user || self::$base_auth_user === $this);
@@ -479,23 +457,22 @@ class Contact {
         return $u ?? $this;
     }
 
-    /** @return Contact */
+    /** @param Qrequest $qreq
+     * @return Contact */
     function activate($qreq, $signin = false) {
-        global $Qreq;
-        $qreq = $qreq ? : $Qreq;
-        $this->activated_ = true;
+        $this->_activated |= 1;
 
         // Handle actas requests
-        if ($qreq && $qreq->actas && $signin && $this->email) {
+        if ($qreq->actas && $signin && $this->email) {
             $actas = $qreq->actas;
             unset($qreq->actas, $_GET["actas"], $_POST["actas"]);
-            $actascontact = $this->actas_user($actas);
-            if ($actascontact !== $this) {
-                $this->conf->save_session("l", null);
-                Conf::$hoturl_defaults["actas"] = urlencode($actascontact->email);
-                $_SESSION["last_actas"] = $actascontact->email;
-                self::$base_auth_user = $this;
-                return $actascontact->activate($qreq);
+            $actasuser = $this->actas_user($actas);
+            if ($actasuser !== $this) {
+                $qreq->set_gsession("last_actas", $actasuser->email);
+                $actasuser->_activated |= 2;
+                $actasuser->_admin_base_user = $this;
+                $actasuser->_hoturl_defaults["actas"] = urlencode($actasuser->email);
+                return $actasuser->activate($qreq, true);
             }
         }
 
@@ -531,20 +508,29 @@ class Contact {
         return null;
     }
 
-
-    function session($name, $defval = null) {
-        return $this->conf->session($name, $defval);
-    }
-
-    function save_session($name, $value) {
-        $this->conf->save_session($name, $value);
+    /** @return array<string,string> -- Note that return values are urlencoded */
+    function hoturl_defaults() {
+        return $this->_hoturl_defaults ?? [];
     }
 
 
+
+    /** @return bool */
+    function is_actas_user() {
+        return ($this->_activated & 3) === 3;
+    }
+
+    /** @return Contact */
+    function base_user() {
+        return $this->_admin_base_user ?? $this;
+    }
+
+    /** @return bool */
     function is_empty() {
-        return $this->contactId <= 0 && !$this->capabilities && !$this->email;
+        return $this->contactId <= 0 && !$this->email && !$this->capabilities;
     }
 
+    /** @return bool */
     function owns_email($email) {
         return (string) $email !== "" && strcasecmp($email, $this->email) === 0;
     }
@@ -1081,15 +1067,6 @@ class Contact {
         return $old_roles != $new_roles;
     }
 
-    private function load_by_query($where) {
-        $result = $this->conf->q_raw("select ContactInfo.* from ContactInfo where $where");
-        if (($row = $result ? $result->fetch_object() : null)) {
-            $this->merge($row);
-        }
-        Dbl::free($result);
-        return !!$row;
-    }
-
     static function safe_registration($reg) {
         $safereg = (object) array();
         foreach (["email", "firstName", "lastName", "name", "preferredEmail",
@@ -1148,7 +1125,7 @@ class Contact {
             $cj->disabled = true;
         }
 
-        $acct = new Contact;
+        $acct = new Contact($conf);
         if ($acct->save_json($cj, null, $send)) {
             if ($Me && $Me->privChair) {
                 $type = $acct->disabled ? "disabled " : "";

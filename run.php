@@ -259,7 +259,7 @@ class RunRequest {
 
             Ht::stash_script("\$pa.runmany({$this->qreq->chain})");
             echo "<hr class=\"c\">\n";
-            $this->conf->footer();
+            $this->qreq->print_footer();
         } else if (!$this->qreq->valid_post()) {
             self::quit("Session out of date.");
         } else {

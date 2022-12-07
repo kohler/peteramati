@@ -14,7 +14,7 @@ $clientsecret = $Conf->opt("githubOAuthClientSecret");
 function error_exit($conf, $msg) {
     $conf->header("GitHub authorization", "home");
     $conf->errorMsg($msg);
-    $conf->footer();
+    Qrequest::$main_request->print_footer();
     exit;
 }
 

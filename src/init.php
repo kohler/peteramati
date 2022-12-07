@@ -3,6 +3,8 @@
 // HotCRP is Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
+const PA_VERSION = "0.6";
+
 const TAG_REGEX_NOTWIDDLE = '[a-zA-Z@*_:.][-+a-zA-Z0-9?!@*_:.\/]*';
 const TAG_MAXLEN = 40;
 
@@ -37,7 +39,7 @@ require_once(SiteLoader::find("lib/dbl.php"));
 require_once(SiteLoader::find("src/helpers.php"));
 require_once(SiteLoader::find("src/conference.php"));
 require_once(SiteLoader::find("src/contact.php"));
-Conf::set_current_time(time());
+Conf::set_current_time(microtime(true));
 if (PHP_SAPI === "cli") {
     set_exception_handler("Multiconference::batch_exception_handler");
     pcntl_signal(SIGPIPE, SIG_DFL);

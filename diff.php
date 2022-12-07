@@ -117,4 +117,4 @@ if ($diff) {
 
 Ht::stash_script('$(window).on("beforeunload",$pa.beforeunload)');
 echo "</div><hr class=\"c\" />\n";
-$Conf->footer();
+$Qreq->print_footer();

@@ -32,9 +32,9 @@ if (!isset($_REQUEST["email"]) || !isset($_REQUEST["action"])) {
 }
 // signout
 if (isset($_REQUEST["signout"])) {
-    $Me = LoginHelper::logout($Me, true);
+    $Me = LoginHelper::logout($Me, $Qreq, true);
 } else if (isset($_REQUEST["signin"]) && !$Conf->opt("httpAuthLogin")) {
-    $Me = LoginHelper::logout($Me, false);
+    $Me = LoginHelper::logout($Me, $Qreq, false);
 }
 // signin
 if ($Conf->opt("httpAuthLogin")) {
@@ -318,4 +318,4 @@ if (!$Me->is_empty() && $User->is_student()) {
 }
 
 echo "<div class='clear'></div>\n";
-$Conf->footer();
+$Qreq->print_footer();

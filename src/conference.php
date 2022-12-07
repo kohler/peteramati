@@ -104,7 +104,7 @@ class Conf {
      * @readonly */
     public $multiuser_page = false;
     /** @var bool */
-    private $_header_printed = false;
+    public $_header_printed = false;
     public $_session_handler;
     /** @var ?list<array{string,string}> */
     private $_save_msgs;
@@ -187,7 +187,6 @@ class Conf {
     /** @var float */
     static public $blocked_time = 0.0;
 
-    static public $hoturl_defaults = null;
     static public $next_xt_subposition = 0;
 
     const INVALID_TOKEN = "INVALID";
@@ -407,9 +406,9 @@ class Conf {
         if (is_string($this->opt["stylesheets"])) {
             $this->opt["stylesheets"] = [$this->opt["stylesheets"]];
         }
-        $this->opt["javascripts"] = $this->opt["javascripts"] ?? [];
-        if (is_string($this->opt["javascripts"])) {
-            $this->opt["javascripts"] = [$this->opt["javascripts"]];
+        $this->opt["scripts"] = $this->opt["scripts"] ?? $this->opt["javascripts"] ?? [];
+        if (is_string($this->opt["scripts"])) {
+            $this->opt["scripts"] = [$this->opt["scripts"]];
         }
 
         // set safePasswords
@@ -944,7 +943,7 @@ class Conf {
 
     /** @param string $email
      * @return ?Contact */
-    function user_by_email($email) {
+    function fresh_user_by_email($email) {
         $u = null;
         if (($email = trim((string) $email)) !== "") {
             $result = $this->qe("select * from ContactInfo where email=?", $email);
@@ -952,6 +951,12 @@ class Conf {
             Dbl::free($result);
         }
         return $u;
+    }
+
+    /** @param string $email
+     * @return ?Contact */
+    function user_by_email($email) {
+        return $this->fresh_user_by_email($email);
     }
 
     /** @return ?Contact */
@@ -1142,20 +1147,6 @@ class Conf {
 
 
     // session data
-
-    function session($name, $defval = null) {
-        if (isset($_SESSION[$this->session_key][$name]))
-            return $_SESSION[$this->session_key][$name];
-        else
-            return $defval;
-    }
-
-    function save_session($name, $value) {
-        if ($value !== null)
-            $_SESSION[$this->session_key][$name] = $value;
-        else
-            unset($_SESSION[$this->session_key][$name]);
-    }
 
     function capability_text($prow, $capType) {
         // A capability has the following representation (. is concatenation):
@@ -1627,54 +1618,70 @@ class Conf {
     const HOTURL_RAW = 1;
     const HOTURL_POST = 2;
     const HOTURL_ABSOLUTE = 4;
+    const HOTURL_SITEREL = 8;
     const HOTURL_SITE_RELATIVE = 8;
-    const HOTURL_NO_DEFAULTS = 16;
+    const HOTURL_SERVERREL = 16;
+    const HOTURL_NO_DEFAULTS = 32;
 
-    function hoturl($page, $param = null, $flags = 0) {
-        global $Me;
-        $nav = Navigation::get();
+    /** @param string $page
+     * @param null|string|array $params
+     * @param int $flags
+     * @return string */
+    function hoturl($page, $params = null, $flags = 0) {
+        $qreq = Qrequest::$main_request;
         $amp = ($flags & self::HOTURL_RAW ? "&" : "&amp;");
         if (str_starts_with($page, "=")) {
             $page = substr($page, 1);
             $flags |= self::HOTURL_POST;
         }
-        $t = $page . $nav->php_suffix;
+        $t = $page;
         $are = '/\A(|.*?(?:&|&amp;))';
         $zre = '(?:&(?:amp;)?|\z)(.*)\z/';
         // parse options, separate anchor
         $anchor = "";
-        if (is_array($param)) {
-            $x = "";
-            foreach ($param as $k => $v) {
+        $defaults = [];
+        if (($flags & self::HOTURL_NO_DEFAULTS) === 0
+            && $qreq
+            && $qreq->user()) {
+            $defaults = $qreq->user()->hoturl_defaults();
+        }
+        if (is_array($params)) {
+            $param = $sep = "";
+            foreach ($params as $k => $v) {
                 if ($v === null || $v === false) {
-                } else if ($k === "anchor") {
-                    $anchor = "#" . urlencode($v);
+                    continue;
+                }
+                $v = urlencode($v);
+                if ($k === "anchor" /* XXX deprecated */ || $k === "#") {
+                    $anchor = "#{$v}";
                 } else {
-                    $x .= ($x === "" ? "" : $amp) . $k . "=" . urlencode($v);
+                    $param .= "{$sep}{$k}={$v}";
+                    $sep = $amp;
                 }
             }
-            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
-                foreach (Conf::$hoturl_defaults as $k => $v) {
-                    if (!array_key_exists($k, $param))
-                        $x .= ($x === "" ? "" : $amp) . $k . "=" . $v;
+            foreach ($defaults as $k => $v) {
+                if (!array_key_exists($k, $params)) {
+                    $param .= "{$sep}{$k}={$v}";
+                    $sep = $amp;
                 }
             }
-            $param = $x;
         } else {
-            $param = (string) $param;
+            $param = (string) $params;
             if (($pos = strpos($param, "#"))) {
                 $anchor = substr($param, $pos);
                 $param = substr($param, 0, $pos);
             }
-            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
-                foreach (Conf::$hoturl_defaults as $k => $v) {
-                    if (!preg_match($are . preg_quote($k) . '=/', $param))
-                        $param .= ($param === "" ? "" : $amp) . $k . "=" . $v;
+            $sep = $param === "" ? "" : $amp;
+            foreach ($defaults as $k => $v) {
+                if (!preg_match($are . preg_quote($k) . '=/', $param)) {
+                    $param .= "{$sep}{$k}={$v}";
+                    $sep = $amp;
                 }
             }
         }
         if ($flags & self::HOTURL_POST) {
-            $param .= ($param === "" ? "" : $amp) . "post=" . post_value();
+            $param .= "{$sep}post=" . $qreq->post_value();
+            $sep = $amp;
         }
         // create slash-based URLs if appropriate
         if ($param) {
@@ -1717,14 +1724,34 @@ class Conf {
             }
             $param = preg_replace('/&(?:amp;)?\z/', "", $param);
         }
-        if ($param !== "" && preg_match('/\A&(?:amp;)?(.*)\z/', $param, $m))
+        $nav = $qreq ? $qreq->navigation() : Navigation::get();
+        if ($nav->php_suffix !== "") {
+            if (($slash = strpos($t, "/")) !== false) {
+                $a = substr($t, 0, $slash);
+                $b = substr($t, $slash);
+            } else {
+                $a = $t;
+                $b = "";
+            }
+            if (!str_ends_with($a, $nav->php_suffix)) {
+                $a .= $nav->php_suffix;
+            }
+            $t = $a . $b;
+        }
+        if ($param !== "" && preg_match('/\A&(?:amp;)?(.*)\z/', $param, $m)) {
             $param = $m[1];
-        if ($param !== "")
+        }
+        if ($param !== "") {
             $t .= "?" . $param;
-        if ($anchor !== "")
+        }
+        if ($anchor !== "") {
             $t .= $anchor;
-        if ($flags & self::HOTURL_SITE_RELATIVE)
+        }
+        if ($flags & self::HOTURL_SITEREL) {
             return $t;
+        } else if ($flags & self::HOTURL_SERVERREL) {
+            return $nav->site_path . $t;
+        }
         $need_site_path = false;
         if ($page === "index") {
             $expect = "index" . $nav->php_suffix;
@@ -1739,24 +1766,40 @@ class Conf {
             return $this->opt("paperSite") . "/" . $t;
         } else {
             $siteurl = $nav->site_path_relative;
-            if ($need_site_path && $siteurl === "")
+            if ($need_site_path && $siteurl === "") {
                 $siteurl = $nav->site_path;
+            }
             return $siteurl . $t;
         }
     }
 
+    /** @param string $page
+     * @param null|string|array $param
+     * @param int $flags
+     * @return string */
     function hoturl_absolute($page, $param = null, $flags = 0) {
         return $this->hoturl($page, $param, self::HOTURL_ABSOLUTE | $flags);
     }
 
+    /** @param string $page
+     * @param null|string|array $param
+     * @return string */
     function hoturl_site_relative_raw($page, $param = null) {
         return $this->hoturl($page, $param, self::HOTURL_SITE_RELATIVE | self::HOTURL_RAW);
     }
 
+    /** @param string $page
+     * @param null|string|array $param
+     * @return string */
     function hoturl_post($page, $param = null) {
         return $this->hoturl($page, $param, self::HOTURL_POST);
     }
 
+    /** @param string $html
+     * @param string $page
+     * @param null|string|array $param
+     * @param ?array $js
+     * @return string */
     function hotlink($html, $page, $param = null, $js = null) {
         return Ht::link($html, $this->hoturl($page, $param), $js);
     }
@@ -1768,10 +1811,10 @@ class Conf {
         "forceShow" => true, "sort" => true, "t" => true, "group" => true
     ];
 
-    function selfurl(Qrequest $qreq = null, $params = null, $flags = 0) {
+    function selfurl(Qrequest $qreq = null, $param = null, $flags = 0) {
         global $Qreq;
         $qreq = $qreq ? : $Qreq;
-        $params = $params ?? [];
+        $param = $param ?? [];
 
         $x = [];
         foreach ($qreq as $k => $v) {
@@ -1781,34 +1824,52 @@ class Conf {
             }
             if ($ak
                 && ($ak === $k || !isset($qreq[$ak]))
-                && !array_key_exists($ak, $params)
+                && !array_key_exists($ak, $param)
                 && !is_array($v)) {
                 $x[$ak] = $v;
             }
         }
-        foreach ($params as $k => $v) {
+        foreach ($param as $k => $v) {
             $x[$k] = $v;
         }
-        return $this->hoturl(Navigation::page(), $x, $flags);
+        return $this->hoturl($qreq->page(), $x, $flags);
     }
 
 
-    function transfer_messages_to_session() {
-        if ($this->_save_msgs) {
-            ensure_session();
-            foreach ($this->_save_msgs as $m) {
-                $_SESSION[$this->session_key]["msgs"][] = $m;
-            }
-            $this->_save_msgs = null;
+    /** @return int */
+    function saved_messages_status() {
+        $st = 0;
+        foreach ($this->_save_msgs ?? [] as $mx) {
+            $st = max($st, $mx[1]);
         }
+        return $st;
+    }
+
+    /** @return list<array{string,int}> */
+    function take_saved_messages() {
+        $ml = $this->_save_msgs ?? [];
+        $this->_save_msgs = null;
+        return $ml;
+    }
+
+    /** @return int */
+    function report_saved_messages() {
+        $st = $this->saved_messages_status();
+        foreach ($this->take_saved_messages() as $mx) {
+            $this->msg($mx[0], $mx[1]);
+        }
+        return $st;
     }
 
     /** @param ?string $url */
     function redirect($url = null) {
-        $nav = Navigation::get();
-        $this->transfer_messages_to_session();
-        session_write_close();
-        Navigation::redirect_absolute($nav->make_absolute($url ?? $this->hoturl("index")));
+        $qreq = Qrequest::$main_request;
+        if ($this->_save_msgs) {
+            $qreq->open_session();
+            $qreq->set_csession("msgs", $this->_save_msgs);
+        }
+        $qreq->qsession()->commit();
+        Navigation::redirect_absolute($qreq->navigation()->make_absolute($url ?? $this->hoturl("index")));
     }
 
     /** @param string $page
@@ -1835,29 +1896,26 @@ class Conf {
     }
 
 
-    /** @param non-empty-string $url
+
+    //
+    // Conference header, footer
+    //
+
+    /** @param array $x
      * @return string */
-    function make_css_link($url, $media = null, $integrity = null) {
-        if (str_starts_with($url, "<meta") || str_starts_with($url, "<link")) {
-            return $url;
+    function make_css_link($x) {
+        $x["rel"] = $x["rel"] ?? "stylesheet";
+        $url = $x["href"];
+        if ($url[0] !== "/"
+            && (($url[0] !== "h" && $url[0] !== "H")
+                || (strtolower(substr($url, 0, 5)) !== "http:"
+                    && strtolower(substr($url, 0, 6)) !== "https:"))) {
+            if (($mtime = @filemtime(SiteLoader::find($url))) !== false) {
+                $url .= "?mtime=$mtime";
+            }
+            $x["href"] = $this->opt["assetsUrl"] . $url;
         }
-        $t = '<link rel="stylesheet" type="text/css" href="';
-        $absolute = preg_match('/\A(?:https:?:|\/)/i', $url);
-        if (!$absolute) {
-            $t .= $this->opt["assetsUrl"];
-        }
-        $t .= htmlspecialchars($url);
-        if (!$absolute && ($mtime = @filemtime(SiteLoader::find($url))) !== false) {
-            $t .= "?mtime=$mtime";
-        }
-        if ($media) {
-            $t .= '" media="' . $media;
-        }
-        $t .= '" crossorigin="anonymous';
-        if ($integrity) {
-            $t .= '" integrity="' . $integrity;
-        }
-        return $t . '">';
+        return "<link" . Ht::extra($x) . ">";
     }
 
     /** @param non-empty-string $url
@@ -1911,7 +1969,7 @@ class Conf {
 
     /** @param string $file */
     function add_javascript($file) {
-        $this->opt["javascripts"][] = $file;
+        $this->opt["scripts"][] = $file;
     }
 
     /** @param string $key */
@@ -1923,14 +1981,19 @@ class Conf {
         }
     }
 
+    /** @param string $name
+     * @param string $value
+     * @param int $expires_at */
     function set_cookie($name, $value, $expires_at) {
+        $secure = $this->opt("sessionSecure") ?? false;
+        $samesite = $this->opt("sessionSameSite") ?? "Lax";
         $opt = [
             "expires" => $expires_at,
             "path" => Navigation::base_path(),
             "domain" => $this->opt("sessionDomain") ?? "",
-            "secure" => $this->opt("sessionSecure") ?? false
+            "secure" => $secure
         ];
-        if (($samesite = $this->opt("sessionSameSite") ?? "Lax")) {
+        if ($samesite && ($secure || $samesite !== "None")) {
             $opt["samesite"] = $samesite;
         }
         if (!hotcrp_setcookie($name, $value, $opt)) {
@@ -1938,25 +2001,49 @@ class Conf {
         }
     }
 
-    private function header_head($title, $id, $options) {
-        global $Me;
-        echo "<!DOCTYPE html>
-<html lang=\"en\">
-<head>
-<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
-<meta name=\"google\" content=\"notranslate\" />\n";
+    /** @param Qrequest $qreq
+     * @param string|list<string> $title */
+    function print_head_tag($qreq, $title, $extra = []) {
+        echo "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n",
+            "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">\n";
 
-        echo $this->opt("fontScript") ?? "";
-
-        echo $this->make_css_link("stylesheets/style.css"), "\n";
-        echo $this->make_css_link("stylesheets/github.css"), "\n";
-        if ($this->opt("mobileStylesheet")) {
-            echo '<meta name="viewport" content="width=device-width, initial-scale=1">', "\n";
-            echo $this->make_css_link("stylesheets/mobile.css", "screen and (max-width: 768px)"), "\n";
+        // gather stylesheets
+        $cssx = [];
+        $has_default_css = $has_media = false;
+        foreach ($this->opt("stylesheets") ?? [] as $css) {
+            if (is_string($css)) {
+                $css = ["href" => $css];
+            }
+            $cssx[] = $this->make_css_link($css);
+            $has_default_css = $has_default_css || $css["href"] === "stylesheets/style.css";
+            $has_media = $has_media || ($css["media"] ?? null) !== null;
         }
-        echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/katex.min.css", null, "sha384-R4558gYOUz8mP9YWpZJjofhk+zx0AS11p36HnD2ZKj/6JR5z27gSSULCNHIRReVs");
-        foreach ($this->opt["stylesheets"] as $css) {
-            echo $this->make_css_link($css), "\n";
+
+        // meta elements
+        $meta = $this->opt("metaTags") ?? [];
+        if ($has_media) {
+            $meta["viewport"] = $meta["viewport"] ?? "width=device-width, initial-scale=1";
+        }
+        foreach ($meta as $key => $value) {
+            if ($value === false) {
+                // nothing
+            } else if (is_int($key)) {
+                assert(str_starts_with($value, "<meta"));
+                echo $value, "\n";
+            } else if ($key === "default-style" || $key === "content-security-policy") {
+                echo "<meta http-equiv=\"", $key, "\" content=\"", htmlspecialchars($value), "\">\n";
+            } else {
+                echo "<meta name=\"", htmlspecialchars($key), "\" content=\"", htmlspecialchars($value), "\">\n";
+            }
+        }
+
+        // css references
+        if (!$has_default_css) {
+            echo $this->make_css_link(["href" => "stylesheets/style.css"]), "\n";
+            echo $this->make_css_link(["href" => "https://cdn.jsdelivr.net/npm/katex@0.16.3/dist/katex.min.css", "crossorigin" => "anonymous", "integrity" => "sha384-Juol1FqnotbkyZUT5Z7gUPjQ9gzlwCENvUZTpQBAPxtusdwFLRy382PSDx5UUJ4/"]), "\n";
+        }
+        foreach ($cssx as $css) {
+            echo $css, "\n";
         }
 
         // favicon
@@ -1966,56 +2053,43 @@ class Conf {
                 if ($this->opt["assetsUrl"] && substr($favicon, 0, 7) === "images/") {
                     $favicon = $this->opt["assetsUrl"] . $favicon;
                 } else {
-                    $favicon = Navigation::siteurl() . $favicon;
+                    $favicon = $qreq->navigation()->siteurl() . $favicon;
                 }
             }
             if (substr($favicon, -4) == ".png") {
-                echo "<link rel=\"icon\" type=\"image/png\" href=\"$favicon\" />\n";
+                echo "<link rel=\"icon\" type=\"image/png\" href=\"$favicon\">\n";
             } else if (substr($favicon, -4) == ".ico") {
-                echo "<link rel=\"shortcut icon\" href=\"$favicon\" />\n";
+                echo "<link rel=\"shortcut icon\" href=\"$favicon\">\n";
             } else if (substr($favicon, -4) == ".gif") {
-                echo "<link rel=\"icon\" type=\"image/gif\" href=\"$favicon\" />\n";
+                echo "<link rel=\"icon\" type=\"image/gif\" href=\"$favicon\">\n";
             } else {
-                echo "<link rel=\"icon\" href=\"$favicon\" />\n";
+                echo "<link rel=\"icon\" href=\"$favicon\">\n";
             }
         }
 
         // title
         echo "<title>";
         if ($title) {
+            if (is_array($title)) {
+                if (count($title) === 3 && $title[2]) {
+                    $title = $title[1] . " - " . $title[0];
+                } else {
+                    $title = $title[0];
+                }
+            }
             $title = preg_replace("/<([^>\"']|'[^']*'|\"[^\"]*\")*>/", "", $title);
             $title = preg_replace(",(?: |&nbsp;|\302\240)+,", " ", $title);
             $title = str_replace("&#x2215;", "-", $title);
         }
-        if ($title) {
+        if ($title && $title !== "Home" && $title !== "Sign in") {
             echo $title, " - ";
         }
-        echo htmlspecialchars($this->short_name), "</title>\n";
-
-        // <body>
-        echo "</head>\n<body", ($id ? " id=\"$id\"" : "");
-        $class = $options["body_class"] ?? "";
-        if ($this->multiuser_page) {
-            $class = $class === "" ? "pa-multiuser" : "$class pa-multiuser";
-        }
-        if ($this->_active_list) {
-            $class = $class === "" ? "has-hotlist" : "$class has-hotlist";
-        }
-        if ($class !== "") {
-            echo ' class="', $class, '"';
-        }
-        if ($this->_active_list) {
-            echo ' data-hotlist="', htmlspecialchars($this->_active_list->listid), '"';
-        }
-        if ($this->default_format) {
-            echo ' data-default-format="', $this->default_format, '"';
-        }
-        echo " onload=\"\$pa.onload()\" data-now=\"", Conf::$now, "\">\n";
+        echo htmlspecialchars($this->short_name), "</title>\n</head>\n";
 
         // jQuery
         $stash = Ht::unstash();
-        if (isset($this->opt["jqueryUrl"])) {
-            Ht::stash_html($this->make_script_file($this->opt["jqueryUrl"], true) . "\n");
+        if (($jqurl = $this->opt["jqueryUrl"] ?? null)) {
+            Ht::stash_html($this->make_script_file($jqurl, true) . "\n");
         } else {
             $jqueryVersion = $this->opt["jqueryVersion"] ?? "3.7.0";
             Ht::stash_html($this->make_jquery_script_file($jqueryVersion) . "\n");
@@ -2024,56 +2098,57 @@ class Conf {
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/highlight.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it-katexx.min.js", true) . "\n");
-        Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/katex.min.js" integrity="sha384-z1fJDqw8ZApjGO3/unPWUPsIymfsJmyrDVWC8Tv/a1HeOtGmkwNd/7xUS0Xcnvsx" crossorigin="anonymous"></script>');
-        foreach ($this->opt["javascripts"] as $scriptfile) {
-            Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
-        }
+        Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.16.3/dist/katex.min.js" integrity="sha384-97gW6UIJxnlKemYavrqDHSX3SiygeOwIZhwyOKRfSaf0JWKRVj9hLASHgFTzT+0O" crossorigin="anonymous"></script>');
 
         // Javascript settings to set before pa.js
-        $nav = Navigation::get();
+        $nav = $qreq->navigation();
         $siteinfo = [
             "site_relative" => $nav->site_path_relative,
             "base" => $nav->base_path,
             "suffix" => $nav->php_suffix,
             "assets" => $this->opt["assetsUrl"],
             "cookie_params" => "",
+            "postvalue" => $qreq->post_value(true),
             "user" => []
         ];
-        if (session_id() !== "") {
-            $siteinfo["postvalue"] = post_value();
-        }
         if (($x = $this->opt("sessionDomain"))) {
-            $siteinfo["cookie_params"] .= "; Domain=" . $x;
+            $siteinfo["cookie_params"] .= "; Domain=$x";
         }
         if ($this->opt("sessionSecure")) {
             $siteinfo["cookie_params"] .= "; Secure";
         }
-        if (($x = $this->opt("sessionSameSite") ?? "Lax")) {
-            $siteinfo["cookie_params"] .= "; SameSite=" . $x;
+        if (($samesite = $this->opt("sessionSameSite") ?? "Lax")) {
+            $siteinfo["cookie_params"] .= "; SameSite={$samesite}";
         }
-        if (self::$hoturl_defaults) {
-            $siteinfo["defaults"] = [];
-            foreach (self::$hoturl_defaults as $k => $v) {
-                $siteinfo["defaults"][$k] = urldecode($v);
+        if (($user = $qreq->user())) {
+            if ($user->email) {
+                $siteinfo["user"]["email"] = $user->email;
             }
-        }
-        if ($Me && $Me->email) {
-            $siteinfo["user"]["email"] = $Me->email;
-        }
-        if ($Me && $Me->is_pclike()) {
-            $siteinfo["user"]["is_pclike"] = true;
-        }
-        if ($Me && $Me->privChair) {
-            $siteinfo["user"]["is_admin"] = true;
-        }
-        if ($Me) {
-            $siteinfo["user"]["cid"] = $Me->contactId;
+            if ($user->is_pclike()) {
+                $siteinfo["user"]["is_pclike"] = true;
+            }
+            if ($user->privChair) {
+                $siteinfo["user"]["is_admin"] = true;
+            }
+            if ($user->has_account_here()) {
+                $siteinfo["user"]["cid"] = $user->contactId;
+            }
+            if ($user->is_actas_user()) {
+                $siteinfo["user"]["is_actas"] = true;
+            }
+            if (($defaults = $user->hoturl_defaults())) {
+                $siteinfo["defaults"] = [];
+                foreach ($defaults as $k => $v) {
+                    $siteinfo["defaults"][$k] = urldecode($v);
+                }
+            }
         }
         foreach ($this->_siteinfo ?? [] as $k => $v) {
             $siteinfo[$k] = $v;
         }
         $this->_siteinfo = null;
-        Ht::stash_script("window.siteinfo=" . json_encode_browser($siteinfo) . ";");
+
+        Ht::stash_script("window.siteinfo=" . json_encode_browser($siteinfo));
 
         // pa.js
         if (!$this->opt("noDefaultScript")) {
@@ -2085,25 +2160,50 @@ class Conf {
             Ht::stash_html($this->make_script_file($file) . "\n");
         }
 
-        // initial load (JS's timezone offsets are negative of PHP's)
-        Ht::stash_script("\$pa.onload.time(" . (-date("Z", Conf::$now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
-
-        echo $stash, Ht::unstash();
+        if ($stash) {
+            Ht::stash_html($stash);
+        }
     }
 
-    function header($title, $id = "", $options = []) {
-        global $Me;
-        if ($this->_header_printed) {
-            return;
+    /** @param Qrequest $qreq
+     * @param string|list<string> $title */
+    function print_body_entry($qreq, $title, $id, $extra = []) {
+        $user = $qreq->user();
+        echo "<body";
+        if ($id) {
+            echo ' id="body-', $id, '"';
         }
+        $class = $extra["body_class"] ?? "";
+        if ($this->multiuser_page) {
+            $class = $class === "" ? "pa-multiuser" : "{$class} pa-multiuser";
+        }
+        if ($this->_active_list) {
+            $class = $class === "" ? "has-hotlist" : "{$class} has-hotlist";
+        }
+        if ($class !== "") {
+            echo ' class="', $class, '"';
+        }
+        if ($this->_active_list) {
+            echo ' data-hotlist="', htmlspecialchars($this->_active_list->listid), '"';
+        }
+        if ($this->default_format) {
+            echo ' data-default-format="', $this->default_format, '"';
+        }
+        echo ' data-upload-limit="', ini_get_bytes("upload_max_filesize"), '"';
+        if (($x = $this->opt["uploadMaxFilesize"] ?? null) !== null) {
+            echo ' data-document-max-size="', ini_get_bytes(null, $x), '"';
+        }
+        echo " onload=\"\$pa.onload()\" data-now=\"", Conf::$now, '"><div id="prebody">';
+
+        // initial load (JS's timezone offsets are negative of PHP's)
+        Ht::stash_script("\$pa.onload.time(" . (-(int) date("Z", Conf::$now) / 60) . "," . ($this->opt("time24hour") ? 1 : 0) . ")");
+
+        echo Ht::unstash();
 
         // <head>
         if ($title === "Home") {
             $title = "";
         }
-        $this->header_head($title, $id, $options);
-
-        echo "<div id='prebody'>\n";
 
         echo "<div id='header'>\n<div id='header_left_conf'><h1>";
         if ($title && ($title == "Home" || $title == "Sign in"))
@@ -2111,23 +2211,25 @@ class Conf {
         else
             echo "<a class='u' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
         echo "</h1></div><div id='header_right'>";
-        if ($Me && !$Me->is_empty()) {
+        if ($user && !$user->is_empty()) {
             // profile link
             $profile_parts = [];
-            if ($Me->has_email() && !$Me->is_disabled()) {
-	        $profile_parts[] = '<strong>' . htmlspecialchars($Me->email) . '</strong>';
+            if ($user->has_email() && !$user->is_disabled()) {
+	        $profile_parts[] = '<strong>' . htmlspecialchars($user->email) . '</strong>';
                 /*echo '<a class="q" href="', hoturl("profile"), '"><strong>',
-                    htmlspecialchars($Me->email),
+                    htmlspecialchars($user->email),
                     '</strong></a> &nbsp; <a href="', hoturl("profile"), '">Profile</a>',
                     $xsep;*/
             }
 
             // "act as" link
-            if (($actas = $_SESSION["last_actas"] ?? null)
-                && (($Me->privChair && strcasecmp($actas, $Me->email) !== 0)
-                    || Contact::$base_auth_user)) {
+            $actas_email = null;
+            if ($user->privChair && !$user->is_actas_user()) {
+                $actas_email = $qreq->gsession("last_actas");
+            }
+            if ($actas_email || Contact::$base_auth_user) {
                 // Link becomes true user if not currently chair.
-                $actas = Contact::$base_auth_user ? Contact::$base_auth_user->email : $actas;
+                $actas = Contact::$base_auth_user ? Contact::$base_auth_user->email : $actas_email;
                 $profile_parts[] = "<a href=\""
                     . $this->selfurl(null, ["actas" => Contact::$base_auth_user ? null : $actas]) . "\">"
                     . (Contact::$base_auth_user ? "Admin" : htmlspecialchars($actas))
@@ -2137,9 +2239,9 @@ class Conf {
 
             // help, sign out
             $x = ($id == "search" ? "t=$id" : ($id == "settings" ? "t=chair" : ""));
-            if (!$Me->has_email() && !isset($this->opt["httpAuthLogin"]))
+            if (!$user->has_email() && !isset($this->opt["httpAuthLogin"]))
                 $profile_parts[] = '<a href="' . $this->hoturl("index", "signin=1") . '">Sign&nbsp;in</a>';
-            if (!$Me->is_empty() || isset($this->opt["httpAuthLogin"]))
+            if (!$user->is_empty() || isset($this->opt["httpAuthLogin"]))
                 $profile_parts[] = '<a href="' . $this->hoturl("=index", "signout=1") . '">Sign&nbsp;out</a>';
 
             if (!empty($profile_parts))
@@ -2154,23 +2256,28 @@ class Conf {
         if (($x = $this->opt("maintenance"))) {
             echo Ht::msg(is_string($x) ? $x : "<strong>The site is down for maintenance.</strong> Please check back later.", 2);
         }
-        if (($msgs = $this->session("msgs"))
-            && !empty($msgs)) {
-            $this->save_session("msgs", null);
-            foreach ($msgs as $m) {
-                $this->msg($m[0], $m[1]);
-            }
+        if ($this->_save_msgs && !($extra["save_messages"] ?? false)) {
+            $this->report_saved_messages();
             echo "<div id=\"initialmsgspacer\"></div>";
-        }
-        if ($this->_save_msgs) {
-            foreach ($this->_save_msgs as $m) {
-                $this->msg($m[0], $m[1]);
-            }
-            $this->_save_msgs = null;
         }
         echo "</div>\n";
 
-        echo "</div>\n<div class='body'>\n";
+        echo "</div>\n<div class=\"body\">\n";
+    }
+
+    function header($title, $id, $extra = []) {
+        if (!$this->_header_printed) {
+            $this->print_head_tag(Qrequest::$main_request, $title, $extra);
+            $this->print_body_entry(Qrequest::$main_request, $title, $id, $extra);
+        }
+    }
+
+    static function git_status() {
+        $args = [];
+        if (is_dir(SiteLoader::find(".git"))) {
+            exec("export GIT_DIR=" . escapeshellarg(SiteLoader::$root) . "/.git; git rev-parse HEAD 2>/dev/null; git rev-parse v" . PA_VERSION . " 2>/dev/null", $args);
+        }
+        return count($args) === 2 ? $args : null;
     }
 
     function footer() {
@@ -2178,9 +2285,6 @@ class Conf {
         echo "</div>\n", // class='body'
             "<div id='footer'>\n";
         $footy = $this->opt("extraFooter") ?? "";
-        if (false) {
-            $footy .= "<a href='http://read.seas.harvard.edu/~kohler/hotcrp/'>HotCRP</a> Conference Management Software";
-        }
         if (!$this->opt("noFooterVersion")) {
             if ($Me && $Me->privChair) {
                 if (is_dir(SiteLoader::$root . "/.git")) {

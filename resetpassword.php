@@ -53,7 +53,7 @@ class ResetPassword_Page {
 
         // don't show information about the current user, if there is one
         global $Me;
-        $Me = new Contact;
+        $Me = Contact::make($this->conf);
 
         $password_class = "";
         if (isset($_POST["go"]) && check_post()) {
@@ -78,7 +78,7 @@ class ResetPassword_Page {
                 $log_acct->log_activity("Password reset via " . substr($resetcap, 0, 8) . "...");
                 $this->conf->confirmMsg("Your password has been changed. You may now sign in to the conference site.");
                 $capmgr->delete($capdata);
-                $this->conf->save_session("password_reset", (object) array("time" => Conf::$now, "email" => $Acct->email, "password" => $_POST["password"]));
+                $this->qreq->set_csession("password_reset", (object) array("time" => Conf::$now, "email" => $Acct->email, "password" => $_POST["password"]));
                 $this->conf->redirect();
             }
             $password_class = " has-error";
@@ -121,8 +121,8 @@ class ResetPassword_Page {
             Ht::submit("go", "Reset password", array("tabindex" => 1)),
             '</div></div></form><hr class="home"></div>', "\n";
 
-        echo '<hr class="c" />', "\n";
-        $this->conf->footer();
+        echo '<hr class="c">', "\n";
+        $this->qreq->print_footer();
     }
 
     static function go(Conf $conf, Qrequest $qreq) {

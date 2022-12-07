@@ -60,4 +60,4 @@ echo Ht::unstash(),
     '</script>';
 
 echo '<hr class="c">';
-$Conf->footer();
+$Qreq->print_footer();

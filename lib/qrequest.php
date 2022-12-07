@@ -3,13 +3,23 @@
 // Copyright (c) 2006-2022 Eddie Kohler; see LICENSE.
 
 class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSerializable {
-    // NB see also count()
+    /** @var ?Conf */
+    private $_conf;
+    /** @var ?Contact */
+    private $_user;
+    /** @var ?NavigationState */
+    private $_navigation;
+    /** @var ?string */
+    private $_page;
+    /** @var ?string */
+    private $_path;
     /** @var string */
     private $_method;
     /** @var array<string,string> */
     private $_v;
     /** @var array<string,list> */
     private $_a = [];
+    /** @var array<string,QrequestFile> */
     private $_files = [];
     private $_annexes = [];
     /** @var bool */
@@ -17,11 +27,11 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
     /** @var bool */
     private $_post_empty = false;
     /** @var ?string */
-    private $_page;
-    /** @var ?string */
-    private $_path;
-    /** @var ?string */
     private $_referrer;
+    /** @var null|false|SessionList */
+    private $_active_list = false;
+    /** @var Qsession */
+    private $_qsession;
 
     /** @var Qrequest */
     static public $main_request;
@@ -33,32 +43,18 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
     function __construct($method, $data = []) {
         $this->_method = $method;
         $this->_v = $data;
+        $this->_qsession = new Qsession;
     }
-    /** @param Qrequest $qreq
-     * @return Qrequest */
-    static function empty_clone($qreq) {
-        $qreq2 = new Qrequest($qreq->_method);
-        return $qreq2->set_page($qreq->_page, $qreq->_path);
+
+    /** @param NavigationState $nav
+     * @return $this */
+    function set_navigation($nav) {
+        $this->_navigation = $nav;
+        $this->_page = $nav->page;
+        $this->_path = $nav->path;
+        return $this;
     }
-    /** @param string $urlpart
-     * @param ?string $method
-     * @return Qrequest */
-    static function make_url($urlpart, $method = "GET") {
-        $qreq = new Qrequest($method);
-        if (preg_match('/\A\/?([^\/?#]+)(\/.*?|)(?:\?|(?=#)|\z)([^#]*)(?:#.*|)\z/', $urlpart, $m)) {
-            $qreq->set_page($m[1], $m[2]);
-            if ($m[3] !== "") {
-                preg_match_all('/([^&;=]*)=([^&;]*)/', $m[3], $n, PREG_SET_ORDER);
-                foreach ($n as $x) {
-                    $qreq->set_req(urldecode($x[1]), urldecode($x[2]));
-                }
-            }
-        }
-        if ($method === "POST") {
-            $qreq->approve_token();
-        }
-        return $qreq;
-    }
+
     /** @param string $page
      * @param ?string $path
      * @return $this */
@@ -66,6 +62,93 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
         $this->_page = $page;
         $this->_path = $path;
         return $this;
+    }
+
+    /** @param ?string $referrer
+     * @return $this */
+    function set_referrer($referrer) {
+        $this->_referrer = $referrer;
+        return $this;
+    }
+
+    /** @param Conf $conf
+     * @return $this */
+    function set_conf($conf) {
+        assert(!$this->_conf || $this->_conf === $conf);
+        $this->_conf = $conf;
+        return $this;
+    }
+
+    /** @param ?Contact $user
+     * @return $this */
+    function set_user($user) {
+        assert(!$user || !$this->_conf || $this->_conf === $user->conf);
+        if ($user) {
+            $this->_conf = $user->conf;
+        }
+        $this->_user = $user;
+        return $this;
+    }
+
+    /** @return $this */
+    function set_qsession(Qsession $qsession) {
+        $this->_qsession = $qsession;
+        return $this;
+    }
+
+    /** @return string */
+    function method() {
+        return $this->_method;
+    }
+    /** @return bool */
+    function is_get() {
+        return $this->_method === "GET";
+    }
+    /** @return bool */
+    function is_post() {
+        return $this->_method === "POST";
+    }
+    /** @return bool */
+    function is_head() {
+        return $this->_method === "HEAD";
+    }
+
+    /** @return Conf */
+    function conf() {
+        return $this->_conf;
+    }
+    /** @return ?Contact */
+    function user() {
+        return $this->_user;
+    }
+    /** @return NavigationState */
+    function navigation() {
+        return $this->_navigation;
+    }
+    /** @return Qsession */
+    function qsession() {
+        return $this->_qsession;
+    }
+
+    /** @return ?string */
+    function page() {
+        return $this->_page;
+    }
+    /** @return ?string */
+    function path() {
+        return $this->_path;
+    }
+    /** @param int $n
+     * @return ?string */
+    function path_component($n, $decoded = false) {
+        if ((string) $this->_path !== "") {
+            $p = explode("/", substr($this->_path, 1));
+            if ($n + 1 < count($p)
+                || ($n + 1 === count($p) && $p[$n] !== "")) {
+                return $decoded ? urldecode($p[$n]) : $p[$n];
+            }
+        }
+        return null;
     }
     /** @param int $n
      * @return ?string */
@@ -86,48 +169,7 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
             return null;
         }
     }
-    /** @param ?string $referrer
-     * @return $this */
-    function set_referrer($referrer) {
-        $this->_referrer = $referrer;
-        return $this;
-    }
-    /** @return string */
-    function method() {
-        return $this->_method;
-    }
-    /** @return bool */
-    function is_get() {
-        return $this->_method === "GET";
-    }
-    /** @return bool */
-    function is_post() {
-        return $this->_method === "POST";
-    }
-    /** @return bool */
-    function is_head() {
-        return $this->_method === "HEAD";
-    }
-    /** @return ?string */
-    function page() {
-        return $this->_page;
-    }
-    /** @return ?string */
-    function path() {
-        return $this->_path;
-    }
-    /** @param int $n
-     * @return ?string */
-    function path_component($n, $decoded = false) {
-        if ((string) $this->_path !== "") {
-            $p = explode("/", substr($this->_path, 1));
-            if ($n + 1 < count($p)
-                || ($n + 1 == count($p) && $p[$n] !== "")) {
-                return $decoded ? urldecode($p[$n]) : $p[$n];
-            }
-        }
-        return null;
-    }
+
     /** @return ?string */
     function referrer() {
         return $this->_referrer;
@@ -155,6 +197,7 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
         unset($this->_a[$offset]);
     }
     #[\ReturnTypeWillChange]
+    /** @return Iterator<string,mixed> */
     function getIterator() {
         return new ArrayIterator($this->as_array());
     }
@@ -263,9 +306,14 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
         return array_key_exists($key, $this->_v);
     }
     /** @param string $name
+     * @param array|QrequestFile $finfo
      * @return $this */
     function set_file($name, $finfo) {
-        $this->_files[$name] = $finfo;
+        if (is_array($finfo)) {
+            $this->_files[$name] = new QrequestFile($finfo);
+        } else {
+            $this->_files[$name] = $finfo;
+        }
         return $this;
     }
     /** @param string $name
@@ -274,13 +322,12 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
      * @param ?string $mimetype
      * @return $this */
     function set_file_content($name, $content, $filename = null, $mimetype = null) {
-        $this->_files[$name] = [
+        $this->_files[$name] = new QrequestFile([
             "name" => $filename ?? "__set_file_content.$name",
-            "type" => $mimetype ?? "application/octet-stream",
+            "type" => $mimetype,
             "size" => strlen($content),
-            "content" => $content,
-            "error" => 0
-        ];
+            "content" => $content
+        ]);
         return $this;
     }
     /** @return bool */
@@ -293,20 +340,16 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
         return isset($this->_files[$name]);
     }
     /** @param string $name
-     * @return ?array{name:string,type:string,size:int,tmp_name:string,error:int} */
+     * @return ?QrequestFile */
     function file($name) {
-        $f = null;
-        if (array_key_exists($name, $this->_files)) {
-            $f = $this->_files[$name];
-        }
-        return $f;
+        return $this->_files[$name] ?? null;
     }
     /** @param string $name
      * @return string|false */
     function file_filename($name) {
         $fn = false;
         if (array_key_exists($name, $this->_files)) {
-            $fn = $this->_files[$name]["name"];
+            $fn = $this->_files[$name]->name;
         }
         return $fn;
     }
@@ -315,7 +358,7 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
     function file_size($name) {
         $sz = false;
         if (array_key_exists($name, $this->_files)) {
-            $sz = $this->_files[$name]["size"];
+            $sz = $this->_files[$name]->size;
         }
         return $sz;
     }
@@ -327,12 +370,12 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
         $data = false;
         if (array_key_exists($name, $this->_files)) {
             $finfo = $this->_files[$name];
-            if (isset($finfo["content"])) {
-                $data = substr($finfo["content"], $offset, $maxlen ?? PHP_INT_MAX);
+            if (isset($finfo->content)) {
+                $data = substr($finfo->content, $offset, $maxlen ?? PHP_INT_MAX);
             } else if ($maxlen === null) {
-                $data = @file_get_contents($finfo["tmp_name"], false, null, $offset);
+                $data = @file_get_contents($finfo->tmp_name, false, null, $offset);
             } else {
-                $data = @file_get_contents($finfo["tmp_name"], false, null, $offset, $maxlen);
+                $data = @file_get_contents($finfo->tmp_name, false, null, $offset, $maxlen);
             }
         }
         return $data;
@@ -355,11 +398,7 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
     }
     /** @param string $name */
     function annex($name) {
-        $x = null;
-        if (array_key_exists($name, $this->_annexes)) {
-            $x = $this->_annexes[$name];
-        }
-        return $x;
+        return $this->_annexes[$name] ?? null;
     }
     /** @template T
      * @param string $name
@@ -419,10 +458,11 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
         }
     }
 
-    static function make_global() : Qrequest {
+    /** @param NavigationState $nav */
+    static function make_global($nav) : Qrequest {
         global $Qreq;
-        $Qreq = $qreq = new Qrequest($_SERVER["REQUEST_METHOD"]);
-        $qreq->set_page(Navigation::page(), Navigation::path());
+        $qreq = new Qrequest($_SERVER["REQUEST_METHOD"]);
+        $qreq->set_navigation($nav);
         foreach ($_GET as $k => $v) {
             $qreq->set_req($k, $v);
         }
@@ -454,25 +494,204 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
                         $qreq->set_file($n, $fi);
                     }
                 } else if ($fi["error"] != UPLOAD_ERR_NO_FILE) {
-                    $s = "";
-                    if (isset($fi["name"])) {
-                        $s .= '<span class="lineno">' . htmlspecialchars($fi["name"]) . ':</span> ';
-                    }
                     if ($fi["error"] == UPLOAD_ERR_INI_SIZE
                         || $fi["error"] == UPLOAD_ERR_FORM_SIZE) {
-                        $s .= "Uploaded file too big. The maximum upload size is " . ini_get("upload_max_filesize") . "B.";
+                        $errors[] = $e = MessageItem::error("Uploaded file too large");
+                        if (!$too_big) {
+                            $errors[] = MessageItem::inform("The maximum upload size is " . ini_get("upload_max_filesie") . "B.");
+                            $too_big = true;
+                        }
                     } else if ($fi["error"] == UPLOAD_ERR_PARTIAL) {
-                        $s .= "File upload interrupted.";
+                        $errors[] = $e = MessageItem::error("File upload interrupted");
                     } else {
-                        $s .= "Error uploading file.";
+                        $errors[] = $e = MessageItem::error("Error uploading file");
                     }
-                    $errors[] = $s;
+                    $e->landmark = $fi["name"] ?? null;
                 }
             }
         }
         if (!empty($errors)) {
             $qreq->set_annex("upload_errors", $errors);
         }
+        Qrequest::$main_request = $Qreq = $qreq;
         return $qreq;
+    }
+
+
+    /** @param string|list<string> $title
+     * @param string $id
+     * @param array{paperId?:int|string,body_class?:string,action_bar?:string,title_div?:string,subtitle?:string,save_messages?:bool} $extra */
+    function print_header($title, $id, $extra = []) {
+        if (!$this->_conf->_header_printed) {
+            $this->_conf->print_head_tag($this, $title, $extra);
+            $this->_conf->print_body_entry($this, $title, $id, $extra);
+        }
+    }
+
+    function print_footer() {
+        echo "<hr class=\"c\"></div>", // class='body'
+            '<div id="footer">',
+            $this->_conf->opt("extraFooter") ?? "";
+        if (!$this->_conf->opt("noFooterVersion")) {
+            if ($this->_user && $this->_user->privChair) {
+                echo '<a class="noq" href="https://github.com/kohler/peteramati/">PA</a>',
+                    " v", PA_VERSION, " [";
+                if (($git_data = Conf::git_status())
+                    && $git_data[0] !== $git_data[1]) {
+                    echo substr($git_data[0], 0, 7), "... ";
+                }
+                echo round(memory_get_peak_usage() / (1 << 20)), "M]";
+            } else {
+                echo "<!-- Version ", PA_VERSION, " -->";
+            }
+        }
+        echo '</div>', Ht::unstash(), "</body>\n</html>\n";
+    }
+
+    static function print_footer_hook(Contact $user, Qrequest $qreq) {
+        $qreq->print_footer();
+    }
+
+
+    /** @return bool */
+    function has_active_list() {
+        return !!$this->_active_list;
+    }
+
+    /** @return ?SessionList */
+    function active_list() {
+        if ($this->_active_list === false) {
+            $this->_active_list = null;
+        }
+        return $this->_active_list;
+    }
+
+    function set_active_list(SessionList $list = null) {
+        assert($this->_active_list === false);
+        $this->_active_list = $list;
+    }
+
+
+    /** @return void */
+    function open_session() {
+        $this->_qsession->open();
+    }
+
+    /** @return ?string */
+    function qsid() {
+        return $this->_qsession->sid;
+    }
+
+    /** @param string $key
+     * @return bool */
+    function has_gsession($key) {
+        return $this->_qsession->has($key);
+    }
+
+    function clear_gsession() {
+        $this->_qsession->clear();
+    }
+
+    /** @param string $key
+     * @return mixed */
+    function gsession($key) {
+        return $this->_qsession->get($key);
+    }
+
+    /** @param string $key
+     * @param mixed $value */
+    function set_gsession($key, $value) {
+        $this->_qsession->set($key, $value);
+    }
+
+    /** @param string $key */
+    function unset_gsession($key) {
+        $this->_qsession->unset($key);
+    }
+
+    /** @param string $key
+     * @return bool */
+    function has_csession($key) {
+        return $this->_conf
+            && $this->_conf->session_key !== null
+            && $this->_qsession->has2($this->_conf->session_key, $key);
+    }
+
+    /** @param string $key
+     * @return mixed */
+    function csession($key) {
+        if ($this->_conf && $this->_conf->session_key !== null) {
+            return $this->_qsession->get2($this->_conf->session_key, $key);
+        } else {
+            return null;
+        }
+    }
+
+    /** @param string $key
+     * @param mixed $value */
+    function set_csession($key, $value) {
+        if ($this->_conf && $this->_conf->session_key !== null) {
+            $this->_qsession->set2($this->_conf->session_key, $key, $value);
+        }
+    }
+
+    /** @param string $key */
+    function unset_csession($key) {
+        if ($this->_conf && $this->_conf->session_key !== null) {
+            $this->_qsession->unset2($this->_conf->session_key, $key);
+        }
+    }
+
+    /** @param bool $allow_empty
+     * @return string */
+    function post_value($allow_empty = false) {
+        $sid = $this->_qsession->sid;
+        if ($sid === null && !$allow_empty) {
+            $this->_qsession->open();
+            $sid = $this->_qsession->sid;
+        }
+        if ($sid === null || $sid === "") {
+            return ".empty";
+        }
+        return urlencode(substr($sid, strlen($sid) > 16 ? 8 : 0, 12));
+    }
+}
+
+class QrequestFile {
+    /** @var string */
+    public $name;
+    /** @var string */
+    public $type;
+    /** @var int */
+    public $size;
+    /** @var ?string */
+    public $tmp_name;
+    /** @var ?string */
+    public $content;
+    /** @var int */
+    public $error;
+
+    /** @param array{name?:string,type?:string,size?:int,tmp_name?:?string,content?:?string,error?:int} $a */
+    function __construct($a) {
+        $this->name = $a["name"] ?? "";
+        $this->type = $a["type"] ?? "application/octet-stream";
+        $this->size = $a["size"] ?? 0;
+        $this->tmp_name = $a["tmp_name"] ?? null;
+        $this->content = $a["content"] ?? null;
+        $this->error = $a["error"] ?? 0;
+    }
+
+    /** @return array{name:string,type:string,size:int,tmp_name?:string,content?:string,error:int}
+     * @deprecated */
+    function as_array() {
+        $a = ["name" => $this->name, "type" => $this->type, "size" => $this->size];
+        if ($this->tmp_name !== null) {
+            $a["tmp_name"] = $this->tmp_name;
+        }
+        if ($this->content !== null) {
+            $a["content"] = $this->content;
+        }
+        $a["error"] = $this->error;
+        return $a;
     }
 }

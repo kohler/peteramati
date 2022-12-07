@@ -967,7 +967,7 @@ class PsetRequest {
         }
 
         echo "<hr class=\"c\">\n";
-        $this->conf->footer();
+        $this->qreq->print_footer();
     }
 }
 

@@ -259,7 +259,7 @@ class DiffMany_Page {
 
         Ht::stash_script('$(window).on("beforeunload",$pa.beforeunload)');
         echo "</div><hr class=\"c\">\n";
-        $this->conf->footer();
+        $this->qreq->print_footer();
     }
 }
 

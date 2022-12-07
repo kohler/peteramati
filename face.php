@@ -103,7 +103,7 @@ class Face_Page {
         }
         echo '</div>';
 
-        $this->conf->footer();
+        $this->qreq->print_footer();
     }
 
     static function run(Contact $viewer, Qrequest $qreq) {

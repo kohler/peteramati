@@ -90,4 +90,4 @@ echo "</div></form>\n";
 
 
 echo "<div class='clear'></div>\n";
-$Conf->footer();
+$Qreq->print_footer();
