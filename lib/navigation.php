@@ -13,13 +13,14 @@ class NavigationState {
     /** @var string */
     public $server;             // "PROTOCOL://HOST[:PORT]"
     /** @var string */
-    public $site_path;          // "/SITEPATH/"; always ends in /
-    /** @var string */
-    public $site_path_relative; // "/SITEPATH/", "../"+, or ""
-    /** @var string */
-    public $base_path;          // "/BASEPATH/"; always ends in /; prefix of $site_path
+    public $base_path;          // "/BASEPATH/"; always ends in /
     /** @var string */
     public $base_path_relative; // "/BASEPATH/", "../"+, or ""
+    /** @var string */
+    public $site_path;          // "/SITEPATH/"; always ends in /; suffix of $site_path;
+                                // may end in `/u/NNN/`
+    /** @var string */
+    public $site_path_relative; // "/SITEPATH/", "../"+, or ""
     /** @var string */
     public $page;               // "PAGE" or "index" (.php suffix stripped)
     /** @var string */
@@ -31,7 +32,7 @@ class NavigationState {
     /** @var string */
     public $query;              // "?QUERY" or ""
     /** @var string */
-    public $php_suffix;
+    public $php_suffix = "";
     /** @var string */
     public $request_uri;
 
@@ -44,6 +45,15 @@ class NavigationState {
             return;
         }
 
+        // php_suffix
+        if (isset($server["HOTCRP_PHP_SUFFIX"])) {
+            $this->php_suffix = $server["HOTCRP_PHP_SUFFIX"];
+        } else if (function_exists("apache_get_modules")
+                   && array_search("mod_rewrite", apache_get_modules()) === false) {
+            $this->php_suffix = ".php";
+        }
+
+        // host, protocol, server
         $this->host = $server["HTTP_HOST"] ?? $server["SERVER_NAME"] ?? null;
         if ((isset($server["HTTPS"])
              && $server["HTTPS"] !== ""
@@ -150,6 +160,8 @@ class NavigationState {
             }
             $this->path = substr($uri_suffix, $spos);
         }
+        $this->apply_php_suffix();
+        $this->path = $m[2];
         $this->shifted_path = "";
 
         // detect $site_path_relative
@@ -162,18 +174,32 @@ class NavigationState {
             $this->base_path_relative = "";
         }
 
-        // $this->site_path: initially $this->base_path
-        $this->site_path = $this->base_path;
-        $this->site_path_relative = $this->base_path_relative;
+        // set $base_path
+        $this->base_path = $this->site_path;
+        $this->base_path_relative = $this->site_path_relative;
+    }
 
-        if (isset($server["HOTCRP_PHP_SUFFIX"])) {
-            $this->php_suffix = $server["HOTCRP_PHP_SUFFIX"];
-        } else if (!function_exists("apache_get_modules")
-                   || array_search("mod_rewrite", apache_get_modules()) !== false) {
-            $this->php_suffix = "";
-        } else {
-            $this->php_suffix = ".php";
+    private function apply_php_suffix() {
+        if ($this->page === $this->raw_page) {
+            $pagelen = strlen($this->page);
+            if ($pagelen > 4
+                && substr_compare($this->page, ".php", $pagelen - 4) === 0) {
+                $this->page = substr($this->page, 0, $pagelen - 4);
+            } else if ($this->php_suffix !== ""
+                       && $this->php_suffix !== ".php"
+                       && $pagelen > ($sfxlen = strlen($this->php_suffix))
+                       && substr_compare($this->page, $this->php_suffix, $pagelen - $sfxlen) === 0) {
+                $this->page = substr($this->page, 0, $pagelen - $sfxlen);
+            }
         }
+    }
+
+    /** @param string $suffix
+     * @return $this */
+    function set_php_suffix($suffix) {
+        $this->php_suffix = $suffix;
+        $this->apply_php_suffix();
+        return $this;
     }
 
     /** @return string */
@@ -233,12 +259,9 @@ class NavigationState {
     /** @param string $page
      * @return string */
     function set_page($page) {
-        $this->raw_page = $page;
-        if (($pagelen = strlen($page)) > 4
-            && substr($page, $pagelen - 4) === ".php") {
-            $page = substr($page, 0, $pagelen - 4);
-        }
-        return ($this->page = $page);
+        $this->raw_page = $this->page = $page;
+        $this->apply_php_suffix();
+        return $this->page;
     }
 
     /** @param string $path
@@ -482,7 +505,7 @@ class Navigation {
     }
 
     /** @param string $url
-     * @return void */
+     * @return never */
     static function redirect_absolute($url) {
         // Might have an HTML-encoded URL; decode at least &amp;.
         $url = str_replace("&amp;", "&", $url);
@@ -493,10 +516,8 @@ class Navigation {
 <meta http-equiv=\"Content-Script-Type\" content=\"text/javascript\" />
 <title>Redirection</title>
 <script>location=", json_encode($url), ";</script></head>
-<body>
-<p>You should be redirected <a href=\"", htmlspecialchars($url), "\">to here</a>.</p>
-</body></html>\n";
-        exit();
+<body><p>You should be redirected <a href=\"", htmlspecialchars($url), "\">to here</a>.</p></body></html>\n";
+        exit;
     }
 }
 

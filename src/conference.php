@@ -182,6 +182,10 @@ class Conf {
     static public $main;
     /** @var int */
     static public $now;
+    /** @var int|float */
+    static public $unow;
+    /** @var float */
+    static public $blocked_time = 0.0;
 
     static public $hoturl_defaults = null;
     static public $next_xt_subposition = 0;
@@ -211,15 +215,18 @@ class Conf {
         }
     }
 
-    /** @param int $t */
+    /** @param int|float $t */
     static function set_current_time($t) {
         global $Now;
-        $Now = Conf::$now = $t;
+        self::$unow = $t;
+        $Now = Conf::$now = (int) $t;
     }
 
-    /** @param int $advance_past */
+    /** @param int|float $advance_past */
     static function advance_current_time($advance_past) {
-        self::set_current_time(max(Conf::$now, $advance_past + 1));
+        if ($advance_past + 1 > Conf::$now) {
+            self::set_current_time($advance_past + 1);
+        }
     }
 
 

@@ -150,6 +150,8 @@ class MessageItem implements JsonSerializable {
 }
 
 class MessageSet {
+    /** @var ?Contact */
+    public $user;
     /** @var list<MessageItem> */
     private $msgs = [];
     /** @var array<string,int> */

@@ -476,6 +476,125 @@ class ContactView {
         }
     }
 
+    /** @param Contact $user
+     * @param Contact $viewer
+     * @param Qrequest $qreq */
+    static function set_repo_action($user, $viewer, $qreq) {
+        $conf = $viewer->conf;
+        if (!($viewer->has_account_here()
+              && $qreq->valid_post()
+              && ($pset = $conf->pset_by_key($qreq->pset)))) {
+            return;
+        }
+        if (!$viewer->can_set_repo($pset, $user)) {
+            return Conf::msg_error("You can’t edit repository information for that problem set now.");
+        }
+
+        // clean up repo url
+        $repo_url = trim($qreq->repo);
+        if ($repo_url === "") {
+            $user->set_repo($pset, null);
+            $conf->redirect_self($qreq);
+        }
+
+        // extend it to full url
+        if (($rgp = $pset->repo_guess_patterns) !== null) {
+            for ($i = 0; $i + 1 < count($rgp); $i += 2) {
+                $x = preg_replace('`' . str_replace("`", "\\`", $rgp[$i]) . '`s',
+                                  $rgp[$i + 1], $repo_url, -1, $nreplace);
+                if ($x !== null && $nreplace) {
+                    $repo_url = $x;
+                    break;
+                }
+            }
+        }
+
+        // does it contain odd characters?
+        if (preg_match('_[,;\[\](){}\\<>&#=\\000-\\027]_', $repo_url)) {
+            return Conf::msg_error("That repository contains funny characters. Remove them.");
+        }
+
+        // record interested repositories
+        $try_classes = [];
+        foreach (RepositorySite::site_classes($user->conf) as $sitek) {
+            $sniff = $sitek::sniff_url($repo_url);
+            if ($sniff == 2) {
+                $try_classes = [$sitek];
+                break;
+            } else if ($sniff) {
+                $try_classes[] = $sitek;
+            }
+        }
+        if (empty($try_classes)) {
+            return Conf::msg_error("Invalid repository URL “" . htmlspecialchars($repo_url) . "”.");
+        }
+
+        // check repositories
+        $ms = new MessageSet;
+        $ms->user = $user;
+        foreach ($try_classes as $sitek) {
+            $reposite = $sitek::make_url($repo_url, $user->conf);
+            if ($reposite && $reposite->validate_working($ms) > 0) {
+                $repo = Repository::find_or_create_url($reposite->url, $user->conf);
+                if ($repo) {
+                    $repo->check_open();
+                }
+                if ($user->set_repo($pset, $repo)) {
+                    $conf->redirect_self($qreq);
+                }
+                return;
+            }
+        }
+
+        // if !working, complain
+        if (!$ms->has_problem()) {
+            Conf::msg_error("Can’t access the repository “" . htmlspecialchars($repo_url) . "” (tried " . join(", ", array_map(function ($m) { return $m::global_friendly_siteclass(); }, $try_classes)) . ").");
+        } else {
+            $msgs = [];
+            foreach ($ms->message_list() as $ms) {
+                $msgs[] = Ftext::unparse_as($ms->message, 5);
+            }
+            if (empty($msgs)) {
+                $msgs[] = "Repository unreachable at the moment.";
+            }
+            Conf::msg_error(join("<br>", $msgs));
+        }
+    }
+
+    /** @param Contact $user
+     * @param Contact $viewer
+     * @param Qrequest $qreq */
+    static function set_branch_action($user, $viewer, $qreq) {
+        if (!($viewer->has_account_here()
+              && $qreq->valid_post()
+              && ($pset = $user->conf->pset_by_key($qreq->pset))
+              && !$pset->no_branch)) {
+            return;
+        }
+        if (!$viewer->can_set_repo($pset, $user)) {
+            return Conf::msg_error("You can’t edit repository information for that problem set now.");
+        }
+
+        $branch = trim($qreq->branch);
+        if ($branch === "") {
+            $branch = $pset->main_branch;
+        }
+        if (!Repository::validate_branch($branch)) {
+            return Conf::msg_error("That branch contains funny characters. Remove them.");
+        }
+
+        $branchid = $user->conf->ensure_branch($branch);
+        if ($branchid === null
+            || ($branchid === 0
+                && ($pset->main_branch === "master"
+                    || $user->repo($pset->id)))) {
+            $user->clear_links(LINK_BRANCH, $pset->id);
+        } else {
+            $user->set_link(LINK_BRANCH, $pset->id, $branchid);
+        }
+        $viewer->conf->redirect_self($qreq);
+    }
+
     static function late_hour_note(PsetView $info) {
         if (($lh = $info->late_hours())
             && $lh > 0

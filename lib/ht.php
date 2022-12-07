@@ -740,11 +740,6 @@ class Ht {
         return self::$_msgset ? self::$_msgset->problem_status_at($field) : 0;
     }
     /** @param string $field
-     * @return iterable<MessageItem> */
-    static function message_list_at($field) {
-        return self::$_msgset ? self::$_msgset->message_list_at($field) : [];
-    }
-    /** @param string $field
      * @return string */
     static function feedback_html_at($field) {
         return self::$_msgset ? self::$_msgset->feedback_html_at($field) : "";
