@@ -667,10 +667,14 @@ class Contact {
             } else {
                 $this->conf->msg("You must sign in to access that page.", 2);
             }
-        } else {
-            $this->conf->msg("You don’t have permission to access that page.", 2);
+            $this->conf->redirect();
         }
-        $this->conf->redirect();
+
+        http_response_code(401);
+        $this->conf->header("Permission error");
+        $this->conf->msg("You don’t have permission to access this page.", 2);
+        $this->conf->footer();
+        exit;
     }
 
     function save() {
