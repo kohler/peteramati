@@ -679,7 +679,9 @@ class Repository {
     function ls_files_info($tree, ...$files) {
         $command = ["git", "ls-tree", "-r", "-z", $tree];
         foreach ($files as $f) {
-            $command[] = preg_replace('/\/+\z/', "", $f);
+            if ($f !== "") {
+                $command[] = preg_replace('/\/+\z/', "", $f);
+            }
         }
         $gr = $this->gitruninfo($command);
         $gtl = new GitTreeListInfo;

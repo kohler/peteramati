@@ -21,6 +21,8 @@ class DiffMany_Page {
     public $viewer;
     /** @var list<string> */
     private $files;
+    /** @var bool */
+    private $fileglob = false;
     /** @var list<string> */
     private $suppress_grades = [];
     /** @var ?list<0|4|5|7> */
@@ -39,6 +41,7 @@ class DiffMany_Page {
         if ($qreq->files) {
             $f = simplify_whitespace($qreq->files);
             $fs = $f === "" ? [] : explode(" ", $f);
+            $this->fileglob = !!preg_match('/[\[\]*?]/', $qreq->files);
         } else if ($qreq->file) {
             $fs = [$qreq->file];
         } else {
@@ -125,10 +128,10 @@ class DiffMany_Page {
 
         if (!$pset->gitless && $info->hash() && $info->commit()) {
             $lnorder = $info->visible_line_notes();
-            $onlyfiles = $this->files;
+            $onlyfiles = $this->fileglob ? $this->expand_files($info) : $this->files;
+            $onefile = count($onlyfiles ?? []) === 1 && !$this->fileglob;
             $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
-            if ($onlyfiles !== null
-                && count($onlyfiles) === 1
+            if ($onefile
                 && isset($diff[$onlyfiles[0]])
                 && $this->qreq->lines
                 && preg_match('/\A\s*(\d+)-(\d+)\s*\z/', $this->qreq->lines, $m)) {
@@ -145,7 +148,7 @@ class DiffMany_Page {
                     $info->echo_file_diff($file, $dinfo, $lnorder, [
                         "expand" => true,
                         "hide_left" => true,
-                        "no_heading" => count($this->files ?? []) == 1,
+                        "no_heading" => $onefile,
                         "diffcontext" => "$linkpart_html / "
                     ]);
                 }
@@ -164,7 +167,24 @@ class DiffMany_Page {
         if ($want_grades) {
             echo Ht::unstash_script('$pa.loadgrades.call(document.getElementById("pa-psetinfo' . $this->psetinfo_idx . '"))');
         }
-        echo "<hr />\n";
+        echo "<hr>\n";
+    }
+
+    /** @param list<string> $files
+     * @return list<string> */
+    private function expand_files(PsetView $info) {
+        if (!$info->repo || !$info->hash()) {
+            return $this->files;
+        }
+        $result = [];
+        foreach ($info->repo->ls_files($info->hash(), $info->pset->directory) as $f) {
+            foreach ($this->files as $pat) {
+                if (fnmatch($pat, $f, FNM_PATHNAME | FNM_PERIOD)) {
+                    $result[] = $f;
+                }
+            }
+        }
+        return $result;
     }
 
     function run() {
