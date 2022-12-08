@@ -13,7 +13,7 @@ export function escape_entities(s) {
 }
 
 const ue_re = /&.*?;/g,
-    ue_rep = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&apos;": "'", "&#039;": "'"};
+    ue_rep = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&apos;": "'", "&#039;": "'", "&#39;": "'"};
 
 export function unescape_entities(s) {
     if (s !== null && typeof s !== "number")

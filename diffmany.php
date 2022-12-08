@@ -99,8 +99,7 @@ class DiffMany_Page {
         } else {
             $gj = $info->info_json();
         }
-        echo '" data-pa-gradeinfo=\'',
-            str_replace("'", "&#39;", json_encode_browser($gj)), '\'>';
+        echo '" data-pa-gradeinfo=\'', json_escape_browser_sqattr($gj), '\'>';
 
         $u = $this->viewer->user_linkpart($user);
         if ($user !== $this->viewer && !$user->is_anonymous && $user->contactImageId) {
@@ -186,7 +185,7 @@ class DiffMany_Page {
             $gexp->set_fixed_values_vf($this->values_vf);
         }
         echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo='",
-             str_replace("'", "&#39;", json_encode_browser($gexp)), "'>";
+            json_escape_browser_sqattr($gexp), "'>";
 
         if (trim((string) $this->qreq->users) === "") {
             $want = [];

@@ -514,6 +514,11 @@ if (defined("JSON_UNESCAPED_LINE_TERMINATORS")) {
 function json_encode_db($x, $flags = 0) {
     return json_encode($x, $flags | JSON_UNESCAPED_UNICODE);
 }
+/** @return string */
+function json_escape_browser_sqattr($x, $flags = 0) {
+    $s = json_encode($x, $flags);
+    return str_replace(["&", "'"], ["&amp;", "&#39;"], $s);
+}
 
 
 // array and object helpers

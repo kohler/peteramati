@@ -72,7 +72,7 @@ $infoj["base_handout"] = $Pset->is_handout($commita);
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey),
     '" data-pa-base-commit="', htmlspecialchars($commita->hash),
     '" data-pa-commit="', htmlspecialchars($commitb->hash),
-    '" data-pa-gradeinfo=\'', str_replace("'", "&#39;", json_encode_browser($infoj)), '\'';
+    '" data-pa-gradeinfo=\'', json_escape_browser_sqattr($infoj), '\'';
 if (!$Pset->gitless && $Pset->directory) {
     echo ' data-pa-directory="', htmlspecialchars($Pset->directory_slash), '"';
 }
