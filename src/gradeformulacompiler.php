@@ -92,6 +92,21 @@ class GradeFormulaCompiler {
         }
     }
 
+    /** @param Pset $pset
+     * @param string $gkey
+     * @param ?GradeEntry $context
+     * @return ?GradeFormula */
+    private function parse_pset_grade($pset, $gkey, $context) {
+        if (($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
+            return new PsetTotal_GradeFormula($pset, ($f & 1) !== 0, ($f & 2) !== 0);
+        } else if (($ge = $pset->gradelike_by_key($gkey))
+                   && $ge !== $context) {
+            return $this->parse_grade_entry($ge);
+        } else {
+            return null;
+        }
+    }
+
     /** @param string $pkey
      * @param string $gkey
      * @return ?GradeFormula */
@@ -104,10 +119,8 @@ class GradeFormulaCompiler {
             $pset = $this->conf->pset_by_key_or_title($pkey);
         }
         if ($pset) {
-            if (($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
-                return new PsetTotal_GradeFormula($pset, ($f & 1) !== 0, ($f & 2) !== 0);
-            } else if (($ge = $pset->gradelike_by_key($gkey))) {
-                return $this->parse_grade_entry($ge);
+            if (($gf = $this->parse_pset_grade($pset, $gkey, null))) {
+                return $gf;
             } else {
                 $this->error_at($this->state->pos2 - strlen($gkey), $this->state->pos2, "Undefined grade entry.");
                 return null;
@@ -130,9 +143,8 @@ class GradeFormulaCompiler {
     private function parse_grade_word($gkey, $no_local) {
         if ($this->state->context
             && !$no_local
-            && ($ge = $this->state->context->pset->gradelike_by_key($gkey))
-            && $ge !== $this->state->context) {
-            return $this->parse_grade_entry($ge);
+            && ($gf = $this->parse_pset_grade($this->state->context->pset, $gkey, $this->state->context))) {
+            return $gf;
         } else if (($gf = $this->conf->formula_by_name($gkey))) {
             $e = $gf->formula();
             if (!$e || $e instanceof Error_GradeFormula) {

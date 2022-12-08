@@ -164,6 +164,10 @@ export function hoturl_absolute_base() {
     return siteinfo.absolute_base;
 }
 
+export function hoturl_get_go(page, options) {
+    window.location = hoturl(page, options);
+}
+
 export function hoturl_post_go(page, options, data) {
     const form = document.createElement("form");
     form.setAttribute("method", "post");

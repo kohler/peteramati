@@ -101,10 +101,12 @@ function focus_at(felt) {
 
 function popup_near(elt, anchor) {
     tooltip.erase();
-    if (elt.jquery)
+    if (elt.jquery) {
         elt = elt[0];
-    while (!hasClass(elt, "modal-dialog"))
+    }
+    while (!hasClass(elt, "modal-dialog")) {
         elt = elt.childNodes[0];
+    }
     var bgelt = elt.parentNode;
     addClass(bgelt, "show");
     addClass(document.body, "modal-open");
@@ -119,16 +121,18 @@ function popup_near(elt, anchor) {
         x = Math.max(wg.left + 5, Math.min(wg.right - 5 - elt.offsetWidth, x)) - po.left;
         elt.style.left = x + "px";
     }
-    var efocus;
-    $(elt).find("input, button, textarea, select").filter(":visible").each(function () {
-        if (hasClass(this, "want-focus")) {
-            efocus = this;
-            return false;
-        } else if (!efocus
-                   && !hasClass(this, "dangerous")
-                   && !hasClass(this, "no-focus")) {
-            efocus = this;
-        }
+    queueMicrotask(function () {
+        let efocus;
+        $(elt).find("input, button, textarea, select").each(function () {
+            if ((hasClass(this, "want-focus")
+                 || (!efocus && !hasClass(this, "dangerous") && !hasClass(this, "no-focus")))
+                && $(this).is(":visible")) {
+                efocus = this;
+                if (hasClass(this, "want-focus")) {
+                    return false;
+                }
+            }
+        });
+        efocus && focus_at(efocus);
     });
-    efocus && focus_at(efocus);
 }

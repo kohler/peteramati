@@ -156,6 +156,8 @@ class Pset {
     private $_late_hours;
     /** @var ?GradeEntry */
     private $_student_timestamp;
+    /** @var ?GradeEntry */
+    private $_placeholder_entry;
 
     /** @var array<string,DownloadEntryConfig> */
     public $downloads = [];
@@ -791,6 +793,16 @@ class Pset {
         }
         return $this->_student_timestamp;
     }
+
+    /** @return GradeEntry
+     * @suppress PhanAccessReadOnlyProperty */
+    function placeholder_entry() {
+        if (!$this->_placeholder_entry) {
+            $this->_placeholder_entry = GradeEntry::make_special($this, "____placeholder____", "checkbox", GradeEntry::GTYPE_PLACEHOLDER);
+        }
+        return $this->_placeholder_entry;
+    }
+
 
     /** @param 1|4 $vf
      * @return int|float */

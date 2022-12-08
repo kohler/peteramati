@@ -339,7 +339,8 @@ function download_psets_report($request) {
     foreach ($students as $s) {
         $csv->add_row(get_object_vars($s));
     }
-    $csv->download_headers("gradereport.csv");
+    $csv->set_filename("gradereport.csv");
+    $csv->download_headers();
     $csv->download();
     exit;
 }

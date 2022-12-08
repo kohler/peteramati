@@ -32,6 +32,8 @@ import "./gc-multicheckbox.js";
 import "./gc-select.js";
 import "./gc-markdown.js";
 import "./gc-timermark.js";
+import "./ptable-grades.js";
+import "./ptable-diff.js";
 import { pa_pset_table } from "./ptable.js";
 import LinkifyIt from "linkify-it";
 window.markdownit.linkify = LinkifyIt();

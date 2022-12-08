@@ -2,8 +2,8 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { addClass, removeClass, toggleClass, HtmlCollector, input_differs } from "./ui.js";
-import { hoturl, hoturl_post_go } from "./hoturl.js";
+import { addClass, removeClass, toggleClass, HtmlCollector, input_differs, handle_ui } from "./ui.js";
+import { hoturl } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
 import { popup_skeleton } from "./popup.js";
@@ -56,7 +56,7 @@ function gdialog_section_click(event) {
 }
 
 
-export function ptable_gdialog(ptconf, checked_spos, table) {
+function ptable_gdialog(ptconf, checked_spos, table) {
     let $gdialog, gdialog_su,
         gradesheet = ptconf.gradesheet,
         uid2tr = make_uid2tr(table.tBodies[0].firstChild);
@@ -76,59 +76,25 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
         }
     }
 
-    function gdialog_gradesheet_submit() {
-        const $gsi = $gdialog.find(".pa-gdialog-gradesheet input"),
-            ge = [], us = [];
-        for (let i = 0; i !== $gsi.length; ++i) {
-            if ($gsi[i].checked)
-                ge.push(gradesheet.entries[$gsi[i].name]);
-        }
-        for (let su of gdialog_su) {
-            us.push(su.uid);
-        }
-        if (ge.length === 0) {
-            alert("No grades selected.");
-        } else {
-            const opt = {pset: ptconf.key, anonymous: ptconf.anonymous ? 1 : "", users: us.join(" ")};
-            if (ge.length === 1 && ge[0].landmark_range_file) {
-                opt.file = ge[0].landmark_range_file;
-                opt.lines = ge[0].landmark_range_first + "-" + ge[0].landmark_range_last;
-            }
-            opt.grade = ge[0].key;
-            for (let i = 1; i !== ge.length; ++i) {
-                opt.grade += " " + ge[i].key;
-            }
-            hoturl_post_go("=diffmany", opt);
-        }
-    }
-
     function gdialog_store(next) {
-        const gradesheet_mode = $gdialog.find("button[name=mode-gradesheet]").hasClass("btn-primary");
         let any = false, byuid = {};
-        if (gradesheet_mode) {
-            if (!next) {
-                gdialog_gradesheet_submit();
-                return;
-            }
-        } else {
-            $gdialog.find(".pa-gradevalue").each(function () {
-                if ((this.hasAttribute("data-pa-unmixed") || input_differs(this))
-                    && !this.indeterminate) {
-                    let k = this.name, ge = gradesheet.entries[k], v;
-                    if (this.type === "checkbox") {
-                        v = this.checked ? this.value : "";
-                    } else {
-                        v = $(this).val();
-                    }
-                    for (let su of gdialog_su) {
-                        byuid[su.uid] = byuid[su.uid] || {grades: {}, oldgrades: {}};
-                        byuid[su.uid].grades[k] = v;
-                        byuid[su.uid].oldgrades[k] = ge.value_in(su);
-                    }
-                    any = true;
+        $gdialog.find(".pa-gradevalue").each(function () {
+            if ((this.hasAttribute("data-pa-unmixed") || input_differs(this))
+                && !this.indeterminate) {
+                let k = this.name, ge = gradesheet.entries[k], v;
+                if (this.type === "checkbox") {
+                    v = this.checked ? this.value : "";
+                } else {
+                    v = $(this).val();
                 }
-            });
-        }
+                for (let su of gdialog_su) {
+                    byuid[su.uid] = byuid[su.uid] || {grades: {}, oldgrades: {}};
+                    byuid[su.uid].grades[k] = v;
+                    byuid[su.uid].oldgrades[k] = ge.value_in(su);
+                }
+                any = true;
+            }
+        });
         next = next || function () { $gdialog.close(); };
         if (!any) {
             next();
@@ -229,6 +195,7 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
             event.preventDefault();
         } else if (event.key === "Esc" || event.key === "Escape") {
             event.stopImmediatePropagation();
+            event.preventDefault();
             $gdialog.close();
         } else if (event.key === "Backspace"
                    && this.hasAttribute("placeholder")
@@ -257,24 +224,6 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
         $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         gl.classList.remove("hidden");
         $gdialog.find("button[name=bsubmit]").text("Save").removeClass("hidden");
-    }
-    function gdialog_mode_gradesheet() {
-        const gs = $gdialog.find(".pa-gdialog-gradesheet")[0];
-        if (!gs.firstChild) {
-            const yc = new HtmlCollector;
-            let in_section = false;
-            for (let i = 0; i !== gradesheet.order.length; ++i) {
-                const ge = gradesheet.entries[gradesheet.order[i]],
-                    gcl = in_section && ge.type !== "section" ? "checki ml-4" : "checki",
-                    ccl = ge.type === "section" ? " pa-gdialog-section" : "";
-                yc.push('<label class="'.concat(gcl, '"><span class="checkc"><input type="checkbox" name="', ge.key, '" class="uic js-range-click', ccl, '" data-range-type="mge"></span>', ge.title_html, '</label>'));
-                in_section = in_section || ge.type === "section";
-            }
-            gs.innerHTML = yc.render();
-        }
-        $gdialog.find(".pa-gdialog-tab").addClass("hidden");
-        gs.classList.remove("hidden");
-        $gdialog.find("button[name=bsubmit]").text("Edit gradesheet").removeClass("hidden");
     }
     function gdialog_settings_submit() {
         const gs = $gdialog.find(".pa-gdialog-settings")[0],
@@ -482,9 +431,7 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
     }
     function gdialog_mode() {
         $gdialog.find(".nav-pills button").removeClass("btn-primary");
-        if (this.name === "mode-gradesheet") {
-            gdialog_mode_gradesheet();
-        } else if (this.name === "mode-settings") {
+        if (this.name === "mode-settings") {
             gdialog_mode_settings();
         } else {
             gdialog_mode_values();
@@ -500,12 +447,10 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
 
         hc.push('<div class="nav-pills">', '</div>');
         hc.push('<button type="button" class="btn btn-primary no-focus is-mode" name="mode-values">Values</button>');
-        hc.push('<button type="button" class="btn no-focus is-mode" name="mode-gradesheet">Gradesheet</button>');
         hc.push('<button type="button" class="btn no-focus is-mode" name="mode-settings">Settings</button>');
         hc.pop();
 
         hc.push('<div class="pa-gdialog-tab pa-gradelist is-modal"></div>');
-        hc.push('<div class="pa-gdialog-tab pa-gdialog-gradesheet multicol-3 hidden"></div>');
         hc.push('<div class="pa-gdialog-tab pa-gdialog-settings hidden"></div>');
 
         hc.push_actions();
@@ -532,3 +477,17 @@ export function ptable_gdialog(ptconf, checked_spos, table) {
 
     show();
 }
+
+handle_ui.on("js-gdialog", function () {
+    const f = this.closest("form"), ptconf = f.pa__ptconf,
+        sus = ptconf.checked_users_in(f);
+    if (sus.length === 0) {
+        alert("Select one or more students first");
+    } else {
+        const spos = [];
+        for (const su of sus) {
+            spos.push(su._spos);
+        }
+        ptable_gdialog(ptconf, spos, f.querySelector("table.gtable"));
+    }
+});

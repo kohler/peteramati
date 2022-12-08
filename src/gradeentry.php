@@ -98,6 +98,7 @@ class GradeEntry {
     const GTYPE_FORMULA = 1;
     const GTYPE_LATE_HOURS = 2;
     const GTYPE_STUDENT_TIMESTAMP = 3;
+    const GTYPE_PLACEHOLDER = 4;
 
     const VTNUMBER = 0;
     const VTBOOL = 1;
@@ -667,6 +668,9 @@ class GradeEntry {
         }
         if ($this->max && ($vf >= VF_TF || $this->max_visible)) {
             $gej["max"] = $this->max;
+        }
+        if ($this->collate && $vf >= VF_TF) {
+            $gej["collate"] = true;
         }
         if ($this->table_color) {
             $gej["table_color"] = $this->table_color;

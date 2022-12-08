@@ -9,7 +9,6 @@ import { hoturl, hoturl_post_go } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
 import { GradeSheet } from "./gradeentry.js";
 import { popup_skeleton, popup_close } from "./popup.js";
-import { ptable_gdialog } from "./ptable-grades.js";
 import { tooltip } from "./tooltip.js";
 
 
@@ -109,6 +108,8 @@ class PtableConf {
         this.need_total = !!pconf.need_total;
         this.total_key = pconf.total_key;
         this.runners = pconf.runners || [];
+        this.diff_files = pconf.diff_files || [];
+        this.reports = pconf.reports || [];
         this.col = pconf.col || null;
 
         this.data = data;
@@ -238,6 +239,24 @@ class PtableConf {
             }
             this.uidmap[s.uid] = s;
         }
+    }
+
+    users_in(form, checked_only) {
+        const table = form.querySelector("table.gtable"),
+            cbidx = this.colmap.checkbox.index,
+            sus = [];
+        for (let tr = table.tBodies[0].firstChild; tr; tr = tr.nextSibling) {
+            const spos = tr.getAttribute("data-pa-spos"),
+                su = spos ? this.smap[spos] : null;
+            if (su && (!checked_only || tr.children[cbidx].firstChild.checked)) {
+                sus.push(su);
+            }
+        }
+        return sus;
+    }
+
+    checked_users_in(form) {
+        return this.users_in(form, true);
     }
 }
 
@@ -1169,18 +1188,6 @@ function pa_render_pset_table(ptconf) {
         }
     }
 
-    $j.closest("form").on("click", ".js-gdialog", function (event) {
-        const checked_spos = $j.find(".papsel:checked").toArray().map(function (x) {
-                return x.parentElement.parentElement.getAttribute("data-pa-spos");
-            });
-        if (checked_spos.length === 0) {
-            alert("Select one or more students first");
-        } else {
-            ptable_gdialog(ptconf, checked_spos, $j[0]);
-        }
-        event.preventDefault();
-    });
-
     function make_overlay_observer() {
         let i = 0;
         while (i !== col.length && !col[i].pin) {
@@ -1483,19 +1490,10 @@ handle_ui.on("js-ptable-run", function () {
     }
 
     function gdialog() {
-        slist = [];
-        let sall = [];
-        const table = $(f).find("table.gtable")[0],
-            cbidx = ptconf.colmap.checkbox.index;
-        for (let tr = table.tBodies[0].firstChild; tr; tr = tr.nextSibling) {
-            const spos = tr.getAttribute("data-pa-spos"),
-                su = spos ? ptconf.smap[spos] : null;
-            if (su) {
-                sall.push(su);
-                tr.children[cbidx].firstChild.checked && slist.push(su);
-            }
+        slist = ptconf.checked_users_in(f);
+        if (slist.length === 0) {
+            slist = ptconf.users_in(f);
         }
-        slist = slist.length ? slist : sall;
 
         const hc = popup_skeleton();
         hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Commands</h2>');

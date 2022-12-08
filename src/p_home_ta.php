@@ -382,6 +382,17 @@ class Home_TA_Page {
                 $jd["runners"][$r->name] = $r->title;
             }
         }
+        if (!$pset->gitless_grades) {
+            foreach ($pset->all_diffconfig() as $dc) {
+                if (($dc->collate || $dc->gradable || ($dc->full && $dc->collate !== false))
+                    && ($f = $dc->exact_filename())) {
+                    $jd["diff_files"][] = $f;
+                }
+            }
+            foreach ($pset->reports as $r) {
+                $jd["reports"][] = ["key" => $r->key, "title" => $r->title];
+            }
+        }
         return $jd;
     }
 
@@ -466,10 +477,8 @@ class Home_TA_Page {
         echo '<div class="gtable-container-0">',
             '<div class="gtable-container-gutter">',
             '<div class="gtable-gutter-content">',
-            '<button type="button" class="ui js-gdialog mb-2 btn-disabled-gray need-tooltip" aria-label="Set grades for selected students" disabled>🛎️</button>';
-        if (false) {
-            echo '<button type="button" class="ui js-ptable-diff mb-2">±</button>';
-        }
+            '<button type="button" class="ui js-gdialog mb-2 btn-disabled-gray need-tooltip" aria-label="Set and configure grades" disabled>🛎️</button>',
+            '<button type="button" class="ui js-ptable-diff mb-2 need-tooltip" aria-label="Diffs, gradesheets, reports">±</button>';
         if (isset($jd["runners"])) {
             echo '<button type="button" class="ui js-ptable-run mb-2 btn-disabled-gray need-tooltip" aria-label="Run commands">🏃🏽‍♀️</button>';
         }
@@ -481,52 +490,7 @@ class Home_TA_Page {
         echo Ht::unstash(),
             '<script>$pa.pset_table($("#', $pset->key, '")[0],',
             json_encode_browser($jd), ',',
-            json_encode_browser($jx), ')</script>';
-
-        $actions = [];
-        if ($this->viewer->isPC) {
-            $stage = -1;
-            $actions["diffmany"] = $pset->gitless ? "Grades" : "Diffs";
-            if (!$pset->gitless_grades) {
-                foreach ($pset->all_diffconfig() as $dc) {
-                    if (($dc->collate
-                         || $dc->gradable
-                         || ($dc->full && $dc->collate !== false))
-                        && ($f = $dc->exact_filename())) {
-                        if ($stage !== -1 && $stage !== 0)
-                            $actions[] = null;
-                        $stage = 0;
-                        $actions["diffmany_$f"] = "$f diffs";
-                    }
-                }
-            }
-            if ($pset->has_grade_collate) {
-                foreach ($pset->grades() as $ge) {
-                    if ($ge->collate) {
-                        if ($stage !== -1 && $stage !== 1) {
-                            $actions[] = null;
-                        }
-                        $stage = 1;
-                        $actions["grademany_{$ge->key}"] = "Grade " . $ge->text_title();
-                    }
-                }
-            }
-            foreach ($pset->reports as $r) {
-                if ($stage !== -1 && $stage !== 2) {
-                    $actions[] = null;
-                }
-                $stage = 2;
-                $actions["report_{$r->key}"] = $r->title;
-            }
-        }
-        if (!empty($actions)) {
-            echo '<span class="nb" style="padding-right:2em">',
-                Ht::select("action", $actions),
-                ' &nbsp;', Ht::submit("doaction", "Go"),
-                '</span>';
-        }
-
-        echo "</form>\n";
+            json_encode_browser($jx), ')</script></form>';
     }
 
 
