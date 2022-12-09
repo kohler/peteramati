@@ -170,8 +170,7 @@ class DiffMany_Page {
         echo "<hr>\n";
     }
 
-    /** @param list<string> $files
-     * @return list<string> */
+    /** @return list<string> */
     private function expand_files(PsetView $info) {
         if (!$info->repo || !$info->hash()) {
             return $this->files;

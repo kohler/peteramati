@@ -184,11 +184,12 @@ class Conf {
 
     const INVALID_TOKEN = "INVALID";
 
-    function __construct($options, $make_dsn) {
+    /** @param array<string,mixed> $options
+     * @param bool $connect */
+    function __construct($options, $connect) {
         // unpack dsn, connect to database, load current settings
-        if ($make_dsn) {
-            $cp = Dbl::parse_connection_params($options);
-            $this->dblink = $cp->connect();
+        if (($cp = Dbl::parse_connection_params($options))) {
+            $this->dblink = $connect ? $cp->connect() : null;
             $this->dbname = $cp->name;
             $this->session_key = "@{$this->dbname}";
         }
