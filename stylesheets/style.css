@@ -3607,6 +3607,15 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 .hidden {
 	display: none;
 }
+.pseudohidden {
+	overflow: visible !important;
+	height: 0 !important;
+	width: 0 !important;
+	margin: 0 !important;
+	border: 0 !important;
+	padding: 0 !important;
+	display: block !important;
+}
 
 /* score help */
 a.help {

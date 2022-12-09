@@ -259,12 +259,12 @@ Sign in to tell us about your code.';
         '<span class="fx2">', $Conf->opt("ldapLogin") ? "Username" : "Email/username",
         '</span><span class="fn2">Email</span></label>',
         Ht::entry("email", $Qreq->email, ["size" => 36, "autofocus" => !$passwordFocus, "autocomplete" => "email"]),
-        Ht::render_feedback_at("email"),
+        Ht::feedback_html_at("email"),
         '</div>',
         '<div class="', Ht::control_class("password", "f-i fx"), '">',
         '<label for="password">Password</label>',
         Ht::password("password", "", ["size" => 36, "autofocus" => $passwordFocus, "autocomplete" => "current-password"]),
-        Ht::render_feedback_at("password"),
+        Ht::feedback_html_at("password"),
         '</div></div>';
     if ($Conf->opt("ldapLogin")) {
         echo "<input type='hidden' name='action' value='login' />\n";
