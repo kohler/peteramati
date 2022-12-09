@@ -30,12 +30,8 @@ class GradeFormulaCompilerState {
 class GradeFormulaCompiler {
     /** @var Conf */
     public $conf;
-    /** @var list<string> */
-    public $errors = [];
-    /** @var list<string> */
-    public $error_decor = [];
-    /** @var list<?string> */
-    public $error_ident = [];
+    /** @var MessageSet */
+    public $ms;
     /** @var GradeFormulaCompilerState */
     private $state;
 
@@ -62,15 +58,18 @@ class GradeFormulaCompiler {
 
     function __construct(Conf $conf) {
         $this->conf = $conf;
+        $this->ms = new MessageSet;
     }
 
     /** @param int $pos1
      * @param int $pos2
      * @param string $msg */
     private function error_at($pos1, $pos2, $msg) {
-        $this->errors[] = $msg;
-        $this->error_decor[] = Ht::contextual_diagnostic($this->state->str, $pos1, $pos2, $msg);
-        $this->error_ident[] = $this->state->ident;
+        $mi = $this->ms->error_at(null, "{$msg} in formula");
+        $mi->landmark = $this->state->ident;
+        $mi->pos1 = $pos1;
+        $mi->pos2 = $pos2;
+        $mi->context = $this->state->str;
     }
 
     /** @param int $pos
@@ -84,7 +83,7 @@ class GradeFormulaCompiler {
         if ($ge->is_formula()) {
             $e = $ge->formula();
             if (!$e || $e instanceof Error_GradeFormula) {
-                $this->error_at($this->state->pos1, $this->state->pos2, "References invalid formula.");
+                $this->error_at($this->state->pos1, $this->state->pos2, "<0>References invalid formula");
             }
             return $e;
         } else {
@@ -122,7 +121,7 @@ class GradeFormulaCompiler {
             if (($gf = $this->parse_pset_grade($pset, $gkey, null))) {
                 return $gf;
             } else {
-                $this->error_at($this->state->pos2 - strlen($gkey), $this->state->pos2, "Undefined grade entry.");
+                $this->error_at($this->state->pos2 - strlen($gkey), $this->state->pos2, "<0>Undefined grade entry");
                 return null;
             }
         } else if ($this->conf->pset_category($pkey)
@@ -132,7 +131,7 @@ class GradeFormulaCompiler {
             }
             return new CategoryTotal_GradeFormula($this->conf, $pkey, ($f & 1) !== 0, ($f & 4) !== 4);
         } else {
-            $this->error_at($this->state->pos1, $this->state->pos1 + strlen($pkey), "Undefined problem set.");
+            $this->error_at($this->state->pos1, $this->state->pos1 + strlen($pkey), "<0>Undefined problem set");
             return null;
         }
     }
@@ -148,7 +147,7 @@ class GradeFormulaCompiler {
         } else if (($gf = $this->conf->formula_by_name($gkey))) {
             $e = $gf->formula();
             if (!$e || $e instanceof Error_GradeFormula) {
-                $this->error_at($this->state->pos1, $this->state->pos2, "References invalid formula.");
+                $this->error_at($this->state->pos1, $this->state->pos2, "<0>References invalid formula");
             }
             return $e;
         } else if (($pset = $this->conf->pset_by_key_or_title($gkey))) {
@@ -156,7 +155,7 @@ class GradeFormulaCompiler {
         } else if ($this->conf->pset_category($gkey)) {
             return new CategoryTotal_GradeFormula($this->conf, $gkey, false, true);
         } else {
-            $this->error_at($this->state->pos1, $this->state->pos2, "Undefined problem set or category.");
+            $this->error_at($this->state->pos1, $this->state->pos2, "<0>Undefined problem set or category");
             return null;
         }
     }
@@ -181,7 +180,7 @@ class GradeFormulaCompiler {
         $p0 = $p = $this->skip_space($p);
 
         if ($p === strlen($s)) {
-            $this->error_near($p, "Expression missing.");
+            $this->error_near($p, "<0>Expression missing");
             return [null, $p];
         } else if ($s[$p] === "(") {
             $p = $this->skip_space($p + 1);
@@ -200,7 +199,7 @@ class GradeFormulaCompiler {
                 }
             }
             if ($p === strlen($s) || $s[$p] !== ")") {
-                $this->error_near($p, "Missing “)”.");
+                $this->error_near($p, "<0>Missing “)”");
                 return [null, $p];
             }
             ++$p;
@@ -213,10 +212,10 @@ class GradeFormulaCompiler {
         }
 
         if ($min !== null && $fe->nargs() < $min) {
-            $this->error_at($p0, $p, "Too few arguments.");
+            $this->error_at($p0, $p, "<0>Too few arguments");
             return [null, $p];
         } else if ($max !== null && $fe->nargs() > $max) {
-            $this->error_at($p0, $p, "Too many arguments.");
+            $this->error_at($p0, $p, "<0>Too many arguments");
             return [null, $p];
         } else {
             return [$fe, $p];
@@ -231,7 +230,7 @@ class GradeFormulaCompiler {
         $p = $this->skip_space($p);
 
         if ($p === strlen($s)) {
-            $this->error_near($p, "Expression missing.");
+            $this->error_near($p, "<0>Expression missing");
             $e = null;
         } else if ($s[$p] === "(") {
             list($e, $p) = $this->parse_prefix($p + 1, self::MIN_PRECEDENCE);
@@ -240,7 +239,7 @@ class GradeFormulaCompiler {
                 if ($p !== strlen($s) && $s[$p] === ")") {
                     ++$p;
                 } else {
-                    $this->error_near($p, "Missing “)”.");
+                    $this->error_near($p, "<0>Missing “)”");
                     $e = null;
                 }
             }
@@ -280,7 +279,7 @@ class GradeFormulaCompiler {
             $p = $this->state->pos2 = $p + strlen($m[0]);
             $e = $this->parse_grade_word($m[0], false);
         } else {
-            $this->error_near($p, "Syntax error.");
+            $this->error_near($p, "<0>Syntax error");
             $e = null;
         }
 
@@ -296,7 +295,7 @@ class GradeFormulaCompiler {
                 if ($prec < $minprec) {
                     return [$e, $p];
                 } else if ($op === ":") {
-                    $this->error_near($p, "Syntax error.");
+                    $this->error_near($p, "<0>Syntax error");
                     return [null, $p];
                 }
                 list($e2, $p) = $this->parse_prefix($p + strlen($op), $op === "**" ? $prec : $prec + 1);
@@ -309,7 +308,7 @@ class GradeFormulaCompiler {
                     $e = new Relation_GradeFormula($op, $e, $e2);
                 } else if ($op === "?") {
                     if (!preg_match('/\G\s*:/s', $s, $m, 0, $p)) {
-                        $this->error_near($p, "Missing “:”.");
+                        $this->error_near($p, "<0>Missing “:”");
                         return [null, $p];
                     }
                     list($e3, $p) = $this->parse_prefix($p + strlen($m[0]), $prec);
@@ -340,7 +339,7 @@ class GradeFormulaCompiler {
         if ($e === null) {
             // skip
         } else if ($this->skip_space($p) !== strlen($s)) {
-            $this->error_near($p, "Syntax error.");
+            $this->error_near($p, "<0>Syntax error");
             $e = null;
         }
         $this->state = $oldstate;

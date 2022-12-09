@@ -1329,6 +1329,38 @@ select.has-warning {
 	border: 1px solid #855c04;
 }
 
+.msg-context, .msg-inform {
+	margin-left: 2rem;
+}
+.msg-context {
+	font-size: smaller;
+	white-space: pre-wrap;
+}
+li:last-child > .msg-context:last-child {
+	padding-bottom: 0.3rem;
+}
+.context-mark {
+	text-decoration-line: underline;
+	text-decoration-style: wavy;
+	text-underline-position: under;
+}
+.context-mark.short {
+	text-decoration-style: dashed;
+}
+.context-caret-mark {
+	position: relative;
+}
+.context-caret-mark::before {
+	content: "^";
+	position: absolute;
+	left: -0.35em;
+	bottom: -1.85ex;
+	font-weight: bold;
+}
+.context-mark.context-caret-mark::before {
+	bottom: -2.5ex;
+}
+
 div.helpside {
 	float: right;
 	width: 20%;

@@ -229,12 +229,8 @@ if (($v = $Conf->setting_data("homemsg"))) {
 if ($Me->privChair) {
     $gc = new GradeFormulaCompiler($Conf);
     $gc->check_all();
-    $t = "";
-    for ($i = 0; $i !== count($gc->errors); ++$i) {
-        $t .= "<div>" . htmlspecialchars($gc->error_ident[$i]) . ": Formula error:<pre>" . $gc->error_decor[$i] . "</pre></div>";
-    }
-    if ($t !== "") {
-        $Conf->warnMsg($t);
+    if ($gc->ms->has_problem()) {
+        $Conf->errorMsg($gc->ms->full_feedback_html());
     }
 }
 
