@@ -418,6 +418,10 @@ class Conf {
         if (!isset($this->opt["contactdb_safePasswords"])) {
             $this->opt["contactdb_safePasswords"] = $this->opt["safePasswords"];
         }
+        if (isset($this->opt["passwordHashMethod"])
+            && !in_array($this->opt["passwordHashMethod"], password_algos())) {
+            unset($this->opt["passwordHashMethod"]);
+        }
 
         // set validate timeouts
         $this->validate_timeout = (float) ($this->opt["validateTimeout"] ?? 5);
