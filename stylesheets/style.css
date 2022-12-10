@@ -2825,6 +2825,14 @@ h3.gdialog-userids {
 .pa-dr > ul, .pa-dr > ol {
 	max-width: 800px;
 }
+.pa-dr blockquote {
+	border-left: 0.2em solid rgba(128, 192, 200, 0.8);
+	padding-left: 0.8em;
+}
+.pa-dr > blockquote {
+	margin-left: 32px;
+	max-width: 768px;
+}
 .pa-dr p.image-container {
 	max-width: 95%;
 }

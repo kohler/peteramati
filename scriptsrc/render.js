@@ -79,10 +79,8 @@ function try_highlight(str, lang, langAttr, token) {
             if (classIndex >= 0 && /^(.*(?: |^))need-lineno((?: |$).*)$/.test(token.attrs[classIndex][1])) {
                 let n = lineIndex >= 0 ? token.attrs[lineIndex][1] : "1";
                 const m = n.match(/^(.*?)(\d*)(\D*)$/),
-                    pfx = m[1], minlen = m[2].startsWith("0") ? m[2].length : 0, sfx = m[3];
-                function fmt(n) {
-                    return pfx + n.toString().padStart(minlen, "0") + sfx;
-                }
+                    pfx = m[1], minlen = m[2].startsWith("0") ? m[2].length : 0, sfx = m[3],
+                    fmt = (n) => pfx + n.toString().padStart(minlen, "0") + sfx;
                 n = m[2] ? +m[2] : 1;
                 let lines = hlstr.split(/\n/);
                 if (lines.length > 0 && lines[lines.length - 1] === "") {
