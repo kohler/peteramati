@@ -71,6 +71,11 @@ fieldset {
 	border-color: #aaa;
 	border-width: 1px;
 }
+.group-only {
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 none !important;
+}
 
 
 /* page background */
@@ -357,9 +362,6 @@ form {
 .d-flex {
 	display: flex !important;
 }
-blockquote.group-only {
-	margin: 0;
-}
 .flex-wrap {
 	flex-wrap: wrap !important;
 }
@@ -495,6 +497,10 @@ blockquote.group-only {
 }
 .justify-content-between {
 	justify-content: between !important;
+}
+
+ol.upper-alpha {
+	list-style-type: upper-alpha;
 }
 
 
