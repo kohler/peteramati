@@ -141,7 +141,8 @@ class GradeStatistics_API {
         }
         $result = $pset->conf->qe_raw($q . " where $notdropped");
         while (($row = $result->fetch_row())) {
-            if (($g = ContactView::pset_grade(json_decode($row[3] ?? $row[1]), $pset))) {
+            if (($jstr = $row[3] ?? $row[1])
+                && ($g = ContactView::pset_grade(json_decode($jstr), $pset))) {
                 $cid = +$row[0];
                 $series->add($cid, $g->total);
                 if ($xseries && $row[2]) {
