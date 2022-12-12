@@ -26,7 +26,7 @@ class Home_Student_Page {
             echo '<div class="pa-grp-hidden">';
         }
         $pseturl = $info->hoturl("pset", ["commit" => null]);
-        echo "<h2><a class=\"btn\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
+        echo "<h2><a class=\"btn pset-title\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
             htmlspecialchars($info->pset->title), "</a>";
         $x = [];
         $c = null;

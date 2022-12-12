@@ -161,7 +161,7 @@ class Home_TA_Page {
 
         echo '<div>',
             Ht::form("", ["id" => "pa-pset-flagged"]),
-            '<h3 class="pa-home-pset">flagged commits</h3>',
+            '<h3 class="pset-title">flagged commits</h3>',
             '<div class="gtable-container-0">',
             '<div class="gtable-container-1">',
             '<table class="gtable"></table></div></div>',
@@ -411,13 +411,13 @@ class Home_TA_Page {
 
         $jd = $this->pconf($pset, $gexp);
 
-        $psettitle = ($pset->disabled || !$pset->visible ? " pa-p-hidden" : "")
-            . "\">"
+        $psettitle = "pset-title"
+            . ($pset->disabled || !$pset->visible ? " pa-p-hidden\">" : "\">")
             . ($pset->visible && !$pset->scores_visible ? '<span class="pa-scores-hidden-marker"></span>' : '')
             . htmlspecialchars($pset->title);
 
         echo '<form id="', $pset->urlkey, '">';
-        echo "<h3 class=\"pa-home-pset", $psettitle;
+        echo '<h3 class="', $psettitle;
         if ($this->viewer->privChair) {
             echo '<button type="button" class="btn-t small ui js-pset-gconfig btn-disabled-gray">⚙️</button>';
         }
@@ -483,7 +483,7 @@ class Home_TA_Page {
             echo '<button type="button" class="ui js-ptable-run mb-2 btn-disabled-gray need-tooltip" aria-label="Run commands">🏃🏽‍♀️</button>';
         }
         if (count($jx) > 20) {
-            echo '<div class="gtable-gutter-pset', $psettitle, '</div>';
+            echo '<div class="gtable-gutter-pset ', $psettitle, '</div>';
         }
         echo '</div></div>',
             '<div class="gtable-container-1"><table class="gtable want-gtable-fixed"></table></div></div>';

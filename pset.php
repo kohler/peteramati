@@ -383,7 +383,7 @@ class PsetRequest {
                     join("", $b), '</div></form>';
             }
         }
-        echo "<h2>", htmlspecialchars($this->pset->title), "</h2>";
+        echo '<h2 class="pset-title">', htmlspecialchars($this->pset->title), "</h2>";
         ContactView::echo_partner_group($this->info);
         ContactView::echo_repo_group($this->info, $this->info->can_edit_grade());
         ContactView::echo_downloads_group($this->info);
@@ -863,7 +863,7 @@ class PsetRequest {
             $this->conf->add_stylesheet("stylesheets/xterm.css");
             $this->conf->add_javascript("scripts/xterm.js");
         }
-        $this->conf->header(htmlspecialchars($this->pset->title), "home");
+        $this->conf->header('<span class="pset-title">' . htmlspecialchars($this->pset->title) . '</span>', "body-pset");
         if ($this->viewer->isPC) {
             $this->echo_session_list_links();
         }

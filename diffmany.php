@@ -192,7 +192,7 @@ class DiffMany_Page {
             $title .= " > " . join(" ", $this->files);
         }
         $this->conf->set_multiuser_page();
-        $this->conf->header(htmlspecialchars($title), "home");
+        $this->conf->header('<span class="pset-title">' . htmlspecialchars($title) . '</span>', "home");
 
         foreach ($this->pset->grade_script ?? [] as $gs) {
             Ht::stash_html($this->conf->make_script_file($gs));

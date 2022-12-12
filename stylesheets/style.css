@@ -139,7 +139,7 @@ h3 {
 	margin-top: 0;
 	margin-bottom: 1rem;
 }
-.pa-home-pset {
+.pset-title {
 	font-weight: 900;
 }
 .hdr-actions {
@@ -810,7 +810,7 @@ span.impending a {
 }
 .home-pset-links {
 	margin: 0 -24px 1rem;
-	padding: 5px 24px;
+	padding: 8px 24px;
 	background-color: #dffdf0;
 	border-top: 1px solid #b2a584;
 	border-bottom: 1px solid #b2a584;
@@ -2617,7 +2617,6 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 	margin-left: 0.5rem;
 	writing-mode: vertical-rl;
 	transform: rotate(180deg);
-	font-weight: 900;
 }
 .gtable-container-1 {
 	padding-right: 24px;

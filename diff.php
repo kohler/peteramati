@@ -63,7 +63,7 @@ if ($commitb->hash === $Info->grading_hash()) {
 }
 
 
-$Conf->header(htmlspecialchars($Pset->title), "home");
+$Conf->header('<span class="pset-title">' . htmlspecialchars($Pset->title) . '</span>', "home");
 ContactView::echo_heading($User, $Me);
 
 $infoj = $Info->info_json();
