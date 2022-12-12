@@ -486,10 +486,10 @@ class GradeEntry {
             return null;
         } else {
             $d = 0;
-            $lastmul = 0;
+            $lastmul = PHP_INT_MAX;
             $v = strtolower($v);
             while ($v !== "") {
-                if (!preg_match('/\A((?:\d+\.?|\.\d)\d*)\s*([hdwms])\s*(?=[\d.]|\z)(.*)\z/', $v, $m)) {
+                if (!preg_match('/\A(\d+\.?|\d*\.\d+)\s*([hdwms])\s*(?=[\d.]|\z)(.*)\z/', $v, $m)) {
                     return new GradeError("Invalid duration.");
                 }
                 if ($m[2] === "s") {
@@ -503,12 +503,12 @@ class GradeEntry {
                 } else {
                     $mul = 86400 * 7;
                 }
-                if ($lastmul >= $mul) {
+                if ($mul >= $lastmul) {
                     return new GradeError("Invalid duration.");
                 }
-                $lastmul = $mul;
                 $d += floatval($m[1]) * $mul;
                 $v = $m[3];
+                $lastmul = $mul;
             }
             $di = (int) $d;
             return (float) $di === $d ? $di : $d;
