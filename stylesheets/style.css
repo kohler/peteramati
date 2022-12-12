@@ -2594,6 +2594,26 @@ td.mhcb {
 	color: white;
 	background: red;
 }
+.pa-timermark-sticky {
+	position: sticky;
+	margin-left: auto;
+	margin-right: 1rem;
+	top: 4px;
+	z-index: 2;
+}
+.pa-timermark-alert {
+	position: absolute;
+	right: 16px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	display: table;
+	font-variant-numeric: tabular-nums;
+}
+.pa-timermark-alert.urgent {
+	color: red;
+	font-weight: bold;
+	background: yellow;
+}
 
 .gtable {
 	font-size: 75%;

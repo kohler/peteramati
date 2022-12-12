@@ -172,24 +172,35 @@ export function strftime(fmt, d) {
     return t;
 }
 
-export function sec2text(s) {
-    const neg = s < 0 ? "-" : "";
-    if (s < 0) {
-        s = -s;
+export function sec2text(s, style) {
+    s = Math.round(s);
+    if (s > -60 && s < 60) {
+        return s + "s";
     }
+    let t = s < 0 ? "-" : "";
+    s = Math.abs(s);
     if (s >= 3600) {
-        const m = Math.round(s / 60);
-        if (m % 15 == 0) {
-            return sprintf("%s%dh", neg, m / 60);
+        if (s % 900 === 0 && style === "quarterhour") {
+            t = t.concat(s / 3600, "h");
+            s = 0;
         } else {
-            return sprintf("%s%dh%dm", neg, m / 60, m % 60);
+            const h = Math.floor(s / 3600);
+            t = t.concat(h, "h");
+            s -= h * 3600;
+            if (s < 60) {
+                t += "0m";
+            }
         }
-    } else if (s > 360) {
-        return sprintf("%s%dm", neg, Math.round(s / 60));
-    } else {
-        s = Math.ceil(s);
-        return sprintf("%s%dm%ds", neg, s / 60, s % 60);
     }
+    if (s >= 60) {
+        const m = Math.floor(s / 60);
+        t = t.concat(m, "m");
+        s -= m * 60;
+    }
+    if (s !== 0) {
+        t = t.concat(s, "s");
+    }
+    return t;
 }
 
 

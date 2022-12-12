@@ -161,7 +161,7 @@ GradeClass.add("duration", {
         if (v == null) {
             return "";
         } else {
-            return sec2text(v);
+            return sec2text(v, "quarterhour");
         }
     }
 });

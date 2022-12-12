@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { GradeClass } from "./gc.js";
-import { handle_ui, addClass, removeClass } from "./ui.js";
+import { handle_ui, addClass, removeClass, toggleClass } from "./ui.js";
 import { sprintf, strftime, sec2text } from "./utils.js";
 
 
@@ -18,6 +18,29 @@ function timeout_value(ge, gi) {
         return tov;
     } else {
         return ge.timeout;
+    }
+}
+
+function remove_tmto(ge, tm, makesticky) {
+    if (tm && tm.pa__tmto) {
+        clearTimeout(tm.pa__tmto);
+        delete tm.pa__tmto;
+    }
+    if (tm && tm.pa__tmsticky && !makesticky) {
+        tm.pa__tmsticky.parentElement.remove();
+        delete tm.pa__tmsticky;
+    } else if (tm && !tm.pa__tmsticky && makesticky) {
+        const gsection = tm.closest(".pa-gsection");
+        if (gsection) {
+            const e = document.createElement("div"),
+                tms = document.createElement("div");
+            e.className = "pa-gnote pa-timermark-sticky";
+            e.setAttribute("data-pa-grade", ge.key);
+            tms.className = "pa-timermark-alert";
+            e.appendChild(tms);
+            gsection.parentElement.insertBefore(e, gsection);
+            tm.pa__tmsticky = tms;
+        }
     }
 }
 
@@ -72,13 +95,13 @@ GradeClass.add("timermark", {
                     delta = gi.student_timestamp - v,
                     timeout = timeout_value(this, gi);
                 if (timeout && delta > timeout + 120) {
-                    ch[0] += " → " + sts + " ";
+                    ch[0] = ch[0].concat(" → ", sts, " ");
                     const strong = document.createElement("strong");
                     strong.className = "overdue";
-                    strong.textContent = sprintf("(%dh%dm later)", delta / 3600, (delta / 60) % 60);
+                    strong.textContent = "(" + sec2text(delta) + " later)";
                     ch.push(strong);
                 } else {
-                    ch[0] += sprintf(" → %s (%dh%dm later)", sts, delta / 3600, (delta / 60) % 60);
+                    ch[0] = ch[0].concat(" → ", sts, " (", sec2text(delta), " later)");
                 }
             }
             elt.replaceChildren(ch);
@@ -115,6 +138,11 @@ GradeClass.add("timermark", {
         fr.append(sp, gv);
         return fr;
     },
+    unmount: function (elt) {
+        const tm = elt.querySelector(".pa-timermark-result");
+        remove_tmto(this, tm, false);
+        elt.remove();
+    },
     update_edit: function (elt, v, opts) {
         const gi = opts.gradesheet;
         let timeout = timeout_value(this, gi);
@@ -123,17 +151,22 @@ GradeClass.add("timermark", {
         });
         const tm = elt.querySelector(".pa-timermark-result");
         tm.classList.toggle("hidden", !v && !timeout);
-        tm.pa_tmto && clearTimeout(tm.pa_tmto);
-        tm.pa_tmto = null;
+        remove_tmto(this, tm, true);
+        let t = strftime(timefmt, v);
         if (v
             && timeout
-            && v + timeout > +document.body.getAttribute("data-now")) {
-            timermark_interval(this, tm, v, timeout);
+            && v + timeout + 600 > +document.body.getAttribute("data-now")) {
+            const arg = {
+                deadline: v + timeout + +document.body.getAttribute("data-time-skew"),
+                start_at_text: t,
+                timeout: timeout,
+                tmelt: tm,
+                stelt: tm.pa__tmsticky
+            };
+            timermark_interval(arg);
         } else if (v) {
-            let t = strftime(timefmt, v);
             if (gi && (gi.student_timestamp || 0) > v) {
-                const delta = gi.student_timestamp - v;
-                t += sprintf(" (updated %dh%dm later at %s)", delta / 3600, (delta / 60) % 60, strftime(timefmt, gi.student_timestamp));
+                t = t.concat(" (updated ", sec2text(gi.student_timestamp - v), " later at ", strftime(timefmt, gi.student_timestamp));
             }
             tm.textContent = t;
         } else if (timeout) {
@@ -152,30 +185,53 @@ handle_ui.on("js-timermark", function () {
     $(elt).trigger("change");
 });
 
-function timermark_interval(ge, tm, gv, timeout) {
-    const delta = +document.body.getAttribute("data-time-skew"),
-        now = new Date().getTime(),
-        left = gv + timeout + delta - now / 1000,
-        ch = [strftime(timefmt, gv)];
-    let next;
-    if (left > 360) {
-        ch[0] = ch[0].concat(" (", sec2text(left), " left)");
-        next = 30000 + Math.floor(left * 1000) % 1000;
-    } else if (left > 0) {
-        ch[0] += " ";
-        const strong = document.createElement("strong");
-        strong.className = "overdue";
-        strong.textContent = "(".concat(sec2text(left), " left)");
-        ch.push(strong);
-        next = 500 + Math.floor(left * 1000) % 500;
-    } else {
-        next = 0;
-    }
-    tm.replaceChildren(...ch);
+function timermark_interval(arg) {
+    const now = new Date().getTime(),
+        dt = Math.round(arg.deadline - now / 1000);
 
-    if (next) {
-        tm.pa_tmto = setTimeout(timermark_interval, next - 1, ge, tm, gv, timeout);
+    const tmch = [arg.start_at_text];
+    if (dt > 630) {
+        tmch[0] = tmch[0].concat(" (", sec2text(Math.ceil(dt / 60) * 60), " left)");
+    } else if (dt > 300) {
+        tmch[0] = tmch[0].concat(" (", sec2text(dt), " left)");
+    } else if (dt >= -599) {
+        const e = document.createElement("strong");
+        e.className = "overdue";
+        e.textContent = "(".concat(sec2text(Math.abs(dt)), dt < 0 ? " over)" : " left)");
+        tmch[0] += " ";
+        tmch.push(e);
     } else {
-        tm.pa_tmto = null;
+        tmch[0] = tmch[0].concat(" (", sec2text(-Math.ceil(dt / 60) * 60), " over)");
     }
+    arg.tmelt.replaceChildren(...tmch);
+
+    if (arg.stelt) {
+        let t;
+        if (dt > 630) {
+            t = sec2text(Math.ceil(dt / 60) * 60) + " left";
+        } else if (dt >= 0) {
+            t = sprintf("%d:%02d left", Math.floor(dt / 60), dt % 60);
+        } else if (dt > -600) {
+            t = sprintf("%d:%02d over", Math.floor(-dt / 60), -dt % 60);
+        } else {
+            t = sec2text(Math.floor(-dt / 60) * 60) + " over";
+        }
+        arg.stelt.replaceChildren(t);
+        toggleClass(arg.stelt, "urgent", dt <= 600 && dt > -900);
+    }
+
+    let nextdt;
+    if (dt > 660 || dt <= -600) {
+        nextdt = Math.floor((dt - 1) / 60) * 60;
+    } else if (dt > 630) {
+        nextdt = 630;
+    } else {
+        nextdt = Math.floor(dt - 0.1);
+    }
+
+    let alarmdelay = (arg.deadline - nextdt) * 1000 - 490 - now;
+    if (alarmdelay <= 0) {
+        alarmdelay += 1000;
+    }
+    arg.tmelt.pa__tmto = setTimeout(timermark_interval, alarmdelay, arg);
 }
