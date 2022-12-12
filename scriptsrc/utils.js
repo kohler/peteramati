@@ -173,16 +173,22 @@ export function strftime(fmt, d) {
 }
 
 export function sec2text(s) {
-    if (s >= 3600 && s % 900 == 0) {
-        return (s / 3600) + "h";
-    } else if (s >= 3600) {
-        s = Math.floor(s / 60);
-        return sprintf("%dh%dm", s / 60, s % 60);
+    const neg = s < 0 ? "-" : "";
+    if (s < 0) {
+        s = -s;
+    }
+    if (s >= 3600) {
+        const m = Math.round(s / 60);
+        if (m % 15 == 0) {
+            return sprintf("%s%dh", neg, m / 60);
+        } else {
+            return sprintf("%s%dh%dm", neg, m / 60, m % 60);
+        }
     } else if (s > 360) {
-        return sprintf("%dm", Math.floor(s / 60));
+        return sprintf("%s%dm", neg, Math.round(s / 60));
     } else {
-        s = Math.floor(s);
-        return sprintf("%dm%ds", s / 60, s % 60);
+        s = Math.ceil(s);
+        return sprintf("%s%dm%ds", neg, s / 60, s % 60);
     }
 }
 
