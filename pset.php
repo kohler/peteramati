@@ -488,7 +488,7 @@ class PsetRequest {
             echo '<div class="pa-gradelist is-main want-pa-landmark-links',
                 $info->can_edit_scores() ? " has-editable-scores" : "",
                 '"></div>';
-            Ht::stash_script('$pa.store_gradeinfo($(".pa-psetinfo")[0],' . json_encode_browser($info->grade_json()) . ');');
+            Ht::stash_script('$pa.gradesheet_store($(".pa-psetinfo")[0],' . json_encode_browser($info->grade_json()) . ');');
             if ($this->pset->has_grade_landmark) {
                 Ht::stash_script('$(function(){$(".pa-psetinfo").each($pa.loadgrades)})');
             }

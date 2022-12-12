@@ -316,6 +316,10 @@ export class GradeEntry {
         }
     }
 
+    unmount_at(elt) {
+        this.gc.unmount.call(this, elt);
+    }
+
     text(v) {
         return this.gc.text.call(this, v);
     }
@@ -479,6 +483,7 @@ export class GradeSheet {
     constructor(x) {
         this.entries = {};
         this.parent = null;
+        this.root = this;
         if (x) {
             this.assign(x);
         }
@@ -487,17 +492,14 @@ export class GradeSheet {
     make_child() {
         const gi = new GradeSheet;
         Object.assign(gi, this);
-        gi.parent = this;
+        gi.parent = gi.root = this;
         return gi;
     }
 
     set_entry(ge) {
-        let gi = this;
-        while (gi.parent) {
-            gi = gi.parent;
-        }
-        gi.entries[ge.key] = ge;
-        ge._all = gi;
+        if (this.entries !== this.root.entries) { throw new Error("!"); }
+        this.entries[ge.key] = ge;
+        ge._all = this.root;
     }
 
     assign(x) {

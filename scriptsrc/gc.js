@@ -56,6 +56,10 @@ export const GradeClass = {
         elt.replaceChildren(...es);
     },
 
+    basic_unmount: function (elt) {
+        elt.remove();
+    },
+
     basic_update_edit: function (elt, v, opts) {
         const ve = elt.querySelector(".pa-gradevalue"),
             gt = this.simple_text(v);
@@ -117,6 +121,7 @@ export const GradeClass = {
         x.mount_show = x.mount_show || GradeClass.basic_mount_show;
         x.mount_edit = x.mount_edit || GradeClass.basic_mount_edit;
         x.update_edit = x.update_edit || GradeClass.basic_update_edit;
+        x.unmount = x.unmount || GradeClass.basic_unmount;
         map[name] = x;
     },
 

@@ -453,52 +453,6 @@ handle_ui.on("pa-grade-button", function (event) {
     }
 });
 
-function gradelist_resolve_section(gi, ge, insp) {
-    let t = "";
-    if (gi.scores_editable && gi.section_has(ge, xge => xge.description)) {
-        t += '<button class="btn ui pa-grade-toggle-description need-tooltip'.concat(insp.closest(".pa-gsection").classList.contains("pa-hide-description") ? ' btn-primary' : '', '" aria-label="Toggle description">…</button>');
-    }
-    if (!gi.answers_editable && gi.section_has(ge, xge => xge.type === "markdown")) {
-        t += '<button class="btn ui pa-grade-toggle-markdown need-tooltip" aria-label="Toggle Markdown">M</button>';
-    }
-    if (gi.scores_editable && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
-        t += '<button class="btn ui pa-grade-toggle-answer need-tooltip" aria-label="Toggle answer editing">E</button>';
-    }
-    let e = insp.firstChild;
-    if (!e.classList.contains("pa-p-section")) {
-        if (t === "") {
-            return;
-        }
-        e = document.createElement("div");
-        e.className = "pa-p pa-p-section";
-        e.appendChild(document.createElement("label"));
-        e.firstChild.className = "pa-pt";
-        e.firstChild.textContent = "—";
-        insp.insertBefore(e, insp.firstChild);
-    }
-    if (hasClass(document.body, "pa-multiuser") && gi.user) {
-        let sp = document.createElement("span");
-        sp.className = "pa-fileref-context";
-        sp.innerText = gi.user + " / ";
-        e.firstChild.insertBefore(sp, e.firstChild.firstChild);
-    }
-
-    addClass(insp, "pa-with-sticky");
-    addClass(e, "pa-sticky");
-    const desc = e.firstChild.nextSibling;
-    if (desc && hasClass(desc, "pa-pdesc")) {
-        addClass(desc, "pa-ptop");
-        hasClass(e, "pa-p-hidden") && addClass(desc, "pa-p-hidden");
-        insp.insertBefore(desc, e.nextSibling);
-    }
-    if (t !== "") {
-        const btnbox = document.createElement("div");
-        btnbox.className = "hdr-actions btnbox";
-        btnbox.innerHTML = t;
-        e.firstChild.appendChild(btnbox);
-    }
-}
-
 function find_top_element_position($es) {
     let section, e, bottom;
     $es.each(function () {
@@ -582,7 +536,7 @@ handle_ui.on("pa-grade-toggle-answer", function (event) {
             const ge = gi.entries[this.getAttribute("data-pa-grade")];
             if (ge.answer) {
                 gi.remount_at(this, mode);
-                gi.update_at(this);
+                gi.update_at(this, {reset: true});
             }
         });
         $(this).find(".pa-grade-toggle-answer").toggleClass("btn-primary", mode !== 0);
@@ -591,20 +545,12 @@ handle_ui.on("pa-grade-toggle-answer", function (event) {
     tooltip.erase();
 });
 
-function pa_resolve_gradelist() {
-    removeClass(this, "need-pa-gradelist");
-    addClass(this, "pa-gradelist");
-    const pi = this.closest(".pa-psetinfo"),
-        gi = GradeSheet.closest(pi);
-    if (!gi) {
-        return;
-    }
-    // obtain list of grades
-    const grl = {};
-    let ch = this.firstChild;
+function gradelist_elementmap(glelt) {
+    const geltmap = {};
+    let ch = glelt.firstChild;
     while (ch) {
         if (hasClass(ch, "pa-grade")) {
-            grl[ch.getAttribute("data-pa-grade")] = ch;
+            geltmap[ch.getAttribute("data-pa-grade")] = ch;
         }
         if (hasClass(ch, "pa-dg")) {
             ch = ch.firstChild;
@@ -615,119 +561,248 @@ function pa_resolve_gradelist() {
             ch = ch.nextSibling;
         }
     }
-    // fill out list of grades
-    ch = this.firstChild;
-    while (ch && !hasClass(ch, "pa-dg") && !hasClass(ch, "pa-grade")) {
+    return geltmap;
+}
+
+function gradelist_make_sections(glelt, gi) {
+    const section_class = "pa-dg pa-gsection".concat(
+        gi.scores_editable ? " pa-hide-description" : "",
+        hasClass(glelt, "is-main") ? " is-main" : ""),
+        new_sections = [];
+    let ch = glelt.firstChild, section = null;
+    for (const k of gi.value_order) {
+        const ge = gi.entries[k];
+        if ((ge.concealed && !gi.scores_editable)
+            || (section !== null && ge.type !== "section")) {
+            continue;
+        }
+        while (ch && !hasClass(ch, "pa-dg") && !hasClass(ch, "pa-grade")) {
+            ch = ch.nextSibling;
+        }
+        if (!ch
+            || !hasClass(ch, "pa-gsection")
+            || ch.getAttribute("data-pa-grade") !== k) {
+            const div = document.createElement("div");
+            div.className = section_class;
+            div.setAttribute("data-pa-grade", k);
+            glelt.insertBefore(div, ch);
+            ch = div;
+            new_sections.push(ch);
+        }
+        if (gi.section_wants_sidebar(ge)
+            && !hasClass(ch, "pa-with-sidebar")) {
+            addClass(ch, "pa-with-sidebar");
+            const sb = document.createElement("div");
+            sb.className = "pa-sidebar";
+            const sdiv = document.createElement("div");
+            sdiv.className = "pa-dg is-mainsb";
+            ch.append(sb, sdiv);
+        }
+        section = ch;
         ch = ch.nextSibling;
     }
-    function remove_from(p, e) {
-        while (e) {
-            const ee = e;
-            e = e.nextSibling;
-            p.removeChild(ee);
-        }
+    return new_sections;
+}
+
+function gradelist_resolve_section(gi, sectione) {
+    const ge = gi.entries[sectione.getAttribute("data-pa-grade")];
+
+    // mark user prefix
+    let prefix = null;
+    if (gi.user && hasClass(document.body, "pa-multiuser")) {
+        prefix = document.createElement("span");
+        prefix.className = "pa-fileref-context";
+        prefix.textContent = gi.user + " / ";
     }
-    let insp = this,
-        sidebar = null,
-        sidebare = null,
-        sectioned = gi.has(xge => xge.description || xge.answer ||
-                xge.type === "section" ||
-                (xge.type === "markdown" && gi.answers_editable === false)),
-        is_main = hasClass(this, "is-main"),
-        section_class = "pa-dg pa-gsection ".concat(gi.scores_editable ? " pa-hide-description" : "", is_main ? " is-main" : "");
+
+    // mark buttons
+    const buttons = [];
+    if (gi.scores_editable && gi.section_has(ge, xge => xge.description)) {
+        const e = document.createElement("button");
+        e.className = "btn ui pa-grade-toggle-description need-tooltip" + (hasClass(sectione, "pa-hide-description") ? " btn-primary" : "");
+        e.setAttribute("aria-label", "Toggle description");
+        e.textContent = "…";
+        buttons.push(e);
+    }
+    if (!gi.answers_editable && gi.section_has(ge, xge => xge.type === "markdown")) {
+        const e = document.createElement("button");
+        e.className = "btn ui pa-grade-toggle-markdown need-tooltip";
+        e.setAttribute("aria-label", "Toggle Markdown");
+        e.textContent = "M";
+        buttons.push(e);
+    }
+    if (gi.scores_editable && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
+        const e = document.createElement("button");
+        e.className = "btn ui pa-grade-toggle-answer need-tooltip";
+        e.setAttribute("aria-label", "Toggle answer editing");
+        e.textContent = "E";
+        buttons.push(e);
+    }
+
+    // find grade parent
+    let parente = sectione;
+    while (!parente.firstChild || !hasClass(parente.firstChild, "pa-p")) {
+        parente = hasClass(parente, "pa-dg") ? parente.firstChild : parente.nextSibling;
+    }
+
+    // add section header if required
+    let headere = parente.firstChild;
+    if (!hasClass(headere, "pa-p-section")) {
+        if (!prefix && !buttons.length) {
+            return;
+        }
+        headere = document.createElement("div");
+        headere.className = "pa-p pa-p-section";
+        const e = document.createElement("label");
+        e.className = "pa-pt";
+        e.textContent = "—";
+        headere.appendChild(e);
+        parente.insertBefore(headere, parente.firstChild);
+    }
+
+    // decorate section header
+    if (prefix) {
+        headere.firstChild.insertBefore(prefix, headere.firstChild.firstChild);
+    }
+    if (buttons.length) {
+        const e = document.createElement("div");
+        e.className = "hdr-actions btnbox";
+        e.append(...buttons);
+        headere.firstChild.appendChild(e);
+    }
+
+    // set stickiness and move description out of sticky region
+    addClass(parente, "pa-with-sticky");
+    addClass(headere, "pa-sticky");
+    const desce = headere.firstChild.nextSibling;
+    if (desce && hasClass(desce, "pa-pdesc")) {
+        addClass(desce, "pa-ptop");
+        hasClass(headere, "pa-p-hidden") && addClass(desce, "pa-p-hidden");
+        parente.insertBefore(desce, headere.nextSibling);
+    }
+}
+
+function gradelist_finish_sidebar(sidebar, sidebarch) {
+    while (sidebarch) {
+        const next = sidebarch.nextSibling;
+        sidebarch.remove();
+        sidebarch = next;
+    }
+    while (!sidebar.firstChild) {
+        const next = sidebar.parentElement;
+        sidebar.remove();
+        sidebar = next;
+    }
+}
+
+function pa_resolve_gradelist() {
+    removeClass(this, "need-pa-gradelist");
+    addClass(this, "pa-gradelist");
+    const pi = this.closest(".pa-psetinfo"),
+        gi = GradeSheet.closest(pi);
+    if (!gi) {
+        return;
+    }
+
+    // obtain list of grade entries
+    const geltmap = gradelist_elementmap(this);
+
+    // set up sections
+    const sectioned = gi.has(xge => xge.description ||
+            xge.answer ||
+            xge.type === "section" ||
+            (xge.type === "markdown" && gi.answers_editable === false)),
+        new_sections = sectioned ? gradelist_make_sections(this, gi) : [];
+
+    // fill out list of grades
+    let chp = this, ch = chp.firstChild,
+        sidebar = null, sidebarch = null;
     for (let i = 0; i !== gi.value_order.length; ++i) {
         const k = gi.value_order[i], ge = gi.entries[k];
         if (!gi.scores_editable && ge.concealed) {
             continue;
         }
 
-        let new_section = null;
-        if (sectioned && (ge.type === "section" || insp === this)) {
-            // end current section
-            while (insp !== this) {
-                remove_from(insp, ch);
-                ch = insp.nextSibling;
-                insp = insp.parentElement;
+        // exit current section if required
+        if (sectioned && chp !== this && ge.type === "section") {
+            while (chp !== this) {
+                ch = chp.nextSibling;
+                chp = chp.parentElement;
             }
-            remove_from(sidebar, sidebare);
-            sidebar = sidebare = null;
-            // add new section if needed
-            if (!ch || !hasClass(ch, "pa-gsection")) {
-                new_section = document.createElement("div");
-                new_section.className = section_class;
-                insp.insertBefore(new_section, ch);
-                ch = new_section;
-                if (gi.section_wants_sidebar(ge)) {
-                    new_section.className += " pa-with-sidebar";
-                    const sb = document.createElement("div");
-                    sb.className = "pa-sidebar";
-                    new_section.appendChild(sb);
-                    const sdiv = document.createElement("div");
-                    sdiv.className = "pa-dg is-mainsb";
-                    new_section.appendChild(sdiv);
-                }
+            if (sidebar) {
+                gradelist_finish_sidebar(sidebar, sidebarch);
+                sidebar = sidebarch = null;
             }
-            // navigate into section
-            while (ch) {
-                if (hasClass(ch, "pa-dg")) {
-                    insp = ch;
-                    ch = ch.firstChild;
-                } else if (hasClass(ch, "pa-sidebar")) {
+        }
+
+        // move into group
+        while (ch && !hasClass(ch, "pa-grade")) {
+            if (hasClass(ch, "pa-dg")) {
+                chp = ch;
+                ch = ch.firstChild;
+            } else {
+                if (hasClass(ch, "pa-sidebar")) {
                     sidebar = ch;
-                    sidebare = ch.firstChild;
-                    ch = ch.nextSibling;
-                } else if (!hasClass(ch, "pa-grade")) {
-                    ch = ch.nextSibling;
-                } else {
-                    break;
                 }
+                ch = ch.nextSibling;
             }
         }
 
         // add grade
-        const gre = grl[k];
-        if (gre && gre === ch) {
-            ch = ch.nextSibling;
-            while (ch && hasClass(ch, "pa-pdesc")) {
-                ch = ch.nextSibling;
+        let gelt = geltmap[k];
+        if (!gelt || gelt !== ch) {
+            if (gelt) {
+                ge.unmount_at(gelt);
+            } else {
+                gelt = ge.render(gi);
             }
-        } else if (gre) {
-            insp.insertBefore(gre, ch);
-        } else {
-            const e = ge.render(gi);
-            insp.insertBefore(e, ch);
-            gi.update_at(e);
+            chp.insertBefore(gelt, ch);
+            gi.update_at(gelt);
+            ch = gelt;
         }
-
-        // separate section heading from description
-        if (new_section) {
-            gradelist_resolve_section(gi, ge, insp);
-        }
+        delete geltmap[k];
 
         // add grade to sidebar
-        if (!ge.answer && sidebar) {
+        if (sidebar && !ge.answer) {
             if (sidebar.className === "pa-sidebar") {
                 if (sidebar.firstChild === null) {
-                    const div = document.createElement("div");
-                    div.className = "pa-gradebox pa-ps";
-                    sidebar.appendChild(div);
+                    const e = document.createElement("div");
+                    e.className = "pa-gradebox pa-ps";
+                    sidebar.appendChild(e);
                 }
                 sidebar = sidebar.firstChild;
-                sidebare = sidebar.firstChild;
+                sidebarch = sidebar.firstChild;
             }
-            if (sidebare && sidebare.getAttribute("data-pa-grade") === k) {
-                sidebare = sidebare.nextSibling;
+            if (sidebarch && sidebarch.getAttribute("data-pa-grade") === k) {
+                sidebarch = sidebarch.nextSibling;
             } else {
                 const e = ge.render(gi);
-                sidebar.insertBefore(e, sidebare);
+                sidebar.insertBefore(e, sidebarch);
                 gi.update_at(e, {sidebar: true});
             }
         }
-    }
-    remove_from(insp, ch);
-    sectioned && remove_from(this, insp.nextSibling);
-    remove_from(sidebar, sidebare);
 
+        ch = ch.nextSibling;
+    }
+
+    // finish sidebar
+    if (sidebar) {
+        gradelist_finish_sidebar(sidebar, sidebarch);
+    }
+
+    // remove remaining grades
+    for (const k in geltmap) {
+        const gelt = geltmap[k],
+            ge = gi.entries[gelt.getAttribute("data-pa-grade")];
+        ge.unmount_at(gelt);
+    }
+
+    // resolve sections
+    for (const sectione of new_sections) {
+        gradelist_resolve_section(gi, sectione);
+    }
+
+    // add links
     if (this.classList.contains("want-psetinfo-links")) {
         const bb = document.createElement("div");
         bb.className = "pa-psetinfo-links btnbox mt-2 mb-2 hidden";
@@ -1126,6 +1201,6 @@ window.$pa = {
     pset_table: pa_pset_table,
     render_text_page: render_text.on_page,
     runmany: pa_runmany,
-    store_gradeinfo: GradeSheet.store,
+    gradesheet_store: GradeSheet.store,
     text_eq: text_eq
 };
