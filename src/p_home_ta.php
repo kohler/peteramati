@@ -419,7 +419,7 @@ class Home_TA_Page {
         echo '<form id="', $pset->urlkey, '">';
         echo '<h3 class="', $psettitle;
         if ($this->viewer->privChair) {
-            echo '<button type="button" class="btn-t small ui js-pset-gconfig btn-disabled-gray">⚙️</button>';
+            echo '<button type="button" class="btn-t small ui js-pset-gconfig ml-2"><span class="filter-gray-if-disabled">⚙️</span></button>';
         }
         echo "</h3>";
         if ($pset->disabled) {
@@ -477,10 +477,10 @@ class Home_TA_Page {
         echo '<div class="gtable-container-0">',
             '<div class="gtable-container-gutter">',
             '<div class="gtable-gutter-content">',
-            '<button type="button" class="ui js-gdialog mb-2 btn-disabled-gray need-tooltip" aria-label="Set and configure grades" disabled>🛎️</button>',
+            '<button type="button" class="ui js-gdialog mb-2 need-tooltip" aria-label="Set and configure grades" disabled><span class="filter-gray-if-disabled">🛎️</span></button>',
             '<button type="button" class="ui js-ptable-diff mb-2 need-tooltip" aria-label="Diffs, gradesheets, reports">±</button>';
         if (isset($jd["runners"])) {
-            echo '<button type="button" class="ui js-ptable-run mb-2 btn-disabled-gray need-tooltip" aria-label="Run commands">🏃🏽‍♀️</button>';
+            echo '<button type="button" class="ui js-ptable-run mb-2 need-tooltip" aria-label="Run commands"><span class="filter-gray-if-disabled">🏃🏽‍♀️</span></button>';
         }
         if (count($jx) > 20) {
             echo '<div class="gtable-gutter-pset ', $psettitle, '</div>';

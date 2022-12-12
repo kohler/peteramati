@@ -453,59 +453,36 @@ handle_ui.on("pa-grade-button", function (event) {
     }
 });
 
-function find_top_element_position($es) {
-    let section, e, bottom;
-    $es.each(function () {
-        section = this;
-        if (this.getBoundingClientRect().bottom > 40)
-            return false;
-    });
-    e = section.firstChild;
-    while (e) {
-        if (e.nodeType === Node.ELEMENT_NODE) {
-            if (hasClass(e, "pa-p")
-                && !hasClass(e, "pa-sticky")
-                && (bottom = e.getBoundingClientRect().bottom) > 40) {
-                return {element: e, bottom: bottom};
-            } else if (hasClass(e, "pa-dg")
-                       && e.firstChild) {
-                e = e.firstChild;
-                continue;
-            }
-        }
-        while (!e.nextSibling && !hasClass(e.parentElement, "pa-gsection")) {
-            e = e.parentElement;
-        }
-        e = e.nextSibling;
-    }
-    return null;
+function button_position_delta(button) {
+    return button.getBoundingClientRect().top - window.scrollY;
 }
 
-function reset_top_element_position(tep) {
-    if (tep) {
-        const bottom = tep.element.getBoundingClientRect().bottom;
-        window.scrollBy(0, Math.ceil(bottom - tep.bottom));
-    }
+function button_reposition_delta(button, delta) {
+    queueMicrotask(() => {
+        const y = button.getBoundingClientRect().top - delta;
+        window.scrollBy(0, y - window.scrollY);
+    })
 }
 
 handle_ui.on("pa-grade-toggle-description", function (event) {
     const me = this.closest(".pa-gsection"),
         $es = event.metaKey ? $(".pa-gsection") : $(me),
         show = hasClass(me, "pa-hide-description"),
-        tep = find_top_element_position($es);
+        tep = button_position_delta(this);
+    tooltip.erase();
     $es.each(function () {
         toggleClass(this, "pa-hide-description", !show);
-        $(this).find(".pa-grade-toggle-description").toggleClass("btn-primary", !show);
+        $(this).find(".pa-grade-toggle-description > span").toggleClass("filter-gray", !show);
     });
-    reset_top_element_position(tep);
-    tooltip.erase();
+    button_reposition_delta(this, tep);
 });
 
 handle_ui.on("pa-grade-toggle-markdown", function (event) {
     const me = this.closest(".pa-gsection"),
         $es = event.metaKey ? $(".pa-gsection") : $(me),
-        show = !hasClass(this, "btn-primary"),
-        tep = find_top_element_position($es);
+        show = hasClass(this.firstChild, "filter-gray"),
+        tep = button_position_delta(this);
+    tooltip.erase();
     $es.each(function () {
         const gi = GradeSheet.closest(this);
         $(this).find(".pa-grade").each(function () {
@@ -519,17 +496,17 @@ handle_ui.on("pa-grade-toggle-markdown", function (event) {
                 }
             }
         });
-        $(this).find(".pa-grade-toggle-markdown").toggleClass("btn-primary", show);
+        $(this).find(".pa-grade-toggle-markdown > span").toggleClass("filter-gray", !show);
     });
-    reset_top_element_position(tep);
-    tooltip.erase();
+    button_reposition_delta(this, tep);
 });
 
 handle_ui.on("pa-grade-toggle-answer", function (event) {
     const me = this.closest(".pa-gsection"),
         $es = event.metaKey ? $(".pa-gsection") : $(me),
-        mode = hasClass(this, "btn-primary") ? 0 : 2,
-        tep = find_top_element_position($es);
+        mode = hasClass(this.firstChild, "filter-gray") ? 2 : 0,
+        tep = button_position_delta(this);
+    tooltip.erase();
     $es.each(function () {
         const gi = GradeSheet.closest(this);
         $(this).find(".pa-grade").each(function () {
@@ -539,10 +516,10 @@ handle_ui.on("pa-grade-toggle-answer", function (event) {
                 gi.update_at(this, {reset: true});
             }
         });
-        $(this).find(".pa-grade-toggle-answer").toggleClass("btn-primary", mode !== 0);
+        $(this).find(".pa-grade-toggle-answer > span").toggleClass("filter-gray", mode === 0);
+        $(this).find(".pa-grade-toggle-markdown").toggleClass("hidden", mode !== 0);
     });
-    reset_top_element_position(tep);
-    tooltip.erase();
+    button_reposition_delta(this, tep);
 });
 
 function gradelist_elementmap(glelt) {
@@ -604,6 +581,15 @@ function gradelist_make_sections(glelt, gi) {
     return new_sections;
 }
 
+function gradelist_section_button(klass, label) {
+    const button = document.createElement("button");
+    button.className = "btn-t ui small need-tooltip " + klass;
+    button.setAttribute("aria-label", label);
+    button.append(document.createElement("span"));
+    button.firstChild.className = "filter-gray";
+    return button;
+}
+
 function gradelist_resolve_section(gi, sectione) {
     const ge = gi.entries[sectione.getAttribute("data-pa-grade")];
 
@@ -618,24 +604,19 @@ function gradelist_resolve_section(gi, sectione) {
     // mark buttons
     const buttons = [];
     if (gi.scores_editable && gi.section_has(ge, xge => xge.description)) {
-        const e = document.createElement("button");
-        e.className = "btn ui pa-grade-toggle-description need-tooltip" + (hasClass(sectione, "pa-hide-description") ? " btn-primary" : "");
-        e.setAttribute("aria-label", "Toggle description");
-        e.textContent = "…";
-        buttons.push(e);
-    }
-    if (!gi.answers_editable && gi.section_has(ge, xge => xge.type === "markdown")) {
-        const e = document.createElement("button");
-        e.className = "btn ui pa-grade-toggle-markdown need-tooltip";
-        e.setAttribute("aria-label", "Toggle Markdown");
-        e.textContent = "M";
+        const e = gradelist_section_button("pa-grade-toggle-description", "Toggle description");
+        toggleClass(e.firstChild, "filter-gray", hasClass(sectione, "pa-hide-description"));
+        e.firstChild.textContent = "📃";
         buttons.push(e);
     }
     if (gi.scores_editable && gi.section_has(ge, xge => xge.answer && xge.type !== "section")) {
-        const e = document.createElement("button");
-        e.className = "btn ui pa-grade-toggle-answer need-tooltip";
-        e.setAttribute("aria-label", "Toggle answer editing");
-        e.textContent = "E";
+        const e = gradelist_section_button("pa-grade-toggle-answer", "Toggle answer editing");
+        e.firstChild.textContent = "✍️";
+        buttons.push(e);
+    }
+    if (!gi.answers_editable && gi.section_has(ge, xge => xge.type === "markdown")) {
+        const e = gradelist_section_button("pa-grade-toggle-markdown", "Toggle Markdown");
+        e.firstChild.className = "icon-markdown filter-gray";
         buttons.push(e);
     }
 
@@ -666,9 +647,9 @@ function gradelist_resolve_section(gi, sectione) {
     }
     if (buttons.length) {
         const e = document.createElement("div");
-        e.className = "hdr-actions btnbox";
+        e.className = "btnbox ml-3";
         e.append(...buttons);
-        headere.firstChild.appendChild(e);
+        headere.firstChild.append(e);
     }
 
     // set stickiness and move description out of sticky region

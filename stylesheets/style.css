@@ -667,7 +667,13 @@ div.merror p, div.info p, div.warning p, div.confirm p, div.help p {
 }
 .icon-markdown {
 	display: inline-block;
-	content: url("data:image/svg+xml,%3Csvg viewBox='0 0 162 73' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 70V2h20l20 25L64 2h20v68H64V31L44 56 24 31v39zm125 0L99 37h20V2h20v35h20z'/%3E%3C/svg%3E");
+	content: url("data:image/svg+xml,%3Csvg viewBox='0 0 162 73' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 70V2h20l20 25L64 2h20v68H64V31L44 56 24 31v39zm125 0L99 37h20V2h20v35h20z' fill='%23333'/%3E%3C/svg%3E");
+	width: 1.553em;
+	height: 0.7em;
+}
+.icon-markdown.filter-gray {
+	display: inline-block;
+	content: url("data:image/svg+xml,%3Csvg viewBox='0 0 162 73' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 70V2h20l20 25L64 2h20v68H64V31L44 56 24 31v39zm125 0L99 37h20V2h20v35h20z' fill='%23888'/%3E%3C/svg%3E");
 	width: 1.553em;
 	height: 0.7em;
 }
@@ -913,8 +919,14 @@ select, button, .btn, button.btn-t:hover {
 	text-indent: 0;
 }
 button.btn-t {
+	border-width: 1px;
+	border-style: solid;
 	border-color: rgba(181, 181, 181, 0);
 	background: none;
+	padding: 2px 2px 3px;
+}
+.btnbox > .btn-t {
+	border-width: 1px;
 }
 .btn-licon {
 	padding: 1px 4px;
@@ -987,8 +999,9 @@ button:disabled, button:disabled:hover,
 	border-color: #c5c5c5;
 	background: rgba(222, 222, 222, 0.5);
 }
-.btn-disabled-gray:disabled {
+.filter-gray, button:disabled .filter-gray-if-disabled {
 	filter: grayscale(80%);
+	color: #888;
 }
 button.btn-link, button.btn-ulink, button.btn-qlink, button.btn-xlink,
 button.btn-link:disabled, button.btn-ulink:disabled, button.btn-qlink:disabled, button.btn-xlink:disabled {
@@ -1050,11 +1063,13 @@ button.btn-link:hover {
 	display: inline-flex;
 	align-items: stretch;
 }
+.btnbox > button, .btnbox > .btn, .btnbox > .btn-t {
+	margin: 0;
+	flex: 0 1 auto;
+}
 .btnbox > button, .btnbox > .btn {
 	border-radius: 0;
 	border-left-width: 0;
-	margin: 0;
-	flex: 0 1 auto;
 }
 .btnbox > button:first-child, .btnbox > .btn:first-child {
 	border-top-left-radius: 4px;
