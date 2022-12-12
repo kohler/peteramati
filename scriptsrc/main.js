@@ -128,10 +128,10 @@ function set_local_time(elt, servtime) {
         else
             s = strftime("%A %#e %b %Y %#r your time", d);
         if (elt.tagName == "SPAN") {
-            elt.innerHTML = " (" + s + ")";
+            elt.textContent = " (" + s + ")";
             elt.style.display = "inline";
         } else {
-            elt.innerHTML = s;
+            elt.textContent = s;
             elt.style.display = "block";
         }
     }

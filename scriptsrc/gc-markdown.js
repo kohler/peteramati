@@ -48,7 +48,7 @@ GradeClass.add("markdown", {
     },
     update_show: function (ve, v, opts) {
         if (v == null || v === "") {
-            ve.innerHTML = "";
+            ve.replaceChildren();
         } else if (this.answer) {
             const gi = opts.gradesheet;
             addClass(ve, "bg-none");
@@ -109,7 +109,7 @@ handle_ui.on("js-toggle-gc-markdown-preview", function () {
         ta.parentElement.removeChild(ta.previousSibling);
         removeClass(ta, "hidden");
         ta.focus();
-        this.innerHTML = "Preview";
+        this.textContent = "Preview";
         removeClass(this.previousSibling, "hidden");
     } else {
         const div = document.createElement("div"),
@@ -123,7 +123,7 @@ handle_ui.on("js-toggle-gc-markdown-preview", function () {
         ta.parentElement.insertBefore(div, ta);
         addClass(ta, "hidden");
         render_text(1, ta.value, inner);
-        this.innerHTML = "Edit";
+        this.textContent = "Edit";
         addClass(this.previousSibling, "hidden");
     }
 });

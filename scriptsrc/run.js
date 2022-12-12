@@ -427,7 +427,7 @@ export function run(button, opts) {
         function set_time() {
             if (erange) {
                 erange.value = tlast;
-                etime.innerHTML = sprintf("%d:%02d.%03d", Math.trunc(tlast / 60000), Math.trunc(tlast / 1000) % 60, Math.trunc(tlast) % 1000);
+                etime.textContent = sprintf("%d:%02d.%03d", Math.trunc(tlast / 60000), Math.trunc(tlast / 1000) % 60, Math.trunc(tlast) % 1000);
             }
         }
 

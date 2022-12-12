@@ -64,20 +64,24 @@ GradeClass.add("timermark", {
     update_show: function (elt, v, opts) {
         const gi = opts.gradesheet;
         if (v == null || v === 0) {
-            elt.innerText = "";
+            elt.textContent = "";
         } else {
-            let t = strftime(timefmt, v);
+            let ch = [strftime(timefmt, v)];
             if (gi && (gi.student_timestamp || 0) > v) {
                 const sts = strftime(timefmt, gi.student_timestamp),
                     delta = gi.student_timestamp - v,
                     timeout = timeout_value(this, gi);
                 if (timeout && delta > timeout + 120) {
-                    t += sprintf(" → %s <strong class=\"overdue\">(%dh%dm later)</strong>", sts, delta / 3600, (delta / 60) % 60);
+                    ch[0] += " → " + sts + " ";
+                    const strong = document.createElement("strong");
+                    strong.className = "overdue";
+                    strong.textContent = sprintf("(%dh%dm later)", delta / 3600, (delta / 60) % 60);
+                    ch.push(strong);
                 } else {
-                    t += sprintf(" → %s (%dh%dm later)", sts, delta / 3600, (delta / 60) % 60);
+                    ch[0] += sprintf(" → %s (%dh%dm later)", sts, delta / 3600, (delta / 60) % 60);
                 }
             }
-            elt.innerHTML = t;
+            elt.replaceChildren(ch);
         }
         return false;
     },
@@ -131,9 +135,9 @@ GradeClass.add("timermark", {
                 const delta = gi.student_timestamp - v;
                 t += sprintf(" (updated %dh%dm later at %s)", delta / 3600, (delta / 60) % 60, strftime(timefmt, gi.student_timestamp));
             }
-            tm.innerHTML = t;
+            tm.textContent = t;
         } else if (timeout) {
-            tm.innerHTML = "Time once started: " + sec2text(timeout);
+            tm.textContent = "Time once started: " + sec2text(timeout);
         }
     },
     justify: "left",
@@ -151,18 +155,24 @@ handle_ui.on("js-timermark", function () {
 function timermark_interval(ge, tm, gv, timeout) {
     const delta = +document.body.getAttribute("data-time-skew"),
         now = new Date().getTime(),
-        left = gv + timeout + delta - now / 1000;
-    let t = strftime(timefmt, gv), next;
+        left = gv + timeout + delta - now / 1000,
+        ch = [strftime(timefmt, gv)];
+    let next;
     if (left > 360) {
-        t = t.concat(" (", sec2text(left), " left)");
+        ch[0] = ch[0].concat(" (", sec2text(left), " left)");
         next = 30000 + Math.floor(left * 1000) % 1000;
     } else if (left > 0) {
-        t = t.concat(" <strong class=\"overdue\">(", sec2text(left), " left)</strong>");
-        next = 500 + Math.floor(left * 1000) % 1000;
+        ch[0] += " ";
+        const strong = document.createElement("strong");
+        strong.className = "overdue";
+        strong.textContent = "(".concat(sec2text(left), " left)");
+        ch.push(strong);
+        next = 500 + Math.floor(left * 1000) % 500;
     } else {
         next = 0;
     }
-    tm.innerHTML = t;
+    tm.replaceChildren(...ch);
+
     if (next) {
         tm.pa_tmto = setTimeout(timermark_interval, next - 1, ge, tm, gv, timeout);
     } else {
