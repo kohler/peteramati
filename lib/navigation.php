@@ -456,7 +456,6 @@ class Navigation {
     /** @param string $url
      * @return void */
     static function redirect_absolute($url) {
-        assert(str_starts_with($url, "https://") || str_starts_with($url, "http://"));
         // Might have an HTML-encoded URL; decode at least &amp;.
         $url = str_replace("&amp;", "&", $url);
         header("Location: $url");
