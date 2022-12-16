@@ -127,6 +127,20 @@ class PtableConf {
         this.uidmap = [];
     }
 
+    set_gradesheet(gi) {
+        this.gradesheet = gi;
+        this.in_total_indexes = [];
+        this.answer_indexes = [];
+        for (let i = 0; i !== gi.value_order.length; ++i) {
+            const ge = gi.entries[gi.value_order[i]];
+            if (ge.answer) {
+                this.answer_indexes.push(i);
+            } else if (ge.in_total && ge.key !== this.total_key) {
+                this.in_total_indexes.push(i);
+            }
+        }
+    }
+
     ukey(s) {
         return (this.anonymous && s.anon_user) || s.user || "";
     }
@@ -670,7 +684,7 @@ function pa_render_pset_table(ptconf) {
     let $j = $(this), table_width = 0, smap = ptconf.smap,
         $overlay = null, name_col, slist_input,
         gradesheet = null,
-        table_entries, need_ngrades,
+        need_ngrades,
         active_nameflag = -1,
         col, colmap, data = ptconf.data;
     let sort = ptconf.sort;
@@ -719,24 +733,16 @@ function pa_render_pset_table(ptconf) {
             ptconf.anonymous = false;
         }
 
-        table_entries = [];
         if (ptconf.grades) {
             gradesheet = new GradeSheet(ptconf.grades);
-            for (let i = 0; i !== gradesheet.value_order.length; ++i) {
-                const k = gradesheet.value_order[i],
-                    ge = gradesheet.entries[k];
-                if (ge.type_tabular) {
-                    table_entries.push(ge);
-                }
-            }
         } else {
-            gradesheet = new GradeSheet;
+            gradesheet = new GradeSheet({order: []});
         }
         gradesheet.scores_visible = ptconf.scores_visible;
-        ptconf.gradesheet = gradesheet;
-        ptconf.table_entries = table_entries;
+        ptconf.set_gradesheet(gradesheet);
 
-        let ngrades_expected = -1, has_late_hours = false, any_visible = ptconf.scores_visible;
+        let ngrades_expected = -1,
+            has_late_hours = false, any_visible = ptconf.scores_visible;
         for (let i = 0; i !== data.length; ++i) {
             const s = data[i] = gradesheet.make_child().assign(data[i]);
             if (s.dropped) {
@@ -749,17 +755,17 @@ function pa_render_pset_table(ptconf) {
             }
             let ngrades = 0;
             if (s.grades) {
-                for (var j = 0; j !== table_entries.length; ++j) {
-                    if (table_entries[j].key != ptconf.total_key
-                        && s.grades[j] != null
-                        && s.grades[j] !== "")
+                for (let x of ptconf.in_total_indexes) {
+                    if (s.grades[x] != null && s.grades[x] !== "")
                         ++ngrades;
                 }
             }
             s.ngrades = ngrades;
             if (ngrades_expected === -1) {
                 ngrades_expected = ngrades;
-            } else if (ngrades_expected !== ngrades && (!s.boringness || ngrades > 0)) {
+            } else if (ngrades_expected >= 0
+                       && ngrades_expected !== ngrades
+                       && (!s.boringness || ngrades > 0)) {
                 ngrades_expected = -2;
             }
             has_late_hours = has_late_hours || !!s.late_hours;
@@ -791,8 +797,9 @@ function pa_render_pset_table(ptconf) {
             if (ptconf.need_total) {
                 col.push("total");
             }
-            for (let i = 0; i !== ptconf.table_entries.length; ++i) {
-                const ge = ptconf.table_entries[i];
+            let gi = ptconf.gradesheet;
+            for (let i = 0; i !== gi.value_order.length; ++i) {
+                const ge = gi.entries[gi.value_order[i]];
                 col.push(ge.configure_column({
                     type: "grade",
                     name: "/g/" + ge.key,
