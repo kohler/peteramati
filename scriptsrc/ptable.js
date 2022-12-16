@@ -80,6 +80,14 @@ function strong(t) {
     return stre;
 }
 
+function user_hover(evt) {
+    if (evt.type === "mouseenter") {
+        tooltip.enter(this, "pa-ptable-user");
+    } else {
+        tooltip.leave(this);
+    }
+}
+
 
 class PtableConf {
     constructor(pconf, data) {
@@ -239,6 +247,12 @@ class PtableConf {
             }
             this.uidmap[s.uid] = s;
         }
+    }
+
+    user_row_checkbox(tr) {
+        const overlay = hasClass(tr.parentElement.parentElement, "gtable-overlay"),
+            cbidx = this.colmap.checkbox[overlay ? "pin_index" : "index"];
+        return cbidx != null ? tr.children[cbidx].firstChild : null;
     }
 
     users_in(form, checked_only) {
@@ -832,6 +846,7 @@ function pa_render_pset_table(ptconf) {
         }
         event.hotlist = {pset: ptconf.flagged_commits ? null : ptconf.key, items: j};
     }
+
     function make_rmap($j) {
         var rmap = {}, tr = $j.find("tbody")[0].firstChild, last = null;
         while (tr) {
@@ -843,6 +858,7 @@ function pa_render_pset_table(ptconf) {
         }
         return rmap;
     }
+
     function resort_table($j) {
         var $b = $j.children("tbody"),
             ncol = $j.children("thead")[0].firstChild.childNodes.length,
@@ -979,6 +995,7 @@ function pa_render_pset_table(ptconf) {
         let tw = 0, cx = [];
         for (let i = 0; i !== col.length; ++i) {
             if (col[i].pin) {
+                col[i].pin_index = cx.length;
                 cx.push(col[i]);
                 tw += col[i].width;
             }
@@ -1036,9 +1053,8 @@ function pa_render_pset_table(ptconf) {
             tr = tr.nextSibling;
         }
         $j.find("input[data-range-type=s61]:checked").each(checkbox_click);
-        if ($overlay) {
-            queueMicrotask(function () { removeClass($overlay[0], "new"); });
-        }
+        $overlay.on("mouseenter mouseleave", "a.pa-user", user_hover);
+        queueMicrotask(function () { removeClass($overlay[0], "new"); });
     }
 
     function render_user_compare(u) {
@@ -1177,14 +1193,12 @@ function pa_render_pset_table(ptconf) {
         const range = this.getAttribute("data-range-type");
         if ((range === "s61" && $overlay) || range === "s61o") {
             const wanto = range === "s61",
-                b0 = this.closest("tbody"),
-                b1 = (wanto ? $overlay : $j)[0].tBodies[0];
-            let r0 = b0.firstChild, r1 = b1.firstChild, rd = this.closest("tr");
-            while (r0 !== rd) {
-                r0 = r0.nextSibling;
-                r1 = r1.nextSibling;
+                tr0 = this.closest("tr"),
+                tr1 = (wanto ? $overlay[0] : $j[0]).rows[tr0.rowIndex],
+                cb1 = ptconf.user_row_checkbox(tr1);
+            if (cb1.checked !== this.checked) {
+                cb1.click();
             }
-            r1.querySelector("[data-range-type=" + (wanto ? "s61o]" : "s61]")).checked = this.checked;
         }
     }
 
@@ -1327,13 +1341,7 @@ function pa_render_pset_table(ptconf) {
         if (evt.detail.rangeType === "s61")
             $(this).find(".js-gdialog").prop("disabled", !evt.detail.newState);
     });
-    $j.on("mouseenter mouseleave", "a.pa-user", function (evt) {
-        if (evt.type === "mouseenter") {
-            tooltip.enter(this, "pa-ptable-user");
-        } else {
-            tooltip.leave(this);
-        }
-    });
+    $j.on("mouseenter mouseleave", "a.pa-user", user_hover);
 }
 
 
