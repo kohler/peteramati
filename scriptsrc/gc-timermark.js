@@ -104,7 +104,7 @@ GradeClass.add("timermark", {
                     ch[0] = ch[0].concat(" → ", sts, " (", sec2text(delta), " later)");
                 }
             }
-            elt.replaceChildren(ch);
+            elt.replaceChildren(...ch);
         }
         return false;
     },
