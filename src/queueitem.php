@@ -378,9 +378,12 @@ class QueueItem {
             if ($runner->nconcurrent !== null) {
                 $qi->nconcurrent = $runner->nconcurrent;
             } else {
-                $qname = $runner->queue ?? "default";
-                $qname = $qname !== "" ? $qname : "default";
-                $qc = $info->conf->config->_queues->{$qname} ?? null;
+                $queuesconfig = $info->conf->config->_queues;
+                $qname = $runner->queue ?? null;
+                if ($qname === "" || !isset($queuesconfig->$qname)) {
+                    $name = "default";
+                }
+                $qc = $queuesconfig->{$qname} ?? null;
                 if (is_object($qc) && is_int($qc->nconcurrent ?? null)) {
                     $qi->nconcurrent = $qc->nconcurrent;
                 }
