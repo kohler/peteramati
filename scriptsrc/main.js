@@ -832,7 +832,7 @@ handle_ui.on("pa-psetinfo-link", function () {
 });
 
 function pa_render_total(gi, tm) {
-    var t = '<div class="pa-total pa-p', ne = 0, nv = 0;
+    var ne = 0, nv = 0;
     for (var k in gi.entries) {
         if (gi.entries[k].in_total) {
             ++ne;
@@ -840,13 +840,21 @@ function pa_render_total(gi, tm) {
                 ++nv;
         }
     }
-    if (ne <= 1)
-        t += ' hidden';
-    else if (nv < ne)
-        t += ' pa-p-hidden';
-    return t.concat('"><div class="pa-pt">total</div>',
-        '<div class="pa-pv"><span class="pa-gradevalue pa-gradewidth"></span> ',
-        '<span class="pa-gradedesc">of ', tm[1], '</span></div></div>');
+    const pdiv = document.createElement("div"),
+        ptdiv = document.createElement("div"),
+        pvdiv = document.createElement("div"),
+        gvspan = document.createElement("span"),
+        gdspan = document.createElement("span");
+    pdiv.className = "pa-total pa-p" + (ne <= 1 ? " hidden" : "") + (nv < ne ? " pa-p-hidden" : "");
+    ptdiv.className = "pa-pt";
+    ptdiv.append(gi.total_type === "subset" ? "subtotal" : "total");
+    pvdiv.className = "pa-pv";
+    gvspan.className = "pa-gradevalue pa-gradewidth";
+    gdspan.className = "pa-gradedesc";
+    gdspan.append("of " + tm[1]);
+    pdiv.append(ptdiv, pvdiv);
+    pvdiv.append(gvspan, " ", gdspan);
+    return pdiv;
 }
 
 function pa_loadgrades() {
@@ -871,7 +879,7 @@ function pa_loadgrades() {
     });
 
     // print totals
-    const tm = gi.total_incomplete ? [null, null] : [gi.grade_total(), gi.grade_maxtotal],
+    const tm = gi.total_type === "hidden" ? [null, null] : [gi.grade_total(), gi.grade_maxtotal],
           total = tm[0] === null ? "" : "" + tm[0];
     if (tm[0] !== null) {
         $(this).find(".pa-gradelist:not(.pa-gradebox)").each(function () {

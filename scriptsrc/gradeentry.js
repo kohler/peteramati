@@ -20,7 +20,7 @@ const gradesheet_props = {
     "commit": true, "base_commit": true, "base_handout": true, "grade_commit": true, "emptydiff": true,
     "late_hours": true, "auto_late_hours": true,
     "student_timestamp": true, "grades_latest": true,
-    "version": true, "history": true, "total_incomplete": true, "total": true,
+    "version": true, "history": true, "total_type": true, "total": true,
     "total_noextra": true, "answer_version": true,
     "scores_editable": true, "answers_editable": true,
     "linenotes": true, "gradercid": true, "has_notes": true, "has_nongrader_notes": true,

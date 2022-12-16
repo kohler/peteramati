@@ -38,8 +38,8 @@ class GradeExport implements JsonSerializable {
     public $total_noextra;
     /** @var bool */
     private $has_total = false;
-    /** @var bool */
-    private $total_incomplete;
+    /** @var ?string */
+    private $total_type;
     /** @var ?string */
     public $grade_commit;
     /** @var ?int */
@@ -227,12 +227,21 @@ class GradeExport implements JsonSerializable {
             } else {
                 $this->total = $this->total_noextra = null;
             }
-            $this->total_incomplete = false;
-            if ($this->vf < VF_TF && $this->vf !== VF_STUDENT_ANY && $any) {
+            $this->total_type = null;
+            if ($any && $this->_fixed_values_vf !== null) {
+                foreach ($this->pset->visible_grades(VF_STUDENT_ANY) as $ge) {
+                    if (!$ge->no_total
+                        && ($this->_fixed_values_vf[$ge->pcview_index] & $this->vf) === 0) {
+                        $this->total_type = "subset";
+                        break;
+                    }
+                }
+            }
+            if ($any && $this->vf < VF_TF && $this->vf !== VF_STUDENT_ANY) {
                 foreach ($this->pset->visible_grades(VF_STUDENT_ANY) as $ge) {
                     if (!$ge->no_total
                         && ($this->_grades_vf[$ge->pcview_index] & $this->vf) === 0) {
-                        $this->total_incomplete = true;
+                        $this->total_type = "hidden";
                         break;
                     }
                 }
@@ -292,8 +301,8 @@ class GradeExport implements JsonSerializable {
             if (!$this->has_total) {
                 $this->total();
             }
-            if ($this->total_incomplete) {
-                $r["total_incomplete"] = true;
+            if ($this->total_type) {
+                $r["total_type"] = $this->total_type;
             }
             if ($this->total !== null) {
                 $r["total"] = $this->total;
