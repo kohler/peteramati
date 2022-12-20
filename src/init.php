@@ -182,14 +182,14 @@ function load_psets_json($exclude_overrides) {
     $json = (object) ["_defaults" => (object) []];
     foreach ($datamap as $fname => $data) {
         if ($data === false) {
-            Multiconference::fail_message("$fname: Required configuration file cannot be read.");
+            Multiconference::fail_message("{$fname}: Required configuration file cannot be read.");
         }
         $x = json_decode($data);
         if (!$x) {
             Json::decode($data); // our JSON decoder provides error positions
-            Multiconference::fail_message("$fname: Invalid JSON. " . Json::last_error_msg());
+            Multiconference::fail_message("{$fname}: Invalid JSON. " . Json::last_error_msg());
         } else if (!is_object($x)) {
-            Multiconference::fail_message("$fname: Not a JSON object.");
+            Multiconference::fail_message("{$fname}: Not a JSON object.");
         }
         object_replace_recursive($json, $x);
     }

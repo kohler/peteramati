@@ -35,8 +35,6 @@ class QueueItem {
 
     /** @var string */
     public $queueclass;
-    /** @var ?int */
-    public $nconcurrent;
     /** @var int */
     public $flags;
     /** @var ?int */
@@ -118,9 +116,6 @@ class QueueItem {
         $this->psetid = (int) $this->psetid;
         $this->repoid = (int) $this->repoid;
 
-        if ($this->nconcurrent !== null) {
-            $this->nconcurrent = (int) $this->nconcurrent;
-        }
         $this->flags = (int) $this->flags;
         if ($this->chain !== null) {
             $this->chain = (int) $this->chain;
@@ -292,6 +287,11 @@ class QueueItem {
         return $this->status >= self::STATUS_CANCELLED;
     }
 
+    /** @return int */
+    function nconcurrent() {
+        return $this->conf->queue($this->queueclass)->nconcurrent;
+    }
+
     /** @return mixed */
     private function evaluate() {
         assert($this->status >= self::STATUS_DONE);
@@ -374,23 +374,7 @@ class QueueItem {
         $qi->status = self::STATUS_UNSCHEDULED;
         if ($runner) {
             $qi->runnername = $runner->name;
-            $qi->nconcurrent = 0;
-            if ($runner->nconcurrent !== null) {
-                $qi->nconcurrent = $runner->nconcurrent;
-            } else {
-                $queuesconfig = $info->conf->config->_queues;
-                $qname = $runner->queue ?? null;
-                if ($qname === "" || !isset($queuesconfig->$qname)) {
-                    $name = "default";
-                }
-                $qc = $queuesconfig->{$qname} ?? null;
-                if (is_object($qc) && is_int($qc->nconcurrent ?? null)) {
-                    $qi->nconcurrent = $qc->nconcurrent;
-                }
-            }
-            if ($qi->nconcurrent <= 0) {
-                $qi->nconcurrent = 10000;
-            }
+            $qi->queueclass = $runner->queue;
             $qi->ensure = $runner->ensure;
         }
 
@@ -503,7 +487,7 @@ class QueueItem {
         $this->conf->qe("insert into ExecutionQueue set reqcid=?, cid=?,
                 runnername=?, psetid=?, repoid=?,
                 bhash=?, runsettings=?, tags=?,
-                queueclass=?, nconcurrent=?, flags=?, chain=?,
+                queueclass=?, flags=?, chain=?,
                 insertat=?, updateat=?,
                 runat=?, runorder=?, status=?,
                 ensure=?, ifneeded=?",
@@ -511,7 +495,7 @@ class QueueItem {
             $this->runnername, $this->psetid, $this->repoid,
             $this->bhash, $this->runsettings ? json_encode_db($this->runsettings) : null,
             $this->tags ? " " . join(" ", $this->tags) . " " : null,
-            $this->queueclass, $this->nconcurrent, $this->flags, $this->chain,
+            $this->queueclass, $this->flags, $this->chain,
             $this->insertat, $this->updateat,
             $this->runat, $this->runorder, $this->status,
             $this->ensure ? json_encode_db($this->ensure) : null, $this->ifneeded);
@@ -710,9 +694,10 @@ class QueueItem {
         }
 
         // if not working, check if can start
-        $nconcurrent = ($this->nconcurrent ?? 0) <= 0 ? 100000 : $this->nconcurrent;
+        $nc = $this->nconcurrent();
+        $ncx = $nc <= 0 ? 1000000 : $nc;
         if ($this->status === self::STATUS_SCHEDULED
-            && $qs->nrunning < min($nconcurrent, $qs->nconcurrent)) {
+            && $qs->nrunning < min($ncx, $qs->nconcurrent)) {
             try {
                 // do not start_command if no command
                 $this->start_command();
@@ -738,8 +723,8 @@ class QueueItem {
             if ($this->runat > 0) {
                 ++$qs->nrunning;
             }
-            if ($this->nconcurrent > 0) {
-                $qs->nconcurrent = max(min($nconcurrent, $qs->nconcurrent), $qs->nrunning);
+            if ($nc > 0) {
+                $qs->nconcurrent = max(min($nc, $qs->nconcurrent), $qs->nrunning);
             }
         }
         return true;

@@ -907,6 +907,13 @@ class UpdateSchema {
             && $conf->ql_ok("alter table Repository drop `snapcommitat`")) {
             $conf->update_schema_version(170);
         }
+        if ($conf->sversion === 170
+            && $conf->ql_ok("alter table `ExecutionQueue` change `queueclass` `queueclass` varbinary(48) NOT NULL")
+            && $conf->ql_ok("alter table `ExecutionQueue` drop key `queueclass`")
+            && $conf->ql_ok("update ExecutionQueue set queueclass=concat(queueclass,'#',nconcurrent) where nconcurrent>0")
+            && $conf->ql_ok("alter table `ExecutionQueue` drop `nconcurrent`")) {
+            $conf->update_schema_version(171);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

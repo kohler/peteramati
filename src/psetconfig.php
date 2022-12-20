@@ -1257,8 +1257,6 @@ class RunnerConfig {
     /** @var ?string */
     public $queue;
     /** @var ?int */
-    public $nconcurrent;
-    /** @var ?int */
     public $rerun_timestamp;
     /** @var ?bool */
     public $xterm_js;
@@ -1347,7 +1345,9 @@ class RunnerConfig {
         $this->evaluate_function = Pset::cstr($loc, $rs, "evaluate_function", "eval");
         $this->display_function = Pset::cstr($loc, $rs, "display_function", "output_function");
         $this->queue = Pset::cstr($loc, $rs, "queue");
-        $this->nconcurrent = Pset::cint($loc, $rs, "nconcurrent");
+        if (($nc = Pset::cint($loc, $rs, "nconcurrent")) !== null) {
+            $this->queue = ($this->queue ?? "") . "#{$nc}";
+        }
         $this->position = Pset::cnum($loc, $rs, "position");
         if ($this->position === null && isset($r->priority)) {
             $this->position = -Pset::cnum($loc, $r, "priority");

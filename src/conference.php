@@ -131,6 +131,8 @@ class Conf {
     private $_psets_by_category;
     /** @var array<string,bool> */
     private $_category_has_extra;
+    /** @var array<string,QueueConfig> */
+    private $_queues = [];
 
     /** @var ?list<FormulaConfig> */
     private $_global_formulas;
@@ -500,6 +502,14 @@ class Conf {
                     $exception->key = $pk;
                     throw $exception;
                 }
+            }
+        }
+
+        // parse queues
+        if (is_object($config->_queues ?? null)) {
+            foreach (get_object_vars($config->_queues) as $qk => $q) {
+                $queue = QueueConfig::make_named($qk, $q);
+                $this->_queues[$queue->key] = $queue;
             }
         }
 
@@ -2448,6 +2458,25 @@ class Conf {
         }
         $this->_canon_formulas[] = $gf;
         return $gf;
+    }
+
+
+    /** @param string $name
+     * @return QueueConfig */
+    function queue($name) {
+        $name = $name ?? "";
+        if (($pos = strpos($name, "#")) !== false
+            && ctype_digit(substr($name, $pos + 1))) {
+            $nconcurrent = intval(substr($name, $pos + 1));
+            $name = substr($name, 0, $pos);
+        } else {
+            $nconcurrent = null;
+        }
+        $qc = $this->_queues[$name] ?? $this->_queues["default"] ?? new QueueConfig;
+        if ($nconcurrent !== null) {
+            $qc->nconcurrent = $nconcurrent;
+        }
+        return $qc;
     }
 
 
