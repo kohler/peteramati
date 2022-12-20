@@ -277,23 +277,40 @@ class RunQueue_Batch {
         if (empty($qf)) {
             $qf[] = "true";
         }
-        $result = $this->conf->qe("select * from ExecutionQueue where status<? and (" . join(" or ", $qf) . ")", QueueItem::STATUS_WORKING, ...$qv);
-        $qids = $qros = [];
-        while (($qi = QueueItem::fetch($this->conf, $result))) {
-            $qids[] = $qi->queueid;
-            $qros[] = $qi->runorder;
-        }
-        Dbl::free($result);
 
-        $old_qros = $qros;
-        shuffle($qros);
+        foreach ([QueueItem::STATUS_SCHEDULED, QueueItem::STATUS_UNSCHEDULED] as $status) {
+            $result = $this->conf->qe("select * from ExecutionQueue
+                    where status=? and (" . join(" or ", $qf) . ")",
+                $status, ...$qv);
+            $qids = $qros = [];
+            while (($qi = QueueItem::fetch($this->conf, $result))) {
+                $qids[] = $qi->queueid;
+                $qros[] = $qi->runorder;
+            }
+            Dbl::free($result);
 
-        $mq = Dbl::make_multi_qe_stager($this->conf->dblink);
-        foreach ($qids as $i => $qid) {
-            $mq("update ExecutionQueue set runorder=? where queueid=? and runorder=? and status<?",
-                $qros[$i], $qid, $old_qros[$i], QueueItem::STATUS_WORKING);
+            // Fisher-Yates shuffle
+            $mq = Dbl::make_multi_qe_stager($this->conf->dblink);
+            for ($i = 0; $i < count($qids) - 1; ++$i) {
+                $j = mt_rand($i, count($qids) - 1);
+                if ($i !== $j) {
+                    $mq("update ExecutionQueue q1, ExecutionQueue q2
+                            set q1.runorder=?, q2.runorder=?
+                            where q1.queueid=? and q1.runorder=? and q1.status=?
+                            and q2.queueid=? and q2.runorder=? and q2.status=?",
+                        $qros[$j], $qros[$i],
+                        $qids[$i], $qros[$i], $status,
+                        $qids[$j], $qros[$j], $status);
+                    $tmp = $qids[$i];
+                    $qids[$i] = $qids[$j];
+                    $qids[$j] = $tmp;
+                    $tmp = $qros[$i];
+                    $qros[$i] = $qros[$j];
+                    $qros[$j] = $tmp;
+                }
+            }
+            $mq(null);
         }
-        $mq(null);
     }
 
     /** @param resource $f
