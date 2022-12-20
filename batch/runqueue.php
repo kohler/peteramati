@@ -12,7 +12,7 @@ if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
 class RunQueue_Batch {
     /** @var Conf */
     public $conf;
-    /** @var 'list'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains' */
+    /** @var 'list'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains'|'randomize' */
     public $mode;
     /** @var ?int */
     public $count;
@@ -263,6 +263,39 @@ class RunQueue_Batch {
         }
     }
 
+    function randomize() {
+        $qc = $this->parse_words();
+        $qf = $qv = [];
+        if (!empty($qc["c"])) {
+            $qf[] = "chain?a";
+            $qv[] = $qc["c"];
+        }
+        if (!empty($qc["q"])) {
+            $qf[] = "queueid?a";
+            $qv[] = $qc["q"];
+        }
+        if (empty($qf)) {
+            $qf[] = "true";
+        }
+        $result = $this->conf->qe("select * from ExecutionQueue where status<? and (" . join(" or ", $qf) . ")", QueueItem::STATUS_WORKING, ...$qv);
+        $qids = $qros = [];
+        while (($qi = QueueItem::fetch($this->conf, $result))) {
+            $qids[] = $qi->queueid;
+            $qros[] = $qi->runorder;
+        }
+        Dbl::free($result);
+
+        $old_qros = $qros;
+        shuffle($qros);
+
+        $mq = Dbl::make_multi_qe_stager($this->conf->dblink);
+        foreach ($qids as $i => $qid) {
+            $mq("update ExecutionQueue set runorder=? where queueid=? and runorder=? and status<?",
+                $qros[$i], $qid, $old_qros[$i], QueueItem::STATUS_WORKING);
+        }
+        $mq(null);
+    }
+
     /** @param resource $f
      * @param QueueItem $qi
      * @param int $old_status */
@@ -301,6 +334,8 @@ class RunQueue_Batch {
             $this->cancel();
         } else if ($this->mode === "pause") {
             $this->pause();
+        } else if ($this->mode === "randomize") {
+            $this->randomize();
         } else if ($this->mode === "list-broken-chains") {
             foreach ($this->broken_chains() as $chain) {
                 fwrite(STDOUT, "C{$chain}\n");
@@ -333,6 +368,7 @@ class RunQueue_Batch {
             "schedule Schedule jobs",
             "cancel Cancel jobs or chains",
             "pause Pause jobs or chains",
+            "randomize Randomize order of unscheduled jobs",
             "list-broken-chains List broken chains",
             "cancel-broken-chains Cancel all broken chains"
         )->description("php batch/runqueue.php SUBCOMMAND [OPTIONS]")
