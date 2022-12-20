@@ -290,26 +290,23 @@ class RunQueue_Batch {
             Dbl::free($result);
 
             // Fisher-Yates shuffle
-            $mq = Dbl::make_multi_qe_stager($this->conf->dblink);
             for ($i = 0; $i < count($qids) - 1; ++$i) {
                 $j = mt_rand($i, count($qids) - 1);
                 if ($i !== $j) {
-                    $mq("update ExecutionQueue q1, ExecutionQueue q2
+                    $result = $this->conf->qe("update ExecutionQueue q1, ExecutionQueue q2
                             set q1.runorder=?, q2.runorder=?
                             where q1.queueid=? and q1.runorder=? and q1.status=?
                             and q2.queueid=? and q2.runorder=? and q2.status=?",
                         $qros[$j], $qros[$i],
                         $qids[$i], $qros[$i], $status,
                         $qids[$j], $qros[$j], $status);
-                    $tmp = $qids[$i];
-                    $qids[$i] = $qids[$j];
-                    $qids[$j] = $tmp;
-                    $tmp = $qros[$i];
-                    $qros[$i] = $qros[$j];
-                    $qros[$j] = $tmp;
+                    if ($result->affected_rows) {
+                        $tmp = $qros[$i];
+                        $qros[$i] = $qros[$j];
+                        $qros[$j] = $tmp;
+                    }
                 }
             }
-            $mq(null);
         }
     }
 
