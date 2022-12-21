@@ -433,7 +433,7 @@ class Getopt {
         }
         if ($this->helpopt !== null
             && (isset($res[$this->helpopt]) || ($res["_subcommand"] ?? null) === "{help}")) {
-            fwrite(STDOUT, $this->help($res[$this->helpopt]));
+            fwrite(STDOUT, $this->help($res[$this->helpopt] ?? false));
             exit(0);
         }
         $res["_"] = array_slice($argv, $i);
@@ -493,10 +493,16 @@ class GetoptOption {
 class CommandLineException extends Exception {
     /** @var ?Getopt */
     public $getopt;
+    /** @var int */
+    public $exitStatus;
+    /** @var int */
+    static public $default_exit_status = 1;
     /** @param string $message
-     * @param ?Getopt $getopt */
-    function __construct($message, $getopt = null) {
+     * @param ?Getopt $getopt
+     * @param ?int $exit_status */
+    function __construct($message, $getopt = null, $exit_status = null) {
         parent::__construct($message);
         $this->getopt = $getopt;
+        $this->exitStatus = $exit_status ?? self::$default_exit_status;
     }
 }

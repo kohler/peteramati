@@ -5,6 +5,7 @@
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     require_once(dirname(__DIR__) . "/src/init.php");
+    CommandLineException::$default_exit_status = 2;
     exit(RunQueue_Batch::make_args(Conf::$main, $argv)->run());
 }
 
@@ -12,7 +13,7 @@ if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
 class RunQueue_Batch {
     /** @var Conf */
     public $conf;
-    /** @var 'list'|'list-chains'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains'|'randomize' */
+    /** @var 'list'|'list-chains'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains'|'randomize'|'pause'|'resume' */
     public $mode;
     /** @var ?int */
     public $count;
@@ -196,12 +197,14 @@ class RunQueue_Batch {
         return ["q" => $q, "c" => $c];
     }
 
-    function schedule() {
+    /** @param bool $is_resume
+     * @return 0|1 */
+    function schedule($is_resume) {
         $qc = $this->parse_words();
         if (!empty($qc["c"])) {
             $result = $this->conf->qe("select * from ExecutionQueue
-                where status<? and chain?a
-                order by runorder asc, queueid asc",
+                    where status<? and chain?a
+                    order by runorder asc, queueid asc",
                 QueueItem::STATUS_CANCELLED, $qc["c"]);
             $sqi = [];
             while (($qix = QueueItem::fetch($this->conf, $result))) {
@@ -218,15 +221,24 @@ class RunQueue_Batch {
                 }
             }
         }
+        $nsched = 0;
         if (!empty($qc["q"])) {
             $result = $this->conf->qe("select * from ExecutionQueue
                     where status<=? and queueid?a",
                 QueueItem::STATUS_UNSCHEDULED, $qc["q"]);
             while (($qix = QueueItem::fetch($this->conf, $result))) {
-                $qix->schedule(0);
+                $old_status = $qix->status();
+                if (!$is_resume || $old_status === QueueItem::STATUS_PAUSED) {
+                    $qix->schedule(0);
+                    if ($this->verbose) {
+                        $this->report(STDOUT, $qix, $old_status);
+                    }
+                    ++$nsched;
+                }
             }
             Dbl::free($result);
         }
+        return $nsched > 0 ? 0 : 1;
     }
 
     function load() {
@@ -291,6 +303,7 @@ class RunQueue_Batch {
         }
     }
 
+    /** @return 0|1 */
     function cancel() {
         $qc = $this->parse_words();
         $qf = $qv = [];
@@ -302,32 +315,39 @@ class RunQueue_Batch {
             $qf[] = "chain?a";
             $qv[] = $qc["c"];
         }
-        if (!empty($qf)) {
-            $this->conf->qe("update ExecutionQueue
-                    set status=?
-                    where status<? and (" . join(" or ", $qf) . ")",
-                QueueItem::STATUS_CANCELLED,
-                QueueItem::STATUS_WORKING, ...$qv);
+        if (empty($qf)) {
+            return 1;
         }
+        $result = $this->conf->qe("update ExecutionQueue
+                set status=?
+                where status<? and (" . join(" or ", $qf) . ")",
+            QueueItem::STATUS_CANCELLED,
+            QueueItem::STATUS_WORKING, ...$qv);
+        return $result->affected_rows > 0 ? 0 : 1;
     }
 
+    /** @return 0|1 */
     function pause() {
         $qc = $this->parse_words();
+        $any = false;
         foreach ($qc["c"] as $chainid) {
-            $this->conf->qe("update ExecutionQueue
+            $result = $this->conf->qe("update ExecutionQueue
                     set status=?
                     where status<? and chain=?
                     order by runorder asc, queueid asc limit 1",
                 QueueItem::STATUS_PAUSED,
                 QueueItem::STATUS_WORKING, $chainid);
+            $any = $any || $result->affected_rows > 0;
         }
         if (!empty($qc["q"])) {
-            $this->conf->qe("update ExecutionQueue
+            $result = $this->conf->qe("update ExecutionQueue
                     set status=?
                     where status<? and queueid?a",
                 QueueItem::STATUS_PAUSED,
                 QueueItem::STATUS_WORKING, $qc["q"]);
+            $any = $any || $result->affected_rows > 0;
         }
+        return $any ? 0 : 1;
     }
 
     function randomize() {
@@ -412,11 +432,13 @@ class RunQueue_Batch {
         } else if ($this->mode === "complete") {
             $this->execute();
         } else if ($this->mode === "schedule") {
-            $this->schedule();
+            return $this->schedule(false);
         } else if ($this->mode === "cancel") {
-            $this->cancel();
+            return $this->cancel();
         } else if ($this->mode === "pause") {
-            $this->pause();
+            return $this->pause();
+        } else if ($this->mode === "resume") {
+            return $this->schedule(true);
         } else if ($this->mode === "randomize") {
             $this->randomize();
         } else if ($this->mode === "list-broken-chains") {
@@ -450,9 +472,10 @@ class RunQueue_Batch {
             "clean Clean queue",
             "once Execute queue once",
             "complete Execute queue to completion",
-            "schedule Schedule jobs",
+            "schedule Schedule jobs or chains",
             "cancel Cancel jobs or chains",
             "pause Pause jobs or chains",
+            "resume Resume jobs or chains",
             "randomize Randomize order of unscheduled jobs",
             "list-broken-chains List broken chains",
             "cancel-broken-chains Cancel all broken chains"

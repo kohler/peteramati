@@ -5,6 +5,7 @@
 class SiteLoader {
     static $map = [
         "CapabilityManager" => "src/capability.php",
+        "CommandLineException" => "lib/getopt.php",
         "CsvGenerator" => "lib/csv.php",
         "CsvParser" => "lib/csv.php",
         "Function_GradeFormula" => "src/gradeformula.php",
