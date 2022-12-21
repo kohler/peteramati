@@ -65,7 +65,7 @@ export class Checkbox_GradeClass {
             element.value = element.checked ? ge.max : "";
         }
         element.type = "text";
-        element.className = (hasClass(element, "ui") || hasClass(element, "uich") ? "uich " : "") + "pa-gradevalue pa-gradewidth";
+        element.className = (hasClass(element, "uich") ? "uich " : "") + "pa-gradevalue pa-gradewidth";
         const container = element.closest(".pa-pv");
         $(container).find(".pa-grade-uncheckbox").remove();
         $(container).find("input[name^=\"" + element.name + ":\"]").addClass("hidden");
@@ -75,7 +75,7 @@ export class Checkbox_GradeClass {
         element.type = "checkbox";
         element.checked = v !== "" && v !== "0";
         element.value = ge.max;
-        element.className = (hasClass(element, "uich") ? "ui " : "") + "pa-gradevalue";
+        element.className = (hasClass(element, "uich") ? "uic uich " : "") + "pa-gradevalue ml-0";
         $(element.closest(".pa-pv")).find(".pa-gradedesc").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
     }
     static finish_mount_edit(ge, chsp) {
