@@ -63,7 +63,12 @@ class RunQueue_Batch {
             if (isset($qix->tags)) {
                 $rest .= " #" . join(" #", $qix->tags);
             }
-            fwrite(STDOUT, "{$n}. #{$qix->queueid} " . $qix->unparse_key() . " {$s} {$t}{$rest}\n");
+            if ($qix->has_response() && $this->verbose) {
+                $rest .= "\n     " . $qix->output_file();
+            }
+            fwrite(STDOUT, str_pad("{$n}. ", 5)
+                   . "#{$qix->queueid}  "
+                   . $qix->unparse_key() . " {$s} {$t}{$rest}\n");
             ++$n;
         }
         Dbl::free($result);
@@ -386,6 +391,7 @@ class RunQueue_Batch {
             "list-broken-chains List broken chains",
             "cancel-broken-chains Cancel all broken chains"
         )->description("php batch/runqueue.php SUBCOMMAND [OPTIONS]")
+         ->otheropt(false)
          ->parse($argv);
 
         $modeargs = [

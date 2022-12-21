@@ -196,6 +196,17 @@ class QueueItem {
         return $this->bhash !== null ? bin2hex($this->bhash) : null;
     }
 
+    /** @return ?RunLogger */
+    function run_logger() {
+        if ($this->_info) {
+            return $this->_info->run_logger();
+        } else if (($pset = $this->pset()) && ($repo = $this->repo())) {
+            return new RunLogger($pset, $repo);
+        } else {
+            return null;
+        }
+    }
+
     /** @return ?RunnerConfig */
     function runner() {
         if (($this->_ocache & 8) === 0) {
@@ -224,6 +235,16 @@ class QueueItem {
     /** @return int */
     function status() {
         return $this->status;
+    }
+
+    /** @return ?string */
+    function output_file() {
+        if ($this->status >= self::STATUS_WORKING
+            && ($rl = $this->run_logger())) {
+            return $rl->output_file($this->runat);
+        } else {
+            return null;
+        }
     }
 
     /** @param bool $verbose
@@ -1135,12 +1156,7 @@ class QueueItem {
      * @param bool $stop
      * @return RunResponse */
     private function command_response($offset, $write, $stop) {
-        if ($this->_info) {
-            $runlog = $this->_info->run_logger();
-        } else {
-            $runlog = new RunLogger($this->pset(), $this->repo());
-        }
-
+        $runlog = $this->run_logger();
         if ((($write ?? "") === "" && !$stop)
             || $runlog->active_job() !== $this->runat) {
             return $runlog->job_response($this->runat, $offset);
@@ -1212,7 +1228,7 @@ class QueueItem {
 
     function cleanup() {
         if ($this->_runstatus === 1) {
-            $runlog = new RunLogger($this->pset(), $this->repo());
+            $runlog = $this->run_logger();
             unlink($runlog->pid_file());
             @unlink($runlog->job_prefix($this->runat) . ".in");
         }

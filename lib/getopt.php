@@ -370,6 +370,8 @@ class Getopt {
                     if ($this->otheropt) {
                         $res["-"][] = $arg;
                         continue;
+                    } else if ($this->otheropt === false) {
+                        throw new CommandLineException("Unknown option `{$arg}`", $this);
                     } else {
                         break;
                     }
