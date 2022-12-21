@@ -414,7 +414,7 @@ class QueueItem {
         $qi->status = self::STATUS_UNSCHEDULED;
         if ($runner) {
             $qi->runnername = $runner->name;
-            $qi->queueclass = $runner->queue;
+            $qi->queueclass = $runner->queue ?? "";
             $qi->ensure = $runner->ensure;
         }
 
