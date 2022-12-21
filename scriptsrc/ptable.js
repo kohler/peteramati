@@ -89,6 +89,10 @@ function user_hover(evt) {
 }
 
 
+const ALL_USERS = 0;
+const CHECKED_USERS = 1;
+const SOME_USERS = 2;
+
 class PtableConf {
     constructor(pconf, data) {
         this.id = pconf.id;
@@ -269,22 +273,39 @@ class PtableConf {
         return cbidx != null ? tr.children[cbidx].firstChild : null;
     }
 
-    users_in(form, checked_only) {
+
+    get ALL_USERS() {
+        return ALL_USERS;
+    }
+
+    get CHECKED_USERS() {
+        return CHECKED_USERS;
+    }
+
+    get SOME_USERS() {
+        return SOME_USERS;
+    }
+
+    users_in(form, users) {
         const table = form.querySelector("table.gtable"),
             cbidx = this.colmap.checkbox.index,
-            sus = [];
+            sus = [], chsus = [];
         for (let tr = table.tBodies[0].firstChild; tr; tr = tr.nextSibling) {
             const spos = tr.getAttribute("data-pa-spos"),
                 su = spos ? this.smap[spos] : null;
-            if (su && (!checked_only || tr.children[cbidx].firstChild.checked)) {
+            if (su) {
                 sus.push(su);
+                if (users && tr.children[cbidx].firstChild.checked)
+                    chsus.push(su);
             }
         }
-        return sus;
-    }
-
-    checked_users_in(form) {
-        return this.users_in(form, true);
+        if (users === SOME_USERS) {
+            return chsus.length > 0 ? chsus : sus;
+        } else if (users === CHECKED_USERS) {
+            return chsus;
+        } else {
+            return sus;
+        }
     }
 }
 
@@ -1505,10 +1526,7 @@ handle_ui.on("js-ptable-run", function () {
     }
 
     function gdialog() {
-        slist = ptconf.checked_users_in(f);
-        if (slist.length === 0) {
-            slist = ptconf.users_in(f);
-        }
+        slist = ptconf.users_in(f, SOME_USERS);
 
         const hc = popup_skeleton();
         hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Commands</h2>');

@@ -480,7 +480,7 @@ function ptable_gdialog(ptconf, checked_spos, table) {
 
 handle_ui.on("js-gdialog", function () {
     const f = this.closest("form"), ptconf = f.pa__ptconf,
-        sus = ptconf.checked_users_in(f);
+        sus = ptconf.users_in(f, ptconf.CHECKED_USERS);
     if (sus.length === 0) {
         alert("Select one or more students first");
     } else {

@@ -216,9 +216,5 @@ function ptable_diffdialog(ptconf, sus) {
 
 handle_ui.on("js-ptable-diff", function () {
     const f = this.closest("form"), ptconf = f.pa__ptconf;
-    let sus = ptconf.checked_users_in(f);
-    if (sus.length === 0) {
-        sus = ptconf.users_in(f);
-    }
-    ptable_diffdialog(ptconf, sus);
+    ptable_diffdialog(ptconf, ptconf.users_in(f, ptconf.SOME_USERS));
 });
