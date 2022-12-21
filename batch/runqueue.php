@@ -114,7 +114,7 @@ class RunQueue_Batch {
         $n = 1;
         foreach ($chains as $chainlist) {
             usort($chainlist, function ($a, $b) {
-                return $b->status <=> $a->status;
+                return $b->status() <=> $a->status();
             });
             $stati = [];
             $tags = null;
