@@ -336,6 +336,11 @@ handle_ui.on("change.pa-gradevalue", function () {
     }
 });
 
+handle_ui.on("click.pa-gradevalue", function () {
+    if (this.type === "checkbox" || this.type === "radio") {
+        queueMicrotask(() => { $(this).trigger("change"); });
+    }
+});
 
 
 function save_grade(self) {

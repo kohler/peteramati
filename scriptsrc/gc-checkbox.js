@@ -30,7 +30,7 @@ GradeClass.add("checkbox", {
     mount_edit: function (elt, id) {
         const ch = document.createElement("input");
         ch.type = "checkbox";
-        ch.className = "ui pa-gradevalue ml-0";
+        ch.className = "uic uich pa-gradevalue ml-0";
         ch.name = this.key;
         ch.id = id;
         ch.value = this.max;
