@@ -579,6 +579,12 @@ export class GradeSheet {
         }
     }
 
+    *value_entries() {
+        for (const key of this.value_order) {
+            yield this.entries[key];
+        }
+    }
+
     remount_at(elt, mode) {
         const ge = this.xentry(elt.getAttribute("data-pa-grade"));
         if (ge) {

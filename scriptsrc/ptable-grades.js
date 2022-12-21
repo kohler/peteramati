@@ -217,7 +217,7 @@ function ptable_gdialog(ptconf, checked_spos, table) {
         const gl = $gdialog.find(".pa-gradelist")[0];
         if (!gl.firstChild) {
             const gi = GradeSheet.closest(gl);
-            for (let te of gi.value_entries) {
+            for (const te of gi.value_entries()) {
                 gl.appendChild(te.render(gi, 1));
             }
         }
