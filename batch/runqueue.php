@@ -12,7 +12,7 @@ if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
 class RunQueue_Batch {
     /** @var Conf */
     public $conf;
-    /** @var 'list'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains'|'randomize' */
+    /** @var 'list'|'list-chains'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains'|'randomize' */
     public $mode;
     /** @var ?int */
     public $count;
@@ -70,7 +70,7 @@ class RunQueue_Batch {
             }
             $rest = $qix->chain ? " C{$qix->chain}" : "";
             if (isset($qix->tags)) {
-                $rest .= " #" . join(" #", $qix->tags);
+                $rest .= " " . $qix->tags_text();
             }
             if ($qix->has_response() && $this->verbose) {
                 $rest .= "\n     " . $qix->output_file();
@@ -81,6 +81,59 @@ class RunQueue_Batch {
             ++$n;
         }
         Dbl::free($result);
+    }
+
+    function list_chains() {
+        if ($this->list_status !== null) {
+            $qf = "status?a";
+            $qstatus = $this->list_status;
+        } else {
+            $qf = "status<?";
+            $qstatus = QueueItem::STATUS_CANCELLED;
+        }
+        $result = $this->conf->qe("select chain, status, tags, min(insertat) insertat, min(runorder) runorder, min(runat) runat, min(queueid) queueid, count(*) group_count from ExecutionQueue
+                where chain is not null and {$qf}
+                group by chain, status, tags",
+            $qstatus);
+        $chains = [];
+        while (($ch = QueueItem::fetch($this->conf, $result))) {
+            $chains[$ch->chain][] = $ch;
+        }
+        Dbl::free($result);
+        usort($chains, function ($a, $b) {
+            $cha = $a[0];
+            $chb = $b[0];
+            if (($cha->status > QueueItem::STATUS_UNSCHEDULED) !== ($chb->status > QueueItem::STATUS_UNSCHEDULED)) {
+                return $cha->status > QueueItem::STATUS_UNSCHEDULED ? -1 : 1;
+            } else if ($cha->runorder !== $chb->runorder) {
+                return $cha->runorder <=> $chb->runorder;
+            } else {
+                return $cha->queueid <=> $chb->queueid;
+            }
+        });
+        $n = 1;
+        foreach ($chains as $chainlist) {
+            usort($chainlist, function ($a, $b) {
+                return $b->status <=> $a->status;
+            });
+            $stati = [];
+            $tags = null;
+            foreach ($chainlist as $ch) {
+                $stati[] = $ch->group_count . " " . $ch->status_text();
+                $chtags = $ch->tags_text();
+                $tags = $tags ?? $chtags;
+                if ($tags !== $chtags) {
+                    $tags = "#<varied>";
+                }
+            }
+            $ch = $chainlist[0];
+            fwrite(STDOUT, str_pad("{$n}. ", 5)
+                   . "C{$ch->chain} " . self::unparse_time($ch->insertat)
+                   . ($tags === "" ? "" : " {$tags}")
+                   . ": " . join(", ", $stati)
+                   . "\n");
+            ++$n;
+        }
     }
 
     function clean() {
@@ -350,6 +403,8 @@ class RunQueue_Batch {
     function run() {
         if ($this->mode === "list") {
             $this->list();
+        } else if ($this->mode === "list-chains") {
+            $this->list_chains();
         } else if ($this->mode === "clean") {
             $this->clean();
         } else if ($this->mode === "once") {
@@ -391,6 +446,7 @@ class RunQueue_Batch {
         )->helpopt("help")
          ->subcommand(
             "list Print queue (default)",
+            "list-chains Print summary of chains",
             "clean Clean queue",
             "once Execute queue once",
             "complete Execute queue to completion",

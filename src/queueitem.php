@@ -59,6 +59,10 @@ class QueueItem {
     /** @var ?string */
     public $eventsource;
 
+    // not in normal objects
+    /** @var ?int */
+    public $group_count;
+
     // object links
     /** @var ?Pset */
     private $_pset;
@@ -147,6 +151,10 @@ class QueueItem {
         $this->updateat = (int) $this->updateat;
         $this->runat = (int) $this->runat;
         $this->status = (int) $this->status;
+
+        if (isset($this->group_count)) {
+            $this->group_count = (int) $this->group_count;
+        }
     }
 
 
@@ -267,6 +275,17 @@ class QueueItem {
             return "done";
         default:
             return "unknown status {$this->status}";
+        }
+    }
+
+    /** @return string */
+    function tags_text() {
+        if ($this->tags === null) {
+            return "";
+        } else if (count($this->tags) === 1) {
+            return "#" . $this->tags[0];
+        } else {
+            return "#" . join(" #", $this->tags);
         }
     }
 
