@@ -304,6 +304,9 @@ class Getopt {
                 }
             }
         }
+        if ($this->helpopt && $arg === "help") {
+            return "{help}";
+        }
         return null;
     }
 
@@ -428,7 +431,8 @@ class Getopt {
             }
             $active_po = $pot === self::MARG2 ? $po : null;
         }
-        if ($this->helpopt !== null && isset($res[$this->helpopt])) {
+        if ($this->helpopt !== null
+            && (isset($res[$this->helpopt]) || ($res["_subcommand"] ?? null) === "{help}")) {
             fwrite(STDOUT, $this->help($res[$this->helpopt]));
             exit(0);
         }
