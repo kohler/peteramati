@@ -20,6 +20,8 @@ class RunQueue_Batch {
     public $words;
     /** @var bool */
     public $verbose = false;
+    /** @var ?list<int> */
+    public $list_status;
     /** @var list<QueueItem> */
     private $running = [];
     /** @var bool */
@@ -44,11 +46,18 @@ class RunQueue_Batch {
     }
 
     function list() {
+        if ($this->list_status !== null) {
+            $qf = "status?a";
+            $qstatus = $this->list_status;
+        } else {
+            $qf = "status<?";
+            $qstatus = QueueItem::STATUS_CANCELLED;
+        }
         $result = $this->conf->qe("select * from ExecutionQueue
-                where status<?
+                where {$qf}
                 order by status>? desc, runorder asc, queueid asc"
                 . ($this->count !== null ? " limit {$this->count}" : ""),
-            QueueItem::STATUS_CANCELLED, QueueItem::STATUS_UNSCHEDULED);
+            $qstatus, QueueItem::STATUS_UNSCHEDULED);
         $n = 1;
         while (($qix = QueueItem::fetch($this->conf, $result))) {
             $s = $qix->status_text(true);
@@ -371,11 +380,12 @@ class RunQueue_Batch {
         $arg = (new Getopt)->long(
             "q,query !",
             "n:,count: {n} =N Print at most N items",
+            "w,working Print only working items",
             "x,execute !",
-            "1 Execute !",
+            "1 ! Execute",
             "c,clean !",
-            "schedule[] =QUEUEID Schedule QUEUEID",
-            "cancel[] =QUEUEID Cancel QUEUEID (or C<CHAINID>)",
+            "schedule[] =QUEUEID ! Schedule QUEUEID",
+            "cancel[] =QUEUEID ! Cancel QUEUEID (or C<CHAINID>)",
             "V,verbose",
             "help"
         )->helpopt("help")
@@ -419,6 +429,9 @@ class RunQueue_Batch {
         }
         if (isset($arg["n"])) {
             $self->count = $arg["n"];
+        }
+        if (isset($arg["w"])) {
+            $self->list_status[] = QueueItem::STATUS_WORKING;
         }
         return $self;
     }
