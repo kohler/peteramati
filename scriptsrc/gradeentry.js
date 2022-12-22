@@ -328,8 +328,8 @@ export class GradeEntry {
         return this.gc.simple_text.call(this, v);
     }
 
-    configure_column(col, pconf) {
-        return this.gc.configure_column.call(this, col, pconf);
+    configure_column(col) {
+        return this.gc.configure_column.call(this, col);
     }
 
     tcell_width() {

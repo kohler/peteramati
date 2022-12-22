@@ -70,13 +70,13 @@ export const GradeClass = {
         }
     },
 
-    basic_configure_column: function (col, pconf) {
+    basic_configure_column: function (col) {
         col.ge = this;
         col.gabbr = this.abbr();
         col.justify = this.gc.justify || "right";
         col.sort_forward = this.gc.sort === "forward";
         const justify = this.gc.justify || "right";
-        col.className = (col.gkey === pconf.total_key ? "gt-total" : "gt-grade") +
+        col.className = (col.gkey === col.ptconf.total_key ? "gt-total" : "gt-grade") +
             (justify === "left" ? " l" : " r");
         if (this.table_color && color_map[this.table_color]) {
             col.className += " " + color_map[this.table_color];

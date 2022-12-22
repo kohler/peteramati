@@ -45,8 +45,8 @@ GradeClass.add("select", {
             ve.remove(0);
         }
     },
-    configure_column: function (col, pconf) {
-        col = GradeClass.basic_configure_column.call(this, col, pconf);
+    configure_column: function (col) {
+        col = GradeClass.basic_configure_column.call(this, col);
         col.className += " gt-el";
         return col;
     },

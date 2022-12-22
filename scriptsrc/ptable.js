@@ -316,26 +316,26 @@ const gcoldef = {
         td: function (tde) {
             tde.className = "gt-rownumber";
         },
-        tw: function (ptconf) {
-            return Math.ceil(Math.log10(Math.max(ptconf.data.length, 1))) * 0.75;
+        tw: function () {
+            return Math.ceil(Math.log10(Math.max(this.ptconf.data.length, 1))) * 0.75;
         }
     },
 
     checkbox: {
         th: '<th class="gt-checkbox" scope="col"><input type="checkbox" class="uic js-range-click is-range-group ignore-diff" data-range-type="s61" aria-label="Select all"></th>',
-        td: function (tde, s, ptconf) {
-            if (ptconf.mode & 1) {
+        td: function (tde, s) {
+            if (this.ptconf.mode & 1) {
                 return;
             }
             tde.className = "gt-checkbox";
             let cbe = document.createElement("input");
             cbe.type = "checkbox";
             cbe.value = 1;
-            if (ptconf.mode & 2) {
+            if (this.ptconf.mode & 2) {
                 cbe.className = "uic js-range-click";
                 cbe.setAttribute("data-range-type", "s61o");
             } else {
-                cbe.name = ptconf.render_checkbox_name(s);
+                cbe.name = this.ptconf.render_checkbox_name(s);
                 cbe.className = this.className || "uic js-range-click papsel";
                 cbe.setAttribute("data-range-type", "s61");
             }
@@ -347,8 +347,8 @@ const gcoldef = {
 
     flagcheckbox: {
         th: '<th class="gt-checkbox" scope="col"></th>',
-        td: function (tde, s, ptconf) {
-            if (ptconf.mode) {
+        td: function (tde, s) {
+            if (this.ptconf.mode) {
                 return;
             }
             tde.className = "gt-checkbox";
@@ -366,10 +366,10 @@ const gcoldef = {
 
     pset: {
         th: '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>',
-        td: function (tde, s, ptconf) {
+        td: function (tde, s) {
             tde.className = "gt-pset";
             let ae = document.createElement("a");
-            ae.href = ptconf.href(s);
+            ae.href = this.ptconf.href(s);
             ae.classname = "track";
             ae.append(siteinfo.psets[s.pset].title + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
             tde.append(ae);
@@ -385,26 +385,26 @@ const gcoldef = {
     },
 
     user: {
-        th: function (ptconf) {
+        th: function () {
             let t = '<span class="heading">';
-            if (ptconf.anonymous || ptconf.sort.u === "user") {
+            if (this.ptconf.anonymous || this.ptconf.sort.u === "user") {
                 t += "Username";
-            } else if (ptconf.sort.u === "email") {
+            } else if (this.ptconf.sort.u === "email") {
                 t += "Email";
             } else {
                 t += "Name";
             }
             t += '</span>';
-            if (ptconf.original_anonymous && ptconf.can_override_anonymous) {
+            if (this.ptconf.original_anonymous && this.ptconf.can_override_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
-            } else if (ptconf.original_anonymous) {
+            } else if (this.ptconf.original_anonymous) {
                 t += ' <span class="n">[anon]</span>';
             }
             return '<th class="gt-user l plsortable" data-pa-sort="user" scope="col">' + t + '</th>';
         },
-        td: function (tde, s, ptconf) {
+        td: function (tde, s) {
             tde.className = "gt-user";
-            ptconf.render_user_td(tde, s);
+            this.ptconf.render_user_td(tde, s);
         },
         tw: 14,
         pin: true,
@@ -412,20 +412,20 @@ const gcoldef = {
     },
 
     username: {
-        th: function (ptconf) {
+        th: function () {
             let t = '<span class="heading">' +
-                (ptconf.anonymous || !ptconf.sort.email ? "Username" : "Email") +
+                (this.ptconf.anonymous || !this.ptconf.sort.email ? "Username" : "Email") +
                 '</span>';
-            if (ptconf.original_anonymous && ptconf.can_override_anonymous) {
+            if (this.ptconf.original_anonymous && this.ptconf.can_override_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
-            } else if (ptconf.original_anonymous) {
+            } else if (this.ptconf.original_anonymous) {
                 t += ' <span class="n">[anon]</span>';
             }
             return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
         },
-        td: function (tde, s, ptconf) {
+        td: function (tde, s) {
             tde.className = "gt-username";
-            ptconf.render_username_td(tde, s);
+            this.ptconf.render_username_td(tde, s);
         },
         tw: 12,
         pin: true,
@@ -434,25 +434,25 @@ const gcoldef = {
 
     name: {
         th: '<th class="gt-name l plsortable" data-pa-sort="name" scope="col">Name</th>',
-        td: function (tde, s, ptconf) {
+        td: function (tde, s) {
             tde.className = "gt-name";
-            ptconf.render_display_name(tde, s, false);
+            this.ptconf.render_display_name(tde, s, false);
         },
         tw: 14,
         sort_forward: true
     },
 
     name2: {
-        th: function (ptconf) {
-            let t = '<span class="heading">' + (ptconf.anonymous ? "Username" : "Name") + '</span>';
-            if (ptconf.original_anonymous && ptconf.can_override_anonymous) {
+        th: function () {
+            let t = '<span class="heading">' + (this.ptconf.anonymous ? "Username" : "Name") + '</span>';
+            if (this.ptconf.original_anonymous && this.ptconf.can_override_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
             }
             return '<th class="gt-name2 l plsortable" data-pa-sort="name2" scope="col">' + t + '</th>';
         },
-        td: function (tde, s, ptconf) {
+        td: function (tde, s) {
             tde.className = "gt-name2";
-            ptconf.render_display_name(tde, s, true);
+            this.ptconf.render_display_name(tde, s, true);
         },
         tw: 14,
         sort_forward: true
@@ -549,16 +549,19 @@ const gcoldef = {
 
     notes: {
         th: '<th class="gt-notes plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
-        td: function (tde, s, ptconf) {
+        td: function (tde, s) {
             tde.className = "gt-notes c";
             let t = s.scores_visible ? '⎚' : '';
-            if (ptconf.flagged_commits && s.grade_commit && s.grade_commit === s.commit) {
+            if (s.grade_commit
+                && s.grade_commit === s.commit
+                && this.ptconf.flagged_commits) {
                 t += '✱';
             }
             if (s.has_notes) {
                 t += '♪';
             }
-            if (!ptconf.flagged_commits && s.has_nongrader_notes) {
+            if (s.has_nongrader_notes
+                && !this.ptconf.flagged_commits) {
                 t += "+";
             }
             tde.replaceChildren(t);
@@ -629,13 +632,13 @@ const gcoldef = {
 
     repo: {
         th: '<th class="gt-repo" scope="col"></th>',
-        td: function (tde, s, ptconf) {
+        td: function (tde, s) {
             tde.className = "gt-repo";
             if (!s.repo) {
                 return;
             }
             const ae = document.createElement("a");
-            if (ptconf.anonymous) {
+            if (this.ptconf.anonymous) {
                 ae.className = "ui pa-anonymized-link";
                 ae.href = "";
                 ae.setAttribute("data-pa-link", s.repo);
@@ -825,8 +828,9 @@ function pa_render_pset_table(ptconf) {
                     type: "grade",
                     name: "/g/" + ge.key,
                     gidx: i,
-                    gkey: ge.key
-                }, ptconf));
+                    gkey: ge.key,
+                    ptconf: ptconf
+                }));
             }
             if (need_ngrades) {
                 col.push("ngrades");
@@ -840,7 +844,7 @@ function pa_render_pset_table(ptconf) {
         for (let i = 0; i !== col.length; ++i) {
             let c = col[i];
             if (typeof c === "string") {
-                c = col[i] = {type: c, name: c};
+                c = col[i] = {type: c, name: c, ptconf: ptconf};
             }
             c.index = i;
             Object.assign(c, gcoldef[c.type]);
@@ -1033,7 +1037,7 @@ function pa_render_pset_table(ptconf) {
             (tw + 24) + 'px"><thead><tr class="gt k0 kfade">';
         for (let c of cx) {
             t += '<th style="width:' + c.width + 'px"' +
-                c.th.call(c, ptconf).substring(3);
+                c.th.call(c).substring(3);
         }
         $overlay = $(t + '</thead><tbody></tbody></table>');
 
@@ -1073,7 +1077,7 @@ function pa_render_pset_table(ptconf) {
                 }
                 for (let c of cx) {
                     const tde = document.createElement("td");
-                    c.td.call(c, tde, smap[spos], ptconf);
+                    c.td.call(c, tde, smap[spos]);
                     tre.append(tde);
                 }
             }
@@ -1261,7 +1265,7 @@ function pa_render_pset_table(ptconf) {
         ptconf.mode = mode;
         for (let i = 0; i !== col.length; ++i) {
             const tde = document.createElement("td");
-            col[i].td.call(col[i], tde, s, ptconf);
+            col[i].td.call(col[i], tde, s);
             tre.appendChild(tde);
         }
     }
@@ -1271,11 +1275,11 @@ function pa_render_pset_table(ptconf) {
             rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
         let a = ['<tr class="gt k0">'];
         for (const c of col) {
-            a.push(c.th.call(c, ptconf));
+            a.push(c.th.call(c));
             if (tfixed) {
                 let w = c.tw;
                 if (typeof w !== "number") {
-                    w = w.call(c, ptconf);
+                    w = w.call(c);
                 }
                 w *= rem;
                 c.left = table_width;
