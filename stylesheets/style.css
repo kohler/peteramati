@@ -298,6 +298,9 @@ label.checki {
 .font-weight-bold {
 	font-weight: bold;
 }
+.font-style-italic {
+	font-style: italic;
+}
 
 .cR {
 	background-color: #ffd8d8;
@@ -2615,7 +2618,7 @@ td.mhcb {
 	background: yellow;
 }
 
-.gtable {
+.gtable, .gtable-left-pin, .gtable-top-pin {
 	font-size: 75%;
 	line-height: 1.5;
 }
@@ -2663,14 +2666,23 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 .gtable-fixed {
 	table-layout: fixed;
 }
-.gtable-overlay {
+.gtable-left-pin {
 	transition: opacity 0.25s ease;
 	opacity: 1;
 }
-.gtable-overlay.new {
+.gtable-left-pin.new {
 	opacity: 0;
 }
-.gtable > thead {
+.gtable-top-pin {
+	position: absolute;
+	z-index: 1;
+	left: 0;
+	top: 0;
+}
+.gtable-left-pin.gtable-top-pin {
+	z-index: 2;
+}
+.gtable-headrow {
 	font-size: smaller;
 	color: #7777aa;
 }
@@ -2682,7 +2694,7 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 	width: 2rem;
 }
 th.gt-checkbox > input {
-	font-size: smaller;
+	transform: scale(90%);
 }
 .gt-rownumber {
 	text-align: right;

@@ -81,10 +81,12 @@ function strong(t) {
 }
 
 function user_hover(evt) {
-    if (evt.type === "mouseenter") {
-        tooltip.enter(this, "pa-ptable-user");
-    } else {
-        tooltip.leave(this);
+    if (evt.target.tagName === "A" && evt.target.classList.contains("pa-user")) {
+        if (evt.type === "mouseenter") {
+            tooltip.enter(evt.target, "pa-ptable-user");
+        } else {
+            tooltip.leave(evt.target);
+        }
     }
 }
 
@@ -109,7 +111,6 @@ class PtableConf {
         this.has_nonanonymous = !this.anonymous || pconf.has_nonanonymous;
         this.overridable_anonymous = this.anonymous && pconf.overridable_anonymous;
         this.flagged_commits = pconf.flagged_commits;
-        this.last_first = null;
         this.sort = {
             f: this.flagged_commits ? "at" : "name", last: false, rev: 1,
             u: "name"
@@ -122,7 +123,11 @@ class PtableConf {
         this.runners = pconf.runners || [];
         this.diff_files = pconf.diff_files || [];
         this.reports = pconf.reports || [];
-        this.col = pconf.col || null;
+        this.requested_columns = pconf.col || null;
+
+        this.col = [];
+        this.pincol = [];
+        this.colmap = {};
 
         this.data = data;
 
@@ -143,6 +148,37 @@ class PtableConf {
                 this.in_total_indexes.push(i);
             }
         }
+    }
+
+    add_column(c) {
+        c.index = this.col.length;
+        this.col.push(c);
+        this.colmap[c.name] = this.colmap[c.name] || c;
+        if (c.pin) {
+            c.pin_index = this.pincol.length;
+            this.pincol.push(c);
+        }
+    }
+
+    get columns() {
+        return this.col;
+    }
+
+    get pinned_columns() {
+        return this.pincol;
+    }
+
+    columns_in(table) {
+        return table.classList.contains("gtable-left-pin") ? this.pincol : this.col;
+    }
+
+    column_index_in(key, table) {
+        const c = this.colmap[key];
+        if (!c) {
+            return -1;
+        }
+        const k = table.classList.contains("gtable-left-pin") ? "pin_index" : "index";
+        return c[k] != null ? c[k] : -1;
     }
 
     ukey(s) {
@@ -194,13 +230,13 @@ class PtableConf {
     }
 
     render_user_td(tde, s) {
-        const ae = this.make_pset_ae(s);
+        const ae = this.make_pset_ae(s), sort = this.sort;
         if (this.anonymous && s.anon_user) {
             ae.append(s.anon_user);
-        } else if (this.sort.u === "email" && s.email) {
+        } else if (sort.u === "email" && s.email) {
             ae.append(s.email);
-        } else if (this.sort.u === "name") {
-            ae.append(render_name(s, this.last_first));
+        } else if (sort.u === "name") {
+            ae.append(render_name(s, sort.last));
         } else {
             ae.append(s.user);
         }
@@ -210,7 +246,7 @@ class PtableConf {
     render_display_name(tde, s, is2) {
         const t = is2 && this.anonymous
             ? s.anon_user || "?"
-            : render_name(s, this.last_first);
+            : render_name(s, this.sort.last);
         if (is2) {
             const ae = this.make_pset_ae(s);
             ae.textContent = t;
@@ -238,6 +274,31 @@ class PtableConf {
         let u = this.anonymous ? s.anon_user || s.user : s.user;
         return "s:" + encodeURIComponent(u).replace(/\./g, "%2E");
     }
+
+    render_table_row(su, mode) {
+        this.mode = mode;
+        const tre = document.createElement("tr");
+        tre.className = "gt";
+        tre.setAttribute("data-pa-spos", su._spos);
+        if (su.uid) {
+            tre.setAttribute("data-pa-uid", su.uid);
+        }
+        if (mode & 2) {
+            tre.classList.add("kfade");
+        }
+        if (mode & 1) {
+            tre.classList.add("gtrow-partner");
+            tre.setAttribute("data-pa-partner", 1);
+        }
+        const cols = mode & 2 ? this.pincol : this.col;
+        for (const c of cols) {
+            const tde = document.createElement("td");
+            c.td.call(c, tde, su);
+            tre.appendChild(tde);
+        }
+        return tre;
+    }
+
 
     render_gdialog_users(h3, slist) {
         if (slist.length === this.data.length || slist.length === 0) {
@@ -268,7 +329,7 @@ class PtableConf {
     }
 
     user_row_checkbox(tr) {
-        const overlay = hasClass(tr.parentElement.parentElement, "gtable-overlay"),
+        const overlay = hasClass(tr.parentElement.parentElement, "gtable-left-pin"),
             cbidx = this.colmap.checkbox[overlay ? "pin_index" : "index"];
         return cbidx != null ? tr.children[cbidx].firstChild : null;
     }
@@ -310,9 +371,199 @@ class PtableConf {
 }
 
 
+function ptable_head_click_change_sort(tgt) {
+    if (tgt.tagName === "TH"
+        ? !tgt.hasAttribute("data-pa-sort")
+        : tgt.tagName !== "BUTTON" || !tgt.classList.contains("js-switch-anon")) {
+        return null;
+    }
+
+    const ptconf = tgt.closest("form").pa__ptconf,
+        sort = Object.assign({}, ptconf.sort);
+    if (tgt.tagName === "BUTTON") {
+        if (!ptconf.overridable_anonymous) {
+            return null;
+        }
+        if (sort.deblind) {
+            delete sort.deblind;
+        } else {
+            sort.deblind = (new Date).getTime() / 1000;
+        }
+        return sort;
+    }
+
+    const sf = tgt.getAttribute("data-pa-sort");
+    if (sf !== sort.f) {
+        sort.f = sf;
+        const col = ptconf.colmap[sf];
+        sort.rev = col && col.sort_forward ? 1 : -1;
+        if (sf === "name") {
+            sort.u = "name";
+        } else if (sf === "name2") {
+            sort.u = ptconf.anonymous ? "user" : "name";
+        } else if (sf === "email") {
+            sort.u = "email";
+        } else if (sf === "username") {
+            if ((ptconf.anonymous && !ptconf.has_nonanonymous) || !sort.email) {
+                sort.u = "user";
+            } else {
+                sort.u = "email";
+            }
+        }
+    } else {
+        sort.rev = -sort.rev;
+        if (sort.rev === 1) {
+            if (sf === "name") {
+                sort.last = !sort.last;
+            } else if (ptconf.anonymous && !ptconf.has_nonanonymous) {
+                // skip
+            } else if (sf === "name2") {
+                sort.last = !sort.last;
+            } else if (sf === "username") {
+                if (sort.email) {
+                    sort.u = "user";
+                    delete sort.email;
+                } else {
+                    sort.u = "email";
+                    sort.email = true;
+                }
+            } else if (sf === "user") {
+                if (sort.u === "name") {
+                    sort.last = !sort.last;
+                    if (!sort.last) {
+                        sort.u = "email";
+                    }
+                } else if (sort.u === "email") {
+                    sort.u = "user";
+                } else {
+                    sort.u = "name";
+                }
+            }
+        }
+    }
+    return sort;
+}
+
+function ptable_head_click(evt) {
+    let tgt = evt.target;
+    while (tgt !== this
+           && tgt.tagName !== "TH"
+           && tgt.tagName !== "BUTTON"
+           && tgt.tagName !== "A") {
+        tgt = tgt.parentElement;
+    }
+    const sort = ptable_head_click_change_sort(tgt);
+    if (sort) {
+        tgt.closest("form").dispatchEvent(new CustomEvent("sortchange", {
+            bubbles: true, cancelable: true,
+            detail: {sort: sort}
+        }));
+    }
+}
+
+
+let ptable_observer, ptables = [];
+
+function ptable_header_observer(entries) {
+    for (const entry of entries) {
+        entry.target.pa__intersecting = entry.isIntersecting;
+    }
+}
+
+function ptable_header_scroller() {
+    for (const table of ptables) {
+        if (table.pa__intersecting) {
+            const r = table.getBoundingClientRect(),
+                pt = table.previousSibling;
+            if (r.top > 0) {
+                pt.style.display = "none";
+            } else {
+                pt.style.display = "table";
+                pt.style.top = Math.min(-r.top, r.height - 48) + "px";
+            }
+        }
+    }
+}
+
+function ptable_track_header(table) {
+    if (!window.IntersectionObserver || table.rows.length <= 10) {
+        return null;
+    }
+    if (!ptable_observer) {
+        ptable_observer = new IntersectionObserver(ptable_header_observer, {rootMargin: "-32px 0px"});
+        document.addEventListener("scroll", ptable_header_scroller, {passive: true});
+    }
+    ptable_observer.observe(table);
+    ptables.push(table);
+    const tctable = document.createElement("table");
+    tctable.className = table.className;
+    tctable.classList.add("gtable-top-pin");
+    tctable.classList.remove("gtable");
+    tctable.style.width = table.style.width;
+    tctable.appendChild(table.tHead.cloneNode(true));
+    table.before(tctable);
+    tctable.tHead.addEventListener("click", ptable_head_click);
+    table.pa__intersecting = true;
+    queueMicrotask(ptable_header_scroller);
+    return tctable;
+}
+
+function ptable_decorate_name_th(the, ptconf) {
+    if (ptconf.overridable_anonymous) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn-ulink n js-switch-anon";
+        b.append("[anon]");
+        the.append(" ", b);
+    } else if (ptconf.original_anonymous) {
+        const sp = document.createElement("span");
+        sp.className = "n";
+        sp.append("[anon]");
+        the.append(" ", sp);
+    }
+}
+
+function ptable_thead(cols, ptconf, tfixed) {
+    const tr = document.createElement("tr");
+    let rem, current_width = 0;
+    tr.className = "gtable-headrow gt k0";
+    for (const c of cols) {
+        const the = document.createElement("th");
+        the.scope = "col";
+        if (c.compare || c.make_compare) {
+            the.className = "plsortable";
+            the.setAttribute("data-pa-sort", c.name);
+        }
+        c.th.call(c, the);
+        if (tfixed) {
+            let w = c.tw;
+            if (typeof w !== "number") {
+                w = w.call(c);
+            }
+            if (rem == null) {
+                rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+            }
+            w *= rem;
+            if (c.left == null) {
+                c.left = current_width;
+            }
+            c.width = w;
+            the.style.width = w + "px";
+            current_width += w;
+        }
+        tr.appendChild(the);
+    }
+    const thead = document.createElement("thead");
+    thead.append(tr);
+    return thead;
+}
+
+
 const gcoldef = {
     rownumber: {
-        th: '<th class="gt-rownumber" scope="col"></th>',
+        th: function (the) {
+            the.classList.add("gt-rownumber");
+        },
         td: function (tde) {
             tde.className = "gt-rownumber";
         },
@@ -322,7 +573,15 @@ const gcoldef = {
     },
 
     checkbox: {
-        th: '<th class="gt-checkbox" scope="col"><input type="checkbox" class="uic js-range-click is-range-group ignore-diff" data-range-type="s61" aria-label="Select all"></th>',
+        th: function (the) {
+            the.classList.add("gt-checkbox");
+            const e = document.createElement("input");
+            e.type = "checkbox";
+            e.className = "uic js-range-click is-range-group ignore-diff";
+            e.ariaLabel = "Select all";
+            e.setAttribute("data-range-type", "s61");
+            the.appendChild(e);
+        },
         td: function (tde, s) {
             if (this.ptconf.mode & 1) {
                 return;
@@ -346,7 +605,9 @@ const gcoldef = {
     },
 
     flagcheckbox: {
-        th: '<th class="gt-checkbox" scope="col"></th>',
+        th: function (the) {
+            the.className = "gt-checkbox";
+        },
         td: function (tde, s) {
             if (this.ptconf.mode) {
                 return;
@@ -365,7 +626,10 @@ const gcoldef = {
     },
 
     pset: {
-        th: '<th class="gt-pset l plsortable" data-pa-sort="pset" scope="col">Pset</th>',
+        th: function (the) {
+            the.classList.add("gt-pset", "l");
+            the.append("Pset");
+        },
         td: function (tde, s) {
             tde.className = "gt-pset";
             let ae = document.createElement("a");
@@ -385,22 +649,21 @@ const gcoldef = {
     },
 
     user: {
-        th: function () {
-            let t = '<span class="heading">';
+        th: function (the) {
+            let sp = the.firstChild;
+            if (!sp) {
+                the.classList.add("gt-user", "l");
+                the.appendChild((sp = document.createElement("span")));
+                sp.className = "heading";
+                ptable_decorate_name_th(the, this.ptconf);
+            }
             if (this.ptconf.anonymous || this.ptconf.sort.u === "user") {
-                t += "Username";
+                sp.replaceChildren("Username");
             } else if (this.ptconf.sort.u === "email") {
-                t += "Email";
+                sp.replaceChildren("Email");
             } else {
-                t += "Name";
+                sp.replaceChildren("Name");
             }
-            t += '</span>';
-            if (this.ptconf.overridable_anonymous) {
-                t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
-            } else if (this.ptconf.original_anonymous) {
-                t += ' <span class="n">[anon]</span>';
-            }
-            return '<th class="gt-user l plsortable" data-pa-sort="user" scope="col">' + t + '</th>';
         },
         td: function (tde, s) {
             tde.className = "gt-user";
@@ -408,20 +671,24 @@ const gcoldef = {
         },
         tw: 14,
         pin: true,
-        sort_forward: true
+        sort_forward: true,
+        compare: true
     },
 
     username: {
-        th: function () {
-            let t = '<span class="heading">' +
-                (this.ptconf.anonymous || !this.ptconf.sort.email ? "Username" : "Email") +
-                '</span>';
-            if (this.ptconf.overridable_anonymous) {
-                t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
-            } else if (this.ptconf.original_anonymous) {
-                t += ' <span class="n">[anon]</span>';
+        th: function (the) {
+            let sp = the.firstChild;
+            if (!sp) {
+                the.classList.add("gt-username", "l");
+                the.appendChild((sp = document.createElement("span")));
+                sp.className = "heading";
+                ptable_decorate_name_th(the, this.ptconf);
             }
-            return '<th class="gt-username l plsortable" data-pa-sort="username" scope="col">' + t + '</th>';
+            if (this.ptconf.anonymous || !this.ptconf.sort.email) {
+                sp.replaceChildren("Username");
+            } else {
+                sp.replaceChildren("Email");
+            }
         },
         td: function (tde, s) {
             tde.className = "gt-username";
@@ -429,37 +696,53 @@ const gcoldef = {
         },
         tw: 12,
         pin: true,
-        sort_forward: true
+        sort_forward: true,
+        compare: true
     },
 
     name: {
-        th: '<th class="gt-name l plsortable" data-pa-sort="name" scope="col">Name</th>',
+        th: function (the) {
+            the.classList.add("gt-name", "l");
+            the.replaceChildren("Name");
+        },
         td: function (tde, s) {
             tde.className = "gt-name";
             this.ptconf.render_display_name(tde, s, false);
         },
         tw: 14,
-        sort_forward: true
+        sort_forward: true,
+        compare: true
     },
 
     name2: {
-        th: function () {
-            let t = '<span class="heading">' + (this.ptconf.anonymous ? "Username" : "Name") + '</span>';
-            if (this.ptconf.overridable_anonymous) {
-                t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
+        th: function (the) {
+            let sp = the.firstChild;
+            if (!sp) {
+                the.classList.add("gt-name2", "l");
+                the.appendChild((sp = document.createElement("span")));
+                sp.className = "heading";
+                ptable_decorate_name_th(the, this.ptconf);
             }
-            return '<th class="gt-name2 l plsortable" data-pa-sort="name2" scope="col">' + t + '</th>';
+            if (this.ptconf.anonymous) {
+                sp.replaceChildren("Username");
+            } else {
+                sp.replaceChildren("Name");
+            }
         },
         td: function (tde, s) {
             tde.className = "gt-name2";
             this.ptconf.render_display_name(tde, s, true);
         },
         tw: 14,
-        sort_forward: true
+        sort_forward: true,
+        compare: true
     },
 
     at: {
-        th: '<th class="gt-at l plsortable" data-pa-sort="at" scope="col">Flagged</th>',
+        th: function (the) {
+            the.classList.add("gt-at", "l");
+            the.replaceChildren("Flagged");
+        },
         td: function (tde, s) {
             tde.className = "gt-at";
             if (s.at)
@@ -476,7 +759,10 @@ const gcoldef = {
     },
 
     extension: {
-        th: '<th class="gt-extension plsortable" data-pa-sort="extension" scope="col">X?</th>',
+        th: function (the) {
+            the.classList.add("gt-extension");
+            the.replaceChildren("X?");
+        },
         td: function (tde, s) {
             tde.className = "gt-extension";
             s.x && tde.append("X");
@@ -492,7 +778,10 @@ const gcoldef = {
     },
 
     year: {
-        th: '<th class="gt-year plsortable" data-pa-sort="year" scole="col">Yr</th>',
+        th: function (the) {
+            the.classList.add("gt-year");
+            the.replaceChildren("Yr");
+        },
         td: function (tde, s) {
             tde.className = "gt-year c";
             tde.replaceChildren(render_year(s.year));
@@ -513,7 +802,10 @@ const gcoldef = {
     },
 
     grader: {
-        th: '<th class="gt-grader l plsortable" data-pa-sort="grader" scope="col">Grader</th>',
+        th: function (the) {
+            the.classList.add("gt-grader", "l");
+            the.replaceChildren("Grader");
+        },
         td: function (tde, s) {
             tde.className = "gt-grader";
             if (s.gradercid && siteinfo.pc[s.gradercid]) {
@@ -531,7 +823,11 @@ const gcoldef = {
     },
 
     latehours: {
-        th: '<th class="gt-latehours r plsortable" data-pa-sort="latehours" scope="col" title="Late">⏰</th>',
+        th: function (the) {
+            the.classList.add("gt-latehours", "r");
+            the.title = "Late";
+            the.replaceChildren("⏰");
+        },
         td: function (tde, s) {
             tde.className = "gt-latehours r";
             tde.replaceChildren(s.late_hours || "");
@@ -548,7 +844,10 @@ const gcoldef = {
     },
 
     notes: {
-        th: '<th class="gt-notes plsortable" data-pa-sort="gradestatus" scope="col">⎚</th>',
+        th: function (the) {
+            the.classList.add("gt-notes");
+            the.replaceChildren("⎚");
+        },
         td: function (tde, s) {
             tde.className = "gt-notes c";
             let t = s.scores_visible ? '⎚' : '';
@@ -571,7 +870,10 @@ const gcoldef = {
     },
 
     total: {
-        th: '<th class="gt-total r plsortable" data-pa-sort="total" scope="col">Tot</th>',
+        th: function (the) {
+            the.classList.add("gt-total", "r");
+            the.replaceChildren("Tot");
+        },
         td: function (tde, s) {
             tde.className = "gt-total r";
             tde.replaceChildren(s.total != null ? s.total + "" : "");
@@ -593,8 +895,10 @@ const gcoldef = {
     },
 
     grade: {
-        th: function () {
-            return '<th class="'.concat(this.className, ' plsortable" data-pa-sort="', this.name, '" scope="col" title="', escape_entities(this.ge.title_text), '">', this.ge.abbr(), '</th>');
+        th: function (the) {
+            the.classList.add(...this.className.split(/\s+/));
+            the.title = this.ge.title_text;
+            the.replaceChildren(this.ge.abbr());
         },
         td: function (tde, s) {
             const gr = s.grades[this.gidx];
@@ -614,7 +918,10 @@ const gcoldef = {
     },
 
     ngrades: {
-        th: '<th class="gt-ngrades r plsortable" data-pa-sort="ngrades" scope="col">#G</th>',
+        th: function (the) {
+            the.classList.add("gt-ngrades", "r");
+            the.replaceChildren("#G");
+        },
         td: function (tde, s) {
             tde.className = "gt-ngrades r";
             tde.replaceChildren(s.ngrades ? s.ngrades + "" : "");
@@ -631,7 +938,8 @@ const gcoldef = {
     },
 
     repo: {
-        th: '<th class="gt-repo" scope="col"></th>',
+        th: function () {
+        },
         td: function (tde, s) {
             tde.className = "gt-repo";
             if (!s.repo) {
@@ -671,7 +979,10 @@ const gcoldef = {
     },
 
     conversation: {
-        th: '<th class="gt-conversation l plsortable" data-pa-sort="conversation" scope="col">Flag</th>',
+        th: function (the) {
+            the.classList.add("gt-conversation", "l");
+            the.replaceChildren("Flag");
+        },
         td: function (tde, s) {
             tde.className = "gt-conversation l";
             if (s.conversation) {
@@ -695,6 +1006,105 @@ const gcoldef = {
 };
 
 
+function ptables_cellpos(ptconf, tables, key) {
+    const a = [];
+    for (let i = 0; i !== tables.length; ++i) {
+        const table = tables[i],
+            idx = ptconf.column_index_in(key, table);
+        if (idx >= 0) {
+            a.push({table: table, index: idx});
+        }
+    }
+    return a;
+}
+
+function ptables_rerender_key(ptconf, tables, ...keys) {
+    for (const key of keys) {
+        const c = ptconf.colmap[key];
+        for (const ti of ptables_cellpos(ptconf, tables, key)) {
+            const table = ti.table, index = ti.index;
+            if (table.tBodies.length > 0) {
+                for (let tr = table.tBodies[0].firstChild; tr; tr = tr.nextSibling) {
+                    const spos = tr.getAttribute("data-pa-spos");
+                    if (spos) {
+                        const su = ptconf.smap[spos], tde = tr.children[index];
+                        c.td.call(c, tde, su);
+                    }
+                }
+            }
+            c.th.call(c, table.tHead.firstChild.children[index]);
+        }
+    }
+}
+
+
+function ptable_rangechange(evt) {
+    if (evt.detail.rangeType === "s61")
+        $(this).find(".js-gdialog").prop("disabled", !evt.detail.newState);
+}
+
+
+function ptable_boring_row(table) {
+    const tr = document.createElement("tr");
+    tr.className = "gt-boring";
+    const td = document.createElement("td");
+    td.colSpan = table.rows[0].childNodes.length;
+    td.appendChild(document.createElement("hr"));
+    tr.appendChild(td);
+    return tr;
+}
+
+function ptable_permute_rmap(table) {
+    const rmap = {};
+    let tr = table.tBodies[0].firstChild;
+    while (tr) {
+        rmap[tr.getAttribute("data-pa-spos")] = tr;
+        tr = tr.nextSibling;
+    }
+    return rmap;
+}
+
+function ptable_permute(ptconf, table, data) {
+    const tb = table.tBodies[0],
+        rmap = ptable_permute_rmap(table),
+        mode = table.classList.contains("gtable-left-pin") ? 2 : 0,
+        klasses = ["k0", "k1"];
+    let was_boringness = false, trn = 0,
+        last = tb.firstChild;
+    for (let i = 0; i !== data.length; ++i) {
+        const su = data[i];
+        if (su.boringness !== was_boringness && was_boringness !== false) {
+            if (last && last.className === "gt-boring") {
+                last = last.nextSibling;
+            } else {
+                tb.insertBefore(ptable_boring_row(table), last);
+            }
+        }
+        was_boringness = su.boringness;
+
+        while (last && last.className === "gt-boring") {
+            const tr = last;
+            last = last.nextSibling;
+            tb.removeChild(tr);
+        }
+
+        ++trn;
+        for (const ss of su.partners ? [su, ...su.partners] : [su]) {
+            const tr = rmap[ss._spos]
+                || ptconf.render_table_row(su, su === ss ? mode : mode | 1);
+            if (tr !== last) {
+                tb.insertBefore(tr, last);
+            } else {
+                last = last.nextSibling;
+            }
+            tr.classList.remove(klasses[(trn ^ 1) & 1]);
+            tr.classList.add(klasses[trn & 1]);
+        }
+    }
+}
+
+
+
 export function pa_pset_table(form, pconf, data) {
     const ptconf = new PtableConf(pconf, data || []);
     form.pa__ptconf = ptconf;
@@ -705,24 +1115,19 @@ export function pa_pset_table(form, pconf, data) {
 }
 
 function pa_render_pset_table(ptconf) {
-    let $j = $(this), table_width = 0, smap = ptconf.smap,
-        $overlay = null, name_col, slist_input,
+    const table = this, $j = $(table),
+        smap = ptconf.smap;
+    let $alltables = $(table), lpintable = null, slist_input,
         gradesheet = null,
-        need_ngrades,
         active_nameflag = -1,
         col, colmap, data = ptconf.data;
-    let sort = ptconf.sort;
-
-    function string_function(s) {
-        return function () { return s; };
-    }
 
     function sort_nameflag() {
         if (ptconf.anonymous) {
             return 8;
-        } else if (sort.u === "name") {
-            return 1 | (sort.last ? 2 : 0);
-        } else if (sort.u === "email") {
+        } else if (ptconf.sort.u === "name") {
+            return 1 | (ptconf.sort.last ? 2 : 0);
+        } else if (ptconf.sort.u === "email") {
             return 4;
         } else {
             return 0;
@@ -730,12 +1135,14 @@ function pa_render_pset_table(ptconf) {
     }
 
     function initialize() {
-        let x = wstorage.site(true, "pa-pset" + ptconf.id + "-table");
+        let sort = ptconf.sort,
+            x = wstorage.site(true, "pa-pset" + ptconf.id + "-table");
         if (x) {
             try {
                 x = JSON.parse(x);
                 if (x && typeof x === "object") {
                     sort = ptconf.sort = x;
+                    delete sort.override_anonymous; // XXX backward compat 21-Dec-2022
                 }
             } catch (e) {
             }
@@ -746,13 +1153,19 @@ function pa_render_pset_table(ptconf) {
         if (sort.rev !== 1 && sort.rev !== -1) {
             sort.rev = 1;
         }
-        if (!ptconf.overridable_anonymous
-            || !sort.override_anonymous) {
-            delete sort.override_anonymous;
+        if (!ptconf.overridable_anonymous) {
+            delete sort.deblind;
         }
-        if (ptconf.anonymous
-            && sort.override_anonymous
-            && sort.override_anonymous + 3600 > (new Date).getTime() / 1000) {
+        if (sort.deblind) {
+            let now = (new Date).getTime() / 1000;
+            if (typeof sort.deblind === "number" && sort.deblind + 3600 > now) {
+                sort.deblind = now;
+            } else {
+                delete sort.deblind;
+            }
+            wstorage.site(true, "pa-pset" + ptconf.id + "-table", JSON.stringify(sort));
+        }
+        if (sort.deblind) {
             ptconf.anonymous = false;
         }
 
@@ -794,10 +1207,10 @@ function pa_render_pset_table(ptconf) {
             has_late_hours = has_late_hours || !!s.late_hours;
             any_visible = any_visible || s.scores_visible_pinned;
         }
-        need_ngrades = ngrades_expected === -2;
+        const need_ngrades = ngrades_expected === -2;
 
-        if (ptconf.col) {
-            col = ptconf.col;
+        if (ptconf.requested_columns) {
+            col = ptconf.requested_columns;
         } else {
             col = ["rownumber"];
             if (ptconf.checkbox) {
@@ -839,26 +1252,21 @@ function pa_render_pset_table(ptconf) {
             }
         }
 
-        colmap = {};
-        for (let i = 0; i !== col.length; ++i) {
-            let c = col[i];
+        for (let c of col) {
             if (typeof c === "string") {
-                c = col[i] = {type: c, name: c, ptconf: ptconf};
+                c = {type: c, name: c, ptconf: ptconf};
             }
-            c.index = i;
             Object.assign(c, gcoldef[c.type]);
-            if (typeof c.th === "string") {
-                c.th = string_function(c.th);
-            }
-            colmap[c.name] = colmap[c.name] || c;
+            ptconf.add_column(c);
         }
-        name_col = colmap.name;
-        ptconf.col = col;
-        ptconf.colmap = colmap;
+        col = ptconf.col;
+        colmap = ptconf.colmap;
 
-        if ($j[0].closest("form")) {
-            slist_input = $('<input name="slist" type="hidden" value="">')[0];
-            $j.after(slist_input);
+        if (table.closest("form")) {
+            slist_input = document.createElement("input");
+            slist_input.type = "hidden";
+            slist_input.name = "slist";
+            table.after(slist_input);
         }
     }
 
@@ -878,75 +1286,6 @@ function pa_render_pset_table(ptconf) {
         event.hotlist = {pset: ptconf.flagged_commits ? null : ptconf.key, items: j};
     }
 
-    function make_rmap($j) {
-        var rmap = {}, tr = $j.find("tbody")[0].firstChild, last = null;
-        while (tr) {
-            if (tr.hasAttribute("data-pa-partner"))
-                last.push(tr);
-            else
-                rmap[tr.getAttribute("data-pa-spos")] = last = [tr];
-            tr = tr.nextSibling;
-        }
-        return rmap;
-    }
-
-    function resort_table($j) {
-        var $b = $j.children("tbody"),
-            ncol = $j.children("thead")[0].firstChild.childNodes.length,
-            tb = $b[0],
-            rmap = make_rmap($j),
-            i, j, trn = 0, was_boringness = false,
-            last = tb.firstChild;
-        for (i = 0; i !== data.length; ++i) {
-            const s = data[i];
-            ++trn;
-            while ((j = last) && j.className === "gt-boring") {
-                last = last.nextSibling;
-                tb.removeChild(j);
-            }
-            if (s.boringness !== was_boringness && was_boringness !== false) {
-                tb.insertBefore($('<tr class="gt-boring"><td colspan="' + ncol + '"><hr></td></tr>')[0], last);
-            }
-            was_boringness = s.boringness;
-            const tr = rmap[s._spos];
-            for (j = 0; j < tr.length; ++j) {
-                if (last !== tr[j]) {
-                    tb.insertBefore(tr[j], last);
-                } else {
-                    last = last.nextSibling;
-                }
-                removeClass(tr[j], "k" + (1 - trn % 2));
-                addClass(tr[j], "k" + (trn % 2));
-            }
-        }
-
-        render_rownumbers();
-
-        var last_first = sort.last;
-        if (last_first !== ptconf.last_first) {
-            ptconf.last_first = last_first;
-            $b.find(".gt-name, .gt-name2").each(function () {
-                const s = smap[this.parentNode.getAttribute("data-pa-spos")];
-                ptconf.render_display_name(this, s, hasClass(this, "gt-name2"));
-            });
-        }
-    }
-
-    function render_rownumbers() {
-        const c = colmap.rownumber;
-        if (!c) {
-            return;
-        }
-        const idx = c.index;
-        let trn = 0;
-        for (let tr = $j.children("tbody")[0].firstChild; tr; tr = tr.nextSibling) {
-            if (hasClass(tr, "gt")) {
-                ++trn;
-                tr.children.item(idx).textContent = trn + ".";
-            }
-        }
-    }
-
     function assign_slist() {
         var j = [];
         for (var i = 0; i !== data.length; ++i) {
@@ -955,137 +1294,15 @@ function pa_render_pset_table(ptconf) {
         slist_input.value = j.join(" ");
     }
 
-    function resort() {
-        resort_table($j);
-        $overlay && resort_table($overlay);
-        slist_input && assign_slist();
-        wstorage.site(true, "pa-pset" + ptconf.id + "-table", JSON.stringify(sort));
-    }
-
-    function rerender_usernames() {
-        var $x = $overlay ? $([$j[0], $overlay[0]]) : $j;
-        $x.find("td.gt-username").each(function () {
-            const s = smap[this.parentNode.getAttribute("data-pa-spos")];
-            ptconf.render_username_td(this, s);
-        });
-        $x.find("th.gt-username > span.heading").html(ptconf.anonymous || !sort.email ? "Username" : "Email");
-        $x.find("td.gt-name2").each(function () {
-            const s = smap[this.parentNode.getAttribute("data-pa-spos")];
-            ptconf.render_display_name(this, s, true);
-        });
-        $x.find("th.gt-name2 > span.heading").html(ptconf.anonymous ? "Username" : "Name");
-    }
-
-    function rerender_users() {
-        let $x = $overlay ? $([$j[0], $overlay[0]]) : $j, th;
-        $x.find("td.gt-user").each(function () {
-            const s = smap[this.parentNode.getAttribute("data-pa-spos")];
-            ptconf.render_user_td(this, s);
-        });
-        if (ptconf.anonymous || sort.u === "user") {
-            th = "Username";
-        } else if (sort.u === "email") {
-            th = "Email";
-        } else {
-            th = "Name";
-        }
-        $x.find("th.gt-user > span.heading").html(th);
-    }
-
-    function display_anon() {
-        $j.toggleClass("gt-anonymous", !!ptconf.anonymous);
-        if (table_width && name_col) {
-            $j.css("width", (table_width - (ptconf.anonymous ? name_col.width : 0)) + "px");
-            $($j[0].firstChild).find(".gt-name").css("width", (ptconf.anonymous ? 0 : name_col.width) + "px");
-        }
-    }
-
-    function switch_anon(evt) {
-        ptconf.anonymous = !ptconf.anonymous;
-        if (ptconf.anonymous) {
-            delete sort.override_anonymous;
-        } else {
-            sort.override_anonymous = (new Date).getTime() / 1000;
-        }
-        display_anon();
-        rerender_usernames();
-        rerender_users();
-        $j.find("tbody input.gt-check").each(function () {
-            var s = smap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
-            this.setAttribute("name", ptconf.render_checkbox_name(s));
-        });
-        sort_data();
-        resort();
-        $j.closest("form").find("input[name=anonymous]").val(ptconf.anonymous ? 1 : 0);
-        evt.preventDefault();
-        evt.stopPropagation();
-    }
-
-
-    function make_overlay() {
-        let tw = 0, cx = [];
-        for (let i = 0; i !== col.length; ++i) {
-            if (col[i].pin) {
-                col[i].pin_index = cx.length;
-                cx.push(col[i]);
-                tw += col[i].width;
+    function rerender_rownumber() {
+        const idx = colmap.rownumber.index;
+        let trn = 0;
+        for (let tr = table.tBodies[0].firstChild; tr; tr = tr.nextSibling) {
+            if (hasClass(tr, "gt")) {
+                ++trn;
+                tr.children.item(idx).textContent = trn + ".";
             }
         }
-
-        let t = '<table class="gtable gtable-fixed gtable-overlay new" style="position:absolute;left:0;width:' +
-            (tw + 24) + 'px"><thead><tr class="gt k0 kfade">';
-        for (let c of cx) {
-            t += '<th style="width:' + c.width + 'px"' +
-                c.th.call(c).substring(3);
-        }
-        $overlay = $(t + '</thead><tbody></tbody></table>');
-
-        let tr = $j[0].firstChild.firstChild,
-            otr = $overlay[0].firstChild.firstChild;
-        for (let i = 0; i !== cx.length; ++i) {
-            otr.childNodes[i].className = tr.childNodes[cx[i].index].className;
-        }
-
-        $j[0].parentNode.prepend($('<div style="position:sticky;left:0;z-index:2"></div>').append($overlay)[0]);
-        $overlay.find("thead").on("click", "th", head_click);
-        $overlay.find("tbody").on("click", "input[type=checkbox]", checkbox_click);
-        $overlay.find(".js-switch-anon").click(switch_anon);
-
-        tr = $j.children("tbody")[0].firstChild;
-        let tbodye = $overlay.find("tbody")[0];
-        tbodye.replaceChildren();
-        while (tr) {
-            let tre = document.createElement("tr");
-            tre.className = tr.className;
-            if (hasClass(tr, "gt-boring")) {
-                let tde = document.createElement("td");
-                tde.colSpan = cx.length;
-                tde.append(document.createElement("hr"));
-                tre.append(tde);
-            } else {
-                let spos = tr.getAttribute("data-pa-spos");
-                tre.className += " kfade";
-                tre.setAttribute("data-pa-spos", spos);
-                if (tr.hasAttribute("data-pa-uid")) {
-                    tre.setAttribute("data-pa-uid", tr.getAttribute("data-pa-uid"));
-                }
-                ptconf.mode = 2;
-                if (tr.hasAttribute("data-pa-partner")) {
-                    tre.setAttribute("data-pa-partner", 1);
-                    ptconf.mode |= 1;
-                }
-                for (let c of cx) {
-                    const tde = document.createElement("td");
-                    c.td.call(c, tde, smap[spos]);
-                    tre.append(tde);
-                }
-            }
-            tbodye.appendChild(tre);
-            tr = tr.nextSibling;
-        }
-        $j.find("input[data-range-type=s61]:checked").each(checkbox_click);
-        $overlay.on("mouseenter mouseleave", "a.pa-user", user_hover);
-        queueMicrotask(function () { removeClass($overlay[0], "new"); });
     }
 
     function render_user_compare(u) {
@@ -1120,13 +1337,13 @@ function pa_render_pset_table(ptconf) {
     }
 
     function sort_data() {
-        let f = sort.f;
+        let f = ptconf.sort.f;
         set_user_sorters();
         let colr = colmap[f];
-        if (colr && colr.compare) {
+        if (colr && colr.compare && colr.compare !== true) {
             data.sort(colr.compare);
         } else if (colr && colr.make_compare) {
-            data.sort(colr.make_compare(sort, colr.subtype || null));
+            data.sort(colr.make_compare(ptconf.sort, colr.subtype || null));
         } else if (((f === "name" || f === "name2") && !ptconf.anonymous)
                    || f === "user") {
             data.sort(user_compare);
@@ -1141,7 +1358,7 @@ function pa_render_pset_table(ptconf) {
                     return grader_compare(a, b) || user_compare(a, b);
                 }
             });
-        } else if (sort.email && !ptconf.anonymous) {
+        } else if (ptconf.sort.email && !ptconf.anonymous) {
             f = "username";
             data.sort(function (a, b) {
                 var ae = (a.email || "").toLowerCase(), be = (b.email || "").toLowerCase();
@@ -1161,71 +1378,20 @@ function pa_render_pset_table(ptconf) {
             data.sort(user_compare);
         }
 
-        if (sort.rev < 0) {
+        if (ptconf.sort.rev < 0) {
             data.reverse();
         }
         data.sort(function (a, b) {
             return a.boringness !== b.boringness ? a.boringness - b.boringness : 0;
         });
-
-        var $x = $overlay ? $([$j[0].firstChild, $overlay[0].firstChild]) : $($j[0].firstChild);
-        $x.find(".plsortable").removeClass("plsortactive plsortreverse");
-        $x.find("th[data-pa-sort='" + f + "']").addClass("plsortactive").
-            toggleClass("plsortreverse", sort.rev < 0);
-    }
-
-    function head_click() {
-        if (!this.hasAttribute("data-pa-sort")) {
-            return;
-        }
-        const sf = this.getAttribute("data-pa-sort");
-        if (sf !== sort.f) {
-            sort.f = sf;
-            const col = colmap[sf];
-            sort.rev = col && col.sort_forward ? 1 : -1;
-            if (sf === "name") {
-                sort.u = "name";
-            } else if (sf === "name2") {
-                sort.u = ptconf.anonymous ? "user" : "name";
-            } else if (sf === "email") {
-                sort.u = "email";
-            } else if (sf === "username") {
-                sort.u = ptconf.anonymous || !ptconf.email ? "user" : "email";
-            }
-        } else {
-            sort.rev = -sort.rev;
-            if (sort.rev === 1) {
-                if (sf === "name" || (sf === "name2" && !ptconf.anonymous)) {
-                    ptconf.last_first = sort.last = !sort.last;
-                } else if (sf === "username" && !ptconf.anonymous) {
-                    sort.email = !sort.email;
-                    sort.u = ptconf.anonymous || !ptconf.email ? "user" : "email";
-                    rerender_usernames();
-                } else if (sf === "user" && (!ptconf.anonymous || ptconf.has_nonanonymous)) {
-                    if (sort.u === "name") {
-                        ptconf.last_first = sort.last = !sort.last;
-                        if (!sort.last) {
-                            sort.u = "email";
-                        }
-                    } else if (sort.u === "email") {
-                        sort.u = "user";
-                    } else {
-                        sort.u = "name";
-                    }
-                    rerender_users();
-                }
-            }
-        }
-        sort_data();
-        resort();
     }
 
     function checkbox_click() {
         const range = this.getAttribute("data-range-type");
-        if ((range === "s61" && $overlay) || range === "s61o") {
+        if ((range === "s61" && lpintable) || range === "s61o") {
             const wanto = range === "s61",
                 tr0 = this.closest("tr"),
-                tr1 = (wanto ? $overlay[0] : $j[0]).rows[tr0.rowIndex],
+                tr1 = (wanto ? lpintable : table).rows[tr0.rowIndex],
                 cb1 = ptconf.user_row_checkbox(tr1);
             if (cb1.checked !== this.checked) {
                 cb1.click();
@@ -1248,131 +1414,148 @@ function pa_render_pset_table(ptconf) {
                     table_hit = e.isIntersecting;
                 }
             }
-            if (table_hit && !left_hit && !$overlay) {
-                make_overlay();
-            } else if (table_hit && left_hit && $overlay) {
-                $overlay.parent().remove();
-                $overlay = null;
+            if (table_hit && (!left_hit || lpintable)) {
+                if (!left_hit && !lpintable) {
+                    make_overlay();
+                }
+                toggleClass(lpintable.parentElement, "hidden", left_hit);
             }
         }
         var observer = new IntersectionObserver(observer_fn);
         observer.observe(overlay_div);
-        observer.observe($j.parent()[0]);
+        observer.observe(table.parentElement);
     }
 
-    function render_tds(tre, s, mode) {
-        ptconf.mode = mode;
-        for (let i = 0; i !== col.length; ++i) {
-            const tde = document.createElement("td");
-            col[i].td.call(col[i], tde, s);
-            tre.appendChild(tde);
+    function make_overlay() {
+        const cx = ptconf.pinned_columns;
+        let tw = 0;
+        for (const c of cx) {
+            tw += c.width;
         }
+
+        lpintable = document.createElement("table");
+        lpintable.className = "gtable-left-pin gtable-fixed new";
+        lpintable.setAttribute("style", "position:absolute;left:0;width:".concat(tw + 24, "px"));
+        lpintable.appendChild(ptable_thead(cx, ptconf, true));
+        lpintable.appendChild(document.createElement("tbody"));
+        lpintable.tHead.firstChild.classList.add("kfade");
+
+        let tr = table.rows[0],
+            otr = lpintable.rows[0];
+        for (let i = 0; i !== cx.length; ++i) {
+            otr.childNodes[i].className = tr.childNodes[cx[i].index].className;
+        }
+
+        const div = document.createElement("div");
+        div.setAttribute("style", "position:sticky;left:0;z-index:2");
+        div.appendChild(lpintable);
+        table.parentNode.prepend(div);
+        lpintable.tHead.addEventListener("click", ptable_head_click);
+        $(lpintable).find("tbody").on("click", "input[type=checkbox]", checkbox_click);
+
+        ptable_permute(ptconf, lpintable, data);
+        const ltpintable = ptable_track_header(lpintable);
+        $j.find("input[data-range-type=s61]:checked").each(checkbox_click);
+        lpintable.addEventListener("mouseenter", user_hover, true);
+        lpintable.addEventListener("mouseleave", user_hover, true);
+        queueMicrotask(function () {
+            removeClass(lpintable, "new");
+            ltpintable && removeClass(ltpintable, "new");
+        });
+
+        $alltables = $alltables.add(lpintable, ltpintable);
     }
 
     function render() {
         const tfixed = $j.hasClass("want-gtable-fixed"),
-            rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
-        let a = ['<tr class="gt k0">'];
-        for (const c of col) {
-            a.push(c.th.call(c));
-            if (tfixed) {
-                let w = c.tw;
-                if (typeof w !== "number") {
-                    w = w.call(c);
-                }
-                w *= rem;
-                c.left = table_width;
-                c.width = w;
-                table_width += w;
-            }
-        }
-        const thead = document.createElement("thead"),
-            tpl = document.createElement("template");
-        tpl.innerHTML = a.join("");
-        thead.appendChild(tpl.content);
+            thead = ptable_thead(col, ptconf, true);
 
-        let tw = 0;
+        toggleClass(table, "gt-anonymous", !!ptconf.anonymous);
+        table.appendChild(thead);
+        toggleClass(table, "gt-useemail", !!ptconf.sort.email);
         if (tfixed) {
-            let td = thead.firstChild.firstChild;
-            for (const c of col) {
-                tw += c.width;
-                td.style.width = c.width + "px";
-                td = td.nextSibling;
-            }
+            const lastc = col[col.length - 1];
+            table.style.width = (lastc.left + lastc.width) + "px";
+            removeClass(table, "want-gtable-fixed");
+            addClass(table, "gtable-fixed");
         }
 
-        display_anon();
-        $j[0].appendChild(thead);
-        $j.toggleClass("gt-useemail", !!sort.email);
-        $j.find("thead").on("click", "th", head_click);
-        $j.find(".js-switch-anon").click(switch_anon);
-        if (tfixed) {
-            $j[0].style.width = tw + "px";
-            $j.removeClass("want-gtable-fixed").css("table-layout", "fixed");
-        }
-
-        const tbody = $('<tbody class="has-hotlist"></tbody>')[0];
-        $j[0].appendChild(tbody);
+        const tbody = document.createElement("tbody");
+        tbody.className = "has-hotlist";
+        table.appendChild(tbody);
         if (!ptconf.no_sort) {
             sort_data();
+            rerender_sort_header();
         }
-        ptconf.last_first = sort.last;
 
-        let trn = 0, was_boringness = 0;
-        for (let i = 0; i !== data.length; ++i) {
-            const s = data[i];
-            ptconf.push(s);
-            ++trn;
-            if (s.boringness !== was_boringness && trn != 1) {
-                const tre = document.createElement("tr");
-                tre.className = "gt-boring";
-                const tde = document.createElement("td");
-                tde.colSpan = col.length;
-                tde.append(document.createElement("hr"));
-                tre.append(tde);
-                tbody.append(tre);
-            }
-            was_boringness = s.boringness;
-            const tre = document.createElement("tr");
-            tre.className = "gt k".concat(trn % 2);
-            tre.setAttribute("data-pa-spos", s._spos);
-            if (s.uid) {
-                tre.setAttribute("data-pa-uid", s.uid);
-            }
-            render_tds(tre, s, 0);
-            tbody.appendChild(tre);
-            for (let j = 0; s.partners && j < s.partners.length; ++j) {
-                const ss = s.partners[j];
-                ptconf.push(ss);
-                const trep = document.createElement("tr");
-                trep.className = "gt k".concat(trn % 2, " gtrow-partner");
-                trep.setAttribute("data-pa-spos", ss._spos);
-                if (ss.uid) {
-                    trep.setAttribute("data-pa-uid", ss.uid);
-                }
-                trep.setAttribute("data-pa-partner", 1);
-                render_tds(trep, s.partners[j], 1);
-                tbody.appendChild(trep);
+        for (const su of data) {
+            ptconf.push(su);
+            for (const psu of su.partners || []) {
+                ptconf.push(psu);
             }
         }
-        render_rownumbers();
+
+        ptable_permute(ptconf, table, data);
+        colmap.rownumber && rerender_rownumber();
         slist_input && assign_slist();
         $j.find("tbody").on("click", "input[type=checkbox]", checkbox_click);
 
+        $alltables = $alltables.add(ptable_track_header(table));
         if (tfixed && window.IntersectionObserver) {
             make_overlay_observer();
         }
     }
 
+    function rerender_sort_header() {
+        $alltables.children("thead").find(".plsortable").removeClass("plsortactive plsortreverse");
+        $alltables.children("thead")
+            .find("th[data-pa-sort='" + ptconf.sort.f + "']")
+            .addClass("plsortactive")
+            .toggleClass("plsortreverse", ptconf.sort.rev < 0);
+    }
+
+    function sortchange(evt) {
+        const osort = ptconf.sort, nsort = evt.detail.sort;
+        ptconf.sort = nsort;
+        if (ptconf.overridable_anonymous
+            && nsort.deblind != osort.deblind) {
+            ptconf.anonymous = !nsort.deblind;
+            $alltables.toggleClass("gt-anonymous", !!ptconf.anonymous);
+            $alltables.children("tbody").find("input.gt-check").each(function () {
+                const s = smap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
+                this.setAttribute("name", ptconf.render_checkbox_name(s));
+            });
+            table.closest("form").elements.anonymous.value = ptconf.anonymous ? "1" : "0";
+        }
+        if (nsort.last !== osort.last
+            || nsort.deblind != osort.deblind) {
+            ptables_rerender_key(ptconf, $alltables, "name", "name2", "username", "user");
+        } else if (nsort.u !== osort.u) {
+            ptables_rerender_key(ptconf, $alltables, "username", "user");
+        }
+
+        sort_data();
+        ptable_permute(ptconf, table, data);
+        lpintable && ptable_permute(ptconf, lpintable, data);
+        colmap.rownumber && rerender_rownumber();
+        rerender_sort_header();
+        slist_input && assign_slist();
+        wstorage.site(true, "pa-pset" + ptconf.id + "-table", JSON.stringify(nsort));
+    }
+
+    function events() {
+        const f = table.closest("form");
+        table.tBodies[0].addEventListener("pa-hotlist", make_hotlist);
+        table.addEventListener("mouseenter", user_hover, true);
+        table.addEventListener("mouseleave", user_hover, true);
+        table.tHead.addEventListener("click", ptable_head_click);
+        f.addEventListener("rangechange", ptable_rangechange);
+        f.addEventListener("sortchange", sortchange);
+    }
+
     initialize();
     render();
-
-    $j.children("tbody").on("pa-hotlist", make_hotlist);
-    $j.closest("form")[0].addEventListener("rangechange", function (evt) {
-        if (evt.detail.rangeType === "s61")
-            $(this).find(".js-gdialog").prop("disabled", !evt.detail.newState);
-    });
-    $j.on("mouseenter mouseleave", "a.pa-user", user_hover);
+    events();
 }
 
 
