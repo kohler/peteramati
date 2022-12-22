@@ -6,7 +6,6 @@
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     require_once(dirname(__DIR__) . "/src/init.php");
     CommandLineException::$default_exit_status = 2;
-    exit(RunQueue_Batch::make_args(Conf::$main, $argv)->run());
 }
 
 
@@ -514,4 +513,9 @@ class RunQueue_Batch {
         }
         return $self;
     }
+}
+
+
+if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    exit(RunQueue_Batch::make_args(Conf::$main, $argv)->run());
 }

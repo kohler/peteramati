@@ -6,7 +6,6 @@
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     require_once(dirname(__DIR__) . "/src/init.php");
     date_default_timezone_set("GMT");
-    exit(LineNotesNear_Batch::make_args(Conf::$main, $argv)->run());
 }
 
 
@@ -82,4 +81,9 @@ class LineNotesNear_Batch {
 
         return $lnb;
     }
+}
+
+
+if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    exit(LineNotesNear_Batch::make_args(Conf::$main, $argv)->run());
 }

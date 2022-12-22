@@ -5,7 +5,6 @@
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     require_once(dirname(__DIR__) . "/src/init.php");
-    exit(UpdateRecordedJobs_Batch::make_args(Conf::$main, $argv)->run_or_warn());
 }
 
 
@@ -162,4 +161,9 @@ class UpdateRecordedJobs_Batch {
         }
         return $self;
     }
+}
+
+
+if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    exit(UpdateRecordedJobs_Batch::make_args(Conf::$main, $argv)->run_or_warn());
 }

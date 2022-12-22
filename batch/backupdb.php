@@ -5,7 +5,6 @@
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     require_once(dirname(__DIR__) . "/src/init.php");
     date_default_timezone_set("GMT");
-    exit(BackupDB_Batch::make_args($argv)->run());
 }
 
 
@@ -690,4 +689,9 @@ Usage: php batch/backupdb.php [-c FILE | -n CONFID] [OPTS...] [-z] -o DUMP
         $Opt["__no_main"] = true;
         return new BackupDB_Batch(Dbl::parse_connection_params($Opt), $arg, $getopt);
     }
+}
+
+
+if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    exit(BackupDB_Batch::make_args($argv)->run());
 }
