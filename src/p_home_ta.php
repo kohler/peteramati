@@ -174,8 +174,8 @@ class Home_TA_Page {
             "has_nonanonymous" => $any_nonanonymous,
             "checkbox" => true
         ];
-        if ($this->viewer->privChair) {
-            $jd["can_override_anonymous"] = true;
+        if ($this->viewer->privChair && $any_anonymous) {
+            $jd["overridable_anonymous"] = true;
         }
         if ($nintotal) {
             $jd["need_total"] = 1;
@@ -363,7 +363,7 @@ class Home_TA_Page {
             $jd["has_older_repo"] = true;
         }
         if ($pset->anonymous) {
-            $jd["can_override_anonymous"] = true;
+            $jd["overridable_anonymous"] = true;
         }
         $nintotal = $last_in_total = 0;
         foreach ($gexp->value_entries() as $ge) {

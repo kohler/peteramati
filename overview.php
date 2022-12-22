@@ -50,7 +50,7 @@ $jd = ["id" => "overview",
        "checkbox" => true,
        "anonymous" => ($anonymity & 1) !== 0,
        "has_nonanonymous" => ($anonymity & 2) !== 0,
-       "can_override_anonymous" => true,
+       "overridable_anonymous" => ($anonymity & 1) !== 0,
        "col" => ["rownumber", ["type" => "checkbox", "className" => "uic uich js-range-click js-grgraph-highlight"], "user"]];
 echo Ht::unstash(),
     '<script>$(".pa-grade-overview").each(function(){$pa.pset_table(this,',

@@ -107,7 +107,7 @@ class PtableConf {
         this.frozen = !!pconf.frozen;
         this.anonymous = this.original_anonymous = !!pconf.anonymous;
         this.has_nonanonymous = !this.anonymous || pconf.has_nonanonymous;
-        this.can_override_anonymous = pconf.can_override_anonymous;
+        this.overridable_anonymous = this.anonymous && pconf.overridable_anonymous;
         this.flagged_commits = pconf.flagged_commits;
         this.last_first = null;
         this.sort = {
@@ -395,7 +395,7 @@ const gcoldef = {
                 t += "Name";
             }
             t += '</span>';
-            if (this.ptconf.original_anonymous && this.ptconf.can_override_anonymous) {
+            if (this.ptconf.overridable_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
             } else if (this.ptconf.original_anonymous) {
                 t += ' <span class="n">[anon]</span>';
@@ -416,7 +416,7 @@ const gcoldef = {
             let t = '<span class="heading">' +
                 (this.ptconf.anonymous || !this.ptconf.sort.email ? "Username" : "Email") +
                 '</span>';
-            if (this.ptconf.original_anonymous && this.ptconf.can_override_anonymous) {
+            if (this.ptconf.overridable_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
             } else if (this.ptconf.original_anonymous) {
                 t += ' <span class="n">[anon]</span>';
@@ -445,7 +445,7 @@ const gcoldef = {
     name2: {
         th: function () {
             let t = '<span class="heading">' + (this.ptconf.anonymous ? "Username" : "Name") + '</span>';
-            if (this.ptconf.original_anonymous && this.ptconf.can_override_anonymous) {
+            if (this.ptconf.overridable_anonymous) {
                 t += ' <button type="button" class="btn-ulink n js-switch-anon">[anon]</button>';
             }
             return '<th class="gt-name2 l plsortable" data-pa-sort="name2" scope="col">' + t + '</th>';
@@ -746,8 +746,7 @@ function pa_render_pset_table(ptconf) {
         if (sort.rev !== 1 && sort.rev !== -1) {
             sort.rev = 1;
         }
-        if (!ptconf.anonymous
-            || !ptconf.can_override_anonymous
+        if (!ptconf.overridable_anonymous
             || !sort.override_anonymous) {
             delete sort.override_anonymous;
         }
