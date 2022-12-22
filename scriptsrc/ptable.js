@@ -1414,7 +1414,8 @@ tooltip.add_builder("pa-ptable-user", function () {
             }
         }
         resolve(maindiv);
-    }), delay: 400, className: "gray small ml-2", dir: "w"};
+    }), delay: 400, className: "gray small ml-2", dir: "w",
+        noDelayClass: "pa-ptable-user"};
 });
 
 

@@ -461,13 +461,6 @@ function show_tooltip(info) {
     var tt, bub = null, to = null, near = null, delayto = null,
         refcount = 1, content = info.content;
 
-    if (info.delay) {
-        delayto = setTimeout(function () {
-            delayto = null;
-            content && !bub && show_bub();
-        }, info.delay);
-    }
-
     function erase() {
         to = clearTimeout(to);
         bub && bub.remove();
@@ -530,6 +523,9 @@ function show_tooltip(info) {
         },
         near: function () {
             return near;
+        },
+        noDelayClass: function () {
+            return info.noDelayClass;
         }
     };
 
@@ -542,7 +538,17 @@ function show_tooltip(info) {
         } else {
             tx && tx.erase();
             $(self).data("tooltipState", tt);
-            show_bub();
+            if (info.delay
+                && (!info.noDelayClass
+                    || !tx
+                    || tx.noDelayClass() !== info.noDelayClass)) {
+                delayto = setTimeout(function () {
+                    delayto = null;
+                    content && !bub && show_bub();
+                }, info.delay);
+            } else {
+                show_bub();
+            }
             window.global_tooltip = tt;
         }
     }
