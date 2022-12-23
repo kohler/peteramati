@@ -165,7 +165,7 @@ class RunEnqueue_Batch {
             "r:,runner:,run: Runner name",
             "e::,if-needed:: {n} =N Run only if needed",
             "ensure !",
-            "u[],user[] Match these users",
+            "u[]+,user[]+ Match these users",
             "H:,hash:,commit: Use this commit",
             "c:,chain: Set chain ID",
             "t[],tag[] Add tag",
