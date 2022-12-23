@@ -129,7 +129,8 @@ class RunEnqueue_Batch {
             foreach ($this->runsettings ?? [] as $k => $v) {
                 $qi->runsettings[$k] = $v;
             }
-            if ($qi->count_compatible_responses($this->verbose, $this->if_needed) < $this->if_needed) {
+            if ($this->if_needed === 0
+                || $qi->count_compatible_responses($this->verbose, $this->if_needed) < $this->if_needed) {
                 $qi->enqueue();
                 if (!$qi->chain) {
                     $qi->schedule($nu);
