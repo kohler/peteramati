@@ -698,7 +698,7 @@ class QueueItem {
 
         // no command + new request = skip to evaluation
         if ($this->queueid === 0
-            && !$this->runner->command()) {
+            && !$this->runner()->command) {
             $this->swap_status(self::STATUS_DONE);
             return true;
         }
