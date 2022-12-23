@@ -694,13 +694,21 @@ class QueueItem {
     /** @param QueueState $qs
      * @return bool */
     function step($qs) {
-        assert($this->queueid !== 0);
         assert(($this->runat > 0) === ($this->status > 0));
+
+        // no command + new request = skip to evaluation
+        if ($this->queueid === 0
+            && !$this->runner->command()) {
+            $this->swap_status(self::STATUS_DONE);
+            return true;
+        }
 
         // cancelled & completed: step does nothing
         if ($this->status >= self::STATUS_CANCELLED) {
             return true;
         }
+
+        assert($this->queueid !== 0);
 
         // cancel abandoned jobs
         if ($this->abandoned()) {
