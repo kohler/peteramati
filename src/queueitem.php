@@ -622,18 +622,24 @@ class QueueItem {
     }
 
     /** @param int $new_status
-     * @param array{runat?:int,lockfile?:string} $fields
+     * @param array{runat?:int,lockfile?:string,eventsource?:string,maxupdate?:int} $fields
      * @return bool */
     private function swap_status($new_status, $fields = []) {
         $new_runat = array_key_exists("runat", $fields) ? $fields["runat"] : $this->runat;
         if ($this->queueid !== 0) {
             $new_lockfile = array_key_exists("lockfile", $fields) ? $fields["lockfile"] : $this->lockfile;
             $new_eventsource = array_key_exists("eventsource", $fields) ? $fields["eventsource"] : $this->eventsource;
+            $ewhere = "";
+            $qv = [];
+            if (array_key_exists("maxupdate", $fields)) {
+                $ewhere = " and updateat<?";
+                $qv[] = $fields["maxupdate"];
+            }
             $result = $this->conf->qe("update ExecutionQueue
                     set status=?, runat=?, lockfile=?, bhash=?, eventsource=?
-                    where queueid=? and status=?",
+                    where queueid=? and status=?{$ewhere}",
                 $new_status, $new_runat, $new_lockfile, $this->bhash, $new_eventsource,
-                $this->queueid, $this->status);
+                $this->queueid, $this->status, ...$qv);
             $changed = $result->affected_rows;
             Dbl::free($result);
             if ($changed) {
@@ -711,17 +717,9 @@ class QueueItem {
         assert($this->queueid !== 0);
 
         // cancel abandoned jobs
-        if ($this->abandoned()) {
-            $result = $this->conf->qe("update ExecutionQueue set status=?
-                    where queueid=? and status=? and updateat<?",
-                self::STATUS_CANCELLED,
-                $this->queueid, $this->status, Conf::$now - 180);
-            $changed = $result->affected_rows;
-            Dbl::free($result);
-            if ($changed) {
-                $this->status = self::STATUS_CANCELLED;
-                return true;
-            }
+        if ($this->abandoned()
+            && $this->swap_status(self::STATUS_CANCELLED, ["maxupdate" => Conf::$now - 180])) {
+            return true;
         }
 
         // do nothing for unscheduled jobs
@@ -751,8 +749,7 @@ class QueueItem {
                 $this->start_command();
             } catch (Exception $e) {
                 $this->last_error = $e->getMessage();
-                $result = $this->conf->qe("update ExecutionQueue set status=? where queueid=?", self::STATUS_CANCELLED, $this->queueid);
-                $this->status = self::STATUS_CANCELLED;
+                $this->swap_status(self::STATUS_CANCELLED);
                 return false;
             }
         }
