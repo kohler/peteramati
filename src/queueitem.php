@@ -625,6 +625,7 @@ class QueueItem {
      * @param array{runat?:int,lockfile?:string,eventsource?:string,maxupdate?:int} $fields
      * @return bool */
     private function swap_status($new_status, $fields = []) {
+        $old_status = $this->status;
         $new_runat = array_key_exists("runat", $fields) ? $fields["runat"] : $this->runat;
         if ($this->queueid !== 0) {
             $new_lockfile = array_key_exists("lockfile", $fields) ? $fields["lockfile"] : $this->lockfile;
@@ -659,7 +660,8 @@ class QueueItem {
             }
         }
         if ($changed && $this->status >= self::STATUS_CANCELLED) {
-            if ($this->status === self::STATUS_DONE) {
+            if ($old_status < self::STATUS_EVALUATED
+                && $this->status >= self::STATUS_DONE) {
                 // always evaluate at least once
                 $this->evaluate();
             }
@@ -702,19 +704,10 @@ class QueueItem {
     function step($qs) {
         assert(($this->runat > 0) === ($this->status > 0));
 
-        // no command + new request = skip to evaluation
-        if ($this->queueid === 0
-            && !$this->runner()->command) {
-            $this->swap_status(self::STATUS_DONE);
-            return true;
-        }
-
         // cancelled & completed: step does nothing
         if ($this->status >= self::STATUS_CANCELLED) {
             return true;
         }
-
-        assert($this->queueid !== 0);
 
         // cancel abandoned jobs
         if ($this->abandoned()
@@ -733,7 +726,7 @@ class QueueItem {
             && $this->ifneeded !== 0
             && ($rr = $this->compatible_response())
             && $this->count_compatible_responses(false, $this->ifneeded) >= $this->ifneeded) {
-            $this->swap_status(self::STATUS_DONE, ["runat" => $rr->timestamp]);
+            $this->swap_status(self::STATUS_EVALUATED, ["runat" => $rr->timestamp]);
             if ($this->status >= self::STATUS_CANCELLED) {
                 return true;
             }
