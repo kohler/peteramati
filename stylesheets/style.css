@@ -3773,7 +3773,7 @@ a.help {
 	float: right;
 	margin-left: 1em;
 }
-.popup-actions > .btn.btnl, .popup-actions > button.btnl {
+.popup-actions > .btnl, .popup-actions > button.btnl {
 	float: left;
 	margin-left: 0;
 	margin-right: 1em;

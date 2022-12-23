@@ -131,6 +131,34 @@ function ptable_gdialog(ptconf, checked_spos, table) {
         }
     }
 
+    function gdialog_clearauto() {
+        const byuid = {}, noauto = {};
+        for (const te of ptconf.gradesheet.value_entries()) {
+            noauto[te.key] = null;
+        }
+        for (let su of gdialog_su) {
+            const x = byuid[su.uid] = {};
+            if (su.grade_commit) {
+                x.commit = su.grade_commit;
+                x.commit_is_grade = 1;
+            } else if (su.commit) {
+                x.commit = su.commit;
+            }
+            x.autogrades = noauto;
+        }
+        api_conditioner(hoturl("=api/multigrade", {pset: ptconf.key}),
+            {us: JSON.stringify(byuid)})
+        .then(function (rv) {
+            gdialog_store_start(rv);
+            if (rv.ok) {
+                for (let rvu of rv.us) {
+                    grade_update(ptconf, uid2tr, rvu);
+                }
+                $gdialog.close();
+            }
+        });
+    }
+
     function gdialog_traverse() {
         const next_spos = this.getAttribute("data-pa-spos");
         gdialog_store(function () { gdialog_fill([next_spos]); });
@@ -456,7 +484,8 @@ function ptable_gdialog(ptconf, checked_spos, table) {
         hc.push_actions();
         hc.push('<button type="button" name="bsubmit" class="btn-primary">Save</button>');
         hc.push('<button type="button" name="cancel">Cancel</button>');
-        hc.push('<span class="btnbox"><button type="button" name="prev" class="btnl">&lt;</button><button type="button" name="next" class="btnl">&gt;</button></span>');
+        hc.push('<span class="btnbox btnl"><button type="button" name="prev" class="btnl">&lt;</button><button type="button" name="next" class="btnl">&gt;</button></span>');
+        hc.push('<button type="button" name="clearauto" class="btnl">Clear autogrades</button>');
         $gdialog = hc.show(false);
         $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
         $gdialog.find("form").addClass("pa-psetinfo")[0].pa__gradesheet = ptconf.gradesheet;
@@ -468,6 +497,7 @@ function ptable_gdialog(ptconf, checked_spos, table) {
         $gdialog.on("keydown", "input, textarea, select", gdialog_key);
         //$gdialog.find(".pa-gradelist").on("input", "input, textarea, select", gdialog_gradelist_input);
         $gdialog.find("button[name=bsubmit]").on("click", function () { gdialog_store(null); });
+        $gdialog.find("button[name=clearauto]").on("click", gdialog_clearauto);
         $gdialog.find("button[name=prev], button[name=next]").on("click", gdialog_traverse);
         $gdialog.find("button.is-mode").on("click", gdialog_mode);
         $gdialog.find("button[name=prev], button[name=next]").prop("disabled", true).addClass("hidden");
