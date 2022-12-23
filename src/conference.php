@@ -154,6 +154,8 @@ class Conf {
     /** @var ?array<int,string> */
     private $_anon_username_cache;
     /** @var ?Contact */
+    private $_root_user;
+    /** @var ?Contact */
     private $_site_contact;
     /** @var array<string,Repository> */
     private $_handout_repos = [];
@@ -451,7 +453,7 @@ class Conf {
         $this->_username_cache = $this->_anon_username_cache = null;
         $this->sort_by_last = $sort_by_last;
         $this->default_format = (int) ($this->opt["defaultFormat"] ?? 0);
-        $this->_site_contact = null;
+        $this->_root_user = $this->_site_contact = null;
         $this->_api_map = null;
         $this->_date_format_initialized = false;
         $this->_dtz = null;
@@ -888,22 +890,26 @@ class Conf {
     }
 
     /** @return Contact */
+    function root_user() {
+        if (!$this->_root_user) {
+            $this->_root_user = Contact::make_site_contact($this, ["email" => "rootuser"]);
+        }
+        return $this->_root_user;
+    }
+
+    /** @return Contact */
     function site_contact() {
         if (!$this->_site_contact) {
-            $args = [
-                "fullName" => $this->opt("contactName"),
-                "email" => $this->opt("contactEmail"),
-                "isChair" => 1, "isPC" => 1, "is_site_contact" => 1,
-                "contactTags" => null
-            ];
-            if ((!$args["email"] || $args["email"] === "you@example.com")
+            $args = ["email" => $this->opt("contactEmail") ?? ""];
+            if (($args["email"] === "" || $args["email"] === "you@example.com")
                 && ($row = $this->default_site_contact())) {
-                unset($args["fullName"]);
                 $args["email"] = $row->email;
                 $args["firstName"] = $row->firstName;
                 $args["lastName"] = $row->lastName;
+            } else if (($name = $this->opt("contactName"))) {
+                list($args["firstName"], $args["lastName"]) = Text::split_name($name);
             }
-            $this->_site_contact = new Contact($args, $this);
+            $this->_site_contact = Contact::make_site_contact($this, $args);
         }
         return $this->_site_contact;
     }

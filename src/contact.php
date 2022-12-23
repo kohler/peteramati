@@ -108,7 +108,7 @@ class Contact {
     const ROLE_ADMIN = 2;
     const ROLE_CHAIR = 4;
     const ROLE_PCLIKE = 15;
-    public $is_site_contact = false;
+    public $_root_user = false;
     public $roles = 0;
     public $isPC = false;
     public $privChair = false;
@@ -121,7 +121,7 @@ class Contact {
     static private $active_forceShow = false;
 
 
-    public function __construct($trueuser = null, Conf $conf = null) {
+    function __construct($trueuser = null, Conf $conf = null) {
         global $Conf;
         $this->conf = $conf ?? $Conf;
         if ($trueuser) {
@@ -139,6 +139,18 @@ class Contact {
             $user->db_load();
         }
         return $user;
+    }
+
+    /** @param array{email?:string,firstName?:string,lastName?:string} $args
+     * @return Contact */
+    static function make_site_contact(Conf $conf, $args) {
+        $u = new Contact(null, $conf);
+        $u->email = $args["email"] ?? "";
+        $u->firstName = $args["firstName"] ?? "";
+        $u->lastName = $args["lastName"] ?? "";
+        $u->assign_roles(self::ROLE_PC | self::ROLE_CHAIR);
+        $u->_root_user = true;
+        return $u;
     }
 
     private function merge($user) {
@@ -226,9 +238,6 @@ class Contact {
                 $roles |= self::ROLE_CHAIR;
             }
             $this->assign_roles($roles);
-        }
-        if (isset($user->is_site_contact)) {
-            $this->is_site_contact = $user->is_site_contact;
         }
         $this->username = $this->github_username;
     }
