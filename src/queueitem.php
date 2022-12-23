@@ -177,6 +177,17 @@ class QueueItem {
         return $this->_user;
     }
 
+    /** @return ?Contact */
+    function requester() {
+        if ($this->cid === $this->reqcid) {
+            return $this->user();
+        } else if ($this->reqcid <= 0) {
+            return $this->conf->root_user();
+        } else {
+            return $this->conf->user_by_id($this->reqcid);
+        }
+    }
+
     /** @return ?Repository */
     function repo() {
         if (($this->_ocache & 2) === 0) {
@@ -192,8 +203,10 @@ class QueueItem {
     function info() {
         if (($this->_ocache & 4) === 0) {
             $this->_ocache |= 4;
-            if (($p = $this->pset()) && ($u = $this->user())) {
-                $this->_info = PsetView::make($p, $u, $u, $this->hash(), true);
+            if (($p = $this->pset())
+                && ($u = $this->user())
+                && ($v = $this->requester())) {
+                $this->_info = PsetView::make($p, $u, $v, $this->hash(), true);
             }
         }
         return $this->_info;
@@ -320,6 +333,11 @@ class QueueItem {
                 || $this->status === self::STATUS_SCHEDULED)
             && ($this->flags & self::FLAG_UNWATCHED) === 0
             && $this->updateat < Conf::$now - 180;
+    }
+
+    /** @return bool */
+    function cancelled() {
+        return $this->status === self::STATUS_CANCELLED;
     }
 
     /** @return bool */
@@ -659,12 +677,11 @@ class QueueItem {
                 $this->runat = $new_runat;
             }
         }
+        if ($changed && $old_status < self::STATUS_EVALUATED && $this->status >= self::STATUS_DONE) {
+            // always evaluate at least once
+            $this->evaluate();
+        }
         if ($changed && $this->status >= self::STATUS_CANCELLED) {
-            if ($old_status < self::STATUS_EVALUATED
-                && $this->status >= self::STATUS_DONE) {
-                // always evaluate at least once
-                $this->evaluate();
-            }
             if ($this->eventsource && ($esdir = $this->eventsource_dir())) {
                 @unlink("{$esdir}{$this->eventsource}");
             }
