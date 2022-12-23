@@ -40,18 +40,27 @@ class RunEnqueue_Batch {
         $this->pset = $pset;
         $this->runner = $runner;
         $this->sset_flags = 0;
-        if (count($usermatch) === 1 && $usermatch[0] === "dropped") {
+        $umatch = [];
+        foreach ($usermatch as $u) {
+            while (str_ends_with($u, ",")) {
+                $u = substr($u, 0, -1);
+            }
+            if ($u !== "") {
+                $umatch[] = $u;
+            }
+        }
+        if (count($umatch) === 1 && $umatch[0] === "dropped") {
             $this->sset_flags |= StudentSet::DROPPED;
         } else {
             $this->sset_flags |= StudentSet::ENROLLED;
         }
-        if (count($usermatch) === 1 && $usermatch[0] === "college") {
+        if (count($umatch) === 1 && $umatch[0] === "college") {
             $this->sset_flags |= StudentSet::COLLEGE;
-        } else if (count($usermatch) === 1 && $usermatch[0] === "extension") {
+        } else if (count($umatch) === 1 && $umatch[0] === "extension") {
             $this->sset_flags |= StudentSet::DCE;
         }
         if ($this->sset_flags === StudentSet::ENROLLED) {
-            foreach ($usermatch as $s) {
+            foreach ($umatch as $s) {
                 if (str_starts_with($s, "[anon")) {
                     $this->usermatch[] = preg_replace('/([\[\]])/', '\\\\$1', $s . "*");
                 } else {
