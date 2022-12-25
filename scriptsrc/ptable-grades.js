@@ -245,8 +245,10 @@ function ptable_gdialog(ptconf, checked_spos, table) {
         const gl = $gdialog.find(".pa-gradelist")[0];
         if (!gl.firstChild) {
             const gi = GradeSheet.closest(gl);
-            for (const te of gi.value_entries()) {
-                gl.appendChild(te.render(gi, 1));
+            for (const ge of gi.value_entries()) {
+                if (!ge.readonly) {
+                    gl.appendChild(ge.render(gi, 1));
+                }
             }
         }
         $gdialog.find(".pa-gdialog-tab").addClass("hidden");
