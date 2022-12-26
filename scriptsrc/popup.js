@@ -122,17 +122,20 @@ function popup_near(elt, anchor) {
         elt.style.left = x + "px";
     }
     queueMicrotask(function () {
-        let efocus;
-        $(elt).find("input, button, textarea, select").each(function () {
-            if ((hasClass(this, "want-focus")
-                 || (!efocus && !hasClass(this, "dangerous") && !hasClass(this, "no-focus")))
-                && $(this).is(":visible")) {
-                efocus = this;
-                if (hasClass(this, "want-focus")) {
-                    return false;
-                }
+        for (const e of elt.querySelectorAll(".want-focus")) {
+            if (e.offsetWidth > 0) {
+                focus_at(e);
+                return;
             }
-        });
-        efocus && focus_at(efocus);
+        }
+        for (const e of elt.querySelector("form").elements) {
+            if (e.type !== "hidden"
+                && !hasClass(e, "dangerous")
+                && !hasClass(e, "no-focus")
+                && e.offsetWidth > 0) {
+                focus_at(e);
+                return;
+            }
+        }
     });
 }
