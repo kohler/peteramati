@@ -45,9 +45,9 @@ class Repository {
     /** @var array<string,array<string,CommitRecord>> */
     private $_commit_lists = [];
     /** @var ?list<string> */
-    private $_remaining_heads;
-    /** @var ?list<string> */
-    private $_snapshot_heads = null;
+    private $_branches;
+    /** @var int */
+    private $_heads_loaded = 0;
     /** @var array<string,bool> */
     private $_commit_lists_cc = [];
     /** @var int */
@@ -130,14 +130,17 @@ class Repository {
     function https_url() {
         return $this->reposite->https_url();
     }
+
     /** @return string */
     function ssh_url() {
         return $this->reposite->ssh_url();
     }
+
     /** @return string */
     function friendly_url() {
         return $this->reposite->friendly_url();
     }
+
     /** @return string */
     function friendly_url_like(Repository $other) {
         if ($this->reposite->siteclass === $other->reposite->siteclass) {
@@ -146,6 +149,7 @@ class Repository {
             return $this->url;
         }
     }
+
     /** @return list<string> */
     function credentialed_git_command() {
         return $this->reposite->credentialed_git_command();
@@ -173,7 +177,8 @@ class Repository {
             $this->reposite->gitfetch($this->repoid, $this->cacheid, $foreground);
             if ($foreground) {
                 $this->_commits = $this->_commit_lists = $this->_commit_lists_cc = [];
-                $this->_remaining_heads = $this->_snapshot_heads = null;
+                $this->_branches = null;
+                $this->_heads_loaded = 0;
                 ++$this->_refresh_count;
             }
         } else {
@@ -330,6 +335,21 @@ class Repository {
      * @return bool */
     function gitrunok($command, $args = []) {
         return $this->gitruninfo($command, $args)->ok;
+    }
+
+    /** @return list<string> */
+    function branches() {
+        if ($this->_branches === null) {
+            $this->_branches = [];
+            $dir = $this->ensure_repodir() . "/.git/refs/remotes/repo{$this->repoid}/";
+            foreach (glob("{$dir}*") as $x) {
+                $br = substr($x, strlen($dir));
+                if ($br !== "" && $br[0] !== "." && $br !== "HEAD") {
+                    $this->_branches[] = $br;
+                }
+            }
+        }
+        return $this->_branches;
     }
 
     /** @param string $arg
@@ -596,65 +616,57 @@ class Repository {
         if (empty($this->_commits)) {
             $this->commits($pset, $branch);
         }
-        // check existing commits
-        list($cx, $found) = self::find_listed_commit($hashpart, $this->_commits);
-        if ($found) {
-            return $cx;
+        // exact commits don’t need access to full commit lists
+        $exact = strlen($hashpart) >= 40;
+        if (array_key_exists($hashpart, $this->_commits)) {
+            return $this->_commits[$hashpart];
         }
-        // load additional cached heads (e.g. student `push -f`)
-        foreach ($this->extra_heads() as $xhead) {
-            if (!isset($this->_commit_lists[".h/{$xhead}"])) {
-                list($cx, $found) = self::find_listed_commit($hashpart, $this->head_commits(".h/{$xhead}", $xhead));
-                if ($found) {
-                    return $cx;
-                }
+        // branch heads
+        if ($this->_heads_loaded === 0) {
+            $this->_heads_loaded = 1;
+            foreach ($this->branches() as $br) {
+                if (!isset($this->_commit_lists[$br]))
+                    $this->head_commits($br, $this->repobranchname($br));
+            }
+            if (array_key_exists($hashpart, $this->_commits)) {
+                return $this->_commits[$hashpart];
             }
         }
-        // load all branches
-        if ($this->_remaining_heads === null) {
-            $this->_remaining_heads = [$this->conf->default_main_branch];
-            $dir = $this->ensure_repodir() . "/.git/refs/remotes/repo{$this->repoid}/";
-            foreach (glob("{$dir}*") as $x) {
-                $this->_remaining_heads[] = substr($x, strlen($dir));
+        // extra heads (e.g., student does `git push -f`)
+        if ($this->_heads_loaded === 1) {
+            $this->_heads_loaded = 2;
+            foreach ($this->extra_heads() as $x) {
+                if (!isset($this->_commits[$x]))
+                    $this->head_commits(".h/{$x}", $x);
+            }
+            if (array_key_exists($hashpart, $this->_commits)) {
+                return $this->_commits[$hashpart];
             }
         }
-        while (!empty($this->_remaining_heads)) {
-            $h = array_shift($this->_remaining_heads);
-            if (!isset($this->_commit_lists[$h])) {
-                list($cx, $found) = self::find_listed_commit($hashpart, $this->head_commits($h, $this->repobranchname($h)));
-                if ($found) {
-                    return $cx;
-                }
-            }
-        }
-        // check snapshots
-        if ($this->_snapshot_heads === null) {
+        // snapshots
+        if ($this->_heads_loaded === 2) {
+            $this->_heads_loaded = 3;
             $pfx = $this->ensure_repodir() . "/.git/refs/tags/repo{$this->repoid}.snap";
-            $this->_snapshot_heads = [];
             foreach (glob("{$pfx}*") as $snapfile) {
                 if (($x = file_get_contents($snapfile)) !== false
                     && ($x = rtrim($x)) !== ""
                     && strlen($x) >= 40
                     && ctype_xdigit($x)
                     && !isset($this->_commits[$x])) {
-                    $this->_snapshot_heads[] = $x;
+                    $this->head_commits(".h/{$x}", $x);
                 }
             }
         }
-        while (!empty($this->_snapshot_heads)) {
-            $head = array_pop($this->_snapshot_heads);
-            list($cx, $found) = self::find_listed_commit($hashpart, $this->head_commits(".h/{$head}", $head));
-            if ($found) {
-                return $cx;
-            }
-        }
-        // nowhere else to look
+        // nothing left to load
         if (!array_key_exists($hashpart, $this->_commits)) {
-            $this->_commits[$hashpart] = null;
+            list($this->_commits[$hashpart], $exact) = self::find_listed_commit($hashpart, $this->_commits);
         }
         return $this->_commits[$hashpart];
     }
 
+    /** @param ?string $branch
+     * @param ?int $limit
+     * @return array<string,string> */
     function author_emails($branch = null, $limit = null) {
         $command = ["git", "log", "--format=%ae"];
         if ($limit) {
