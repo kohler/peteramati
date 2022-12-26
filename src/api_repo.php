@@ -97,6 +97,30 @@ class Repo_API {
         return $ans;
     }
 
+    static function branches(Contact $user, Qrequest $qreq, APIData $mapi) {
+        if ($user->is_empty()) {
+            return ["ok" => false, "error" => "Permission denied"];
+        } else if (!preg_match('/\A(?:repo|)(\d+)\z/', $qreq->repoid ?? "", $m)) {
+            return ["ok" => false, "error" => "Invalid request"];
+        }
+
+        $repo = Repository::by_id(intval($m[1]), $mapi->conf);
+        if (!$repo) {
+            return ["ok" => false, "error" => $user->isPC ? "Repository not found" : "Permission denied"];
+        }
+
+        $vbr = [];
+        foreach ($repo->branches() as $br) {
+            if ($user->can_view_repo_contents($repo, $br))
+                $vbr[] = $br;
+        }
+        if (empty($vbr) && !$user->isPC) {
+            return ["ok" => false, "error" => "Permission denied"];
+        } else {
+            return ["ok" => true, "branches" => $vbr];
+        }
+    }
+
     static function diffconfig(Contact $user, Qrequest $qreq, APIData $api) {
         if (!$user->can_view_repo_contents($api->repo, $api->branch)
             || ($qreq->is_post() && !$qreq->valid_post())) {

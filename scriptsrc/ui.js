@@ -109,7 +109,8 @@ $(document).on("keydown", ".uikd", handle_ui);
 $(document).on("load", ".ui-load", handle_ui);
 $(document).on("mouseup mousedown", ".uim", handle_ui);
 $(document).on("unfold", ".ui-unfold", handle_ui);
-$(document).on("blur", ".ui-blur", handle_ui);
+$(document).on("focusin", ".ui-focusin", handle_ui);
+$(document).on("focusout", ".ui-focusout", handle_ui);
 
 
 let in_tab = false;

@@ -409,7 +409,9 @@ class ContactView {
             $js = [
                 "style" => "width:32em",
                 "id" => $id,
-                "placeholder" => $pset->main_branch
+                "placeholder" => $pset->main_branch,
+                "class" => $repo ? "ui-focusin pa-branch-datalist" : null,
+                "data-pa-repoid" => $repo ? "repo{$repo->repoid}" : null
             ];
             $value = Ht::entry("branch", $xvalue, $js) . " " . Ht::submit("Save");
         } else if ($user->is_anonymous) {

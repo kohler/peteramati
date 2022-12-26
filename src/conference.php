@@ -2715,6 +2715,7 @@ class Conf {
         $this->_api_map = [
             "blob" => "15 Repo_API::blob",
             "branch" => "19 RepoConfig_API::branch",
+            "branches" => "1 Repo_API::branches",
             "diffconfig" => "15 Repo_API::diffconfig",
             "filediff" => "15 Repo_API::filediff",
             "flag" => "15 Flag_API::flag",

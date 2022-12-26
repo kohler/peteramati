@@ -1143,6 +1143,39 @@ handle_ui.on("submit.pa-setbranch", function (evt) {
     evt.preventDefault();
 });
 
+function repo_branches(repoid) {
+    let bl = document.getElementById("branchlist-" + repoid);
+    if (bl) {
+        return Promise.resolve(bl);
+    }
+    bl = document.createElement("datalist");
+    bl.id = "branchlist-" + repoid;
+    document.body.appendChild(bl);
+    return new Promise(function (resolve, reject) {
+        $.ajax(hoturl("api/branches", {repoid: repoid}), {
+            "type": "GET", cache: false, success: function (data) {
+                if (data.ok) {
+                    for (const br of data.branches) {
+                        const e = document.createElement("option");
+                        e.value = br;
+                        bl.appendChild(e);
+                    }
+                    resolve(bl);
+                } else {
+                    reject(data);
+                }
+            }
+        });
+    });
+}
+
+handle_ui.on("focusin.pa-branch-datalist", function () {
+    removeClass(this, "ui-focusin");
+    if (!this.hasAttribute("list") && this.hasAttribute("data-pa-repoid")) {
+        repo_branches(this.getAttribute("data-pa-repoid")).then((bl) => { this.setAttribute("list", bl.id); }).catch((e) => console.log(e));
+    }
+});
+
 function pa_checklatest(pset) {
     var start = (new Date).getTime(), timeout;
 
