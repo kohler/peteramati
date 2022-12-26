@@ -2,13 +2,13 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { escape_entities, unescape_entities, html_id_encode } from "./encoders.js";
+import { escape_entities, html_id_encode } from "./encoders.js";
 import { hasClass, addClass, toggleClass, removeClass,
     input_default_value, input_set_default_value, input_differs } from "./ui.js";
 import { Filediff, Linediff } from "./diff.js";
 import { Note } from "./note.js";
 import { GradeClass } from "./gc.js";
-import { render_ftext } from "./render.js";
+import { render_onto } from "./render.js";
 
 
 let id_counter = 0, late_hours_entry;
@@ -40,6 +40,14 @@ function pa_resetgrade() {
     }
 }
 
+function title_span(ftext) {
+    const x = document.createElement("span");
+    document.body.appendChild(x);
+    render_onto(x, "f", ftext);
+    x.remove();
+    return x;
+}
+
 export class GradeEntry {
     constructor(x) {
         Object.assign(this, x);
@@ -61,38 +69,26 @@ export class GradeEntry {
     }
 
     get title_html() {
-        let t = this.title, ch, int;
+        let t = this.title, ch;
         if (!t) {
             return this.key;
         } else if (t.charAt(0) === "<"
                    && (ch = t.charAt(1)) >= "0"
                    && ch <= "9") {
-            t = render_ftext(t).trim();
-            if (t.startsWith("<p>")
-                && t.endsWith("</p>")
-                && (int = t.substring(3, t.length - 4)).indexOf("</p>") < 0) {
-                t = int;
-            }
-            return t;
+            return title_span(t).innerHTML;
         } else {
             return escape_entities(t);
         }
     }
 
     get title_text() {
-        let t = this.title, ch, int;
+        let t = this.title, ch;
         if (!t) {
             return this.key;
         } else if (t.charAt(0) === "<"
                    && (ch = t.charAt(1)) >= "0"
                    && ch <= "9") {
-            t = render_ftext(t).trim();
-            if (t.startsWith("<p>")
-                && t.endsWith("</p>")
-                && (int = t.substring(3, t.length - 4)).indexOf("</p>") < 0) {
-                t = int;
-            }
-            return unescape_entities(t);
+            return title_span(t).textContext;
         } else {
             return t;
         }
@@ -164,7 +160,7 @@ export class GradeEntry {
         if (this.description) {
             const de = document.createElement("div");
             de.className = "pa-pdesc pa-dr";
-            de.innerHTML = render_ftext(this.description);
+            render_onto(de, "f", this.description);
             pge.appendChild(de);
         }
         pde.className = mode === 2 ? "ui-submit pa-pv" : "pa-pv";

@@ -9,7 +9,7 @@ import { event_key, event_modkey } from "./ui-key.js";
 import { Linediff } from "./diff.js";
 import { Note } from "./note.js";
 import { GradeSheet } from "./gradeentry.js";
-import { ftext } from "./render.js";
+import { ftext, render_onto } from "./render.js";
 import { tooltip } from "./tooltip.js";
 
 
@@ -300,7 +300,7 @@ function display_note_suggestions(form, ns) {
         b2.className = "ui pa-use-suggestion dislike".concat(mf < 0 ? " taken" : "");
         b2.setAttribute("aria-label", "Downrank");
         b2.textContent = "➖";
-        ftext.render(n.ftext, tx);
+        render_onto(tx, "f", n.ftext);
         tooltip.call(b1);
         tooltip.call(b2);
     }

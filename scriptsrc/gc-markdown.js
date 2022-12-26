@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { GradeClass } from "./gc.js";
-import { render_text } from "./render.js";
+import { render_onto } from "./render.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { Filediff } from "./diff.js";
 import { Note } from "./note.js";
@@ -91,9 +91,9 @@ GradeClass.add("markdown", {
                 }
             }
         } else if (hasClass(ve.parentElement, "pa-markdown")) {
-            render_text(1, v, ve);
+            render_onto(ve, 1, v);
         } else {
-            render_text(0, v, ve);
+            render_onto(ve, 0, v);
         }
         return ve.firstChild === null;
     },
@@ -122,7 +122,7 @@ handle_ui.on("js-toggle-gc-markdown-preview", function () {
         div.append(hr1, inner, hr2);
         ta.parentElement.insertBefore(div, ta);
         addClass(ta, "hidden");
-        render_text(1, ta.value, inner);
+        render_onto(inner, 1, ta.value);
         this.textContent = "Edit";
         addClass(this.previousSibling, "hidden");
     }

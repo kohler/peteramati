@@ -4,24 +4,13 @@
 
 import { escape_entities } from "./encoders.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
+import { hasClass } from "./ui.js";
 
 function render_class(c, format) {
     if (c) {
         return c.replace(/(?:^|\s)(?:need-format|format\d+)(?=$|\s)/g, "").concat(" format", format).trimStart();
     } else {
         return "format" + format;
-    }
-}
-
-function render_with(r, text, context) {
-    const t = r.render(text);
-    if (context == null) {
-        return t;
-    } else if (context instanceof Element) {
-        context.className = render_class(context.className, r.format);
-        context.innerHTML = t;
-    } else {
-        return '<div class="'.concat(render_class(context, r.format), '">', t, '</div>');
     }
 }
 
@@ -43,17 +32,13 @@ export function parse_ftext(t) {
 
 const renderers = {};
 
-
-export function render_text(format, text, context) {
-    return render_with(renderers[format] || renderers[0], text, context);
-}
-
-render_text.add_format = function (r) {
+function add_format(r) {
     if (r.format == null || r.format === "" || renderers[r.format]) {
         throw new Error("bad or reused format");
     }
     renderers[r.format] = r;
-};
+}
+
 
 function link_urls(t) {
     var re = /((?:https?|ftp):\/\/(?:[^\s<>\"&]|&amp;)*[^\s<>\"().,:;&])([\"().,:;]*)(?=[\s<>&]|$)/g;
@@ -62,11 +47,28 @@ function link_urls(t) {
     });
 }
 
-render_text.add_format({
-    format: 0,
-    render: function (text) {
-        return link_urls(escape_entities(text));
+function render0(text) {
+    var lines = text.split(/((?:\r\n?|\n)(?:[-+*][ \t]|\d+\.)?)/), ch;
+    for (var i = 1; i < lines.length; i += 2) {
+        if (lines[i - 1].length > 49
+            && lines[i].length <= 2
+            && (ch = lines[i + 1].charAt(0)) !== ""
+            && ch !== " "
+            && ch !== "\t")
+            lines[i] = " ";
     }
+    text = "<p>" + link_urls(escape_entities(lines.join(""))) + "</p>";
+    return text.replace(/\r\n?(?:\r\n?)+|\n\n+/g, "</p><p>");
+}
+
+function render0_inline(text) {
+    return link_urls(escape_entities(text));
+}
+
+add_format({
+    format: 0,
+    render: render0,
+    render_inline: render0_inline
 });
 
 let md, md2;
@@ -99,7 +101,7 @@ function try_highlight(str, lang, langAttr, token) {
     return "";
 }
 
-render_text.add_format({
+add_format({
     format: 1,
     render: function (text) {
         if (!md) {
@@ -109,7 +111,7 @@ render_text.add_format({
     }
 });
 
-render_text.add_format({
+add_format({
     format: 3,
     render: function (text) {
         if (!md2) {
@@ -119,7 +121,7 @@ render_text.add_format({
     }
 });
 
-render_text.add_format({
+add_format({
     format: 5,
     render: function (text) {
         return text;
@@ -127,36 +129,62 @@ render_text.add_format({
 });
 
 
-render_text.on_page = function () {
-    $(".need-format").each(function () {
-        let format = this.getAttribute("data-format"),
-            content = this.getAttribute("data-content");
-        if (content == null) {
-            content = this.textContent;
-        }
-        if (format == null) {
-            const ft = parse_ftext(content);
-            format = ft[0];
-            content = ft[1];
-        }
-        render_text(format, content, this);
-    });
-};
-
-$(render_text.on_page);
-
-export function render_ftext(ftext, context) {
-    const ft = parse_ftext(ftext);
-    return render_with(renderers[ft[0]] || renderers[0], ft[1], context);
+function render_with(context, renderer, text) {
+    const want_inline = hasClass(context, "format-inline")
+            || window.getComputedStyle(context).display.startsWith("inline"),
+        renderf = (want_inline && renderer.render_inline) || renderer.render,
+        html = renderf.call(context, text, context);
+    context.className = render_class(context.className, renderer.format);
+    context.innerHTML = html;
+    if (want_inline
+        && !renderer.render_inline
+        && context.children.length === 1
+        && context.firstChild.tagName === "P") {
+        context.firstChild.replaceWith(...context.firstChild.childNodes);
+    }
 }
 
+export function render_onto(context, format, text) {
+    if (format === "f") {
+        var ft = parse_ftext(text);
+        format = ft[0];
+        text = ft[1];
+    }
+    try {
+        render_with(context, renderers[format] || renderers[0], text);
+    } catch (err) {
+        render_with(context, renderers[0], text);
+        delete renderers[format];
+    }
+}
+
+
+function render_this() {
+    const format = this.hasAttribute("data-format")
+            ? this.getAttribute("data-format")
+            : "f",
+        content = this.hasAttribute("data-content")
+            ? this.getAttribute("data-content")
+            : this.textContent;
+    render_onto(this, format !== "" ? format : "f", content);
+}
+
+function on_page() {
+    $(".need-format").each(render_this);
+}
+
+export const render_text = {
+    add_format: add_format,
+    on_page: on_page
+};
+
+$(on_page);
 
 export const ftext = {
     parse: parse_ftext,
     unparse: function (format, text) {
         return format || text.startsWith("<") ? "<".concat(format || 0, ">", text) : text;
-    },
-    render: render_ftext
+    }
 };
 
 

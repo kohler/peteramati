@@ -6,7 +6,7 @@ import { hasClass, addClass, removeClass } from "./ui.js";
 import { escape_entities } from "./encoders.js";
 import { hoturl } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
-import { ftext } from "./render.js";
+import { ftext, render_onto } from "./render.js";
 import { text_eq } from "./utils.js";
 import { Filediff, Linediff } from "./diff.js";
 
@@ -210,7 +210,7 @@ export class Note {
         contdiv.append(notediv);
         $td.append(contdiv);
 
-        ftext.render(this.ftext, notediv);
+        render_onto(notediv, "f", this.ftext);
 
         fix_links_at(this.element);
         if (transition) {
