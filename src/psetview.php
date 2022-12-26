@@ -1445,12 +1445,12 @@ class PsetView {
 
     /** @return bool */
     function can_view_repo_contents($cached = false) {
-        return $this->viewer->can_view_repo_contents($this->repo, $this->branch, $cached);
+        return $this->repo && $this->viewer->can_view_repo_contents($this->repo, $this->branch, $cached);
     }
 
     /** @return bool */
     function user_can_view_repo_contents($cached = false) {
-        return $this->user->can_view_repo_contents($this->repo, $this->branch, $cached);
+        return $this->repo && $this->user->can_view_repo_contents($this->repo, $this->branch, $cached);
     }
 
     /** @return bool */
