@@ -113,10 +113,15 @@ class MessageItem implements JsonSerializable {
         return (object) $x;
     }
 
+    /** @return array{ok:bool,message_list:list<MessageItem>} */
+    function make_json() {
+        return ["ok" => $this->status < 2, "message_list" => [$this]];
+    }
+
     /** @param ?string $msg
      * @return array{ok:false,message_list:list<MessageItem>} */
     static function make_error_json($msg) {
-        return ["ok" => false, "message_list" => [new MessageItem(null, $msg ?? "", 2)]];
+        return (new MessageItem(null, $msg ?? "", 2))->make_json();
     }
 
     /** @param ?string $msg
@@ -145,8 +150,6 @@ class MessageItem implements JsonSerializable {
 }
 
 class MessageSet {
-    /** @var ?Contact */
-    public $user;
     /** @var list<MessageItem> */
     private $msgs = [];
     /** @var array<string,int> */

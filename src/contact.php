@@ -892,7 +892,7 @@ class Contact {
     }
 
     /** @param ?Repository $repo
-     * @return bool */
+     * @return true */
     function set_repo(Pset $pset, $repo) {
         if ($repo) {
             $this->set_link(LINK_REPO, $pset->id, $repo->repoid);

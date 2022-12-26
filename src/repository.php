@@ -15,7 +15,7 @@ class Repository {
     public $reposite;
     /** @var string */
     public $cacheid;
-    /** @var int */
+    /** @var -1|0|1 */
     public $open;
     /** @var int */
     public $opencheckat;
@@ -25,6 +25,7 @@ class Repository {
     public $snapat;
     /** @var int */
     public $snapcheckat;
+    /** @var int */
     public $working;
     /** @var int */
     public $infosnapat;
@@ -186,23 +187,30 @@ class Repository {
         }
     }
 
+    /** @var array<string,-1|0|1> */
     static private $open_cache = [];
-    function validate_open(MessageSet $ms = null) {
-        if (isset(self::$open_cache[$this->url]))
+
+    /** @return -1|0|1 */
+    function validate_open() {
+        if (isset(self::$open_cache[$this->url])) {
             return self::$open_cache[$this->url];
-        if (self::$validate_time_used >= self::VALIDATE_TOTAL_TIMEOUT)
+        }
+        if (self::$validate_time_used >= self::VALIDATE_TOTAL_TIMEOUT) {
             return -1;
+        }
         $before = microtime(true);
         self::$open_cache[$this->url] = $r = $this->reposite->validate_open();
         self::$validate_time_used += microtime(true) - $before;
         return $r;
     }
-    function check_open(MessageSet $ms = null) {
+
+    /** @return -1|0|1 */
+    function check_open() {
         // Recheck repository openness after a day for closed repositories,
         // and after 30 seconds for open or failed-check repositories.
         if (Conf::$now - $this->opencheckat > ($this->open == 0 ? 86400 : 30)) {
-            $open = $this->validate_open($ms);
-            if ($open != $this->open || Conf::$now != $this->opencheckat) {
+            $open = $this->validate_open();
+            if ($open !== $this->open || Conf::$now !== $this->opencheckat) {
                 if ($this->repoid > 0)
                     $this->conf->qe("update Repository set `open`=?, opencheckat=? where repoid=?",
                         $open, Conf::$now, $this->repoid);
@@ -210,51 +218,57 @@ class Repository {
                 $this->opencheckat = Conf::$now;
             }
         }
-        if ($this->open < 0 && $ms && $ms->user->isPC && !$ms->has_problem()) {
-            $ms->warning_at("open", Messages::$main->expand_html("repo_toopublic_timeout", $this->reposite->message_defs($ms->user)));
-        }
-        if ($this->open > 0 && $ms && !$ms->has_problem()) {
-            $ms->error_at("open", Messages::$main->expand_html("repo_toopublic", $this->reposite->message_defs($ms->user)));
-        }
         return $this->open;
     }
 
+    /** @var array<string,-1|0|1> */
     static private $working_cache = [];
-    function validate_working(MessageSet $ms = null) {
+
+    /** @return -1|0|1 */
+    function validate_working(Contact $user, MessageSet $ms = null) {
         if (isset(self::$working_cache[$this->url])) {
             return self::$working_cache[$this->url];
         } else if (self::$validate_time_used >= self::VALIDATE_TOTAL_TIMEOUT) {
             return -1;
         }
         $before = microtime(true);
-        self::$working_cache[$this->url] = $r = $this->reposite->validate_working($ms);
+        self::$working_cache[$this->url] = $r = $this->reposite->validate_working($user, $ms);
         self::$validate_time_used += microtime(true) - $before;
         return $r;
     }
-    function check_working(MessageSet $ms = null) {
+
+    /** @return bool */
+    function check_working(Contact $user, MessageSet $ms = null) {
         $working = $this->working;
-        if ($working == 0) {
-            $working = $this->validate_working($ms);
+        if ($working === 0) {
+            $working = $this->validate_working($user, $ms);
             if ($working > 0) {
                 $this->working = Conf::$now;
-                if ($this->repoid > 0)
+                if ($this->repoid > 0) {
                     $this->conf->qe("update Repository set working=? where repoid=?", Conf::$now, $this->repoid);
+                }
             }
         }
-        if ($working < 0 && $ms && $ms->user->isPC && !$ms->has_problem_at("working")) {
-            $ms->warning_at("working", Messages::$main->expand_html("repo_working_timeout", $this->reposite->message_defs($ms->user)));
+        if ($working < 0 && $ms && $user->isPC && !$ms->has_problem_at("working")) {
+            $ms->warning_at("repo", Messages::$main->expand_html("repo_working_timeout", $this->reposite->message_defs($user)));
+            $ms->warning_at("working");
         }
-        if ($working == 0 && $ms && !$ms->has_problem_at("working")) {
-            $ms->error_at("working", Messages::$main->expand_html("repo_unreadable", $this->reposite->message_defs($ms->user)));
+        if ($working === 0 && $ms && !$ms->has_problem_at("working")) {
+            $ms->warning_at("repo", Messages::$main->expand_html("repo_unreadable", $this->reposite->message_defs($user)));
+            $ms->warning_at("working");
         }
         return $working > 0;
     }
 
+    /** @return -1|0|1 */
     function validate_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
         return $this->reposite->validate_ownership($this, $user, $partner, $ms);
     }
+
+    /** @return -1|0|1 */
     function check_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
-        list($when, $ownership) = [0, -1];
+        $when = 0;
+        $ownership = -1;
         $always = $this->reposite->validate_ownership_always();
         if ($this->notes && isset($this->notes["owner." . $user->contactId])) {
             list($when, $ownership) = $this->notes["owner." . $user->contactId];
@@ -273,8 +287,9 @@ class Repository {
                     "update Repository set notes=?{desired} where notes?{expected}e and repoid=?", [$this->repoid]);
             }
         }
-        if ($ownership == 0 && $ms && !$ms->has_problem_at("ownership")) {
-            $ms->warning_at("ownership", $this->expand_message("repo_notowner", $ms->user));
+        if ($ownership === 0 && $ms && !$ms->has_problem_at("ownership")) {
+            $ms->warning_at("repo", $this->expand_message("repo_notowner", $user));
+            $ms->warning_at("ownership");
         }
         return $ownership;
     }

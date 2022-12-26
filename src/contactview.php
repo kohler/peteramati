@@ -335,10 +335,9 @@ class ContactView {
 
         // check repo
         $ms = new MessageSet;
-        $ms->user = $user;
         if ($repo) {
-            $repo->check_working($ms);
-            $repo->check_open($ms);
+            $repo->check_working($user, $ms);
+            $repo->check_open();
         }
         if ($partner && $info->partner_same() && !$pset->partner_repo) {
             $prepo = $partner->repo($pset->id);
@@ -535,10 +534,9 @@ class ContactView {
 
         // check repositories
         $ms = new MessageSet;
-        $ms->user = $user;
         foreach ($try_classes as $sitek) {
             $reposite = $sitek::make_url($repo_url, $user->conf);
-            if ($reposite && $reposite->validate_working($ms) > 0) {
+            if ($reposite && $reposite->validate_working($user, $ms) > 0) {
                 $repo = Repository::find_or_create_url($reposite->url, $user->conf);
                 if ($repo) {
                     $repo->check_open();

@@ -78,19 +78,19 @@ class RepositorySite {
     function gitfetch($repoid, $cacheid, $foreground) {
         return false;
     }
-    /** @return int */
-    function validate_open(MessageSet $ms = null) {
+    /** @return -1|0|1 */
+    function validate_open() {
         return -1;
     }
-    /** @return int */
-    function validate_working(MessageSet $ms = null) {
+    /** @return -1|0|1 */
+    function validate_working(Contact $user, MessageSet $ms = null) {
         return -1;
     }
     /** @return bool */
     function validate_ownership_always() {
         return true;
     }
-    /** @return int */
+    /** @return -1|0|1 */
     function validate_ownership(Repository $repo, Contact $user, Contact $partner = null,
                                 MessageSet $ms = null) {
         return -1;
