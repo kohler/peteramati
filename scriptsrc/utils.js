@@ -292,3 +292,36 @@ export function text_eq(a, b) {
         return a === b;
     }
 }
+
+
+export function string_utf8_index(str, index) {
+    let r = 0, m, n;
+    while (str && index > 0) {
+        // eslint-disable-next-line no-control-regex
+        m = str.match(/^([\x00-\x7F]*)([\u0080-\u07FF]*)([\u0800-\uD7FF\uE000-\uFFFF]*)((?:[\uD800-\uDBFF][\uDC00-\uDFFF])*)/);
+        if (!m)
+            break;
+        if (m[1].length) {
+            n = Math.min(index, m[1].length);
+            r += n;
+            index -= n;
+        }
+        if (m[2].length) {
+            n = Math.min(index, m[2].length * 2);
+            r += n / 2;
+            index -= n;
+        }
+        if (m[3].length) {
+            n = Math.min(index, m[3].length * 3);
+            r += n / 3;
+            index -= n;
+        }
+        if (m[4].length) {
+            n = Math.min(index, m[4].length * 2);
+            r += n / 2; // surrogate pairs
+            index -= n;
+        }
+        str = str.substring(m[0].length);
+    }
+    return r;
+}

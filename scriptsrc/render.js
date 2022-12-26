@@ -5,6 +5,7 @@
 import { escape_entities } from "./encoders.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
 import { hasClass } from "./ui.js";
+import { string_utf8_index } from "./utils.js";
 
 function render_class(c, format) {
     if (c) {
@@ -208,4 +209,78 @@ export function render_xmsg(status, msg) {
         div.append(p);
     }
     return div;
+}
+
+
+function message_list_status(ml) {
+    var i, status = 0;
+    for (i = 0; i !== (ml || []).length; ++i) {
+        if (ml[i].status === -3 && status === 0) {
+            status = -3;
+        } else if (ml[i].status >= 1 && ml[i].status > status) {
+            status = ml[i].status;
+        }
+    }
+    return status;
+}
+
+export function render_message_list(ml) {
+    var status = message_list_status(ml),
+        div = document.createElement("div");
+    if (status === -3) {
+        div.className = "msg msg-success";
+    } else if (status >= 2) {
+        div.className = "msg msg-error";
+    } else if (status === 1) {
+        div.className = "msg msg-warning";
+    } else {
+        div.className = "msg msg-info";
+    }
+    div.appendChild(render_feedback_list(ml));
+    return div;
+}
+
+export function render_feedback_list(ml) {
+    const ul = document.createElement("ul");
+    ul.className = "feedback-list";
+    for (let i = 0; i !== (ml || []).length; ++i) {
+        append_feedback_to(ul, ml[i]);
+    }
+    return ul;
+}
+
+function append_feedback_to(ul, mi) {
+    var sklass, li, div;
+    if (mi.message != null && mi.message !== "") {
+        if (ul.tagName !== "UL")
+            throw new Error("bad append_feedback");
+        sklass = "";
+        if (mi.status != null && mi.status >= -4 && mi.status <= 3)
+            sklass = ["warning-note", "success", "urgent-note", "note", "", "warning", "error", "error"][mi.status + 4];
+        div = document.createElement("div");
+        if (mi.status !== -5 || !ul.firstChild) {
+            li = document.createElement("li");
+            ul.appendChild(li);
+            div.className = sklass ? "is-diagnostic format-inline is-" + sklass : "is-diagnostic format-inline";
+        } else {
+            li = ul.lastChild;
+            div.className = "msg-inform format-inline";
+        }
+        li.appendChild(div);
+        render_onto(div, "f", mi.message);
+    }
+    if (mi.context) {
+        div = document.createElement("div");
+        div.className = "msg-context";
+        var s = mi.context[0],
+            p1 = string_utf8_index(s, mi.context[1]),
+            p2 = string_utf8_index(s, mi.context[2]),
+            span = document.createElement("span");
+        sklass = mi.status > 1 ? "is-error" : "is-warning";
+        span.className = (p2 > p1 + 2 ? "context-mark " : "context-caret-mark ") +
+            (mi.status > 1 ? "is-error" : "is-warning");
+        span.append(s.substring(p1, p2));
+        div.append(s.substring(0, p1), span, s.substring(p2));
+        ul.lastChild.appendChild(div);
+    }
 }

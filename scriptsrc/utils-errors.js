@@ -45,31 +45,3 @@ window.onerror = function (errormsg, url, lineno, colno, error) {
     }
     return old_onerror ? old_onerror.apply(this, arguments) : false;
 };
-
-
-$(document).ajaxError(function (event, jqxhr, settings, httperror) {
-    if (jqxhr.readyState != 4) {
-        return;
-    }
-    var data;
-    if (jqxhr.responseText && jqxhr.responseText.charAt(0) === "{") {
-        try {
-            data = JSON.parse(jqxhr.responseText);
-        } catch (e) {
-        }
-    }
-    if (!data || !data.user_error) {
-        var msg = new URL(settings.url, document.baseURI).href + " API failure: ";
-        if (siteinfo.user && siteinfo.user.email) {
-            msg += "user " + siteinfo.user.email + ", ";
-        }
-        msg += jqxhr.status;
-        if (httperror) {
-            msg += ", " + httperror;
-        }
-        if (jqxhr.responseText) {
-            msg += ", " + jqxhr.responseText.substring(0, 100);
-        }
-        log_jserror(msg);
-    }
-});
