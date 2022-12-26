@@ -292,12 +292,6 @@ class PsetRequest {
         if ($this->qreq->set_partner) {
             ContactView::set_partner_action($this->user, $this->viewer, $this->qreq);
         }
-        if ($this->qreq->set_repo) {
-            ContactView::set_repo_action($this->user, $this->viewer, $this->qreq);
-        }
-        if ($this->qreq->set_branch) {
-            ContactView::set_branch_action($this->user, $this->viewer, $this->qreq);
-        }
         if ($this->qreq->download) {
             $this->handle_download();
         }

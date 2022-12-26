@@ -19,7 +19,7 @@ import { Filediff } from "./diff.js";
 import "./diff-markdown.js";
 import { Note } from "./note.js";
 import "./note-edit.js";
-import { render_text } from "./render.js";
+import { render_text, render_feedback_list } from "./render.js";
 import "./render-terminal.js";
 import { run } from "./run.js";
 import { run_settings_load } from "./run-settings.js";
@@ -1095,6 +1095,53 @@ $(".pa-download-timed").each(function () {
     show();
 });
 
+handle_ui.on("submit.pa-setrepo", function (evt) {
+    let f = this;
+    this.classList.remove("has-error", "has-warning");
+    if (hasClass(this.firstChild, "feedback-list")) {
+        this.removeChild(this.firstChild);
+    }
+    this.querySelector("button[type=submit]").disabled = true;
+    $.ajax(hoturl("=api/repo", {
+        pset: this.getAttribute("data-pa-pset"),
+        u: siteinfo.uservalue
+    }), {
+        type: "POST", cache: false, data: $(this).serialize(),
+        success: function (data) {
+            f.querySelector("button[type=submit]").disabled = false;
+            if (data.message_list) {
+                f.insertBefore(render_feedback_list(data.message_list), f.firstChild);
+            } else {
+                location.reload();
+            }
+        }
+    })
+    evt.preventDefault();
+});
+
+handle_ui.on("submit.pa-setbranch", function (evt) {
+    let f = this;
+    this.classList.remove("has-error", "has-warning");
+    if (hasClass(this.firstChild, "feedback-list")) {
+        this.removeChild(this.firstChild);
+    }
+    this.querySelector("button[type=submit]").disabled = true;
+    $.ajax(hoturl("=api/branch", {
+        pset: this.getAttribute("data-pa-pset"),
+        u: siteinfo.uservalue
+    }), {
+        type: "POST", cache: false, data: $(this).serialize(),
+        success: function (data) {
+            f.querySelector("button[type=submit]").disabled = false;
+            if (data.message_list) {
+                f.insertBefore(render_feedback_list(data.message_list), f.firstChild);
+            } else {
+                location.reload();
+            }
+        }
+    })
+    evt.preventDefault();
+});
 
 function pa_checklatest(pset) {
     var start = (new Date).getTime(), timeout;

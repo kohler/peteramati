@@ -68,12 +68,6 @@ if (!$Me->is_empty()
     }
 }
 
-if (!$Me->is_empty() && $Qreq->set_repo !== null) {
-    ContactView::set_repo_action($User, $Me, $Qreq);
-}
-if (!$Me->is_empty() && $Qreq->set_branch !== null) {
-    ContactView::set_branch_action($User, $Me, $Qreq);
-}
 if ($Qreq->set_partner !== null) {
     ContactView::set_partner_action($User, $Me, $Qreq);
 }

@@ -2714,6 +2714,7 @@ class Conf {
     private function fill_api_map() {
         $this->_api_map = [
             "blob" => "15 Repo_API::blob",
+            "branch" => "19 RepoConfig_API::branch",
             "diffconfig" => "15 Repo_API::diffconfig",
             "filediff" => "15 Repo_API::filediff",
             "flag" => "15 Flag_API::flag",
@@ -2728,7 +2729,8 @@ class Conf {
             "multigrade" => "3 Grade_API::multigrade",
             "multiresolveflag" => "0 Flag_API::multiresolve",
             "psetconfig" => "35 PsetConfig_API::psetconfig",
-            "repositories" => "17 Repo_API::user_repositories",
+            "repo" => "19 RepoConfig_API::repo",
+            "repositories" => "17 RepoConfig_API::user_repositories",
             "runchainhead" => "1 Run_API::runchainhead"
         ];
         if (($olist = $this->opt("apiFunctions"))) {

@@ -184,39 +184,4 @@ class Repo_API {
         ob_end_clean();
         return ["ok" => true, "content_html" => $content];
     }
-
-    static function user_repositories(Contact $user, Qrequest $qreq, APIData $api) {
-        if (!$user->isPC) {
-            return ["ok" => false, "error" => "Permission error."];
-        }
-        if (!($organization = $user->conf->opt("githubOrganization"))) {
-            return ["ok" => false, "error" => "No GitHub organization."];
-        }
-        if (!$api->user->github_username) {
-            return ["ok" => false, "error" => "No GitHub username."];
-        }
-        $cursor = null;
-        $repos = [];
-        for ($i = 0; $i < 10; ++$i) {
-            $gql = GitHub_RepositorySite::graphql($user->conf,
-                "{ user(login:" . json_encode($api->user->github_username) . ")"
-                . "{ repositories(first:100, affiliations:[ORGANIZATION_MEMBER]"
-                . ($cursor ? ", after:" . json_encode($cursor) : "")
-                . ") { nodes { name, owner { login }}, pageInfo { hasNextPage, endCursor }} }}");
-            if (!$gql->rdata) {
-                error_log(json_encode($gql));
-                return ["ok" => false, "error" => "GitHub API error."];
-            }
-            foreach ($gql->rdata->user->repositories->nodes as $n) {
-                if ($n->owner->login === $organization)
-                    $repos[] = ["name" => "$organization/{$n->name}", "url" => "https://github.com/" . urlencode($organization) . "/" . urlencode($n->name)];
-            }
-            usort($repos, function ($a, $b) { return strnatcmp($a["name"], $b["name"]); });
-            $pageinfo = $gql->rdata->user->repositories->pageInfo;
-            if (!$pageinfo->hasNextPage)
-                break;
-            $cursor = $pageinfo->endCursor;
-        }
-        return ["ok" => true, "repositories" => $repos];
-    }
 }
