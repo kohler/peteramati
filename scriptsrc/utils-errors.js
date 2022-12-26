@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { hoturl, url_absolute } from "./hoturl.js";
+import { hoturl } from "./hoturl.js";
 
 export function log_jserror(errormsg, error, noconsole) {
     if (!error && errormsg instanceof Error) {
@@ -59,7 +59,7 @@ $(document).ajaxError(function (event, jqxhr, settings, httperror) {
         }
     }
     if (!data || !data.user_error) {
-        var msg = url_absolute(settings.url) + " API failure: ";
+        var msg = new URL(settings.url, document.baseURI).href + " API failure: ";
         if (siteinfo.user && siteinfo.user.email) {
             msg += "user " + siteinfo.user.email + ", ";
         }

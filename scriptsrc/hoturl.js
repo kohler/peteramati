@@ -137,29 +137,9 @@ export function hoturl(page, options) {
     return siteinfo.site_relative + x.pt + x.t + anchor;
 }
 
-export function url_absolute(url, loc) {
-    var x = "", m;
-    loc = loc || window.location.href;
-    if (!/^\w+:\/\//.test(url)
-        && (m = loc.match(/^(\w+:)/)))
-        x = m[1];
-    if (x && !/^\/\//.test(url)
-        && (m = loc.match(/^\w+:(\/\/[^\/]+)/)))
-        x += m[1];
-    if (x && !/^\//.test(url)
-        && (m = loc.match(/^\w+:\/\/[^\/]+(\/[^?#]*)/))) {
-        x = (x + m[1]).replace(/\/[^\/]+$/, "/");
-        while (url.substring(0, 3) === "../") {
-            x = x.replace(/\/[^\/]*\/$/, "/");
-            url = url.substring(3);
-        }
-    }
-    return x + url;
-}
-
 export function hoturl_absolute_base() {
     if (!siteinfo.absolute_base) {
-        siteinfo.absolute_base = url_absolute(siteinfo.base);
+        siteinfo.absolute_base = new URL(siteinfo.base, document.baseURI).href;
     }
     return siteinfo.absolute_base;
 }
