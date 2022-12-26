@@ -68,8 +68,8 @@ class Flag_API {
             if (!is_object($flag)
                 || !is_int($flag->uid ?? null)
                 || !is_int($flag->pset ?? null)
-                || !is_string($flag->commit ?? null)
-                || !ctype_xdigit($flag->commit)
+                || !is_string($flag->hash ?? $flag->commit ?? null)
+                || !ctype_xdigit($flag->hash ?? $flag->commit)
                 || !is_string($flag->flagid ?? null)) {
                 return ["ok" => false, "error" => "Format error."];
             }
@@ -95,7 +95,8 @@ class Flag_API {
                 $errors[] = $flag;
                 continue;
             }
-            $commit = $info->repo->connected_commit($flag->commit, $info->pset);
+            $hash = $flag->hash ?? $flag->commit;
+            $commit = $info->repo->connected_commit($hash, $info->pset);
             if (!$commit) {
                 $flag->error = "Disconnected commit.";
                 $errors[] = $flag;

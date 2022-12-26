@@ -1153,10 +1153,10 @@ function pa_checklatest(pset) {
                     latesthash = this.getAttribute("data-pa-checkhash");
                 for (var c of d.commits) {
                     if (c.pset == pset
-                        && c.commit
-                        && c.commit !== latesthash
+                        && c.hash
+                        && c.hash !== latesthash
                         && c.snaphash !== latesthash) {
-                        $(this).find(".pa-pv").append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: c.commit}) + "\">Load them</a></div>");
+                        $(this).find(".pa-pv").append("<div class=\"pa-inf-error\"><span class=\"pa-inf-alert\">Newer commits are available.</span> <a href=\"" + hoturl("pset", {u: siteinfo.uservalue, pset: pset, commit: c.hash}) + "\">Load them</a></div>");
                         clearTimeout(timeout);
                         break;
                     }
@@ -1213,7 +1213,7 @@ handle_ui.on("js-multiresolveflag", function () {
         ptconf = form.pa__ptconf, flags = [];
     $(form).find(".papsel:checked").each(function () {
         const s = ptconf.smap[this.closest("tr").getAttribute("data-pa-spos")];
-        flags.push({pset: s.pset, uid: s.uid, commit: s.commit, flagid: s.flagid});
+        flags.push({pset: s.pset, uid: s.uid, hash: s.commit, flagid: s.flagid});
     });
     if (flags.length !== 0) {
         $.ajax(hoturl("=api/multiresolveflag"), {
