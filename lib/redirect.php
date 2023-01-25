@@ -58,6 +58,9 @@ function set_session_name(Conf $conf) {
     if ($domain !== null || !isset($params["domain"])) {
         $params["domain"] = $domain;
     }
+    if ($domain === null) {
+        $params["path"] = Navigation::base_path();
+    }
     $params["httponly"] = true;
     if ($samesite && ($secure || $samesite !== "None")) {
         $params["samesite"] = $samesite;

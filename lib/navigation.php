@@ -39,7 +39,7 @@ class NavigationState {
     //   required: SERVER_PORT, SCRIPT_FILENAME, SCRIPT_NAME, REQUEST_URI
     //   optional: HTTP_HOST, SERVER_NAME, HTTPS, REQUEST_SCHEME
 
-    function __construct($server, $index_name = "index") {
+    function __construct($server) {
         if (!$server) {
             return;
         }
@@ -64,79 +64,107 @@ class NavigationState {
             $x .= ":" . $port;
         }
         $this->server = $x;
+        $this->request_uri = $server["REQUEST_URI"];
 
-        // detect $site_path
-        $sfilename = $server["SCRIPT_FILENAME"]; // pathname
-        $sfile = substr($sfilename, strrpos($sfilename, "/") + 1);
+        // NGINX and Apache in different modes supply all kinds of nonsense.
 
+        // $sname: URL-decoded path by which server found this script;
+        // derived from SCRIPT_NAME
         $sname = $server["SCRIPT_NAME"]; // URL-decoded
-        $sname_slash = strrpos($sname, "/");
-        if (substr($sname, $sname_slash + 1) !== $sfile) {
-            if ($sname === "" || $sname[strlen($sname) - 1] !== "/") {
-                $sname .= "/";
+        $sfilename = $server["SCRIPT_FILENAME"];
+        // Apache proxy in `ProxyFCGIBackendType GENERIC` mode
+        // may append path_info to SCRIPT_NAME; must remove it
+        if (isset($server["ORIG_SCRIPT_FILENAME"])
+            && !isset($server["ORIG_SCRIPT_NAME"])) {
+            $orig_sfilename = $server["ORIG_SCRIPT_FILENAME"];
+            if (strlen($orig_sfilename) > strlen($sfilename)
+                && str_starts_with($orig_sfilename, $sfilename)) {
+                $spath = substr($orig_sfilename, strlen($sfilename));
+                $nslash = substr_count($sname, "/") - substr_count($spath, "/");
+                $pos = 0;
+                while ($nslash > 0) {
+                    $pos = strpos($sname, "/", $pos + 1);
+                    --$nslash;
+                }
+                $sname = substr($sname, 0, $pos);
             }
-            $sname_slash = strlen($sname) - 1;
         }
 
-        $this->request_uri = $uri = $server["REQUEST_URI"]; // URL-encoded
-        if (substr($uri, 0, $sname_slash) === substr($sname, 0, $sname_slash)) {
-            $uri_slash = $sname_slash;
+        // $this->base_path: URL-encoded, prefix of $this->request_uri
+        // Derived from $sbpath, which might be URL-decoded
+        $sbpath = $sname;
+        $sfile = substr($sfilename, strrpos($sfilename, "/") + 1);
+        $pos = strlen($sbpath) - strlen($sfile) - 1;
+        if ($pos >= 0
+            && $sbpath[$pos] === "/"
+            && substr($sbpath, $pos + 1) === $sfile) {
+            $sbpath = substr($sbpath, 0, $pos);
+        }
+        $sblen = strlen($sbpath);
+        if (substr($this->request_uri, 0, $sblen) !== $sbpath) {
+            $sblen = strpos($this->request_uri, "/");
+            $nslash = substr_count($sbpath, "/");
+            while ($nslash > 0) {
+                $sblen = strpos($this->request_uri, "/", $pos + 1);
+                --$nslash;
+            }
+        }
+        $this->base_path = substr($this->request_uri, 0, $sblen + 1);
+
+        // semi-URL-decode suffix of request URI, decoding safe characters [-A-Za-z0-9._,@~]
+        // (This is generally done for us but just to be safe.)
+        $uri_suffix = preg_replace_callback('/%(?:2[CDEcde]|3[0-9]|4[0-9A-Fa-f]|5[0-9AaFf]|6[1-9A-Fa-f]|7[0-9AEae])/', function ($m) {
+            return urldecode($m[0]);
+        }, substr($this->request_uri, $sblen + 1));
+
+        // $this->query: query string
+        if (($qpos = strpos($uri_suffix, "?")) === false) {
+            $qpos = strlen($uri_suffix);
+        }
+        if (($hpos = strpos($uri_suffix, "#")) !== false && $hpos < $qpos) {
+            $qpos = $hpos;
+        }
+        if ($qpos < strlen($uri_suffix)) {
+            $this->query = substr($uri_suffix, $qpos);
+            $uri_suffix = substr($uri_suffix, 0, $qpos);
         } else {
-            // URL-encoded prefix != URL-decoded prefix
-            for ($nslash = substr_count(substr($sname, 0, $sname_slash), "/"),
-                 $uri_slash = 0;
-                 $nslash > 0; --$nslash) {
-                $uri_slash = strpos($uri, "/", $uri_slash + 1);
-            }
+            $this->query = "";
         }
-        if ($uri_slash === false || $uri_slash > strlen($uri)) {
-            $uri_slash = strlen($uri);
+        // now $uri_suffix is everything after $this->base_path and before
+        // $this->query_string
+
+        // separate $this->page and $this->path
+        if (($spos = strpos($uri_suffix, "/")) === false) {
+            $spos = strlen($uri_suffix);
         }
-
-        $this->site_path = substr($uri, 0, $uri_slash) . "/";
-
-        // separate $page, $path, $query
-        $uri_suffix = substr($uri, $uri_slash);
-        // Semi-URL-decode $uri_suffix, only decoding safe characters.
-        // (This is generally already done for us but just to be safe.)
-        $uri_suffix = preg_replace_callback('/%[2-7][0-9a-f]/i', function ($m) {
-            $x = urldecode($m[0]);
-            /** @phan-suppress-next-line PhanParamSuspiciousOrder */
-            if (ctype_alnum($x) || strpos("._,-=@~", $x) !== false) {
-                return $x;
-            } else {
-                return $m[0];
-            }
-        }, $uri_suffix);
-        preg_match('/\A(\/[^\/\?\#]*|)([^\?\#]*)(.*)\z/', $uri_suffix, $m);
-        if ($m[1] !== "" && $m[1] !== "/") {
-            $this->raw_page = $this->page = substr($m[1], 1);
-        } else {
+        if ($spos === 0) {
             $this->raw_page = "";
-            $this->page = $index_name;
+            $this->page = "index";
+            $this->path = "";
+        } else {
+            $this->raw_page = substr($uri_suffix, 0, $spos);
+            $this->page = $this->raw_page;
+            if (($plen = strlen($this->page)) > 4
+                && substr($this->page, $plen - 4) === ".php") {
+                $this->page = substr($this->page, 0, $plen - 4);
+            }
+            $this->path = substr($uri_suffix, $spos);
         }
-        // NB: str_ends_with is not available in this file in older PHPs
-        if (($pagelen = strlen($this->page)) > 4
-            && substr($this->page, $pagelen - 4) === ".php") {
-            $this->page = substr($this->page, 0, $pagelen - 4);
-        }
-        $this->path = $m[2];
         $this->shifted_path = "";
-        $this->query = $m[3];
 
         // detect $site_path_relative
         $path_slash = substr_count($this->path, "/");
-        if ($path_slash) {
-            $this->site_path_relative = str_repeat("../", $path_slash);
-        } else if ($uri_slash >= strlen($uri)) {
-            $this->site_path_relative = $this->site_path;
+        if ($path_slash > 0) {
+            $this->base_path_relative = str_repeat("../", $path_slash);
+        } else if ($this->raw_page === "") {
+            $this->base_path_relative = $this->base_path;
         } else {
-            $this->site_path_relative = "";
+            $this->base_path_relative = "";
         }
 
-        // set $base_path
-        $this->base_path = $this->site_path;
-        $this->base_path_relative = $this->site_path_relative;
+        // $this->site_path: initially $this->base_path
+        $this->site_path = $this->base_path;
+        $this->site_path_relative = $this->base_path_relative;
 
         if (isset($server["HOTCRP_PHP_SUFFIX"])) {
             $this->php_suffix = $server["HOTCRP_PHP_SUFFIX"];
@@ -332,9 +360,9 @@ class Navigation {
     /** @var ?NavigationState */
     static private $s;
 
-    static function analyze($index_name = "index") {
+    static function analyze() {
         if (PHP_SAPI !== "cli") {
-            self::$s = new NavigationState($_SERVER, $index_name);
+            self::$s = new NavigationState($_SERVER);
         } else {
             self::$s = new NavigationState(null);
         }

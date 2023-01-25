@@ -1916,7 +1916,8 @@ class Conf {
 
     function set_cookie($name, $value, $expires_at) {
         $opt = [
-            "expires" => $expires_at, "path" => Navigation::site_path(),
+            "expires" => $expires_at,
+            "path" => Navigation::base_path(),
             "domain" => $this->opt("sessionDomain") ?? "",
             "secure" => $this->opt("sessionSecure") ?? false
         ];
