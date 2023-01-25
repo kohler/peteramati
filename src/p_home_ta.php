@@ -488,7 +488,7 @@ class Home_TA_Page {
         echo '</div></div>',
             '<div class="gtable-container-1"><table class="gtable want-gtable-fixed"></table></div></div>';
         echo Ht::unstash(),
-            '<script>$pa.pset_table($("#', $pset->key, '")[0],',
+            '<script>$pa.pset_table($("#', $pset->urlkey, '")[0],',
             json_encode_browser($jd), ',',
             json_encode_browser($jx), ')</script></form>';
     }
