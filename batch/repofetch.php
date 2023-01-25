@@ -5,6 +5,7 @@
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     require_once(dirname(__DIR__) . "/src/init.php");
+    exit(RepoFetch_Batch::make_args(Conf::$main, $argv)->run());
 }
 
 
@@ -369,9 +370,4 @@ class RepoFetch_Batch {
         }
         return $self;
     }
-}
-
-
-if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
-    exit(RepoFetch_Batch::make_args(Conf::$main, $argv)->run());
 }

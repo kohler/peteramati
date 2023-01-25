@@ -279,7 +279,7 @@ class Repository {
                 Dbl::compare_exchange($user->conf->dblink,
                     "select notes from Repository where repoid=?", [$this->repoid],
                     function ($value) use ($user, $ownership) {
-                        $value = json_decode($value, true) ? : [];
+                        $value = json_decode($value ?? "[]", true) ? : [];
                         $value["owner." . $user->contactId] = [time(), $ownership];
                         $this->notes = $value;
                         return json_encode_db($value);
