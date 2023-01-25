@@ -21,7 +21,8 @@ class RepoLatestCommit_API implements JsonSerializable {
     /** @var ?string */
     public $error;
 
-    function jsonSerialize() : mixed {
+    #[\ReturnTypeWillChange]
+    function jsonSerialize() {
         $j = [];
         foreach (get_object_vars($this) as $k => $v) {
             if ($v !== null)
