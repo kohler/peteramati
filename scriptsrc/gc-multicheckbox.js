@@ -38,7 +38,7 @@ function make_multicheckbox(mark) {
             chsp.append(chhidden);
             for (let i = 0; i < this.max; ++i) {
                 const ch = document.createElement("input");
-                ch.type ="checkbox";
+                ch.type = "checkbox";
                 ch.className = "ui js-multicheckbox-grade ml-0";
                 ch.name = this.key + ":" + i;
                 ch.value = 1;
@@ -48,7 +48,7 @@ function make_multicheckbox(mark) {
                 }
                 chsp.append(ch);
             }
-            return Checkbox_GradeClass.finish_mount_edit(chsp);
+            return Checkbox_GradeClass.finish_mount_edit(this, chsp);
         },
         update_edit: function (elt, v, opts) {
             const want_checkbox = v == null || v === "" || v === 0
