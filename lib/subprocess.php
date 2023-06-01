@@ -3,7 +3,7 @@
 // Peteramati is Copyright (c) 2013-2019 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-class Subprocess {
+class Subprocess implements JsonSerializable {
     /** @var list<string> */
     public $command;
     /** @var string */
@@ -153,5 +153,16 @@ class Subprocess {
             $s[] = preg_match('/\A[-_.,:=+~\/a-zA-Z0-9]+\z/', $w) ? $w : escapeshellarg($w);
         }
         return join(" ", $s);
+    }
+
+    #[\ReturnTypeWillChange]
+    function jsonSerialize() {
+        return [
+            "command" => $this->command,
+            "stdout" => $this->stdout,
+            "stderr" => $this->stderr,
+            "status" => $this->status,
+            "ok" => $this->ok
+        ];
     }
 }

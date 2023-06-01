@@ -19,13 +19,17 @@ class RepoFetch_Batch {
     /** @var bool */
     public $done = false;
     /** @var ?Repository */
-    public $repo;
+    private $repo;
+    /** @var list<Repository> */
+    private $repos = [];
     /** @var string */
     public $reponame = "<none>";
 
     function __construct(Conf $conf, Repository $repo = null) {
         $this->conf = $conf;
-        $this->repo = $repo;
+        if ($repo) {
+            $this->repos[] = $repo;
+        }
     }
 
     /** @return RepoFetch_Batch */
@@ -36,10 +40,9 @@ class RepoFetch_Batch {
                 and exists (select * from ContactLink where type=? and link=r.repoid)
                 order by snapcheckat asc limit 1",
             Conf::$now - 900, LINK_REPO);
-        $self->repo = Repository::fetch($result, $conf);
+        $repo = Repository::fetch($result, $conf);
         Dbl::free($result);
-        $self->done = $self->repo === null;
-        return $self;
+        return new RepoFetch_Batch($conf, $repo);
     }
 
     /** @param int $repoid
@@ -49,6 +52,23 @@ class RepoFetch_Batch {
         $repo = Repository::fetch($result, $conf);
         Dbl::free($result);
         return $repo ? new RepoFetch_Batch($conf, $repo) : null;
+    }
+
+    /** @param string $user
+     * @return ?RepoFetch_Batch */
+    static function make_user(Conf $conf, $user) {
+        $u = $conf->user_by_whatever($user);
+        if (!$u) {
+            return null;
+        }
+        $rf = new RepoFetch_Batch($conf, null);
+        $result = $conf->qe("select * from Repository r
+                where exists (select * from ContactLink where cid=? and type=? and link=r.repoid)",
+            $u->contactId, LINK_REPO);
+        while (($repo = Repository::fetch($result, $conf))) {
+            $rf->repos[] = $repo;
+        }
+        return $rf;
     }
 
 
@@ -262,17 +282,13 @@ class RepoFetch_Batch {
     }
 
     /** @return int */
-    function run() {
-        if ($this->done) {
-            return 0;
-        }
-
+    private function run_repo() {
         $repodir = $this->repo->ensure_repodir();
         if (!$repodir) {
             throw new CommandLineException("Cannot create repository");
         }
         if ($this->verbose) {
-            fwrite(STDERR, "* repo{$this->repo->repoid}, repo/repo{$this->repo->cacheid}\n");
+            fwrite(STDERR, "* repo{$this->repo->repoid}, repo/repo{$this->repo->cacheid} {$this->repo->url}\n");
         }
 
         // configure remote
@@ -317,11 +333,19 @@ class RepoFetch_Batch {
         if ($this->force) {
             $this->recheck_heads();
         }
-
-        $this->done = true;
         return 0;
     }
 
+    /** @return int */
+    function run() {
+        foreach ($this->repos as $repo) {
+            $this->repo = $repo;
+            if (($status = $this->run_repo()) !== 0) {
+                return $status;
+            }
+        }
+        return 0;
+    }
 
     /** @return RepoFetch_Batch */
     static function make_args(Conf $conf, $argv) {
@@ -350,7 +374,7 @@ class RepoFetch_Batch {
                 throw new CommandLineException("Too many arguments", $getopt);
             }
         }
-        if ($is_user + $is_repo + $is_refresh > 1) {
+        if ($is_user + $is_repo + $is_refresh !== 1) {
             throw new CommandLineException("Mode conflict", $getopt);
         }
         if ($is_refresh) {
@@ -360,8 +384,11 @@ class RepoFetch_Batch {
             if (!$self) {
                 throw new CommandLineException("No such repository", $getopt);
             }
-        } else {
-            throw new CommandLineException("Not implemented", $getopt);
+        } else if ($is_user) {
+            $self = RepoFetch_Batch::make_user($conf, $arg["u"]);
+            if (!$self) {
+                throw new CommandLineException("No such user", $getopt);
+            }
         }
         $self->force = isset($arg["f"]);
         $self->verbose = isset($arg["V"]);
