@@ -1878,7 +1878,9 @@ class Conf {
     private function make_jquery_script_file($jqueryVersion) {
         $integrity = null;
         if ($this->opt("jqueryCdn")) {
-            if ($jqueryVersion === "3.5.1") {
+            if ($jqueryVersion === "3.7.0") {
+                $integrity = "sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=";
+            } else if ($jqueryVersion === "3.5.1") {
                 $integrity = "sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2";
             } else if ($jqueryVersion === "3.4.1") {
                 $integrity = "sha384-vk5WoKIaW/vJyUAd9n/wmopsmNhiy+L2Z+SBxGYnUkunIxVxAv/UtMOhba/xskxh";
@@ -2008,16 +2010,8 @@ class Conf {
         if (isset($this->opt["jqueryUrl"])) {
             Ht::stash_html($this->make_script_file($this->opt["jqueryUrl"], true) . "\n");
         } else {
-            $jqueryVersion = $this->opt["jqueryVersion"] ?? "3.5.1";
-            if ($jqueryVersion[0] === "3") {
-                Ht::stash_html("<!--[if lt IE 9]>" . $this->make_jquery_script_file("1.12.4") . "<![endif]-->\n");
-                Ht::stash_html("<![if !IE|gte IE 9]>" . $this->make_jquery_script_file($jqueryVersion) . "<![endif]>\n");
-            } else {
-                Ht::stash_html($this->make_jquery_script_file($jqueryVersion) . "\n");
-            }
-        }
-        if ($this->opt("jqueryMigrate")) {
-            Ht::stash_html($this->make_script_file("//code.jquery.com/jquery-migrate-3.0.0.js", true));
+            $jqueryVersion = $this->opt["jqueryVersion"] ?? "3.7.0";
+            Ht::stash_html($this->make_jquery_script_file($jqueryVersion) . "\n");
         }
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
