@@ -308,7 +308,7 @@ class Repository {
             if (!mk_site_subdir($subdir, 02770)) {
                 return "";
             }
-            shell_exec("cd $repodir && git init --shared -b main");
+            shell_exec("cd {$repodir} && git init --shared -b main");
         }
         return $repodir;
     }
@@ -330,6 +330,7 @@ class Repository {
     function gitruninfo($command, $args = []) {
         if ($command[0] === "git") {
             $command[0] = $this->conf->opt("gitCommand") ?? "git";
+            array_splice($command, 1, 0, ["-c", "safe.directory=*"]); // XXX
         }
         $cwd = $args["cwd"] ?? $this->ensure_repodir();
         if (!$cwd) {
