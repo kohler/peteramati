@@ -246,9 +246,10 @@ class RepoFetch_Batch {
     }
 
     private function handle_fetch_unchanged() {
-        $this->conf->qe("update Repository set working=?, snapcheckat=?
+        $this->conf->qe("update Repository set snapat=coalesce(snapat,?),
+            working=?, snapcheckat=?
             where repoid=?",
-            Conf::$now, Conf::$now,
+            Conf::$now, Conf::$now, Conf::$now,
             $this->repo->repoid);
         if ($this->verbose) {
             fwrite(STDERR, "+ " . $this->repo->reponame() . ": " . json_encode([
