@@ -3351,7 +3351,7 @@ int main(int argc, char** argv) {
         strcpy(eventsource_addr.sun_path, eventsourcefilename.c_str());
         int r = bind(eventsourcefd, (sockaddr*) &eventsource_addr, sizeof(eventsource_addr));
         if (r < 0) {
-            perror_die("bind");
+            perror_die("bind " + eventsourcefilename);
         }
         umask(old_umask);
 
