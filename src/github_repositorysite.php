@@ -264,6 +264,8 @@ class GitHub_RepositorySite extends RepositorySite {
         $base = $user->is_anonymous ? "[anonymous]" : $this->base;
         return ["REPOURL" => "https://github.com/$base", "REPOGITURL" => "git@github.com:$base", "REPOBASE" => $base, "GITHUB" => 1];
     }
+    /** @param string $name
+     * @return ?string */
     function expand_message($name, Contact $user) {
         return Messages::$main->expand_html($name, $this->message_defs($user));
     }

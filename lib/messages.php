@@ -62,6 +62,7 @@ class Messages {
         return $reqj;
     }
 
+    /** @return ?string */
     public function expand($type, $kind, $defs = array()) {
         $reqj = $this->find($type, $kind, $defs);
         if ($reqj) {
@@ -78,13 +79,17 @@ class Messages {
             }
             return $t . $u;
         } else
-            return false;
+            return null;
     }
 
+    /** @param string $type
+     * @return ?string */
     public function expand_text($type, $defs = array()) {
         return $this->expand($type, "text", $defs);
     }
 
+    /** @param string $type
+     * @return ?string */
     public function expand_html($type, $defs = array()) {
         return $this->expand($type, "html", $defs);
     }

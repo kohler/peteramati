@@ -156,6 +156,8 @@ class Repository {
         return $this->reposite->credentialed_git_command();
     }
 
+    /** @param string $name
+     * @return ?string */
     function expand_message($name, Contact $user) {
         return Messages::$main->expand_html($name, $this->reposite->message_defs($user));
     }
@@ -250,11 +252,11 @@ class Repository {
             }
         }
         if ($working < 0 && $ms && $user->isPC && !$ms->has_problem_at("working")) {
-            $ms->warning_at("repo", Messages::$main->expand_html("repo_working_timeout", $this->reposite->message_defs($user)));
+            $ms->warning_at("repo", $this->expand_message("repo_working_timeout", $user));
             $ms->warning_at("working");
         }
         if ($working === 0 && $ms && !$ms->has_problem_at("working")) {
-            $ms->warning_at("repo", Messages::$main->expand_html("repo_unreadable", $this->reposite->message_defs($user)));
+            $ms->warning_at("repo", $this->expand_message("repo_unreadable", $user));
             $ms->warning_at("working");
         }
         return $working > 0;

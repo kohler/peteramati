@@ -385,7 +385,8 @@ class RepoFetch_Batch {
             if (!$self) {
                 throw new CommandLineException("No such repository", $getopt);
             }
-        } else if ($is_user) {
+        } else {
+            assert($is_user === 1);
             $self = RepoFetch_Batch::make_user($conf, $arg["u"]);
             if (!$self) {
                 throw new CommandLineException("No such user", $getopt);
