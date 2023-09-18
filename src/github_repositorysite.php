@@ -323,13 +323,10 @@ class GitHub_RepositorySite extends RepositorySite {
                 $ms->error_at("working");
             }
             return 0;
-        } else if (!preg_match('/^[0-9a-f]{40,}\s+refs\/heads\/(?:' . $this->conf->default_main_branch . '|master|main)/m', $answer)) {
-            if ($ms) {
-                $ms->error_at("repo", $this->expand_message("repo_nomaster", $user));
-                $ms->error_at("working");
-            }
-            return 0;
         } else {
+            if ($ms && !preg_match('/^[0-9a-f]{40,}\s+refs\/heads\/(?:' . $this->conf->default_main_branch . '|master|main)/m', $answer)) {
+                $ms->warning_at("repo", $this->expand_message("repo_nomain", $user));
+            }
             return 1;
         }
     }

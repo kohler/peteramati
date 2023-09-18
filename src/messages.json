@@ -14,7 +14,7 @@
     },
     {
         "type": "repo_nomain",
-        "html": "The %REPOBASE% repository does not appear to have a “master” branch. That branch is required for grading."
+        "html": "The %REPOBASE% repository does not appear to have a “main” branch. That branch is required for grading."
     },
     {
         "type": "repo_toopublic",
