@@ -672,7 +672,8 @@ const gcoldef = {
         tw: 14,
         pin: true,
         sort_forward: true,
-        compare: true
+        compare: true,
+        refreshable: 2
     },
 
     username: {
@@ -697,7 +698,8 @@ const gcoldef = {
         tw: 12,
         pin: true,
         sort_forward: true,
-        compare: true
+        compare: true,
+        refreshable: 2
     },
 
     name: {
@@ -711,7 +713,8 @@ const gcoldef = {
         },
         tw: 14,
         sort_forward: true,
-        compare: true
+        compare: true,
+        refreshable: 2
     },
 
     name2: {
@@ -735,7 +738,8 @@ const gcoldef = {
         },
         tw: 14,
         sort_forward: true,
-        compare: true
+        compare: true,
+        refreshable: 2
     },
 
     at: {
@@ -819,7 +823,7 @@ const gcoldef = {
         compare: function (a, b) {
             return grader_compare(a, b) || user_compare(a, b);
         },
-        refreshable: true
+        refreshable: 2
     },
 
     latehours: {
@@ -840,7 +844,7 @@ const gcoldef = {
                 return user_compare(a, b);
             }
         },
-        refreshable: true
+        refreshable: 1
     },
 
     notes: {
@@ -866,7 +870,7 @@ const gcoldef = {
             tde.replaceChildren(t);
         },
         tw: 2,
-        refreshable: true
+        refreshable: 1
     },
 
     total: {
@@ -891,7 +895,7 @@ const gcoldef = {
             return -user_compare(a, b);
         },
         tw: 3.5,
-        refreshable: true
+        refreshable: 1
     },
 
     grade: {
@@ -914,7 +918,7 @@ const gcoldef = {
             const w = this.ge.abbr().length * 0.5 + 1.5;
             return Math.max(w, this.ge.tcell_width());
         },
-        refreshable: true
+        refreshable: 1
     },
 
     ngrades: {
@@ -934,7 +938,7 @@ const gcoldef = {
             else
                 return -user_compare(a, b);
         },
-        refreshable: true
+        refreshable: 1
     },
 
     repo: {

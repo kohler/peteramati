@@ -21,7 +21,7 @@ function make_uid2tr(tr) {
     return uid2tr;
 }
 
-function grade_update(ptconf, uid2tr, rv) {
+function grade_update(ptconf, uid2tr, rv, refreshflags) {
     const tr = uid2tr[rv.uid],
         su = ptconf.smap[tr.getAttribute("data-pa-spos")];
     su.assign(rv);
@@ -32,7 +32,7 @@ function grade_update(ptconf, uid2tr, rv) {
     }
     su.ngrades = ngrades;
     for (let c of ptconf.col) {
-        if (c.refreshable)
+        if (((c.refreshable || 0) & refreshflags) !== 0)
             c.td.call(c, tr.childNodes[c.index], su, ptconf);
     }
 }
@@ -104,7 +104,7 @@ function ptable_gdialog(ptconf, checked_spos, table) {
             .then(function (rv) {
                 gdialog_store_start(rv);
                 if (rv.ok) {
-                    grade_update(ptconf, uid2tr, rv);
+                    grade_update(ptconf, uid2tr, rv, 1);
                     next();
                 }
             });
@@ -123,7 +123,7 @@ function ptable_gdialog(ptconf, checked_spos, table) {
                 gdialog_store_start(rv);
                 if (rv.ok) {
                     for (let rvu of rv.us) {
-                        grade_update(ptconf, uid2tr, rvu);
+                        grade_update(ptconf, uid2tr, rvu, 1);
                     }
                     next();
                 }
@@ -152,7 +152,7 @@ function ptable_gdialog(ptconf, checked_spos, table) {
             gdialog_store_start(rv);
             if (rv.ok) {
                 for (let rvu of rv.us) {
-                    grade_update(ptconf, uid2tr, rvu);
+                    grade_update(ptconf, uid2tr, rvu, 1);
                 }
                 $gdialog.close();
             }
@@ -316,6 +316,14 @@ function ptable_gdialog(ptconf, checked_spos, table) {
                 clearrepo && (us[su.uid].clearrepo = true);
                 adoptoldrepo && (us[su.uid].adoptoldrepo = true);
             }
+        } else if (this.name === "save-dropped") {
+            const l = f.querySelectorAll(".pa-dropped:checked");
+            if (l.length !== 1) {
+                return;
+            }
+            for (let su of gdialog_su) {
+                us[su.uid].dropped = l[0].value === "true";
+            }
         }
         this.disabled = true;
         const usc = [];
@@ -338,7 +346,7 @@ function ptable_gdialog(ptconf, checked_spos, table) {
                 progress.value = usci;
                 if (rv.ok && rv.us) {
                     for (let rvu of rv.us) {
-                        grade_update(ptconf, uid2tr, rvu);
+                        grade_update(ptconf, uid2tr, rvu, 3);
                     }
                 }
                 if (rv.ok && usci < usc.length) {
@@ -353,6 +361,12 @@ function ptable_gdialog(ptconf, checked_spos, table) {
     function gdialog_settings_gvis_click() {
         const gs = $gdialog.find(".pa-gdialog-settings")[0];
         $(gs).find(".pa-gvis").prop("checked", false).prop("indeterminate", false);
+        this.checked = true;
+    }
+    function gdialog_settings_dropped_click() {
+        const gs = $gdialog.find(".pa-gdialog-settings")[0];
+        $(gs).find(".pa-dropped").prop("checked", false).prop("indeterminate", false);
+        $(gs).find("button[name=save-dropped]").prop("disabled", false);
         this.checked = true;
     }
     function gdialog_settings_grader_click() {
@@ -376,11 +390,11 @@ function ptable_gdialog(ptconf, checked_spos, table) {
         const gs = $gdialog.find(".pa-gdialog-settings")[0], f = gs.closest("form");
         if (!gs.firstChild) {
             const yc = new HtmlCollector;
-            yc.push('<fieldset><legend>Grade visibility</legend>', '</fieldset>');
+            yc.push('<fieldset><legend>Grade visibility</legend><div class="multicol-3">', '</fieldset>');
             yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="true" class="uic pa-gvis"></span>Visible</label>');
             yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="false" class="uic pa-gvis"></span>Hidden</label>');
             yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="null" class="uic pa-gvis"></span>Default (' + (ptconf.scores_visible ? 'visible' : 'hidden') + ')</label>');
-            yc.push('<div class="popup-actions"><button type="button" class="btn btn-primary" name="save-gvis">Save</button></div>');
+            yc.push('</div><div class="popup-actions"><button type="button" class="btn btn-primary" name="save-gvis">Save</button></div>');
             yc.pop();
 
             yc.push('<fieldset class="mt-3"><legend>Grader</legend>', '</fieldset>');
@@ -406,13 +420,22 @@ function ptable_gdialog(ptconf, checked_spos, table) {
                 yc.pop();
             }
 
+            if (siteinfo.user.is_admin) {
+                yc.push('<fieldset class="mt-3"><legend>Enrollment</legend><div class="multicol-2">', '</fieldset>');
+                yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="dropped" value="false" class="uic pa-dropped"></span>Enrolled</label>');
+                yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="dropped" value="true" class="uic pa-dropped"></span>Dropped</label>');
+                yc.push('</div><div class="popup-actions"><button type="button" class="btn btn-primary" name="save-dropped">Save</button></div>');
+                yc.pop();
+            }
+
             gs.innerHTML = yc.render();
             $(gs).on("click", "button", gdialog_settings_submit);
             $(gs).on("click", ".pa-grader", gdialog_settings_grader_click);
             $(gs).on("click", ".pa-gvis", gdialog_settings_gvis_click);
+            $(gs).on("click", ".pa-dropped", gdialog_settings_dropped_click);
         }
 
-        const gvis = {}, ggr = {}, ggra = {};
+        const gvis = {}, ggr = {}, ggra = {}, gdropped = {};
         for (let su of gdialog_su) {
             if (!su.scores_visible_pinned) {
                 gvis["null"] = (gvis["null"] || 0) + 1;
@@ -423,6 +446,8 @@ function ptable_gdialog(ptconf, checked_spos, table) {
             }
             const grcid = su.gradercid || 0;
             ggr[grcid] = (ggr[grcid] || 0) + 1;
+            const dropped = su.dropped ? "true" : "false";
+            gdropped[dropped] = (gdropped[dropped] || 0) + 1;
         }
         for (let su of ptconf.smap) {
             if (su) {
@@ -454,6 +479,12 @@ function ptable_gdialog(ptconf, checked_spos, table) {
                 elt.textContent = "";
             }
         });
+        for (let x in gdropped) {
+            $(gs).find(".pa-dropped[value=" + x + "]").prop("checked", !!gdropped[x]).prop("indeterminate", gdropped[x] && gdropped[x] !== gdialog_su.length);
+        }
+        if (gdropped["true"] && gdropped["false"]) {
+            $(gs).find("button[name=save-dropped]").prop("disabled", true);
+        }
 
         $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         gs.classList.remove("hidden");

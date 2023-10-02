@@ -360,6 +360,12 @@ class Grade_API {
                 }
             }
         }
+        if (isset($ug->dropped)
+            && $ug->dropped !== ($info->user->dropped > 0)) {
+            $info->user->dropped = $ug->dropped ? Conf::$now : 0;
+            $info->conf->qe("update ContactInfo set dropped=? where contactId=?",
+                $info->user->dropped, $info->user->contactId);
+        }
     }
 
     static function gradesettings(Contact $viewer, Qrequest $qreq, APIData $api) {
@@ -399,6 +405,9 @@ class Grade_API {
                 if (isset($ug->adoptoldrepo) && !is_bool($ug->adoptoldrepo)) {
                     return ["ok" => false, "error" => "Invalid `adoptoldrepo` request"];
                 }
+                if (isset($ug->dropped) && !is_bool($ug->dropped)) {
+                    return ["ok" => false, "error" => "Invalid `dropped` request"];
+                }
             }
             $old_pset = null;
             foreach ($sset as $uid => $info) {
@@ -416,7 +425,8 @@ class Grade_API {
                 $j["us"][] = [
                     "uid" => $uid,
                     "scores_visible" => $info->pinned_scores_visible(),
-                    "gradercid" => $info->gradercid()
+                    "gradercid" => $info->gradercid(),
+                    "dropped" => $info->user->dropped > 0
                 ];
             }
         }

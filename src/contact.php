@@ -73,6 +73,7 @@ class Contact {
     public $huid;
     public $college;
     public $extension;
+    /** @var ?int */
     public $dropped;
     /** @var ?string */
     public $username;
@@ -216,6 +217,9 @@ class Contact {
         if (isset($user->extension)) {
             $this->extension = !!$user->extension;
         }
+        if (isset($user->dropped)) {
+            $this->dropped = (int) $user->dropped;
+        }
         if (isset($user->github_username)) {
             $this->github_username = $user->github_username;
         }
@@ -262,6 +266,9 @@ class Contact {
         }
         if (isset($this->extension)) {
             $this->extension = !!$this->extension;
+        }
+        if (isset($this->dropped)) {
+            $this->dropped = (int) $this->dropped;
         }
         if (isset($this->contactImageId)) {
             $this->contactImageId = (int) $this->contactImageId;
