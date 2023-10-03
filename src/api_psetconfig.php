@@ -76,7 +76,8 @@ class PsetConfig_API {
 
             if ($qreq->state === "visible" || $qreq->state === "scores_visible") {
                 $o->visible = true;
-            } else if (!$old_pset->disabled && $old_pset->visible && $qreq->state !== "default") {
+            } else if ($qreq->state === "hidden"
+                       || (!$old_pset->disabled && $old_pset->visible && $qreq->state !== "default")) {
                 $o->visible = false;
             } else {
                 $o->visible = null; // delete override
