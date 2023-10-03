@@ -166,7 +166,7 @@ GradeClass.add("timermark", {
             timermark_interval(arg);
         } else if (v) {
             if (gi && (gi.student_timestamp || 0) > v) {
-                t = t.concat(" (updated ", sec2text(gi.student_timestamp - v), " later at ", strftime(timefmt, gi.student_timestamp));
+                t = t.concat(" (updated ", sec2text(gi.student_timestamp - v), " later at ", strftime(timefmt, gi.student_timestamp), ")");
             }
             tm.textContent = t;
         } else if (timeout) {
