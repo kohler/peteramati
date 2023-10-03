@@ -265,7 +265,7 @@ export class GradeEntry {
             hidden = this.gc.update_show.call(this, ve, v, opts);
         } else {
             let gt = this.text(v);
-            hidden = gt === "" && (!this.max || this.required) && !this.answer;
+            hidden = gt === "" && (!this.max || this.required) && /*???*/ !this.answer;
             if (!hidden) {
                 if (gt === "") {
                     gt = "—";
@@ -275,7 +275,11 @@ export class GradeEntry {
                 }
             }
         }
-        hidden != null && toggleClass(pde.closest(".pa-grade"), "hidden", hidden);
+        if (hidden != null) {
+            const clg = pde.closest(".pa-grade");
+            toggleClass(clg, "hidden", hidden && !this.description);
+            toggleClass(clg, "pa-hidden-description", hidden && this.description);
+        }
         this.landmark && this.update_landmark(pde);
     }
 

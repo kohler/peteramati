@@ -2982,7 +2982,8 @@ h3.gdialog-userids {
 	margin-bottom: 0;
 }
 
-.pa-hide-description .pa-pdesc {
+.pa-hide-description .pa-pdesc,
+.pa-hide-description .pa-hidden-description {
 	display: none;
 }
 .pa-with-sidebar {
