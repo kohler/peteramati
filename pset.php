@@ -537,11 +537,11 @@ class PsetRequest {
                 && $curhead !== $k->fromhead
                 && !$pset->is_handout($k)) {
                 if (!$grouphead) {
-                    $sel["from.$k->fromhead"] = (object) [
+                    $sel["from.{$k->fromhead}"] = (object) [
                         "type" => "optgroup", "label" => "Other snapshots"
                     ];
                 } else {
-                    $sel["from.$k->fromhead"] = null;
+                    $sel["from.{$k->fromhead}"] = null;
                 }
                 $curhead = $grouphead = $k->fromhead;
             }
@@ -551,7 +551,8 @@ class PsetRequest {
             if (strlen($x) !== strlen($k->subject)) {
                 $x .= "...";
             }
-            $sel[$k->hash] = substr($k->hash, 0, 7) . " " . htmlspecialchars($x);
+            $t = date("Y-m-d H:i", $k->commitat);
+            $sel[$k->hash] = substr($k->hash, 0, 7) . " [{$t}] " . htmlspecialchars($x);
             $bhashes[] = hex2bin($k->hash);
         }
 
@@ -591,7 +592,7 @@ class PsetRequest {
         } else {
             $key = "this commit";
         }
-        $value = Ht::select("newcommit", $sel, $this->info->commit_hash(), ["class" => "uich js-pset-setcommit"]);
+        $value = Ht::select("newcommit", $sel, $this->info->commit_hash(), ["class" => "uich js-pset-setcommit pa-commit-selector"]);
         if ($this->info->pc_view) {
             $x = $this->info->is_grading_commit() ? "" : "font-weight:bold";
             $value .= " " . Ht::submit("grade", "Grade", array("style" => $x));

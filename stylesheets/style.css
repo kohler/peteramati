@@ -2689,6 +2689,9 @@ td.mhcb {
 	display: table;
 	font-variant-numeric: tabular-nums;
 }
+.pa-commit-selector {
+	font-variant-numeric: tabular-nums;
+}
 .pa-timermark-alert.urgent {
 	color: red;
 	font-weight: bold;
