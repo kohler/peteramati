@@ -277,8 +277,7 @@ export class GradeEntry {
         }
         if (hidden != null) {
             const clg = pde.closest(".pa-grade");
-            toggleClass(clg, "hidden", hidden && !this.description);
-            toggleClass(clg, "pa-hidden-description", hidden && this.description);
+            toggleClass(clg, this.description ? "pa-hidden-description" : "hidden", hidden);
         }
         this.landmark && this.update_landmark(pde);
     }

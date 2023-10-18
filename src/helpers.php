@@ -7,10 +7,10 @@ function ago($t) {
         return "less than a minute ago";
     else if ($t + 7200 >= Conf::$now)
         return plural((int)((Conf::$now - $t) / 60 + 0.5), "minute") . " ago";
-    else if ($t + 259200 >= Conf::$now)
+    else if ($t + 86400 >= Conf::$now)
         return plural((int)((Conf::$now - $t) / 3600 + 0.5), "hour") . " ago";
     else
-        return plural((int)((Conf::$now - $t) / 86400 + 0.5), "day") . " ago";
+        return date("Y-m-d H:i", $t);
 }
 
 
