@@ -2303,9 +2303,6 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     newenv_.push_back(nullptr);
 
     // create command
-    if (!argc) {
-        die("Nothing to run\n");
-    }
     delete[] argv_;
     argv_ = new char*[5 + argc];
     if (!argv_) {
@@ -2315,16 +2312,20 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     std::string command;
     argv_[newargvpos++] = (char*) owner_sh_.c_str();
     argv_[newargvpos++] = (char*) "-l";
-    argv_[newargvpos++] = (char*) "-c";
-    if (argc == 1) {
-        command = argv[0];
+    if (argc == 0) {
+        // just a login shell
     } else {
-        command = shell_quote(argv[0]);
-        for (int i = 0; i < argc; ++i) {
-            command += std::string(" ") + shell_quote(argv[i]);
+        argv_[newargvpos++] = (char*) "-c";
+        if (argc == 1) {
+            command = argv[0];
+        } else {
+            command = shell_quote(argv[0]);
+            for (int i = 0; i < argc; ++i) {
+                command += std::string(" ") + shell_quote(argv[i]);
+            }
         }
+        argv_[newargvpos++] = const_cast<char*>(command.c_str());
     }
-    argv_[newargvpos++] = const_cast<char*>(command.c_str());
     argv_[newargvpos++] = nullptr;
 
     // store other arguments
