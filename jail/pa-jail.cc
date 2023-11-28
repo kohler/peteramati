@@ -2088,8 +2088,9 @@ class jailownerinfo {
 
     void init(const char* owner_name);
     void set_inputfd(int inputfd);
-    void exec(int argc, char** argv, jaildirinfo& jaildir,
-              double timeout, double idle_timeout, bool foreground);
+    void set_timeout(double timeout, double idle_timeout);
+    void set_foreground(bool foreground);
+    void exec(int argc, char** argv, jaildirinfo& jaildir);
     int exec_go();
 
   private:
@@ -2097,9 +2098,11 @@ class jailownerinfo {
     char** argv_ = nullptr;
     jaildirinfo* jaildir_;
     int inputfd_ = -1;
+    double timeout_ = -1.0;
+    double idle_timeout_ = -1.0;
+    bool foreground_= false;
     struct timeval start_time_;
     struct timeval expiry_;
-    double idle_timeout_;
     struct timeval active_time_;
     struct timeval idle_expiry_;
     jbuffer to_slave_;
@@ -2123,6 +2126,7 @@ class jailownerinfo {
     int check_child_timeout(pid_t child, bool waitpid);
     void wait_background(pid_t child, int ptymaster);
     void write_timing();
+    void exec_go_pty(int ptymaster, const char* ptyslavename, pid_t child);
     [[noreturn]] void exec_done(pid_t child, int exit_status);
 };
 
@@ -2247,9 +2251,16 @@ static int timer_difference_ms(const struct timeval& lhs, struct timeval rhs) {
     return rhs.tv_sec * 1000 + rhs.tv_usec / 1000;
 }
 
-void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
-                         double timeout, double idle_timeout,
-                         bool foreground) {
+void jailownerinfo::set_timeout(double timeout, double idle_timeout) {
+    this->timeout_ = timeout;
+    this->idle_timeout_ = idle_timeout;
+}
+
+void jailownerinfo::set_foreground(bool foreground) {
+    this->foreground_ = foreground;
+}
+
+void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     sprintf(homebuf, "HOME=%s", owner_home_.c_str());
@@ -2331,15 +2342,14 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     // store other arguments
     this->jaildir_ = &jaildir;
     gettimeofday(&this->start_time_, nullptr);
-    if (timeout > 0) {
-        this->expiry_ = timer_add_delay(this->start_time_, timeout);
+    if (this->timeout_ > 0) {
+        this->expiry_ = timer_add_delay(this->start_time_, this->timeout_);
     } else {
         timerclear(&this->expiry_);
     }
-    this->idle_timeout_ = idle_timeout;
-    if (idle_timeout > 0) {
+    if (this->idle_timeout_ > 0) {
         this->active_time_ = this->start_time_;
-        this->idle_expiry_ = timer_add_delay(this->active_time_, idle_timeout);
+        this->idle_expiry_ = timer_add_delay(this->active_time_, this->idle_timeout_);
     }
 
     // enter the jail
@@ -2379,7 +2389,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
     close(STDERR_FILENO);
 
     int exit_status = 0;
-    if (foreground) {
+    if (foreground_) {
         int r = setresgid(caller_group, caller_group, caller_group);
         (void) r;
         r = setresuid(caller_owner, caller_owner, caller_owner);
@@ -2481,11 +2491,9 @@ int jailownerinfo::exec_go() {
     }
 #endif
 
-    // create a pty
-    int ptymaster = -1;
-    char* ptyslavename = nullptr;
+    // upgrade privileges
     if (verbose) {
-        fprintf(verbosefile, "su %s\nmake-pty\n", uid_to_name(owner_));
+        fprintf(verbosefile, "su %s\n", uid_to_name(owner_));
     }
     if (!dryrun) {
         // change effective uid/gid, but save root for later
@@ -2495,6 +2503,15 @@ int jailownerinfo::exec_go() {
         if (setresuid(owner_, owner_, ROOT) != 0) {
             perror_die("setresuid");
         }
+    }
+
+    // create a pty
+    int ptymaster = -1;
+    char* ptyslavename = nullptr;
+    if (verbose) {
+        fprintf(verbosefile, "make-pty\n");
+    }
+    if (!dryrun) {
         // create pty
         if ((ptymaster = posix_openpt(O_RDWR | O_NOCTTY)) == -1) {
             perror_die("posix_openpt");
@@ -2583,47 +2600,9 @@ int jailownerinfo::exec_go() {
             if (setsid() == -1) {
                 perror_die("setsid");
             }
-
-            int ptyslave = open(ptyslavename, O_RDWR);
-            if (ptyslave == -1) {
-                perror_die(ptyslavename);
+            if (ptyslavename) {
+                exec_go_pty(ptymaster, ptyslavename, child);
             }
-            close(ptymaster);
-#ifdef TIOCSCTTY
-            ioctl(ptyslave, TIOCSCTTY, 0);
-#endif
-            tcsetpgrp(ptyslave, child);
-#ifdef TIOCGWINSZ
-            if (tsize[0] > 0) {
-                struct winsize ws;
-                ioctl(ptyslave, TIOCGWINSZ, &ws);
-                ws.ws_row = tsize[1];
-                ws.ws_col = tsize[0];
-                ioctl(ptyslave, TIOCSWINSZ, &ws);
-            }
-#endif
-            struct termios tty;
-            if (tcgetattr(ptyslave, &tty) >= 0) {
-                tty.c_iflag |= BRKINT | IGNPAR | IMAXBEL;
-#ifdef IUTF8
-                tty.c_iflag |= IUTF8;
-#endif
-                if (no_onlcr) {
-                    tty.c_oflag &= ~ONLCR;
-                }
-                tcsetattr(ptyslave, TCSANOW, &tty);
-            }
-
-            if (inputfd_ > 0 || stdin_tty_) {
-                dup2(ptyslave, STDIN_FILENO);
-            }
-            if (inputfd_ > 0 || stdout_tty_) {
-                dup2(ptyslave, STDOUT_FILENO);
-            }
-            if (inputfd_ > 0 || stderr_tty_) {
-                dup2(ptyslave, STDERR_FILENO);
-            }
-            close(ptyslave);
 
             // restore all signals to their default actions
             // (e.g., PHP may have ignored SIGPIPE; don't want that
@@ -2644,6 +2623,49 @@ int jailownerinfo::exec_go() {
     }
 
     return 0;
+}
+
+void jailownerinfo::exec_go_pty(int ptymaster, const char* ptyslavename, pid_t child) {
+    int ptyslave = open(ptyslavename, O_RDWR);
+    if (ptyslave == -1) {
+        perror_die(ptyslavename);
+    }
+    close(ptymaster);
+#ifdef TIOCSCTTY
+    ioctl(ptyslave, TIOCSCTTY, 0);
+#endif
+    tcsetpgrp(ptyslave, child);
+#ifdef TIOCGWINSZ
+    if (tsize[0] > 0) {
+        struct winsize ws;
+        ioctl(ptyslave, TIOCGWINSZ, &ws);
+        ws.ws_row = tsize[1];
+        ws.ws_col = tsize[0];
+        ioctl(ptyslave, TIOCSWINSZ, &ws);
+    }
+#endif
+    struct termios tty;
+    if (tcgetattr(ptyslave, &tty) >= 0) {
+        tty.c_iflag |= BRKINT | IGNPAR | IMAXBEL;
+#ifdef IUTF8
+        tty.c_iflag |= IUTF8;
+#endif
+        if (no_onlcr) {
+            tty.c_oflag &= ~ONLCR;
+        }
+        tcsetattr(ptyslave, TCSANOW, &tty);
+    }
+
+    if (inputfd_ > 0 || stdin_tty_) {
+        dup2(ptyslave, STDIN_FILENO);
+    }
+    if (inputfd_ > 0 || stdout_tty_) {
+        dup2(ptyslave, STDOUT_FILENO);
+    }
+    if (inputfd_ > 0 || stderr_tty_) {
+        dup2(ptyslave, STDERR_FILENO);
+    }
+    close(ptyslave);
 }
 
 extern "C" {
@@ -2867,25 +2889,32 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
         exec_done(child, 127);
     }
 
-    // if input is a tty, put it in raw mode with short blocking
-    if (ttyfd_ >= 0) {
-        struct termios tty = ttyfd_termios_;
-        cfmakeraw(&tty);
-        tty.c_cc[VMIN] = 1;
-        tty.c_cc[VTIME] = 1;
-        (void) tcsetattr(ttyfd_, TCSANOW, &tty);
-    }
-
-    make_nonblocking(ptymaster);
     fflush(stdout);
-    if (inputfd_ == 0 && !stdin_tty_) {
-        close(STDIN_FILENO);
-        to_slave_.rclosed_ = to_slave_.wclosed_ = true;
-    }
-    if (inputfd_ == 0 && !stdout_tty_ && !stderr_tty_) {
-        close(STDOUT_FILENO);
+
+    if (ptymaster >= 0) {
+        // if input is a tty, put it in raw mode with short blocking
+        if (ttyfd_ >= 0) {
+            struct termios tty = ttyfd_termios_;
+            cfmakeraw(&tty);
+            tty.c_cc[VMIN] = 1;
+            tty.c_cc[VTIME] = 1;
+            (void) tcsetattr(ttyfd_, TCSANOW, &tty);
+        }
+
+        make_nonblocking(ptymaster);
+        if (inputfd_ == 0 && !stdin_tty_) {
+            close(STDIN_FILENO);
+            to_slave_.rclosed_ = to_slave_.wclosed_ = true;
+        }
+        if (inputfd_ == 0 && !stdout_tty_ && !stderr_tty_) {
+            close(STDOUT_FILENO);
+            from_slave_.rclosed_ = from_slave_.wclosed_ = true;
+            from_slave_.rerrno_ = EIO; // don't misinterpret closed as error
+        }
+    } else {
         from_slave_.rclosed_ = from_slave_.wclosed_ = true;
-        from_slave_.rerrno_ = EIO; // don't misinterpret closed as error
+        to_slave_.rclosed_ = to_slave_.wclosed_ = true;
+        from_slave_.rerrno_ = EIO;
     }
 
     // listen on unix socket
@@ -2975,6 +3004,8 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
         xmsg = "...timed out";
     } else if (exit_status == 128 + SIGTERM && !quiet) {
         xmsg = "...terminated";
+    } else if (verbose) {
+        xmsg = "...terminating with status " + std::to_string(exit_status);
     }
     if (!xmsg.empty()) {
         const char* nl = no_onlcr ? "\n" : "\r\n";
@@ -3269,6 +3300,7 @@ int main(int argc, char** argv) {
         || (action == do_mv && optind + 2 != argc)
         || (action == do_add && optind != argc - 1 && optind + 2 != argc)
         || (action == do_run && optind + 3 > argc)
+        || (action == do_run && foreground && (!inputarg.empty() || !eventsourcefilename.empty()))
         || (action == do_rm && has_runarg)
         || (action == do_mv && has_runarg)
         || !argv[optind][0]
@@ -3522,8 +3554,9 @@ int main(int argc, char** argv) {
     // maybe execute a command in the jail
     if (optind + 2 < argc) {
         jailuser.set_inputfd(inputfd);
-        jailuser.exec(argc - (optind + 2), argv + optind + 2,
-                      jaildir, timeout, idle_timeout, foreground);
+        jailuser.set_timeout(timeout, idle_timeout);
+        jailuser.set_foreground(foreground);
+        jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir);
     }
 
     // close timing and lock file if appropriate
