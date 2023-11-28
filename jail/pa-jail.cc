@@ -2384,7 +2384,12 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir,
         (void) r;
         r = setresuid(caller_owner, caller_owner, caller_owner);
         (void) r;
+
         exit_status = x_waitpid(child, 0).second;
+
+        if (ttyfd_ >= 0) {
+            tcsetattr(ttyfd_, TCSANOW, &ttyfd_termios_);
+        }
     } else {
         pidfd = -1;
     }
