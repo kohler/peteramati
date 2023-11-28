@@ -2138,7 +2138,8 @@ jailownerinfo::jailownerinfo()
     } else {
         ttyfd_ = -1;
     }
-    from_slave_.bufpos_ = from_slave_off_ = lseek(STDOUT_FILENO, 0, SEEK_CUR);
+    auto stdout_off = lseek(STDOUT_FILENO, 0, SEEK_CUR);
+    from_slave_.bufpos_ = from_slave_off_ = stdout_off < 0 ? 0 : stdout_off;
 }
 
 jailownerinfo::~jailownerinfo() {
