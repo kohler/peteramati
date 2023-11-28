@@ -96,8 +96,10 @@ class QueueItem {
     public $last_error;
 
     const FLAG_UNWATCHED = 1;
+    const FLAG_FOREGROUND = 2;
     const FLAG_ANONYMOUS = 4;
     const FLAG_NOEVENTSOURCE = 8;
+    const FLAG_FOREGROUND_VERBOSE = 16;
 
     const STATUS_PAUSED = -2;
     const STATUS_UNSCHEDULED = -1;
@@ -331,7 +333,7 @@ class QueueItem {
     function abandoned() {
         return ($this->status === self::STATUS_UNSCHEDULED
                 || $this->status === self::STATUS_SCHEDULED)
-            && ($this->flags & self::FLAG_UNWATCHED) === 0
+            && ($this->flags & (self::FLAG_UNWATCHED | self::FLAG_FOREGROUND)) === 0
             && $this->updateat < Conf::$now - 180;
     }
 
@@ -427,6 +429,7 @@ class QueueItem {
         }
         $qi->flags = $info->user->is_anonymous ? self::FLAG_ANONYMOUS : 0;
         $qi->ifneeded = 0;
+        $qi->runat = 0;
 
         $qi->queueclass = "";
         $qi->status = self::STATUS_UNSCHEDULED;
@@ -536,7 +539,7 @@ class QueueItem {
     }
 
     function enqueue() {
-        assert($this->queueid === 0);
+        assert($this->queueid === 0 && ($this->flags & self::FLAG_FOREGROUND) === 0);
         $this->conf->clean_queue();
         $this->insertat = $this->updateat = Conf::$now;
         $this->runat = 0;
@@ -670,7 +673,6 @@ class QueueItem {
                 $this->update_from_database();
             }
         } else {
-            assert(!isset($fields["lockfile"]));
             $changed = $this->status !== $new_status;
             if ($changed) {
                 $this->status = $new_status;
@@ -737,7 +739,11 @@ class QueueItem {
         // do nothing for unscheduled jobs
         // XXX should kickstart broken chain
         if ($this->status === self::STATUS_UNSCHEDULED) {
-            return true;
+            if (($this->flags & self::FLAG_FOREGROUND) === 0) {
+                return true;
+            } else {
+                $this->status = self::STATUS_SCHEDULED;
+            }
         }
 
         // on ifneeded, check for compatible response
@@ -872,8 +878,9 @@ class QueueItem {
             return;
         }
 
-        // otherwise must be enqueued
-        assert($this->queueid !== 0);
+        // otherwise must be enqueued or foreground
+        $foreground = ($this->flags & self::FLAG_FOREGROUND) !== 0;
+        assert($this->queueid !== 0 || $foreground);
 
         if (!chdir(SiteLoader::$root)) {
             throw new RunnerException("Can’t cd to main directory.");
@@ -920,24 +927,30 @@ class QueueItem {
         // create logfile and pidfile
         $runat = time();
         $logbase = $runlog->job_prefix($runat);
-        $this->_logfile = "{$logbase}.log";
-        $timingfile = "{$logbase}.log.time";
         $pidfile = $runlog->pid_file();
         file_put_contents($pidfile, "{$runat}\n");
-        $inputfifo = "{$logbase}.in";
-        if (!posix_mkfifo($inputfifo, 0660)) {
-            $inputfifo = null;
+        $inputfifo = $timingfile = null;
+        if (!$foreground) {
+            if (posix_mkfifo("{$logbase}.in", 0660)) {
+                $inputfifo = "{$logbase}.in";
+            }
+            if ($runner->timed_replay && touch("{$logbase}.log.time")) {
+                $timingfile = "{$logbase}.log.time";
+            }
+            $this->_logfile = "{$logbase}.log";
+            $this->_logstream = fopen($this->_logfile, "a");
+        } else if (($this->flags & self::FLAG_FOREGROUND_VERBOSE) !== 0) {
+            $this->_logstream = STDERR;
+        } else {
+            $this->_logstream = fopen("/dev/null", "w");
         }
-        if ($runner->timed_replay) {
-            touch($timingfile);
-        }
-        $this->_logstream = fopen($this->_logfile, "a");
         $this->bhash = $info->bhash(); // resolve blank hash
 
         // maybe register eventsource
         $esfile = $esid = null;
         if (($this->flags & self::FLAG_NOEVENTSOURCE) === 0
-            && ($esdir = $this->eventsource_dir())) {
+            && ($esdir = $this->eventsource_dir())
+            && !$foreground) {
             $esid = bin2hex(random_bytes(16));
             $esfile = "{$esdir}{$esid}";
             if (file_exists($esfile)) {
@@ -971,16 +984,16 @@ class QueueItem {
             "jail/pa-jail", "run", "-p{$pidfile}",
             "-P{$this->runat} \$\$" . ($inputfifo ? " -i" : "")
         ];
-        if ($runner->timed_replay) {
+        if ($timingfile) {
             $cmdarg[] = "-t{$timingfile}";
         }
-        if ($esfile !== null) {
+        if ($esfile) {
             $cmdarg[] = "--event-source={$esfile}";
         }
 
         $skeletondir = $pset->run_skeletondir ? : $this->conf->opt("run_skeletondir");
         $binddir = $pset->run_binddir ? : $this->conf->opt("run_binddir");
-        if ($skeletondir && $binddir && !is_dir("$skeletondir/proc")) {
+        if ($skeletondir && $binddir && !is_dir("{$skeletondir}/proc")) {
             $binddir = false;
         }
         $jfiles = $runner->jailfiles();
@@ -1013,20 +1026,25 @@ class QueueItem {
             $cmdarg[] = "-F" . join("\n", $jmanifest);
         }
 
-        if (($to = $runner->timeout ?? $pset->run_timeout) > 0) {
-            $cmdarg[] = "-T{$to}";
+        if (!$foreground) {
+            if (($to = $runner->timeout ?? $pset->run_timeout) > 0) {
+                $cmdarg[] = "-T{$to}";
+            }
+            if (($to = $runner->idle_timeout ?? $pset->run_idle_timeout) > 0) {
+                $cmdarg[] = "-I{$to}";
+            }
+            if (($runner->rows ?? 0) > 0 || ($runner->columns ?? 0) > 0) {
+                $rows = ($runner->rows ?? 0) > 0 ? $runner->rows : 25;
+                $cols = ($runner->columns ?? 0) > 0 ? $runner->columns : 80;
+                $cmdarg[] = "--size={$cols}x{$rows}";
+            }
+            if ($inputfifo) {
+                $cmdarg[] = "-i{$inputfifo}";
+            }
+        } else {
+            $cmdarg[] = "--fg";
         }
-        if (($to = $runner->idle_timeout ?? $pset->run_idle_timeout) > 0) {
-            $cmdarg[] = "-I{$to}";
-        }
-        if (($runner->rows ?? 0) > 0 || ($runner->columns ?? 0) > 0) {
-            $rows = ($runner->rows ?? 0) > 0 ? $runner->rows : 25;
-            $cols = ($runner->columns ?? 0) > 0 ? $runner->columns : 80;
-            $cmdarg[] = "--size={$cols}x{$rows}";
-        }
-        if ($inputfifo) {
-            $cmdarg[] = "-i{$inputfifo}";
-        }
+
         $cmdarg[] = $homedir;
         $cmdarg[] = $username;
         $cmdarg[] = "TERM=xterm-256color";
@@ -1035,30 +1053,36 @@ class QueueItem {
         $this->run_and_log($cmdarg, null, true);
 
         // save information about execution
-        $this->info()->add_recorded_job($runner->name, $this->runat);
+        if (!$foreground) {
+            $this->info()->add_recorded_job($runner->name, $this->runat);
+        }
+        if ($this->_logstream !== STDERR) {
+            fclose($this->_logstream);
+        }
+        $this->_logstream = null;
     }
 
     /** @param list<string> $cmdarg
      * @param ?string $cwd
-     * @param bool $ready
+     * @param bool $main_command
      * @return int */
-    private function run_and_log($cmdarg, $cwd = null, $ready = false) {
-        fwrite($this->_logstream, "++ " . Subprocess::unparse_command($cmdarg) . ($ready ? "\n\n" : "\n"));
+    private function run_and_log($cmdarg, $cwd = null, $main_command = false) {
+        fwrite($this->_logstream, "++ " . Subprocess::unparse_command($cmdarg) . ($main_command ? "\n\n" : "\n"));
         fflush($this->_logstream);
 
-        if (PHP_VERSION_ID >= 70400) {
-            $cmd = $cmdarg;
-            $stderr = ["redirect", 1];
-        } else {
-            $cmd = Subprocess::unparse_command($cmdarg);
-            $stderr = ["file", $this->_logfile, "a"];
+        $cmd = PHP_VERSION_ID >= 70400 ? $cmdarg : Subprocess::unparse_command($cmdarg);
+        $redirects = [];
+        if (!$main_command || ($this->flags & self::FLAG_FOREGROUND) === 0) {
+            $redirects[0] = ["file", "/dev/null", "r"];
+        }
+        if (($this->flags & self::FLAG_FOREGROUND) === 0) {
+            $redirects[1] = ["file", $this->_logfile, "a"];
+            $redirects[2] = PHP_VERSION_ID >= 70400 ? ["redirect", 1] : ["file", $this->_logfile, "a"];
+        } else if (($this->flags & self::FLAG_FOREGROUND_VERBOSE) !== 0 && PHP_VERSION_ID >= 70400) {
+            $redirects[1] = ["redirect", 2];
         }
         $pipes = null;
-        $proc = proc_open($cmd, [
-                0 => ["file", "/dev/null", "r"],
-                1 => ["file", $this->_logfile, "a"],
-                2 => $stderr
-            ], $pipes, $cwd);
+        $proc = proc_open($cmd, $redirects, $pipes, $cwd);
         return proc_close($proc);
     }
 
@@ -1097,7 +1121,7 @@ class QueueItem {
             $clonedir .= "/{$pset->directory_noslash}";
         }
 
-        fwrite($this->_logstream, "++ mkdir $checkoutdir\n");
+        fwrite($this->_logstream, "++ mkdir {$checkoutdir}\n");
         if (!mkdir($clonedir, 0777, true)) {
             throw new RunnerException("Can’t initialize user repo in jail.");
         }
@@ -1177,9 +1201,9 @@ class QueueItem {
             if (preg_match('/\A[A-Za-z_][A-Za-z_0-9]*\z/', $k)
                 && !preg_match('/\A(?:PATH|MAKE|HOME|SHELL|POSIXLY_CORRECT|TMPDIR|LANG|USER|LOGNAME|SSH.*|PS\d|HISTFILE|LD_LIBRARY_PATH|HOST|HOSTNAME|TERM|TERMCAP|EDITOR|PAGER|MANPATH)\z/', $k)) {
                 if (preg_match('/\A[-A-Za-z0-9_:\/ .,]*\z/', $v)) {
-                    $mk[] = "$k = $v\n";
+                    $mk[] = "{$k} = {$v}\n";
                 }
-                $sh[] = "$k=" . escapeshellarg($v) . "\n";
+                $sh[] = "{$k}=" . escapeshellarg($v) . "\n";
             }
         }
         file_put_contents("{$this->_jailhomedir}/config.mk", join("", $mk));
@@ -1266,6 +1290,9 @@ class QueueItem {
             $runlog = $this->run_logger();
             unlink($runlog->pid_file());
             @unlink($runlog->job_prefix($this->runat) . ".in");
+        }
+        if ($this->_logstream && $this->_logstream !== STDERR) {
+            fclose($this->_logstream);
         }
     }
 }
