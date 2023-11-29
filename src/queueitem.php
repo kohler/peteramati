@@ -283,7 +283,7 @@ class QueueItem {
         case self::STATUS_SCHEDULED:
             return "scheduled" . ($verbose && $this->abandoned() ? " abandoned" : "");
         case self::STATUS_WORKING:
-            return "working";
+            return "working" . ($verbose && $this->working_complete() ? " complete": "");
         case self::STATUS_CANCELLED:
             return "cancelled";
         case self::STATUS_DONE:
@@ -324,6 +324,13 @@ class QueueItem {
     /** @return bool */
     function working() {
         return $this->status === self::STATUS_WORKING;
+    }
+
+    /** @return bool */
+    function working_complete() {
+        return $this->status === self::STATUS_WORKING
+            && $this->lockfile
+            && RunLogger::active_job_at($this->lockfile) !== $this->runat;
     }
 
     /** @return bool */
