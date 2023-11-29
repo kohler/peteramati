@@ -1470,6 +1470,18 @@ function pa_render_pset_table(ptconf) {
         $alltables = $alltables.add(lpintable, ltpintable);
     }
 
+    function set_tables_width() {
+        const lastc = col[col.length - 1];
+        let width = lastc.left + lastc.width;
+        if (ptconf.anonymous) {
+            colmap.name && (width -= colmap.name.width);
+            colmap.year && (width -= colmap.year.width);
+        }
+        $alltables.each(function () {
+            this.style.width = width + "px";
+        });
+    }
+
     function render() {
         const tfixed = $j.hasClass("want-gtable-fixed"),
             thead = ptable_thead(col, ptconf, true);
@@ -1478,8 +1490,7 @@ function pa_render_pset_table(ptconf) {
         table.appendChild(thead);
         toggleClass(table, "gt-useemail", !!ptconf.sort.email);
         if (tfixed) {
-            const lastc = col[col.length - 1];
-            table.style.width = (lastc.left + lastc.width) + "px";
+            set_tables_width();
             removeClass(table, "want-gtable-fixed");
             addClass(table, "gtable-fixed");
         }
@@ -1525,6 +1536,7 @@ function pa_render_pset_table(ptconf) {
             && nsort.deblind != osort.deblind) {
             ptconf.anonymous = !nsort.deblind;
             $alltables.toggleClass("gt-anonymous", !!ptconf.anonymous);
+            set_tables_width();
             $alltables.children("tbody").find("input.gt-check").each(function () {
                 const s = smap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
                 this.setAttribute("name", ptconf.render_checkbox_name(s));
