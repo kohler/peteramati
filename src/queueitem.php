@@ -92,6 +92,8 @@ class QueueItem {
     private $_logstream;
     /** @var ?int */
     private $_runstatus;
+    /** @var ?int */
+    public $foreground_command_status;
     /** @var ?string */
     public $last_error;
 
@@ -1050,10 +1052,12 @@ class QueueItem {
         $cmdarg[] = "TERM=xterm-256color";
         $cmdarg[] = $this->expand($runner->command);
         $this->_runstatus = 2;
-        $this->run_and_log($cmdarg, null, true);
+        $s = $this->run_and_log($cmdarg, null, true);
 
         // save information about execution
-        if (!$foreground) {
+        if ($foreground) {
+            $this->foreground_command_status = $s;
+        } else {
             $this->info()->add_recorded_job($runner->name, $this->runat);
         }
         if ($this->_logstream !== STDERR) {
@@ -1136,18 +1140,24 @@ class QueueItem {
         }
 
         // make the checkout
+        $quiet = [];
+        if (($this->flags & (self::FLAG_FOREGROUND | self::FLAG_FOREGROUND_VERBOSE)) === self::FLAG_FOREGROUND) {
+            $quiet[] = "-q";
+        }
         $status = 0;
         if (!is_dir("{$clonedir}/.git")) {
-            $status = $this->run_and_log(["git", "init", "--shared=group", "-b", "main"], $clonedir);
+            $status = $this->run_and_log(["git", "init", "--shared=group", "-b", "main", ...$quiet], $clonedir);
         }
         if ($status === 0) {
-            $status = $this->run_and_log(["git", "fetch", "--depth=1", "-p", $repodir, $branch], $clonedir);
+            $args = array_merge($quiet, [$repodir, $branch]);
+            $status = $this->run_and_log(["git", "fetch", "--depth=1", "-p", ...$args], $clonedir);
         }
         if ($status === 0) {
-            $status = $this->run_and_log(["git", "reset", "--hard", $hash], $clonedir);
+            $args = array_merge($quiet, [$hash]);
+            $status = $this->run_and_log(["git", "reset", "--hard", ...$args], $clonedir);
         }
-
-        $this->run_and_log(["git", "branch", "-D", $branch], $repodir);
+        $args = array_merge($quiet, [$branch]);
+        $this->run_and_log(["git", "branch", "-D", ...$args], $repodir);
 
         if ($status !== 0) {
             throw new RunnerException("Can’t check out code into jail.");

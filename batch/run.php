@@ -140,7 +140,12 @@ class Run_Batch {
             $qi->runsettings[$k] = $v;
         }
         $qi->step(new QueueState);
-        return 0;
+        if ($qi->foreground_command_status !== null
+            && $qi->foreground_command_status >= 0) {
+            return $qi->foreground_command_status;
+        } else {
+            return 127;
+        }
     }
 
     /** @return Run_Batch */
