@@ -183,19 +183,18 @@ class RunEnqueue_Batch {
             "V,verbose",
             "help"
         )->helpopt("help")->parse($argv);
-        if (($arg["p"] ?? "") === "") {
-            throw new CommandLineException("missing `--pset`");
-        }
-        $pset = $conf->pset_by_key($arg["p"]);
+        $pset_arg = $arg["p"] ?? "";
+        $pset = $conf->pset_by_key($pset_arg);
         if (!$pset) {
-            throw new CommandLineException("no such pset");
+            $pset_keys = array_values(array_map(function ($p) { return $p->key; }, $conf->psets()));
+            throw (new CommandLineException($pset_arg === "" ? "`--pset` required" : "Pset `{$pset_arg}` not found"))->add_context("(Options are " . join(", ", $pset_keys) . ".)");
         }
-        if (($arg["r"] ?? "") === "") {
-            throw new CommandLineException("missing `--runner`");
-        }
-        $runner = $pset->runners[$arg["r"]] ?? null;
+        $runner_arg = $arg["r"] ?? "";
+        $runner = $pset->runner_by_key($runner_arg);
         if (!$runner) {
-            throw new CommandLineException("no such runner");
+            $runners = array_keys($pset->runners);
+            sort($runners);
+            throw (new CommandLineException($runner_arg === "" ? "`--runner` required" : "Runner `{$runner_arg}` not found"))->add_context("(Options are " . join(", ", $runners) . ".)");
         }
         $self = new RunEnqueue_Batch($pset, $runner, $arg["u"] ?? []);
         if (isset($arg["e"])) {

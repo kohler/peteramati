@@ -536,6 +536,8 @@ class CommandLineException extends Exception {
     public $getopt;
     /** @var int */
     public $exitStatus;
+    /** @var ?list<string> */
+    public $context;
     /** @var int */
     static public $default_exit_status = 1;
     /** @param string $message
@@ -545,5 +547,11 @@ class CommandLineException extends Exception {
         parent::__construct($message);
         $this->getopt = $getopt;
         $this->exitStatus = $exit_status ?? self::$default_exit_status;
+    }
+    /** @param string ...$context
+     * @return $this */
+    function add_context(...$context) {
+        $this->context = array_merge($this->context ?? [], $context);
+        return $this;
     }
 }

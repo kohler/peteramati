@@ -255,6 +255,16 @@ class Multiconference {
         if (substr($s, -1) !== "\n") {
             $s = "{$s}\n";
         }
+        if (property_exists($ex, "context")
+            && is_array($ex->context)) {
+            foreach ($ex->context as $c) {
+                $i = 0;
+                while ($i !== strlen($c) && $c[$i] === " ") {
+                    ++$i;
+                }
+                $s .= prefix_word_wrap(str_repeat(" ", $i + 2), trim($c), 2);
+            }
+        }
         if (property_exists($ex, "getopt")
             && $ex->getopt instanceof Getopt) {
             $s .= $ex->getopt->short_usage();
