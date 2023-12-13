@@ -18,6 +18,8 @@ class RunEnqueue_Batch {
     /** @var int */
     public $if_needed = 0;
     /** @var bool */
+    public $ordered = false;
+    /** @var bool */
     public $verbose = false;
     /** @var ?int */
     public $chainid;
@@ -110,6 +112,9 @@ class RunEnqueue_Batch {
         $viewer = $this->conf->site_contact();
         $sset = new StudentSet($viewer, $this->sset_flags, [$this, "test_user"]);
         $sset->set_pset($this->pset);
+        if (!$this->ordered) {
+            $sset->shuffle();
+        }
         $nu = 0;
         $chain = $this->chainid ?? QueueItem::new_chain();
         $chainstr = $chain ? " C{$chain}" : "";
@@ -180,6 +185,7 @@ class RunEnqueue_Batch {
             "t[],tag[] Add tag",
             "s[],setting[] Set NAME=VALUE",
             "event-source,eventsource Listen for EventSource connections",
+            "ordered Do not randomize user order",
             "V,verbose",
             "help"
         )->helpopt("help")->parse($argv);
@@ -205,6 +211,9 @@ class RunEnqueue_Batch {
             }
         } else if (isset($arg["ensure"])) {
             $self->if_needed = 1;
+        }
+        if (isset($arg["ordered"])) {
+            $self->ordered = true;
         }
         if (isset($arg["V"])) {
             $self->verbose = true;

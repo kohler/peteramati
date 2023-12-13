@@ -438,12 +438,10 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         return PsetView::make_from_set_at($this, $this->_ua[$this->_upos], $this->pset);
     }
 
-    /** @return int */
     function key(): int {
         return $this->_ua[$this->_upos]->contactId;
     }
 
-    /** @return void */
     function next(): void {
         ++$this->_upos;
         while ($this->_upos < count($this->_ua)
@@ -463,22 +461,24 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         }
     }
 
-    /** @return void */
     function rewind(): void {
         assert($this->_infos === null);
         $this->_upos = -1;
         $this->next();
     }
 
-    /** @return bool */
     function valid(): bool {
         return $this->_upos < count($this->_ua);
     }
 
 
-    /** @return int */
     function count(): int {
         return count($this->_ua);
+    }
+
+    /** @return void */
+    function shuffle() {
+        shuffle($this->_ua);
     }
 
 
