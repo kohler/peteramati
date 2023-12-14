@@ -1276,10 +1276,9 @@ function pa_render_pset_table(ptconf) {
 
 
     function make_hotlist(event) {
-        var j = [];
-        for (var i = 0; i < data.length; ++i) {
-            var s = data[i],
-                t = "~".concat(encodeURIComponent(ptconf.ukey(s)));
+        const j = [];
+        for (const s of data) {
+            let t = "~".concat(encodeURIComponent(ptconf.ukey(s)));
             if (ptconf.flagged_commits) {
                 t = t.concat("/pset/", s.pset);
                 if (s.commit)
@@ -1287,7 +1286,7 @@ function pa_render_pset_table(ptconf) {
             }
             j.push(t);
         }
-        event.hotlist = {pset: ptconf.flagged_commits ? null : ptconf.key, items: j};
+        event.detail.hotlist = {pset: ptconf.flagged_commits ? null : ptconf.key, items: j};
     }
 
     function assign_slist() {

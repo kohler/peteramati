@@ -107,22 +107,26 @@ function is_listable(sitehref) {
 }
 
 function handle_list(e, href) {
-    var hl, sitehref;
-    if (href
-        && href.startsWith(siteinfo.site_relative)
-        && is_listable((sitehref = href.substring(siteinfo.site_relative.length)))
-        && (hl = e.closest(".has-hotlist"))) {
-        var info = hl.getAttribute("data-hotlist");
-        if (!info) {
-            var event = jQuery.Event("pa-hotlist");
-            $(hl).trigger(event);
-            info = event.hotlist;
-            if (info && typeof info !== "string") {
-                info = JSON.stringify(info);
-            }
-        }
-        info && set_cookie(info, sitehref);
+    let hl, sitehref;
+    if (!href
+        || !href.startsWith(siteinfo.site_relative)
+        || !is_listable((sitehref = href.substring(siteinfo.site_relative.length)))
+        || !(hl = e.closest(".has-hotlist"))) {
+        return;
     }
+    let info = hl.getAttribute("data-hotlist");
+    if (!info) {
+        const event = new CustomEvent("pa-hotlist", {
+            bubbles: true, cancelable: true,
+            detail: {hotlist: null}
+        });
+        hl.dispatchEvent(event);
+        info = event.detail.hotlist;
+        if (info && typeof info !== "string") {
+            info = JSON.stringify(info);
+        }
+    }
+    info && set_cookie(info, sitehref);
 }
 
 function unload_list() {
