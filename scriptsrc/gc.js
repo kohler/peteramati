@@ -153,7 +153,8 @@ GradeClass.add("time", {
         } else {
             return strftime("%Y-%m-%d %H:%M", v);
         }
-    }
+    },
+    tcell_width: 6
 });
 
 GradeClass.add("duration", {
@@ -163,7 +164,8 @@ GradeClass.add("duration", {
         } else {
             return sec2text(v, "quarterhour");
         }
-    }
+    },
+    tcell_width: 6
 });
 
 GradeClass.add("text", {
