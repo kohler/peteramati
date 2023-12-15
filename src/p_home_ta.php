@@ -164,7 +164,8 @@ class Home_TA_Page {
             '<h3 class="pset-title">flagged commits</h3>',
             '<div class="gtable-container-0">',
             '<div class="gtable-container-1">',
-            '<table class="gtable"></table></div></div>',
+            '<div class="gtable-container-2">',
+            '<table class="gtable want-gtable-fixed"></table></div></div></div>',
             Ht::button("Resolve flags", ["class" => "btn ui js-multiresolveflag"]),
             '</form></div>', "\n";
         $jd = [
@@ -475,6 +476,7 @@ class Home_TA_Page {
         }
 
         echo '<div class="gtable-container-0">',
+            '<div class="gtable-container-1">',
             '<div class="gtable-container-gutter">',
             '<div class="gtable-gutter-content">',
             '<button type="button" class="ui js-gdialog mb-2 need-tooltip" aria-label="Set and configure grades" disabled><span class="filter-gray-if-disabled">🛎️</span></button>',
@@ -486,7 +488,7 @@ class Home_TA_Page {
             echo '<div class="gtable-gutter-pset ', $psettitle, '</div>';
         }
         echo '</div></div>',
-            '<div class="gtable-container-1"><table class="gtable want-gtable-fixed"></table></div></div>';
+            '<div class="gtable-container-2"><table class="gtable want-gtable-fixed"></table></div></div></div>';
         echo Ht::unstash(),
             '<script>$pa.pset_table($("#', $pset->urlkey, '")[0],',
             json_encode_browser($jd), ',',

@@ -462,49 +462,53 @@ function ptable_head_click(evt) {
 }
 
 
-let ptable_observer, ptables = [];
-
-function ptable_header_observer(entries) {
-    for (const entry of entries) {
-        entry.target.pa__intersecting = entry.isIntersecting;
-    }
-}
-
-function ptable_header_scroller() {
-    for (const table of ptables) {
-        if (table.pa__intersecting) {
-            const r = table.getBoundingClientRect(),
-                pt = table.previousSibling;
-            if (r.top > 0) {
-                pt.style.display = "none";
-            } else {
-                pt.style.display = "table";
-                pt.style.top = Math.min(-r.top, r.height - 48) + "px";
-            }
+function ptable_body_scroller(ctrh) {
+    return function () {
+        ctrh.scrollLeft = this.scrollLeft;
+        if (hasClass(ctrh.lastChild, "gtable-left-pin")) {
+            ctrh.lastChild.style.left = this.scrollLeft + "px";
         }
-    }
+    };
 }
 
 function ptable_track_header(table) {
     if (!window.IntersectionObserver || table.rows.length <= 10) {
         return null;
     }
-    if (!ptable_observer) {
-        ptable_observer = new IntersectionObserver(ptable_header_observer, {rootMargin: "-32px 0px"});
-        document.addEventListener("scroll", ptable_header_scroller, {passive: true});
-    }
-    ptable_observer.observe(table);
-    ptables.push(table);
+    // find containers
+    const ctr2 = table.closest(".gtable-container-2"),
+        ctr1 = ctr2.parentElement,
+        ctr0 = ctr1.parentElement,
+        isleft = hasClass(table, "gtable-left-pin");
+    // create pinned header table
     const tctable = document.createElement("table");
     tctable.className = table.className;
     tctable.classList.add("gtable-top-pin");
     tctable.classList.remove("gtable");
     tctable.style.width = table.style.width;
     tctable.appendChild(table.tHead.cloneNode(true));
-    table.before(tctable);
+    // hide table’s own header
+    const thead_bounds = table.tHead.getBoundingClientRect(),
+        ctr0_bounds = ctr0.getBoundingClientRect(),
+        ctr2_bounds = ctr2.getBoundingClientRect();
+    table.style.marginTop = (-thead_bounds.height - 0.5) + "px";
+    table.tHead.style.visibility = "hidden";
+    // create header container
+    if (!hasClass(ctr0.firstChild, "gtable-container-headers")) {
+        const ctrh = document.createElement("div");
+        ctrh.className = "gtable-container-headers";
+        ctrh.style.marginLeft = (ctr2_bounds.left - ctr0_bounds.left) + "px";
+        ctrh.scrollLeft = ctr2.scrollLeft;
+        ctr0.prepend(ctrh);
+        ctr2.addEventListener("scroll", ptable_body_scroller(ctrh), {passive: true});
+    }
+    // append to header container
+    const ctrh = ctr0.firstChild;
+    if (hasClass(tctable, "gtable-left-pin")) {
+        tctable.style.left = ctrh.scrollLeft + "px";
+    }
+    ctrh.append(tctable);
     tctable.tHead.addEventListener("click", ptable_head_click);
-    table.pa__intersecting = true;
-    queueMicrotask(ptable_header_scroller);
     return tctable;
 }
 
@@ -638,7 +642,7 @@ const gcoldef = {
             ae.append(siteinfo.psets[s.pset].title + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
             tde.append(ae);
         },
-        tw: 12,
+        tw: 8,
         sort_forward: true,
         compare: function (a, b) {
             if (a.pset != b.pset)
@@ -1121,7 +1125,9 @@ export function pa_pset_table(form, pconf, data) {
 function pa_render_pset_table(ptconf) {
     const table = this, $j = $(table),
         smap = ptconf.smap;
-    let $alltables = $(table), lpintable = null, slist_input,
+    let $alltables = $(table),
+        hdrtable = null, lpintable = null, lpinhdrtable = null,
+        slist_input,
         gradesheet = null,
         active_nameflag = -1,
         col, colmap, data = ptconf.data;
@@ -1422,6 +1428,7 @@ function pa_render_pset_table(ptconf) {
                     make_overlay();
                 }
                 toggleClass(lpintable.parentElement, "hidden", left_hit);
+                lpinhdrtable && toggleClass(lpinhdrtable, "hidden", left_hit);
             }
         }
         var observer = new IntersectionObserver(observer_fn);
@@ -1438,35 +1445,34 @@ function pa_render_pset_table(ptconf) {
 
         lpintable = document.createElement("table");
         lpintable.className = "gtable-left-pin gtable-fixed new";
-        lpintable.setAttribute("style", "position:absolute;left:0;width:".concat(tw + 24, "px"));
+        lpintable.style.width = (tw + 24) + "px";
         lpintable.appendChild(ptable_thead(cx, ptconf, true));
         lpintable.appendChild(document.createElement("tbody"));
         lpintable.tHead.firstChild.classList.add("kfade");
 
-        let tr = table.rows[0],
-            otr = lpintable.rows[0];
+        let tr = table.rows[0], otr = lpintable.rows[0];
         for (let i = 0; i !== cx.length; ++i) {
             otr.childNodes[i].className = tr.childNodes[cx[i].index].className;
         }
 
         const div = document.createElement("div");
-        div.setAttribute("style", "position:sticky;left:0;z-index:2");
+        div.className = "gtable-container-left-pin";
         div.appendChild(lpintable);
         table.parentNode.prepend(div);
         lpintable.tHead.addEventListener("click", ptable_head_click);
         $(lpintable).find("tbody").on("click", "input[type=checkbox]", checkbox_click);
 
         ptable_permute(ptconf, lpintable, data);
-        const ltpintable = ptable_track_header(lpintable);
+        lpinhdrtable = ptable_track_header(lpintable);
         $j.find("input[data-range-type=s61]:checked").each(checkbox_click);
         lpintable.addEventListener("mouseenter", user_hover, true);
         lpintable.addEventListener("mouseleave", user_hover, true);
         queueMicrotask(function () {
             removeClass(lpintable, "new");
-            ltpintable && removeClass(ltpintable, "new");
+            lpinhdrtable && removeClass(lpinhdrtable, "new");
         });
 
-        $alltables = $alltables.add(lpintable, ltpintable);
+        $alltables = $alltables.add(lpintable).add(lpinhdrtable);
     }
 
     function set_tables_width() {
@@ -1477,7 +1483,9 @@ function pa_render_pset_table(ptconf) {
             colmap.year && (width -= colmap.year.width);
         }
         $alltables.each(function () {
-            this.style.width = width + "px";
+            if (!hasClass(this, "gtable-left-pin")) {
+                this.style.width = width + "px";
+            }
         });
     }
 
@@ -1514,7 +1522,8 @@ function pa_render_pset_table(ptconf) {
         slist_input && assign_slist();
         $j.find("tbody").on("click", "input[type=checkbox]", checkbox_click);
 
-        $alltables = $alltables.add(ptable_track_header(table));
+        hdrtable = ptable_track_header(table);
+        $alltables = $alltables.add(hdrtable);
         if (tfixed && window.IntersectionObserver) {
             make_overlay_observer();
         }

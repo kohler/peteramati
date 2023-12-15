@@ -2720,8 +2720,17 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 .gtable-container-0 {
 	margin-right: -24px;
 	margin-bottom: 0.75rem;
-	display: flex;
 	position: relative;
+}
+.gtable-container-1 {
+	display: flex;
+}
+.gtable-container-headers {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	padding-right: 24px;
+	overflow: hidden;
 }
 .gtable-container-gutter {
 	padding-right: 16px;
@@ -2739,17 +2748,24 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 	writing-mode: vertical-rl;
 	transform: rotate(180deg);
 }
-.gtable-container-1 {
+.gtable-container-2 {
 	padding-right: 24px;
 	padding-bottom: 8px;
-	overflow-x: scroll;
+	overflow: scroll;
 	position: relative;
 	z-index: 1;
 }
 .gtable-fixed {
 	table-layout: fixed;
 }
+.gtable-container-left-pin {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+}
 .gtable-left-pin {
+	position: absolute;
+	left: 0;
 	transition: opacity 0.25s ease;
 	opacity: 1;
 }
@@ -2757,13 +2773,9 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 	opacity: 0;
 }
 .gtable-top-pin {
-	position: absolute;
 	z-index: 1;
 	left: 0;
 	top: 0;
-}
-.gtable-left-pin.gtable-top-pin {
-	z-index: 2;
 }
 .gtable-headrow {
 	font-size: smaller;
@@ -2777,7 +2789,8 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 	width: 2rem;
 }
 th.gt-checkbox > input {
-	transform: scale(90%);
+	/*transform: scale(90%);*/
+	width: 1em;
 }
 .gt-rownumber {
 	text-align: right;
