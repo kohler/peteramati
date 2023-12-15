@@ -1647,7 +1647,7 @@ handle_ui.on("js-pset-gconfig", function () {
         const hc = popup_skeleton();
         hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Settings</h2>');
         hc.push('<div class="pa-messages"></div>');
-        hc.push('<div class="d-grid-1">', '</div>');
+        hc.push('<div class="d-grid-1 grid-gap-2">', '</div>');
 
         hc.push('<span class="select"><select name="state">', '</select></span>');
         hc.push('<option value="disabled">Disabled</option>');

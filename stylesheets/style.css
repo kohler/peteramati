@@ -501,6 +501,9 @@ form {
 .justify-content-between {
 	justify-content: between !important;
 }
+.grid-gap-2 {
+	grid-gap: 0.5rem !important;
+}
 
 ol.upper-alpha {
 	list-style-type: upper-alpha;
