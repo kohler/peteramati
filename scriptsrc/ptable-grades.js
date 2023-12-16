@@ -22,7 +22,9 @@ function make_uid2tr(tr) {
 }
 
 function grade_update(ptconf, uid2tr, rv, refreshflags) {
-    const tr = uid2tr[rv.uid], su = ptconf.assign_user(rv);
+    const tr = uid2tr[rv.uid], su = ptconf.uidmap[rv.uid],
+        oldgrades = [].concat(su.grades || []);
+    su.assign(rv);
     let ngrades = 0;
     for (let gv of su.grades || []) {
         if (gv != null && gv !== "")
@@ -31,7 +33,7 @@ function grade_update(ptconf, uid2tr, rv, refreshflags) {
     su.ngrades = ngrades;
     for (let c of ptconf.col) {
         if (((c.refreshable || 0) & refreshflags) !== 0)
-            c.td.call(c, tr.childNodes[c.index], su, ptconf);
+            c.td.call(c, tr.childNodes[c.index], su, {oldgrades: oldgrades});
     }
 }
 

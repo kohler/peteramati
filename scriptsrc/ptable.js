@@ -329,20 +329,6 @@ class PtableConf {
         }
     }
 
-    assign_user(s) {
-        const su = this.uidmap[s.uid];
-        if (su.grades && s.grades) {
-            su._gdiff = [];
-            for (let i = 0; i !== s.grades.length; ++i) {
-                su._gdiff.push(s.grades[i] !== su.grades[i]);
-            }
-        } else if (su._gdiff) {
-            su._gdiff = null;
-        }
-        su.assign(s);
-        return su;
-    }
-
     user_row_checkbox(tr) {
         const overlay = hasClass(tr.parentElement.parentElement, "gtable-left-pin"),
             cbidx = this.colmap.checkbox[overlay ? "pin_index" : "index"];
@@ -962,7 +948,7 @@ const gcoldef = {
             the.title = this.ge.title_text;
             the.replaceChildren(this.ge.abbr());
         },
-        td: function (tde, s) {
+        td: function (tde, s, opt) {
             const gr = s.grades[this.gidx];
             tde.className = this.className;
             if (s.autogrades
@@ -970,7 +956,7 @@ const gcoldef = {
                 && s.autogrades[this.gidx] !== gr) {
                 tde.className += " gt-highlight";
             }
-            if (s._gdiff && s._gdiff[this.gidx]) {
+            if (opt && opt.oldgrades && opt.oldgrades[this.gidx] !== gr) {
                 tde.className += " update";
                 queue_update_microtask(tde);
             }
