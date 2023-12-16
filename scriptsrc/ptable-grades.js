@@ -56,7 +56,7 @@ function gdialog_section_click(event) {
 }
 
 
-function ptable_gdialog(ptconf, checked_spos, table) {
+export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
     let $gdialog, gdialog_su,
         gradesheet = ptconf.gradesheet,
         uid2tr = make_uid2tr(table.tBodies[0].firstChild);
@@ -521,7 +521,9 @@ function ptable_gdialog(ptconf, checked_spos, table) {
         hc.push('<button type="button" name="clearauto" class="btnl">Clear autogrades</button>');
         $gdialog = hc.show(false);
         $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
-        $gdialog.find("form").addClass("pa-psetinfo")[0].pa__gradesheet = ptconf.gradesheet;
+        const form = $gdialog.find("form")[0];
+        addClass(form, "pa-psetinfo");
+        form.pa__gradesheet = ptconf.gradesheet;
         gdialog_mode_values();
         $gdialog.on("click", ".pa-gdialog-section", gdialog_section_click);
         $gdialog.on("change blur", ".pa-gradevalue", gdialog_gradelist_change);
@@ -535,6 +537,10 @@ function ptable_gdialog(ptconf, checked_spos, table) {
         $gdialog.find("button.is-mode").on("click", gdialog_mode);
         $gdialog.find("button[name=prev], button[name=next]").prop("disabled", true).addClass("hidden");
         gdialog_fill(checked_spos);
+        if (hlgrade && form.elements[hlgrade]) {
+            addClass(form.elements[hlgrade], "want-focus");
+            addClass(form.elements[hlgrade], "want-select");
+        }
         hc.show();
     }
 

@@ -10,6 +10,7 @@ import { escape_entities } from "./encoders.js";
 import { GradeSheet } from "./gradeentry.js";
 import { popup_skeleton, popup_close } from "./popup.js";
 import { tooltip } from "./tooltip.js";
+import { ptable_gdialog } from "./ptable-grades.js";
 
 
 function render_name(s, last_first) {
@@ -461,6 +462,29 @@ function ptable_head_click(evt) {
     }
 }
 
+function ptable_body_click(evt) {
+    let tgt = evt.target;
+    while (tgt !== this && tgt.tagName !== "TD") {
+        tgt = tgt.parentElement;
+    }
+    if (tgt.tagName !== "TD") {
+        return;
+    }
+    let i = 0;
+    for (let td = tgt.parentElement.firstChild; td !== tgt; td = td.nextSibling) {
+        ++i;
+    }
+    const ptconf = tgt.closest("form").pa__ptconf,
+        ge = ptconf.col[i].ge,
+        tr = tgt.closest("tr");
+    if (ge
+        && !ge.readonly
+        && tr.hasAttribute("data-pa-spos")
+        && !evt.shiftKey
+        && !evt.ctrlKey) {
+        ptable_gdialog(ptconf, [+tr.getAttribute("data-pa-spos")], tgt.closest("table"), ge.key);
+    }
+}
 
 function ptable_body_scroller(ctrh) {
     return function () {
@@ -478,8 +502,7 @@ function ptable_track_header(table) {
     // find containers
     const ctr2 = table.closest(".gtable-container-2"),
         ctr1 = ctr2.parentElement,
-        ctr0 = ctr1.parentElement,
-        isleft = hasClass(table, "gtable-left-pin");
+        ctr0 = ctr1.parentElement;
     // create pinned header table
     const tctable = document.createElement("table");
     tctable.className = table.className;
@@ -1570,6 +1593,7 @@ function pa_render_pset_table(ptconf) {
     function events() {
         const f = table.closest("form");
         table.tBodies[0].addEventListener("pa-hotlist", make_hotlist);
+        table.tBodies[0].addEventListener("click", ptable_body_click);
         table.addEventListener("mouseenter", user_hover, true);
         table.addEventListener("mouseleave", user_hover, true);
         table.tHead.addEventListener("click", ptable_head_click);

@@ -2800,12 +2800,18 @@ th.gt-checkbox > input {
 	font-weight: bold;
 }
 .gt-user, .gt-username, .gt-name, .gt-grader,
-.gt-grade, .gt-ngrades, .gt-total,
+.gt-grade, .gt-rograde, .gt-ngrades, .gt-total,
 .gt-conversation, .gt-repo, .gt-pset, .gt-at, .gt-latehours {
 	padding-right: 0.75rem;
 }
-.gt-grade, .gt-total, .gt-ngrades {
+.gt-grade, .gt-rograde, .gt-total, .gt-ngrades {
 	font-variant-numeric: tabular-nums;
+}
+td.gt-grade {
+	cursor: default;
+}
+td.gt-grade:hover {
+	background-color: rgba(255, 255, 0, 0.2);
 }
 .gtrow-partner > .gt-username, .gtrow-partner > .gt-user {
 	padding-left: 1em;

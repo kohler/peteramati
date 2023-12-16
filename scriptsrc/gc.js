@@ -76,8 +76,12 @@ export const GradeClass = {
         col.justify = this.gc.justify || "right";
         col.sort_forward = this.gc.sort === "forward";
         const justify = this.gc.justify || "right";
-        col.className = (col.gkey === col.ptconf.total_key ? "gt-total" : "gt-grade") +
-            (justify === "left" ? " l" : " r");
+        if (col.gkey === col.ptconf.total_key) {
+            col.className = this.readonly ? "gt-total" : "gt-total gt-grade";
+        } else {
+            col.className = this.readonly ? "gt-rograde" : "gt-grade";
+        }
+        col.className += justify === "left" ? " l" : " r";
         if (this.table_color && color_map[this.table_color]) {
             col.className += " " + color_map[this.table_color];
         }
