@@ -277,3 +277,28 @@ export class HtmlCollector {
         return this.html;
     }
 }
+
+export function $e(tag, attr) {
+    var e = document.createElement(tag), i;
+    if (!attr) {
+        // nothing
+    } else if (typeof attr === "string") {
+        e.className = attr;
+    } else {
+        for (i in attr) {
+            if (attr[i] == null) {
+                // skip
+            } else if (typeof attr[i] === "boolean") {
+                e[i] = attr[i];
+            } else {
+                e.setAttribute(i, attr[i]);
+            }
+        }
+    }
+    for (i = 2; i < arguments.length; ++i) {
+        if (arguments[i] != null) {
+            e.append(arguments[i]);
+        }
+    }
+    return e;
+}

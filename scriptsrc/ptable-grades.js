@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { addClass, removeClass, toggleClass, HtmlCollector, input_differs, handle_ui } from "./ui.js";
+import { addClass, removeClass, toggleClass, $e, input_differs, handle_ui } from "./ui.js";
 import { hoturl } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
@@ -55,9 +55,19 @@ function gdialog_section_click(event) {
     }
 }
 
+function $checkbox(attr, ...label) {
+    return $e("label", "checki",
+        $e("span", "checkc", $e("input", attr)),
+        ...label);
+}
+
+function $save_action(name) {
+    return $e("div", "popup-actions", $e("button", {type: "button", "class": "btn btn-primary", name: name}, "Save"));
+}
+
 
 export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
-    let $gdialog, gdialog_su,
+    let $gdialog, form, gdialog_su,
         gradesheet = ptconf.gradesheet,
         uid2tr = make_uid2tr(table.tBodies[0].firstChild);
 
@@ -194,14 +204,19 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
                 gidx = ge.value_order_in(gradesheet),
                 sv = gdialog_su[0].grades[gidx],
                 opts = {reset: true, mixed: false};
-            for (let i = 1; i !== gdialog_su.length; ++i) {
-                let suv = gdialog_su[i].grades[gidx];
-                if (suv !== sv
-                    && !(suv == null && sv === "")
-                    && !(suv === "" && sv == null)) {
-                    sv = null;
-                    opts.mixed = true;
-                    break;
+            if (gdialog_su.length === 1) {
+                opts.gradesheet = gdialog_su[0];
+                opts.autograde = ge.autovalue_in(gdialog_su[0]);
+            } else {
+                for (let i = 1; i !== gdialog_su.length; ++i) {
+                    let suv = gdialog_su[i].grades[gidx];
+                    if (suv !== sv
+                        && !(suv == null && sv === "")
+                        && !(suv === "" && sv == null)) {
+                        sv = null;
+                        opts.mixed = true;
+                        break;
+                    }
                 }
             }
             ge.update_at(this, sv, opts);
@@ -253,11 +268,11 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
         }
         $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         gl.classList.remove("hidden");
-        $gdialog.find("button[name=bsubmit]").text("Save").removeClass("hidden");
+        removeClass(form.elements.bsubmit, "hidden");
+        removeClass(form.elements.clearauto, "hidden");
     }
     function gdialog_settings_submit() {
         const gs = $gdialog.find(".pa-gdialog-settings")[0],
-            f = gs.closest("form"),
             us = {};
         for (let su of gdialog_su) {
             us[su.uid] = {uid: su.uid};
@@ -272,12 +287,12 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
                 us[su.uid].scores_visible = gvisarg;
             }
         } else if (this.name === "save-grader"
-                   && f.elements.gradertype.value === "clear") {
+                   && form.elements.gradertype.value === "clear") {
             for (let su of gdialog_su) {
                 us[su.uid].gradercid = 0;
             }
         } else if (this.name === "save-grader"
-                   && f.elements.gradertype.value === "previous") {
+                   && form.elements.gradertype.value === "previous") {
             for (let su of gdialog_su) {
                 us[su.uid].gradercid = "previous";
             }
@@ -310,14 +325,14 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
                 }
             }
         } else if (this.name === "save-repo") {
-            const clearrepo = f.elements.clearrepo.checked,
-                adoptoldrepo = f.elements.adoptoldrepo.checked;
+            const clearrepo = form.elements.clearrepo.checked,
+                adoptoldrepo = form.elements.adoptoldrepo.checked;
             for (let su of gdialog_su) {
                 clearrepo && (us[su.uid].clearrepo = true);
                 adoptoldrepo && (us[su.uid].adoptoldrepo = true);
             }
         } else if (this.name === "save-dropped") {
-            const l = f.querySelectorAll(".pa-dropped:checked");
+            const l = form.querySelectorAll(".pa-dropped:checked");
             if (l.length !== 1) {
                 return;
             }
@@ -389,46 +404,44 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
     function gdialog_mode_settings() {
         const gs = $gdialog.find(".pa-gdialog-settings")[0], f = gs.closest("form");
         if (!gs.firstChild) {
-            const yc = new HtmlCollector;
-            yc.push('<fieldset><legend>Grade visibility</legend><div class="multicol-3">', '</fieldset>');
-            yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="true" class="uic pa-gvis"></span>Visible</label>');
-            yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="false" class="uic pa-gvis"></span>Hidden</label>');
-            yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="gvis" value="null" class="uic pa-gvis"></span>Default (' + (ptconf.scores_visible ? 'visible' : 'hidden') + ')</label>');
-            yc.push('</div><div class="popup-actions"><button type="button" class="btn btn-primary" name="save-gvis">Save</button></div>');
-            yc.pop();
+            const itype = gdialog_su.length === 1 ? "radio" : "checkbox";
+            gs.append($e("fieldset", null,
+                $e("legend", null, "Grade visibility"),
+                $e("div", "multicol-3",
+                    $checkbox({name: "gvis", value: "true", type: itype, "class": "uic pa-gvis"}, "Visible"),
+                    $checkbox({name: "gvis", value: "false", type: itype, "class": "uic pa-gvis"}, "Hidden"),
+                    $checkbox({name: "gvis", value: "null", type: itype, "class": "uic pa-gvis"}, "Default (" + (ptconf.scores_visible ? "visible" : "hidden") + ")")),
+                $save_action("save-gvis")));
 
-            yc.push('<fieldset class="mt-3"><legend>Grader</legend>', '</fieldset>');
-            yc.push('<label class="checki"><span class="checkc"><input type="radio" name="gradertype" value="clear" class="uic"></span>Clear</label>');
-            //yc.push('<label class="checki"><span class="checkc"><input type="radio" name="gradertype" value="previous" class="uic"></span>Adopt from previous problem set</label>');
-            yc.push('<label class="checki"><span class="checkc"><input type="radio" name="gradertype" value="set" class="uic"></span>Set grader</label>');
-            yc.push('<div class="checki mt-1 multicol-3">', '</div>');
+            const gradertable = $e("div", "checki mt-1 multicol-3");
             for (let i = 0; i !== siteinfo.pc.__order__.length; ++i) {
                 const cid = siteinfo.pc.__order__[i], pc = siteinfo.pc[cid];
-                yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="grader'.concat(cid, '" class="uic js-range-click pa-grader" data-range-type="grader"></span>', escape_entities(pc.name), '<span class="ct small dim"></span></label>'));
+                gradertable.append($checkbox({name: "grader" + cid, value: "1", type: "checkbox", "class": "uic js-range-click pa-grader", "data-range-type": "grader"}, pc.name, $e("span", "ct small dim")));
             }
-            yc.pop();
-            yc.push('<div class="popup-actions"><button type="button" class="btn btn-primary" name="save-grader">Save</button></div>');
-            yc.pop();
+            gs.append($e("fieldset", "mt-3",
+                $e("legend", null, "Grader"),
+                $checkbox({name: "gradertype", value: "clear", type: "radio", "class": "uic"}, "Clear"),
+                $checkbox({name: "gradertype", value: "set", type: "radio", "class": "uic"}, "Set grader"),
+                gradertable,
+                $save_action("save-grader")));
 
             if (!ptconf.gitless) {
-                yc.push('<fieldset class="mt-3"><legend>Repository</legend>', '</fieldset>');
-                yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="clearrepo" value="1" class="uic"></span>Clear repository</label>');
-                if (ptconf.has_older_repo) {
-                    yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="adoptoldrepo" value="1" class="uic"></span>Adopt previous repository</label>');
-                }
-                yc.push('<div class="popup-actions"><button type="button" class="btn btn-primary" name="save-repo">Save</button></div>');
-                yc.pop();
+                gs.append($e("fieldset", "mt-3",
+                    $e("legend", null, "Repository"),
+                    $checkbox({name: "clearrepo", value: 1, type: "checkbox", "class": "uic"}, "Clear repository"),
+                    ptconf.has_older_repo ? $checkbox({name: "adoptoldrepo", value: 1, type: "checkbox", "class": "uic"}, "Adopt previous repository") : null,
+                    $save_action("save-repo")));
             }
 
             if (siteinfo.user.is_admin) {
-                yc.push('<fieldset class="mt-3"><legend>Enrollment</legend><div class="multicol-2">', '</fieldset>');
-                yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="dropped" value="false" class="uic pa-dropped"></span>Enrolled</label>');
-                yc.push('<label class="checki"><span class="checkc"><input type="checkbox" name="dropped" value="true" class="uic pa-dropped"></span>Dropped</label>');
-                yc.push('</div><div class="popup-actions"><button type="button" class="btn btn-primary" name="save-dropped">Save</button></div>');
-                yc.pop();
+                gs.append($e("fieldset", "mt-3",
+                    $e("legend", null, "Enrollment"),
+                    $e("div", "multicol-2",
+                        $checkbox({name: "dropped", value: "false", type: itype, "class": "uic pa-dropped"}, "Enrolled"),
+                        $checkbox({name: "dropped", value: "true", type: itype, "class": "uic pa-dropped"}, "Dropped")),
+                    $save_action("save-dropped")));
             }
 
-            gs.innerHTML = yc.render();
             $(gs).on("click", "button", gdialog_settings_submit);
             $(gs).on("click", ".pa-grader", gdialog_settings_grader_click);
             $(gs).on("click", ".pa-gvis", gdialog_settings_gvis_click);
@@ -488,7 +501,8 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
 
         $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         gs.classList.remove("hidden");
-        $gdialog.find("button[name=bsubmit]").addClass("hidden");
+        addClass(form.elements.bsubmit, "hidden");
+        addClass(form.elements.clearauto, "hidden");
     }
     function gdialog_mode() {
         $gdialog.find(".nav-pills button").removeClass("btn-primary");
@@ -521,7 +535,7 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
         hc.push('<button type="button" name="clearauto" class="btnl">Clear autogrades</button>');
         $gdialog = hc.show(false);
         $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
-        const form = $gdialog.find("form")[0];
+        form = $gdialog.find("form")[0];
         addClass(form, "pa-psetinfo");
         form.pa__gradesheet = ptconf.gradesheet;
         gdialog_mode_values();
