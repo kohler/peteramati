@@ -22,9 +22,7 @@ function make_uid2tr(tr) {
 }
 
 function grade_update(ptconf, uid2tr, rv, refreshflags) {
-    const tr = uid2tr[rv.uid],
-        su = ptconf.smap[tr.getAttribute("data-pa-spos")];
-    su.assign(rv);
+    const tr = uid2tr[rv.uid], su = ptconf.assign_user(rv);
     let ngrades = 0;
     for (let gv of su.grades || []) {
         if (gv != null && gv !== "")

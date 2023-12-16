@@ -2811,7 +2811,15 @@ td.gt-grade {
 	cursor: default;
 }
 td.gt-grade:hover {
-	background-color: rgba(255, 255, 0, 0.2);
+	outline: rgba(0, 77, 170, 0.3) auto 2px;
+}
+.gt-grade.update, .gt-rograde.update {
+	transition: none;
+	background-color: yellow;
+}
+.gt-grade, .gt-rograde {
+	transition: background-color 3s ease-out;
+	background-color: transparent;
 }
 .gtrow-partner > .gt-username, .gtrow-partner > .gt-user {
 	padding-left: 1em;

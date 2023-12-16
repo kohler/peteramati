@@ -329,6 +329,20 @@ class PtableConf {
         }
     }
 
+    assign_user(s) {
+        const su = this.uidmap[s.uid];
+        if (su.grades && s.grades) {
+            su._gdiff = [];
+            for (let i = 0; i !== s.grades.length; ++i) {
+                su._gdiff.push(s.grades[i] !== su.grades[i]);
+            }
+        } else if (su._gdiff) {
+            su._gdiff = null;
+        }
+        su.assign(s);
+        return su;
+    }
+
     user_row_checkbox(tr) {
         const overlay = hasClass(tr.parentElement.parentElement, "gtable-left-pin"),
             cbidx = this.colmap.checkbox[overlay ? "pin_index" : "index"];
@@ -583,6 +597,23 @@ function ptable_thead(cols, ptconf, tfixed) {
     const thead = document.createElement("thead");
     thead.append(tr);
     return thead;
+}
+
+let queue_update_microtask_scheduled = 0, queue_update_microtask_tds = [];
+
+function update_microtask() {
+    queue_update_microtask_scheduled = 0;
+    for (const td of queue_update_microtask_tds) {
+        removeClass(td, "update");
+    }
+    queue_update_microtask_tds = [];
+}
+
+function queue_update_microtask(td) {
+    if (++queue_update_microtask_scheduled === 1) {
+        setTimeout(update_microtask, 0);
+    }
+    queue_update_microtask_tds.push(td);
 }
 
 
@@ -938,6 +969,10 @@ const gcoldef = {
                 && s.autogrades[this.gidx] != null
                 && s.autogrades[this.gidx] !== gr) {
                 tde.className += " gt-highlight";
+            }
+            if (s._gdiff && s._gdiff[this.gidx]) {
+                tde.className += " update";
+                queue_update_microtask(tde);
             }
             tde.replaceChildren(this.ge.tcell(gr));
         },
