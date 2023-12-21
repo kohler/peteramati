@@ -274,7 +274,7 @@ class RunRequest {
             if (empty($users) && ($this->qreq->slist ?? $this->qreq->users)) {
                 $users = preg_split('/\s+/', $this->qreq->slist ?? $this->qreq->users, -1, PREG_SPLIT_NO_EMPTY);
             }
-            $nu = 0;
+            $runorder = QueueItem::unscheduled_runorder();
             $chain = QueueItem::new_chain();
             foreach ($users as $uname) {
                 if (($u = $this->conf->user_by_whatever($uname))) {
@@ -282,13 +282,13 @@ class RunRequest {
                     if (!$this->runner->command || $info->repo) {
                         $qi = QueueItem::make_info($info, $this->runner);
                         $qi->chain = $chain;
-                        $qi->runorder = QueueItem::unscheduled_runorder($nu * 10);
+                        $qi->runorder = $runorder;
                         $qi->flags |= QueueItem::FLAG_UNWATCHED;
                         if ($this->if_needed) {
                             $qi->ifneeded = 1;
                         }
                         $qi->enqueue();
-                        ++$nu;
+                        $runorder += 10;
                     }
                 }
             }

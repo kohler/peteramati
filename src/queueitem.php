@@ -481,10 +481,9 @@ class QueueItem {
         return null;
     }
 
-    /** @param int $delta
-     * @return int */
-    static function unscheduled_runorder($delta = 0) {
-        return Conf::$now + $delta + 1000000000;
+    /** @return int */
+    static function unscheduled_runorder() {
+        return Conf::$now + 1000000000;
     }
 
 

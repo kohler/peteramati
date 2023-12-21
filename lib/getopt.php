@@ -69,7 +69,7 @@ class Getopt {
                 continue;
             }
             // Format of a `long` string:
-            // "option[,option,option] ['{'ARGTYPE'}'] ['='ARGNAME] HELPSTRING"
+            // "option[,option,option] ['{'ARGTYPE'}'] ['='ARGNAME] [!SUBCOMMAND] HELPSTRING"
             // Each `option` can be followed by:
             // * `:` - single mandatory argument
             // * `::` - single optional argument
@@ -223,7 +223,10 @@ class Getopt {
                     $comma = $space;
                 }
                 $on = substr($sc, 0, $comma);
-                $s[] = self::format_help_line("  {$on}", ltrim(substr($sc, $space)));
+                $desc = ltrim(substr($sc, $space));
+                if ($desc !== "!") {
+                    $s[] = self::format_help_line("  {$on}", $desc);
+                }
             }
             $s[] = "\n";
         }
