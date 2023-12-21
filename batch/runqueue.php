@@ -8,7 +8,6 @@ if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     CommandLineException::$default_exit_status = 2;
 }
 
-
 class RunQueue_Batch {
     /** @var Conf */
     public $conf;
@@ -500,7 +499,7 @@ class RunQueue_Batch {
         )->helpopt("help")
          ->subcommand(
             "list Print queue (default)",
-            "add Add jobs to queue",
+            "add Add jobs to queue (`add --help` for more)",
             "once Execute queue once",
             "complete Execute queue to completion",
             "clean Clean queue",
@@ -806,7 +805,6 @@ class RunEnqueue_Batch {
         return $self;
     }
 }
-
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     exit(RunQueue_Batch::make_args(Conf::$main, $argv)->run());
