@@ -31,7 +31,7 @@ function make_multicheckbox(mark) {
         mount_edit: function (elt, id) {
             const chhidden = document.createElement("input");
             chhidden.type = "hidden";
-            chhidden.className = "uich pa-gradevalue";
+            chhidden.className = "uich pa-gradevalue pa-fresh";
             chhidden.name = this.key;
             const chsp = document.createElement("span");
             chsp.className = "pa-gradewidth";

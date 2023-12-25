@@ -28,14 +28,14 @@ export const GradeClass = {
         let e;
         if (window.$pa.long_page) {
             e = document.createElement("textarea");
-            e.className = "ta1 uich pa-gradevalue pa-gradewidth";
+            e.className = "ta1 uich uii pa-gradevalue pa-gradewidth pa-fresh";
             e.setAttribute("rows", 1);
             e.setAttribute("cols", 10000);
             e.setAttribute("wrap", "none");
         } else {
             e = document.createElement("input");
             e.type = "text";
-            e.className = "uich pa-gradevalue pa-gradewidth";
+            e.className = "uich uii pa-gradevalue pa-gradewidth pa-fresh";
         }
         e.name = this.key;
         e.id = id;
@@ -181,7 +181,7 @@ GradeClass.add("text", {
     mount_edit: function (elt, id) {
         addClass(elt, "pa-textv");
         const ta = document.createElement("textarea");
-        ta.className = "uich pa-gradevalue need-autogrow";
+        ta.className = "uich uii pa-gradevalue need-autogrow pa-fresh";
         ta.name = this.key;
         ta.id = id;
         ta.disabled = this.disabled;
@@ -199,7 +199,7 @@ GradeClass.add("shorttext", {
     },
     mount_edit: function (elt, id) {
         const ta = document.createElement("textarea");
-        ta.className = "uich pa-gradevalue need-autogrow";
+        ta.className = "uich uii pa-gradevalue need-autogrow pa-fresh";
         ta.setAttribute("rows", 1);
         ta.name = this.key;
         ta.id = id;

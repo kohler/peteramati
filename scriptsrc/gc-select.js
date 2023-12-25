@@ -9,7 +9,7 @@ import { input_set_default_value } from "./ui.js";
 GradeClass.add("select", {
     mount_edit: function (elt, id) {
         const sel = document.createElement("select");
-        sel.className = "uich pa-gradevalue";
+        sel.className = "uich pa-gradevalue pa-fresh";
         sel.name = this.key;
         sel.id = id;
         sel.disabled = this.disabled;

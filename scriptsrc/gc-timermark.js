@@ -133,7 +133,7 @@ GradeClass.add("timermark", {
         sp.className = "pa-timermark-result hidden";
         const gv = document.createElement("input");
         gv.type = "hidden";
-        gv.className = "uich pa-gradevalue";
+        gv.className = "uich pa-gradevalue pa-fresh";
         gv.name = this.key;
         fr.append(sp, gv);
         return fr;

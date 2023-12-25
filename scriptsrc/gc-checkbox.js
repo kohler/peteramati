@@ -4,7 +4,7 @@
 
 import { GradeClass } from "./gc.js";
 import { GradeEntry } from "./gradeentry.js";
-import { hasClass, handle_ui } from "./ui.js";
+import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 
 
 GradeClass.add("checkbox", {
@@ -30,7 +30,7 @@ GradeClass.add("checkbox", {
     mount_edit: function (elt, id) {
         const ch = document.createElement("input");
         ch.type = "checkbox";
-        ch.className = "uic uich pa-gradevalue ml-0";
+        ch.className = "uic uich pa-gradevalue ml-0 pa-fresh";
         ch.name = this.key;
         ch.id = id;
         ch.value = this.max;
@@ -65,7 +65,10 @@ export class Checkbox_GradeClass {
             element.value = element.checked ? ge.max : "";
         }
         element.type = "text";
-        element.className = (hasClass(element, "uich") ? "uich " : "") + "pa-gradevalue pa-gradewidth";
+        removeClass(element, "ml-0");
+        addClass(element, "pa-gradewidth");
+        removeClass(element, "uic");
+        hasClass(element, "uich") && addClass(element, "uii");
         const container = element.closest(".pa-pv");
         $(container).find(".pa-grade-uncheckbox").remove();
         $(container).find("input[name^=\"" + element.name + ":\"]").addClass("hidden");
@@ -75,15 +78,18 @@ export class Checkbox_GradeClass {
         element.type = "checkbox";
         element.checked = v !== "" && v !== "0";
         element.value = ge.max;
-        element.className = (hasClass(element, "uich") ? "uic uich " : "") + "pa-gradevalue ml-0";
+        addClass(element, "ml-0");
+        removeClass(element, "pa-gradewidth");
+        removeClass(element, "uii");
+        hasClass(element, "uich") && addClass(element, "uic");
         $(element.closest(".pa-pv")).find(".pa-gradedesc").append(' <button type="button" class="qo ui pa-grade-uncheckbox" tabindex="-1">#</button>');
     }
     static finish_mount_edit(ge, chsp) {
         const sp = document.createElement("span");
         sp.className = "pa-gradedesc";
-        const a = document.createElement("a");
-        a.href = "";
-        a.className = "x ui pa-grade-uncheckbox";
+        const a = document.createElement("button");
+        a.type = "button";
+        a.className = "link x ui pa-grade-uncheckbox";
         a.tabIndex = -1;
         a.append("#");
         sp.append("of " + ge.max + " ", a);

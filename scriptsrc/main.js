@@ -5,7 +5,7 @@
 import { sprintf, strftime, text_eq } from "./utils.js";
 import {
     hasClass, addClass, removeClass, toggleClass, classList,
-    handle_ui
+    handle_ui, $e
     } from "./ui.js";
 import { event_key } from "./ui-key.js";
 import "./ui-autogrow.js";
@@ -327,12 +327,37 @@ handle_ui.on("pa-signin-radio", function () {
 });
 
 
+// SAVE FLOW
+// * Every form containing unsaved grades has `.pa-dirty`
+// * Every psetinfo containing unsaved grades is included in `gv_dirtypi`
+//
+// When a grade entry changes:
+// * Mark the form with `.pa-dirty`, add the psetinfo to `gv_dirtypi`
+// * Soon, call `api_conditioner.then(gv_save_some)`
+// * That dequeues a psetinfo.
+//   * If psetinfo has `.pa-outstanding`, requeue it.
+//   * Otherwise:
+//     * Mark psetinfo as `.pa-outstanding`
+//     * Collect all changed grades, removing `.pa-dirty`
+//     * Save the grades
+//     * On response, remove `.pa-outstanding`
+
+let gv_dirtypi = [], gv_save_queued = false;
+
+handle_ui.on("input.pa-gradevalue", function () {
+    const f = this.form;
+    if (f && hasClass(f, "pa-pv") && !hasClass(f, "pa-dirty")) {
+        gv_save_after(f, 8000);
+    }
+});
+
 handle_ui.on("change.pa-gradevalue", function () {
-    var f = this.form, ge, self = this;
+    const f = this.form;
+    let ge;
     if (f && hasClass(f, "pa-pv")) {
-        $(f).submit();
-    } else if (self.type === "hidden" && (ge = GradeEntry.closest(self))) {
-        queueMicrotask(function () { ge.gc.update_edit.call(ge, self, +self.value, {}) });
+        gv_save_after(f, 0);
+    } else if (this.type === "hidden" && (ge = GradeEntry.closest(this))) {
+        queueMicrotask(() => { ge.gc.update_edit.call(ge, this, +this.value, {}); });
     }
 });
 
@@ -342,67 +367,121 @@ handle_ui.on("click.pa-gradevalue", function () {
     }
 });
 
+handle_ui.on("pa-pv", function (event) {
+    event.preventDefault();
+    gv_save_after(this, 0);
+});
 
-function save_grade(self) {
-    addClass(self, "pa-saving");
-    var p = $(self).data("paOutstandingPromise");
-    if (p) {
-        p.then(save_grade, reject_save_grade);
+function gv_save_after(f, t) {
+    if (t > 0 && !hasClass(f, "pa-dirty")) {
+        setTimeout(gv_mark_changed, t);
+    }
+    addClass(f, "pa-dirty");
+    const pi = f.closest(".pa-psetinfo");
+    if (gv_dirtypi.indexOf(pi) < 0) {
+        gv_dirtypi.push(pi);
+    }
+    if (t === 0) {
+        gv_add_spinner(f);
+        gv_mark_changed();
+    }
+}
+
+function gv_add_spinner(f) {
+    let sm = f.querySelector(".pa-save-message");
+    sm || f.appendChild((sm = $e("span", "pa-save-message compact")));
+    sm.className = "pa-save-message compact";
+    sm.replaceChildren($e("span", "spinner"));
+}
+
+function gv_mark_changed() {
+    if (gv_dirtypi.length > 0 && !gv_save_queued) {
+        gv_save_queued = true;
+        api_conditioner.then(gv_save_some);
+    }
+}
+
+function gv_save_some() {
+    gv_save_queued = false;
+    const pi = gv_dirtypi[0];
+    if (!pi) {
+        api_conditioner.done();
+        return;
+    } else if (hasClass(pi, "pa-outstanding")) {
+        api_conditioner.retry(gv_save_some);
         return;
     }
+    gv_dirtypi.shift();
 
-    var $f = $(self);
-    $f.find(".pa-gradediffers, .pa-save-message").remove();
-    $f.append('<span class="pa-save-message compact"><span class="spinner"></span></span>');
-
-    var gi = GradeSheet.closest(self), g = {}, og = {};
-    $f.find("input.pa-gradevalue, textarea.pa-gradevalue, select.pa-gradevalue").each(function () {
-        let ge = gi.xentry(this.name), gv;
-        if (ge && (gv = ge.value_in(gi)) != null) {
-            og[this.name] = gv;
+    const g = {}, og = {}, gi = GradeSheet.closest(pi), fs = [];
+    $(pi).find(".pa-dirty .pa-gradevalue").each(function () {
+        if (this.tagName !== "INPUT" && this.tagName !== "TEXTAREA" && this.tagName !== "SELECT") {
+            return;
         }
+        const ge = gi.xentry(this.name),
+            ov = ge ? ge.value_in(gi) : null;
+        let nv;
         if ((this.type !== "checkbox" && this.type !== "radio")
             || this.checked) {
-            g[this.name] = this.value;
+            nv = this.value;
         } else if (this.type === "checkbox") {
-            g[this.name] = 0;
+            nv = 0;
+        }
+        if (nv != null && (ov == null || nv != ov)) {
+            ov == null || (og[this.name] = ov);
+            g[this.name] = nv;
+            if (fs.indexOf(this.form) < 0) {
+                fs.push(this.form);
+            }
         }
     });
 
-    $f.data("paOutstandingPromise", new Promise(function (resolve, reject) {
-        api_conditioner(hoturl("=api/grade", {psetinfo: $f[0]}),
-            {grades: g, oldgrades: og})
-        .then(function (data) {
-            var e, $sm = $f.find(".pa-save-message");
-            $f.removeData("paOutstandingPromise");
-            reject_save_grade(self);
-            if (data.ok) {
-                if (data.answer_timeout
-                    && (e = self.closest(".pa-grade"))
-                    && hasClass(e, "pa-ans")) {
-                    $sm.remove();
-                    $sm = $('<div class="pa-save-message"><strong class="err">Your exam period has closed.</strong> Your change was saved anyway, but the version used for grading will be selected from within the exam window.</div>').appendTo($f);
-                } else {
-                    $sm.addClass("compact fadeout").html('<span class="savesuccess"></span>');
+    $(pi).find(".pa-dirty .pa-save-message.compact").remove();
+    $(pi).find(".pa-dirty").removeClass("pa-dirty");
+
+    if (fs.length === 0) {
+        api_conditioner.done();
+    } else {
+        addClass(pi, "pa-outstanding");
+        for (const f of fs) {
+            gv_add_spinner(f);
+        }
+        $.ajax(hoturl("=api/grade", {psetinfo: pi}), {
+            data: {grades: g, oldgrades: og},
+            method: "POST", cache: false, dataType: "json",
+            success: function (data) {
+                for (const f of fs) {
+                    gv_resolve_change(f, data);
                 }
-                GradeSheet.store(self.closest(".pa-psetinfo"), data);
-                resolve(self);
-            } else {
-                $sm.removeClass("compact").html('<strong class="err">' + data.error + '</strong>');
-                reject(self);
+                removeClass(pi, "pa-outstanding");
+                data.ok && GradeSheet.store(pi, data);
+                api_conditioner.done();
             }
         });
-    }));
+    }
+
+    gv_mark_changed();
 }
 
-function reject_save_grade(self) {
-    removeClass(self, "pa-saving");
+function gv_resolve_change(f, data) {
+    const sm = f.querySelector(".pa-save-message");
+    let ge;
+    if (data.ok) {
+        if (data.answer_timeout
+            && (ge = f.closest(".pa-grade"))
+            && hasClass(ge, "pa-ans")) {
+            removeClass(sm, "compact");
+            sm.replaceChildren($e("strong", "err", "Your exam period has closed."), " Your change was saved anyway, but the version used for grading will be selected from within the exam window.");
+        } else {
+            addClass(sm, "compact");
+            addClass(sm, "fadeout");
+            sm.replaceChildren($e("span", "savesuccess"));
+        }
+    } else {
+        removeClass(sm, "compact"),
+        sm.replaceChildren($e("strong", "err", data.error));
+    }
 }
-
-handle_ui.on("pa-pv", function (event) {
-    event.preventDefault();
-    save_grade(this);
-});
 
 
 function pa_resolve_grade() {
@@ -419,11 +498,11 @@ function pa_resolve_grade() {
         }
         if (this.hasAttribute("data-pa-landmark-buttons")) {
             const lb = JSON.parse(this.getAttribute("data-pa-landmark-buttons"));
-            for (let i = 0; i !== lb.length; ++i) {
-                if (typeof lb[i] === "string") {
-                    $(e).find(".pa-pv").append(lb[i]);
-                } else if (lb[i].className) {
-                    $(e).find(".pa-pv").append('<button type="button" class="btn uic uikd pa-grade-button" data-pa-grade-button="' + lb[i].className + '">' + lb[i].title + '</button>');
+            for (const lbb of lb) {
+                if (typeof lbb === "string") {
+                    $(e).find(".pa-pv").append(lbb);
+                } else if (lbb.className) {
+                    $(e).find(".pa-pv").append($e("button", {type: "button", "class": "uic uikd pa-grade-button", "data-pa-grade-button": lbb.className}, lbb.title));
                 }
             }
         }
@@ -930,10 +1009,9 @@ handle_ui.on("pa-notes-grade", function (event) {
             }
         }
     } else if (event.type === "click") {
-        var $gv = $(this).closest(".pa-grade").find(".pa-gradevalue");
-        if ($gv.length
-            && $gv.val() != $gv.attr("data-pa-notes-grade")) {
-            $gv.val($gv.attr("data-pa-notes-grade")).change();
+        const gv = this.closest(".pa-grade").querySelector(".pa-gradevalue");
+        if (gv && gv.value != gv.getAttribute("data-pa-notes-grade")) {
+            $(gv).val(gv.getAttribute("data-pa-notes-grade")).change();
         }
         event.preventDefault();
     }

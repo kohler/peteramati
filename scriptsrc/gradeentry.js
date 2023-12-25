@@ -187,23 +187,8 @@ export class GradeEntry {
     }
 
     update_edit(pde, v, opts) {
-        const $pde = $(pde),
-            ve = pde.querySelector(".pa-gradevalue"),
+        const ve = pde.querySelector(".pa-gradevalue"),
             vt = this.simple_text(v);
-
-        // check whether to skip update
-        if (hasClass(pde, "pa-saving")) {
-            return;
-        } else if (ve
-                   && ve.type !== "hidden"
-                   && ve.matches(":focus")) {
-            if (!hasClass(ve, "pa-resetgrade")
-                && vt !== input_default_value(ve)) {
-                addClass(ve, "pa-resetgrade");
-                ve.addEventListener("blur", pa_resetgrade, false);
-            }
-            return;
-        }
 
         // “grade is above max” message
         if (this.max) {
@@ -219,32 +204,44 @@ export class GradeEntry {
         }
 
         // “autograde differs” message
+        let gd = pde.querySelector(".pa-gradediffers");
         if (opts.autograde == null || v === opts.autograde) {
-            $pde.find(".pa-gradediffers").remove();
+            gd && gd.remove();
         } else {
             const txt = (this.key === "late_hours" ? "auto-late hours" : "autograde") +
                 " is " + this.text(opts.autograde);
-            if (!$pde.find(".pa-gradediffers").length) {
-                $pde.append('<span class="pa-gradediffers"></span>');
+            if (!gd) {
+                pde.appendChild((gd = $e("span", "pa-gradediffers")));
             }
-            const $ag = $pde.find(".pa-gradediffers");
-            if ($ag.text() !== txt) {
-                $ag.text(txt);
+            if (gd.textContent !== txt) {
+                gd.textContent = txt;
             }
         }
 
-        // grade value
-        if (opts.reset || !ve || input_default_value(ve) !== vt) {
+        // do not update if user has edited
+        if (hasClass(pde, "pa-dirty")) {
+            return;
+        }
+
+        // update on blur if element is focused
+        if (ve && ve.type !== "hidden" && ve.matches(":focus")) {
+            if (!hasClass(ve, "pa-resetgrade")
+                && vt !== input_default_value(ve)) {
+                addClass(ve, "pa-resetgrade");
+                ve.addEventListener("blur", pa_resetgrade, false);
+            }
+            return;
+        }
+
+        // grade value: update value if reset or fresh;
+        // update default value always
+        const fresh = ve && hasClass(ve, "pa-fresh"),
+            reset = opts.reset || fresh;
+        if (reset || !ve) {
             this.gc.update_edit.call(this, pde, v, opts);
         }
-
-        // reset, tabIndex
-        if (ve && opts.reset) {
+        if (ve) {
             input_set_default_value(ve, vt);
-        }
-        if (ve && opts.sidebar) {
-            ve.tabIndex = -1;
-            ve.classList.add("uikd", "pa-sidebar-tab");
         }
 
         // landmark
@@ -252,7 +249,14 @@ export class GradeEntry {
             this.update_landmark(pde);
         }
 
-        // finally grow
+        // UI: sidebar tabbing, autogrow
+        if (ve && opts.sidebar) {
+            ve.tabIndex = -1;
+            ve.classList.add("uikd", "pa-sidebar-tab");
+        }
+        if (fresh) {
+            removeClass(ve, "pa-fresh");
+        }
         $(pde).find("input, textarea").autogrow();
     }
 
@@ -295,23 +299,24 @@ export class GradeEntry {
     }
 
     update_landmark(pde) {
-        let gl = pde.closest(".pa-gradelist");
-        if (gl && hasClass(gl, "want-landmark-links")) {
-            let want_gbr = "";
-            const m = /^(.*):(\d+)$/.exec(this.landmark);
-            if (m && Filediff.by_file(m[1])) {
-                const pi = pde.closest(".pa-psetinfo"),
-                    directory = pi.getAttribute("data-pa-directory") || "",
-                    filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
-                want_gbr = '@<a href="#La'.concat(m[2], 'F', html_id_encode(m[1]), '">', escape_entities(filename), ":", m[2], '</a>');
-            }
-            const $pgbr = $(pde).find(".pa-gradeboxref");
-            if (want_gbr === "") {
-                $pgbr.remove();
-            } else if (!$pgbr.length || $pgbr.html() !== want_gbr) {
-                $pgbr.remove();
-                $(pde).append('<span class="pa-gradeboxref">' + want_gbr + '</span>');
-            }
+        const gl = pde.closest(".pa-gradelist");
+        if (!gl || !hasClass(gl, "want-landmark-links")) {
+            return;
+        }
+        let pgbr = pde.querySelector(".pa-gradeboxref");
+        if (this.landmark ? pgbr && pgbr.getAttribute("data-landmark") === this.landmark : !pgbr) {
+            return;
+        }
+        const m = /^(.*):(\d+)$/.exec(this.landmark);
+        if (m && Filediff.by_file(m[1])) {
+            const pi = pde.closest(".pa-psetinfo"),
+                directory = pi.getAttribute("data-pa-directory") || "",
+                filename = m[1].startsWith(directory) ? m[1].substring(directory.length) : m[1];
+            pgbr || pde.append((pgbr = $e("span", "pa-gradeboxref")));
+            pgbr.setAttribute("data-landmark", this.landmark);
+            pgbr.replaceChildren("@", $e("a", {href: "#La".concat(m[2], "F", html_id_encode(m[1]))}, filename + ":" + m[2]));
+        } else {
+            pgbr && pgbr.remove();
         }
     }
 
@@ -415,7 +420,7 @@ export class GradeEntry {
     save_landmark_grade(t) {
         const sum = this.landmark_grade(t);
 
-        const gv = $(t).find(".pa-gradevalue")[0];
+        const gv = t.querySelector(".pa-gradevalue");
         if (gv) {
             const sumstr = sum === null ? "" : "" + sum,
                 gval = $(gv).val();

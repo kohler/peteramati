@@ -165,17 +165,39 @@ export function api_conditioner(url, data, method) {
         method = {method: method};
     }
     return new Promise(function (resolve) {
-        function process() {
-            ++cond_out;
+        api_conditioner.then(function () {
             $.ajax(url, Object.assign({
                 data: data, method: "POST", cache: false, dataType: "json",
                 success: function (data) {
                     resolve(data);
-                    --cond_out;
-                    cond_waiting.length && cond_waiting.shift()();
+                    api_conditioner.done();
                 }
             }, method || {}));
-        }
-        cond_out < 5 ? process() : cond_waiting.push(process);
+        });
     });
 }
+
+api_conditioner.then = function (f) {
+    // call `f` when ready. `f` must call `api_conditioner.done()` when done
+    if (cond_out < 5) {
+        ++cond_out;
+        f();
+    } else {
+        cond_waiting.push(f);
+    }
+};
+
+api_conditioner.done = function () {
+    --cond_out;
+    if (cond_waiting.length) {
+        cond_waiting.shift()();
+    }
+};
+
+api_conditioner.retry = function (f) {
+    if (cond_out <= 1) {
+        throw new Error("api_conditioner.after called with nothing outstanding");
+    }
+    --cond_out;
+    cond_waiting.push(f);
+};

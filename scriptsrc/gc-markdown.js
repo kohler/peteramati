@@ -38,7 +38,7 @@ GradeClass.add("markdown", {
         descp.className = "pa-preview-notice";
         descp.append(descspan, desclink);
         const ta = document.createElement("textarea");
-        ta.className = "uich pa-gradevalue need-autogrow";
+        ta.className = "uich uii pa-gradevalue need-autogrow pa-fresh";
         ta.name = this.key;
         ta.id = id;
         ta.disabled = this.disabled;
