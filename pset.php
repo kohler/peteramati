@@ -403,8 +403,8 @@ class PsetRequest {
         if (is_string($this->qreq->gg)) {
             echo '" data-pa-gg-type="', htmlspecialchars($this->qreq->gg);
         }
-        echo '"><button type="button" class="btn-qlink ui js-grgraph-flip prev">&lt;</button>';
-        echo '<button type="button" class="btn-qlink ui js-grgraph-flip next">&gt;</button>';
+        echo '"><button type="button" class="qo ui js-grgraph-flip prev">←</button>';
+        echo '<button type="button" class="qo ui js-grgraph-flip next">→</button>';
         echo '<h4 class="title pa-grgraph-type"></h4>';
         if ($this->info->can_view_grade_statistics_graph()) {
             echo '<div class="pa-plot" style="width:350px;height:200px"></div>';
@@ -601,10 +601,10 @@ class PsetRequest {
         // view options
         $fold_viewoptions = !isset($this->qreq->tab) && !isset($this->qreq->wdiff);
         $value .= '<div class="pa-viewoptions">'
-            . '<a class="q ui js-pset-viewoptions" href="">'
+            . '<button type="button" class="q ui js-pset-viewoptions">'
             . '<span class="foldarrow">'
             . ($fold_viewoptions ? '&#x25B6;' : '&#x25BC;')
-            . '</span>&nbsp;options</a><span style="padding-left:1em"'
+            . '</span> options</button><span style="padding-left:1em"'
             . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
         foreach ([2, 4, 8] as $i) {
             $value .= '&nbsp;<a href="' . $this->conf->selfurl($this->qreq, ["tab" => $i]) . '"'
@@ -802,7 +802,7 @@ class PsetRequest {
         if (!$rr || !isset($rr->timestamp)) {
             echo ' hidden';
         }
-        echo '"><h3><button type="button" class="btn-qlink ui pa-run-show">',
+        echo '"><h3><button type="button" class="qo ui pa-run-show">',
             '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($runner->display_title), '</button></h3>',
             '<div class="pa-run pa-run-short need-run hidden" id="pa-run-', $runner->name, '"';

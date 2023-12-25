@@ -29,8 +29,8 @@ foreach ($Conf->psets() as $pset) {
             echo ' pa-grp-hidden';
         }
         echo '" data-pa-pset="', $pset->urlkey, '">';
-        echo '<button type="button" class="btn-xlink ui js-grgraph-flip prev">&lt;</button>';
-        echo '<button type="button" class="btn-xlink ui js-grgraph-flip next">&gt;</button>';
+        echo '<button type="button" class="qo ui js-grgraph-flip prev">←</button>';
+        echo '<button type="button" class="qo ui js-grgraph-flip next">→</button>';
         echo '<h4 class="title">', htmlspecialchars($pset->title), '</h4>';
         echo '<div class="pa-plot pa-grgraph-min-yaxis"></div>';
         echo '<div class="statistics"></div></div>';

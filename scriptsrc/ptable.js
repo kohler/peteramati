@@ -539,7 +539,7 @@ function ptable_decorate_name_th(the, ptconf) {
     if (ptconf.overridable_anonymous) {
         const b = document.createElement("button");
         b.type = "button";
-        b.className = "btn-ulink n js-switch-anon";
+        b.className = "q n js-switch-anon";
         b.append("[anon]");
         the.append(" ", b);
     } else if (ptconf.original_anonymous) {

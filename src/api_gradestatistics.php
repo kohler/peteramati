@@ -236,15 +236,15 @@ class GradeStatistics_API {
         }
 
         if ($gradets
-            && ($r = $pset->conf->gsetting_json("__gradestat$suffix"))) {
+            && ($r = $pset->conf->gsetting_json("__gradestat{$suffix}"))) {
             if (isset($r->series)) {
                 $r->series = (array) $r->series;
             }
         } else {
             $r = self::compute($pset, $user->isPC);
             $gradets = Conf::$now;
-            $pset->conf->save_setting("__gradets$suffix", Conf::$now);
-            $pset->conf->save_gsetting("__gradestat$suffix", Conf::$now, $r);
+            $pset->conf->save_setting("__gradets{$suffix}", Conf::$now);
+            $pset->conf->save_gsetting("__gradestat{$suffix}", Conf::$now, $r);
         }
 
         $r->ok = true;

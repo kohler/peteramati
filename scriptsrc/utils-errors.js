@@ -45,3 +45,37 @@ window.onerror = function (errormsg, url, lineno, colno, error) {
     }
     return old_onerror ? old_onerror.apply(this, arguments) : false;
 };
+
+
+$(function () {
+    function locator(e) {
+        var p = [];
+        while (e && e.nodeName !== "BODY" && e.nodeName !== "MAIN") {
+            var t = e.nodeName, s = e.className.replace(/\s+/g, ".");
+            if (e.id !== "") {
+                t += "#" + e.id;
+            }
+            if (s !== "") {
+                t += "." + s;
+            }
+            p.push(t);
+            e = e.parentElement;
+        }
+        p.reverse();
+        return p.join(">");
+    }
+    var err = [], elt = [];
+    $("button.btn-link,button.btn-qlink,button.btn-qolink,.btn-xlink,.btn-ulink,.btn-disabled,a.qx,a.u,a.x").each(function () {
+        err.push(locator(this));
+        elt.push(this);
+    });
+    if (err.length > 0) {
+        if (window.console) {
+            console.log(err.join("\n"));
+            for (var i = 0; i !== elt.length; ++i) {
+                console.log(elt[i]);
+            }
+        }
+        log_jserror(err.join("\n"));
+    }
+});

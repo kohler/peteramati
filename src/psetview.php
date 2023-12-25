@@ -2013,7 +2013,7 @@ class PsetView {
     function commit_link($commit_html, $rest_html, $hash) {
         $url = $this->hoturl("pset", ["commit" => $hash]);
         if ($rest_html) {
-            return "<a href=\"{$url}\" class=\"qx xtrack\"><code class=\"link\">{$commit_html}</code>{$rest_html}</a>";
+            return "<a href=\"{$url}\" class=\"q xtrack\"><code class=\"link\">{$commit_html}</code>{$rest_html}</a>";
         } else {
             return "<a href=\"{$url}\" class=\"track\"><code>{$commit_html}</code></a>";
         }

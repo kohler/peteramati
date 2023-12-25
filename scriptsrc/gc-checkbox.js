@@ -76,7 +76,7 @@ export class Checkbox_GradeClass {
         element.checked = v !== "" && v !== "0";
         element.value = ge.max;
         element.className = (hasClass(element, "uich") ? "uic uich " : "") + "pa-gradevalue ml-0";
-        $(element.closest(".pa-pv")).find(".pa-gradedesc").append(' <a href="" class="x ui pa-grade-uncheckbox" tabindex="-1">#</a>');
+        $(element.closest(".pa-pv")).find(".pa-gradedesc").append(' <button type="button" class="qo ui pa-grade-uncheckbox" tabindex="-1">#</button>');
     }
     static finish_mount_edit(ge, chsp) {
         const sp = document.createElement("span");

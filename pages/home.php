@@ -209,7 +209,7 @@ if ($Me->isPC && $User === $Me) {
     $a = [];
     foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset) && !$pset->disabled)
-            $a[] = '<a class="x pset-title" href="#' . $pset->urlkey . '">' . htmlspecialchars($pset->title) . '</a>';
+            $a[] = '<a class="ulh pset-title" href="#' . $pset->urlkey . '">' . htmlspecialchars($pset->title) . '</a>';
     }
     if (!empty($a)) {
         echo '<div class="home-pset-links">', join(" • ", $a), '</div>';

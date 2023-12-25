@@ -163,43 +163,57 @@ td.spanner {
 
 
 /* generic horizontal styles */
-:link, :visited, .link, .btn-link, .btn-xlink {
+
+/* links
+   * a.qh: color inherit/link
+   * a.noq: color inherit/inherit
+   * a.ulh: underline inherit/link
+   * a.noul: underline inherit/inherit
+   * a.q: color inherit/link + underline inherit/link (a.qh.ulh)
+   * a.qo: color inherit/link + underline inherit/inherit (a.qh.noul)
+   * u.x: underline when in a:hover */
+:link, :visited, .link {
 	color: #004daa;
-}
-.btn-qlink, .btn-ulink {
-	color: inherit;
 }
 .track:visited, .xtrack:visited .link {
 	color: #660099;
 }
-a:hover, a.track:hover, a:hover .link, a.xtrack:hover .link,
-.btn-link:hover, .btn-qlink:hover, .btn-xlink:hover {
-	color: #c45500;
-}
-a.q, a.qx, a.u, a.btn {
+
+a.qh, a.noq, a.noq:hover, a.q, a.qo, a.btn, a.btn:hover,
+.is-error a, .is-warning a, .is-success a, .is-note a,
+.is-warning-note a, .is-urgent-note a,
+button.q, button.qo {
 	color: inherit;
+	-webkit-text-decoration-color: inherit;
+	text-decoration-color: inherit;
+}
+a:hover, a.track:hover, a:hover .link, a.xtrack:hover .link,
+button.link:hover, button.q:hover, button.qo:hover {
+	color: #c45500;
+	-webkit-text-decoration-color: #c45500;
+	text-decoration-color: #c45500;
 }
 a:active, a.track:active, a:active .link, a.xtrack:active .link,
-.btn-link:active, .btn-ulink:active, .btn-qlink:active, .btn-xlink:active,
-.u:active {
+button.link:active, button.q:active, button.qo:active {
 	color: red;
+	-webkit-text-decoration-color: red;
+	text-decoration-color: red;
 }
-a.q, a.qx, a.x, a.btn,
-.btn-xlink,
-div.papmodex > a, div.leftmenu_item > a,
-a.pnum, a.ptitle, a.maillink, u.x, .noul {
-	text-decoration: none;
+a.btn {
+	cursor: default;
 }
-a.q:hover, a.x:hover,
-.link, .btn-link, .btn-qlink, .btn-xlink:hover,
-div.papmodex:hover > a, div.leftmenu_item:hover > a,
-tr.pl:hover a.pnum, tr.pl:hover a.ptitle, a.ptitle.uu,
-.childfold:hover a.q, a.maillink:hover, a:hover u.x, .ul {
+.noul, .noul:hover,
+a.ulh, a.q, a.qo, a.btn, a.btn:hover,
+u.x {
+	text-decoration: inherit;
+}
+.ul,
+a.ulh:hover, a.q:hover,
+button.link, button.q:hover,
+a:hover u.x {
 	text-decoration: underline;
 }
-.btn-link:disabled, .btn-qlink:disabled, .btn-xlink:disabled {
-	text-decoration: none;
-}
+
 .strut {
 	display: inline-block;
 	line-height: 1.8;
@@ -912,17 +926,18 @@ a.closebtn {
 }
 button, .btn {
 	padding: 2px 7px 3px;
+	margin: 0;
 }
 select, button, .btn, button.btn-t:hover {
+	display: inline-block;
+	text-indent: 0;
 	border-width: 1px;
 	border-style: solid;
 	border-color: #b5b5b5;
 	border-radius: 4px;
-	display: inline-block;
 	background: white;
 	background-image: linear-gradient(#fcfcfc, #f0f0f0);
 	white-space: nowrap;
-	text-indent: 0;
 }
 button.btn-t {
 	border-width: 1px;
@@ -1000,7 +1015,7 @@ button:disabled, button:disabled:hover,
 .alert .btn-primary:disabled, .alert .btn-primary:disabled:hover,
 .alert .btn-alertable:disabled, .alert .btn-alertable:disabled:hover,
 .btn-highlight:disabled, .alert .btn-highlight:disabled:hover,
-.btn-disabled, .btn-disabled:hover {
+button.disabled, button.disabled:hover {
 	color: rgba(102, 102, 102, 0.5);
 	border-color: #c5c5c5;
 	background: rgba(222, 222, 222, 0.5);
@@ -1009,22 +1024,24 @@ button:disabled, button:disabled:hover,
 	filter: grayscale(80%);
 	color: #888;
 }
-button.btn-link, button.btn-ulink, button.btn-qlink, button.btn-xlink,
-button.btn-link:disabled, button.btn-ulink:disabled, button.btn-qlink:disabled, button.btn-xlink:disabled {
+button.link, button.q, button.qo {
+	font-weight: inherit;
+	font-style: inherit;
 	padding: 0;
-	margin: 0;
-	border-width: 0;
+	border-style: none;
 	background: initial;
 	cursor: pointer;
-	font-weight: inherit;
-	display: inline;
 }
-button.btn-link:disabled, button.btn-ulink:disabled, button.btn-qlink:disabled, button.btn-xlink:disabled {
-	cursor: inherit;
-}
-button.btn-link:hover {
+button.link:hover, button.q:hover, button.qo:hover {
 	background: initial;
+	cursor: pointer;
 }
+button.link:disabled, button.q:disabled, button.qo:disabled,
+button.link:disabled:hover, button.q:disabled:hover, button.qo:disabled:hover,
+button.disabled, button.disabled:hover {
+	cursor: default;
+}
+
 .pa-runstop {
 	margin-left: 0.5em;
 }
@@ -3559,8 +3576,6 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 	position: relative;
 	overflow: scroll;
 	min-height: 25vh;
-}
-.pa-grade-overview-users-inner {
 }
 #pa-overview-table {
 	position: absolute;

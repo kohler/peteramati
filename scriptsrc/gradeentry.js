@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { escape_entities, html_id_encode } from "./encoders.js";
-import { hasClass, addClass, toggleClass, removeClass,
+import { hasClass, addClass, toggleClass, removeClass, $e,
     input_default_value, input_set_default_value, input_differs } from "./ui.js";
 import { Filediff, Linediff } from "./diff.js";
 import { Note } from "./note.js";
@@ -389,26 +389,24 @@ export class GradeEntry {
         }
 
         const gh = t.closest(".pa-grade") || t.closest(".pa-grade-range-block");
-        let $gnv = $(gh).find(".pa-notes-grade");
+        let gnv = gh.querySelector(".pa-notes-grade");
         if (sum === null) {
-            $gnv.remove();
+            gnv.remove();
         } else {
-            if (!$gnv.length) {
-                const $gs = hasClass(gh, "pa-grade") ? $(gh) : $(gh).find(".pa-grade");
-                $gs.each(function () {
-                    let e = this.firstChild;
-                    while (e && !hasClass(e, "pa-pv")) {
-                        e = e.nextSibling;
-                    }
-                    e = e.firstChild;
-                    while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
-                        e = e.nextSibling;
-                    }
-                    this.lastChild.insertBefore($('<a class="uic uikd pa-notes-grade" href=""></a>')[0], e);
-                });
-                $gnv = $(gh).find(".pa-notes-grade");
+            if (!gnv) {
+                const gs = hasClass(gh, "pa-grade") ? gh : gh.querySelector(".pa-grade");
+                let e = gs.firstChild;
+                while (e && !hasClass(e, "pa-pv")) {
+                    e = e.nextSibling;
+                }
+                e = e.firstChild;
+                while (e && (e.nodeType !== 1 || hasClass(e, "pa-gradewidth") || hasClass(e, "pa-gradedesc"))) {
+                    e = e.nextSibling;
+                }
+                gnv = $e("button", {type: "button", "class": "link uic uikd pa-notes-grade"});
+                this.lastChild.insertBefore(gnv, e);
             }
-            $gnv.text("Notes grade " + sum);
+            gnv.textContent = "Notes grade " + sum;
         }
 
         return sum;
