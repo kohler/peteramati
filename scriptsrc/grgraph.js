@@ -153,6 +153,11 @@ export class GradeGraph {
         this.gg.setAttribute("transform", "translate(" + this.ml + "," + this.mt + ")");
         this.gx.setAttribute("transform", "translate(" + this.ml + "," + (this.mt + this.gh + (this.xt ? 2 : -5)) + ")");
         this.gy.setAttribute("transform", "translate(" + (this.ml + (this.yt ? -2 : 5)) + "," + this.mt + ")");
+
+        this.hlcurve = null;
+        this.hlcurve_series = null;
+        this.hlcurve_priority = null;
+        this.hlcurve_ucdf = null;
     }
     numeric_xaxis() {
         // determine number
@@ -308,7 +313,18 @@ export class GradeGraph {
     container() {
         return this.svg.closest(".pa-grgraph");
     }
-    append_cdf(d, klass) {
+    _add_curve(path, series, prio) {
+        if (prio == null) {
+            prio = 0;
+        }
+        if (this.hlcurve_priority == null || this.hlcurve_priority <= prio) {
+            this.hlcurve = path;
+            this.hlcurve_series = series;
+            this.hlcurve_priority = prio;
+            this.hlcurve_ucdf = null;
+        }
+    }
+    append_cdf(d, klass, prio) {
         const cdf = d.cdf, data = [], nr = 1 / d.n,
               cutoff = this.cutoff || 0, xmin = this.min;
         let i = 0;
@@ -334,11 +350,10 @@ export class GradeGraph {
         path.setAttribute("fill", "none");
         path.setAttribute("class", klass);
         this.gg.appendChild(path);
-        this.last_curve = path;
-        this.last_curve_series = d;
+        this._add_curve(path, d, prio);
         return path;
     }
-    append_pdf(kde, klass) {
+    append_pdf(kde, klass, prio) {
         if (kde.maxp === 0) {
             return null;
         }
@@ -399,8 +414,7 @@ export class GradeGraph {
         path.setAttribute("fill", "none");
         path.setAttribute("class", klass);
         this.gg.appendChild(path);
-        this.last_curve = path;
-        this.last_curve_series = kde.series;
+        this._add_curve(path, kde.series, prio);
         return path;
     }
     remove_if(predicate) {
@@ -413,15 +427,15 @@ export class GradeGraph {
             e = next;
         }
     }
-    highlight_last_curve(d, predicate, klass) {
-        if (!this.last_curve || !this.last_curve_series.cdfu) {
+    highlight(d, predicate, klass) {
+        if (!this.hlcurve || !this.hlcurve_series.cdfu) {
             return null;
         }
-        var ispdf = hasClass(this.last_curve, "pa-gg-pdf"),
-            cdf = this.last_curve_series.cdf,
-            cdfu = this.last_curve_series.cdfu,
-            data = [], nr, nrgh,
-            i, ui, xv, yv, yc;
+        const ispdf = hasClass(this.hlcurve, "pa-gg-pdf"),
+            cdf = this.hlcurve_series.cdf,
+            cdfu = this.hlcurve_series.cdfu,
+            data = [];
+        let nr, nrgh, i, ui, xv, yv, yc;
         if (ispdf) {
             nr = 0.9 / (this.maxp * d.n);
         } else {
@@ -436,7 +450,7 @@ export class GradeGraph {
             if (yc) {
                 xv = this.xax(cdf[i]);
                 if (ispdf) {
-                    yv = svgutil.eval_function_path.call(this.last_curve, xv);
+                    yv = svgutil.eval_function_path.call(this.hlcurve, xv);
                 } else {
                     yv = this.yax(cdf[i+1] * nr);
                 }
@@ -481,9 +495,9 @@ export class GradeGraph {
         star.setAttribute("d", d.join(""));
         return star;
     }
-    annotate_last_curve(x, elt, after) {
-        if (this.last_curve) {
-            var xv = this.xax(x), yv = svgutil.eval_function_path.call(this.last_curve, xv);
+    annotate(x, elt, after) {
+        if (this.hlcurve) {
+            var xv = this.xax(x), yv = svgutil.eval_function_path.call(this.hlcurve, xv);
             if (yv === null && this.cutoff)
                 yv = this.yax(this.cutoff);
             if (yv !== null) {
@@ -496,29 +510,31 @@ export class GradeGraph {
         return false;
     }
     user_x(uid) {
-        if (!this.last_curve_series.cdfu) {
-            return undefined;
-        }
-        if (!this.last_curve_series.ucdf) {
-            var cdf = this.last_curve_series.cdf,
-                cdfu = this.last_curve_series.cdfu,
-                ucdf = this.last_curve_series.ucdf = {}, i, ui;
-            for (i = ui = 0; ui !== cdfu.length; ++ui) {
+        let ucdf = this.hlcurve_ucdf;
+        if (!ucdf) {
+            if (!this.hlcurve_series || !this.hlcurve_series.cdfu) {
+                return undefined;
+            }
+            const cdf = this.hlcurve_series.cdf,
+                cdfu = this.hlcurve_series.cdfu;
+            this.hlcurve_ucdf = ucdf = {};
+            let i = 0;
+            for (let ui = 0; ui !== cdfu.length; ++ui) {
                 while (ui >= cdf[i + 1]) {
                     i += 2;
                 }
                 ucdf[cdfu[ui]] = cdf[i];
             }
         }
-        return this.last_curve_series.ucdf[uid];
+        return ucdf[uid];
     }
     highlight_users() {
-        if (!this.last_curve || !this.last_curve_series.cdfu) {
+        if (!this.hlcurve_series || !this.hlcurve_series.cdfu) {
             return;
         }
 
         this.last_highlight = this.last_highlight || {};
-        var attrs = this.container().attributes, desired = {}, x;
+        const attrs = this.container().attributes, desired = {};
         for (let i = 0; i !== attrs.length; ++i) {
             if (attrs[i].name.startsWith("data-pa-highlight")) {
                 let type;
@@ -538,10 +554,10 @@ export class GradeGraph {
                 continue;
             }
 
-            var uidm = {}, uidx = uids.split(/\s+/);
-            for (let i = 0; i !== uidx.length; ++i) {
-                if (uidx[i] !== "")
-                    uidm[uidx[i]] = 1;
+            const uidm = {}, uidx = uids.split(/\s+/);
+            for (const uid of uidx) {
+                if (uid !== "")
+                    uidm[uid] = 1;
             }
 
             var el = this.gg.firstChild, elnext;
@@ -552,7 +568,7 @@ export class GradeGraph {
 
             while (el && el.className.animVal === klass) {
                 elnext = el.nextSibling;
-                var uid = +el.getAttribute("data-pa-uid");
+                const uid = +el.getAttribute("data-pa-uid");
                 if (uidm[uid]) {
                     uidm[uid] = 2;
                 } else {
@@ -561,12 +577,15 @@ export class GradeGraph {
                 el = elnext;
             }
 
-            for (let i = 0; i !== uidx.length; ++i) {
-                if (uidm[uidx[i]] === 1
-                    && (x = this.user_x(uidx[i])) != null) {
-                    var e = this.typed_annotation(type);
-                    e.setAttribute("data-pa-uid", uidx[i]);
-                    this.annotate_last_curve(x, e, el);
+            for (const uid in uidm) {
+                if (uidm[uid] !== 1) {
+                    continue;
+                }
+                const x = this.user_x(uid);
+                if (x != null) {
+                    const e = this.typed_annotation(type);
+                    e.setAttribute("data-pa-uid", uid);
+                    this.annotate(x, e, el);
                 }
             }
 

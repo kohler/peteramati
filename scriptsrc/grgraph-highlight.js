@@ -142,10 +142,7 @@ function update_hash(href) {
     }
 }
 
-handle_ui.on("js-grgraph-highlight", function (event) {
-    if (event.type !== "change") {
-        return;
-    }
+handle_ui.on("change.js-grgraph-highlight", function () {
     const rt = this.getAttribute("data-range-type"),
         a = [];
     $(this).closest("form").find("input[type=checkbox]").each(function () {

@@ -121,7 +121,7 @@ function draw_grgraph() {
     }
     if (plot_type === "cdf"
         || plot_type === "all") {
-        grgr.append_cdf(d.series.all, "pa-gg-cdf");
+        grgr.append_cdf(d.series.all, "pa-gg-cdf", 1);
     }
     if (plot_type === "cdf-extension"
         || (plot_type === "all" && d.series.extension && user_extension)) {
@@ -143,7 +143,7 @@ function draw_grgraph() {
     const sheet = pi ? pi.pa__gradesheet : null,
         total = sheet ? sheet.grade_total(want_noextra && !want_all) : null;
     if (total != null) {
-        grgr.annotate_last_curve(total);
+        grgr.annotate(total);
     }
 
     // axes

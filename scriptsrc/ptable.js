@@ -496,13 +496,14 @@ function ptable_body_scroller(ctrh) {
 }
 
 function ptable_track_header(table) {
-    if (!window.IntersectionObserver || table.rows.length <= 10) {
+    let ctr2;
+    if (!window.IntersectionObserver
+        || table.rows.length <= 10
+        || !(ctr2 = table.closest(".gtable-container-2"))) {
         return null;
     }
     // find containers
-    const ctr2 = table.closest(".gtable-container-2"),
-        ctr1 = ctr2.parentElement,
-        ctr0 = ctr1.parentElement;
+    const ctr1 = ctr2.parentElement, ctr0 = ctr1.parentElement;
     // create pinned header table
     const tctable = document.createElement("table");
     tctable.className = table.className;
@@ -1160,9 +1161,9 @@ function ptable_permute(ptconf, table, data) {
 export function pa_pset_table(form, pconf, data) {
     const ptconf = new PtableConf(pconf, data || []);
     form.pa__ptconf = ptconf;
-    let table = $(form).find("table.gtable");
-    if (table.length) {
-        pa_render_pset_table.call(table[0], ptconf);
+    const table = form.querySelector("table.gtable");
+    if (table) {
+        pa_render_pset_table.call(table, ptconf);
     }
 }
 
@@ -1308,9 +1309,10 @@ function pa_render_pset_table(ptconf) {
 
         for (let c of col) {
             if (typeof c === "string") {
-                c = {type: c, name: c, ptconf: ptconf};
+                c = {type: c, name: c};
             }
             Object.assign(c, gcoldef[c.type]);
+            c.ptconf = ptconf;
             ptconf.add_column(c);
         }
         col = ptconf.col;
@@ -1568,7 +1570,9 @@ function pa_render_pset_table(ptconf) {
 
         hdrtable = ptable_track_header(table);
         $alltables = $alltables.add(hdrtable);
-        if (tfixed && window.IntersectionObserver) {
+        if (tfixed
+            && window.IntersectionObserver
+            && table.closest(".gtable-container-2")) {
             make_overlay_observer();
         }
     }
@@ -1593,7 +1597,8 @@ function pa_render_pset_table(ptconf) {
                 const s = smap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
                 this.setAttribute("name", ptconf.render_checkbox_name(s));
             });
-            table.closest("form").elements.anonymous.value = ptconf.anonymous ? "1" : "0";
+            const anon = table.closest("form").elements.anonymous;
+            anon && (anon.value = ptconf.anonymous ? "1" : "0");
         }
         if (nsort.last !== osort.last
             || nsort.deblind != osort.deblind) {
