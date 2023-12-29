@@ -472,6 +472,8 @@ function gv_resolve_change(f, data) {
             && hasClass(ge, "pa-ans")) {
             removeClass(sm, "compact");
             sm.replaceChildren($e("strong", "err", "Your exam period has closed."), " Your change was saved anyway, but the version used for grading will be selected from within the exam window.");
+        } else if (hasClass(f, "pa-dirty")) {
+            sm.remove();
         } else {
             addClass(sm, "compact");
             addClass(sm, "fadeout");
@@ -1018,15 +1020,18 @@ handle_ui.on("pa-notes-grade", function (event) {
 });
 
 
-function pa_beforeunload() {
-    var ok = true;
-    $(".pa-gw textarea").each(function () {
-        var tr = this.closest(".pa-dl"), note = Note.at(tr);
-        if (!text_eq(this.value, note.text) && !hasClass(tr, "pa-save-failed"))
-            ok = false;
-    });
-    if (!ok) {
-        return (event.returnValue = "You have unsaved notes. You will lose them if you leave the page now.");
+function pa_beforeunload(evt) {
+    let e = document.querySelector(".pa-dirty, .pa-outstanding");
+    if (e) {
+        evt.preventDefault();
+        return;
+    }
+    for (const ta of document.querySelectorAll(".pa-gw textarea")) {
+        const tr = ta.closest(".pa-dl"), note = Note.at(tr);
+        if (!text_eq(ta.value, note.text) && !hasClass(tr, "pa-save-failed")) {
+            evt.preventDefault();
+            return;
+        }
     }
 }
 

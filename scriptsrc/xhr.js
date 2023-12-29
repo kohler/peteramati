@@ -158,7 +158,7 @@ export function after_outstanding(f) {
 }
 
 
-let cond_out = 0, cond_waiting = [];
+let cond_out = 0, cond_wait = [], cond_retry = [];
 
 export function api_conditioner(url, data, method) {
     if (typeof method === "string") {
@@ -178,26 +178,36 @@ export function api_conditioner(url, data, method) {
 }
 
 api_conditioner.then = function (f) {
-    // call `f` when ready. `f` must call `api_conditioner.done()` when done
+    // call `f` when ready. `f` calls `api_conditioner.done()` or
+    // `api_conditioner.retry(f)` when done
     if (cond_out < 5) {
         ++cond_out;
         f();
     } else {
-        cond_waiting.push(f);
+        cond_wait.push(f);
     }
 };
 
-api_conditioner.done = function () {
-    --cond_out;
-    if (cond_waiting.length) {
-        cond_waiting.shift()();
+function api_conditioner_next() {
+    if (cond_out < 1 || cond_out > 5) {
+        throw new Error("api_conditioner outstanding error " + cond_out);
     }
+    if (cond_wait.length) {
+        cond_wait.shift()();
+    } else {
+        --cond_out;
+    }
+}
+
+api_conditioner.done = function () {
+    if (cond_retry.length) {
+        cond_wait.unshift(...cond_retry);
+        cond_retry.length = 0;
+    }
+    api_conditioner_next();
 };
 
 api_conditioner.retry = function (f) {
-    if (cond_out <= 1) {
-        throw new Error("api_conditioner.after called with nothing outstanding");
-    }
-    --cond_out;
-    cond_waiting.push(f);
+    cond_retry.push(f);
+    api_conditioner_next();
 };
