@@ -4,7 +4,7 @@
 
 import { GradeClass } from "./gc.js";
 import { GradeEntry } from "./gradeentry.js";
-import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
+import { hasClass, addClass, removeClass, $e, handle_ui } from "./ui.js";
 
 
 GradeClass.add("checkbox", {
@@ -28,17 +28,10 @@ GradeClass.add("checkbox", {
         }
     },
     mount_edit: function (elt, id) {
-        const ch = document.createElement("input");
-        ch.type = "checkbox";
-        ch.className = "uic uich pa-gradevalue ml-0 pa-fresh";
-        ch.name = this.key;
-        ch.id = id;
-        ch.value = this.max;
-        ch.disabled = this.disabled;
-        const chsp = document.createElement("span");
-        chsp.className = "pa-gradewidth";
-        chsp.append(ch);
-        return Checkbox_GradeClass.finish_mount_edit(this, chsp);
+        return Checkbox_GradeClass.finish_mount_edit(this, $e("span", "pa-gradewidth", $e("input", {
+            type: "checkbox", "class": "uic uich pa-gradevalue ml-0 pa-fresh",
+            name: this.key, id: id, value: this.max, disabled: this.disabled
+        })));
     },
     update_edit: function (elt, v, opts) {
         const want_checkbox = v == null || v === "" || v === 0 || (this && v === this.max),
@@ -85,16 +78,10 @@ export class Checkbox_GradeClass {
         $(element.closest(".pa-pv")).find(".pa-gradedesc").append(' <button type="button" class="qo ui pa-grade-uncheckbox" tabindex="-1">#</button>');
     }
     static finish_mount_edit(ge, chsp) {
-        const sp = document.createElement("span");
-        sp.className = "pa-gradedesc";
-        const a = document.createElement("button");
-        a.type = "button";
-        a.className = "link x ui pa-grade-uncheckbox";
-        a.tabIndex = -1;
-        a.append("#");
-        sp.append("of " + ge.max + " ", a);
         const fr = new DocumentFragment;
-        fr.append(chsp, " ", sp);
+        fr.append(chsp, " ", $e("span", "pa-gradesc", "of " + ge.max + " ", $e("button", {
+                type: "button", "class": "link x ui pa-grade-uncheckbox", "tabindex": -1
+            }, "#")));
         return fr;
     }
 }
