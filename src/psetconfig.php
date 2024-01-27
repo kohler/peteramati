@@ -84,7 +84,7 @@ class Pset {
     public $hide_comments = false;
 
     /** @var string */
-    public $main_branch = "master";
+    public $main_branch;
     /** @var ?string */
     public $handout_repo_url;
     /** @var ?string */
@@ -314,12 +314,15 @@ class Pset {
         $this->hide_comments = self::cbool($p, "hide_comments");
 
         // directory
-        $this->main_branch = self::cstr($p, "main_branch") ?? "master";
+        $main_branch = self::cstr($p, "main_branch");
+        $handout_branch = self::cstr($p, "handout_branch");
+        $main_branch = $main_branch ?? ($handout_branch === "main" ? "main" : "master");
+        $this->main_branch = $main_branch;
         $this->handout_repo_url = self::cstr($p, "handout_repo_url");
         if (!$this->handout_repo_url && !$this->gitless) {
             throw new PsetConfigException("`handout_repo_url` missing", "handout_repo_url");
         }
-        $this->handout_branch = self::cstr($p, "handout_branch") ?? $this->main_branch;
+        $this->handout_branch = $handout_branch ?? $main_branch;
         $this->handout_hash = self::cstr($p, "handout_hash");
         $this->handout_warn_hash = self::cstr($p, "handout_warn_hash");
         $this->handout_warn_merge = self::cbool($p, "handout_warn_merge");
