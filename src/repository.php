@@ -53,6 +53,8 @@ class Repository {
     private $_commit_lists_cc = [];
     /** @var int */
     private $_refresh_count = 0;
+    /** @var ?string */
+    private $_original_cacheid;
 
     /** @var list<array{string,string,list<string>,int}> */
     static private $_file_contents = [];
@@ -160,6 +162,12 @@ class Repository {
      * @return ?string */
     function expand_message($name, Contact $user) {
         return Messages::$main->expand_html($name, $this->reposite->message_defs($user));
+    }
+
+    /** @param ?string $cacheid */
+    function override_cacheid($cacheid) {
+        $this->_original_cacheid = $this->_original_cacheid ?? $this->cacheid;
+        $this->cacheid = $cacheid ?? $this->_original_cacheid;
     }
 
     const VALIDATE_TIMEOUT = 5;

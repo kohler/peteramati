@@ -279,7 +279,7 @@ class GitHub_RepositorySite extends RepositorySite {
         $arg = $foreground ? [] : ["--bg"];
         $php = $this->conf->opt("phpCommand") ?? "php";
         $sp = Subprocess::run([
-            $php, "batch/repofetch.php", "-r", $repoid, ...$arg
+            $php, "batch/repofetch.php", "-r", $repoid, "-C", $cacheid, ...$arg
         ], SiteLoader::$root);
         if (!$sp->ok) {
             error_log("`php batch/repofetch.php -r {$repoid}` failed: {$sp->status}, {$sp->stderr}");

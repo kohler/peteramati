@@ -16,6 +16,8 @@ class RepoFetch_Batch {
     public $force = false;
     /** @var bool */
     public $verbose = false;
+    /** @var ?string */
+    private $cacheid;
     /** @var bool */
     public $done = false;
     /** @var ?Repository */
@@ -283,7 +285,11 @@ class RepoFetch_Batch {
     }
 
     /** @return int */
-    private function run_repo() {
+    private function run_repo(Repository $repo) {
+        $this->repo = $repo;
+        if ($this->cacheid !== null) {
+            $this->repo->override_cacheid($this->cacheid);
+        }
         $repodir = $this->repo->ensure_repodir();
         if (!$repodir) {
             throw new CommandLineException("Cannot create repository");
@@ -340,8 +346,7 @@ class RepoFetch_Batch {
     /** @return int */
     function run() {
         foreach ($this->repos as $repo) {
-            $this->repo = $repo;
-            if (($status = $this->run_repo()) !== 0) {
+            if (($status = $this->run_repo($repo)) !== 0) {
                 return $status;
             }
         }
@@ -352,6 +357,7 @@ class RepoFetch_Batch {
     static function make_args(Conf $conf, $argv) {
         $getopt = (new Getopt)->long(
             "r:,repo:,repository: {n}",
+            "cacheid:,C:",
             "u:,user:",
             "refresh",
             "f,force",
@@ -394,6 +400,7 @@ class RepoFetch_Batch {
         }
         $self->force = isset($arg["f"]);
         $self->verbose = isset($arg["V"]);
+        $self->cacheid = $arg["cacheid"] ?? null;
         if (isset($arg["bg"]) && pcntl_fork() > 0) {
             exit(0);
         }
