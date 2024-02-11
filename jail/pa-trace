@@ -179,17 +179,17 @@ sub check_dotdot ($$) {
     my($super, $entry) = @_;
     my($dir) = $super . $entry;
     if (!exists($dotdotmaps{$dir})) {
-	if (!-d $dir) {
-	    $dotdotmaps{$dir} = undef;
-	} elsif (!-l $dir) {
-	    $dotdotmaps{$dir} = $super;
-	} else {
-	    chdir("$dir/..");
-	    $x = cwd();
-	    chdir(MAINDIR);
-	    $x =~ s/\/+\z//;
-	    $dotdotmaps{$dir} = "$x/";
-	}
+        if (!-d $dir) {
+            $dotdotmaps{$dir} = undef;
+        } elsif (!-l $dir) {
+            $dotdotmaps{$dir} = $super;
+        } else {
+            chdir("$dir/..");
+            $x = cwd();
+            chdir(MAINDIR);
+            $x =~ s/\/+\z//;
+            $dotdotmaps{$dir} = "$x/";
+        }
     }
     $dotdotmaps{$dir};
 }
@@ -276,11 +276,13 @@ $n = $na = 0;
 my($cwd) = `pwd`;
 chomp $cwd;
 
-sub resolve ($$$) {
-    my($f, $pidh, $in) = @_;
+sub resolve ($$$$) {
+    my($f, $pidh, $in, $line) = @_;
     if ($f !~ m{\A/}) {
         if (!exists $fdp{$pidh}{$in}) {
-            print STDERR "CONFUSION $pidh $in DOES NOT EXIST ($fn)\n";
+            my $fx = $f eq "" ? "<empty>" : $f;
+            chomp $line;
+            print STDERR "Cannot resolve “${fx}” in pid $pidh at $in\n  > ", $line, "\n";
             return "";
         }
         $f = $fdp{$pidh}{$in} . "/" . $f;
@@ -330,25 +332,27 @@ while (defined($_ = <STDIN>)) {
     } elsif (/^\d+\s*close\((\d+).*\)/) {
         undef $fdp{$pidh}{$1};
     } elsif (/^\d+\s*open\(\s*"(.*?)\".*\)\s*=\s*([0-9]+|-1 \S+)/s) {
-        my $fn = resolve($1, $pidh, "AT_FDCWD");
+        my $fn = resolve($1, $pidh, "AT_FDCWD", $_);
         $fdp{$pidh}{$2} = $fn if substr($2, 0, 1) ne "-";
         addfile($fn, "open", 0) if $2 ne "-1 ENOENT";
     } elsif (/^\d+\s*openat\((\d+|AT_FDCWD),\s*"(.*?)".*\)\s*=\s*([0-9]+|-1 \S+)/s) {
-        my $fn = resolve($2, $pidh, $1);
+        my $fn = resolve($2, $pidh, $1, $_);
         $fdp{$pidh}{$3} = $fn if substr($3, 0, 1) ne "-";
         addfile($fn, "openat", 0) if $3 ne "-1 ENOENT";
     } elsif (/^\d+\s*chdir\("(.*)"\)\s*=\s*0/) {
-        my $fn = resolve($1, $pidh, "AT_FDCWD");
+        my $fn = resolve($1, $pidh, "AT_FDCWD", $_);
         $fdp{$pidh}{"AT_FDCWD"} = $fn;
         print STDERR "CHDIR $pidh $fn\n" if $verbose;
     } elsif (/^\d+\s*fchdir\((\d+)\)\s*=\s*0/) {
-        my $fn = resolve("", $pidh, $1);
+        my $fn = resolve("", $pidh, $1, $_);
         $fdp{$pidh}{"AT_FDCWD"} = $fn;
         print STDERR "FCHDIR $pidh $fn\n" if $verbose;
     } elsif (/^\d*\s*(access|chdir|chmod|exec[a-z]+|getcwd|lstat|readlink|rename|rmdir|stat\d*|statfs|truncate|unlink)\(\s*"(.*?)".*\)\s*=\s*([0-9]+|-1 \S+)/s) {
-        addfile(resolve($2, $pidh, "AT_FDCWD"), $1, 0) if $3 ne "-1 ENOENT";
+        addfile(resolve($2, $pidh, "AT_FDCWD", $_), $1, 0) if $3 ne "-1 ENOENT";
+    } elsif (/^\d*\s*newfstatat\((\d+|AT_FDCWD),\s*"".*AT_EMPTY_PATH\)\s*=\s*([0-9]+|-1 \S+)/s) {
+        # special case: don’t need to do anything
     } elsif (/^\d*\s*(faccessat|newfstatat|unlinkat|utimensat)\((\d+|AT_FDCWD),\s*"(.*?)".*\)\s*=\s*([0-9]+|-1 \S+)/s) {
-        addfile(resolve($3, $pidh, $2), $1, 0) if $4 ne "-1 ENOENT";
+        addfile(resolve($3, $pidh, $2, $_), $1, 0) if $4 ne "-1 ENOENT";
     } elsif (/^\d+\s*dup[23]?\((\d).*\)\s*=\s*([0-9]+|-1 \S+)/s) {
         $fdp{$pidh}{$3} = $fdp{$pidh}{$1} if substr($3, 0, 1) ne "-" && exists $fdp{$pidh}{$1};
     } elsif (/^\d+\s*fcntl\((\d), F_DUPFD.*\)\s*=\s*([0-9]+|-1 \S+)/s) {
