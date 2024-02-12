@@ -13,7 +13,7 @@ sub usage (;$) {
     print STDERR "  -n, --no-defaults     Do not include default programs.\n";
     print STDERR "  -o, --output=OUTFILE  Add to files listed in OUTFILE.\n";
     print STDERR "  -u, --user=USER       Don't exclude USER dotfiles.\n";
-    print STDERR "  -r, --raw             Don't redirect standard output/error.\n";
+    print STDERR "      --no-raw          Redirect standard output/error.\n";
     print STDERR "  -f, --file=FILE       Include files in FILE (one per line).\n";
     print STDERR "  -x, --exclude=PATTERN Exclude files matching PATTERN.\n";
     print STDERR "  -V, --verbose         Be verbose.\n";
@@ -65,7 +65,7 @@ sub run_trace ($@) {
     }
 }
 
-my($jailfile, $defaults, $nodefaults, $help, $raw) = (undef, undef, 0, 0, 0);
+my($jailfile, $defaults, $nodefaults, $help, $raw, $no_raw) = (undef, undef, 0, 0, 0, 0);
 my($user) = undef;
 my(@extras, @excludes);
 GetOptions("output|o=s" => \$jailfile,
@@ -73,6 +73,7 @@ GetOptions("output|o=s" => \$jailfile,
            "n" => \$nodefaults,
            "help" => \$help,
            "raw|r" => \$raw,
+           "no-raw" => \$no_raw,
            "user|u=s" => \$user,
            "file|f=s" => \@extras,
            "exclude|x=s" => \@excludes,
@@ -265,7 +266,7 @@ foreach my $fn (@extras) {
 }
 
 if (@ARGV) {
-    run_trace($raw, @ARGV);
+    run_trace($raw || !$no_raw, @ARGV);
     my($program) = `which "$ARGV[0]"`;
     chomp $program;
     addfile($program, "exec", 0) if $program;
