@@ -631,16 +631,16 @@ class PsetRequest {
                     ? ["commit" => $gc->hash, "commit1" => $tc->hash]
                     : ["commit" => $tc->hash, "commit1" => $gc->hash];
                 $remarks[] = [true, "This is not "
-                    . "<a class=\"u\" href=\"" . $this->info->hoturl("pset", ["commit" => $gc->hash])
+                    . "<a class=\"qh\" href=\"" . $this->info->hoturl("pset", ["commit" => $gc->hash])
                     . "\">the commit currently marked for grading</a>"
-                    . " <span class=\"n\">(<a href=\"" . $this->info->hoturl("diff", $args)
+                    . " <span class=\"n\">(<a class=\"qh\" href=\"" . $this->info->hoturl("diff", $args)
                     . "\">see diff</a>)</span>."
                 ];
             }
         }
         if (!$this->info->is_lateish_commit()) {
             $remarks[] = [true, "This is not "
-                          . "<a class=\"u\" href=\"" . $this->info->hoturl("pset", ["commit" => $this->info->latest_hash()]) . "\">the latest commit</a>"
+                          . "<a class=\"qh\" href=\"" . $this->info->hoturl("pset", ["commit" => $this->info->latest_hash()]) . "\">the latest commit</a>"
                           . " <span style=\"font-weight:normal\">(<a href=\"" . $this->info->hoturl("diff", ["commit1" => $this->info->latest_hash()]) . "\">see diff</a>)</span>."];
         }
         $lhd = $this->info->late_hours_data();
