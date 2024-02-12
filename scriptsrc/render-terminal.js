@@ -256,7 +256,7 @@ export function render_terminal(container, string, options) {
             }
             var a = document.createElement("a");
             a.href = "#" + filematch.lineid_anchor("b" + line);
-            a.className = "u pa-goto";
+            a.className = "qh pa-goto";
             a.append(link.substring(prefix.length).replace(/(?:\x1b\[[\d;]*m|\x1b\[\d*K)/g, ""));
             addlinepart(node, a);
             return true;
