@@ -641,7 +641,7 @@ class PsetRequest {
         if (!$this->info->is_lateish_commit()) {
             $remarks[] = [true, "This is not "
                           . "<a class=\"qh\" href=\"" . $this->info->hoturl("pset", ["commit" => $this->info->latest_hash()]) . "\">the latest commit</a>"
-                          . " <span style=\"font-weight:normal\">(<a href=\"" . $this->info->hoturl("diff", ["commit1" => $this->info->latest_hash()]) . "\">see diff</a>)</span>."];
+                          . " <span class=\"n\">(<a class=\"qh\" href=\"" . $this->info->hoturl("diff", ["commit1" => $this->info->latest_hash()]) . "\">see diff</a>)</span>."];
         }
         $lhd = $this->info->late_hours_data();
         if ($lhd
