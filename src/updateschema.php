@@ -61,12 +61,16 @@ class UpdateSchema {
             left join (select link, pset, min(cid) cid
                        from ContactLink where type=" . LINK_REPO . " group by link, pset) u on (u.link=rgr.repoid)");
         while (($row = $result->fetch_object())) {
-            if ($row->cid && ($u = $this->conf->user_by_id($row->cid))
-                && ($pset = $this->conf->pset_by_id($row->pset))) {
-                $info = PsetView::make($pset, $u, $u);
-                $info->force_set_hash($row->hash);
-                $update = ["flags" => ["t" . $row->requested_at => ["uid" => $u->contactId]]];
-                $info->update_commit_notes($update);
+            if ($row->cid) {
+                $x = $this->conf->fetch_first_object("select * from CommitNotes where hash=?", $row->hash);
+                $j = ($x ? json_decode($x->notes) : null) ?? (object) [];
+                $j->flags = $j->flags ?? (object) [];
+                $j->flags->{"t" . $row->requested_at} = ["uid" => $row->cid];
+                if ($x) {
+                    $this->conf->ql_ok("update CommitNotes set notes=? where hash=?", json_encode_db($j), $row->hash);
+                } else {
+                    $this->conf->ql_ok("insert into CommitNotes set pset=?, hash=?, repoid=?, notes=?", $row->pset, $row->hash, $row->repoid, json_encode_db($j));
+                }
             }
         }
         Dbl::free($result);
@@ -237,13 +241,23 @@ class UpdateSchema {
     private function v145_studentupdateat() {
         $all = [];
         $result = $this->conf->qe("select * from ContactGrade");
-        while (($row = UserPsetInfo::fetch($result))) {
+        while (($row = $result->fetch_object())) {
+            $row->pset = (int) $row->pset;
+            $row->cid = (int) $row->cid;
+            $row->notesversion = (int) $row->notesversion;
+            $row->updateat = (int) $row->updateat;
+            $row->updateby = (int) $row->updateby;
             $all[$row->pset][$row->cid][] = $row;
         }
         Dbl::free($result);
 
         $result = $this->conf->qe("select * from ContactGradeHistory");
-        while (($row = UserPsetHistory::fetch($result))) {
+        while (($row = $result->fetch_object())) {
+            $row->pset = (int) $row->pset;
+            $row->cid = (int) $row->cid;
+            $row->notesversion = (int) $row->notesversion;
+            $row->updateat = (int) $row->updateat;
+            $row->updateby = (int) $row->updateby;
             $all[$row->pset][$row->cid][] = $row;
         }
         Dbl::free($result);
@@ -262,7 +276,7 @@ class UpdateSchema {
                     }
                     if ($items[$i]->studentupdateat !== $studentupdateat) {
                         $table = $items[$i] instanceof UserPsetInfo ? "ContactGrade" : "ContactGradeHistory";
-                        $mqe("update $table set studentupdateat=? where cid=? and pset=? and notesversion=?", $studentupdateat, $cid, $pset, $items[$i]->notesversion);
+                        $mqe("update {$table} set studentupdateat=? where cid=? and pset=? and notesversion=?", $studentupdateat, $cid, $pset, $items[$i]->notesversion);
                     }
                 }
             }
@@ -521,6 +535,7 @@ class UpdateSchema {
             $conf->update_schema_version(95);
         }
         if ($conf->sversion == 95
+            && $conf->ql_ok("drop table if exists RepositoryCommitSnapshot")
             && $conf->ql_ok("create table `RepositoryCommitSnapshot` ( `repoid` int(11) NOT NULL, `hash` binary(40) NOT NULL, `snapshot` bigint(11) NOT NULL, PRIMARY KEY (`repoid`,`hash`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8")) {
             $conf->update_schema_version(96);
         }
@@ -649,7 +664,10 @@ class UpdateSchema {
         }
         if ($conf->sversion == 118
             && $conf->ql_ok("delete from ExecutionQueue where `hash` is null")
-            && $conf->ql_ok("alter table ExecutionQueue change `hash` `bhash` varbinary(32) NOT NULL")) {
+            && $conf->ql_ok("alter table ExecutionQueue add `bhash` varbinary(32) DEFAULT NULL")
+            && $conf->ql_ok("update ExecutionQueue set bhash=unhex(hash)")
+            && $conf->ql_ok("alter table ExecutionQueue change `bhash` `bhash` varbinary(32) NOT NULL")
+            && $conf->ql_ok("alter table ExecutionQueue drop `hash`")) {
             $conf->update_schema_version(119);
         }
         if ($conf->sversion == 119
@@ -797,6 +815,7 @@ class UpdateSchema {
             $conf->update_schema_version(147);
         }
         if ($conf->sversion === 147
+            && $conf->ql_ok("delete from ExecutionQueue where runnername is null")
             && $conf->ql_ok("alter table `ExecutionQueue` change `runnername` `runnername` varbinary(128) NOT NULL")) {
             $conf->update_schema_version(148);
         }
