@@ -125,7 +125,7 @@ class GitHub_RepositorySite extends RepositorySite {
             if (is_string($post_data) && !$preencoded) {
                 $post_data = json_encode(["query" => $post_data]);
             }
-            $response->run_post($conf, "application/json", $post_data, "Authorization: token $token\r\n");
+            $response->run_post($conf, "application/json", $post_data, "Authorization: token {$token}\r\n");
         }
         return $response;
     }
@@ -350,8 +350,11 @@ class GitHub_RepositorySite extends RepositorySite {
         if (!$gql->rdata) {
             error_log(json_encode($gql));
             return -1;
-        } else if ($gql->rdata->repository == null) { // no such repository
+        } else if ($gql->rdata->repository === null) { // no such repository
             return -1;
+        } else if ($gql->rdata->repository->collaborators === null) {
+            // no permission to view collaborators
+            return 0;
         } else if (array_filter($gql->rdata->repository->collaborators->nodes,
                         function ($node) use ($user) {
                             return strcasecmp($node->login, $user->github_username) === 0;
