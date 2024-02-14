@@ -25,6 +25,13 @@ class UpdateSchema {
         }
     }
 
+    /** @param string $table
+     * @param string $column
+     * @return ?int */
+    private function check_column_exists($table, $column) {
+        return Dbl::fetch_ivalue($this->conf->dblink, "select exists (select * from information_schema.columns where table_schema=database() and `table_name`='{$table}' and `column_name`='{$column}') from dual");
+    }
+
     private function v72_haslinenotes() {
         $this->conf->ql("lock tables CommitNotes write");
         $hashes = [[], [], [], []];
@@ -67,8 +74,8 @@ class UpdateSchema {
     }
 
     private function v109_hasflags() {
-        if (!$this->conf->ql_ok("alter table CommitNotes add `hasflags` tinyint(1) NOT NULL DEFAULT '0'")) {
-            return false;
+        if (!$this->check_column_exists("CommitNotes", "hasflags")) {
+            $this->conf->ql_ok("alter table CommitNotes add `hasflags` tinyint(1) NOT NULL DEFAULT '0'");
         }
         $result = $this->conf->ql("select * from CommitNotes");
         $queries = [];
@@ -80,8 +87,10 @@ class UpdateSchema {
             }
         }
         Dbl::free($result);
-        $mresult = Dbl::multi_ql_apply($this->conf->dblink, join(";", $queries), $qv);
-        while ($mresult->next()) {
+        if (!empty($queries)) {
+            $mresult = Dbl::multi_ql_apply($this->conf->dblink, join(";", $queries), $qv);
+            while ($mresult->next()) {
+            }
         }
         return true;
     }
@@ -584,7 +593,7 @@ class UpdateSchema {
             $conf->update_schema_version(110);
         }
         if ($conf->sversion == 110
-            && $conf->ql_ok("alter table CommitInfo ENGINE=InnoDB")) {
+            && $conf->ql_ok("drop table if exists `CommitInfo`")) {
             $conf->update_schema_version(111);
         }
         if ($conf->sversion == 111
@@ -602,8 +611,9 @@ class UpdateSchema {
             $conf->update_schema_version(114);
         }
         if ($conf->sversion == 114
-            && $conf->ql_ok("alter table CommitInfo change `sha1` `bhash` varbinary(32) NOT NULL")
-            && $conf->ql_ok("alter table CommitNotes add `bhash` varbinary(32) DEFAULT NULL")
+            && ($this->check_column_exists("CommitNotes", "bhash")
+                || $conf->ql_ok("alter table CommitNotes add `bhash` varbinary(32) DEFAULT NULL"))
+            && $conf->ql_ok("delete from CommitNotes where hex(hash)='00000000000000000000000000000000000000000000000000000000000000000000000000000000'")
             && $conf->ql_ok("update CommitNotes set bhash=unhex(hash)")
             && $conf->ql_ok("alter table CommitNotes change `bhash` `bhash` varbinary(32) NOT NULL")) {
             $conf->update_schema_version(115);
@@ -638,6 +648,7 @@ class UpdateSchema {
             $conf->update_schema_version(118);
         }
         if ($conf->sversion == 118
+            && $conf->ql_ok("delete from ExecutionQueue where `hash` is null")
             && $conf->ql_ok("alter table ExecutionQueue change `hash` `bhash` varbinary(32) NOT NULL")) {
             $conf->update_schema_version(119);
         }
