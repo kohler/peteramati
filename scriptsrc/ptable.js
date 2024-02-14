@@ -237,7 +237,7 @@ class PtableConf {
         } else if (sort.u === "email" && s.email) {
             ae.append(s.email);
         } else if (sort.u === "name") {
-            ae.append(render_name(s, sort.last));
+            ae.append(render_name(s, sort.last) || s.email);
         } else {
             ae.append(s.user);
         }
@@ -247,7 +247,7 @@ class PtableConf {
     render_display_name(tde, s, is2) {
         const t = is2 && this.anonymous
             ? s.anon_user || "?"
-            : render_name(s, this.sort.last);
+            : render_name(s, this.sort.last) || s.email;
         if (is2) {
             const ae = this.make_pset_ae(s);
             ae.textContent = t;
@@ -265,7 +265,7 @@ class PtableConf {
         } else if (this.sort.u === "email" && s.email) {
             return s.email;
         } else if (this.sort.u === "name") {
-            return render_name(s, false);
+            return render_name(s, false) || s.email;
         } else {
             return s.user;
         }
@@ -1666,7 +1666,7 @@ tooltip.add_builder("pa-ptable-user", function () {
             if (name !== "") {
                 const nameae = ptconf.make_student_ae(su);
                 nameae.className = "q";
-                nameae.append(render_name(su, false));
+                nameae.append(name);
                 idiv.append(nameae, document.createElement("br"));
             }
             if (su.email) {
