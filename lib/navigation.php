@@ -44,7 +44,8 @@ class NavigationState {
             return;
         }
 
-        $this->host = $server["HTTP_HOST"] ?? $server["SERVER_NAME"] ?? null;
+        $http_host = $server["HTTP_HOST"] ?? null;
+        $this->host = $http_host ?? $server["SERVER_NAME"] ?? null;
         if ((isset($server["HTTPS"])
              && $server["HTTPS"] !== ""
              && $server["HTTPS"] !== "off")
@@ -58,9 +59,10 @@ class NavigationState {
         }
         $this->protocol = $x;
         $x .= $this->host ? : "localhost";
-        if (($port = $server["SERVER_PORT"])
-            && $port != $xport
-            && strpos($x, ":", 6) === false) {
+        if ($http_host === null // HTTP `Host` header should contain port
+            && strpos($x, ":", 6) === false
+            && ($port = $server["SERVER_PORT"])
+            && $port != $xport) {
             $x .= ":" . $port;
         }
         $this->server = $x;
