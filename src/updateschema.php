@@ -705,6 +705,11 @@ class UpdateSchema {
             $conf->update_schema_version(125);
         }
         if ($conf->sversion == 125
+            && $conf->ql_ok("create temporary table ContactLinkDups ( `cid` int(11) NOT NULL, `type` int(11) NOT NULL, `pset` int(11) NOT NULL, `link` int(11) NOT NULL ) ENGINE=InnoDB DEFAULT CHARSET=utf8")
+            && $conf->ql_ok("insert into ContactLinkDups (cid, type, pset, link) select distinct cid, type, pset, link from ContactLink")
+            && $conf->ql_ok("delete from ContactLink")
+            && $conf->ql_ok("insert into ContactLink (cid, type, pset, link) select cid, type, pset, link from ContactLinkDups")
+            && $conf->ql_ok("drop temporary table ContactLinkDups")
             && $conf->ql_ok("alter table ContactLink add primary key (`cid`,`type`,`pset`,`link`)")
             && $conf->ql_ok("alter table ContactLink drop key `cid_type`")) {
             $conf->update_schema_version(126);
