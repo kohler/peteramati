@@ -197,8 +197,10 @@ class Pset {
     public $diffs = [];
     public $ignore;
     private $_file_ignore_regex;
-    /** @var ?list<DiffConfig> */
-    private $_extra_diffs;
+    /** @var int */
+    private $_baseline_diffconfig_count;
+    /** @var ?PsetView */
+    private $_local_diffconfig_source;
     /** @var ?list<DiffConfig> */
     private $_all_diffs;
     /** @var ?DiffConfig */
@@ -913,19 +915,23 @@ class Pset {
     }
 
 
-    /** @return list<DiffConfig> */
-    function all_diffconfig() {
+    private function seal_diffconfig() {
         if ($this->_all_diffs === null) {
             $this->_all_diffs = $this->diffs;
             if (($regex = $this->file_ignore_regex())) {
                 $this->_all_diffs[] = new DiffConfig((object) ["match" => $regex, "ignore" => true, "priority" => -10]);
             }
-            foreach ($this->_extra_diffs ?? [] as $d) {
-                $this->_all_diffs[] = $d;
+            foreach ($this->_all_diffs as $i => $di) {
+                $di->subposition = $i;
             }
-            foreach ($this->_all_diffs as $i => $d) {
-                $d->subposition = $i;
-            }
+            $this->_baseline_diffconfig_count = count($this->_all_diffs);
+        }
+    }
+
+    /** @return list<DiffConfig> */
+    function all_diffconfig() {
+        if ($this->_all_diffs === null) {
+            $this->seal_diffconfig();
         }
         return $this->_all_diffs;
     }
@@ -991,10 +997,29 @@ class Pset {
         }
     }
 
-    function add_diffconfig(DiffConfig $dc) {
-        $this->_all_diffs = null;
+    /** @return ?PsetView */
+    function local_diffconfig_source() {
+        return $this->_local_diffconfig_source;
+    }
+
+    /** @param ?PsetView $lds
+     * @return bool */
+    function set_local_diffconfig_source($lds) {
+        if ($lds === $this->_local_diffconfig_source) {
+            return false;
+        }
+        $this->seal_diffconfig();
         $this->_file_diffinfo = [];
-        $this->_extra_diffs[] = $dc;
+        array_splice($this->_all_diffs, $this->_baseline_diffconfig_count);
+        $this->_local_diffconfig_source = $lds;
+        return true;
+    }
+
+    function add_local_diffconfig(DiffConfig $dc) {
+        $this->seal_diffconfig();
+        $this->_file_diffinfo = [];
+        $this->_all_diffs[] = $dc;
+        $dc->subposition = count($this->_all_diffs) - 1;
     }
 
 

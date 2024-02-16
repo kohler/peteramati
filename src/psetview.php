@@ -87,8 +87,6 @@ class PsetView {
 
     /** @var bool */
     private $need_format = false;
-    /** @var bool */
-    private $added_diffinfo = false;
 
     const ERROR_NOTRUN = 1;
     const ERROR_LOGMISSING = 2;
@@ -2212,14 +2210,14 @@ class PsetView {
     }
 
     /** @param float $prio */
-    private function _add_diffconfigs($diffs, $prio) {
+    private function _add_local_diffconfigs($diffs, $prio) {
         if (is_object($diffs)) {
             foreach (get_object_vars($diffs) as $k => $v) {
-                $this->pset->add_diffconfig(new DiffConfig($v, $k, $prio));
+                $this->pset->add_local_diffconfig(new DiffConfig($v, $k, $prio));
             }
         } else if (is_array($diffs)) {
             foreach ($diffs as $v) {
-                $this->pset->add_diffconfig(new DiffConfig($v, null, $prio));
+                $this->pset->add_local_diffconfig(new DiffConfig($v, null, $prio));
             }
         }
     }
@@ -2227,17 +2225,18 @@ class PsetView {
     /** @return array<string,DiffInfo> */
     function diff(CommitRecord $commita, CommitRecord $commitb,
                   LineNotesOrder $lnorder = null, $args = []) {
-        if (!$this->added_diffinfo) {
+        if ($args["no_local_diffconfig"] ?? false) {
+            $this->pset->set_local_diffconfig_source(null);
+        } else if ($this->pset->set_local_diffconfig_source($this)) {
             if (($tw = $this->commit_jnote("tabwidth"))) {
-                $this->pset->add_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 101.0));
+                $this->pset->add_local_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 101.0));
             }
             if (($diffs = $this->repository_jnote("diffs"))) {
-                $this->_add_diffconfigs($diffs, 100.0);
+                $this->_add_local_diffconfigs($diffs, 100.0);
             }
             if (($diffs = $this->commit_jnote("diffs"))) {
-                $this->_add_diffconfigs($diffs, 101.0);
+                $this->_add_local_diffconfigs($diffs, 101.0);
             }
-            $this->added_diffinfo = true;
         }
         // both repos must be in the same directory; assume handout
         // is only potential problem

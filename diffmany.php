@@ -130,7 +130,7 @@ class DiffMany_Page {
             $lnorder = $info->visible_line_notes();
             $onlyfiles = $this->fileglob ? $this->expand_files($info) : $this->files;
             $onefile = count($onlyfiles ?? []) === 1 && !$this->fileglob;
-            $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true]);
+            $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true, "no_local_diffconfig" => true]);
             if ($onefile
                 && isset($diff[$onlyfiles[0]])
                 && $this->qreq->lines
@@ -149,7 +149,7 @@ class DiffMany_Page {
                         "expand" => true,
                         "hide_left" => true,
                         "no_heading" => $onefile,
-                        "diffcontext" => "$linkpart_html / "
+                        "diffcontext" => "{$linkpart_html} / "
                     ]);
                 }
                 if ($info->can_edit_scores() && !$pset->has_grade_landmark_range) {
