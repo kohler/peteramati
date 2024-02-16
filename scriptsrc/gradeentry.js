@@ -68,13 +68,26 @@ export class GradeEntry {
             || (this.visible == null && (this.answer || gi.scores_visible));
     }
 
+    get title_node() {
+        let t = this.title, ch;
+        if (!t) {
+            return this.key;
+        } else if (t.charCodeAt(0) === 60 /* "<" */
+                   && (ch = t.charCodeAt(1)) >= 48
+                   && ch <= 57) {
+            return title_span(t);
+        } else {
+            return t;
+        }
+    }
+
     get title_html() {
         let t = this.title, ch;
         if (!t) {
             return this.key;
-        } else if (t.charAt(0) === "<"
-                   && (ch = t.charAt(1)) >= "0"
-                   && ch <= "9") {
+        } else if (t.charCodeAt(0) === 60 /* "<" */
+                   && (ch = t.charCodeAt(1)) >= 48
+                   && ch <= 57) {
             return title_span(t).innerHTML;
         } else {
             return escape_entities(t);
@@ -85,9 +98,9 @@ export class GradeEntry {
         let t = this.title, ch;
         if (!t) {
             return this.key;
-        } else if (t.charAt(0) === "<"
-                   && (ch = t.charAt(1)) >= "0"
-                   && ch <= "9") {
+        } else if (t.charCodeAt(0) === 60 /* "<" */
+                   && (ch = t.charCodeAt(1)) >= 48
+                   && ch <= 57) {
             return title_span(t).textContext;
         } else {
             return t;

@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { hasClass, addClass, HtmlCollector, handle_ui } from "./ui.js";
+import { hasClass, addClass, handle_ui, $e } from "./ui.js";
 import { hoturl_get_go } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
 import { popup_skeleton } from "./popup.js";
@@ -77,9 +77,38 @@ function ptable_diffdialog(ptconf, sus) {
     }
 
     function do_report() {
-        const opt = {pset: ptconf.key, anonymous: ptconf.anonymous ? 1 : "", users: sus_uids(),
-                   report: gdform.elements.report.value || "default"};
-        hoturl_get_go("report", opt);
+        const report = gdform.elements.report.value || "default";
+        if (report === "copyemails") {
+            const us = [];
+            for (const su of sus) {
+                let name = "";
+                if (su.first != null && su.last != null) {
+                    name = su.first.concat(" ", su.last);
+                } else if (su.first != null) {
+                    name = su.first;
+                } else if (su.last != null) {
+                    name = su.last;
+                }
+                if (name !== "" && /^[-A-Z a-z]*$/.test(name)) {
+                    us.push(name.concat(" <", su.email, ">"));
+                } else if (name !== "") {
+                    name = name.replace(/\"/g, "\\\"");
+                    us.push("\"".concat(name, "\" <", su.email, ">"));
+                } else {
+                    us.push(su.email);
+                }
+            }
+            navigator.clipboard.writeText(us.join(", "));
+            $gdialog.close();
+        } else {
+            const opt = {
+                pset: ptconf.key,
+                anonymous: ptconf.anonymous ? 1 : "",
+                users: sus_uids(),
+                report: gdform.elements.report.value || "default"
+            };
+            hoturl_get_go("report", opt);
+        }
     }
 
     function do_submit() {
@@ -107,25 +136,29 @@ function ptable_diffdialog(ptconf, sus) {
     function mode_diff() {
         const dv = $gdialog.find(".pa-gdialog-diff")[0];
         if (!dv.firstChild) {
-            const yc = new HtmlCollector;
-            yc.push('<label class="checki"><span class="checkc"><input type="radio" name="diff" value="all" checked></span><strong>Full diffs</strong></label>');
+            const es = [];
+            es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "diff", value: "all", checked: true})), $e("strong", null, "Full diffs")));
             let sep = " mt-2";
             for (const fd of ptconf.diff_files) {
-                yc.push('<label class="checki'.concat(sep, '"><span class="checkc"><input type="radio" name="diff" value="file:', escape_entities(fd), '"></span>', escape_entities(fd), ' diffs</label>'));
+                es.push($e("label", "checki" + sep, $e("span", "checkc", $e("input", {type: "radio", name: "diff", value: "file:" + fd})), fd));
                 sep = "";
             }
             sep = " mt-2";
             for (const gkey of gradesheet.order) {
                 const ge = gradesheet.entries[gkey];
                 if (ge.collate) {
-                    yc.push('<label class="checki'.concat(sep, '"><span class="checkc"><input type="radio" name="diff" value="grade:', escape_entities(ge.key), '"></span>', ge.title_html, '</label>'));
+                    es.push($e("label", "checki" + sep, $e("span", "checkc", $e("input", {type: "radio", name: "diff", value: "grade:" + ge.key})), ge.title_node));
                     sep = "";
                 }
             }
             if (!ptconf.gitless) {
-                yc.push('<label class="checki mt-2"><span class="checkc"><input type="radio" name="diff" value="other"></span>Diffs in <input type="text" name="otherdiff" size="30" class="ml-2"></label>');
+                const input = $e("input", {type: "text", name: "otherdiff", size: "30", class: "ml-2"});
+                es.push($e("label", "checki mt-2", $e("span", "checkc", $e("input", {type: "radio", name: "diff", value: "other"})), "Diffs in ", input));
+                input.addEventListener("input", function () {
+                    this.closest("label").querySelector("input[type=radio]").click();
+                });
             }
-            dv.innerHTML = yc.render();
+            dv.replaceChildren(...es);
         }
         $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         dv.classList.remove("hidden");
@@ -134,16 +167,16 @@ function ptable_diffdialog(ptconf, sus) {
     function mode_gradesheet() {
         const gs = $gdialog.find(".pa-gdialog-gradesheet")[0];
         if (!gs.firstChild) {
-            const yc = new HtmlCollector;
+            const es = [];
             let in_section = false;
             for (const gkey of gradesheet.order) {
                 const ge = gradesheet.entries[gkey],
                     gcl = in_section && ge.type !== "section" ? "checki ml-4" : "checki",
                     ccl = ge.type === "section" ? " pa-gdialog-section" : "";
-                yc.push('<label class="'.concat(gcl, '"><span class="checkc"><input type="checkbox" name="', ge.key, '" class="uic js-range-click', ccl, '" data-range-type="mge"></span>', ge.title_html, '</label>'));
+                es.push($e("label", gcl, $e("span", "checkc", $e("input", {type: "checkbox", name: ge.key, class: "uic js-rage-click" + ccl, "data-range-type": "mge"})), ge.title_node));
                 in_section = in_section || ge.type === "section";
             }
-            gs.innerHTML = yc.render();
+            gs.replaceChildren(...es);
         }
         $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         gs.classList.remove("hidden");
@@ -152,15 +185,16 @@ function ptable_diffdialog(ptconf, sus) {
     function mode_report() {
         const dv = $gdialog.find(".pa-gdialog-report")[0];
         if (!dv.firstChild) {
-            const yc = new HtmlCollector;
-            yc.push('<label class="checki"><span class="checkc"><input type="radio" name="report" value="default" checked></span>Grades</label>');
+            const es = [];
+            es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "report", value: "default", checked: true})), "Grades"));
             if (!ptconf.gitless) {
-                yc.push('<label class="checki"><span class="checkc"><input type="radio" name="report" value="git"></span>Git information</label>');
+                es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "report", value: "git"})), "Git information"));
             }
             for (const fd of ptconf.reports) {
-                yc.push('<label class="checki"><span class="checkc"><input type="radio" name="report" value="', escape_entities(fd.key), '"></span>', escape_entities(fd.title), '</label>');
+                es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "report", value: fd.key})), fd.title));
             }
-            dv.innerHTML = yc.render();
+            es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "report", value: "copyemails"})), "Copy emails to clipboard"));
+            dv.replaceChildren(...es);
         }
         $gdialog.find(".pa-gdialog-tab").addClass("hidden");
         dv.classList.remove("hidden");
