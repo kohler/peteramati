@@ -101,9 +101,13 @@ class Pset {
     public $directory_noslash;
     public $test_file;
 
+    /** @var null|int|float */
     public $deadline;
+    /** @var null|int|float */
     public $deadline_college;
+    /** @var null|int|float */
     public $deadline_extension;
+    /** @var bool */
     public $obscure_late_hours = false;
 
     /** @var array<string,GradeEntry> */
@@ -292,10 +296,10 @@ class Pset {
         if (($this->removed = self::cbool($p, "removed", "admin_disabled"))) {
             $this->disabled = true;
         }
-        $v = self::cdate($p, "visible");
+        $v = self::cbool_or_date($p, "visible");
         $this->visible = $v === true || (is_int($v) && $v > 0 && $v <= Conf::$now);
         $this->visible_at = is_int($v) ? $v : 0;
-        $this->frozen = self::cdate($p, "frozen");
+        $this->frozen = self::cbool_or_date($p, "frozen");
         $this->partner = self::cbool($p, "partner");
         $this->no_branch = self::cbool($p, "no_branch");
         $this->anonymous = self::cbool($p, "anonymous");
@@ -399,7 +403,7 @@ class Pset {
         $this->ngrades = count($this->grades);
         $this->grades_history = self::cbool($p, "grades_history") ?? false;
         $this->grades_selection_function = self::cstr($p, "grades_selection_function");
-        $gv = self::cdate($p, "scores_visible", "grades_visible");
+        $gv = self::cbool_or_date($p, "scores_visible", "grades_visible");
         $this->scores_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->scores_visible_at = is_int($gv) ? $gv : 0;
         $vf_mask = $this->visible_student() ? ~0 : ~VF_STUDENT_ANY;
@@ -416,7 +420,7 @@ class Pset {
             }
         }
 
-        $gsv = self::cdate_or_grades($p, "grade_statistics_visible");
+        $gsv = self::cbool_or_grades_or_date($p, "grade_statistics_visible");
         if ($gsv === true) {
             $this->grade_statistics_visible = 1;
         } else if (($gsv ?? "grades") === "grades") {
@@ -1128,14 +1132,19 @@ class Pset {
         return self::ccheck("is_string_or_string_list", $args);
     }
 
-    /** @return null|bool|int|float */
+    /** @return null|int|float */
     static function cdate(...$args) {
         return self::ccheck("check_date", $args);
     }
 
+    /** @return null|bool|int|float */
+    static function cbool_or_date(...$args) {
+        return self::ccheck("check_bool_or_date", $args);
+    }
+
     /** @return null|bool|int|float|'grades' */
-    static function cdate_or_grades(...$args) {
-        return self::ccheck("check_date_or_grades", $args);
+    static function cbool_or_grades_or_date(...$args) {
+        return self::ccheck("check_bool_or_grades_or_date", $args);
     }
 
     /** @return null|int|float */
@@ -1245,7 +1254,7 @@ class DownloadEntryConfig {
         }
         $this->timed = Pset::cbool($loc, $g, "timed");
         $this->position = Pset::cnum($loc, $g, "position");
-        $this->visible = Pset::cdate($loc, $g, "visible");
+        $this->visible = Pset::cbool_or_date($loc, $g, "visible");
         $this->timeout = Pset::cinterval($loc, $g, "timeout");
     }
 }
@@ -1339,8 +1348,8 @@ class RunnerConfig {
         $this->title = Pset::cstr($loc, $r, "title") ?? $this->name;
         $this->display_title = Pset::cstr($loc, $r, "display_title") ?? "{$this->title} output";
         $this->disabled = Pset::cbool($loc, $rs, "disabled");
-        $this->visible = Pset::cdate_or_grades($loc, $rs, "visible");
-        $this->display_visible = Pset::cdate_or_grades($loc, $rs, "display_visible");
+        $this->visible = Pset::cbool_or_grades_or_date($loc, $rs, "visible");
+        $this->display_visible = Pset::cbool_or_grades_or_date($loc, $rs, "display_visible");
         $this->timeout = Pset::cinterval($loc, $rs, "timeout", "run_timeout");
         $this->idle_timeout = Pset::cinterval($loc, $rs, "idle_timeout");
         if (isset($r->rerun_timestamp)) {
@@ -1732,7 +1741,7 @@ function is_string_or_string_list($x) {
 }
 
 function check_date($x) {
-    if (is_bool($x) || is_int($x)) {
+    if (is_int($x)) {
         return true;
     } else if (is_string($x) && ($d = Conf::$main->parse_time($x))) {
         return [true, $d];
@@ -1743,12 +1752,12 @@ function check_date($x) {
     }
 }
 
-function check_date_or_grades($x) {
-    if ($x === "grades") {
-        return true;
-    } else {
-        return check_date($x);
-    }
+function check_bool_or_date($x) {
+    return is_bool($x) ? true : check_date($x);
+}
+
+function check_bool_or_grades_or_date($x) {
+    return is_bool($x) || $x === "grades" ? true : check_date($x);
 }
 
 function check_interval($x) {
