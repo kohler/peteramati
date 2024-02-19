@@ -9,8 +9,8 @@
         "linkify-it": "latest",
         "markdown-it": "latest",
         "markdown-it-katexx": "^3.2.0",
-        "uglify-js": "^3.14",
-        "xterm": "^4.15"
+        "uglify-js": "^3.17",
+        "xterm": "^5.3.0"
     },
     "devDependencies": {
         "@rollup/plugin-commonjs": "^23.0.2",
