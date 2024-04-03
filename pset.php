@@ -935,16 +935,18 @@ class PsetRequest {
             if (!empty($diff)) {
                 echo "<hr>\n";
                 echo '<div class="pa-diffset">';
+                $sbflags = 0;
                 if ($this->info->can_edit_scores() && !$this->pset->has_grade_landmark_range) {
-                    PsetView::echo_pa_sidebar_gradelist();
+                    $sbflags |= PsetView::SIDEBAR_GRADELIST | PsetView::SIDEBAR_GRADELIST_LINKS;
                 }
+                if (count($diff) > 2) {
+                    $sbflags |= PsetView::SIDEBAR_FILENAV;
+                }
+                PsetView::print_sidebar_open($sbflags, $diff);
                 foreach ($diff as $file => $dinfo) {
                     $this->info->echo_file_diff($file, $dinfo, $lnorder, ["hide_left" => $this->info->can_edit_scores()]);
                 }
-                if ($this->info->can_edit_scores()
-                    && !$this->pset->has_grade_landmark_range) {
-                    PsetView::echo_close_pa_sidebar_gradelist();
-                }
+                PsetView::print_sidebar_close($sbflags);
                 echo '</div>';
             }
 

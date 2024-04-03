@@ -2632,6 +2632,12 @@ td.mhcb {
 .pa-p.pa-ans > .pa-pv > .pa-preview > .pa-preview-border {
 	max-width: 800px;
 }
+.pa-filenav-list {
+	font-size: smaller;
+	list-style-type: none;
+	padding-left: 0;
+	margin: 0;
+}
 
 .pa-gradelist {
 	margin: 1.5rem 0;
@@ -3059,11 +3065,13 @@ h3.gdialog-userids {
 	overflow-y: auto;
 }
 .pa-sidebar > .pa-gradebox {
-	margin-top: 2.125rem;
 	left: 0;
 	display: block;
 	padding-right: 0.8rem;
 	font-size: 90%;
+}
+.pa-sidebar > .pa-gradebox:first-child {
+	margin-top: 2.125rem;
 }
 @media screen and (max-width: 1024px), print {
 .pa-sidebar {
@@ -3296,7 +3304,22 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	border: 1px solid #d0d4e8;
 	border-radius: 4px;
 	background: #f8fcff;
-	padding: 0.65rem 168px 0.3rem 0.8rem;
+	padding: 0.65rem 168px 0.65rem 0.8rem;
+}
+.pa-gradebox.pa-gradelist {
+	padding-bottom: 0.3rem;
+}
+.pa-gradebox.pa-filenavbox {
+	padding-top: 0;
+	padding-bottom: 0;
+	max-height: 25vh;
+	overflow: auto;
+	background: #f8f8f8;
+}
+.pa-filenav-list {
+	margin-top: 0.65rem;
+	margin-bottom: 0.65rem;
+	text-overflow: ellipsis;
 }
 .pa-gradebox > .pa-p {
 	margin-left: 0;

@@ -140,10 +140,15 @@ class DiffMany_Page {
             $want_grades = $pset->has_grade_landmark;
 
             if (!empty($diff)) {
+                $sbflags = 0;
                 if ($info->can_edit_scores() && !$pset->has_grade_landmark_range) {
-                    PsetView::echo_pa_sidebar_gradelist(" want-psetinfo-links");
+                    $sbflags |= PsetView::SIDEBAR_GRADELIST | PsetView::SIDEBAR_GRADELIST_LINKS;
                     $want_grades = true;
                 }
+                if (count($diff) > 2) {
+                    $sbflags |= PsetView::SIDEBAR_FILENAV;
+                }
+                PsetView::print_sidebar_open($sbflags, $diff);
                 foreach ($diff as $file => $dinfo) {
                     $info->echo_file_diff($file, $dinfo, $lnorder, [
                         "expand" => true,
@@ -152,9 +157,7 @@ class DiffMany_Page {
                         "diffcontext" => "{$linkpart_html} / "
                     ]);
                 }
-                if ($info->can_edit_scores() && !$pset->has_grade_landmark_range) {
-                    PsetView::echo_close_pa_sidebar_gradelist();
-                }
+                PsetView::print_sidebar_close($sbflags);
             }
 
             $this->all_viewed += $info->viewed_gradeentries; // XXX off if want all grades

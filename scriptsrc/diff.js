@@ -42,6 +42,11 @@ export class Filediff {
         }
         return e ? new Filediff(e) : null;
     }
+    static by_href(href) {
+        const m = href.match(/^[^#]*#(?:L[ab]\d+|)([UF][-A-Za-z0-9_.@\/]+)$/),
+            e = m && m[1] ? document.getElementById(m[1]) : null;
+        return e ? new Filediff(e) : null;
+    }
     static add_decorator(f) {
         decorators.push(f);
     }
@@ -65,11 +70,19 @@ export class Filediff {
                             const result = $(data.content_html);
                             $(this.element).html(result.children());
                             this.decorate();
+                            $pa.render_text_page();
                         }
                         resolve(this);
                     }
                 })
             });
+        }
+    }
+    load_if(show) {
+        if (!show) {
+            return new ImmediatePromise(this);
+        } else {
+            return this.load();
         }
     }
     decorate() {
@@ -143,6 +156,15 @@ export class Filediff {
     }
     get repourl() {
         return this.psetinfo.getAttribute("data-pa-repourl");
+    }
+    scroll_position() {
+        const cr = this.element.getBoundingClientRect();
+        let top = cr.y + window.scrollY;
+        const preve = this.element.previousSibling;
+        if (preve && preve.nodeName === "H3") {
+            top -= preve.getBoundingClientRect().height + 8;
+        }
+        return Math.max(top - 8, 0);
     }
     static define_method(name, f) {
         if (!Object.prototype.hasOwnProperty.call(Filediff.prototype, name)) {
@@ -439,15 +461,24 @@ handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
     $es.each(function () { Filediff.referenced(this).toggle_show_left(show); });
 });
 
-function goto_hash(hash) {
-    let m, lineid, fd;
-    if ((m = hash.match(/^[^#]*(#(?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@\/]+)$/))) {
-        fd = Filediff.by_hash(m[1]);
-    } else if ((m = hash.match(/^[^#]*#L([ab]\d+)((?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@\/]+)$/))) {
-        fd = Filediff.by_hash("#" + m[2]);
-        lineid = m[1];
+handle_ui.on("pa-filenav", function () {
+    goto_hash(this.hash);
+});
+
+handle_ui.on("pa-filenav-all", function () {
+    for (const e of this.closest("nav").querySelectorAll(".pa-filenav")) {
+        const fd = Filediff.by_href(e.href);
+        fd && fd.load().then(() => { fd.toggle(true); });
     }
-    if (fd && lineid) {
+});
+
+function goto_hash(hash) {
+    const m = hash.match(/^[^#]*#(L[ab]\d+|)((?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@\/]+)$/),
+        lineid = m && m[1] ? m[1].substring(1) : null,
+        fd = m ? Filediff.by_hash("#" + m[2]) : null;
+    if (!fd) {
+        return;
+    } else if (lineid) {
         fd.line(lineid).then(ln => {
             fd.toggle(true);
             const e = ln.visible_predecessor().element;
@@ -455,9 +486,11 @@ function goto_hash(hash) {
             addClass(e, "pa-line-highlight");
             window.scrollTo(0, Math.max($(e).geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
         }).catch(null);
-    } else if (fd) {
-        fd.toggle(true);
-        window.scrollTo(0, Math.max($(fd.element).geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
+    } else {
+        fd.load().then(() => {
+            fd.toggle(true);
+            window.scrollTo(0, fd.scroll_position());
+        });
     }
 }
 

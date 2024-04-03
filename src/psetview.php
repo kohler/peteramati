@@ -2309,7 +2309,15 @@ class PsetView {
             $lnorder->set_diff($diff);
         }
 
-        return $diff;
+        // restrict diff
+        $ndiff = [];
+        foreach ($diff as $fn => $diffi) {
+            if ((!$diffi->hide_if_anonymous || !$this->user->is_anonymous)
+                && (!$diffi->is_empty() || !$diffi->loaded)) {
+                $ndiff[$fn] = $diffi;
+            }
+        }
+        return $ndiff;
     }
 
     private function diff_line_code($t) {
@@ -2335,11 +2343,6 @@ class PsetView {
     /** @param string $file
      * @param array $args */
     function echo_file_diff($file, DiffInfo $dinfo, LineNotesOrder $lnorder, $args) {
-        if (($dinfo->hide_if_anonymous && $this->user->is_anonymous)
-            || ($dinfo->is_empty() && $dinfo->loaded)) {
-            return;
-        }
-
         $this->_diff_tabwidth = $dinfo->tabwidth;
         $this->_diff_lnorder = $lnorder;
         $expand = ($args["expand"] ?? !$dinfo->collapse) && $dinfo->loaded;
@@ -2599,6 +2602,7 @@ class PsetView {
 
         if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {
             echo '<div class="pa-dl pa-gn" data-landmark="', $bln, '"><div class="pa-warnbox"><div class="pa-warncontent need-format" data-format="2">', htmlspecialchars(join("", $lineanno[$bln]->warnings)), '</div></div></div>';
+            $this->need_format = true;
         }
 
         if ($ala) {
@@ -2678,13 +2682,40 @@ class PsetView {
         echo '</div></div></div>'; // pa-notecontent, pa-notebox, pa-dl
     }
 
-    static function echo_pa_sidebar_gradelist($ec = null) {
-        echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
-            '<div class="pa-gradebox pa-ps need-pa-gradelist',
-            $ec ? " $ec" : "", '"></div></div><div class="pa-dg">';
+    const SIDEBAR_GRADELIST = 1;
+    const SIDEBAR_GRADELIST_LINKS = 2;
+    const SIDEBAR_FILENAV = 4;
+    /** @param int $flags
+     * @param array<string,DiffInfo> $diff */
+    static function print_sidebar_open($flags, $diff) {
+        if ($flags === 0) {
+            return;
+        }
+        echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">';
+        if (($flags & self::SIDEBAR_FILENAV) !== 0) {
+            echo '<div class="pa-gradebox pa-filenavbox"><nav>',
+                '<ul class="pa-filenav-list">';
+            foreach ($diff as $file => $di) {
+                echo '<li><a class="ui pa-filenav ulh" href="#F', html_id_encode($file), '">',
+                    htmlspecialchars($file), '</a></li>';
+            }
+            echo '</ul></nav></div>';
+        }
+        if (($flags & self::SIDEBAR_GRADELIST) !== 0) {
+            echo '<div class="pa-gradebox pa-ps need-pa-gradelist';
+            if (($flags & self::SIDEBAR_GRADELIST_LINKS) !== 0) {
+                echo ' want-psetinfo-links';
+            }
+            echo '"></div>';
+        }
+        echo '</div><div class="pa-dg">';
     }
-    static function echo_close_pa_sidebar_gradelist() {
-        echo '</div></div>';
+
+    /** @param int $flags */
+    static function print_sidebar_close($flags) {
+        if ($flags !== 0) {
+            echo '</div></div>';
+        }
     }
 }
 
