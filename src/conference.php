@@ -1878,14 +1878,10 @@ class Conf {
     private function make_jquery_script_file($jqueryVersion) {
         $integrity = null;
         if ($this->opt("jqueryCdn")) {
-            if ($jqueryVersion === "3.7.0") {
+            if ($jqueryVersion === "3.7.1") {
+                $integrity = "sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=";
+            } else if ($jqueryVersion === "3.7.0") {
                 $integrity = "sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=";
-            } else if ($jqueryVersion === "3.5.1") {
-                $integrity = "sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2";
-            } else if ($jqueryVersion === "3.4.1") {
-                $integrity = "sha384-vk5WoKIaW/vJyUAd9n/wmopsmNhiy+L2Z+SBxGYnUkunIxVxAv/UtMOhba/xskxh";
-            } else if ($jqueryVersion === "3.3.1") {
-                $integrity = "sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=";
             } else if ($jqueryVersion === "1.12.4") {
                 $integrity = "sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=";
             }
@@ -2014,7 +2010,7 @@ class Conf {
         if (isset($this->opt["jqueryUrl"])) {
             Ht::stash_html($this->make_script_file($this->opt["jqueryUrl"], true) . "\n");
         } else {
-            $jqueryVersion = $this->opt["jqueryVersion"] ?? "3.7.0";
+            $jqueryVersion = $this->opt["jqueryVersion"] ?? "3.7.1";
             Ht::stash_html($this->make_jquery_script_file($jqueryVersion) . "\n");
         }
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
