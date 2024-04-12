@@ -66,8 +66,9 @@ function ansistyle_parse(dst, style) {
                 if (r <= 255 && g <= 255 && b <= 255) {
                     dst[cmp] = [r, g, b];
                 }
+                i += 4;
             } else if (i + 2 < a.length && parseInt(a[i+1]) === 5) {
-                const c = parseInt(a[i+1]);
+                const c = parseInt(a[i+2]);
                 if (c <= 15) {
                     dst[cmp] = c;
                 } else if (c <= 0xe7) {
@@ -79,6 +80,7 @@ function ansistyle_parse(dst, style) {
                     b = Math.round((c - 0xe8) * 255 / 23);
                     dst[cmp] = [b, b, b];
                 }
+                i += 2;
             }
         }
     }
@@ -133,27 +135,24 @@ function ansistyle_render(text, style) {
         || (typeof style === "string" && !(style = ansistyle_parse(style)))) {
         return text;
     }
-    const node = document.createElement("span"), cl = [];
+    const node = document.createElement("span");
     for (let key in ansistyle_keymap) {
         if (style[key])
-            cl.push("ansi" + key);
+            node.classList.add("ansi" + key);
     }
     if (style.fg) {
         if (typeof style.fg === "number") {
-            cl.push("ansifg" + style.fg);
+            node.classList.add("ansifg" + style.fg);
         } else {
-            node.styles.foregroundColor = ansistyle_hexcolor(style.fg[0], style.fg[1], style.fg[2]);
+            node.style.color = ansistyle_hexcolor(style.fg[0], style.fg[1], style.fg[2]);
         }
     }
     if (style.bg) {
         if (typeof style.bg === "number") {
-            cl.push("ansibg" + style.bg);
+            node.classList.add("ansibg" + style.bg);
         } else {
-            node.styles.backgroundColor = ansistyle_hexcolor(style.bg[0], style.bg[1], style.bg[2]);
+            node.style.backgroundColor = ansistyle_hexcolor(style.bg[0], style.bg[1], style.bg[2]);
         }
-    }
-    if (cl.length) {
-        node.className = cl.join(" ");
     }
     node.appendChild(text);
     return node;
@@ -287,7 +286,7 @@ export function render_terminal(container, string, options) {
         var render, link = "";
         while (line !== "") {
             render = line;
-            if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K|\x1b\]8;;)([^]*)$/))) {
+            if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K|\x1b\]8;;|\x1bc)([^]*)$/))) {
                 if (m[1] === "") {
                     if (m[2] === "\x1b]8;;") {
                         if ((mm = m[3].match(/^(.*?)(?:\x1b\\|\x07)([^]*)$/))) {
@@ -296,10 +295,13 @@ export function render_terminal(container, string, options) {
                         } else {
                             line = "";
                         }
-                        continue;
+                    } else if (m[2] === "\x1bc") {
+                        node.replaceChildren();
+                        line = m[3];
+                    } else {
+                        styles = ansistyle_combine(styles, m[2]);
+                        line = m[3];
                     }
-                    styles = ansistyle_combine(styles, m[2]);
-                    line = m[3];
                     continue;
                 }
                 render = m[1];

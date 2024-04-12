@@ -32,23 +32,23 @@ function make_xterm_write_handler(write) {
                 if (key === "Enter" && !mod) {
                     key = "\r";
                 } else if (key === "Escape" && !mod) {
-                    key = "\x1B";
+                    key = "\x1b";
                 } else if (key === "Backspace" && !mod) {
-                    key = "\x7F";
+                    key = "\x7f";
                 } else if (key === "Tab" && !mod) {
                     key = "\x09";
                 } else if (key === "ArrowUp" && !mod) {
-                    key = "\x1BOA";
+                    key = "\x1bOA";
                 } else if (key === "ArrowDown" && !mod) {
-                    key = "\x1BOB";
+                    key = "\x1bOB";
                 } else if (key === "ArrowRight" && !mod) {
-                    key = "\x1BOC";
+                    key = "\x1bOC";
                 } else if (key === "ArrowLeft" && !mod) {
-                    key = "\x1BOD";
+                    key = "\x1bOD";
                 } else if (key === "PageUp" && !mod) {
-                    key = "\x1B[5~";
+                    key = "\x1b[5~";
                 } else if (key === "PageDown" && !mod) {
-                    key = "\x1B[6~";
+                    key = "\x1b[6~";
                 } else {
                     key = "";
                 }
