@@ -1121,9 +1121,8 @@ function pa_runmany(chain) {
         if (data && data.ok && data.queueid) {
             f.elements.u.value = data.u;
             f.elements.pset.value = data.pset;
-            let $x = $("<a href=\"" + siteinfo.site_relative + "~" + encodeURIComponent(data.u) + "/pset/" + data.pset + "\" class=\"q ansib ansifg7\"></a>");
-            $x.text(data.u);
-            run(f.elements.run, {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: $x[0], done_function: check});
+            const url = `${siteinfo.site_relative}~${encodeURIComponent(data.u)}/pset/${data.pset}`;
+            run(f.elements.run, {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: `\x1b]8;;${url}\x07${data.u}\x1b]8;;\x07`, done_function: check});
         }
         if (data && data.njobs != null) {
             progress(data.njobs);

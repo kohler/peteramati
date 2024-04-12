@@ -183,8 +183,17 @@ export function render_terminal(container, string, options) {
         if (link != null && link !== "") {
             var a = document.createElement("a");
             a.href = link;
-            a.append(n);
-            node.append(a);
+            a.className = "qh";
+            if (n.nodeName === "SPAN") {
+                while (n.firstChild) {
+                    a.appendChild(n.firstChild);
+                }
+                n.appendChild(a);
+                node.append(n);
+            } else {
+                a.append(n);
+                node.append(a);
+            }
         } else {
             node.append(n);
         }
@@ -289,7 +298,7 @@ export function render_terminal(container, string, options) {
             if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K|\x1b\]8;;|\x1bc)([^]*)$/))) {
                 if (m[1] === "") {
                     if (m[2] === "\x1b]8;;") {
-                        if ((mm = m[3].match(/^(.*?)(?:\x1b\\|\x07)([^]*)$/))) {
+                        if ((mm = m[3].match(/^(.*?)(?:[\x1b\x07])([^]*)$/))) {
                             link = mm[1];
                             line = mm[2];
                         } else {

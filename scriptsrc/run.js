@@ -276,19 +276,6 @@ export function run(button, opts) {
         }
     }
 
-    function append_html(html) {
-        if (typeof html === "string") {
-            html = $(html)[0];
-        }
-        if (thexterm) {
-            if (window.console) {
-                console.log("xterm.js cannot render " + html);
-            }
-        } else {
-            render_terminal(thepre[0], html, {cursor: true});
-        }
-    }
-
     function append_data(str, data, done) {
         if (ibuffer !== null) { // haven't started generating output
             ibuffer += str;
@@ -785,12 +772,10 @@ export function run(button, opts) {
         send({write: value});
     }
 
-    if (opts.headline && opts.noclear && !thexterm && thepre[0].firstChild) {
+    if (opts.headline && opts.noclear && thepre[0].firstChild) {
         append("\n\n");
     }
-    if (opts.headline && opts.headline instanceof Node) {
-        append_html(opts.headline);
-    } else if (opts.headline) {
+    if (opts.headline) {
         append("\x1b[1;37m" + opts.headline + "\x1b[m\n");
     }
     if (opts.unfold && therun.getAttribute("data-pa-content")) {
