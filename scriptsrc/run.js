@@ -773,10 +773,10 @@ export function run(button, opts) {
     }
 
     if (opts.headline && opts.noclear && thepre[0].firstChild) {
-        append("\n\n");
+        append("\r\n\r\n");
     }
     if (opts.headline) {
-        append("\x1b[1;37m" + opts.headline + "\x1b[m\n");
+        append("\x1b[1;37m" + opts.headline + "\x1b[m\r\n");
     }
     if (opts.unfold && therun.getAttribute("data-pa-content")) {
         append(therun.getAttribute("data-pa-content"));
