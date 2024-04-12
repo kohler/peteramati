@@ -292,36 +292,17 @@ export function run(button, opts) {
     function append_data(str, data, done) {
         if (ibuffer !== null) { // haven't started generating output
             ibuffer += str;
-            var pos = ibuffer.indexOf("\n\n");
+            const pos = ibuffer.indexOf("\n\n");
             if (pos < 0) {
                 return; // not ready yet
             }
-
             preamble_offset = utf8_length(ibuffer.substr(0, pos + 2));
-            str = ibuffer.substr(pos + 2);
-            ibuffer = null;
-
-            var tsmsg = "";
+            let tsmsg = opts.noclear ? "" : "\x1bc";
             if (data && data.timestamp) {
-                tsmsg = "...started " + strftime("%l:%M:%S%P %e %b %Y", new Date(data.timestamp * 1000));
+                tsmsg += "\x1b[38;5;108;3m...started " + strftime("%l:%M:%S%P %e %b %Y", new Date(data.timestamp * 1000)) + "\x1b[m\r\n";
             }
-
-            if (thexterm) {
-                if (tsmsg !== "") {
-                    tsmsg = "\x1b[3;1;38;5;86m" + tsmsg + "\x1b[m\r\n";
-                }
-                if (!opts.noclear) {
-                    tsmsg = "\x1bc" + tsmsg;
-                }
-                str = tsmsg + str;
-            } else {
-                if (!opts.noclear) {
-                    thepre.html("");
-                }
-                if (tsmsg !== "") {
-                    append_html("<span class=\"pa-runtime\">" + tsmsg + "</span>");
-                }
-            }
+            str = tsmsg + ibuffer.substr(pos + 2);
+            ibuffer = null;
         }
         if (str !== "") {
             append(str, done);
