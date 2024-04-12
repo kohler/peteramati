@@ -233,6 +233,11 @@ class RunRequest {
         } else if (($err = $this->check_view(true))) {
             self::quit($err);
         } else if (isset($this->qreq->chain) && ctype_digit($this->qreq->chain)) {
+            if ($this->pset->has_xterm_js) {
+                $this->conf->add_stylesheet("stylesheets/xterm.css");
+                $this->conf->add_javascript("scripts/xterm.js");
+            }
+
             $t = $this->pset->title;
             if ($this->if_needed) {
                 $t .= " (if needed)";
@@ -253,7 +258,8 @@ class RunRequest {
                 '</div></form>';
 
             echo '<div id="run-', $this->runner->name, '">',
-                '<div class="pa-run pa-run-short" id="pa-run-', $this->runner->name, '">',
+                '<div class="pa-run pa-run-short"',
+                $this->runner->div_attributes($this->pset), '>',
                 '<pre class="pa-runpre"></pre></div>',
                 '</div>';
 

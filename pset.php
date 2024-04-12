@@ -805,20 +805,8 @@ class PsetRequest {
         echo '"><h3><button type="button" class="qo ui pa-run-show">',
             '<span class="foldarrow">&#x25B6;</span>',
             htmlspecialchars($runner->display_title), '</button></h3>',
-            '<div class="pa-run pa-run-short need-run hidden" id="pa-run-', $runner->name, '"';
-        if ($runner->xterm_js
-            || ($runner->xterm_js === null && $info->pset->run_xterm_js)) {
-            echo ' data-pa-xterm-js="true"';
-        }
-        if ($runner->rows > 0) {
-            echo ' data-pa-rows="', $runner->rows, '"';
-        }
-        if ($runner->columns > 0) {
-            echo ' data-pa-columns="', $runner->columns, '"';
-        }
-        if ($runner->font_size > 0) {
-            echo ' data-pa-font-size="', $runner->font_size, '"';
-        }
+            '<div class="pa-run pa-run-short need-run hidden"',
+            $runner->div_attributes($info->pset);
         if ($rr && isset($rr->timestamp)) {
             echo ' data-pa-timestamp="', $rr->timestamp, '"';
         }

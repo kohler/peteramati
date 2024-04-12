@@ -1,6 +1,6 @@
 <?php
 // psetconfig.php -- Peteramati configuration classes
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class PsetConfigException extends Exception {
@@ -1460,6 +1460,24 @@ class RunnerConfig {
             }
         }
         return $this->rerun_timestamp;
+    }
+
+    /** @return string */
+    function div_attributes(Pset $pset) {
+        $t = " id=\"pa-run-{$this->name}\"";
+        if ($this->xterm_js ?? $pset->run_xterm_js) {
+            $t .= " data-pa-xterm-js=\"true\"";
+        }
+        if ($this->rows > 0) {
+            $t .= " data-pa-rows=\"{$this->rows}\"";
+        }
+        if ($this->columns > 0) {
+            $t .= " data-pa-columns=\"{$this->columns}\"";
+        }
+        if ($this->font_size > 0) {
+            $t .= " data-pa-font-size=\"{$this->font_size}\"";
+        }
+        return $t;
     }
 }
 
