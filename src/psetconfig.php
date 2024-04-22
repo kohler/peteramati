@@ -1477,6 +1477,7 @@ class RunnerConfig {
         if ($this->font_size > 0) {
             $t .= " data-pa-font-size=\"{$this->font_size}\"";
         }
+        $t .= " data-pa-start=\"alternate-screen\"";
         return $t;
     }
 }
