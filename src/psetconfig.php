@@ -1319,6 +1319,8 @@ class RunnerConfig {
     public $display_function;
     /** @var null|bool|float */
     public $timed_replay;
+    /** @var ?string */
+    public $timed_replay_start;
 
     function __construct($name, $r, $defr, Pset $pset) {
         $loc = ["runners", $name];
@@ -1403,6 +1405,7 @@ class RunnerConfig {
         } else {
             $this->timed_replay = !!Pset::cbool($loc, $rs, "timed_replay");
         }
+        $this->timed_replay_start = Pset::cstr($loc, $rs, "timed_replay_start");
     }
 
     /** @param string $x
@@ -1476,6 +1479,9 @@ class RunnerConfig {
         }
         if ($this->font_size > 0) {
             $t .= " data-pa-font-size=\"{$this->font_size}\"";
+        }
+        if ($this->timed_replay_start) {
+            $t .= " data-pa-start=\"" . htmlspecialchars($this->timed_replay_start) . "\"";
         }
         return $t;
     }

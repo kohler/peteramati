@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { wstorage, sprintf, strftime } from "./utils.js";
-import { hasClass, addClass, removeClass, fold61, handle_ui } from "./ui.js";
+import { $e, hasClass, addClass, removeClass, fold61, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { render_terminal } from "./render-terminal.js";
 import { grades_fetch } from "./grade-ui.js";
@@ -322,19 +322,18 @@ export function run(button, opts) {
         return a;
     }
 
-    function append_timed(data, at_end) {
-        let erange, etime, ebutton, espeed,
-            tpos, tstart, tlast, timeout, running, factor,
-            partial_outstanding = 0, partial_time;
+    function set_time_data(data, at_end) {
+        let tpos, tstart, tlast, timeout, running,
+            partial_outstanding = false, partial_time;
         if (times) {
             return;
         } else if (data.offset !== 0) {
             throw new Error("fuck");
         }
 
+        let factor = data.time_factor;
         {
             const runspeed = wstorage.site_json(false, "pa-runspeed-" + category);
-            factor = data.time_factor;
             if (runspeed && runspeed[1] >= (new Date).getTime() - 86400000) {
                 factor = runspeed[0];
             } else if (runspeed) {
@@ -349,13 +348,16 @@ export function run(button, opts) {
         if (typeof times === "string") {
             times = parse_times(times);
         }
+
+        let ebutton, erange, etime, espeed;
         if (times.length > 2) {
-            erange = $('<div class="pa-runrange"><button type="button" class="pa-runrange-play"></button><input type="range" class="pa-runrange-range" min="0" max="' + times[times.length - 2] + '"><span class="pa-runrange-time"></span><span class="pa-runrange-speed-slow" title="Slow">🐢</span><input type="range" class="pa-runrange-speed" min="0.1" max="10" step="0.1"><span class="pa-runrange-speed-fast" title="Fast">🐇</span></div>').prependTo(therun);
-            etime = erange[0].lastChild;
-            ebutton = erange[0].firstChild;
-            erange = ebutton.nextSibling;
-            etime = erange.nextSibling;
-            espeed = etime.nextSibling.nextSibling;
+            therun.prepend($e("div", "pa-runrange",
+                (ebutton = $e("button", {type: "button", "class": "pa-runrange-play"})),
+                (erange = $e("input", {type: "range", "class": "pa-runrange-range", min: 0, max: times[times.length -2]})),
+                (etime = $e("span", "pa-runrange-time")),
+                $e("span", {title: "Slow", "class": "pa-runrange-speed-slow"}, "🐢"),
+                (espeed = $e("input", {type: "range", "class": "pa-runrange-speed", min: "0.1", max: 10, step: "0.1"})),
+                $e("span", {title: "Fast", "class": "pa-runrange-speen-fast"}, "🐇")));
             erange.addEventListener("input", function () {
                 running = false;
                 addClass(ebutton, "paused");
@@ -415,16 +417,45 @@ export function run(button, opts) {
             }
         }
 
-        function tpos_offset(tpos) {
+        function add_data() {
             if (ibuffer !== null) {
                 const nlnl = data.data.indexOf("\n\n");
                 append_data(data.data.substring(0, nlnl + 2), data);
+                // ... which sets `ibuffer = null`
             }
+        }
+
+        function tpos_offset(tpos) {
             if (tpos < times.length) {
                 return preamble_offset + times[tpos + 1];
             } else {
                 return data.size;
             }
+        }
+
+        function tpos_lower_bound(l, r, time) {
+            while (l < r) {
+                const m = l + (((r - l) >> 1) & ~1);
+                if (time <= times[m]) {
+                    r = m;
+                } else {
+                    l = m + 2;
+                }
+            }
+            return l;
+        }
+
+        function offset_lower_bound(offset) {
+            let l = 0, r = times.length;
+            while (l < r) {
+                const m = l + (((r - l) >> 1) & ~1);
+                if (offset <= times[m + 1]) {
+                    r = m;
+                } else {
+                    l = m + 2;
+                }
+            }
+            return l;
         }
 
         function f(time) {
@@ -436,36 +467,32 @@ export function run(button, opts) {
                 }
             }
 
-            // find `npos`: the new time position
+            // find `npos`, the new time position
             let npos = tpos;
             if (npos >= times.length || time < times[npos]) {
                 npos = 0;
             }
             if (npos + 2 < times.length && time >= times[npos]) {
-                let rpos = times.length;
-                while (npos < rpos) {
-                    const m = npos + (((rpos - npos) >> 1) & ~1);
-                    if (time <= times[m]) {
-                        rpos = m;
-                    } else {
-                        npos = m + 2;
-                    }
-                }
+                npos = tpos_lower_bound(npos, times.length, time);
             }
             while (npos < times.length && time >= times[npos]) {
                 npos += 2;
             }
 
-            // find `tpos`, the first time position, and `boffset`, data position
+            // reset buffer if new time position is less than current
             if (npos < tpos) {
                 ibuffer = "";
                 tpos = 0;
             }
-            let boffset = tpos_offset(tpos);
+            if (ibuffer !== null) {
+                add_data();
+            }
+
+            // range of data [boffset, eoffset) to feed to xterm.js
+            let boffset = tpos_offset(tpos), eoffset = tpos_offset(npos);
 
             // flow control: give xterm.js 8MB of data at a time
             const maxdata = 8 << 20;
-            let eoffset = tpos_offset(npos);
             if (boffset + maxdata < eoffset) {
                 let lpos = tpos;
                 while (lpos < npos) {
@@ -527,6 +554,14 @@ export function run(button, opts) {
             tstart = (new Date).getTime();
             running = true;
             if (times.length) {
+                if (therun.getAttribute("data-pa-start") === "alternate-screen") {
+                    const nlnl = data.data.indexOf("\n\n"),
+                        altscr = data.data.indexOf("\x1b[?1049h"),
+                        xtpos = altscr > nlnl ? offset_lower_bound(altscr - nlnl - 2) : -1;
+                    if (xtpos >= 0 && xtpos < times.length) {
+                        tstart -= times[xtpos] / factor;
+                    }
+                }
                 f(null);
             }
         }
@@ -665,12 +700,12 @@ export function run(button, opts) {
             data.data = data.data.substring(0, data.data.length - m[0].length);
         }
 
-        // Pure replay -> append_timed
+        // Pure replay -> set_time_data
         if (data.done
             && data.time_data != null
             && ibuffer === "") {
             // Parse timing data
-            append_timed(data);
+            set_time_data(data);
             return;
         }
 
@@ -712,7 +747,7 @@ export function run(button, opts) {
     function succeed_add_times(data) {
         --send_out;
         if (data.data && data.done && data.time_data != null) {
-            append_timed(data, true);
+            set_time_data(data, true);
         }
     }
 
