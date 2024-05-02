@@ -196,7 +196,7 @@ class Repo_API {
             $args["linecount"] = intval($qreq->linecount);
         }
         $x = $api->repo->gitruninfo(["git", "show", "{$api->hash}:{$qreq->file}"], $args);
-        if (!$x->status && ($x->stdout !== "" || $x->stderr === "")) {
+        if ($x->ok && ($x->stdout !== "" || $x->stderr === "")) {
             $data = $x->stdout;
             if (is_valid_utf8($data)) {
                 return ["ok" => true, "data" => $data];
@@ -206,7 +206,7 @@ class Repo_API {
         } else if (strpos($x->stderr, "does not exist") !== false) {
             return ["ok" => false, "error" => "No such file."];
         } else {
-            error_log(join(" ", $x->command) . ": " . $x->stderr);
+            error_log(join(" ", $x->command) . ": {$x->status}: " . $x->stderr);
             return ["ok" => false, "error" => "Problem."];
         }
     }
