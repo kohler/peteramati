@@ -1,5 +1,5 @@
 // pa-jail.cc -- Peteramati program sets up a jail for student code
-// Peteramati is Copyright (c) 2013-2019 Eddie Kohler and others
+// Peteramati is Copyright (c) 2013-2024 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 #include <sys/types.h>
@@ -3024,7 +3024,7 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
     fflush(stderr);
     // close event sources
     for (auto& esf : esfds_) {
-        esf.append("data:{\"done\":true}\n\n", 20);
+        esf.jbuf_.append("data:{\"done\":true}\n\n", 20);
     }
     while (true) {
         std::vector<pollfd> p;
@@ -3036,7 +3036,7 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
                 close(it->fd_);
                 it = esfds_.erase(it);
             } else {
-                p.push_back({esf.fd_, POLLOUT, 0});
+                p.push_back({it->fd_, POLLOUT, 0});
                 ++it;
             }
         }
