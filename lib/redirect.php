@@ -4,19 +4,24 @@
 
 /** @return string */
 function make_session_name(Conf $conf, $n) {
-    if (($n === "" || $n === null || $n === true)
-        && ($x = $conf->opt("dbName"))) {
-        $n = $x;
+    if ($n === "" || $n === null || $n === true) {
+        $n = $conf->dbname;
     }
-    if (($x = $conf->opt("confid"))) {
-        $n = preg_replace('/\*|\$\{confid\}|\$confid\b/', $x, $n);
+    if (ctype_lower($n)) {
+        return $n;
+    }
+    if (strpos($n, '${') !== false) {
+        $n = SiteLoader::substitute($n, [
+            "confid" => $conf->opt("confid"),
+            "siteclass" => $conf->opt("siteclass")
+        ]);
     }
     return preg_replace_callback('/[^-_A-Ya-z0-9]/', function ($m) {
         return "Z" . dechex(ord($m[0]));
     }, $n);
 }
 
-function set_session_name(Conf $conf) {
+function set_session_name(Conf $conf, NavigationState $nav) {
     if (!($sn = make_session_name($conf, $conf->opt("sessionName")))) {
         return false;
     }
@@ -34,7 +39,7 @@ function set_session_name(Conf $conf) {
         $_COOKIE[$sn] = $_COOKIE[$upgrade_sn];
         hotcrp_setcookie($upgrade_sn, "", [
             "expires" => time() - 3600, "path" => "/",
-            "domain" => $conf->opt("sessionUpgradeDomain") ?? ($domain ? : ""),
+            "domain" => $conf->opt("sessionUpgradeDomain") ?? $domain,
             "secure" => $secure
         ]);
     }
@@ -55,12 +60,8 @@ function set_session_name(Conf $conf) {
         $params["lifetime"] = $lifetime;
     }
     $params["secure"] = $secure;
-    if ($domain !== null || !isset($params["domain"])) {
-        $params["domain"] = $domain;
-    }
-    if ($domain === null) {
-        $params["path"] = Navigation::base_path();
-    }
+    $params["domain"] = $domain ?? $params["domain"] ?? "";
+    $params["path"] = $params["domain"] === "" ? $nav->base_path : "/";
     $params["httponly"] = true;
     if ($samesite && ($secure || $samesite !== "None")) {
         $params["samesite"] = $samesite;
@@ -74,113 +75,12 @@ function set_session_name(Conf $conf) {
     }
 }
 
-const ENSURE_SESSION_ALLOW_EMPTY = 1;
-const ENSURE_SESSION_REGENERATE_ID = 2;
-
-function ensure_session($flags = 0) {
-    global $Conf;
-    if (headers_sent($hsfn, $hsln)) {
-        error_log("$hsfn:$hsln: headers sent: " . debug_string_backtrace());
-    }
-    if (($flags & ENSURE_SESSION_REGENERATE_ID) !== 0
-        && !function_exists("session_create_id")) { // PHP 7.0 compatibility
-        $flags &= ~ENSURE_SESSION_REGENERATE_ID;
-    }
-    if (session_id() !== ""
-        && ($flags & ENSURE_SESSION_REGENERATE_ID) === 0) {
-        return;
-    }
-
-    $sn = session_name();
-    $has_cookie = isset($_COOKIE[$sn]);
-    if (!$has_cookie && ($flags & ENSURE_SESSION_ALLOW_EMPTY)) {
-        return;
-    }
-
-    $session_data = [];
-    if ($has_cookie && ($flags & ENSURE_SESSION_REGENERATE_ID)) {
-        // choose new id, mark old session as deleted
-        if (session_id() === "") {
-            session_start();
-        }
-        $session_data = $_SESSION ? : [];
-        $new_sid = session_create_id();
-        $_SESSION["deletedat"] = Conf::$now;
-        session_commit();
-
-        session_id($new_sid);
-        if (!isset($_COOKIE[$sn]) || $_COOKIE[$sn] !== $new_sid) {
-            $params = session_get_cookie_params();
-            $params["expires"] = Conf::$now + $params["lifetime"];
-            unset($params["lifetime"]);
-            hotcrp_setcookie($sn, $new_sid, $params);
-        }
-    }
-
-    session_start();
-
-    // maybe kill old session
-    if (isset($_SESSION["deletedat"])
-        && $_SESSION["deletedat"] < Conf::$now - 30) {
-        $_SESSION = [];
-    }
-
-    // transfer data from previous session if regenerating id
-    foreach ($session_data as $k => $v) {
-        $_SESSION[$k] = $v;
-    }
-
-    // avoid session fixation
-    if (empty($_SESSION)) {
-        if ($has_cookie && !($flags & ENSURE_SESSION_REGENERATE_ID)) {
-            session_regenerate_id();
-        }
-        $_SESSION["testsession"] = false;
-    } else if (Conf::$main->_session_handler
-               && is_callable([Conf::$main->_session_handler, "refresh_cookie"])) {
-        call_user_func([Conf::$main->_session_handler, "refresh_cookie"], $sn, session_id());
-    }
-}
-
-function post_value($allow_empty = false) {
-    $sid = session_id();
-    if ($sid === "" && !$allow_empty) {
-        ensure_session();
-        $sid = session_id();
-    }
-    if ($sid !== "") {
-        if (strlen($sid) > 16) {
-            $sid = substr($sid, 8, 12);
-        } else {
-            $sid = substr($sid, 0, 12);
-        }
-    } else {
-        $sid = ".empty";
-    }
-    return urlencode($sid);
-}
-
-function kill_session() {
-    if (($sn = session_name())
-        && isset($_COOKIE[$sn])) {
-        if (session_id() !== "") {
-            session_commit();
-        }
+function unlink_session() {
+    if (($sn = session_name()) && isset($_COOKIE[$sn])) {
         $params = session_get_cookie_params();
         $params["expires"] = Conf::$now - 86400;
         unset($params["lifetime"]);
         hotcrp_setcookie($sn, "", $params);
         $_COOKIE[$sn] = "";
-    }
-}
-
-/** @deprecated */
-function check_post($qreq = null) {
-    $pv = post_value();
-    if ($qreq) {
-        return $qreq->valid_post();
-    } else {
-        return (isset($_GET["post"]) && $_GET["post"] == $pv)
-            || (isset($_POST["post"]) && $_POST["post"] == $pv);
     }
 }

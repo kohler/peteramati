@@ -78,7 +78,7 @@ class ResetPassword_Page {
                 $log_acct->log_activity("Password reset via " . substr($resetcap, 0, 8) . "...");
                 $this->conf->confirmMsg("Your password has been changed. You may now sign in to the conference site.");
                 $capmgr->delete($capdata);
-                $this->conf->save_session("password_reset", (object) array("time" => Conf::$now, "email" => $Acct->email, "password" => $_POST["password"]));
+                $this->qreq->set_gsession("password_reset", (object) ["time" => Conf::$now, "email" => $Acct->email, "password" => $_POST["password"]]);
                 $this->conf->redirect();
             }
             $password_class = " has-error";
@@ -101,7 +101,7 @@ class ResetPassword_Page {
         echo "</div>
         <hr class='home' />
         <div class='homegrp' id='homereset'>\n",
-            Ht::form($this->conf->hoturl_post("resetpassword")),
+            Ht::form($this->conf->hoturl("=resetpassword")),
             '<div class="f-contain">',
             Ht::hidden("resetcap", $resetcap),
             Ht::hidden("autopassword", $_POST["autopassword"]),

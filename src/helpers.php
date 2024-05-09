@@ -250,32 +250,7 @@ class JsonResult {
         } else if (!is_object($json) || !($json instanceof JsonResult)) {
             $json = new JsonResult($json);
         }
-        if (!$json->has_messages && $user) {
-            $json->take_messages($user);
-        }
         return $json;
-    }
-    function take_messages(Contact $user, $div = false) {
-        if (session_id() !== ""
-            && ($msgs = $user->session("msgs", []))) {
-            $user->save_session("msgs", null);
-            $t = "";
-            foreach ($msgs as $msg) {
-                if (($msg[1] === "merror" || $msg[1] === "xmerror")
-                    && !isset($this->content["error"])) {
-                    $this->content["error"] = $msg[0];
-                }
-                if ($div) {
-                    $t .= Ht::msg($msg[0], $msg[1]);
-                } else {
-                    $t .= "<span class=\"$msg[1]\">$msg[0]</span>";
-                }
-            }
-            if ($t !== "") {
-                $this->content["response"] = $t . ($this->content["response"] ?? "");
-            }
-            $this->has_messages = true;
-        }
     }
     function export_errors() {
         if (isset($this->content["error"])) {
@@ -320,7 +295,7 @@ function json_exit($json, $arg2 = null) {
                 $json->content["status"] = $json->status;
             }
             if ($Qreq->post && !$Qreq->valid_token()) {
-                $json->content["postvalue"] = post_value(true);
+                $json->content["postvalue"] = $Qreq->maybe_post_value();
             }
         }
         header("Content-Type: application/json; charset=utf-8");

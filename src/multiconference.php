@@ -1,6 +1,6 @@
 <?php
 // multiconference.php -- HotCRP multiconference installations
-// Copyright (c) 2006-2022 Eddie Kohler; see LICENSE.
+// Copyright (c) 2006-2024 Eddie Kohler; see LICENSE.
 
 class Multiconference {
     /** @var ?array<string,mixed> */
@@ -81,11 +81,11 @@ class Multiconference {
         if (self::$conf_cache === null) {
             self::$conf_cache = [];
             if (Conf::$main && ($xconfid = Conf::$main->opt("confid"))) {
-                self::$conf_cache[SiteLoader::$root . "{}{$xconfid}"] = Conf::$main;
+                self::$conf_cache[SiteLoader::$root . "\0{$xconfid}"] = Conf::$main;
             }
         }
         $root = $root ?? SiteLoader::$root;
-        $key = "{$root}{}{$confid}";
+        $key = "{$root}\0{$confid}";
         if (!array_key_exists($key, self::$conf_cache)) {
             self::$conf_cache[$key] = self::load_conf($root, $confid);
         }

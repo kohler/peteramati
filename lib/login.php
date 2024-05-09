@@ -3,40 +3,26 @@
 // Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
 
 class LoginHelper {
-    static function logout(Contact $user, $explicit) {
-        if (isset($_SESSION)) {
-            $_SESSION = [];
-            session_commit();
-        }
-        if ($explicit && $user->conf->opt("httpAuthLogin")) {
-            ensure_session(ENSURE_SESSION_REGENERATE_ID);
-            $_SESSION["reauth"] = true;
-            $user->conf->redirect();
-        } else if ($explicit) {
-            kill_session();
-        }
-        $user = new Contact(null, $user->conf);
-        return $user->activate(null);
-    }
-
     static function check_http_auth(Contact $user, Qrequest $qreq) {
         $conf = $user->conf;
         assert($conf->opt("httpAuthLogin") !== null);
 
         // if user signed out of HTTP authentication, send a reauth request
-        if (isset($_SESSION["reauth"])) {
-            unset($_SESSION["reauth"]);
+        if ($qreq->has_gsession("reauth")) {
+            $qreq->unset_gsession("reauth");
             header("HTTP/1.0 401 Unauthorized");
-            if (is_string($conf->opt("httpAuthLogin")))
+            if (is_string($conf->opt("httpAuthLogin"))) {
                 header("WWW-Authenticate: " . $conf->opt("httpAuthLogin"));
-            else
+            } else {
                 header("WWW-Authenticate: Basic realm=\"HotCRP\"");
+            }
             exit;
         }
 
         // if user is still valid, OK
-        if ($user->has_account_here())
+        if ($user->has_account_here()) {
             return;
+        }
 
         // check HTTP auth
         if (!isset($_SERVER["REMOTE_USER"]) || !$_SERVER["REMOTE_USER"]) {
@@ -165,13 +151,13 @@ class LoginHelper {
         $xuser->mark_login();
 
         // store authentication
-        ensure_session(ENSURE_SESSION_REGENERATE_ID);
-        $_SESSION["u"] = $xuser->email;
-        $_SESSION["testsession"] = true;
+        $qreq->qsession()->open_new_sid();
+        $qreq->set_gsession("u", $xuser->email);
+        $qreq->set_gsession("v", 2);
 
         // activate
         $user = $xuser->activate($qreq);
-        $user->save_session("password_reset", null);
+        $qreq->unset_csession("password_reset");
 
         // give chair privilege to first user (external login or contactdb)
         if ($conf->setting("setupPhase")) {
@@ -179,7 +165,7 @@ class LoginHelper {
         }
 
         // redirect
-        $nav = Navigation::get();
+        $nav = $qreq->navigation();
         $url = $nav->server . $nav->base_path;
         $url .= "?postlogin=1";
         if ($qreq->go !== null) {
@@ -190,20 +176,19 @@ class LoginHelper {
 
     static function check_postlogin(Contact $user, Qrequest $qreq) {
         // Check for the cookie
-        if (!isset($_SESSION["testsession"]) || !$_SESSION["testsession"]) {
+        if (!$qreq->has_gsession("v")) {
             return Conf::msg_error("You appear to have disabled cookies in your browser. This site requires cookies to function.");
         }
-        unset($_SESSION["testsession"]);
 
         // Go places
-        if (isset($qreq->go)) {
-            $where = $qreq->go;
-        } else if (isset($_SESSION["login_bounce"])
-                   && $_SESSION["login_bounce"][0] == $user->conf->dsn) {
-            $where = $_SESSION["login_bounce"][1];
+        if (isset($qreq->redirect)) {
+            $where = $qreq->redirect;
+        } else if (($login_bounce = $qreq->gsession("login_bounce"))
+                   && $login_bounce[0] === $user->conf->session_key) {
+            $where = $login_bounce[1];
         } else {
-            $user->save_session("freshlogin", true);
-            $where = $user->conf->hoturl("index");
+            $qreq->set_csession("freshlogin", true);
+            $where = $user->conf->hoturl("index", null, Conf::HOTURL_RAW);
         }
         $user->conf->redirect($where);
         exit;
@@ -276,5 +261,26 @@ class LoginHelper {
         $user->save_roles(Contact::ROLE_ADMIN, null);
         $user->conf->save_setting("setupPhase", null);
         $user->conf->confirmMsg(ltrim($msg));
+    }
+
+    /** @param bool $explicit
+     * @return Contact */
+    static function logout(Contact $user, Qrequest $qreq, $explicit) {
+        $qsess = $qreq->qsession();
+        if ($qsess->maybe_open()) {
+            $qsess->clear();
+            $qsess->commit();
+        }
+        if ($explicit) {
+            if ($user->conf->opt("httpAuthLogin")) {
+                $qsess->open_new_sid();
+                $qsess->set("reauth", true);
+            } else {
+                unlink_session();
+            }
+        }
+        $user = new Contact(null, $user->conf);
+        unset($qreq->actas, $qreq->cap, $qreq->forceShow, $qreq->override);
+        return $user->activate($qreq, null);
     }
 }

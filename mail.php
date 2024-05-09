@@ -132,7 +132,7 @@ class MailSender {
         global $Conf, $Me, $Qreq;
         if ($this->started)
             return;
-        echo Ht::form(hoturl_post("mail"));
+        echo Ht::form($Conf->hoturl("=mail"));
         foreach (array("recipients", "subject", "emailBody", "cc", "replyto", "q", "t", "plimit") as $x)
             if (isset($Qreq[$x]))
                 echo Ht::hidden($x, $Qreq[$x]);
@@ -447,7 +447,7 @@ else if (($Qreq->check || $Qreq->group || $Qreq->ungroup)
     MailSender::check($recip);
 
 
-echo Ht::form_div(hoturl_post("mail", "check=1")),
+echo Ht::form_div($Conf->hoturl("=mail", "check=1")),
     Ht::hidden_default_submit("default", 1), "
 
 <div class='aa' style='padding-left:8px'>

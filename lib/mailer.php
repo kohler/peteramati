@@ -179,7 +179,7 @@ class Mailer {
             return $Conf->hoturl_absolute($a[0], isset($a[1]) ? $a[1] : "", Conf::HOTURL_NO_DEFAULTS);
         }
         if ($what == "%PHP%")
-            return Navigation::php_suffix();
+            return Navigation::get()->php_suffix;
         if (preg_match('/\A%(CONTACT|NAME|EMAIL|FIRST|LAST)%\z/', $what, $m)) {
             if ($this->recipient) {
                 if ($this->preparation)

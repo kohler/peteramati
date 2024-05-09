@@ -480,9 +480,7 @@ class Contact {
     }
 
     /** @return Contact */
-    function activate($qreq, $signin = false) {
-        global $Qreq;
-        $qreq = $qreq ? : $Qreq;
+    function activate(Qrequest $qreq, $signin = false) {
         $this->activated_ = true;
 
         // Handle actas requests
@@ -491,9 +489,8 @@ class Contact {
             unset($qreq->actas, $_GET["actas"], $_POST["actas"]);
             $actascontact = $this->actas_user($actas);
             if ($actascontact !== $this) {
-                $this->conf->save_session("l", null);
                 Conf::$hoturl_defaults["actas"] = urlencode($actascontact->email);
-                $_SESSION["last_actas"] = $actascontact->email;
+                $qreq->set_gsession("last_actas", $actascontact->email);
                 self::$base_auth_user = $this;
                 return $actascontact->activate($qreq);
             }
@@ -529,15 +526,6 @@ class Contact {
 
     function contactdb_user() {
         return null;
-    }
-
-
-    function session($name, $defval = null) {
-        return $this->conf->session($name, $defval);
-    }
-
-    function save_session($name, $value) {
-        $this->conf->save_session($name, $value);
     }
 
 
@@ -670,14 +658,14 @@ class Contact {
         if ($this->is_empty()) {
             // Preserve post values across session expiration.
             $x = array();
-            if (Navigation::path()) {
-                $x["__PATH__"] = preg_replace(",^/+,", "", Navigation::path());
+            if ($Qreq->path()) {
+                $x["__PATH__"] = preg_replace(",^/+,", "", $Qreq->path());
             }
-            if ($Qreq->anchor) {
-                $x["anchor"] = $Qreq->anchor;
+            if ($Qreq["anchor"]) {
+                $x["anchor"] = $Qreq["anchor"];
             }
             $url = $this->conf->selfurl($Qreq, [], Conf::HOTURL_RAW | Conf::HOTURL_SITE_RELATIVE);
-            $_SESSION["login_bounce"] = array($this->conf->dsn, $url, Navigation::page(), $_POST);
+            $Qreq->set_gsession("login_bounce", [$this->conf->session_key, $url, $Qreq->page(), $_POST, Conf::$now + 120]);
             if ($Qreq->valid_post()) {
                 $this->conf->msg("You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.", 2);
             } else {
@@ -1661,7 +1649,7 @@ class Contact {
         $user = $user ?? $this;
         if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous))) {
             return $user->anon_username;
-        } else if ($this->isPC || ($_SESSION["last_actas"] ?? null)) {
+        } else if ($this->isPC) {
             return $user->username ? : $user->email;
         } else {
             return null;
@@ -1670,10 +1658,10 @@ class Contact {
 
     function user_idpart(Contact $user = null) {
         $user = $user ?? $this;
-        if (!$this->isPC && !($_SESSION["last_actas"] ?? null)) {
-            return null;
-        } else {
+        if ($this->isPC) {
             return $user->github_username ? : $user->huid;
+        } else {
+            return null;
         }
     }
 }

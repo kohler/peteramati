@@ -22,7 +22,7 @@ function initialize_request() {
 
     // check PHP suffix
     if (($php_suffix = $conf->opt("phpSuffix")) !== null) {
-        $nav->php_suffix = $php_suffix;
+        $nav->set_php_suffix($php_suffix);
     }
 
     // maybe redirect to https
@@ -31,7 +31,9 @@ function initialize_request() {
     }
 
     // collect $qreq
-    $qreq = Qrequest::make_global();
+    $qreq = Qrequest::make_global($nav);
+    $qreq->set_conf($conf);
+    Qrequest::set_main_request($qreq);
 
     // check method
     if ($qreq->method() !== "GET"
@@ -52,12 +54,7 @@ function initialize_request() {
     }
 
     // set up session
-    if (($sh = $conf->opt["sessionHandler"] ?? null)) {
-        /** @phan-suppress-next-line PhanTypeExpectedObjectOrClassName, PhanNonClassMethodCall */
-        $conf->_session_handler = new $sh($conf);
-        session_set_save_handler($conf->_session_handler, true);
-    }
-    set_session_name($conf);
+    set_session_name($conf, $nav);
     $sn = session_name();
 
     // check CSRF token, using old value of session ID
@@ -68,15 +65,17 @@ function initialize_request() {
             $qreq->approve_token();
         }
     }
-    ensure_session(ENSURE_SESSION_ALLOW_EMPTY);
-
-    // upgrade session format
-    if (!isset($_SESSION["u"]) && isset($_SESSION["trueuser"])) {
-        $_SESSION["u"] = $_SESSION["trueuser"]->email;
+    $qsessionf = $conf->opt["qsessionFunction"] ?? "+PHPQsession";
+    if (str_starts_with($qsessionf, "+")) {
+        $class = substr($qsessionf, 1);
+        $qreq->set_qsession(new $class($conf, $qreq));
+    } else if ($qsessionf) {
+        $qreq->set_qsession(call_user_func($qsessionf, $conf, $qreq));
     }
+    $qreq->qsession()->maybe_open();
 
     // determine user
-    $trueemail = isset($_SESSION["u"]) ? $_SESSION["u"] : null;
+    $trueemail = $qreq->gsession("u");
 
     // look up and activate user
     $guser = null;
@@ -86,11 +85,12 @@ function initialize_request() {
     if (!$guser) {
         $guser = new Contact($trueemail ? (object) ["email" => $trueemail] : null);
     }
-    $guser = $guser->activate($qreq, true);
-    Contact::set_main_user($guser);
+    $muser = $guser->activate($qreq, true);
+    Contact::set_main_user($muser);
+    $qreq->set_user($muser);
 
     // redirect if disabled
-    if ($guser->is_disabled()) {
+    if ($muser->is_disabled()) {
         if ($nav->page === "api") {
             json_exit(["ok" => false, "error" => "Your account is disabled."]);
         } else if ($nav->page !== "index" && $nav->page !== "resetpassword") {
@@ -99,49 +99,43 @@ function initialize_request() {
     }
 
     // if bounced through login, add post data
-    if (isset($_SESSION["login_bounce"][4])
-        && $_SESSION["login_bounce"][4] <= Conf::$now) {
-        unset($_SESSION["login_bounce"]);
+    $login_bounce = $qreq->gsession("login_bounce");
+    if (isset($login_bounce[4]) && $login_bounce[4] <= Conf::$now) {
+        $qreq->unset_gsession("login_bounce");
+        $login_bounce = null;
     }
 
-    if (!$guser->is_empty()
-        && isset($_SESSION["login_bounce"])
-        && !isset($_SESSION["testsession"])) {
-        $lb = $_SESSION["login_bounce"];
-        if ($lb[0] == $conf->dsn
-            && $lb[2] !== "index"
-            && $lb[2] == Navigation::page()) {
-            foreach ($lb[3] as $k => $v)
+    if (!$muser->is_empty() && $login_bounce !== null) {
+        if ($login_bounce[0] === $conf->session_key
+            && $login_bounce[2] !== "index"
+            && $login_bounce[2] === $nav->page) {
+            foreach ($login_bounce[3] as $k => $v) {
                 if (!isset($qreq[$k]))
                     $qreq[$k] = $v;
+            }
             $qreq->set_annex("after_login", true);
         }
-        unset($_SESSION["login_bounce"]);
+        $qreq->unset_gsession("login_bounce");
     }
 
-    // set $_SESSION["addrs"]
-    if ($_SERVER["REMOTE_ADDR"]
-        && (!$guser->is_empty()
-            || isset($_SESSION["addrs"]))
-        && (!isset($_SESSION["addrs"])
-            || !is_array($_SESSION["addrs"])
-            || $_SESSION["addrs"][0] !== $_SERVER["REMOTE_ADDR"])) {
-        $as = [$_SERVER["REMOTE_ADDR"]];
-        if (isset($_SESSION["addrs"]) && is_array($_SESSION["addrs"])) {
-            foreach ($_SESSION["addrs"] as $a)
-                if ($a !== $_SERVER["REMOTE_ADDR"] && count($as) < 5)
-                    $as[] = $a;
+    // remember recent addresses in session
+    $addr = $_SERVER["REMOTE_ADDR"];
+    if ($addr
+        && $qreq->qsid()
+        && (!$muser->is_empty() || $qreq->has_gsession("addrs"))) {
+        $addrs = $qreq->gsession("addrs");
+        if (!is_array($addrs) || empty($addrs)) {
+            $addrs = [];
         }
-        $_SESSION["addrs"] = $as;
+        if (($addrs[0] ?? null) !== $_SERVER["REMOTE_ADDR"]) {
+            $naddrs = [$addr];
+            foreach ($addrs as $a) {
+                if ($a !== $addr && count($naddrs) < 5)
+                    $naddrs[] = $a;
+            }
+            $qreq->set_gsession("addrs", $naddrs);
+        }
     }
 }
 
 initialize_request();
-
-
-// Extract an error that we redirected through
-if (isset($_SESSION["redirect_error"])) {
-    global $Error;
-    $Error = $_SESSION["redirect_error"];
-    unset($_SESSION["redirect_error"]);
-}

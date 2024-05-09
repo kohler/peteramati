@@ -8,7 +8,7 @@ class ContactView {
      * @param list<string> $paths
      * @param Conf $conf */
     static function set_path_request($qreq, $paths, $conf) {
-        $path = Navigation::path();
+        $path = $qreq->path();
         if ($path === "") {
             return;
         }
@@ -469,7 +469,7 @@ class ContactView {
                 }
             }
             echo '"><div class="pa-pt">', htmlspecialchars($dl->title), '</div><div class="pa-pv">';
-            echo '<a href="', $info->conf->hoturl("pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "post" => post_value(), "download" => $dl->key]), '">', htmlspecialchars($dl->filename), '</a>';
+            echo '<a href="', $info->conf->hoturl("=pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "download" => $dl->key]), '">', htmlspecialchars($dl->filename), '</a>';
             if ($timer_start)
                 echo '<span class="pa-download-timer" style="padding-left:1em"></span>';
             echo '</span></div></div>';

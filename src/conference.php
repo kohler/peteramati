@@ -105,11 +105,16 @@ class Conf {
     public $multiuser_page = false;
     /** @var bool */
     private $_header_printed = false;
-    public $_session_handler;
     /** @var ?list<array{string,string}> */
     private $_save_msgs;
     /** @var false|null|array<string,mixed> */
     private $_session_list = false;
+    /** @var string */
+    private $_assets_url;
+    /** @var ?string */
+    private $_script_assets_url;
+    /** @var bool */
+    private $_script_assets_site;
     /** @var ?Collator */
     private $_collator;
 
@@ -359,8 +364,9 @@ class Conf {
         }
 
         // remove final slash from $Opt["paperSite"]
+        $nav = Navigation::get();
         if (!isset($this->opt["paperSite"]) || $this->opt["paperSite"] === "") {
-            $this->opt["paperSite"] = Navigation::base_absolute();
+            $this->opt["paperSite"] = $nav->base_absolute();
         }
         if ($this->opt["paperSite"] == "" && isset($this->opt["defaultPaperSite"])) {
             $this->opt["paperSite"] = $this->opt["defaultPaperSite"];
@@ -369,30 +375,22 @@ class Conf {
             $this->opt["paperSite"] = substr($this->opt["paperSite"], 0, -1);
         }
 
+        // asset URLs (general assets, scripts, jQuery)
+        $baseurl = $nav->base_path_relative ?? "";
+        $this->_assets_url = $this->opt["assetsUrl"] ?? $this->opt["assetsURL"] ?? $baseurl;
+        if ($this->_assets_url !== "" && !str_ends_with($this->_assets_url, "/")) {
+            $this->_assets_url .= "/";
+        }
+        $this->_script_assets_url = $this->opt["scriptAssetsUrl"]
+            ?? (strpos($_SERVER["HTTP_USER_AGENT"] ?? "", "MSIE") === false ? $this->_assets_url : $baseurl);
+        $this->_script_assets_site = $this->_script_assets_url === $baseurl;
+
         // option name updates (backwards compatibility)
-        foreach (["assetsURL" => "assetsUrl",
-                  "jqueryURL" => "jqueryUrl", "jqueryCDN" => "jqueryCdn",
+        foreach (["jqueryURL" => "jqueryUrl", "jqueryCDN" => "jqueryCdn",
                   "disableCSV" => "disableCsv"] as $kold => $knew) {
             if (isset($this->opt[$kold]) && !isset($this->opt[$knew])) {
                 $this->opt[$knew] = $this->opt[$kold];
             }
-        }
-
-        // set assetsUrl and scriptAssetsUrl
-        if (!isset($this->opt["scriptAssetsUrl"])
-            && isset($_SERVER["HTTP_USER_AGENT"])
-            && strpos($_SERVER["HTTP_USER_AGENT"], "MSIE") !== false) {
-            $this->opt["scriptAssetsUrl"] = Navigation::siteurl();
-        }
-        if (!isset($this->opt["assetsUrl"])) {
-            $this->opt["assetsUrl"] = (string) Navigation::siteurl();
-        }
-        if ($this->opt["assetsUrl"] !== ""
-            && !str_ends_with($this->opt["assetsUrl"], "/")) {
-            $this->opt["assetsUrl"] .= "/";
-        }
-        if (!isset($this->opt["scriptAssetsUrl"])) {
-            $this->opt["scriptAssetsUrl"] = $this->opt["assetsUrl"];
         }
 
         // clean stylesheets and scripts
@@ -460,7 +458,7 @@ class Conf {
     }
 
     function crosscheck_globals() {
-        Ht::$img_base = $this->opt["assetsUrl"] . "images/";
+        Ht::$img_base = $this->_assets_url . "images/";
 
         if (isset($this->opt["timezone"])) {
             if (!date_default_timezone_set($this->opt["timezone"])) {
@@ -1136,20 +1134,6 @@ class Conf {
 
     // session data
 
-    function session($name, $defval = null) {
-        if (isset($_SESSION[$this->session_key][$name]))
-            return $_SESSION[$this->session_key][$name];
-        else
-            return $defval;
-    }
-
-    function save_session($name, $value) {
-        if ($value !== null)
-            $_SESSION[$this->session_key][$name] = $value;
-        else
-            unset($_SESSION[$this->session_key][$name]);
-    }
-
     function capability_text($prow, $capType) {
         // A capability has the following representation (. is concatenation):
         //    capFormat . paperId . capType . hashPrefix
@@ -1495,7 +1479,7 @@ class Conf {
     }
 
     function cacheableImage($name, $alt, $title = null, $class = null, $style = null) {
-        $t = "<img src=\"" . Navigation::siteurl() . "images/$name\" alt=\"$alt\"";
+        $t = "<img src=\"" . Navigation::get()->siteurl() . "images/$name\" alt=\"$alt\"";
         if ($title)
             $t .= " title=\"$title\"";
         if ($class)
@@ -1605,15 +1589,19 @@ class Conf {
         $this->_active_list = $list;
     }
 
-    function set_siteurl($base) {
-        $old_siteurl = Navigation::siteurl();
-        $base = Navigation::set_siteurl($base);
-        if ($this->opt["assetsUrl"] === $old_siteurl) {
-            $this->opt["assetsUrl"] = $base;
-            Ht::$img_base = $this->opt["assetsUrl"] . "images/";
-        }
-        if ($this->opt["scriptAssetsUrl"] === $old_siteurl) {
-            $this->opt["scriptAssetsUrl"] = $base;
+    /** @param NavigationState $nav
+     * @param string $url */
+    function set_site_path_relative($nav, $url) {
+        if ($nav->site_path_relative !== $url) {
+            $old_baseurl = $nav->base_path_relative;
+            $nav->set_site_path_relative($url);
+            if ($this->_assets_url === $old_baseurl) {
+                $this->_assets_url = $nav->base_path_relative;
+                Ht::$img_base = $this->_assets_url . "images/";
+            }
+            if ($this->_script_assets_site) {
+                $this->_script_assets_url = $nav->base_path_relative;
+            }
         }
     }
 
@@ -1625,7 +1613,8 @@ class Conf {
 
     function hoturl($page, $param = null, $flags = 0) {
         global $Me;
-        $nav = Navigation::get();
+        $qreq = Qrequest::$main_request;
+        $nav = $qreq->navigation();
         $amp = ($flags & self::HOTURL_RAW ? "&" : "&amp;");
         if (str_starts_with($page, "=")) {
             $page = substr($page, 1);
@@ -1667,7 +1656,7 @@ class Conf {
             }
         }
         if ($flags & self::HOTURL_POST) {
-            $param .= ($param === "" ? "" : $amp) . "post=" . post_value();
+            $param .= ($param === "" ? "" : $amp) . "post=" . $qreq->post_value();
         }
         // create slash-based URLs if appropriate
         if ($param) {
@@ -1746,10 +1735,6 @@ class Conf {
         return $this->hoturl($page, $param, self::HOTURL_SITE_RELATIVE | self::HOTURL_RAW);
     }
 
-    function hoturl_post($page, $param = null) {
-        return $this->hoturl($page, $param, self::HOTURL_POST);
-    }
-
     function hotlink($html, $page, $param = null, $js = null) {
         return Ht::link($html, $this->hoturl($page, $param), $js);
     }
@@ -1762,8 +1747,7 @@ class Conf {
     ];
 
     function selfurl(Qrequest $qreq = null, $params = null, $flags = 0) {
-        global $Qreq;
-        $qreq = $qreq ? : $Qreq;
+        $qreq = $qreq ?? Qrequest::$main_request;
         $params = $params ?? [];
 
         $x = [];
@@ -1782,26 +1766,19 @@ class Conf {
         foreach ($params as $k => $v) {
             $x[$k] = $v;
         }
-        return $this->hoturl(Navigation::page(), $x, $flags);
+        return $this->hoturl($qreq->page(), $x, $flags);
     }
 
-
-    function transfer_messages_to_session() {
-        if ($this->_save_msgs) {
-            ensure_session();
-            foreach ($this->_save_msgs as $m) {
-                $_SESSION[$this->session_key]["msgs"][] = $m;
-            }
-            $this->_save_msgs = null;
-        }
-    }
 
     /** @param ?string $url */
     function redirect($url = null) {
-        $nav = Navigation::get();
-        $this->transfer_messages_to_session();
-        session_write_close();
-        Navigation::redirect_absolute($nav->make_absolute($url ?? $this->hoturl("index")));
+        $qreq = Qrequest::$main_request;
+        if ($this->_save_msgs) {
+            $qreq->open_session();
+            $qreq->set_csession("msgs", $this->_save_msgs);
+        }
+        $qreq->qsession()->commit();
+        Navigation::redirect_absolute($qreq->navigation()->resolve($url ?? $this->hoturl("index")));
     }
 
     /** @param string $page
@@ -1821,9 +1798,9 @@ class Conf {
     function make_absolute_site($siteurl) {
         $nav = Navigation::get();
         if (str_starts_with($siteurl, "u/")) {
-            return $nav->make_absolute($siteurl, $nav->base_path);
+            return $nav->resolve($siteurl, $nav->base_path);
         } else {
-            return $nav->make_absolute($siteurl, $nav->site_path);
+            return $nav->resolve($siteurl, $nav->site_path);
         }
     }
 
@@ -1837,7 +1814,7 @@ class Conf {
         $t = '<link rel="stylesheet" type="text/css" href="';
         $absolute = preg_match('/\A(?:https:?:|\/)/i', $url);
         if (!$absolute) {
-            $t .= $this->opt["assetsUrl"];
+            $t .= $this->_assets_url;
         }
         $t .= htmlspecialchars($url);
         if (!$absolute && ($mtime = @filemtime(SiteLoader::find($url))) !== false) {
@@ -1862,14 +1839,14 @@ class Conf {
                 $post = "mtime=$mtime";
             }
             if (($this->opt["strictJavascript"] ?? false) && !$no_strict) {
-                $url = $this->opt["scriptAssetsUrl"] . "cacheable.php/"
+                $url = $this->_script_assets_url . "cacheable.php/"
                     . str_replace("%2F", "/", urlencode($url))
                     . "?strictjs=1" . ($post ? "&$post" : "");
             } else {
-                $url = $this->opt["scriptAssetsUrl"] . $url . ($post ? "?$post" : "");
+                $url = $this->_script_assets_url . $url . ($post ? "?$post" : "");
             }
-            if ($this->opt["scriptAssetsUrl"] === Navigation::siteurl()) {
-                return Ht::script_file($url);
+            if ($this->_script_assets_site) {
+                return Ht::script_file($url, ["integrity" => $integrity]);
             }
         }
         return Ht::script_file($url, ["crossorigin" => "anonymous", "integrity" => $integrity]);
@@ -1912,21 +1889,6 @@ class Conf {
         }
     }
 
-    function set_cookie($name, $value, $expires_at) {
-        $opt = [
-            "expires" => $expires_at,
-            "path" => Navigation::base_path(),
-            "domain" => $this->opt("sessionDomain") ?? "",
-            "secure" => $this->opt("sessionSecure") ?? false
-        ];
-        if (($samesite = $this->opt("sessionSameSite") ?? "Lax")) {
-            $opt["samesite"] = $samesite;
-        }
-        if (!hotcrp_setcookie($name, $value, $opt)) {
-            error_log(debug_string_backtrace());
-        }
-    }
-
     private function header_head($title, $id, $options) {
         global $Me;
         echo "<!DOCTYPE html>
@@ -1956,10 +1918,10 @@ class Conf {
         $favicon = $this->opt("favicon");
         if ($favicon) {
             if (strpos($favicon, "://") === false && $favicon[0] != "/") {
-                if ($this->opt["assetsUrl"] && substr($favicon, 0, 7) === "images/") {
-                    $favicon = $this->opt["assetsUrl"] . $favicon;
+                if ($this->_assets_url && substr($favicon, 0, 7) === "images/") {
+                    $favicon = $this->_assets_url . $favicon;
                 } else {
-                    $favicon = Navigation::siteurl() . $favicon;
+                    $favicon = Navigation::get()->base_path_relative . $favicon;
                 }
             }
             if (substr($favicon, -4) == ".png") {
@@ -2032,12 +1994,13 @@ class Conf {
             "site_relative" => $nav->site_path_relative,
             "base" => $nav->base_path,
             "suffix" => $nav->php_suffix,
-            "assets" => $this->opt["assetsUrl"],
+            "assets" => $this->_assets_url,
             "cookie_params" => "",
             "user" => []
         ];
-        if (session_id() !== "") {
-            $siteinfo["postvalue"] = post_value();
+        $qreq = Qrequest::$main_request;
+        if ($qreq->qsid()) {
+            $siteinfo["postvalue"] = $qreq->post_value();
         }
         if (($x = $this->opt("sessionDomain"))) {
             $siteinfo["cookie_params"] .= "; Domain=" . $x;
@@ -2093,6 +2056,7 @@ class Conf {
         if ($this->_header_printed) {
             return;
         }
+        $qreq = Qrequest::$main_request;
 
         // <head>
         if ($title === "Home") {
@@ -2121,7 +2085,7 @@ class Conf {
             }
 
             // "act as" link
-            if (($actas = $_SESSION["last_actas"] ?? null)
+            if (($actas = $qreq->gsession("last_actas"))
                 && (($Me->privChair && strcasecmp($actas, $Me->email) !== 0)
                     || Contact::$base_auth_user)) {
                 // Link becomes true user if not currently chair.
@@ -2152,9 +2116,8 @@ class Conf {
         if (($x = $this->opt("maintenance"))) {
             echo Ht::msg(is_string($x) ? $x : "<strong>The site is down for maintenance.</strong> Please check back later.", 2);
         }
-        if (($msgs = $this->session("msgs"))
-            && !empty($msgs)) {
-            $this->save_session("msgs", null);
+        if (($msgs = $qreq->csession("msgs")) && !empty($msgs)) {
+            $qreq->unset_csession("msgs");
             foreach ($msgs as $m) {
                 $this->msg($m[0], $m[1]);
             }
