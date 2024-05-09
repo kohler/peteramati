@@ -3023,12 +3023,27 @@ void jailownerinfo::exec_done(pid_t child, int exit_status) {
     }
     fflush(stderr);
     // close event sources
-    // XXX what if blocked?
-    for (auto it = esfds_.begin(); it != esfds_.end(); ) {
-        ssize_t nw = write(it->fd_, "data:{\"done\":true}\n\n", 20);
-        assert(nw == 20);
-        close(it->fd_);
-        it = esfds_.erase(it);
+    for (auto& esf : esfds_) {
+        esf.append("data:{\"done\":true}\n\n", 20);
+    }
+    while (true) {
+        std::vector<pollfd> p;
+        for (auto it = esfds_.begin(); it != esfds_.end(); ) {
+            if (it->jbuf_.write(it->fd_, it->off_)) {
+                it->jbuf_.consume_to(it->off_);
+            }
+            if (it->jbuf_.wclosed_ || !it->jbuf_.can_write()) {
+                close(it->fd_);
+                it = esfds_.erase(it);
+            } else {
+                p.push_back({esf.fd_, POLLOUT, 0});
+                ++it;
+            }
+        }
+        if (p.empty()) {
+            break;
+        }
+        (void) poll(p.data(), p.size(), 5000);
     }
     exit(exit_status);
 }
