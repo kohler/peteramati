@@ -149,11 +149,10 @@ export function run(button, opts) {
         checkt = opts.timestamp;
     }
 
-    if (hasClass(form, "pa-run-active")) {
+    if (hasClass(therun, "pa-run-active")) {
         return true;
     }
-    $(form).find("button").prop("disabled", true);
-    addClass(form, "pa-run-active");
+    addClass(therun, "pa-run-active");
     if (!checkt) {
         therun.removeAttribute("data-pa-timestamp");
     }
@@ -253,10 +252,7 @@ export function run(button, opts) {
     }
 
     function done(complete) {
-        if (hasClass(form, "pa-run-active")) {
-            removeClass(form, "pa-run-active");
-            $(form).find("button").prop("disabled", false);
-        }
+        removeClass(therun, "pa-run-active");
         if (complete !== false) {
             hide_cursor();
             if (button.hasAttribute("data-pa-run-grade")) {
@@ -794,7 +790,7 @@ export function run(button, opts) {
             },
             error: function () {
                 $(form).find(".ajaxsave61").html("Failed");
-                removeClass(form, "pa-run-active");
+                removeClass(therun, "pa-run-active");
             }
         });
     }

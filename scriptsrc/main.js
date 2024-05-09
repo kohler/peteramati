@@ -1048,43 +1048,37 @@ function pa_runmany(chain) {
         });
         f.setAttribute("data-pa-runmany-unload", "");
     }
-    function take_jobinfo() {
-        const button = f.elements.run,
-            category = button.getAttribute("data-pa-run-category") || button.value,
-            therun = document.getElementById("pa-run-" + category),
-            timestamp = therun ? therun.getAttribute("data-pa-timestamp") : null;
-        if (category && timestamp) {
-            therun.removeAttribute("data-pa-timestamp"); // don't retake
-            return {
-                u: f.elements.u.value,
-                pset: f.elements.pset.value,
-                run: category,
-                timestamp: +timestamp
-            };
-        } else {
-            return null;
+    function mark_job_complete(category, timestamp) {
+        doneinfo.push({
+            u: f.elements.u.value,
+            pset: f.elements.pset.value,
+            run: category,
+            timestamp: timestamp
+        });
+        f.elements.jobs.value = JSON.stringify(doneinfo);
+        if (doneinfo.length === 1) { // just added first output
+            const button = document.createElement("button");
+            button.append("Download");
+            button.className = "ui js-runmany-download";
+            statusui().lastChild.append(button);
         }
     }
     function check() {
-        if (!hasClass(f, "pa-run-active")) {
-            const ji = take_jobinfo();
-            if (ji && f.elements.jobs) {
-                doneinfo.push(ji);
-                f.elements.jobs.value = JSON.stringify(doneinfo);
-                if (doneinfo.length === 1) {
-                    const button = document.createElement("button");
-                    button.append("Download");
-                    button.className = "ui js-runmany-download";
-                    statusui().lastChild.append(button);
-                }
-            }
-            $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
-                type: "POST", cache: false, dataType: "json", timeout: 30000,
-                success: success
-            });
-        } else if (!timeout) {
-            timeout = setTimeout(check, 2000);
+        const button = f.elements.run,
+            category = button.getAttribute("data-pa-run-category") || button.value,
+            therun = document.getElementById("pa-run-" + category);
+        if (therun && hasClass(therun, "pa-run-active")) {
+            timeout = timeout || setTimeout(check, 2000);
+            return;
         }
+        if (f.elements.jobs && category && therun && therun.hasAttribute("data-pa-timestamp")) {
+            mark_job_complete(category, +therun.getAttribute("data-pa-timestamp"));
+            therun.removeAttribute("data-pa-timestamp");
+        }
+        $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
+            type: "POST", cache: false, dataType: "json", timeout: 30000,
+            success: success
+        });
     }
     function statusui() {
         let e = document.getElementById("pa-runmany-statusui");
