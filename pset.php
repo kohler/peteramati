@@ -171,7 +171,7 @@ class PsetRequest {
             && $this->viewer->isPC
             && $this->viewer !== $this->user) {
             $rs = $this->qreq->get_a("runsettings");
-            $rs = empty($rs) ? null : $rs;
+            $rs = empty($rs) ? null : new JsonReplacement($rs);
             $this->info->update_commit_notes(["runsettings" => $rs]);
             if ($this->qreq->ajax) {
                 json_exit(["ok" => true, "runsettings" => $rs]);
