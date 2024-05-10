@@ -1,6 +1,6 @@
 <?php
 // dbl.php -- database interface layer
-// Copyright (c) 2006-2022 Eddie Kohler; see LICENSE.
+// Copyright (c) 2006-2024 Eddie Kohler; see LICENSE.
 
 class Dbl_Result {
     /** @var int */
@@ -32,6 +32,18 @@ class Dbl_Result {
         $r->insert_id = null;
         $r->errno = 0;
         return $r;
+    }
+    /** @return Dbl_Result */
+    static function make_error() {
+        $r = new Dbl_Result;
+        $r->affected_rows = $r->warning_count = 0;
+        $r->insert_id = null;
+        $r->errno = 2002; /* CR_CONNECTION_ERROR */
+        return $r;
+    }
+    /** @return bool */
+    function is_error() {
+        return $this->errno !== 0;
     }
     /** @return list<array<int,?string>> */
     function fetch_all() {
@@ -114,6 +126,21 @@ class Dbl_ConnectionParams {
     /** @var ?string */
     public $name;
 
+    /** @var ?boolean */
+    public $ssl;
+    /** @var ?string */
+    public $ssl_key;
+    /** @var ?string */
+    public $ssl_cert;
+    /** @var ?string */
+    public $ssl_ca;
+    /** @var ?string */
+    public $ssl_capath;
+    /** @var ?string */
+    public $ssl_cipher;
+    /** @var ?bool */
+    public $ssl_verify = true;
+
     /** @return string */
     function sanitized_dsn() {
         $t = "mysql://";
@@ -123,30 +150,54 @@ class Dbl_ConnectionParams {
         return $t . urlencode($this->host ?? "localhost") . "/" . urlencode($this->name);
     }
 
+    function apply_defaults() {
+        if ($this->port === null) {
+            $this->port = $this->socket ? (int) ini_get("mysqli.default_port") : 0;
+        }
+        $this->host = $this->host ?? ini_get("mysqli.default_host");
+        $this->user = $this->user ?? ini_get("mysqli.default_user");
+        $this->password = $this->password ?? ini_get("mysqli.default_pw");
+    }
+
     /** @return ?\mysqli */
     function connect() {
         assert(($this->name ?? "") !== "");
-        if ($this->socket) {
-            $dblink = new mysqli($this->host, $this->user, $this->password, "", $this->port, $this->socket);
-        } else if ($this->port !== null) {
-            $dblink = new mysqli($this->host, $this->user, $this->password, "", $this->port);
-        } else {
-            $dblink = new mysqli($this->host, $this->user, $this->password);
+
+        $dblink = new mysqli();
+        $client_flags = 0;
+
+        if ($this->ssl) {
+            $client_flags += MYSQLI_CLIENT_SSL;
+            if ($this->ssl_verify && defined("MYSQLI_OPT_SSL_VERIFY_SERVER_CERT")) {
+                $dblink->options(MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, true);
+            } else if (!$this->ssl_verify && defined("MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT")) {
+                $client_flags += MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT;
+            }
+            $dblink->ssl_set($this->ssl_key, $this->ssl_cert, $this->ssl_ca, $this->ssl_capath, $this->ssl_cipher);
         }
+
+        $dblink->real_connect(
+            $this->host,
+            $this->user,
+            $this->password,
+            $this->name,
+            $this->port,
+            $this->socket,
+            $client_flags
+        );
+
         if ($dblink->connect_errno || mysqli_connect_errno()) {
             return null;
-        } else if (!$dblink->select_db($this->name)) {
-            $dblink->close();
-            return null;
-        } else {
-            // We send binary strings to MySQL, so we don't want warnings
-            // about non-UTF-8 data
-            $dblink->set_charset("binary");
-            // The necessity of the following line is explosively terrible
-            // (the default is 1024/!?))(U#*@$%&!U
-            $dblink->query("set group_concat_max_len=4294967295");
-            return $dblink;
         }
+
+        // We send binary strings to MySQL, so we don't want warnings
+        // about non-UTF-8 data
+        $dblink->set_charset("binary");
+        // The necessity of the following line is explosively terrible
+        // (the default is 1024/!?))(U#*@$%&!U
+        $dblink->query("set group_concat_max_len=4294967295");
+
+        return $dblink;
     }
 }
 
@@ -160,6 +211,7 @@ class Dbl {
     const F_MULTI_OK = 64; // internal
     const F_ECHO = 128;
     const F_NOEXEC = 256;
+    const F_THROW = 512;
 
     /** @var int */
     static public $nerrors = 0;
@@ -167,7 +219,7 @@ class Dbl {
     static public $default_dblink;
     /** @var callable(\mysqli,string) */
     static private $error_handler = "Dbl::default_error_handler";
-    /** @var false|array<string,array{float,int,string}> */
+    /** @var false|array<string,array{float,int,int,string}> */
     static private $query_log = false;
     /** @var false|string */
     static private $query_log_key = false;
@@ -239,35 +291,29 @@ class Dbl {
         if (isset($opt["dbSocket"]) && is_string($opt["dbSocket"])) {
             $cp->socket = $opt["dbSocket"];
         }
-        if ($cp->port === null) {
-            $cp->port = $cp->socket ? (int) ini_get("mysqli.default_port") : 0;
+        if (($opt["dbSsl"] ?? false) === true) {
+            $cp->ssl = true;
+            if (isset($opt["dbSslKey"]) && is_string($opt["dbSslKey"])) {
+                $cp->ssl_key = $opt["dbSslKey"];
+            }
+            if (isset($opt["dbSslCert"]) && is_string($opt["dbSslCert"])) {
+                $cp->ssl_cert = $opt["dbSslCert"];
+            }
+            if (isset($opt["dbSslCa"]) && is_string($opt["dbSslCa"])) {
+                $cp->ssl_ca = $opt["dbSslCa"];
+            }
+            if (isset($opt["dbSslCapath"]) && is_string($opt["dbSslCapath"])) {
+                $cp->ssl_capath = $opt["dbSslCapath"];
+            }
+            if (isset($opt["dbSslCipher"]) && is_string($opt["dbSslCipher"])) {
+                $cp->ssl_cipher = $opt["dbSslCipher"];
+            }
+            if (isset($opt["dbSslVerify"]) && is_bool($opt["dbSslVerify"])) {
+                $cp->ssl_verify = $opt["dbSslVerify"];
+            }
         }
-        $cp->host = $cp->host ?? ini_get("mysqli.default_host");
-        $cp->user = $cp->user ?? ini_get("mysqli.default_user");
-        $cp->password = $cp->password ?? ini_get("mysqli.default_pw");
+        $cp->apply_defaults();
         return $cp;
-    }
-
-    /** @param array<string,mixed>|Dbl_ConnectionParams $opt
-     * @return array{?\mysqli,?string}
-     * @deprecated */
-    static function connect($opt, $noconnect = false) {
-        $cp = is_array($opt) ? self::parse_connection_params($opt) : $opt;
-        if (!$cp) {
-            return [null, null];
-        } else if ($noconnect) {
-            return [null, $cp->name];
-        } else {
-            return [$cp->connect(), $cp->name];
-        }
-    }
-
-    /** @param string $dsn
-     * @return array{?\mysqli,?string}
-     * @deprecated */
-    static function connect_dsn($dsn, $noconnect = false) {
-        /** @phan-suppress-next-line PhanDeprecatedFunction */
-        return self::connect(self::parse_connection_params(["dsn" => $dsn]), $noconnect);
     }
 
     /** @param \mysqli $dblink */
@@ -316,12 +362,12 @@ class Dbl {
         if (($flags & self::F_MULTI) && is_array($q)) {
             $q = join(";", $q);
         }
-        if ($log_location && self::$query_log !== false) {
+        if ($log_location && is_array(self::$query_log)) {
             self::$query_log_key = $qx = simplify_whitespace($q);
             if (isset(self::$query_log[$qx])) {
                 ++self::$query_log[$qx][1];
             } else {
-                self::$query_log[$qx] = [0.0, 1, self::landmark()];
+                self::$query_log[$qx] = [0.0, 1, 0, self::landmark()];
             }
         }
         if (count($args) === $argpos + 1) {
@@ -522,12 +568,20 @@ class Dbl {
             $time = microtime(true);
             $result = $dblink->$qfunc($qstr);
             self::$query_log[self::$query_log_key][0] += microtime(true) - $time;
+            if ($result === true) {
+                self::$query_log[self::$query_log_key][2] += $dblink->affected_rows;
+            } else if ($result) {
+                self::$query_log[self::$query_log_key][2] += $result->num_rows;
+            }
             self::$query_log_key = false;
         } else {
             $result = $dblink->$qfunc($qstr);
         }
         return $result;
     }
+
+    // NB The following functions are intentionally misdeclared to return
+    // `Dbl_Result`. The true return type is `Dbl_Result|\mysqli_result`.
 
     /** @return Dbl_Result */
     static private function do_query_with($dblink, $qstr, $argv, $flags) {
@@ -559,19 +613,21 @@ class Dbl {
             $result = Dbl_Result::make_empty();
             $result->errno = 1002;
         }
-        if ($dblink->errno) {
+        if ($dblink->errno && !($result instanceof \mysqli_result)) {
             $result->query_string = $qstr;
-            if (!($flags & self::F_ALLOWERROR)) {
+            if (($flags & self::F_ALLOWERROR) === 0) {
                 ++self::$nerrors;
             }
-            if ($flags & self::F_ERROR) {
+            if (($flags & self::F_THROW) !== 0) {
+                throw new Error("Database error");
+            } else if (($flags & self::F_ERROR) !== 0) {
                 call_user_func(self::$error_handler, $dblink, $qstr);
-            } else if ($flags & self::F_LOG) {
+            } else if (($flags & self::F_LOG) !== 0) {
                 error_log(self::landmark() . ": database error: {$dblink->error} in {$qstr}");
             }
         }
         if (self::$check_warnings
-            && !($flags & self::F_ALLOWERROR)
+            && ($flags & self::F_ALLOWERROR) === 0
             && $dblink->warning_count) {
             $wresult = $dblink->query("show warnings");
             while ($wresult && ($wrow = $wresult->fetch_row())) {
@@ -714,7 +770,7 @@ class Dbl {
 
     /** @param \mysqli $dblink
      * @param int $flags
-     * @return callable(?string,string|int|null...):void */
+     * @return callable(?string,string|int|null|list...):void */
     static function make_multi_query_stager($dblink, $flags) {
         // NB $q argument as `true` is deprecated but might still be present
         $qs = $qvs = [];
@@ -755,7 +811,7 @@ class Dbl {
      * @return bool */
     static function is_error($result) {
         return !$result
-            || ($result instanceof Dbl_Result && $result->errno);
+            || ($result instanceof Dbl_Result && $result->errno !== 0);
     }
 
     static private function do_make_result($args, $flags = self::F_ERROR) {
@@ -880,13 +936,20 @@ class Dbl {
         throw new Exception("Dbl::compare_exchange failure on query `" . Dbl::format_query_args($dblink, $value_query, $value_query_args) . "`");
     }
 
-    /** @param null|bool|float $limit
+    /** @param null|bool|float|'verbose' $limit
      * @param ?string $file */
     static function log_queries($limit, $file = null) {
-        if (is_float($limit)) {
-            $limit = $limit >= 1 || ($limit > 0 && mt_rand() < $limit * mt_getrandmax());
+        if ($limit === "verbose") {
+            self::$verbose = true;
+            return;
         }
-        if (!$limit) {
+        if (is_bool($limit)) {
+            $limit = $limit ? 1.0 : 0.0;
+        } else if (!is_float($limit)) {
+            $limit = (float) $limit;
+        }
+        if ($limit <= 0
+            || ($limit < 1 && mt_rand() >= $limit * (mt_getrandmax() + 1))) {
             self::$query_log = false;
         } else if (self::$query_log === false) {
             register_shutdown_function("Dbl::shutdown");
@@ -896,23 +959,28 @@ class Dbl {
     }
 
     static function shutdown() {
-        if (self::$query_log) {
+        if (is_array(self::$query_log)) {
             uasort(self::$query_log, function ($a, $b) {
                 return $b[0] <=> $a[0];
             });
-            $self = Navigation::self();
+            $nq = $tt = $nr = 0;
+            foreach (self::$query_log as $what) {
+                $tt += $what[0];
+                $nq += $what[1];
+                $nr += $what[2];
+            }
             $i = 1;
             $n = count(self::$query_log);
-            $t = [0, 0];
             $qlog = "";
+            $self = Navigation::self();
             foreach (self::$query_log as $where => $what) {
-                $a = [$what[0], $what[1], $what[2], $where];
-                $qlog .= "query_log: $self #$i/$n: " . json_encode($a) . "\n";
+                $pct = round($what[0] / $tt * 1000) / 10;
+                $qlog .= "query_log: {$self} #{$i}/{$n}: "
+                    . json_encode([$what[0], $what[1], $pct, $what[2], $what[3], $where])
+                    . "\n";
                 ++$i;
-                $t[0] += $what[0];
-                $t[1] += $what[1];
             }
-            $qlog .= "query_log: total: " . json_encode($t) . "\n";
+            $qlog .= "query_log: total: " . json_encode([$tt, $nq, 100.0, $nr]) . "\n";
             if (self::$query_log_file) {
                 @file_put_contents(self::$query_log_file, $qlog, FILE_APPEND);
             } else {
@@ -962,7 +1030,7 @@ class Dbl {
             $dblink = self::$default_dblink;
         }
         $utf8 = $dblink->server_version >= 50503 ? "utf8mb4" : "utf8";
-        return "convert($qstr using $utf8)";
+        return "convert({$qstr} using {$utf8})";
     }
 
     /** @param string $str
@@ -995,4 +1063,8 @@ function sql_in_int_list($set) {
     } else {
         return " in (" . join(", ", $set) . ")";
     }
+}
+
+if (function_exists("mysqli_report")) {
+    mysqli_report(MYSQLI_REPORT_OFF);
 }
