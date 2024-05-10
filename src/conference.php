@@ -227,6 +227,11 @@ class Conf {
         self::set_current_time(max(Conf::$now, $advance_past + 1));
     }
 
+    /** @return ?\mysqli */
+    static function main_contactdb() {
+        return null;
+    }
+
 
     //
     // Initialization functions
@@ -261,7 +266,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 171) {
+        if ($this->sversion < 172) {
             $old_nerrors = Dbl::$nerrors;
             (new UpdateSchema($this))->run();
             Dbl::$nerrors = $old_nerrors;

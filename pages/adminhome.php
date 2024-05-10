@@ -17,9 +17,12 @@ function admin_home_messages($conf) {
     if (defined("JSON_HOTCRP")) {
         $m[] = "Your PHP was built without JSON functionality. HotCRP is using its built-in replacements; the native functions would be faster.";
     }
-    if ((int) ini_get("session.gc_maxlifetime") < ($conf->opt("sessionLifetime") ?? 86400)
-        && !isset($conf->opt["sessionHandler"])) {
-        $m[] = "PHP’s systemwide <code>session.gc_maxlifetime</code> setting, which is " . htmlspecialchars(ini_get("session.gc_maxlifetime")) . " seconds, is less than HotCRP’s preferred session expiration time, which is " . ($conf->opt("sessionLifetime") ?? 86400) . " seconds.  You should update <code>session.gc_maxlifetime</code> in the <code>php.ini</code> file or users may be booted off the system earlier than you expect.";
+    if (($conf->opt["qsessionFunction"] ?? "+DbQsession") === "+PHPQsession") {
+        $gc_lifetime = (int) ini_get("session.gc_maxlifetime");
+        $co_lifetime = (session_get_cookie_params())["lifetime"];
+        if ($co_lifetime > 0 && $gc_lifetime < $co_lifetime) {
+            $m[] = "PHP’s systemwide <code>session.gc_maxlifetime</code> setting, which is {$gc_lifetime} seconds, is less than Peteramati’s preferred session expiration time, which is {$co_lifetime} seconds.  You should update <code>session.gc_maxlifetime</code> in the <code>php.ini</code> file or users may be booted off the system earlier than you expect.";
+        }
     }
     if (!function_exists("imagecreate")) {
         $m[] = $errmarker . "This PHP installation lacks support for the GD library, so HotCRP cannot generate score charts (as backup for browsers that don’t support &lt;canvas&gt;). You should update your PHP installation. For example, on Ubuntu Linux, install the <code>php5-gd</code> package.";

@@ -116,9 +116,7 @@ $Opt["emailFrom"] = "you@example.edu";
 //                   to $Opt["dbName"].
 //   sessionLifetime Number of seconds a user may be idle before their session
 //                   is garbage collected and they must log in again. Defaults
-//                   to 86400 (24 hours). Should be less than or equal to the
-//                   system-wide setting for `session.gc_maxlifetime` in
-//                   the PHP initialization file, `php.ini`.
+//                   to 604800 (7 days).
 //   memoryLimit     Maximum amount of memory a PHP script can use. Defaults
 //                   to 128MB.
 //   timezone        Server timezone. See http://php.net/manual/en/timezones

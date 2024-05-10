@@ -949,6 +949,19 @@ class UpdateSchema {
             && $conf->ql_ok("alter table `ExecutionQueue` drop `nconcurrent`")) {
             $conf->update_schema_version(171);
         }
+        if ($conf->sversion === 171
+            && $conf->ql_ok("DROP TABLE IF EXISTS `SessionData`")
+            && $conf->ql_ok("CREATE TABLE `SessionData` (
+  `sid` varbinary(128) NOT NULL,
+  `updated_at` bigint(20) NOT NULL DEFAULT 0,
+  `expires_at` bigint(20) NOT NULL DEFAULT 0,
+  `data` varbinary(32768) DEFAULT NULL,
+  `dataOverflow` longblob DEFAULT NULL,
+  PRIMARY KEY (`sid`),
+  KEY `expires_at` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci")) {
+            $conf->update_schema_version(172);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

@@ -56,9 +56,7 @@ function set_session_name(Conf $conf, NavigationState $nav) {
     }
 
     $params = session_get_cookie_params();
-    if (($lifetime = $conf->opt("sessionLifetime")) !== null) {
-        $params["lifetime"] = $lifetime;
-    }
+    $params["lifetime"] = $conf->opt("sessionLifetime") ?? 604800;
     $params["secure"] = $secure;
     $params["domain"] = $domain ?? $params["domain"] ?? "";
     $params["path"] = $params["domain"] === "" ? $nav->base_path : "/";

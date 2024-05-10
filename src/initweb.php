@@ -65,7 +65,7 @@ function initialize_request() {
             $qreq->approve_token();
         }
     }
-    $qsessionf = $conf->opt["qsessionFunction"] ?? "+PHPQsession";
+    $qsessionf = $conf->opt["qsessionFunction"] ?? "+DbQsession";
     if (str_starts_with($qsessionf, "+")) {
         $class = substr($qsessionf, 1);
         $qreq->set_qsession(new $class($conf, $qreq));
