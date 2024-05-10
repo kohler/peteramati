@@ -2669,6 +2669,7 @@ class Conf {
         }
         return $commit;
     }
+
     function _add_api_json($fj) {
         if (is_string($fj->fn)
             && !isset($this->_api_map[$fj->fn])
@@ -2679,6 +2680,7 @@ class Conf {
             return false;
         }
     }
+
     private function fill_api_map() {
         $this->_api_map = [
             "blob" => "15 Repo_API::blob",
@@ -2706,6 +2708,7 @@ class Conf {
             expand_json_includes_callback($olist, [$this, "_add_api_json"]);
         }
     }
+
     /** @param string $fn
      * @return bool */
     function has_api($fn) {
@@ -2714,6 +2717,7 @@ class Conf {
         }
         return isset($this->_api_map[$fn]);
     }
+
     /** @param string $fn
      * @return ?object */
     function api($fn) {

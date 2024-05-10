@@ -899,7 +899,7 @@ class PsetRequest {
             // collect diff and sort line notes
             $lnorder = $this->info->visible_line_notes();
             if ($this->info->commit()) {
-                $diff = $this->info->diff($this->info->base_handout_commit(), $this->info->commit(),
+                $diff = $this->info->diff($this->info->diff_base_commit(), $this->info->commit(),
                     $lnorder, ["wdiff" => !!$this->info->commit_jnote("wdiff")]);
             } else {
                 $diff = [];

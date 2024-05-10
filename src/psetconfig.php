@@ -197,6 +197,8 @@ class Pset {
     /** @var bool */
     public $has_xterm_js;
 
+    /** @var string */
+    public $diff_base;
     /** @var list<DiffConfig> */
     public $diffs = [];
     public $ignore;
@@ -503,6 +505,7 @@ class Pset {
         $this->run_binddir = self::cstr($p, "run_binddir");
 
         // diffs
+        $this->diff_base = self::cstr($p, "diff_base") ?? "handout";
         $diffs = $p->diffs ?? null;
         if (is_object($diffs)) {
             foreach (get_object_vars($p->diffs) as $k => $v) {
