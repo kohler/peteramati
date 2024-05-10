@@ -197,7 +197,7 @@ class Pset {
     /** @var bool */
     public $has_xterm_js;
 
-    /** @var string */
+    /** @var null|int|string */
     public $diff_base;
     /** @var list<DiffConfig> */
     public $diffs = [];
@@ -505,7 +505,13 @@ class Pset {
         $this->run_binddir = self::cstr($p, "run_binddir");
 
         // diffs
-        $this->diff_base = self::cstr($p, "diff_base") ?? "handout";
+        if (isset($p->diff_base) && $p->diff_base !== "handout") {
+            if (is_int($p->diff_base)) {
+                $this->diff_base = $p->diff_base;
+            } else {
+                $this->diff_base = self::cstr($p, "diff_base");
+            }
+        }
         $diffs = $p->diffs ?? null;
         if (is_object($diffs)) {
             foreach (get_object_vars($p->diffs) as $k => $v) {

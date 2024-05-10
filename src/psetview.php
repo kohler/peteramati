@@ -495,11 +495,17 @@ class PsetView {
     /** @return CommitRecord */
     function diff_base_commit() {
         $c = $this->base_handout_commit();
-        if ($this->pset->diff_base !== "handout"
-            && ($prevp = $this->conf->pset_by_key($this->pset->diff_base))
-            && $this->user->link(LINK_REPO, $prevp->id) === $this->repo->repoid) {
-            $prevv = PsetView::make($prevp, $this->user, $this->viewer);
-            $c = $prevv->grading_commit() ?? $c;
+        if ($this->pset->diff_base !== null) {
+            if (is_int($this->pset->diff_base)) {
+                $prevp = $this->conf->pset_by_id($this->pset->diff_base);
+            } else {
+                $prevp = $this->conf->pset_by_key($this->pset->diff_base);
+            }
+            if ($prevp
+                && $this->user->link(LINK_REPO, $prevp->id) === $this->repo->repoid) {
+                $prevv = PsetView::make($prevp, $this->user, $this->viewer);
+                $c = $prevv->grading_commit() ?? $c;
+            }
         }
         return $c;
     }
