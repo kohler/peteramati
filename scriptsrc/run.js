@@ -692,7 +692,7 @@ export function run(button, opts) {
         if (data.data
             && !data.partial
             && data.done
-            && (m = data.data.match(/\x1b\[\?1049l(?:[\r\n]|\x1b\[\?1l|\x1b>)*$/))) {
+            && (m = data.data.match(/\x1b\[\?1049l(?:[\r\n]|\x1b\[\?1l|\x1b\[23;0;0t|\x1b>)*$/))) {
             data.data = data.data.substring(0, data.data.length - m[0].length);
         }
 
