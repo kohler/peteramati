@@ -811,24 +811,27 @@ class PsetView {
                 }
                 $v = $this->_g[$ge->pcview_index] ?? null;
                 $gvf = $this->_grades_vf[$ge->pcview_index];
-                if ($v !== null && ($gvf & $vf) !== 0) {
+                if ($v !== null
+                    && ($gvf & $vf) !== 0) {
                     $this->_gtot = ($this->_gtot ?? 0) + $v;
                     if (!$ge->is_extra) {
                         $this->_gtotne = ($this->_gtotne ?? 0) + $v;
                     }
                 }
-                if ($v !== null && ($gvf & $vf & ~VF_TF) !== 0) {
+                if ($v !== null
+                    && ($gvf & $vf & ~VF_TF) !== 0) {
                     $this->_gutot = ($this->_gutot ?? 0) + $v;
                 }
-                if (!$ge->is_extra && $ge->max_visible && ($gvf & $vf) !== 0) {
+                if (!$ge->is_extra
+                    && $ge->max_visible
+                    && ($gvf & $vf) !== 0) {
                     $this->_gmaxtot = ($this->_gmaxtot ?? 0) + $ge->max;
                 }
                 if (!$ge->is_extra
-                    && ($gvf & ~VF_TF) !== 0
-                    && (($gvf & $vf & ~VF_TF) === 0 || ($v === null && $ge->required))) {
-                    // A non-extra-credit score in the total either:
-                    // 1. will be eventually visible, but is not now
-                    // 2. is required and not provided
+                    && $ge->required
+                    && $v === null
+                    && ($gvf & ~VF_TF) !== 0) {
+                    // A required non-extra-credit score is missing
                     $this->_gallreq = false;
                 }
             }
@@ -1252,7 +1255,14 @@ class PsetView {
         }
     }
 
-    /** @return 0|1|3|4|5|7 */
+    /** @return 0|1|3|4|5|7
+     *
+     * Returns flags indicating who can view grades on this view. Bitwise
+     * or of:
+     * * VF_TF: TFs can view
+     * * VF_STUDENT_ALLOWED: Students can view TF-assigned grades
+     * * VF_STUDENT_ANY: Students can view grades they entered (i.e., answers)
+     * If VF_STUDENT_ALLOWED is set, then VF_STUDENT_ANY is also set. */
     private function vf() {
         if ($this->_vf === null) {
             $this->_vf = 0;
