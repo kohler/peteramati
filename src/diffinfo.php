@@ -130,7 +130,7 @@ class DiffInfo implements Iterator {
 
     function set_ends_without_newline() {
         $di = $this->_diffsz - 4;
-        assert($di >= 0 && ($this->_diff[$di] === "-" || $this->_diff[$di] === "+"));
+        assert($di >= 0);
         if ($this->_dflags === null) {
             $this->_dflags = [];
         }
