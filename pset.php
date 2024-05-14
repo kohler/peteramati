@@ -437,7 +437,7 @@ class PsetRequest {
                 $xinfo = PsetView::make($pred_pset, $this->user, $this->viewer);
                 if (($xcid = $xinfo->gradercid())
                     && ($pcm = ($this->conf->pc_members_and_admins())[$xcid] ?? null)) {
-                    $sel[$pcm->email] .= " [✱" . htmlspecialchars($xpset->title) . "]";
+                    $sel[$pcm->email] .= " [✱" . htmlspecialchars($pred_pset->title) . "]";
                 }
             }
 
