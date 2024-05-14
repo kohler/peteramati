@@ -2419,7 +2419,7 @@ class PsetView {
                 $args["onlyfiles"] = $flist;
                 $diff = array_merge($diff, $this->_read_diff($cbyhash[$hash], $commitb, $args));
             }
-            usort($diff, "DiffInfo::compare");
+            uasort($diff, "DiffInfo::compare");
         }
         return $this->_complete_diff($diff, $lnorder, $args);
     }
